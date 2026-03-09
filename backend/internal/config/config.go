@@ -38,7 +38,7 @@ type PluginsConfig struct {
 
 // DevPlugin 开发模式插件
 type DevPlugin struct {
-	Name string `yaml:"name"` // 插件名称
+	Name string `yaml:"name"` // 插件名称提示值（兼容字段，实际以插件 Info().ID 为准）
 	Path string `yaml:"path"` // 源码目录路径（用 go run 启动）
 }
 

@@ -36,8 +36,12 @@ func (h *PluginHandler) ListPlugins(c *gin.Context) {
 	list := make([]dto.PluginResp, 0, len(allMeta))
 	for _, m := range allMeta {
 		resp := dto.PluginResp{
-			Name:     m.Name,
-			Platform: m.Platform,
+			Name:        m.Name,
+			DisplayName: m.DisplayName,
+			Version:     m.Version,
+			Author:      m.Author,
+			Type:        m.Type,
+			Platform:    m.Platform,
 		}
 		for _, at := range m.AccountTypes {
 			resp.AccountTypes = append(resp.AccountTypes, dto.AccountTypeResp{

@@ -23,11 +23,16 @@ import (
 
 // PluginInstance 运行中的插件实例
 type PluginInstance struct {
-	Name     string
-	Platform string
-	Type     string // "gateway", "payment", "extension"
-	Client   *goplugin.Client
-	Gateway  *sdkgrpc.SimpleGatewayGRPCClient
+	Name        string
+	SourceName  string
+	BinaryDir   string
+	DisplayName string
+	Version     string
+	Author      string
+	Platform    string
+	Type        string // "gateway", "payment", "extension"
+	Client      *goplugin.Client
+	Gateway     *sdkgrpc.SimpleGatewayGRPCClient
 }
 
 // Manager 插件管理器
@@ -37,7 +42,8 @@ type Manager struct {
 
 	mu        sync.RWMutex
 	instances map[string]*PluginInstance // pluginName → 运行实例
-	devPaths  map[string]string         // pluginName → 源码目录（仅 dev 模式插件）
+	aliases   map[string]string          // alias/sourceName → canonical pluginName
+	devPaths  map[string]string          // pluginName → 源码目录（仅 dev 模式插件）
 
 	// 缓存：插件启动时从 gRPC 获取并缓存
 	modelCache        map[string][]sdk.ModelInfo       // platform → models
@@ -52,6 +58,7 @@ func NewManager(pluginDir string) *Manager {
 	return &Manager{
 		pluginDir:         pluginDir,
 		instances:         make(map[string]*PluginInstance),
+		aliases:           make(map[string]string),
 		devPaths:          make(map[string]string),
 		modelCache:        make(map[string][]sdk.ModelInfo),
 		routeCache:        make(map[string][]sdk.RouteDefinition),
@@ -85,11 +92,12 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 			continue
 		}
 
-		if err := m.startPlugin(ctx, name, exec.Command(binaryPath)); err != nil {
+		canonicalName, err := m.startPlugin(ctx, name, exec.Command(binaryPath), name)
+		if err != nil {
 			slog.Error("加载插件失败", "name", name, "error", err)
 			continue
 		}
-		slog.Info("插件加载成功", "name", name)
+		slog.Info("插件加载成功", "name", canonicalName, "source", name)
 	}
 	return nil
 }
@@ -101,51 +109,59 @@ func (m *Manager) LoadDev(ctx context.Context, name, srcPath string) error {
 		return fmt.Errorf("插件源码目录不存在: %s", srcPath)
 	}
 
+	requestedName := normalizePluginName(name)
+	if requestedName == "" {
+		requestedName = filepath.Base(srcPath)
+	}
+
 	cmd := exec.Command("go", "run", ".")
 	cmd.Dir = srcPath
 
-	if err := m.startPlugin(ctx, name, cmd); err != nil {
+	canonicalName, err := m.startPlugin(ctx, requestedName, cmd, "")
+	if err != nil {
 		return fmt.Errorf("加载开发插件失败: %w", err)
 	}
 
 	// 记录源码路径，用于热加载
 	m.mu.Lock()
-	m.devPaths[name] = srcPath
+	m.devPaths[canonicalName] = srcPath
+	m.registerAliasesLocked(canonicalName, requestedName)
 	m.mu.Unlock()
 
-	slog.Info("开发插件加载成功", "name", name, "src", srcPath)
+	slog.Info("开发插件加载成功", "name", canonicalName, "requested_name", requestedName, "src", srcPath)
 	return nil
 }
 
 // ReloadDev 热加载开发模式插件：停止旧进程，重新 go run 启动
 func (m *Manager) ReloadDev(ctx context.Context, name string) error {
 	m.mu.RLock()
-	srcPath, isDev := m.devPaths[name]
+	resolvedName := m.resolveNameLocked(name)
+	srcPath, isDev := m.devPaths[resolvedName]
 	m.mu.RUnlock()
 
 	if !isDev {
 		return fmt.Errorf("插件 %s 不是开发模式插件，无法热加载", name)
 	}
 
-	slog.Info("正在热加载开发插件", "name", name, "src", srcPath)
+	slog.Info("正在热加载开发插件", "name", resolvedName, "src", srcPath)
 
 	// 停止旧进程
-	m.stopPlugin(name)
+	m.stopPlugin(resolvedName)
 
 	// 重新启动
-	return m.LoadDev(ctx, name, srcPath)
+	return m.LoadDev(ctx, resolvedName, srcPath)
 }
 
 // IsDev 检查插件是否为开发模式
 func (m *Manager) IsDev(name string) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	_, ok := m.devPaths[name]
+	_, ok := m.devPaths[m.resolveNameLocked(name)]
 	return ok
 }
 
 // startPlugin 启动插件子进程并建立 gRPC 连接
-func (m *Manager) startPlugin(ctx context.Context, name string, cmd *exec.Cmd) error {
+func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *exec.Cmd, binaryDir string) (string, error) {
 	// 创建 go-plugin 客户端
 	client := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig: shared.Handshake,
@@ -160,90 +176,112 @@ func (m *Manager) startPlugin(ctx context.Context, name string, cmd *exec.Cmd) e
 	rpcClient, err := client.Client()
 	if err != nil {
 		client.Kill()
-		return fmt.Errorf("连接插件进程失败: %w", err)
+		return "", fmt.Errorf("连接插件进程失败: %w", err)
 	}
 
 	// 获取 SimpleGateway 接口
 	raw, err := rpcClient.Dispense(shared.PluginKeySimpleGateway)
 	if err != nil {
 		client.Kill()
-		return fmt.Errorf("获取插件接口失败: %w", err)
+		return "", fmt.Errorf("获取插件接口失败: %w", err)
 	}
 
 	gateway, ok := raw.(*sdkgrpc.SimpleGatewayGRPCClient)
 	if !ok {
 		client.Kill()
-		return fmt.Errorf("插件类型断言失败")
+		return "", fmt.Errorf("插件类型断言失败")
+	}
+
+	info := gateway.Info()
+	canonicalName := canonicalPluginName(info, requestedName)
+	if canonicalName == "" {
+		client.Kill()
+		return "", fmt.Errorf("插件未提供有效的 ID/name")
 	}
 
 	// 初始化插件
-	pluginCtx := newCorePluginContext(nil, name)
+	pluginCtx := newCorePluginContext(nil, canonicalName)
 	if err := gateway.Init(pluginCtx); err != nil {
 		client.Kill()
-		return fmt.Errorf("初始化插件失败: %w", err)
+		return "", fmt.Errorf("初始化插件失败: %w", err)
 	}
 
 	// 启动插件
 	if err := gateway.Start(ctx); err != nil {
 		client.Kill()
-		return fmt.Errorf("启动插件失败: %w", err)
+		return "", fmt.Errorf("启动插件失败: %w", err)
 	}
 
 	// 获取插件元信息并缓存
 	platform := gateway.Platform()
 	models := gateway.Models()
 	routes := gateway.Routes()
-	info := gateway.Info()
+	pluginType := string(info.Type)
+	if pluginType == "" {
+		pluginType = "gateway"
+	}
 
 	instance := &PluginInstance{
-		Name:     name,
-		Platform: platform,
-		Type:     "gateway",
-		Client:   client,
-		Gateway:  gateway,
+		Name:        canonicalName,
+		SourceName:  normalizePluginName(requestedName),
+		BinaryDir:   normalizePluginName(binaryDir),
+		DisplayName: info.Name,
+		Version:     info.Version,
+		Author:      info.Author,
+		Platform:    platform,
+		Type:        pluginType,
+		Client:      client,
+		Gateway:     gateway,
 	}
 
 	m.mu.Lock()
-	m.instances[name] = instance
+	m.instances[canonicalName] = instance
+	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
 	m.modelCache[platform] = models
-	m.routeCache[name] = routes
+	m.routeCache[canonicalName] = routes
 	m.credCache[platform] = info.CredentialFields
 	m.accountTypeCache[platform] = info.AccountTypes
 	if len(info.FrontendPages) > 0 {
-		m.frontendPageCache[name] = info.FrontendPages
+		m.frontendPageCache[canonicalName] = info.FrontendPages
 	}
 	m.mu.Unlock()
 
 	// 提取前端静态资源
 	assets, err := gateway.GetWebAssets()
 	if err != nil {
-		slog.Warn("获取插件前端资源失败", "plugin", name, "error", err)
+		slog.Warn("获取插件前端资源失败", "plugin", canonicalName, "error", err)
 	} else if len(assets) > 0 {
-		assetsDir := filepath.Join(m.pluginDir, name, "assets")
+		assetsDir := filepath.Join(m.pluginDir, canonicalName, "assets")
 		if err := extractWebAssets(assetsDir, assets); err != nil {
-			slog.Warn("写入插件前端资源失败", "plugin", name, "error", err)
+			slog.Warn("写入插件前端资源失败", "plugin", canonicalName, "error", err)
 		} else {
-			slog.Info("已提取插件前端资源", "plugin", name, "files", len(assets))
+			slog.Info("已提取插件前端资源", "plugin", canonicalName, "files", len(assets))
 		}
 	}
 
-	return nil
+	if normalizePluginName(requestedName) != "" && canonicalName != normalizePluginName(requestedName) {
+		slog.Info("插件名称已统一到 Info().ID", "requested_name", requestedName, "canonical_name", canonicalName)
+	}
+
+	return canonicalName, nil
 }
 
 // stopPlugin 停止插件进程
 func (m *Manager) stopPlugin(name string) {
 	m.mu.Lock()
-	inst, ok := m.instances[name]
+	resolvedName := m.resolveNameLocked(name)
+	inst, ok := m.instances[resolvedName]
 	if !ok {
 		m.mu.Unlock()
 		return
 	}
-	delete(m.instances, name)
+	delete(m.instances, resolvedName)
 	delete(m.modelCache, inst.Platform)
 	delete(m.routeCache, inst.Name)
 	delete(m.credCache, inst.Platform)
 	delete(m.accountTypeCache, inst.Platform)
 	delete(m.frontendPageCache, inst.Name)
+	m.unregisterAliasesLocked(inst.Name, inst.SourceName, inst.BinaryDir)
 	m.mu.Unlock()
 
 	if inst.Gateway != nil {
@@ -272,14 +310,27 @@ func (m *Manager) StopAll(ctx context.Context) {
 
 // Uninstall 卸载插件：停止进程并删除目录
 func (m *Manager) Uninstall(ctx context.Context, name string) error {
-	m.stopPlugin(name)
+	resolvedName := m.resolveName(name)
+	inst := m.GetInstance(resolvedName)
 
-	targetDir := filepath.Join(m.pluginDir, name)
-	if err := os.RemoveAll(targetDir); err != nil {
-		return fmt.Errorf("删除插件目录失败: %w", err)
+	m.stopPlugin(resolvedName)
+
+	m.mu.Lock()
+	delete(m.devPaths, resolvedName)
+	m.mu.Unlock()
+
+	targetDirs := []string{filepath.Join(m.pluginDir, resolvedName)}
+	if inst != nil && inst.BinaryDir != "" && inst.BinaryDir != resolvedName {
+		targetDirs = append(targetDirs, filepath.Join(m.pluginDir, inst.BinaryDir))
 	}
 
-	slog.Info("插件已卸载", "name", name)
+	for _, targetDir := range targetDirs {
+		if err := os.RemoveAll(targetDir); err != nil {
+			return fmt.Errorf("删除插件目录失败: %w", err)
+		}
+	}
+
+	slog.Info("插件已卸载", "name", resolvedName)
 	return nil
 }
 
@@ -307,11 +358,12 @@ func (m *Manager) InstallFromBinary(ctx context.Context, name string, binary []b
 	}
 
 	// 启动插件
-	if err := m.startPlugin(ctx, realName, exec.Command(binaryPath)); err != nil {
+	canonicalName, err := m.startPlugin(ctx, realName, exec.Command(binaryPath), realName)
+	if err != nil {
 		return fmt.Errorf("启动插件失败: %w", err)
 	}
 
-	slog.Info("插件从二进制安装成功", "name", realName)
+	slog.Info("插件从二进制安装成功", "name", canonicalName)
 	return nil
 }
 
@@ -472,7 +524,7 @@ func (m *Manager) GetPluginByPlatform(platform string) *PluginInstance {
 func (m *Manager) GetInstance(name string) *PluginInstance {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.instances[name]
+	return m.instances[m.resolveNameLocked(name)]
 }
 
 // GetCredentialFields 获取指定平台的凭证字段声明
@@ -493,7 +545,7 @@ func (m *Manager) GetAccountTypes(platform string) []sdk.AccountType {
 func (m *Manager) GetRoutes(pluginName string) []sdk.RouteDefinition {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.routeCache[pluginName]
+	return m.routeCache[m.resolveNameLocked(pluginName)]
 }
 
 // GetAllRoutes 获取所有运行中插件的路由
@@ -546,7 +598,7 @@ func (m *Manager) MatchPluginByPathPrefix(path string) *PluginInstance {
 func (m *Manager) IsRunning(name string) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	_, ok := m.instances[name]
+	_, ok := m.instances[m.resolveNameLocked(name)]
 	return ok
 }
 
@@ -561,12 +613,16 @@ func (m *Manager) RunningCount() int {
 func (m *Manager) GetFrontendPages(pluginName string) []sdk.FrontendPage {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.frontendPageCache[pluginName]
+	return m.frontendPageCache[m.resolveNameLocked(pluginName)]
 }
 
 // PluginMeta 插件运行时元信息
 type PluginMeta struct {
 	Name          string
+	DisplayName   string
+	Version       string
+	Author        string
+	Type          string
 	Platform      string
 	AccountTypes  []sdk.AccountType
 	FrontendPages []sdk.FrontendPage
@@ -582,9 +638,13 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 	for _, inst := range m.instances {
 		_, isDev := m.devPaths[inst.Name]
 		meta := PluginMeta{
-			Name:     inst.Name,
-			Platform: inst.Platform,
-			IsDev:    isDev,
+			Name:        inst.Name,
+			DisplayName: inst.DisplayName,
+			Version:     inst.Version,
+			Author:      inst.Author,
+			Type:        inst.Type,
+			Platform:    inst.Platform,
+			IsDev:       isDev,
 		}
 		if types, ok := m.accountTypeCache[inst.Platform]; ok {
 			meta.AccountTypes = types
@@ -603,9 +663,66 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 
 // HasWebAssets 检查插件是否有前端资源
 func (m *Manager) HasWebAssets(pluginName string) bool {
-	assetsDir := filepath.Join(m.pluginDir, pluginName, "assets")
+	assetsDir := filepath.Join(m.pluginDir, m.resolveName(pluginName), "assets")
 	_, err := os.Stat(assetsDir)
 	return err == nil
+}
+
+func normalizePluginName(name string) string {
+	return strings.TrimSpace(name)
+}
+
+func canonicalPluginName(info sdk.PluginInfo, fallback string) string {
+	if id := normalizePluginName(info.ID); id != "" {
+		return id
+	}
+	return normalizePluginName(fallback)
+}
+
+func (m *Manager) resolveName(name string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.resolveNameLocked(name)
+}
+
+func (m *Manager) resolveNameLocked(name string) string {
+	name = normalizePluginName(name)
+	if name == "" {
+		return ""
+	}
+	if canonical, ok := m.aliases[name]; ok && canonical != "" {
+		return canonical
+	}
+	return name
+}
+
+func (m *Manager) registerAliasesLocked(canonical string, aliases ...string) {
+	canonical = normalizePluginName(canonical)
+	if canonical == "" {
+		return
+	}
+	m.aliases[canonical] = canonical
+	for _, alias := range aliases {
+		alias = normalizePluginName(alias)
+		if alias == "" {
+			continue
+		}
+		m.aliases[alias] = canonical
+	}
+}
+
+func (m *Manager) unregisterAliasesLocked(canonical string, aliases ...string) {
+	canonical = normalizePluginName(canonical)
+	if canonical != "" {
+		delete(m.aliases, canonical)
+	}
+	for _, alias := range aliases {
+		alias = normalizePluginName(alias)
+		if alias == "" {
+			continue
+		}
+		delete(m.aliases, alias)
+	}
 }
 
 // extractWebAssets 将前端资源写入指定目录

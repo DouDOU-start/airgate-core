@@ -3,6 +3,10 @@ package dto
 // PluginResp 插件响应
 type PluginResp struct {
 	Name          string             `json:"name"`
+	DisplayName   string             `json:"display_name,omitempty"`
+	Version       string             `json:"version,omitempty"`
+	Author        string             `json:"author,omitempty"`
+	Type          string             `json:"type,omitempty"`
 	Platform      string             `json:"platform"`
 	AccountTypes  []AccountTypeResp  `json:"account_types,omitempty"`
 	FrontendPages []FrontendPageResp `json:"frontend_pages,omitempty"`

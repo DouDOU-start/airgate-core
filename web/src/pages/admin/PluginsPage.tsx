@@ -71,7 +71,36 @@ export default function PluginsPage() {
     {
       key: 'name',
       title: t('common.name'),
-      render: (row) => <span className="text-[var(--ag-text)] font-medium">{row.name}</span>,
+      render: (row) => (
+        <div className="min-w-0">
+          <div className="text-[var(--ag-text)] font-medium">
+            {row.display_name || row.name}
+          </div>
+          {row.display_name && row.display_name !== row.name && (
+            <div className="text-xs text-[var(--ag-text-tertiary)] font-mono mt-0.5">
+              {row.name}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'type',
+      title: t('common.type'),
+      render: (row) => (
+        <div className="flex flex-col gap-1">
+          <div>
+            <Badge variant={typeVariant[row.type || 'gateway'] || 'default'}>
+              {row.type || 'gateway'}
+            </Badge>
+          </div>
+          {row.version && (
+            <span className="text-xs text-[var(--ag-text-tertiary)]">
+              {t('common.version')}: {row.version}
+            </span>
+          )}
+        </div>
+      ),
     },
     {
       key: 'platform',

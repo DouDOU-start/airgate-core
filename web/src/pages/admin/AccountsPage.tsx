@@ -32,6 +32,8 @@ import type {
   CreateAccountReq,
   UpdateAccountReq,
   CredentialField,
+  AccountTypeResp,
+  CredentialSchemaResp,
 } from '../../shared/types';
 
 /** 平台 → 插件名称映射缓存 */
@@ -53,6 +55,44 @@ function detectCredentialAccountType(credentials: Record<string, string>): strin
   if (credentials.api_key) return 'apikey';
   if (credentials.access_token) return 'oauth';
   return '';
+}
+
+function getSchemaAccountTypes(schema?: CredentialSchemaResp): AccountTypeResp[] {
+  return schema?.account_types ?? [];
+}
+
+function getSchemaSelectedAccountType(
+  schema: CredentialSchemaResp | undefined,
+  accountType: string,
+): AccountTypeResp | undefined {
+  const accountTypes = getSchemaAccountTypes(schema);
+  if (!accountTypes.length) return undefined;
+  return accountTypes.find((item) => item.key === accountType) ?? accountTypes[0];
+}
+
+function getSchemaVisibleFields(
+  schema: CredentialSchemaResp | undefined,
+  accountType: string,
+): CredentialField[] {
+  const selectedType = getSchemaSelectedAccountType(schema, accountType);
+  if (selectedType) return selectedType.fields;
+  return schema?.fields ?? [];
+}
+
+function filterCredentialsForAccountType(
+  credentials: Record<string, string>,
+  accountType?: AccountTypeResp,
+): Record<string, string> {
+  if (!accountType) return credentials;
+
+  const allowedKeys = new Set(accountType.fields.map((field) => field.key));
+  const next: Record<string, string> = {};
+  for (const [key, value] of Object.entries(credentials)) {
+    if (allowedKeys.has(key)) {
+      next[key] = value;
+    }
+  }
+  return next;
 }
 
 const pluginFormCache = new Map<string, ComponentType<AccountFormProps> | null>();
@@ -457,11 +497,23 @@ function CreateAccountModal({
   const { Form: PluginAccountForm, pluginId } = usePluginAccountForm(platform);
   const pluginOAuth = createPluginOAuthBridge(pluginId);
 
+  useEffect(() => {
+    const selectedType = getSchemaSelectedAccountType(schema, accountType);
+    if (!selectedType || selectedType.key === accountType) return;
+    setAccountType(selectedType.key);
+  }, [schema, accountType]);
+
   // 平台变化时重置凭证和账号类型
   const handlePlatformChange = (newPlatform: string) => {
     setPlatform(newPlatform);
     setCredentials({});
     setAccountType('');
+  };
+
+  const handleSchemaAccountTypeChange = (type: string) => {
+    const selectedType = getSchemaSelectedAccountType(schema, type);
+    setAccountType(type);
+    setCredentials((prev) => filterCredentialsForAccountType(prev, selectedType));
   };
 
   const handleSubmit = () => {
@@ -537,28 +589,14 @@ function CreateAccountModal({
               oauth={pluginOAuth}
             />
           </div>
-        ) : schema?.fields && schema.fields.length > 0 ? (
-          <div
-            className="space-y-4 pt-4"
-            style={{ borderTop: '1px solid var(--ag-border)' }}
-          >
-            <p
-              className="text-xs font-medium uppercase tracking-wider"
-              style={{ color: 'var(--ag-text-secondary)' }}
-            >
-              {t('accounts.credentials')}
-            </p>
-            {schema.fields.map((field) => (
-              <CredentialFieldInput
-                key={field.key}
-                field={field}
-                value={credentials[field.key] ?? ''}
-                onChange={(val) =>
-                  setCredentials({ ...credentials, [field.key]: val })
-                }
-              />
-            ))}
-          </div>
+        ) : schema && getSchemaVisibleFields(schema, accountType).length > 0 ? (
+          <SchemaCredentialsForm
+            schema={schema}
+            accountType={accountType}
+            onAccountTypeChange={handleSchemaAccountTypeChange}
+            credentials={credentials}
+            onCredentialsChange={setCredentials}
+          />
         ) : null}
 
         <Input
@@ -630,6 +668,69 @@ function CredentialFieldInput({
   );
 }
 
+function SchemaCredentialsForm({
+  schema,
+  accountType,
+  onAccountTypeChange,
+  credentials,
+  onCredentialsChange,
+}: {
+  schema: CredentialSchemaResp;
+  accountType: string;
+  onAccountTypeChange: (type: string) => void;
+  credentials: Record<string, string>;
+  onCredentialsChange: (credentials: Record<string, string>) => void;
+}) {
+  const { t } = useTranslation();
+  const accountTypes = getSchemaAccountTypes(schema);
+  const selectedType = getSchemaSelectedAccountType(schema, accountType);
+  const visibleFields = getSchemaVisibleFields(schema, accountType);
+
+  return (
+    <div
+      className="space-y-4 pt-4"
+      style={{ borderTop: '1px solid var(--ag-border)' }}
+    >
+      <p
+        className="text-xs font-medium uppercase tracking-wider"
+        style={{ color: 'var(--ag-text-secondary)' }}
+      >
+        {t('accounts.credentials')}
+      </p>
+
+      {accountTypes.length > 0 && (
+        <>
+          <Select
+            label={t('common.type')}
+            value={selectedType?.key ?? ''}
+            onChange={(e) => onAccountTypeChange(e.target.value)}
+            options={accountTypes.map((item) => ({
+              value: item.key,
+              label: item.label,
+            }))}
+          />
+          {selectedType?.description && (
+            <p className="text-xs text-[var(--ag-text-tertiary)] -mt-2">
+              {selectedType.description}
+            </p>
+          )}
+        </>
+      )}
+
+      {visibleFields.map((field) => (
+        <CredentialFieldInput
+          key={field.key}
+          field={field}
+          value={credentials[field.key] ?? ''}
+          onChange={(val) =>
+            onCredentialsChange({ ...credentials, [field.key]: val })
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
 // ==================== 编辑账号弹窗 ====================
 
 function EditAccountModal({
@@ -672,9 +773,22 @@ function EditAccountModal({
     account.credentials,
   );
 
+  useEffect(() => {
+    const selectedType = getSchemaSelectedAccountType(schema, accountType);
+    if (!selectedType || selectedType.key === accountType) return;
+    setAccountType(selectedType.key);
+    setForm((prev) => ({ ...prev, type: selectedType.key || undefined }));
+  }, [schema, accountType]);
+
   const handleAccountTypeChange = (type: string) => {
     setAccountType(type);
     setForm({ ...form, type: type || undefined });
+  };
+
+  const handleSchemaAccountTypeChange = (type: string) => {
+    const selectedType = getSchemaSelectedAccountType(schema, type);
+    handleAccountTypeChange(type);
+    setCredentials((prev) => filterCredentialsForAccountType(prev, selectedType));
   };
 
   return (
@@ -721,28 +835,14 @@ function EditAccountModal({
               oauth={pluginOAuth}
             />
           </div>
-        ) : schema?.fields && schema.fields.length > 0 ? (
-          <div
-            className="space-y-4 pt-4"
-            style={{ borderTop: '1px solid var(--ag-border)' }}
-          >
-            <p
-              className="text-xs font-medium uppercase tracking-wider"
-              style={{ color: 'var(--ag-text-secondary)' }}
-            >
-              {t('accounts.credentials')}
-            </p>
-            {schema.fields.map((field) => (
-              <CredentialFieldInput
-                key={field.key}
-                field={field}
-                value={credentials[field.key] ?? ''}
-                onChange={(val) =>
-                  setCredentials({ ...credentials, [field.key]: val })
-                }
-              />
-            ))}
-          </div>
+        ) : schema && getSchemaVisibleFields(schema, accountType).length > 0 ? (
+          <SchemaCredentialsForm
+            schema={schema}
+            accountType={accountType}
+            onAccountTypeChange={handleSchemaAccountTypeChange}
+            credentials={credentials}
+            onCredentialsChange={setCredentials}
+          />
         ) : null}
 
         <Select

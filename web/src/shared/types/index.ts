@@ -415,6 +415,10 @@ export interface TestProxyResp {
 
 export interface PluginResp {
   name: string;
+  display_name?: string;
+  version?: string;
+  author?: string;
+  type?: string;
   platform: string;
   account_types?: Array<{
     key: string;

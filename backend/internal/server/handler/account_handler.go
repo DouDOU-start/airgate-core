@@ -288,7 +288,38 @@ func (h *AccountHandler) TestAccount(c *gin.Context) {
 func (h *AccountHandler) GetCredentialsSchema(c *gin.Context) {
 	platform := c.Param("platform")
 
-	// 优先从插件缓存获取动态 schema
+	// 优先使用新模型：AccountTypes
+	if accountTypes := h.pluginMgr.GetAccountTypes(platform); len(accountTypes) > 0 {
+		resp := dto.CredentialSchemaResp{}
+		for _, at := range accountTypes {
+			atResp := dto.AccountTypeResp{
+				Key:         at.Key,
+				Label:       at.Label,
+				Description: at.Description,
+			}
+			for _, f := range at.Fields {
+				fieldResp := dto.CredentialFieldResp{
+					Key:         f.Key,
+					Label:       f.Label,
+					Type:        f.Type,
+					Required:    f.Required,
+					Placeholder: f.Placeholder,
+				}
+				atResp.Fields = append(atResp.Fields, fieldResp)
+			}
+			resp.AccountTypes = append(resp.AccountTypes, atResp)
+		}
+
+		// 向后兼容：fields 继续返回默认账号类型的字段
+		if len(resp.AccountTypes) > 0 {
+			resp.Fields = resp.AccountTypes[0].Fields
+		}
+
+		response.Success(c, resp)
+		return
+	}
+
+	// 旧模型兼容：CredentialFields
 	if fields := h.pluginMgr.GetCredentialFields(platform); len(fields) > 0 {
 		respFields := make([]dto.CredentialFieldResp, len(fields))
 		for i, f := range fields {
@@ -300,30 +331,8 @@ func (h *AccountHandler) GetCredentialsSchema(c *gin.Context) {
 				Placeholder: f.Placeholder,
 			}
 		}
-		resp := dto.CredentialSchemaResp{Fields: respFields}
 
-		// 附带账号类型信息
-		if accountTypes := h.pluginMgr.GetAccountTypes(platform); len(accountTypes) > 0 {
-			for _, at := range accountTypes {
-				atResp := dto.AccountTypeResp{
-					Key:         at.Key,
-					Label:       at.Label,
-					Description: at.Description,
-				}
-				for _, f := range at.Fields {
-					atResp.Fields = append(atResp.Fields, dto.CredentialFieldResp{
-						Key:         f.Key,
-						Label:       f.Label,
-						Type:        f.Type,
-						Required:    f.Required,
-						Placeholder: f.Placeholder,
-					})
-				}
-				resp.AccountTypes = append(resp.AccountTypes, atResp)
-			}
-		}
-
-		response.Success(c, resp)
+		response.Success(c, dto.CredentialSchemaResp{Fields: respFields})
 		return
 	}
 
