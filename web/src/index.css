@@ -2,73 +2,9 @@
 @import "tailwindcss";
 
 /* ==========================================
-   AirGate 设计系统 — 暗色科技指挥台风格
+   AirGate 设计系统
+   主题变量由 @airgate/theme (SDK) 运行时注入
    ========================================== */
-
-/* 设计变量 */
-:root {
-  /* 主色调 — 冷蓝光辉 */
-  --ag-primary: #3b82f6;
-  --ag-primary-hover: #2563eb;
-  --ag-primary-subtle: rgba(59, 130, 246, 0.12);
-  --ag-primary-glow: rgba(59, 130, 246, 0.25);
-
-  /* 语义色 */
-  --ag-success: #10b981;
-  --ag-success-subtle: rgba(16, 185, 129, 0.12);
-  --ag-warning: #f59e0b;
-  --ag-warning-subtle: rgba(245, 158, 11, 0.12);
-  --ag-danger: #ef4444;
-  --ag-danger-subtle: rgba(239, 68, 68, 0.12);
-  --ag-info: #6366f1;
-  --ag-info-subtle: rgba(99, 102, 241, 0.12);
-
-  /* 背景层次 */
-  --ag-bg-deep: #0a0e1a;
-  --ag-bg: #0f1320;
-  --ag-bg-elevated: #161b2e;
-  --ag-bg-surface: #1c2237;
-  --ag-bg-hover: #232a42;
-  --ag-bg-active: #2a3350;
-
-  /* 边框 */
-  --ag-border: rgba(255, 255, 255, 0.06);
-  --ag-border-subtle: rgba(255, 255, 255, 0.03);
-  --ag-border-focus: rgba(59, 130, 246, 0.5);
-
-  /* 文字 */
-  --ag-text: #e8ecf4;
-  --ag-text-secondary: #8892a8;
-  --ag-text-tertiary: #5a637a;
-  --ag-text-inverse: #0f1320;
-
-  /* 玻璃态 */
-  --ag-glass: rgba(255, 255, 255, 0.03);
-  --ag-glass-border: rgba(255, 255, 255, 0.08);
-
-  /* 布局 */
-  --ag-sidebar-width: 260px;
-  --ag-sidebar-collapsed: 72px;
-  --ag-topbar-height: 64px;
-  --ag-radius-sm: 6px;
-  --ag-radius-md: 10px;
-  --ag-radius-lg: 14px;
-  --ag-radius-xl: 20px;
-
-  /* 字体 */
-  --ag-font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --ag-font-mono: 'JetBrains Mono', 'SF Mono', monospace;
-
-  /* 阴影 */
-  --ag-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --ag-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --ag-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
-  --ag-shadow-glow: 0 0 20px rgba(59, 130, 246, 0.15);
-
-  /* 过渡 */
-  --ag-transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  --ag-transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
-}
 
 /* 全局样式 */
 * {

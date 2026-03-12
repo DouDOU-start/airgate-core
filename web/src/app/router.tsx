@@ -7,7 +7,9 @@ import {
 } from '@tanstack/react-router';
 import { Suspense, lazy } from 'react';
 import { AppShell } from './layout/AppShell';
+import { ErrorBoundary } from './providers/ErrorBoundary';
 import { getToken } from '../shared/api/client';
+import { usersApi } from '../shared/api/users';
 import { setupApi } from '../shared/api/setup';
 import DashboardPage from '../pages/DashboardPage';
 import UsersPage from '../pages/admin/UsersPage';
@@ -53,7 +55,11 @@ export function resetSetupCache() {
 
 // 根路由
 const rootRoute = createRootRoute({
-  component: () => <Outlet />,
+  component: () => (
+    <ErrorBoundary>
+      <Outlet />
+    </ErrorBoundary>
+  ),
 });
 
 // 安装向导（无需认证，懒加载）
@@ -113,16 +119,29 @@ const authLayout = createRoute({
 // 仪表盘
 const dashboardRoute = createRoute({ getParentRoute: () => authLayout, path: '/', component: DashboardPage });
 
+// 管理员布局（需要 admin 角色）
+const adminLayout = createRoute({
+  getParentRoute: () => authLayout,
+  id: 'admin',
+  beforeLoad: async () => {
+    const user = await usersApi.me();
+    if (user.role !== 'admin') {
+      throw redirect({ to: '/' });
+    }
+  },
+  component: Outlet,
+});
+
 // 管理员路由
-const adminUsersRoute = createRoute({ getParentRoute: () => authLayout, path: '/admin/users', component: UsersPage });
-const adminAccountsRoute = createRoute({ getParentRoute: () => authLayout, path: '/admin/accounts', component: AccountsPage });
-const adminGroupsRoute = createRoute({ getParentRoute: () => authLayout, path: '/admin/groups', component: GroupsPage });
-const adminAPIKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/admin/api-keys', component: APIKeysPage });
-const adminSubscriptionsRoute = createRoute({ getParentRoute: () => authLayout, path: '/admin/subscriptions', component: SubscriptionsPage });
-const adminProxiesRoute = createRoute({ getParentRoute: () => authLayout, path: '/admin/proxies', component: ProxiesPage });
-const adminUsageRoute = createRoute({ getParentRoute: () => authLayout, path: '/admin/usage', component: UsagePage });
-const adminPluginsRoute = createRoute({ getParentRoute: () => authLayout, path: '/admin/plugins', component: PluginsPage });
-const adminSettingsRoute = createRoute({ getParentRoute: () => authLayout, path: '/admin/settings', component: SettingsPage });
+const adminUsersRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/users', component: UsersPage });
+const adminAccountsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/accounts', component: AccountsPage });
+const adminGroupsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/groups', component: GroupsPage });
+const adminAPIKeysRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/api-keys', component: APIKeysPage });
+const adminSubscriptionsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/subscriptions', component: SubscriptionsPage });
+const adminProxiesRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/proxies', component: ProxiesPage });
+const adminUsageRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/usage', component: UsagePage });
+const adminPluginsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/plugins', component: PluginsPage });
+const adminSettingsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/settings', component: SettingsPage });
 
 // 用户路由
 const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/profile', component: ProfilePage });
@@ -145,15 +164,17 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   authLayout.addChildren([
     dashboardRoute,
-    adminUsersRoute,
-    adminAccountsRoute,
-    adminGroupsRoute,
-    adminAPIKeysRoute,
-    adminSubscriptionsRoute,
-    adminProxiesRoute,
-    adminUsageRoute,
-    adminPluginsRoute,
-    adminSettingsRoute,
+    adminLayout.addChildren([
+      adminUsersRoute,
+      adminAccountsRoute,
+      adminGroupsRoute,
+      adminAPIKeysRoute,
+      adminSubscriptionsRoute,
+      adminProxiesRoute,
+      adminUsageRoute,
+      adminPluginsRoute,
+      adminSettingsRoute,
+    ]),
     profileRoute,
     userKeysRoute,
     pluginRoute,

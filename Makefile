@@ -7,7 +7,7 @@ BINARY := $(BACKEND_DIR)/server
 GO := GOTOOLCHAIN=local go
 
 .PHONY: help dev dev-backend dev-frontend build build-backend build-frontend \
-        ent lint clean install
+        ent lint fmt test clean install docs-check
 
 help: ## 显示帮助信息
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -53,9 +53,44 @@ ent: ## 生成 Ent ORM 代码
 
 # ===================== 质量检查 =====================
 
-lint: ## 代码检查
-	@cd $(BACKEND_DIR) && $(GO) vet ./...
-	@echo "Go vet 通过"
+lint: ## 代码检查（后端 golangci-lint）
+	@cd $(BACKEND_DIR) && \
+	if command -v golangci-lint > /dev/null 2>&1; then \
+		golangci-lint run ./...; \
+	else \
+		echo "未安装 golangci-lint，回退到 go vet"; \
+		echo "安装: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
+		$(GO) vet ./...; \
+	fi
+	@echo "后端代码检查通过"
+
+fmt: ## 格式化代码
+	@cd $(BACKEND_DIR) && \
+	if command -v goimports > /dev/null 2>&1; then \
+		goimports -w -local github.com/DouDOU-start .; \
+	else \
+		$(GO) fmt ./...; \
+	fi
+	@echo "代码格式化完成"
+
+test: ## 运行测试
+	@cd $(BACKEND_DIR) && $(GO) test ./...
+	@echo "后端测试完成"
+
+# ===================== 文档检查 =====================
+
+docs-check: ## 检查文档中引用的文件是否存在
+	@echo "检查文档引用..."
+	@errors=0; \
+	for doc in docs/*.md; do \
+		for ref in $$(grep -oP '`([a-zA-Z0-9_/-]+\.md)`' "$$doc" | tr -d '`'); do \
+			if [ ! -f "docs/$$ref" ] && [ ! -f "$$ref" ]; then \
+				echo "  ✗ $$doc 引用了不存在的文件: $$ref"; \
+				errors=$$((errors + 1)); \
+			fi; \
+		done; \
+	done; \
+	if [ $$errors -eq 0 ]; then echo "文档引用检查通过"; else echo "发现 $$errors 个破损引用"; exit 1; fi
 
 # ===================== 依赖安装 =====================
 

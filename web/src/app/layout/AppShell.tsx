@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../providers/AuthProvider';
 import { pluginsApi } from '../../shared/api/plugins';
+import { useTheme } from '../providers/ThemeProvider';
 import {
   LayoutDashboard,
   Users,
@@ -21,6 +22,8 @@ import {
   PanelLeft,
   Zap,
   Languages,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -86,6 +89,7 @@ function usePluginMenuItems(): MenuItem[] {
 export function AppShell({ children }: AppShellProps) {
   const { user, logout } = useAuth();
   const { t, i18n } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const matchRoute = useMatchRoute();
 
@@ -236,6 +240,13 @@ export function AppShell({ children }: AppShellProps) {
               {!collapsed && (
                 <span className="text-[11px] font-medium uppercase">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
               )}
+            </button>
+            <button
+              onClick={toggleTheme}
+              className="flex items-center justify-center flex-1 h-8 rounded-[var(--ag-radius-sm)] text-[var(--ag-text-tertiary)] hover:text-[var(--ag-text)] hover:bg-[var(--ag-bg-hover)] transition-colors"
+              title={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
             <button
               onClick={() => setCollapsed(!collapsed)}

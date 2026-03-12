@@ -43,8 +43,9 @@ func (s *Server) registerRoutes() {
 	// API v1 路由组
 	v1 := r.Group("/api/v1")
 
-	// === 认证路由（无需 JWT） ===
+	// === 认证路由（无需 JWT，带限流保护） ===
 	authGroup := v1.Group("/auth")
+	authGroup.Use(middleware.RateLimit(s.limiter))
 	{
 		authGroup.POST("/login", authHandler.Login)
 		authGroup.POST("/register", authHandler.Register)

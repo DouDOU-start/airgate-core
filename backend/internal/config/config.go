@@ -1,4 +1,4 @@
-// Package config 提供配置管理（YAML 文件 + 环境变量）
+// Package config 提供配置管理（YAML 文件 + 环境变量覆盖）
 package config
 
 import (
@@ -80,26 +80,14 @@ func (d DatabaseConfig) DSN() string {
 		sslmode = "disable"
 	}
 	return "host=" + d.Host +
-		" port=" + itoa(d.Port) +
+		" port=" + strconv.Itoa(d.Port) +
 		" user=" + d.User +
 		" password=" + d.Password +
 		" dbname=" + d.DBName +
 		" sslmode=" + sslmode
 }
 
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	s := ""
-	for n > 0 {
-		s = string(rune('0'+n%10)) + s
-		n /= 10
-	}
-	return s
-}
-
-// Load 从 YAML 文件加载配置
+// Load 从 YAML 文件加载配置，环境变量优先级高于配置文件
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -112,13 +100,52 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
-	// 环境变量覆盖
-	if v := os.Getenv("PORT"); v != "" {
-		if p, err := strconv.Atoi(v); err == nil {
-			cfg.Server.Port = p
+	applyEnvOverrides(cfg)
+	return cfg, nil
+}
+
+// applyEnvOverrides 用环境变量覆盖配置值
+func applyEnvOverrides(cfg *Config) {
+	// 服务器
+	envInt("PORT", &cfg.Server.Port)
+	envStr("GIN_MODE", &cfg.Server.Mode)
+
+	// 数据库
+	envStr("DB_HOST", &cfg.Database.Host)
+	envInt("DB_PORT", &cfg.Database.Port)
+	envStr("DB_USER", &cfg.Database.User)
+	envStr("DB_PASSWORD", &cfg.Database.Password)
+	envStr("DB_NAME", &cfg.Database.DBName)
+	envStr("DB_SSLMODE", &cfg.Database.SSLMode)
+
+	// Redis
+	envStr("REDIS_HOST", &cfg.Redis.Host)
+	envInt("REDIS_PORT", &cfg.Redis.Port)
+	envStr("REDIS_PASSWORD", &cfg.Redis.Password)
+	envInt("REDIS_DB", &cfg.Redis.DB)
+
+	// JWT
+	envStr("JWT_SECRET", &cfg.JWT.Secret)
+	envInt("JWT_EXPIRE_HOUR", &cfg.JWT.ExpireHour)
+
+	// 插件
+	envStr("PLUGINS_DIR", &cfg.Plugins.Dir)
+}
+
+// envStr 如果环境变量存在，覆盖目标字符串
+func envStr(key string, dst *string) {
+	if v := os.Getenv(key); v != "" {
+		*dst = v
+	}
+}
+
+// envInt 如果环境变量存在且为合法整数，覆盖目标整数
+func envInt(key string, dst *int) {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			*dst = n
 		}
 	}
-	return cfg, nil
 }
 
 // ConfigPath 返回配置文件路径

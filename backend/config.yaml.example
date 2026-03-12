@@ -1,0 +1,28 @@
+server:
+  port: 9517
+  mode: release                  # debug / release
+
+database:
+  host: localhost
+  port: 5432
+  user: airgate
+  password: ""                   # 必须修改！或设置环境变量 DB_PASSWORD
+  dbname: airgate
+  sslmode: disable
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""                   # 或设置环境变量 REDIS_PASSWORD
+  db: 0
+
+jwt:
+  secret: ""                     # 必须修改！或设置环境变量 JWT_SECRET
+  expire_hour: 24
+
+plugins:
+  dir: data/plugins
+  dev: []
+  # dev:
+  #   - name: airgate-openai
+  #     path: ../../airgate-openai/backend

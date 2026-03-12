@@ -25,11 +25,28 @@ func NewDynamicRouter(forwarder *plugin.Forwarder) *DynamicRouter {
 }
 
 // Handle catch-all 路由处理器
-// 所有 /v1/* 请求都进入这里，由 forwarder 根据路径匹配插件并转发
+// 所有 /v1/* 请求都进入这里，先检查路由是否已注册，再转发到插件
 func (dr *DynamicRouter) Handle(c *gin.Context) {
 	if dr.forwarder == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "插件系统未就绪"})
 		return
+	}
+
+	// 检查路由是否已注册
+	dr.mu.RLock()
+	hasRoutes := len(dr.routes) > 0
+	dr.mu.RUnlock()
+
+	// 如果有注册路由，则检查当前请求是否匹配
+	if hasRoutes {
+		key := c.Request.Method + " " + c.Request.URL.Path
+		dr.mu.RLock()
+		matched := dr.routes[key]
+		dr.mu.RUnlock()
+		if !matched {
+			c.JSON(http.StatusNotFound, gin.H{"error": "未知的 API 路径"})
+			return
+		}
 	}
 
 	dr.forwarder.Forward(c)

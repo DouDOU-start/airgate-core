@@ -1,0 +1,22 @@
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - gosimple
+    - gofmt
+    - goimports
+
+linters-settings:
+  goimports:
+    local-prefixes: github.com/DouDOU-start
+
+run:
+  skip-dirs:
+    - ent
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
