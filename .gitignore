@@ -29,8 +29,6 @@ web/dist/
 Thumbs.db
 
 # Runtime
-backend/.air.toml
-backend/.installed
 backend/config.yaml
 
 # Config

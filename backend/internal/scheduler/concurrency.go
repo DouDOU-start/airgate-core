@@ -78,3 +78,35 @@ func (cm *ConcurrencyManager) ReleaseSlot(ctx context.Context, accountID int, re
 	key := concurrencyKey(accountID)
 	cm.rdb.SRem(ctx, key, requestID)
 }
+
+// GetCurrentCount 获取账户当前并发数
+func (cm *ConcurrencyManager) GetCurrentCount(ctx context.Context, accountID int) int {
+	if cm.rdb == nil {
+		return 0
+	}
+	n, err := cm.rdb.SCard(ctx, concurrencyKey(accountID)).Result()
+	if err != nil {
+		return 0
+	}
+	return int(n)
+}
+
+// GetCurrentCounts 批量获取多个账户的当前并发数
+func (cm *ConcurrencyManager) GetCurrentCounts(ctx context.Context, accountIDs []int) map[int]int {
+	result := make(map[int]int, len(accountIDs))
+	if cm.rdb == nil {
+		return result
+	}
+	pipe := cm.rdb.Pipeline()
+	cmds := make(map[int]*redis.IntCmd, len(accountIDs))
+	for _, id := range accountIDs {
+		cmds[id] = pipe.SCard(ctx, concurrencyKey(id))
+	}
+	_, _ = pipe.Exec(ctx)
+	for id, cmd := range cmds {
+		if n, err := cmd.Result(); err == nil {
+			result[id] = int(n)
+		}
+	}
+	return result
+}

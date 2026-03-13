@@ -110,6 +110,7 @@ export interface AccountResp {
   status: 'active' | 'error' | 'disabled';
   priority: number;
   max_concurrency: number;
+  current_concurrency: number;
   proxy_id?: number;
   rate_multiplier: number;
   error_msg?: string;
@@ -161,17 +162,6 @@ export interface AccountTypeResp {
 export interface CredentialSchemaResp {
   fields: CredentialField[];
   account_types?: AccountTypeResp[];
-}
-
-export interface PluginOAuthStartResp {
-  authorize_url: string;
-  state: string;
-}
-
-export interface PluginOAuthExchangeResp {
-  account_type: string;
-  account_name: string;
-  credentials: Record<string, string>;
 }
 
 // ==================== Group ====================
@@ -511,4 +501,9 @@ export interface AdminSetup {
 export interface TestConnectionResp {
   success: boolean;
   error_msg?: string;
+}
+
+export interface ModelInfo {
+  id: string;
+  name: string;
 }

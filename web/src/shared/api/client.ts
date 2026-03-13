@@ -107,6 +107,10 @@ export function del<T>(path: string): Promise<T> {
   return request<T>('DELETE', path);
 }
 
+export function patch<T>(path: string, body?: unknown): Promise<T> {
+  return request<T>('PATCH', path, body);
+}
+
 // 文件上传（multipart/form-data）
 export async function upload<T>(path: string, formData: FormData): Promise<T> {
   const url = new URL(`${BASE_URL}${path}`, window.location.origin);

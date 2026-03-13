@@ -1,7 +1,6 @@
 import { get, post, upload } from './client';
 import type {
   PluginResp, MarketplacePluginResp, PageReq, PagedData,
-  PluginOAuthStartResp, PluginOAuthExchangeResp,
 } from '../types';
 
 export const pluginsApi = {
@@ -21,10 +20,7 @@ export const pluginsApi = {
   // 从 GitHub Release 安装
   installGithub: (repo: string) =>
     post<void>('/api/v1/admin/plugins/install-github', { repo }),
-  oauthStart: (name: string) =>
-    post<PluginOAuthStartResp>(`/api/v1/admin/plugins/${name}/oauth/start`),
-  oauthExchange: (name: string, callbackUrl: string) =>
-    post<PluginOAuthExchangeResp>(`/api/v1/admin/plugins/${name}/oauth/exchange`, {
-      callback_url: callbackUrl,
-    }),
+  // 通用插件 RPC 调用，action 由插件自行定义
+  rpc: <T = unknown>(name: string, action: string, body?: unknown) =>
+    post<T>(`/api/v1/admin/plugins/${name}/rpc/${action}`, body),
 };

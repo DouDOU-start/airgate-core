@@ -21,6 +21,7 @@ import { StatusBadge } from '../../shared/components/Badge';
 import { useToast } from '../../shared/components/Toast';
 import { accountsApi } from '../../shared/api/accounts';
 import { pluginsApi } from '../../shared/api/plugins';
+import { AccountTestModal } from './AccountTestModal';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import {
   loadPluginFrontend,
@@ -148,14 +149,18 @@ function createPluginOAuthBridge(pluginId: string): PluginOAuthBridge | undefine
 
   return {
     start: async () => {
-      const result = await pluginsApi.oauthStart(pluginId);
+      const result = await pluginsApi.rpc<{ authorize_url: string; state: string }>(
+        pluginId, 'oauth/start',
+      );
       return {
         authorizeURL: result.authorize_url,
         state: result.state,
       };
     },
     exchange: async (callbackURL: string) => {
-      const result = await pluginsApi.oauthExchange(pluginId, callbackURL);
+      const result = await pluginsApi.rpc<{
+        account_type: string; account_name: string; credentials: Record<string, string>;
+      }>(pluginId, 'oauth/exchange', { callback_url: callbackURL });
       return {
         accountType: result.account_type,
         accountName: result.account_name,
@@ -194,7 +199,7 @@ export default function AccountsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountResp | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<AccountResp | null>(null);
-  const [testingId, setTestingId] = useState<number | null>(null);
+  const [testingAccount, setTestingAccount] = useState<AccountResp | null>(null);
 
   // 查询账号列表
   const { data, isLoading } = useQuery({
@@ -206,6 +211,13 @@ export default function AccountsPage() {
         platform: platformFilter || undefined,
         status: statusFilter || undefined,
       }),
+  });
+
+  // 查询用量窗口
+  const { data: usageData } = useQuery({
+    queryKey: ['account-usage', platformFilter],
+    queryFn: () => accountsApi.usage(platformFilter || ''),
+    refetchInterval: 60_000, // 每分钟刷新
   });
 
   // 创建账号
@@ -242,21 +254,11 @@ export default function AccountsPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  // 测试连通性
-  const testMutation = useMutation({
-    mutationFn: (id: number) => accountsApi.test(id),
-    onSuccess: (result) => {
-      if (result.success) {
-        toast('success', t('accounts.test_success'));
-      } else {
-        toast('error', t('accounts.test_failed', { error: result.error_msg ?? '' }));
-      }
-      setTestingId(null);
-    },
-    onError: (err: Error) => {
-      toast('error', err.message);
-      setTestingId(null);
-    },
+  // 切换调度状态
+  const toggleMutation = useMutation({
+    mutationFn: (id: number) => accountsApi.toggleScheduling(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+    onError: (err: Error) => toast('error', err.message),
   });
 
   // 表格列定义
@@ -283,12 +285,57 @@ export default function AccountsPage() {
     {
       key: 'platform',
       title: t('accounts.platform'),
-      render: (row) => (
-        <span className="inline-flex items-center gap-1.5">
-          <Server className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
-          {row.platform}
-        </span>
-      ),
+      render: (row) => {
+        const planType = row.credentials?.plan_type;
+        const subUntil = row.credentials?.subscription_active_until;
+        const isExpired = subUntil ? new Date(subUntil) < new Date() : false;
+
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="inline-flex items-center gap-1.5">
+              <Server className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+              <span>{row.platform.toUpperCase()}</span>
+              {row.type && (
+                <span className="text-[10px] px-1 py-0 rounded" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
+                  {row.type}
+                </span>
+              )}
+            </span>
+            {planType && (
+              <span className="inline-flex items-center gap-1 text-[11px]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                <span className="px-1 py-0 rounded text-[10px]" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
+                  {planType.charAt(0).toUpperCase() + planType.slice(1)}
+                </span>
+                {subUntil && (
+                  <span style={{ color: isExpired ? 'var(--ag-danger)' : 'var(--ag-text-tertiary)', fontSize: 10 }}>
+                    {isExpired
+                      ? t('accounts.subscription_expired')
+                      : new Date(subUntil).toLocaleDateString()
+                    }
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'capacity',
+      title: t('accounts.capacity'),
+      width: '100px',
+      render: (row) => {
+        const current = row.current_concurrency || 0;
+        const max = row.max_concurrency;
+        const loadPct = max > 0 ? (current / max) * 100 : 0;
+        const color = loadPct < 50 ? 'var(--ag-success)' : loadPct < 80 ? 'var(--ag-warning)' : 'var(--ag-danger)';
+        return (
+          <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+            <span style={{ color }}>{current}</span>
+            <span style={{ color: 'var(--ag-text-tertiary)' }}> / {max}</span>
+          </span>
+        );
+      },
     },
     {
       key: 'status',
@@ -296,23 +343,26 @@ export default function AccountsPage() {
       render: (row) => <StatusBadge status={row.status} />,
     },
     {
-      key: 'priority',
-      title: t('accounts.priority'),
+      key: 'scheduling',
+      title: t('accounts.scheduling'),
       width: '80px',
       render: (row) => (
-        <span className="font-mono">
-          {row.priority}
-        </span>
-      ),
-    },
-    {
-      key: 'max_concurrency',
-      title: t('accounts.concurrency'),
-      width: '80px',
-      render: (row) => (
-        <span className="font-mono">
-          {row.max_concurrency}
-        </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleMutation.mutate(row.id);
+          }}
+          disabled={toggleMutation.isPending}
+          className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none"
+          style={{
+            backgroundColor: row.status === 'active' ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
+          }}
+        >
+          <span
+            className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform duration-200"
+            style={{ transform: row.status === 'active' ? 'translateX(17px)' : 'translateX(3px)' }}
+          />
+        </button>
       ),
     },
     {
@@ -339,6 +389,69 @@ export default function AccountsPage() {
           <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
         ),
     },
+    // 用量窗口
+    ...(usageData?.accounts && Object.keys(usageData.accounts).length > 0 ? [{
+      key: 'usage_window',
+      title: t('accounts.usage_window'),
+      width: '200px',
+      render: (row: AccountResp) => {
+        const usage = usageData?.accounts?.[String(row.id)];
+        if (!usage) return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
+
+        const windows: Array<{ label: string; used_percent: number; reset_seconds: number }> = usage.windows || [];
+        const credits: { balance: number; unlimited: boolean } | null = usage.credits || null;
+
+        if (windows.length === 0 && !credits) {
+          return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
+        }
+
+        const formatReset = (seconds: number) => {
+          if (!seconds || seconds <= 0) return '-';
+          const d = Math.floor(seconds / 86400);
+          const h = Math.floor((seconds % 86400) / 3600);
+          const m = Math.floor((seconds % 3600) / 60);
+          if (d > 0) return `${d}d ${h}h`;
+          if (h > 0) return `${h}h ${m}m`;
+          return `${m}m`;
+        };
+
+        const usageColor = (pct: number) => {
+          if (pct < 50) return 'var(--ag-success)';
+          if (pct < 80) return 'var(--ag-warning)';
+          return 'var(--ag-danger)';
+        };
+
+        const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', minWidth: 24 };
+
+        return (
+          <div className="flex flex-col gap-0.5 text-[11px]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+            {windows.map((w, i) => (
+              <div key={i} className="flex items-center gap-1">
+                <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
+                  {w.label}
+                </span>
+                <span style={{ color: usageColor(w.used_percent) }}>
+                  {Math.round(w.used_percent)}%
+                </span>
+                <span style={{ color: 'var(--ag-text-tertiary)', fontSize: 10 }}>
+                  {formatReset(w.reset_seconds)}
+                </span>
+              </div>
+            ))}
+            {credits && (
+              <div className="flex items-center gap-1">
+                <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
+                  $
+                </span>
+                <span style={{ color: credits.unlimited ? 'var(--ag-success)' : credits.balance > 0 ? 'var(--ag-text)' : 'var(--ag-danger)' }}>
+                  {credits.unlimited ? '∞' : `$${Number(credits.balance).toFixed(2)}`}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      },
+    } as Column<AccountResp>] : []),
     {
       key: 'actions',
       title: t('common.actions'),
@@ -356,13 +469,9 @@ export default function AccountsPage() {
             size="sm"
             variant="ghost"
             icon={<Zap className="w-3.5 h-3.5" />}
-            loading={testingId === row.id && testMutation.isPending}
-            onClick={() => {
-              setTestingId(row.id);
-              testMutation.mutate(row.id);
-            }}
+            onClick={() => setTestingAccount(row)}
           >
-            {t('common.test')}
+            {t('accounts.test_connection')}
           </Button>
           <Button
             size="sm"
@@ -455,6 +564,13 @@ export default function AccountsPage() {
         message={t('accounts.delete_confirm', { name: deletingAccount?.name })}
         loading={deleteMutation.isPending}
         danger
+      />
+
+      {/* 测试连接 */}
+      <AccountTestModal
+        open={!!testingAccount}
+        account={testingAccount}
+        onClose={() => setTestingAccount(null)}
       />
     </div>
   );

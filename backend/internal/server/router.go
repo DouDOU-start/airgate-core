@@ -21,7 +21,7 @@ func (s *Server) registerRoutes() {
 	// 初始化所有 Handler
 	authHandler := handler.NewAuthHandler(s.db, s.jwtMgr)
 	userHandler := handler.NewUserHandler(s.db)
-	accountHandler := handler.NewAccountHandler(s.db, s.pluginMgr)
+	accountHandler := handler.NewAccountHandler(s.db, s.pluginMgr, s.concurrency)
 	groupHandler := handler.NewGroupHandler(s.db)
 	apikeyHandler := handler.NewAPIKeyHandler(s.db)
 	subscriptionHandler := handler.NewSubscriptionHandler(s.db)
@@ -99,10 +99,13 @@ func (s *Server) registerRoutes() {
 
 		// 账号管理
 		adminGroup.GET("/accounts", accountHandler.ListAccounts)
+		adminGroup.GET("/accounts/usage", accountHandler.GetAccountUsage)
 		adminGroup.POST("/accounts", accountHandler.CreateAccount)
 		adminGroup.PUT("/accounts/:id", accountHandler.UpdateAccount)
 		adminGroup.DELETE("/accounts/:id", accountHandler.DeleteAccount)
 		adminGroup.POST("/accounts/:id/test", accountHandler.TestAccount)
+		adminGroup.PATCH("/accounts/:id/toggle", accountHandler.ToggleScheduling)
+		adminGroup.GET("/accounts/:id/models", accountHandler.GetAccountModels)
 		adminGroup.GET("/accounts/credentials-schema/:platform", accountHandler.GetCredentialsSchema)
 
 		// 分组管理
@@ -137,8 +140,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/plugins/install-github", pluginHandler.InstallFromGithub)
 		adminGroup.POST("/plugins/:name/uninstall", pluginHandler.UninstallPlugin)
 		adminGroup.POST("/plugins/:name/reload", pluginHandler.ReloadPlugin)
-		adminGroup.POST("/plugins/:name/oauth/start", pluginHandler.StartOAuth)
-		adminGroup.POST("/plugins/:name/oauth/exchange", pluginHandler.ExchangeOAuth)
+		adminGroup.Any("/plugins/:name/rpc/*action", pluginHandler.ProxyRequest)
 
 		// 插件市场
 		adminGroup.GET("/marketplace/plugins", pluginHandler.ListMarketplace)

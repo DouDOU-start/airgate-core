@@ -89,9 +89,10 @@ setup-hooks: ## 安装 Git pre-commit hook
 
 # ===================== 依赖安装 =====================
 
-install: setup-hooks ## 安装前后端依赖
+install: setup-hooks ## 安装前后端依赖与开发工具
 	@cd $(BACKEND_DIR) && $(GO) mod download
 	@cd $(WEB_DIR) && npm install
+	@command -v air > /dev/null 2>&1 || (echo "安装 air（热重载工具）..."; $(GO) install github.com/air-verse/air@latest)
 	@echo "依赖安装完成"
 
 # ===================== 清理 =====================
