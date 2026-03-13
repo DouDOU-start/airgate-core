@@ -2,7 +2,9 @@
 package handler
 
 import (
+	"encoding/json"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -157,9 +159,10 @@ func (h *PluginHandler) ReloadPlugin(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// StartOAuth 发起插件 OAuth 授权
-// POST /api/v1/admin/plugins/:name/oauth/start
-func (h *PluginHandler) StartOAuth(c *gin.Context) {
+// ProxyRequest 通用插件请求代理
+// ANY /api/v1/admin/plugins/:name/rpc/*action
+// 将请求透传给插件的 HandleRequest，插件自行路由
+func (h *PluginHandler) ProxyRequest(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
 		response.BadRequest(c, "插件名称无效")
@@ -172,25 +175,48 @@ func (h *PluginHandler) StartOAuth(c *gin.Context) {
 		return
 	}
 
-	response.BadRequest(c, "当前 SDK 版本不支持插件 OAuth 授权")
-}
+	// 去掉 gin 通配符前缀 "/"
+	action := strings.TrimPrefix(c.Param("action"), "/")
 
-// ExchangeOAuth 使用回调 URL 完成插件 OAuth token 交换
-// POST /api/v1/admin/plugins/:name/oauth/exchange
-func (h *PluginHandler) ExchangeOAuth(c *gin.Context) {
-	name := c.Param("name")
-	if name == "" {
-		response.BadRequest(c, "插件名称无效")
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		response.BadRequest(c, "读取请求体失败")
 		return
 	}
 
-	inst := h.manager.GetInstance(name)
-	if inst == nil || inst.Gateway == nil {
-		response.NotFound(c, "插件未运行或不存在")
+	status, respHeaders, respBody, err := inst.Gateway.HandleHTTPRequest(
+		c.Request.Context(), c.Request.Method, action, c.Request.URL.RawQuery, c.Request.Header, body,
+	)
+	if err != nil {
+		response.InternalError(c, "插件请求失败: "+err.Error())
 		return
 	}
 
-	response.BadRequest(c, "当前 SDK 版本不支持插件 OAuth 回调交换")
+	// 转发插件设置的响应头
+	for k, vs := range respHeaders {
+		for _, v := range vs {
+			c.Header(k, v)
+		}
+	}
+
+	// 包装为标准 ApiResponse 格式 { code, data, message }
+	if status >= http.StatusOK && status < http.StatusBadRequest {
+		var data interface{}
+		if err := json.Unmarshal(respBody, &data); err != nil {
+			data = string(respBody)
+		}
+		response.Success(c, data)
+	} else {
+		// 插件返回错误，尝试提取 error 字段
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		msg := "插件请求失败"
+		if json.Unmarshal(respBody, &errResp) == nil && errResp.Error != "" {
+			msg = errResp.Error
+		}
+		response.Error(c, status, -1, msg)
+	}
 }
 
 // ListMarketplace 列出市场可用插件

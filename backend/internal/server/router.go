@@ -137,8 +137,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/plugins/install-github", pluginHandler.InstallFromGithub)
 		adminGroup.POST("/plugins/:name/uninstall", pluginHandler.UninstallPlugin)
 		adminGroup.POST("/plugins/:name/reload", pluginHandler.ReloadPlugin)
-		adminGroup.POST("/plugins/:name/oauth/start", pluginHandler.StartOAuth)
-		adminGroup.POST("/plugins/:name/oauth/exchange", pluginHandler.ExchangeOAuth)
+		adminGroup.Any("/plugins/:name/rpc/*action", pluginHandler.ProxyRequest)
 
 		// 插件市场
 		adminGroup.GET("/marketplace/plugins", pluginHandler.ListMarketplace)

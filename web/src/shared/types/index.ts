@@ -163,17 +163,6 @@ export interface CredentialSchemaResp {
   account_types?: AccountTypeResp[];
 }
 
-export interface PluginOAuthStartResp {
-  authorize_url: string;
-  state: string;
-}
-
-export interface PluginOAuthExchangeResp {
-  account_type: string;
-  account_name: string;
-  credentials: Record<string, string>;
-}
-
 // ==================== Group ====================
 
 export interface GroupResp {

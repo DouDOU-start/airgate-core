@@ -25,20 +25,49 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const installedFile = ".installed"
-
 var installMu sync.Mutex
 
-// NeedsSetup 检查是否需要安装
+// NeedsSetup 检查是否需要安装。
+// 判断逻辑：config.yaml 不存在 → 需要安装；
+// config.yaml 存在则尝试连接数据库，查询是否已有管理员账户。
 func NeedsSetup() bool {
 	configPath := config.ConfigPath()
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return true
 	}
-	if _, err := os.Stat(installedFile); os.IsNotExist(err) {
+
+	// config.yaml 存在，尝试加载并连接数据库确认是否已初始化
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		slog.Warn("加载配置文件失败，进入安装向导", "error", err)
 		return true
 	}
-	return false
+
+	db, err := sql.Open("postgres", cfg.Database.DSN())
+	if err != nil {
+		slog.Warn("打开数据库失败，进入安装向导", "error", err)
+		return true
+	}
+	defer func() { _ = db.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		slog.Warn("数据库连接失败，进入安装向导", "error", err)
+		return true
+	}
+
+	// 查询 users 表是否存在管理员记录
+	var count int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&count)
+	if err != nil {
+		// 表不存在或查询失败，视为未安装
+		slog.Warn("查询管理员记录失败，进入安装向导", "error", err)
+		return true
+	}
+
+	return count == 0
 }
 
 // TestDBConnection 测试数据库连接
@@ -119,8 +148,8 @@ func Install(params InstallParams) error {
 
 	slog.Info("正在执行数据库迁移...")
 	if err := client.Schema.Create(context.Background(),
-		migrate.WithDropIndex(true),
-		migrate.WithDropColumn(true),
+		migrate.WithDropIndex(false),
+		migrate.WithDropColumn(false),
 	); err != nil {
 		return fmt.Errorf("数据库迁移失败: %w", err)
 	}
@@ -154,11 +183,6 @@ func Install(params InstallParams) error {
 	}
 	if err := os.WriteFile(config.ConfigPath(), cfgData, 0644); err != nil {
 		return fmt.Errorf("写入配置文件失败: %w", err)
-	}
-
-	// 5. 创建安装锁定文件
-	if err := os.WriteFile(installedFile, []byte("installed"), 0644); err != nil {
-		return fmt.Errorf("写入锁定文件失败: %w", err)
 	}
 
 	slog.Info("安装完成")

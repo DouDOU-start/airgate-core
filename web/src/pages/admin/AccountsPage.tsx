@@ -148,14 +148,18 @@ function createPluginOAuthBridge(pluginId: string): PluginOAuthBridge | undefine
 
   return {
     start: async () => {
-      const result = await pluginsApi.oauthStart(pluginId);
+      const result = await pluginsApi.rpc<{ authorize_url: string; state: string }>(
+        pluginId, 'oauth/start',
+      );
       return {
         authorizeURL: result.authorize_url,
         state: result.state,
       };
     },
     exchange: async (callbackURL: string) => {
-      const result = await pluginsApi.oauthExchange(pluginId, callbackURL);
+      const result = await pluginsApi.rpc<{
+        account_type: string; account_name: string; credentials: Record<string, string>;
+      }>(pluginId, 'oauth/exchange', { callback_url: callbackURL });
       return {
         accountType: result.account_type,
         accountName: result.account_name,

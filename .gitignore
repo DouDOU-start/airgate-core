@@ -29,7 +29,6 @@ web/dist/
 Thumbs.db
 
 # Runtime
-backend/.installed
 backend/config.yaml
 
 # Config
