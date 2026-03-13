@@ -323,8 +323,11 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 		return "", fmt.Errorf("插件未提供有效的 ID/name")
 	}
 
-	// 初始化插件
-	pluginCtx := newCorePluginContext(nil, canonicalName)
+	// 初始化插件（注入 log_level 让插件子进程应用 Core 的日志级别）
+	initConfig := map[string]interface{}{
+		sdk.ConfigKeyLogLevel: m.logLevel,
+	}
+	pluginCtx := newCorePluginContext(initConfig, canonicalName)
 	if err := ext.Init(pluginCtx); err != nil {
 		client.Kill()
 		return "", fmt.Errorf("初始化 extension 插件失败: %w", err)
@@ -418,10 +421,14 @@ func (m *Manager) stopPlugin(name string) {
 	m.mu.Unlock()
 
 	if inst.Gateway != nil {
-		_ = inst.Gateway.Stop(context.Background())
+		if err := inst.Gateway.Stop(context.Background()); err != nil {
+			slog.Warn("停止 gateway 插件失败", "name", inst.Name, "error", err)
+		}
 	}
 	if inst.Extension != nil {
-		_ = inst.Extension.Stop(context.Background())
+		if err := inst.Extension.Stop(context.Background()); err != nil {
+			slog.Warn("停止 extension 插件失败", "name", inst.Name, "error", err)
+		}
 	}
 	if inst.Client != nil {
 		inst.Client.Kill()
@@ -536,26 +543,33 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 		return "", fmt.Errorf("连接探测进程失败: %w", err)
 	}
 
-	// 先尝试 gateway
-	if raw, err := rpcClient.Dispense(shared.PluginKeyGateway); err == nil {
-		if gateway, ok := raw.(*sdkgrpc.GatewayGRPCClient); ok {
-			if info := gateway.Info(); info.ID != "" {
-				return info.ID, nil
-			}
-			return fallbackName, nil
-		}
-	}
-
-	// 再尝试 extension
-	raw, err := rpcClient.Dispense(shared.PluginKeyExtension)
+	// 通过 gateway 接口的 Info().Type 探测插件类型（与 startPlugin 逻辑一致）
+	raw, err := rpcClient.Dispense(shared.PluginKeyGateway)
 	if err != nil {
-		return "", fmt.Errorf("获取探测接口失败（gateway 和 extension 均不匹配）: %w", err)
+		return "", fmt.Errorf("获取探测接口失败: %w", err)
 	}
-	ext, ok := raw.(*sdkgrpc.ExtensionGRPCClient)
+	probe, ok := raw.(*sdkgrpc.GatewayGRPCClient)
 	if !ok {
 		return "", fmt.Errorf("探测类型断言失败")
 	}
-	if info := ext.Info(); info.ID != "" {
+
+	info := probe.Info()
+	if info.Type == sdk.PluginTypeExtension {
+		// 是 extension 插件，用 extension 接口获取 ID
+		extRaw, err := rpcClient.Dispense(shared.PluginKeyExtension)
+		if err != nil {
+			return "", fmt.Errorf("获取 extension 探测接口失败: %w", err)
+		}
+		if ext, ok := extRaw.(*sdkgrpc.ExtensionGRPCClient); ok {
+			if extInfo := ext.Info(); extInfo.ID != "" {
+				return extInfo.ID, nil
+			}
+		}
+		return fallbackName, nil
+	}
+
+	// 默认作为 gateway 处理
+	if info.ID != "" {
 		return info.ID, nil
 	}
 	return fallbackName, nil

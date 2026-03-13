@@ -105,7 +105,7 @@ function Stepper({ current }: { current: number }) {
 
 function TestResultBanner({ result }: { result: { success: boolean; error_msg?: string } | null }) {
   const { t } = useTranslation();
-  if (!result) return <div />;
+  if (!result) return null;
 
   return (
     <div

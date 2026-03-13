@@ -11,6 +11,20 @@ import (
 	pb "github.com/DouDOU-start/airgate-sdk/proto"
 )
 
+// 请求体大小限制（100MB）
+const maxExtensionBodySize = 100 << 20
+
+// 禁止插件设置的响应头（安全黑名单）
+var blockedResponseHeaders = map[string]bool{
+	"transfer-encoding":   true,
+	"content-length":      true,
+	"connection":          true,
+	"keep-alive":          true,
+	"upgrade":             true,
+	"proxy-authenticate":  true,
+	"proxy-authorization": true,
+}
+
 // ExtensionProxy 将 HTTP 请求代理到 extension 类型插件
 type ExtensionProxy struct {
 	manager *Manager
@@ -38,10 +52,12 @@ func (ep *ExtensionProxy) Handle(c *gin.Context) {
 		return
 	}
 
-	// 构建 gRPC HttpRequest
+	// 限制请求体大小，防止恶意大请求导致内存溢出
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxExtensionBodySize)
+
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "读取请求体失败"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "读取请求体失败（可能超过大小限制）"})
 		return
 	}
 
@@ -66,12 +82,27 @@ func (ep *ExtensionProxy) Handle(c *gin.Context) {
 		return
 	}
 
-	// 写回响应头
+	// 写回响应头（过滤掉安全黑名单中的头部）
 	for k, vals := range resp.Headers {
+		if blockedResponseHeaders[strings.ToLower(k)] {
+			continue
+		}
 		for _, v := range vals.Values {
 			c.Writer.Header().Add(k, v)
 		}
 	}
 
-	c.Data(int(resp.StatusCode), c.Writer.Header().Get("Content-Type"), resp.Body)
+	// 确保 Content-Type 有默认值
+	contentType := c.Writer.Header().Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	// 验证状态码范围
+	statusCode := int(resp.StatusCode)
+	if statusCode < 100 || statusCode > 599 {
+		statusCode = http.StatusBadGateway
+	}
+
+	c.Data(statusCode, contentType, resp.Body)
 }

@@ -48,7 +48,7 @@ export function Button({
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
         </span>
       )}
-      {children && <span>{children}</span>}
+      {children}
     </button>
   );
 }

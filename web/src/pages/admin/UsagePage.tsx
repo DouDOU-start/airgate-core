@@ -270,64 +270,25 @@ export default function UsagePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* 按模型 */}
-                  {statsGroupBy === 'model' &&
-                    stats.by_model?.map((s) => (
-                      <tr key={s.model} className="border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover">
-                        <td className="py-2.5 pr-4 font-medium text-text">{s.model}</td>
-                        <td className="py-2.5 pr-4 text-text-secondary font-mono">
-                          {s.requests.toLocaleString()}
-                        </td>
-                        <td className="py-2.5 pr-4 text-text-secondary font-mono">
-                          {s.tokens.toLocaleString()}
-                        </td>
-                        <td className="py-2.5 text-text-secondary font-mono">
-                          ${s.total_cost.toFixed(4)}
-                        </td>
+                  {(() => {
+                    const rowClass = "border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover";
+                    const dataMap: Record<string, { items: Array<{ key: string | number; name: string; requests: number; tokens?: number; total_cost: number }> }> = {
+                      model: { items: stats.by_model?.map((s) => ({ key: s.model, name: s.model, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost })) ?? [] },
+                      user: { items: stats.by_user?.map((s) => ({ key: s.user_id, name: s.email, requests: s.requests, total_cost: s.total_cost })) ?? [] },
+                      account: { items: stats.by_account?.map((s) => ({ key: s.account_id, name: s.name, requests: s.requests, total_cost: s.total_cost })) ?? [] },
+                      group: { items: stats.by_group?.map((s) => ({ key: s.group_id, name: s.name, requests: s.requests, total_cost: s.total_cost })) ?? [] },
+                    };
+                    return dataMap[statsGroupBy]?.items.map((row) => (
+                      <tr key={row.key} className={rowClass}>
+                        <td className="py-2.5 pr-4 font-medium text-text">{row.name}</td>
+                        <td className="py-2.5 pr-4 text-text-secondary font-mono">{row.requests.toLocaleString()}</td>
+                        {statsGroupBy === 'model' && (
+                          <td className="py-2.5 pr-4 text-text-secondary font-mono">{row.tokens?.toLocaleString()}</td>
+                        )}
+                        <td className="py-2.5 text-text-secondary font-mono">${row.total_cost.toFixed(4)}</td>
                       </tr>
-                    ))}
-
-                  {/* 按用户 */}
-                  {statsGroupBy === 'user' &&
-                    stats.by_user?.map((s) => (
-                      <tr key={s.user_id} className="border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover">
-                        <td className="py-2.5 pr-4 font-medium text-text">{s.email}</td>
-                        <td className="py-2.5 pr-4 text-text-secondary font-mono">
-                          {s.requests.toLocaleString()}
-                        </td>
-                        <td className="py-2.5 text-text-secondary font-mono">
-                          ${s.total_cost.toFixed(4)}
-                        </td>
-                      </tr>
-                    ))}
-
-                  {/* 按账号 */}
-                  {statsGroupBy === 'account' &&
-                    stats.by_account?.map((s) => (
-                      <tr key={s.account_id} className="border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover">
-                        <td className="py-2.5 pr-4 font-medium text-text">{s.name}</td>
-                        <td className="py-2.5 pr-4 text-text-secondary font-mono">
-                          {s.requests.toLocaleString()}
-                        </td>
-                        <td className="py-2.5 text-text-secondary font-mono">
-                          ${s.total_cost.toFixed(4)}
-                        </td>
-                      </tr>
-                    ))}
-
-                  {/* 按分组 */}
-                  {statsGroupBy === 'group' &&
-                    stats.by_group?.map((s) => (
-                      <tr key={s.group_id} className="border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover">
-                        <td className="py-2.5 pr-4 font-medium text-text">{s.name}</td>
-                        <td className="py-2.5 pr-4 text-text-secondary font-mono">
-                          {s.requests.toLocaleString()}
-                        </td>
-                        <td className="py-2.5 text-text-secondary font-mono">
-                          ${s.total_cost.toFixed(4)}
-                        </td>
-                      </tr>
-                    ))}
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>

@@ -83,11 +83,11 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		marketplace:    marketplace,
 		dynamicRouter:  dynamicRouter,
 		extensionProxy: extensionProxy,
-		scheduler:     sched,
-		concurrency:   concurrency,
-		priceMgr:      priceMgr,
-		calculator:    calculator,
-		recorder:      recorder,
+		scheduler:      sched,
+		concurrency:    concurrency,
+		priceMgr:       priceMgr,
+		calculator:     calculator,
+		recorder:       recorder,
 	}
 
 	// 注册路由

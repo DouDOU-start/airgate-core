@@ -113,11 +113,20 @@ export function Select({
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [focusIdx, setFocusIdx] = useState(-1);
+  const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
   const selectedOption = options.find((o) => o.value === value);
   const displayLabel = selectedOption?.label ?? placeholder ?? '';
+
+  // 检测下拉方向：空间不足时向上弹出
+  useEffect(() => {
+    if (!open || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    setDropUp(spaceBelow < 240 && rect.top > spaceBelow);
+  }, [open]);
 
   // Close on outside click
   useEffect(() => {
@@ -227,7 +236,7 @@ export function Select({
           <ul
             ref={listRef}
             role="listbox"
-            className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-glass-border bg-bg-elevated shadow-lg py-1"
+            className={`absolute z-[9999] max-h-60 w-full overflow-auto rounded-md border border-glass-border bg-bg-elevated shadow-lg py-1 ${dropUp ? 'bottom-full mb-1' : 'mt-1'}`}
             style={{ animation: 'ag-scale-in 0.15s ease-out forwards' }}
           >
             {options.map((opt, idx) => {

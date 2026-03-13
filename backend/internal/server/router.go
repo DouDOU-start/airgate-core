@@ -146,9 +146,9 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/dashboard/stats", dashboardHandler.Stats)
 	}
 
-	// === Extension 插件 API 路由（JWT 认证） ===
+	// === Extension 插件 API 路由（JWT 认证 + 管理员权限） ===
 	extGroup := r.Group("/api/v1/ext")
-	extGroup.Use(middleware.JWTAuth(s.jwtMgr))
+	extGroup.Use(middleware.JWTAuth(s.jwtMgr), middleware.AdminOnly())
 	{
 		extGroup.Any("/:pluginName/*path", s.extensionProxy.Handle)
 	}
