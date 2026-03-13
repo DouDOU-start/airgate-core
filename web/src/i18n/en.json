@@ -163,7 +163,21 @@
     "update_success": "Account updated successfully",
     "delete_success": "Account deleted",
     "test_success": "Connection test passed",
-    "test_failed": "Connection test failed: {{error}}"
+    "test_failed": "Connection test failed: {{error}}",
+    "test_connection": "Test Connection",
+    "test_modal_title": "Test Account Connection",
+    "select_model": "Select Test Model",
+    "start_test": "Start Test",
+    "retry": "Retry",
+    "test_ready": "Click \"Start Test\" to begin...",
+    "test_connecting": "Connecting to API...",
+    "test_connected": "Connected to API",
+    "test_model_used": "Using model: {{model}}",
+    "test_sending": "Sending test message: \"hi\"",
+    "test_response": "Response:",
+    "test_done": "Test complete!",
+    "test_error": "Test failed",
+    "usage_window": "Usage Window"
   },
 
   "groups": {

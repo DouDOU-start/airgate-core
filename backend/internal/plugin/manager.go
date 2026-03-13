@@ -570,6 +570,13 @@ func (m *Manager) GetAccountTypes(platform string) []sdk.AccountType {
 	return m.accountTypeCache[platform]
 }
 
+// GetModels 获取指定平台的模型列表
+func (m *Manager) GetModels(platform string) []sdk.ModelInfo {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.modelCache[platform]
+}
+
 // GetRoutes 获取指定插件的路由声明
 func (m *Manager) GetRoutes(pluginName string) []sdk.RouteDefinition {
 	m.mu.RLock()

@@ -99,10 +99,12 @@ func (s *Server) registerRoutes() {
 
 		// 账号管理
 		adminGroup.GET("/accounts", accountHandler.ListAccounts)
+		adminGroup.GET("/accounts/usage", accountHandler.GetAccountUsage)
 		adminGroup.POST("/accounts", accountHandler.CreateAccount)
 		adminGroup.PUT("/accounts/:id", accountHandler.UpdateAccount)
 		adminGroup.DELETE("/accounts/:id", accountHandler.DeleteAccount)
 		adminGroup.POST("/accounts/:id/test", accountHandler.TestAccount)
+		adminGroup.GET("/accounts/:id/models", accountHandler.GetAccountModels)
 		adminGroup.GET("/accounts/credentials-schema/:platform", accountHandler.GetCredentialsSchema)
 
 		// 分组管理

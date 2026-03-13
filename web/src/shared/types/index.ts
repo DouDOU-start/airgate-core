@@ -501,3 +501,8 @@ export interface TestConnectionResp {
   success: boolean;
   error_msg?: string;
 }
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+}

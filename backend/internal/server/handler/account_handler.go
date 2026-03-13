@@ -1,11 +1,15 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+
+	sdk "github.com/DouDOU-start/airgate-sdk"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/account"
@@ -235,7 +239,10 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// TestAccount 测试账号连通性
+// TestAccount 测试账号连通性（SSE 流式）
+// POST /api/v1/admin/accounts/:id/test
+// 请求体: { "model_id": "gpt-4o" }
+// 响应: SSE 流，包含 test_start / 插件原始 SSE / test_complete 事件
 func (h *AccountHandler) TestAccount(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -243,8 +250,16 @@ func (h *AccountHandler) TestAccount(c *gin.Context) {
 		return
 	}
 
-	// 查询账号
-	a, err := h.db.Account.Get(c.Request.Context(), id)
+	var req struct {
+		ModelID string `json:"model_id"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	// 查询账号（加载代理关联）
+	a, err := h.db.Account.Query().
+		Where(account.IDEQ(id)).
+		WithProxy().
+		Only(c.Request.Context())
 	if err != nil {
 		if ent.IsNotFound(err) {
 			response.NotFound(c, "账号不存在")
@@ -258,31 +273,207 @@ func (h *AccountHandler) TestAccount(c *gin.Context) {
 	// 查找对应平台的插件
 	inst := h.pluginMgr.GetPluginByPlatform(a.Platform)
 	if inst == nil {
-		response.Success(c, map[string]interface{}{
-			"success": false,
-			"message": "未找到平台 " + a.Platform + " 对应的插件，请先安装并启用插件",
-		})
+		response.InternalError(c, "未找到平台 "+a.Platform+" 对应的插件")
 		return
 	}
 
-	// 调用插件的 ValidateAccount
+	// 模型 ID 默认取平台第一个模型
+	modelID := req.ModelID
+	if modelID == "" {
+		if models := h.pluginMgr.GetModels(a.Platform); len(models) > 0 {
+			modelID = models[0].ID
+		}
+	}
+	if modelID == "" {
+		response.BadRequest(c, "请指定测试模型")
+		return
+	}
+
+	// 设置 SSE 响应头
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	c.Writer.Flush()
+
+	// 发送 test_start 事件
+	sendSSEEvent(c.Writer, map[string]any{
+		"type":         "test_start",
+		"account":      a.Name,
+		"model":        modelID,
+		"account_type": a.Type,
+	})
+
+	// 构造凭证和代理
 	creds := make(map[string]string, len(a.Credentials))
 	for k, v := range a.Credentials {
 		creds[k] = fmt.Sprintf("%v", v)
 	}
 
-	if err := inst.Gateway.ValidateAccount(c.Request.Context(), creds); err != nil {
-		response.Success(c, map[string]interface{}{
+	proxyURL := ""
+	if proxy := a.Edges.Proxy; proxy != nil {
+		if proxy.Username != "" {
+			proxyURL = fmt.Sprintf("%s://%s:%s@%s:%d", proxy.Protocol, proxy.Username, proxy.Password, proxy.Address, proxy.Port)
+		} else {
+			proxyURL = fmt.Sprintf("%s://%s:%d", proxy.Protocol, proxy.Address, proxy.Port)
+		}
+	}
+
+	sdkAccount := &sdk.Account{
+		ID:          int64(a.ID),
+		Name:        a.Name,
+		Platform:    a.Platform,
+		Type:        a.Type,
+		Credentials: creds,
+		ProxyURL:    proxyURL,
+	}
+
+	// 构造最小测试请求体（OpenAI 兼容格式）
+	testBody, _ := json.Marshal(map[string]any{
+		"model":    modelID,
+		"messages": []map[string]string{{"role": "user", "content": "hi"}},
+		"stream":   true,
+	})
+
+	fwdReq := &sdk.ForwardRequest{
+		Account: sdkAccount,
+		Body:    testBody,
+		Headers: http.Header{"Content-Type": {"application/json"}},
+		Model:   modelID,
+		Stream:  true,
+		Writer:  c.Writer,
+	}
+
+	// 调用 Forward，流式写入上游 SSE 数据
+	_, err = inst.Gateway.Forward(c.Request.Context(), fwdReq)
+
+	// 发送 test_complete 事件
+	if err != nil {
+		sendSSEEvent(c.Writer, map[string]any{
+			"type":    "test_complete",
 			"success": false,
-			"message": "凭证验证失败: " + err.Error(),
+			"error":   err.Error(),
 		})
+	} else {
+		sendSSEEvent(c.Writer, map[string]any{
+			"type":    "test_complete",
+			"success": true,
+		})
+	}
+}
+
+// GetAccountModels 获取账号所属平台的模型列表
+// GET /api/v1/admin/accounts/:id/models
+func (h *AccountHandler) GetAccountModels(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "无效的账号 ID")
 		return
 	}
 
-	response.Success(c, map[string]interface{}{
-		"success": true,
-		"message": "凭证验证通过",
-	})
+	a, err := h.db.Account.Get(c.Request.Context(), id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			response.NotFound(c, "账号不存在")
+			return
+		}
+		slog.Error("查询账号失败", "error", err)
+		response.InternalError(c, "查询失败")
+		return
+	}
+
+	models := h.pluginMgr.GetModels(a.Platform)
+	type modelResp struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	list := make([]modelResp, len(models))
+	for i, m := range models {
+		list[i] = modelResp{ID: m.ID, Name: m.Name}
+	}
+
+	response.Success(c, list)
+}
+
+// GetAccountUsage 获取账号的用量窗口（通过插件 HandleRequest 透传）
+// GET /api/v1/admin/accounts/usage[?platform=xxx]
+// platform 可选；不传时查询所有平台
+func (h *AccountHandler) GetAccountUsage(c *gin.Context) {
+	platform := c.Query("platform")
+
+	// 收集需要查询的平台 → 插件实例
+	type platformQuery struct {
+		platform string
+		inst     *plugin.PluginInstance
+	}
+	var queries []platformQuery
+
+	if platform != "" {
+		inst := h.pluginMgr.GetPluginByPlatform(platform)
+		if inst != nil {
+			queries = append(queries, platformQuery{platform, inst})
+		}
+	} else {
+		// 从已加载插件中获取所有 gateway 平台
+		for _, meta := range h.pluginMgr.GetAllPluginMeta() {
+			if meta.Platform == "" {
+				continue
+			}
+			inst := h.pluginMgr.GetPluginByPlatform(meta.Platform)
+			if inst != nil {
+				queries = append(queries, platformQuery{meta.Platform, inst})
+			}
+		}
+	}
+
+	merged := make(map[string]any)
+
+	type acctReq struct {
+		ID          int               `json:"id"`
+		Credentials map[string]string `json:"credentials"`
+	}
+
+	for _, q := range queries {
+		accounts, err := h.db.Account.Query().
+			Where(account.PlatformEQ(q.platform)).
+			All(c.Request.Context())
+		if err != nil || len(accounts) == 0 {
+			continue
+		}
+
+		reqList := make([]acctReq, len(accounts))
+		for i, a := range accounts {
+			reqList[i] = acctReq{ID: a.ID, Credentials: a.Credentials}
+		}
+		body, _ := json.Marshal(reqList)
+
+		status, _, respBody, err := q.inst.Gateway.HandleHTTPRequest(
+			c.Request.Context(), "POST", "usage/accounts", "", nil, body,
+		)
+		if err != nil || status != http.StatusOK {
+			continue
+		}
+
+		var result struct {
+			Accounts map[string]any `json:"accounts"`
+		}
+		if json.Unmarshal(respBody, &result) == nil {
+			for k, v := range result.Accounts {
+				merged[k] = v
+			}
+		}
+	}
+
+	response.Success(c, map[string]any{"accounts": merged})
+}
+
+// sendSSEEvent 发送一个 SSE 事件
+func sendSSEEvent(w http.ResponseWriter, data any) {
+	b, _ := json.Marshal(data)
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", b)
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 // GetCredentialsSchema 获取指定平台的凭证字段 schema

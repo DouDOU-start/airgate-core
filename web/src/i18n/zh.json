@@ -163,7 +163,21 @@
     "update_success": "账号更新成功",
     "delete_success": "账号已删除",
     "test_success": "连通性测试通过",
-    "test_failed": "连通性测试失败：{{error}}"
+    "test_failed": "连通性测试失败：{{error}}",
+    "test_connection": "测试连接",
+    "test_modal_title": "测试账号连接",
+    "select_model": "选择测试模型",
+    "start_test": "开始测试",
+    "retry": "重试",
+    "test_ready": "点击「开始测试」按钮开始...",
+    "test_connecting": "连接 API 中...",
+    "test_connected": "已连接到 API",
+    "test_model_used": "使用模型：{{model}}",
+    "test_sending": "发送测试消息：\"hi\"",
+    "test_response": "响应：",
+    "test_done": "测试完成！",
+    "test_error": "测试失败",
+    "usage_window": "用量窗口"
   },
 
   "groups": {

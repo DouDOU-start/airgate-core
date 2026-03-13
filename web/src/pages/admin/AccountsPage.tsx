@@ -21,6 +21,7 @@ import { StatusBadge } from '../../shared/components/Badge';
 import { useToast } from '../../shared/components/Toast';
 import { accountsApi } from '../../shared/api/accounts';
 import { pluginsApi } from '../../shared/api/plugins';
+import { AccountTestModal } from './AccountTestModal';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import {
   loadPluginFrontend,
@@ -198,7 +199,7 @@ export default function AccountsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountResp | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<AccountResp | null>(null);
-  const [testingId, setTestingId] = useState<number | null>(null);
+  const [testingAccount, setTestingAccount] = useState<AccountResp | null>(null);
 
   // 查询账号列表
   const { data, isLoading } = useQuery({
@@ -210,6 +211,13 @@ export default function AccountsPage() {
         platform: platformFilter || undefined,
         status: statusFilter || undefined,
       }),
+  });
+
+  // 查询用量窗口
+  const { data: usageData } = useQuery({
+    queryKey: ['account-usage', platformFilter],
+    queryFn: () => accountsApi.usage(platformFilter || ''),
+    refetchInterval: 60_000, // 每分钟刷新
   });
 
   // 创建账号
@@ -244,23 +252,6 @@ export default function AccountsPage() {
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
     },
     onError: (err: Error) => toast('error', err.message),
-  });
-
-  // 测试连通性
-  const testMutation = useMutation({
-    mutationFn: (id: number) => accountsApi.test(id),
-    onSuccess: (result) => {
-      if (result.success) {
-        toast('success', t('accounts.test_success'));
-      } else {
-        toast('error', t('accounts.test_failed', { error: result.error_msg ?? '' }));
-      }
-      setTestingId(null);
-    },
-    onError: (err: Error) => {
-      toast('error', err.message);
-      setTestingId(null);
-    },
   });
 
   // 表格列定义
@@ -343,6 +334,69 @@ export default function AccountsPage() {
           <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>
         ),
     },
+    // 用量窗口
+    ...(usageData?.accounts && Object.keys(usageData.accounts).length > 0 ? [{
+      key: 'usage_window',
+      title: t('accounts.usage_window'),
+      width: '200px',
+      render: (row: AccountResp) => {
+        const usage = usageData?.accounts?.[String(row.id)];
+        if (!usage) return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
+
+        const windows: Array<{ label: string; used_percent: number; reset_seconds: number }> = usage.windows || [];
+        const credits: { balance: number; unlimited: boolean } | null = usage.credits || null;
+
+        if (windows.length === 0 && !credits) {
+          return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
+        }
+
+        const formatReset = (seconds: number) => {
+          if (!seconds || seconds <= 0) return '-';
+          const d = Math.floor(seconds / 86400);
+          const h = Math.floor((seconds % 86400) / 3600);
+          const m = Math.floor((seconds % 3600) / 60);
+          if (d > 0) return `${d}d ${h}h`;
+          if (h > 0) return `${h}h ${m}m`;
+          return `${m}m`;
+        };
+
+        const usageColor = (pct: number) => {
+          if (pct < 50) return 'var(--ag-success)';
+          if (pct < 80) return 'var(--ag-warning)';
+          return 'var(--ag-danger)';
+        };
+
+        const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', minWidth: 24 };
+
+        return (
+          <div className="flex flex-col gap-0.5 text-[11px]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+            {windows.map((w, i) => (
+              <div key={i} className="flex items-center gap-1">
+                <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
+                  {w.label}
+                </span>
+                <span style={{ color: usageColor(w.used_percent) }}>
+                  {Math.round(w.used_percent)}%
+                </span>
+                <span style={{ color: 'var(--ag-text-tertiary)', fontSize: 10 }}>
+                  {formatReset(w.reset_seconds)}
+                </span>
+              </div>
+            ))}
+            {credits && (
+              <div className="flex items-center gap-1">
+                <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
+                  $
+                </span>
+                <span style={{ color: credits.unlimited ? 'var(--ag-success)' : credits.balance > 0 ? 'var(--ag-text)' : 'var(--ag-danger)' }}>
+                  {credits.unlimited ? '∞' : `$${Number(credits.balance).toFixed(2)}`}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      },
+    } as Column<AccountResp>] : []),
     {
       key: 'actions',
       title: t('common.actions'),
@@ -360,13 +414,9 @@ export default function AccountsPage() {
             size="sm"
             variant="ghost"
             icon={<Zap className="w-3.5 h-3.5" />}
-            loading={testingId === row.id && testMutation.isPending}
-            onClick={() => {
-              setTestingId(row.id);
-              testMutation.mutate(row.id);
-            }}
+            onClick={() => setTestingAccount(row)}
           >
-            {t('common.test')}
+            {t('accounts.test_connection')}
           </Button>
           <Button
             size="sm"
@@ -459,6 +509,13 @@ export default function AccountsPage() {
         message={t('accounts.delete_confirm', { name: deletingAccount?.name })}
         loading={deleteMutation.isPending}
         danger
+      />
+
+      {/* 测试连接 */}
+      <AccountTestModal
+        open={!!testingAccount}
+        account={testingAccount}
+        onClose={() => setTestingAccount(null)}
       />
     </div>
   );
