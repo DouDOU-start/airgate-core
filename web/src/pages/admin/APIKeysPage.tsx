@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Shield,
   Layers,
+  Eye,
 } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
@@ -35,6 +36,7 @@ export default function APIKeysPage() {
   const [editingKey, setEditingKey] = useState<APIKeyResp | null>(null);
   const [deletingKey, setDeletingKey] = useState<APIKeyResp | null>(null);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
 
   // 查询密钥列表
   const { data, isLoading } = useQuery({
@@ -63,10 +65,10 @@ export default function APIKeysPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  // 更新密钥
+  // 更新密钥（管理员接口，支持修改分组）
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateAPIKeyReq }) =>
-      apikeysApi.update(id, data),
+      apikeysApi.adminUpdate(id, data),
     onSuccess: () => {
       toast('success', t('api_keys.update_success'));
       setEditingKey(null);
@@ -82,6 +84,17 @@ export default function APIKeysPage() {
       toast('success', t('api_keys.delete_success'));
       setDeletingKey(null);
       queryClient.invalidateQueries({ queryKey: ['apikeys'] });
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  // 查看密钥
+  const revealMutation = useMutation({
+    mutationFn: (id: number) => apikeysApi.reveal(id),
+    onSuccess: (resp) => {
+      if (resp.key) {
+        setRevealedKey(resp.key);
+      }
     },
     onError: (err: Error) => toast('error', err.message),
   });
@@ -186,6 +199,15 @@ export default function APIKeysPage() {
           <Button
             size="sm"
             variant="ghost"
+            icon={<Eye className="w-3.5 h-3.5" />}
+            onClick={() => revealMutation.mutate(row.id)}
+            loading={revealMutation.isPending}
+          >
+            {t('api_keys.reveal')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
             icon={<Pencil className="w-3.5 h-3.5" />}
             onClick={() => setEditingKey(row)}
           >
@@ -238,11 +260,18 @@ export default function APIKeysPage() {
         loading={createMutation.isPending}
       />
 
-      {/* 密钥展示弹窗 */}
+      {/* 密钥展示弹窗（创建后） */}
       <KeyRevealModal
         open={!!createdKey}
         keyValue={createdKey ?? ''}
         onClose={() => setCreatedKey(null)}
+      />
+
+      {/* 密钥展示弹窗（查看） */}
+      <KeyRevealModal
+        open={!!revealedKey}
+        keyValue={revealedKey ?? ''}
+        onClose={() => setRevealedKey(null)}
       />
 
       {/* 编辑弹窗 */}
@@ -250,6 +279,7 @@ export default function APIKeysPage() {
         <EditKeyModal
           open
           apiKey={editingKey}
+          groups={groupsData?.list ?? []}
           onClose={() => setEditingKey(null)}
           onSubmit={(data) =>
             updateMutation.mutate({ id: editingKey.id, data })
@@ -522,17 +552,20 @@ function KeyRevealModal({
 function EditKeyModal({
   open,
   apiKey,
+  groups,
   onClose,
   onSubmit,
   loading,
 }: {
   open: boolean;
   apiKey: APIKeyResp;
+  groups: GroupResp[];
   onClose: () => void;
   onSubmit: (data: UpdateAPIKeyReq) => void;
   loading: boolean;
 }) {
   const { t } = useTranslation();
+  const [groupId, setGroupId] = useState(apiKey.group_id);
   const [form, setForm] = useState<UpdateAPIKeyReq>({
     name: apiKey.name,
     quota_usd: apiKey.quota_usd,
@@ -555,10 +588,16 @@ function EditKeyModal({
       : undefined;
     onSubmit({
       ...form,
+      group_id: groupId !== apiKey.group_id ? groupId : undefined,
       ip_whitelist: whitelist,
       ip_blacklist: blacklist,
     });
   };
+
+  const groupOptions = groups.map((g) => ({
+    value: String(g.id),
+    label: `${g.name} (${g.platform})`,
+  }));
 
   return (
     <Modal
@@ -583,6 +622,13 @@ function EditKeyModal({
           value={form.name ?? ''}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           icon={<Key className="w-4 h-4" />}
+        />
+
+        <Select
+          label={t('api_keys.group')}
+          value={String(groupId)}
+          onChange={(e) => setGroupId(Number(e.target.value))}
+          options={groupOptions}
         />
 
         <Input

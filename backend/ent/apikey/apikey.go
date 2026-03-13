@@ -19,6 +19,8 @@ const (
 	FieldName = "name"
 	// FieldKeyHash holds the string denoting the key_hash field in the database.
 	FieldKeyHash = "key_hash"
+	// FieldKeyEncrypted holds the string denoting the key_encrypted field in the database.
+	FieldKeyEncrypted = "key_encrypted"
 	// FieldIPWhitelist holds the string denoting the ip_whitelist field in the database.
 	FieldIPWhitelist = "ip_whitelist"
 	// FieldIPBlacklist holds the string denoting the ip_blacklist field in the database.
@@ -71,6 +73,7 @@ var Columns = []string{
 	FieldID,
 	FieldName,
 	FieldKeyHash,
+	FieldKeyEncrypted,
 	FieldIPWhitelist,
 	FieldIPBlacklist,
 	FieldQuotaUsd,
@@ -162,6 +165,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByKeyHash orders the results by the key_hash field.
 func ByKeyHash(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldKeyHash, opts...).ToFunc()
+}
+
+// ByKeyEncrypted orders the results by the key_encrypted field.
+func ByKeyEncrypted(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldKeyEncrypted, opts...).ToFunc()
 }
 
 // ByQuotaUsd orders the results by the quota_usd field.

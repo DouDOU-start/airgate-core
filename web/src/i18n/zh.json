@@ -241,7 +241,8 @@
     "delete_key_confirm": "确定要删除密钥「{{name}}」吗？此操作不可恢复。",
     "create_success": "API 密钥创建成功",
     "update_success": "密钥更新成功",
-    "delete_success": "密钥已删除"
+    "delete_success": "密钥已删除",
+    "reveal": "查看密钥"
   },
 
   "subscriptions": {
@@ -287,7 +288,7 @@
     "create_success": "代理创建成功",
     "update_success": "代理更新成功",
     "delete_success": "代理已删除",
-    "test_success": "连通性测试成功，延迟: {{ms}}ms",
+    "test_success": "连通性测试成功：{{detail}}",
     "test_failed": "连通性测试失败: {{error}}"
   },
 

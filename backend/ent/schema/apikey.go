@@ -15,6 +15,7 @@ func (APIKey) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").NotEmpty(),
 		field.String("key_hash").NotEmpty().Sensitive(),
+		field.String("key_encrypted").Optional().Sensitive(),
 		field.JSON("ip_whitelist", []string{}).Optional(),
 		field.JSON("ip_blacklist", []string{}).Optional(),
 		field.Float("quota_usd").Default(0),

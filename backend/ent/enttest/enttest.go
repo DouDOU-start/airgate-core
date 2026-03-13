@@ -10,7 +10,6 @@ import (
 	_ "github.com/DouDOU-start/airgate-core/ent/runtime"
 
 	"entgo.io/ent/dialect/sql/schema"
-
 	"github.com/DouDOU-start/airgate-core/ent/migrate"
 )
 

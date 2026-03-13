@@ -8,8 +8,9 @@ export const apikeysApi = {
   create: (data: CreateAPIKeyReq) => post<APIKeyResp>('/api/v1/api-keys', data),
   update: (id: number, data: UpdateAPIKeyReq) => put<void>(`/api/v1/api-keys/${id}`, data),
   delete: (id: number) => del<void>(`/api/v1/api-keys/${id}`),
+  reveal: (id: number) => get<APIKeyResp>(`/api/v1/api-keys/${id}/reveal`),
 
   // 管理员接口
-  adminUpdate: (id: number, data: UpdateAPIKeyReq & { group_id?: number }) =>
+  adminUpdate: (id: number, data: UpdateAPIKeyReq) =>
     put<void>(`/api/v1/admin/api-keys/${id}`, data),
 };

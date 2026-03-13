@@ -10,7 +10,6 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -33,6 +32,20 @@ func (akc *APIKeyCreate) SetName(s string) *APIKeyCreate {
 // SetKeyHash sets the "key_hash" field.
 func (akc *APIKeyCreate) SetKeyHash(s string) *APIKeyCreate {
 	akc.mutation.SetKeyHash(s)
+	return akc
+}
+
+// SetKeyEncrypted sets the "key_encrypted" field.
+func (akc *APIKeyCreate) SetKeyEncrypted(s string) *APIKeyCreate {
+	akc.mutation.SetKeyEncrypted(s)
+	return akc
+}
+
+// SetNillableKeyEncrypted sets the "key_encrypted" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableKeyEncrypted(s *string) *APIKeyCreate {
+	if s != nil {
+		akc.SetKeyEncrypted(*s)
+	}
 	return akc
 }
 
@@ -303,6 +316,10 @@ func (akc *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := akc.mutation.KeyHash(); ok {
 		_spec.SetField(apikey.FieldKeyHash, field.TypeString, value)
 		_node.KeyHash = value
+	}
+	if value, ok := akc.mutation.KeyEncrypted(); ok {
+		_spec.SetField(apikey.FieldKeyEncrypted, field.TypeString, value)
+		_node.KeyEncrypted = value
 	}
 	if value, ok := akc.mutation.IPWhitelist(); ok {
 		_spec.SetField(apikey.FieldIPWhitelist, field.TypeJSON, value)

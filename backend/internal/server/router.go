@@ -23,7 +23,7 @@ func (s *Server) registerRoutes() {
 	userHandler := handler.NewUserHandler(s.db)
 	accountHandler := handler.NewAccountHandler(s.db, s.pluginMgr, s.concurrency)
 	groupHandler := handler.NewGroupHandler(s.db)
-	apikeyHandler := handler.NewAPIKeyHandler(s.db)
+	apikeyHandler := handler.NewAPIKeyHandler(s.db, s.cfg.JWT.Secret)
 	subscriptionHandler := handler.NewSubscriptionHandler(s.db)
 	usageHandler := handler.NewUsageHandler(s.db)
 	proxyHandler := handler.NewProxyHandler(s.db)
@@ -32,14 +32,6 @@ func (s *Server) registerRoutes() {
 
 	// 插件 Handler（使用 server 持有的组件）
 	pluginHandler := handler.NewPluginHandler(s.pluginMgr, s.marketplace)
-
-	// === 插件 API 路由（API Key 认证，catch-all） ===
-	// 必须在管理 API 路由之前注册，使用独立的路由组
-	pluginAPI := r.Group("/v1")
-	pluginAPI.Use(middleware.APIKeyAuth(s.db))
-	{
-		pluginAPI.Any("/*path", s.dynamicRouter.Handle)
-	}
 
 	// API v1 路由组
 	v1 := r.Group("/api/v1")
@@ -74,6 +66,7 @@ func (s *Server) registerRoutes() {
 		userGroup.POST("/api-keys", apikeyHandler.CreateKey)
 		userGroup.PUT("/api-keys/:id", apikeyHandler.UpdateKey)
 		userGroup.DELETE("/api-keys/:id", apikeyHandler.DeleteKey)
+		userGroup.GET("/api-keys/:id/reveal", apikeyHandler.RevealKey)
 
 		// 订阅
 		userGroup.GET("/subscriptions", subscriptionHandler.UserSubscriptions)
@@ -169,7 +162,21 @@ func (s *Server) registerRoutes() {
 
 	// 静态文件服务（前端）
 	r.Static("/assets", "web/dist/assets")
+
+	// NoRoute: 携带 API Key 的请求转发到插件系统，其余返回前端 index.html
+	apiKeyAuth := middleware.APIKeyAuth(s.db)
 	r.NoRoute(func(c *gin.Context) {
+		// 检查是否携带 Bearer token（API Key 调用）
+		auth := c.GetHeader("Authorization")
+		if len(auth) > 7 && auth[:7] == "Bearer " {
+			apiKeyAuth(c)
+			if c.IsAborted() {
+				return
+			}
+			c.Params = append(c.Params, gin.Param{Key: "path", Value: c.Request.URL.Path})
+			s.dynamicRouter.Handle(c)
+			return
+		}
 		c.File("web/dist/index.html")
 	})
 }

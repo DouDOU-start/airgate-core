@@ -7,7 +7,6 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
-
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 )
 
@@ -64,6 +63,11 @@ func Name(v string) predicate.APIKey {
 // KeyHash applies equality check predicate on the "key_hash" field. It's identical to KeyHashEQ.
 func KeyHash(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldKeyHash, v))
+}
+
+// KeyEncrypted applies equality check predicate on the "key_encrypted" field. It's identical to KeyEncryptedEQ.
+func KeyEncrypted(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldKeyEncrypted, v))
 }
 
 // QuotaUsd applies equality check predicate on the "quota_usd" field. It's identical to QuotaUsdEQ.
@@ -219,6 +223,81 @@ func KeyHashEqualFold(v string) predicate.APIKey {
 // KeyHashContainsFold applies the ContainsFold predicate on the "key_hash" field.
 func KeyHashContainsFold(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldContainsFold(FieldKeyHash, v))
+}
+
+// KeyEncryptedEQ applies the EQ predicate on the "key_encrypted" field.
+func KeyEncryptedEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldKeyEncrypted, v))
+}
+
+// KeyEncryptedNEQ applies the NEQ predicate on the "key_encrypted" field.
+func KeyEncryptedNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldKeyEncrypted, v))
+}
+
+// KeyEncryptedIn applies the In predicate on the "key_encrypted" field.
+func KeyEncryptedIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldKeyEncrypted, vs...))
+}
+
+// KeyEncryptedNotIn applies the NotIn predicate on the "key_encrypted" field.
+func KeyEncryptedNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldKeyEncrypted, vs...))
+}
+
+// KeyEncryptedGT applies the GT predicate on the "key_encrypted" field.
+func KeyEncryptedGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldKeyEncrypted, v))
+}
+
+// KeyEncryptedGTE applies the GTE predicate on the "key_encrypted" field.
+func KeyEncryptedGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldKeyEncrypted, v))
+}
+
+// KeyEncryptedLT applies the LT predicate on the "key_encrypted" field.
+func KeyEncryptedLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldKeyEncrypted, v))
+}
+
+// KeyEncryptedLTE applies the LTE predicate on the "key_encrypted" field.
+func KeyEncryptedLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldKeyEncrypted, v))
+}
+
+// KeyEncryptedContains applies the Contains predicate on the "key_encrypted" field.
+func KeyEncryptedContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldKeyEncrypted, v))
+}
+
+// KeyEncryptedHasPrefix applies the HasPrefix predicate on the "key_encrypted" field.
+func KeyEncryptedHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldKeyEncrypted, v))
+}
+
+// KeyEncryptedHasSuffix applies the HasSuffix predicate on the "key_encrypted" field.
+func KeyEncryptedHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldKeyEncrypted, v))
+}
+
+// KeyEncryptedIsNil applies the IsNil predicate on the "key_encrypted" field.
+func KeyEncryptedIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldKeyEncrypted))
+}
+
+// KeyEncryptedNotNil applies the NotNil predicate on the "key_encrypted" field.
+func KeyEncryptedNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldKeyEncrypted))
+}
+
+// KeyEncryptedEqualFold applies the EqualFold predicate on the "key_encrypted" field.
+func KeyEncryptedEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldKeyEncrypted, v))
+}
+
+// KeyEncryptedContainsFold applies the ContainsFold predicate on the "key_encrypted" field.
+func KeyEncryptedContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldKeyEncrypted, v))
 }
 
 // IPWhitelistIsNil applies the IsNil predicate on the "ip_whitelist" field.

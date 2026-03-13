@@ -17,6 +17,7 @@ import {
   Key,
   Copy,
   AlertTriangle,
+  Eye,
 } from 'lucide-react';
 import type { APIKeyResp, CreateAPIKeyReq, UpdateAPIKeyReq } from '../../shared/types';
 
@@ -47,6 +48,7 @@ export default function UserKeysPage() {
 
   // 显示新创建密钥的弹窗
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
 
   // 密钥列表
   const { data, isLoading } = useQuery({
@@ -98,6 +100,17 @@ export default function UserKeysPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
+  // 查看密钥
+  const revealMutation = useMutation({
+    mutationFn: (id: number) => apikeysApi.reveal(id),
+    onSuccess: (resp) => {
+      if (resp.key) {
+        setRevealedKey(resp.key);
+      }
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
   function openCreate() {
     setEditingKey(null);
     setForm(emptyForm);
@@ -134,6 +147,7 @@ export default function UserKeysPage() {
     if (editingKey) {
       const payload: UpdateAPIKeyReq = {
         name: form.name,
+        group_id: form.group_id ? Number(form.group_id) : undefined,
         quota_usd: form.quota_usd ? Number(form.quota_usd) : undefined,
         expires_at: form.expires_at || undefined,
       };
@@ -218,6 +232,15 @@ export default function UserKeysPage() {
           <Button
             size="sm"
             variant="ghost"
+            onClick={() => revealMutation.mutate(row.id)}
+            icon={<Eye className="w-3.5 h-3.5" />}
+            loading={revealMutation.isPending}
+          >
+            {t('api_keys.reveal')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
             onClick={() => openEdit(row)}
             icon={<Pencil className="w-3.5 h-3.5" />}
           >
@@ -285,15 +308,13 @@ export default function UserKeysPage() {
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             placeholder={t('user_keys.name_placeholder')}
           />
-          {!editingKey && (
-            <Select
-              label={t('user_keys.group')}
-              required
-              value={form.group_id}
-              onChange={(e) => setForm({ ...form, group_id: e.target.value })}
-              options={groupOptions}
-            />
-          )}
+          <Select
+            label={t('user_keys.group')}
+            required
+            value={form.group_id}
+            onChange={(e) => setForm({ ...form, group_id: e.target.value })}
+            options={groupOptions}
+          />
           <Input
             label={t('user_keys.quota_label')}
             type="number"
@@ -338,6 +359,36 @@ export default function UserKeysPage() {
             size="sm"
             onClick={() => {
               navigator.clipboard.writeText(createdKey || '');
+              toast('success', t('user_keys.copy_key'));
+            }}
+            icon={<Copy className="w-3.5 h-3.5" />}
+          >
+            {t('user_keys.copy_key')}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* 查看密钥弹窗 */}
+      <Modal
+        open={!!revealedKey}
+        onClose={() => setRevealedKey(null)}
+        title={t('api_keys.reveal')}
+        footer={
+          <Button onClick={() => setRevealedKey(null)}>{t('common.close')}</Button>
+        }
+      >
+        <div className="space-y-4">
+          <div
+            className="rounded-[var(--ag-radius-md)] border border-[var(--ag-glass-border)] bg-[var(--ag-bg-surface)] p-3 break-all text-sm text-[var(--ag-text)]"
+            style={{ fontFamily: 'var(--ag-font-mono)' }}
+          >
+            {revealedKey}
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              navigator.clipboard.writeText(revealedKey || '');
               toast('success', t('user_keys.copy_key'));
             }}
             icon={<Copy className="w-3.5 h-3.5" />}

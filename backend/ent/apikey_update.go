@@ -12,7 +12,6 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
-
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
@@ -58,6 +57,26 @@ func (aku *APIKeyUpdate) SetNillableKeyHash(s *string) *APIKeyUpdate {
 	if s != nil {
 		aku.SetKeyHash(*s)
 	}
+	return aku
+}
+
+// SetKeyEncrypted sets the "key_encrypted" field.
+func (aku *APIKeyUpdate) SetKeyEncrypted(s string) *APIKeyUpdate {
+	aku.mutation.SetKeyEncrypted(s)
+	return aku
+}
+
+// SetNillableKeyEncrypted sets the "key_encrypted" field if the given value is not nil.
+func (aku *APIKeyUpdate) SetNillableKeyEncrypted(s *string) *APIKeyUpdate {
+	if s != nil {
+		aku.SetKeyEncrypted(*s)
+	}
+	return aku
+}
+
+// ClearKeyEncrypted clears the value of the "key_encrypted" field.
+func (aku *APIKeyUpdate) ClearKeyEncrypted() *APIKeyUpdate {
+	aku.mutation.ClearKeyEncrypted()
 	return aku
 }
 
@@ -334,6 +353,12 @@ func (aku *APIKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := aku.mutation.KeyHash(); ok {
 		_spec.SetField(apikey.FieldKeyHash, field.TypeString, value)
 	}
+	if value, ok := aku.mutation.KeyEncrypted(); ok {
+		_spec.SetField(apikey.FieldKeyEncrypted, field.TypeString, value)
+	}
+	if aku.mutation.KeyEncryptedCleared() {
+		_spec.ClearField(apikey.FieldKeyEncrypted, field.TypeString)
+	}
 	if value, ok := aku.mutation.IPWhitelist(); ok {
 		_spec.SetField(apikey.FieldIPWhitelist, field.TypeJSON, value)
 	}
@@ -528,6 +553,26 @@ func (akuo *APIKeyUpdateOne) SetNillableKeyHash(s *string) *APIKeyUpdateOne {
 	if s != nil {
 		akuo.SetKeyHash(*s)
 	}
+	return akuo
+}
+
+// SetKeyEncrypted sets the "key_encrypted" field.
+func (akuo *APIKeyUpdateOne) SetKeyEncrypted(s string) *APIKeyUpdateOne {
+	akuo.mutation.SetKeyEncrypted(s)
+	return akuo
+}
+
+// SetNillableKeyEncrypted sets the "key_encrypted" field if the given value is not nil.
+func (akuo *APIKeyUpdateOne) SetNillableKeyEncrypted(s *string) *APIKeyUpdateOne {
+	if s != nil {
+		akuo.SetKeyEncrypted(*s)
+	}
+	return akuo
+}
+
+// ClearKeyEncrypted clears the value of the "key_encrypted" field.
+func (akuo *APIKeyUpdateOne) ClearKeyEncrypted() *APIKeyUpdateOne {
+	akuo.mutation.ClearKeyEncrypted()
 	return akuo
 }
 
@@ -833,6 +878,12 @@ func (akuo *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err er
 	}
 	if value, ok := akuo.mutation.KeyHash(); ok {
 		_spec.SetField(apikey.FieldKeyHash, field.TypeString, value)
+	}
+	if value, ok := akuo.mutation.KeyEncrypted(); ok {
+		_spec.SetField(apikey.FieldKeyEncrypted, field.TypeString, value)
+	}
+	if akuo.mutation.KeyEncryptedCleared() {
+		_spec.ClearField(apikey.FieldKeyEncrypted, field.TypeString)
 	}
 	if value, ok := akuo.mutation.IPWhitelist(); ok {
 		_spec.SetField(apikey.FieldIPWhitelist, field.TypeJSON, value)

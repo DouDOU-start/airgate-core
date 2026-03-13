@@ -14,18 +14,20 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/user"
+	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
 )
 
 // APIKeyHandler API 密钥管理 Handler
 type APIKeyHandler struct {
-	db *ent.Client
+	db     *ent.Client
+	secret string // JWT secret，用于 AES-GCM 加密 API 密钥
 }
 
 // NewAPIKeyHandler 创建 APIKeyHandler
-func NewAPIKeyHandler(db *ent.Client) *APIKeyHandler {
-	return &APIKeyHandler{db: db}
+func NewAPIKeyHandler(db *ent.Client, secret string) *APIKeyHandler {
+	return &APIKeyHandler{db: db, secret: secret}
 }
 
 // ListKeys 查询当前用户的 API 密钥列表
@@ -106,9 +108,18 @@ func (h *APIKeyHandler) CreateKey(c *gin.Context) {
 	// 计算 SHA256 哈希存储
 	keyHash := hashAPIKey(rawKey)
 
+	// AES-GCM 加密存储（用于后续查看原文）
+	encrypted, err := auth.EncryptAPIKey(rawKey, h.secret)
+	if err != nil {
+		slog.Error("加密 API 密钥失败", "error", err)
+		response.InternalError(c, "创建失败")
+		return
+	}
+
 	builder := h.db.APIKey.Create().
 		SetName(req.Name).
 		SetKeyHash(keyHash).
+		SetKeyEncrypted(encrypted).
 		SetUserID(uid).
 		SetGroupID(int(req.GroupID)).
 		SetQuotaUsd(req.QuotaUSD)
@@ -189,6 +200,9 @@ func (h *APIKeyHandler) UpdateKey(c *gin.Context) {
 	builder := h.db.APIKey.UpdateOneID(id)
 	if req.Name != nil {
 		builder = builder.SetName(*req.Name)
+	}
+	if req.GroupID != nil {
+		builder = builder.SetGroupID(int(*req.GroupID))
 	}
 	if req.IPWhitelist != nil {
 		builder = builder.SetIPWhitelist(req.IPWhitelist)
@@ -337,6 +351,54 @@ func (h *APIKeyHandler) AdminUpdateKey(c *gin.Context) {
 	}
 
 	response.Success(c, toAPIKeyResp(updated, ""))
+}
+
+// RevealKey 查看 API 密钥原文
+func (h *APIKeyHandler) RevealKey(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	uid, ok := userID.(int)
+	if !ok {
+		response.Unauthorized(c, "用户未认证")
+		return
+	}
+
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "无效的密钥 ID")
+		return
+	}
+
+	// 查询密钥（验证归属）
+	k, err := h.db.APIKey.Query().
+		Where(apikey.IDEQ(id), apikey.HasUserWith(user.IDEQ(uid))).
+		WithGroup().
+		Only(c.Request.Context())
+	if err != nil {
+		if ent.IsNotFound(err) {
+			response.NotFound(c, "密钥不存在")
+			return
+		}
+		slog.Error("查询密钥失败", "error", err)
+		response.InternalError(c, "查询失败")
+		return
+	}
+
+	// 旧密钥没有加密字段
+	if k.KeyEncrypted == "" {
+		response.BadRequest(c, "该密钥创建于加密存储启用前，无法查看原文")
+		return
+	}
+
+	plainKey, err := auth.DecryptAPIKey(k.KeyEncrypted, h.secret)
+	if err != nil {
+		slog.Error("解密 API 密钥失败", "error", err)
+		response.InternalError(c, "解密失败")
+		return
+	}
+
+	resp := toAPIKeyResp(k, plainKey)
+	resp.UserID = int64(uid)
+	response.Success(c, resp)
 }
 
 // generateAPIKey 生成 sk- 前缀的随机 API 密钥

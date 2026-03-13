@@ -30,6 +30,7 @@ type CreateAPIKeyReq struct {
 // UpdateAPIKeyReq 更新 API 密钥请求
 type UpdateAPIKeyReq struct {
 	Name        *string  `json:"name"`
+	GroupID     *int64   `json:"group_id"`
 	IPWhitelist []string `json:"ip_whitelist"`
 	IPBlacklist []string `json:"ip_blacklist"`
 	QuotaUSD    *float64 `json:"quota_usd"`
@@ -39,6 +40,5 @@ type UpdateAPIKeyReq struct {
 
 // AdminUpdateAPIKeyReq 管理员更新密钥请求
 type AdminUpdateAPIKeyReq struct {
-	GroupID *int64 `json:"group_id"`
 	UpdateAPIKeyReq
 }

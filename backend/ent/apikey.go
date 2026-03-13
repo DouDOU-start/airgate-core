@@ -10,7 +10,6 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -25,6 +24,8 @@ type APIKey struct {
 	Name string `json:"name,omitempty"`
 	// KeyHash holds the value of the "key_hash" field.
 	KeyHash string `json:"-"`
+	// KeyEncrypted holds the value of the "key_encrypted" field.
+	KeyEncrypted string `json:"-"`
 	// IPWhitelist holds the value of the "ip_whitelist" field.
 	IPWhitelist []string `json:"ip_whitelist,omitempty"`
 	// IPBlacklist holds the value of the "ip_blacklist" field.
@@ -104,7 +105,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case apikey.FieldID:
 			values[i] = new(sql.NullInt64)
-		case apikey.FieldName, apikey.FieldKeyHash, apikey.FieldStatus:
+		case apikey.FieldName, apikey.FieldKeyHash, apikey.FieldKeyEncrypted, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
 		case apikey.FieldExpiresAt, apikey.FieldCreatedAt, apikey.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -144,6 +145,12 @@ func (ak *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field key_hash", values[i])
 			} else if value.Valid {
 				ak.KeyHash = value.String
+			}
+		case apikey.FieldKeyEncrypted:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field key_encrypted", values[i])
+			} else if value.Valid {
+				ak.KeyEncrypted = value.String
 			}
 		case apikey.FieldIPWhitelist:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -267,6 +274,8 @@ func (ak *APIKey) String() string {
 	builder.WriteString(ak.Name)
 	builder.WriteString(", ")
 	builder.WriteString("key_hash=<sensitive>")
+	builder.WriteString(", ")
+	builder.WriteString("key_encrypted=<sensitive>")
 	builder.WriteString(", ")
 	builder.WriteString("ip_whitelist=")
 	builder.WriteString(fmt.Sprintf("%v", ak.IPWhitelist))

@@ -11,7 +11,6 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-
 	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
@@ -56,6 +55,7 @@ type APIKeyMutation struct {
 	id                 *int
 	name               *string
 	key_hash           *string
+	key_encrypted      *string
 	ip_whitelist       *[]string
 	appendip_whitelist []string
 	ip_blacklist       *[]string
@@ -249,6 +249,55 @@ func (m *APIKeyMutation) OldKeyHash(ctx context.Context) (v string, err error) {
 // ResetKeyHash resets all changes to the "key_hash" field.
 func (m *APIKeyMutation) ResetKeyHash() {
 	m.key_hash = nil
+}
+
+// SetKeyEncrypted sets the "key_encrypted" field.
+func (m *APIKeyMutation) SetKeyEncrypted(s string) {
+	m.key_encrypted = &s
+}
+
+// KeyEncrypted returns the value of the "key_encrypted" field in the mutation.
+func (m *APIKeyMutation) KeyEncrypted() (r string, exists bool) {
+	v := m.key_encrypted
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKeyEncrypted returns the old "key_encrypted" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldKeyEncrypted(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKeyEncrypted is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKeyEncrypted requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKeyEncrypted: %w", err)
+	}
+	return oldValue.KeyEncrypted, nil
+}
+
+// ClearKeyEncrypted clears the value of the "key_encrypted" field.
+func (m *APIKeyMutation) ClearKeyEncrypted() {
+	m.key_encrypted = nil
+	m.clearedFields[apikey.FieldKeyEncrypted] = struct{}{}
+}
+
+// KeyEncryptedCleared returns if the "key_encrypted" field was cleared in this mutation.
+func (m *APIKeyMutation) KeyEncryptedCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldKeyEncrypted]
+	return ok
+}
+
+// ResetKeyEncrypted resets all changes to the "key_encrypted" field.
+func (m *APIKeyMutation) ResetKeyEncrypted() {
+	m.key_encrypted = nil
+	delete(m.clearedFields, apikey.FieldKeyEncrypted)
 }
 
 // SetIPWhitelist sets the "ip_whitelist" field.
@@ -816,12 +865,15 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 11)
 	if m.name != nil {
 		fields = append(fields, apikey.FieldName)
 	}
 	if m.key_hash != nil {
 		fields = append(fields, apikey.FieldKeyHash)
+	}
+	if m.key_encrypted != nil {
+		fields = append(fields, apikey.FieldKeyEncrypted)
 	}
 	if m.ip_whitelist != nil {
 		fields = append(fields, apikey.FieldIPWhitelist)
@@ -859,6 +911,8 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case apikey.FieldKeyHash:
 		return m.KeyHash()
+	case apikey.FieldKeyEncrypted:
+		return m.KeyEncrypted()
 	case apikey.FieldIPWhitelist:
 		return m.IPWhitelist()
 	case apikey.FieldIPBlacklist:
@@ -888,6 +942,8 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldName(ctx)
 	case apikey.FieldKeyHash:
 		return m.OldKeyHash(ctx)
+	case apikey.FieldKeyEncrypted:
+		return m.OldKeyEncrypted(ctx)
 	case apikey.FieldIPWhitelist:
 		return m.OldIPWhitelist(ctx)
 	case apikey.FieldIPBlacklist:
@@ -926,6 +982,13 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetKeyHash(v)
+		return nil
+	case apikey.FieldKeyEncrypted:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKeyEncrypted(v)
 		return nil
 	case apikey.FieldIPWhitelist:
 		v, ok := value.([]string)
@@ -1040,6 +1103,9 @@ func (m *APIKeyMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *APIKeyMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(apikey.FieldKeyEncrypted) {
+		fields = append(fields, apikey.FieldKeyEncrypted)
+	}
 	if m.FieldCleared(apikey.FieldIPWhitelist) {
 		fields = append(fields, apikey.FieldIPWhitelist)
 	}
@@ -1063,6 +1129,9 @@ func (m *APIKeyMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *APIKeyMutation) ClearField(name string) error {
 	switch name {
+	case apikey.FieldKeyEncrypted:
+		m.ClearKeyEncrypted()
+		return nil
 	case apikey.FieldIPWhitelist:
 		m.ClearIPWhitelist()
 		return nil
@@ -1085,6 +1154,9 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldKeyHash:
 		m.ResetKeyHash()
+		return nil
+	case apikey.FieldKeyEncrypted:
+		m.ResetKeyEncrypted()
 		return nil
 	case apikey.FieldIPWhitelist:
 		m.ResetIPWhitelist()
