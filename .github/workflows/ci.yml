@@ -13,9 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Clone airgate-sdk (go.mod replace)
+        run: git clone --depth 1 https://github.com/DouDOU-start/airgate-sdk.git ../airgate-sdk
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
 
       - name: Install golangci-lint
         run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest

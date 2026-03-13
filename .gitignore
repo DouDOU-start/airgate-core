@@ -1,4 +1,5 @@
 # Go
+go.work.sum
 *.exe
 *.exe~
 *.dll

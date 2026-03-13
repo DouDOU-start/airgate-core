@@ -4,7 +4,7 @@ go 1.25.7
 
 require (
 	entgo.io/ent v0.13.1
-	github.com/DouDOU-start/airgate-sdk v0.0.0
+	github.com/DouDOU-start/airgate-sdk v0.0.1
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
@@ -62,5 +62,3 @@ require (
 	google.golang.org/grpc v1.79.2 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-replace github.com/DouDOU-start/airgate-sdk => ../../airgate-sdk
