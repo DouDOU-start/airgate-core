@@ -5,12 +5,13 @@ import (
 	"log/slog"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
-	"github.com/gin-gonic/gin"
 )
 
 // AccountHandler 上游账号管理 Handler
@@ -264,13 +265,13 @@ func (h *AccountHandler) TestAccount(c *gin.Context) {
 		return
 	}
 
-	// 调用插件的 ValidateCredentials
+	// 调用插件的 ValidateAccount
 	creds := make(map[string]string, len(a.Credentials))
 	for k, v := range a.Credentials {
 		creds[k] = fmt.Sprintf("%v", v)
 	}
 
-	if err := inst.Gateway.ValidateCredentials(c.Request.Context(), creds); err != nil {
+	if err := inst.Gateway.ValidateAccount(c.Request.Context(), creds); err != nil {
 		response.Success(c, map[string]interface{}{
 			"success": false,
 			"message": "凭证验证失败: " + err.Error(),

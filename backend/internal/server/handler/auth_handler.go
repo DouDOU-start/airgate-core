@@ -4,14 +4,15 @@ package handler
 import (
 	"log/slog"
 
+	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	entUser "github.com/DouDOU-start/airgate-core/ent/user"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
-	"github.com/gin-gonic/gin"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // AuthHandler 认证相关 Handler

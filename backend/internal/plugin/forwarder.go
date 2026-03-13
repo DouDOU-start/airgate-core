@@ -8,15 +8,16 @@ import (
 	"net/http"
 	"time"
 
-	sdk "github.com/DouDOU-start/airgate-sdk"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/ratelimit"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	sdk "github.com/DouDOU-start/airgate-sdk"
 )
 
 // Forwarder 请求转发器
@@ -144,13 +145,12 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	}
 
 	sdkAccount := &sdk.Account{
-		ID:             int64(account.ID),
-		Name:           account.Name,
-		Platform:       account.Platform,
-		Credentials:    account.Credentials,
-		ProxyURL:       proxyURL,
-		RateMultiplier: account.RateMultiplier,
-		MaxConcurrency: account.MaxConcurrency,
+		ID:          int64(account.ID),
+		Name:        account.Name,
+		Platform:    account.Platform,
+		Type:        account.Type,
+		Credentials: account.Credentials,
+		ProxyURL:    proxyURL,
 	}
 
 	fwdReq := &sdk.ForwardRequest{
@@ -203,7 +203,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		CacheTokens:           result.CacheTokens,
 		Model:                 actualModel,
 		Platform:              inst.Platform,
-		GroupRateMultiplier:    groupRate,
+		GroupRateMultiplier:   groupRate,
 		AccountRateMultiplier: account.RateMultiplier,
 		UserRateMultiplier:    1.0,
 	}, price)
@@ -225,7 +225,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		UserID:                keyInfo.UserID,
 		APIKeyID:              keyInfo.KeyID,
 		AccountID:             account.ID,
-		GroupID:                keyInfo.GroupID,
+		GroupID:               keyInfo.GroupID,
 		Platform:              inst.Platform,
 		Model:                 actualModel,
 		InputTokens:           result.InputTokens,
@@ -263,4 +263,3 @@ func extractModelAndStream(body []byte) (string, bool) {
 	_ = json.Unmarshal(body, &parsed)
 	return parsed.Model, parsed.Stream
 }
-

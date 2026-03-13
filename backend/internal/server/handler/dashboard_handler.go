@@ -4,12 +4,13 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
-	"github.com/gin-gonic/gin"
 )
 
 // DashboardHandler 仪表盘 Handler

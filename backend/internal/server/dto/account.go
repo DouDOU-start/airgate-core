@@ -33,28 +33,28 @@ type CreateAccountReq struct {
 
 // UpdateAccountReq 更新账号请求
 type UpdateAccountReq struct {
-	Name           *string            `json:"name"`
-	Type           *string            `json:"type"`
-	Credentials    map[string]string  `json:"credentials"`
-	Status         *string            `json:"status" binding:"omitempty,oneof=active disabled"`
-	Priority       *int               `json:"priority"`
-	MaxConcurrency *int               `json:"max_concurrency"`
-	ProxyID        *int64             `json:"proxy_id"`
-	RateMultiplier *float64           `json:"rate_multiplier"`
-	GroupIDs       []int64            `json:"group_ids"`
+	Name           *string           `json:"name"`
+	Type           *string           `json:"type"`
+	Credentials    map[string]string `json:"credentials"`
+	Status         *string           `json:"status" binding:"omitempty,oneof=active disabled"`
+	Priority       *int              `json:"priority"`
+	MaxConcurrency *int              `json:"max_concurrency"`
+	ProxyID        *int64            `json:"proxy_id"`
+	RateMultiplier *float64          `json:"rate_multiplier"`
+	GroupIDs       []int64           `json:"group_ids"`
 }
 
 // CredentialSchemaResp 凭证字段 schema 响应
 type CredentialSchemaResp struct {
-	Fields       []CredentialFieldResp  `json:"fields"`
-	AccountTypes []AccountTypeResp      `json:"account_types,omitempty"`
+	Fields       []CredentialFieldResp `json:"fields"`
+	AccountTypes []AccountTypeResp     `json:"account_types,omitempty"`
 }
 
 // AccountTypeResp 账号类型定义
 type AccountTypeResp struct {
-	Key         string               `json:"key"`
-	Label       string               `json:"label"`
-	Description string               `json:"description"`
+	Key         string                `json:"key"`
+	Label       string                `json:"label"`
+	Description string                `json:"description"`
 	Fields      []CredentialFieldResp `json:"fields"`
 }
 

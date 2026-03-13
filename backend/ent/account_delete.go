@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+
 	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 )

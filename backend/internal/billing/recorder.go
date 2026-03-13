@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	defaultBufferSize = 1000             // 内存 channel 缓冲大小
-	batchSize         = 100              // 批量写入阈值
-	flushInterval     = 5 * time.Second  // 定时刷新间隔
-	maxRetries        = 3                // 写入失败最大重试次数
+	defaultBufferSize = 1000            // 内存 channel 缓冲大小
+	batchSize         = 100             // 批量写入阈值
+	flushInterval     = 5 * time.Second // 定时刷新间隔
+	maxRetries        = 3               // 写入失败最大重试次数
 )
 
 // UsageRecord 使用记录

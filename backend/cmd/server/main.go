@@ -12,15 +12,16 @@ import (
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/migrate"
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/i18n"
 	"github.com/DouDOU-start/airgate-core/internal/server"
 	"github.com/DouDOU-start/airgate-core/internal/setup"
-	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq"
-	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -93,7 +94,11 @@ func startMainServer(cfg *config.Config) {
 		os.Exit(1)
 	}
 	db := ent.NewClient(ent.Driver(drv))
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			slog.Warn("关闭数据库连接失败", "error", err)
+		}
+	}()
 
 	// 启动时执行非破坏性迁移，补齐缺失表和字段，避免升级后因 schema 落后导致接口报错。
 	if err := db.Schema.Create(context.Background(), migrate.WithDropIndex(false), migrate.WithDropColumn(false)); err != nil {
@@ -107,7 +112,11 @@ func startMainServer(cfg *config.Config) {
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.DB,
 	})
-	defer rdb.Close()
+	defer func() {
+		if err := rdb.Close(); err != nil {
+			slog.Warn("关闭 Redis 连接失败", "error", err)
+		}
+	}()
 
 	// 创建并启动 HTTP 服务器
 	srv := server.NewServer(cfg, db, rdb)

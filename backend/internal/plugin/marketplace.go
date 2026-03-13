@@ -111,7 +111,11 @@ func (m *Marketplace) SyncFromURL(ctx context.Context, registryURL string) error
 	if err != nil {
 		return fmt.Errorf("请求插件源失败: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Warn("关闭插件源响应失败", "url", registryURL, "error", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("插件源返回状态码 %d", resp.StatusCode)
@@ -143,7 +147,11 @@ func (m *Marketplace) Download(ctx context.Context, pluginName, version, downloa
 	if err != nil {
 		return "", fmt.Errorf("下载插件失败: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Warn("关闭插件下载响应失败", "url", downloadURL, "error", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("下载返回状态码 %d", resp.StatusCode)
@@ -155,22 +163,38 @@ func (m *Marketplace) Download(ctx context.Context, pluginName, version, downloa
 	if err != nil {
 		return "", fmt.Errorf("创建临时文件失败: %w", err)
 	}
+	closeTempFile := func() error {
+		if err := f.Close(); err != nil {
+			return fmt.Errorf("关闭临时文件失败: %w", err)
+		}
+		return nil
+	}
+	removeTempFile := func() {
+		if err := os.Remove(tmpFile); err != nil && !os.IsNotExist(err) {
+			slog.Warn("删除临时插件文件失败", "path", tmpFile, "error", err)
+		}
+	}
 
 	hasher := sha256.New()
 	writer := io.MultiWriter(f, hasher)
 
 	if _, err := io.Copy(writer, resp.Body); err != nil {
-		f.Close()
-		os.Remove(tmpFile)
+		if closeErr := closeTempFile(); closeErr != nil {
+			slog.Warn("写入失败后关闭临时文件失败", "path", tmpFile, "error", closeErr)
+		}
+		removeTempFile()
 		return "", fmt.Errorf("写入文件失败: %w", err)
 	}
-	f.Close()
+	if err := closeTempFile(); err != nil {
+		removeTempFile()
+		return "", err
+	}
 
 	// SHA256 校验
 	if expectedSHA256 != "" {
 		actualHash := hex.EncodeToString(hasher.Sum(nil))
 		if actualHash != expectedSHA256 {
-			os.Remove(tmpFile)
+			removeTempFile()
 			return "", fmt.Errorf("SHA256 校验失败: 期望 %s，实际 %s", expectedSHA256, actualHash)
 		}
 	}
@@ -178,7 +202,7 @@ func (m *Marketplace) Download(ctx context.Context, pluginName, version, downloa
 	// 重命名为最终文件
 	finalPath := filepath.Join(targetDir, pluginName)
 	if err := os.Rename(tmpFile, finalPath); err != nil {
-		os.Remove(tmpFile)
+		removeTempFile()
 		return "", fmt.Errorf("移动文件失败: %w", err)
 	}
 

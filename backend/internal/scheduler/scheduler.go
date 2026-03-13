@@ -11,9 +11,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/account"
-	"github.com/redis/go-redis/v9"
 )
 
 var (

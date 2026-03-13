@@ -7,7 +7,7 @@ BINARY := $(BACKEND_DIR)/server
 GO := GOTOOLCHAIN=local go
 
 .PHONY: help dev dev-backend dev-frontend build build-backend build-frontend \
-        ent lint fmt test clean install docs-check
+        ent lint fmt test clean install ci pre-commit setup-hooks
 
 help: ## 显示帮助信息
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -53,16 +53,13 @@ ent: ## 生成 Ent ORM 代码
 
 # ===================== 质量检查 =====================
 
-lint: ## 代码检查（后端 golangci-lint）
-	@cd $(BACKEND_DIR) && \
-	if command -v golangci-lint > /dev/null 2>&1; then \
-		golangci-lint run ./...; \
-	else \
-		echo "未安装 golangci-lint，回退到 go vet"; \
-		echo "安装: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
-		$(GO) vet ./...; \
+lint: ## 代码检查（需要安装 golangci-lint）
+	@if ! command -v golangci-lint > /dev/null 2>&1; then \
+		echo "错误: 未安装 golangci-lint，请执行: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"; \
+		exit 1; \
 	fi
-	@echo "后端代码检查通过"
+	@cd $(BACKEND_DIR) && golangci-lint run ./...
+	@echo "代码检查通过"
 
 fmt: ## 格式化代码
 	@cd $(BACKEND_DIR) && \
@@ -77,24 +74,22 @@ test: ## 运行测试
 	@cd $(BACKEND_DIR) && $(GO) test ./...
 	@echo "后端测试完成"
 
-# ===================== 文档检查 =====================
 
-docs-check: ## 检查文档中引用的文件是否存在
-	@echo "检查文档引用..."
-	@errors=0; \
-	for doc in docs/*.md; do \
-		for ref in $$(grep -oP '`([a-zA-Z0-9_/-]+\.md)`' "$$doc" | tr -d '`'); do \
-			if [ ! -f "docs/$$ref" ] && [ ! -f "$$ref" ]; then \
-				echo "  ✗ $$doc 引用了不存在的文件: $$ref"; \
-				errors=$$((errors + 1)); \
-			fi; \
-		done; \
-	done; \
-	if [ $$errors -eq 0 ]; then echo "文档引用检查通过"; else echo "发现 $$errors 个破损引用"; exit 1; fi
+# ===================== CI =====================
+
+ci: lint test build-backend ## 本地运行与 CI 完全一致的检查
+
+pre-commit: lint build-backend ## pre-commit hook 调用（跳过耗时的测试）
+
+setup-hooks: ## 安装 Git pre-commit hook
+	@echo '#!/bin/sh' > .git/hooks/pre-commit
+	@echo 'make pre-commit' >> .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "pre-commit hook 已安装"
 
 # ===================== 依赖安装 =====================
 
-install: ## 安装前后端依赖
+install: setup-hooks ## 安装前后端依赖
 	@cd $(BACKEND_DIR) && $(GO) mod download
 	@cd $(WEB_DIR) && npm install
 	@echo "依赖安装完成"

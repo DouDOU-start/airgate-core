@@ -15,10 +15,11 @@ import (
 	"strings"
 	"sync"
 
+	goplugin "github.com/hashicorp/go-plugin"
+
 	sdk "github.com/DouDOU-start/airgate-sdk"
 	sdkgrpc "github.com/DouDOU-start/airgate-sdk/grpc"
 	"github.com/DouDOU-start/airgate-sdk/shared"
-	goplugin "github.com/hashicorp/go-plugin"
 )
 
 // PluginInstance 运行中的插件实例
@@ -32,7 +33,7 @@ type PluginInstance struct {
 	Platform    string
 	Type        string // "gateway", "payment", "extension"
 	Client      *goplugin.Client
-	Gateway     *sdkgrpc.SimpleGatewayGRPCClient
+	Gateway     *sdkgrpc.GatewayGRPCClient
 }
 
 // Manager 插件管理器
@@ -48,7 +49,7 @@ type Manager struct {
 	// 缓存：插件启动时从 gRPC 获取并缓存
 	modelCache        map[string][]sdk.ModelInfo       // platform → models
 	routeCache        map[string][]sdk.RouteDefinition // pluginName → routes
-	credCache         map[string][]sdk.CredentialField // platform → credential fields
+	credCache         map[string][]sdk.CredentialField // platform → credential fields（兼容旧接口）
 	accountTypeCache  map[string][]sdk.AccountType     // platform → account types
 	frontendPageCache map[string][]sdk.FrontendPage    // pluginName → 前端页面声明
 }
@@ -166,7 +167,7 @@ func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *ex
 	client := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig: shared.Handshake,
 		Plugins: goplugin.PluginSet{
-			shared.PluginKeySimpleGateway: &sdkgrpc.SimpleGatewayGRPCPlugin{},
+			shared.PluginKeyGateway: &sdkgrpc.GatewayGRPCPlugin{},
 		},
 		Cmd:              cmd,
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
@@ -179,14 +180,14 @@ func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *ex
 		return "", fmt.Errorf("连接插件进程失败: %w", err)
 	}
 
-	// 获取 SimpleGateway 接口
-	raw, err := rpcClient.Dispense(shared.PluginKeySimpleGateway)
+	// 获取网关插件接口
+	raw, err := rpcClient.Dispense(shared.PluginKeyGateway)
 	if err != nil {
 		client.Kill()
 		return "", fmt.Errorf("获取插件接口失败: %w", err)
 	}
 
-	gateway, ok := raw.(*sdkgrpc.SimpleGatewayGRPCClient)
+	gateway, ok := raw.(*sdkgrpc.GatewayGRPCClient)
 	if !ok {
 		client.Kill()
 		return "", fmt.Errorf("插件类型断言失败")
@@ -239,7 +240,11 @@ func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *ex
 	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
 	m.modelCache[platform] = models
 	m.routeCache[canonicalName] = routes
-	m.credCache[platform] = info.CredentialFields
+	if len(info.AccountTypes) > 0 {
+		m.credCache[platform] = info.AccountTypes[0].Fields
+	} else {
+		delete(m.credCache, platform)
+	}
 	m.accountTypeCache[platform] = info.AccountTypes
 	if len(info.FrontendPages) > 0 {
 		m.frontendPageCache[canonicalName] = info.FrontendPages
@@ -373,7 +378,11 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 	if err != nil {
 		return "", fmt.Errorf("创建临时目录失败: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			slog.Warn("清理插件探测临时目录失败", "dir", tmpDir, "error", err)
+		}
+	}()
 
 	tmpBinary := filepath.Join(tmpDir, fallbackName)
 	if err := os.WriteFile(tmpBinary, binary, 0755); err != nil {
@@ -383,7 +392,7 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 	client := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig: shared.Handshake,
 		Plugins: goplugin.PluginSet{
-			shared.PluginKeySimpleGateway: &sdkgrpc.SimpleGatewayGRPCPlugin{},
+			shared.PluginKeyGateway: &sdkgrpc.GatewayGRPCPlugin{},
 		},
 		Cmd:              exec.Command(tmpBinary),
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
@@ -395,12 +404,12 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 		return "", fmt.Errorf("连接探测进程失败: %w", err)
 	}
 
-	raw, err := rpcClient.Dispense(shared.PluginKeySimpleGateway)
+	raw, err := rpcClient.Dispense(shared.PluginKeyGateway)
 	if err != nil {
 		return "", fmt.Errorf("获取探测接口失败: %w", err)
 	}
 
-	gateway, ok := raw.(*sdkgrpc.SimpleGatewayGRPCClient)
+	gateway, ok := raw.(*sdkgrpc.GatewayGRPCClient)
 	if !ok {
 		return "", fmt.Errorf("探测类型断言失败")
 	}
@@ -427,7 +436,11 @@ func (m *Manager) InstallFromGithub(ctx context.Context, repo string) error {
 	if err != nil {
 		return fmt.Errorf("请求 GitHub API 失败: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Warn("关闭 GitHub API 响应失败", "repo", repo, "error", err)
+		}
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return fmt.Errorf("仓库 %s/%s 不存在或没有 Release", owner, repoName)
@@ -460,7 +473,11 @@ func (m *Manager) InstallFromGithub(ctx context.Context, repo string) error {
 	if err != nil {
 		return fmt.Errorf("下载插件失败: %w", err)
 	}
-	defer dlResp.Body.Close()
+	defer func() {
+		if err := dlResp.Body.Close(); err != nil {
+			slog.Warn("关闭插件下载响应失败", "url", downloadURL, "error", err)
+		}
+	}()
 
 	if dlResp.StatusCode != http.StatusOK {
 		return fmt.Errorf("下载返回状态码 %d", dlResp.StatusCode)

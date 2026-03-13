@@ -4,10 +4,11 @@ package middleware
 import (
 	"strings"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
-	"github.com/gin-gonic/gin"
 )
 
 // Context Key 常量

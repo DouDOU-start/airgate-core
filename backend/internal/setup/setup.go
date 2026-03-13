@@ -14,12 +14,13 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
-	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/ent/migrate"
-	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
+
+	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DouDOU-start/airgate-core/ent/migrate"
+	"github.com/DouDOU-start/airgate-core/internal/config"
 
 	_ "github.com/lib/pq"
 )
@@ -51,7 +52,11 @@ func TestDBConnection(host string, port int, user, password, dbname, sslmode str
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			slog.Warn("关闭测试数据库连接失败", "error", err)
+		}
+	}()
 	return db.PingContext(context.Background())
 }
 
@@ -62,7 +67,11 @@ func TestRedisConnection(host string, port int, password string, db int) error {
 		Password: password,
 		DB:       db,
 	})
-	defer rdb.Close()
+	defer func() {
+		if err := rdb.Close(); err != nil {
+			slog.Warn("关闭测试 Redis 连接失败", "error", err)
+		}
+	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -102,7 +111,11 @@ func Install(params InstallParams) error {
 		return fmt.Errorf("打开数据库失败: %w", err)
 	}
 	client := ent.NewClient(ent.Driver(drv))
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			slog.Warn("关闭安装数据库客户端失败", "error", err)
+		}
+	}()
 
 	slog.Info("正在执行数据库迁移...")
 	if err := client.Schema.Create(context.Background(),

@@ -22,10 +22,10 @@ const apiKeyPrefix = "sk-"
 
 // APIKeyInfo API Key 验证后的信息
 type APIKeyInfo struct {
-	KeyID    int
-	UserID   int
-	GroupID  int
-	QuotaUSD float64
+	KeyID     int
+	UserID    int
+	GroupID   int
+	QuotaUSD  float64
 	UsedQuota float64
 }
 

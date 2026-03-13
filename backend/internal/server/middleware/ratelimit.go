@@ -1,9 +1,10 @@
 package middleware
 
 import (
+	"github.com/gin-gonic/gin"
+
 	"github.com/DouDOU-start/airgate-core/internal/ratelimit"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
-	"github.com/gin-gonic/gin"
 )
 
 // RateLimit 限流中间件

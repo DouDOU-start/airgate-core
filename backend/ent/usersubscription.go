@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 	"github.com/DouDOU-start/airgate-core/ent/usersubscription"

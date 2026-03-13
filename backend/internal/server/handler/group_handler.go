@@ -4,11 +4,12 @@ import (
 	"log/slog"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
-	"github.com/gin-gonic/gin"
 )
 
 // GroupHandler 分组管理 Handler
@@ -51,7 +52,7 @@ func (h *GroupHandler) ListGroups(c *gin.Context) {
 
 	// 分页查询
 	groups, err := query.
-		Offset((page.Page - 1) * page.PageSize).
+		Offset((page.Page-1)*page.PageSize).
 		Limit(page.PageSize).
 		Order(ent.Desc(group.FieldSortWeight), ent.Desc(group.FieldCreatedAt)).
 		All(c.Request.Context())

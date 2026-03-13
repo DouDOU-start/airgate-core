@@ -2,16 +2,14 @@
 package handler
 
 import (
-	"fmt"
 	"io"
-	"net/url"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
-	sdk "github.com/DouDOU-start/airgate-sdk"
-	"github.com/gin-gonic/gin"
 )
 
 // PluginHandler 插件管理 API
@@ -75,11 +73,18 @@ func (h *PluginHandler) UploadPlugin(c *gin.Context) {
 		response.InternalError(c, "读取上传文件失败")
 		return
 	}
-	defer f.Close()
 
 	binary, err := io.ReadAll(f)
 	if err != nil {
+		if closeErr := f.Close(); closeErr != nil {
+			response.InternalError(c, "关闭上传文件失败: "+closeErr.Error())
+			return
+		}
 		response.InternalError(c, "读取文件内容失败")
+		return
+	}
+	if err := f.Close(); err != nil {
+		response.InternalError(c, "关闭上传文件失败: "+err.Error())
 		return
 	}
 
@@ -167,16 +172,7 @@ func (h *PluginHandler) StartOAuth(c *gin.Context) {
 		return
 	}
 
-	result, err := inst.Gateway.StartOAuth(c.Request.Context(), &sdk.OAuthStartRequest{})
-	if err != nil {
-		response.InternalError(c, "发起 OAuth 授权失败: "+err.Error())
-		return
-	}
-
-	response.Success(c, dto.PluginOAuthStartResp{
-		AuthorizeURL: result.AuthorizeURL,
-		State:        result.State,
-	})
+	response.BadRequest(c, "当前 SDK 版本不支持插件 OAuth 授权")
 }
 
 // ExchangeOAuth 使用回调 URL 完成插件 OAuth token 交换
@@ -194,32 +190,7 @@ func (h *PluginHandler) ExchangeOAuth(c *gin.Context) {
 		return
 	}
 
-	var req dto.PluginOAuthExchangeReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "请求参数无效")
-		return
-	}
-
-	code, state, err := parseOAuthCallbackURL(req.CallbackURL)
-	if err != nil {
-		response.BadRequest(c, err.Error())
-		return
-	}
-
-	result, err := inst.Gateway.HandleOAuthCallback(c.Request.Context(), &sdk.OAuthCallbackRequest{
-		Code:  code,
-		State: state,
-	})
-	if err != nil {
-		response.InternalError(c, "OAuth 回调交换失败: "+err.Error())
-		return
-	}
-
-	response.Success(c, dto.PluginOAuthExchangeResp{
-		AccountType: result.AccountType,
-		AccountName: result.AccountName,
-		Credentials: result.Credentials,
-	})
+	response.BadRequest(c, "当前 SDK 版本不支持插件 OAuth 回调交换")
 }
 
 // ListMarketplace 列出市场可用插件
@@ -243,24 +214,4 @@ func (h *PluginHandler) ListMarketplace(c *gin.Context) {
 	}
 
 	response.Success(c, response.PagedData(list, int64(len(list)), 1, len(list)))
-}
-
-func parseOAuthCallbackURL(raw string) (code, state string, err error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return "", "", fmt.Errorf("请粘贴完整的回调 URL")
-	}
-
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return "", "", fmt.Errorf("回调 URL 格式无效")
-	}
-
-	code = strings.TrimSpace(parsed.Query().Get("code"))
-	state = strings.TrimSpace(parsed.Query().Get("state"))
-	if code == "" || state == "" {
-		return "", "", fmt.Errorf("回调 URL 中缺少 code 或 state 参数")
-	}
-
-	return code, state, nil
 }

@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	ErrInvalidToken = errors.New("无效的 Token")
-	ErrTokenExpired = errors.New("Token 已过期")
+	ErrInvalidToken = errors.New("无效的 token")
+	ErrTokenExpired = errors.New("token 已过期")
 )
 
 // Claims JWT 自定义声明

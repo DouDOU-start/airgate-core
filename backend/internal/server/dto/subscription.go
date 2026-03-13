@@ -8,15 +8,15 @@ type SubscriptionResp struct {
 	GroupName   string                 `json:"group_name"`
 	EffectiveAt string                 `json:"effective_at"`
 	ExpiresAt   string                 `json:"expires_at"`
-	Usage       map[string]interface{} `json:"usage"` // 日/周/月使用量窗口
+	Usage       map[string]interface{} `json:"usage"`  // 日/周/月使用量窗口
 	Status      string                 `json:"status"` // active / expired / suspended
 	TimeMixin
 }
 
 // SubscriptionProgressResp 订阅进度响应
 type SubscriptionProgressResp struct {
-	GroupID   int64   `json:"group_id"`
-	GroupName string  `json:"group_name"`
+	GroupID   int64        `json:"group_id"`
+	GroupName string       `json:"group_name"`
 	Daily     *UsageWindow `json:"daily,omitempty"`
 	Weekly    *UsageWindow `json:"weekly,omitempty"`
 	Monthly   *UsageWindow `json:"monthly,omitempty"`

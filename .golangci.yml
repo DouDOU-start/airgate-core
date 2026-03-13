@@ -1,3 +1,5 @@
+version: "2"
+
 linters:
   enable:
     - errcheck
@@ -5,16 +7,18 @@ linters:
     - staticcheck
     - unused
     - ineffassign
-    - gosimple
+
+formatters:
+  enable:
     - gofmt
     - goimports
-
-linters-settings:
-  goimports:
-    local-prefixes: github.com/DouDOU-start
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/DouDOU-start
 
 run:
-  skip-dirs:
+  exclude-dirs:
     - ent
 
 issues:

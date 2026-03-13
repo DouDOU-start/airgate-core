@@ -3,11 +3,12 @@ package handler
 import (
 	"log/slog"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
-	"github.com/gin-gonic/gin"
 )
 
 // SettingsHandler 系统设置 Handler

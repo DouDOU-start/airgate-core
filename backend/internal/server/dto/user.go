@@ -2,15 +2,15 @@ package dto
 
 // UserResp 用户响应
 type UserResp struct {
-	ID             int64              `json:"id"`
-	Email          string             `json:"email"`
-	Username       string             `json:"username"`
-	Balance        float64            `json:"balance"`
-	Role           string             `json:"role"` // admin / user
-	MaxConcurrency int                `json:"max_concurrency"`
-	TOTPEnabled    bool               `json:"totp_enabled"`
-	GroupRates     map[int64]float64  `json:"group_rates,omitempty"` // 用户专属分组倍率
-	Status         string             `json:"status"`
+	ID             int64             `json:"id"`
+	Email          string            `json:"email"`
+	Username       string            `json:"username"`
+	Balance        float64           `json:"balance"`
+	Role           string            `json:"role"` // admin / user
+	MaxConcurrency int               `json:"max_concurrency"`
+	TOTPEnabled    bool              `json:"totp_enabled"`
+	GroupRates     map[int64]float64 `json:"group_rates,omitempty"` // 用户专属分组倍率
+	Status         string            `json:"status"`
 	TimeMixin
 }
 
@@ -37,11 +37,11 @@ type CreateUserReq struct {
 
 // UpdateUserReq 管理员更新用户请求
 type UpdateUserReq struct {
-	Username       *string            `json:"username"`
-	Role           *string            `json:"role" binding:"omitempty,oneof=admin user"`
-	MaxConcurrency *int               `json:"max_concurrency"`
-	GroupRates     map[int64]float64  `json:"group_rates"`
-	Status         *string            `json:"status" binding:"omitempty,oneof=active disabled"`
+	Username       *string           `json:"username"`
+	Role           *string           `json:"role" binding:"omitempty,oneof=admin user"`
+	MaxConcurrency *int              `json:"max_concurrency"`
+	GroupRates     map[int64]float64 `json:"group_rates"`
+	Status         *string           `json:"status" binding:"omitempty,oneof=active disabled"`
 }
 
 // AdjustBalanceReq 余额调整请求

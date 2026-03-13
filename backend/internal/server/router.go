@@ -1,10 +1,11 @@
 package server
 
 import (
+	"github.com/gin-gonic/gin"
+
 	"github.com/DouDOU-start/airgate-core/internal/server/handler"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 	"github.com/DouDOU-start/airgate-core/internal/setup"
-	"github.com/gin-gonic/gin"
 )
 
 // registerRoutes 注册所有 API 路由

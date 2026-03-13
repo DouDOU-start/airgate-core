@@ -1,7 +1,6 @@
 package plugin
 
 import (
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -37,14 +36,6 @@ func (c *corePluginContext) Logger() *slog.Logger {
 
 func (c *corePluginContext) Config() sdk.PluginConfig {
 	return c.config
-}
-
-func (c *corePluginContext) DB() *sql.DB {
-	return nil // SimpleGateway 不需要 DB 访问
-}
-
-func (c *corePluginContext) CoreServices() sdk.CoreServices {
-	return nil // SimpleGateway 不需要核心服务
 }
 
 // coreMapConfig 基于 map 的配置实现

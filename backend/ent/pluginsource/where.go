@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 )
 

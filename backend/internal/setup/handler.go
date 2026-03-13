@@ -4,10 +4,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
-	"github.com/gin-gonic/gin"
 )
 
 // 安装完成回调
@@ -24,9 +25,11 @@ func RegisterRoutesWithCallback(r *gin.Engine, callback func()) {
 	setup := r.Group("/setup")
 	{
 		setup.GET("/status", handleStatus)
-		setup.POST("/test-db", handleTestDB)
-		setup.POST("/test-redis", handleTestRedis)
-		setup.POST("/install", handleInstall)
+		guarded := setup.Group("")
+		guarded.Use(setupGuard())
+		guarded.POST("/test-db", handleTestDB)
+		guarded.POST("/test-redis", handleTestRedis)
+		guarded.POST("/install", handleInstall)
 	}
 }
 

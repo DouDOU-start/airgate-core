@@ -7,6 +7,9 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
@@ -14,8 +17,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/ratelimit"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
-	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
 // Server HTTP 服务器
