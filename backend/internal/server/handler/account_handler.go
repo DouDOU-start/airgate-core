@@ -14,19 +14,21 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
+	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
 )
 
 // AccountHandler 上游账号管理 Handler
 type AccountHandler struct {
-	db        *ent.Client
-	pluginMgr *plugin.Manager
+	db          *ent.Client
+	pluginMgr   *plugin.Manager
+	concurrency *scheduler.ConcurrencyManager
 }
 
 // NewAccountHandler 创建 AccountHandler
-func NewAccountHandler(db *ent.Client, pluginMgr *plugin.Manager) *AccountHandler {
-	return &AccountHandler{db: db, pluginMgr: pluginMgr}
+func NewAccountHandler(db *ent.Client, pluginMgr *plugin.Manager, concurrency *scheduler.ConcurrencyManager) *AccountHandler {
+	return &AccountHandler{db: db, pluginMgr: pluginMgr, concurrency: concurrency}
 }
 
 // ListAccounts 查询账号列表（支持分页、平台/状态筛选）
@@ -76,9 +78,18 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 		return
 	}
 
+	// 批量获取当前并发数
+	accountIDs := make([]int, len(accounts))
+	for i, a := range accounts {
+		accountIDs[i] = a.ID
+	}
+	concurrencyCounts := h.concurrency.GetCurrentCounts(c.Request.Context(), accountIDs)
+
 	list := make([]dto.AccountResp, 0, len(accounts))
 	for _, a := range accounts {
-		list = append(list, toAccountResp(a))
+		resp := toAccountResp(a)
+		resp.CurrentConcurrency = concurrencyCounts[a.ID]
+		list = append(list, resp)
 	}
 
 	response.Success(c, response.PagedData(list, int64(total), page.Page, page.PageSize))
@@ -237,6 +248,46 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 	}
 
 	response.Success(c, nil)
+}
+
+// ToggleScheduling 快速切换账号的调度状态（active ↔ disabled）
+// PATCH /api/v1/admin/accounts/:id/toggle
+func (h *AccountHandler) ToggleScheduling(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "无效的账号 ID")
+		return
+	}
+
+	a, err := h.db.Account.Get(c.Request.Context(), id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			response.NotFound(c, "账号不存在")
+			return
+		}
+		slog.Error("查询账号失败", "error", err)
+		response.InternalError(c, "查询失败")
+		return
+	}
+
+	// active → disabled，其他（disabled/error）→ active
+	newStatus := account.StatusDisabled
+	if a.Status != account.StatusActive {
+		newStatus = account.StatusActive
+	}
+
+	if err := h.db.Account.UpdateOneID(id).
+		SetStatus(newStatus).
+		Exec(c.Request.Context()); err != nil {
+		slog.Error("切换调度状态失败", "error", err)
+		response.InternalError(c, "切换失败")
+		return
+	}
+
+	response.Success(c, map[string]any{
+		"id":     id,
+		"status": string(newStatus),
+	})
 }
 
 // TestAccount 测试账号连通性（SSE 流式）

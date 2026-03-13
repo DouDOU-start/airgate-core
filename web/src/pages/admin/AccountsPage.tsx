@@ -254,6 +254,13 @@ export default function AccountsPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
+  // 切换调度状态
+  const toggleMutation = useMutation({
+    mutationFn: (id: number) => accountsApi.toggleScheduling(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+    onError: (err: Error) => toast('error', err.message),
+  });
+
   // 表格列定义
   const columns: Column<AccountResp>[] = [
     {
@@ -278,12 +285,57 @@ export default function AccountsPage() {
     {
       key: 'platform',
       title: t('accounts.platform'),
-      render: (row) => (
-        <span className="inline-flex items-center gap-1.5">
-          <Server className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
-          {row.platform}
-        </span>
-      ),
+      render: (row) => {
+        const planType = row.credentials?.plan_type;
+        const subUntil = row.credentials?.subscription_active_until;
+        const isExpired = subUntil ? new Date(subUntil) < new Date() : false;
+
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="inline-flex items-center gap-1.5">
+              <Server className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+              <span>{row.platform.toUpperCase()}</span>
+              {row.type && (
+                <span className="text-[10px] px-1 py-0 rounded" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
+                  {row.type}
+                </span>
+              )}
+            </span>
+            {planType && (
+              <span className="inline-flex items-center gap-1 text-[11px]" style={{ fontFamily: 'var(--ag-font-mono)' }}>
+                <span className="px-1 py-0 rounded text-[10px]" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
+                  {planType.charAt(0).toUpperCase() + planType.slice(1)}
+                </span>
+                {subUntil && (
+                  <span style={{ color: isExpired ? 'var(--ag-danger)' : 'var(--ag-text-tertiary)', fontSize: 10 }}>
+                    {isExpired
+                      ? t('accounts.subscription_expired')
+                      : new Date(subUntil).toLocaleDateString()
+                    }
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'capacity',
+      title: t('accounts.capacity'),
+      width: '100px',
+      render: (row) => {
+        const current = row.current_concurrency || 0;
+        const max = row.max_concurrency;
+        const loadPct = max > 0 ? (current / max) * 100 : 0;
+        const color = loadPct < 50 ? 'var(--ag-success)' : loadPct < 80 ? 'var(--ag-warning)' : 'var(--ag-danger)';
+        return (
+          <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
+            <span style={{ color }}>{current}</span>
+            <span style={{ color: 'var(--ag-text-tertiary)' }}> / {max}</span>
+          </span>
+        );
+      },
     },
     {
       key: 'status',
@@ -291,23 +343,26 @@ export default function AccountsPage() {
       render: (row) => <StatusBadge status={row.status} />,
     },
     {
-      key: 'priority',
-      title: t('accounts.priority'),
+      key: 'scheduling',
+      title: t('accounts.scheduling'),
       width: '80px',
       render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
-          {row.priority}
-        </span>
-      ),
-    },
-    {
-      key: 'max_concurrency',
-      title: t('accounts.concurrency'),
-      width: '80px',
-      render: (row) => (
-        <span style={{ fontFamily: 'var(--ag-font-mono)' }}>
-          {row.max_concurrency}
-        </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleMutation.mutate(row.id);
+          }}
+          disabled={toggleMutation.isPending}
+          className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none"
+          style={{
+            backgroundColor: row.status === 'active' ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
+          }}
+        >
+          <span
+            className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform duration-200"
+            style={{ transform: row.status === 'active' ? 'translateX(17px)' : 'translateX(3px)' }}
+          />
+        </button>
       ),
     },
     {

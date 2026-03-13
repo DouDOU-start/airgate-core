@@ -177,6 +177,10 @@
     "test_response": "Response:",
     "test_done": "Test complete!",
     "test_error": "Test failed",
+    "subscription": "Subscription",
+    "subscription_expired": "Expired",
+    "capacity": "Capacity",
+    "scheduling": "Scheduling",
     "usage_window": "Usage Window"
   },
 

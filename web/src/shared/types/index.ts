@@ -110,6 +110,7 @@ export interface AccountResp {
   status: 'active' | 'error' | 'disabled';
   priority: number;
   max_concurrency: number;
+  current_concurrency: number;
   proxy_id?: number;
   rate_multiplier: number;
   error_msg?: string;

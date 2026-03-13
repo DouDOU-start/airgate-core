@@ -2,19 +2,20 @@ package dto
 
 // AccountResp 账号响应
 type AccountResp struct {
-	ID             int64             `json:"id"`
-	Name           string            `json:"name"`
-	Platform       string            `json:"platform"`
-	Type           string            `json:"type"`
-	Credentials    map[string]string `json:"credentials"`
-	Status         string            `json:"status"` // active / error / disabled
-	Priority       int               `json:"priority"`
-	MaxConcurrency int               `json:"max_concurrency"`
-	ProxyID        *int64            `json:"proxy_id,omitempty"`
-	RateMultiplier float64           `json:"rate_multiplier"`
-	ErrorMsg       string            `json:"error_msg,omitempty"`
-	LastUsedAt     *string           `json:"last_used_at,omitempty"`
-	GroupIDs       []int64           `json:"group_ids"`
+	ID                 int64             `json:"id"`
+	Name               string            `json:"name"`
+	Platform           string            `json:"platform"`
+	Type               string            `json:"type"`
+	Credentials        map[string]string `json:"credentials"`
+	Status             string            `json:"status"` // active / error / disabled
+	Priority           int               `json:"priority"`
+	MaxConcurrency     int               `json:"max_concurrency"`
+	CurrentConcurrency int               `json:"current_concurrency"`
+	ProxyID            *int64            `json:"proxy_id,omitempty"`
+	RateMultiplier     float64           `json:"rate_multiplier"`
+	ErrorMsg           string            `json:"error_msg,omitempty"`
+	LastUsedAt         *string           `json:"last_used_at,omitempty"`
+	GroupIDs           []int64           `json:"group_ids"`
 	TimeMixin
 }
 

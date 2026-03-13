@@ -177,6 +177,10 @@
     "test_response": "响应：",
     "test_done": "测试完成！",
     "test_error": "测试失败",
+    "subscription": "订阅",
+    "subscription_expired": "已过期",
+    "capacity": "容量",
+    "scheduling": "调度",
     "usage_window": "用量窗口"
   },
 
