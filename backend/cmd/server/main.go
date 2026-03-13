@@ -16,6 +16,8 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 
+	sdk "github.com/DouDOU-start/airgate-sdk"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/migrate"
 	"github.com/DouDOU-start/airgate-core/internal/config"
@@ -25,6 +27,8 @@ import (
 )
 
 func main() {
+	// 默认初始化日志（配置加载前先用默认值）
+	sdk.InitLogger("core", "info", "text")
 	slog.Info("AirGate Core 启动中...")
 
 	// 加载国际化
@@ -44,6 +48,9 @@ func main() {
 		slog.Error("加载配置失败", "error", err)
 		os.Exit(1)
 	}
+
+	// 用配置值重新初始化日志（应用配置文件中的 level/format）
+	sdk.InitLogger("core", cfg.Log.Level, cfg.Log.Format)
 
 	// 启动正常服务
 	startMainServer(cfg)

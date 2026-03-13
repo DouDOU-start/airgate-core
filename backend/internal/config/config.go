@@ -27,7 +27,14 @@ type Config struct {
 	Database DatabaseConfig `yaml:"database"`
 	Redis    RedisConfig    `yaml:"redis"`
 	JWT      JWTConfig      `yaml:"jwt"`
+	Log      LogConfig      `yaml:"log"`
 	Plugins  PluginsConfig  `yaml:"plugins"`
+}
+
+// LogConfig 日志配置
+type LogConfig struct {
+	Level  string `yaml:"level"`  // debug/info/warn/error，默认 info
+	Format string `yaml:"format"` // text/json，默认 text
 }
 
 // PluginsConfig 插件配置
@@ -127,6 +134,10 @@ func applyEnvOverrides(cfg *Config) {
 	// JWT
 	envStr("JWT_SECRET", &cfg.JWT.Secret)
 	envInt("JWT_EXPIRE_HOUR", &cfg.JWT.ExpireHour)
+
+	// 日志
+	envStr("LOG_LEVEL", &cfg.Log.Level)
+	envStr("LOG_FORMAT", &cfg.Log.Format)
 
 	// 插件
 	envStr("PLUGINS_DIR", &cfg.Plugins.Dir)

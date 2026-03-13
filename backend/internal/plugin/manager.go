@@ -40,6 +40,7 @@ type PluginInstance struct {
 // 负责插件的安装、卸载、启停、进程管理和 gRPC 通信
 type Manager struct {
 	pluginDir string // 插件二进制目录
+	logLevel  string // 日志级别，传给插件子进程
 
 	mu        sync.RWMutex
 	instances map[string]*PluginInstance // pluginName → 运行实例
@@ -55,9 +56,10 @@ type Manager struct {
 }
 
 // NewManager 创建插件管理器
-func NewManager(pluginDir string) *Manager {
+func NewManager(pluginDir, logLevel string) *Manager {
 	return &Manager{
 		pluginDir:         pluginDir,
+		logLevel:          logLevel,
 		instances:         make(map[string]*PluginInstance),
 		aliases:           make(map[string]string),
 		devPaths:          make(map[string]string),
@@ -112,7 +114,12 @@ func (m *Manager) LoadDev(ctx context.Context, name, srcPath string) error {
 
 	requestedName := normalizePluginName(name)
 	if requestedName == "" {
-		requestedName = filepath.Base(srcPath)
+		// name 未配置时用项目目录名作为临时标识，启动后由插件 Info().ID 覆盖
+		dir := filepath.Base(srcPath)
+		if dir == "backend" || dir == "." {
+			dir = filepath.Base(filepath.Dir(srcPath))
+		}
+		requestedName = dir
 	}
 
 	cmd := exec.Command("go", "run", ".")
@@ -163,7 +170,7 @@ func (m *Manager) IsDev(name string) bool {
 
 // startPlugin 启动插件子进程并建立 gRPC 连接
 func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *exec.Cmd, binaryDir string) (string, error) {
-	// 创建 go-plugin 客户端
+	// 创建 go-plugin 客户端（SyncStdout/Stderr 转发子进程日志到主进程）
 	client := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig: shared.Handshake,
 		Plugins: goplugin.PluginSet{
@@ -171,6 +178,8 @@ func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *ex
 		},
 		Cmd:              cmd,
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
+		SyncStdout:       os.Stdout,
+		SyncStderr:       os.Stderr,
 	})
 
 	// 建立 RPC 连接
@@ -200,8 +209,11 @@ func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *ex
 		return "", fmt.Errorf("插件未提供有效的 ID/name")
 	}
 
-	// 初始化插件
-	pluginCtx := newCorePluginContext(nil, canonicalName)
+	// 初始化插件（注入 log_level 让插件子进程应用 Core 的日志级别）
+	initConfig := map[string]interface{}{
+		sdk.ConfigKeyLogLevel: m.logLevel,
+	}
+	pluginCtx := newCorePluginContext(initConfig, canonicalName)
 	if err := gateway.Init(pluginCtx); err != nil {
 		client.Kill()
 		return "", fmt.Errorf("初始化插件失败: %w", err)
