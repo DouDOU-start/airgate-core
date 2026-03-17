@@ -289,7 +289,7 @@ export default function ProfilePage() {
                   {t('profile.totp_scan_uri')}
                 </p>
                 <div
-                  className="rounded-md border border-glass-border bg-surface p-3 break-all text-sm text-text-secondary font-mono"
+                  className="border border-glass-border bg-bg-elevated shadow-sm rounded-lg p-3 break-all text-sm text-text-secondary font-mono"
                 >
                   <div className="flex items-start gap-2">
                     <Smartphone className="w-4 h-4 text-primary mt-0.5 shrink-0" />

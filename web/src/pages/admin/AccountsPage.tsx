@@ -1003,7 +1003,7 @@ function CreateAccountModal({
         {/* 凭证区域：插件自定义表单 or 默认 schema 驱动 */}
         {PluginAccountForm ? (
           <div
-            className="pt-4"
+            className="ag-plugin-scope pt-4"
             style={{ borderTop: '1px solid var(--ag-border)' }}
           >
             <PluginAccountForm
@@ -1409,7 +1409,7 @@ function EditAccountModal({
         {/* 凭证编辑：插件自定义表单 or 默认 schema 驱动 */}
         {PluginAccountForm ? (
           <div
-            className="pt-4"
+            className="ag-plugin-scope pt-4"
             style={{ borderTop: '1px solid var(--ag-border)' }}
           >
             <PluginAccountForm

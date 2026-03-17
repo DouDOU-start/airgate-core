@@ -49,5 +49,9 @@ export default function PluginPage() {
   }
 
   const PageComponent = matched.component;
-  return <PageComponent />;
+  return (
+    <div className="ag-plugin-scope">
+      <PageComponent />
+    </div>
+  );
 }

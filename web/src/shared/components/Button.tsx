@@ -10,7 +10,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<string, string> = {
   primary:
-    'bg-primary text-text-inverse hover:bg-primary-hover shadow-[0_0_16px_var(--ag-primary-glow)] hover:shadow-[0_0_24px_var(--ag-primary-glow)]',
+    'bg-primary text-text-inverse hover:bg-primary-hover shadow-md hover:shadow-lg',
   secondary:
     'bg-surface text-text border border-glass-border hover:bg-bg-hover hover:border-border',
   danger:
@@ -39,16 +39,18 @@ export function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >
-      {(loading || icon) && (
+      {loading ? (
         <span className="flex-shrink-0">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
+          <Loader2 className="h-4 w-4 animate-spin" />
         </span>
-      )}
-      {children}
+      ) : icon ? (
+        <span className="flex-shrink-0">{icon}</span>
+      ) : null}
+      <span>{children}</span>
     </button>
   );
 }

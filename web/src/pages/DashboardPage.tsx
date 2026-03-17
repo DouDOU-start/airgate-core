@@ -30,7 +30,8 @@ type RangePreset = 'today' | '7d' | '30d' | '90d';
 type Granularity = 'hour' | 'day';
 
 // 格式化数字
-function fmtNum(n: number): string {
+function fmtNum(n: number | undefined | null): string {
+  if (n == null) return '0';
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(2)}K`;
@@ -38,7 +39,8 @@ function fmtNum(n: number): string {
 }
 
 // 格式化费用
-function fmtCost(n: number): string {
+function fmtCost(n: number | undefined | null): string {
+  if (n == null) return '$0.00';
   if (n >= 1000) return `$${(n / 1000).toFixed(2)}K`;
   return `$${n.toFixed(2)}`;
 }
@@ -116,15 +118,23 @@ export default function DashboardPage() {
           <div className="rounded-lg border border-glass-border bg-bg-elevated p-5 h-96 ag-shimmer" />
         </div>
       ) : trend ? (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            <ModelDistributionCard trend={trend} />
-            <TokenTrendCard trend={trend} />
-          </div>
-          <TopUsersCard trend={trend} />
-        </>
+        <TrendCharts trend={trend} />
       ) : null}
     </div>
+  );
+}
+
+// ==================== 趋势图组合 ====================
+
+function TrendCharts({ trend }: { trend: DashboardTrendResp }) {
+  return (
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <ModelDistributionCard trend={trend} />
+        <TokenTrendCard trend={trend} />
+      </div>
+      <TopUsersCard trend={trend} />
+    </>
   );
 }
 
@@ -179,15 +189,15 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
     },
     {
       title: t('dashboard.performance'),
-      value: `${Math.round(stats.rpm)}`,
+      value: `${Math.round(stats.rpm ?? 0)}`,
       valueSuffix: t('dashboard.rpm'),
-      sub: `${fmtNum(stats.tpm)} ${t('dashboard.tpm')}`,
+      sub: `${fmtNum(stats.tpm ?? 0)} ${t('dashboard.tpm')}`,
       icon: <Zap className="w-5 h-5" />,
       color: 'var(--ag-success)',
     },
     {
       title: t('dashboard.avg_response'),
-      value: `${(stats.avg_duration_ms / 1000).toFixed(2)}s`,
+      value: `${((stats.avg_duration_ms ?? 0) / 1000).toFixed(2)}s`,
       sub: t('dashboard.active_users', { count: stats.active_users }),
       icon: <Clock className="w-5 h-5" />,
       color: 'var(--ag-warning)',

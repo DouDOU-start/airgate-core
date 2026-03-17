@@ -58,6 +58,62 @@
   --shadow-glow: var(--ag-shadow-glow);
 }
 
+/* ==================== 弹窗 & 下拉框（需要独立不透明度） ==================== */
+
+:root {
+  --_glass-modal-bg: var(--ag-bg-elevated);
+  --_glass-modal-border: 1px solid var(--ag-glass-border);
+  --_glass-modal-shadow: var(--ag-shadow-lg);
+
+  --_glass-dropdown-bg: var(--ag-bg-elevated);
+  --_glass-dropdown-border: 1px solid var(--ag-glass-border);
+  --_glass-dropdown-shadow: var(--ag-shadow-lg);
+}
+
+:root[data-theme="light"] {
+  --_glass-modal-bg: rgba(255, 255, 255, 0.94);
+  --_glass-modal-border: 1px solid rgba(29, 39, 52, 0.06);
+  --_glass-modal-shadow:
+    0 18px 48px rgba(85, 102, 122, 0.12),
+    0 4px 12px rgba(85, 102, 122, 0.05);
+
+  --_glass-dropdown-bg: rgba(255, 255, 255, 0.96);
+  --_glass-dropdown-border: 1px solid rgba(29, 39, 52, 0.06);
+  --_glass-dropdown-shadow:
+    0 10px 28px rgba(85, 102, 122, 0.12),
+    0 2px 6px rgba(85, 102, 122, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.ag-glass-modal {
+  background: var(--_glass-modal-bg);
+  border: var(--_glass-modal-border);
+  box-shadow: var(--_glass-modal-shadow);
+}
+
+.ag-glass-dropdown {
+  background: var(--_glass-dropdown-bg);
+  border: var(--_glass-dropdown-border);
+  box-shadow: var(--_glass-dropdown-shadow);
+}
+
+/*
+ * ── 亮色主题：虹彩马卡龙渐变背景 ──
+ * 直接放在 body 上，不用伪元素/isolation/额外层叠上下文
+ * body 背景是所有元素的最底层，backdrop-filter 天然能捕获它
+ */
+[data-theme="light"] body {
+  background:
+    /* 青白色调渐变色块 — 对标 demo.html iOS 风格 */
+    radial-gradient(circle at 20% 14%, rgba(190, 220, 230, 0.70), transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(200, 228, 236, 0.58), transparent 24%),
+    radial-gradient(circle at 25% 30%, rgba(182, 214, 226, 0.24), transparent 38%),
+    radial-gradient(circle at 75% 28%, rgba(196, 224, 232, 0.18), transparent 38%),
+    radial-gradient(circle at 50% 80%, rgba(255, 255, 255, 0.40), transparent 28%),
+    /* 底色渐变 */
+    linear-gradient(180deg, var(--ag-bg-deep) 0%, var(--ag-bg) 100%);
+}
+
 /* ==================== 全局样式 ==================== */
 
 * {
@@ -83,16 +139,6 @@
   background: var(--ag-text-tertiary);
 }
 
-/* 隐藏 number 输入框的加减按钮 */
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-input[type="number"] {
-  -moz-appearance: textfield;
-}
-
 html {
   font-size: 14px;
 }
@@ -116,6 +162,35 @@ body {
 :focus-visible {
   outline: 1.5px solid var(--ag-primary);
   outline-offset: 2px;
+}
+
+/* ── 亮色主题：虹彩光晕（hover 时显示） ── */
+[data-theme="light"] .ag-iridescent-glow {
+  position: relative;
+}
+
+[data-theme="light"] .ag-iridescent-glow::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 180deg,
+    rgba(140, 170, 210, 0.14),
+    rgba(120, 155, 200, 0.12),
+    rgba(20, 184, 166, 0.14),
+    rgba(130, 180, 200, 0.10),
+    rgba(140, 170, 210, 0.14)
+  );
+  filter: blur(16px);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: -1;
+  pointer-events: none;
+}
+
+[data-theme="light"] .ag-iridescent-glow:hover::before {
+  opacity: 1;
 }
 
 /* ==================== 动画关键帧 ==================== */
@@ -222,24 +297,44 @@ body {
   animation: ag-shimmer 1.5s infinite;
 }
 
-/* 固定列背景 */
-.ag-sticky-cell-header {
-  background: var(--ag-bg-surface) !important;
+/* ── 虹彩背景漂移 ── */
+@keyframes ag-mesh-drift {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 3% 2%;
+  }
 }
 
-.ag-sticky-cell {
-  background: var(--ag-bg-elevated) !important;
+/* ── 悬浮入场动画 ── */
+@keyframes ag-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
 }
 
-tr:hover > .ag-sticky-cell {
-  background: var(--ag-bg-hover) !important;
+.ag-float-in {
+  animation: ag-float-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* 固定列滚动阴影 */
-.ag-sticky-shadow-right {
-  box-shadow: 4px 0 8px -2px rgba(0, 0, 0, 0.15);
+/* ── 呼吸脉动 ── */
+@keyframes ag-breathe {
+  0%, 100% {
+    box-shadow: var(--ag-shadow-sm);
+  }
+  50% {
+    box-shadow: var(--ag-shadow-md), 0 0 24px rgba(20, 184, 166, 0.08);
+  }
 }
 
-.ag-sticky-shadow-left {
-  box-shadow: -4px 0 8px -2px rgba(0, 0, 0, 0.15);
+[data-theme="light"] .ag-breathe {
+  animation: ag-breathe 4s ease-in-out infinite;
 }

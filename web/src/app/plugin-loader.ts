@@ -145,7 +145,23 @@ export async function loadPluginFrontend(
     const blob = new Blob([code], { type: 'application/javascript' });
     const blobUrl = URL.createObjectURL(blob);
     try {
+      // 记录 import 前已有的 <style> id，用于检测插件注入的主题变量样式
+      const styleIdsBefore = new Set(
+        Array.from(document.querySelectorAll('style[id]'), (el) => el.id),
+      );
+
       const module = await import(/* @vite-ignore */ blobUrl);
+
+      // 移除插件注入的主题变量样式（id 含 "theme-vars"）
+      // 插件会打包旧版 SDK token 并通过 injectThemeStyle 注入作用域变量，
+      // 这些变量优先级高于全局 :root 声明，导致配色不同步。
+      // 移除后插件元素自然继承核心注入的最新主题变量。
+      document.querySelectorAll('style[id]').forEach((el) => {
+        if (!styleIdsBefore.has(el.id) && el.id.includes('theme-vars')) {
+          el.remove();
+        }
+      });
+
       return normalizePluginFrontendModule(module.default as PluginFrontendModule);
     } finally {
       URL.revokeObjectURL(blobUrl);

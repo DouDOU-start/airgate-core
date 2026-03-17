@@ -38,7 +38,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
         <div className="relative">
           {icon && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary">
+            <div className="absolute left-3 top-0 bottom-0 flex items-center text-text pointer-events-none z-10">
               {icon}
             </div>
           )}
@@ -113,20 +113,11 @@ export function Select({
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [focusIdx, setFocusIdx] = useState(-1);
-  const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
   const selectedOption = options.find((o) => o.value === value);
   const displayLabel = selectedOption?.label ?? placeholder ?? '';
-
-  // 检测下拉方向：空间不足时向上弹出
-  useEffect(() => {
-    if (!open || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    setDropUp(spaceBelow < 240 && rect.top > spaceBelow);
-  }, [open]);
 
   // Close on outside click
   useEffect(() => {
@@ -216,14 +207,15 @@ export function Select({
           onClick={() => !disabled && setOpen((o) => !o)}
           onKeyDown={handleKeyDown}
           className={`${inputBase} cursor-pointer pr-10 text-left ${error ? inputError : ''} ${
-            open ? 'border-border-focus shadow-[0_0_0_3px_var(--ag-primary-subtle)]' : ''
+            open ? 'shadow-[0_0_0_2px_var(--ag-primary-subtle)]' : ''
           } ${!selectedOption ? 'text-text-tertiary' : ''} ${className}`}
+          style={open ? { borderColor: 'var(--ag-border-focus)' } : undefined}
         >
           {displayLabel || '\u00A0'}
         </button>
         {/* Chevron icon */}
         <div
-          className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary transition-transform duration-200 ${
+          className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 z-10 text-text transition-transform duration-200 ${
             open ? 'rotate-180' : ''
           }`}
         >
@@ -236,7 +228,7 @@ export function Select({
           <ul
             ref={listRef}
             role="listbox"
-            className={`absolute z-[9999] max-h-60 w-full overflow-auto rounded-md border border-glass-border bg-bg-elevated shadow-lg py-1 ${dropUp ? 'bottom-full mb-1' : 'mt-1'}`}
+            className="ag-glass-dropdown absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg py-1"
             style={{ animation: 'ag-scale-in 0.15s ease-out forwards' }}
           >
             {options.map((opt, idx) => {

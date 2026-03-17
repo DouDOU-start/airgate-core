@@ -30,23 +30,24 @@ export function Modal({ open, onClose, title, children, footer, width = '480px' 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ animation: 'ag-fade-in 0.15s ease-out' }}>
-      <div className="fixed inset-0 bg-black/70" onClick={onClose} />
+      {/* 遮罩层：去掉 backdrop-blur 提升性能 */}
+      <div className="fixed inset-0 bg-black/20" onClick={onClose} />
       <div
-        className="relative rounded-lg border border-glass-border bg-bg-elevated shadow-lg max-h-[85vh] flex flex-col"
+        className="ag-glass-modal ag-elevation-modal relative rounded-2xl max-h-[85vh] flex flex-col"
         style={{ width, maxWidth: '90vw', animation: 'ag-scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--ag-border-subtle)' }}>
           <h3 className="text-sm font-semibold text-text">{title}</h3>
           <button
             onClick={onClose}
-            className="flex items-center justify-center w-7 h-7 rounded-md text-text-tertiary hover:text-text hover:bg-bg-hover transition-colors"
+            className="flex items-center justify-center w-7 h-7 rounded-lg text-text-tertiary hover:text-text hover:bg-bg-hover transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="px-6 py-5 overflow-y-auto flex-1">{children}</div>
         {footer && (
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--ag-border-subtle)' }}>
             {footer}
           </div>
         )}

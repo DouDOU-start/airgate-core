@@ -647,7 +647,7 @@ export default function UserKeysPage() {
             </p>
           </div>
           <div
-            className="rounded-md border border-glass-border bg-surface p-3 break-all text-sm text-text font-mono"
+            className="border border-glass-border bg-bg-elevated shadow-sm rounded-lg p-3 break-all text-sm text-text font-mono"
           >
             {createdKey}
           </div>

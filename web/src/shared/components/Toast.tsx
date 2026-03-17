@@ -56,7 +56,7 @@ function ToastItem({ type, message, onClose }: ToastMessage & { onClose: () => v
 
   return (
     <div
-      className="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-md border border-glass-border shadow-md bg-bg-elevated min-w-[280px] max-w-[400px]"
+      className="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg border border-glass-border bg-bg-elevated shadow-md min-w-[280px] max-w-[400px]"
       style={{
         borderLeftColor: config.borderColor,
         borderLeftWidth: '2px',

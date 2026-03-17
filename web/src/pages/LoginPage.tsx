@@ -203,7 +203,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-deep flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
       {/* 背景 — 微弱网格 + 双光晕 */}
       <div className="absolute inset-0 pointer-events-none">
         {/* 网格 */}
@@ -246,7 +246,7 @@ export default function LoginPage() {
         </div>
 
         {/* 表单卡片 */}
-        <div className="rounded-lg border border-glass-border bg-bg-elevated/80 shadow-lg backdrop-blur-sm overflow-hidden">
+        <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl overflow-hidden">
           {/* Tab 切换 */}
           <div className="flex border-b border-border">
             {(['login', 'register'] as const).map((tab) => (

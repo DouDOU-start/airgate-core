@@ -13,7 +13,7 @@ interface CardProps {
 export function Card({ children, className = '', title, extra, noPadding }: CardProps) {
   return (
     <div
-      className={`rounded-lg border border-glass-border bg-bg-elevated shadow-sm ${className}`}
+      className={`border border-glass-border bg-bg-elevated shadow-sm rounded-xl ${className}`}
     >
       {title && (
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -39,7 +39,7 @@ interface StatCardProps {
 
 export function StatCard({ title, value, icon, change, changeType, accentColor = 'var(--ag-primary)' }: StatCardProps) {
   return (
-    <div className="group relative overflow-hidden rounded-lg border border-glass-border bg-bg-elevated p-5 transition-all duration-200 hover:border-border hover:shadow-md">
+    <div className="border border-glass-border bg-bg-elevated shadow-sm ag-iridescent-glow group relative overflow-hidden rounded-xl p-6 transition-all duration-200">
       {/* 顶部发光线 */}
       <div
         className="absolute top-0 left-0 right-0 h-px opacity-40 group-hover:opacity-80 transition-opacity"

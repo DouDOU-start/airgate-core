@@ -586,7 +586,7 @@ function FinishStep({ dbConfig, redisConfig, adminConfig, onPrev }: FinishStepPr
           return (
             <div
               key={item.title}
-              className="rounded-md border border-glass-border bg-surface p-4"
+              className="border border-glass-border bg-bg-elevated shadow-sm rounded-lg p-4"
             >
               <div className="flex items-center gap-2 mb-3">
                 <Icon className="w-4 h-4 text-primary" />
@@ -722,7 +722,7 @@ export default function SetupPage() {
   });
 
   return (
-    <div className="min-h-screen bg-bg-deep flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
       {/* 背景 */}
       <div className="absolute inset-0 pointer-events-none">
         <div

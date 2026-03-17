@@ -129,7 +129,7 @@ export default function UsersPage() {
       key: 'email',
       title: t('users.email'),
       render: (row) => (
-        <div className="flex items-center justify-center gap-2.5">
+        <div className="flex items-center gap-2.5">
           <div
             className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
             style={{ backgroundColor: getAvatarColor(row.email) }}
@@ -637,7 +637,7 @@ function BalanceModal({
       }
     >
       <div className="space-y-4">
-        <div className="rounded-md bg-surface border border-glass-border px-4 py-3">
+        <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-lg px-4 py-3">
           <p className="text-xs text-text-tertiary uppercase tracking-wider">{t('users.current_balance')}</p>
           <p className="text-lg font-bold mt-1 font-mono">${user.balance.toFixed(2)}</p>
         </div>
