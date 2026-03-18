@@ -1,0 +1,56 @@
+# 生产部署编排
+# 构建: docker compose build
+# 启动: docker compose up -d
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airgate
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-airgate}
+      POSTGRES_DB: airgate
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airgate -d airgate"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  core:
+    build:
+      context: ..
+      dockerfile: airgate-core/Dockerfile
+    image: airgate-core:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-airgate}
+      REDIS_HOST: redis
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      WEB_DIR: frontend
+    volumes:
+      - plugins_data:/app/data/plugins
+    ports:
+      - "${PORT:-9517}:9517"
+
+volumes:
+  postgres_data:
+  redis_data:
+  plugins_data:

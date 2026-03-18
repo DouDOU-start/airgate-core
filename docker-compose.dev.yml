@@ -1,0 +1,107 @@
+# 开发环境编排 — 源码挂载 + 实时编译
+# 使用方式: docker compose -f docker-compose.dev.yml up
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airgate
+      POSTGRES_PASSWORD: airgate
+      POSTGRES_DB: airgate
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airgate -d airgate"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  frontend-builder:
+    image: node:22-bookworm
+    working_dir: /workspace
+    environment:
+      npm_config_cache: /root/.npm
+    volumes:
+      - ..:/workspace
+      - npm_cache:/root/.npm
+    command:
+      - bash
+      - -lc
+      - >-
+        set -e;
+        cd /workspace/airgate-sdk/frontend && npm install && npm run build;
+        cd /workspace/airgate-openai/web && npm install && npm run build;
+        cd /workspace/airgate-core/web && npm install && npm run build
+    restart: "no"
+
+  plugin-builder:
+    image: golang:1.25-bookworm
+    working_dir: /workspace/airgate-openai/backend
+    depends_on:
+      frontend-builder:
+        condition: service_completed_successfully
+    volumes:
+      - ..:/workspace
+      - go_pkg_mod:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    command:
+      - bash
+      - -lc
+      - >-
+        set -e;
+        rm -rf /workspace/airgate-openai/backend/internal/gateway/webdist;
+        cp -r /workspace/airgate-openai/web/dist /workspace/airgate-openai/backend/internal/gateway/webdist;
+        /usr/local/go/bin/go build -buildvcs=false -o /workspace/airgate-openai/bin/gateway-openai .
+    restart: "no"
+
+  core:
+    image: golang:1.25-bookworm
+    working_dir: /workspace/airgate-core/backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      frontend-builder:
+        condition: service_completed_successfully
+      plugin-builder:
+        condition: service_completed_successfully
+    environment:
+      CONFIG_PATH: /workspace/airgate-core/backend/config.docker.yaml
+      PLUGINS_DIR: /workspace/airgate-core/backend/data/plugins
+    volumes:
+      - ..:/workspace
+      - go_pkg_mod:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+      - plugins_data:/workspace/airgate-core/backend/data/plugins
+    ports:
+      - "9517:9517"
+    command:
+      - bash
+      - -lc
+      - >-
+        set -e;
+        mkdir -p /workspace/airgate-core/backend/data/plugins/gateway-openai;
+        cp /workspace/airgate-openai/bin/gateway-openai /workspace/airgate-core/backend/data/plugins/gateway-openai/gateway-openai;
+        chmod +x /workspace/airgate-core/backend/data/plugins/gateway-openai/gateway-openai;
+        /usr/local/go/bin/go run -buildvcs=false ./cmd/server
+
+volumes:
+  postgres_data:
+  redis_data:
+  npm_cache:
+  go_pkg_mod:
+  go_build_cache:
+  plugins_data:

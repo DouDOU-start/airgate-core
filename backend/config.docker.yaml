@@ -1,0 +1,30 @@
+server:
+  port: 9517
+  mode: release
+  web_dir: frontend
+
+database:
+  host: postgres
+  port: 5432
+  user: airgate
+  password: airgate
+  dbname: airgate
+  sslmode: disable
+
+redis:
+  host: redis
+  port: 6379
+  password: ""
+  db: 0
+  tls: false
+
+jwt:
+  secret: airgate-docker-secret-change-me
+  expire_hour: 24
+
+log:
+  level: info
+  format: text
+
+plugins:
+  dir: data/plugins

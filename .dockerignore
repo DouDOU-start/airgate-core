@@ -1,0 +1,10 @@
+**/.git
+**/node_modules
+**/tmp
+**/.env
+**/.env.*
+**/backend/data
+**/backend/server
+**/backend/tmp
+**/.air.toml
+**/.github

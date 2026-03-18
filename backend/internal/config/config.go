@@ -51,8 +51,9 @@ type DevPlugin struct {
 
 // ServerConfig HTTP 服务器配置
 type ServerConfig struct {
-	Port int    `yaml:"port"`
-	Mode string `yaml:"mode"` // debug / release
+	Port   int    `yaml:"port"`
+	Mode   string `yaml:"mode"`    // debug / release
+	WebDir string `yaml:"web_dir"` // 前端静态文件目录，默认 "web/dist"
 }
 
 // DatabaseConfig 数据库配置
@@ -101,7 +102,7 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 	cfg := &Config{
-		Server: ServerConfig{Port: DefaultPort, Mode: "release"},
+		Server: ServerConfig{Port: DefaultPort, Mode: "release", WebDir: "web/dist"},
 		JWT:    JWTConfig{ExpireHour: 24},
 	}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
@@ -116,6 +117,7 @@ func applyEnvOverrides(cfg *Config) {
 	// 服务器
 	envInt("PORT", &cfg.Server.Port)
 	envStr("GIN_MODE", &cfg.Server.Mode)
+	envStr("WEB_DIR", &cfg.Server.WebDir)
 
 	// 数据库
 	envStr("DB_HOST", &cfg.Database.Host)

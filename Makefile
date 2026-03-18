@@ -7,7 +7,8 @@ BINARY := $(BACKEND_DIR)/server
 GO := GOTOOLCHAIN=local go
 
 .PHONY: help dev dev-backend dev-frontend build build-backend build-frontend \
-        ent lint fmt test clean install ci pre-commit setup-hooks
+        ent lint fmt test clean install ci pre-commit setup-hooks \
+        docker-build docker-rebuild docker-up docker-down docker-dev
 
 help: ## 显示帮助信息
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -90,11 +91,32 @@ setup-hooks: ## 安装 Git pre-commit hook
 
 # ===================== 依赖安装 =====================
 
-install: setup-hooks ## 安装前后端依赖与开发工具
+SDK_FRONTEND := ../airgate-sdk/frontend
+
+install: setup-hooks ## 安装全部依赖（含 SDK 前端构建）
+	@cd $(SDK_FRONTEND) && npm install && npm run build && echo "SDK 前端构建完成"
 	@cd $(BACKEND_DIR) && $(GO) mod download
+	@rm -rf $(WEB_DIR)/node_modules/.vite
 	@cd $(WEB_DIR) && npm install
 	@command -v air > /dev/null 2>&1 || (echo "安装 air（热重载工具）..."; $(GO) install github.com/air-verse/air@latest)
 	@echo "依赖安装完成"
+
+# ===================== Docker =====================
+
+docker-build: ## 构建 Docker 镜像（使用缓存）
+	@docker build -f Dockerfile -t airgate-core:latest ..
+
+docker-rebuild: ## 构建 Docker 镜像（无缓存，强制全量重建）
+	@docker build -f Dockerfile -t airgate-core:latest --no-cache ..
+
+docker-up: ## 启动生产环境（后台运行）
+	@docker compose up -d
+
+docker-down: ## 停止生产环境
+	@docker compose down
+
+docker-dev: ## 启动开发环境（源码编译模式）
+	@docker compose -f docker-compose.dev.yml up
 
 # ===================== 清理 =====================
 

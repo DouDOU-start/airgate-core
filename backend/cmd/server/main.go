@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -67,10 +68,15 @@ func startSetupServer() {
 	})
 
 	// 静态文件服务（前端）
-	r.Static("/assets", "web/dist/assets")
-	r.StaticFile("/", "web/dist/index.html")
+	webDir := os.Getenv("WEB_DIR")
+	if webDir == "" {
+		webDir = "web/dist"
+	}
+	indexHTML := filepath.Join(webDir, "index.html")
+	r.Static("/assets", filepath.Join(webDir, "assets"))
+	r.StaticFile("/", indexHTML)
 	r.NoRoute(func(c *gin.Context) {
-		c.File("web/dist/index.html")
+		c.File(indexHTML)
 	})
 
 	port := config.GetPort()

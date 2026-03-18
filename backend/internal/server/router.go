@@ -1,6 +1,8 @@
 package server
 
 import (
+	"path/filepath"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/DouDOU-start/airgate-core/internal/server/handler"
@@ -169,9 +171,14 @@ func (s *Server) registerRoutes() {
 	r.Static("/plugins", pluginDir)
 
 	// 静态文件服务（前端）
-	r.Static("/assets", "web/dist/assets")
+	webDir := s.cfg.Server.WebDir
+	if webDir == "" {
+		webDir = "web/dist"
+	}
+	r.Static("/assets", filepath.Join(webDir, "assets"))
 
 	// NoRoute: 携带 API Key 的请求转发到插件系统，其余返回前端 index.html
+	indexHTML := filepath.Join(webDir, "index.html")
 	apiKeyAuth := middleware.APIKeyAuth(s.db)
 	r.NoRoute(func(c *gin.Context) {
 		// 检查是否携带 Bearer token（API Key 调用）
@@ -185,6 +192,6 @@ func (s *Server) registerRoutes() {
 			s.dynamicRouter.Handle(c)
 			return
 		}
-		c.File("web/dist/index.html")
+		c.File(indexHTML)
 	})
 }
