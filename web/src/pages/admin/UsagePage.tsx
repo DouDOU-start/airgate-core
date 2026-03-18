@@ -4,12 +4,21 @@ import { useQuery } from '@tanstack/react-query';
 import { usageApi } from '../../shared/api/usage';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { Table, type Column } from '../../shared/components/Table';
-import { Input } from '../../shared/components/Input';
+import { Input, Select } from '../../shared/components/Input';
 import { DatePicker } from '../../shared/components/DatePicker';
 import { Card, StatCard } from '../../shared/components/Card';
 import { Badge } from '../../shared/components/Badge';
+import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { Activity, Coins, Hash, DollarSign, Search } from 'lucide-react';
 import type { UsageLogResp, UsageQuery } from '../../shared/types';
+
+/** 大数字友好显示：33518599 → "33.52M"，1234 → "1,234" */
+function formatLargeNumber(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString();
+}
 
 // 分组统计 key 映射
 const groupByKeys: Record<string, string> = {
@@ -24,6 +33,7 @@ export default function UsagePage() {
   const { page, setPage, pageSize, setPageSize } = usePagination(20);
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
+  const { platforms, platformName } = usePlatforms();
 
   // 构建查询参数
   const queryParams: UsageQuery = {
@@ -145,33 +155,34 @@ export default function UsagePage() {
   return (
     <div>
       {/* 筛选栏 */}
-      <div className="flex items-end gap-3 mb-5 flex-wrap">
+      <div className="flex items-center gap-3 mb-5 flex-wrap">
         <div className="w-44">
           <DatePicker
-            label={t('usage.start_date')}
+            placeholder={t('usage.start_date')}
             value={filters.start_date || ''}
             onChange={(v) => updateFilter('start_date', v)}
           />
         </div>
         <div className="w-44">
           <DatePicker
-            label={t('usage.end_date')}
+            placeholder={t('usage.end_date')}
             value={filters.end_date || ''}
             onChange={(v) => updateFilter('end_date', v)}
           />
         </div>
         <div className="w-40">
-          <Input
-            label={t('usage.platform')}
-            placeholder={t('usage.platform_placeholder')}
+          <Select
+            placeholder={t('common.all')}
             value={filters.platform || ''}
             onChange={(e) => updateFilter('platform', e.target.value)}
-            icon={<Search className="w-4 h-4" />}
+            options={[
+              { label: t('common.all'), value: '' },
+              ...platforms.map((p) => ({ label: platformName(p), value: p })),
+            ]}
           />
         </div>
         <div className="w-40">
           <Input
-            label={t('usage.model')}
             placeholder={t('usage.model_placeholder')}
             value={filters.model || ''}
             onChange={(e) => updateFilter('model', e.target.value)}
@@ -180,7 +191,6 @@ export default function UsagePage() {
         </div>
         <div className="w-36">
           <Input
-            label={t('usage.user_id')}
             type="number"
             placeholder={t('usage.user_id')}
             value={filters.user_id ?? ''}
@@ -201,7 +211,7 @@ export default function UsagePage() {
             />
             <StatCard
               title={t('usage.total_tokens')}
-              value={stats.total_tokens.toLocaleString()}
+              value={formatLargeNumber(stats.total_tokens)}
               icon={<Hash className="w-5 h-5" />}
               accentColor="var(--ag-info)"
             />

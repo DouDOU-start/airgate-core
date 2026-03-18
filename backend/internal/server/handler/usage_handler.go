@@ -197,25 +197,26 @@ func (h *UsageHandler) AdminUsageStats(c *gin.Context) {
 
 	// 使用 Ent 聚合查询获取总计
 	var results []struct {
-		TotalTokens     int64   `json:"sum_input_tokens"`
-		TotalCost       float64 `json:"sum_total_cost"`
-		TotalActualCost float64 `json:"sum_actual_cost"`
+		InputTokens  int64   `json:"input_tokens"`
+		OutputTokens int64   `json:"output_tokens"`
+		TotalCost    float64 `json:"total_cost"`
+		ActualCost   float64 `json:"actual_cost"`
 	}
 	err = h.db.UsageLog.Query().
 		Aggregate(
-			ent.Sum(usagelog.FieldInputTokens),
-			ent.Sum(usagelog.FieldOutputTokens),
-			ent.Sum(usagelog.FieldTotalCost),
-			ent.Sum(usagelog.FieldActualCost),
+			ent.As(ent.Sum(usagelog.FieldInputTokens), "input_tokens"),
+			ent.As(ent.Sum(usagelog.FieldOutputTokens), "output_tokens"),
+			ent.As(ent.Sum(usagelog.FieldTotalCost), "total_cost"),
+			ent.As(ent.Sum(usagelog.FieldActualCost), "actual_cost"),
 		).
 		Scan(ctx, &results)
 
 	var totalTokens int64
 	var totalCost, totalActualCost float64
 	if err == nil && len(results) > 0 {
-		totalTokens = results[0].TotalTokens
+		totalTokens = results[0].InputTokens + results[0].OutputTokens
 		totalCost = results[0].TotalCost
-		totalActualCost = results[0].TotalActualCost
+		totalActualCost = results[0].ActualCost
 	}
 
 	response.Success(c, dto.UsageStatsResp{
