@@ -50,9 +50,9 @@ export default function PluginsPage() {
     mutationFn: (name: string) => pluginsApi.uninstall(name),
     onSuccess: () => {
       toast('success', t('plugins.uninstall_success'));
-      queryClient.invalidateQueries({ queryKey: ['plugins'] });
-      queryClient.invalidateQueries({ queryKey: ['marketplace'] });
       setUninstallTarget(null);
+      // 插件卸载后需要整页重载以清理已加载的前端模块
+      window.location.reload();
     },
     onError: (err: Error) => toast('error', err.message),
   });
@@ -220,9 +220,9 @@ export default function PluginsPage() {
         open={installOpen}
         onClose={() => setInstallOpen(false)}
         onInstalled={() => {
-          queryClient.invalidateQueries({ queryKey: ['plugins'] });
-          queryClient.invalidateQueries({ queryKey: ['marketplace'] });
           setInstallOpen(false);
+          // 插件前端模块需要整页重载才能生效
+          window.location.reload();
         }}
       />
 
