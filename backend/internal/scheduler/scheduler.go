@@ -28,6 +28,12 @@ type Scheduler struct {
 	rdb    *redis.Client
 	sticky *StickySession
 
+	// 可选的调度约束检查器
+	windowCost *WindowCostChecker
+	rpm        *RPMCounter
+	session    *SessionManager
+	msgQueue   *MessageQueue
+
 	// 连续失败计数器（accountID → 连续失败次数）
 	failCounts sync.Map
 	// 连续失败阈值，超过则标记账户为 error
@@ -36,10 +42,15 @@ type Scheduler struct {
 
 // NewScheduler 创建调度器
 func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
+	rpm := NewRPMCounter(rdb)
 	return &Scheduler{
 		db:           db,
 		rdb:          rdb,
 		sticky:       NewStickySession(rdb),
+		windowCost:   NewWindowCostChecker(db, rdb),
+		rpm:          rpm,
+		session:      NewSessionManager(rdb),
+		msgQueue:     NewMessageQueue(rdb, rpm),
 		maxFailCount: 3,
 	}
 }
@@ -56,30 +67,65 @@ func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, u
 		return nil, ErrNoAvailableAccount
 	}
 
-	// 第二层：粘性会话
+	// 第二层：调度约束过滤（窗口费用、RPM、会话数）
+	var normalCandidates, stickyCandidates []*ent.Account
+	for _, acc := range candidates {
+		sched := s.checkSchedulability(ctx, acc)
+		switch sched {
+		case Normal:
+			normalCandidates = append(normalCandidates, acc)
+			stickyCandidates = append(stickyCandidates, acc)
+		case StickyOnly:
+			stickyCandidates = append(stickyCandidates, acc)
+		case NotSchedulable:
+			// 跳过
+		}
+	}
+
+	// 第三层：粘性会话（可使用 StickyOnly + Normal 账户）
 	if sessionID != "" {
 		accountID, found := s.sticky.Get(ctx, userID, platform, sessionID)
 		if found {
-			// 验证粘性账户是否仍在候选列表中
-			for _, acc := range candidates {
+			for _, acc := range stickyCandidates {
 				if acc.ID == accountID {
-					// 续期 TTL
 					s.sticky.Set(ctx, userID, platform, sessionID, accountID)
 					return acc, nil
 				}
 			}
-			// 粘性账户不在候选列表中，忽略粘性
 		}
 	}
 
-	// 第三层：负载均衡
-	selected := s.selectByLoadBalance(ctx, candidates)
+	// 第四层：负载均衡（仅 Normal 账户）
+	if len(normalCandidates) == 0 {
+		return nil, ErrNoAvailableAccount
+	}
+
+	selected := s.selectByLoadBalance(ctx, normalCandidates)
 	if selected == nil {
 		return nil, ErrNoAvailableAccount
 	}
 
-	// 设置粘性会话
+	// 注册会话（首次分配账户时）
 	if sessionID != "" {
+		if !s.RegisterSession(ctx, selected.ID, sessionID, selected.Extra) {
+			// 会话数已满，从候选中移除此账户后重试
+			var retry []*ent.Account
+			for _, acc := range normalCandidates {
+				if acc.ID != selected.ID {
+					retry = append(retry, acc)
+				}
+			}
+			if len(retry) == 0 {
+				return nil, ErrNoAvailableAccount
+			}
+			selected = s.selectByLoadBalance(ctx, retry)
+			if selected == nil {
+				return nil, ErrNoAvailableAccount
+			}
+			if !s.RegisterSession(ctx, selected.ID, sessionID, selected.Extra) {
+				return nil, ErrNoAvailableAccount
+			}
+		}
 		s.sticky.Set(ctx, userID, platform, sessionID, selected.ID)
 	}
 
@@ -218,6 +264,36 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 	return items[0].acc
 }
 
+// checkSchedulability 综合检查账户调度约束（窗口费用、RPM、会话数）
+// 返回最严格的约束状态
+func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account) Schedulability {
+	worst := Normal
+
+	// 窗口费用检查
+	if sched := s.windowCost.GetSchedulability(ctx, acc.ID, acc.Extra); sched > worst {
+		worst = sched
+	}
+	if worst == NotSchedulable {
+		return worst
+	}
+
+	// RPM 检查
+	maxRPM := ExtraInt(acc.Extra, "max_rpm")
+	if sched := s.rpm.GetSchedulability(ctx, acc.ID, maxRPM); sched > worst {
+		worst = sched
+	}
+	if worst == NotSchedulable {
+		return worst
+	}
+
+	// 会话数检查
+	if sched := s.session.GetSchedulability(ctx, acc.ID, acc.Extra); sched > worst {
+		worst = sched
+	}
+
+	return worst
+}
+
 // getCurrentLoad 获取账户当前并发数（从 Redis SET 大小获取）
 func (s *Scheduler) getCurrentLoad(ctx context.Context, accountID int) int {
 	if s.rdb == nil {
@@ -229,6 +305,80 @@ func (s *Scheduler) getCurrentLoad(ctx context.Context, accountID int) int {
 		return 0
 	}
 	return int(n)
+}
+
+// IncrementRPM 递增账户 RPM 计数（转发成功后调用）
+func (s *Scheduler) IncrementRPM(ctx context.Context, accountID int) {
+	if _, err := s.rpm.IncrementRPM(ctx, accountID); err != nil {
+		slog.Debug("递增 RPM 计数失败", "account_id", accountID, "error", err)
+	}
+}
+
+// DecrementRPM 回退 RPM 计数（请求未实际消耗上游配额时调用）
+func (s *Scheduler) DecrementRPM(ctx context.Context, accountID int) {
+	s.rpm.DecrementRPM(ctx, accountID)
+}
+
+// RefreshSession 刷新账户会话时间戳（转发成功后调用）
+func (s *Scheduler) RefreshSession(ctx context.Context, accountID int, sessionID string, extra map[string]interface{}) {
+	if sessionID == "" {
+		return
+	}
+	idleTimeout := time.Duration(ExtraInt(extra, "session_idle_timeout")) * time.Second
+	if idleTimeout <= 0 {
+		idleTimeout = defaultSessionIdleTimeout
+	}
+	if err := s.session.RefreshSession(ctx, accountID, sessionID, idleTimeout); err != nil {
+		slog.Debug("刷新会话时间戳失败", "account_id", accountID, "error", err)
+	}
+}
+
+// RegisterSession 注册会话（调度选中账户后调用）
+func (s *Scheduler) RegisterSession(ctx context.Context, accountID int, sessionID string, extra map[string]interface{}) bool {
+	if sessionID == "" {
+		return true
+	}
+	maxSessions := ExtraInt(extra, "max_sessions")
+	if maxSessions <= 0 {
+		return true // 不限制
+	}
+	idleTimeout := time.Duration(ExtraInt(extra, "session_idle_timeout")) * time.Second
+	if idleTimeout <= 0 {
+		idleTimeout = defaultSessionIdleTimeout
+	}
+	allowed, _ := s.session.RegisterSession(ctx, accountID, sessionID, maxSessions, idleTimeout)
+	return allowed
+}
+
+// AcquireMessageLock 获取消息锁（真实用户消息串行化）
+func (s *Scheduler) AcquireMessageLock(ctx context.Context, accountID int, requestID string, extra map[string]interface{}) (bool, error) {
+	return s.msgQueue.WaitAcquire(ctx, accountID, requestID, defaultLockTTL, 30*time.Second)
+}
+
+// ReleaseMessageLock 释放消息锁
+func (s *Scheduler) ReleaseMessageLock(ctx context.Context, accountID int, requestID string) {
+	if err := s.msgQueue.Release(ctx, accountID, requestID); err != nil {
+		slog.Debug("释放消息锁失败", "account_id", accountID, "error", err)
+	}
+}
+
+// EnforceMessageDelay 执行消息延迟
+func (s *Scheduler) EnforceMessageDelay(ctx context.Context, accountID int, extra map[string]interface{}) {
+	baseRPM := ExtraInt(extra, "base_rpm")
+	if baseRPM <= 0 {
+		baseRPM = ExtraInt(extra, "max_rpm")
+	}
+	if baseRPM <= 0 {
+		return // 无 RPM 配置，不延迟
+	}
+	if err := s.msgQueue.EnforceDelay(ctx, accountID, baseRPM); err != nil {
+		slog.Debug("消息延迟失败", "account_id", accountID, "error", err)
+	}
+}
+
+// AddWindowCost 在请求计费后增量更新缓存的窗口费用
+func (s *Scheduler) AddWindowCost(ctx context.Context, accountID int, cost float64) {
+	s.windowCost.AddCost(ctx, accountID, cost)
 }
 
 // ReportResult 上报调度结果，用于动态调整

@@ -196,6 +196,18 @@ func (au *AccountUpdate) ClearLastUsedAt() *AccountUpdate {
 	return au
 }
 
+// SetExtra sets the "extra" field.
+func (au *AccountUpdate) SetExtra(m map[string]interface{}) *AccountUpdate {
+	au.mutation.SetExtra(m)
+	return au
+}
+
+// ClearExtra clears the value of the "extra" field.
+func (au *AccountUpdate) ClearExtra() *AccountUpdate {
+	au.mutation.ClearExtra()
+	return au
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (au *AccountUpdate) SetUpdatedAt(t time.Time) *AccountUpdate {
 	au.mutation.SetUpdatedAt(t)
@@ -421,6 +433,12 @@ func (au *AccountUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if au.mutation.LastUsedAtCleared() {
 		_spec.ClearField(account.FieldLastUsedAt, field.TypeTime)
+	}
+	if value, ok := au.mutation.Extra(); ok {
+		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
+	}
+	if au.mutation.ExtraCleared() {
+		_spec.ClearField(account.FieldExtra, field.TypeJSON)
 	}
 	if value, ok := au.mutation.UpdatedAt(); ok {
 		_spec.SetField(account.FieldUpdatedAt, field.TypeTime, value)
@@ -729,6 +747,18 @@ func (auo *AccountUpdateOne) ClearLastUsedAt() *AccountUpdateOne {
 	return auo
 }
 
+// SetExtra sets the "extra" field.
+func (auo *AccountUpdateOne) SetExtra(m map[string]interface{}) *AccountUpdateOne {
+	auo.mutation.SetExtra(m)
+	return auo
+}
+
+// ClearExtra clears the value of the "extra" field.
+func (auo *AccountUpdateOne) ClearExtra() *AccountUpdateOne {
+	auo.mutation.ClearExtra()
+	return auo
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (auo *AccountUpdateOne) SetUpdatedAt(t time.Time) *AccountUpdateOne {
 	auo.mutation.SetUpdatedAt(t)
@@ -984,6 +1014,12 @@ func (auo *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err e
 	}
 	if auo.mutation.LastUsedAtCleared() {
 		_spec.ClearField(account.FieldLastUsedAt, field.TypeTime)
+	}
+	if value, ok := auo.mutation.Extra(); ok {
+		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
+	}
+	if auo.mutation.ExtraCleared() {
+		_spec.ClearField(account.FieldExtra, field.TypeJSON)
 	}
 	if value, ok := auo.mutation.UpdatedAt(); ok {
 		_spec.SetField(account.FieldUpdatedAt, field.TypeTime, value)

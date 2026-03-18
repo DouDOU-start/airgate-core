@@ -66,7 +66,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		pluginDir = "data/plugins"
 	}
 	pluginMgr := plugin.NewManager(pluginDir, cfg.Log.Level, priceMgr)
-	forwarder := plugin.NewForwarder(pluginMgr, sched, concurrency, limiter, calculator, priceMgr, recorder)
+	forwarder := plugin.NewForwarder(db, pluginMgr, sched, concurrency, limiter, calculator, priceMgr, recorder)
 	marketplace := plugin.NewMarketplace(pluginDir)
 	dynamicRouter := NewDynamicRouter(forwarder)
 	extensionProxy := plugin.NewExtensionProxy(pluginMgr)
