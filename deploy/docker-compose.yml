@@ -46,7 +46,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       WEB_DIR: frontend
     volumes:
-      - ./config.docker.yaml:/app/config.yaml:ro
+      - ./config.docker.yaml:/app/config.yaml
       - ../backend/data/plugins:/app/data/plugins
     ports:
       - "${PORT:-9517}:9517"
