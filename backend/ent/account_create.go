@@ -139,6 +139,12 @@ func (ac *AccountCreate) SetNillableLastUsedAt(t *time.Time) *AccountCreate {
 	return ac
 }
 
+// SetExtra sets the "extra" field.
+func (ac *AccountCreate) SetExtra(m map[string]interface{}) *AccountCreate {
+	ac.mutation.SetExtra(m)
+	return ac
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (ac *AccountCreate) SetCreatedAt(t time.Time) *AccountCreate {
 	ac.mutation.SetCreatedAt(t)
@@ -279,6 +285,10 @@ func (ac *AccountCreate) defaults() {
 		v := account.DefaultErrorMsg
 		ac.mutation.SetErrorMsg(v)
 	}
+	if _, ok := ac.mutation.Extra(); !ok {
+		v := account.DefaultExtra
+		ac.mutation.SetExtra(v)
+	}
 	if _, ok := ac.mutation.CreatedAt(); !ok {
 		v := account.DefaultCreatedAt()
 		ac.mutation.SetCreatedAt(v)
@@ -406,6 +416,10 @@ func (ac *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := ac.mutation.LastUsedAt(); ok {
 		_spec.SetField(account.FieldLastUsedAt, field.TypeTime, value)
 		_node.LastUsedAt = &value
+	}
+	if value, ok := ac.mutation.Extra(); ok {
+		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
+		_node.Extra = value
 	}
 	if value, ok := ac.mutation.CreatedAt(); ok {
 		_spec.SetField(account.FieldCreatedAt, field.TypeTime, value)

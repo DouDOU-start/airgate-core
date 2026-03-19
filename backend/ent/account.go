@@ -39,6 +39,8 @@ type Account struct {
 	ErrorMsg string `json:"error_msg,omitempty"`
 	// LastUsedAt holds the value of the "last_used_at" field.
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+	// 扩展配置（插件/调度器使用）
+	Extra map[string]interface{} `json:"extra,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -97,7 +99,7 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case account.FieldCredentials:
+		case account.FieldCredentials, account.FieldExtra:
 			values[i] = new([]byte)
 		case account.FieldRateMultiplier:
 			values[i] = new(sql.NullFloat64)
@@ -192,6 +194,14 @@ func (a *Account) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				a.LastUsedAt = new(time.Time)
 				*a.LastUsedAt = value.Time
+			}
+		case account.FieldExtra:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field extra", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &a.Extra); err != nil {
+					return fmt.Errorf("unmarshal field extra: %w", err)
+				}
 			}
 		case account.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -294,6 +304,9 @@ func (a *Account) String() string {
 		builder.WriteString("last_used_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("extra=")
+	builder.WriteString(fmt.Sprintf("%v", a.Extra))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(a.CreatedAt.Format(time.ANSIC))

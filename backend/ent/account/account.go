@@ -35,6 +35,8 @@ const (
 	FieldErrorMsg = "error_msg"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
 	FieldLastUsedAt = "last_used_at"
+	// FieldExtra holds the string denoting the extra field in the database.
+	FieldExtra = "extra"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -81,6 +83,7 @@ var Columns = []string{
 	FieldRateMultiplier,
 	FieldErrorMsg,
 	FieldLastUsedAt,
+	FieldExtra,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -131,6 +134,8 @@ var (
 	DefaultRateMultiplier float64
 	// DefaultErrorMsg holds the default value on creation for the "error_msg" field.
 	DefaultErrorMsg string
+	// DefaultExtra holds the default value on creation for the "extra" field.
+	DefaultExtra map[string]interface{}
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
