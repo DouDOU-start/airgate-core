@@ -8,7 +8,7 @@ GO := GOTOOLCHAIN=local go
 
 .PHONY: help dev dev-backend dev-frontend build build-backend build-frontend \
         ent lint fmt test clean install ci pre-commit setup-hooks \
-        docker-build docker-rebuild docker-up docker-down docker-dev
+        docker-build docker-rebuild docker-up docker-down docker-restart docker-dev
 
 help: ## 显示帮助信息
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -114,6 +114,9 @@ docker-up: ## 启动生产环境（后台运行）
 
 docker-down: ## 停止生产环境
 	@docker compose -f deploy/docker-compose.yml down
+
+docker-restart: ## 重启生产环境
+	@docker compose -f deploy/docker-compose.yml restart
 
 docker-dev: ## 启动开发环境（源码编译模式）
 	@docker compose -f deploy/docker-compose.dev.yml up
