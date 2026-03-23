@@ -253,16 +253,15 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		f.scheduler.DecrementRPM(c.Request.Context(), account.ID)
 		slog.Warn("上游限流", "account_id", account.ID, "retry_after", result.RetryAfter)
 	case isAccountError:
-		// 401/403 账号问题：回退 RPM，计入失败（可能触发自动停用）
+		// 401/403 账号凭证问题：回退 RPM，立即标记为 error
 		f.scheduler.DecrementRPM(c.Request.Context(), account.ID)
-		// 优先使用插件提取的上游错误信息，回退到 error
-		reason := ""
+		reason := "账号凭证错误"
 		if result != nil && result.ErrorMessage != "" {
 			reason = result.ErrorMessage
 		} else if err != nil {
 			reason = err.Error()
 		}
-		f.scheduler.ReportResult(account.ID, false, duration, reason)
+		f.scheduler.ReportAccountError(account.ID, reason)
 	case err != nil:
 		// 5xx / 网络错误：回退 RPM，计入失败
 		f.scheduler.DecrementRPM(c.Request.Context(), account.ID)

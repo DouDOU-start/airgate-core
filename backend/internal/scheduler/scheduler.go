@@ -381,6 +381,16 @@ func (s *Scheduler) AddWindowCost(ctx context.Context, accountID int, cost float
 	s.windowCost.AddCost(ctx, accountID, cost)
 }
 
+// ReportAccountError 立即标记账号为 error（用于 401/403 等确定性凭证错误）
+func (s *Scheduler) ReportAccountError(accountID int, reason string) {
+	slog.Error("账户凭证错误，立即标记为 error", "account_id", accountID, "reason", reason)
+	_ = s.db.Account.UpdateOneID(accountID).
+		SetStatus(account.StatusError).
+		SetErrorMsg(reason).
+		Exec(context.Background())
+	s.failCounts.Delete(accountID)
+}
+
 // ReportResult 上报调度结果，用于动态调整
 // reason 为失败时的错误原因（可选），记录到账号 error_msg 便于排查
 func (s *Scheduler) ReportResult(accountID int, success bool, latency time.Duration, reason ...string) {
