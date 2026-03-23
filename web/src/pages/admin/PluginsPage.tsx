@@ -72,14 +72,14 @@ export default function PluginsPage() {
       key: 'name',
       title: t('common.name'),
       render: (row) => (
-        <div className="min-w-0 inline-block text-center">
+        <div className="min-w-0 inline-flex items-center gap-2">
           <div className="text-text font-medium">
             {row.display_name || row.name}
           </div>
           {row.display_name && row.display_name !== row.name && (
-            <div className="text-xs text-text-tertiary font-mono mt-0.5">
+            <span className="text-xs text-text-tertiary font-mono">
               {row.name}
-            </div>
+            </span>
           )}
         </div>
       ),
@@ -88,12 +88,10 @@ export default function PluginsPage() {
       key: 'type',
       title: t('common.type'),
       render: (row) => (
-        <div className="flex flex-col gap-1">
-          <div>
-            <Badge variant={typeVariant[row.type || 'gateway'] || 'default'}>
-              {row.type || 'gateway'}
-            </Badge>
-          </div>
+        <div className="flex items-center gap-2">
+          <Badge variant={typeVariant[row.type || 'gateway'] || 'default'}>
+            {row.type || 'gateway'}
+          </Badge>
           {row.version && (
             <span className="text-xs text-text-tertiary">
               {t('common.version')}: {row.version}
