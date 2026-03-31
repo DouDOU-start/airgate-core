@@ -545,7 +545,7 @@ func (h *UsageHandler) AdminUsageTrend(c *gin.Context) {
 		}
 		tb.InputTokens += int64(l.InputTokens)
 		tb.OutputTokens += int64(l.OutputTokens)
-		tb.CacheRead += int64(l.CacheTokens)
+		tb.CacheRead += int64(l.CachedInputTokens)
 		tb.ActualCost += l.ActualCost
 		tb.StandardCost += l.TotalCost
 	}

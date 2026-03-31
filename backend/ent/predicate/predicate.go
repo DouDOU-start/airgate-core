@@ -18,9 +18,6 @@ type BalanceLog func(*sql.Selector)
 // Group is the predicate function for group builders.
 type Group func(*sql.Selector)
 
-// Order is the predicate function for order builders.
-type Order func(*sql.Selector)
-
 // Plugin is the predicate function for plugin builders.
 type Plugin func(*sql.Selector)
 

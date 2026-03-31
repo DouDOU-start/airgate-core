@@ -19,7 +19,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/order"
 	"github.com/DouDOU-start/airgate-core/ent/plugin"
 	"github.com/DouDOU-start/airgate-core/ent/pluginsource"
 	"github.com/DouDOU-start/airgate-core/ent/proxy"
@@ -42,8 +41,6 @@ type Client struct {
 	BalanceLog *BalanceLogClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
-	// Order is the client for interacting with the Order builders.
-	Order *OrderClient
 	// Plugin is the client for interacting with the Plugin builders.
 	Plugin *PluginClient
 	// PluginSource is the client for interacting with the PluginSource builders.
@@ -73,7 +70,6 @@ func (c *Client) init() {
 	c.Account = NewAccountClient(c.config)
 	c.BalanceLog = NewBalanceLogClient(c.config)
 	c.Group = NewGroupClient(c.config)
-	c.Order = NewOrderClient(c.config)
 	c.Plugin = NewPluginClient(c.config)
 	c.PluginSource = NewPluginSourceClient(c.config)
 	c.Proxy = NewProxyClient(c.config)
@@ -177,7 +173,6 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Account:          NewAccountClient(cfg),
 		BalanceLog:       NewBalanceLogClient(cfg),
 		Group:            NewGroupClient(cfg),
-		Order:            NewOrderClient(cfg),
 		Plugin:           NewPluginClient(cfg),
 		PluginSource:     NewPluginSourceClient(cfg),
 		Proxy:            NewProxyClient(cfg),
@@ -208,7 +203,6 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Account:          NewAccountClient(cfg),
 		BalanceLog:       NewBalanceLogClient(cfg),
 		Group:            NewGroupClient(cfg),
-		Order:            NewOrderClient(cfg),
 		Plugin:           NewPluginClient(cfg),
 		PluginSource:     NewPluginSourceClient(cfg),
 		Proxy:            NewProxyClient(cfg),
@@ -245,8 +239,8 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.APIKey, c.Account, c.BalanceLog, c.Group, c.Order, c.Plugin, c.PluginSource,
-		c.Proxy, c.Setting, c.UsageLog, c.User, c.UserSubscription,
+		c.APIKey, c.Account, c.BalanceLog, c.Group, c.Plugin, c.PluginSource, c.Proxy,
+		c.Setting, c.UsageLog, c.User, c.UserSubscription,
 	} {
 		n.Use(hooks...)
 	}
@@ -256,8 +250,8 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.APIKey, c.Account, c.BalanceLog, c.Group, c.Order, c.Plugin, c.PluginSource,
-		c.Proxy, c.Setting, c.UsageLog, c.User, c.UserSubscription,
+		c.APIKey, c.Account, c.BalanceLog, c.Group, c.Plugin, c.PluginSource, c.Proxy,
+		c.Setting, c.UsageLog, c.User, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -274,8 +268,6 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.BalanceLog.mutate(ctx, m)
 	case *GroupMutation:
 		return c.Group.mutate(ctx, m)
-	case *OrderMutation:
-		return c.Order.mutate(ctx, m)
 	case *PluginMutation:
 		return c.Plugin.mutate(ctx, m)
 	case *PluginSourceMutation:
@@ -1016,155 +1008,6 @@ func (c *GroupClient) mutate(ctx context.Context, m *GroupMutation) (Value, erro
 		return (&GroupDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Group mutation op: %q", m.Op())
-	}
-}
-
-// OrderClient is a client for the Order schema.
-type OrderClient struct {
-	config
-}
-
-// NewOrderClient returns a client for the Order from the given config.
-func NewOrderClient(c config) *OrderClient {
-	return &OrderClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `order.Hooks(f(g(h())))`.
-func (c *OrderClient) Use(hooks ...Hook) {
-	c.hooks.Order = append(c.hooks.Order, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `order.Intercept(f(g(h())))`.
-func (c *OrderClient) Intercept(interceptors ...Interceptor) {
-	c.inters.Order = append(c.inters.Order, interceptors...)
-}
-
-// Create returns a builder for creating a Order entity.
-func (c *OrderClient) Create() *OrderCreate {
-	mutation := newOrderMutation(c.config, OpCreate)
-	return &OrderCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of Order entities.
-func (c *OrderClient) CreateBulk(builders ...*OrderCreate) *OrderCreateBulk {
-	return &OrderCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *OrderClient) MapCreateBulk(slice any, setFunc func(*OrderCreate, int)) *OrderCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &OrderCreateBulk{err: fmt.Errorf("calling to OrderClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*OrderCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &OrderCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for Order.
-func (c *OrderClient) Update() *OrderUpdate {
-	mutation := newOrderMutation(c.config, OpUpdate)
-	return &OrderUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *OrderClient) UpdateOne(o *Order) *OrderUpdateOne {
-	mutation := newOrderMutation(c.config, OpUpdateOne, withOrder(o))
-	return &OrderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *OrderClient) UpdateOneID(id int) *OrderUpdateOne {
-	mutation := newOrderMutation(c.config, OpUpdateOne, withOrderID(id))
-	return &OrderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for Order.
-func (c *OrderClient) Delete() *OrderDelete {
-	mutation := newOrderMutation(c.config, OpDelete)
-	return &OrderDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *OrderClient) DeleteOne(o *Order) *OrderDeleteOne {
-	return c.DeleteOneID(o.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *OrderClient) DeleteOneID(id int) *OrderDeleteOne {
-	builder := c.Delete().Where(order.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &OrderDeleteOne{builder}
-}
-
-// Query returns a query builder for Order.
-func (c *OrderClient) Query() *OrderQuery {
-	return &OrderQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeOrder},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a Order entity by its id.
-func (c *OrderClient) Get(ctx context.Context, id int) (*Order, error) {
-	return c.Query().Where(order.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *OrderClient) GetX(ctx context.Context, id int) *Order {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// QueryUser queries the user edge of a Order.
-func (c *OrderClient) QueryUser(o *Order) *UserQuery {
-	query := (&UserClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := o.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(order.Table, order.FieldID, id),
-			sqlgraph.To(user.Table, user.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, order.UserTable, order.UserColumn),
-		)
-		fromV = sqlgraph.Neighbors(o.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// Hooks returns the client hooks.
-func (c *OrderClient) Hooks() []Hook {
-	return c.hooks.Order
-}
-
-// Interceptors returns the client interceptors.
-func (c *OrderClient) Interceptors() []Interceptor {
-	return c.inters.Order
-}
-
-func (c *OrderClient) mutate(ctx context.Context, m *OrderMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&OrderCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&OrderUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&OrderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&OrderDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown Order mutation op: %q", m.Op())
 	}
 }
 
@@ -2053,22 +1896,6 @@ func (c *UserClient) QuerySubscriptions(u *User) *UserSubscriptionQuery {
 	return query
 }
 
-// QueryOrders queries the orders edge of a User.
-func (c *UserClient) QueryOrders(u *User) *OrderQuery {
-	query := (&OrderClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := u.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(user.Table, user.FieldID, id),
-			sqlgraph.To(order.Table, order.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, user.OrdersTable, user.OrdersColumn),
-		)
-		fromV = sqlgraph.Neighbors(u.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
 // QueryUsageLogs queries the usage_logs edge of a User.
 func (c *UserClient) QueryUsageLogs(u *User) *UsageLogQuery {
 	query := (&UsageLogClient{config: c.config}).Query()
@@ -2310,11 +2137,11 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, Account, BalanceLog, Group, Order, Plugin, PluginSource, Proxy, Setting,
+		APIKey, Account, BalanceLog, Group, Plugin, PluginSource, Proxy, Setting,
 		UsageLog, User, UserSubscription []ent.Hook
 	}
 	inters struct {
-		APIKey, Account, BalanceLog, Group, Order, Plugin, PluginSource, Proxy, Setting,
+		APIKey, Account, BalanceLog, Group, Plugin, PluginSource, Proxy, Setting,
 		UsageLog, User, UserSubscription []ent.Interceptor
 	}
 )

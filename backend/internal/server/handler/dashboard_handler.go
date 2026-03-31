@@ -74,7 +74,7 @@ func (h *DashboardHandler) Stats(c *gin.Context) {
 
 	for _, l := range todayLogs {
 		todayRequests++
-		todayTokens += int64(l.InputTokens + l.OutputTokens + l.CacheTokens)
+		todayTokens += int64(l.InputTokens + l.OutputTokens + l.CachedInputTokens)
 		todayCost += l.ActualCost
 		todayDurationSum += l.DurationMs
 		if u := l.Edges.User; u != nil {
@@ -109,7 +109,7 @@ func (h *DashboardHandler) Stats(c *gin.Context) {
 		Aggregate(
 			ent.Sum(usagelog.FieldInputTokens),
 			ent.Sum(usagelog.FieldOutputTokens),
-			ent.Sum(usagelog.FieldCacheTokens),
+			ent.Sum(usagelog.FieldCachedInputTokens),
 			ent.Sum(usagelog.FieldActualCost),
 		).
 		Scan(ctx, &allTimeAgg)
@@ -132,7 +132,7 @@ func (h *DashboardHandler) Stats(c *gin.Context) {
 		Aggregate(
 			ent.Sum(usagelog.FieldInputTokens),
 			ent.Sum(usagelog.FieldOutputTokens),
-			ent.Sum(usagelog.FieldCacheTokens),
+			ent.Sum(usagelog.FieldCachedInputTokens),
 		).
 		Scan(ctx, &tokenAgg)
 	if err == nil && len(tokenAgg) > 0 {
@@ -166,7 +166,7 @@ func (h *DashboardHandler) Stats(c *gin.Context) {
 		Aggregate(
 			ent.Sum(usagelog.FieldInputTokens),
 			ent.Sum(usagelog.FieldOutputTokens),
-			ent.Sum(usagelog.FieldCacheTokens),
+			ent.Sum(usagelog.FieldCachedInputTokens),
 			ent.Sum(usagelog.FieldDurationMs),
 		).
 		Scan(ctx, &recentTokenAgg)
@@ -247,7 +247,7 @@ func (h *DashboardHandler) Trend(c *gin.Context) {
 			modelMap[l.Model] = ms
 		}
 		ms.Requests++
-		ms.Tokens += int64(l.InputTokens + l.OutputTokens + l.CacheTokens)
+		ms.Tokens += int64(l.InputTokens + l.OutputTokens + l.CachedInputTokens)
 		ms.ActualCost += l.ActualCost
 		ms.StandardCost += l.TotalCost
 	}
@@ -274,7 +274,7 @@ func (h *DashboardHandler) Trend(c *gin.Context) {
 			userMap[uid] = ur
 		}
 		ur.Requests++
-		ur.Tokens += int64(l.InputTokens + l.OutputTokens + l.CacheTokens)
+		ur.Tokens += int64(l.InputTokens + l.OutputTokens + l.CachedInputTokens)
 		ur.ActualCost += l.ActualCost
 		ur.StandardCost += l.TotalCost
 	}
@@ -331,7 +331,7 @@ func (h *DashboardHandler) Trend(c *gin.Context) {
 			ut = &userTotal{uid: uid, email: email}
 			userTotalMap[uid] = ut
 		}
-		ut.total += int64(l.InputTokens + l.OutputTokens + l.CacheTokens)
+		ut.total += int64(l.InputTokens + l.OutputTokens + l.CachedInputTokens)
 	}
 	userTotals := make([]userTotal, 0, len(userTotalMap))
 	for _, ut := range userTotalMap {
@@ -363,7 +363,7 @@ func (h *DashboardHandler) Trend(c *gin.Context) {
 		if userTimeBuckets[uid] == nil {
 			userTimeBuckets[uid] = make(map[string]int64)
 		}
-		userTimeBuckets[uid][key] += int64(l.InputTokens + l.OutputTokens + l.CacheTokens)
+		userTimeBuckets[uid][key] += int64(l.InputTokens + l.OutputTokens + l.CachedInputTokens)
 	}
 
 	topUsers := make([]dto.DashboardUserTrend, 0, len(userTotals))

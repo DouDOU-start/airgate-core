@@ -276,19 +276,6 @@ export interface SubscriptionResp {
   updated_at: string;
 }
 
-export interface UsageWindow {
-  used: number;
-  limit: number;
-  reset: string;
-}
-
-export interface SubscriptionProgressResp {
-  group_id: number;
-  group_name: string;
-  daily?: UsageWindow;
-  weekly?: UsageWindow;
-  monthly?: UsageWindow;
-}
 
 export interface AssignSubscriptionReq {
   user_id: number;

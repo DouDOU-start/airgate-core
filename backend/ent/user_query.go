@@ -14,7 +14,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/order"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -30,7 +29,6 @@ type UserQuery struct {
 	predicates        []predicate.User
 	withAPIKeys       *APIKeyQuery
 	withSubscriptions *UserSubscriptionQuery
-	withOrders        *OrderQuery
 	withUsageLogs     *UsageLogQuery
 	withAllowedGroups *GroupQuery
 	withBalanceLogs   *BalanceLogQuery
@@ -107,28 +105,6 @@ func (uq *UserQuery) QuerySubscriptions() *UserSubscriptionQuery {
 			sqlgraph.From(user.Table, user.FieldID, selector),
 			sqlgraph.To(usersubscription.Table, usersubscription.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, user.SubscriptionsTable, user.SubscriptionsColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(uq.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QueryOrders chains the current query on the "orders" edge.
-func (uq *UserQuery) QueryOrders() *OrderQuery {
-	query := (&OrderClient{config: uq.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := uq.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := uq.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(user.Table, user.FieldID, selector),
-			sqlgraph.To(order.Table, order.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, user.OrdersTable, user.OrdersColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(uq.driver.Dialect(), step)
 		return fromU, nil
@@ -396,7 +372,6 @@ func (uq *UserQuery) Clone() *UserQuery {
 		predicates:        append([]predicate.User{}, uq.predicates...),
 		withAPIKeys:       uq.withAPIKeys.Clone(),
 		withSubscriptions: uq.withSubscriptions.Clone(),
-		withOrders:        uq.withOrders.Clone(),
 		withUsageLogs:     uq.withUsageLogs.Clone(),
 		withAllowedGroups: uq.withAllowedGroups.Clone(),
 		withBalanceLogs:   uq.withBalanceLogs.Clone(),
@@ -425,17 +400,6 @@ func (uq *UserQuery) WithSubscriptions(opts ...func(*UserSubscriptionQuery)) *Us
 		opt(query)
 	}
 	uq.withSubscriptions = query
-	return uq
-}
-
-// WithOrders tells the query-builder to eager-load the nodes that are connected to
-// the "orders" edge. The optional arguments are used to configure the query builder of the edge.
-func (uq *UserQuery) WithOrders(opts ...func(*OrderQuery)) *UserQuery {
-	query := (&OrderClient{config: uq.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	uq.withOrders = query
 	return uq
 }
 
@@ -550,10 +514,9 @@ func (uq *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 	var (
 		nodes       = []*User{}
 		_spec       = uq.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [5]bool{
 			uq.withAPIKeys != nil,
 			uq.withSubscriptions != nil,
-			uq.withOrders != nil,
 			uq.withUsageLogs != nil,
 			uq.withAllowedGroups != nil,
 			uq.withBalanceLogs != nil,
@@ -588,13 +551,6 @@ func (uq *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		if err := uq.loadSubscriptions(ctx, query, nodes,
 			func(n *User) { n.Edges.Subscriptions = []*UserSubscription{} },
 			func(n *User, e *UserSubscription) { n.Edges.Subscriptions = append(n.Edges.Subscriptions, e) }); err != nil {
-			return nil, err
-		}
-	}
-	if query := uq.withOrders; query != nil {
-		if err := uq.loadOrders(ctx, query, nodes,
-			func(n *User) { n.Edges.Orders = []*Order{} },
-			func(n *User, e *Order) { n.Edges.Orders = append(n.Edges.Orders, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -679,37 +635,6 @@ func (uq *UserQuery) loadSubscriptions(ctx context.Context, query *UserSubscript
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "user_subscriptions" returned %v for node %v`, *fk, n.ID)
-		}
-		assign(node, n)
-	}
-	return nil
-}
-func (uq *UserQuery) loadOrders(ctx context.Context, query *OrderQuery, nodes []*User, init func(*User), assign func(*User, *Order)) error {
-	fks := make([]driver.Value, 0, len(nodes))
-	nodeids := make(map[int]*User)
-	for i := range nodes {
-		fks = append(fks, nodes[i].ID)
-		nodeids[nodes[i].ID] = nodes[i]
-		if init != nil {
-			init(nodes[i])
-		}
-	}
-	query.withFKs = true
-	query.Where(predicate.Order(func(s *sql.Selector) {
-		s.Where(sql.InValues(s.C(user.OrdersColumn), fks...))
-	}))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		fk := n.user_orders
-		if fk == nil {
-			return fmt.Errorf(`foreign-key "user_orders" is nil for node %v`, n.ID)
-		}
-		node, ok := nodeids[*fk]
-		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "user_orders" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

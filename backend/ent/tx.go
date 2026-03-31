@@ -20,8 +20,6 @@ type Tx struct {
 	BalanceLog *BalanceLogClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
-	// Order is the client for interacting with the Order builders.
-	Order *OrderClient
 	// Plugin is the client for interacting with the Plugin builders.
 	Plugin *PluginClient
 	// PluginSource is the client for interacting with the PluginSource builders.
@@ -171,7 +169,6 @@ func (tx *Tx) init() {
 	tx.Account = NewAccountClient(tx.config)
 	tx.BalanceLog = NewBalanceLogClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
-	tx.Order = NewOrderClient(tx.config)
 	tx.Plugin = NewPluginClient(tx.config)
 	tx.PluginSource = NewPluginSourceClient(tx.config)
 	tx.Proxy = NewProxyClient(tx.config)

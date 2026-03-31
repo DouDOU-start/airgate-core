@@ -33,7 +33,6 @@ func (User) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("api_keys", APIKey.Type),
 		edge.To("subscriptions", UserSubscription.Type),
-		edge.To("orders", Order.Type),
 		edge.To("usage_logs", UsageLog.Type),
 		// 用户可访问的专属分组（多对多）
 		edge.To("allowed_groups", Group.Type),

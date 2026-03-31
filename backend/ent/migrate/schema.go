@@ -123,32 +123,6 @@ var (
 		Columns:    GroupsColumns,
 		PrimaryKey: []*schema.Column{GroupsColumns[0]},
 	}
-	// OrdersColumns holds the columns for the "orders" table.
-	OrdersColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "order_no", Type: field.TypeString, Unique: true},
-		{Name: "amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "paid", "failed", "expired"}, Default: "pending"},
-		{Name: "channel", Type: field.TypeString, Default: ""},
-		{Name: "paid_at", Type: field.TypeTime, Nullable: true},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "user_orders", Type: field.TypeInt},
-	}
-	// OrdersTable holds the schema information for the "orders" table.
-	OrdersTable = &schema.Table{
-		Name:       "orders",
-		Columns:    OrdersColumns,
-		PrimaryKey: []*schema.Column{OrdersColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "orders_users_orders",
-				Columns:    []*schema.Column{OrdersColumns[8]},
-				RefColumns: []*schema.Column{UsersColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-		},
-	}
 	// PluginsColumns holds the columns for the "plugins" table.
 	PluginsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -226,12 +200,10 @@ var (
 		{Name: "input_tokens", Type: field.TypeInt, Default: 0},
 		{Name: "output_tokens", Type: field.TypeInt, Default: 0},
 		{Name: "cached_input_tokens", Type: field.TypeInt, Default: 0},
-		{Name: "cache_tokens", Type: field.TypeInt, Default: 0},
 		{Name: "reasoning_output_tokens", Type: field.TypeInt, Default: 0},
 		{Name: "input_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "output_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "cached_input_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
-		{Name: "cache_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "total_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "actual_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "rate_multiplier", Type: field.TypeFloat64, Default: 1},
@@ -256,25 +228,25 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "usage_logs_api_keys_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[23]},
+				Columns:    []*schema.Column{UsageLogsColumns[21]},
 				RefColumns: []*schema.Column{APIKeysColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_accounts_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[24]},
+				Columns:    []*schema.Column{UsageLogsColumns[22]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "usage_logs_groups_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[25]},
+				Columns:    []*schema.Column{UsageLogsColumns[23]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_users_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[26]},
+				Columns:    []*schema.Column{UsageLogsColumns[24]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -389,7 +361,6 @@ var (
 		AccountsTable,
 		BalanceLogsTable,
 		GroupsTable,
-		OrdersTable,
 		PluginsTable,
 		PluginSourcesTable,
 		ProxiesTable,
@@ -407,7 +378,6 @@ func init() {
 	APIKeysTable.ForeignKeys[1].RefTable = UsersTable
 	AccountsTable.ForeignKeys[0].RefTable = ProxiesTable
 	BalanceLogsTable.ForeignKeys[0].RefTable = UsersTable
-	OrdersTable.ForeignKeys[0].RefTable = UsersTable
 	UsageLogsTable.ForeignKeys[0].RefTable = APIKeysTable
 	UsageLogsTable.ForeignKeys[1].RefTable = AccountsTable
 	UsageLogsTable.ForeignKeys[2].RefTable = GroupsTable

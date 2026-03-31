@@ -122,27 +122,6 @@ func (ulu *UsageLogUpdate) AddCachedInputTokens(i int) *UsageLogUpdate {
 	return ulu
 }
 
-// SetCacheTokens sets the "cache_tokens" field.
-func (ulu *UsageLogUpdate) SetCacheTokens(i int) *UsageLogUpdate {
-	ulu.mutation.ResetCacheTokens()
-	ulu.mutation.SetCacheTokens(i)
-	return ulu
-}
-
-// SetNillableCacheTokens sets the "cache_tokens" field if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillableCacheTokens(i *int) *UsageLogUpdate {
-	if i != nil {
-		ulu.SetCacheTokens(*i)
-	}
-	return ulu
-}
-
-// AddCacheTokens adds i to the "cache_tokens" field.
-func (ulu *UsageLogUpdate) AddCacheTokens(i int) *UsageLogUpdate {
-	ulu.mutation.AddCacheTokens(i)
-	return ulu
-}
-
 // SetReasoningOutputTokens sets the "reasoning_output_tokens" field.
 func (ulu *UsageLogUpdate) SetReasoningOutputTokens(i int) *UsageLogUpdate {
 	ulu.mutation.ResetReasoningOutputTokens()
@@ -224,27 +203,6 @@ func (ulu *UsageLogUpdate) SetNillableCachedInputCost(f *float64) *UsageLogUpdat
 // AddCachedInputCost adds f to the "cached_input_cost" field.
 func (ulu *UsageLogUpdate) AddCachedInputCost(f float64) *UsageLogUpdate {
 	ulu.mutation.AddCachedInputCost(f)
-	return ulu
-}
-
-// SetCacheCost sets the "cache_cost" field.
-func (ulu *UsageLogUpdate) SetCacheCost(f float64) *UsageLogUpdate {
-	ulu.mutation.ResetCacheCost()
-	ulu.mutation.SetCacheCost(f)
-	return ulu
-}
-
-// SetNillableCacheCost sets the "cache_cost" field if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillableCacheCost(f *float64) *UsageLogUpdate {
-	if f != nil {
-		ulu.SetCacheCost(*f)
-	}
-	return ulu
-}
-
-// AddCacheCost adds f to the "cache_cost" field.
-func (ulu *UsageLogUpdate) AddCacheCost(f float64) *UsageLogUpdate {
-	ulu.mutation.AddCacheCost(f)
 	return ulu
 }
 
@@ -603,12 +561,6 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ulu.mutation.AddedCachedInputTokens(); ok {
 		_spec.AddField(usagelog.FieldCachedInputTokens, field.TypeInt, value)
 	}
-	if value, ok := ulu.mutation.CacheTokens(); ok {
-		_spec.SetField(usagelog.FieldCacheTokens, field.TypeInt, value)
-	}
-	if value, ok := ulu.mutation.AddedCacheTokens(); ok {
-		_spec.AddField(usagelog.FieldCacheTokens, field.TypeInt, value)
-	}
 	if value, ok := ulu.mutation.ReasoningOutputTokens(); ok {
 		_spec.SetField(usagelog.FieldReasoningOutputTokens, field.TypeInt, value)
 	}
@@ -632,12 +584,6 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := ulu.mutation.AddedCachedInputCost(); ok {
 		_spec.AddField(usagelog.FieldCachedInputCost, field.TypeFloat64, value)
-	}
-	if value, ok := ulu.mutation.CacheCost(); ok {
-		_spec.SetField(usagelog.FieldCacheCost, field.TypeFloat64, value)
-	}
-	if value, ok := ulu.mutation.AddedCacheCost(); ok {
-		_spec.AddField(usagelog.FieldCacheCost, field.TypeFloat64, value)
 	}
 	if value, ok := ulu.mutation.TotalCost(); ok {
 		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)
@@ -914,27 +860,6 @@ func (uluo *UsageLogUpdateOne) AddCachedInputTokens(i int) *UsageLogUpdateOne {
 	return uluo
 }
 
-// SetCacheTokens sets the "cache_tokens" field.
-func (uluo *UsageLogUpdateOne) SetCacheTokens(i int) *UsageLogUpdateOne {
-	uluo.mutation.ResetCacheTokens()
-	uluo.mutation.SetCacheTokens(i)
-	return uluo
-}
-
-// SetNillableCacheTokens sets the "cache_tokens" field if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillableCacheTokens(i *int) *UsageLogUpdateOne {
-	if i != nil {
-		uluo.SetCacheTokens(*i)
-	}
-	return uluo
-}
-
-// AddCacheTokens adds i to the "cache_tokens" field.
-func (uluo *UsageLogUpdateOne) AddCacheTokens(i int) *UsageLogUpdateOne {
-	uluo.mutation.AddCacheTokens(i)
-	return uluo
-}
-
 // SetReasoningOutputTokens sets the "reasoning_output_tokens" field.
 func (uluo *UsageLogUpdateOne) SetReasoningOutputTokens(i int) *UsageLogUpdateOne {
 	uluo.mutation.ResetReasoningOutputTokens()
@@ -1016,27 +941,6 @@ func (uluo *UsageLogUpdateOne) SetNillableCachedInputCost(f *float64) *UsageLogU
 // AddCachedInputCost adds f to the "cached_input_cost" field.
 func (uluo *UsageLogUpdateOne) AddCachedInputCost(f float64) *UsageLogUpdateOne {
 	uluo.mutation.AddCachedInputCost(f)
-	return uluo
-}
-
-// SetCacheCost sets the "cache_cost" field.
-func (uluo *UsageLogUpdateOne) SetCacheCost(f float64) *UsageLogUpdateOne {
-	uluo.mutation.ResetCacheCost()
-	uluo.mutation.SetCacheCost(f)
-	return uluo
-}
-
-// SetNillableCacheCost sets the "cache_cost" field if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillableCacheCost(f *float64) *UsageLogUpdateOne {
-	if f != nil {
-		uluo.SetCacheCost(*f)
-	}
-	return uluo
-}
-
-// AddCacheCost adds f to the "cache_cost" field.
-func (uluo *UsageLogUpdateOne) AddCacheCost(f float64) *UsageLogUpdateOne {
-	uluo.mutation.AddCacheCost(f)
 	return uluo
 }
 
@@ -1425,12 +1329,6 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	if value, ok := uluo.mutation.AddedCachedInputTokens(); ok {
 		_spec.AddField(usagelog.FieldCachedInputTokens, field.TypeInt, value)
 	}
-	if value, ok := uluo.mutation.CacheTokens(); ok {
-		_spec.SetField(usagelog.FieldCacheTokens, field.TypeInt, value)
-	}
-	if value, ok := uluo.mutation.AddedCacheTokens(); ok {
-		_spec.AddField(usagelog.FieldCacheTokens, field.TypeInt, value)
-	}
 	if value, ok := uluo.mutation.ReasoningOutputTokens(); ok {
 		_spec.SetField(usagelog.FieldReasoningOutputTokens, field.TypeInt, value)
 	}
@@ -1454,12 +1352,6 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if value, ok := uluo.mutation.AddedCachedInputCost(); ok {
 		_spec.AddField(usagelog.FieldCachedInputCost, field.TypeFloat64, value)
-	}
-	if value, ok := uluo.mutation.CacheCost(); ok {
-		_spec.SetField(usagelog.FieldCacheCost, field.TypeFloat64, value)
-	}
-	if value, ok := uluo.mutation.AddedCacheCost(); ok {
-		_spec.AddField(usagelog.FieldCacheCost, field.TypeFloat64, value)
 	}
 	if value, ok := uluo.mutation.TotalCost(); ok {
 		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)

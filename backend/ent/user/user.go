@@ -41,8 +41,6 @@ const (
 	EdgeAPIKeys = "api_keys"
 	// EdgeSubscriptions holds the string denoting the subscriptions edge name in mutations.
 	EdgeSubscriptions = "subscriptions"
-	// EdgeOrders holds the string denoting the orders edge name in mutations.
-	EdgeOrders = "orders"
 	// EdgeUsageLogs holds the string denoting the usage_logs edge name in mutations.
 	EdgeUsageLogs = "usage_logs"
 	// EdgeAllowedGroups holds the string denoting the allowed_groups edge name in mutations.
@@ -65,13 +63,6 @@ const (
 	SubscriptionsInverseTable = "user_subscriptions"
 	// SubscriptionsColumn is the table column denoting the subscriptions relation/edge.
 	SubscriptionsColumn = "user_subscriptions"
-	// OrdersTable is the table that holds the orders relation/edge.
-	OrdersTable = "orders"
-	// OrdersInverseTable is the table name for the Order entity.
-	// It exists in this package in order to avoid circular dependency with the "order" package.
-	OrdersInverseTable = "orders"
-	// OrdersColumn is the table column denoting the orders relation/edge.
-	OrdersColumn = "user_orders"
 	// UsageLogsTable is the table that holds the usage_logs relation/edge.
 	UsageLogsTable = "usage_logs"
 	// UsageLogsInverseTable is the table name for the UsageLog entity.
@@ -282,20 +273,6 @@ func BySubscriptions(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
-// ByOrdersCount orders the results by orders count.
-func ByOrdersCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newOrdersStep(), opts...)
-	}
-}
-
-// ByOrders orders the results by orders terms.
-func ByOrders(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newOrdersStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
-
 // ByUsageLogsCount orders the results by usage_logs count.
 func ByUsageLogsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -349,13 +326,6 @@ func newSubscriptionsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(SubscriptionsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, SubscriptionsTable, SubscriptionsColumn),
-	)
-}
-func newOrdersStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(OrdersInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.O2M, false, OrdersTable, OrdersColumn),
 	)
 }
 func newUsageLogsStep() *sqlgraph.Step {

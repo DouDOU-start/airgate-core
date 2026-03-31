@@ -31,8 +31,6 @@ type UsageLog struct {
 	OutputTokens int `json:"output_tokens,omitempty"`
 	// CachedInputTokens holds the value of the "cached_input_tokens" field.
 	CachedInputTokens int `json:"cached_input_tokens,omitempty"`
-	// CacheTokens holds the value of the "cache_tokens" field.
-	CacheTokens int `json:"cache_tokens,omitempty"`
 	// ReasoningOutputTokens holds the value of the "reasoning_output_tokens" field.
 	ReasoningOutputTokens int `json:"reasoning_output_tokens,omitempty"`
 	// InputCost holds the value of the "input_cost" field.
@@ -41,8 +39,6 @@ type UsageLog struct {
 	OutputCost float64 `json:"output_cost,omitempty"`
 	// CachedInputCost holds the value of the "cached_input_cost" field.
 	CachedInputCost float64 `json:"cached_input_cost,omitempty"`
-	// CacheCost holds the value of the "cache_cost" field.
-	CacheCost float64 `json:"cache_cost,omitempty"`
 	// TotalCost holds the value of the "total_cost" field.
 	TotalCost float64 `json:"total_cost,omitempty"`
 	// ActualCost holds the value of the "actual_cost" field.
@@ -141,9 +137,9 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case usagelog.FieldStream:
 			values[i] = new(sql.NullBool)
-		case usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldCacheCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldAccountRateMultiplier:
+		case usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldAccountRateMultiplier:
 			values[i] = new(sql.NullFloat64)
-		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs:
+		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs:
 			values[i] = new(sql.NullInt64)
 		case usagelog.FieldPlatform, usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldUserAgent, usagelog.FieldIPAddress:
 			values[i] = new(sql.NullString)
@@ -208,12 +204,6 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.CachedInputTokens = int(value.Int64)
 			}
-		case usagelog.FieldCacheTokens:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field cache_tokens", values[i])
-			} else if value.Valid {
-				ul.CacheTokens = int(value.Int64)
-			}
 		case usagelog.FieldReasoningOutputTokens:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field reasoning_output_tokens", values[i])
@@ -237,12 +227,6 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field cached_input_cost", values[i])
 			} else if value.Valid {
 				ul.CachedInputCost = value.Float64
-			}
-		case usagelog.FieldCacheCost:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field cache_cost", values[i])
-			} else if value.Valid {
-				ul.CacheCost = value.Float64
 			}
 		case usagelog.FieldTotalCost:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
@@ -409,9 +393,6 @@ func (ul *UsageLog) String() string {
 	builder.WriteString("cached_input_tokens=")
 	builder.WriteString(fmt.Sprintf("%v", ul.CachedInputTokens))
 	builder.WriteString(", ")
-	builder.WriteString("cache_tokens=")
-	builder.WriteString(fmt.Sprintf("%v", ul.CacheTokens))
-	builder.WriteString(", ")
 	builder.WriteString("reasoning_output_tokens=")
 	builder.WriteString(fmt.Sprintf("%v", ul.ReasoningOutputTokens))
 	builder.WriteString(", ")
@@ -423,9 +404,6 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("cached_input_cost=")
 	builder.WriteString(fmt.Sprintf("%v", ul.CachedInputCost))
-	builder.WriteString(", ")
-	builder.WriteString("cache_cost=")
-	builder.WriteString(fmt.Sprintf("%v", ul.CacheCost))
 	builder.WriteString(", ")
 	builder.WriteString("total_cost=")
 	builder.WriteString(fmt.Sprintf("%v", ul.TotalCost))

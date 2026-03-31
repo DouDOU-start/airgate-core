@@ -80,11 +80,6 @@ func CachedInputTokens(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCachedInputTokens, v))
 }
 
-// CacheTokens applies equality check predicate on the "cache_tokens" field. It's identical to CacheTokensEQ.
-func CacheTokens(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEQ(FieldCacheTokens, v))
-}
-
 // ReasoningOutputTokens applies equality check predicate on the "reasoning_output_tokens" field. It's identical to ReasoningOutputTokensEQ.
 func ReasoningOutputTokens(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldReasoningOutputTokens, v))
@@ -103,11 +98,6 @@ func OutputCost(v float64) predicate.UsageLog {
 // CachedInputCost applies equality check predicate on the "cached_input_cost" field. It's identical to CachedInputCostEQ.
 func CachedInputCost(v float64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCachedInputCost, v))
-}
-
-// CacheCost applies equality check predicate on the "cache_cost" field. It's identical to CacheCostEQ.
-func CacheCost(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEQ(FieldCacheCost, v))
 }
 
 // TotalCost applies equality check predicate on the "total_cost" field. It's identical to TotalCostEQ.
@@ -415,46 +405,6 @@ func CachedInputTokensLTE(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldLTE(FieldCachedInputTokens, v))
 }
 
-// CacheTokensEQ applies the EQ predicate on the "cache_tokens" field.
-func CacheTokensEQ(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEQ(FieldCacheTokens, v))
-}
-
-// CacheTokensNEQ applies the NEQ predicate on the "cache_tokens" field.
-func CacheTokensNEQ(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNEQ(FieldCacheTokens, v))
-}
-
-// CacheTokensIn applies the In predicate on the "cache_tokens" field.
-func CacheTokensIn(vs ...int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldIn(FieldCacheTokens, vs...))
-}
-
-// CacheTokensNotIn applies the NotIn predicate on the "cache_tokens" field.
-func CacheTokensNotIn(vs ...int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNotIn(FieldCacheTokens, vs...))
-}
-
-// CacheTokensGT applies the GT predicate on the "cache_tokens" field.
-func CacheTokensGT(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldGT(FieldCacheTokens, v))
-}
-
-// CacheTokensGTE applies the GTE predicate on the "cache_tokens" field.
-func CacheTokensGTE(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldGTE(FieldCacheTokens, v))
-}
-
-// CacheTokensLT applies the LT predicate on the "cache_tokens" field.
-func CacheTokensLT(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldLT(FieldCacheTokens, v))
-}
-
-// CacheTokensLTE applies the LTE predicate on the "cache_tokens" field.
-func CacheTokensLTE(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldLTE(FieldCacheTokens, v))
-}
-
 // ReasoningOutputTokensEQ applies the EQ predicate on the "reasoning_output_tokens" field.
 func ReasoningOutputTokensEQ(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldReasoningOutputTokens, v))
@@ -613,46 +563,6 @@ func CachedInputCostLT(v float64) predicate.UsageLog {
 // CachedInputCostLTE applies the LTE predicate on the "cached_input_cost" field.
 func CachedInputCostLTE(v float64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldLTE(FieldCachedInputCost, v))
-}
-
-// CacheCostEQ applies the EQ predicate on the "cache_cost" field.
-func CacheCostEQ(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEQ(FieldCacheCost, v))
-}
-
-// CacheCostNEQ applies the NEQ predicate on the "cache_cost" field.
-func CacheCostNEQ(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNEQ(FieldCacheCost, v))
-}
-
-// CacheCostIn applies the In predicate on the "cache_cost" field.
-func CacheCostIn(vs ...float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldIn(FieldCacheCost, vs...))
-}
-
-// CacheCostNotIn applies the NotIn predicate on the "cache_cost" field.
-func CacheCostNotIn(vs ...float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNotIn(FieldCacheCost, vs...))
-}
-
-// CacheCostGT applies the GT predicate on the "cache_cost" field.
-func CacheCostGT(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldGT(FieldCacheCost, v))
-}
-
-// CacheCostGTE applies the GTE predicate on the "cache_cost" field.
-func CacheCostGTE(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldGTE(FieldCacheCost, v))
-}
-
-// CacheCostLT applies the LT predicate on the "cache_cost" field.
-func CacheCostLT(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldLT(FieldCacheCost, v))
-}
-
-// CacheCostLTE applies the LTE predicate on the "cache_cost" field.
-func CacheCostLTE(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldLTE(FieldCacheCost, v))
 }
 
 // TotalCostEQ applies the EQ predicate on the "total_cost" field.

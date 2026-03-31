@@ -29,7 +29,6 @@ type CalculateResult struct {
 	InputCost             float64 // 输入 token 费用
 	OutputCost            float64 // 输出 token 费用
 	CachedInputCost       float64 // cached input token 费用
-	CacheCost             float64 // 兼容字段，等同于 CachedInputCost
 	TotalCost             float64 // 原始成本 = input + cached_input + output
 	ActualCost            float64 // 最终计费 = TotalCost * group * account * user
 	RateMultiplier        float64 // 最终综合倍率
@@ -86,7 +85,6 @@ func (c *Calculator) Calculate(input CalculateInput, price ModelPrice) Calculate
 		InputCost:             inputCost,
 		OutputCost:            outputCost,
 		CachedInputCost:       cachedInputCost,
-		CacheCost:             cachedInputCost,
 		TotalCost:             totalCost,
 		ActualCost:            actualCost,
 		RateMultiplier:        combinedRate,
