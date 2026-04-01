@@ -139,14 +139,6 @@
   background: var(--ag-text-tertiary);
 }
 
-/* 表头容器：隐藏滚动条但保留占位宽度 */
-.ag-table-header::-webkit-scrollbar {
-  background: transparent;
-}
-.ag-table-header::-webkit-scrollbar-thumb {
-  background: transparent;
-}
-
 html {
   font-size: 14px;
 }
