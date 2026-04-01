@@ -457,11 +457,21 @@ export default function UsagePage() {
       key: 'model',
       title: t('usage.model'),
       render: (row) => {
-        const keyLabel = row.api_key_deleted ? t('usage.api_key_deleted') : (row.api_key_name || `API Key #${row.api_key_id}`);
+        const keyParts: string[] = [];
+        if (row.api_key_deleted) {
+          keyParts.push(t('usage.api_key_deleted'));
+        } else {
+          if (row.api_key_hint) keyParts.push(row.api_key_hint);
+          if (row.api_key_name) keyParts.push(row.api_key_name);
+          if (keyParts.length === 0) keyParts.push(`API Key #${row.api_key_id}`);
+        }
         return (
-          <span className="text-text cursor-default" title={keyLabel}>
-            {row.model}
-          </span>
+          <div>
+            <div className="text-text">{row.model}</div>
+            <div className="text-xs text-text-tertiary font-mono truncate max-w-[200px]" title={keyParts.join(' · ')}>
+              {keyParts.join(' · ')}
+            </div>
+          </div>
         );
       },
     },

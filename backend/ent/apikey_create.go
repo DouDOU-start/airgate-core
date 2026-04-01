@@ -29,6 +29,20 @@ func (akc *APIKeyCreate) SetName(s string) *APIKeyCreate {
 	return akc
 }
 
+// SetKeyHint sets the "key_hint" field.
+func (akc *APIKeyCreate) SetKeyHint(s string) *APIKeyCreate {
+	akc.mutation.SetKeyHint(s)
+	return akc
+}
+
+// SetNillableKeyHint sets the "key_hint" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableKeyHint(s *string) *APIKeyCreate {
+	if s != nil {
+		akc.SetKeyHint(*s)
+	}
+	return akc
+}
+
 // SetKeyHash sets the "key_hash" field.
 func (akc *APIKeyCreate) SetKeyHash(s string) *APIKeyCreate {
 	akc.mutation.SetKeyHash(s)
@@ -225,6 +239,10 @@ func (akc *APIKeyCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (akc *APIKeyCreate) defaults() {
+	if _, ok := akc.mutation.KeyHint(); !ok {
+		v := apikey.DefaultKeyHint
+		akc.mutation.SetKeyHint(v)
+	}
 	if _, ok := akc.mutation.QuotaUsd(); !ok {
 		v := apikey.DefaultQuotaUsd
 		akc.mutation.SetQuotaUsd(v)
@@ -256,6 +274,9 @@ func (akc *APIKeyCreate) check() error {
 		if err := apikey.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "APIKey.name": %w`, err)}
 		}
+	}
+	if _, ok := akc.mutation.KeyHint(); !ok {
+		return &ValidationError{Name: "key_hint", err: errors.New(`ent: missing required field "APIKey.key_hint"`)}
 	}
 	if _, ok := akc.mutation.KeyHash(); !ok {
 		return &ValidationError{Name: "key_hash", err: errors.New(`ent: missing required field "APIKey.key_hash"`)}
@@ -317,6 +338,10 @@ func (akc *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := akc.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 		_node.Name = value
+	}
+	if value, ok := akc.mutation.KeyHint(); ok {
+		_spec.SetField(apikey.FieldKeyHint, field.TypeString, value)
+		_node.KeyHint = value
 	}
 	if value, ok := akc.mutation.KeyHash(); ok {
 		_spec.SetField(apikey.FieldKeyHash, field.TypeString, value)

@@ -46,6 +46,20 @@ func (aku *APIKeyUpdate) SetNillableName(s *string) *APIKeyUpdate {
 	return aku
 }
 
+// SetKeyHint sets the "key_hint" field.
+func (aku *APIKeyUpdate) SetKeyHint(s string) *APIKeyUpdate {
+	aku.mutation.SetKeyHint(s)
+	return aku
+}
+
+// SetNillableKeyHint sets the "key_hint" field if the given value is not nil.
+func (aku *APIKeyUpdate) SetNillableKeyHint(s *string) *APIKeyUpdate {
+	if s != nil {
+		aku.SetKeyHint(*s)
+	}
+	return aku
+}
+
 // SetKeyHash sets the "key_hash" field.
 func (aku *APIKeyUpdate) SetKeyHash(s string) *APIKeyUpdate {
 	aku.mutation.SetKeyHash(s)
@@ -355,6 +369,9 @@ func (aku *APIKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := aku.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 	}
+	if value, ok := aku.mutation.KeyHint(); ok {
+		_spec.SetField(apikey.FieldKeyHint, field.TypeString, value)
+	}
 	if value, ok := aku.mutation.KeyHash(); ok {
 		_spec.SetField(apikey.FieldKeyHash, field.TypeString, value)
 	}
@@ -543,6 +560,20 @@ func (akuo *APIKeyUpdateOne) SetName(s string) *APIKeyUpdateOne {
 func (akuo *APIKeyUpdateOne) SetNillableName(s *string) *APIKeyUpdateOne {
 	if s != nil {
 		akuo.SetName(*s)
+	}
+	return akuo
+}
+
+// SetKeyHint sets the "key_hint" field.
+func (akuo *APIKeyUpdateOne) SetKeyHint(s string) *APIKeyUpdateOne {
+	akuo.mutation.SetKeyHint(s)
+	return akuo
+}
+
+// SetNillableKeyHint sets the "key_hint" field if the given value is not nil.
+func (akuo *APIKeyUpdateOne) SetNillableKeyHint(s *string) *APIKeyUpdateOne {
+	if s != nil {
+		akuo.SetKeyHint(*s)
 	}
 	return akuo
 }
@@ -885,6 +916,9 @@ func (akuo *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err er
 	}
 	if value, ok := akuo.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
+	}
+	if value, ok := akuo.mutation.KeyHint(); ok {
+		_spec.SetField(apikey.FieldKeyHint, field.TypeString, value)
 	}
 	if value, ok := akuo.mutation.KeyHash(); ok {
 		_spec.SetField(apikey.FieldKeyHash, field.TypeString, value)

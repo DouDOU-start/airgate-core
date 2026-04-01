@@ -54,6 +54,7 @@ type APIKeyMutation struct {
 	typ                string
 	id                 *int
 	name               *string
+	key_hint           *string
 	key_hash           *string
 	key_encrypted      *string
 	ip_whitelist       *[]string
@@ -213,6 +214,42 @@ func (m *APIKeyMutation) OldName(ctx context.Context) (v string, err error) {
 // ResetName resets all changes to the "name" field.
 func (m *APIKeyMutation) ResetName() {
 	m.name = nil
+}
+
+// SetKeyHint sets the "key_hint" field.
+func (m *APIKeyMutation) SetKeyHint(s string) {
+	m.key_hint = &s
+}
+
+// KeyHint returns the value of the "key_hint" field in the mutation.
+func (m *APIKeyMutation) KeyHint() (r string, exists bool) {
+	v := m.key_hint
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKeyHint returns the old "key_hint" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldKeyHint(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKeyHint is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKeyHint requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKeyHint: %w", err)
+	}
+	return oldValue.KeyHint, nil
+}
+
+// ResetKeyHint resets all changes to the "key_hint" field.
+func (m *APIKeyMutation) ResetKeyHint() {
+	m.key_hint = nil
 }
 
 // SetKeyHash sets the "key_hash" field.
@@ -865,9 +902,12 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.name != nil {
 		fields = append(fields, apikey.FieldName)
+	}
+	if m.key_hint != nil {
+		fields = append(fields, apikey.FieldKeyHint)
 	}
 	if m.key_hash != nil {
 		fields = append(fields, apikey.FieldKeyHash)
@@ -909,6 +949,8 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 	switch name {
 	case apikey.FieldName:
 		return m.Name()
+	case apikey.FieldKeyHint:
+		return m.KeyHint()
 	case apikey.FieldKeyHash:
 		return m.KeyHash()
 	case apikey.FieldKeyEncrypted:
@@ -940,6 +982,8 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 	switch name {
 	case apikey.FieldName:
 		return m.OldName(ctx)
+	case apikey.FieldKeyHint:
+		return m.OldKeyHint(ctx)
 	case apikey.FieldKeyHash:
 		return m.OldKeyHash(ctx)
 	case apikey.FieldKeyEncrypted:
@@ -975,6 +1019,13 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetName(v)
+		return nil
+	case apikey.FieldKeyHint:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKeyHint(v)
 		return nil
 	case apikey.FieldKeyHash:
 		v, ok := value.(string)
@@ -1151,6 +1202,9 @@ func (m *APIKeyMutation) ResetField(name string) error {
 	switch name {
 	case apikey.FieldName:
 		m.ResetName()
+		return nil
+	case apikey.FieldKeyHint:
+		m.ResetKeyHint()
 		return nil
 	case apikey.FieldKeyHash:
 		m.ResetKeyHash()

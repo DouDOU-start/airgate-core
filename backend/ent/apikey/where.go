@@ -60,6 +60,11 @@ func Name(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldName, v))
 }
 
+// KeyHint applies equality check predicate on the "key_hint" field. It's identical to KeyHintEQ.
+func KeyHint(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldKeyHint, v))
+}
+
 // KeyHash applies equality check predicate on the "key_hash" field. It's identical to KeyHashEQ.
 func KeyHash(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldKeyHash, v))
@@ -158,6 +163,71 @@ func NameEqualFold(v string) predicate.APIKey {
 // NameContainsFold applies the ContainsFold predicate on the "name" field.
 func NameContainsFold(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldContainsFold(FieldName, v))
+}
+
+// KeyHintEQ applies the EQ predicate on the "key_hint" field.
+func KeyHintEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldKeyHint, v))
+}
+
+// KeyHintNEQ applies the NEQ predicate on the "key_hint" field.
+func KeyHintNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldKeyHint, v))
+}
+
+// KeyHintIn applies the In predicate on the "key_hint" field.
+func KeyHintIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldKeyHint, vs...))
+}
+
+// KeyHintNotIn applies the NotIn predicate on the "key_hint" field.
+func KeyHintNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldKeyHint, vs...))
+}
+
+// KeyHintGT applies the GT predicate on the "key_hint" field.
+func KeyHintGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldKeyHint, v))
+}
+
+// KeyHintGTE applies the GTE predicate on the "key_hint" field.
+func KeyHintGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldKeyHint, v))
+}
+
+// KeyHintLT applies the LT predicate on the "key_hint" field.
+func KeyHintLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldKeyHint, v))
+}
+
+// KeyHintLTE applies the LTE predicate on the "key_hint" field.
+func KeyHintLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldKeyHint, v))
+}
+
+// KeyHintContains applies the Contains predicate on the "key_hint" field.
+func KeyHintContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldKeyHint, v))
+}
+
+// KeyHintHasPrefix applies the HasPrefix predicate on the "key_hint" field.
+func KeyHintHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldKeyHint, v))
+}
+
+// KeyHintHasSuffix applies the HasSuffix predicate on the "key_hint" field.
+func KeyHintHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldKeyHint, v))
+}
+
+// KeyHintEqualFold applies the EqualFold predicate on the "key_hint" field.
+func KeyHintEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldKeyHint, v))
+}
+
+// KeyHintContainsFold applies the ContainsFold predicate on the "key_hint" field.
+func KeyHintContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldKeyHint, v))
 }
 
 // KeyHashEQ applies the EQ predicate on the "key_hash" field.

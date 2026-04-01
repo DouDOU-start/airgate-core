@@ -20,7 +20,9 @@ import (
 	sdk "github.com/DouDOU-start/airgate-sdk"
 
 	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/migrate"
+	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/i18n"
 	"github.com/DouDOU-start/airgate-core/internal/server"
@@ -119,6 +121,9 @@ func startMainServer(cfg *config.Config) {
 		os.Exit(1)
 	}
 
+	// 回填历史 API Key 的 key_hint
+	backfillKeyHints(db, cfg.APIKeySecret())
+
 	// 初始化 Redis
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port),
@@ -156,4 +161,35 @@ func startMainServer(cfg *config.Config) {
 		slog.Error("服务器关闭失败", "error", err)
 	}
 	slog.Info("服务器已关闭")
+}
+
+// backfillKeyHints 为缺少 key_hint 的 API Key 回填 sk-...后4位
+func backfillKeyHints(db *ent.Client, secret string) {
+	ctx := context.Background()
+	keys, err := db.APIKey.Query().
+		Where(apikey.KeyHint("")).
+		All(ctx)
+	if err != nil {
+		slog.Warn("查询待回填 API Key 失败", "error", err)
+		return
+	}
+	if len(keys) == 0 {
+		return
+	}
+	slog.Info("回填 API Key hint", "count", len(keys))
+	for _, k := range keys {
+		if k.KeyEncrypted == "" {
+			continue
+		}
+		plain, err := auth.DecryptAPIKey(k.KeyEncrypted, secret)
+		if err != nil {
+			slog.Warn("解密 API Key 失败，跳过", "id", k.ID, "error", err)
+			continue
+		}
+		hint := "sk-..." + plain[len(plain)-4:]
+		if err := db.APIKey.UpdateOneID(k.ID).SetKeyHint(hint).Exec(ctx); err != nil {
+			slog.Warn("回填 key_hint 失败", "id", k.ID, "error", err)
+		}
+	}
+	slog.Info("API Key hint 回填完成")
 }

@@ -17,6 +17,8 @@ const (
 	FieldID = "id"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
+	// FieldKeyHint holds the string denoting the key_hint field in the database.
+	FieldKeyHint = "key_hint"
 	// FieldKeyHash holds the string denoting the key_hash field in the database.
 	FieldKeyHash = "key_hash"
 	// FieldKeyEncrypted holds the string denoting the key_encrypted field in the database.
@@ -72,6 +74,7 @@ const (
 var Columns = []string{
 	FieldID,
 	FieldName,
+	FieldKeyHint,
 	FieldKeyHash,
 	FieldKeyEncrypted,
 	FieldIPWhitelist,
@@ -109,6 +112,8 @@ func ValidColumn(column string) bool {
 var (
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
+	// DefaultKeyHint holds the default value on creation for the "key_hint" field.
+	DefaultKeyHint string
 	// KeyHashValidator is a validator for the "key_hash" field. It is called by the builders before save.
 	KeyHashValidator func(string) error
 	// DefaultQuotaUsd holds the default value on creation for the "quota_usd" field.
@@ -160,6 +165,11 @@ func ByID(opts ...sql.OrderTermOption) OrderOption {
 // ByName orders the results by the name field.
 func ByName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldName, opts...).ToFunc()
+}
+
+// ByKeyHint orders the results by the key_hint field.
+func ByKeyHint(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldKeyHint, opts...).ToFunc()
 }
 
 // ByKeyHash orders the results by the key_hash field.

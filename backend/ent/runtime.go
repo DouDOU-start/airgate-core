@@ -29,24 +29,28 @@ func init() {
 	apikeyDescName := apikeyFields[0].Descriptor()
 	// apikey.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	apikey.NameValidator = apikeyDescName.Validators[0].(func(string) error)
+	// apikeyDescKeyHint is the schema descriptor for key_hint field.
+	apikeyDescKeyHint := apikeyFields[1].Descriptor()
+	// apikey.DefaultKeyHint holds the default value on creation for the key_hint field.
+	apikey.DefaultKeyHint = apikeyDescKeyHint.Default.(string)
 	// apikeyDescKeyHash is the schema descriptor for key_hash field.
-	apikeyDescKeyHash := apikeyFields[1].Descriptor()
+	apikeyDescKeyHash := apikeyFields[2].Descriptor()
 	// apikey.KeyHashValidator is a validator for the "key_hash" field. It is called by the builders before save.
 	apikey.KeyHashValidator = apikeyDescKeyHash.Validators[0].(func(string) error)
 	// apikeyDescQuotaUsd is the schema descriptor for quota_usd field.
-	apikeyDescQuotaUsd := apikeyFields[5].Descriptor()
+	apikeyDescQuotaUsd := apikeyFields[6].Descriptor()
 	// apikey.DefaultQuotaUsd holds the default value on creation for the quota_usd field.
 	apikey.DefaultQuotaUsd = apikeyDescQuotaUsd.Default.(float64)
 	// apikeyDescUsedQuota is the schema descriptor for used_quota field.
-	apikeyDescUsedQuota := apikeyFields[6].Descriptor()
+	apikeyDescUsedQuota := apikeyFields[7].Descriptor()
 	// apikey.DefaultUsedQuota holds the default value on creation for the used_quota field.
 	apikey.DefaultUsedQuota = apikeyDescUsedQuota.Default.(float64)
 	// apikeyDescCreatedAt is the schema descriptor for created_at field.
-	apikeyDescCreatedAt := apikeyFields[9].Descriptor()
+	apikeyDescCreatedAt := apikeyFields[10].Descriptor()
 	// apikey.DefaultCreatedAt holds the default value on creation for the created_at field.
 	apikey.DefaultCreatedAt = apikeyDescCreatedAt.Default.(func() time.Time)
 	// apikeyDescUpdatedAt is the schema descriptor for updated_at field.
-	apikeyDescUpdatedAt := apikeyFields[10].Descriptor()
+	apikeyDescUpdatedAt := apikeyFields[11].Descriptor()
 	// apikey.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	apikey.DefaultUpdatedAt = apikeyDescUpdatedAt.Default.(func() time.Time)
 	// apikey.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

@@ -22,6 +22,8 @@ type APIKey struct {
 	ID int `json:"id,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
+	// KeyHint holds the value of the "key_hint" field.
+	KeyHint string `json:"key_hint,omitempty"`
 	// KeyHash holds the value of the "key_hash" field.
 	KeyHash string `json:"-"`
 	// KeyEncrypted holds the value of the "key_encrypted" field.
@@ -105,7 +107,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case apikey.FieldID:
 			values[i] = new(sql.NullInt64)
-		case apikey.FieldName, apikey.FieldKeyHash, apikey.FieldKeyEncrypted, apikey.FieldStatus:
+		case apikey.FieldName, apikey.FieldKeyHint, apikey.FieldKeyHash, apikey.FieldKeyEncrypted, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
 		case apikey.FieldExpiresAt, apikey.FieldCreatedAt, apikey.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -139,6 +141,12 @@ func (ak *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field name", values[i])
 			} else if value.Valid {
 				ak.Name = value.String
+			}
+		case apikey.FieldKeyHint:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field key_hint", values[i])
+			} else if value.Valid {
+				ak.KeyHint = value.String
 			}
 		case apikey.FieldKeyHash:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -272,6 +280,9 @@ func (ak *APIKey) String() string {
 	builder.WriteString(fmt.Sprintf("id=%v, ", ak.ID))
 	builder.WriteString("name=")
 	builder.WriteString(ak.Name)
+	builder.WriteString(", ")
+	builder.WriteString("key_hint=")
+	builder.WriteString(ak.KeyHint)
 	builder.WriteString(", ")
 	builder.WriteString("key_hash=<sensitive>")
 	builder.WriteString(", ")

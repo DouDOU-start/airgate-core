@@ -14,6 +14,7 @@ type APIKey struct {
 func (APIKey) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").NotEmpty(),
+		field.String("key_hint").Default(""),
 		field.String("key_hash").NotEmpty().Sensitive(),
 		field.String("key_encrypted").Optional().Sensitive(),
 		field.JSON("ip_whitelist", []string{}).Optional(),

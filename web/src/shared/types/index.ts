@@ -302,6 +302,7 @@ export interface UsageLogResp {
   user_email?: string;
   api_key_id: number;
   api_key_name?: string;
+  api_key_hint?: string;
   api_key_deleted: boolean;
   account_id: number;
   account_name?: string;

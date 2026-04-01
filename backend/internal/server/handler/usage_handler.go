@@ -569,10 +569,11 @@ func (h *UsageHandler) AdminUsageTrend(c *gin.Context) {
 
 // toUsageLogResp 将 ent.UsageLog 转换为 dto.UsageLogResp
 func toUsageLogResp(l *ent.UsageLog, userID int64, userEmail string) dto.UsageLogResp {
-	var apiKeyName string
+	var apiKeyName, apiKeyHint string
 	apiKeyDeleted := l.Edges.APIKey == nil
 	if !apiKeyDeleted {
 		apiKeyName = l.Edges.APIKey.Name
+		apiKeyHint = l.Edges.APIKey.KeyHint
 	}
 	var accountID int64
 	var accountName string
@@ -589,6 +590,7 @@ func toUsageLogResp(l *ent.UsageLog, userID int64, userEmail string) dto.UsageLo
 		UserID:                userID,
 		UserEmail:             userEmail,
 		APIKeyName:            apiKeyName,
+		APIKeyHint:            apiKeyHint,
 		APIKeyDeleted:         apiKeyDeleted,
 		AccountID:             accountID,
 		AccountName:           accountName,
