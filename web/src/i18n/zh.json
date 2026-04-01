@@ -467,6 +467,7 @@
     "platform": "平台",
     "platform_placeholder": "例如：openai",
     "model": "模型",
+    "account": "账号",
     "api_key_deleted": "已删除密钥",
     "model_placeholder": "例如：gpt-4",
     "user_id": "用户 ID",

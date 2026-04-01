@@ -466,6 +466,15 @@ export default function UsagePage() {
       ),
     },
     {
+      key: 'account_name',
+      title: t('usage.account'),
+      render: (row) => (
+        <span className="text-text-tertiary font-mono">
+          {row.account_name || `#${row.account_id}`}
+        </span>
+      ),
+    },
+    {
       key: 'input_tokens',
       title: t('usage.input_tokens'),
       render: (row) => (

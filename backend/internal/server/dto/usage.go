@@ -9,6 +9,7 @@ type UsageLogResp struct {
 	APIKeyName            string  `json:"api_key_name,omitempty"`
 	APIKeyDeleted         bool    `json:"api_key_deleted"`
 	AccountID             int64   `json:"account_id"`
+	AccountName           string  `json:"account_name,omitempty"`
 	GroupID               int64   `json:"group_id"`
 	Platform              string  `json:"platform"`
 	Model                 string  `json:"model"`

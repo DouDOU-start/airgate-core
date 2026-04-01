@@ -58,6 +58,7 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 
 	logs, err := query.
 		WithAPIKey().
+		WithAccount().
 		Offset((q.Page - 1) * q.PageSize).
 		Limit(q.PageSize).
 		Order(ent.Desc(usagelog.FieldCreatedAt)).
@@ -170,6 +171,7 @@ func (h *UsageHandler) AdminUsage(c *gin.Context) {
 	logs, err := query.
 		WithUser().
 		WithAPIKey().
+		WithAccount().
 		Offset((q.Page - 1) * q.PageSize).
 		Limit(q.PageSize).
 		Order(ent.Desc(usagelog.FieldCreatedAt)).
@@ -572,12 +574,20 @@ func toUsageLogResp(l *ent.UsageLog, userID int64, userEmail string) dto.UsageLo
 	if !apiKeyDeleted {
 		apiKeyName = l.Edges.APIKey.Name
 	}
+	var accountID int64
+	var accountName string
+	if l.Edges.Account != nil {
+		accountID = int64(l.Edges.Account.ID)
+		accountName = l.Edges.Account.Name
+	}
 	return dto.UsageLogResp{
 		ID:                    int64(l.ID),
 		UserID:                userID,
 		UserEmail:             userEmail,
 		APIKeyName:            apiKeyName,
 		APIKeyDeleted:         apiKeyDeleted,
+		AccountID:             accountID,
+		AccountName:           accountName,
 		Platform:              l.Platform,
 		Model:                 l.Model,
 		InputTokens:           l.InputTokens,

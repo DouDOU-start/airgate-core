@@ -467,6 +467,7 @@
     "platform": "Platform",
     "platform_placeholder": "e.g. openai",
     "model": "Model",
+    "account": "Account",
     "api_key_deleted": "Deleted API Key",
     "model_placeholder": "e.g. gpt-4",
     "user_id": "User ID",
