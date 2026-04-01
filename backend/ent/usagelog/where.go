@@ -85,6 +85,21 @@ func ReasoningOutputTokens(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldReasoningOutputTokens, v))
 }
 
+// InputPrice applies equality check predicate on the "input_price" field. It's identical to InputPriceEQ.
+func InputPrice(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldInputPrice, v))
+}
+
+// OutputPrice applies equality check predicate on the "output_price" field. It's identical to OutputPriceEQ.
+func OutputPrice(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldOutputPrice, v))
+}
+
+// CachedInputPrice applies equality check predicate on the "cached_input_price" field. It's identical to CachedInputPriceEQ.
+func CachedInputPrice(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldCachedInputPrice, v))
+}
+
 // InputCost applies equality check predicate on the "input_cost" field. It's identical to InputCostEQ.
 func InputCost(v float64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldInputCost, v))
@@ -443,6 +458,126 @@ func ReasoningOutputTokensLT(v int) predicate.UsageLog {
 // ReasoningOutputTokensLTE applies the LTE predicate on the "reasoning_output_tokens" field.
 func ReasoningOutputTokensLTE(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldLTE(FieldReasoningOutputTokens, v))
+}
+
+// InputPriceEQ applies the EQ predicate on the "input_price" field.
+func InputPriceEQ(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldInputPrice, v))
+}
+
+// InputPriceNEQ applies the NEQ predicate on the "input_price" field.
+func InputPriceNEQ(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldInputPrice, v))
+}
+
+// InputPriceIn applies the In predicate on the "input_price" field.
+func InputPriceIn(vs ...float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldInputPrice, vs...))
+}
+
+// InputPriceNotIn applies the NotIn predicate on the "input_price" field.
+func InputPriceNotIn(vs ...float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldInputPrice, vs...))
+}
+
+// InputPriceGT applies the GT predicate on the "input_price" field.
+func InputPriceGT(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldInputPrice, v))
+}
+
+// InputPriceGTE applies the GTE predicate on the "input_price" field.
+func InputPriceGTE(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldInputPrice, v))
+}
+
+// InputPriceLT applies the LT predicate on the "input_price" field.
+func InputPriceLT(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldInputPrice, v))
+}
+
+// InputPriceLTE applies the LTE predicate on the "input_price" field.
+func InputPriceLTE(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldInputPrice, v))
+}
+
+// OutputPriceEQ applies the EQ predicate on the "output_price" field.
+func OutputPriceEQ(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldOutputPrice, v))
+}
+
+// OutputPriceNEQ applies the NEQ predicate on the "output_price" field.
+func OutputPriceNEQ(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldOutputPrice, v))
+}
+
+// OutputPriceIn applies the In predicate on the "output_price" field.
+func OutputPriceIn(vs ...float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldOutputPrice, vs...))
+}
+
+// OutputPriceNotIn applies the NotIn predicate on the "output_price" field.
+func OutputPriceNotIn(vs ...float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldOutputPrice, vs...))
+}
+
+// OutputPriceGT applies the GT predicate on the "output_price" field.
+func OutputPriceGT(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldOutputPrice, v))
+}
+
+// OutputPriceGTE applies the GTE predicate on the "output_price" field.
+func OutputPriceGTE(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldOutputPrice, v))
+}
+
+// OutputPriceLT applies the LT predicate on the "output_price" field.
+func OutputPriceLT(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldOutputPrice, v))
+}
+
+// OutputPriceLTE applies the LTE predicate on the "output_price" field.
+func OutputPriceLTE(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldOutputPrice, v))
+}
+
+// CachedInputPriceEQ applies the EQ predicate on the "cached_input_price" field.
+func CachedInputPriceEQ(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldCachedInputPrice, v))
+}
+
+// CachedInputPriceNEQ applies the NEQ predicate on the "cached_input_price" field.
+func CachedInputPriceNEQ(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldCachedInputPrice, v))
+}
+
+// CachedInputPriceIn applies the In predicate on the "cached_input_price" field.
+func CachedInputPriceIn(vs ...float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldCachedInputPrice, vs...))
+}
+
+// CachedInputPriceNotIn applies the NotIn predicate on the "cached_input_price" field.
+func CachedInputPriceNotIn(vs ...float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldCachedInputPrice, vs...))
+}
+
+// CachedInputPriceGT applies the GT predicate on the "cached_input_price" field.
+func CachedInputPriceGT(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldCachedInputPrice, v))
+}
+
+// CachedInputPriceGTE applies the GTE predicate on the "cached_input_price" field.
+func CachedInputPriceGTE(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldCachedInputPrice, v))
+}
+
+// CachedInputPriceLT applies the LT predicate on the "cached_input_price" field.
+func CachedInputPriceLT(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldCachedInputPrice, v))
+}
+
+// CachedInputPriceLTE applies the LTE predicate on the "cached_input_price" field.
+func CachedInputPriceLTE(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldCachedInputPrice, v))
 }
 
 // InputCostEQ applies the EQ predicate on the "input_cost" field.

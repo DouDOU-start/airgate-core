@@ -18,6 +18,9 @@ type UsageLogResp struct {
 	OutputTokens          int     `json:"output_tokens"`
 	CachedInputTokens     int     `json:"cached_input_tokens"`
 	ReasoningOutputTokens int     `json:"reasoning_output_tokens"`
+	InputPrice            float64 `json:"input_price"`
+	OutputPrice           float64 `json:"output_price"`
+	CachedInputPrice      float64 `json:"cached_input_price"`
 	InputCost             float64 `json:"input_cost"`
 	OutputCost            float64 `json:"output_cost"`
 	CachedInputCost       float64 `json:"cached_input_cost"`

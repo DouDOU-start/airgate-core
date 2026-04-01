@@ -26,6 +26,12 @@ const (
 	FieldCachedInputTokens = "cached_input_tokens"
 	// FieldReasoningOutputTokens holds the string denoting the reasoning_output_tokens field in the database.
 	FieldReasoningOutputTokens = "reasoning_output_tokens"
+	// FieldInputPrice holds the string denoting the input_price field in the database.
+	FieldInputPrice = "input_price"
+	// FieldOutputPrice holds the string denoting the output_price field in the database.
+	FieldOutputPrice = "output_price"
+	// FieldCachedInputPrice holds the string denoting the cached_input_price field in the database.
+	FieldCachedInputPrice = "cached_input_price"
 	// FieldInputCost holds the string denoting the input_cost field in the database.
 	FieldInputCost = "input_cost"
 	// FieldOutputCost holds the string denoting the output_cost field in the database.
@@ -103,6 +109,9 @@ var Columns = []string{
 	FieldOutputTokens,
 	FieldCachedInputTokens,
 	FieldReasoningOutputTokens,
+	FieldInputPrice,
+	FieldOutputPrice,
+	FieldCachedInputPrice,
 	FieldInputCost,
 	FieldOutputCost,
 	FieldCachedInputCost,
@@ -156,6 +165,12 @@ var (
 	DefaultCachedInputTokens int
 	// DefaultReasoningOutputTokens holds the default value on creation for the "reasoning_output_tokens" field.
 	DefaultReasoningOutputTokens int
+	// DefaultInputPrice holds the default value on creation for the "input_price" field.
+	DefaultInputPrice float64
+	// DefaultOutputPrice holds the default value on creation for the "output_price" field.
+	DefaultOutputPrice float64
+	// DefaultCachedInputPrice holds the default value on creation for the "cached_input_price" field.
+	DefaultCachedInputPrice float64
 	// DefaultInputCost holds the default value on creation for the "input_cost" field.
 	DefaultInputCost float64
 	// DefaultOutputCost holds the default value on creation for the "output_cost" field.
@@ -222,6 +237,21 @@ func ByCachedInputTokens(opts ...sql.OrderTermOption) OrderOption {
 // ByReasoningOutputTokens orders the results by the reasoning_output_tokens field.
 func ByReasoningOutputTokens(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldReasoningOutputTokens, opts...).ToFunc()
+}
+
+// ByInputPrice orders the results by the input_price field.
+func ByInputPrice(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldInputPrice, opts...).ToFunc()
+}
+
+// ByOutputPrice orders the results by the output_price field.
+func ByOutputPrice(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOutputPrice, opts...).ToFunc()
+}
+
+// ByCachedInputPrice orders the results by the cached_input_price field.
+func ByCachedInputPrice(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCachedInputPrice, opts...).ToFunc()
 }
 
 // ByInputCost orders the results by the input_cost field.

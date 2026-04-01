@@ -33,6 +33,12 @@ type UsageLog struct {
 	CachedInputTokens int `json:"cached_input_tokens,omitempty"`
 	// ReasoningOutputTokens holds the value of the "reasoning_output_tokens" field.
 	ReasoningOutputTokens int `json:"reasoning_output_tokens,omitempty"`
+	// InputPrice holds the value of the "input_price" field.
+	InputPrice float64 `json:"input_price,omitempty"`
+	// OutputPrice holds the value of the "output_price" field.
+	OutputPrice float64 `json:"output_price,omitempty"`
+	// CachedInputPrice holds the value of the "cached_input_price" field.
+	CachedInputPrice float64 `json:"cached_input_price,omitempty"`
 	// InputCost holds the value of the "input_cost" field.
 	InputCost float64 `json:"input_cost,omitempty"`
 	// OutputCost holds the value of the "output_cost" field.
@@ -137,7 +143,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case usagelog.FieldStream:
 			values[i] = new(sql.NullBool)
-		case usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldAccountRateMultiplier:
+		case usagelog.FieldInputPrice, usagelog.FieldOutputPrice, usagelog.FieldCachedInputPrice, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldAccountRateMultiplier:
 			values[i] = new(sql.NullFloat64)
 		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs:
 			values[i] = new(sql.NullInt64)
@@ -209,6 +215,24 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field reasoning_output_tokens", values[i])
 			} else if value.Valid {
 				ul.ReasoningOutputTokens = int(value.Int64)
+			}
+		case usagelog.FieldInputPrice:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field input_price", values[i])
+			} else if value.Valid {
+				ul.InputPrice = value.Float64
+			}
+		case usagelog.FieldOutputPrice:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field output_price", values[i])
+			} else if value.Valid {
+				ul.OutputPrice = value.Float64
+			}
+		case usagelog.FieldCachedInputPrice:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field cached_input_price", values[i])
+			} else if value.Valid {
+				ul.CachedInputPrice = value.Float64
 			}
 		case usagelog.FieldInputCost:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
@@ -395,6 +419,15 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("reasoning_output_tokens=")
 	builder.WriteString(fmt.Sprintf("%v", ul.ReasoningOutputTokens))
+	builder.WriteString(", ")
+	builder.WriteString("input_price=")
+	builder.WriteString(fmt.Sprintf("%v", ul.InputPrice))
+	builder.WriteString(", ")
+	builder.WriteString("output_price=")
+	builder.WriteString(fmt.Sprintf("%v", ul.OutputPrice))
+	builder.WriteString(", ")
+	builder.WriteString("cached_input_price=")
+	builder.WriteString(fmt.Sprintf("%v", ul.CachedInputPrice))
 	builder.WriteString(", ")
 	builder.WriteString("input_cost=")
 	builder.WriteString(fmt.Sprintf("%v", ul.InputCost))

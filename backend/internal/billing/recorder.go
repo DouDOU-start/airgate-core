@@ -28,6 +28,9 @@ type UsageRecord struct {
 	OutputTokens          int
 	CachedInputTokens     int
 	ReasoningOutputTokens int
+	InputPrice            float64
+	OutputPrice           float64
+	CachedInputPrice      float64
 	InputCost             float64
 	OutputCost            float64
 	CachedInputCost       float64
@@ -163,6 +166,9 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 			SetOutputTokens(rec.OutputTokens).
 			SetCachedInputTokens(rec.CachedInputTokens).
 			SetReasoningOutputTokens(rec.ReasoningOutputTokens).
+			SetInputPrice(rec.InputPrice).
+			SetOutputPrice(rec.OutputPrice).
+			SetCachedInputPrice(rec.CachedInputPrice).
 			SetInputCost(rec.InputCost).
 			SetOutputCost(rec.OutputCost).
 			SetCachedInputCost(rec.CachedInputCost).

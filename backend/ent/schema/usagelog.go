@@ -20,6 +20,12 @@ func (UsageLog) Fields() []ent.Field {
 		field.Int("output_tokens").Default(0),
 		field.Int("cached_input_tokens").Default(0),
 		field.Int("reasoning_output_tokens").Default(0),
+		field.Float("input_price").Default(0).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("output_price").Default(0).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("cached_input_price").Default(0).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("input_cost").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("output_cost").Default(0).

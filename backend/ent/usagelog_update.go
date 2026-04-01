@@ -143,6 +143,69 @@ func (ulu *UsageLogUpdate) AddReasoningOutputTokens(i int) *UsageLogUpdate {
 	return ulu
 }
 
+// SetInputPrice sets the "input_price" field.
+func (ulu *UsageLogUpdate) SetInputPrice(f float64) *UsageLogUpdate {
+	ulu.mutation.ResetInputPrice()
+	ulu.mutation.SetInputPrice(f)
+	return ulu
+}
+
+// SetNillableInputPrice sets the "input_price" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableInputPrice(f *float64) *UsageLogUpdate {
+	if f != nil {
+		ulu.SetInputPrice(*f)
+	}
+	return ulu
+}
+
+// AddInputPrice adds f to the "input_price" field.
+func (ulu *UsageLogUpdate) AddInputPrice(f float64) *UsageLogUpdate {
+	ulu.mutation.AddInputPrice(f)
+	return ulu
+}
+
+// SetOutputPrice sets the "output_price" field.
+func (ulu *UsageLogUpdate) SetOutputPrice(f float64) *UsageLogUpdate {
+	ulu.mutation.ResetOutputPrice()
+	ulu.mutation.SetOutputPrice(f)
+	return ulu
+}
+
+// SetNillableOutputPrice sets the "output_price" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableOutputPrice(f *float64) *UsageLogUpdate {
+	if f != nil {
+		ulu.SetOutputPrice(*f)
+	}
+	return ulu
+}
+
+// AddOutputPrice adds f to the "output_price" field.
+func (ulu *UsageLogUpdate) AddOutputPrice(f float64) *UsageLogUpdate {
+	ulu.mutation.AddOutputPrice(f)
+	return ulu
+}
+
+// SetCachedInputPrice sets the "cached_input_price" field.
+func (ulu *UsageLogUpdate) SetCachedInputPrice(f float64) *UsageLogUpdate {
+	ulu.mutation.ResetCachedInputPrice()
+	ulu.mutation.SetCachedInputPrice(f)
+	return ulu
+}
+
+// SetNillableCachedInputPrice sets the "cached_input_price" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableCachedInputPrice(f *float64) *UsageLogUpdate {
+	if f != nil {
+		ulu.SetCachedInputPrice(*f)
+	}
+	return ulu
+}
+
+// AddCachedInputPrice adds f to the "cached_input_price" field.
+func (ulu *UsageLogUpdate) AddCachedInputPrice(f float64) *UsageLogUpdate {
+	ulu.mutation.AddCachedInputPrice(f)
+	return ulu
+}
+
 // SetInputCost sets the "input_cost" field.
 func (ulu *UsageLogUpdate) SetInputCost(f float64) *UsageLogUpdate {
 	ulu.mutation.ResetInputCost()
@@ -567,6 +630,24 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ulu.mutation.AddedReasoningOutputTokens(); ok {
 		_spec.AddField(usagelog.FieldReasoningOutputTokens, field.TypeInt, value)
 	}
+	if value, ok := ulu.mutation.InputPrice(); ok {
+		_spec.SetField(usagelog.FieldInputPrice, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.AddedInputPrice(); ok {
+		_spec.AddField(usagelog.FieldInputPrice, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.OutputPrice(); ok {
+		_spec.SetField(usagelog.FieldOutputPrice, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.AddedOutputPrice(); ok {
+		_spec.AddField(usagelog.FieldOutputPrice, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.CachedInputPrice(); ok {
+		_spec.SetField(usagelog.FieldCachedInputPrice, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.AddedCachedInputPrice(); ok {
+		_spec.AddField(usagelog.FieldCachedInputPrice, field.TypeFloat64, value)
+	}
 	if value, ok := ulu.mutation.InputCost(); ok {
 		_spec.SetField(usagelog.FieldInputCost, field.TypeFloat64, value)
 	}
@@ -878,6 +959,69 @@ func (uluo *UsageLogUpdateOne) SetNillableReasoningOutputTokens(i *int) *UsageLo
 // AddReasoningOutputTokens adds i to the "reasoning_output_tokens" field.
 func (uluo *UsageLogUpdateOne) AddReasoningOutputTokens(i int) *UsageLogUpdateOne {
 	uluo.mutation.AddReasoningOutputTokens(i)
+	return uluo
+}
+
+// SetInputPrice sets the "input_price" field.
+func (uluo *UsageLogUpdateOne) SetInputPrice(f float64) *UsageLogUpdateOne {
+	uluo.mutation.ResetInputPrice()
+	uluo.mutation.SetInputPrice(f)
+	return uluo
+}
+
+// SetNillableInputPrice sets the "input_price" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableInputPrice(f *float64) *UsageLogUpdateOne {
+	if f != nil {
+		uluo.SetInputPrice(*f)
+	}
+	return uluo
+}
+
+// AddInputPrice adds f to the "input_price" field.
+func (uluo *UsageLogUpdateOne) AddInputPrice(f float64) *UsageLogUpdateOne {
+	uluo.mutation.AddInputPrice(f)
+	return uluo
+}
+
+// SetOutputPrice sets the "output_price" field.
+func (uluo *UsageLogUpdateOne) SetOutputPrice(f float64) *UsageLogUpdateOne {
+	uluo.mutation.ResetOutputPrice()
+	uluo.mutation.SetOutputPrice(f)
+	return uluo
+}
+
+// SetNillableOutputPrice sets the "output_price" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableOutputPrice(f *float64) *UsageLogUpdateOne {
+	if f != nil {
+		uluo.SetOutputPrice(*f)
+	}
+	return uluo
+}
+
+// AddOutputPrice adds f to the "output_price" field.
+func (uluo *UsageLogUpdateOne) AddOutputPrice(f float64) *UsageLogUpdateOne {
+	uluo.mutation.AddOutputPrice(f)
+	return uluo
+}
+
+// SetCachedInputPrice sets the "cached_input_price" field.
+func (uluo *UsageLogUpdateOne) SetCachedInputPrice(f float64) *UsageLogUpdateOne {
+	uluo.mutation.ResetCachedInputPrice()
+	uluo.mutation.SetCachedInputPrice(f)
+	return uluo
+}
+
+// SetNillableCachedInputPrice sets the "cached_input_price" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableCachedInputPrice(f *float64) *UsageLogUpdateOne {
+	if f != nil {
+		uluo.SetCachedInputPrice(*f)
+	}
+	return uluo
+}
+
+// AddCachedInputPrice adds f to the "cached_input_price" field.
+func (uluo *UsageLogUpdateOne) AddCachedInputPrice(f float64) *UsageLogUpdateOne {
+	uluo.mutation.AddCachedInputPrice(f)
 	return uluo
 }
 
@@ -1334,6 +1478,24 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if value, ok := uluo.mutation.AddedReasoningOutputTokens(); ok {
 		_spec.AddField(usagelog.FieldReasoningOutputTokens, field.TypeInt, value)
+	}
+	if value, ok := uluo.mutation.InputPrice(); ok {
+		_spec.SetField(usagelog.FieldInputPrice, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.AddedInputPrice(); ok {
+		_spec.AddField(usagelog.FieldInputPrice, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.OutputPrice(); ok {
+		_spec.SetField(usagelog.FieldOutputPrice, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.AddedOutputPrice(); ok {
+		_spec.AddField(usagelog.FieldOutputPrice, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.CachedInputPrice(); ok {
+		_spec.SetField(usagelog.FieldCachedInputPrice, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.AddedCachedInputPrice(); ok {
+		_spec.AddField(usagelog.FieldCachedInputPrice, field.TypeFloat64, value)
 	}
 	if value, ok := uluo.mutation.InputCost(); ok {
 		_spec.SetField(usagelog.FieldInputCost, field.TypeFloat64, value)

@@ -7740,6 +7740,12 @@ type UsageLogMutation struct {
 	addcached_input_tokens     *int
 	reasoning_output_tokens    *int
 	addreasoning_output_tokens *int
+	input_price                *float64
+	addinput_price             *float64
+	output_price               *float64
+	addoutput_price            *float64
+	cached_input_price         *float64
+	addcached_input_price      *float64
 	input_cost                 *float64
 	addinput_cost              *float64
 	output_cost                *float64
@@ -8169,6 +8175,174 @@ func (m *UsageLogMutation) AddedReasoningOutputTokens() (r int, exists bool) {
 func (m *UsageLogMutation) ResetReasoningOutputTokens() {
 	m.reasoning_output_tokens = nil
 	m.addreasoning_output_tokens = nil
+}
+
+// SetInputPrice sets the "input_price" field.
+func (m *UsageLogMutation) SetInputPrice(f float64) {
+	m.input_price = &f
+	m.addinput_price = nil
+}
+
+// InputPrice returns the value of the "input_price" field in the mutation.
+func (m *UsageLogMutation) InputPrice() (r float64, exists bool) {
+	v := m.input_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInputPrice returns the old "input_price" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldInputPrice(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInputPrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInputPrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInputPrice: %w", err)
+	}
+	return oldValue.InputPrice, nil
+}
+
+// AddInputPrice adds f to the "input_price" field.
+func (m *UsageLogMutation) AddInputPrice(f float64) {
+	if m.addinput_price != nil {
+		*m.addinput_price += f
+	} else {
+		m.addinput_price = &f
+	}
+}
+
+// AddedInputPrice returns the value that was added to the "input_price" field in this mutation.
+func (m *UsageLogMutation) AddedInputPrice() (r float64, exists bool) {
+	v := m.addinput_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetInputPrice resets all changes to the "input_price" field.
+func (m *UsageLogMutation) ResetInputPrice() {
+	m.input_price = nil
+	m.addinput_price = nil
+}
+
+// SetOutputPrice sets the "output_price" field.
+func (m *UsageLogMutation) SetOutputPrice(f float64) {
+	m.output_price = &f
+	m.addoutput_price = nil
+}
+
+// OutputPrice returns the value of the "output_price" field in the mutation.
+func (m *UsageLogMutation) OutputPrice() (r float64, exists bool) {
+	v := m.output_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOutputPrice returns the old "output_price" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldOutputPrice(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOutputPrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOutputPrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOutputPrice: %w", err)
+	}
+	return oldValue.OutputPrice, nil
+}
+
+// AddOutputPrice adds f to the "output_price" field.
+func (m *UsageLogMutation) AddOutputPrice(f float64) {
+	if m.addoutput_price != nil {
+		*m.addoutput_price += f
+	} else {
+		m.addoutput_price = &f
+	}
+}
+
+// AddedOutputPrice returns the value that was added to the "output_price" field in this mutation.
+func (m *UsageLogMutation) AddedOutputPrice() (r float64, exists bool) {
+	v := m.addoutput_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetOutputPrice resets all changes to the "output_price" field.
+func (m *UsageLogMutation) ResetOutputPrice() {
+	m.output_price = nil
+	m.addoutput_price = nil
+}
+
+// SetCachedInputPrice sets the "cached_input_price" field.
+func (m *UsageLogMutation) SetCachedInputPrice(f float64) {
+	m.cached_input_price = &f
+	m.addcached_input_price = nil
+}
+
+// CachedInputPrice returns the value of the "cached_input_price" field in the mutation.
+func (m *UsageLogMutation) CachedInputPrice() (r float64, exists bool) {
+	v := m.cached_input_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCachedInputPrice returns the old "cached_input_price" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldCachedInputPrice(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCachedInputPrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCachedInputPrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCachedInputPrice: %w", err)
+	}
+	return oldValue.CachedInputPrice, nil
+}
+
+// AddCachedInputPrice adds f to the "cached_input_price" field.
+func (m *UsageLogMutation) AddCachedInputPrice(f float64) {
+	if m.addcached_input_price != nil {
+		*m.addcached_input_price += f
+	} else {
+		m.addcached_input_price = &f
+	}
+}
+
+// AddedCachedInputPrice returns the value that was added to the "cached_input_price" field in this mutation.
+func (m *UsageLogMutation) AddedCachedInputPrice() (r float64, exists bool) {
+	v := m.addcached_input_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCachedInputPrice resets all changes to the "cached_input_price" field.
+func (m *UsageLogMutation) ResetCachedInputPrice() {
+	m.cached_input_price = nil
+	m.addcached_input_price = nil
 }
 
 // SetInputCost sets the "input_cost" field.
@@ -9045,7 +9219,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 20)
+	fields := make([]string, 0, 23)
 	if m.platform != nil {
 		fields = append(fields, usagelog.FieldPlatform)
 	}
@@ -9063,6 +9237,15 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.reasoning_output_tokens != nil {
 		fields = append(fields, usagelog.FieldReasoningOutputTokens)
+	}
+	if m.input_price != nil {
+		fields = append(fields, usagelog.FieldInputPrice)
+	}
+	if m.output_price != nil {
+		fields = append(fields, usagelog.FieldOutputPrice)
+	}
+	if m.cached_input_price != nil {
+		fields = append(fields, usagelog.FieldCachedInputPrice)
 	}
 	if m.input_cost != nil {
 		fields = append(fields, usagelog.FieldInputCost)
@@ -9126,6 +9309,12 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.CachedInputTokens()
 	case usagelog.FieldReasoningOutputTokens:
 		return m.ReasoningOutputTokens()
+	case usagelog.FieldInputPrice:
+		return m.InputPrice()
+	case usagelog.FieldOutputPrice:
+		return m.OutputPrice()
+	case usagelog.FieldCachedInputPrice:
+		return m.CachedInputPrice()
 	case usagelog.FieldInputCost:
 		return m.InputCost()
 	case usagelog.FieldOutputCost:
@@ -9175,6 +9364,12 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCachedInputTokens(ctx)
 	case usagelog.FieldReasoningOutputTokens:
 		return m.OldReasoningOutputTokens(ctx)
+	case usagelog.FieldInputPrice:
+		return m.OldInputPrice(ctx)
+	case usagelog.FieldOutputPrice:
+		return m.OldOutputPrice(ctx)
+	case usagelog.FieldCachedInputPrice:
+		return m.OldCachedInputPrice(ctx)
 	case usagelog.FieldInputCost:
 		return m.OldInputCost(ctx)
 	case usagelog.FieldOutputCost:
@@ -9253,6 +9448,27 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetReasoningOutputTokens(v)
+		return nil
+	case usagelog.FieldInputPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInputPrice(v)
+		return nil
+	case usagelog.FieldOutputPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOutputPrice(v)
+		return nil
+	case usagelog.FieldCachedInputPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCachedInputPrice(v)
 		return nil
 	case usagelog.FieldInputCost:
 		v, ok := value.(float64)
@@ -9372,6 +9588,15 @@ func (m *UsageLogMutation) AddedFields() []string {
 	if m.addreasoning_output_tokens != nil {
 		fields = append(fields, usagelog.FieldReasoningOutputTokens)
 	}
+	if m.addinput_price != nil {
+		fields = append(fields, usagelog.FieldInputPrice)
+	}
+	if m.addoutput_price != nil {
+		fields = append(fields, usagelog.FieldOutputPrice)
+	}
+	if m.addcached_input_price != nil {
+		fields = append(fields, usagelog.FieldCachedInputPrice)
+	}
 	if m.addinput_cost != nil {
 		fields = append(fields, usagelog.FieldInputCost)
 	}
@@ -9415,6 +9640,12 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedCachedInputTokens()
 	case usagelog.FieldReasoningOutputTokens:
 		return m.AddedReasoningOutputTokens()
+	case usagelog.FieldInputPrice:
+		return m.AddedInputPrice()
+	case usagelog.FieldOutputPrice:
+		return m.AddedOutputPrice()
+	case usagelog.FieldCachedInputPrice:
+		return m.AddedCachedInputPrice()
 	case usagelog.FieldInputCost:
 		return m.AddedInputCost()
 	case usagelog.FieldOutputCost:
@@ -9469,6 +9700,27 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddReasoningOutputTokens(v)
+		return nil
+	case usagelog.FieldInputPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddInputPrice(v)
+		return nil
+	case usagelog.FieldOutputPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOutputPrice(v)
+		return nil
+	case usagelog.FieldCachedInputPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCachedInputPrice(v)
 		return nil
 	case usagelog.FieldInputCost:
 		v, ok := value.(float64)
@@ -9577,6 +9829,15 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldReasoningOutputTokens:
 		m.ResetReasoningOutputTokens()
+		return nil
+	case usagelog.FieldInputPrice:
+		m.ResetInputPrice()
+		return nil
+	case usagelog.FieldOutputPrice:
+		m.ResetOutputPrice()
+		return nil
+	case usagelog.FieldCachedInputPrice:
+		m.ResetCachedInputPrice()
 		return nil
 	case usagelog.FieldInputCost:
 		m.ResetInputCost()

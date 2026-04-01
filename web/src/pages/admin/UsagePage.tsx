@@ -539,8 +539,6 @@ export default function UsagePage() {
       key: 'cost',
       title: t('usage.cost'),
       render: (row) => {
-        const inputPrice = row.input_tokens > 0 ? (row.input_cost / row.input_tokens * 1_000_000) : 0;
-        const outputPrice = row.output_tokens > 0 ? (row.output_cost / row.output_tokens * 1_000_000) : 0;
         return (
           <HoverCard
             content={
@@ -555,16 +553,16 @@ export default function UsagePage() {
                     <span className="text-text-tertiary">{t('usage.output_cost')}</span>
                     <span className="text-text-secondary">${row.output_cost.toFixed(6)}</span>
                   </div>
-                  {inputPrice > 0 && (
+                  {row.input_price > 0 && (
                     <div className="flex justify-between gap-6">
                       <span className="text-text-tertiary">{t('usage.input_unit_price')}</span>
-                      <span className="text-text-secondary">${inputPrice.toFixed(4)} / 1M Token</span>
+                      <span className="text-text-secondary">${row.input_price.toFixed(4)} / 1M Token</span>
                     </div>
                   )}
-                  {outputPrice > 0 && (
+                  {row.output_price > 0 && (
                     <div className="flex justify-between gap-6">
                       <span className="text-text-tertiary">{t('usage.output_unit_price')}</span>
-                      <span className="text-text-secondary">${outputPrice.toFixed(4)} / 1M Token</span>
+                      <span className="text-text-secondary">${row.output_price.toFixed(4)} / 1M Token</span>
                     </div>
                   )}
                   {row.cached_input_cost > 0 && (

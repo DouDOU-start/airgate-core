@@ -312,6 +312,9 @@ export interface UsageLogResp {
   input_tokens: number;
   output_tokens: number;
   cached_input_tokens: number;
+  input_price: number;
+  output_price: number;
+  cached_input_price: number;
   input_cost: number;
   output_cost: number;
   cached_input_cost: number;
