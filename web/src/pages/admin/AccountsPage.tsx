@@ -1,15 +1,12 @@
-import { useState, useEffect, useRef, type ComponentType } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   Pencil,
   Trash2,
   Zap,
-  Hash,
-  Gauge,
-  Layers,
   Shield,
   MoreHorizontal,
   BarChart3,
@@ -19,172 +16,30 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
-import { Input, Textarea, Select } from '../../shared/components/Input';
-import { Switch } from '../../shared/components/Switch';
+import { Input, Select } from '../../shared/components/Input';
 import { Table, type Column } from '../../shared/components/Table';
-import { Modal, ConfirmModal } from '../../shared/components/Modal';
+import { ConfirmModal } from '../../shared/components/Modal';
 import { StatusBadge } from '../../shared/components/Badge';
 import { PlatformIcon } from '../../shared/components/PlatformIcon';
-import { useToast } from '../../shared/components/Toast';
 import { accountsApi } from '../../shared/api/accounts';
 import { groupsApi } from '../../shared/api/groups';
 import { proxiesApi } from '../../shared/api/proxies';
-import { pluginsApi } from '../../shared/api/plugins';
 import { AccountTestModal } from './AccountTestModal';
 import { AccountStatsModal } from './AccountStatsModal';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
-import {
-  loadPluginFrontend,
-  type AccountFormProps,
-  type PluginOAuthBridge,
-} from '../../app/plugin-loader';
+import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { queryKeys } from '../../shared/queryKeys';
+import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
+import { CreateAccountModal } from './accounts/CreateAccountModal';
+import { EditAccountModal } from './accounts/EditAccountModal';
 import type {
   AccountResp,
   CreateAccountReq,
   UpdateAccountReq,
-  CredentialField,
-  AccountTypeResp,
-  CredentialSchemaResp,
 } from '../../shared/types';
-
-/** 平台 → 插件名称映射缓存 */
-let platformPluginMap: Map<string, string> | null = null;
-
-async function getPlatformPluginMap(): Promise<Map<string, string>> {
-  if (platformPluginMap) return platformPluginMap;
-  const resp = await pluginsApi.list({ page: 1, page_size: 100 });
-  const map = new Map<string, string>();
-  for (const p of resp.list) {
-    if (p.platform) map.set(p.platform, p.name);
-  }
-  platformPluginMap = map;
-  return map;
-}
-
-function detectCredentialAccountType(credentials: Record<string, string>): string {
-  if (credentials.provider === 'sub2api') return 'sub2api';
-  if (credentials.api_key) return 'apikey';
-  if (credentials.access_token) return 'oauth';
-  return '';
-}
-
-function getSchemaAccountTypes(schema?: CredentialSchemaResp): AccountTypeResp[] {
-  return schema?.account_types ?? [];
-}
-
-function getSchemaSelectedAccountType(
-  schema: CredentialSchemaResp | undefined,
-  accountType: string,
-): AccountTypeResp | undefined {
-  const accountTypes = getSchemaAccountTypes(schema);
-  if (!accountTypes.length) return undefined;
-  return accountTypes.find((item) => item.key === accountType) ?? accountTypes[0];
-}
-
-function getSchemaVisibleFields(
-  schema: CredentialSchemaResp | undefined,
-  accountType: string,
-): CredentialField[] {
-  const selectedType = getSchemaSelectedAccountType(schema, accountType);
-  if (selectedType) return selectedType.fields;
-  return schema?.fields ?? [];
-}
-
-function filterCredentialsForAccountType(
-  credentials: Record<string, string>,
-  accountType?: AccountTypeResp,
-): Record<string, string> {
-  if (!accountType) return credentials;
-
-  const allowedKeys = new Set(accountType.fields.map((field) => field.key));
-  const next: Record<string, string> = {};
-  for (const [key, value] of Object.entries(credentials)) {
-    if (allowedKeys.has(key)) {
-      next[key] = value;
-    }
-  }
-  return next;
-}
-
-const pluginFormCache = new Map<string, ComponentType<AccountFormProps> | null>();
-function usePluginAccountForm(platform: string) {
-  const [Form, setForm] = useState<ComponentType<AccountFormProps> | null>(null);
-  const [pluginId, setPluginId] = useState('');
-  const loadedRef = useRef('');
-
-  useEffect(() => {
-    if (!platform) {
-      setForm(null);
-      setPluginId('');
-      loadedRef.current = '';
-      return;
-    }
-    if (loadedRef.current === platform) return;
-    loadedRef.current = platform;
-    let cancelled = false;
-
-    getPlatformPluginMap().then((map) => {
-      const resolvedPluginId = map.get(platform) ?? '';
-      if (cancelled) return;
-
-      setPluginId(resolvedPluginId);
-
-      if (!resolvedPluginId) {
-        setForm(null);
-        return;
-      }
-      if (pluginFormCache.has(resolvedPluginId)) {
-        const cachedForm = pluginFormCache.get(resolvedPluginId) ?? null;
-        setForm(() => cachedForm);
-        return;
-      }
-      loadPluginFrontend(resolvedPluginId).then((mod) => {
-        if (cancelled) return;
-        const form = mod?.accountForm ?? null;
-        pluginFormCache.set(resolvedPluginId, form);
-        setForm(() => form);
-      });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [platform]);
-
-  return { Form, pluginId };
-}
-
-function createPluginOAuthBridge(pluginId: string): PluginOAuthBridge | undefined {
-  if (!pluginId) return undefined;
-
-  return {
-    start: async () => {
-      const result = await pluginsApi.rpc<{ authorize_url: string; state: string }>(
-        pluginId, 'oauth/start',
-      );
-      return {
-        authorizeURL: result.authorize_url,
-        state: result.state,
-      };
-    },
-    exchange: async (callbackURL: string) => {
-      const result = await pluginsApi.rpc<{
-        account_type: string; account_name: string; credentials: Record<string, string>;
-      }>(pluginId, 'oauth/exchange', { callback_url: callbackURL });
-      return {
-        accountType: result.account_type,
-        accountName: result.account_name,
-        credentials: result.credentials,
-      };
-    },
-  };
-}
-
-const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 export default function AccountsPage() {
   const { t } = useTranslation();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const { platforms, platformName } = usePlatforms();
 
@@ -230,7 +85,7 @@ export default function AccountsPage() {
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          queryClient.invalidateQueries({ queryKey: ['accounts'] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
           return autoRefresh;
         }
         return prev - 1;
@@ -247,7 +102,7 @@ export default function AccountsPage() {
 
   // 查询账号列表
   const { data, isLoading } = useQuery({
-    queryKey: ['accounts', page, pageSize, keyword, platformFilter, statusFilter, groupFilter, proxyFilter],
+    queryKey: queryKeys.accounts(page, pageSize, keyword, platformFilter, statusFilter, groupFilter, proxyFilter),
     queryFn: () =>
       accountsApi.list({
         page,
@@ -262,8 +117,8 @@ export default function AccountsPage() {
 
   // 查询分组列表（用于表格中 ID→名称映射）
   const { data: allGroupsData } = useQuery({
-    queryKey: ['groups-all'],
-    queryFn: () => groupsApi.list({ page: 1, page_size: 100 }),
+    queryKey: queryKeys.groupsAll(),
+    queryFn: () => groupsApi.list(FETCH_ALL_PARAMS),
   });
   const groupMap = new Map(
     (allGroupsData?.list ?? []).map((g) => [g.id, g.name]),
@@ -271,8 +126,8 @@ export default function AccountsPage() {
 
   // 查询代理列表（用于表格中 ID→名称映射）
   const { data: allProxiesData } = useQuery({
-    queryKey: ['proxies-all'],
-    queryFn: () => proxiesApi.list({ page: 1, page_size: 100 }),
+    queryKey: queryKeys.proxiesAll(),
+    queryFn: () => proxiesApi.list(FETCH_ALL_PARAMS),
   });
   const proxyMap = new Map(
     (allProxiesData?.list ?? []).map((p) => [p.id, p.name]),
@@ -280,60 +135,47 @@ export default function AccountsPage() {
 
   // 查询用量窗口
   const { data: usageData } = useQuery({
-    queryKey: ['account-usage', platformFilter],
+    queryKey: queryKeys.accountUsage(platformFilter),
     queryFn: () => accountsApi.usage(platformFilter || ''),
     refetchInterval: 60_000, // 每分钟刷新
   });
 
   // 创建账号
-  const createMutation = useMutation({
+  const createMutation = useCrudMutation({
     mutationFn: (data: CreateAccountReq) => accountsApi.create(data),
-    onSuccess: () => {
-      toast('success', t('accounts.create_success'));
-      setShowCreateModal(false);
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-    },
-    onError: (err: Error) => toast('error', err.message),
+    successMessage: t('accounts.create_success'),
+    queryKey: queryKeys.accounts(),
+    onSuccess: () => setShowCreateModal(false),
   });
 
   // 更新账号
-  const updateMutation = useMutation({
+  const updateMutation = useCrudMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateAccountReq }) =>
       accountsApi.update(id, data),
-    onSuccess: () => {
-      toast('success', t('accounts.update_success'));
-      setEditingAccount(null);
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-    },
-    onError: (err: Error) => toast('error', err.message),
+    successMessage: t('accounts.update_success'),
+    queryKey: queryKeys.accounts(),
+    onSuccess: () => setEditingAccount(null),
   });
 
   // 删除账号
-  const deleteMutation = useMutation({
+  const deleteMutation = useCrudMutation({
     mutationFn: (id: number) => accountsApi.delete(id),
-    onSuccess: () => {
-      toast('success', t('accounts.delete_success'));
-      setDeletingAccount(null);
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-    },
-    onError: (err: Error) => toast('error', err.message),
+    successMessage: t('accounts.delete_success'),
+    queryKey: queryKeys.accounts(),
+    onSuccess: () => setDeletingAccount(null),
   });
 
   // 切换调度状态
-  const toggleMutation = useMutation({
+  const toggleMutation = useCrudMutation({
     mutationFn: (id: number) => accountsApi.toggleScheduling(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
-    onError: (err: Error) => toast('error', err.message),
+    queryKey: queryKeys.accounts(),
   });
 
   // 刷新令牌
-  const refreshQuotaMutation = useMutation({
+  const refreshQuotaMutation = useCrudMutation({
     mutationFn: (id: number) => accountsApi.refreshQuota(id),
-    onSuccess: () => {
-      toast('success', t('accounts.refresh_quota_success'));
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-    },
-    onError: (err: Error) => toast('error', err.message),
+    successMessage: t('accounts.refresh_quota_success'),
+    queryKey: queryKeys.accounts(),
   });
 
   // 更多菜单状态（合并 id 和位置为单一状态，避免分步更新导致闪跳）
@@ -720,7 +562,7 @@ export default function AccountsPage() {
         {/* 刷新 & 自动刷新 */}
         <div className="flex items-center gap-1.5 ml-auto">
           <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['accounts'] })}
+            onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
             className="flex items-center justify-center w-8 h-8 rounded-lg text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
             title={t('common.refresh')}
           >
@@ -772,7 +614,7 @@ export default function AccountsPage() {
         pageSize={pageSize}
         total={data?.total ?? 0}
         onPageChange={setPage}
-        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        pageSizeOptions={PAGE_SIZE_OPTIONS as unknown as number[]}
         onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
       />
 
@@ -876,628 +718,5 @@ export default function AccountsPage() {
         />
       )}
     </div>
-  );
-}
-
-// ==================== 创建账号弹窗 ====================
-
-function CreateAccountModal({
-  open,
-  onClose,
-  onSubmit,
-  loading,
-  platforms,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSubmit: (data: CreateAccountReq) => void;
-  loading: boolean;
-  platforms: string[];
-}) {
-  const { t } = useTranslation();
-  const { platformName: pName } = usePlatforms();
-  const [platform, setPlatform] = useState('');
-  const [accountType, setAccountType] = useState('');
-  const [form, setForm] = useState<Omit<CreateAccountReq, 'platform' | 'credentials' | 'type'>>({
-    name: '',
-    priority: 0,
-    max_concurrency: 5,
-    rate_multiplier: 1,
-  });
-  const [credentials, setCredentials] = useState<Record<string, string>>({});
-  const [groupIds, setGroupIds] = useState<number[]>([]);
-
-  // 根据平台获取凭证字段定义
-  const { data: schema } = useQuery({
-    queryKey: ['credentials-schema', platform],
-    queryFn: () => accountsApi.credentialsSchema(platform),
-    enabled: !!platform,
-  });
-
-  // 查询分组列表
-  const { data: groupsData } = useQuery({
-    queryKey: ['groups-all'],
-    queryFn: () => groupsApi.list({ page: 1, page_size: 100 }),
-  });
-
-  // 加载插件自定义表单组件
-  const { Form: PluginAccountForm, pluginId } = usePluginAccountForm(platform);
-  const pluginOAuth = createPluginOAuthBridge(pluginId);
-
-  useEffect(() => {
-    const selectedType = getSchemaSelectedAccountType(schema, accountType);
-    if (!selectedType || selectedType.key === accountType) return;
-    setAccountType(selectedType.key);
-  }, [schema, accountType]);
-
-  // 平台变化时重置凭证和账号类型
-  const handlePlatformChange = (newPlatform: string) => {
-    setPlatform(newPlatform);
-    setCredentials({});
-    setAccountType('');
-  };
-
-  const handleSchemaAccountTypeChange = (type: string) => {
-    const selectedType = getSchemaSelectedAccountType(schema, type);
-    setAccountType(type);
-    setCredentials((prev) => filterCredentialsForAccountType(prev, selectedType));
-  };
-
-  const handleSubmit = () => {
-    if (!platform || !form.name) return;
-    onSubmit({
-      ...form,
-      platform,
-      type: accountType || undefined,
-      credentials,
-      group_ids: groupIds,
-    });
-  };
-
-  const handleClose = () => {
-    setPlatform('');
-    setAccountType('');
-    setForm({ name: '', priority: 0, max_concurrency: 5, rate_multiplier: 1 });
-    setCredentials({});
-    setGroupIds([]);
-    onClose();
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={t('accounts.create')}
-      width="560px"
-      footer={
-        <>
-          <Button variant="secondary" onClick={handleClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleSubmit} loading={loading} disabled={!platform}>
-            {t('common.create')}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <Select
-          label={t('accounts.platform')}
-          required
-          value={platform}
-          onChange={(e) => handlePlatformChange(e.target.value)}
-          options={[
-            { value: '', label: t('accounts.select_platform') },
-            ...platforms.map((p) => ({ value: p, label: pName(p) })),
-          ]}
-        />
-
-        <Input
-          label={t('common.name')}
-          required
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          icon={<Layers className="w-4 h-4" />}
-        />
-
-        {/* 凭证区域：插件自定义表单 or 默认 schema 驱动 */}
-        {PluginAccountForm ? (
-          <div
-            className="ag-plugin-scope pt-4"
-            style={{ borderTop: '1px solid var(--ag-border)' }}
-          >
-            <PluginAccountForm
-              credentials={credentials}
-              onChange={setCredentials}
-              mode="create"
-              accountType={accountType}
-              onAccountTypeChange={setAccountType}
-              onSuggestedName={(name) =>
-                setForm((prev) => (prev.name ? prev : { ...prev, name }))
-              }
-              oauth={pluginOAuth}
-            />
-          </div>
-        ) : schema && getSchemaVisibleFields(schema, accountType).length > 0 ? (
-          <SchemaCredentialsForm
-            schema={schema}
-            accountType={accountType}
-            onAccountTypeChange={handleSchemaAccountTypeChange}
-            credentials={credentials}
-            onCredentialsChange={setCredentials}
-          />
-        ) : null}
-
-        <Input
-          label={t('accounts.priority_hint')}
-          type="number"
-          min={0}
-          max={999}
-          step={1}
-          value={String(form.priority ?? 50)}
-          onChange={(e) => {
-            const v = Math.round(Number(e.target.value));
-            setForm({ ...form, priority: Math.max(0, Math.min(999, v)) });
-          }}
-          icon={<Hash className="w-4 h-4" />}
-        />
-        <Input
-          label={t('accounts.concurrency')}
-          type="number"
-          value={String(form.max_concurrency ?? 5)}
-          onChange={(e) =>
-            setForm({ ...form, max_concurrency: Number(e.target.value) })
-          }
-          icon={<Gauge className="w-4 h-4" />}
-        />
-        <Input
-          label={t('accounts.rate_multiplier')}
-          type="number"
-          step="0.1"
-          value={String(form.rate_multiplier ?? 1)}
-          onChange={(e) =>
-            setForm({ ...form, rate_multiplier: Number(e.target.value) })
-          }
-        />
-
-        {/* 分组选择 */}
-        <GroupCheckboxList
-          groups={groupsData?.list ?? []}
-          selectedIds={groupIds}
-          onChange={setGroupIds}
-        />
-      </div>
-    </Modal>
-  );
-}
-
-// ==================== 分组多选 ====================
-
-function GroupCheckboxList({
-  groups,
-  selectedIds,
-  onChange,
-}: {
-  groups: { id: number; name: string; platform: string }[];
-  selectedIds: number[];
-  onChange: (ids: number[]) => void;
-}) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  if (groups.length === 0) return null;
-
-  const toggle = (id: number) => {
-    onChange(
-      selectedIds.includes(id)
-        ? selectedIds.filter((v) => v !== id)
-        : [...selectedIds, id],
-    );
-  };
-
-  const selectedGroups = groups.filter((g) => selectedIds.includes(g.id));
-
-  return (
-    <div ref={ref} className="relative">
-      <label
-        className="block text-xs font-medium mb-1.5"
-        style={{ color: 'var(--ag-text-secondary)' }}
-      >
-        {t('accounts.groups')}
-      </label>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center justify-between w-full px-3 py-2 rounded-lg border text-sm text-left transition-colors"
-        style={{ borderColor: 'var(--ag-glass-border)', background: 'var(--ag-bg-surface)', color: 'var(--ag-text)' }}
-      >
-        <span className="truncate" style={selectedGroups.length === 0 ? { color: 'var(--ag-text-tertiary)' } : undefined}>
-          {selectedGroups.length === 0
-            ? t('accounts.select_groups')
-            : selectedGroups.map((g) => g.name).join('、')}
-        </span>
-        <ChevronDown className={`w-4 h-4 flex-shrink-0 ml-2 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} style={{ color: 'var(--ag-text-tertiary)' }} />
-      </button>
-      {open && (
-        <div
-          className="absolute z-50 mt-1 w-full rounded-lg border shadow-lg max-h-48 overflow-y-auto py-1"
-          style={{ borderColor: 'var(--ag-glass-border)', background: 'var(--ag-bg-elevated)' }}
-        >
-          {groups.map((g) => (
-            <button
-              key={g.id}
-              type="button"
-              onClick={() => toggle(g.id)}
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-bg-hover transition-colors text-left"
-              style={{ color: 'var(--ag-text)' }}
-            >
-              <span
-                className="flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 transition-colors"
-                style={{
-                  borderColor: selectedIds.includes(g.id) ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
-                  background: selectedIds.includes(g.id) ? 'var(--ag-primary)' : 'transparent',
-                }}
-              >
-                {selectedIds.includes(g.id) && (
-                  <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none"><path d="M2.5 6l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                )}
-              </span>
-              <span>{g.name}</span>
-              <span className="text-[10px]" style={{ color: 'var(--ag-text-tertiary)' }}>{g.platform}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ==================== 凭证字段渲染 ====================
-
-function CredentialFieldInput({
-  field,
-  value,
-  onChange,
-  disabled,
-  placeholder,
-}: {
-  field: CredentialField;
-  value: string;
-  onChange: (val: string) => void;
-  disabled?: boolean;
-  placeholder?: string;
-}) {
-  const hint = placeholder ?? field.placeholder;
-
-  if (field.type === 'textarea') {
-    return (
-      <Textarea
-        label={field.label}
-        required={field.required}
-        placeholder={hint}
-        value={value}
-        rows={3}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-      />
-    );
-  }
-
-  // text 和 password 都使用 Input
-  // 密码字段使用 type="text" + CSS 遮蔽，避免浏览器检测到 password 字段自动填充
-  const isPassword = field.type === 'password';
-  return (
-    <Input
-      label={field.label}
-      type="text"
-      required={field.required}
-      placeholder={hint}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={disabled}
-      autoComplete="off"
-      style={isPassword ? { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties : undefined}
-    />
-  );
-}
-
-function SchemaCredentialsForm({
-  schema,
-  accountType,
-  onAccountTypeChange,
-  credentials,
-  onCredentialsChange,
-  mode = 'create',
-}: {
-  schema: CredentialSchemaResp;
-  accountType: string;
-  onAccountTypeChange: (type: string) => void;
-  credentials: Record<string, string>;
-  onCredentialsChange: (credentials: Record<string, string>) => void;
-  mode?: 'create' | 'edit';
-}) {
-  const { t } = useTranslation();
-  const accountTypes = getSchemaAccountTypes(schema);
-  const selectedType = getSchemaSelectedAccountType(schema, accountType);
-  const visibleFields = getSchemaVisibleFields(schema, accountType);
-
-  return (
-    <div
-      className="space-y-4 pt-4"
-      style={{ borderTop: '1px solid var(--ag-border)' }}
-    >
-      <p
-        className="text-xs font-medium uppercase tracking-wider"
-        style={{ color: 'var(--ag-text-secondary)' }}
-      >
-        {t('accounts.credentials')}
-      </p>
-
-      {accountTypes.length > 0 && mode === 'create' && (
-        <>
-          <Select
-            label={t('common.type')}
-            value={selectedType?.key ?? ''}
-            onChange={(e) => onAccountTypeChange(e.target.value)}
-            options={accountTypes.map((item) => ({
-              value: item.key,
-              label: item.label,
-            }))}
-          />
-          {selectedType?.description && (
-            <p className="text-xs text-text-tertiary -mt-2">
-              {selectedType.description}
-            </p>
-          )}
-        </>
-      )}
-
-      {visibleFields
-        .filter((field) => !(mode === 'edit' && field.edit_disabled))
-        .map((field) => (
-          <CredentialFieldInput
-            key={field.key}
-            field={field}
-            value={credentials[field.key] ?? ''}
-            onChange={(val) =>
-              onCredentialsChange({ ...credentials, [field.key]: val })
-            }
-            placeholder={mode === 'edit' && field.type === 'password' ? t('accounts.leave_empty_to_keep') : undefined}
-          />
-        ))}
-    </div>
-  );
-}
-
-// ==================== 编辑账号弹窗 ====================
-
-function EditAccountModal({
-  open,
-  account,
-  onClose,
-  onSubmit,
-  loading,
-}: {
-  open: boolean;
-  account: AccountResp;
-  onClose: () => void;
-  onSubmit: (data: UpdateAccountReq) => void;
-  loading: boolean;
-}) {
-  const { t } = useTranslation();
-  const { platformName: pName } = usePlatforms();
-  const initialAccountType = account.type || detectCredentialAccountType(account.credentials);
-  const [accountType, setAccountType] = useState(initialAccountType);
-  const [form, setForm] = useState<UpdateAccountReq>({
-    name: account.name,
-    type: initialAccountType || undefined,
-    status: account.status === 'error' ? 'active' : (account.status as 'active' | 'disabled'),
-    priority: account.priority,
-    max_concurrency: account.max_concurrency,
-    rate_multiplier: account.rate_multiplier,
-    proxy_id: account.proxy_id,
-  });
-
-  // 获取凭证字段定义，用于编辑凭证
-  const { data: schema } = useQuery({
-    queryKey: ['credentials-schema', account.platform],
-    queryFn: () => accountsApi.credentialsSchema(account.platform),
-  });
-
-  // 加载插件自定义表单组件
-  const { Form: PluginAccountForm, pluginId } = usePluginAccountForm(account.platform);
-  const pluginOAuth = createPluginOAuthBridge(pluginId);
-
-  // 保留原始凭证，用于提交时回填未修改的密码字段
-  const origCredentials = useRef(account.credentials);
-  const [credentials, setCredentials] = useState<Record<string, string>>(
-    account.credentials,
-  );
-
-  // schema 加载后，清空密码字段的显示值（避免回填）
-  const passwordFieldsCleared = useRef(false);
-  useEffect(() => {
-    if (!schema || passwordFieldsCleared.current) return;
-    const passwordKeys = getSchemaVisibleFields(schema, accountType)
-      .filter((f) => f.type === 'password')
-      .map((f) => f.key);
-    if (passwordKeys.length === 0) return;
-    passwordFieldsCleared.current = true;
-    setCredentials((prev) => {
-      const next = { ...prev };
-      for (const key of passwordKeys) next[key] = '';
-      return next;
-    });
-  }, [schema, accountType]);
-  const [groupIds, setGroupIds] = useState<number[]>(account.group_ids ?? []);
-
-  // 查询分组列表
-  const { data: groupsData } = useQuery({
-    queryKey: ['groups-all'],
-    queryFn: () => groupsApi.list({ page: 1, page_size: 100 }),
-  });
-
-  // 查询代理列表
-  const { data: proxiesData } = useQuery({
-    queryKey: ['proxies-all'],
-    queryFn: () => proxiesApi.list({ page: 1, page_size: 100 }),
-  });
-
-  useEffect(() => {
-    const selectedType = getSchemaSelectedAccountType(schema, accountType);
-    if (!selectedType || selectedType.key === accountType) return;
-    setAccountType(selectedType.key);
-    setForm((prev) => ({ ...prev, type: selectedType.key || undefined }));
-  }, [schema, accountType]);
-
-  const handleAccountTypeChange = (type: string) => {
-    setAccountType(type);
-    setForm({ ...form, type: type || undefined });
-  };
-
-  const handleSchemaAccountTypeChange = (type: string) => {
-    const selectedType = getSchemaSelectedAccountType(schema, type);
-    handleAccountTypeChange(type);
-    setCredentials((prev) => filterCredentialsForAccountType(prev, selectedType));
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={t('accounts.edit')}
-      width="560px"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button
-            onClick={() => {
-              // 提交时：仅将未修改的密码字段回填原值，允许普通字段被清空
-              const merged = { ...credentials };
-              const passwordKeys = new Set(
-                getSchemaVisibleFields(schema, accountType)
-                  .filter((field) => field.type === 'password')
-                  .map((field) => field.key),
-              );
-              for (const [k, v] of Object.entries(origCredentials.current)) {
-                if (passwordKeys.has(k) && merged[k] === '' && v) merged[k] = v;
-              }
-              onSubmit({ ...form, type: accountType || undefined, credentials: merged, group_ids: groupIds });
-            }}
-            loading={loading}
-          >
-            {t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <Input label={t('accounts.platform')} value={pName(account.platform)} disabled />
-        <Input
-          label={t('common.name')}
-          value={form.name ?? ''}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          icon={<Layers className="w-4 h-4" />}
-        />
-
-        {/* 凭证编辑：插件自定义表单 or 默认 schema 驱动 */}
-        {PluginAccountForm ? (
-          <div
-            className="ag-plugin-scope pt-4"
-            style={{ borderTop: '1px solid var(--ag-border)' }}
-          >
-            <PluginAccountForm
-              credentials={credentials}
-              onChange={setCredentials}
-              mode="edit"
-              accountType={accountType}
-              onAccountTypeChange={handleAccountTypeChange}
-              oauth={pluginOAuth}
-            />
-          </div>
-        ) : schema && getSchemaVisibleFields(schema, accountType).length > 0 ? (
-          <SchemaCredentialsForm
-            schema={schema}
-            accountType={accountType}
-            onAccountTypeChange={handleSchemaAccountTypeChange}
-            credentials={credentials}
-            onCredentialsChange={setCredentials}
-            mode="edit"
-          />
-        ) : null}
-
-        <Switch
-          label={t('accounts.enable_dispatch')}
-          checked={form.status !== 'disabled'}
-          onChange={(on) => setForm({ ...form, status: on ? 'active' : 'disabled' })}
-        />
-        <Input
-          label={t('accounts.priority_hint')}
-          type="number"
-          min={0}
-          max={999}
-          step={1}
-          value={String(form.priority ?? 50)}
-          onChange={(e) => {
-            const v = Math.round(Number(e.target.value));
-            setForm({ ...form, priority: Math.max(0, Math.min(999, v)) });
-          }}
-          icon={<Hash className="w-4 h-4" />}
-        />
-        <Input
-          label={t('accounts.concurrency')}
-          type="number"
-          value={String(form.max_concurrency ?? 5)}
-          onChange={(e) =>
-            setForm({ ...form, max_concurrency: Number(e.target.value) })
-          }
-          icon={<Gauge className="w-4 h-4" />}
-        />
-        <Input
-          label={t('accounts.rate_multiplier')}
-          type="number"
-          step="0.1"
-          value={String(form.rate_multiplier ?? 1)}
-          onChange={(e) =>
-            setForm({ ...form, rate_multiplier: Number(e.target.value) })
-          }
-        />
-        <Select
-          label={t('accounts.proxy')}
-          value={form.proxy_id == null ? '' : String(form.proxy_id)}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              proxy_id: e.target.value ? Number(e.target.value) : null,
-            })
-          }
-          options={[
-            { value: '', label: t('accounts.no_proxy') },
-            ...(proxiesData?.list ?? []).map((p) => ({
-              value: String(p.id),
-              label: `${p.name} (${p.protocol}://${p.address}:${p.port})`,
-            })),
-          ]}
-        />
-
-        {/* 分组选择 */}
-        <GroupCheckboxList
-          groups={groupsData?.list ?? []}
-          selectedIds={groupIds}
-          onChange={setGroupIds}
-        />
-      </div>
-    </Modal>
   );
 }

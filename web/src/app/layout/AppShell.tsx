@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../providers/AuthProvider';
 import { pluginsApi } from '../../shared/api/plugins';
+import { queryKeys } from '../../shared/queryKeys';
 import { useTheme } from '../providers/ThemeProvider';
 import {
   LayoutDashboard,
@@ -58,7 +59,7 @@ const userMenuItems: MenuItem[] = [
 
 function usePluginMenuItems(): MenuItem[] {
   const { data } = useQuery({
-    queryKey: ['plugins-menu'],
+    queryKey: queryKeys.pluginsMenu(),
     queryFn: () => pluginsApi.list(),
     staleTime: 60_000,
   });

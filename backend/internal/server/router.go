@@ -5,7 +5,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/internal/server/handler"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 	"github.com/DouDOU-start/airgate-core/internal/setup"
 )
@@ -13,27 +12,13 @@ import (
 // registerRoutes 注册所有 API 路由
 func (s *Server) registerRoutes() {
 	r := s.engine
+	handlers := s.handlers
 
 	// 全局中间件
 	r.Use(middleware.I18n())
 
 	// 安装向导路由（无需认证）
 	setup.RegisterRoutes(r)
-
-	// 初始化所有 Handler
-	authHandler := handler.NewAuthHandler(s.db, s.jwtMgr)
-	userHandler := handler.NewUserHandler(s.db)
-	accountHandler := handler.NewAccountHandler(s.db, s.pluginMgr, s.concurrency)
-	groupHandler := handler.NewGroupHandler(s.db)
-	apikeyHandler := handler.NewAPIKeyHandler(s.db, s.cfg.APIKeySecret())
-	subscriptionHandler := handler.NewSubscriptionHandler(s.db)
-	usageHandler := handler.NewUsageHandler(s.db)
-	proxyHandler := handler.NewProxyHandler(s.db)
-	settingsHandler := handler.NewSettingsHandler(s.db)
-	dashboardHandler := handler.NewDashboardHandler(s.db, s.pluginMgr)
-
-	// 插件 Handler（使用 server 持有的组件）
-	pluginHandler := handler.NewPluginHandler(s.pluginMgr, s.marketplace)
 
 	// API v1 路由组
 	v1 := r.Group("/api/v1")
@@ -42,8 +27,8 @@ func (s *Server) registerRoutes() {
 	authGroup := v1.Group("/auth")
 	authGroup.Use(middleware.RateLimit(s.limiter))
 	{
-		authGroup.POST("/login", authHandler.Login)
-		authGroup.POST("/register", authHandler.Register)
+		authGroup.POST("/login", handlers.Auth.Login)
+		authGroup.POST("/register", handlers.Auth.Register)
 	}
 
 	// === 用户路由（需要 JWT 认证） ===
@@ -51,36 +36,36 @@ func (s *Server) registerRoutes() {
 	userGroup.Use(middleware.JWTAuth(s.jwtMgr))
 	{
 		// Token 刷新
-		userGroup.POST("/auth/refresh", authHandler.RefreshToken)
+		userGroup.POST("/auth/refresh", handlers.Auth.RefreshToken)
 
 		// TOTP 管理
-		userGroup.POST("/auth/totp/setup", authHandler.TOTPSetup)
-		userGroup.POST("/auth/totp/verify", authHandler.TOTPVerify)
-		userGroup.POST("/auth/totp/disable", authHandler.TOTPDisable)
+		userGroup.POST("/auth/totp/setup", handlers.Auth.TOTPSetup)
+		userGroup.POST("/auth/totp/verify", handlers.Auth.TOTPVerify)
+		userGroup.POST("/auth/totp/disable", handlers.Auth.TOTPDisable)
 
 		// 用户资料
-		userGroup.GET("/users/me", userHandler.GetMe)
-		userGroup.PUT("/users/me", userHandler.UpdateProfile)
-		userGroup.POST("/users/me/password", userHandler.ChangePassword)
+		userGroup.GET("/users/me", handlers.User.GetMe)
+		userGroup.PUT("/users/me", handlers.User.UpdateProfile)
+		userGroup.POST("/users/me/password", handlers.User.ChangePassword)
 
 		// API Key 管理
-		userGroup.GET("/api-keys", apikeyHandler.ListKeys)
-		userGroup.POST("/api-keys", apikeyHandler.CreateKey)
-		userGroup.PUT("/api-keys/:id", apikeyHandler.UpdateKey)
-		userGroup.DELETE("/api-keys/:id", apikeyHandler.DeleteKey)
-		userGroup.GET("/api-keys/:id/reveal", apikeyHandler.RevealKey)
+		userGroup.GET("/api-keys", handlers.APIKey.ListKeys)
+		userGroup.POST("/api-keys", handlers.APIKey.CreateKey)
+		userGroup.PUT("/api-keys/:id", handlers.APIKey.UpdateKey)
+		userGroup.DELETE("/api-keys/:id", handlers.APIKey.DeleteKey)
+		userGroup.GET("/api-keys/:id/reveal", handlers.APIKey.RevealKey)
 
 		// 分组
-		userGroup.GET("/groups", groupHandler.ListAvailableGroups)
+		userGroup.GET("/groups", handlers.Group.ListAvailableGroups)
 
 		// 订阅
-		userGroup.GET("/subscriptions", subscriptionHandler.UserSubscriptions)
-		userGroup.GET("/subscriptions/active", subscriptionHandler.ActiveSubscriptions)
-		userGroup.GET("/subscriptions/progress", subscriptionHandler.SubscriptionProgress)
+		userGroup.GET("/subscriptions", handlers.Subscription.UserSubscriptions)
+		userGroup.GET("/subscriptions/active", handlers.Subscription.ActiveSubscriptions)
+		userGroup.GET("/subscriptions/progress", handlers.Subscription.SubscriptionProgress)
 
 		// 使用记录
-		userGroup.GET("/usage", usageHandler.UserUsage)
-		userGroup.GET("/usage/stats", usageHandler.UserUsageStats)
+		userGroup.GET("/usage", handlers.Usage.UserUsage)
+		userGroup.GET("/usage/stats", handlers.Usage.UserUsageStats)
 
 	}
 
@@ -89,74 +74,74 @@ func (s *Server) registerRoutes() {
 	adminGroup.Use(middleware.JWTAuth(s.jwtMgr), middleware.AdminOnly())
 	{
 		// 用户管理
-		adminGroup.GET("/users", userHandler.ListUsers)
-		adminGroup.POST("/users", userHandler.CreateUser)
-		adminGroup.PUT("/users/:id", userHandler.UpdateUser)
-		adminGroup.DELETE("/users/:id", userHandler.DeleteUser)
-		adminGroup.PATCH("/users/:id/toggle", userHandler.ToggleUserStatus)
-		adminGroup.POST("/users/:id/balance", userHandler.AdjustBalance)
-		adminGroup.GET("/users/:id/balance-history", userHandler.GetUserBalanceHistory)
-		adminGroup.GET("/users/:id/api-keys", userHandler.AdminListUserKeys)
+		adminGroup.GET("/users", handlers.User.ListUsers)
+		adminGroup.POST("/users", handlers.User.CreateUser)
+		adminGroup.PUT("/users/:id", handlers.User.UpdateUser)
+		adminGroup.DELETE("/users/:id", handlers.User.DeleteUser)
+		adminGroup.PATCH("/users/:id/toggle", handlers.User.ToggleUserStatus)
+		adminGroup.POST("/users/:id/balance", handlers.User.AdjustBalance)
+		adminGroup.GET("/users/:id/balance-history", handlers.User.GetUserBalanceHistory)
+		adminGroup.GET("/users/:id/api-keys", handlers.User.AdminListUserKeys)
 
 		// 账号管理
-		adminGroup.GET("/accounts", accountHandler.ListAccounts)
-		adminGroup.GET("/accounts/usage", accountHandler.GetAccountUsage)
-		adminGroup.POST("/accounts", accountHandler.CreateAccount)
-		adminGroup.PUT("/accounts/:id", accountHandler.UpdateAccount)
-		adminGroup.DELETE("/accounts/:id", accountHandler.DeleteAccount)
-		adminGroup.POST("/accounts/:id/test", accountHandler.TestAccount)
-		adminGroup.PATCH("/accounts/:id/toggle", accountHandler.ToggleScheduling)
-		adminGroup.GET("/accounts/:id/models", accountHandler.GetAccountModels)
-		adminGroup.GET("/accounts/credentials-schema/:platform", accountHandler.GetCredentialsSchema)
-		adminGroup.POST("/accounts/:id/refresh-quota", accountHandler.RefreshQuota)
-		adminGroup.GET("/accounts/:id/stats", accountHandler.GetAccountStats)
+		adminGroup.GET("/accounts", handlers.Account.ListAccounts)
+		adminGroup.GET("/accounts/usage", handlers.Account.GetAccountUsage)
+		adminGroup.POST("/accounts", handlers.Account.CreateAccount)
+		adminGroup.PUT("/accounts/:id", handlers.Account.UpdateAccount)
+		adminGroup.DELETE("/accounts/:id", handlers.Account.DeleteAccount)
+		adminGroup.POST("/accounts/:id/test", handlers.Account.TestAccount)
+		adminGroup.PATCH("/accounts/:id/toggle", handlers.Account.ToggleScheduling)
+		adminGroup.GET("/accounts/:id/models", handlers.Account.GetAccountModels)
+		adminGroup.GET("/accounts/credentials-schema/:platform", handlers.Account.GetCredentialsSchema)
+		adminGroup.POST("/accounts/:id/refresh-quota", handlers.Account.RefreshQuota)
+		adminGroup.GET("/accounts/:id/stats", handlers.Account.GetAccountStats)
 
 		// 分组管理
-		adminGroup.GET("/groups", groupHandler.ListGroups)
-		adminGroup.POST("/groups", groupHandler.CreateGroup)
-		adminGroup.GET("/groups/:id", groupHandler.GetGroup)
-		adminGroup.PUT("/groups/:id", groupHandler.UpdateGroup)
-		adminGroup.DELETE("/groups/:id", groupHandler.DeleteGroup)
+		adminGroup.GET("/groups", handlers.Group.ListGroups)
+		adminGroup.POST("/groups", handlers.Group.CreateGroup)
+		adminGroup.GET("/groups/:id", handlers.Group.GetGroup)
+		adminGroup.PUT("/groups/:id", handlers.Group.UpdateGroup)
+		adminGroup.DELETE("/groups/:id", handlers.Group.DeleteGroup)
 
 		// API 密钥管理（管理员）
-		adminGroup.PUT("/api-keys/:id", apikeyHandler.AdminUpdateKey)
+		adminGroup.PUT("/api-keys/:id", handlers.APIKey.AdminUpdateKey)
 
 		// 订阅管理
-		adminGroup.GET("/subscriptions", subscriptionHandler.AdminListSubscriptions)
-		adminGroup.POST("/subscriptions/assign", subscriptionHandler.AdminAssign)
-		adminGroup.POST("/subscriptions/bulk-assign", subscriptionHandler.AdminBulkAssign)
-		adminGroup.PUT("/subscriptions/:id/adjust", subscriptionHandler.AdminAdjust)
+		adminGroup.GET("/subscriptions", handlers.Subscription.AdminListSubscriptions)
+		adminGroup.POST("/subscriptions/assign", handlers.Subscription.AdminAssign)
+		adminGroup.POST("/subscriptions/bulk-assign", handlers.Subscription.AdminBulkAssign)
+		adminGroup.PUT("/subscriptions/:id/adjust", handlers.Subscription.AdminAdjust)
 
 		// 代理池管理
-		adminGroup.GET("/proxies", proxyHandler.ListProxies)
-		adminGroup.POST("/proxies", proxyHandler.CreateProxy)
-		adminGroup.PUT("/proxies/:id", proxyHandler.UpdateProxy)
-		adminGroup.DELETE("/proxies/:id", proxyHandler.DeleteProxy)
-		adminGroup.POST("/proxies/:id/test", proxyHandler.TestProxy)
+		adminGroup.GET("/proxies", handlers.Proxy.ListProxies)
+		adminGroup.POST("/proxies", handlers.Proxy.CreateProxy)
+		adminGroup.PUT("/proxies/:id", handlers.Proxy.UpdateProxy)
+		adminGroup.DELETE("/proxies/:id", handlers.Proxy.DeleteProxy)
+		adminGroup.POST("/proxies/:id/test", handlers.Proxy.TestProxy)
 
 		// 使用记录（管理员）
-		adminGroup.GET("/usage", usageHandler.AdminUsage)
-		adminGroup.GET("/usage/stats", usageHandler.AdminUsageStats)
-		adminGroup.GET("/usage/trend", usageHandler.AdminUsageTrend)
+		adminGroup.GET("/usage", handlers.Usage.AdminUsage)
+		adminGroup.GET("/usage/stats", handlers.Usage.AdminUsageStats)
+		adminGroup.GET("/usage/trend", handlers.Usage.AdminUsageTrend)
 
 		// 插件管理
-		adminGroup.GET("/plugins", pluginHandler.ListPlugins)
-		adminGroup.POST("/plugins/upload", pluginHandler.UploadPlugin)
-		adminGroup.POST("/plugins/install-github", pluginHandler.InstallFromGithub)
-		adminGroup.POST("/plugins/:name/uninstall", pluginHandler.UninstallPlugin)
-		adminGroup.POST("/plugins/:name/reload", pluginHandler.ReloadPlugin)
-		adminGroup.Any("/plugins/:name/rpc/*action", pluginHandler.ProxyRequest)
+		adminGroup.GET("/plugins", handlers.Plugin.ListPlugins)
+		adminGroup.POST("/plugins/upload", handlers.Plugin.UploadPlugin)
+		adminGroup.POST("/plugins/install-github", handlers.Plugin.InstallFromGithub)
+		adminGroup.POST("/plugins/:name/uninstall", handlers.Plugin.UninstallPlugin)
+		adminGroup.POST("/plugins/:name/reload", handlers.Plugin.ReloadPlugin)
+		adminGroup.Any("/plugins/:name/rpc/*action", handlers.Plugin.ProxyRequest)
 
 		// 插件市场
-		adminGroup.GET("/marketplace/plugins", pluginHandler.ListMarketplace)
+		adminGroup.GET("/marketplace/plugins", handlers.Plugin.ListMarketplace)
 
 		// 系统设置
-		adminGroup.GET("/settings", settingsHandler.GetSettings)
-		adminGroup.PUT("/settings", settingsHandler.UpdateSettings)
+		adminGroup.GET("/settings", handlers.Settings.GetSettings)
+		adminGroup.PUT("/settings", handlers.Settings.UpdateSettings)
 
 		// 仪表盘（管理员）
-		adminGroup.GET("/dashboard/stats", dashboardHandler.Stats)
-		adminGroup.GET("/dashboard/trend", dashboardHandler.Trend)
+		adminGroup.GET("/dashboard/stats", handlers.Dashboard.Stats)
+		adminGroup.GET("/dashboard/trend", handlers.Dashboard.Trend)
 	}
 
 	// === Extension 插件 API 路由（JWT 认证 + 管理员权限） ===

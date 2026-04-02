@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { settingsApi } from '../../shared/api/settings';
-import { useToast } from '../../shared/components/Toast';
+import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { queryKeys } from '../../shared/queryKeys';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Input } from '../../shared/components/Input';
@@ -12,8 +13,6 @@ import type { SettingResp, SettingItem } from '../../shared/types';
 
 export default function SettingsPage() {
   const { t } = useTranslation();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   // 本地编辑状态：{ key: value }
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
@@ -21,7 +20,7 @@ export default function SettingsPage() {
 
   // 获取设置列表
   const { data: settings, isLoading } = useQuery({
-    queryKey: ['settings'],
+    queryKey: queryKeys.settings(),
     queryFn: () => settingsApi.list(),
   });
 
@@ -38,14 +37,11 @@ export default function SettingsPage() {
   }, [settings]);
 
   // 保存设置
-  const saveMutation = useMutation({
+  const saveMutation = useCrudMutation({
     mutationFn: (items: SettingItem[]) => settingsApi.update({ settings: items }),
-    onSuccess: () => {
-      toast('success', t('settings.save_success'));
-      queryClient.invalidateQueries({ queryKey: ['settings'] });
-      setHasChanges(false);
-    },
-    onError: (err: Error) => toast('error', err.message),
+    successMessage: t('settings.save_success'),
+    queryKey: queryKeys.settings(),
+    onSuccess: () => setHasChanges(false),
   });
 
   // 更新某个设置值

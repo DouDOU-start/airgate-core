@@ -1,4 +1,5 @@
 import type { ApiResponse } from '../types';
+import i18n from '../../i18n';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -19,8 +20,48 @@ export function getToken(): string | null {
 }
 
 // 查询参数类型
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type QueryParams = Record<string, any>;
+
+// 构建请求头
+function buildHeaders(includeContentType: boolean): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (includeContentType) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+  return headers;
+}
+
+// 统一响应处理
+async function handleResponse<T>(res: Response): Promise<T> {
+  let json: ApiResponse<T>;
+  try {
+    json = await res.json();
+  } catch {
+    throw new ApiError(-1, i18n.t('common.server_error', { status: res.status }), res.status);
+  }
+
+  if (json.code !== 0) {
+    if (res.status === 401 && accessToken) {
+      setToken(null);
+      window.location.href = '/login';
+    }
+    throw new ApiError(json.code, json.message, res.status);
+  }
+
+  return json.data;
+}
+
+// 执行 fetch 请求
+async function doFetch(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    throw new ApiError(-1, i18n.t('common.network_error'), 0);
+  }
+}
 
 // 统一请求方法
 async function request<T>(
@@ -31,7 +72,6 @@ async function request<T>(
 ): Promise<T> {
   const url = new URL(`${BASE_URL}${path}`, window.location.origin);
 
-  // 添加查询参数
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -40,42 +80,13 @@ async function request<T>(
     });
   }
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+  const res = await doFetch(url.toString(), {
+    method,
+    headers: buildHeaders(true),
+    body: body ? JSON.stringify(body) : undefined,
+  });
 
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`;
-  }
-
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-  } catch {
-    throw new ApiError(-1, '无法连接到服务器，请检查网络或服务是否正常', 0);
-  }
-
-  let json: ApiResponse<T>;
-  try {
-    json = await res.json();
-  } catch {
-    throw new ApiError(-1, `服务端响应异常 (HTTP ${res.status})`, res.status);
-  }
-
-  if (json.code !== 0) {
-    // Token 过期，尝试刷新
-    if (res.status === 401 && accessToken) {
-      setToken(null);
-      window.location.href = '/login';
-    }
-    throw new ApiError(json.code, json.message, res.status);
-  }
-
-  return json.data;
+  return handleResponse<T>(res);
 }
 
 // API 错误类
@@ -115,37 +126,11 @@ export function patch<T>(path: string, body?: unknown): Promise<T> {
 export async function upload<T>(path: string, formData: FormData): Promise<T> {
   const url = new URL(`${BASE_URL}${path}`, window.location.origin);
 
-  const headers: Record<string, string> = {};
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`;
-  }
-  // 不设 Content-Type，让浏览器自动设置 boundary
+  const res = await doFetch(url.toString(), {
+    method: 'POST',
+    headers: buildHeaders(false),
+    body: formData,
+  });
 
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
-  } catch {
-    throw new ApiError(-1, '无法连接到服务器，请检查网络或服务是否正常', 0);
-  }
-
-  let json: ApiResponse<T>;
-  try {
-    json = await res.json();
-  } catch {
-    throw new ApiError(-1, `服务端响应异常 (HTTP ${res.status})`, res.status);
-  }
-
-  if (json.code !== 0) {
-    if (res.status === 401 && accessToken) {
-      setToken(null);
-      window.location.href = '/login';
-    }
-    throw new ApiError(json.code, json.message, res.status);
-  }
-
-  return json.data;
+  return handleResponse<T>(res);
 }

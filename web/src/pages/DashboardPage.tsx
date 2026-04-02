@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Card } from '../shared/components/Card';
 import { dashboardApi } from '../shared/api/dashboard';
+import { queryKeys } from '../shared/queryKeys';
 import type { DashboardStatsResp, DashboardTrendResp, DashboardTrendReq } from '../shared/types';
 
 // 饼图颜色
@@ -52,7 +53,7 @@ export default function DashboardPage() {
 
   // 统计数据
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
-    queryKey: ['dashboard', 'stats'],
+    queryKey: queryKeys.dashboard(),
     queryFn: () => dashboardApi.stats(),
   });
 
@@ -63,7 +64,7 @@ export default function DashboardPage() {
   }), [range, granularity]);
 
   const { data: trend, isLoading: trendLoading } = useQuery({
-    queryKey: ['dashboard', 'trend', trendParams],
+    queryKey: queryKeys.dashboardTrend(trendParams),
     queryFn: () => dashboardApi.trend(trendParams),
   });
 

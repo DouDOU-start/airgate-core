@@ -56,7 +56,9 @@
     "copy_failed": "复制失败，请手动复制",
     "fill_required": "请填写必填项",
     "more": "更多",
-    "user": "用户"
+    "user": "用户",
+    "network_error": "无法连接到服务器，请检查网络或服务是否正常",
+    "server_error": "服务端响应异常 (HTTP {{status}})"
   },
 
   "status": {
@@ -395,8 +397,9 @@
     "ip_placeholder": "每行一个 IP 地址",
     "ip_hint": "留空表示不限制，每行一个 IP",
     "key_created": "密钥已创建",
-    "key_created_warning": "请立即复制并妥善保存此密钥，关闭后将无法再次查看完整密钥。",
-    "key_saved_close": "我已保存，关闭",
+    "key_created_warning": "请复制并妥善保存此密钥；如有需要，你也可以稍后再次查看完整密钥。",
+    "key_reveal_warning": "请谨慎展示和复制此密钥，并注意避免泄露给无关人员。",
+    "key_saved_close": "关闭",
     "delete_key": "删除密钥",
     "delete_key_confirm": "确定要删除密钥「{{name}}」吗？此操作不可恢复。",
     "create_success": "API 密钥创建成功",
@@ -612,7 +615,8 @@
     "expires_at": "过期时间",
     "expire_hint": "留空表示永不过期",
     "never_expire": "永不过期",
-    "key_created_warning": "请立即复制并保存此密钥，关闭后将无法再次查看完整密钥！",
+    "key_created_warning": "请复制并妥善保存此密钥；如有需要，你也可以稍后再次查看完整密钥。",
+    "key_saved_close": "关闭",
     "copy_key": "复制密钥",
     "delete_key": "删除密钥",
     "delete_confirm": "确定要删除密钥「{{name}}」吗？删除后使用此密钥的请求将立即失效。",

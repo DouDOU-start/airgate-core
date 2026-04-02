@@ -13,6 +13,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
+	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/ratelimit"
@@ -41,6 +42,7 @@ type Server struct {
 	concurrency *scheduler.ConcurrencyManager
 	calculator  *billing.Calculator
 	recorder    *billing.Recorder
+	handlers    *bootstrap.HTTPHandlers
 }
 
 // NewServer 创建 HTTP 服务器
@@ -86,6 +88,15 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		calculator:     calculator,
 		recorder:       recorder,
 	}
+
+	s.handlers = bootstrap.NewHTTPHandlers(bootstrap.HTTPDependencies{
+		Config:      cfg,
+		DB:          db,
+		JWTMgr:      jwtMgr,
+		PluginMgr:   pluginMgr,
+		Marketplace: marketplace,
+		Concurrency: concurrency,
+	})
 
 	// 注册路由
 	s.registerRoutes()

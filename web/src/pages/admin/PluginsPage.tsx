@@ -1,8 +1,11 @@
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { pluginsApi } from '../../shared/api/plugins';
 import { useToast } from '../../shared/components/Toast';
+import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { queryKeys } from '../../shared/queryKeys';
+import { FETCH_ALL_PARAMS } from '../../shared/constants';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Table, type Column } from '../../shared/components/Table';
 import { Button } from '../../shared/components/Button';
@@ -26,7 +29,6 @@ const typeVariant: Record<string, 'info' | 'success' | 'warning'> = {
 export default function PluginsPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<'installed' | 'marketplace'>('installed');
   const [uninstallTarget, setUninstallTarget] = useState<PluginResp | null>(null);
@@ -34,14 +36,14 @@ export default function PluginsPage() {
 
   // 已安装插件列表
   const { data: pluginsData, isLoading: pluginsLoading } = useQuery({
-    queryKey: ['plugins'],
-    queryFn: () => pluginsApi.list({ page: 1, page_size: 100 }),
+    queryKey: queryKeys.plugins(),
+    queryFn: () => pluginsApi.list(FETCH_ALL_PARAMS),
   });
 
   // 插件市场列表
   const { data: marketData, isLoading: marketLoading } = useQuery({
-    queryKey: ['marketplace'],
-    queryFn: () => pluginsApi.marketplace({ page: 1, page_size: 100 }),
+    queryKey: queryKeys.marketplace(),
+    queryFn: () => pluginsApi.marketplace(FETCH_ALL_PARAMS),
     enabled: activeTab === 'marketplace',
   });
 
@@ -58,13 +60,10 @@ export default function PluginsPage() {
   });
 
   // 热加载插件
-  const reloadMutation = useMutation({
+  const reloadMutation = useCrudMutation({
     mutationFn: (name: string) => pluginsApi.reload(name),
-    onSuccess: () => {
-      toast('success', t('plugins.reload_success'));
-      queryClient.invalidateQueries({ queryKey: ['plugins'] });
-    },
-    onError: (err: Error) => toast('error', err.message),
+    successMessage: t('plugins.reload_success'),
+    queryKey: queryKeys.plugins(),
   });
 
   const installedColumns: Column<PluginResp>[] = [

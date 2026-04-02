@@ -56,7 +56,9 @@
     "copy_failed": "Copy failed, please copy manually",
     "fill_required": "Please fill in required fields",
     "more": "More",
-    "user": "User"
+    "user": "User",
+    "network_error": "Unable to connect to server. Please check your network or service status.",
+    "server_error": "Server response error (HTTP {{status}})"
   },
 
   "status": {
@@ -395,8 +397,9 @@
     "ip_placeholder": "One IP per line",
     "ip_hint": "Leave empty for no restriction, one IP per line",
     "key_created": "Key Created",
-    "key_created_warning": "Please copy and save this key immediately. You won't be able to see the full key after closing.",
-    "key_saved_close": "Saved, Close",
+    "key_created_warning": "Please copy and save this key. You can view the full key again later if needed.",
+    "key_reveal_warning": "Handle this key carefully and avoid exposing it to unauthorized parties.",
+    "key_saved_close": "Close",
     "delete_key": "Delete Key",
     "delete_key_confirm": "Are you sure you want to delete key \"{{name}}\"? This action cannot be undone.",
     "create_success": "API key created successfully",
@@ -612,7 +615,8 @@
     "expires_at": "Expires At",
     "expire_hint": "Leave empty for no expiry",
     "never_expire": "Never expires",
-    "key_created_warning": "Please copy and save this key now! You won't be able to see the full key after closing.",
+    "key_created_warning": "Please copy and save this key. You can view the full key again later if needed.",
+    "key_saved_close": "Close",
     "copy_key": "Copy Key",
     "delete_key": "Delete Key",
     "delete_confirm": "Are you sure you want to delete key \"{{name}}\"? Requests using this key will immediately fail.",

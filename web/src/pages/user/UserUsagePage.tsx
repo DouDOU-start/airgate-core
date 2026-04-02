@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { usageApi } from '../../shared/api/usage';
+import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { Table } from '../../shared/components/Table';
 import { Input, Select } from '../../shared/components/Input';
@@ -26,13 +27,13 @@ export default function UserUsagePage() {
   const { platforms, platformName } = usePlatforms();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['user-usage', queryParams],
+    queryKey: queryKeys.userUsage(queryParams),
     queryFn: () => usageApi.list(queryParams),
   });
 
   // 聚合统计（跟随筛选条件，独立于分页）
   const { data: stats } = useQuery({
-    queryKey: ['user-usage-stats', filters],
+    queryKey: queryKeys.userUsageStats(filters),
     queryFn: () => usageApi.userStats(filters),
   });
 

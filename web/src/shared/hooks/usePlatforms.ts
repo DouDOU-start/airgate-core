@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { pluginsApi } from '../api/plugins';
+import { queryKeys } from '../queryKeys';
+import { FETCH_ALL_PARAMS } from '../constants';
 
 /** 从插件 display_name 中提取平台显示名（去掉"网关""Gateway"等后缀） */
 function extractPlatformName(displayName: string): string {
@@ -18,9 +20,9 @@ function capitalize(s: string) {
  */
 export function usePlatforms() {
   const { data, isLoading } = useQuery({
-    queryKey: ['installed-platforms'],
+    queryKey: queryKeys.platforms(),
     queryFn: async () => {
-      const resp = await pluginsApi.list({ page: 1, page_size: 100 });
+      const resp = await pluginsApi.list(FETCH_ALL_PARAMS);
       const platformSet = new Set<string>();
       const nameMap: Record<string, string> = {};
       for (const p of resp.list) {

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { usersApi } from '../../shared/api/users';
 import { authApi } from '../../shared/api/auth';
 import { useToast } from '../../shared/components/Toast';
+import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { queryKeys } from '../../shared/queryKeys';
 import { Card } from '../../shared/components/Card';
 import { Button } from '../../shared/components/Button';
 import { Input } from '../../shared/components/Input';
@@ -28,17 +30,13 @@ export default function ProfilePage() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
 
   // 修改用户名
   const [username, setUsername] = useState(user?.username || '');
-  const profileMutation = useMutation({
-    mutationFn: (data: { username: string }) => usersApi.updateProfile(data),
-    onSuccess: () => {
-      toast('success', t('profile.username_updated'));
-      queryClient.invalidateQueries({ queryKey: ['user-me'] });
-    },
-    onError: (err: Error) => toast('error', err.message),
+  const profileMutation = useCrudMutation<unknown, { username: string }>({
+    mutationFn: (data) => usersApi.updateProfile(data),
+    successMessage: t('profile.username_updated'),
+    queryKey: queryKeys.userMe(),
   });
 
   // 修改密码
@@ -47,14 +45,13 @@ export default function ProfilePage() {
     new_password: '',
     confirm_password: '',
   });
-  const passwordMutation = useMutation({
-    mutationFn: (data: { old_password: string; new_password: string }) =>
-      usersApi.changePassword(data),
+  const passwordMutation = useCrudMutation<unknown, { old_password: string; new_password: string }>({
+    mutationFn: (data) => usersApi.changePassword(data),
+    successMessage: t('profile.password_changed'),
+    queryKey: queryKeys.userMe(),
     onSuccess: () => {
-      toast('success', t('profile.password_changed'));
       setPasswords({ old_password: '', new_password: '', confirm_password: '' });
     },
-    onError: (err: Error) => toast('error', err.message),
   });
 
   // TOTP 设置
@@ -72,26 +69,24 @@ export default function ProfilePage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  const totpVerifyMutation = useMutation({
-    mutationFn: (code: string) => authApi.totpVerify({ code }),
+  const totpVerifyMutation = useCrudMutation<unknown, string>({
+    mutationFn: (code) => authApi.totpVerify({ code }),
+    successMessage: t('profile.totp_enabled_success'),
+    queryKey: queryKeys.userMe(),
     onSuccess: () => {
-      toast('success', t('profile.totp_enabled_success'));
       setTotpStep('idle');
       setTotpCode('');
       setTotpUri('');
-      queryClient.invalidateQueries({ queryKey: ['user-me'] });
     },
-    onError: (err: Error) => toast('error', err.message),
   });
 
-  const totpDisableMutation = useMutation({
-    mutationFn: (code: string) => authApi.totpDisable({ code }),
+  const totpDisableMutation = useCrudMutation<unknown, string>({
+    mutationFn: (code) => authApi.totpDisable({ code }),
+    successMessage: t('profile.totp_disabled_success'),
+    queryKey: queryKeys.userMe(),
     onSuccess: () => {
-      toast('success', t('profile.totp_disabled_success'));
       setDisableCode('');
-      queryClient.invalidateQueries({ queryKey: ['user-me'] });
     },
-    onError: (err: Error) => toast('error', err.message),
   });
 
   function handleUpdateUsername() {

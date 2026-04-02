@@ -1,40 +1,38 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   Plus,
   Users,
   Settings2,
   Layers,
-  CalendarDays,
   User,
 } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
-import { Input, Select } from '../../shared/components/Input';
+import { Select } from '../../shared/components/Input';
 import { Table, type Column } from '../../shared/components/Table';
-import { Modal } from '../../shared/components/Modal';
 import { StatusBadge } from '../../shared/components/Badge';
-import { useToast } from '../../shared/components/Toast';
 import { subscriptionsApi } from '../../shared/api/subscriptions';
 import { groupsApi } from '../../shared/api/groups';
 import { usersApi } from '../../shared/api/users';
 import { usePagination } from '../../shared/hooks/usePagination';
+import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { queryKeys } from '../../shared/queryKeys';
+import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
+import { AssignModal } from './subscriptions/AssignModal';
+import { BulkAssignModal } from './subscriptions/BulkAssignModal';
+import { AdjustModal } from './subscriptions/AdjustModal';
 import type {
   SubscriptionResp,
   AssignSubscriptionReq,
   BulkAssignReq,
   AdjustSubscriptionReq,
-  GroupResp,
   UserResp,
 } from '../../shared/types';
 
-const PAGE_SIZE = 20;
-
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const STATUS_OPTIONS = [
     { value: '', label: t('subscriptions.all_status') },
@@ -44,7 +42,7 @@ export default function SubscriptionsPage() {
   ];
 
   // 筛选状态
-  const { page, setPage, pageSize, setPageSize } = usePagination(PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE);
   const [statusFilter, setStatusFilter] = useState('');
 
   // 弹窗状态
@@ -54,7 +52,7 @@ export default function SubscriptionsPage() {
 
   // 查询订阅列表
   const { data, isLoading } = useQuery({
-    queryKey: ['subscriptions', page, pageSize, statusFilter],
+    queryKey: queryKeys.subscriptions(page, pageSize, statusFilter),
     queryFn: () =>
       subscriptionsApi.adminList({
         page,
@@ -65,48 +63,38 @@ export default function SubscriptionsPage() {
 
   // 查询分组列表
   const { data: groupsData } = useQuery({
-    queryKey: ['groups-all'],
-    queryFn: () => groupsApi.list({ page: 1, page_size: 100 }),
+    queryKey: queryKeys.groupsAll(),
+    queryFn: () => groupsApi.list(FETCH_ALL_PARAMS),
   });
 
   // 查询用户列表（用于选择用户）
   const { data: usersData } = useQuery({
-    queryKey: ['users-all'],
-    queryFn: () => usersApi.list({ page: 1, page_size: 100 }),
+    queryKey: queryKeys.usersAll(),
+    queryFn: () => usersApi.list(FETCH_ALL_PARAMS),
   });
 
   // 分配订阅
-  const assignMutation = useMutation({
-    mutationFn: (data: AssignSubscriptionReq) => subscriptionsApi.assign(data),
-    onSuccess: () => {
-      toast('success', t('subscriptions.assign_success'));
-      setShowAssignModal(false);
-      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
-    },
-    onError: (err: Error) => toast('error', err.message),
+  const assignMutation = useCrudMutation<unknown, AssignSubscriptionReq>({
+    mutationFn: (data) => subscriptionsApi.assign(data),
+    successMessage: t('subscriptions.assign_success'),
+    queryKey: queryKeys.subscriptions(),
+    onSuccess: () => setShowAssignModal(false),
   });
 
   // 批量分配
-  const bulkMutation = useMutation({
-    mutationFn: (data: BulkAssignReq) => subscriptionsApi.bulkAssign(data),
-    onSuccess: () => {
-      toast('success', t('subscriptions.bulk_success'));
-      setShowBulkModal(false);
-      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
-    },
-    onError: (err: Error) => toast('error', err.message),
+  const bulkMutation = useCrudMutation<unknown, BulkAssignReq>({
+    mutationFn: (data) => subscriptionsApi.bulkAssign(data),
+    successMessage: t('subscriptions.bulk_success'),
+    queryKey: queryKeys.subscriptions(),
+    onSuccess: () => setShowBulkModal(false),
   });
 
   // 调整订阅
-  const adjustMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: AdjustSubscriptionReq }) =>
-      subscriptionsApi.adjust(id, data),
-    onSuccess: () => {
-      toast('success', t('subscriptions.adjust_success'));
-      setAdjustingSub(null);
-      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
-    },
-    onError: (err: Error) => toast('error', err.message),
+  const adjustMutation = useCrudMutation<unknown, { id: number; data: AdjustSubscriptionReq }>({
+    mutationFn: ({ id, data }) => subscriptionsApi.adjust(id, data),
+    successMessage: t('subscriptions.adjust_success'),
+    queryKey: queryKeys.subscriptions(),
+    onSuccess: () => setAdjustingSub(null),
   });
 
   // 格式化日期
@@ -280,332 +268,5 @@ export default function SubscriptionsPage() {
         />
       )}
     </div>
-  );
-}
-
-// ==================== 分配订阅弹窗 ====================
-
-function AssignModal({
-  open,
-  groups,
-  users,
-  onClose,
-  onSubmit,
-  loading,
-}: {
-  open: boolean;
-  groups: GroupResp[];
-  users: UserResp[];
-  onClose: () => void;
-  onSubmit: (data: AssignSubscriptionReq) => void;
-  loading: boolean;
-}) {
-  const { t } = useTranslation();
-  const [form, setForm] = useState<AssignSubscriptionReq>({
-    user_id: 0,
-    group_id: 0,
-    expires_at: '',
-  });
-
-  const handleSubmit = () => {
-    if (!form.user_id || !form.group_id || !form.expires_at) return;
-    onSubmit(form);
-  };
-
-  const handleClose = () => {
-    setForm({ user_id: 0, group_id: 0, expires_at: '' });
-    onClose();
-  };
-
-  const userOptions = [
-    { value: '0', label: t('subscriptions.select_user') },
-    ...users.map((u) => ({
-      value: String(u.id),
-      label: `${u.email} (${u.username || '-'})`,
-    })),
-  ];
-
-  const groupOptions = [
-    { value: '0', label: t('subscriptions.select_group') },
-    ...groups.map((g) => ({
-      value: String(g.id),
-      label: `${g.name} (${g.platform})`,
-    })),
-  ];
-
-  return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={t('subscriptions.assign')}
-      footer={
-        <>
-          <Button variant="secondary" onClick={handleClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleSubmit} loading={loading}>
-            {t('subscriptions.assign')}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <Select
-          label={t('subscriptions.user')}
-          required
-          value={String(form.user_id)}
-          onChange={(e) =>
-            setForm({ ...form, user_id: Number(e.target.value) })
-          }
-          options={userOptions}
-        />
-
-        <Select
-          label={t('subscriptions.group')}
-          required
-          value={String(form.group_id)}
-          onChange={(e) =>
-            setForm({ ...form, group_id: Number(e.target.value) })
-          }
-          options={groupOptions}
-        />
-
-        <Input
-          label={t('subscriptions.expire_time')}
-          type="date"
-          required
-          value={form.expires_at ? form.expires_at.split('T')[0] : ''}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              expires_at: e.target.value
-                ? `${e.target.value}T23:59:59Z`
-                : '',
-            })
-          }
-          icon={<CalendarDays className="w-4 h-4" />}
-        />
-      </div>
-    </Modal>
-  );
-}
-
-// ==================== 批量分配弹窗 ====================
-
-function BulkAssignModal({
-  open,
-  groups,
-  users,
-  onClose,
-  onSubmit,
-  loading,
-}: {
-  open: boolean;
-  groups: GroupResp[];
-  users: UserResp[];
-  onClose: () => void;
-  onSubmit: (data: BulkAssignReq) => void;
-  loading: boolean;
-}) {
-  const { t } = useTranslation();
-  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
-  const [groupId, setGroupId] = useState(0);
-  const [expiresAt, setExpiresAt] = useState('');
-
-  const toggleUser = (userId: number) => {
-    setSelectedUserIds((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId],
-    );
-  };
-
-  const handleSubmit = () => {
-    if (selectedUserIds.length === 0 || !groupId || !expiresAt) return;
-    onSubmit({
-      user_ids: selectedUserIds,
-      group_id: groupId,
-      expires_at: expiresAt,
-    });
-  };
-
-  const handleClose = () => {
-    setSelectedUserIds([]);
-    setGroupId(0);
-    setExpiresAt('');
-    onClose();
-  };
-
-  const groupOptions = [
-    { value: '0', label: t('subscriptions.select_group') },
-    ...groups.map((g) => ({
-      value: String(g.id),
-      label: `${g.name} (${g.platform})`,
-    })),
-  ];
-
-  return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={t('subscriptions.bulk_assign')}
-      width="560px"
-      footer={
-        <>
-          <Button variant="secondary" onClick={handleClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleSubmit} loading={loading}>
-            {t('subscriptions.bulk_assign_count', { count: selectedUserIds.length })}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        {/* 用户多选 */}
-        <div className="space-y-1.5">
-          <label
-            className="block text-xs font-medium uppercase tracking-wider"
-            style={{ color: 'var(--ag-text-secondary)' }}
-          >
-            {t('subscriptions.select_users')} <span style={{ color: 'var(--ag-danger)' }}>*</span>
-          </label>
-          <div
-            className="rounded-md max-h-48 overflow-y-auto p-2 space-y-0.5"
-            style={{
-              border: '1px solid var(--ag-glass-border)',
-              background: 'var(--ag-bg-surface)',
-            }}
-          >
-            {users.map((u) => (
-              <label
-                key={u.id}
-                className="flex items-center gap-2.5 px-2 py-1.5 rounded-sm cursor-pointer transition-colors"
-                style={{ color: 'var(--ag-text-secondary)' }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = 'var(--ag-bg-hover)';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = 'transparent';
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedUserIds.includes(u.id)}
-                  onChange={() => toggleUser(u.id)}
-                  className="rounded"
-                  style={{
-                    borderColor: 'var(--ag-glass-border)',
-                    accentColor: 'var(--ag-primary)',
-                  }}
-                />
-                <User className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
-                <span className="text-sm">
-                  {u.email} ({u.username || '-'})
-                </span>
-              </label>
-            ))}
-          </div>
-          <p className="text-xs font-mono" style={{ color: 'var(--ag-text-tertiary)' }}>
-            {t('subscriptions.selected_count', { count: selectedUserIds.length })}
-          </p>
-        </div>
-
-        <Select
-          label={t('subscriptions.group')}
-          required
-          value={String(groupId)}
-          onChange={(e) => setGroupId(Number(e.target.value))}
-          options={groupOptions}
-        />
-
-        <Input
-          label={t('subscriptions.expire_time')}
-          type="date"
-          required
-          value={expiresAt ? expiresAt.split('T')[0] : ''}
-          onChange={(e) =>
-            setExpiresAt(
-              e.target.value ? `${e.target.value}T23:59:59Z` : '',
-            )
-          }
-          icon={<CalendarDays className="w-4 h-4" />}
-        />
-      </div>
-    </Modal>
-  );
-}
-
-// ==================== 调整订阅弹窗 ====================
-
-function AdjustModal({
-  open,
-  subscription,
-  onClose,
-  onSubmit,
-  loading,
-}: {
-  open: boolean;
-  subscription: SubscriptionResp;
-  onClose: () => void;
-  onSubmit: (data: AdjustSubscriptionReq) => void;
-  loading: boolean;
-}) {
-  const { t } = useTranslation();
-  const [form, setForm] = useState<AdjustSubscriptionReq>({
-    expires_at: subscription.expires_at,
-    status: subscription.status as 'active' | 'suspended',
-  });
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={t('subscriptions.adjust_title', { name: subscription.group_name })}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={() => onSubmit(form)} loading={loading}>
-            {t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <Input
-          label={t('subscriptions.expire_time')}
-          type="date"
-          value={
-            form.expires_at ? form.expires_at.split('T')[0] : ''
-          }
-          onChange={(e) =>
-            setForm({
-              ...form,
-              expires_at: e.target.value
-                ? `${e.target.value}T23:59:59Z`
-                : undefined,
-            })
-          }
-          icon={<CalendarDays className="w-4 h-4" />}
-        />
-
-        <Select
-          label={t('common.status')}
-          value={form.status ?? 'active'}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              status: e.target.value as 'active' | 'suspended',
-            })
-          }
-          options={[
-            { value: 'active', label: t('subscriptions.status_active') },
-            { value: 'suspended', label: t('subscriptions.status_suspended') },
-          ]}
-        />
-      </div>
-    </Modal>
   );
 }

@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { proxiesApi } from '../../shared/api/proxies';
 import { useToast } from '../../shared/components/Toast';
+import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { PageHeader } from '../../shared/components/PageHeader';
 import { Table, type Column } from '../../shared/components/Table';
@@ -35,7 +37,6 @@ const emptyForm: ProxyForm = {
 export default function ProxiesPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const { page, setPage, pageSize, setPageSize } = usePagination(20);
   const [modalOpen, setModalOpen] = useState(false);
@@ -46,42 +47,33 @@ export default function ProxiesPage() {
 
   // 查询代理列表
   const { data, isLoading } = useQuery({
-    queryKey: ['proxies', page, pageSize],
+    queryKey: queryKeys.proxies(page, pageSize),
     queryFn: () => proxiesApi.list({ page, page_size: pageSize }),
   });
 
   // 创建代理
-  const createMutation = useMutation({
+  const createMutation = useCrudMutation({
     mutationFn: (data: CreateProxyReq) => proxiesApi.create(data),
-    onSuccess: () => {
-      toast('success', t('proxies.create_success'));
-      queryClient.invalidateQueries({ queryKey: ['proxies'] });
-      closeModal();
-    },
-    onError: (err: Error) => toast('error', err.message),
+    successMessage: t('proxies.create_success'),
+    queryKey: queryKeys.proxies(),
+    onSuccess: () => closeModal(),
   });
 
   // 更新代理
-  const updateMutation = useMutation({
+  const updateMutation = useCrudMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateProxyReq }) =>
       proxiesApi.update(id, data),
-    onSuccess: () => {
-      toast('success', t('proxies.update_success'));
-      queryClient.invalidateQueries({ queryKey: ['proxies'] });
-      closeModal();
-    },
-    onError: (err: Error) => toast('error', err.message),
+    successMessage: t('proxies.update_success'),
+    queryKey: queryKeys.proxies(),
+    onSuccess: () => closeModal(),
   });
 
   // 删除代理
-  const deleteMutation = useMutation({
+  const deleteMutation = useCrudMutation({
     mutationFn: (id: number) => proxiesApi.delete(id),
-    onSuccess: () => {
-      toast('success', t('proxies.delete_success'));
-      queryClient.invalidateQueries({ queryKey: ['proxies'] });
-      setDeleteTarget(null);
-    },
-    onError: (err: Error) => toast('error', err.message),
+    successMessage: t('proxies.delete_success'),
+    queryKey: queryKeys.proxies(),
+    onSuccess: () => setDeleteTarget(null),
   });
 
   // 测试连通性
