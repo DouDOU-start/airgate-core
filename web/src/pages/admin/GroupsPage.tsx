@@ -7,8 +7,8 @@ import {
   Layers,
   ArrowUpDown,
   Trash2,
+  RefreshCw,
 } from 'lucide-react';
-import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Select } from '../../shared/components/Input';
 import { Table, type Column } from '../../shared/components/Table';
@@ -42,7 +42,7 @@ export default function GroupsPage() {
   const [deletingGroup, setDeletingGroup] = useState<GroupResp | null>(null);
 
   // 查询分组列表
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: queryKeys.groups(page, pageSize, platformFilter),
     queryFn: () =>
       groupsApi.list({
@@ -233,20 +233,8 @@ export default function GroupsPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('groups.title')}
-        description={t('groups.description')}
-        onRefresh={refetch}
-        refreshing={isFetching}
-        actions={
-          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
-            {t('groups.create')}
-          </Button>
-        }
-      />
-
       {/* 筛选 */}
-      <div className="flex items-center gap-3 mb-5">
+      <div className="flex flex-wrap items-center gap-3 mb-5">
         <Select
           value={platformFilter}
           onChange={(e) => {
@@ -254,8 +242,18 @@ export default function GroupsPage() {
             setPage(1);
           }}
           options={PLATFORM_OPTIONS}
-          label={t('groups.platform')}
         />
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={() => refetch()}
+            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
+            {t('groups.create')}
+          </Button>
+        </div>
       </div>
 
       {/* 表格 */}

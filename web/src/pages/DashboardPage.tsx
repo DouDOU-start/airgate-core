@@ -10,6 +10,8 @@ import {
   Coins, Database, Zap, Clock,
 } from 'lucide-react';
 import { Card } from '../shared/components/Card';
+import { Alert } from '../shared/components/Alert';
+import { Tabs } from '../shared/components/Tabs';
 import { dashboardApi } from '../shared/api/dashboard';
 import { usersApi } from '../shared/api/users';
 import { queryKeys } from '../shared/queryKeys';
@@ -77,16 +79,14 @@ export default function DashboardPage() {
     <div>
       {/* 错误提示 */}
       {statsError && (
-        <div className="rounded-md bg-danger-subtle border border-danger border-opacity-20 px-4 py-3 text-sm text-danger mb-4">
-          {t('dashboard.load_failed', { error: statsError instanceof Error ? statsError.message : '' })}
-        </div>
+        <Alert variant="error">{t('dashboard.load_failed', { error: statsError instanceof Error ? statsError.message : '' })}</Alert>
       )}
 
       {/* 统计卡片 */}
       {statsLoading ? <StatsSkeleton /> : stats ? <StatsCards stats={stats} /> : null}
 
       {/* 时间范围选择 */}
-      <div className="flex items-center justify-between mt-6 mb-4 flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-6 mb-4 gap-3">
         <div className="flex items-center gap-2">
           <span className="text-xs text-text-tertiary">{t('dashboard.time_range')}</span>
           {(['today', '7d', '30d', '90d'] as const).map((r) => (
@@ -300,28 +300,14 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
 
   return (
     <Card title={t('dashboard.model_distribution')} extra={
-      <div className="flex gap-1">
-        <button
-          className={`px-2.5 py-1 text-[11px] rounded font-medium transition-all cursor-pointer ${
-            tab === 'model'
-              ? 'bg-primary-subtle text-primary'
-              : 'text-text-tertiary hover:text-text'
-          }`}
-          onClick={() => setTab('model')}
-        >
-          {t('dashboard.model_distribution')}
-        </button>
-        <button
-          className={`px-2.5 py-1 text-[11px] rounded font-medium transition-all cursor-pointer ${
-            tab === 'user'
-              ? 'bg-primary-subtle text-primary'
-              : 'text-text-tertiary hover:text-text'
-          }`}
-          onClick={() => setTab('user')}
-        >
-          {t('dashboard.user_ranking')}
-        </button>
-      </div>
+      <Tabs
+        items={[
+          { key: 'model', label: t('dashboard.model_distribution') },
+          { key: 'user', label: t('dashboard.user_ranking') },
+        ]}
+        activeKey={tab}
+        onChange={(k) => setTab(k as 'model' | 'user')}
+      />
     }>
       {tab === 'model' ? (
         <div className="flex gap-4">

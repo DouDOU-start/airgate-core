@@ -22,8 +22,8 @@ const variantStyles: Record<string, string> = {
 };
 
 const sizeStyles: Record<string, string> = {
-  sm: 'h-8 px-3 text-xs gap-1.5',
-  md: 'h-9 px-4 text-sm gap-2',
+  sm: 'h-8 px-3.5 text-xs gap-1.5',
+  md: 'h-10 px-5 text-sm gap-2',
   lg: 'h-11 px-6 text-sm gap-2',
 };
 
@@ -39,7 +39,7 @@ export function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-[10px] font-medium transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >

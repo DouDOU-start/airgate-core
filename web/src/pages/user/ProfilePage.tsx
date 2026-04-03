@@ -121,7 +121,7 @@ export default function ProfilePage() {
 
       {/* 修改用户名 */}
       <Card title={t('profile.change_username')} className="mb-6">
-        <div className="flex items-end gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
           <div className="flex-1">
             <Input
               label={t('profile.change_username')}

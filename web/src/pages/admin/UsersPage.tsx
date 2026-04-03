@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Input, Select } from '../../shared/components/Input';
 import { Table, type Column } from '../../shared/components/Table';
@@ -24,7 +23,7 @@ import { BalanceHistoryModal } from './users/BalanceHistoryModal';
 import { UserGroupsModal } from './users/UserGroupsModal';
 import type { UserResp } from '../../shared/types';
 import {
-  Plus, Search, Pencil, MoreHorizontal,
+  Plus, Search, Pencil, MoreHorizontal, RefreshCw,
   Key, Users, PlusCircle, MinusCircle, Clock, Trash2,
 } from 'lucide-react';
 
@@ -245,19 +244,8 @@ export default function UsersPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('users.title')}
-        onRefresh={refetch}
-        refreshing={isFetching}
-        actions={
-          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
-            {t('users.create')}
-          </Button>
-        }
-      />
-
-      <div className="flex items-end gap-3 mb-5">
-        <div className="w-64">
+      <div className="flex flex-wrap items-end gap-3 mb-5">
+        <div className="w-full sm:w-64">
           <Input
             placeholder={t('users.search_placeholder')}
             value={keyword}
@@ -275,6 +263,21 @@ export default function UsersPage() {
               { value: 'disabled', label: t('status.disabled') },
             ]}
           />
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          {isFetching ? (
+            <RefreshCw className="w-4 h-4 text-text-tertiary animate-spin" />
+          ) : (
+            <button
+              onClick={() => refetch()}
+              className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          )}
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
+            {t('users.create')}
+          </Button>
         </div>
       </div>
 

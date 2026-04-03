@@ -3,6 +3,8 @@ import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../shared/components/Button';
 import { Input } from '../shared/components/Input';
+import { Alert } from '../shared/components/Alert';
+import { Tabs } from '../shared/components/Tabs';
 import { useAuth } from '../app/providers/AuthProvider';
 import { authApi } from '../shared/api/auth';
 import { ApiError } from '../shared/api/client';
@@ -67,9 +69,7 @@ function LoginForm() {
         required
       />
       {error && (
-        <div className="rounded-md bg-danger-subtle border border-danger/20 px-4 py-3 text-sm text-danger">
-          {error}
-        </div>
+        <Alert variant="error">{error}</Alert>
       )}
       <Button type="submit" loading={loading} className="w-full h-11">
         {t('common.login')}
@@ -159,9 +159,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         error={passwordMismatch ? t('auth.password_mismatch') : undefined}
       />
       {error && (
-        <div className="rounded-md bg-danger-subtle border border-danger/20 px-4 py-3 text-sm text-danger">
-          {error}
-        </div>
+        <Alert variant="error">{error}</Alert>
       )}
       <Button type="submit" loading={loading} className="w-full h-11">
         {t('common.register')}
@@ -228,33 +226,22 @@ export default function LoginPage() {
         {/* 表单卡片 */}
         <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl overflow-hidden">
           {/* Tab 切换 */}
-          <div className="flex border-b border-border">
-            {(['login', 'register'] as const).map((tab) => (
-              <button
-                key={tab}
-                className={`flex-1 py-3 text-xs font-medium text-center transition-all relative uppercase tracking-wider ${
-                  activeTab === tab
-                    ? 'text-primary'
-                    : 'text-text-tertiary hover:text-text-secondary'
-                }`}
-                onClick={() => {
-                  setActiveTab(tab);
-                  setRegisterSuccess(false);
-                }}
-              >
-                {tab === 'login' ? t('common.login') : t('common.register')}
-                {activeTab === tab && (
-                  <div className="absolute bottom-0 left-1/4 right-1/4 h-[1.5px] bg-primary rounded-full" />
-                )}
-              </button>
-            ))}
-          </div>
+          <Tabs
+            variant="underline"
+            items={[
+              { key: 'login', label: t('common.login') },
+              { key: 'register', label: t('common.register') },
+            ]}
+            activeKey={activeTab}
+            onChange={(key) => {
+              setActiveTab(key as TabKey);
+              setRegisterSuccess(false);
+            }}
+          />
 
           <div className="p-6">
             {registerSuccess && activeTab === 'login' && (
-              <div className="rounded-md bg-success-subtle border border-success/20 px-4 py-3 text-sm text-success mb-5">
-                {t('auth.register_success')}
-              </div>
+              <Alert variant="success" className="mb-5">{t('auth.register_success')}</Alert>
             )}
 
             {activeTab === 'login' ? (

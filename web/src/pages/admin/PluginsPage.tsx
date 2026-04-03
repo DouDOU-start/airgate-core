@@ -6,7 +6,6 @@ import { useToast } from '../../shared/components/Toast';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../shared/constants';
-import { PageHeader } from '../../shared/components/PageHeader';
 import { Table, type Column } from '../../shared/components/Table';
 import { Button } from '../../shared/components/Button';
 import { Modal, ConfirmModal } from '../../shared/components/Modal';
@@ -35,7 +34,7 @@ export default function PluginsPage() {
   const [installOpen, setInstallOpen] = useState(false);
 
   // 已安装插件列表
-  const { data: pluginsData, isLoading: pluginsLoading, refetch: refetchPlugins, isFetching: pluginsFetching } = useQuery({
+  const { data: pluginsData, isLoading: pluginsLoading, refetch: refetchPlugins } = useQuery({
     queryKey: queryKeys.plugins(),
     queryFn: () => pluginsApi.list(FETCH_ALL_PARAMS),
   });
@@ -146,23 +145,8 @@ export default function PluginsPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('plugins.title')}
-        description={t('plugins.description')}
-        onRefresh={refetchPlugins}
-        refreshing={pluginsFetching}
-        actions={
-          <Button
-            icon={<Plus className="w-4 h-4" />}
-            onClick={() => setInstallOpen(true)}
-          >
-            {t('plugins.install_plugin')}
-          </Button>
-        }
-      />
-
-      {/* Tab 切换 */}
-      <div className="flex gap-1 mb-6 border-b border-border">
+      {/* Tab 切换 + 操作按钮 */}
+      <div className="flex items-center gap-1 mb-6 border-b border-border">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -176,6 +160,20 @@ export default function PluginsPage() {
             {tab.label}
           </button>
         ))}
+        <div className="flex items-center gap-2 ml-auto pb-1">
+          <button
+            onClick={() => refetchPlugins()}
+            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <Button
+            icon={<Plus className="w-4 h-4" />}
+            onClick={() => setInstallOpen(true)}
+          >
+            {t('plugins.install_plugin')}
+          </Button>
+        </div>
       </div>
 
       {/* 已安装 Tab */}

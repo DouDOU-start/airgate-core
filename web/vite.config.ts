@@ -71,6 +71,8 @@ export default defineConfig({
     watch: {
       usePolling: true,
       interval: 1000,
+      // 监听 SDK 符号链接目标，token 变更后自动热更新
+      ignored: ['!**/node_modules/@airgate/theme/**'],
     },
     proxy: {
       '/api': BACKEND,

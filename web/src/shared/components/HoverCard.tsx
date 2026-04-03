@@ -29,7 +29,7 @@ export function HoverCard({ children, content }: HoverCardProps) {
           className="fixed z-50 pointer-events-none"
           style={{ left: pos.x, top: pos.y, transform: 'translate(-50%, -100%)' }}
         >
-          <div className="mb-2 bg-[#1a1a2e] border border-glass-border rounded-lg px-4 py-3 shadow-xl whitespace-nowrap">
+          <div className="mb-2 bg-bg-elevated border border-glass-border rounded-[10px] px-4 py-3 shadow-lg whitespace-nowrap">
             {content}
           </div>
         </div>,

@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, ChevronDown, Loader2 } from 'lucide-react';
-
-const inputBase =
-  'block w-full rounded-md border border-glass-border bg-surface px-3 py-2 text-sm text-text placeholder-text-tertiary transition-all duration-200 focus:outline-none focus:border-border-focus focus:shadow-[0_0_0_3px_var(--ag-primary-subtle)] disabled:opacity-40 disabled:cursor-not-allowed';
+import { inputBase } from './Input';
 
 export interface SearchSelectOption {
   value: string;
@@ -165,7 +163,7 @@ export function SearchSelect({
         <ul
           ref={listRef}
           role="listbox"
-          className="ag-glass-dropdown absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg py-1"
+          className="ag-glass-dropdown absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-[10px] py-1"
           style={{ animation: 'ag-scale-in 0.15s ease-out forwards', minWidth: '220px' }}
         >
           {options.length === 0 && !loading && (

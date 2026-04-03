@@ -476,22 +476,22 @@ export default function UsagePage() {
   return (
     <div>
       {/* 筛选栏 */}
-      <div className="flex items-center gap-3 mb-5 flex-wrap">
-        <div className="w-44">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
+        <div className="w-full sm:w-44">
           <DatePicker
             placeholder={t('usage.start_date')}
             value={filters.start_date || ''}
             onChange={(v) => updateFilter('start_date', v)}
           />
         </div>
-        <div className="w-44">
+        <div className="w-full sm:w-44">
           <DatePicker
             placeholder={t('usage.end_date')}
             value={filters.end_date || ''}
             onChange={(v) => updateFilter('end_date', v)}
           />
         </div>
-        <div className="w-40">
+        <div className="w-full sm:w-40">
           <Select
             placeholder={t('common.all')}
             value={filters.platform || ''}
@@ -502,7 +502,7 @@ export default function UsagePage() {
             ]}
           />
         </div>
-        <div className="w-40">
+        <div className="w-full sm:w-40">
           <Input
             placeholder={t('usage.model_placeholder')}
             value={filters.model || ''}
@@ -510,7 +510,7 @@ export default function UsagePage() {
             icon={<Search className="w-4 h-4" />}
           />
         </div>
-        <div className="w-48">
+        <div className="w-full sm:w-48">
           <SearchSelect
             placeholder={t('usage.search_user')}
             value={filters.user_id ? String(filters.user_id) : ''}

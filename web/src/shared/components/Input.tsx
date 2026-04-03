@@ -13,8 +13,8 @@ import { createPortal } from 'react-dom';
 
 /* ==================== 共享样式 ==================== */
 
-const inputBase =
-  'block w-full rounded-md border border-glass-border bg-surface px-3 py-2 text-sm text-text placeholder-text-tertiary transition-all duration-200 focus:outline-none focus:border-border-focus focus:shadow-[0_0_0_3px_var(--ag-primary-subtle)] disabled:opacity-40 disabled:cursor-not-allowed';
+export const inputBase =
+  'block w-full rounded-[10px] border border-glass-border bg-surface px-3.5 py-2.5 text-sm text-text placeholder-text-tertiary transition-all duration-200 focus:outline-none focus:border-border-focus focus:shadow-[0_0_0_3px_var(--ag-primary-subtle)] disabled:opacity-40 disabled:cursor-not-allowed';
 
 const inputError =
   'border-danger focus:border-danger focus:shadow-[0_0_0_3px_var(--ag-danger-subtle)]';
@@ -36,7 +36,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="space-y-1.5">
         {label && (
-          <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider">
+          <label className="block text-[13px] font-medium text-text-secondary">
             {label}
             {props.required && <span className="text-danger ml-0.5">*</span>}
           </label>
@@ -95,7 +95,7 @@ export function Textarea({ label, error, className = '', ...props }: TextareaPro
   return (
     <div className="space-y-1.5">
       {label && (
-        <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider">
+        <label className="block text-[13px] font-medium text-text-secondary">
           {label}
           {props.required && <span className="text-danger ml-0.5">*</span>}
         </label>
@@ -237,7 +237,7 @@ export function Select({
   return (
     <div className="space-y-1.5" ref={containerRef}>
       {label && (
-        <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider">
+        <label className="block text-[13px] font-medium text-text-secondary">
           {label}
           {required && <span className="text-danger ml-0.5">*</span>}
         </label>
@@ -277,7 +277,7 @@ export function Select({
           <ul
             ref={listRef}
             role="listbox"
-            className="ag-glass-dropdown fixed z-[9999] max-h-60 overflow-auto rounded-lg py-1"
+            className="ag-glass-dropdown fixed z-[9999] max-h-60 overflow-auto rounded-[10px] py-1"
             style={{
               ...(dropdownPos.openUp
                 ? { bottom: window.innerHeight - dropdownPos.top + 4 }

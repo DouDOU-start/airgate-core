@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Key, Layers, Eye } from 'lucide-react';
-import { PageHeader } from '../../shared/components/PageHeader';
+import { Plus, Pencil, Trash2, Key, Layers, Eye, RefreshCw } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
 import { Table, type Column } from '../../shared/components/Table';
 import { ConfirmModal } from '../../shared/components/Modal';
@@ -29,7 +28,7 @@ export default function APIKeysPage() {
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: queryKeys.apikeys(page, pageSize),
     queryFn: () => apikeysApi.list({ page, page_size: pageSize }),
   });
@@ -196,17 +195,19 @@ export default function APIKeysPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('api_keys.title')}
-        description={t('api_keys.description')}
-        onRefresh={refetch}
-        refreshing={isFetching}
-        actions={
+      <div className="flex justify-end mb-5">
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={() => refetch()}
+            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
           <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
             {t('api_keys.create')}
           </Button>
-        }
-      />
+        </div>
+      </div>
 
       <Table<APIKeyResp>
         columns={columns}

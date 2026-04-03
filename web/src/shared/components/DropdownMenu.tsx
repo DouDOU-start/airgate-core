@@ -20,7 +20,7 @@ export const DropdownMenu = forwardRef<HTMLDivElement, DropdownMenuProps>(
     return createPortal(
       <div
         ref={ref}
-        className="fixed py-1 rounded-lg shadow-lg min-w-[140px]"
+        className="fixed p-1 rounded-[10px] shadow-lg min-w-[140px]"
         style={{
           top: position.top,
           left: position.left,
@@ -36,7 +36,7 @@ export const DropdownMenu = forwardRef<HTMLDivElement, DropdownMenuProps>(
               <div className="my-1 border-t" style={{ borderColor: 'var(--ag-border-subtle)' }} />
             )}
             <button
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left cursor-pointer"
+              className="flex items-center gap-2.5 w-full px-3 py-2 text-sm rounded-lg hover:bg-bg-hover transition-colors text-left cursor-pointer"
               style={{ color: item.danger ? 'var(--ag-danger)' : 'var(--ag-text-secondary)' }}
               onClick={() => {
                 item.onClick();

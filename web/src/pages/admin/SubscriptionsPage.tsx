@@ -7,8 +7,8 @@ import {
   Settings2,
   Layers,
   User,
+  RefreshCw,
 } from 'lucide-react';
-import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Select } from '../../shared/components/Input';
 import { Table, type Column } from '../../shared/components/Table';
@@ -51,7 +51,7 @@ export default function SubscriptionsPage() {
   const [adjustingSub, setAdjustingSub] = useState<SubscriptionResp | null>(null);
 
   // 查询订阅列表
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: queryKeys.subscriptions(page, pageSize, statusFilter),
     queryFn: () =>
       subscriptionsApi.adminList({
@@ -187,32 +187,8 @@ export default function SubscriptionsPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('subscriptions.title')}
-        description={t('subscriptions.description')}
-        onRefresh={refetch}
-        refreshing={isFetching}
-        actions={
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              icon={<Users className="w-4 h-4" />}
-              onClick={() => setShowBulkModal(true)}
-            >
-              {t('subscriptions.bulk_assign')}
-            </Button>
-            <Button
-              icon={<Plus className="w-4 h-4" />}
-              onClick={() => setShowAssignModal(true)}
-            >
-              {t('subscriptions.assign')}
-            </Button>
-          </div>
-        }
-      />
-
       {/* 筛选 */}
-      <div className="flex items-center gap-3 mb-5">
+      <div className="flex flex-wrap items-center gap-3 mb-5">
         <Select
           value={statusFilter}
           onChange={(e) => {
@@ -220,8 +196,28 @@ export default function SubscriptionsPage() {
             setPage(1);
           }}
           options={STATUS_OPTIONS}
-          label={t('common.status')}
         />
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={() => refetch()}
+            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <Button
+            variant="secondary"
+            icon={<Users className="w-4 h-4" />}
+            onClick={() => setShowBulkModal(true)}
+          >
+            {t('subscriptions.bulk_assign')}
+          </Button>
+          <Button
+            icon={<Plus className="w-4 h-4" />}
+            onClick={() => setShowAssignModal(true)}
+          >
+            {t('subscriptions.assign')}
+          </Button>
+        </div>
       </div>
 
       {/* 表格 */}

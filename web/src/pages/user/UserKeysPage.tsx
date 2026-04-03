@@ -5,7 +5,6 @@ import { apikeysApi } from '../../shared/api/apikeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { groupsApi } from '../../shared/api/groups';
 import { useToast } from '../../shared/components/Toast';
-import { PageHeader } from '../../shared/components/PageHeader';
 import { Table, type Column } from '../../shared/components/Table';
 import { Button } from '../../shared/components/Button';
 import { ConfirmModal } from '../../shared/components/Modal';
@@ -27,6 +26,7 @@ import {
   Terminal,
   Upload,
   MoreHorizontal,
+  RefreshCw,
 } from 'lucide-react';
 import type { APIKeyResp, CreateAPIKeyReq, UpdateAPIKeyReq, GroupResp } from '../../shared/types';
 import { EditKeyModal } from './userkeys/EditKeyModal';
@@ -54,7 +54,7 @@ export default function UserKeysPage() {
   const { menu: moreMenu, menuRef: moreMenuRef, open: openMoreMenu, close: closeMoreMenu } = useDropdownMenu();
 
   // 密钥列表
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: queryKeys.userKeys(page, pageSize),
     queryFn: () => apikeysApi.list({ page, page_size: pageSize }),
   });
@@ -373,11 +373,14 @@ export default function UserKeysPage() {
 
   return (
     <div className="p-6">
-      <PageHeader
-        title={t('user_keys.title')}
-        onRefresh={refetch}
-        refreshing={isFetching}
-        actions={
+      <div className="flex justify-end mb-5">
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={() => refetch()}
+            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
           <Button
             onClick={openCreate}
             icon={<Plus className="w-4 h-4" />}
@@ -386,8 +389,8 @@ export default function UserKeysPage() {
           >
             {hasAvailableGroups ? t('user_keys.create') : t('user_keys.create_disabled_no_groups')}
           </Button>
-        }
-      />
+        </div>
+      </div>
 
       <Table
         columns={columns}

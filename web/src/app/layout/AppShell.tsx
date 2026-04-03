@@ -1,11 +1,12 @@
 import { type ReactNode, useEffect, useState } from 'react';
-import { Link, useMatchRoute } from '@tanstack/react-router';
+import { Link, useMatchRoute, useRouterState } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../providers/AuthProvider';
 import { pluginsApi } from '../../shared/api/plugins';
 import { queryKeys } from '../../shared/queryKeys';
 import { useTheme } from '../providers/ThemeProvider';
+import { useIsMobile } from '../../shared/hooks/useMediaQuery';
 import {
   LayoutDashboard,
   Users,
@@ -25,6 +26,7 @@ import {
   Languages,
   Sun,
   Moon,
+  Menu,
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -88,11 +90,26 @@ export function AppShell({ children }: AppShellProps) {
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const isMobile = useIsMobile();
   const matchRoute = useMatchRoute();
+  const routerPath = useRouterState({ select: (s) => s.location.pathname });
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [routerPath]);
+
+  // Prevent body scroll when mobile drawer is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [mobileOpen]);
 
   const isAdmin = user?.role === 'admin';
   const pluginMenuItems = usePluginMenuItems();
-  // 管理员：排除"个人概览"（与仪表盘路径重复），保留其余个人页面，并把分区标题移到首项
   const adminUserItems = userMenuItems
     .filter((item) => item.path !== '/')
     .map((item, i) => (i === 0 ? { ...item, sectionKey: 'nav.personal' } : item));
@@ -121,7 +138,6 @@ export function AppShell({ children }: AppShellProps) {
     localStorage.setItem('lang', nextLang);
   };
 
-  // 根据当前路由设置浏览器标签标题
   const activeItem = menuItems.find((item) => {
     if (item.path === '/') return !!matchRoute({ to: '/' });
     return !!matchRoute({ to: item.path, fuzzy: true });
@@ -131,88 +147,86 @@ export function AppShell({ children }: AppShellProps) {
     document.title = 'AirGate';
   }, []);
 
-  return (
-    <div className="flex h-screen">
-      {/* 侧边栏 */}
-      <aside
-        className="relative flex flex-col border-r border-border bg-bg transition-all duration-300 ease-in-out"
-        style={{ width: collapsed ? 'var(--ag-sidebar-collapsed)' : 'var(--ag-sidebar-width)' }}
-      >
+  // On mobile, sidebar is always expanded inside the drawer
+  const sidebarCollapsed = isMobile ? false : collapsed;
 
-        {/* Logo 区 */}
-        <div className="flex items-center h-14 px-4 border-b border-border">
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary-subtle flex-shrink-0">
-              <Zap className="w-4 h-4 text-primary" />
-            </div>
-            {!collapsed && (
-              <div className="overflow-hidden">
-                <h1 className="text-sm font-semibold text-text tracking-tight whitespace-nowrap">
-                  AirGate
-                </h1>
-                <p className="text-[9px] text-text-tertiary font-mono tracking-[0.1em] uppercase">
-                  Control Panel
-                </p>
-              </div>
-            )}
+  const sidebarContent = (
+    <>
+      {/* Logo */}
+      <div className="flex items-center h-16 px-4 border-b border-border">
+        <div className="flex items-center gap-2.5 overflow-hidden">
+          <div className="flex items-center justify-center w-8 h-8 rounded-[10px] bg-primary-subtle flex-shrink-0">
+            <Zap className="w-4 h-4 text-primary" />
           </div>
-        </div>
-
-        {/* 导航菜单 */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
-          {sections.map((section, si) => (
-            <div key={si}>
-              {section.titleKey && !collapsed && (
-                <p className="text-[10px] font-medium text-text-tertiary uppercase tracking-[0.1em] px-2.5 mb-1.5">
-                  {t(section.titleKey)}
-                </p>
-              )}
-              {collapsed && si > 0 && (
-                <div className="h-px mx-3 mb-2 bg-border" />
-              )}
-              <div className="space-y-0.5">
-                {section.items.map((item) => {
-                  const isActive = !!matchRoute({ to: item.path, fuzzy: item.path !== '/' });
-                  const isExactDashboard = item.path === '/' && !!matchRoute({ to: '/' });
-                  const active = item.path === '/' ? isExactDashboard : isActive;
-
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className={`group flex items-center gap-2.5 rounded-md transition-all duration-150 relative ${
-                        collapsed ? 'justify-center px-0 py-2.5 mx-1' : 'px-2.5 py-[7px]'
-                      } ${
-                        active
-                          ? 'bg-primary-subtle text-primary'
-                          : 'text-text-tertiary hover:text-text-secondary hover:bg-bg-hover'
-                      }`}
-                    >
-                      {active && (
-                        <div className="absolute left-0 top-0 bottom-0 flex items-center"><div className="w-[2px] h-3.5 rounded-r-full bg-primary" /></div>
-                      )}
-                      <span className="flex-shrink-0">{item.icon}</span>
-                      {!collapsed && (
-                        <span className="text-[13px] font-medium truncate">{t(item.labelKey, { defaultValue: item.labelKey })}</span>
-                      )}
-                      {collapsed && (
-                        <div className="ag-glass-dropdown absolute left-full ml-2 px-2.5 py-1.5 rounded-lg text-xs text-text whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                          {t(item.labelKey, { defaultValue: item.labelKey })}
-                        </div>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
+          {!sidebarCollapsed && (
+            <div className="overflow-hidden">
+              <h1 className="text-sm font-semibold text-text tracking-tight whitespace-nowrap">
+                AirGate
+              </h1>
+              <p className="text-[9px] text-text-tertiary font-mono tracking-[0.1em] uppercase">
+                Control Panel
+              </p>
             </div>
-          ))}
-        </nav>
+          )}
+        </div>
+      </div>
 
-        {/* 底部折叠按钮 */}
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
+        {sections.map((section, si) => (
+          <div key={si}>
+            {section.titleKey && !sidebarCollapsed && (
+              <p className="text-[10px] font-medium text-text-tertiary uppercase tracking-[0.1em] px-2.5 mb-1.5">
+                {t(section.titleKey)}
+              </p>
+            )}
+            {sidebarCollapsed && si > 0 && (
+              <div className="h-px mx-3 mb-2 bg-border" />
+            )}
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const isActive = !!matchRoute({ to: item.path, fuzzy: item.path !== '/' });
+                const isExactDashboard = item.path === '/' && !!matchRoute({ to: '/' });
+                const active = item.path === '/' ? isExactDashboard : isActive;
+
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`group flex items-center gap-2.5 rounded-[10px] transition-all duration-150 relative ${
+                      sidebarCollapsed ? 'justify-center px-0 py-2.5 mx-1' : 'px-2.5 py-[7px]'
+                    } ${
+                      active
+                        ? 'bg-primary-subtle text-primary'
+                        : 'text-text-tertiary hover:text-text-secondary hover:bg-bg-hover'
+                    }`}
+                  >
+                    {active && (
+                      <div className="absolute left-0 top-0 bottom-0 flex items-center"><div className="w-[2px] h-3.5 rounded-r-full bg-primary" /></div>
+                    )}
+                    <span className="flex-shrink-0">{item.icon}</span>
+                    {!sidebarCollapsed && (
+                      <span className="text-[13px] font-medium truncate">{t(item.labelKey, { defaultValue: item.labelKey })}</span>
+                    )}
+                    {sidebarCollapsed && (
+                      <div className="ag-glass-dropdown absolute left-full ml-2 px-2.5 py-1.5 rounded-lg text-xs text-text whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                        {t(item.labelKey, { defaultValue: item.labelKey })}
+                      </div>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {/* Collapse toggle (desktop only) */}
+      {!isMobile && (
         <div className="border-t border-border p-2.5">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="flex items-center justify-center w-full h-7 rounded-md text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+            className="flex items-center justify-center w-full h-7 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
           >
             {collapsed ? (
               <PanelLeft className="w-3.5 h-3.5" />
@@ -221,27 +235,67 @@ export function AppShell({ children }: AppShellProps) {
             )}
           </button>
         </div>
-      </aside>
+      )}
+    </>
+  );
 
-      {/* 主内容 */}
+  return (
+    <div className="flex h-screen">
+      {/* Mobile backdrop */}
+      {isMobile && mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40"
+          onClick={() => setMobileOpen(false)}
+          style={{ animation: 'ag-fade-in 0.15s ease-out' }}
+        />
+      )}
+
+      {/* Sidebar */}
+      {isMobile ? (
+        <aside
+          className="fixed inset-y-0 left-0 z-50 flex flex-col bg-bg border-r border-border transition-transform duration-300 ease-in-out"
+          style={{ width: 'var(--ag-sidebar-width)', transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)' }}
+        >
+          {sidebarContent}
+        </aside>
+      ) : (
+        <aside
+          className="relative flex flex-col border-r border-border bg-bg transition-all duration-300 ease-in-out"
+          style={{ width: collapsed ? 'var(--ag-sidebar-collapsed)' : 'var(--ag-sidebar-width)' }}
+        >
+          {sidebarContent}
+        </aside>
+      )}
+
+      {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* 顶栏 */}
-        <header className="flex items-center justify-between h-14 px-6 border-b border-border bg-bg shrink-0">
-          <h2 className="text-sm font-semibold text-text">{pageTitle}</h2>
+        {/* Header */}
+        <header className="flex items-center justify-between h-16 px-4 md:px-6 border-b border-border bg-bg shrink-0">
+          <div className="flex items-center gap-3">
+            {isMobile && (
+              <button
+                onClick={() => setMobileOpen(true)}
+                className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text hover:bg-bg-hover transition-colors"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
+            <h2 className="text-sm font-semibold text-text">{pageTitle}</h2>
+          </div>
           <div className="flex items-center gap-1.5">
-            {/* 语言切换 */}
+            {/* Language toggle */}
             <button
               onClick={toggleLanguage}
-              className="flex items-center justify-center h-8 px-2.5 rounded-md text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors gap-1.5"
+              className="flex items-center justify-center h-8 px-2.5 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors gap-1.5"
               title={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
             >
               <Languages className="w-3.5 h-3.5" />
-              <span className="text-[10px] font-mono uppercase">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
+              <span className="text-[10px] font-mono uppercase hidden sm:inline">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
             </button>
-            {/* 主题切换 */}
+            {/* Theme toggle */}
             <button
               onClick={toggleTheme}
-              className="flex items-center justify-center w-8 h-8 rounded-md text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+              className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
               title={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
             >
               {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
@@ -249,9 +303,9 @@ export function AppShell({ children }: AppShellProps) {
 
             <div className="w-px h-5 bg-border mx-1.5" />
 
-            {/* 用户信息 */}
+            {/* User info */}
             <div className="flex items-center gap-2.5 pl-1">
-              <div className="text-right">
+              <div className="text-right hidden sm:block">
                 <p className="text-xs font-medium text-text leading-tight">
                   {user?.username || user?.email}
                 </p>
@@ -264,7 +318,7 @@ export function AppShell({ children }: AppShellProps) {
               </div>
               <button
                 onClick={logout}
-                className="flex items-center justify-center w-7 h-7 rounded-md text-text-tertiary hover:text-danger hover:bg-danger-subtle transition-all"
+                className="flex items-center justify-center w-7 h-7 rounded-[10px] text-text-tertiary hover:text-danger hover:bg-danger-subtle transition-all"
                 title={t('common.logout')}
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -274,7 +328,7 @@ export function AppShell({ children }: AppShellProps) {
         </header>
 
         <main className="flex-1 overflow-auto">
-          <div className="p-8 max-w-[1400px] mx-auto">
+          <div className="p-4 md:p-6 lg:p-8 max-w-[1400px] mx-auto">
             {children}
           </div>
         </main>

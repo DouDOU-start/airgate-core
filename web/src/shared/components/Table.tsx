@@ -72,8 +72,8 @@ export function Table<T extends Record<string, any>>({
     return styles;
   }, [columns]);
 
-  const thBaseClass = 'px-4 py-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-widest whitespace-nowrap bg-bg-elevated';
-  const tdBaseClass = 'px-4 py-3 text-sm text-text-secondary whitespace-nowrap align-middle';
+  const thBaseClass = 'px-5 py-3 text-xs font-semibold text-text-tertiary uppercase tracking-wider whitespace-nowrap bg-bg-elevated';
+  const tdBaseClass = 'px-5 py-3 text-sm text-text-secondary whitespace-nowrap align-middle';
 
   if (loading) {
     return (

@@ -19,9 +19,17 @@ const variantStyles: Record<string, string> = {
 export function Badge({ children, variant = 'default' }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${variantStyles[variant]}`}
+      className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border ${variantStyles[variant]}`}
     >
-      <span className="w-1.5 h-1.5 rounded-full mr-1.5 opacity-80" style={{ background: 'currentColor' }} />
+      {children}
+    </span>
+  );
+}
+
+/** Outlined tag for version/code/metric display */
+export function Tag({ children, className = '' }: { children: string; className?: string }) {
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold font-mono border border-glass-border text-text-secondary ${className}`}>
       {children}
     </span>
   );

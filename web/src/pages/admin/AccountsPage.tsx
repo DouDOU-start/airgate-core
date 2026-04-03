@@ -14,7 +14,6 @@ import {
   ChevronDown,
   Search,
 } from 'lucide-react';
-import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Input, Select } from '../../shared/components/Input';
 import { Table, type Column } from '../../shared/components/Table';
@@ -101,7 +100,7 @@ export default function AccountsPage() {
   const [testingAccount, setTestingAccount] = useState<AccountResp | null>(null);
 
   // 查询账号列表
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: queryKeys.accounts(page, pageSize, keyword, platformFilter, statusFilter, groupFilter, proxyFilter),
     queryFn: () =>
       accountsApi.list({
@@ -513,18 +512,6 @@ export default function AccountsPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('accounts.title')}
-        description={t('accounts.description')}
-        onRefresh={refetch}
-        refreshing={isFetching}
-        actions={
-          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
-            {t('accounts.create')}
-          </Button>
-        }
-      />
-
       {/* 筛选 */}
       <div className="flex items-end gap-3 mb-5 flex-wrap">
         <Input
@@ -535,16 +522,19 @@ export default function AccountsPage() {
           style={{ width: 200 }}
         />
         <Select
+          className="min-w-0"
           value={platformFilter}
           onChange={(e) => { setPlatformFilter(e.target.value); setPage(1); }}
           options={PLATFORM_OPTIONS}
         />
         <Select
+          className="min-w-0"
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           options={STATUS_OPTIONS}
         />
         <Select
+          className="min-w-0"
           value={groupFilter}
           onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }}
           options={[
@@ -553,6 +543,7 @@ export default function AccountsPage() {
           ]}
         />
         <Select
+          className="min-w-0"
           value={proxyFilter}
           onChange={(e) => { setProxyFilter(e.target.value); setPage(1); }}
           options={[
@@ -561,11 +552,11 @@ export default function AccountsPage() {
           ]}
         />
 
-        {/* 刷新 & 自动刷新 */}
-        <div className="flex items-center gap-1.5 ml-auto">
+        {/* 刷新 & 自动刷新 & 创建 */}
+        <div className="flex items-center gap-2 ml-auto">
           <button
             onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
-            className="flex items-center justify-center w-8 h-8 rounded-lg text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
             title={t('common.refresh')}
           >
             <RefreshCw className="w-4 h-4" />
@@ -603,6 +594,9 @@ export default function AccountsPage() {
               </div>
             )}
           </div>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
+            {t('accounts.create')}
+          </Button>
         </div>
       </div>
 

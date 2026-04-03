@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { settingsApi } from '../../shared/api/settings';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
-import { PageHeader } from '../../shared/components/PageHeader';
 import { Button } from '../../shared/components/Button';
 import { Input } from '../../shared/components/Input';
 import { Card } from '../../shared/components/Card';
@@ -85,20 +84,16 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('settings.title')}
-        description={t('settings.description')}
-        actions={
-          <Button
-            icon={<Save className="w-4 h-4" />}
-            onClick={handleSave}
-            loading={saveMutation.isPending}
-            disabled={!hasChanges}
-          >
-            {t('common.save')}
-          </Button>
-        }
-      />
+      <div className="flex justify-end mb-5">
+        <Button
+          icon={<Save className="w-4 h-4" />}
+          onClick={handleSave}
+          loading={saveMutation.isPending}
+          disabled={!hasChanges}
+        >
+          {t('common.save')}
+        </Button>
+      </div>
 
       {Object.keys(groups).length === 0 ? (
         <div className="text-center py-16 text-text-tertiary">
@@ -110,9 +105,9 @@ export default function SettingsPage() {
             <Card key={group} title={group}>
               <div className="space-y-4">
                 {items.map((setting) => (
-                  <div key={setting.key} className="flex items-center gap-4">
+                  <div key={setting.key} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                     <label
-                      className="w-52 shrink-0 text-xs font-medium text-text-secondary uppercase tracking-wider font-mono"
+                      className="sm:w-52 sm:shrink-0 text-xs font-medium text-text-secondary uppercase tracking-wider font-mono"
                     >
                       {setting.key}
                     </label>

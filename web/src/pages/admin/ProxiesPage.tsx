@@ -6,13 +6,12 @@ import { useToast } from '../../shared/components/Toast';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
-import { PageHeader } from '../../shared/components/PageHeader';
 import { Table, type Column } from '../../shared/components/Table';
 import { Button } from '../../shared/components/Button';
 import { Input, Select } from '../../shared/components/Input';
 import { Modal, ConfirmModal } from '../../shared/components/Modal';
 import { Badge, StatusBadge } from '../../shared/components/Badge';
-import { Plus, Pencil, Trash2, Zap } from 'lucide-react';
+import { Plus, Pencil, Trash2, Zap, RefreshCw } from 'lucide-react';
 import type { ProxyResp, CreateProxyReq, UpdateProxyReq } from '../../shared/types';
 
 // 代理表单数据
@@ -46,7 +45,7 @@ export default function ProxiesPage() {
   const [testingId, setTestingId] = useState<number | null>(null);
 
   // 查询代理列表
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: queryKeys.proxies(page, pageSize),
     queryFn: () => proxiesApi.list({ page, page_size: pageSize }),
   });
@@ -242,17 +241,19 @@ export default function ProxiesPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('proxies.title')}
-        description={t('proxies.description')}
-        onRefresh={refetch}
-        refreshing={isFetching}
-        actions={
+      <div className="flex justify-end mb-5">
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={() => refetch()}
+            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
           <Button icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
             {t('proxies.create')}
           </Button>
-        }
-      />
+        </div>
+      </div>
 
       <Table
         columns={columns}
