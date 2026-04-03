@@ -38,11 +38,6 @@ func (s *Server) registerRoutes() {
 		// Token 刷新
 		userGroup.POST("/auth/refresh", handlers.Auth.RefreshToken)
 
-		// TOTP 管理
-		userGroup.POST("/auth/totp/setup", handlers.Auth.TOTPSetup)
-		userGroup.POST("/auth/totp/verify", handlers.Auth.TOTPVerify)
-		userGroup.POST("/auth/totp/disable", handlers.Auth.TOTPDisable)
-
 		// 用户资料
 		userGroup.GET("/users/me", handlers.User.GetMe)
 		userGroup.PUT("/users/me", handlers.User.UpdateProfile)

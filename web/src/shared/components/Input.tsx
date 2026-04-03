@@ -7,7 +7,9 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useLayoutEffect,
 } from 'react';
+import { createPortal } from 'react-dom';
 
 /* ==================== 共享样式 ==================== */
 
@@ -140,6 +142,23 @@ export function Select({
   const [focusIdx, setFocusIdx] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0, openUp: false });
+
+  // Update dropdown position when open, flip upward if not enough space below
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const maxDropH = 240; // max-h-60 = 15rem = 240px
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUp = spaceBelow < maxDropH && rect.top > spaceBelow;
+    setDropdownPos({
+      top: openUp ? rect.top : rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+      openUp,
+    });
+  }, [open]);
 
   const selectedOption = options.find((o) => o.value === value);
   const displayLabel = selectedOption?.label ?? placeholder ?? '';
@@ -148,7 +167,11 @@ export function Select({
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        listRef.current && !listRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     }
@@ -223,6 +246,7 @@ export function Select({
       <input type="hidden" name={name} value={value ?? ''} />
       <div className="relative">
         <button
+          ref={buttonRef}
           type="button"
           id={id}
           role="combobox"
@@ -248,13 +272,20 @@ export function Select({
             <path d="m6 9 6 6 6-6" />
           </svg>
         </div>
-        {/* Dropdown panel */}
-        {open && (
+        {/* Dropdown panel — rendered via portal to avoid overflow clipping */}
+        {open && createPortal(
           <ul
             ref={listRef}
             role="listbox"
-            className="ag-glass-dropdown absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg py-1"
-            style={{ animation: 'ag-scale-in 0.15s ease-out forwards' }}
+            className="ag-glass-dropdown fixed z-[9999] max-h-60 overflow-auto rounded-lg py-1"
+            style={{
+              ...(dropdownPos.openUp
+                ? { bottom: window.innerHeight - dropdownPos.top + 4 }
+                : { top: dropdownPos.top }),
+              left: dropdownPos.left,
+              width: dropdownPos.width,
+              animation: 'ag-scale-in 0.15s ease-out forwards',
+            }}
           >
             {options.map((opt, idx) => {
               const isSelected = opt.value === value;
@@ -279,7 +310,8 @@ export function Select({
                 </li>
               );
             })}
-          </ul>
+          </ul>,
+          document.body,
         )}
       </div>
       {error && <p className="text-xs text-danger">{error}</p>}

@@ -19,7 +19,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	result, err := h.service.Login(c.Request.Context(), appauth.LoginInput{
 		Email:    req.Email,
 		Password: req.Password,
-		TOTPCode: req.TOTPCode,
 	})
 	if err != nil {
 		httpCode, message, unauthorized := h.handleLoginError(err)
@@ -72,88 +71,6 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		Token: result.Token,
 		User:  userToResp(result.User),
 	})
-}
-
-// TOTPSetup 启用 TOTP，生成密钥。
-func (h *AuthHandler) TOTPSetup(c *gin.Context) {
-	identity, ok := authIdentityFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "用户未认证")
-		return
-	}
-
-	result, err := h.service.TOTPSetup(c.Request.Context(), identity)
-	if err != nil {
-		httpCode, message := h.handleTOTPSetupError(err)
-		switch httpCode {
-		case 400:
-			response.BadRequest(c, message)
-		case 401:
-			response.Unauthorized(c, message)
-		default:
-			response.InternalError(c, message)
-		}
-		return
-	}
-
-	response.Success(c, dto.TOTPSetupResp{
-		Secret: result.Secret,
-		URI:    result.URI,
-	})
-}
-
-// TOTPVerify 验证 TOTP 验证码。
-func (h *AuthHandler) TOTPVerify(c *gin.Context) {
-	userID, ok := currentUserID(c)
-	if !ok {
-		response.Unauthorized(c, "用户未认证")
-		return
-	}
-
-	var req dto.TOTPVerifyReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BindError(c, err)
-		return
-	}
-
-	if err := h.service.TOTPVerify(c.Request.Context(), userID, req.Code); err != nil {
-		httpCode, message := h.handleTOTPVerifyError(err)
-		if httpCode == 400 {
-			response.BadRequest(c, message)
-			return
-		}
-		response.InternalError(c, message)
-		return
-	}
-
-	response.Success(c, nil)
-}
-
-// TOTPDisable 禁用 TOTP。
-func (h *AuthHandler) TOTPDisable(c *gin.Context) {
-	userID, ok := currentUserID(c)
-	if !ok {
-		response.Unauthorized(c, "用户未认证")
-		return
-	}
-
-	var req dto.TOTPVerifyReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BindError(c, err)
-		return
-	}
-
-	if err := h.service.TOTPDisable(c.Request.Context(), userID, req.Code); err != nil {
-		httpCode, message := h.handleTOTPDisableError(err)
-		if httpCode == 400 {
-			response.BadRequest(c, message)
-			return
-		}
-		response.InternalError(c, message)
-		return
-	}
-
-	response.Success(c, nil)
 }
 
 // RefreshToken 刷新 JWT Token。

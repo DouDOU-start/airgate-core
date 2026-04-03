@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -37,15 +36,6 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (LoginResult, err
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
 		return LoginResult{}, ErrInvalidCredentials
-	}
-
-	if hasTOTP(user) {
-		if input.TOTPCode == "" {
-			return LoginResult{}, ErrTOTPCodeRequired
-		}
-		if !corauth.ValidateCode(totpSecret(user), input.TOTPCode) {
-			return LoginResult{}, ErrInvalidTOTPCode
-		}
 	}
 
 	token, err := s.jwtMgr.GenerateToken(user.ID, user.Role, user.Email)
@@ -94,61 +84,6 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (LoginResul
 		Token: token,
 		User:  user,
 	}, nil
-}
-
-// TOTPSetup 生成并保存 TOTP 密钥。
-func (s *Service) TOTPSetup(ctx context.Context, identity AuthIdentity) (TOTPSetupResult, error) {
-	user, err := s.repo.FindByID(ctx, identity.UserID, false)
-	if err != nil {
-		return TOTPSetupResult{}, err
-	}
-	if hasTOTP(user) {
-		return TOTPSetupResult{}, ErrTOTPAlreadyEnabled
-	}
-
-	secret, uri, err := corauth.GenerateSecret(identity.Email)
-	if err != nil {
-		return TOTPSetupResult{}, fmt.Errorf("%w: %v", ErrGenerateTOTPSecretFailed, err)
-	}
-
-	if err := s.repo.SetTOTPSecret(ctx, identity.UserID, secret); err != nil {
-		return TOTPSetupResult{}, fmt.Errorf("%w: %v", ErrSaveTOTPSecretFailed, err)
-	}
-
-	return TOTPSetupResult{
-		Secret: secret,
-		URI:    uri,
-	}, nil
-}
-
-// TOTPVerify 验证 TOTP 验证码。
-func (s *Service) TOTPVerify(ctx context.Context, userID int, code string) error {
-	user, err := s.repo.FindByID(ctx, userID, false)
-	if err != nil {
-		return err
-	}
-	if !hasTOTP(user) {
-		return ErrTOTPNotSetup
-	}
-	if !corauth.ValidateCode(totpSecret(user), code) {
-		return ErrVerificationCodeInvalid
-	}
-	return nil
-}
-
-// TOTPDisable 禁用 TOTP。
-func (s *Service) TOTPDisable(ctx context.Context, userID int, code string) error {
-	user, err := s.repo.FindByID(ctx, userID, false)
-	if err != nil {
-		return err
-	}
-	if !hasTOTP(user) {
-		return ErrTOTPNotEnabled
-	}
-	if !corauth.ValidateCode(totpSecret(user), code) {
-		return ErrVerificationCodeInvalid
-	}
-	return s.repo.ClearTOTPSecret(ctx, userID)
 }
 
 // RefreshToken 刷新 JWT。

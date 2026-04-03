@@ -285,7 +285,6 @@ func mapUser(item *ent.User) appuser.User {
 		Balance:        item.Balance,
 		Role:           item.Role.String(),
 		MaxConcurrency: item.MaxConcurrency,
-		TOTPEnabled:    item.TotpSecret != nil && *item.TotpSecret != "",
 		GroupRates:     cloneUserGroupRates(item.GroupRates),
 		Status:         item.Status.String(),
 		CreatedAt:      item.CreatedAt,

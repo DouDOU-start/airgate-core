@@ -55,7 +55,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	accountStore := store.NewAccountStore(dep.DB)
 	accountService := appaccount.NewService(accountStore, dep.PluginMgr, dep.Concurrency)
 	groupStore := store.NewGroupStore(dep.DB)
-	groupService := appgroup.NewService(groupStore)
+	groupService := appgroup.NewService(groupStore, dep.Concurrency)
 	proxyStore := store.NewProxyStore(dep.DB)
 	proxyService := appproxy.NewService(proxyStore)
 	subscriptionStore := store.NewSubscriptionStore(dep.DB)

@@ -211,7 +211,7 @@ export default function AccountsPage() {
       render: (row) => {
         const email = row.credentials?.email;
         return (
-          <div className="flex flex-col">
+          <div className="flex flex-col items-center">
             <span style={{ color: 'var(--ag-text)' }} className="font-medium">
               {row.name}
             </span>

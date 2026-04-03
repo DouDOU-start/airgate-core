@@ -2,8 +2,10 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
+	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -207,6 +209,92 @@ func (s *GroupStore) Delete(ctx context.Context, id int) error {
 	}
 
 	return nil
+}
+
+// StatsForGroups 批量查询分组统计信息（账号数、容量、用量）。
+func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int) (map[int]appgroup.GroupStats, map[int][]appgroup.AccountCapacity, error) {
+	if len(groupIDs) == 0 {
+		return nil, nil, nil
+	}
+
+	result := make(map[int]appgroup.GroupStats, len(groupIDs))
+	activeAccounts := make(map[int][]appgroup.AccountCapacity, len(groupIDs))
+
+	// 1. 查询每个分组的账号按状态统计，同时收集活跃账号的容量
+	groups, err := s.db.Group.Query().
+		Where(entgroup.IDIn(groupIDs...)).
+		WithAccounts(func(q *ent.AccountQuery) {
+			q.Select(entaccount.FieldStatus, entaccount.FieldMaxConcurrency)
+		}).
+		All(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, g := range groups {
+		stats := appgroup.GroupStats{}
+		for _, a := range g.Edges.Accounts {
+			switch a.Status {
+			case entaccount.StatusActive:
+				stats.AccountActive++
+				stats.CapacityTotal += a.MaxConcurrency
+				activeAccounts[g.ID] = append(activeAccounts[g.ID], appgroup.AccountCapacity{
+					AccountID:      a.ID,
+					MaxConcurrency: a.MaxConcurrency,
+				})
+			case entaccount.StatusError:
+				stats.AccountError++
+			case entaccount.StatusDisabled:
+				stats.AccountDisabled++
+			}
+			stats.AccountTotal++
+		}
+		result[g.ID] = stats
+	}
+
+	// 2. 查询每个分组的总用量
+	var totalRows []struct {
+		GroupID   int     `json:"group_usage_logs"`
+		TotalCost float64 `json:"total_cost"`
+	}
+	err = s.db.UsageLog.Query().
+		Where(entusagelog.HasGroupWith(entgroup.IDIn(groupIDs...))).
+		GroupBy("group_usage_logs").
+		Aggregate(ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost")).
+		Scan(ctx, &totalRows)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, row := range totalRows {
+		stats := result[row.GroupID]
+		stats.TotalCost = row.TotalCost
+		result[row.GroupID] = stats
+	}
+
+	// 3. 查询每个分组的今日用量
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	var todayRows []struct {
+		GroupID   int     `json:"group_usage_logs"`
+		TotalCost float64 `json:"total_cost"`
+	}
+	err = s.db.UsageLog.Query().
+		Where(
+			entusagelog.HasGroupWith(entgroup.IDIn(groupIDs...)),
+			entusagelog.CreatedAtGTE(todayStart),
+		).
+		GroupBy("group_usage_logs").
+		Aggregate(ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost")).
+		Scan(ctx, &todayRows)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, row := range todayRows {
+		stats := result[row.GroupID]
+		stats.TodayCost = row.TotalCost
+		result[row.GroupID] = stats
+	}
+
+	return result, activeAccounts, nil
 }
 
 func applyGroupListFilters(query *ent.GroupQuery, keyword, platform, serviceTier string) *ent.GroupQuery {

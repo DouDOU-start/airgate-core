@@ -14,7 +14,6 @@ func userToResp(user appauth.User) dto.UserResp {
 		Balance:        user.Balance,
 		Role:           user.Role,
 		MaxConcurrency: user.MaxConcurrency,
-		TOTPEnabled:    user.TOTPSecret != nil && *user.TOTPSecret != "",
 		GroupRates:     user.GroupRates,
 		AllowedGroupIDs: append([]int64(nil),
 			user.AllowedGroupIDs...),

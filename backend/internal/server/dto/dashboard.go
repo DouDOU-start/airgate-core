@@ -20,12 +20,14 @@ type DashboardStatsResp struct {
 	NewUsersToday int64 `json:"new_users_today"`
 
 	// 今日 Token
-	TodayTokens int64   `json:"today_tokens"`
-	TodayCost   float64 `json:"today_cost"`
+	TodayTokens       int64   `json:"today_tokens"`
+	TodayCost         float64 `json:"today_cost"`
+	TodayStandardCost float64 `json:"today_standard_cost"`
 
 	// 总 Token
-	AllTimeTokens int64   `json:"alltime_tokens"` //nolint:misspell
-	AllTimeCost   float64 `json:"alltime_cost"`   //nolint:misspell
+	AllTimeTokens       int64   `json:"alltime_tokens"`        //nolint:misspell
+	AllTimeCost         float64 `json:"alltime_cost"`          //nolint:misspell
+	AllTimeStandardCost float64 `json:"alltime_standard_cost"` //nolint:misspell
 
 	// 性能指标
 	RPM           float64 `json:"rpm"`
@@ -34,12 +36,18 @@ type DashboardStatsResp struct {
 	ActiveUsers   int64   `json:"active_users"`
 }
 
+// DashboardStatsReq 仪表盘统计查询参数
+type DashboardStatsReq struct {
+	UserID int `form:"user_id"`
+}
+
 // DashboardTrendReq 仪表盘趋势查询参数
 type DashboardTrendReq struct {
 	Range       string `form:"range" binding:"required,oneof=today 7d 30d 90d custom"`
 	Granularity string `form:"granularity" binding:"required,oneof=hour day"`
 	StartDate   string `form:"start_date"`
 	EndDate     string `form:"end_date"`
+	UserID      int    `form:"user_id"`
 }
 
 // DashboardTrendResp 仪表盘趋势响应

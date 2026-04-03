@@ -6,7 +6,6 @@ import {
   Pencil,
   Layers,
   ArrowUpDown,
-  Lock,
   Trash2,
 } from 'lucide-react';
 import { PageHeader } from '../../shared/components/PageHeader';
@@ -33,16 +32,9 @@ export default function GroupsPage() {
     { value: '', label: t('groups.all_platforms') },
     ...platforms.map((p) => ({ value: p, label: platformName(p) })),
   ];
-  const SERVICE_TIER_OPTIONS = [
-    { value: '', label: t('groups.service_tier_all') },
-    { value: 'fast', label: 'fast' },
-    { value: 'flex', label: 'flex' },
-  ];
-
   // 筛选状态
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE);
   const [platformFilter, setPlatformFilter] = useState('');
-  const [serviceTierFilter, setServiceTierFilter] = useState('');
 
   // 弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -51,13 +43,12 @@ export default function GroupsPage() {
 
   // 查询分组列表
   const { data, isLoading } = useQuery({
-    queryKey: queryKeys.groups(page, pageSize, platformFilter, serviceTierFilter),
+    queryKey: queryKeys.groups(page, pageSize, platformFilter),
     queryFn: () =>
       groupsApi.list({
         page,
         page_size: pageSize,
         platform: platformFilter || undefined,
-        service_tier: (serviceTierFilter || undefined) as 'fast' | 'flex' | undefined,
       }),
   });
 
@@ -90,18 +81,11 @@ export default function GroupsPage() {
     },
   });
 
+  // 格式化费用
+  const formatCost = (v: number) => `$${v.toFixed(2)}`;
+
   // 表格列定义
   const columns: Column<GroupResp>[] = [
-    {
-      key: 'id',
-      title: t('common.id'),
-      width: '60px',
-      render: (row) => (
-        <span className="font-mono">
-          {row.id}
-        </span>
-      ),
-    },
     {
       key: 'name',
       title: t('common.name'),
@@ -144,29 +128,75 @@ export default function GroupsPage() {
       ),
     },
     {
-      key: 'service_tier',
-      title: t('groups.service_tier'),
-      width: '100px',
-      render: (row) => row.service_tier ? <Badge variant="info">{row.service_tier}</Badge> : <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.service_tier_default')}</span>,
-    },
-    {
       key: 'is_exclusive',
-      title: t('groups.exclusive'),
+      title: t('groups.group_type'),
       width: '80px',
       render: (row) =>
         row.is_exclusive ? (
-          <span className="inline-flex items-center gap-1" style={{ color: 'var(--ag-warning)' }}>
-            <Lock className="w-3.5 h-3.5" />
-            {t('common.yes')}
-          </span>
+          <Badge variant="warning">{t('groups.type_exclusive')}</Badge>
         ) : (
-          <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('common.no')}</span>
+          <Badge variant="default">{t('groups.type_public')}</Badge>
         ),
+    },
+    {
+      key: 'account_stats',
+      title: t('groups.account_stats'),
+      width: '160px',
+      render: (row) => (
+        <div className="text-xs leading-relaxed">
+          <div>
+            <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.account_available')}: </span>
+            <span className="font-mono" style={{ color: 'var(--ag-success)' }}>{row.account_active}</span>
+          </div>
+          {row.account_error > 0 && (
+            <div>
+              <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.account_error')}: </span>
+              <span className="font-mono" style={{ color: 'var(--ag-danger)' }}>{row.account_error}</span>
+            </div>
+          )}
+          <div>
+            <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.account_total')}: </span>
+            <span className="font-mono">{row.account_total}</span>
+            <span style={{ color: 'var(--ag-text-tertiary)' }}> {t('groups.account_unit')}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'usage',
+      title: t('groups.usage'),
+      width: '140px',
+      render: (row) => (
+        <div className="text-xs leading-relaxed">
+          <div>
+            <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.today_cost')} </span>
+            <span className="font-mono" style={{ color: 'var(--ag-primary)' }}>{formatCost(row.today_cost)}</span>
+          </div>
+          <div>
+            <span style={{ color: 'var(--ag-text-tertiary)' }}>{t('groups.total_cost')} </span>
+            <span className="font-mono">{formatCost(row.total_cost)}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'capacity',
+      title: t('groups.capacity'),
+      width: '120px',
+      render: (row) => (
+        <div>
+          <span className="font-mono" style={{ color: row.capacity_used > 0 ? 'var(--ag-primary)' : undefined }}>
+            {row.capacity_used}
+          </span>
+          <span style={{ color: 'var(--ag-text-tertiary)' }}> / </span>
+          <span className="font-mono">{row.capacity_total}</span>
+        </div>
+      ),
     },
     {
       key: 'sort_weight',
       title: t('groups.sort_weight'),
-      width: '100px',
+      width: '80px',
       render: (row) => (
         <span className="inline-flex items-center gap-1 font-mono">
           <ArrowUpDown className="w-3 h-3" style={{ color: 'var(--ag-text-tertiary)' }} />
@@ -223,15 +253,6 @@ export default function GroupsPage() {
           }}
           options={PLATFORM_OPTIONS}
           label={t('groups.platform')}
-        />
-        <Select
-          value={serviceTierFilter}
-          onChange={(e) => {
-            setServiceTierFilter(e.target.value);
-            setPage(1);
-          }}
-          options={SERVICE_TIER_OPTIONS}
-          label={t('groups.service_tier')}
         />
       </div>
 

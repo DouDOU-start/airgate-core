@@ -4,10 +4,11 @@ import { EmptyState } from './EmptyState';
 
 export interface Column<T> {
   key: string;
-  title: string;
+  title: ReactNode;
   render?: (row: T) => ReactNode;
   width?: string;
   fixed?: 'left' | 'right';
+  align?: 'left' | 'center' | 'right';
 }
 
 export interface TableProps<T> {
@@ -71,8 +72,8 @@ export function Table<T extends Record<string, any>>({
     return styles;
   }, [columns]);
 
-  const thClass = 'px-4 py-3 text-center text-[10px] font-semibold text-text-tertiary uppercase tracking-widest whitespace-nowrap bg-bg-elevated';
-  const tdClass = 'px-4 py-3 text-sm text-text-secondary whitespace-nowrap align-middle';
+  const thBaseClass = 'px-4 py-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-widest whitespace-nowrap bg-bg-elevated';
+  const tdBaseClass = 'px-4 py-3 text-sm text-text-secondary whitespace-nowrap align-middle';
 
   if (loading) {
     return (
@@ -110,15 +111,19 @@ export function Table<T extends Record<string, any>>({
   const theadRow = (
     <thead className="bg-bg-elevated" style={{ boxShadow: '0 1px 0 var(--ag-border)' }}>
       <tr>
-        {columns.map((col) => (
-          <th
-            key={col.key}
-            className={thClass}
-            style={fixedStyles[col.key] ? { ...fixedStyles[col.key], zIndex: 2 } : undefined}
-          >
-            {col.title}
-          </th>
-        ))}
+        {columns.map((col) => {
+          const align = col.align || 'center';
+          const textAlign = align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center';
+          return (
+            <th
+              key={col.key}
+              className={`${thBaseClass} ${textAlign}`}
+              style={fixedStyles[col.key] ? { ...fixedStyles[col.key], zIndex: 2 } : undefined}
+            >
+              {col.title}
+            </th>
+          );
+        })}
       </tr>
     </thead>
   );
@@ -130,13 +135,17 @@ export function Table<T extends Record<string, any>>({
           key={rowKey ? rowKey(row) : i}
           className="border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover"
         >
-          {columns.map((col) => (
-            <td key={col.key} className={tdClass} style={fixedStyles[col.key]}>
-              <div className="flex items-center justify-center">
-                {col.render ? col.render(row) : String(row[col.key] ?? '')}
-              </div>
-            </td>
-          ))}
+          {columns.map((col) => {
+            const align = col.align || 'center';
+            const justify = align === 'left' ? 'justify-start' : align === 'right' ? 'justify-end' : 'justify-center';
+            return (
+              <td key={col.key} className={tdBaseClass} style={fixedStyles[col.key]}>
+                <div className={`flex items-center ${justify}`}>
+                  {col.render ? col.render(row) : String(row[col.key] ?? '')}
+                </div>
+              </td>
+            );
+          })}
         </tr>
       ))}
     </tbody>
@@ -146,7 +155,7 @@ export function Table<T extends Record<string, any>>({
     <div className="space-y-4">
       {autoHeight ? (
         <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl overflow-x-auto">
-          <table className="w-full min-w-max">
+          <table className="w-full min-w-max" style={{ tableLayout: 'fixed' }}>
             {colGroup}
             {theadRow}
             {tbody}
@@ -156,14 +165,14 @@ export function Table<T extends Record<string, any>>({
         <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl overflow-hidden flex flex-col" style={{ height: '494px' }}>
           {/* 固定表头 —— 不参与垂直滚动 */}
           <div ref={headerRef} className="shrink-0 overflow-hidden">
-            <table className="w-full min-w-max">
+            <table className="w-full min-w-max" style={{ tableLayout: 'fixed' }}>
               {colGroup}
               {theadRow}
             </table>
           </div>
           {/* 数据体 —— 独立滚动，滚动条只出现在此区域 */}
           <div ref={bodyRef} className="flex-1 overflow-auto" onScroll={handleBodyScroll}>
-            <table className="w-full min-w-max">
+            <table className="w-full min-w-max" style={{ tableLayout: 'fixed' }}>
               {colGroup}
               {tbody}
             </table>

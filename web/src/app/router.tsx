@@ -7,11 +7,13 @@ import {
 } from '@tanstack/react-router';
 import { Suspense, lazy } from 'react';
 import { AppShell } from './layout/AppShell';
+import { useAuth } from './providers/AuthProvider';
 import { ErrorBoundary } from './providers/ErrorBoundary';
 import { getToken } from '../shared/api/client';
 import { usersApi } from '../shared/api/users';
 import { setupApi } from '../shared/api/setup';
 import DashboardPage from '../pages/DashboardPage';
+import UserOverviewPage from '../pages/user/UserOverviewPage';
 import UsersPage from '../pages/admin/UsersPage';
 import AccountsPage from '../pages/admin/AccountsPage';
 import GroupsPage from '../pages/admin/GroupsPage';
@@ -116,8 +118,13 @@ const authLayout = createRoute({
   ),
 });
 
-// 仪表盘
-const dashboardRoute = createRoute({ getParentRoute: () => authLayout, path: '/', component: DashboardPage });
+// 首页：管理员看仪表盘，普通用户看个人概览
+function HomePage() {
+  const { user } = useAuth();
+  if (!user) return null;
+  return user.role === 'admin' ? <DashboardPage /> : <UserOverviewPage />;
+}
+const dashboardRoute = createRoute({ getParentRoute: () => authLayout, path: '/', component: HomePage });
 
 // 管理员布局（需要 admin 角色）
 const adminLayout = createRoute({

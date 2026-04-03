@@ -16,7 +16,8 @@ func (h *GroupHandler) ListGroups(c *gin.Context) {
 		return
 	}
 
-	result, err := h.service.List(c.Request.Context(), appgroup.ListFilter{
+	ctx := c.Request.Context()
+	result, err := h.service.List(ctx, appgroup.ListFilter{
 		Page:        page.Page,
 		PageSize:    page.PageSize,
 		Keyword:     page.Keyword,
@@ -29,9 +30,27 @@ func (h *GroupHandler) ListGroups(c *gin.Context) {
 		return
 	}
 
+	// 批量查询分组统计
+	groupIDs := make([]int, 0, len(result.List))
+	for _, item := range result.List {
+		groupIDs = append(groupIDs, item.ID)
+	}
+	statsMap, _ := h.service.StatsForGroups(ctx, groupIDs)
+
 	list := make([]dto.GroupResp, 0, len(result.List))
 	for _, item := range result.List {
-		list = append(list, toGroupRespFromDomain(item))
+		resp := toGroupRespFromDomain(item)
+		if stats, ok := statsMap[item.ID]; ok {
+			resp.AccountActive = stats.AccountActive
+			resp.AccountError = stats.AccountError
+			resp.AccountDisabled = stats.AccountDisabled
+			resp.AccountTotal = stats.AccountTotal
+			resp.CapacityUsed = stats.CapacityUsed
+			resp.CapacityTotal = stats.CapacityTotal
+			resp.TodayCost = stats.TodayCost
+			resp.TotalCost = stats.TotalCost
+		}
+		list = append(list, resp)
 	}
 
 	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))

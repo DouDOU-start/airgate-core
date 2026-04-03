@@ -27,10 +27,6 @@ func (h *AuthHandler) handleLoginError(err error) (int, string, bool) {
 		return 401, err.Error(), true
 	case errors.Is(err, appauth.ErrUserDisabled):
 		return 403, err.Error(), true
-	case errors.Is(err, appauth.ErrTOTPCodeRequired):
-		return 400, err.Error(), true
-	case errors.Is(err, appauth.ErrInvalidTOTPCode):
-		return 401, err.Error(), true
 	default:
 		slog.Error("登录失败", "error", err)
 		return 500, "登录失败", false
@@ -44,48 +40,6 @@ func (h *AuthHandler) handleRegisterError(err error) (int, string) {
 	default:
 		slog.Error("注册失败", "error", err)
 		return 500, "注册失败"
-	}
-}
-
-func (h *AuthHandler) handleTOTPSetupError(err error) (int, string) {
-	switch {
-	case errors.Is(err, appauth.ErrTOTPAlreadyEnabled):
-		return 400, err.Error()
-	case errors.Is(err, appauth.ErrGenerateTOTPSecretFailed):
-		return 500, appauth.ErrGenerateTOTPSecretFailed.Error()
-	case errors.Is(err, appauth.ErrSaveTOTPSecretFailed):
-		return 500, appauth.ErrSaveTOTPSecretFailed.Error()
-	case appauth.IsUserMissing(err):
-		return 500, "获取用户信息失败"
-	default:
-		slog.Error("启用 TOTP 失败", "error", err)
-		return 500, "保存 TOTP 密钥失败"
-	}
-}
-
-func (h *AuthHandler) handleTOTPVerifyError(err error) (int, string) {
-	switch {
-	case errors.Is(err, appauth.ErrTOTPNotSetup),
-		errors.Is(err, appauth.ErrVerificationCodeInvalid):
-		return 400, err.Error()
-	case appauth.IsUserMissing(err):
-		return 500, "获取用户信息失败"
-	default:
-		slog.Error("TOTP 验证失败", "error", err)
-		return 500, "获取用户信息失败"
-	}
-}
-
-func (h *AuthHandler) handleTOTPDisableError(err error) (int, string) {
-	switch {
-	case errors.Is(err, appauth.ErrTOTPNotEnabled),
-		errors.Is(err, appauth.ErrVerificationCodeInvalid):
-		return 400, err.Error()
-	case appauth.IsUserMissing(err):
-		return 500, "获取用户信息失败"
-	default:
-		slog.Error("禁用 TOTP 失败", "error", err)
-		return 500, "禁用 TOTP 失败"
 	}
 }
 

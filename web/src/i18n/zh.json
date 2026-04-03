@@ -58,7 +58,8 @@
     "more": "更多",
     "user": "用户",
     "network_error": "无法连接到服务器，请检查网络或服务是否正常",
-    "server_error": "服务端响应异常 (HTTP {{status}})"
+    "server_error": "服务端响应异常 (HTTP {{status}})",
+    "view_all": "查看全部"
   },
 
   "status": {
@@ -107,9 +108,6 @@
     "password_hint": "至少 8 个字符",
     "confirm_placeholder": "再次输入密码",
     "username_placeholder": "可选",
-    "totp_label": "两步验证码",
-    "totp_placeholder": "6 位验证码",
-    "totp_required": "请输入两步验证码",
     "login_failed": "登录失败，请稍后重试",
     "register_failed": "注册失败，请稍后重试",
     "register_success": "注册成功！请使用邮箱和密码登录。",
@@ -167,7 +165,9 @@
     "cached_input": "Cached Input",
     "top_users": "最近使用 (Top 12)",
     "email": "邮箱",
-    "cost": "费用"
+    "cost": "费用",
+    "all_users": "全部用户",
+    "filter_user": "筛选用户"
   },
 
   "user_overview": {
@@ -175,16 +175,13 @@
     "description": "查看你的账户状态、使用情况、密钥与订阅信息",
     "balance": "账户余额",
     "max_concurrency": "最大并发",
-    "totp_status": "两步验证",
     "active_subscriptions": "活跃订阅",
     "recent_usage": "最近使用记录",
     "my_keys": "我的密钥",
     "enabled_keys": "{{count}} 个启用中",
     "recent_usage_empty": "暂无使用记录",
     "subscriptions_empty": "暂无活跃订阅",
-    "keys_empty": "暂无 API 密钥",
-    "totp_enabled": "已启用",
-    "totp_disabled": "未启用"
+    "keys_empty": "暂无 API 密钥"
   },
 
   "users": {
@@ -361,6 +358,9 @@
     "service_tier_default": "默认",
     "exclusive": "专属",
     "exclusive_hint": "专属分组（仅分配了该分组的用户可用）",
+    "group_type": "类型",
+    "type_exclusive": "专属",
+    "type_public": "公开",
     "subscription_type": "订阅类型",
     "type_standard": "标准",
     "type_subscription": "订阅制",
@@ -375,7 +375,17 @@
     "update_success": "分组更新成功",
     "delete_title": "删除分组",
     "delete_confirm": "确定要删除分组「{{name}}」吗？删除后将自动解绑已绑定的 API 密钥，保留已有使用记录；若该分组仍存在用户订阅，则无法删除。",
-    "delete_success": "分组删除成功"
+    "delete_success": "分组删除成功",
+    "account_stats": "账号数",
+    "account_available": "可用",
+    "account_error": "异常",
+    "account_disabled": "禁用",
+    "account_total": "总量",
+    "account_unit": "个账号",
+    "capacity": "容量",
+    "usage": "用量",
+    "today_cost": "今日",
+    "total_cost": "累计"
   },
 
   "api_keys": {
@@ -577,26 +587,12 @@
     "new_password_placeholder": "输入新密码（至少6个字符）",
     "confirm_new_password": "确认新密码",
     "confirm_placeholder": "再次输入新密码",
-    "totp_title": "双因素认证 (TOTP)",
-    "totp_enabled": "已启用",
-    "totp_enabled_desc": "双因素认证已开启",
-    "totp_code": "验证码",
-    "totp_code_placeholder": "输入 TOTP 验证码以禁用",
-    "totp_disable": "禁用双因素认证",
-    "totp_enable_desc": "启用双因素认证可以增强账户安全性。您需要使用 Google Authenticator 或类似的应用扫描二维码。",
-    "totp_enable": "启用双因素认证",
-    "totp_scan_uri": "请使用认证器应用扫描以下 URI 或手动添加：",
-    "totp_verify_code": "验证码",
-    "totp_verify_placeholder": "输入6位验证码确认绑定",
-    "totp_verify_enable": "验证并启用",
     "username_empty": "用户名不能为空",
     "password_incomplete": "请填写完整密码信息",
     "password_mismatch": "两次输入的新密码不一致",
     "password_too_short": "新密码至少6个字符",
     "username_updated": "用户名已更新",
-    "password_changed": "密码已修改",
-    "totp_enabled_success": "双因素认证已启用",
-    "totp_disabled_success": "双因素认证已禁用"
+    "password_changed": "密码已修改"
   },
 
   "user_keys": {

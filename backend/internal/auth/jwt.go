@@ -1,4 +1,4 @@
-// Package auth 提供认证相关功能（JWT、API Key、TOTP）
+// Package auth 提供认证相关功能（JWT、API Key）
 package auth
 
 import (

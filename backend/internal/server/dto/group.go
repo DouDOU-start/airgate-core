@@ -12,6 +12,17 @@ type GroupResp struct {
 	ModelRouting     map[string][]int64     `json:"model_routing,omitempty"`
 	ServiceTier      string                 `json:"service_tier,omitempty"`
 	SortWeight       int                    `json:"sort_weight"`
+
+	// 统计字段（仅管理员列表返回）
+	AccountActive   int     `json:"account_active"`
+	AccountError    int     `json:"account_error"`
+	AccountDisabled int     `json:"account_disabled"`
+	AccountTotal    int     `json:"account_total"`
+	CapacityUsed    int     `json:"capacity_used"`
+	CapacityTotal   int     `json:"capacity_total"`
+	TodayCost       float64 `json:"today_cost"`
+	TotalCost       float64 `json:"total_cost"`
+
 	TimeMixin
 }
 

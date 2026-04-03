@@ -18,7 +18,7 @@ func TestStatsComputesDerivedMetrics(t *testing.T) {
 		},
 	})
 
-	result, err := service.Stats(t.Context())
+	result, err := service.Stats(t.Context(), 0)
 	if err != nil {
 		t.Fatalf("Stats() returned error: %v", err)
 	}
@@ -116,14 +116,14 @@ type dashboardStubRepository struct {
 	listTrendLogs     func(context.Context, time.Time, time.Time) ([]TrendLog, error)
 }
 
-func (s dashboardStubRepository) LoadStatsSnapshot(ctx context.Context, todayStart, fiveMinAgo time.Time) (StatsSnapshot, error) {
+func (s dashboardStubRepository) LoadStatsSnapshot(ctx context.Context, todayStart, fiveMinAgo time.Time, _ int) (StatsSnapshot, error) {
 	if s.loadStatsSnapshot == nil {
 		return StatsSnapshot{}, nil
 	}
 	return s.loadStatsSnapshot(ctx, todayStart, fiveMinAgo)
 }
 
-func (s dashboardStubRepository) ListTrendLogs(ctx context.Context, startTime, endTime time.Time) ([]TrendLog, error) {
+func (s dashboardStubRepository) ListTrendLogs(ctx context.Context, startTime, endTime time.Time, _ int) ([]TrendLog, error) {
 	if s.listTrendLogs == nil {
 		return nil, nil
 	}

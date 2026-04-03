@@ -338,3 +338,9 @@ body {
 [data-theme="light"] .ag-breathe {
   animation: ag-breathe 4s ease-in-out infinite;
 }
+
+/* ── 原生 select/option 主题适配 ── */
+select option {
+  background: var(--ag-bg-elevated);
+  color: var(--ag-text);
+}

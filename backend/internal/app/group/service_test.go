@@ -13,7 +13,7 @@ func TestListNormalizesPagination(t *testing.T) {
 			captured = filter
 			return nil, 0, nil
 		},
-	})
+	}, stubConcurrencyReader{})
 
 	result, err := service.List(t.Context(), ListFilter{})
 	if err != nil {
@@ -35,7 +35,7 @@ func TestCreateClonesMutableFields(t *testing.T) {
 			captured = input
 			return Group{ID: 1}, nil
 		},
-	})
+	}, stubConcurrencyReader{})
 
 	quotas := map[string]any{"day": float64(100)}
 	routing := map[string][]int64{"gpt-*": {1, 2}}
@@ -62,13 +62,20 @@ func TestCreateClonesMutableFields(t *testing.T) {
 	}
 }
 
+type stubConcurrencyReader struct{}
+
+func (stubConcurrencyReader) GetCurrentCounts(_ context.Context, _ []int) map[int]int {
+	return nil
+}
+
 type groupStubRepository struct {
-	list          func(context.Context, ListFilter) ([]Group, int64, error)
-	listAvailable func(context.Context, AvailableFilter) ([]Group, int64, error)
-	findByID      func(context.Context, int) (Group, error)
-	create        func(context.Context, CreateInput) (Group, error)
-	update        func(context.Context, int, UpdateInput) (Group, error)
-	delete        func(context.Context, int) error
+	list           func(context.Context, ListFilter) ([]Group, int64, error)
+	listAvailable  func(context.Context, AvailableFilter) ([]Group, int64, error)
+	findByID       func(context.Context, int) (Group, error)
+	create         func(context.Context, CreateInput) (Group, error)
+	update         func(context.Context, int, UpdateInput) (Group, error)
+	delete         func(context.Context, int) error
+	statsForGroups func(context.Context, []int) (map[int]GroupStats, map[int][]AccountCapacity, error)
 }
 
 func (s groupStubRepository) List(ctx context.Context, filter ListFilter) ([]Group, int64, error) {
@@ -111,4 +118,11 @@ func (s groupStubRepository) Delete(ctx context.Context, id int) error {
 		return nil
 	}
 	return s.delete(ctx, id)
+}
+
+func (s groupStubRepository) StatsForGroups(ctx context.Context, groupIDs []int) (map[int]GroupStats, map[int][]AccountCapacity, error) {
+	if s.statsForGroups == nil {
+		return nil, nil, nil
+	}
+	return s.statsForGroups(ctx, groupIDs)
 }

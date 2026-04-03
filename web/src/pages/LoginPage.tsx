@@ -6,7 +6,7 @@ import { Input } from '../shared/components/Input';
 import { useAuth } from '../app/providers/AuthProvider';
 import { authApi } from '../shared/api/auth';
 import { ApiError } from '../shared/api/client';
-import { Mail, Lock, User, Zap, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, User, Zap } from 'lucide-react';
 
 type TabKey = 'login' | 'register';
 
@@ -19,8 +19,6 @@ function LoginForm() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [totpCode, setTotpCode] = useState('');
-  const [needsTotp, setNeedsTotp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -33,18 +31,12 @@ function LoginForm() {
       const resp = await authApi.login({
         email,
         password,
-        totp_code: needsTotp ? totpCode : undefined,
       });
       login(resp.token, resp.user);
       navigate({ to: '/' });
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.message.toLowerCase().includes('totp') || err.code === 40102) {
-          setNeedsTotp(true);
-          setError(t('auth.totp_required'));
-        } else {
-          setError(err.message);
-        }
+        setError(err.message);
       } else {
         setError(t('auth.login_failed'));
       }
@@ -74,18 +66,6 @@ function LoginForm() {
         icon={<Lock className="w-4 h-4" />}
         required
       />
-      {needsTotp && (
-        <Input
-          label={t('auth.totp_label')}
-          value={totpCode}
-          onChange={(e) => setTotpCode(e.target.value)}
-          placeholder={t('auth.totp_placeholder')}
-          icon={<ShieldCheck className="w-4 h-4" />}
-          maxLength={6}
-          autoFocus
-          required
-        />
-      )}
       {error && (
         <div className="rounded-md bg-danger-subtle border border-danger/20 px-4 py-3 text-sm text-danger">
           {error}

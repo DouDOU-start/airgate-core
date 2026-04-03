@@ -20,34 +20,36 @@ func NewService(repo Repository) *Service {
 	}
 }
 
-// Stats 查询仪表盘统计。
-func (s *Service) Stats(ctx context.Context) (Stats, error) {
+// Stats 查询仪表盘统计。userID 为 0 表示查全部。
+func (s *Service) Stats(ctx context.Context, userID int) (Stats, error) {
 	now := s.now()
 	todayStart := now.Truncate(24 * time.Hour)
 	fiveMinAgo := now.Add(-5 * time.Minute)
 
-	snapshot, err := s.repo.LoadStatsSnapshot(ctx, todayStart, fiveMinAgo)
+	snapshot, err := s.repo.LoadStatsSnapshot(ctx, todayStart, fiveMinAgo, userID)
 	if err != nil {
 		return Stats{}, err
 	}
 
 	result := Stats{
-		TotalAPIKeys:    snapshot.TotalAPIKeys,
-		EnabledAPIKeys:  snapshot.EnabledAPIKeys,
-		TotalAccounts:   snapshot.TotalAccounts,
-		EnabledAccounts: snapshot.EnabledAccounts,
-		ErrorAccounts:   snapshot.ErrorAccounts,
-		TodayRequests:   snapshot.TodayRequests,
-		AllTimeRequests: snapshot.AllTimeRequests,
-		TotalUsers:      snapshot.TotalUsers,
-		NewUsersToday:   snapshot.NewUsersToday,
-		TodayTokens:     snapshot.TodayTokens,
-		TodayCost:       snapshot.TodayCost,
-		AllTimeTokens:   snapshot.AllTimeTokens,
-		AllTimeCost:     snapshot.AllTimeCost,
-		ActiveUsers:     snapshot.ActiveUsers,
-		RPM:             float64(snapshot.RecentRequests) / 5.0,
-		TPM:             float64(snapshot.RecentTokens) / 5.0,
+		TotalAPIKeys:        snapshot.TotalAPIKeys,
+		EnabledAPIKeys:      snapshot.EnabledAPIKeys,
+		TotalAccounts:       snapshot.TotalAccounts,
+		EnabledAccounts:     snapshot.EnabledAccounts,
+		ErrorAccounts:       snapshot.ErrorAccounts,
+		TodayRequests:       snapshot.TodayRequests,
+		AllTimeRequests:     snapshot.AllTimeRequests,
+		TotalUsers:          snapshot.TotalUsers,
+		NewUsersToday:       snapshot.NewUsersToday,
+		TodayTokens:         snapshot.TodayTokens,
+		TodayCost:           snapshot.TodayCost,
+		TodayStandardCost:   snapshot.TodayStandardCost,
+		AllTimeTokens:       snapshot.AllTimeTokens,
+		AllTimeCost:         snapshot.AllTimeCost,
+		AllTimeStandardCost: snapshot.AllTimeStandardCost,
+		ActiveUsers:         snapshot.ActiveUsers,
+		RPM:                 float64(snapshot.RecentRequests) / 5.0,
+		TPM:                 float64(snapshot.RecentTokens) / 5.0,
 	}
 	if snapshot.TodayRequests > 0 {
 		result.AvgDurationMs = float64(snapshot.TodayDurationMs) / float64(snapshot.TodayRequests)
@@ -59,7 +61,7 @@ func (s *Service) Stats(ctx context.Context) (Stats, error) {
 // Trend 查询仪表盘趋势。
 func (s *Service) Trend(ctx context.Context, query TrendQuery) (Trend, error) {
 	startTime, endTime := resolveTrendTimeRange(query, s.now())
-	logs, err := s.repo.ListTrendLogs(ctx, startTime, endTime)
+	logs, err := s.repo.ListTrendLogs(ctx, startTime, endTime, query.UserID)
 	if err != nil {
 		return Trend{}, err
 	}

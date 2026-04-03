@@ -92,8 +92,12 @@ export function AppShell({ children }: AppShellProps) {
 
   const isAdmin = user?.role === 'admin';
   const pluginMenuItems = usePluginMenuItems();
+  // 管理员：排除"个人概览"（与仪表盘路径重复），保留其余个人页面，并把分区标题移到首项
+  const adminUserItems = userMenuItems
+    .filter((item) => item.path !== '/')
+    .map((item, i) => (i === 0 ? { ...item, sectionKey: 'nav.personal' } : item));
   const menuItems = isAdmin
-    ? [...adminMenuItems, ...pluginMenuItems, ...userMenuItems]
+    ? [...adminMenuItems, ...pluginMenuItems, ...adminUserItems]
     : [...userMenuItems, ...pluginMenuItems];
 
   const sections: Array<{ titleKey?: string; items: MenuItem[] }> = [];

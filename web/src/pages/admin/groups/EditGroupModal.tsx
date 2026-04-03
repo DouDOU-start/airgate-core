@@ -50,7 +50,6 @@ export function GroupFormModal({
     rate_multiplier: group?.rate_multiplier ?? 1,
     is_exclusive: group?.is_exclusive ?? false,
     subscription_type: group?.subscription_type ?? 'standard' as const,
-    service_tier: group?.service_tier ?? undefined as 'fast' | 'flex' | undefined,
     sort_weight: group?.sort_weight ?? 0,
   });
 
@@ -117,22 +116,6 @@ export function GroupFormModal({
           onChange={(e) =>
             setForm({ ...form, rate_multiplier: Number(e.target.value) })
           }
-        />
-
-        <Select
-          label={t('groups.service_tier')}
-          value={form.service_tier ?? ''}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              service_tier: (e.target.value || undefined) as 'fast' | 'flex' | undefined,
-            })
-          }
-          options={[
-            { value: '', label: t('groups.service_tier_default') },
-            { value: 'fast', label: 'fast' },
-            { value: 'flex', label: 'flex' },
-          ]}
         />
 
         <div className="flex items-center justify-between">

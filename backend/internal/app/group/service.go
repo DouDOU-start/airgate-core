@@ -4,12 +4,13 @@ import "context"
 
 // Service 提供分组域用例编排。
 type Service struct {
-	repo Repository
+	repo        Repository
+	concurrency ConcurrencyReader
 }
 
 // NewService 创建分组服务。
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo Repository, concurrency ConcurrencyReader) *Service {
+	return &Service{repo: repo, concurrency: concurrency}
 }
 
 // List 查询管理员分组列表。
@@ -29,6 +30,34 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 		Page:     page,
 		PageSize: pageSize,
 	}, nil
+}
+
+// StatsForGroups 批量查询分组统计信息（含实时容量）。
+func (s *Service) StatsForGroups(ctx context.Context, groupIDs []int) (map[int]GroupStats, error) {
+	stats, activeAccounts, err := s.repo.StatsForGroups(ctx, groupIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// 收集所有活跃账号 ID，批量查询当前并发数
+	var allAccountIDs []int
+	for _, accs := range activeAccounts {
+		for _, a := range accs {
+			allAccountIDs = append(allAccountIDs, a.AccountID)
+		}
+	}
+	counts := s.concurrency.GetCurrentCounts(ctx, allAccountIDs)
+
+	// 按分组聚合已用容量
+	for groupID, accs := range activeAccounts {
+		st := stats[groupID]
+		for _, a := range accs {
+			st.CapacityUsed += counts[a.AccountID]
+		}
+		stats[groupID] = st
+	}
+
+	return stats, nil
 }
 
 // ListAvailable 查询用户可用分组列表。

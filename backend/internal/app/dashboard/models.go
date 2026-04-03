@@ -7,50 +7,54 @@ import (
 
 // Repository 定义仪表盘域持久化接口。
 type Repository interface {
-	LoadStatsSnapshot(context.Context, time.Time, time.Time) (StatsSnapshot, error)
-	ListTrendLogs(context.Context, time.Time, time.Time) ([]TrendLog, error)
+	LoadStatsSnapshot(ctx context.Context, todayStart, fiveMinAgo time.Time, userID int) (StatsSnapshot, error)
+	ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]TrendLog, error)
 }
 
 // StatsSnapshot 表示从存储层读取的原始统计快照。
 type StatsSnapshot struct {
-	TotalAPIKeys    int64
-	EnabledAPIKeys  int64
-	TotalAccounts   int64
-	EnabledAccounts int64
-	ErrorAccounts   int64
-	TotalUsers      int64
-	NewUsersToday   int64
-	TodayRequests   int64
-	AllTimeRequests int64
-	TodayTokens     int64
-	TodayCost       float64
-	TodayDurationMs int64
-	ActiveUsers     int64
-	AllTimeTokens   int64
-	AllTimeCost     float64
-	RecentRequests  int64
-	RecentTokens    int64
+	TotalAPIKeys        int64
+	EnabledAPIKeys      int64
+	TotalAccounts       int64
+	EnabledAccounts     int64
+	ErrorAccounts       int64
+	TotalUsers          int64
+	NewUsersToday       int64
+	TodayRequests       int64
+	AllTimeRequests     int64
+	TodayTokens         int64
+	TodayCost           float64
+	TodayStandardCost   float64
+	TodayDurationMs     int64
+	ActiveUsers         int64
+	AllTimeTokens       int64
+	AllTimeCost         float64
+	AllTimeStandardCost float64
+	RecentRequests      int64
+	RecentTokens        int64
 }
 
 // Stats 表示仪表盘统计结果。
 type Stats struct {
-	TotalAPIKeys    int64
-	EnabledAPIKeys  int64
-	TotalAccounts   int64
-	EnabledAccounts int64
-	ErrorAccounts   int64
-	TodayRequests   int64
-	AllTimeRequests int64
-	TotalUsers      int64
-	NewUsersToday   int64
-	TodayTokens     int64
-	TodayCost       float64
-	AllTimeTokens   int64
-	AllTimeCost     float64
-	RPM             float64
-	TPM             float64
-	AvgDurationMs   float64
-	ActiveUsers     int64
+	TotalAPIKeys        int64
+	EnabledAPIKeys      int64
+	TotalAccounts       int64
+	EnabledAccounts     int64
+	ErrorAccounts       int64
+	TodayRequests       int64
+	AllTimeRequests     int64
+	TotalUsers          int64
+	NewUsersToday       int64
+	TodayTokens         int64
+	TodayCost           float64
+	TodayStandardCost   float64
+	AllTimeTokens       int64
+	AllTimeCost         float64
+	AllTimeStandardCost float64
+	RPM                 float64
+	TPM                 float64
+	AvgDurationMs       float64
+	ActiveUsers         int64
 }
 
 // TrendQuery 表示趋势查询参数。
@@ -59,6 +63,7 @@ type TrendQuery struct {
 	Granularity string
 	StartDate   string
 	EndDate     string
+	UserID      int
 }
 
 // Trend 表示仪表盘趋势结果。

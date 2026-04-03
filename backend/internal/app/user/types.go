@@ -14,7 +14,6 @@ type User struct {
 	Balance         float64
 	Role            string
 	MaxConcurrency  int
-	TOTPEnabled     bool
 	GroupRates      map[int64]float64
 	AllowedGroupIDs []int64
 	Status          string

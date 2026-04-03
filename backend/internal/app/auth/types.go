@@ -17,7 +17,6 @@ type User struct {
 	GroupRates      map[int64]float64
 	AllowedGroupIDs []int64
 	Status          string
-	TOTPSecret      *string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -26,7 +25,6 @@ type User struct {
 type LoginInput struct {
 	Email    string
 	Password string
-	TOTPCode string
 }
 
 // RegisterInput 注册输入。
@@ -49,12 +47,6 @@ type LoginResult struct {
 	User  User
 }
 
-// TOTPSetupResult TOTP 初始化结果。
-type TOTPSetupResult struct {
-	Secret string
-	URI    string
-}
-
 // CreateUserInput 创建用户输入。
 type CreateUserInput struct {
 	Email        string
@@ -70,17 +62,4 @@ type Repository interface {
 	EmailExists(context.Context, string) (bool, error)
 	Create(context.Context, CreateUserInput) (User, error)
 	FindByID(context.Context, int, bool) (User, error)
-	SetTOTPSecret(context.Context, int, string) error
-	ClearTOTPSecret(context.Context, int) error
-}
-
-func hasTOTP(user User) bool {
-	return user.TOTPSecret != nil && *user.TOTPSecret != ""
-}
-
-func totpSecret(user User) string {
-	if user.TOTPSecret == nil {
-		return ""
-	}
-	return *user.TOTPSecret
 }

@@ -145,7 +145,8 @@ export default function UsersPage() {
     },
     {
       key: 'email',
-      title: t('users.email'),
+      title: <span className="pl-[38px]">{t('users.email')}</span>,
+      align: 'left',
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <div

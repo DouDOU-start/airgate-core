@@ -11,8 +11,10 @@ import {
 } from 'lucide-react';
 import { Card } from '../shared/components/Card';
 import { dashboardApi } from '../shared/api/dashboard';
+import { usersApi } from '../shared/api/users';
 import { queryKeys } from '../shared/queryKeys';
-import type { DashboardStatsResp, DashboardTrendResp, DashboardTrendReq } from '../shared/types';
+import { FETCH_ALL_PARAMS } from '../shared/constants';
+import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
 // 饼图颜色
 const PIE_COLORS = [
@@ -50,18 +52,28 @@ export default function DashboardPage() {
   const { t } = useTranslation();
   const [range, setRange] = useState<RangePreset>('today');
   const [granularity, setGranularity] = useState<Granularity>('day');
+  const [selectedUserId, setSelectedUserId] = useState<number | undefined>();
+
+  // 用户列表（用于筛选）
+  const { data: usersData } = useQuery({
+    queryKey: queryKeys.usersAll(),
+    queryFn: () => usersApi.list(FETCH_ALL_PARAMS),
+  });
+
+  const userFilter = selectedUserId ? { user_id: selectedUserId } : undefined;
 
   // 统计数据
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
-    queryKey: queryKeys.dashboard(),
-    queryFn: () => dashboardApi.stats(),
+    queryKey: queryKeys.dashboard(selectedUserId),
+    queryFn: () => dashboardApi.stats(userFilter),
   });
 
   // 趋势数据
-  const trendParams: DashboardTrendReq = useMemo(() => ({
+  const trendParams = useMemo(() => ({
     range,
-    granularity: range === 'today' ? 'hour' : granularity,
-  }), [range, granularity]);
+    granularity: range === 'today' ? 'hour' as const : granularity,
+    ...(selectedUserId ? { user_id: selectedUserId } : {}),
+  }), [range, granularity, selectedUserId]);
 
   const { data: trend, isLoading: trendLoading } = useQuery({
     queryKey: queryKeys.dashboardTrend(trendParams),
@@ -98,17 +110,32 @@ export default function DashboardPage() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-text-tertiary">{t('dashboard.granularity')}</span>
-          <select
-            className="text-xs rounded-md border border-border-subtle bg-bg-elevated px-3 py-1.5 text-text-secondary"
-            value={range === 'today' ? 'hour' : granularity}
-            onChange={(e) => setGranularity(e.target.value as Granularity)}
-            disabled={range === 'today'}
-          >
-            <option value="day">{t('dashboard.granularity_day')}</option>
-            <option value="hour">{t('dashboard.granularity_hour')}</option>
-          </select>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-tertiary">{t('dashboard.filter_user')}</span>
+            <select
+              className="text-xs rounded-md border border-border-subtle bg-bg-elevated px-3 py-1.5 text-text-secondary max-w-[180px]"
+              value={selectedUserId ?? ''}
+              onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : undefined)}
+            >
+              <option value="">{t('dashboard.all_users')}</option>
+              {(usersData?.list ?? []).map((u) => (
+                <option key={u.id} value={u.id}>{u.email}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-tertiary">{t('dashboard.granularity')}</span>
+            <select
+              className="text-xs rounded-md border border-border-subtle bg-bg-elevated px-3 py-1.5 text-text-secondary"
+              value={range === 'today' ? 'hour' : granularity}
+              onChange={(e) => setGranularity(e.target.value as Granularity)}
+              disabled={range === 'today'}
+            >
+              <option value="day">{t('dashboard.granularity_day')}</option>
+              <option value="hour">{t('dashboard.granularity_hour')}</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -177,14 +204,14 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
     {
       title: t('dashboard.today_tokens'),
       value: fmtNum(stats.today_tokens),
-      sub: `${fmtCost(stats.today_cost)} / ${fmtCost(stats.today_cost)}`,
+      sub: `${fmtCost(stats.today_cost)} / ${fmtCost(stats.today_standard_cost)}`,
       icon: <Coins className="w-5 h-5" />,
       color: 'var(--ag-primary)',
     },
     {
       title: t('dashboard.total_tokens'),
       value: fmtNum(stats.alltime_tokens),
-      sub: `${fmtCost(stats.alltime_cost)} / ${fmtCost(stats.alltime_cost)}`,
+      sub: `${fmtCost(stats.alltime_cost)} / ${fmtCost(stats.alltime_standard_cost)}`,
       icon: <Database className="w-5 h-5" />,
       color: 'var(--ag-info)',
     },

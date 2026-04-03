@@ -7,6 +7,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
 	appdashboard "github.com/DouDOU-start/airgate-core/internal/app/dashboard"
@@ -22,8 +23,14 @@ func NewDashboardStore(db *ent.Client) *DashboardStore {
 	return &DashboardStore{db: db}
 }
 
-// LoadStatsSnapshot 读取统计快照。
-func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, fiveMinAgo time.Time) (appdashboard.StatsSnapshot, error) {
+// LoadStatsSnapshot 读取统计快照。userID 为 0 表示查全部。
+func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, fiveMinAgo time.Time, userID int) (appdashboard.StatsSnapshot, error) {
+	// 用户过滤谓词
+	var userPred []predicate.UsageLog
+	if userID > 0 {
+		userPred = append(userPred, entusagelog.HasUserWith(entuser.IDEQ(userID)))
+	}
+
 	totalAPIKeys, err := s.db.APIKey.Query().Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
@@ -55,13 +62,13 @@ func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, five
 		return appdashboard.StatsSnapshot{}, err
 	}
 
-	allTimeRequests, err := s.db.UsageLog.Query().Count(ctx)
+	allTimeRequests, err := s.db.UsageLog.Query().Where(userPred...).Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
 
 	todayLogs, err := s.db.UsageLog.Query().
-		Where(entusagelog.CreatedAtGTE(todayStart)).
+		Where(append([]predicate.UsageLog{entusagelog.CreatedAtGTE(todayStart)}, userPred...)...).
 		WithUser().
 		All(ctx)
 	if err != nil {
@@ -71,61 +78,70 @@ func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, five
 	var todayRequests int64
 	var todayTokens int64
 	var todayCost float64
+	var todayStandardCost float64
 	var todayDurationMs int64
 	activeUserSet := make(map[int]bool)
 	for _, item := range todayLogs {
 		todayRequests++
 		todayTokens += int64(item.InputTokens + item.OutputTokens + item.CachedInputTokens)
 		todayCost += item.ActualCost
+		todayStandardCost += item.TotalCost
 		todayDurationMs += item.DurationMs
 		if edgeUser := item.Edges.User; edgeUser != nil {
 			activeUserSet[edgeUser.ID] = true
 		}
 	}
 
-	allTimeTokens, allTimeCost, err := queryUsageTotals(ctx, s.db.UsageLog.Query())
+	allTimeTokens, allTimeCost, allTimeStandardCost, err := queryUsageTotals(ctx, s.db.UsageLog.Query().Where(userPred...))
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
-	recentTokens, _, err := queryUsageTotals(ctx, s.db.UsageLog.Query().Where(entusagelog.CreatedAtGTE(fiveMinAgo)))
+	recentTokens, _, _, err := queryUsageTotals(ctx, s.db.UsageLog.Query().Where(append([]predicate.UsageLog{entusagelog.CreatedAtGTE(fiveMinAgo)}, userPred...)...))
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
 	recentRequests, err := s.db.UsageLog.Query().
-		Where(entusagelog.CreatedAtGTE(fiveMinAgo)).
+		Where(append([]predicate.UsageLog{entusagelog.CreatedAtGTE(fiveMinAgo)}, userPred...)...).
 		Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
 
 	return appdashboard.StatsSnapshot{
-		TotalAPIKeys:    int64(totalAPIKeys),
-		EnabledAPIKeys:  int64(enabledAPIKeys),
-		TotalAccounts:   int64(totalAccounts),
-		EnabledAccounts: int64(enabledAccounts),
-		ErrorAccounts:   int64(errorAccounts),
-		TotalUsers:      int64(totalUsers),
-		NewUsersToday:   int64(newUsersToday),
-		TodayRequests:   todayRequests,
-		AllTimeRequests: int64(allTimeRequests),
-		TodayTokens:     todayTokens,
-		TodayCost:       todayCost,
-		TodayDurationMs: todayDurationMs,
-		ActiveUsers:     int64(len(activeUserSet)),
-		AllTimeTokens:   allTimeTokens,
-		AllTimeCost:     allTimeCost,
-		RecentRequests:  int64(recentRequests),
-		RecentTokens:    recentTokens,
+		TotalAPIKeys:        int64(totalAPIKeys),
+		EnabledAPIKeys:      int64(enabledAPIKeys),
+		TotalAccounts:       int64(totalAccounts),
+		EnabledAccounts:     int64(enabledAccounts),
+		ErrorAccounts:       int64(errorAccounts),
+		TotalUsers:          int64(totalUsers),
+		NewUsersToday:       int64(newUsersToday),
+		TodayRequests:       todayRequests,
+		AllTimeRequests:     int64(allTimeRequests),
+		TodayTokens:         todayTokens,
+		TodayCost:           todayCost,
+		TodayStandardCost:   todayStandardCost,
+		TodayDurationMs:     todayDurationMs,
+		ActiveUsers:         int64(len(activeUserSet)),
+		AllTimeTokens:       allTimeTokens,
+		AllTimeCost:         allTimeCost,
+		AllTimeStandardCost: allTimeStandardCost,
+		RecentRequests:      int64(recentRequests),
+		RecentTokens:        recentTokens,
 	}, nil
 }
 
-// ListTrendLogs 读取趋势聚合所需日志。
-func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime time.Time) ([]appdashboard.TrendLog, error) {
+// ListTrendLogs 读取趋势聚合所需日志。userID 为 0 表示查全部。
+func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]appdashboard.TrendLog, error) {
+	preds := []predicate.UsageLog{
+		entusagelog.CreatedAtGTE(startTime),
+		entusagelog.CreatedAtLT(endTime),
+	}
+	if userID > 0 {
+		preds = append(preds, entusagelog.HasUserWith(entuser.IDEQ(userID)))
+	}
+
 	list, err := s.db.UsageLog.Query().
-		Where(
-			entusagelog.CreatedAtGTE(startTime),
-			entusagelog.CreatedAtLT(endTime),
-		).
+		Where(preds...).
 		WithUser().
 		All(ctx)
 	if err != nil {
@@ -153,23 +169,25 @@ func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime t
 	return result, nil
 }
 
-func queryUsageTotals(ctx context.Context, query *ent.UsageLogQuery) (int64, float64, error) {
+func queryUsageTotals(ctx context.Context, query *ent.UsageLogQuery) (int64, float64, float64, error) {
 	var rows []struct {
-		InputSum  int64   `json:"input_sum"`
-		OutputSum int64   `json:"output_sum"`
-		CacheSum  int64   `json:"cache_sum"`
-		CostSum   float64 `json:"cost_sum"`
+		InputSum        int64   `json:"input_sum"`
+		OutputSum       int64   `json:"output_sum"`
+		CacheSum        int64   `json:"cache_sum"`
+		CostSum         float64 `json:"cost_sum"`
+		StandardCostSum float64 `json:"standard_cost_sum"`
 	}
 	if err := query.Aggregate(
 		ent.As(ent.Sum(entusagelog.FieldInputTokens), "input_sum"),
 		ent.As(ent.Sum(entusagelog.FieldOutputTokens), "output_sum"),
 		ent.As(ent.Sum(entusagelog.FieldCachedInputTokens), "cache_sum"),
 		ent.As(ent.Sum(entusagelog.FieldActualCost), "cost_sum"),
+		ent.As(ent.Sum(entusagelog.FieldTotalCost), "standard_cost_sum"),
 	).Scan(ctx, &rows); err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	if len(rows) == 0 {
-		return 0, 0, nil
+		return 0, 0, 0, nil
 	}
-	return rows[0].InputSum + rows[0].OutputSum + rows[0].CacheSum, rows[0].CostSum, nil
+	return rows[0].InputSum + rows[0].OutputSum + rows[0].CacheSum, rows[0].CostSum, rows[0].StandardCostSum, nil
 }

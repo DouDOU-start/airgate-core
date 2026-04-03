@@ -27,7 +27,7 @@ export interface PageReq {
 export interface LoginReq {
   email: string;
   password: string;
-  totp_code?: string;
+
 }
 
 export interface LoginResp {
@@ -39,15 +39,6 @@ export interface RegisterReq {
   email: string;
   password: string;
   username?: string;
-}
-
-export interface TOTPSetupResp {
-  secret: string;
-  uri: string;
-}
-
-export interface TOTPVerifyReq {
-  code: string;
 }
 
 export interface RefreshResp {
@@ -63,7 +54,7 @@ export interface UserResp {
   balance: number;
   role: 'admin' | 'user';
   max_concurrency: number;
-  totp_enabled: boolean;
+
   group_rates?: Record<number, number>;
   allowed_group_ids?: number[];
   status: string;
@@ -194,6 +185,14 @@ export interface GroupResp {
   model_routing?: Record<string, number[]>;
   service_tier?: 'fast' | 'flex';
   sort_weight: number;
+  account_active: number;
+  account_error: number;
+  account_disabled: number;
+  account_total: number;
+  capacity_used: number;
+  capacity_total: number;
+  today_cost: number;
+  total_cost: number;
   created_at: string;
   updated_at: string;
 }
@@ -505,8 +504,10 @@ export interface DashboardStatsResp {
   new_users_today: number;
   today_tokens: number;
   today_cost: number;
+  today_standard_cost: number;
   alltime_tokens: number;
   alltime_cost: number;
+  alltime_standard_cost: number;
   rpm: number;
   tpm: number;
   avg_duration_ms: number;

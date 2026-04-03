@@ -70,28 +70,6 @@ func (s *AuthStore) FindByID(ctx context.Context, id int, withAllowedGroups bool
 	return mapAuthUser(item), nil
 }
 
-// SetTOTPSecret 保存 TOTP 密钥。
-func (s *AuthStore) SetTOTPSecret(ctx context.Context, id int, secret string) error {
-	if err := s.db.User.UpdateOneID(id).SetTotpSecret(secret).Exec(ctx); err != nil {
-		if ent.IsNotFound(err) {
-			return appauth.ErrUserNotFound
-		}
-		return err
-	}
-	return nil
-}
-
-// ClearTOTPSecret 清空 TOTP 密钥。
-func (s *AuthStore) ClearTOTPSecret(ctx context.Context, id int) error {
-	if err := s.db.User.UpdateOneID(id).ClearTotpSecret().Exec(ctx); err != nil {
-		if ent.IsNotFound(err) {
-			return appauth.ErrUserNotFound
-		}
-		return err
-	}
-	return nil
-}
-
 func mapAuthUser(item *ent.User) appauth.User {
 	result := appauth.User{
 		ID:             item.ID,
@@ -103,7 +81,6 @@ func mapAuthUser(item *ent.User) appauth.User {
 		MaxConcurrency: item.MaxConcurrency,
 		GroupRates:     cloneAuthGroupRates(item.GroupRates),
 		Status:         string(item.Status),
-		TOTPSecret:     item.TotpSecret,
 		CreatedAt:      item.CreatedAt,
 		UpdatedAt:      item.UpdatedAt,
 	}

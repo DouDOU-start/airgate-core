@@ -18,6 +18,30 @@ type Repository interface {
 	Create(context.Context, CreateInput) (Group, error)
 	Update(context.Context, int, UpdateInput) (Group, error)
 	Delete(context.Context, int) error
+	StatsForGroups(ctx context.Context, groupIDs []int) (stats map[int]GroupStats, activeAccounts map[int][]AccountCapacity, err error)
+}
+
+// ConcurrencyReader 并发读接口。
+type ConcurrencyReader interface {
+	GetCurrentCounts(context.Context, []int) map[int]int
+}
+
+// GroupStats 描述分组统计信息。
+type GroupStats struct {
+	AccountActive   int
+	AccountError    int
+	AccountDisabled int
+	AccountTotal    int
+	CapacityUsed    int
+	CapacityTotal   int
+	TodayCost       float64
+	TotalCost       float64
+}
+
+// AccountCapacity 描述每个分组中活跃账号的容量信息。
+type AccountCapacity struct {
+	AccountID      int
+	MaxConcurrency int
 }
 
 // Group 描述分组领域对象。
