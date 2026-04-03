@@ -7,6 +7,8 @@ export const usageApi = {
     get<PagedData<UsageLogResp>>('/api/v1/usage', params),
   userStats: (params: Omit<UsageQuery, 'page' | 'page_size'>) =>
     get<UsageStatsResp>('/api/v1/usage/stats', params),
+  userTrend: (params: { granularity: string; start_date?: string; end_date?: string }) =>
+    get<UsageTrendBucket[]>('/api/v1/usage/trend', params),
 
   // 管理员接口
   adminList: (params: UsageQuery) =>

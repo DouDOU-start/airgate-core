@@ -561,12 +561,13 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
 // ==================== 工具函数 ====================
 
 /** 格式化时间标签：日期取 MM/DD，含小时的取 HH:00 */
+/** 将后端 UTC 时间字符串转为本地时区显示 */
 function fmtTime(timeStr: string): string {
+  const utcStr = timeStr.includes(' ') ? timeStr.replace(' ', 'T') + ':00Z' : timeStr + 'T00:00:00Z';
+  const d = new Date(utcStr);
+  if (isNaN(d.getTime())) return timeStr;
   if (timeStr.includes(' ')) {
-    // "2026-03-16 15:00" -> "15:00"
-    return timeStr.split(' ')[1] ?? timeStr;
+    return `${String(d.getHours()).padStart(2, '0')}:00`;
   }
-  // "2026-03-16" -> "03/16"
-  const parts = timeStr.split('-');
-  return `${parts[1] ?? ''}/${parts[2] ?? ''}`;
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
 }

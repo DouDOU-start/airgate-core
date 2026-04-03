@@ -65,6 +65,7 @@ func (s *Server) registerRoutes() {
 		// 使用记录
 		userGroup.GET("/usage", handlers.Usage.UserUsage)
 		userGroup.GET("/usage/stats", handlers.Usage.UserUsageStats)
+		userGroup.GET("/usage/trend", handlers.Usage.UserUsageTrend)
 
 	}
 

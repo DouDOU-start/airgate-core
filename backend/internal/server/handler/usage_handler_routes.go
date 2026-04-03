@@ -100,6 +100,42 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 	response.Success(c, resp)
 }
 
+// UserUsageTrend 用户 Token 使用趋势。
+func (h *UsageHandler) UserUsageTrend(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		response.Unauthorized(c, "用户未认证")
+		return
+	}
+
+	var query dto.UsageFilterQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	granularity := c.DefaultQuery("granularity", "day")
+	uid64 := int64(userID)
+
+	result, err := h.service.AdminTrend(c.Request.Context(), appusage.TrendFilter{
+		StatsFilter: appusage.StatsFilter{
+			UserID:    &uid64,
+			Platform:  query.Platform,
+			Model:     query.Model,
+			StartDate: query.StartDate,
+			EndDate:   query.EndDate,
+		},
+		Granularity: granularity,
+	})
+	if err != nil {
+		handleUsageError("查询用户趋势失败", err)
+		response.InternalError(c, "查询失败")
+		return
+	}
+
+	response.Success(c, toUsageTrendBuckets(result))
+}
+
 // AdminUsage 管理员查看全局使用记录。
 func (h *UsageHandler) AdminUsage(c *gin.Context) {
 	var query dto.UsageQuery

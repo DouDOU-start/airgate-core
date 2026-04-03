@@ -34,7 +34,7 @@ func BuildTrendBuckets(entries []TrendEntry, granularity string) []TrendBucket {
 		if err != nil {
 			continue
 		}
-		key := createdAt.Format(timeFmt)
+		key := createdAt.UTC().Format(timeFmt)
 		bucket, ok := bucketMap[key]
 		if !ok {
 			bucket = &TrendBucket{Time: key}
