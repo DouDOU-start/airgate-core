@@ -188,6 +188,29 @@ func (s *UserStore) ListBalanceLogs(ctx context.Context, userID, page, pageSize 
 	return result, int64(total), nil
 }
 
+// GetAPIKeyName 获取 API Key 名称。
+func (s *UserStore) GetAPIKeyName(ctx context.Context, keyID int) (string, error) {
+	ak, err := s.db.APIKey.Get(ctx, keyID)
+	if err != nil {
+		return "", err
+	}
+	return ak.Name, nil
+}
+
+// GetAPIKeyInfo 获取 API Key 基本信息（名称、额度、到期时间）。
+func (s *UserStore) GetAPIKeyInfo(ctx context.Context, keyID int) (appuser.APIKeyBrief, error) {
+	ak, err := s.db.APIKey.Get(ctx, keyID)
+	if err != nil {
+		return appuser.APIKeyBrief{}, err
+	}
+	return appuser.APIKeyBrief{
+		Name:      ak.Name,
+		QuotaUSD:  ak.QuotaUsd,
+		UsedQuota: ak.UsedQuota,
+		ExpiresAt: ak.ExpiresAt,
+	}, nil
+}
+
 // ListAPIKeys 查询指定用户的 API Key 列表。
 func (s *UserStore) ListAPIKeys(ctx context.Context, userID, page, pageSize int) ([]appuser.APIKey, int64, error) {
 	query := s.db.APIKey.Query().

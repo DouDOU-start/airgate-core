@@ -9,9 +9,9 @@ import { useSiteSettings } from '../app/providers/SiteSettingsProvider';
 import { authApi } from '../shared/api/auth';
 import { useTheme } from '../app/providers/ThemeProvider';
 import { ApiError } from '../shared/api/client';
-import { Mail, Lock, User, Zap, ArrowRight, Sun, Moon, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, User, Zap, ArrowRight, Sun, Moon, ShieldCheck, Key } from 'lucide-react';
 
-type TabKey = 'login' | 'register';
+type TabKey = 'login' | 'register' | 'apikey';
 
 /* ==================== 登录表单 ==================== */
 
@@ -271,6 +271,58 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+/* ==================== API Key 登录表单 ==================== */
+
+function APIKeyLoginForm() {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const { t } = useTranslation();
+
+  const [apiKey, setApiKey] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const resp = await authApi.loginByAPIKey({ key: apiKey });
+      login(resp.token, { ...resp.user, api_key_id: resp.api_key_id, api_key_name: resp.api_key_name });
+      navigate({ to: '/' });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError(t('auth.login_failed'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Input
+        label="API Key"
+        type="password"
+        value={apiKey}
+        onChange={(e) => setApiKey(e.target.value)}
+        placeholder="sk-..."
+        icon={<Key className="w-4 h-4" />}
+        required
+        autoFocus
+      />
+      <p className="text-[11px] text-text-tertiary">{t('auth.apikey_login_hint')}</p>
+      {error && <Alert variant="error">{error}</Alert>}
+      <Button type="submit" loading={loading} className="w-full h-11" icon={<ArrowRight className="w-4 h-4" />}>
+        {t('common.login')}
+      </Button>
+    </form>
+  );
+}
+
 /* ==================== 登录页主组件 ==================== */
 
 export default function LoginPage() {
@@ -397,27 +449,26 @@ export default function LoginPage() {
             </h1>
           </div>
 
-          {/* Tab 切换（关闭注册时不显示） */}
-          {site.registration_enabled && (
-            <div className="flex gap-1 mb-6 p-1 rounded-xl bg-bg-hover/60">
-              {([
-                { key: 'login' as const, label: t('common.login') },
-                { key: 'register' as const, label: t('common.register') },
-              ]).map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => { setActiveTab(tab.key); setRegisterSuccess(false); }}
-                  className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
-                    activeTab === tab.key
-                      ? 'bg-bg-elevated text-text shadow-sm'
-                      : 'text-text-tertiary hover:text-text-secondary'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Tab 切换 */}
+          <div className="flex gap-1 mb-6 p-1 rounded-xl bg-bg-hover/60">
+            {([
+              { key: 'login' as const, label: t('common.login') },
+              ...(site.registration_enabled ? [{ key: 'register' as const, label: t('common.register') }] : []),
+              { key: 'apikey' as const, label: 'API Key' },
+            ]).map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => { setActiveTab(tab.key); setRegisterSuccess(false); }}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+                  activeTab === tab.key
+                    ? 'bg-bg-elevated text-text shadow-sm'
+                    : 'text-text-tertiary hover:text-text-secondary'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
           {/* 表单 */}
           <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl p-6">
@@ -425,10 +476,12 @@ export default function LoginPage() {
               <Alert variant="success" className="mb-5">{t('auth.register_success')}</Alert>
             )}
 
-            {activeTab === 'login' || !site.registration_enabled ? (
-              <LoginForm />
-            ) : (
+            {activeTab === 'apikey' ? (
+              <APIKeyLoginForm />
+            ) : activeTab === 'register' && site.registration_enabled ? (
               <RegisterForm onSuccess={handleRegisterSuccess} />
+            ) : (
+              <LoginForm />
             )}
           </div>
 

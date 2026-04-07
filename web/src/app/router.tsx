@@ -118,10 +118,11 @@ const authLayout = createRoute({
   ),
 });
 
-// 首页：管理员看仪表盘，普通用户看个人概览
+// 首页：API Key 登录重定向到使用记录，管理员看仪表盘，普通用户看个人概览
 function HomePage() {
-  const { user } = useAuth();
+  const { user, isAPIKeySession } = useAuth();
   if (!user) return null;
+  if (isAPIKeySession) return <UserUsagePage />;
   return user.role === 'admin' ? <DashboardPage /> : <UserOverviewPage />;
 }
 const dashboardRoute = createRoute({ getParentRoute: () => authLayout, path: '/', component: HomePage });

@@ -19,6 +19,7 @@ type ListFilter struct {
 // StatsFilter 聚合统计筛选。
 type StatsFilter struct {
 	UserID    *int64
+	APIKeyID  *int64
 	Platform  string
 	Model     string
 	StartDate string

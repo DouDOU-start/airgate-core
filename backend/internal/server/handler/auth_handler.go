@@ -7,8 +7,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/DouDOU-start/airgate-core/ent"
 	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
+	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 )
@@ -18,14 +20,18 @@ type AuthHandler struct {
 	service         *appauth.Service
 	settingsService *appsettings.Service
 	codeStore       *mailer.VerifyCodeStore
+	db              *ent.Client
+	jwtMgr          *auth.JWTManager
 }
 
 // NewAuthHandler 创建认证 Handler。
-func NewAuthHandler(service *appauth.Service, settingsService *appsettings.Service, codeStore *mailer.VerifyCodeStore) *AuthHandler {
+func NewAuthHandler(service *appauth.Service, settingsService *appsettings.Service, codeStore *mailer.VerifyCodeStore, db *ent.Client, jwtMgr *auth.JWTManager) *AuthHandler {
 	return &AuthHandler{
 		service:         service,
 		settingsService: settingsService,
 		codeStore:       codeStore,
+		db:              db,
+		jwtMgr:          jwtMgr,
 	}
 }
 
@@ -78,9 +84,15 @@ func authIdentityFromContext(c *gin.Context) (appauth.AuthIdentity, bool) {
 		return appauth.AuthIdentity{}, false
 	}
 
-	return appauth.AuthIdentity{
+	identity := appauth.AuthIdentity{
 		UserID: userID,
 		Role:   role,
 		Email:  email,
-	}, true
+	}
+	if apiKeyID, exists := c.Get(middleware.CtxKeyAPIKeyID); exists {
+		if id, ok := apiKeyID.(int); ok {
+			identity.APIKeyID = id
+		}
+	}
+	return identity, true
 }

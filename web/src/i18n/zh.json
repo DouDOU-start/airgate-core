@@ -132,7 +132,12 @@
     "email_required": "请输入邮箱地址",
     "code_required": "请输入验证码",
     "next_step": "下一步",
-    "change_email": "更换"
+    "change_email": "更换",
+    "apikey_login_hint": "使用 API Key 登录后，仅能查看该 Key 的使用记录。",
+    "apikey_quota": "额度",
+    "apikey_unlimited": "不限",
+    "apikey_expires": "到期时间",
+    "apikey_never": "永不过期"
   },
 
   "dashboard": {
@@ -634,10 +639,11 @@
     "smtp_from_name": "发件人名称",
     "smtp_use_tls": "使用 TLS",
     "smtp_use_tls_desc": "通过 TLS 加密连接 SMTP 服务器（端口通常为 465）",
-    "email_template": "邮件模板",
+    "email_template": "注册验证邮件模板",
+    "balance_alert_email_template": "余额预警邮件模板",
     "template_subject": "邮件标题",
     "template_body": "邮件内容",
-    "template_body_hint": "支持 HTML，使用 {{site_name}} {{code}} {{email}} 等变量",
+    "template_body_hint": "支持 HTML，使用上方列出的变量",
     "template_preview": "预览",
     "template_reset": "重置默认",
     "template_vars": "可用变量",

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { pluginsApi } from '../api/plugins';
 import { queryKeys } from '../queryKeys';
 import { FETCH_ALL_PARAMS } from '../constants';
+import { useAuth } from '../../app/providers/AuthProvider';
 
 /** 从插件 display_name 中提取平台显示名（去掉"网关""Gateway"等后缀） */
 function extractPlatformName(displayName: string): string {
@@ -19,6 +20,7 @@ function capitalize(s: string) {
  * 同时返回 platform → 显示名的映射。
  */
 export function usePlatforms() {
+  const { isAPIKeySession } = useAuth();
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.platforms(),
     queryFn: async () => {
@@ -36,6 +38,7 @@ export function usePlatforms() {
       return { platforms: [...platformSet], nameMap };
     },
     staleTime: 60_000,
+    enabled: !isAPIKeySession,
   });
 
   return {

@@ -31,6 +31,7 @@ func (s *Server) registerRoutes() {
 	authGroup.Use(middleware.RateLimit(s.limiter))
 	{
 		authGroup.POST("/login", handlers.Auth.Login)
+		authGroup.POST("/login-apikey", handlers.Auth.LoginByAPIKey)
 		authGroup.POST("/register", handlers.Auth.Register)
 		authGroup.POST("/send-verify-code", handlers.Auth.SendVerifyCode)
 	}

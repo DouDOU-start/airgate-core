@@ -132,7 +132,12 @@
     "email_required": "Please enter your email",
     "code_required": "Please enter the verification code",
     "next_step": "Next",
-    "change_email": "Change"
+    "change_email": "Change",
+    "apikey_login_hint": "Login with API Key to view usage records for this key only.",
+    "apikey_quota": "Quota",
+    "apikey_unlimited": "Unlimited",
+    "apikey_expires": "Expires",
+    "apikey_never": "Never"
   },
 
   "dashboard": {
@@ -634,10 +639,11 @@
     "smtp_from_name": "From Name",
     "smtp_use_tls": "Use TLS",
     "smtp_use_tls_desc": "Connect to SMTP server with TLS encryption (usually port 465)",
-    "email_template": "Email Template",
+    "email_template": "Registration Email Template",
+    "balance_alert_email_template": "Balance Alert Email Template",
     "template_subject": "Subject",
     "template_body": "Body",
-    "template_body_hint": "Supports HTML. Use {{site_name}} {{code}} {{email}} as variables",
+    "template_body_hint": "Supports HTML. Use the variables listed above",
     "template_preview": "Preview",
     "template_reset": "Reset Default",
     "template_vars": "Variables",

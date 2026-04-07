@@ -12,6 +12,11 @@ type UserResp struct {
 	AllowedGroupIDs       []int64           `json:"allowed_group_ids,omitempty"` // 已分配的专属分组 ID
 	BalanceAlertThreshold float64           `json:"balance_alert_threshold"`
 	Status                string            `json:"status"`
+	APIKeyID              int64             `json:"api_key_id,omitempty"`        // API Key 登录时返回
+	APIKeyName            string            `json:"api_key_name,omitempty"`      // API Key 登录时返回
+	APIKeyQuotaUSD        float64           `json:"api_key_quota_usd,omitempty"` // Key 额度（0=不限）
+	APIKeyUsedQuota       float64           `json:"api_key_used_quota,omitempty"`
+	APIKeyExpiresAt       string            `json:"api_key_expires_at,omitempty"` // RFC3339
 	TimeMixin
 }
 

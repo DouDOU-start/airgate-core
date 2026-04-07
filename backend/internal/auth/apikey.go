@@ -24,6 +24,7 @@ const apiKeyPrefix = "sk-"
 // APIKeyInfo API Key 验证后的信息
 type APIKeyInfo struct {
 	KeyID         int
+	KeyName       string
 	UserID        int
 	GroupID       int
 	GroupPlatform string
@@ -53,6 +54,38 @@ func GenerateAPIKey() (key string, hash string, err error) {
 func HashAPIKey(key string) string {
 	h := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(h[:])
+}
+
+// ValidateAPIKeyForLogin 验证 API Key 用于 Web 登录（不要求绑定分组）。
+// 返回 KeyID、KeyName、UserID 等基本信息。
+func ValidateAPIKeyForLogin(ctx context.Context, db *ent.Client, key string) (*APIKeyInfo, error) {
+	hash := HashAPIKey(key)
+
+	ak, err := db.APIKey.Query().
+		Where(
+			apikey.KeyHash(hash),
+			apikey.StatusEQ(apikey.StatusActive),
+		).
+		WithUser().
+		Only(ctx)
+	if err != nil {
+		return nil, ErrInvalidAPIKey
+	}
+
+	if ak.ExpiresAt != nil && ak.ExpiresAt.Before(time.Now()) {
+		return nil, ErrAPIKeyExpired
+	}
+
+	u, err := ak.Edges.UserOrErr()
+	if err != nil {
+		return nil, ErrInvalidAPIKey
+	}
+
+	return &APIKeyInfo{
+		KeyID:   ak.ID,
+		KeyName: ak.Name,
+		UserID:  u.ID,
+	}, nil
 }
 
 // ValidateAPIKey 验证 API Key 并返回关联信息
@@ -94,6 +127,7 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 
 	return &APIKeyInfo{
 		KeyID:         ak.ID,
+		KeyName:       ak.Name,
 		UserID:        u.ID,
 		GroupID:       g.ID,
 		GroupPlatform: g.Platform,

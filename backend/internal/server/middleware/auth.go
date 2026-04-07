@@ -14,10 +14,11 @@ import (
 
 // Context Key 常量
 const (
-	CtxKeyUserID  = "user_id"
-	CtxKeyRole    = "role"
-	CtxKeyEmail   = "email"
-	CtxKeyKeyInfo = "api_key_info"
+	CtxKeyUserID   = "user_id"
+	CtxKeyRole     = "role"
+	CtxKeyEmail    = "email"
+	CtxKeyKeyInfo  = "api_key_info"
+	CtxKeyAPIKeyID = "jwt_api_key_id" // JWT 中的 API Key ID（API Key 登录场景）
 )
 
 // JWTAuth JWT 认证中间件
@@ -41,6 +42,9 @@ func JWTAuth(jwtMgr *auth.JWTManager) gin.HandlerFunc {
 		c.Set(CtxKeyUserID, claims.UserID)
 		c.Set(CtxKeyRole, claims.Role)
 		c.Set(CtxKeyEmail, claims.Email)
+		if claims.APIKeyID > 0 {
+			c.Set(CtxKeyAPIKeyID, claims.APIKeyID)
+		}
 		c.Next()
 	}
 }

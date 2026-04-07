@@ -228,6 +228,15 @@ export default function AccountsPage() {
       title: t('accounts.platform_type'),
       render: (row) => {
         const planType = row.credentials?.plan_type;
+        const subUntil = row.credentials?.subscription_active_until;
+        const subExpired = subUntil ? new Date(subUntil) < new Date() : false;
+        // 订阅过期时降级显示为 free
+        const displayPlanType = (planType && subExpired && planType.toLowerCase() !== 'free') ? 'free' : planType;
+        // 仅未过期的付费订阅 hover 显示过期时间
+        const isPaid = displayPlanType && displayPlanType.toLowerCase() !== 'free';
+        const planTooltip = isPaid && subUntil && !subExpired
+          ? `${t('accounts.expires_at')}: ${new Date(subUntil).toLocaleDateString()}`
+          : undefined;
         return (
           <div className="flex flex-col items-center gap-1.5">
             <span className="inline-flex items-center gap-1">
@@ -240,9 +249,9 @@ export default function AccountsPage() {
                   {row.type.charAt(0).toUpperCase() + row.type.slice(1)}
                 </span>
               )}
-              {planType && (
-                <span className="text-[10px] px-1 py-0 rounded font-medium" style={{ background: 'var(--ag-primary)', color: 'var(--ag-text-inverse)', opacity: 0.85 }}>
-                  {planType.charAt(0).toUpperCase() + planType.slice(1)}
+              {displayPlanType && (
+                <span className="text-[10px] px-1 py-0 rounded font-medium cursor-default" title={planTooltip} style={{ background: 'var(--ag-primary)', color: 'var(--ag-text-inverse)', opacity: 0.85 }}>
+                  {displayPlanType.charAt(0).toUpperCase() + displayPlanType.slice(1)}
                 </span>
               )}
             </div>
@@ -448,27 +457,6 @@ export default function AccountsPage() {
         return (
           <span className="text-xs" style={{ color: 'var(--ag-text-secondary)' }} title={new Date(row.last_used_at).toLocaleString()}>
             {relative}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'expires_at',
-      title: t('accounts.expires_at'),
-      width: '120px',
-      hideOnMobile: true,
-      render: (row) => {
-        const subUntil = row.credentials?.subscription_active_until;
-        if (!subUntil) {
-          return <span style={{ color: 'var(--ag-text-tertiary)' }}>-</span>;
-        }
-        const isExpired = new Date(subUntil) < new Date();
-        return (
-          <span
-            className="text-xs"
-            style={{ color: isExpired ? 'var(--ag-danger)' : 'var(--ag-text-secondary)' }}
-          >
-            {isExpired ? t('accounts.subscription_expired') : new Date(subUntil).toLocaleDateString()}
           </span>
         );
       },

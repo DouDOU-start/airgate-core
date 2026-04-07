@@ -34,6 +34,7 @@ const SMTP_KEYS = [
   'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password',
   'smtp_from_email', 'smtp_from_name', 'smtp_use_tls',
   'email_template_subject', 'email_template_body',
+  'balance_alert_email_subject', 'balance_alert_email_body',
 ] as const;
 
 const DEFAULT_EMAIL_SUBJECT = '{{site_name}} - 邮箱验证码';
@@ -48,6 +49,28 @@ const DEFAULT_EMAIL_BODY = `<div style="font-family: -apple-system, BlinkMacSyst
   </div>
   <div style="border-top: 1px solid #f0f0f0; padding: 14px 28px;">
     <p style="color: #c0c0c0; font-size: 11px; margin: 0; text-align: center;">此邮件由 {{site_name}} 系统自动发送，请勿直接回复</p>
+  </div>
+</div>`;
+
+const DEFAULT_BALANCE_ALERT_SUBJECT = '{{site_name}} - 余额预警';
+const DEFAULT_BALANCE_ALERT_BODY = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 420px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e5e7eb;">
+  <div style="padding: 32px 28px;">
+    <div style="font-size: 16px; font-weight: 600; color: #111; margin-bottom: 20px;">{{site_name}}</div>
+    <p style="color: #555; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">您的账户余额已低于预警阈值：</p>
+    <div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+        <span style="color: #92400e; font-size: 13px;">当前余额</span>
+        <span style="color: #92400e; font-size: 16px; font-weight: 700;">{{balance}}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: #92400e; font-size: 13px;">预警阈值</span>
+        <span style="color: #92400e; font-size: 13px;">{{threshold}}</span>
+      </div>
+    </div>
+    <p style="color: #999; font-size: 12px; line-height: 1.6; margin: 0;">请及时充值以免影响正常使用。余额回到阈值以上后，预警将自动重置。</p>
+  </div>
+  <div style="border-top: 1px solid #f0f0f0; padding: 14px 28px;">
+    <p style="color: #c0c0c0; font-size: 11px; margin: 0; text-align: center;">此邮件由 {{site_name}} 系统自动发送</p>
   </div>
 </div>`;
 
@@ -86,6 +109,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('site');
   const [values, setValues] = useState<Record<string, string>>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [emailTplType, setEmailTplType] = useState<'verify' | 'balance_alert'>('verify');
 
   // 获取所有设置
   const { data: settings, isLoading } = useQuery({
@@ -325,18 +349,63 @@ export default function SettingsPage() {
             </div>
           </Card>
 
-          {/* 邮件模板 */}
-          <EmailTemplateEditor
-            subject={val('email_template_subject') || DEFAULT_EMAIL_SUBJECT}
-            body={val('email_template_body') || DEFAULT_EMAIL_BODY}
-            onSubjectChange={(v) => set('email_template_subject', v)}
-            onBodyChange={(v) => set('email_template_body', v)}
-            onReset={() => {
-              set('email_template_subject', DEFAULT_EMAIL_SUBJECT);
-              set('email_template_body', DEFAULT_EMAIL_BODY);
-            }}
-            siteName={val('site_name') || 'AirGate'}
-          />
+          {/* 邮件模板切换 */}
+          <div className="flex items-center gap-1 border-b border-border">
+            {([
+              { key: 'verify' as const, label: t('settings.email_template') },
+              { key: 'balance_alert' as const, label: t('settings.balance_alert_email_template') },
+            ]).map((item) => (
+              <button
+                key={item.key}
+                onClick={() => setEmailTplType(item.key)}
+                className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  emailTplType === item.key
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-text-tertiary hover:text-text-secondary'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {emailTplType === 'verify' ? (
+            <EmailTemplateEditor
+              title={t('settings.email_template')}
+              subject={val('email_template_subject') || DEFAULT_EMAIL_SUBJECT}
+              body={val('email_template_body') || DEFAULT_EMAIL_BODY}
+              onSubjectChange={(v) => set('email_template_subject', v)}
+              onBodyChange={(v) => set('email_template_body', v)}
+              onReset={() => {
+                set('email_template_subject', DEFAULT_EMAIL_SUBJECT);
+                set('email_template_body', DEFAULT_EMAIL_BODY);
+              }}
+              siteName={val('site_name') || 'AirGate'}
+              variables={[
+                { name: 'site_name', sample: val('site_name') || 'AirGate' },
+                { name: 'code', sample: '888888' },
+                { name: 'email', sample: 'user@example.com' },
+              ]}
+            />
+          ) : (
+            <EmailTemplateEditor
+              title={t('settings.balance_alert_email_template')}
+              subject={val('balance_alert_email_subject') || DEFAULT_BALANCE_ALERT_SUBJECT}
+              body={val('balance_alert_email_body') || DEFAULT_BALANCE_ALERT_BODY}
+              onSubjectChange={(v) => set('balance_alert_email_subject', v)}
+              onBodyChange={(v) => set('balance_alert_email_body', v)}
+              onReset={() => {
+                set('balance_alert_email_subject', DEFAULT_BALANCE_ALERT_SUBJECT);
+                set('balance_alert_email_body', DEFAULT_BALANCE_ALERT_BODY);
+              }}
+              siteName={val('site_name') || 'AirGate'}
+              variables={[
+                { name: 'site_name', sample: val('site_name') || 'AirGate' },
+                { name: 'balance', sample: '$1.2345' },
+                { name: 'threshold', sample: '$5.00' },
+              ]}
+            />
+          )}
         </>)}
       </div>
 
@@ -358,27 +427,34 @@ export default function SettingsPage() {
 // ==================== Email Template Editor ====================
 
 function EmailTemplateEditor({
-  subject, body, onSubjectChange, onBodyChange, onReset, siteName,
+  title, subject, body, onSubjectChange, onBodyChange, onReset, siteName, variables,
 }: {
+  title: string;
   subject: string;
   body: string;
   onSubjectChange: (v: string) => void;
   onBodyChange: (v: string) => void;
   onReset: () => void;
   siteName: string;
+  variables: { name: string; sample: string }[];
 }) {
   const { t } = useTranslation();
   const [showPreview, setShowPreview] = useState(false);
 
   // 模板变量替换预览
-  const previewHtml = body
-    .replace(/\{\{site_name\}\}/g, siteName)
-    .replace(/\{\{code\}\}/g, '888888')
-    .replace(/\{\{email\}\}/g, 'user@example.com');
+  function replaceVars(text: string) {
+    let result = text;
+    for (const v of variables) {
+      result = result.replace(new RegExp(`\\{\\{${v.name}\\}\\}`, 'g'), v.sample);
+    }
+    return result;
+  }
+
+  const previewHtml = replaceVars(body);
 
   return (
     <Card
-      title={t('settings.email_template')}
+      title={title}
       extra={
         <div className="flex items-center gap-1.5">
           <Button
@@ -403,8 +479,8 @@ function EmailTemplateEditor({
       <div className="space-y-4">
         <div className="text-[11px] text-text-tertiary space-x-3">
           <span>{t('settings.template_vars')}:</span>
-          {['site_name', 'code', 'email'].map((v) => (
-            <code key={v} className="px-1.5 py-0.5 rounded bg-surface border border-glass-border text-primary">{`{{${v}}}`}</code>
+          {variables.map((v) => (
+            <code key={v.name} className="px-1.5 py-0.5 rounded bg-surface border border-glass-border text-primary">{`{{${v.name}}}`}</code>
           ))}
         </div>
         <Field label={t('settings.template_subject')}>
@@ -429,7 +505,7 @@ function EmailTemplateEditor({
                 </div>
                 <div className="flex gap-2">
                   <span className="text-text-tertiary w-8 shrink-0">Sub</span>
-                  <span className="text-text font-medium">{subject.replace(/\{\{site_name\}\}/g, siteName).replace(/\{\{code\}\}/g, '888888')}</span>
+                  <span className="text-text font-medium">{replaceVars(subject)}</span>
                 </div>
               </div>
               {/* 邮件正文 */}

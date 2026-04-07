@@ -96,6 +96,14 @@ type BalanceLogList struct {
 }
 
 // APIKey 用户 API Key 领域对象。
+// APIKeyBrief API Key 概要（用于 API Key 登录场景展示）。
+type APIKeyBrief struct {
+	Name      string
+	QuotaUSD  float64
+	UsedQuota float64
+	ExpiresAt *time.Time
+}
+
 type APIKey struct {
 	ID            int
 	Name          string
@@ -157,6 +165,8 @@ type Repository interface {
 	Delete(context.Context, int) error
 	ListBalanceLogs(context.Context, int, int, int) ([]BalanceLog, int64, error)
 	ListAPIKeys(context.Context, int, int, int) ([]APIKey, int64, error)
+	GetAPIKeyName(ctx context.Context, keyID int) (string, error)
+	GetAPIKeyInfo(ctx context.Context, keyID int) (APIKeyBrief, error)
 	UpdateBalanceAlert(ctx context.Context, userID int, threshold float64) error
 	SetBalanceAlertNotified(ctx context.Context, userID int, notified bool) error
 }

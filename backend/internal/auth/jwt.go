@@ -15,9 +15,10 @@ var (
 
 // Claims JWT 自定义声明
 type Claims struct {
-	UserID int    `json:"user_id"`
-	Role   string `json:"role"`
-	Email  string `json:"email"`
+	UserID   int    `json:"user_id"`
+	Role     string `json:"role"`
+	Email    string `json:"email"`
+	APIKeyID int    `json:"api_key_id,omitempty"` // >0 表示 API Key 登录，仅可查看该 Key 的使用记录
 	jwt.RegisteredClaims
 }
 
@@ -76,7 +77,28 @@ func (m *JWTManager) ParseToken(tokenStr string) (*Claims, error) {
 	return claims, nil
 }
 
+// GenerateAPIKeyToken 签发 API Key 登录 Token
+func (m *JWTManager) GenerateAPIKeyToken(userID int, role, email string, apiKeyID int) (string, error) {
+	now := time.Now()
+	claims := Claims{
+		UserID:   userID,
+		Role:     role,
+		Email:    email,
+		APIKeyID: apiKeyID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(m.expireHour) * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			Issuer:    "airgate",
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(m.secret)
+}
+
 // RefreshToken 刷新 Token（基于旧 Claims 签发新 Token）
 func (m *JWTManager) RefreshToken(claims *Claims) (string, error) {
+	if claims.APIKeyID > 0 {
+		return m.GenerateAPIKeyToken(claims.UserID, claims.Role, claims.Email, claims.APIKeyID)
+	}
 	return m.GenerateToken(claims.UserID, claims.Role, claims.Email)
 }

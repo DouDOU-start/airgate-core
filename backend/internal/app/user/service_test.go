@@ -84,3 +84,9 @@ func (s stubRepository) ListAPIKeys(ctx context.Context, userID, page, pageSize 
 	}
 	return s.listAPIKeys(ctx, userID, page, pageSize)
 }
+func (s stubRepository) GetAPIKeyName(_ context.Context, _ int) (string, error) {
+	return "", nil
+}
+func (s stubRepository) GetAPIKeyInfo(_ context.Context, _ int) (APIKeyBrief, error) {
+	return APIKeyBrief{}, nil
+}

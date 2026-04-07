@@ -5,6 +5,7 @@ import (
 
 	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
 )
 
@@ -22,10 +23,16 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		return
 	}
 
+	// API Key 登录场景：强制只查该 Key 的记录
+	apiKeyFilter := query.APIKeyID
+	if scopedKey := scopedAPIKeyID(c); scopedKey > 0 {
+		apiKeyFilter = &scopedKey
+	}
+
 	result, err := h.service.ListUser(c.Request.Context(), int64(userID), appusage.ListFilter{
 		Page:      query.Page,
 		PageSize:  query.PageSize,
-		APIKeyID:  query.APIKeyID,
+		APIKeyID:  apiKeyFilter,
 		AccountID: query.AccountID,
 		GroupID:   query.GroupID,
 		Platform:  query.Platform,
@@ -60,7 +67,14 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 		return
 	}
 
+	// API Key 登录场景：限定统计范围
+	var scopedKey *int64
+	if sk := scopedAPIKeyID(c); sk > 0 {
+		scopedKey = &sk
+	}
+
 	summary, err := h.service.UserStats(c.Request.Context(), int64(userID), appusage.StatsFilter{
+		APIKeyID:  scopedKey,
 		Platform:  query.Platform,
 		Model:     query.Model,
 		StartDate: query.StartDate,
@@ -76,6 +90,7 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 	uid64 := int64(userID)
 	modelStats, _ := h.service.StatsByModel(c.Request.Context(), appusage.StatsFilter{
 		UserID:    &uid64,
+		APIKeyID:  scopedKey,
 		Platform:  query.Platform,
 		Model:     query.Model,
 		StartDate: query.StartDate,
@@ -117,9 +132,16 @@ func (h *UsageHandler) UserUsageTrend(c *gin.Context) {
 	granularity := c.DefaultQuery("granularity", "day")
 	uid64 := int64(userID)
 
+	// API Key 登录场景：限定趋势范围
+	var scopedKeyTrend *int64
+	if sk := scopedAPIKeyID(c); sk > 0 {
+		scopedKeyTrend = &sk
+	}
+
 	result, err := h.service.AdminTrend(c.Request.Context(), appusage.TrendFilter{
 		StatsFilter: appusage.StatsFilter{
 			UserID:    &uid64,
+			APIKeyID:  scopedKeyTrend,
 			Platform:  query.Platform,
 			Model:     query.Model,
 			StartDate: query.StartDate,
@@ -227,4 +249,14 @@ func currentUserID(c *gin.Context) (int, bool) {
 	}
 	id, ok := userID.(int)
 	return id, ok
+}
+
+// scopedAPIKeyID 返回 JWT 中携带的 API Key ID（API Key 登录场景），0 表示普通登录。
+func scopedAPIKeyID(c *gin.Context) int64 {
+	if v, exists := c.Get(middleware.CtxKeyAPIKeyID); exists {
+		if id, ok := v.(int); ok {
+			return int64(id)
+		}
+	}
+	return 0
 }

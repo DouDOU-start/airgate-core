@@ -5,7 +5,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -99,9 +98,6 @@ func parseForwardRequestBody(body []byte, requestPath string) parsedForwardReque
 		Stream:    fields.Stream,
 		SessionID: fields.Metadata.UserID,
 	}
-	if shouldForceStreamForPath(requestPath) {
-		parsed.Stream = true
-	}
 	return parsed
 }
 
@@ -121,10 +117,6 @@ func extractModelAndStream(body []byte) (string, bool) {
 func extractSessionID(body []byte) string {
 	parsed := decodeRequestFields(body)
 	return parsed.Metadata.UserID
-}
-
-func shouldForceStreamForPath(requestPath string) bool {
-	return strings.HasSuffix(requestPath, "/responses")
 }
 
 func (f *Forwarder) matchForwardPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, requestPath string) *PluginInstance {

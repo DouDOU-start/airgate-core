@@ -6,6 +6,8 @@ import { usersApi } from '../../shared/api/users';
 interface AuthContextType {
   user: UserResp | null;
   loading: boolean;
+  /** 是否为 API Key 登录 */
+  isAPIKeySession: boolean;
   login: (token: string, user: UserResp) => void;
   logout: () => void;
 }
@@ -13,6 +15,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  isAPIKeySession: false,
   login: () => {},
   logout: () => {},
 });
@@ -44,8 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = '/login';
   };
 
+  const isAPIKeySession = !!(user?.api_key_id && user.api_key_id > 0);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, isAPIKeySession, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

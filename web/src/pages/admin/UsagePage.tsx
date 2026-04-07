@@ -14,7 +14,7 @@ import { SearchSelect, type SearchSelectOption } from '../../shared/components/S
 import { DatePicker } from '../../shared/components/DatePicker';
 import { Card, StatCard } from '../../shared/components/Card';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
-import { Activity, Coins, Hash, DollarSign, Search } from 'lucide-react';
+import { Activity, Coins, Hash, DollarSign, Search, RefreshCw } from 'lucide-react';
 import { useUsageColumns, fmtNum, fmtCost } from '../../shared/columns/usageColumns';
 import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 
@@ -344,7 +344,7 @@ export default function UsagePage() {
   };
 
   // 使用记录列表
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['admin-usage', queryParams],
     queryFn: () => usageApi.adminList(queryParams),
   });
@@ -477,53 +477,6 @@ export default function UsagePage() {
 
   return (
     <div>
-      {/* 筛选栏 */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
-        <div className="w-full sm:w-44">
-          <DatePicker
-            placeholder={t('usage.start_date')}
-            value={filters.start_date || ''}
-            onChange={(v) => updateFilter('start_date', v)}
-          />
-        </div>
-        <div className="w-full sm:w-44">
-          <DatePicker
-            placeholder={t('usage.end_date')}
-            value={filters.end_date || ''}
-            onChange={(v) => updateFilter('end_date', v)}
-          />
-        </div>
-        <div className="w-full sm:w-40">
-          <Select
-            placeholder={t('common.all')}
-            value={filters.platform || ''}
-            onChange={(e) => updateFilter('platform', e.target.value)}
-            options={[
-              { label: t('common.all'), value: '' },
-              ...platforms.map((p) => ({ label: platformName(p), value: p })),
-            ]}
-          />
-        </div>
-        <div className="w-full sm:w-40">
-          <Input
-            placeholder={t('usage.model_placeholder')}
-            value={filters.model || ''}
-            onChange={(e) => updateFilter('model', e.target.value)}
-            icon={<Search className="w-4 h-4" />}
-          />
-        </div>
-        <div className="w-full sm:w-48">
-          <SearchSelect
-            placeholder={t('usage.search_user')}
-            value={filters.user_id ? String(filters.user_id) : ''}
-            onChange={(v) => updateFilter('user_id', v)}
-            onSearch={handleUserSearch}
-            options={userOptions}
-            loading={usersLoading}
-          />
-        </div>
-      </div>
-
       {/* 聚合统计 */}
       {stats && (
         <div className="mb-6 space-y-4">
@@ -643,6 +596,60 @@ export default function UsagePage() {
           </Card>
         </div>
       )}
+
+      {/* 筛选栏 */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
+        <div className="w-full sm:w-44">
+          <DatePicker
+            placeholder={t('usage.start_date')}
+            value={filters.start_date || ''}
+            onChange={(v) => updateFilter('start_date', v)}
+          />
+        </div>
+        <div className="w-full sm:w-44">
+          <DatePicker
+            placeholder={t('usage.end_date')}
+            value={filters.end_date || ''}
+            onChange={(v) => updateFilter('end_date', v)}
+          />
+        </div>
+        <div className="w-full sm:w-40">
+          <Select
+            placeholder={t('common.all')}
+            value={filters.platform || ''}
+            onChange={(e) => updateFilter('platform', e.target.value)}
+            options={[
+              { label: t('common.all'), value: '' },
+              ...platforms.map((p) => ({ label: platformName(p), value: p })),
+            ]}
+          />
+        </div>
+        <div className="w-full sm:w-40">
+          <Input
+            placeholder={t('usage.model_placeholder')}
+            value={filters.model || ''}
+            onChange={(e) => updateFilter('model', e.target.value)}
+            icon={<Search className="w-4 h-4" />}
+          />
+        </div>
+        <div className="w-full sm:w-48">
+          <SearchSelect
+            placeholder={t('usage.search_user')}
+            value={filters.user_id ? String(filters.user_id) : ''}
+            onChange={(v) => updateFilter('user_id', v)}
+            onSearch={handleUserSearch}
+            options={userOptions}
+            loading={usersLoading}
+          />
+        </div>
+        <button
+          onClick={() => refetch()}
+          className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+          title={t('common.refresh')}
+        >
+          <RefreshCw className={`w-4 h-4${isFetching ? ' animate-spin' : ''}`} />
+        </button>
+      </div>
 
       {/* 使用记录表格 */}
       <Table

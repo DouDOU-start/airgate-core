@@ -38,9 +38,10 @@ type RegisterInput struct {
 
 // AuthIdentity 表示当前登录身份。
 type AuthIdentity struct {
-	UserID int
-	Role   string
-	Email  string
+	UserID   int
+	Role     string
+	Email    string
+	APIKeyID int // >0 表示 API Key 登录
 }
 
 // LoginResult 登录/注册结果。

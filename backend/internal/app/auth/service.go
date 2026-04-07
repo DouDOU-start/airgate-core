@@ -88,6 +88,11 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (LoginResul
 	}, nil
 }
 
+// FindByID 根据 ID 查询用户。
+func (s *Service) FindByID(ctx context.Context, id int) (User, error) {
+	return s.repo.FindByID(ctx, id, true)
+}
+
 // EmailExists 检查邮箱是否已注册。
 func (s *Service) EmailExists(ctx context.Context, email string) (bool, error) {
 	return s.repo.EmailExists(ctx, email)
@@ -95,6 +100,9 @@ func (s *Service) EmailExists(ctx context.Context, email string) (bool, error) {
 
 // RefreshToken 刷新 JWT。
 func (s *Service) RefreshToken(identity AuthIdentity) (string, error) {
+	if identity.APIKeyID > 0 {
+		return s.jwtMgr.GenerateAPIKeyToken(identity.UserID, identity.Role, identity.Email, identity.APIKeyID)
+	}
 	return s.jwtMgr.GenerateToken(identity.UserID, identity.Role, identity.Email)
 }
 

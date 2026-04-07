@@ -63,6 +63,11 @@ const userMenuItems: MenuItem[] = [
   { path: '/usage', labelKey: 'nav.my_usage', icon: <BarChart3 className="w-[18px] h-[18px]" /> },
 ];
 
+// API Key 登录只能看使用记录
+const apiKeyMenuItems: MenuItem[] = [
+  { path: '/usage', labelKey: 'nav.my_usage', icon: <BarChart3 className="w-[18px] h-[18px]" />, sectionKey: 'nav.personal' },
+];
+
 function usePluginMenuItems(isAdmin: boolean): MenuItem[] {
   const { data } = useQuery({
     queryKey: queryKeys.pluginsMenu(),
@@ -115,13 +120,16 @@ export function AppShell({ children }: AppShellProps) {
   }, [mobileOpen]);
 
   const isAdmin = user?.role === 'admin';
-  const pluginMenuItems = usePluginMenuItems(isAdmin);
+  const isAPIKeySession = !!(user?.api_key_id && user.api_key_id > 0);
+  const pluginMenuItems = usePluginMenuItems(isAdmin && !isAPIKeySession);
   const adminUserItems = userMenuItems
     .filter((item) => item.path !== '/')
     .map((item, i) => (i === 0 ? { ...item, sectionKey: 'nav.personal' } : item));
-  const menuItems = isAdmin
-    ? [...adminMenuItems, ...pluginMenuItems, ...adminUserItems]
-    : [...userMenuItems, ...pluginMenuItems];
+  const menuItems = isAPIKeySession
+    ? apiKeyMenuItems
+    : isAdmin
+      ? [...adminMenuItems, ...pluginMenuItems, ...adminUserItems]
+      : [...userMenuItems, ...pluginMenuItems];
 
   const sections: Array<{ titleKey?: string; items: MenuItem[] }> = [];
   let currentSection: { titleKey?: string; items: MenuItem[] } | null = null;
@@ -334,10 +342,16 @@ export function AppShell({ children }: AppShellProps) {
 
             {/* User info */}
             <div className="flex items-center gap-2 pl-1">
-              <div className="hidden sm:block text-center">
-                <p className="text-xs font-medium text-text leading-tight">{user?.username || user?.email?.split('@')[0]}</p>
-                <p className="text-[10px] text-text-tertiary leading-tight">{user?.email}</p>
-              </div>
+              {!isAPIKeySession && (
+                <div className="hidden sm:block text-center">
+                  <p className="text-xs font-medium text-text leading-tight">
+                    {user?.username || user?.email?.split('@')[0]}
+                  </p>
+                  <p className="text-[10px] text-text-tertiary leading-tight">
+                    {user?.email}
+                  </p>
+                </div>
+              )}
               {isAdmin ? (
                 <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary-subtle text-primary shrink-0">
                   <ShieldCheck className="w-3.5 h-3.5" />

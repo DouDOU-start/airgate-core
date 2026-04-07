@@ -218,6 +218,16 @@ func (s *Service) ListBalanceLogs(ctx context.Context, userID, page, pageSize in
 	return BalanceLogList{List: list, Total: total, Page: page, PageSize: pageSize}, nil
 }
 
+// GetAPIKeyName 获取 API Key 名称。
+func (s *Service) GetAPIKeyName(ctx context.Context, keyID int) (string, error) {
+	return s.repo.GetAPIKeyName(ctx, keyID)
+}
+
+// GetAPIKeyInfo 获取 API Key 概要信息。
+func (s *Service) GetAPIKeyInfo(ctx context.Context, keyID int) (APIKeyBrief, error) {
+	return s.repo.GetAPIKeyInfo(ctx, keyID)
+}
+
 // ListAPIKeys 查询指定用户的 API Key 列表。
 func (s *Service) ListAPIKeys(ctx context.Context, userID, page, pageSize int) (APIKeyList, error) {
 	page, pageSize = normalizePage(page, pageSize)

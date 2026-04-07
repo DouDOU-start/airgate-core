@@ -27,12 +27,17 @@ export interface PageReq {
 export interface LoginReq {
   email: string;
   password: string;
+}
 
+export interface APIKeyLoginReq {
+  key: string;
 }
 
 export interface LoginResp {
   token: string;
   user: UserResp;
+  api_key_id?: number;
+  api_key_name?: string;
 }
 
 export interface RegisterReq {
@@ -60,6 +65,11 @@ export interface UserResp {
   allowed_group_ids?: number[];
   balance_alert_threshold: number;
   status: string;
+  api_key_id?: number;
+  api_key_name?: string;
+  api_key_quota_usd?: number;
+  api_key_used_quota?: number;
+  api_key_expires_at?: string;
   created_at: string;
   updated_at: string;
 }

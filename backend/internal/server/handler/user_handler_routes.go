@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 
 	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
+	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
 )
 
@@ -22,7 +25,24 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
-	response.Success(c, toUserRespFromDomain(item))
+	resp := toUserRespFromDomain(item)
+
+	// API Key 登录场景：附带 Key 信息（名称、额度、到期时间）
+	if apiKeyID, exists := c.Get(middleware.CtxKeyAPIKeyID); exists {
+		if id, ok := apiKeyID.(int); ok && id > 0 {
+			resp.APIKeyID = int64(id)
+			if info, err := h.service.GetAPIKeyInfo(c.Request.Context(), id); err == nil {
+				resp.APIKeyName = info.Name
+				resp.APIKeyQuotaUSD = info.QuotaUSD
+				resp.APIKeyUsedQuota = info.UsedQuota
+				if info.ExpiresAt != nil {
+					resp.APIKeyExpiresAt = info.ExpiresAt.Format(time.RFC3339)
+				}
+			}
+		}
+	}
+
+	response.Success(c, resp)
 }
 
 // UpdateProfile 更新当前用户资料。

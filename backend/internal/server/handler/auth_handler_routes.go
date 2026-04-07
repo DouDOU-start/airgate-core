@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
+	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
@@ -47,6 +48,57 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	response.Success(c, dto.LoginResp{
 		Token: result.Token,
 		User:  userToResp(result.User),
+	})
+}
+
+// LoginByAPIKey 使用 API Key 登录（仅能查看该 Key 的使用记录）。
+func (h *AuthHandler) LoginByAPIKey(c *gin.Context) {
+	var req dto.APIKeyLoginReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	if !strings.HasPrefix(req.Key, "sk-") {
+		response.BadRequest(c, "无效的 API Key 格式")
+		return
+	}
+
+	info, err := auth.ValidateAPIKeyForLogin(c.Request.Context(), h.db, req.Key)
+	if err != nil {
+		switch err {
+		case auth.ErrAPIKeyExpired:
+			response.Unauthorized(c, "API Key 已过期")
+		default:
+			response.Unauthorized(c, "无效的 API Key")
+		}
+		return
+	}
+
+	// 查询用户信息
+	user, err := h.service.FindByID(c.Request.Context(), info.UserID)
+	if err != nil {
+		response.InternalError(c, "查询用户失败")
+		return
+	}
+
+	if user.Status != "active" {
+		response.Forbidden(c, "用户已被禁用")
+		return
+	}
+
+	// 签发带 api_key_id 的 JWT
+	token, err := h.jwtMgr.GenerateAPIKeyToken(user.ID, user.Role, user.Email, info.KeyID)
+	if err != nil {
+		response.InternalError(c, "生成 Token 失败")
+		return
+	}
+
+	response.Success(c, dto.LoginResp{
+		Token:      token,
+		User:       userToResp(user),
+		APIKeyID:   int64(info.KeyID),
+		APIKeyName: info.KeyName,
 	})
 }
 

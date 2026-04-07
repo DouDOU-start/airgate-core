@@ -410,6 +410,9 @@ func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) 
 }
 
 func applyUsageStatsFilter(query *ent.UsageLogQuery, filter appusage.StatsFilter) *ent.UsageLogQuery {
+	if filter.APIKeyID != nil {
+		query = query.Where(entusagelog.HasAPIKeyWith(entapikey.IDEQ(int(*filter.APIKeyID))))
+	}
 	if filter.Platform != "" {
 		query = query.Where(entusagelog.PlatformEQ(filter.Platform))
 	}
