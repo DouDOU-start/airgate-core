@@ -10,6 +10,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	entsetting "github.com/DouDOU-start/airgate-core/ent/setting"
 )
 
 var (
@@ -20,6 +21,7 @@ var (
 )
 
 const apiKeyPrefix = "sk-"
+const adminKeyPrefix = "admin-"
 
 // APIKeyInfo API Key 验证后的信息
 type APIKeyInfo struct {
@@ -55,6 +57,30 @@ func GenerateAPIKey() (key string, hash string, err error) {
 func HashAPIKey(key string) string {
 	h := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(h[:])
+}
+
+// GenerateAdminAPIKey 生成管理员 API Key，返回明文密钥和哈希。
+func GenerateAdminAPIKey() (key string, hash string, err error) {
+	b := make([]byte, 32)
+	if _, err = rand.Read(b); err != nil {
+		return "", "", err
+	}
+	key = adminKeyPrefix + hex.EncodeToString(b)
+	hash = HashAPIKey(key)
+	return key, hash, nil
+}
+
+// AdminKeyHint 生成管理员 API Key 的显示提示（前缀 + 前4位...后4位）。
+func AdminKeyHint(key string) string {
+	if len(key) <= 12 {
+		return key
+	}
+	return key[:10] + "..." + key[len(key)-4:]
+}
+
+// IsAdminAPIKey 判断是否为管理员 API Key 格式。
+func IsAdminAPIKey(key string) bool {
+	return len(key) > len(adminKeyPrefix) && key[:len(adminKeyPrefix)] == adminKeyPrefix
 }
 
 // ValidateAPIKeyForLogin 验证 API Key 用于 Web 登录（不要求绑定分组）。
@@ -140,4 +166,24 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 		GroupServiceTier:       g.ServiceTier,
 		GroupForceInstructions: g.ForceInstructions,
 	}, nil
+}
+
+// ValidateAdminAPIKey 验证管理员 API Key，返回 nil 表示验证通过。
+func ValidateAdminAPIKey(ctx context.Context, db *ent.Client, key string) error {
+	hash := HashAPIKey(key)
+
+	// 从 settings 表查询 admin_api_key_hash
+	s, err := db.Setting.Query().
+		Where(
+			entsetting.KeyEQ("admin_api_key_hash"),
+			entsetting.GroupEQ("security"),
+		).
+		Only(ctx)
+	if err != nil {
+		return ErrInvalidAPIKey
+	}
+	if s.Value == "" || s.Value != hash {
+		return ErrInvalidAPIKey
+	}
+	return nil
 }

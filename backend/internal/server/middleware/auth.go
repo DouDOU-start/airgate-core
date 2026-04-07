@@ -22,13 +22,28 @@ const (
 )
 
 // JWTAuth JWT 认证中间件
-// 从 Authorization: Bearer <token> 头解析 JWT，将 user_id、role 设置到 Context
-func JWTAuth(jwtMgr *auth.JWTManager) gin.HandlerFunc {
+// 从 Authorization: Bearer <token> 头解析 JWT，将 user_id、role 设置到 Context。
+// 同时支持管理员 API Key（admin-xxx 格式）作为备选认证方式。
+func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := extractBearerToken(c)
 		if tokenStr == "" {
 			response.Unauthorized(c, "缺少认证 Token")
 			c.Abort()
+			return
+		}
+
+		// 管理员 API Key 认证
+		if auth.IsAdminAPIKey(tokenStr) && len(db) > 0 && db[0] != nil {
+			if err := auth.ValidateAdminAPIKey(c.Request.Context(), db[0], tokenStr); err != nil {
+				response.Unauthorized(c, "管理员 API Key 无效")
+				c.Abort()
+				return
+			}
+			c.Set(CtxKeyUserID, 0)
+			c.Set(CtxKeyRole, "admin")
+			c.Set(CtxKeyEmail, "")
+			c.Next()
 			return
 		}
 

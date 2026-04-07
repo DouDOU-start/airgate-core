@@ -71,9 +71,9 @@ func (s *Server) registerRoutes() {
 
 	}
 
-	// === 管理员路由（需要 JWT + AdminOnly） ===
+	// === 管理员路由（需要 JWT + AdminOnly，支持管理员 API Key） ===
 	adminGroup := v1.Group("/admin")
-	adminGroup.Use(middleware.JWTAuth(s.jwtMgr), middleware.AdminOnly())
+	adminGroup.Use(middleware.JWTAuth(s.jwtMgr, s.db), middleware.AdminOnly())
 	{
 		// 用户管理
 		adminGroup.GET("/users", handlers.User.ListUsers)
@@ -143,14 +143,19 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/settings/test-smtp", handlers.Settings.TestSMTP)
 		adminGroup.POST("/settings/upload", handlers.Settings.UploadFile)
 
+		// 管理员 API Key
+		adminGroup.GET("/settings/admin-api-key", handlers.Settings.GetAdminAPIKey)
+		adminGroup.POST("/settings/admin-api-key", handlers.Settings.GenerateAdminAPIKey)
+		adminGroup.DELETE("/settings/admin-api-key", handlers.Settings.DeleteAdminAPIKey)
+
 		// 仪表盘（管理员）
 		adminGroup.GET("/dashboard/stats", handlers.Dashboard.Stats)
 		adminGroup.GET("/dashboard/trend", handlers.Dashboard.Trend)
 	}
 
-	// === Extension 插件 API 路由（JWT 认证 + 管理员权限） ===
+	// === Extension 插件 API 路由（JWT 认证 + 管理员权限，支持管理员 API Key） ===
 	extGroup := r.Group("/api/v1/ext")
-	extGroup.Use(middleware.JWTAuth(s.jwtMgr), middleware.AdminOnly())
+	extGroup.Use(middleware.JWTAuth(s.jwtMgr, s.db), middleware.AdminOnly())
 	{
 		extGroup.Any("/:pluginName/*path", s.extensionProxy.Handle)
 	}

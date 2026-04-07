@@ -92,7 +92,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Subscription: handler.NewSubscriptionHandler(subscriptionService),
 		Usage:        handler.NewUsageHandler(usageService),
 		Proxy:        handler.NewProxyHandler(proxyService),
-		Settings:     handler.NewSettingsHandler(settingsService),
+		Settings:     handler.NewSettingsHandler(settingsService, dep.Config.APIKeySecret()),
 		Dashboard:    handler.NewDashboardHandler(dashboardService),
 		Plugin:       handler.NewPluginHandler(pluginAdminService),
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
+	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
 )
@@ -216,4 +217,84 @@ func (h *SettingsHandler) UploadFile(c *gin.Context) {
 
 	url := "/uploads/" + filename
 	response.Success(c, map[string]string{"url": url})
+}
+
+// settings key 常量（管理员 API Key）
+const (
+	settingAdminKeyHint      = "admin_api_key_hint"
+	settingAdminKeyHash      = "admin_api_key_hash"
+	settingAdminKeyEncrypted = "admin_api_key_encrypted"
+	settingGroupSecurity     = "security"
+)
+
+// GetAdminAPIKey 获取管理员 API Key 信息（仅返回脱敏 hint）。
+func (h *SettingsHandler) GetAdminAPIKey(c *gin.Context) {
+	list, err := h.service.List(c.Request.Context(), settingGroupSecurity)
+	if err != nil {
+		slog.Error("查询管理员 API Key 失败", "error", err)
+		response.InternalError(c, "查询失败")
+		return
+	}
+
+	var hint string
+	for _, item := range list {
+		if item.Key == settingAdminKeyHint {
+			hint = item.Value
+		}
+	}
+	if hint == "" {
+		response.Success(c, nil)
+		return
+	}
+
+	response.Success(c, dto.AdminAPIKeyResp{Hint: hint})
+}
+
+// GenerateAdminAPIKey 生成（或重新生成）管理员 API Key。
+func (h *SettingsHandler) GenerateAdminAPIKey(c *gin.Context) {
+	plainKey, hash, err := auth.GenerateAdminAPIKey()
+	if err != nil {
+		slog.Error("生成管理员 API Key 失败", "error", err)
+		response.InternalError(c, "生成密钥失败")
+		return
+	}
+
+	encrypted, err := auth.EncryptAPIKey(plainKey, h.apiKeySecret)
+	if err != nil {
+		slog.Error("加密管理员 API Key 失败", "error", err)
+		response.InternalError(c, "加密密钥失败")
+		return
+	}
+
+	hint := auth.AdminKeyHint(plainKey)
+
+	items := []appsettings.ItemInput{
+		{Key: settingAdminKeyHint, Value: hint, Group: settingGroupSecurity},
+		{Key: settingAdminKeyHash, Value: hash, Group: settingGroupSecurity},
+		{Key: settingAdminKeyEncrypted, Value: encrypted, Group: settingGroupSecurity},
+	}
+	if err := h.service.Update(c.Request.Context(), items); err != nil {
+		slog.Error("保存管理员 API Key 失败", "error", err)
+		response.InternalError(c, "保存密钥失败")
+		return
+	}
+
+	response.Success(c, dto.AdminAPIKeyResp{Hint: hint, Key: plainKey})
+}
+
+// DeleteAdminAPIKey 删除管理员 API Key。
+func (h *SettingsHandler) DeleteAdminAPIKey(c *gin.Context) {
+	// 将三个 key 置空即可
+	items := []appsettings.ItemInput{
+		{Key: settingAdminKeyHint, Value: "", Group: settingGroupSecurity},
+		{Key: settingAdminKeyHash, Value: "", Group: settingGroupSecurity},
+		{Key: settingAdminKeyEncrypted, Value: "", Group: settingGroupSecurity},
+	}
+	if err := h.service.Update(c.Request.Context(), items); err != nil {
+		slog.Error("删除管理员 API Key 失败", "error", err)
+		response.InternalError(c, "删除密钥失败")
+		return
+	}
+
+	response.Success(c, nil)
 }

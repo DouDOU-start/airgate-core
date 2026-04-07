@@ -171,6 +171,17 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
               streamingRef.current += data.delta;
               setStreamingContent(streamingRef.current);
               scrollToBottom();
+              continue;
+            }
+
+            // 插件原始 SSE：Chat Completions API 格式
+            if (data?.object === 'chat.completion.chunk') {
+              const content = data.choices?.[0]?.delta?.content;
+              if (content) {
+                streamingRef.current += content;
+                setStreamingContent(streamingRef.current);
+                scrollToBottom();
+              }
             }
           } catch {
             // 非 JSON，忽略
