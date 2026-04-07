@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pluginsApi } from '../../shared/api/plugins';
 import { useToast } from '../../shared/components/Toast';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -28,6 +28,7 @@ const typeVariant: Record<string, 'info' | 'success' | 'warning'> = {
 export default function PluginsPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<'installed' | 'marketplace'>('installed');
   const [uninstallTarget, setUninstallTarget] = useState<PluginResp | null>(null);
@@ -64,6 +65,24 @@ export default function PluginsPage() {
   function handleMarketInstall(repo: string) {
     setInstallingRepo(repo);
     marketInstallMutation.mutate(repo);
+  }
+
+  // 强制从 GitHub 同步市场列表（点击右上角刷新按钮时触发）
+  const refreshMarketMutation = useMutation({
+    mutationFn: () => pluginsApi.refreshMarketplace(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.marketplace() });
+      toast('success', t('plugins.marketplace_refreshed'));
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  function handleHeaderRefresh() {
+    if (activeTab === 'marketplace') {
+      refreshMarketMutation.mutate();
+    } else {
+      refetchPlugins();
+    }
   }
 
   // 卸载插件
@@ -182,10 +201,11 @@ export default function PluginsPage() {
         ))}
         <div className="flex items-center gap-2 ml-auto pb-1">
           <button
-            onClick={() => refetchPlugins()}
-            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+            onClick={handleHeaderRefresh}
+            disabled={refreshMarketMutation.isPending}
+            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors disabled:opacity-50"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${refreshMarketMutation.isPending ? 'animate-spin' : ''}`} />
           </button>
           <Button
             icon={<Plus className="w-4 h-4" />}

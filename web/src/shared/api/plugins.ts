@@ -10,6 +10,8 @@ export const pluginsApi = {
   reload: (name: string) => post<void>(`/api/v1/admin/plugins/${name}/reload`),
   marketplace: (params?: PageReq) =>
     get<PagedData<MarketplacePluginResp>>('/api/v1/admin/marketplace/plugins', params),
+  // 强制从 GitHub 同步市场列表
+  refreshMarketplace: () => post<void>('/api/v1/admin/marketplace/refresh'),
   // 上传安装插件
   upload: (file: File, name?: string) => {
     const fd = new FormData();

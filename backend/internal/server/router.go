@@ -136,6 +136,7 @@ func (s *Server) registerRoutes() {
 
 		// 插件市场
 		adminGroup.GET("/marketplace/plugins", handlers.Plugin.ListMarketplace)
+		adminGroup.POST("/marketplace/refresh", handlers.Plugin.RefreshMarketplace)
 
 		// 系统设置
 		adminGroup.GET("/settings", handlers.Settings.GetSettings)

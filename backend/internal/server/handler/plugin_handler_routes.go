@@ -168,6 +168,15 @@ func (h *PluginHandler) ProxyRequest(c *gin.Context) {
 	response.Error(c, result.StatusCode, -1, message)
 }
 
+// RefreshMarketplace 强制从 GitHub 同步市场列表。
+func (h *PluginHandler) RefreshMarketplace(c *gin.Context) {
+	if err := h.service.RefreshMarketplace(c.Request.Context()); err != nil {
+		response.InternalError(c, "刷新插件市场失败: "+err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
 // ListMarketplace 列出市场可用插件。
 func (h *PluginHandler) ListMarketplace(c *gin.Context) {
 	list, err := h.service.ListMarketplace(c.Request.Context())

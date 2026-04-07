@@ -22,6 +22,7 @@ type Manager interface {
 // MarketplaceReader 定义插件市场读取能力。
 type MarketplaceReader interface {
 	ListAvailable(context.Context) ([]plugin.MarketplacePlugin, error)
+	SyncFromGithub(context.Context) error
 }
 
 // PluginMeta 插件元信息。

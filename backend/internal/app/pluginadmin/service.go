@@ -92,6 +92,11 @@ func (s *Service) Proxy(ctx context.Context, input ProxyInput) (ProxyResult, err
 	}, nil
 }
 
+// RefreshMarketplace 强制从 GitHub 同步市场列表。
+func (s *Service) RefreshMarketplace(ctx context.Context) error {
+	return s.marketplace.SyncFromGithub(ctx)
+}
+
 // ListMarketplace 返回市场插件列表。
 func (s *Service) ListMarketplace(ctx context.Context) ([]MarketplacePlugin, error) {
 	items, err := s.marketplace.ListAvailable(ctx)

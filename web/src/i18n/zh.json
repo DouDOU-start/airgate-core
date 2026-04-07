@@ -608,6 +608,7 @@
     "github_hint": "从 GitHub Release 下载适配当前系统的预编译二进制文件",
     "upload_success": "插件上传安装成功",
     "github_success": "插件从 GitHub 安装成功",
+    "marketplace_refreshed": "插件市场已同步最新版本",
     "reload": "热加载",
     "reload_success": "插件热加载成功",
     "dev_badge": "开发"

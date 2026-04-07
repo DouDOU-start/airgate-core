@@ -604,6 +604,7 @@
     "github_hint": "Download pre-built binary from GitHub Release for the current platform",
     "upload_success": "Plugin uploaded and installed",
     "github_success": "Plugin installed from GitHub",
+    "marketplace_refreshed": "Marketplace synced with latest releases",
     "reload": "Reload",
     "reload_success": "Plugin reloaded successfully",
     "dev_badge": "Dev"

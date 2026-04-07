@@ -56,3 +56,7 @@ func (s pluginMarketplaceStub) ListAvailable(ctx context.Context) ([]plugin.Mark
 	}
 	return s.listAvailable(ctx)
 }
+
+func (s pluginMarketplaceStub) SyncFromGithub(context.Context) error {
+	return nil
+}
