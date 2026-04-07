@@ -512,6 +512,8 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		} else {
 			record.AccountName = item.Edges.Account.Name
 		}
+	} else {
+		record.AccountName = "-"
 	}
 	if item.Edges.Group != nil {
 		record.GroupID = int64(item.Edges.Group.ID)

@@ -52,7 +52,7 @@ func (UsageLog) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("user", User.Type).Ref("usage_logs").Unique().Required(),
 		edge.From("api_key", APIKey.Type).Ref("usage_logs").Unique(),
-		edge.From("account", Account.Type).Ref("usage_logs").Unique().Required(),
+		edge.From("account", Account.Type).Ref("usage_logs").Unique(),
 		edge.From("group", Group.Type).Ref("usage_logs").Unique(),
 	}
 }

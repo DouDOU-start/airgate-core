@@ -487,6 +487,14 @@ func (ulu *UsageLogUpdate) SetAccountID(id int) *UsageLogUpdate {
 	return ulu
 }
 
+// SetNillableAccountID sets the "account" edge to the Account entity by ID if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableAccountID(id *int) *UsageLogUpdate {
+	if id != nil {
+		ulu = ulu.SetAccountID(*id)
+	}
+	return ulu
+}
+
 // SetAccount sets the "account" edge to the Account entity.
 func (ulu *UsageLogUpdate) SetAccount(a *Account) *UsageLogUpdate {
 	return ulu.SetAccountID(a.ID)
@@ -581,9 +589,6 @@ func (ulu *UsageLogUpdate) check() error {
 	}
 	if _, ok := ulu.mutation.UserID(); ulu.mutation.UserCleared() && !ok {
 		return errors.New(`ent: clearing a required unique edge "UsageLog.user"`)
-	}
-	if _, ok := ulu.mutation.AccountID(); ulu.mutation.AccountCleared() && !ok {
-		return errors.New(`ent: clearing a required unique edge "UsageLog.account"`)
 	}
 	return nil
 }
@@ -1306,6 +1311,14 @@ func (uluo *UsageLogUpdateOne) SetAccountID(id int) *UsageLogUpdateOne {
 	return uluo
 }
 
+// SetNillableAccountID sets the "account" edge to the Account entity by ID if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableAccountID(id *int) *UsageLogUpdateOne {
+	if id != nil {
+		uluo = uluo.SetAccountID(*id)
+	}
+	return uluo
+}
+
 // SetAccount sets the "account" edge to the Account entity.
 func (uluo *UsageLogUpdateOne) SetAccount(a *Account) *UsageLogUpdateOne {
 	return uluo.SetAccountID(a.ID)
@@ -1413,9 +1426,6 @@ func (uluo *UsageLogUpdateOne) check() error {
 	}
 	if _, ok := uluo.mutation.UserID(); uluo.mutation.UserCleared() && !ok {
 		return errors.New(`ent: clearing a required unique edge "UsageLog.user"`)
-	}
-	if _, ok := uluo.mutation.AccountID(); uluo.mutation.AccountCleared() && !ok {
-		return errors.New(`ent: clearing a required unique edge "UsageLog.account"`)
 	}
 	return nil
 }

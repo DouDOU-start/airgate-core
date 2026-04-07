@@ -366,6 +366,14 @@ func (ulc *UsageLogCreate) SetAccountID(id int) *UsageLogCreate {
 	return ulc
 }
 
+// SetNillableAccountID sets the "account" edge to the Account entity by ID if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableAccountID(id *int) *UsageLogCreate {
+	if id != nil {
+		ulc = ulc.SetAccountID(*id)
+	}
+	return ulc
+}
+
 // SetAccount sets the "account" edge to the Account entity.
 func (ulc *UsageLogCreate) SetAccount(a *Account) *UsageLogCreate {
 	return ulc.SetAccountID(a.ID)
@@ -594,9 +602,6 @@ func (ulc *UsageLogCreate) check() error {
 	}
 	if _, ok := ulc.mutation.UserID(); !ok {
 		return &ValidationError{Name: "user", err: errors.New(`ent: missing required edge "UsageLog.user"`)}
-	}
-	if _, ok := ulc.mutation.AccountID(); !ok {
-		return &ValidationError{Name: "account", err: errors.New(`ent: missing required edge "UsageLog.account"`)}
 	}
 	return nil
 }
