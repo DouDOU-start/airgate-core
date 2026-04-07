@@ -17,6 +17,11 @@ func (s *Server) registerRoutes() {
 	// 全局中间件
 	r.Use(middleware.I18n())
 
+	// 健康检查（无需认证，供 docker / k8s healthcheck 使用）
+	r.GET("/healthz", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	// 安装向导路由（无需认证）
 	setup.RegisterRoutes(r)
 

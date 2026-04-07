@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: doudou-start/airgate-core
+
+jobs:
+  build-and-push:
+    name: Build & Push Multi-arch Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout airgate-core
+        uses: actions/checkout@v4
+        with:
+          path: airgate-core
+
+      - name: Clone airgate-sdk (Dockerfile expects sibling repo)
+        run: git clone --depth 1 https://github.com/DouDOU-start/airgate-sdk.git airgate-sdk
+
+      - name: Set up QEMU (cross-arch emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
+
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: airgate-core/deploy/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  release-notes:
+    name: Create GitHub Release
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release with auto-generated notes
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            ## 镜像
+
+            ```bash
+            docker pull ghcr.io/doudou-start/airgate-core:${{ github.ref_name }}
+            # 或固定到 latest
+            docker pull ghcr.io/doudou-start/airgate-core:latest
+            ```
+
+            支持架构：`linux/amd64` `linux/arm64`
+
+            ## 部署
+
+            参考 [deploy/docker-compose.yml](https://github.com/DouDOU-start/airgate-core/blob/${{ github.ref_name }}/deploy/docker-compose.yml) 与 [deploy/.env.example](https://github.com/DouDOU-start/airgate-core/blob/${{ github.ref_name }}/deploy/.env.example)。

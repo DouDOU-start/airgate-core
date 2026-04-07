@@ -1,38 +1,73 @@
-# 生产部署编排
-# 构建: docker compose -f deploy/docker-compose.yml build
-# 启动: docker compose -f deploy/docker-compose.yml up -d
+# ============================================================
+# AirGate Core 生产部署
+#
+# 用法：
+#   1. 在本目录（或任意空目录）准备 docker-compose.yml + .env：
+#        cp .env.example .env && vim .env   # 至少改 DB_PASSWORD 和 JWT_SECRET
+#   2. 启动：
+#        docker compose up -d
+#   3. 查看日志：
+#        docker compose logs -f core
+#   4. 停止：
+#        docker compose down       # 保留数据卷
+#        docker compose down -v    # 同时清理数据卷（慎用）
+#
+# 镜像版本通过 AIRGATE_IMAGE_TAG 控制，默认 latest。
+# 如需本地构建（开发用），改用 docker-compose.dev.yml。
+# ============================================================
+
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: airgate
       POSTGRES_PASSWORD: ${DB_PASSWORD:-airgate}
       POSTGRES_DB: airgate
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${TZ:-Asia/Shanghai}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airgate -d airgate"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 20
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    networks:
+      - airgate-net
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     restart: unless-stopped
+    command:
+      - redis-server
+      - --save
+      - "60"
+      - "1"
+      - --appendonly
+      - "yes"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 3s
       retries: 20
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    networks:
+      - airgate-net
 
   core:
-    build:
-      context: ../..
-      dockerfile: airgate-core/deploy/Dockerfile
-    image: airgate-core:latest
+    image: ${AIRGATE_IMAGE:-ghcr.io/doudou-start/airgate-core}:${AIRGATE_IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -40,17 +75,53 @@ services:
       redis:
         condition: service_healthy
     environment:
+      # ---- 数据库 ----
       DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: airgate
       DB_PASSWORD: ${DB_PASSWORD:-airgate}
+      DB_NAME: airgate
+      DB_SSLMODE: disable
+      # ---- Redis ----
       REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # ---- 安全 ----
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      API_KEY_SECRET: ${API_KEY_SECRET:-}
+      # ---- 运行时 ----
+      GIN_MODE: release
+      LOG_LEVEL: info
+      LOG_FORMAT: text
       WEB_DIR: frontend
+      PLUGINS_DIR: /app/data/plugins
+      PLUGINS_MARKETPLACE_GITHUB_TOKEN: ${PLUGINS_MARKETPLACE_GITHUB_TOKEN:-}
+      TZ: ${TZ:-Asia/Shanghai}
     volumes:
-      - ./config.docker.yaml:/app/config.yaml
-      - ../backend/data/plugins:/app/data/plugins
+      # 插件目录持久化（重建容器不丢已安装插件）
+      - airgate_plugins:/app/data/plugins
+      # 上传文件持久化
+      - airgate_uploads:/app/data/uploads
     ports:
-      - "${PORT:-9517}:9517"
+      - "${BIND_HOST:-0.0.0.0}:${PORT:-9517}:9517"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9517/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    networks:
+      - airgate-net
 
 volumes:
   postgres_data:
   redis_data:
+  airgate_plugins:
+  airgate_uploads:
+
+networks:
+  airgate-net:
+    driver: bridge
