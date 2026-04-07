@@ -31,7 +31,7 @@ func TestExtractSessionID(t *testing.T) {
 	}
 }
 
-func TestParseForwardRequestBodyForcesResponsesStream(t *testing.T) {
+func TestParseForwardRequestBodyResponsesRespectsStream(t *testing.T) {
 	t.Parallel()
 
 	body := []byte(`{"model":"gpt-4.1","stream":false,"metadata":{"user_id":"session-123"}}`)
@@ -43,8 +43,8 @@ func TestParseForwardRequestBodyForcesResponsesStream(t *testing.T) {
 	if parsed.SessionID != "session-123" {
 		t.Fatalf("parseForwardRequestBody() sessionID = %q, want %q", parsed.SessionID, "session-123")
 	}
-	if !parsed.Stream {
-		t.Fatalf("parseForwardRequestBody() stream = false, want true")
+	if parsed.Stream {
+		t.Fatalf("parseForwardRequestBody() stream = true, want false")
 	}
 }
 
