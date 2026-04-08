@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*'
+  # 允许手动从 gh CLI 触发：gh workflow run release.yml --ref v0.1.0
+  # 用于重跑失败的发布，或在快速 delete+repush 同一个 tag 时手工补发
+  # （GitHub Actions 偶尔会跳过这种 push 事件）。
+  # github.ref_name 由 --ref 参数提供，与 tag 推送的语义一致。
+  workflow_dispatch:
 
 permissions:
   contents: write
