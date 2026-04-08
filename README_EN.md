@@ -124,6 +124,26 @@ Once started, visit `http://<your-host>:9517` and follow the wizard to create th
 
 ### Method 2: Run from Source (Development)
 
+For development or running the full stack inside containers. Pick one of the two paths:
+
+**A. Fully containerized (recommended, zero host dependencies)**
+
+The host only needs Docker. Clone [`airgate-sdk`](https://github.com/DouDOU-start/airgate-sdk) / [`airgate-core`](https://github.com/DouDOU-start/airgate-core) / [`airgate-openai`](https://github.com/DouDOU-start/airgate-openai) into a shared parent directory:
+
+```bash
+mkdir airgate && cd airgate
+git clone https://github.com/DouDOU-start/airgate-sdk.git
+git clone https://github.com/DouDOU-start/airgate-core.git
+git clone https://github.com/DouDOU-start/airgate-openai.git
+
+cd airgate-core
+docker compose -f deploy/docker-compose.dev.yml up
+```
+
+[deploy/docker-compose.dev.yml](deploy/docker-compose.dev.yml) brings up postgres + redis, builds the sdk / openai / core frontends, builds the gateway-openai plugin, and finally runs core via `go run ./cmd/server` — all inside containers. Visit `http://localhost:9517` once it is up.
+
+**B. Run on the host directly**
+
 Requires Go 1.25+, Node 22+, local Postgres + Redis, and the sibling [`airgate-sdk`](https://github.com/DouDOU-start/airgate-sdk) repo:
 
 ```bash

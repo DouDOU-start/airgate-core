@@ -124,6 +124,26 @@ docker compose logs -f core
 
 ### 方式 2：源码运行（开发）
 
+适合二次开发或想完整在容器里跑全家桶的场景。两条路任选其一：
+
+**A. 全容器（推荐，宿主机零依赖）**
+
+宿主机只需要 Docker。父目录同时克隆 [`airgate-sdk`](https://github.com/DouDOU-start/airgate-sdk) / [`airgate-core`](https://github.com/DouDOU-start/airgate-core) / [`airgate-openai`](https://github.com/DouDOU-start/airgate-openai) 三个仓库：
+
+```bash
+mkdir airgate && cd airgate
+git clone https://github.com/DouDOU-start/airgate-sdk.git
+git clone https://github.com/DouDOU-start/airgate-core.git
+git clone https://github.com/DouDOU-start/airgate-openai.git
+
+cd airgate-core
+docker compose -f deploy/docker-compose.dev.yml up
+```
+
+[deploy/docker-compose.dev.yml](deploy/docker-compose.dev.yml) 会拉起 postgres + redis，依次构建 sdk / openai / core 三个前端、构建 gateway-openai 插件，最后用 `go run ./cmd/server` 启动 core，全部跑在容器里。访问 `http://localhost:9517` 即可。
+
+**B. 宿主机直跑**
+
 需要 Go 1.25+、Node 22+、本地 Postgres + Redis，以及兄弟目录 [`airgate-sdk`](https://github.com/DouDOU-start/airgate-sdk)：
 
 ```bash
