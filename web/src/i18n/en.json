@@ -828,7 +828,7 @@
 
   "status_page": {
     "title": "Service Status",
-    "subtitle": "Uptime over the past 7 days, auto-refresh every minute",
+    "subtitle": "Uptime computed over the past 7 days, trend chart covers the past 90 days, auto-refresh every minute",
     "refresh": "Refresh",
     "all_operational": "All Systems Operational",
     "partial_degraded": "Partial Service Degradation",

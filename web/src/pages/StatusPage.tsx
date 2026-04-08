@@ -83,7 +83,7 @@ function StatusContent({ hideHeader = false }: { hideHeader?: boolean } = {}) {
   return (
     <div className="space-y-4">
       {/* 顶部说明 + 刷新 */}
-      {!hideHeader ? (
+      {!hideHeader && (
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-text flex items-center gap-2">
@@ -92,18 +92,6 @@ function StatusContent({ hideHeader = false }: { hideHeader?: boolean } = {}) {
             </h1>
             <p className="text-xs text-text-tertiary mt-1">{t('status_page.subtitle')}</p>
           </div>
-          <button
-            onClick={reload}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 h-8 rounded-[10px] text-xs text-text-secondary hover:text-text bg-bg-hover hover:bg-bg-elevated border border-glass-border transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            {t('status_page.refresh')}
-          </button>
-        </div>
-      ) : (
-        // 未登录布局：标题已在 hero 中展示，这里只放一个右上角的刷新按钮
-        <div className="flex justify-end">
           <button
             onClick={reload}
             disabled={loading}

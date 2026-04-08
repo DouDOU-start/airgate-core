@@ -832,7 +832,7 @@
 
   "status_page": {
     "title": "服务状态",
-    "subtitle": "最近 7 天可用率，每分钟自动刷新",
+    "subtitle": "可用率取最近 7 天，趋势图展示最近 90 天，每分钟自动刷新",
     "refresh": "刷新",
     "all_operational": "所有服务运行正常",
     "partial_degraded": "部分服务出现降级",
