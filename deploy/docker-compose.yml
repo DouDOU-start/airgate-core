@@ -50,12 +50,16 @@ services:
       - "1"
       - --appendonly
       - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD is required, see .env.example}
     environment:
       TZ: ${TZ:-Asia/Shanghai}
+      # 仅供 healthcheck 内部读取，不影响 Redis 自身鉴权（鉴权由 --requirepass 决定）
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required, see .env.example}
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
       interval: 10s
       timeout: 3s
       retries: 20
@@ -85,6 +89,7 @@ services:
       # ---- Redis ----
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required, see .env.example}
       # ---- 安全 ----
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       API_KEY_SECRET: ${API_KEY_SECRET:-}

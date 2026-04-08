@@ -98,7 +98,7 @@ curl -O https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deplo
 curl -O https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/.env.example
 mv .env.example .env
 
-# 改两个必填项：DB_PASSWORD 和 JWT_SECRET
+# 改三个必填项：DB_PASSWORD / REDIS_PASSWORD / JWT_SECRET
 vim .env
 
 # 启动
@@ -115,6 +115,7 @@ docker compose logs -f core
 | 变量 | 说明 | 是否必填 |
 |---|---|---|
 | `DB_PASSWORD` | Postgres 密码，首次启动后请勿修改 | ✅ |
+| `REDIS_PASSWORD` | Redis 鉴权密码，建议 `openssl rand -hex 24`；不会持久化，可随时改后重启 | ✅ |
 | `JWT_SECRET` | JWT 签名密钥，建议 `openssl rand -hex 32` | ✅ |
 | `BIND_HOST` | 监听地址，反向代理后部署时改 `127.0.0.1` | ❌ |
 | `PORT` | 对外端口，默认 9517 | ❌ |

@@ -98,7 +98,7 @@ curl -O https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deplo
 curl -O https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/.env.example
 mv .env.example .env
 
-# Edit two required values: DB_PASSWORD and JWT_SECRET
+# Edit three required values: DB_PASSWORD / REDIS_PASSWORD / JWT_SECRET
 vim .env
 
 # Start
@@ -115,6 +115,7 @@ Once started, visit `http://<your-host>:9517` and follow the wizard to create th
 | Variable | Description | Required |
 |---|---|---|
 | `DB_PASSWORD` | Postgres password — do not change after first boot | ✅ |
+| `REDIS_PASSWORD` | Redis auth password, recommended `openssl rand -hex 24`; not persisted, can be rotated by restart | ✅ |
 | `JWT_SECRET` | JWT signing key, recommended `openssl rand -hex 32` | ✅ |
 | `BIND_HOST` | Bind address; set `127.0.0.1` when behind a reverse proxy | ❌ |
 | `PORT` | External port, default 9517 | ❌ |
