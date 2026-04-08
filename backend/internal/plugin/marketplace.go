@@ -112,20 +112,20 @@ var officialPlugins = []MarketplacePlugin{
 		GithubRepo:  "DouDOU-start/airgate-openai",
 	},
 	{
-		Name:        "gateway-claude",
-		Version:     "0.1.0",
-		Description: "Anthropic Claude API 网关插件",
-		Author:      "AirGate",
-		Type:        "gateway",
-		GithubRepo:  "DouDOU-start/airgate-claude",
-	},
-	{
 		Name:        "payment-epay",
 		Version:     "0.1.0",
 		Description: "多渠道支付插件：易支付 / 支付宝官方 / 微信支付官方",
 		Author:      "AirGate",
 		Type:        "extension",
 		GithubRepo:  "DouDOU-start/airgate-epay",
+	},
+	{
+		Name:        "airgate-health",
+		Version:     "0.1.0",
+		Description: "AI 提供商健康监控：主动探测、可用率/延迟聚合、对外公开状态页",
+		Author:      "AirGate",
+		Type:        "extension",
+		GithubRepo:  "DouDOU-start/airgate-health",
 	},
 }
 

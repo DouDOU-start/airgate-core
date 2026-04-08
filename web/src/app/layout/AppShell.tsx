@@ -75,14 +75,22 @@ const apiKeyMenuItems: MenuItem[] = [
  *   audience = "user"                    — 仅普通用户可见（管理员不显示），挂在「个人中心」分组
  *   audience = "all"                     — 所有登录用户可见，按当前角色挂分组
  */
-function usePluginMenuItems(isAdmin: boolean): { adminItems: MenuItem[]; userItems: MenuItem[] } {
+function usePluginMenuItems(isAdmin: boolean): {
+  adminItems: MenuItem[];
+  userItems: MenuItem[];
+  healthInstalled: boolean;
+} {
   const { data } = useQuery({
     queryKey: queryKeys.pluginsMenu(),
     queryFn: () => pluginsApi.menu(),
     staleTime: 60_000,
   });
 
-  if (!data?.list) return { adminItems: [], userItems: [] };
+  if (!data?.list) return { adminItems: [], userItems: [], healthInstalled: false };
+
+  // 服务状态页由 airgate-health 插件提供（core 反代 /status/* → 插件）；
+  // 未装该插件时顶栏不显示状态入口，避免点进去看到 404 / "状态页未启用" 错误。
+  const healthInstalled = data.list.some((p) => p.name === 'airgate-health');
 
   const adminItems: MenuItem[] = [];
   const userItems: MenuItem[] = [];
@@ -120,7 +128,7 @@ function usePluginMenuItems(isAdmin: boolean): { adminItems: MenuItem[]; userIte
       }
     }
   }
-  return { adminItems, userItems };
+  return { adminItems, userItems, healthInstalled };
 }
 
 export function AppShell({ children }: AppShellProps) {
@@ -149,7 +157,7 @@ export function AppShell({ children }: AppShellProps) {
 
   const isAdmin = user?.role === 'admin';
   const isAPIKeySession = !!(user?.api_key_id && user.api_key_id > 0);
-  const { adminItems: pluginAdminItems, userItems: pluginUserItems } = usePluginMenuItems(isAdmin);
+  const { adminItems: pluginAdminItems, userItems: pluginUserItems, healthInstalled } = usePluginMenuItems(isAdmin);
   const adminUserItems = userMenuItems
     .filter((item) => item.path !== '/')
     .map((item, i) => (i === 0 ? { ...item, sectionKey: 'nav.personal' } : item));
@@ -329,14 +337,16 @@ export function AppShell({ children }: AppShellProps) {
             <h2 className="text-sm font-semibold text-text">{pageTitle}</h2>
           </div>
           <div className="flex items-center gap-1.5">
-            {/* Service status */}
-            <Link
-              to="/status"
-              className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
-              title={t('nav.status')}
-            >
-              <Activity className="w-3.5 h-3.5" />
-            </Link>
+            {/* Service status — 仅当 airgate-health 插件已安装时显示 */}
+            {healthInstalled && (
+              <Link
+                to="/status"
+                className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+                title={t('nav.status')}
+              >
+                <Activity className="w-3.5 h-3.5" />
+              </Link>
+            )}
             {/* GitHub */}
             <a
               href="https://github.com/DouDOU-start/airgate-core"
