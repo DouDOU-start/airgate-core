@@ -43,8 +43,8 @@ Plugins can be **released, installed, uninstalled, and hot-reloaded independentl
 | Plugin | Type | Capabilities | Repository |
 |---|---|---|---|
 | **gateway-openai** | gateway | OpenAI Responses / Chat Completions / ChatGPT OAuth / Anthropic protocol translation / WebSocket | [DouDOU-start/airgate-openai](https://github.com/DouDOU-start/airgate-openai) |
-| gateway-claude | gateway | Anthropic Claude API (in development) | — |
-| payment-epay | payment | EPay integration (in development) | — |
+| **payment-epay** | extension | Multi-channel payment: EPay (Xunhu/Rainbow) / Alipay Official / WeChat Pay Official, with recharge page, order management, provider configuration | [DouDOU-start/airgate-epay](https://github.com/DouDOU-start/airgate-epay) |
+| **airgate-health** | extension | AI provider health monitoring: active probing, availability/latency aggregation, public status page | [DouDOU-start/airgate-health](https://github.com/DouDOU-start/airgate-health) |
 
 ### Installing a plugin
 
