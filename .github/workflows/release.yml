@@ -161,6 +161,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
+          # 必须显式 filter，否则 docker/build-push-action@v6 自动产生的
+          # *.dockerbuild 缓存元数据也会被列入，且下载会失败 5 次重试。
+          pattern: airgate-core-*-*
           merge-multiple: true
 
       - name: List collected artifacts
