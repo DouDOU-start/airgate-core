@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback, type ReactNode, type CSSProperties } from 'react';
+import { useMemo, type ReactNode, type CSSProperties } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { EmptyState } from './EmptyState';
 import { useIsMobile } from '../hooks/useMediaQuery';
@@ -122,22 +122,14 @@ export function Table<T extends Record<string, any>>({
 
   const columns = selectionColumn ? [selectionColumn, ...userColumns] : userColumns;
 
-  // Sync horizontal scroll between fixed header and scrollable body
-  const headerRef = useRef<HTMLDivElement>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const handleBodyScroll = useCallback(() => {
-    if (bodyRef.current && headerRef.current) {
-      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
-    }
-  }, []);
-
-  // Compute sticky styles for fixed columns
+  // 计算固定列的粘性偏移（left/right 累加），不含背景色 —— 背景色交给 className 处理，
+  // 以便 group-hover 能覆盖。parseInt 忽略 "120px" 里的 px 后缀。
   const fixedStyles = useMemo(() => {
     const styles: Record<string, CSSProperties> = {};
     let leftOffset = 0;
     for (const col of columns) {
       if (col.fixed === 'left') {
-        styles[col.key] = { position: 'sticky', left: leftOffset, zIndex: 1, backgroundColor: 'var(--ag-bg-elevated)' };
+        styles[col.key] = { position: 'sticky', left: leftOffset };
         leftOffset += parseInt(col.width || '0', 10);
       }
     }
@@ -145,7 +137,7 @@ export function Table<T extends Record<string, any>>({
     for (let i = columns.length - 1; i >= 0; i--) {
       const col = columns[i]!;
       if (col.fixed === 'right') {
-        styles[col.key] = { position: 'sticky', right: rightOffset, zIndex: 1, backgroundColor: 'var(--ag-bg-elevated)' };
+        styles[col.key] = { position: 'sticky', right: rightOffset };
         rightOffset += parseInt(col.width || '0', 10);
       }
     }
@@ -308,83 +300,95 @@ export function Table<T extends Record<string, any>>({
   }
 
   // --- Desktop table view ---
+  //
+  // 结构：单一 <table> 放在单一 overflow:auto 容器内。
+  //  - <thead> 的每个 <th> 用 `sticky top-0` 纵向钉顶
+  //  - fixed:left/right 的列再叠加 `position:sticky; left/right:X` 横向钉边
+  //  - 两个 sticky 复合生效 → 左上/右上角的 <th> 同时钉顶 + 钉边
+  //  - 使用 border-separate + border-spacing:0；border-collapse 下 sticky 在 cell 上
+  //    在部分浏览器（尤其 Safari）有残留/抖动 bug
+  //  - 固定列的背景走 Tailwind class 而非 inline style，这样 group-hover 能正确覆盖 hover 态
+
   const colGroup = (
     <colgroup>
       {columns.map((col) => <col key={col.key} style={{ width: col.width }} />)}
     </colgroup>
   );
 
-  const theadRow = (
-    <thead className="bg-bg-elevated" style={{ boxShadow: '0 1px 0 var(--ag-border)' }}>
-      <tr>
-        {columns.map((col) => {
-          const align = col.align || 'center';
-          const textAlign = align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center';
-          return (
-            <th
-              key={col.key}
-              className={`${thBaseClass} ${textAlign}`}
-              style={fixedStyles[col.key] ? { ...fixedStyles[col.key], zIndex: 2 } : undefined}
-            >
-              {col.title}
-            </th>
-          );
-        })}
-      </tr>
-    </thead>
-  );
-
-  const tbody = (
-    <tbody>
-      {data.map((row, i) => (
-        <tr
-          key={rowKey ? rowKey(row) : i}
-          className="border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover"
-        >
+  const tableEl = (
+    <table
+      className="w-full border-separate"
+      style={{ borderSpacing: 0, minWidth: 'max-content' }}
+    >
+      {colGroup}
+      <thead>
+        <tr>
           {columns.map((col) => {
             const align = col.align || 'center';
-            const justify = align === 'left' ? 'justify-start' : align === 'right' ? 'justify-end' : 'justify-center';
+            const textAlign = align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center';
+            const isFixed = !!col.fixed;
             return (
-              <td key={col.key} className={tdBaseClass} style={fixedStyles[col.key]}>
-                <div className={`flex items-center ${justify}`}>
-                  {col.render ? col.render(row) : String(row[col.key] ?? '')}
-                </div>
-              </td>
+              <th
+                key={col.key}
+                className={`${thBaseClass} ${textAlign} sticky top-0`}
+                style={{
+                  ...(fixedStyles[col.key] || {}),
+                  // 固定列交叉点需要更高 z 以盖住普通表头和 body 固定单元格
+                  zIndex: isFixed ? 30 : 20,
+                  boxShadow: '0 1px 0 var(--ag-border)',
+                }}
+              >
+                {col.title}
+              </th>
             );
           })}
         </tr>
-      ))}
-    </tbody>
+      </thead>
+      <tbody>
+        {data.map((row, i) => {
+          const isLast = i === data.length - 1;
+          return (
+            <tr
+              key={rowKey ? rowKey(row) : i}
+              className="group transition-colors"
+            >
+              {columns.map((col) => {
+                const align = col.align || 'center';
+                const justify = align === 'left' ? 'justify-start' : align === 'right' ? 'justify-end' : 'justify-center';
+                const isFixed = !!col.fixed;
+                // 固定列自带背景色，并随行一起 group-hover。普通列的 hover 也走 group-hover。
+                // border-separate 下 tr 的 border 不生效，改为放在 td 底部。
+                const bgClass = isFixed
+                  ? 'bg-bg-elevated group-hover:bg-bg-hover'
+                  : 'group-hover:bg-bg-hover';
+                const borderClass = isLast ? '' : 'border-b border-border-subtle';
+                return (
+                  <td
+                    key={col.key}
+                    className={`${tdBaseClass} ${borderClass} ${bgClass}`}
+                    style={fixedStyles[col.key] ? { ...fixedStyles[col.key], zIndex: 10 } : undefined}
+                  >
+                    <div className={`flex items-center ${justify}`}>
+                      {col.render ? col.render(row) : String(row[col.key] ?? '')}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 
   return (
     <div className="space-y-4">
-      {autoHeight ? (
-        <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl overflow-x-auto">
-          <table className="w-full min-w-max" style={{ tableLayout: 'fixed' }}>
-            {colGroup}
-            {theadRow}
-            {tbody}
-          </table>
-        </div>
-      ) : (
-        <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl overflow-hidden flex flex-col" style={{ height: '494px' }}>
-          {/* 固定表头 —— 不参与垂直滚动 */}
-          <div ref={headerRef} className="shrink-0 overflow-hidden">
-            <table className="w-full min-w-max" style={{ tableLayout: 'fixed' }}>
-              {colGroup}
-              {theadRow}
-            </table>
-          </div>
-          {/* 数据体 —— 独立滚动，滚动条只出现在此区域 */}
-          <div ref={bodyRef} className="flex-1 overflow-auto" onScroll={handleBodyScroll}>
-            <table className="w-full min-w-max" style={{ tableLayout: 'fixed' }}>
-              {colGroup}
-              {tbody}
-            </table>
-          </div>
-        </div>
-      )}
+      <div
+        className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl overflow-auto"
+        style={autoHeight ? undefined : { maxHeight: '494px' }}
+      >
+        {tableEl}
+      </div>
 
       {/* 分页 */}
       {pagination}
