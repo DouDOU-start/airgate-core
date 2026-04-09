@@ -72,6 +72,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # 关闭 buildx v6 默认开启的 SBOM / provenance attestation 与
+          # *.dockerbuild summary artifact 上传 —— 我们既不消费这些数据，
+          # 它们还会污染 release-notes job 的 artifact 列表（之前导致过下载 retry 失败）。
+          provenance: false
+          sbom: false
 
   # ------------------------------------------------------------
   # Job 2: 跨平台原生二进制（linux/darwin × amd64/arm64）
