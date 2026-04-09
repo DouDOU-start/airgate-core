@@ -135,7 +135,13 @@ func (ep *ExtensionProxy) handle(c *gin.Context, pluginName, subPath, entry stri
 	resp, err := ext.HandleHTTPRequest(c.Request.Context(), req)
 	if err != nil {
 		slog.Error("extension 插件请求失败", "plugin", pluginName, "path", subPath, "error", err)
-		c.JSON(http.StatusBadGateway, gin.H{"error": "extension 插件请求失败"})
+		// 仅对内部入口（admin / user）回显原始错误，便于定位问题；
+		// 对外部入口（callback / public）保持泛化，避免向第三方泄漏内部细节。
+		msg := "extension 插件请求失败"
+		if entry == "admin" || entry == "user" {
+			msg = msg + ": " + err.Error()
+		}
+		c.JSON(http.StatusBadGateway, gin.H{"error": msg})
 		return
 	}
 
