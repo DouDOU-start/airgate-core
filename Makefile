@@ -72,8 +72,8 @@ build: build-frontend build-backend build-plugins ## 构建前后端及插件（
 
 ensure-webdist: ## 把 web/dist 同步到 backend/internal/web/webdist 供 go:embed 使用
 	@if [ -d $(WEB_DIR)/dist ] && [ "$$(ls -A $(WEB_DIR)/dist 2>/dev/null)" ]; then \
-		rm -rf $(WEBDIST); \
 		mkdir -p $(WEBDIST); \
+		find $(WEBDIST) -mindepth 1 ! -name '.gitkeep' -exec rm -rf {} +; \
 		cp -r $(WEB_DIR)/dist/. $(WEBDIST)/; \
 		echo "前端产物已同步到 $(WEBDIST)"; \
 	else \
