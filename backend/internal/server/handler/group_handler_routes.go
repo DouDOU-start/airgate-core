@@ -118,17 +118,18 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 	}
 
 	item, err := h.service.Create(c.Request.Context(), appgroup.CreateInput{
-		Name:              req.Name,
-		Platform:          req.Platform,
-		RateMultiplier:    req.RateMultiplier,
-		IsExclusive:       req.IsExclusive,
-		SubscriptionType:  req.SubscriptionType,
-		Quotas:            req.Quotas,
-		ModelRouting:      req.ModelRouting,
-		ServiceTier:       req.ServiceTier,
-		ForceInstructions: req.ForceInstructions,
-		Note:              req.Note,
-		SortWeight:        req.SortWeight,
+		Name:                     req.Name,
+		Platform:                 req.Platform,
+		RateMultiplier:           req.RateMultiplier,
+		IsExclusive:              req.IsExclusive,
+		SubscriptionType:         req.SubscriptionType,
+		Quotas:                   req.Quotas,
+		ModelRouting:             req.ModelRouting,
+		ServiceTier:              req.ServiceTier,
+		ForceInstructions:        req.ForceInstructions,
+		Note:                     req.Note,
+		SortWeight:               req.SortWeight,
+		CopyAccountsFromGroupIDs: req.CopyAccountsFromGroupIDs,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("创建分组失败", "创建失败", err)

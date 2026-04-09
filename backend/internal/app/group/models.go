@@ -101,6 +101,8 @@ type CreateInput struct {
 	ForceInstructions string
 	Note              string
 	SortWeight        int
+	// CopyAccountsFromGroupIDs 指定在新分组创建后从这些分组复制账号绑定（同平台，自动去重）。
+	CopyAccountsFromGroupIDs []int
 }
 
 // UpdateInput 描述更新分组输入。

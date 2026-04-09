@@ -89,7 +89,78 @@ func (s *GroupStore) FindByID(ctx context.Context, id int) (appgroup.Group, erro
 
 // Create 创建分组。
 func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (appgroup.Group, error) {
-	builder := s.db.Group.Create().
+	// 若无需复制账号，走快路径。
+	if len(input.CopyAccountsFromGroupIDs) == 0 {
+		builder := s.db.Group.Create().
+			SetName(input.Name).
+			SetPlatform(input.Platform).
+			SetRateMultiplier(input.RateMultiplier).
+			SetIsExclusive(input.IsExclusive).
+			SetSubscriptionType(entgroup.SubscriptionType(input.SubscriptionType)).
+			SetServiceTier(input.ServiceTier).
+			SetForceInstructions(input.ForceInstructions).
+			SetNote(input.Note).
+			SetSortWeight(input.SortWeight)
+
+		if input.Quotas != nil {
+			builder = builder.SetQuotas(appgroupCloneQuotas(input.Quotas))
+		}
+		if input.ModelRouting != nil {
+			builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
+		}
+
+		item, err := builder.Save(ctx)
+		if err != nil {
+			return appgroup.Group{}, err
+		}
+		return mapGroup(item), nil
+	}
+
+	// 需要复制账号：在事务内校验源分组平台、收集去重的账号 ID，随后一次性绑定。
+	tx, err := s.db.Tx(ctx)
+	if err != nil {
+		return appgroup.Group{}, err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	// 去重源分组 ID。
+	seenGroup := make(map[int]struct{}, len(input.CopyAccountsFromGroupIDs))
+	uniqueSourceGroupIDs := make([]int, 0, len(input.CopyAccountsFromGroupIDs))
+	for _, gid := range input.CopyAccountsFromGroupIDs {
+		if _, ok := seenGroup[gid]; ok {
+			continue
+		}
+		seenGroup[gid] = struct{}{}
+		uniqueSourceGroupIDs = append(uniqueSourceGroupIDs, gid)
+	}
+
+	// 校验源分组存在且平台一致。
+	srcGroups, err := tx.Group.Query().
+		Where(entgroup.IDIn(uniqueSourceGroupIDs...)).
+		All(ctx)
+	if err != nil {
+		return appgroup.Group{}, err
+	}
+	if len(srcGroups) != len(uniqueSourceGroupIDs) {
+		return appgroup.Group{}, appgroup.ErrGroupNotFound
+	}
+	for _, g := range srcGroups {
+		if g.Platform != input.Platform {
+			return appgroup.Group{}, appgroup.ErrSourceGroupPlatformMismatch
+		}
+	}
+
+	// 从源分组收集去重后的账号 ID。
+	accountIDs, err := tx.Account.Query().
+		Where(entaccount.HasGroupsWith(entgroup.IDIn(uniqueSourceGroupIDs...))).
+		IDs(ctx)
+	if err != nil {
+		return appgroup.Group{}, err
+	}
+
+	builder := tx.Group.Create().
 		SetName(input.Name).
 		SetPlatform(input.Platform).
 		SetRateMultiplier(input.RateMultiplier).
@@ -106,9 +177,16 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 	if input.ModelRouting != nil {
 		builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
 	}
+	if len(accountIDs) > 0 {
+		builder = builder.AddAccountIDs(accountIDs...)
+	}
 
 	item, err := builder.Save(ctx)
 	if err != nil {
+		return appgroup.Group{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return appgroup.Group{}, err
 	}
 

@@ -443,7 +443,13 @@
     "instructions_custom_placeholder": "输入自定义 instructions 内容...",
     "note": "备注",
     "note_hint": "运维备注，会显示在「健康监控」页的分组聚合表中",
-    "note_placeholder": "例：官方维护中 / 配额已耗尽 / 临时停用"
+    "note_placeholder": "例：官方维护中 / 配额已耗尽 / 临时停用",
+    "copy_accounts_title": "从分组复制账号",
+    "copy_accounts_hint": "可选多个分组，账号会自动去重；仅展示同平台的分组",
+    "copy_accounts_placeholder": "选择分组以复制其账号...",
+    "copy_accounts_select_platform_first": "请先选择平台",
+    "copy_accounts_empty": "该平台暂无其他分组可复制",
+    "copy_accounts_count": "{{count}} 个账号"
   },
 
   "api_keys": {
@@ -655,6 +661,8 @@
     "security_admin_key_regenerate_confirm_msg": "重新生成后旧密钥将立即失效。确定要继续吗？",
     "security_admin_key_delete_confirm_title": "删除管理员 API Key",
     "security_admin_key_delete_confirm_msg": "删除后此密钥将立即失效，所有使用该密钥的集成都将无法访问。确定要继续吗？",
+    "security_admin_key_missing_banner": "尚未生成管理员 API Key。部分扩展插件（如健康监控）需要它回调核心接口，未配置时调用会直接报错。",
+    "security_admin_key_missing_banner_action": "前往创建",
 
     "site_branding": "站点品牌信息",
     "site_name": "站点名称",

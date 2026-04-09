@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Layers, ArrowUpDown } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Layers, ArrowUpDown, X } from 'lucide-react';
 import { Modal } from '../../../shared/components/Modal';
 import { Button } from '../../../shared/components/Button';
 import { Input, Select } from '../../../shared/components/Input';
+import { groupsApi } from '../../../shared/api/groups';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../../shared/types';
 
 // 从 quotas 对象解析为结构化值
@@ -61,6 +63,18 @@ export function GroupFormModal({
     parseQuotas(group?.quotas as Record<string, unknown> | undefined),
   );
 
+  // 创建模式下：从分组复制账号（同平台，可多选，自动去重）
+  const [copyFromGroupIds, setCopyFromGroupIds] = useState<number[]>([]);
+
+  // 加载同平台的全部分组用于下拉（仅创建时需要，且已选定平台）
+  const { data: copySourceData } = useQuery({
+    queryKey: ['groups-for-copy', form.platform],
+    queryFn: () =>
+      groupsApi.list({ page: 1, page_size: 1000, platform: form.platform }),
+    enabled: !isEdit && !!form.platform && open,
+  });
+  const copySourceGroups: GroupResp[] = copySourceData?.list ?? [];
+
   const handleSubmit = () => {
     if (!isEdit && (!form.name || !form.platform)) return;
 
@@ -73,6 +87,9 @@ export function GroupFormModal({
       // 空串需要真实下发，让后端把字段更新为空字符串。
       force_instructions: form.force_instructions ?? '',
       note: form.note,
+      ...(!isEdit && copyFromGroupIds.length > 0
+        ? { copy_accounts_from_group_ids: copyFromGroupIds }
+        : {}),
     });
   };
 
@@ -109,12 +126,87 @@ export function GroupFormModal({
             label={t('groups.platform')}
             required
             value={form.platform}
-            onChange={(e) => setForm({ ...form, platform: e.target.value })}
+            onChange={(e) => {
+              setForm({ ...form, platform: e.target.value });
+              setCopyFromGroupIds([]);
+            }}
             options={[
               { value: '', label: t('groups.select_platform') },
               ...platforms.map((p) => ({ value: p, label: p })),
             ]}
           />
+        )}
+
+        {/* 从分组复制账号 —— 仅创建时显示 */}
+        {!isEdit && (
+          <div>
+            <label
+              className="block text-xs font-medium uppercase tracking-wider mb-1.5"
+              style={{ color: 'var(--ag-text-secondary)' }}
+            >
+              {t('groups.copy_accounts_title')}
+            </label>
+            {copyFromGroupIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {copyFromGroupIds.map((gid) => {
+                  const g = copySourceGroups.find((it) => it.id === gid);
+                  return (
+                    <span
+                      key={gid}
+                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs"
+                      style={{
+                        backgroundColor: 'var(--ag-primary-alpha)',
+                        color: 'var(--ag-primary)',
+                      }}
+                    >
+                      {g ? g.name : `#${gid}`}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCopyFromGroupIds(copyFromGroupIds.filter((id) => id !== gid))
+                        }
+                        className="inline-flex"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            <Select
+              value=""
+              disabled={!form.platform}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                if (val && !copyFromGroupIds.includes(val)) {
+                  setCopyFromGroupIds([...copyFromGroupIds, val]);
+                }
+              }}
+              options={[
+                {
+                  value: '',
+                  label: !form.platform
+                    ? t('groups.copy_accounts_select_platform_first')
+                    : copySourceGroups.length === 0
+                      ? t('groups.copy_accounts_empty')
+                      : t('groups.copy_accounts_placeholder'),
+                },
+                ...copySourceGroups
+                  .filter((g) => !copyFromGroupIds.includes(g.id))
+                  .map((g) => ({
+                    value: String(g.id),
+                    label: `${g.name} (${t('groups.copy_accounts_count', { count: g.account_total })})`,
+                  })),
+              ]}
+            />
+            <p
+              className="text-[11px] mt-1"
+              style={{ color: 'var(--ag-text-tertiary)' }}
+            >
+              {t('groups.copy_accounts_hint')}
+            </p>
+          </div>
         )}
 
         <Input

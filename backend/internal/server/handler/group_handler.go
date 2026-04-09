@@ -28,6 +28,8 @@ func (h *GroupHandler) handleError(logMessage, publicMessage string, err error) 
 		return 404, err.Error()
 	case errors.Is(err, appgroup.ErrGroupHasSubscriptions):
 		return 400, err.Error()
+	case errors.Is(err, appgroup.ErrSourceGroupPlatformMismatch):
+		return 400, err.Error()
 	default:
 		slog.Error(logMessage, "error", err)
 		return 500, publicMessage

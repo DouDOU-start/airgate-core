@@ -252,6 +252,7 @@ export interface CreateGroupReq {
   force_instructions?: string;
   note?: string;
   sort_weight?: number;
+  copy_accounts_from_group_ids?: number[];
 }
 
 export interface UpdateGroupReq {

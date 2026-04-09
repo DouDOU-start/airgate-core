@@ -41,6 +41,8 @@ type CreateGroupReq struct {
 	ForceInstructions string                 `json:"force_instructions"`
 	Note              string                 `json:"note"`
 	SortWeight        int                    `json:"sort_weight"`
+	// CopyAccountsFromGroupIDs 创建时从指定分组复制账号绑定（同平台，自动去重）。
+	CopyAccountsFromGroupIDs []int `json:"copy_accounts_from_group_ids"`
 }
 
 // UpdateGroupReq 更新分组请求
