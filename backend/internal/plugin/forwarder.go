@@ -64,11 +64,30 @@ func shouldPenalizeForwardError(err error) bool {
 	return true
 }
 
+// isClientSideForwardError 判断本次转发失败本质上是客户端请求自身的问题
+// （如 model 不被支持、context 超长、参数无效等），与账号无关。
+// 插件遇到这类错误时会回填 AccountStatus=OK + 4xx StatusCode 作为信号。
+// 命中时既不应 failover 切账号，也不应计入账号失败次数。
+func isClientSideForwardError(execution forwardExecution) bool {
+	r := execution.result
+	if r == nil {
+		return false
+	}
+	return r.AccountStatus == sdk.AccountStatusOK &&
+		r.StatusCode >= 400 && r.StatusCode < 500
+}
+
 // canFailover 判断本次转发失败是否可以切换账户重试
 // 条件：1) 响应未开始写入（流式场景）2) 错误类型可重试（429、连接错误、5xx）
 func (f *Forwarder) canFailover(c *gin.Context, state *forwardState, execution forwardExecution) bool {
 	// 流式模式下，如果已经开始向客户端写入数据，不能重试
 	if state.stream && c.Writer.Written() {
+		return false
+	}
+
+	// 客户端请求自身的问题（不被支持的 model、超长 context 等），换账号也救不回来，
+	// 而且不能让这类错误连续打多个账号、被误判为账号故障。
+	if isClientSideForwardError(execution) {
 		return false
 	}
 

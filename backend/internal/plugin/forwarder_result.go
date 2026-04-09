@@ -54,6 +54,16 @@ func maybeWriteForwardError(c *gin.Context, state *forwardState, execution forwa
 	if state.stream && c.Writer.Written() {
 		return
 	}
+	// 客户端请求自身错误：把插件回填的 4xx 状态码与原始错误信息透传出去，
+	// 让客户端能看到诸如"model is not supported"这类有用提示，而不是笼统的 502。
+	if isClientSideForwardError(execution) {
+		message := execution.result.ErrorMessage
+		if message == "" {
+			message = execution.err.Error()
+		}
+		openAIError(c, execution.result.StatusCode, "invalid_request_error", "invalid_request", message)
+		return
+	}
 	openAIError(c, http.StatusBadGateway, "server_error", "upstream_error", "插件转发失败")
 }
 
@@ -81,9 +91,16 @@ func (f *Forwarder) reportForwardExecution(ctx context.Context, state *forwardSt
 		f.scheduler.ReportAccountError(state.account.ID, resolveAccountErrorReason(execution))
 	case execution.err != nil:
 		f.scheduler.DecrementRPM(ctx, state.account.ID)
-		if shouldPenalizeForwardError(execution.err) {
+		switch {
+		case isClientSideForwardError(execution):
+			// 客户端请求本身的问题（不被支持的 model 等），账号是无辜的，不计失败。
+			slog.Warn("忽略客户端侧转发错误",
+				"account_id", state.account.ID,
+				"status", execution.result.StatusCode,
+				"error", execution.err)
+		case shouldPenalizeForwardError(execution.err):
 			f.scheduler.ReportResult(state.account.ID, false, execution.duration, execution.err.Error())
-		} else {
+		default:
 			slog.Warn("忽略非惩罚性转发错误", "account_id", state.account.ID, "error", execution.err)
 		}
 	default:
