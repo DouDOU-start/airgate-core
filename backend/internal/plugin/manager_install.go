@@ -89,15 +89,7 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 		return "", fmt.Errorf("写入临时二进制失败: %w", err)
 	}
 
-	client := goplugin.NewClient(&goplugin.ClientConfig{
-		HandshakeConfig: sdkgrpc.Handshake,
-		Plugins: goplugin.PluginSet{
-			sdkgrpc.PluginKeyGateway:   &sdkgrpc.GatewayGRPCPlugin{},
-			sdkgrpc.PluginKeyExtension: &sdkgrpc.ExtensionGRPCPlugin{},
-		},
-		Cmd:              exec.Command(tmpBinary),
-		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
-	})
+	client := goplugin.NewClient(newPluginClientConfig(exec.Command(tmpBinary), false))
 	defer client.Kill()
 
 	rpcClient, err := client.Client()

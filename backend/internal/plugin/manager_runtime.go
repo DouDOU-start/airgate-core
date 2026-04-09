@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	goplugin "github.com/hashicorp/go-plugin"
+	"google.golang.org/grpc"
 
 	sdk "github.com/DouDOU-start/airgate-sdk"
 	sdkgrpc "github.com/DouDOU-start/airgate-sdk/grpc"
@@ -18,6 +19,40 @@ import (
 	settingent "github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 )
+
+// pluginGRPCMaxMessageBytes 是与插件之间 gRPC 单条消息的最大字节数（收/发同值）。
+// 默认值 4 MB 经常被大段 LLM 响应或翻译后的 SSE 事件击穿，统一抬到 64 MB。
+const pluginGRPCMaxMessageBytes = 64 * 1024 * 1024
+
+// newPluginClientConfig 构造与插件子进程通信的 go-plugin ClientConfig。
+//
+// forwardOutput=true 时把插件的 stdout/stderr 透传到 core 自身（用于正常运行的插件），
+// false 时丢弃（用于一次性的探测客户端，避免污染日志）。
+//
+// 抽出这个 helper 是为了让 manager_install.go / manager_runtime.go 共用同一份握手 +
+// gRPC 上限配置，避免改一处忘另一处。
+func newPluginClientConfig(cmd *exec.Cmd, forwardOutput bool) *goplugin.ClientConfig {
+	cfg := &goplugin.ClientConfig{
+		HandshakeConfig: sdkgrpc.Handshake,
+		Plugins: goplugin.PluginSet{
+			sdkgrpc.PluginKeyGateway:   &sdkgrpc.GatewayGRPCPlugin{},
+			sdkgrpc.PluginKeyExtension: &sdkgrpc.ExtensionGRPCPlugin{},
+		},
+		Cmd:              cmd,
+		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
+		GRPCDialOptions: []grpc.DialOption{
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallRecvMsgSize(pluginGRPCMaxMessageBytes),
+				grpc.MaxCallSendMsgSize(pluginGRPCMaxMessageBytes),
+			),
+		},
+	}
+	if forwardOutput {
+		cfg.SyncStdout = os.Stdout
+		cfg.SyncStderr = os.Stderr
+	}
+	return cfg
+}
 
 // buildInitConfig 构造传递给插件 Init() 的配置 map。
 //
@@ -194,17 +229,7 @@ func (m *Manager) IsDev(name string) bool {
 }
 
 func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *exec.Cmd, binaryDir string) (string, error) {
-	client := goplugin.NewClient(&goplugin.ClientConfig{
-		HandshakeConfig: sdkgrpc.Handshake,
-		Plugins: goplugin.PluginSet{
-			sdkgrpc.PluginKeyGateway:   &sdkgrpc.GatewayGRPCPlugin{},
-			sdkgrpc.PluginKeyExtension: &sdkgrpc.ExtensionGRPCPlugin{},
-		},
-		Cmd:              cmd,
-		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
-		SyncStdout:       os.Stdout,
-		SyncStderr:       os.Stderr,
-	})
+	client := goplugin.NewClient(newPluginClientConfig(cmd, true))
 
 	rpcClient, err := client.Client()
 	if err != nil {
