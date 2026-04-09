@@ -158,11 +158,20 @@ type BalanceUpdate struct {
 	Remark        string
 }
 
+// GroupRateOverride 表示某个用户对某个分组的专属倍率。
+type GroupRateOverride struct {
+	UserID   int
+	Email    string
+	Username string
+	Rate     float64
+}
+
 // Repository 用户持久化接口。
 type Repository interface {
 	FindByID(context.Context, int, bool) (User, error)
 	List(context.Context, ListFilter) ([]User, int64, error)
 	EmailExists(context.Context, string) (bool, error)
+	ListWithGroupRateOverride(ctx context.Context, groupID int64) ([]GroupRateOverride, error)
 	Create(context.Context, Mutation) (User, error)
 	Update(context.Context, int, Mutation) (User, error)
 	UpdateBalance(context.Context, int, BalanceUpdate) (User, error)

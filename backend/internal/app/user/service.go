@@ -97,6 +97,13 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (User, error) {
 
 // Update 更新用户。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (User, error) {
+	if input.HasGroupRates {
+		for _, v := range input.GroupRates {
+			if v < 0 {
+				return User{}, ErrInvalidRateMultiplier
+			}
+		}
+	}
 	mutation := Mutation{
 		Username:           input.Username,
 		Role:               input.Role,
@@ -177,6 +184,61 @@ func (s *Service) checkBalanceAlert(ctx context.Context, user User, beforeBalanc
 	if user.Balance >= threshold && user.BalanceAlertNotified {
 		_ = s.repo.SetBalanceAlertNotified(ctx, user.ID, false)
 	}
+}
+
+// ListGroupRateOverrides 返回指定分组下所有设置了专属倍率的用户。
+func (s *Service) ListGroupRateOverrides(ctx context.Context, groupID int64) ([]GroupRateOverride, error) {
+	return s.repo.ListWithGroupRateOverride(ctx, groupID)
+}
+
+// SetGroupRate 为用户在指定分组下设置/更新专属倍率（rate 必须 > 0）。
+//
+// 读 - 改 - 写：先拉出用户当前的 group_rates map，修改单个条目，再整体写回。
+// 并发场景下存在理论上的写丢失窗口，但后台管理单用户操作可以接受。
+func (s *Service) SetGroupRate(ctx context.Context, userID int, groupID int64, rate float64) (GroupRateOverride, error) {
+	if rate <= 0 {
+		return GroupRateOverride{}, ErrInvalidRateMultiplier
+	}
+	u, err := s.repo.FindByID(ctx, userID, false)
+	if err != nil {
+		return GroupRateOverride{}, err
+	}
+	rates := cloneGroupRates(u.GroupRates)
+	if rates == nil {
+		rates = make(map[int64]float64)
+	}
+	rates[groupID] = rate
+	updated, err := s.repo.Update(ctx, userID, Mutation{
+		GroupRates:    rates,
+		HasGroupRates: true,
+	})
+	if err != nil {
+		return GroupRateOverride{}, err
+	}
+	return GroupRateOverride{
+		UserID:   updated.ID,
+		Email:    updated.Email,
+		Username: updated.Username,
+		Rate:     rate,
+	}, nil
+}
+
+// DeleteGroupRate 删除用户在指定分组下的专属倍率。
+func (s *Service) DeleteGroupRate(ctx context.Context, userID int, groupID int64) error {
+	u, err := s.repo.FindByID(ctx, userID, false)
+	if err != nil {
+		return err
+	}
+	if _, ok := u.GroupRates[groupID]; !ok {
+		return nil // 幂等：本来就没有，直接成功
+	}
+	rates := cloneGroupRates(u.GroupRates)
+	delete(rates, groupID)
+	_, err = s.repo.Update(ctx, userID, Mutation{
+		GroupRates:    rates,
+		HasGroupRates: true,
+	})
+	return err
 }
 
 // Delete 删除用户。

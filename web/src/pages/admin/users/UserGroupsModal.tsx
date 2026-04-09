@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../../../shared/components/Modal';
@@ -8,7 +8,7 @@ import { groupsApi } from '../../../shared/api/groups';
 import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
-import type { UserResp, GroupResp } from '../../../shared/types';
+import type { UserResp, GroupResp, UpdateUserReq } from '../../../shared/types';
 
 interface UserGroupsModalProps {
   open: boolean;
@@ -17,9 +17,23 @@ interface UserGroupsModalProps {
   onSaved: () => void;
 }
 
+// 把 user.group_rates 中的数字键转成内部字符串状态（便于受控 <input>）
+function initialRateState(groupRates?: Record<number, number>): Record<number, string> {
+  const out: Record<number, string> = {};
+  if (!groupRates) return out;
+  for (const [k, v] of Object.entries(groupRates)) {
+    if (typeof v === 'number' && v > 0) {
+      out[Number(k)] = String(v);
+    }
+  }
+  return out;
+}
+
 export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModalProps) {
   const { t } = useTranslation();
   const [selectedIds, setSelectedIds] = useState<number[]>(user.allowed_group_ids ?? []);
+  // groupId -> 用户侧的倍率输入值（字符串，空串 = 使用分组默认倍率）
+  const [customRates, setCustomRates] = useState<Record<number, string>>(() => initialRateState(user.group_rates));
 
   const { data: groupsData, isLoading: groupsLoading } = useQuery({
     queryKey: queryKeys.groupsAll(),
@@ -27,27 +41,89 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
     enabled: open,
   });
 
+  const allGroups: GroupResp[] = groupsData?.list ?? [];
+  const exclusiveGroups = allGroups.filter((g) => g.is_exclusive);
+  const normalGroups = allGroups.filter((g) => !g.is_exclusive);
+
+  // 构造提交 payload：只发送合法的自定义倍率（数值 > 0），把整个 map 作为替换语义提交
+  const buildPayload = (): UpdateUserReq => {
+    const group_rates: Record<number, number> = {};
+    for (const [k, raw] of Object.entries(customRates)) {
+      if (raw === '' || raw == null) continue;
+      const v = Number(raw);
+      if (!Number.isFinite(v) || v <= 0) continue;
+      group_rates[Number(k)] = v;
+    }
+    return {
+      allowed_group_ids: selectedIds,
+      group_rates,
+    };
+  };
+
   const updateMutation = useCrudMutation({
-    mutationFn: (_?: void) => usersApi.update(user.id, { allowed_group_ids: selectedIds }),
+    mutationFn: (_?: void) => usersApi.update(user.id, buildPayload()),
     successMessage: t('users.update_success'),
     queryKey: queryKeys.users(),
     onSuccess: () => onSaved(),
   });
 
-  const allGroups = groupsData?.list ?? [];
-  const exclusiveGroups = allGroups.filter((g: GroupResp) => g.is_exclusive);
-  const normalGroups = allGroups.filter((g: GroupResp) => !g.is_exclusive);
+  const setRate = (groupId: number, value: string) => {
+    setCustomRates((prev) => ({ ...prev, [groupId]: value }));
+  };
+
+  // 一个分组是否允许编辑倍率：
+  //  - 普通分组：所有用户都可访问，任何时候都能覆盖
+  //  - 专属分组：只有勾选后才允许填倍率（未勾选时倍率无意义）
+  const canEditRate = (g: GroupResp) => !g.is_exclusive || selectedIds.includes(g.id);
+
+  const renderRateInput = (g: GroupResp) => {
+    const enabled = canEditRate(g);
+    const value = customRates[g.id] ?? '';
+    return (
+      <div className="flex items-center gap-1.5 ml-auto flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          disabled={!enabled}
+          value={value}
+          placeholder={String(g.rate_multiplier ?? 1)}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => setRate(g.id, e.target.value)}
+          className="w-16 px-2 py-1 text-xs text-right rounded border bg-transparent focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40"
+          style={{ borderColor: 'var(--ag-glass-border)', color: 'var(--ag-text)' }}
+        />
+        <span className="text-[10px]" style={{ color: 'var(--ag-text-tertiary)' }}>×</span>
+      </div>
+    );
+  };
+
+  // memo 是否有任何非法输入（负数），用于禁用保存按钮
+  const hasInvalidRate = useMemo(() => {
+    for (const raw of Object.values(customRates)) {
+      if (raw === '' || raw == null) continue;
+      const v = Number(raw);
+      if (!Number.isFinite(v) || v < 0) return true;
+    }
+    return false;
+  }, [customRates]);
 
   return (
     <Modal
       open={open}
       onClose={onClose}
       title={`${t('users.groups')} - ${user.email}`}
-      width="480px"
+      width="540px"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button onClick={() => updateMutation.mutate()} loading={updateMutation.isPending}>{t('common.save')}</Button>
+          <Button
+            onClick={() => updateMutation.mutate()}
+            loading={updateMutation.isPending}
+            disabled={hasInvalidRate}
+          >
+            {t('common.save')}
+          </Button>
         </>
       }
     >
@@ -56,12 +132,14 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
       ) : allGroups.length === 0 ? (
         <p className="text-sm text-text-tertiary text-center py-8">{t('common.no_data')}</p>
       ) : (
-        <div className="space-y-4 max-h-80 overflow-y-auto">
+        <div className="space-y-4 max-h-[26rem] overflow-y-auto">
+          <p className="text-[11px]" style={{ color: 'var(--ag-text-tertiary)' }}>{t('users.group_rate_hint')}</p>
+
           {normalGroups.length > 0 && (
             <div>
               <p className="text-xs text-text-tertiary mb-2 font-medium uppercase tracking-wider">{t('users.normal_groups')}</p>
               <div className="space-y-0.5">
-                {normalGroups.map((g: GroupResp) => (
+                {normalGroups.map((g) => (
                   <div
                     key={g.id}
                     className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm"
@@ -75,7 +153,7 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
                     </span>
                     <span>{g.name}</span>
                     <span className="text-[10px]" style={{ color: 'var(--ag-text-tertiary)' }}>{g.platform}</span>
-                    <span className="ml-auto text-[10px]" style={{ color: 'var(--ag-text-tertiary)' }}>{t('users.all_users_accessible')}</span>
+                    {renderRateInput(g)}
                   </div>
                 ))}
               </div>
@@ -86,7 +164,7 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
             <div>
               <p className="text-xs text-text-tertiary mb-2 font-medium uppercase tracking-wider">{t('users.exclusive_groups')}</p>
               <div className="space-y-0.5">
-                {exclusiveGroups.map((g: GroupResp) => (
+                {exclusiveGroups.map((g) => (
                   <button
                     key={g.id}
                     type="button"
@@ -115,6 +193,7 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
                     </span>
                     <span>{g.name}</span>
                     <span className="text-[10px]" style={{ color: 'var(--ag-text-tertiary)' }}>{g.platform}</span>
+                    {renderRateInput(g)}
                   </button>
                 ))}
               </div>

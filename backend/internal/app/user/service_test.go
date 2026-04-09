@@ -63,7 +63,10 @@ func (s stubRepository) List(_ context.Context, _ ListFilter) ([]User, int64, er
 	return nil, 0, nil
 }
 func (s stubRepository) EmailExists(_ context.Context, _ string) (bool, error) { return false, nil }
-func (s stubRepository) Create(_ context.Context, _ Mutation) (User, error)    { return User{}, nil }
+func (s stubRepository) ListWithGroupRateOverride(_ context.Context, _ int64) ([]GroupRateOverride, error) {
+	return nil, nil
+}
+func (s stubRepository) Create(_ context.Context, _ Mutation) (User, error) { return User{}, nil }
 func (s stubRepository) Update(_ context.Context, _ int, _ Mutation) (User, error) {
 	return User{}, nil
 }

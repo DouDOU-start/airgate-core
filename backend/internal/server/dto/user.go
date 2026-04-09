@@ -62,6 +62,19 @@ type AdjustBalanceReq struct {
 	Remark string  `json:"remark"`
 }
 
+// GroupRateOverrideResp 分组专属倍率条目。
+type GroupRateOverrideResp struct {
+	UserID   int64   `json:"user_id"`
+	Email    string  `json:"email"`
+	Username string  `json:"username"`
+	Rate     float64 `json:"rate"`
+}
+
+// SetGroupRateOverrideReq 设置分组专属倍率请求。
+type SetGroupRateOverrideReq struct {
+	Rate float64 `json:"rate" binding:"required,gt=0"`
+}
+
 // BalanceLogResp 余额变更日志响应
 type BalanceLogResp struct {
 	ID            int64   `json:"id"`

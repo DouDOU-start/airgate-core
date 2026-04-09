@@ -283,6 +283,13 @@ export interface CreateGroupReq {
   copy_accounts_from_group_ids?: number[];
 }
 
+export interface GroupRateOverrideResp {
+  user_id: number;
+  email: string;
+  username: string;
+  rate: number;
+}
+
 export interface UpdateGroupReq {
   name?: string;
   rate_multiplier?: number;

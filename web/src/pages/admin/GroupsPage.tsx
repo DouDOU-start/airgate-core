@@ -8,6 +8,7 @@ import {
   ArrowUpDown,
   Trash2,
   RefreshCw,
+  Percent,
 } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
 import { Select } from '../../shared/components/Input';
@@ -22,6 +23,7 @@ import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
 import { GroupFormModal } from './groups/EditGroupModal';
+import { GroupRateOverridesModal } from './groups/GroupRateOverridesModal';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/types';
 
 export default function GroupsPage() {
@@ -40,6 +42,7 @@ export default function GroupsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupResp | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<GroupResp | null>(null);
+  const [rateOverrideGroup, setRateOverrideGroup] = useState<GroupResp | null>(null);
 
   // 查询分组列表
   const { data, isLoading, refetch } = useQuery({
@@ -143,7 +146,7 @@ export default function GroupsPage() {
     {
       key: 'account_stats',
       title: t('groups.account_stats'),
-      width: '160px',
+      width: '130px',
       hideOnMobile: true,
       render: (row) => (
         <div className="text-xs leading-relaxed">
@@ -168,7 +171,7 @@ export default function GroupsPage() {
     {
       key: 'usage',
       title: t('groups.usage'),
-      width: '140px',
+      width: '115px',
       render: (row) => (
         <div className="text-xs leading-relaxed">
           <div>
@@ -212,25 +215,34 @@ export default function GroupsPage() {
     {
       key: 'actions',
       title: t('common.actions'),
+      width: '120px',
+      fixed: 'right',
       render: (row) => (
-        <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<Pencil className="w-3.5 h-3.5" />}
+        <div className="flex items-center justify-center gap-0.5">
+          <button
+            className="p-1.5 rounded hover:bg-bg-hover transition-colors"
+            style={{ color: 'var(--ag-text-secondary)' }}
+            title={t('common.edit')}
             onClick={() => setEditingGroup(row)}
           >
-            {t('common.edit')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<Trash2 className="w-3.5 h-3.5" />}
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            className="p-1.5 rounded hover:bg-bg-hover transition-colors"
+            style={{ color: 'var(--ag-text-secondary)' }}
+            title={t('groups.rate_override_manage')}
+            onClick={() => setRateOverrideGroup(row)}
+          >
+            <Percent className="w-3.5 h-3.5" />
+          </button>
+          <button
+            className="p-1.5 rounded hover:bg-bg-hover transition-colors"
             style={{ color: 'var(--ag-danger)' }}
+            title={t('common.delete')}
             onClick={() => setDeletingGroup(row)}
           >
-            {t('common.delete')}
-          </Button>
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
       ),
     },
@@ -298,6 +310,15 @@ export default function GroupsPage() {
           loading={updateMutation.isPending}
           platforms={platforms}
           instructionPresets={instructionPresets}
+        />
+      )}
+
+      {/* 分组专属倍率管理 */}
+      {rateOverrideGroup && (
+        <GroupRateOverridesModal
+          open
+          group={rateOverrideGroup}
+          onClose={() => setRateOverrideGroup(null)}
         />
       )}
 

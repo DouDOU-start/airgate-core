@@ -82,6 +82,37 @@ func (s *UserStore) EmailExists(ctx context.Context, email string) (bool, error)
 	return s.db.User.Query().Where(entuser.EmailEQ(email)).Exist(ctx)
 }
 
+// ListWithGroupRateOverride 返回所有在 group_rates 中为 groupID 设置了 > 0 倍率的用户。
+//
+// 采用内存过滤：group_rates 是 JSON map 字段，ent 未生成 JSONB 包含谓词；
+// 管理员后台的用户规模较小（通常数百到数千），全表扫描 + 内存过滤成本可接受。
+// 如未来规模增长可改为原生 SQL `WHERE group_rates ? $1`。
+func (s *UserStore) ListWithGroupRateOverride(ctx context.Context, groupID int64) ([]appuser.GroupRateOverride, error) {
+	users, err := s.db.User.Query().
+		Order(ent.Asc(entuser.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]appuser.GroupRateOverride, 0)
+	for _, u := range users {
+		if u.GroupRates == nil {
+			continue
+		}
+		rate, ok := u.GroupRates[groupID]
+		if !ok || rate <= 0 {
+			continue
+		}
+		result = append(result, appuser.GroupRateOverride{
+			UserID:   u.ID,
+			Email:    u.Email,
+			Username: u.Username,
+			Rate:     rate,
+		})
+	}
+	return result, nil
+}
+
 // Create 创建用户。
 func (s *UserStore) Create(ctx context.Context, mutation appuser.Mutation) (appuser.User, error) {
 	builder := s.db.User.Create()

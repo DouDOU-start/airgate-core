@@ -122,6 +122,11 @@ func (s *Server) registerRoutes() {
 		adminGroup.PUT("/groups/:id", handlers.Group.UpdateGroup)
 		adminGroup.DELETE("/groups/:id", handlers.Group.DeleteGroup)
 
+		// 分组专属倍率管理（reverse 视角：某个分组下哪些用户有专属倍率）
+		adminGroup.GET("/groups/:id/rate-overrides", handlers.User.ListGroupRateOverrides)
+		adminGroup.PUT("/groups/:id/rate-overrides/:userId", handlers.User.SetGroupRateOverride)
+		adminGroup.DELETE("/groups/:id/rate-overrides/:userId", handlers.User.DeleteGroupRateOverride)
+
 		// API 密钥管理（管理员）
 		adminGroup.PUT("/api-keys/:id", handlers.APIKey.AdminUpdateKey)
 
