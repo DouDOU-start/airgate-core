@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"os/exec"
 	"testing"
 
 	sdk "github.com/DouDOU-start/airgate-sdk"
@@ -73,5 +74,14 @@ func TestGetModelsReturnsClone(t *testing.T) {
 
 	if got := mgr.modelCache["openai"][0].Name; got != "GPT-4.1" {
 		t.Fatalf("expected cached model to remain unchanged, got %q", got)
+	}
+}
+
+func TestNewPluginClientConfigSetsStartTimeout(t *testing.T) {
+	mgr := &Manager{}
+	cfg := mgr.newPluginClientConfig(exec.Command("sh", "-c", "exit 0"), false, nil)
+
+	if cfg.StartTimeout != pluginStartTimeout {
+		t.Fatalf("StartTimeout = %v, want %v", cfg.StartTimeout, pluginStartTimeout)
 	}
 }

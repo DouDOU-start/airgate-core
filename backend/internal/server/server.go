@@ -43,6 +43,8 @@ type Server struct {
 	calculator  *billing.Calculator
 	recorder    *billing.Recorder
 	handlers    *bootstrap.HTTPHandlers
+
+	pluginStartCancel context.CancelFunc
 }
 
 // NewServer 创建 HTTP 服务器
@@ -149,27 +151,42 @@ func (s *Server) StartPlugins(ctx context.Context) {
 	// 启动使用量异步记录器
 	s.recorder.Start()
 
-	// 加载已编译的插件
-	if err := s.pluginMgr.LoadAll(ctx); err != nil {
-		slog.Error("加载插件失败（不影响核心服务）", "error", err)
-	}
+	pluginCtx, cancel := context.WithCancel(ctx)
+	s.pluginStartCancel = cancel
 
-	// 加载开发模式插件（go run 源码）
-	for _, dev := range s.cfg.Plugins.Dev {
-		if err := s.pluginMgr.LoadDev(ctx, dev.Name, dev.Path); err != nil {
-			slog.Error("加载开发插件失败", "name", dev.Name, "path", dev.Path, "error", err)
+	go func() {
+		// 加载已编译的插件。后台执行，避免坏插件阻塞 core 监听端口。
+		if err := s.pluginMgr.LoadAll(pluginCtx); err != nil {
+			slog.Error("加载插件失败（不影响核心服务）", "error", err)
 		}
-	}
+		if pluginCtx.Err() != nil {
+			return
+		}
 
-	// 启动插件市场后台同步（默认开启，配置 plugins.marketplace.disabled=true 可关闭）
-	if !s.cfg.Plugins.Marketplace.Disabled {
-		s.marketplace.Start(context.Background())
-	}
+		// 加载开发模式插件（go run 源码）
+		for _, dev := range s.cfg.Plugins.Dev {
+			if pluginCtx.Err() != nil {
+				return
+			}
+			if err := s.pluginMgr.LoadDev(pluginCtx, dev.Name, dev.Path); err != nil {
+				slog.Error("加载开发插件失败", "name", dev.Name, "path", dev.Path, "error", err)
+			}
+		}
+
+		// 启动插件市场后台同步（默认开启，配置 plugins.marketplace.disabled=true 可关闭）
+		if !s.cfg.Plugins.Marketplace.Disabled && pluginCtx.Err() == nil {
+			s.marketplace.Start(context.Background())
+		}
+	}()
 }
 
 // Shutdown 优雅关闭服务器
 func (s *Server) Shutdown(ctx context.Context) error {
 	slog.Info("正在关闭服务器...")
+
+	if s.pluginStartCancel != nil {
+		s.pluginStartCancel()
+	}
 
 	// 停止使用量记录器
 	s.recorder.Stop()

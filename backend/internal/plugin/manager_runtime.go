@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	goplugin "github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
@@ -23,6 +24,10 @@ import (
 // 默认值 4 MB 经常被大段 LLM 响应或翻译后的 SSE 事件击穿，统一抬到 64 MB。
 const pluginGRPCMaxMessageBytes = 64 * 1024 * 1024
 
+// pluginStartTimeout 限制插件子进程握手与 Start RPC 的最长耗时，避免坏插件把 core
+// 的启动或后台加载协程长期卡死。
+const pluginStartTimeout = 15 * time.Second
+
 // newPluginClientConfig 构造与插件子进程通信的 go-plugin ClientConfig。
 //
 // forwardOutput=true 时把插件的 stdout/stderr 透传到 core 自身（用于正常运行的插件），
@@ -35,6 +40,17 @@ const pluginGRPCMaxMessageBytes = 64 * 1024 * 1024
 //   - 非 nil 时作为本次 spawn 的 HostService 实现，注册到所有 PluginType 的 GRPCPlugin
 //     的 HostImpl 字段；spawn 后 manager 会调 hostHandle.SetCapabilities 写入权限
 //   - nil 时（探测式 spawn / 没装 host service 的部署）走软失败路径，插件 ctx.Host()==nil
+func sdkCapabilitiesToStrings(capabilities []sdk.Capability) []string {
+	if len(capabilities) == 0 {
+		return nil
+	}
+	out := make([]string, len(capabilities))
+	for i, capability := range capabilities {
+		out[i] = string(capability)
+	}
+	return out
+}
+
 func (m *Manager) newPluginClientConfig(cmd *exec.Cmd, forwardOutput bool, hostHandle *pluginHostHandle) *goplugin.ClientConfig {
 	// hostHandle 通过 PluginSet 注入到 GatewayGRPCPlugin / ExtensionGRPCPlugin / MiddlewareGRPCPlugin。
 	// 插件 Dispense 时，sdk-grpc 的 GRPCClient 钩子会通过 GRPCBroker 启一条
@@ -62,6 +78,7 @@ func (m *Manager) newPluginClientConfig(cmd *exec.Cmd, forwardOutput bool, hostH
 				grpc.MaxCallSendMsgSize(pluginGRPCMaxMessageBytes),
 			),
 		},
+		StartTimeout: pluginStartTimeout,
 	}
 	if forwardOutput {
 		cfg.SyncStdout = os.Stdout
@@ -283,6 +300,9 @@ func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *ex
 }
 
 func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Client, gateway *sdkgrpc.GatewayGRPCClient, requestedName, binaryDir string) (string, error) {
+	startCtx, cancel := context.WithTimeout(ctx, pluginStartTimeout)
+	defer cancel()
+
 	info := gateway.Info()
 	canonicalName := canonicalPluginName(info, requestedName)
 	if canonicalName == "" {
@@ -303,7 +323,7 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("初始化插件失败: %w", err)
 	}
-	if err := gateway.Start(ctx); err != nil {
+	if err := gateway.Start(startCtx); err != nil {
 		client.Kill()
 		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("启动插件失败: %w", err)
@@ -328,7 +348,7 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 		Type:               pluginType,
 		InstructionPresets: info.InstructionPresets,
 		ConfigSchema:       cloneConfigSchema(info.ConfigSchema),
-		Capabilities:       append([]string(nil), info.Capabilities...),
+		Capabilities:       sdkCapabilitiesToStrings(info.Capabilities),
 		Priority:           info.Priority,
 		Client:             client,
 		Gateway:            gateway,
@@ -364,6 +384,9 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 }
 
 func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Client, ext *sdkgrpc.ExtensionGRPCClient, requestedName, binaryDir string) (string, error) {
+	startCtx, cancel := context.WithTimeout(ctx, pluginStartTimeout)
+	defer cancel()
+
 	info := ext.Info()
 	canonicalName := canonicalPluginName(info, requestedName)
 	if canonicalName == "" {
@@ -382,7 +405,7 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("初始化 extension 插件失败: %w", err)
 	}
-	if err := ext.Start(ctx); err != nil {
+	if err := ext.Start(startCtx); err != nil {
 		client.Kill()
 		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("启动 extension 插件失败: %w", err)
@@ -405,7 +428,7 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 		Author:       info.Author,
 		Type:         pluginType,
 		ConfigSchema: cloneConfigSchema(info.ConfigSchema),
-		Capabilities: append([]string(nil), info.Capabilities...),
+		Capabilities: sdkCapabilitiesToStrings(info.Capabilities),
 		Priority:     info.Priority,
 		Client:       client,
 		Extension:    ext,
@@ -445,6 +468,9 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 // 与 gateway 的区别：
 //   - 不替代 upstream（不需要 Platform / Models / Routes）
 func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Client, mw *sdkgrpc.MiddlewareGRPCClient, requestedName, binaryDir string) (string, error) {
+	startCtx, cancel := context.WithTimeout(ctx, pluginStartTimeout)
+	defer cancel()
+
 	info := mw.Info()
 	canonicalName := canonicalPluginName(info, requestedName)
 	if canonicalName == "" {
@@ -463,7 +489,7 @@ func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Cl
 		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("初始化 middleware 插件失败: %w", err)
 	}
-	if err := mw.Start(ctx); err != nil {
+	if err := mw.Start(startCtx); err != nil {
 		client.Kill()
 		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("启动 middleware 插件失败: %w", err)
@@ -478,7 +504,7 @@ func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Cl
 		Author:       info.Author,
 		Type:         string(sdk.PluginTypeMiddleware),
 		ConfigSchema: cloneConfigSchema(info.ConfigSchema),
-		Capabilities: append([]string(nil), info.Capabilities...),
+		Capabilities: sdkCapabilitiesToStrings(info.Capabilities),
 		Priority:     info.Priority,
 		Client:       client,
 		Middleware:   mw,
