@@ -31,8 +31,9 @@ func TestRenderInstallScript_Defaults(t *testing.T) {
 		`AIRGATE_BASE="https://airgate.example.com"`,
 		`PROVIDER_NAME="airgate"`,
 		`/openclaw/models`,
-		`MEM_ENABLED="0"`, // memory_search 关闭时模板分支应输出 0
-		`/v1/models`,      // API Key 校验路径
+		`MEM_ENABLED="0"`,                       // memory_search 关闭时模板分支应输出 0
+		`/v1/models`,                            // API Key 校验路径
+		`info "已读取 API Key: ${MASKED_API_KEY}"`, // 输入后显示脱敏确认
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("rendered script missing %q", want)

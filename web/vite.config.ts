@@ -76,6 +76,29 @@ export default defineConfig({
     },
     proxy: {
       '/api': BACKEND,
+      '/openclaw': {
+        target: BACKEND,
+        changeOrigin: false,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            const host = req.headers.host;
+            const forwardedProto = req.headers['x-forwarded-proto'];
+            const forwardedHost = req.headers['x-forwarded-host'];
+
+            if (host) {
+              proxyReq.setHeader('X-Forwarded-Host', host);
+            } else if (forwardedHost) {
+              proxyReq.setHeader('X-Forwarded-Host', forwardedHost);
+            }
+
+            if (forwardedProto) {
+              proxyReq.setHeader('X-Forwarded-Proto', forwardedProto);
+            } else {
+              proxyReq.setHeader('X-Forwarded-Proto', 'http');
+            }
+          });
+        },
+      },
       '/uploads': BACKEND,
       // 注意：只代理插件 assets 的请求路径（用 bypass 函数细分）。
       // /plugins/{name}/{页面} 是 SPA 路由（由 PluginPage 内部加载组件），

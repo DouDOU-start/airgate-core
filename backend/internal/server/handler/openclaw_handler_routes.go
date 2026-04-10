@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -25,16 +26,26 @@ func (h *OpenClawHandler) loadConfig(c *gin.Context) (appopenclaw.Config, error)
 	}
 	if cfg.BaseURL == "" {
 		scheme := "http"
-		if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+		if c.Request.TLS != nil || strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") {
 			scheme = "https"
 		}
-		host := c.Request.Host
+		host := forwardedHost(c)
 		if host == "" {
 			host = "localhost"
 		}
 		cfg.BaseURL = fmt.Sprintf("%s://%s", scheme, host)
 	}
 	return cfg, nil
+}
+
+func forwardedHost(c *gin.Context) string {
+	if raw := strings.TrimSpace(c.GetHeader("X-Forwarded-Host")); raw != "" {
+		if idx := strings.IndexByte(raw, ','); idx >= 0 {
+			raw = raw[:idx]
+		}
+		return strings.TrimSpace(raw)
+	}
+	return strings.TrimSpace(c.Request.Host)
 }
 
 // ensureEnabled 如果管理员关闭了 openclaw.enabled，则返回 404。
@@ -50,7 +61,7 @@ func (h *OpenClawHandler) ensureEnabled(c *gin.Context, cfg appopenclaw.Config) 
 //
 // 用法（用户终端）：
 //
-//	curl -fsSL https://<airgate-host>/openclaw/install.sh | bash
+//	curl -fsSL https://<airgate-host>/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh
 func (h *OpenClawHandler) HandleInstallScript(c *gin.Context) {
 	cfg, err := h.loadConfig(c)
 	if err != nil {
@@ -119,7 +130,7 @@ func (h *OpenClawHandler) HandleInfo(c *gin.Context) {
 		"provider_name":   cfg.ProviderName,
 		"base_url":        cfg.BaseURL,
 		"site_name":       cfg.SiteName,
-		"install_command": fmt.Sprintf("curl -fsSL %s/openclaw/install.sh | bash", cfg.BaseURL),
+		"install_command": fmt.Sprintf("curl -fsSL %s/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh", cfg.BaseURL),
 		"memory_search": gin.H{
 			"enabled": cfg.MemorySearchEnabled,
 			"model":   cfg.MemorySearchModel,

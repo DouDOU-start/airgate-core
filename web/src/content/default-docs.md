@@ -82,7 +82,7 @@ print(resp.content[0].text)
 AirGate 已经兼容 openclaw 所需的全部协议，只需运行一行命令即可完成接入：
 
 ```bash
-curl -fsSL https://your-airgate.example.com/openclaw/install.sh | bash
+curl -fsSL https://your-airgate.example.com/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh
 ```
 
 脚本会：

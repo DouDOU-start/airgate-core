@@ -795,8 +795,8 @@ function OpenClawPanel({
   const usingFallbackOrigin = !val('openclaw.base_url') && !val('api_base_url');
   const previewBase = (val('openclaw.base_url') || val('api_base_url') || fallbackOrigin || '').replace(/\/$/, '');
   const installCommand = previewBase
-    ? `curl -fsSL ${previewBase}/openclaw/install.sh | bash`
-    : 'curl -fsSL <站点地址>/openclaw/install.sh | bash';
+    ? `curl -fsSL ${previewBase}/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh`
+    : 'curl -fsSL <站点地址>/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh';
 
   // 模型预设 JSON 的客户端校验：不阻塞保存，只给提示，让管理员自己决定。
   const modelsRaw = values['openclaw.models_preset'] ?? '';

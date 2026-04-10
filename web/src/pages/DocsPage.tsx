@@ -39,7 +39,7 @@ export default function DocsPage() {
   const baseUrl = (
     site.api_base_url || (typeof window !== 'undefined' ? window.location.origin : '')
   ).replace(/\/$/, '');
-  const installCommand = `curl -fsSL ${baseUrl}/openclaw/install.sh | bash`;
+  const installCommand = `curl -fsSL ${baseUrl}/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh`;
 
   // 占位符替换：把 markdown 文本中所有 your-airgate.example.com / {{site_name}} 等
   // 全局替换为当前站点真实值。注意 markdown 源文件里用的是 your-airgate.example.com 这种

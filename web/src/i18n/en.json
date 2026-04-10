@@ -751,7 +751,7 @@
     "smtp_test_success": "Test email sent, please check your inbox",
 
     "openclaw_quickstart": "One-line install command",
-    "openclaw_quickstart_desc": "Copy the command below. When users run it in their terminal, ~/.openclaw/openclaw.json is generated automatically with interactive model selection. The command points at this site's dynamic /openclaw/install.sh script.",
+    "openclaw_quickstart_desc": "Copy the command below. It first downloads this site's dynamic /openclaw/install.sh script and then runs it with bash, generating ~/.openclaw/openclaw.json with interactive model selection.",
     "openclaw_copy_command": "Copy command",
     "openclaw_base_url_missing_hint": "Neither openclaw.base_url nor api_base_url is set; the preview uses the current browser URL. The script will fall back to the request Host at runtime, but setting it explicitly avoids misdetection behind reverse proxies.",
     "openclaw_basic": "Basics",

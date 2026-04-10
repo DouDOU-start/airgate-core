@@ -36,10 +36,14 @@ die()   { printf "${C_RED}✗${C_RESET} %s\n" "$*" >&2; exit 1; }
 # ----------------------------------------------------------------------------
 command -v curl >/dev/null 2>&1 || die "需要 curl，请先安装"
 
-# 脚本走 `curl ... | bash` 时，stdin 已被 curl 占用，无法 read；此时从 /dev/tty 读。
+# 脚本走 `curl ... | bash` 时，bash 仍需要继续从 stdin 读取脚本本身，
+# 不能直接 `exec < /dev/tty` 覆盖 fd 0；否则后续脚本内容会从 tty 读，表现成挂起。
+# 这里单独开一个 fd 3 给交互式 read 使用。
+INPUT_FD=0
 if [ ! -t 0 ]; then
-  if [ -e /dev/tty ]; then
-    exec < /dev/tty
+  if [ -r /dev/tty ]; then
+    exec 3</dev/tty
+    INPUT_FD=3
   else
     die "当前环境无法交互式读取输入，请下载脚本后再执行：curl -fsSL ${AIRGATE_BASE}/openclaw/install.sh -o install.sh && bash install.sh"
   fi
@@ -54,13 +58,26 @@ printf "${C_DIM}%s${C_RESET}\n\n" "站点: ${AIRGATE_BASE}"
 API_KEY=""
 while [ -z "${API_KEY}" ]; do
   printf "请粘贴你的 ${SITE_NAME} API Key (sk-...): "
-  # -s 隐藏输入；有些极简 sh 不支持 -s，所以用 bash 的 read
-  read -rs API_KEY || true
+  # -s 隐藏输入；脚本固定由 bash 执行，管道场景下从 fd 3 (/dev/tty) 读取。
+  if [ "${INPUT_FD}" -eq 0 ]; then
+    read -rs API_KEY || true
+  else
+    read -rs -u "${INPUT_FD}" API_KEY || true
+  fi
   printf "\n"
   if [ -z "${API_KEY}" ]; then
     warn "API Key 不能为空，请重试"
   fi
 done
+
+MASKED_API_KEY="****"
+if [ "${#API_KEY}" -ge 4 ]; then
+  MASKED_API_KEY="****${API_KEY: -4}"
+fi
+if [[ "${API_KEY}" == sk-* ]]; then
+  MASKED_API_KEY="sk-${MASKED_API_KEY}"
+fi
+info "已读取 API Key: ${MASKED_API_KEY}"
 
 # 轻量校验：调一下 /v1/models；非 200 即视为无效。
 info "正在校验 API Key ..."
@@ -112,7 +129,11 @@ echo
 SELECTION=""
 while [ -z "${SELECTION}" ]; do
   printf "请输入要启用的模型编号（空格分隔，回车默认选 1）: "
-  read -r RAW
+  if [ "${INPUT_FD}" -eq 0 ]; then
+    read -r RAW
+  else
+    read -r -u "${INPUT_FD}" RAW
+  fi
   if [ -z "${RAW}" ]; then
     RAW="1"
   fi

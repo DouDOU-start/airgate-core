@@ -755,7 +755,7 @@
     "smtp_test_success": "测试邮件已发送，请检查收件箱",
 
     "openclaw_quickstart": "一键安装命令",
-    "openclaw_quickstart_desc": "复制下面这行命令，用户在终端运行即可自动生成 ~/.openclaw/openclaw.json。命令指向本站 /openclaw/install.sh 动态脚本，支持交互式选择模型。",
+    "openclaw_quickstart_desc": "复制下面这行命令，用户在终端运行即可自动生成 ~/.openclaw/openclaw.json。命令会先下载本站 /openclaw/install.sh 动态脚本，再以 bash 执行，支持交互式选择模型。",
     "openclaw_copy_command": "复制命令",
     "openclaw_base_url_missing_hint": "尚未配置 openclaw.base_url 或 api_base_url，当前预览使用浏览器地址栏的 URL。脚本运行时会按请求 Host 自动推导，但建议显式填写以避免反向代理下的误判。",
     "openclaw_basic": "基础配置",
