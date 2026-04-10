@@ -10,9 +10,11 @@ SDK_FRONTEND := ../airgate-sdk/frontend
 OPENAI_PLUGIN := ../airgate-openai/web
 EPAY_PLUGIN := ../airgate-epay/web
 HEALTH_PLUGIN := ../airgate-health/web
-# build-plugins 阶段（生产）仍然把 dist/index.js 同步到 core 的 plugin assets dir
+# build-plugins 阶段（生产）同步各插件的 admin dist/index.js 到
+# core 的 plugin assets dir；health 的公开状态页仍走 /status 反代，不经过这套 assets。
 OPENAI_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-openai/assets
 EPAY_ASSETS := $(BACKEND_DIR)/data/plugins/payment-epay/assets
+HEALTH_ASSETS := $(BACKEND_DIR)/data/plugins/airgate-health/assets
 BINARY := $(BACKEND_DIR)/server
 WEBDIST := $(BACKEND_DIR)/internal/web/webdist
 GO := GOTOOLCHAIN=local go
@@ -55,13 +57,25 @@ dev-plugins: ## 启动所有插件前端 watch 模式
 	@wait
 
 dev-plugin-openai: ## 单独 watch openai 插件前端（输出到 ../airgate-openai/web/dist）
-	@cd $(OPENAI_PLUGIN) && npx vite build --watch
+	@if [ -d $(OPENAI_PLUGIN) ]; then \
+		cd $(OPENAI_PLUGIN) && npx vite build --watch; \
+	else \
+		echo "跳过 openai 插件前端 watch：$(OPENAI_PLUGIN) 不存在"; \
+	fi
 
 dev-plugin-epay: ## 单独 watch epay 插件前端（输出到 ../airgate-epay/web/dist）
-	@cd $(EPAY_PLUGIN) && npx vite build --watch
+	@if [ -d $(EPAY_PLUGIN) ]; then \
+		cd $(EPAY_PLUGIN) && npx vite build --watch; \
+	else \
+		echo "跳过 epay 插件前端 watch：$(EPAY_PLUGIN) 不存在"; \
+	fi
 
 dev-plugin-health: ## 单独 watch health 插件前端（同时 watch admin index.js + status standalone）
-	@cd $(HEALTH_PLUGIN) && npm run dev
+	@if [ -d $(HEALTH_PLUGIN) ]; then \
+		cd $(HEALTH_PLUGIN) && npm run dev; \
+	else \
+		echo "跳过 health 插件前端 watch：$(HEALTH_PLUGIN) 不存在"; \
+	fi
 
 dev-backend: ## 启动后端（带热重载，需要 air）
 	@cd $(BACKEND_DIR) && \
@@ -103,17 +117,34 @@ build-frontend: ## 构建前端产物
 build-plugins: sync-plugins ## 构建插件前端并同步到 core
 	@echo "插件前端构建完成"
 
-sync-plugins: ## 构建所有插件前端并同步到 data/plugins/
-	@echo "构建并同步 openai 插件前端..."
-	@cd $(OPENAI_PLUGIN) && npm run build
-	@mkdir -p $(OPENAI_ASSETS)
-	@cp $(OPENAI_PLUGIN)/dist/index.js $(OPENAI_ASSETS)/index.js
-	@echo "openai 插件前端已同步到 $(OPENAI_ASSETS)/"
-	@echo "构建并同步 epay 插件前端..."
-	@cd $(EPAY_PLUGIN) && npm run build
-	@mkdir -p $(EPAY_ASSETS)
-	@cp $(EPAY_PLUGIN)/dist/index.js $(EPAY_ASSETS)/index.js
-	@echo "epay 插件前端已同步到 $(EPAY_ASSETS)/"
+sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
+	@if [ -d $(OPENAI_PLUGIN) ]; then \
+		echo "构建并同步 openai 插件前端..."; \
+		cd $(OPENAI_PLUGIN) && npm run build; \
+		mkdir -p $(OPENAI_ASSETS); \
+		cp $(OPENAI_PLUGIN)/dist/index.js $(OPENAI_ASSETS)/index.js; \
+		echo "openai 插件前端已同步到 $(OPENAI_ASSETS)/"; \
+	else \
+		echo "跳过 openai 插件前端构建：$(OPENAI_PLUGIN) 不存在"; \
+	fi
+	@if [ -d $(EPAY_PLUGIN) ]; then \
+		echo "构建并同步 epay 插件前端..."; \
+		cd $(EPAY_PLUGIN) && npm run build; \
+		mkdir -p $(EPAY_ASSETS); \
+		cp $(EPAY_PLUGIN)/dist/index.js $(EPAY_ASSETS)/index.js; \
+		echo "epay 插件前端已同步到 $(EPAY_ASSETS)/"; \
+	else \
+		echo "跳过 epay 插件前端构建：$(EPAY_PLUGIN) 不存在"; \
+	fi
+	@if [ -d $(HEALTH_PLUGIN) ]; then \
+		echo "构建并同步 health 插件前端..."; \
+		cd $(HEALTH_PLUGIN) && npm run build; \
+		mkdir -p $(HEALTH_ASSETS); \
+		cp $(HEALTH_PLUGIN)/dist/index.js $(HEALTH_ASSETS)/index.js; \
+		echo "health 插件 admin 前端已同步到 $(HEALTH_ASSETS)/"; \
+	else \
+		echo "跳过 health 插件前端构建：$(HEALTH_PLUGIN) 不存在"; \
+	fi
 
 # ===================== 代码生成 =====================
 
