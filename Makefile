@@ -4,9 +4,14 @@
 BACKEND_DIR := backend
 WEB_DIR := web
 SDK_FRONTEND := ../airgate-sdk/frontend
+# 插件前端目录。所有插件 dev watch 都输出到自己的 web/dist；core 的
+# servePluginAsset handler 在 dev 模式下从 <plugin>/web/dist 读，prod 模式从
+# data/plugins/<id>/assets 读。这样三个插件的 dev 体验完全一致，没有特例。
 OPENAI_PLUGIN := ../airgate-openai/web
-OPENAI_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-openai/assets
 EPAY_PLUGIN := ../airgate-epay/web
+HEALTH_PLUGIN := ../airgate-health/web
+# build-plugins 阶段（生产）仍然把 dist/index.js 同步到 core 的 plugin assets dir
+OPENAI_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-openai/assets
 EPAY_ASSETS := $(BACKEND_DIR)/data/plugins/payment-epay/assets
 BINARY := $(BACKEND_DIR)/server
 WEBDIST := $(BACKEND_DIR)/internal/web/webdist
@@ -16,7 +21,7 @@ GO := GOTOOLCHAIN=local go
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.Version=$(VERSION)
 
-.PHONY: help dev dev-backend dev-frontend dev-sdk dev-plugins dev-plugin-openai dev-plugin-epay \
+.PHONY: help dev dev-backend dev-frontend dev-sdk dev-plugins dev-plugin-openai dev-plugin-epay dev-plugin-health \
         build build-backend build-frontend \
         build-plugins sync-plugins \
         ent lint fmt test clean install ci pre-commit setup-hooks \
@@ -39,19 +44,24 @@ dev: ## 同时启动 SDK watch + 插件 watch + 前后端开发服务器
 dev-sdk: ## 启动 SDK 主题 watch 模式（修改 token 自动编译）
 	@cd $(SDK_FRONTEND) && npm run dev
 
-dev-plugins: ## 启动所有插件前端 watch 模式（修改后自动构建并同步到 core）
-	@echo "启动插件前端 watch："
-	@echo "  - openai → $(OPENAI_ASSETS)/"
-	@echo "  - epay   → $(EPAY_ASSETS)/"
+dev-plugins: ## 启动所有插件前端 watch 模式
+	@echo "启动插件前端 watch（统一输出到 <plugin>/web/dist，core 在 dev 模式下直读）："
+	@echo "  - openai → ../airgate-openai/web/dist/"
+	@echo "  - epay   → ../airgate-epay/web/dist/"
+	@echo "  - health → ../airgate-health/web/dist/  （含 admin index.js + standalone status page）"
 	@$(MAKE) dev-plugin-openai &
 	@$(MAKE) dev-plugin-epay &
+	@$(MAKE) dev-plugin-health &
 	@wait
 
-dev-plugin-openai: ## 单独 watch openai 插件前端
-	@cd $(OPENAI_PLUGIN) && npx vite build --watch --outDir ../../airgate-core/$(OPENAI_ASSETS) 2>&1 | grep -v 'not inside project root'
+dev-plugin-openai: ## 单独 watch openai 插件前端（输出到 ../airgate-openai/web/dist）
+	@cd $(OPENAI_PLUGIN) && npx vite build --watch
 
-dev-plugin-epay: ## 单独 watch epay 插件前端
-	@cd $(EPAY_PLUGIN) && npx vite build --watch --outDir ../../airgate-core/$(EPAY_ASSETS) 2>&1 | grep -v 'not inside project root'
+dev-plugin-epay: ## 单独 watch epay 插件前端（输出到 ../airgate-epay/web/dist）
+	@cd $(EPAY_PLUGIN) && npx vite build --watch
+
+dev-plugin-health: ## 单独 watch health 插件前端（同时 watch admin index.js + status standalone）
+	@cd $(HEALTH_PLUGIN) && npm run dev
 
 dev-backend: ## 启动后端（带热重载，需要 air）
 	@cd $(BACKEND_DIR) && \

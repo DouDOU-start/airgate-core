@@ -164,6 +164,30 @@ func (m *Manager) GetFrontendPages(pluginName string) []sdk.FrontendPage {
 	return cloneFrontendPages(m.frontendPageCache[m.resolveNameLocked(pluginName)])
 }
 
+// DevWebDistPath 返回某个 dev 模式插件前端构建产物的本地路径。
+//
+// 约定：插件的源码 root 都遵循 `<plugin>/backend` + `<plugin>/web` 平级布局，
+// 因此 web/dist 在 srcPath 的父目录下的 web/dist 子目录。
+//
+// 用途：core router 的 plugin assets handler 在 dev 模式下从这个路径直读
+// vite 实时构建的产物，让"改插件前端 → 浏览器刷新立即生效"成为可能，
+// 不必再让 vite watch 写到 core 的 data/plugins/<id>/assets/。
+//
+// 返回 (path, true) 表示该插件是 dev 模式且 web/dist 路径已计算好（不保证目录存在）。
+// 返回 ("", false) 表示该插件是 production 模式，调用方应 fallback 到
+// data/plugins/<id>/assets。
+func (m *Manager) DevWebDistPath(pluginName string) (string, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	src, ok := m.devPaths[m.resolveNameLocked(pluginName)]
+	if !ok || src == "" {
+		return "", false
+	}
+	// srcPath 例如 /path/to/airgate-health/backend
+	// web/dist 例如 /path/to/airgate-health/web/dist
+	return filepath.Join(filepath.Dir(src), "web", "dist"), true
+}
+
 // GetAllPluginMeta 获取所有运行中插件的元信息。
 func (m *Manager) GetAllPluginMeta() []PluginMeta {
 	m.mu.RLock()

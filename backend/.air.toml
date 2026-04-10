@@ -8,6 +8,9 @@ tmp_dir = "tmp"
   cmd = "go build -o ./tmp/main ./cmd/server"
   bin = "./tmp/main"
   delay = 1000
+  # WSL2 + /mnt/* (9p drvfs) 不支持 inotify，必须开 poll 才能检测文件变更
+  poll = true
+  poll_interval = 1000
   exclude_dir = ["tmp", "vendor", "node_modules"]
   exclude_regex = ["_test.go"]
   include_ext = ["go", "toml", "yaml"]

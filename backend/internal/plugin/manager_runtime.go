@@ -185,6 +185,11 @@ func (m *Manager) LoadDev(ctx context.Context, name, srcPath string) error {
 	m.registerAliasesLocked(canonicalName, requestedName)
 	m.mu.Unlock()
 
+	// 注册 dev watcher：mtime 轮询源码 .go 改动后自动 ReloadDev，无需重启 core
+	if m.devWatcher != nil {
+		m.devWatcher.add(canonicalName, srcPath)
+	}
+
 	slog.Info("开发插件加载成功", "name", canonicalName, "requested_name", requestedName, "src", srcPath)
 	return nil
 }
@@ -521,6 +526,11 @@ func (m *Manager) stopPlugin(name string) {
 	delete(m.hostHandles, inst.Name)
 	m.unregisterAliasesLocked(inst.Name, inst.SourceName, inst.BinaryDir)
 	m.mu.Unlock()
+
+	// 摘掉 dev watcher 上的注册（ReloadDev 内部会再 add 回来）
+	if m.devWatcher != nil {
+		m.devWatcher.remove(inst.Name)
+	}
 
 	// 先停后台任务调度器，再走插件 Stop —— 避免 ticker 在 plugin 进程被 Kill
 	// 之后还往 dead client 发 RPC，造成一堆 connection refused 噪音。

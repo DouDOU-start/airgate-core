@@ -61,6 +61,10 @@ type Manager struct {
 	// 只是它们拿不到 plugin_dsn，必须用旧的 db_dsn）。
 	pluginDB *pluginDSNProvisioner
 
+	// devWatcher 监听 dev 模式插件源码目录的 .go 改动，自动 ReloadDev。
+	// 实现是 mtime 轮询（不是 fsnotify），原因见 dev_watcher.go 顶部注释。
+	devWatcher *devWatcher
+
 	mu        sync.RWMutex
 	instances map[string]*PluginInstance
 	aliases   map[string]string
@@ -122,6 +126,7 @@ func NewManager(pluginDir, logLevel, coreDSN string, db *ent.Client) *Manager {
 	if coreDSN != "" && db != nil {
 		m.pluginDB = newPluginDSNProvisioner(db, coreDSN)
 	}
+	m.devWatcher = newDevWatcher(m)
 	return m
 }
 
