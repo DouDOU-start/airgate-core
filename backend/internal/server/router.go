@@ -5,9 +5,12 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 	"github.com/DouDOU-start/airgate-core/internal/setup"
 	webfs "github.com/DouDOU-start/airgate-core/internal/web"
@@ -199,14 +202,15 @@ func (s *Server) registerRoutes() {
 	r.Any("/api/v1/payment-callback/:pluginName/*path", s.extensionProxy.Handle)
 
 	// === 公开状态页路由 ===
-	// 设计：
-	//   - GET /status            → 返回前端 SPA 的 index.html，由 SPA 内的 StatusPage 组件渲染
-	//                              （登录前后均可访问，体验与其他页面一致）
-	//   - GET /status/*path      → 转发到 airgate-health 插件（API + assets）
-	//                              注意：通配符 *path 必须捕获完整的子路径，例如
-	//                              /status/api/summary → 插件看到 /api/summary
-	//                              所以这里仍然走整段 catchall，不能拆成 /status/api/*path
-	//                              （否则 *path 只捕获 /summary，插件路由无法匹配）
+	// 设计：core 完全不维护一份状态页前端，所有 /status* 请求一律反代到
+	// airgate-health 插件，由插件内部 standalone 打包的 status.html + status-XXX.js
+	// 渲染。这样状态页的 UI / 数据 / 粒度都由健康监控插件单点维护，避免 core
+	// 与插件出现两份重复实现（之前 core 自己有个 React StatusPage 组件并维护
+	// 90 天日级方格图，与 health 插件的 standalone 页严重重复，移除）。
+	//
+	// 反代规则：
+	//   - GET /status            → 插件看到 /        → handlePublicIndex 返回 status.html
+	//   - GET /status/*path      → 插件看到 /<path> → API + 静态资源
 	statusProxy := s.extensionProxy.HandleNamed("airgate-health", "public")
 
 	// 加载嵌入的前端 SPA：所有静态资源通过 //go:embed 打进二进制
@@ -222,9 +226,8 @@ func (s *Server) registerRoutes() {
 		os.Exit(1)
 	}
 
-	r.GET("/status", func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
-	})
+	// /status 与 /status/*path 都走 statusProxy 反代到 airgate-health 插件
+	r.GET("/status", statusProxy)
 	r.GET("/status/*path", statusProxy)
 
 	// === OpenClaw 一键接入（公共路由，无需认证） ===
@@ -242,12 +245,19 @@ func (s *Server) registerRoutes() {
 	// 上传文件静态服务（这部分仍然在磁盘上，因为是用户上传的运行时数据）
 	r.Static("/uploads", "data/uploads")
 
-	// 插件前端静态资源（/plugins/{pluginName}/assets/index.js）
+	// 插件前端静态资源（/plugins/{pluginName}/assets/*）
+	//
+	// 与 r.Static 不同：这是一个 dev-aware handler，对每个请求按以下顺序查找：
+	//   1. 如果该插件是 dev 模式 → 从 <plugin_src>/web/dist/ 读 vite watch 实时产物
+	//   2. fallback 到 data/plugins/<id>/assets/ —— 生产模式或 vite 还没构建好
+	//
+	// 这样所有插件的 vite watch 都可以统一输出到自己的 web/dist，不需要再让
+	// vite watch --outDir 写到 core 的 plugin assets dir。
 	pluginDir := s.cfg.Plugins.Dir
 	if pluginDir == "" {
 		pluginDir = "data/plugins"
 	}
-	r.Static("/plugins", pluginDir)
+	r.GET("/plugins/:name/assets/*path", servePluginAsset(s.pluginMgr, pluginDir))
 
 	// 静态文件服务（前端 SPA）
 	r.StaticFS("/assets", http.FS(assetsFS))
@@ -268,4 +278,70 @@ func (s *Server) registerRoutes() {
 		}
 		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
 	})
+}
+
+// servePluginAsset 处理 /plugins/<name>/assets/* 请求。
+//
+// 双模式：
+//   - dev 模式：从 <plugin_src>/web/dist/<rel> 读 vite watch 实时构建产物。
+//     这样 openai/epay/health 都可以让 vite watch 输出到自己的 web/dist，
+//     core 透明地从那里读，不再需要让 vite watch --outDir 写到 core 内部目录。
+//   - production 模式：fallback 到 data/plugins/<name>/assets/<rel>，
+//     由 core 启动时通过 GetWebAssets() 把插件 binary embed 的 webdist 提取出来。
+//
+// 路径穿越防御：clean 后检查不允许 ".."。
+func servePluginAsset(mgr *plugin.Manager, baseDir string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+		rel := strings.TrimPrefix(c.Param("path"), "/")
+
+		// 路径穿越防御
+		clean := filepath.Clean("/" + rel)
+		if strings.Contains(clean, "..") {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		rel = strings.TrimPrefix(clean, "/")
+
+		// 优先尝试 dev 路径
+		if devDir, ok := mgr.DevWebDistPath(name); ok {
+			full := filepath.Join(devDir, rel)
+			if data, err := os.ReadFile(full); err == nil {
+				c.Data(http.StatusOK, contentTypeFromExt(rel), data)
+				return
+			}
+		}
+
+		// fallback 到 production 路径
+		full := filepath.Join(baseDir, name, "assets", rel)
+		data, err := os.ReadFile(full)
+		if err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		c.Data(http.StatusOK, contentTypeFromExt(rel), data)
+	}
+}
+
+// contentTypeFromExt 按扩展名返回 Content-Type。覆盖插件资源里常见的几种文件，
+// 未知扩展名退回 application/octet-stream。
+func contentTypeFromExt(name string) string {
+	switch {
+	case strings.HasSuffix(name, ".html"):
+		return "text/html; charset=utf-8"
+	case strings.HasSuffix(name, ".css"):
+		return "text/css; charset=utf-8"
+	case strings.HasSuffix(name, ".js"), strings.HasSuffix(name, ".mjs"):
+		return "application/javascript; charset=utf-8"
+	case strings.HasSuffix(name, ".json"):
+		return "application/json"
+	case strings.HasSuffix(name, ".svg"):
+		return "image/svg+xml"
+	case strings.HasSuffix(name, ".png"):
+		return "image/png"
+	case strings.HasSuffix(name, ".woff2"):
+		return "font/woff2"
+	default:
+		return "application/octet-stream"
+	}
 }

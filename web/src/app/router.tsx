@@ -25,8 +25,6 @@ import SettingsPage from '../pages/admin/SettingsPage';
 import ProfilePage from '../pages/user/ProfilePage';
 import UserKeysPage from '../pages/user/UserKeysPage';
 import UserUsagePage from '../pages/user/UserUsagePage';
-import StatusPage from '../pages/StatusPage';
-
 // 登录、安装、首页不常用，保持懒加载
 const SetupPage = lazy(() => import('../pages/SetupPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
@@ -101,18 +99,9 @@ const homeRoute = createRoute({
   ),
 });
 
-// 公开状态页路由 —— 登录前后均可访问
-// 登录后通过 authStatusRoute 进入（套 AppShell），未登录通过 publicStatusRoute 进入（独立布局）
-// 这里是未登录入口；登录态会在 beforeLoad 中重定向到 authLayout 下的同名路径
-const publicStatusRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/status',
-  beforeLoad: () => {
-    // 已登录用户继续渲染（StatusPage 内部判断），未登录也直接渲染
-    // 不做 setup 检查，状态页是最公开的入口
-  },
-  component: StatusPage,
-});
+// 注意：/status 不再注册客户端路由，整个公开状态页交给 airgate-health 插件维护。
+// 后端 GET /status 直接反代到插件的 handlePublicIndex，前端用 <a href="/status"> 跳转。
+// 这样避免 core 与插件出现两份重复的状态页实现。
 
 // 内置默认文档页 —— 当管理员未在 系统设置 → 站点品牌 → 文档链接 中填写外部 URL 时，
 // 所有"文档"按钮 fallback 到这里。公开可访问，独立布局（不挂 AppShell）。
@@ -216,7 +205,6 @@ const routeTree = rootRoute.addChildren([
   setupRoute,
   homeRoute,
   loginRoute,
-  publicStatusRoute,
   docsRoute,
   authLayout.addChildren([
     dashboardRoute,

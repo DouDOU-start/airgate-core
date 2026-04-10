@@ -93,11 +93,12 @@ export default defineConfig({
           return req.url; // 让 vite 处理（最终落到 index.html）
         },
       },
-      // 公开状态页 API（airgate-health 插件，无需登录）
-      // 注意：只代理 /status/api/* 与 /status/assets/*，根路径 /status 与子路径
-      // /status/xxx 留给 SPA 自己渲染（StatusPage 组件）
-      '/status/api': BACKEND,
-      '/status/assets': BACKEND,
+      // 公开状态页：完全交给后端 → airgate-health 插件 standalone 渲染。
+      // core 不再维护 SPA 内的 StatusPage 组件，所以根路径 /status 也走 proxy。
+      // 顺序敏感：/status 必须放在更具体的子路径之前（Vite proxy 按字典序匹配
+      // 但 /status 是 /status/api 与 /status/assets 的前缀，写在哪个位置都会
+      // 一并 cover——这里集中标注便于阅读）。
+      '/status': BACKEND,
       '/setup/status': BACKEND,
       '/setup/test-db': BACKEND,
       '/setup/test-redis': BACKEND,

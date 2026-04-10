@@ -342,15 +342,17 @@ export function AppShell({ children }: AppShellProps) {
             <h2 className="text-sm font-semibold text-text">{pageTitle}</h2>
           </div>
           <div className="flex items-center gap-1.5">
-            {/* Service status — 仅当 airgate-health 插件已安装且公开状态页已开启时显示 */}
+            {/* Service status — 仅当 airgate-health 插件已安装且公开状态页已开启时显示
+                注意：用普通 <a> 而非 <Link>，因为 /status 由后端反代到 health 插件
+                的 standalone 页面，不在 SPA 路由树里 */}
             {showStatusEntry && (
-              <Link
-                to="/status"
+              <a
+                href="/status"
                 className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
                 title={t('nav.status')}
               >
                 <Activity className="w-3.5 h-3.5" />
-              </Link>
+              </a>
             )}
             {/* GitHub */}
             <a
