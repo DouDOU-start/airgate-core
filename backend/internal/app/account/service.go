@@ -87,6 +87,8 @@ func (s *Service) ExportAll(ctx context.Context, filter ListFilter) ([]Account, 
 func (s *Service) Import(ctx context.Context, items []CreateInput) ImportSummary {
 	summary := ImportSummary{}
 	for index, input := range items {
+		input.GroupIDs = nil
+		input.ProxyID = nil
 		if _, err := s.repo.Create(ctx, input); err != nil {
 			summary.Failed++
 			summary.Errors = append(summary.Errors, ImportItemError{

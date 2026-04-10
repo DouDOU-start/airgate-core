@@ -45,7 +45,8 @@ type UpdateAccountReq struct {
 	GroupIDs       []int64           `json:"group_ids"`
 }
 
-// AccountExportItem 导出文件中的单条账号（精简字段，可被导入还原）
+// AccountExportItem 导出文件中的单条账号。
+// group_ids / proxy_id 仅为兼容旧导入文件保留，导出时不会再写出，导入时也会被忽略。
 type AccountExportItem struct {
 	Name           string            `json:"name"`
 	Platform       string            `json:"platform"`
@@ -58,7 +59,7 @@ type AccountExportItem struct {
 	ProxyID        *int64            `json:"proxy_id,omitempty"`
 }
 
-// AccountExportFile 导出文件结构
+// AccountExportFile 导出文件结构，仅包含可跨环境迁移的账号本体字段。
 type AccountExportFile struct {
 	Version    int                 `json:"version"`
 	ExportedAt string              `json:"exported_at"`

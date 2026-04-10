@@ -96,8 +96,6 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 			Priority:       item.Priority,
 			MaxConcurrency: item.MaxConcurrency,
 			RateMultiplier: item.RateMultiplier,
-			GroupIDs:       item.GroupIDs,
-			ProxyID:        item.ProxyID,
 		})
 	}
 
