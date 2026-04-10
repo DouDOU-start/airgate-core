@@ -163,7 +163,7 @@ func (m *Manager) finalizeHostHandle(name string, info sdk.PluginInfo) {
 			"plugin", name, "sdk_version", info.SDKVersion)
 		return
 	}
-	caps := make(map[string]bool, len(info.Capabilities))
+	caps := make(map[sdk.Capability]bool, len(info.Capabilities))
 	for _, c := range info.Capabilities {
 		caps[c] = true
 	}

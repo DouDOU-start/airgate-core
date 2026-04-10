@@ -76,21 +76,21 @@ type pluginHostHandle struct {
 	base       *HostService
 	pluginName string
 
-	// caps 指针指向一个 map[string]bool。nil = "未授权状态"，所有 RPC 都拒绝。
+	// caps 指针指向一个 map[sdk.Capability]bool。nil = "未授权状态"，所有 RPC 都拒绝。
 	// 用 atomic.Pointer 是为了让 SetCapabilities 与 RPC 处理并发安全，无需 mutex。
-	caps atomic.Pointer[map[string]bool]
+	caps atomic.Pointer[map[sdk.Capability]bool]
 }
 
 // SetCapabilities 由 Manager 在 spawn 完成、Info() 拿到 capability 列表后调用。
 //
 // nil caps == 兼容模式（豁免校验），用于 sdk_version <= 0.2.x 的存量插件。
 // 空 set（len=0）== 显式声明"什么都不要"，所有 RPC 都被拒。
-func (h *pluginHostHandle) SetCapabilities(caps map[string]bool) {
+func (h *pluginHostHandle) SetCapabilities(caps map[sdk.Capability]bool) {
 	if caps == nil {
 		h.caps.Store(nil)
 		return
 	}
-	cloned := make(map[string]bool, len(caps))
+	cloned := make(map[sdk.Capability]bool, len(caps))
 	for k, v := range caps {
 		cloned[k] = v
 	}
@@ -101,7 +101,7 @@ func (h *pluginHostHandle) SetCapabilities(caps map[string]bool) {
 //
 // 兼容模式（caps==nil）下放行任何调用并 log debug，便于审计哪些老插件依赖什么能力，
 // 等老插件全部声明 capabilities 后再去掉兼容路径。
-func (h *pluginHostHandle) requireCap(cap string) error {
+func (h *pluginHostHandle) requireCap(cap sdk.Capability) error {
 	caps := h.caps.Load()
 	if caps == nil {
 		// 兼容模式：sdk_version 豁免的老插件
