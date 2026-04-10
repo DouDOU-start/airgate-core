@@ -33,6 +33,7 @@ type Config struct {
 	MemorySearchEnabled bool
 	MemorySearchModel   string
 	SiteName            string
+	GatewayMode         string // 写进 openclaw.json 的 gateway.mode，默认 local
 }
 
 // Load 读取 openclaw/site 两个分组的设置并应用默认值。
@@ -47,6 +48,7 @@ func (s *Service) Load(ctx context.Context) (Config, error) {
 		MemorySearchEnabled: false,
 		MemorySearchModel:   DefaultMemorySearchModel,
 		SiteName:            "AirGate",
+		GatewayMode:         DefaultGatewayMode,
 	}
 
 	ocItems, err := s.settings.List(ctx, GroupName)
@@ -74,6 +76,10 @@ func (s *Service) Load(ctx context.Context) (Config, error) {
 		case KeyMemorySearchModel:
 			if v := strings.TrimSpace(it.Value); v != "" {
 				cfg.MemorySearchModel = v
+			}
+		case KeyGatewayMode:
+			if v := strings.TrimSpace(it.Value); v != "" {
+				cfg.GatewayMode = v
 			}
 		}
 	}
@@ -105,18 +111,24 @@ func (s *Service) RenderInstallScript(cfg Config) (string, error) {
 		return "", err
 	}
 	var buf bytes.Buffer
+	gatewayMode := strings.TrimSpace(cfg.GatewayMode)
+	if gatewayMode == "" {
+		gatewayMode = DefaultGatewayMode
+	}
 	data := struct {
 		BaseURL             string
 		SiteName            string
 		ProviderName        string
 		MemorySearchEnabled bool
 		MemorySearchModel   string
+		GatewayMode         string
 	}{
 		BaseURL:             cfg.BaseURL,
 		SiteName:            cfg.SiteName,
 		ProviderName:        cfg.ProviderName,
 		MemorySearchEnabled: cfg.MemorySearchEnabled,
 		MemorySearchModel:   cfg.MemorySearchModel,
+		GatewayMode:         gatewayMode,
 	}
 	if err := tpl.Execute(&buf, data); err != nil {
 		return "", err

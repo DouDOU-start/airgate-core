@@ -18,10 +18,15 @@ const (
 	KeyModelsPreset        = "openclaw.models_preset"
 	KeyMemorySearchEnabled = "openclaw.memory_search_enabled"
 	KeyMemorySearchModel   = "openclaw.memory_search_model"
+	KeyGatewayMode         = "openclaw.gateway_mode"
 )
 
 // DefaultProviderName 是写入 openclaw.json 的默认 provider 键名。
 const DefaultProviderName = "airgate"
+
+// DefaultGatewayMode 是写入 openclaw.json 的 gateway.mode 默认值。
+// 新版 openclaw gateway 启动时强校验此字段缺失会拒绝启动。
+const DefaultGatewayMode = "local"
 
 // DefaultMemorySearchModel 是 memorySearch 用的默认 embedding 模型。
 const DefaultMemorySearchModel = "text-embedding-3-small"

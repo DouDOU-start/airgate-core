@@ -177,11 +177,12 @@ fi
 
 MEM_ENABLED="{{if .MemorySearchEnabled}}1{{else}}0{{end}}"
 MEM_MODEL="{{.MemorySearchModel}}"
+GATEWAY_MODE="{{.GatewayMode}}"
 
 # 用 python 组装 JSON，确保键顺序稳定且转义正确。
-python3 - "${MODELS_FILE}" "${CONFIG_FILE}" "${PROVIDER_NAME}" "${AIRGATE_BASE}" "${API_KEY}" "${SELECTION}" "${MEM_ENABLED}" "${MEM_MODEL}" <<'PY'
+python3 - "${MODELS_FILE}" "${CONFIG_FILE}" "${PROVIDER_NAME}" "${AIRGATE_BASE}" "${API_KEY}" "${SELECTION}" "${MEM_ENABLED}" "${MEM_MODEL}" "${GATEWAY_MODE}" <<'PY'
 import json, sys
-models_file, config_file, provider, base, api_key, selection, mem_enabled, mem_model = sys.argv[1:9]
+models_file, config_file, provider, base, api_key, selection, mem_enabled, mem_model, gateway_mode = sys.argv[1:10]
 with open(models_file, "r", encoding="utf-8") as f:
     all_models = json.load(f)
 picks = [all_models[int(i) - 1] for i in selection.split()]
@@ -197,6 +198,9 @@ provider_models = [clean(m) for m in picks]
 alias_map = {f"{provider}/{m['id']}": {"alias": m.get("label") or m["id"]} for m in picks}
 
 cfg = {
+    "gateway": {
+        "mode": gateway_mode or "local",
+    },
     "models": {
         "mode": "merge",
         "providers": {
