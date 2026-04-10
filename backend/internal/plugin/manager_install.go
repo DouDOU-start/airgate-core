@@ -89,7 +89,8 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 		return "", fmt.Errorf("写入临时二进制失败: %w", err)
 	}
 
-	client := goplugin.NewClient(newPluginClientConfig(exec.Command(tmpBinary), false))
+	// 探测式 spawn：只是为了拿 Info()，不挂 host handle（capability 校验不适用）
+	client := goplugin.NewClient(m.newPluginClientConfig(exec.Command(tmpBinary), false, nil))
 	defer client.Kill()
 
 	rpcClient, err := client.Client()

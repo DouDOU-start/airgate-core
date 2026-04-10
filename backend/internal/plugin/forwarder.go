@@ -140,6 +140,13 @@ const maxFailoverAttempts = 3
 // Forward 转发请求到对应插件。
 // 支持账户级 failover：当遇到可重试错误（429、连接失败等）且响应未开始写入时，
 // 自动切换到其他账户重试，最多尝试 maxFailoverAttempts 次。
+//
+// Middleware 集成（详见 ADR-0001 Decision 2）：
+//   - 选完账号、prepareForwardExecution 之前调 OnForwardBegin（升序）。
+//     middleware 的 metadata bag 在整条链中累积传递。
+//   - finishForward 之前调 OnForwardEnd（降序）。failover 重试不触发 End，
+//     只有最终（成功 or 永久失败）的那一次才触发，避免对插件造成 N 倍噪声。
+//   - middleware 失败永远不 block 主流程；唯一例外是 OnForwardBegin 返回 DENY。
 func (f *Forwarder) Forward(c *gin.Context) {
 	state, ok := f.buildForwardState(c)
 	if !ok {
@@ -153,6 +160,10 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	// 记录已尝试过的账户 ID，传给调度器做排除
 	var excludeIDs []int
 
+	// middleware metadata bag：所有 middleware 在 begin/end 之间共享
+	var mwBag map[string]string
+	beginCalled := false
+
 	for attempt := 0; attempt < maxFailoverAttempts; attempt++ {
 		if !f.selectForwardAccount(c, state, excludeIDs...) {
 			return
@@ -162,6 +173,18 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		cleanup, ok := f.prepareForwardExecution(c, state)
 		if !ok {
 			return
+		}
+
+		// middleware OnForwardBegin 链。只在第一次 attempt 调用——failover 切换账号
+		// 不应该让 middleware 看到多次"开始"事件，那会污染审计日志的请求计数。
+		if !beginCalled {
+			allowed, bag := f.runForwardBeginChain(c, state)
+			beginCalled = true
+			if !allowed {
+				cleanup()
+				return
+			}
+			mwBag = bag
 		}
 
 		execution := f.executeForward(c, state)
@@ -174,12 +197,17 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			continue
 		}
 
-		// 最终结果处理
+		// 最终结果处理：先跑 middleware OnForwardEnd（用最终一次 execution 的数据），
+		// 再走 finishForward 写 usage_log。这个顺序保证 middleware 看到的 metadata
+		// 与 usage_log 计费写入是同一份事实，只是 middleware 观察更早一点点。
+		f.runForwardEndChain(c, state, execution, mwBag)
 		f.finishForward(c, state, execution)
 		cleanup()
 		return
 	}
 
-	// 所有 failover 都失败，返回最后一次错误
+	// 所有 failover 都失败，返回最后一次错误。
+	// 此时 OnForwardEnd 已经在最后一次 attempt 的失败分支被调过；这里的 503 是
+	// 整个 forward 流程已耗尽重试次数后的兜底，不再额外触发 middleware。
 	openAIError(c, 503, "server_error", "all_accounts_failed", "所有可用账户均失败，请稍后重试")
 }

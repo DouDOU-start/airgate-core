@@ -65,10 +65,10 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	if pluginDir == "" {
 		pluginDir = "data/plugins"
 	}
-	// coreBaseURL 让 extension 插件回调 core admin API（如 health 插件的 prober）。
-	// 走 127.0.0.1 + 实际监听端口；如果用户用 PORT 环境变量改了端口，cfg.Server.Port 会跟着变。
-	coreBaseURL := fmt.Sprintf("http://127.0.0.1:%d", cfg.Server.Port)
-	pluginMgr := plugin.NewManager(pluginDir, cfg.Log.Level, cfg.Database.DSN(), coreBaseURL, cfg.APIKeySecret(), db)
+	pluginMgr := plugin.NewManager(pluginDir, cfg.Log.Level, cfg.Database.DSN(), db)
+	// HostService 通过 hashicorp/go-plugin GRPCBroker 暴露给所有插件子进程，
+	// 替代旧的 admin HTTP API + admin_api_key 模式。必须在加载任何插件之前注入。
+	pluginMgr.SetHostService(plugin.NewHostService(db, pluginMgr, sched))
 	forwarder := plugin.NewForwarder(db, pluginMgr, sched, concurrency, limiter, calculator, recorder)
 
 	marketOpts := []plugin.MarketplaceOption{

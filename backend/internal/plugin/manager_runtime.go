@@ -13,11 +13,10 @@ import (
 
 	sdk "github.com/DouDOU-start/airgate-sdk"
 	sdkgrpc "github.com/DouDOU-start/airgate-sdk/grpc"
+	pb "github.com/DouDOU-start/airgate-sdk/proto"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	pluginent "github.com/DouDOU-start/airgate-core/ent/plugin"
-	settingent "github.com/DouDOU-start/airgate-core/ent/setting"
-	"github.com/DouDOU-start/airgate-core/internal/auth"
 )
 
 // pluginGRPCMaxMessageBytes 是与插件之间 gRPC 单条消息的最大字节数（收/发同值）。
@@ -31,12 +30,29 @@ const pluginGRPCMaxMessageBytes = 64 * 1024 * 1024
 //
 // 抽出这个 helper 是为了让 manager_install.go / manager_runtime.go 共用同一份握手 +
 // gRPC 上限配置，避免改一处忘另一处。
-func newPluginClientConfig(cmd *exec.Cmd, forwardOutput bool) *goplugin.ClientConfig {
+//
+// hostHandle 参数：
+//   - 非 nil 时作为本次 spawn 的 HostService 实现，注册到所有 PluginType 的 GRPCPlugin
+//     的 HostImpl 字段；spawn 后 manager 会调 hostHandle.SetCapabilities 写入权限
+//   - nil 时（探测式 spawn / 没装 host service 的部署）走软失败路径，插件 ctx.Host()==nil
+func (m *Manager) newPluginClientConfig(cmd *exec.Cmd, forwardOutput bool, hostHandle *pluginHostHandle) *goplugin.ClientConfig {
+	// hostHandle 通过 PluginSet 注入到 GatewayGRPCPlugin / ExtensionGRPCPlugin / MiddlewareGRPCPlugin。
+	// 插件 Dispense 时，sdk-grpc 的 GRPCClient 钩子会通过 GRPCBroker 启一条
+	// 反向 stream 注册 HostService，把 stream id 通过 InitRequest.host_broker_id
+	// 透传到插件子进程。hostHandle 为 nil 时，stream 不创建，插件以软失败方式运行。
+	//
+	// 注意：MiddlewareGRPCPlugin 也注册到 PluginSet，让 middleware 类型插件可以被
+	// dispense（与 gateway/extension 平行）。
+	var hostImpl pb.HostServiceServer
+	if hostHandle != nil {
+		hostImpl = hostHandle
+	}
 	cfg := &goplugin.ClientConfig{
 		HandshakeConfig: sdkgrpc.Handshake,
 		Plugins: goplugin.PluginSet{
-			sdkgrpc.PluginKeyGateway:   &sdkgrpc.GatewayGRPCPlugin{},
-			sdkgrpc.PluginKeyExtension: &sdkgrpc.ExtensionGRPCPlugin{},
+			sdkgrpc.PluginKeyGateway:    &sdkgrpc.GatewayGRPCPlugin{HostImpl: hostImpl},
+			sdkgrpc.PluginKeyExtension:  &sdkgrpc.ExtensionGRPCPlugin{HostImpl: hostImpl},
+			sdkgrpc.PluginKeyMiddleware: &sdkgrpc.MiddlewareGRPCPlugin{HostImpl: hostImpl},
 		},
 		Cmd:              cmd,
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
@@ -59,15 +75,20 @@ func newPluginClientConfig(cmd *exec.Cmd, forwardOutput bool) *goplugin.ClientCo
 // 内容来源（优先级从低到高）：
 //  1. 系统自动注入（管理员不必填、也不允许覆盖）：
 //     - sdk.ConfigKeyLogLevel  来自 core 配置 log.level
-//     - db_dsn                 来自 core 配置 database 节，让插件复用 core 数据库
-//     - core_base_url          core 自身 HTTP 监听根地址，供插件回调 core admin API
-//     - admin_api_key          从 settings 表读 admin_api_key_encrypted 解密而来
-//     （未生成时不注入，插件以软失败方式运行）
+//     - db_dsn                 admin DSN（可访问 core 业务表）—— 兼容老插件，
+//     将来下线（详见 ADR-0001 Decision 5 迁移路径）
+//     - plugin_dsn             受限 DSN（只能访问 plugin_<id> schema），新插件首选
 //  2. 用户配置：DB ent.Plugin.Config (JSONB) — 由管理员通过 UI 写入
 //
 // 用户配置不允许覆盖系统字段（防止管理员误填把 db_dsn 改成不可用的串）。
 // 当 DB 中没有该插件记录或 config 为空时，仅返回系统字段。
 // 这里刻意不报错：缺配置只是让插件以"未配置态"加载，UI 仍然可见。
+//
+// Step 2 变更：下线 core_base_url / admin_api_key 注入。插件要调 core 能力一律走
+// HostService（hashicorp/go-plugin GRPCBroker 反向 gRPC），不再需要 HTTP + Bearer。
+//
+// Step 3 变更：新增 plugin_dsn（受限 DSN + 独立 schema）。db_dsn 暂时保留以兼容
+// 尚未迁移的 epay/health/openai 插件，等它们逐个迁过来后再下线 db_dsn。
 func (m *Manager) buildInitConfig(ctx context.Context, name string) map[string]interface{} {
 	cfg := map[string]interface{}{
 		sdk.ConfigKeyLogLevel: m.logLevel,
@@ -75,11 +96,14 @@ func (m *Manager) buildInitConfig(ctx context.Context, name string) map[string]i
 	if m.coreDSN != "" {
 		cfg["db_dsn"] = m.coreDSN
 	}
-	if m.coreBaseURL != "" {
-		cfg["core_base_url"] = m.coreBaseURL
-	}
-	if key := m.lookupAdminAPIKey(ctx); key != "" {
-		cfg["admin_api_key"] = key
+	// 给插件准备一个独立 schema + 受限 role，注入 plugin_dsn
+	if m.pluginDB != nil {
+		if pluginDSN, err := m.pluginDB.EnsureFor(ctx, name); err != nil {
+			slog.Warn("provision plugin DB 失败，plugin_dsn 将不可用",
+				"plugin", name, "error", err)
+		} else {
+			cfg["plugin_dsn"] = pluginDSN
+		}
 	}
 	if m.db == nil {
 		return cfg
@@ -99,45 +123,6 @@ func (m *Manager) buildInitConfig(ctx context.Context, name string) map[string]i
 		cfg[k] = v
 	}
 	return cfg
-}
-
-// lookupAdminAPIKey 从 settings 表读取 admin_api_key_encrypted 并解密为明文。
-//
-// 返回空串的常见情况：
-//   - 管理员还没在「系统设置 → 安全与认证」生成过 admin key（settings 表里没行）
-//   - apiKeySecret 与加密时不一致（用户中途改了 API_KEY_SECRET）
-//
-// 任何失败都只 warn，不返回 error —— 调用方据此决定不注入 admin_api_key 字段，
-// 让插件以软失败方式继续运行（airgate-health 在 admin_api_key 缺失时不启 prober，
-// 但插件仍然可见、仍能展示历史数据）。
-func (m *Manager) lookupAdminAPIKey(ctx context.Context) string {
-	if m.db == nil || m.apiKeySecret == "" {
-		return ""
-	}
-	const (
-		settingKey   = "admin_api_key_encrypted"
-		settingGroup = "security"
-	)
-	row, err := m.db.Setting.Query().
-		Where(settingent.KeyEQ(settingKey), settingent.GroupEQ(settingGroup)).
-		Only(ctx)
-	if err != nil {
-		if !ent.IsNotFound(err) {
-			slog.Warn("查询 admin_api_key_encrypted 失败", "error", err)
-		}
-		return ""
-	}
-	if row.Value == "" {
-		return ""
-	}
-	plain, err := auth.DecryptAPIKey(row.Value, m.apiKeySecret)
-	if err != nil {
-		slog.Warn("解密 admin_api_key 失败，将不注入到插件",
-			"error", err,
-			"hint", "API_KEY_SECRET 可能跟生成 admin key 时不一致")
-		return ""
-	}
-	return plain
 }
 
 // LoadAll 启动时扫描插件目录，发现可执行二进制则直接加载。
@@ -229,41 +214,67 @@ func (m *Manager) IsDev(name string) bool {
 }
 
 func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *exec.Cmd, binaryDir string) (string, error) {
-	client := goplugin.NewClient(newPluginClientConfig(cmd, true))
+	// 在 spawn 之前先用 requestedName 占位创建 host handle。
+	// canonical name 可能在 Info() 之后才确定；spawn 完成后会用 canonicalName 重新注册 handle。
+	hostHandle := m.prepareHostHandle(requestedName)
+	client := goplugin.NewClient(m.newPluginClientConfig(cmd, true, hostHandle))
 
 	rpcClient, err := client.Client()
 	if err != nil {
 		client.Kill()
+		m.removeHostHandle(requestedName)
 		return "", fmt.Errorf("连接插件进程失败: %w", err)
 	}
 
 	raw, err := rpcClient.Dispense(sdkgrpc.PluginKeyGateway)
 	if err != nil {
 		client.Kill()
+		m.removeHostHandle(requestedName)
 		return "", fmt.Errorf("获取插件接口失败: %w", err)
 	}
 	probe, ok := raw.(*sdkgrpc.GatewayGRPCClient)
 	if !ok {
 		client.Kill()
+		m.removeHostHandle(requestedName)
 		return "", fmt.Errorf("插件类型断言失败")
 	}
 
 	info := probe.Info()
-	if info.Type == sdk.PluginTypeExtension {
+	switch info.Type {
+	case sdk.PluginTypeExtension:
 		extRaw, err := rpcClient.Dispense(sdkgrpc.PluginKeyExtension)
 		if err != nil {
 			client.Kill()
+			m.removeHostHandle(requestedName)
 			return "", fmt.Errorf("获取 extension 插件接口失败: %w", err)
 		}
 		ext, ok := extRaw.(*sdkgrpc.ExtensionGRPCClient)
 		if !ok {
 			client.Kill()
+			m.removeHostHandle(requestedName)
 			return "", fmt.Errorf("extension 插件类型断言失败")
 		}
 		return m.startExtensionPlugin(ctx, client, ext, requestedName, binaryDir)
-	}
 
-	return m.startGatewayPlugin(ctx, client, probe, requestedName, binaryDir)
+	case sdk.PluginTypeMiddleware:
+		mwRaw, err := rpcClient.Dispense(sdkgrpc.PluginKeyMiddleware)
+		if err != nil {
+			client.Kill()
+			m.removeHostHandle(requestedName)
+			return "", fmt.Errorf("获取 middleware 插件接口失败: %w", err)
+		}
+		mw, ok := mwRaw.(*sdkgrpc.MiddlewareGRPCClient)
+		if !ok {
+			client.Kill()
+			m.removeHostHandle(requestedName)
+			return "", fmt.Errorf("middleware 插件类型断言失败")
+		}
+		return m.startMiddlewarePlugin(ctx, client, mw, requestedName, binaryDir)
+
+	default:
+		// 默认按 gateway 处理（包括 info.Type == "" 的极老插件）
+		return m.startGatewayPlugin(ctx, client, probe, requestedName, binaryDir)
+	}
 }
 
 func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Client, gateway *sdkgrpc.GatewayGRPCClient, requestedName, binaryDir string) (string, error) {
@@ -271,17 +282,25 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 	canonicalName := canonicalPluginName(info, requestedName)
 	if canonicalName == "" {
 		client.Kill()
+		m.removeHostHandle(requestedName)
 		return "", fmt.Errorf("插件未提供有效的 ID/name")
 	}
+
+	// canonicalName 可能与 requestedName 不同，把 host handle 从临时占位 key 改名到正式 key
+	m.relocateHostHandle(requestedName, canonicalName)
+	// 解析插件声明的 capability set，写入 handle。之后插件调任何 RPC 都会被校验。
+	m.finalizeHostHandle(canonicalName, info)
 
 	initConfig := m.buildInitConfig(ctx, canonicalName)
 	pluginCtx := newCorePluginContext(initConfig, canonicalName)
 	if err := gateway.Init(pluginCtx); err != nil {
 		client.Kill()
+		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("初始化插件失败: %w", err)
 	}
 	if err := gateway.Start(ctx); err != nil {
 		client.Kill()
+		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("启动插件失败: %w", err)
 	}
 
@@ -304,6 +323,8 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 		Type:               pluginType,
 		InstructionPresets: info.InstructionPresets,
 		ConfigSchema:       cloneConfigSchema(info.ConfigSchema),
+		Capabilities:       append([]string(nil), info.Capabilities...),
+		Priority:           info.Priority,
 		Client:             client,
 		Gateway:            gateway,
 	}
@@ -319,8 +340,12 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 		delete(m.credCache, platform)
 	}
 	m.accountTypeCache[platform] = cloneAccountTypes(info.AccountTypes)
+	// 注意：不能用 `if len > 0` 守卫，必须无条件 delete + set。否则插件从"有 frontend pages"
+	// 改成"无"后，旧的 cache 永远不会被清掉（airgate-health 删 admin tab 时踩到过这个坑）。
 	if len(info.FrontendPages) > 0 {
 		m.frontendPageCache[canonicalName] = cloneFrontendPages(info.FrontendPages)
+	} else {
+		delete(m.frontendPageCache, canonicalName)
 	}
 	m.mu.Unlock()
 
@@ -338,17 +363,23 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 	canonicalName := canonicalPluginName(info, requestedName)
 	if canonicalName == "" {
 		client.Kill()
+		m.removeHostHandle(requestedName)
 		return "", fmt.Errorf("插件未提供有效的 ID/name")
 	}
+
+	m.relocateHostHandle(requestedName, canonicalName)
+	m.finalizeHostHandle(canonicalName, info)
 
 	initConfig := m.buildInitConfig(ctx, canonicalName)
 	pluginCtx := newCorePluginContext(initConfig, canonicalName)
 	if err := ext.Init(pluginCtx); err != nil {
 		client.Kill()
+		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("初始化 extension 插件失败: %w", err)
 	}
 	if err := ext.Start(ctx); err != nil {
 		client.Kill()
+		m.removeHostHandle(canonicalName)
 		return "", fmt.Errorf("启动 extension 插件失败: %w", err)
 	}
 	if err := ext.Migrate(); err != nil {
@@ -369,6 +400,8 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 		Author:       info.Author,
 		Type:         pluginType,
 		ConfigSchema: cloneConfigSchema(info.ConfigSchema),
+		Capabilities: append([]string(nil), info.Capabilities...),
+		Priority:     info.Priority,
 		Client:       client,
 		Extension:    ext,
 	}
@@ -376,8 +409,11 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 	m.mu.Lock()
 	m.instances[canonicalName] = instance
 	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
+	// 必须无条件 delete + set，避免插件移除 frontend pages 后旧 cache 残留。
 	if len(info.FrontendPages) > 0 {
 		m.frontendPageCache[canonicalName] = cloneFrontendPages(info.FrontendPages)
+	} else {
+		delete(m.frontendPageCache, canonicalName)
 	}
 	m.mu.Unlock()
 
@@ -390,6 +426,80 @@ func (m *Manager) startExtensionPlugin(ctx context.Context, client *goplugin.Cli
 	if normalizePluginName(requestedName) != "" && canonicalName != normalizePluginName(requestedName) {
 		slog.Info("插件名称已统一到 Info().ID", "requested_name", requestedName, "canonical_name", canonicalName)
 	}
+
+	return canonicalName, nil
+}
+
+// startMiddlewarePlugin 处理 type=middleware 的插件。
+//
+// 与 extension 的区别：
+//   - 不暴露自定义 HTTP 路由（middleware 完全围绕 forward chain 工作）
+//   - 不声明 BackgroundTask
+//   - 实例存到 m.instances 后会被 forwarder 的 middleware chain 自动 pickup
+//
+// 与 gateway 的区别：
+//   - 不替代 upstream（不需要 Platform / Models / Routes）
+func (m *Manager) startMiddlewarePlugin(ctx context.Context, client *goplugin.Client, mw *sdkgrpc.MiddlewareGRPCClient, requestedName, binaryDir string) (string, error) {
+	info := mw.Info()
+	canonicalName := canonicalPluginName(info, requestedName)
+	if canonicalName == "" {
+		client.Kill()
+		m.removeHostHandle(requestedName)
+		return "", fmt.Errorf("插件未提供有效的 ID/name")
+	}
+
+	m.relocateHostHandle(requestedName, canonicalName)
+	m.finalizeHostHandle(canonicalName, info)
+
+	initConfig := m.buildInitConfig(ctx, canonicalName)
+	pluginCtx := newCorePluginContext(initConfig, canonicalName)
+	if err := mw.Init(pluginCtx); err != nil {
+		client.Kill()
+		m.removeHostHandle(canonicalName)
+		return "", fmt.Errorf("初始化 middleware 插件失败: %w", err)
+	}
+	if err := mw.Start(ctx); err != nil {
+		client.Kill()
+		m.removeHostHandle(canonicalName)
+		return "", fmt.Errorf("启动 middleware 插件失败: %w", err)
+	}
+
+	instance := &PluginInstance{
+		Name:         canonicalName,
+		SourceName:   normalizePluginName(requestedName),
+		BinaryDir:    normalizePluginName(binaryDir),
+		DisplayName:  info.Name,
+		Version:      info.Version,
+		Author:       info.Author,
+		Type:         string(sdk.PluginTypeMiddleware),
+		ConfigSchema: cloneConfigSchema(info.ConfigSchema),
+		Capabilities: append([]string(nil), info.Capabilities...),
+		Priority:     info.Priority,
+		Client:       client,
+		Middleware:   mw,
+	}
+
+	m.mu.Lock()
+	m.instances[canonicalName] = instance
+	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
+	// 必须无条件 delete + set，避免插件移除 frontend pages 后旧 cache 残留。
+	if len(info.FrontendPages) > 0 {
+		m.frontendPageCache[canonicalName] = cloneFrontendPages(info.FrontendPages)
+	} else {
+		delete(m.frontendPageCache, canonicalName)
+	}
+	m.mu.Unlock()
+
+	m.extractPluginWebAssets(canonicalName, mw)
+
+	if normalizePluginName(requestedName) != "" && canonicalName != normalizePluginName(requestedName) {
+		slog.Info("插件名称已统一到 Info().ID", "requested_name", requestedName, "canonical_name", canonicalName)
+	}
+
+	slog.Info("middleware 插件已加载",
+		"name", canonicalName,
+		"priority", info.Priority,
+		"capabilities", info.Capabilities)
 
 	return canonicalName, nil
 }
@@ -408,6 +518,7 @@ func (m *Manager) stopPlugin(name string) {
 	delete(m.credCache, inst.Platform)
 	delete(m.accountTypeCache, inst.Platform)
 	delete(m.frontendPageCache, inst.Name)
+	delete(m.hostHandles, inst.Name)
 	m.unregisterAliasesLocked(inst.Name, inst.SourceName, inst.BinaryDir)
 	m.mu.Unlock()
 
@@ -425,6 +536,11 @@ func (m *Manager) stopPlugin(name string) {
 	if inst.Extension != nil {
 		if err := inst.Extension.Stop(context.Background()); err != nil {
 			slog.Warn("停止 extension 插件失败", "name", inst.Name, "error", err)
+		}
+	}
+	if inst.Middleware != nil {
+		if err := inst.Middleware.Stop(context.Background()); err != nil {
+			slog.Warn("停止 middleware 插件失败", "name", inst.Name, "error", err)
 		}
 	}
 	if inst.Client != nil {

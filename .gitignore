@@ -9,6 +9,7 @@ go.work.sum
 *.out
 vendor/
 backend/server
+backend/bin/
 backend/tmp/
 backend/web
 

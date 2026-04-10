@@ -166,15 +166,6 @@ export default function SettingsPage() {
     queryFn: () => settingsApi.list(),
   });
 
-  // 同步加载管理员 API Key 状态：未生成时在所有 tab 顶部展示横幅，
-  // 因为部分扩展插件（如 airgate-health）需要它回调 core 才能正常工作。
-  // 与 SecurityPanel 共用同一 queryKey，react-query 会自动去重。
-  const { data: adminKey } = useQuery({
-    queryKey: queryKeys.adminApiKey(),
-    queryFn: () => adminApiKeyApi.get(),
-  });
-  const adminKeyMissing = !adminKey?.hint;
-
   // 初始化
   useEffect(() => {
     if (settings) {
@@ -255,25 +246,6 @@ export default function SettingsPage() {
 
   return (
     <div>
-      {/* 管理员 API Key 缺失横幅：跨 tab 提示，避免新用户卡在"插件请求失败"却找不到原因 */}
-      {adminKeyMissing && activeTab !== 'security' && (
-        <div className="mb-4">
-          <Alert variant="warning">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <span>{t('settings.security_admin_key_missing_banner')}</span>
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={<KeyRound className="w-3.5 h-3.5" />}
-                onClick={() => setActiveTab('security')}
-              >
-                {t('settings.security_admin_key_missing_banner_action')}
-              </Button>
-            </div>
-          </Alert>
-        </div>
-      )}
-
       {/* Tabs */}
       <div className="flex items-center gap-1 mb-6 border-b border-border overflow-x-auto">
         {TABS.map((tab) => {

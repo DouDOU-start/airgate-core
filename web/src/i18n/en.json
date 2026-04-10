@@ -695,8 +695,6 @@
     "security_admin_key_regenerate_confirm_msg": "Regenerating will immediately invalidate the existing key. Continue?",
     "security_admin_key_delete_confirm_title": "Delete admin API key",
     "security_admin_key_delete_confirm_msg": "Once deleted, this key is immediately invalidated and any integration using it will lose access. Continue?",
-    "security_admin_key_missing_banner": "No admin API key has been generated yet. Some extension plugins (e.g. health monitoring) call back into core with this key and will fail outright if it is missing.",
-    "security_admin_key_missing_banner_action": "Create now",
 
     "site_branding": "Site Branding",
     "site_name": "Site Name",

@@ -55,16 +55,22 @@ func (h *PluginHandler) UpdatePluginConfig(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// ListPluginMenu 返回精简的插件菜单元信息（仅含 name + frontend_pages）。
+// ListPluginMenu 返回精简的插件元信息（仅含 name + type + frontend_pages）。
 // 普通登录用户即可访问，前端 AppShell 据此渲染插件提供的页面菜单。
 // 不会泄露插件配置或账号类型等敏感信息。
+//
+// 注意：**所有运行中的插件都会被列出**，包括那些 FrontendPages 为空的插件。
+// 前端有两种使用场景：
+//  1. 菜单渲染：循环时按 frontend_pages 是否为空来过滤
+//  2. "某插件是否在线" 探测：例如 AppShell 用 list.some(p=>p.name==='airgate-health')
+//     来决定要不要在顶栏显示 /status 入口
+//
+// 如果这里按 frontend_pages 过滤就会让场景 2 误判，已经被 airgate-health 删除
+// admin 前端页面的场景命中过一次。
 func (h *PluginHandler) ListPluginMenu(c *gin.Context) {
 	list := h.service.List()
 	resp := make([]dto.PluginResp, 0, len(list))
 	for _, item := range list {
-		if len(item.FrontendPages) == 0 {
-			continue
-		}
 		menuItem := dto.PluginResp{Name: item.Name, Type: item.Type}
 		for _, page := range item.FrontendPages {
 			menuItem.FrontendPages = append(menuItem.FrontendPages, dto.FrontendPageResp{
