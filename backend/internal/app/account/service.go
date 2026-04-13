@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	sdk "github.com/DouDOU-start/airgate-sdk"
@@ -28,11 +29,22 @@ type ConcurrencyReader interface {
 }
 
 // Service 提供账号域用例编排。
+// usageCacheEntry 用量缓存条目
+type usageCacheEntry struct {
+	data      map[string]any
+	fetchedAt time.Time
+}
+
+const usageCacheTTL = 5 * time.Minute
+
 type Service struct {
 	repo        Repository
 	plugins     PluginCatalog
 	concurrency ConcurrencyReader
 	now         func() time.Time
+
+	usageMu    sync.RWMutex
+	usageCache map[string]*usageCacheEntry // platform -> cache
 }
 
 // NewService 创建账号服务。
@@ -42,6 +54,7 @@ func NewService(repo Repository, plugins PluginCatalog, concurrency ConcurrencyR
 		plugins:     plugins,
 		concurrency: concurrency,
 		now:         time.Now,
+		usageCache:  make(map[string]*usageCacheEntry),
 	}
 }
 
@@ -75,7 +88,11 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 
 // Create 创建账号。
 func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error) {
-	return s.repo.Create(ctx, input)
+	account, err := s.repo.Create(ctx, input)
+	if err == nil {
+		s.InvalidateUsageCache("") // 新账号创建后清除用量缓存
+	}
+	return account, err
 }
 
 // ExportAll 查询符合筛选条件的全部账号（用于导出，不分页、不带并发计数）。
@@ -110,7 +127,11 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Accoun
 
 // Delete 删除账号。
 func (s *Service) Delete(ctx context.Context, id int) error {
-	return s.repo.Delete(ctx, id)
+	err := s.repo.Delete(ctx, id)
+	if err == nil {
+		s.InvalidateUsageCache("")
+	}
+	return err
 }
 
 // BulkUpdate 批量更新账号。逐条执行并收集每个账号的成功/失败信息，允许部分成功。
@@ -259,8 +280,30 @@ func (s *Service) GetModels(ctx context.Context, id int) ([]Model, error) {
 	return models, nil
 }
 
-// GetAccountUsage 查询插件上报的账号额度。
+// InvalidateUsageCache 清除指定平台的用量缓存（创建/删除账号后调用）
+func (s *Service) InvalidateUsageCache(platform string) {
+	s.usageMu.Lock()
+	defer s.usageMu.Unlock()
+	if platform == "" {
+		s.usageCache = make(map[string]*usageCacheEntry)
+	} else {
+		delete(s.usageCache, platform)
+	}
+}
+
+// GetAccountUsage 查询插件上报的账号额度（带内存缓存）。
 func (s *Service) GetAccountUsage(ctx context.Context, platform string) (map[string]any, error) {
+	// 检查缓存
+	cacheKey := platform
+	if cacheKey == "" {
+		cacheKey = "__all__"
+	}
+	s.usageMu.RLock()
+	if entry, ok := s.usageCache[cacheKey]; ok && time.Since(entry.fetchedAt) < usageCacheTTL {
+		s.usageMu.RUnlock()
+		return entry.data, nil
+	}
+	s.usageMu.RUnlock()
 	type platformQuery struct {
 		platform string
 		inst     *plugin.PluginInstance
@@ -335,6 +378,11 @@ func (s *Service) GetAccountUsage(ctx context.Context, platform string) (map[str
 			_ = s.repo.MarkError(ctx, item.ID, item.Message)
 		}
 	}
+
+	// 写入缓存
+	s.usageMu.Lock()
+	s.usageCache[cacheKey] = &usageCacheEntry{data: merged, fetchedAt: time.Now()}
+	s.usageMu.Unlock()
 
 	return merged, nil
 }

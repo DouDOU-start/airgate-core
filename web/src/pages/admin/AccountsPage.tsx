@@ -169,7 +169,11 @@ export default function AccountsPage() {
     mutationFn: (data: CreateAccountReq) => accountsApi.create(data),
     successMessage: t('accounts.create_success'),
     queryKey: queryKeys.accounts(),
-    onSuccess: () => setShowCreateModal(false),
+    onSuccess: () => {
+      setShowCreateModal(false);
+      // 创建账号后立即刷新用量窗口
+      queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
+    },
   });
 
   // 导出账号（按当前筛选条件）
