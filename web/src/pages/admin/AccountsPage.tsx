@@ -396,7 +396,7 @@ export default function AccountsPage() {
             <div className="flex items-center gap-1">
               {row.type && (
                 <span className="text-[10px] px-1 py-0 rounded" style={{ background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', color: 'var(--ag-text-secondary)' }}>
-                  {row.type.charAt(0).toUpperCase() + row.type.slice(1)}
+                  {{ oauth: 'OAuth', session_key: 'Session Key', apikey: 'API Key' }[row.type] ?? row.type}
                 </span>
               )}
               {displayPlanType && (
@@ -718,8 +718,6 @@ export default function AccountsPage() {
           options={[
             { value: '', label: t('accounts.all_types', '全部类型') },
             { value: 'oauth', label: 'OAuth' },
-            { value: 'session_key', label: 'Session Key' },
-            { value: 'setup_token', label: 'Setup Token' },
             { value: 'apikey', label: 'API Key' },
           ]}
         />
