@@ -41,7 +41,7 @@ COPY --from=frontend /build/airgate-core/web/dist/. airgate-core/backend/interna
 # 镜像内的 Version 由 build-arg 注入，与 release workflow 的 git tag 一致
 ARG VERSION=docker
 RUN cd airgate-core/backend && CGO_ENABLED=0 go build -buildvcs=false -trimpath \
-    -ldflags "-X main.Version=${VERSION}" \
+    -ldflags "-X github.com/DouDOU-start/airgate-core/internal/version.Version=${VERSION}" \
     -o /server ./cmd/server
 
 # ---- 阶段 3: 运行时 ----

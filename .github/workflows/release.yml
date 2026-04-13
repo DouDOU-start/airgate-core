@@ -20,22 +20,126 @@ env:
 
 jobs:
   # ------------------------------------------------------------
-  # Job 1: 多架构 Docker 镜像（push 到 ghcr.io）
+  # Job 1: 构建前端（只跑一次，供后续 job 复用）
   # ------------------------------------------------------------
-  build-and-push-image:
-    name: Build & Push Multi-arch Image
+  build-frontend:
+    name: Build Frontend
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone airgate-sdk
+        run: git clone --depth 1 https://github.com/DouDOU-start/airgate-sdk.git ../airgate-sdk
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build @airgate/theme (sdk frontend dependency)
+        run: cd ../airgate-sdk/frontend && npm ci && npm run build
+
+      - name: Build core frontend
+        run: cd web && npm ci && npm run build
+
+      - name: Upload web/dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          retention-days: 1
+
+  # ------------------------------------------------------------
+  # Job 2: 多架构 Docker 镜像（原生 runner 并行构建，无 QEMU）
+  # ------------------------------------------------------------
+  build-image:
+    name: Build Image (${{ matrix.platform }})
+    needs: build-frontend
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
     steps:
       - name: Checkout airgate-core
         uses: actions/checkout@v4
         with:
           path: airgate-core
 
-      - name: Clone airgate-sdk (Dockerfile expects sibling repo)
+      - name: Clone airgate-sdk
         run: git clone --depth 1 https://github.com/DouDOU-start/airgate-sdk.git airgate-sdk
 
-      - name: Set up QEMU (cross-arch emulation)
-        uses: docker/setup-qemu-action@v3
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: airgate-core/web/dist
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Build & push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: airgate-core/deploy/Dockerfile
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,scope=${{ matrix.platform }},mode=max
+          provenance: false
+          sbom: false
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # ------------------------------------------------------------
+  # Job 3: 合并多架构 manifest
+  # ------------------------------------------------------------
+  merge-manifests:
+    name: Merge Multi-arch Manifest
+    needs: build-image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -59,32 +163,25 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
 
-      - name: Build & push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: airgate-core/deploy/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          build-args: |
-            VERSION=${{ github.ref_name }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          # 关闭 buildx v6 默认开启的 SBOM / provenance attestation 与
-          # *.dockerbuild summary artifact 上传 —— 我们既不消费这些数据，
-          # 它们还会污染 release-notes job 的 artifact 列表（之前导致过下载 retry 失败）。
-          provenance: false
-          sbom: false
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
 
   # ------------------------------------------------------------
-  # Job 2: 跨平台原生二进制（linux/darwin × amd64/arm64）
+  # Job 4: 跨平台原生二进制（linux/darwin × amd64/arm64）
   # 用于裸金属 install.sh 部署 —— 二进制完全自包含，前端 SPA + 翻译文件
   # 都已 //go:embed 进 binary，不需要附加资源。
   # ------------------------------------------------------------
   build-binaries:
     name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: build-frontend
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -104,17 +201,11 @@ jobs:
       - name: Clone airgate-sdk (go.work replace)
         run: git clone --depth 1 https://github.com/DouDOU-start/airgate-sdk.git ../airgate-sdk
 
-      - uses: actions/setup-node@v4
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
         with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Build @airgate/theme (sdk frontend dependency)
-        run: cd ../airgate-sdk/frontend && npm ci && npm run build
-
-      - name: Build core frontend
-        run: cd web && npm ci && npm run build
+          name: web-dist
+          path: web/dist
 
       - name: Embed web/dist into backend
         run: |
@@ -138,7 +229,7 @@ jobs:
           echo "Injecting Version=${VERSION}"
           mkdir -p bin
           cd backend && go build -buildvcs=false -trimpath \
-            -ldflags "-X 'main.Version=${VERSION}' -s -w" \
+            -ldflags "-X 'github.com/DouDOU-start/airgate-core/internal/version.Version=${VERSION}' -s -w" \
             -o ../bin/airgate-core-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/server
 
       - name: Generate SHA256
@@ -156,12 +247,12 @@ jobs:
           retention-days: 1
 
   # ------------------------------------------------------------
-  # Job 3: 创建 GitHub Release，把 docker tag 与原生二进制聚合发布
+  # Job 5: 创建 GitHub Release，把 docker tag 与原生二进制聚合发布
   # ------------------------------------------------------------
   release-notes:
     name: Create GitHub Release
     needs:
-      - build-and-push-image
+      - merge-manifests
       - build-binaries
     runs-on: ubuntu-latest
     steps:
@@ -262,7 +353,6 @@ jobs:
           if [ ! -s "$tmp_dir/feat.txt" ] && [ ! -s "$tmp_dir/fix.txt" ] && [ ! -s "$tmp_dir/refactor.txt" ] && [ ! -s "$tmp_dir/perf.txt" ] && [ ! -s "$tmp_dir/docs.txt" ] && [ ! -s "$tmp_dir/other.txt" ]; then
             printf -- '- 本版本没有检测到可汇总的提交记录。\n\n' >> release_body.md
           fi
-
 
       - name: Create release with generated changelog
         uses: softprops/action-gh-release@v2
