@@ -182,6 +182,17 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
                 setStreamingContent(streamingRef.current);
                 scrollToBottom();
               }
+              continue;
+            }
+
+            // 插件原始 SSE：Anthropic Messages API 格式
+            if (data?.type === 'content_block_delta' && data?.delta?.type === 'text_delta') {
+              const text = data.delta.text;
+              if (text) {
+                streamingRef.current += text;
+                setStreamingContent(streamingRef.current);
+                scrollToBottom();
+              }
             }
           } catch {
             // 非 JSON，忽略
