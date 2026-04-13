@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Key } from 'lucide-react';
 import { Modal } from '../../../shared/components/Modal';
 import { Button } from '../../../shared/components/Button';
-import { Input, Textarea, Select } from '../../../shared/components/Input';
+import { Input, Textarea } from '../../../shared/components/Input';
+import { SearchSelect } from '../../../shared/components/SearchSelect';
 import { parseIpList } from '../../../shared/utils/ip';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import type { CreateAPIKeyReq, GroupResp } from '../../../shared/types';
@@ -52,20 +53,22 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
 
   const { user } = useAuth();
   const userGroupRates = user?.group_rates;
-  const groupOptions = [
-    { value: '0', label: t('api_keys.select_group') },
-    ...groups.map((g) => {
-      const override = userGroupRates?.[g.id];
-      const hasOverride = override != null && override > 0 && override !== g.rate_multiplier;
-      const rateLabel = hasOverride
-        ? `${g.rate_multiplier}x → ${override}x`
-        : `${g.rate_multiplier}x`;
-      return {
-        value: String(g.id),
-        label: `${g.name} (${g.platform}) · ${rateLabel}`,
-      };
-    }),
-  ];
+  const groupOptions = groups.map((g) => {
+    const override = userGroupRates?.[g.id];
+    const hasOverride = override != null && override > 0 && override !== g.rate_multiplier;
+    return {
+      value: String(g.id),
+      label: `${g.name} (${g.platform})`,
+      suffix: hasOverride ? (
+        <span className="text-text-tertiary">
+          <span className="line-through opacity-60">{g.rate_multiplier}x</span>{' '}
+          <span className="text-primary font-medium">{override}x</span>
+        </span>
+      ) : (
+        <span className="text-text-tertiary">{g.rate_multiplier}x 倍率</span>
+      ),
+    };
+  });
 
   return (
     <Modal
@@ -94,11 +97,12 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
           icon={<Key className="w-4 h-4" />}
         />
 
-        <Select
+        <SearchSelect
           label={t('api_keys.group')}
           required
-          value={String(form.group_id)}
-          onChange={(e) => setForm({ ...form, group_id: Number(e.target.value) })}
+          placeholder={t('api_keys.select_group')}
+          value={form.group_id ? String(form.group_id) : ''}
+          onChange={(v) => setForm({ ...form, group_id: Number(v) })}
           options={groupOptions}
         />
 

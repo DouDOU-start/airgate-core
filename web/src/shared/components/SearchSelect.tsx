@@ -1,18 +1,23 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, ChevronDown, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
+import { X, ChevronDown, Loader2, Search } from 'lucide-react';
 import { inputBase } from './Input';
 
 export interface SearchSelectOption {
   value: string;
   label: string;
   description?: string;
+  /** 渲染在选项右侧（如倍率标签），支持 ReactNode 用于富文本样式 */
+  suffix?: ReactNode;
 }
 
 interface SearchSelectProps {
+  label?: string;
+  required?: boolean;
   placeholder?: string;
   value?: string;
   onChange: (value: string) => void;
-  onSearch: (keyword: string) => void;
+  /** 异步搜索回调；省略时使用本地 label 过滤 */
+  onSearch?: (keyword: string) => void;
   options: SearchSelectOption[];
   loading?: boolean;
   disabled?: boolean;
@@ -20,6 +25,8 @@ interface SearchSelectProps {
 }
 
 export function SearchSelect({
+  label: fieldLabel,
+  required,
   placeholder,
   value,
   onChange,
@@ -59,13 +66,20 @@ export function SearchSelect({
     item?.scrollIntoView({ block: 'nearest' });
   }, [focusIdx, open]);
 
-  // 防抖搜索
+  // 本地过滤（onSearch 未提供时）
+  const filteredOptions = onSearch
+    ? options
+    : options.filter((o) => !keyword || o.label.toLowerCase().includes(keyword.toLowerCase()));
+
+  // 防抖搜索 / 本地过滤
   const handleInput = useCallback(
     (val: string) => {
       setKeyword(val);
       setFocusIdx(-1);
-      clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => onSearch(val), 300);
+      if (onSearch) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => onSearch(val), 300);
+      }
     },
     [onSearch],
   );
@@ -86,7 +100,7 @@ export function SearchSelect({
   const clear = useCallback(() => {
     onChange('');
     setKeyword('');
-    onSearch('');
+    onSearch?.('');
   }, [onChange, onSearch]);
 
   const handleKeyDown = useCallback(
@@ -97,19 +111,19 @@ export function SearchSelect({
           if (!open) {
             setOpen(true);
           } else {
-            setFocusIdx((i) => (i < options.length - 1 ? i + 1 : 0));
+            setFocusIdx((i) => (i < filteredOptions.length - 1 ? i + 1 : 0));
           }
           break;
         case 'ArrowUp':
           e.preventDefault();
           if (open) {
-            setFocusIdx((i) => (i > 0 ? i - 1 : options.length - 1));
+            setFocusIdx((i) => (i > 0 ? i - 1 : filteredOptions.length - 1));
           }
           break;
         case 'Enter':
           e.preventDefault();
-          if (open && focusIdx >= 0 && options[focusIdx]) {
-            select(options[focusIdx].value);
+          if (open && focusIdx >= 0 && filteredOptions[focusIdx]) {
+            select(filteredOptions[focusIdx].value);
           }
           break;
         case 'Escape':
@@ -118,10 +132,10 @@ export function SearchSelect({
           break;
       }
     },
-    [open, focusIdx, options, select],
+    [open, focusIdx, filteredOptions, select],
   );
 
-  return (
+  const dropdown = (
     <div ref={containerRef} className={`relative ${className}`}>
       <div className="relative">
         {/* 已选中：显示标签 */}
@@ -166,12 +180,29 @@ export function SearchSelect({
           className="ag-glass-dropdown absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-[10px] py-1"
           style={{ animation: 'ag-scale-in 0.15s ease-out forwards', minWidth: '220px' }}
         >
-          {options.length === 0 && !loading && (
+          {/* 本地过滤搜索框 */}
+          {!onSearch && filteredOptions.length > 0 && (
+            <li className="px-2 pb-1">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={keyword}
+                  onChange={(e) => handleInput(e.target.value)}
+                  placeholder={placeholder ?? '搜索...'}
+                  className="w-full pl-8 pr-2 py-1.5 text-xs bg-transparent border-b border-border outline-none text-text placeholder:text-text-tertiary"
+                  autoFocus
+                />
+              </div>
+            </li>
+          )}
+          {filteredOptions.length === 0 && !loading && (
             <li className="px-3 py-2 text-xs text-text-tertiary text-center">
               {keyword ? '无匹配结果' : '输入关键词搜索'}
             </li>
           )}
-          {options.map((opt, idx) => {
+          {filteredOptions.map((opt, idx) => {
             const isFocused = idx === focusIdx;
             const isSelected = opt.value === value;
             return (
@@ -185,7 +216,10 @@ export function SearchSelect({
                   isFocused ? 'bg-bg-hover text-text' : 'text-text-secondary'
                 } ${isSelected ? 'text-primary font-medium' : ''}`}
               >
-                <div className="truncate">{opt.label}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate">{opt.label}</span>
+                  {opt.suffix && <span className="shrink-0 text-xs">{opt.suffix}</span>}
+                </div>
                 {opt.description && (
                   <div className="text-xs text-text-tertiary truncate">{opt.description}</div>
                 )}
@@ -194,6 +228,18 @@ export function SearchSelect({
           })}
         </ul>
       )}
+    </div>
+  );
+
+  if (!fieldLabel) return dropdown;
+
+  return (
+    <div>
+      <label className="block text-xs font-medium text-text-secondary mb-1.5">
+        {fieldLabel}
+        {required && <span className="text-danger ml-0.5">*</span>}
+      </label>
+      {dropdown}
     </div>
   );
 }

@@ -196,27 +196,24 @@ export default function UserKeysPage() {
 
   const hasAvailableGroups = groupList.length > 0;
 
-  // 分组选项（如果用户有专属倍率，显示专属倍率）
+  // 分组选项（如果用户有专属倍率，右侧显示划线原价 + 专属倍率）
   const userGroupRates = user?.group_rates;
-  const groupOptions = [
-    {
-      value: '',
-      label: hasAvailableGroups
-        ? t('user_keys.select_group')
-        : t('user_keys.no_groups_available'),
-    },
-    ...groupList.map((g) => {
-      const override = userGroupRates?.[g.id];
-      const hasOverride = override != null && override > 0 && override !== g.rate_multiplier;
-      const rateLabel = hasOverride
-        ? `${g.rate_multiplier}x → ${override}x`
-        : `${g.rate_multiplier}x`;
-      return {
-        value: String(g.id),
-        label: `${g.name} (${g.platform}) · ${rateLabel}`,
-      };
-    }),
-  ];
+  const groupOptions = groupList.map((g) => {
+    const override = userGroupRates?.[g.id];
+    const hasOverride = override != null && override > 0 && override !== g.rate_multiplier;
+    return {
+      value: String(g.id),
+      label: g.name,
+      suffix: hasOverride ? (
+        <span className="text-text-tertiary">
+          <span className="line-through opacity-60">{g.rate_multiplier}x</span>{' '}
+          <span className="text-primary font-medium">{override}x</span>
+        </span>
+      ) : (
+        <span className="text-text-tertiary">{g.rate_multiplier}x {t('user_keys.rate_suffix', '倍率')}</span>
+      ),
+    };
+  });
 
   // 使用配置弹窗
   const {

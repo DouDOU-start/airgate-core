@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Modal } from '../../../shared/components/Modal';
 import { Button } from '../../../shared/components/Button';
-import { Input, Select } from '../../../shared/components/Input';
+import { Input } from '../../../shared/components/Input';
+import { SearchSelect, type SearchSelectOption } from '../../../shared/components/SearchSelect';
 import { DatePicker } from '../../../shared/components/DatePicker';
 import type { KeyForm } from './types';
 
@@ -19,7 +20,7 @@ export function EditKeyModal({
   isEdit: boolean;
   form: KeyForm;
   setForm: (form: KeyForm) => void;
-  groupOptions: Array<{ value: string; label: string }>;
+  groupOptions: SearchSelectOption[];
   onClose: () => void;
   onSubmit: () => void;
   loading: boolean;
@@ -50,11 +51,12 @@ export function EditKeyModal({
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           placeholder={t('user_keys.name_placeholder')}
         />
-        <Select
+        <SearchSelect
           label={t('user_keys.group')}
           required
+          placeholder={t('user_keys.select_group')}
           value={form.group_id}
-          onChange={(e) => setForm({ ...form, group_id: e.target.value })}
+          onChange={(v) => setForm({ ...form, group_id: v })}
           options={groupOptions}
         />
         <Input
