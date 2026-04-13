@@ -169,7 +169,7 @@ sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 # ===================== 代码生成 =====================
 
 ent: ## 生成 Ent ORM 代码
-	@cd $(BACKEND_DIR) && $(GO) generate ./ent
+	@cd $(BACKEND_DIR) && GOWORK=off $(GO) generate ./ent
 	@echo "Ent 代码生成完成"
 
 # ===================== 质量检查 =====================
@@ -202,7 +202,7 @@ test: ## 运行测试
 
 ci: lint test vet verify-ent build-backend ## 本地运行与 CI 完全一致的检查
 
-pre-commit: lint vet build-backend ## pre-commit hook 调用（跳过耗时的测试）
+pre-commit: lint vet verify-ent build-backend ## pre-commit hook 调用（跳过耗时的测试）
 
 vet: ## 静态分析
 	@cd $(BACKEND_DIR) && $(GO) vet ./...
