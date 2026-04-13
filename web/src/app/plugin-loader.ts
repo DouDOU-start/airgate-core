@@ -166,8 +166,9 @@ export async function loadPluginFrontend(
     } finally {
       URL.revokeObjectURL(blobUrl);
     }
-  } catch {
-    // 插件可能没有前端模块，静默忽略
+  } catch (err) {
+    // 插件可能没有前端模块，记录错误便于排查
+    console.warn(`[plugin-loader] Failed to load plugin frontend: ${pluginId}`, err);
     return null;
   }
 }

@@ -85,6 +85,7 @@ export function usePluginAccountForm(platform: string) {
       loadedRef.current = '';
       return;
     }
+    // 跳过重复加载（但 cleanup 时重置，兼容 React 18 Strict Mode double-mount）
     if (loadedRef.current === platform) return;
     loadedRef.current = platform;
     let cancelled = false;
@@ -114,6 +115,7 @@ export function usePluginAccountForm(platform: string) {
 
     return () => {
       cancelled = true;
+      loadedRef.current = ''; // 重置，让 Strict Mode re-mount 时能重新加载
     };
   }, [platform]);
 
