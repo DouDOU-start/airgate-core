@@ -589,7 +589,7 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
               padding: '8px 12px',
             }}
             labelStyle={{ color: 'var(--ag-text)', fontWeight: 600, marginBottom: 4 }}
-            formatter={(value) => [fmtNum(Number(value)), '']}
+            formatter={(value, name) => [fmtNum(Number(value)), name]}
           />
           <Legend
             iconType="circle"
