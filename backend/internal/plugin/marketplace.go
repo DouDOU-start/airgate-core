@@ -128,7 +128,7 @@ var officialPlugins = []MarketplacePlugin{
 		GithubRepo:  "DouDOU-start/airgate-health",
 	},
 	{
-		Name:        "gateway-anthropic",
+		Name:        "gateway-claude",
 		Version:     "1.0.0",
 		Description: "Claude Messages API 网关插件：OAuth 授权、TLS 指纹、用量监控",
 		Author:      "AirGate",
