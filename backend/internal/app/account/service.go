@@ -3,6 +3,7 @@ package account
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -260,8 +261,26 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 		run: func(runCtx context.Context, writer http.ResponseWriter) error {
 			req := *forwardReq
 			req.Writer = writer
-			_, forwardErr := inst.Gateway.Forward(runCtx, &req)
-			return forwardErr
+			result, forwardErr := inst.Gateway.Forward(runCtx, &req)
+			if forwardErr != nil {
+				return forwardErr
+			}
+			// 关键：Claude 等插件对上游 4xx 返回 (result, nil) 是为了让正常
+			// 请求路径透传错误给客户端，但测试路径必须严格判定——只要不是
+			// 2xx 都视为失败：
+			//   - SSE 流式响应成功的 HTTP 状态就是 200
+			//   - 401 invalid api key / 403 forbidden / 429 rate limit /
+			//     5xx upstream error 全部应该报告测试失败
+			// 优先用插件已提取的 ErrorMessage（如 "invalid_api_key: Invalid
+			// API key"），插件没填则用状态码兜底。
+			if result != nil && (result.StatusCode < 200 || result.StatusCode >= 300) {
+				msg := result.ErrorMessage
+				if msg == "" {
+					msg = fmt.Sprintf("upstream returned HTTP %d", result.StatusCode)
+				}
+				return errors.New(msg)
+			}
+			return nil
 		},
 	}, nil
 }

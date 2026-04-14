@@ -210,8 +210,13 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
                 if (data.success) {
                   setStatus('success');
                 } else {
+                  // 失败时把错误消息也写到终端输出区，不要只塞在底部
+                  // status 行——原始错误 JSON 因为后面有 test_complete
+                  // 已经被丢弃，再不显示用户根本看不到任何错误信息。
+                  const errMsg = data.error || t('accounts.test_error');
+                  addLine(errMsg, 'text-red-400');
                   setStatus('error');
-                  setErrorMessage(data.error || '');
+                  setErrorMessage(errMsg);
                 }
                 continue;
               }
