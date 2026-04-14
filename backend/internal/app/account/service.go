@@ -309,8 +309,48 @@ func (s *Service) GetAccountUsage(ctx context.Context, platform string) (map[str
 	// 浅克隆一份：后续把 today_stats 注入克隆体，避免污染缓存里那份"纯上游数据"。
 	// 深度无需——我们只给外层 map 和每个 account map 加一个字段，不会动 windows / credits。
 	result := cloneMergedShallow(base)
+
+	// 每次调用都重新 seed 当前活跃账号到 result。
+	// 原因：上游缓存里只有"上次 populate 时处于 active 的账号"，若某个账号之后才
+	// 从 error/disabled 变回 active（或刚创建），就不会出现在缓存里，enrichTodayStats
+	// 也遍历不到它，前端就看不到今日统计。这一步 DB 开销很小（单列 + 平台索引），
+	// 但保证状态变更立即生效，不用等缓存过期。
+	s.ensureActiveAccountsSeeded(ctx, platform, result)
+
 	s.enrichTodayStats(ctx, result)
 	return result, nil
+}
+
+// ensureActiveAccountsSeeded 确保所有当前活跃账号都在 merged 里有占位条目。
+// 对于 apikey 类型的账号（没有上游 quota 接口），它们只靠 seed 占位才能走进
+// enrichTodayStats，拿到今日聚合统计。
+func (s *Service) ensureActiveAccountsSeeded(ctx context.Context, platform string, merged map[string]any) {
+	var platforms []string
+	if platform != "" {
+		platforms = []string{platform}
+	} else {
+		for _, meta := range s.plugins.GetAllPluginMeta() {
+			if meta.Platform != "" {
+				platforms = append(platforms, meta.Platform)
+			}
+		}
+	}
+
+	for _, p := range platforms {
+		accounts, err := s.repo.ListByPlatform(ctx, p)
+		if err != nil || len(accounts) == 0 {
+			continue
+		}
+		for _, item := range accounts {
+			if item.Status != "active" {
+				continue
+			}
+			key := strconv.Itoa(item.ID)
+			if _, exists := merged[key]; !exists {
+				merged[key] = map[string]any{}
+			}
+		}
+	}
 }
 
 // getUpstreamUsage 拿到上游账号的 quota 窗口 / credits（带 5 分钟 TTL 内存缓存）。
