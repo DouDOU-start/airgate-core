@@ -243,22 +243,24 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): Column<Usag
               </>
             }
           >
-            <div className="font-mono text-xs flex items-center gap-1.5">
-              <span className="text-emerald-400">↓ {row.input_tokens.toLocaleString()}</span>
-              <span className="text-sky-400">↑ {row.output_tokens.toLocaleString()}</span>
-            </div>
-            {(row.cached_input_tokens > 0 || cacheCreation > 0) && (
-              <div className="text-[11px] font-mono text-text-tertiary flex items-center gap-2">
-                {row.cached_input_tokens > 0 && (
-                  <span title={t('usage.cache_read')}>⊕ {fmtNum(row.cached_input_tokens)}</span>
-                )}
-                {cacheCreation > 0 && (
-                  <span className="text-amber-400" title={t('usage.cache_creation')}>
-                    ✦ {fmtNum(cacheCreation)}
-                  </span>
-                )}
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="font-mono text-xs flex items-center gap-1.5">
+                <span className="text-emerald-400">↓ {row.input_tokens.toLocaleString()}</span>
+                <span className="text-sky-400">↑ {row.output_tokens.toLocaleString()}</span>
               </div>
-            )}
+              {(row.cached_input_tokens > 0 || cacheCreation > 0) && (
+                <div className="text-[11px] font-mono text-text-tertiary flex items-center gap-2">
+                  {row.cached_input_tokens > 0 && (
+                    <span title={t('usage.cache_read')}>⊕ {fmtNum(row.cached_input_tokens)}</span>
+                  )}
+                  {cacheCreation > 0 && (
+                    <span className="text-amber-400" title={t('usage.cache_creation')}>
+                      ✦ {fmtNum(cacheCreation)}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </HoverCard>
         );
       },
