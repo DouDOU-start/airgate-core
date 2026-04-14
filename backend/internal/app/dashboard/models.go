@@ -115,6 +115,8 @@ type TimeBucket struct {
 	OutputTokens  int64
 	CachedInput   int64
 	CacheCreation int64
+	ActualCost    float64
+	StandardCost  float64
 }
 
 // UserTrend 表示单个用户的趋势。

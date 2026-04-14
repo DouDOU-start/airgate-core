@@ -403,6 +403,73 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
 
 // ==================== Token 趋势 ====================
 
+type TokenTrendDatum = {
+  time: string;
+  input: number;
+  output: number;
+  cachedInput: number;
+  actualCost: number;
+  standardCost: number;
+};
+
+type TokenTrendTooltipPayload = {
+  dataKey: string;
+  value: number;
+  color: string;
+  payload: TokenTrendDatum;
+};
+
+function TokenTrendTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: TokenTrendTooltipPayload[];
+  label?: string;
+}) {
+  const { t } = useTranslation();
+  const first = payload?.[0];
+  if (!active || !first) return null;
+  const datum = first.payload;
+  const labels: Record<string, string> = {
+    input: t('dashboard.input'),
+    output: t('dashboard.output'),
+    cachedInput: t('dashboard.cached_input'),
+  };
+  return (
+    <div
+      style={{
+        background: 'var(--ag-bg-elevated)',
+        border: '1px solid var(--ag-border)',
+        borderRadius: 8,
+        fontSize: 12,
+        padding: '8px 12px',
+        color: 'var(--ag-text)',
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      {payload.map((p) => (
+        <div key={p.dataKey} style={{ color: p.color, lineHeight: 1.6 }}>
+          {labels[p.dataKey] || p.dataKey} : {fmtNum(Number(p.value))}
+        </div>
+      ))}
+      <div
+        style={{
+          marginTop: 6,
+          paddingTop: 6,
+          borderTop: '1px solid var(--ag-border-subtle)',
+          color: 'var(--ag-text-secondary)',
+        }}
+      >
+        {t('dashboard.actual')} : <span style={{ color: 'var(--ag-warning)' }}>{fmtCost(datum.actualCost)}</span>
+        {' | '}
+        {t('dashboard.standard')} : {fmtCost(datum.standardCost)}
+      </div>
+    </div>
+  );
+}
+
 function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
   const { t } = useTranslation();
 
@@ -412,6 +479,8 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
       input: d.input_tokens,
       output: d.output_tokens,
       cachedInput: d.cached_input,
+      actualCost: d.actual_cost,
+      standardCost: d.standard_cost,
     })),
     [trend.token_trend],
   );
@@ -443,24 +512,7 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
             tickLine={false}
             tickFormatter={(v: number) => fmtNum(v)}
           />
-          <RechartsTooltip
-            contentStyle={{
-              background: 'var(--ag-bg-elevated)',
-              border: '1px solid var(--ag-border)',
-              borderRadius: 8,
-              fontSize: 12,
-              padding: '8px 12px',
-            }}
-            labelStyle={{ color: 'var(--ag-text)', fontWeight: 600, marginBottom: 4 }}
-            formatter={(value, name) => {
-              const labels: Record<string, string> = {
-                input: t('dashboard.input'),
-                output: t('dashboard.output'),
-                cachedInput: t('dashboard.cached_input'),
-              };
-              return [fmtNum(Number(value)), labels[String(name)] || String(name)];
-            }}
-          />
+          <RechartsTooltip content={<TokenTrendTooltip />} />
           <Legend
             iconType="circle"
             iconSize={8}

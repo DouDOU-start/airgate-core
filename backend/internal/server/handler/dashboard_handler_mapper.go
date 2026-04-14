@@ -75,6 +75,8 @@ func toDashboardTimeBuckets(items []appdashboard.TimeBucket) []dto.DashboardTime
 			InputTokens:  item.InputTokens,
 			OutputTokens: item.OutputTokens,
 			CachedInput:  item.CachedInput,
+			ActualCost:   item.ActualCost,
+			StandardCost: item.StandardCost,
 		})
 	}
 	return result

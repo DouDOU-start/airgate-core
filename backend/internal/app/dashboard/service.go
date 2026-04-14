@@ -180,6 +180,8 @@ func aggregateTokenTrend(logs []TrendLog, granularity string, loc *time.Location
 		bucket.OutputTokens += item.OutputTokens
 		bucket.CachedInput += item.CachedInputTokens
 		bucket.CacheCreation += item.CacheCreationTokens
+		bucket.ActualCost += item.ActualCost
+		bucket.StandardCost += item.StandardCost
 	}
 
 	result := make([]TimeBucket, 0, len(bucketMap))
