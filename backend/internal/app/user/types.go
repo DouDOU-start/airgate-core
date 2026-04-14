@@ -106,6 +106,8 @@ type APIKeyBrief struct {
 	SellRate float64
 	// GroupRate 所属分组的费率倍率（未绑定分组时为 0）
 	GroupRate float64
+	// Platform 所属分组的平台标识（如 anthropic / openai），未绑定分组时为空
+	Platform string
 }
 
 type APIKey struct {

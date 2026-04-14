@@ -246,6 +246,7 @@ func (s *UserStore) GetAPIKeyInfo(ctx context.Context, keyID int) (appuser.APIKe
 	}
 	if g, _ := ak.Edges.GroupOrErr(); g != nil {
 		brief.GroupRate = g.RateMultiplier
+		brief.Platform = g.Platform
 	}
 	return brief, nil
 }

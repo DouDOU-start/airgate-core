@@ -10,19 +10,38 @@ import { DatePicker } from '../../shared/components/DatePicker';
 import { StatCard } from '../../shared/components/Card';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useAuth } from '../../app/providers/AuthProvider';
-import { Activity, Hash, DollarSign, Coins, Search, RefreshCw, Key, Clock, Gauge, Percent } from 'lucide-react';
+import { useToast } from '../../shared/components/Toast';
+import { Activity, Hash, DollarSign, Coins, Search, RefreshCw, Key, Clock, Gauge, Percent, Upload } from 'lucide-react';
 import { useUsageColumns, fmtNum } from '../../shared/columns/usageColumns';
+import { getSessionAPIKey } from '../../shared/api/client';
+import { CcsImportModal } from './userkeys/CcsImportModal';
 import type { UsageQuery } from '../../shared/types';
 
 function APIKeyInfoBar() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [ccsOpen, setCcsOpen] = useState(false);
   if (!user?.api_key_id) return null;
 
   const quota = user.api_key_quota_usd ?? 0;
   const used = user.api_key_used_quota ?? 0;
   const expiresAt = user.api_key_expires_at;
   const pct = quota > 0 ? Math.min((used / quota) * 100, 100) : 0;
+
+  // 原文 Key 仅在 API Key 登录当次会话内通过 sessionStorage 暂存；刷新页面后丢失，
+  // 此时按钮会提示用户重新登录。
+  const sessionKey = getSessionAPIKey();
+  const platform = user.api_key_platform || '';
+  const canImportCcs = !!sessionKey;
+
+  function handleImportCcs() {
+    if (!sessionKey) {
+      toast('error', t('user_keys.ccs_session_expired'));
+      return;
+    }
+    setCcsOpen(true);
+  }
 
   // 后端已经把"销售倍率优先、否则分组倍率"折算成单一字段 api_key_rate，
   // 前端拿不到原始来源，避免通过 DevTools 推断 reseller 定价模型。
@@ -96,6 +115,24 @@ function APIKeyInfoBar() {
           <span className="text-text-secondary font-mono">{effectiveRate.toFixed(2)}x</span>
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={handleImportCcs}
+        disabled={!canImportCcs}
+        title={!canImportCcs ? t('user_keys.ccs_session_expired') : undefined}
+        className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-glass-border bg-surface text-text-secondary hover:text-text hover:bg-bg-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        <Upload className="w-3.5 h-3.5" />
+        <span>{t('user_keys.import_ccs')}</span>
+      </button>
+
+      <CcsImportModal
+        open={ccsOpen}
+        ccsKeyValue={sessionKey}
+        ccsPlatform={platform}
+        onClose={() => setCcsOpen(false)}
+      />
     </div>
   );
 }

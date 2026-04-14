@@ -910,7 +910,8 @@
     "ccs_select_desc": "Choose the client type to import into CC-Switch.",
     "ccs_claude_desc": "Anthropic Claude Code coding assistant",
     "ccs_codex_desc": "OpenAI Codex CLI coding assistant",
-    "ccs_not_installed": "CC-Switch not detected. Please install the CC-Switch client first."
+    "ccs_not_installed": "CC-Switch not detected. Please install the CC-Switch client first.",
+    "ccs_session_expired": "Session expired. Please log in with your API key again before importing."
   },
 
   "setup": {

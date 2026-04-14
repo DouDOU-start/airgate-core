@@ -71,6 +71,7 @@ export interface UserResp {
   api_key_used_quota?: number;
   api_key_expires_at?: string;
   api_key_rate?: number;
+  api_key_platform?: string;
   created_at: string;
   updated_at: string;
 }

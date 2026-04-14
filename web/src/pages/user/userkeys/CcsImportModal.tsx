@@ -117,12 +117,12 @@ export function useCcsImportModal(groupMap: Map<number, GroupResp>) {
 }
 
 export function CcsImportModal({
-  ccsTarget,
+  open,
   ccsKeyValue,
   ccsPlatform,
   onClose,
 }: {
-  ccsTarget: APIKeyResp | null;
+  open: boolean;
   ccsKeyValue: string | null;
   ccsPlatform: string;
   onClose: () => void;
@@ -133,7 +133,7 @@ export function CcsImportModal({
 
   return (
     <Modal
-      open={!!ccsTarget}
+      open={open}
       onClose={onClose}
       title={t('user_keys.ccs_select_client')}
       footer={

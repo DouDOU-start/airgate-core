@@ -40,6 +40,7 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 				} else {
 					resp.APIKeyRate = info.GroupRate
 				}
+				resp.APIKeyPlatform = info.Platform
 				if info.ExpiresAt != nil {
 					resp.APIKeyExpiresAt = info.ExpiresAt.Format(time.RFC3339)
 				}

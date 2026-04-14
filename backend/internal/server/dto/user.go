@@ -20,6 +20,8 @@ type UserResp struct {
 	// APIKeyRate 对客户展示的最终倍率：sell_rate>0 时取 sell_rate，否则取分组 rate_multiplier。
 	// 故意不区分来源以避免泄漏 reseller 的定价模型。
 	APIKeyRate float64 `json:"api_key_rate,omitempty"`
+	// APIKeyPlatform 当前 Key 所属分组平台（如 anthropic / openai），用于前端 CCS 导入识别客户端类型。
+	APIKeyPlatform string `json:"api_key_platform,omitempty"`
 	TimeMixin
 }
 

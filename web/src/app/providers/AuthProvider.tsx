@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { UserResp } from '../../shared/types';
-import { setToken, getToken } from '../../shared/api/client';
+import { setToken, getToken, setSessionAPIKey } from '../../shared/api/client';
 import { usersApi } from '../../shared/api/users';
 
 interface AuthContextType {
@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setToken(null);
+    setSessionAPIKey(null);
     setUser(null);
     window.location.href = '/login';
   };

@@ -19,6 +19,22 @@ export function getToken(): string | null {
   return accessToken;
 }
 
+// API Key 登录场景下用户输入的原文 Key，仅保留在 sessionStorage 内，
+// 退出登录或关闭浏览器即清除。供 CCS 导入等需要原文 Key 的客户端功能使用。
+const API_KEY_SECRET_STORAGE = 'apikey_session_secret';
+
+export function setSessionAPIKey(key: string | null) {
+  if (key) {
+    sessionStorage.setItem(API_KEY_SECRET_STORAGE, key);
+  } else {
+    sessionStorage.removeItem(API_KEY_SECRET_STORAGE);
+  }
+}
+
+export function getSessionAPIKey(): string | null {
+  return sessionStorage.getItem(API_KEY_SECRET_STORAGE);
+}
+
 // 查询参数类型
 type QueryParams = Record<string, any>;
 

@@ -548,7 +548,7 @@ export default function UserKeysPage() {
 
       {/* CCS 导入弹窗 */}
       <CcsImportModal
-        ccsTarget={ccsTarget}
+        open={!!ccsTarget}
         ccsKeyValue={ccsKeyValue}
         ccsPlatform={ccsPlatform}
         onClose={closeCcsModal}

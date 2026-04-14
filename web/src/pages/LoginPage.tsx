@@ -9,7 +9,7 @@ import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsPr
 import { authApi } from '../shared/api/auth';
 import { useTheme } from '../app/providers/ThemeProvider';
 import { useStatusPageEnabled } from '../shared/hooks/useStatusPageEnabled';
-import { ApiError } from '../shared/api/client';
+import { ApiError, setSessionAPIKey } from '../shared/api/client';
 import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key, Activity } from 'lucide-react';
 
 type TabKey = 'login' | 'register' | 'apikey';
@@ -290,6 +290,8 @@ function APIKeyLoginForm() {
 
     try {
       const resp = await authApi.loginByAPIKey({ key: apiKey });
+      // 把用户输入的原文 Key 暂存到 sessionStorage，供 CCS 导入等需要原文的功能使用。
+      setSessionAPIKey(apiKey);
       login(resp.token, { ...resp.user, api_key_id: resp.api_key_id, api_key_name: resp.api_key_name });
       navigate({ to: '/' });
     } catch (err) {
