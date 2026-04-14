@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pluginsApi } from '../../shared/api/plugins';
@@ -459,9 +459,11 @@ function InstallPluginModal({
   const { t } = useTranslation();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
 
   const [installTab, setInstallTab] = useState<'upload' | 'github'>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const [pluginName, setPluginName] = useState('');
   const [githubRepo, setGithubRepo] = useState('');
 
@@ -491,12 +493,44 @@ function InstallPluginModal({
     setSelectedFile(null);
     setPluginName('');
     setGithubRepo('');
+    dragCounterRef.current = 0;
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   function handleClose() {
     resetForm();
+    setDragActive(false);
     onClose();
+  }
+
+  function handleFileSelect(file: File | null) {
+    setSelectedFile(file);
+    setDragActive(false);
+  }
+
+  function handleDragEvent(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleDragEnter(e: DragEvent<HTMLDivElement>) {
+    handleDragEvent(e);
+    dragCounterRef.current += 1;
+    setDragActive(true);
+  }
+
+  function handleDragLeave(e: DragEvent<HTMLDivElement>) {
+    handleDragEvent(e);
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setDragActive(false);
+    }
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    handleDragEvent(e);
+    dragCounterRef.current = 0;
+    handleFileSelect(e.dataTransfer.files?.[0] || null);
   }
 
   const installing = uploadMutation.isPending || githubMutation.isPending;
@@ -564,18 +598,23 @@ function InstallPluginModal({
               {t('plugins.plugin_file')} <span className="text-danger">*</span>
             </label>
             <div
-              className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${
-                selectedFile
+              className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${selectedFile
                   ? 'border-primary bg-primary-subtle'
-                  : 'border-glass-border hover:border-border-focus'
-              }`}
+                  : dragActive
+                    ? 'border-border-focus bg-[var(--ag-bg-muted)]'
+                    : 'border-glass-border hover:border-border-focus'
+                }`}
               onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleDragEvent}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
             >
               <input
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
               />
               {selectedFile ? (
                 <div className="flex items-center justify-center gap-2">
@@ -587,7 +626,7 @@ function InstallPluginModal({
                 </div>
               ) : (
                 <div>
-                  <Upload className="w-8 h-8 mx-auto mb-2 text-text-tertiary" />
+                  <Upload className={`w-8 h-8 mx-auto mb-2 ${dragActive ? 'text-primary' : 'text-text-tertiary'}`} />
                   <p className="text-sm text-text-tertiary">
                     {t('plugins.upload_hint')}
                   </p>
