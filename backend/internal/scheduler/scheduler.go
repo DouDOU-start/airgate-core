@@ -232,6 +232,8 @@ func (s *Scheduler) matchModelRouting(routing map[string][]int64, model string) 
 
 // selectByLoadBalance 基于负载均衡选择最优账户
 // 排序权重 = priority * 1000 + (1 - load_rate) * 100 + lru_score
+// 若账号处于降级窗口（upstream_is_pool 账号刚刚返回池耗尽错误），
+// 额外减去 degradedPenalty 把它打到所有非降级账号之后，作为兜底。
 func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.Account) *ent.Account {
 	if len(candidates) == 0 {
 		return nil
@@ -244,6 +246,11 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 		acc   *ent.Account
 		score float64
 	}
+
+	// 降级惩罚：比 priority 的最大可能贡献 (999 * 1000) 还大一个量级，
+	// 这样任何非降级账号（哪怕 priority=0）都排在降级账号前面。
+	// 降级账号之间仍按原 score 相对排序，避免全部降级时调度完全崩溃。
+	const degradedPenalty = 10_000_000.0
 
 	now := time.Now()
 	items := make([]scored, 0, len(candidates))
@@ -273,6 +280,10 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 		}
 
 		score := float64(acc.Priority)*1000 + (1-loadRate)*100 + lruScore
+
+		if s.overload.IsDegraded(ctx, acc.ID) {
+			score -= degradedPenalty
+		}
 
 		items = append(items, scored{acc: acc, score: score})
 	}
@@ -360,6 +371,12 @@ func (s *Scheduler) DecrementRPM(ctx context.Context, accountID int) {
 // retryAfter 为上游建议的等待时间
 func (s *Scheduler) MarkOverloaded(ctx context.Context, accountID int, retryAfter time.Duration) {
 	s.overload.MarkOverloaded(ctx, accountID, retryAfter)
+}
+
+// MarkDegraded 把账号打入临时降级窗口，调度器会在窗口内把该账号优先级
+// 打到最低，仅在没有其它可用账号时才兜底使用。窗口过期自动恢复。
+func (s *Scheduler) MarkDegraded(ctx context.Context, accountID int, duration time.Duration) {
+	s.overload.MarkDegraded(ctx, accountID, duration)
 }
 
 // RefreshSession 刷新账户会话时间戳（转发成功后调用）

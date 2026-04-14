@@ -195,7 +195,14 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): Column<Usag
       title: 'TOKEN',
       width: '160px',
       render: (row) => {
-        const total = row.input_tokens + row.output_tokens + row.cached_input_tokens;
+        // 注意：cached_input_tokens 表示 cache read；cache_creation_tokens 为 5m+1h 之和，
+        // 两者与 input/output 互斥计入 total_tokens。
+        // CustomerUsageLogResp 不下发 cache_creation_* 字段，这里用 ?? 0 做兼容。
+        const cacheCreation = (row as UsageLogResp).cache_creation_tokens ?? 0;
+        const cacheCreation5m = (row as UsageLogResp).cache_creation_5m_tokens ?? 0;
+        const cacheCreation1h = (row as UsageLogResp).cache_creation_1h_tokens ?? 0;
+        const total =
+          row.input_tokens + row.output_tokens + row.cached_input_tokens + cacheCreation;
         return (
           <HoverCard
             content={
@@ -212,8 +219,20 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): Column<Usag
                   </div>
                   {row.cached_input_tokens > 0 && (
                     <div className="flex justify-between gap-6">
-                      <span className="text-text-tertiary">{t('usage.cached_input_tokens')}</span>
+                      <span className="text-text-tertiary">{t('usage.cache_read')}</span>
                       <span className="text-text-secondary">{row.cached_input_tokens.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {cacheCreation5m > 0 && (
+                    <div className="flex justify-between gap-6">
+                      <span className="text-text-tertiary">{t('usage.cache_creation_5m')}</span>
+                      <span className="text-text-secondary">{cacheCreation5m.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {cacheCreation1h > 0 && (
+                    <div className="flex justify-between gap-6">
+                      <span className="text-text-tertiary">{t('usage.cache_creation_1h')}</span>
+                      <span className="text-text-secondary">{cacheCreation1h.toLocaleString()}</span>
                     </div>
                   )}
                   <div className="flex justify-between gap-6 pt-1 border-t border-glass-border">
@@ -228,9 +247,16 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): Column<Usag
               <span className="text-emerald-400">↓ {row.input_tokens.toLocaleString()}</span>
               <span className="text-sky-400">↑ {row.output_tokens.toLocaleString()}</span>
             </div>
-            {row.cached_input_tokens > 0 && (
-              <div className="text-[11px] font-mono text-text-tertiary">
-                ⊕ {fmtNum(row.cached_input_tokens)}
+            {(row.cached_input_tokens > 0 || cacheCreation > 0) && (
+              <div className="text-[11px] font-mono text-text-tertiary flex items-center gap-2">
+                {row.cached_input_tokens > 0 && (
+                  <span title={t('usage.cache_read')}>⊕ {fmtNum(row.cached_input_tokens)}</span>
+                )}
+                {cacheCreation > 0 && (
+                  <span className="text-amber-400" title={t('usage.cache_creation')}>
+                    ✦ {fmtNum(cacheCreation)}
+                  </span>
+                )}
               </div>
             )}
           </HoverCard>

@@ -643,8 +643,10 @@
     "token_trend": "Token 使用趋势",
     "input": "Input",
     "output": "Output",
-    "cache_creation": "Cache Creation",
-    "cache_read": "Cache Read",
+    "cache_creation": "缓存创建",
+    "cache_creation_5m": "缓存创建 5m",
+    "cache_creation_1h": "缓存创建 1h",
+    "cache_read": "缓存读取",
     "granularity_hour": "按小时",
     "granularity_day": "按天"
   },

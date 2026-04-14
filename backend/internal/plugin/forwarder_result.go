@@ -121,17 +121,22 @@ func (f *Forwarder) reportForwardExecution(ctx context.Context, state *forwardSt
 	isAccountError := accountStatus == sdk.AccountStatusExpired || accountStatus == sdk.AccountStatusDisabled
 
 	// 账号池场景：上游是账号池（如 sub2api）时，"No available accounts"
-	// 之类的池子耗尽错误是**请求级**的瞬时事件，不是账号级故障：
-	//   - 本地账号凭证完全没坏
-	//   - 池子下一秒可能就恢复了
-	// 所以：本次请求当作软失败返回给用户（由客户端/上层决定是否重试），
-	// 账号**不暂停调度**、**不累计 fail count**、**不写 status=error**。
-	// 下一个进来的请求依然可以选中这个账号，让上游自己决定是否已恢复。
+	// / "Upstream access forbidden" 之类的耗尽错误不是账号级故障，本地
+	// 账号的凭证完全没坏，池子可能几秒内就恢复。
+	//
+	// 处理策略：把账号打入一个**临时降级窗口**（默认 60s）。窗口内：
+	//   - 账号仍然可被调度器选中（不像 overload 那样硬排除）
+	//   - 但 score 被减去一个巨大惩罚值，任何非降级账号都会排在它前面
+	//   - 只有当组内所有账号都降级时，才会兜底用到它
+	//   - 窗口过期后（Redis TTL 自动），优先级自动恢复正常
+	//
+	// 不写 status=error，不累计 fail count。本次请求由上层返回给客户端。
 	if isAccountError && state.account != nil && state.account.UpstreamIsPool {
-		slog.Warn("上游账号池临时耗尽，软失败返回但不影响调度",
+		slog.Warn("上游账号池耗尽，打入降级窗口",
 			"account_id", state.account.ID,
 			"reason", resolveAccountErrorReason(execution))
 		f.scheduler.DecrementRPM(ctx, state.account.ID)
+		f.scheduler.MarkDegraded(ctx, state.account.ID, 0) // 0 = 使用默认窗口
 		return
 	}
 
