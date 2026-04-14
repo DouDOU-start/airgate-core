@@ -101,8 +101,9 @@ function DistributionCard({
                 cy="50%"
                 innerRadius={35}
                 outerRadius={70}
-                paddingAngle={2}
                 dataKey="value"
+                stroke="var(--ag-bg-elevated)"
+                strokeWidth={1}
               >
                 {pieData.map((_, i) => (
                   <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />

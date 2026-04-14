@@ -152,7 +152,7 @@ export default function UserOverviewPage() {
               <div className="w-44 h-44 flex-shrink-0 mx-auto sm:mx-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={models.map((m) => ({ name: m.model, value: m.tokens }))} cx="50%" cy="50%" innerRadius={35} outerRadius={65} paddingAngle={2} dataKey="value">
+                    <Pie data={models.map((m) => ({ name: m.model, value: m.tokens }))} cx="50%" cy="50%" innerRadius={35} outerRadius={65} dataKey="value" stroke="var(--ag-bg-elevated)" strokeWidth={1}>
                       {models.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                     </Pie>
                     <RechartsTooltip
