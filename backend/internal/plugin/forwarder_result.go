@@ -120,17 +120,19 @@ func (f *Forwarder) reportForwardExecution(ctx context.Context, state *forwardSt
 	isRateLimited := accountStatus == sdk.AccountStatusRateLimited
 	isAccountError := accountStatus == sdk.AccountStatusExpired || accountStatus == sdk.AccountStatusDisabled
 
-	// 账号池场景：上游是账号池（如 sub2api 之类的聚合转发器）时，
-	// "No available accounts" 之类的池子耗尽错误本质上是临时不可用，
-	// 本地账号的凭证和调度状态都没坏。此时把 expired/disabled 降级为
-	// 限流，走 MarkOverloaded 临时暂停 + 正常的 RetryAfter 恢复路径，
-	// 避免池子抖动一次就永久关掉调度。
+	// 账号池场景：上游是账号池（如 sub2api）时，"No available accounts"
+	// 之类的池子耗尽错误是**请求级**的瞬时事件，不是账号级故障：
+	//   - 本地账号凭证完全没坏
+	//   - 池子下一秒可能就恢复了
+	// 所以：本次请求当作软失败返回给用户（由客户端/上层决定是否重试），
+	// 账号**不暂停调度**、**不累计 fail count**、**不写 status=error**。
+	// 下一个进来的请求依然可以选中这个账号，让上游自己决定是否已恢复。
 	if isAccountError && state.account != nil && state.account.UpstreamIsPool {
-		slog.Warn("上游账号池临时耗尽，降级为限流",
+		slog.Warn("上游账号池临时耗尽，软失败返回但不影响调度",
 			"account_id", state.account.ID,
 			"reason", resolveAccountErrorReason(execution))
-		isAccountError = false
-		isRateLimited = true
+		f.scheduler.DecrementRPM(ctx, state.account.ID)
+		return
 	}
 
 	switch {
@@ -139,12 +141,8 @@ func (f *Forwarder) reportForwardExecution(ctx context.Context, state *forwardSt
 		f.scheduler.RefreshSession(ctx, state.account.ID, state.sessionID, state.account.Extra)
 	case isRateLimited:
 		f.scheduler.DecrementRPM(ctx, state.account.ID)
-		retryAfter := time.Duration(0)
-		if execution.result != nil {
-			retryAfter = execution.result.RetryAfter
-		}
-		f.scheduler.MarkOverloaded(ctx, state.account.ID, retryAfter)
-		slog.Warn("上游限流，临时暂停调度", "account_id", state.account.ID, "retry_after", retryAfter)
+		f.scheduler.MarkOverloaded(ctx, state.account.ID, execution.result.RetryAfter)
+		slog.Warn("上游限流，临时暂停调度", "account_id", state.account.ID, "retry_after", execution.result.RetryAfter)
 	case isAccountError:
 		f.scheduler.DecrementRPM(ctx, state.account.ID)
 		f.scheduler.ReportAccountError(state.account.ID, resolveAccountErrorReason(execution))
