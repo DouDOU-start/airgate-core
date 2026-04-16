@@ -17,6 +17,11 @@ func (Group) Fields() []ent.Field {
 		field.String("platform").NotEmpty(),
 		field.Float("rate_multiplier").Default(1.0),
 		field.Bool("is_exclusive").Default(false),
+		// status_visible 控制此分组是否在公开「服务状态」页展示。
+		// 默认 true 保持旧行为兼容；管理员可在「分组管理」中关掉以对外隐藏
+		// （比如仅限熟客的专属分组、调试中的分组等）。
+		// 隐藏仅影响公开状态页 (/status)，不影响 admin 视图和 API 鉴权逻辑。
+		field.Bool("status_visible").Default(true),
 		field.Enum("subscription_type").Values("standard", "subscription").Default("standard"),
 		field.JSON("quotas", map[string]interface{}{}).Optional(),
 		field.JSON("model_routing", map[string][]int64{}).Optional(),

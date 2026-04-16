@@ -53,6 +53,9 @@ export function GroupFormModal({
     platform: group?.platform ?? '',
     rate_multiplier: group?.rate_multiplier ?? 1,
     is_exclusive: group?.is_exclusive ?? false,
+    // status_visible 默认 true —— 与后端 ent schema 的 Default(true) 对齐。
+    // 旧记录在未跑迁移的情况下 GroupResp 不会带这个字段，所以用 ?? true 兜底。
+    status_visible: group?.status_visible ?? true,
     subscription_type: group?.subscription_type ?? 'standard' as const,
     sort_weight: group?.sort_weight ?? 0,
     force_instructions: group?.force_instructions ?? '',
@@ -237,6 +240,30 @@ export function GroupFormModal({
               className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform"
               style={{
                 transform: form.is_exclusive ? 'translateX(18px)' : 'translateX(3px)',
+              }}
+            />
+          </button>
+        </div>
+
+        {/* 是否在公开 /status 页展示 —— 关掉后访客看不到该分组（但 admin 监控视图仍然能看）*/}
+        <div className="flex items-center justify-between">
+          <span className="text-sm" style={{ color: 'var(--ag-text-secondary)' }}>
+            {t('groups.status_visible_hint')}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={form.status_visible}
+            onClick={() => setForm({ ...form, status_visible: !form.status_visible })}
+            className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+            style={{
+              backgroundColor: form.status_visible ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
+            }}
+          >
+            <span
+              className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform"
+              style={{
+                transform: form.status_visible ? 'translateX(18px)' : 'translateX(3px)',
               }}
             />
           </button>

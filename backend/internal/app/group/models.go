@@ -51,6 +51,7 @@ type Group struct {
 	Platform          string
 	RateMultiplier    float64
 	IsExclusive       bool
+	StatusVisible     bool
 	SubscriptionType  string
 	Quotas            map[string]any
 	ModelRouting      map[string][]int64
@@ -94,6 +95,7 @@ type CreateInput struct {
 	Platform          string
 	RateMultiplier    float64
 	IsExclusive       bool
+	StatusVisible     bool
 	SubscriptionType  string
 	Quotas            map[string]any
 	ModelRouting      map[string][]int64
@@ -110,6 +112,7 @@ type UpdateInput struct {
 	Name              *string
 	RateMultiplier    *float64
 	IsExclusive       *bool
+	StatusVisible     *bool
 	SubscriptionType  *string
 	Quotas            map[string]any
 	ModelRouting      map[string][]int64

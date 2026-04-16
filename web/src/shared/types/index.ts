@@ -253,6 +253,7 @@ export interface GroupResp {
   platform: string;
   rate_multiplier: number;
   is_exclusive: boolean;
+  status_visible: boolean;
   subscription_type: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
   model_routing?: Record<string, number[]>;
@@ -277,6 +278,7 @@ export interface CreateGroupReq {
   platform: string;
   rate_multiplier?: number;
   is_exclusive?: boolean;
+  status_visible?: boolean;
   subscription_type: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
   model_routing?: Record<string, number[]>;
@@ -298,6 +300,7 @@ export interface UpdateGroupReq {
   name?: string;
   rate_multiplier?: number;
   is_exclusive?: boolean;
+  status_visible?: boolean;
   subscription_type?: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
   model_routing?: Record<string, number[]>;

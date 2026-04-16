@@ -96,6 +96,20 @@ func (gu *GroupUpdate) SetNillableIsExclusive(b *bool) *GroupUpdate {
 	return gu
 }
 
+// SetStatusVisible sets the "status_visible" field.
+func (gu *GroupUpdate) SetStatusVisible(b bool) *GroupUpdate {
+	gu.mutation.SetStatusVisible(b)
+	return gu
+}
+
+// SetNillableStatusVisible sets the "status_visible" field if the given value is not nil.
+func (gu *GroupUpdate) SetNillableStatusVisible(b *bool) *GroupUpdate {
+	if b != nil {
+		gu.SetStatusVisible(*b)
+	}
+	return gu
+}
+
 // SetSubscriptionType sets the "subscription_type" field.
 func (gu *GroupUpdate) SetSubscriptionType(gt group.SubscriptionType) *GroupUpdate {
 	gu.mutation.SetSubscriptionType(gt)
@@ -471,6 +485,9 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := gu.mutation.IsExclusive(); ok {
 		_spec.SetField(group.FieldIsExclusive, field.TypeBool, value)
 	}
+	if value, ok := gu.mutation.StatusVisible(); ok {
+		_spec.SetField(group.FieldStatusVisible, field.TypeBool, value)
+	}
 	if value, ok := gu.mutation.SubscriptionType(); ok {
 		_spec.SetField(group.FieldSubscriptionType, field.TypeEnum, value)
 	}
@@ -808,6 +825,20 @@ func (guo *GroupUpdateOne) SetIsExclusive(b bool) *GroupUpdateOne {
 func (guo *GroupUpdateOne) SetNillableIsExclusive(b *bool) *GroupUpdateOne {
 	if b != nil {
 		guo.SetIsExclusive(*b)
+	}
+	return guo
+}
+
+// SetStatusVisible sets the "status_visible" field.
+func (guo *GroupUpdateOne) SetStatusVisible(b bool) *GroupUpdateOne {
+	guo.mutation.SetStatusVisible(b)
+	return guo
+}
+
+// SetNillableStatusVisible sets the "status_visible" field if the given value is not nil.
+func (guo *GroupUpdateOne) SetNillableStatusVisible(b *bool) *GroupUpdateOne {
+	if b != nil {
+		guo.SetStatusVisible(*b)
 	}
 	return guo
 }
@@ -1216,6 +1247,9 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 	}
 	if value, ok := guo.mutation.IsExclusive(); ok {
 		_spec.SetField(group.FieldIsExclusive, field.TypeBool, value)
+	}
+	if value, ok := guo.mutation.StatusVisible(); ok {
+		_spec.SetField(group.FieldStatusVisible, field.TypeBool, value)
 	}
 	if value, ok := guo.mutation.SubscriptionType(); ok {
 		_spec.SetField(group.FieldSubscriptionType, field.TypeEnum, value)

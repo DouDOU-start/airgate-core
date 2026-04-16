@@ -456,6 +456,7 @@
     "service_tier_default": "默认",
     "exclusive": "专属",
     "exclusive_hint": "专属分组（仅分配了该分组的用户可用）",
+    "status_visible_hint": "在公开服务状态页展示（关闭后仅管理员可见）",
     "group_type": "类型",
     "type_exclusive": "专属",
     "type_public": "公开",

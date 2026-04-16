@@ -117,11 +117,18 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		return
 	}
 
+	// StatusVisible 未提交时默认 true（保持旧行为兼容：已有接入方不传值就继续对外展示）。
+	statusVisible := true
+	if req.StatusVisible != nil {
+		statusVisible = *req.StatusVisible
+	}
+
 	item, err := h.service.Create(c.Request.Context(), appgroup.CreateInput{
 		Name:                     req.Name,
 		Platform:                 req.Platform,
 		RateMultiplier:           req.RateMultiplier,
 		IsExclusive:              req.IsExclusive,
+		StatusVisible:            statusVisible,
 		SubscriptionType:         req.SubscriptionType,
 		Quotas:                   req.Quotas,
 		ModelRouting:             req.ModelRouting,
@@ -158,6 +165,7 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 		Name:              req.Name,
 		RateMultiplier:    req.RateMultiplier,
 		IsExclusive:       req.IsExclusive,
+		StatusVisible:     req.StatusVisible,
 		SubscriptionType:  req.SubscriptionType,
 		Quotas:            req.Quotas,
 		ModelRouting:      req.ModelRouting,

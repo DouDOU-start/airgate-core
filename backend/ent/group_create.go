@@ -65,6 +65,20 @@ func (gc *GroupCreate) SetNillableIsExclusive(b *bool) *GroupCreate {
 	return gc
 }
 
+// SetStatusVisible sets the "status_visible" field.
+func (gc *GroupCreate) SetStatusVisible(b bool) *GroupCreate {
+	gc.mutation.SetStatusVisible(b)
+	return gc
+}
+
+// SetNillableStatusVisible sets the "status_visible" field if the given value is not nil.
+func (gc *GroupCreate) SetNillableStatusVisible(b *bool) *GroupCreate {
+	if b != nil {
+		gc.SetStatusVisible(*b)
+	}
+	return gc
+}
+
 // SetSubscriptionType sets the "subscription_type" field.
 func (gc *GroupCreate) SetSubscriptionType(gt group.SubscriptionType) *GroupCreate {
 	gc.mutation.SetSubscriptionType(gt)
@@ -293,6 +307,10 @@ func (gc *GroupCreate) defaults() {
 		v := group.DefaultIsExclusive
 		gc.mutation.SetIsExclusive(v)
 	}
+	if _, ok := gc.mutation.StatusVisible(); !ok {
+		v := group.DefaultStatusVisible
+		gc.mutation.SetStatusVisible(v)
+	}
 	if _, ok := gc.mutation.SubscriptionType(); !ok {
 		v := group.DefaultSubscriptionType
 		gc.mutation.SetSubscriptionType(v)
@@ -346,6 +364,9 @@ func (gc *GroupCreate) check() error {
 	}
 	if _, ok := gc.mutation.IsExclusive(); !ok {
 		return &ValidationError{Name: "is_exclusive", err: errors.New(`ent: missing required field "Group.is_exclusive"`)}
+	}
+	if _, ok := gc.mutation.StatusVisible(); !ok {
+		return &ValidationError{Name: "status_visible", err: errors.New(`ent: missing required field "Group.status_visible"`)}
 	}
 	if _, ok := gc.mutation.SubscriptionType(); !ok {
 		return &ValidationError{Name: "subscription_type", err: errors.New(`ent: missing required field "Group.subscription_type"`)}
@@ -414,6 +435,10 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := gc.mutation.IsExclusive(); ok {
 		_spec.SetField(group.FieldIsExclusive, field.TypeBool, value)
 		_node.IsExclusive = value
+	}
+	if value, ok := gc.mutation.StatusVisible(); ok {
+		_spec.SetField(group.FieldStatusVisible, field.TypeBool, value)
+		_node.StatusVisible = value
 	}
 	if value, ok := gc.mutation.SubscriptionType(); ok {
 		_spec.SetField(group.FieldSubscriptionType, field.TypeEnum, value)

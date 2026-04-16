@@ -456,6 +456,7 @@
     "service_tier_default": "Default",
     "exclusive": "Exclusive",
     "exclusive_hint": "Exclusive group (only assigned users can access)",
+    "status_visible_hint": "Show on public status page (disable to hide from visitors)",
     "group_type": "Type",
     "type_exclusive": "Exclusive",
     "type_public": "Public",

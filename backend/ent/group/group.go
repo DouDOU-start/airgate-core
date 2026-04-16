@@ -23,6 +23,8 @@ const (
 	FieldRateMultiplier = "rate_multiplier"
 	// FieldIsExclusive holds the string denoting the is_exclusive field in the database.
 	FieldIsExclusive = "is_exclusive"
+	// FieldStatusVisible holds the string denoting the status_visible field in the database.
+	FieldStatusVisible = "status_visible"
 	// FieldSubscriptionType holds the string denoting the subscription_type field in the database.
 	FieldSubscriptionType = "subscription_type"
 	// FieldQuotas holds the string denoting the quotas field in the database.
@@ -93,6 +95,7 @@ var Columns = []string{
 	FieldPlatform,
 	FieldRateMultiplier,
 	FieldIsExclusive,
+	FieldStatusVisible,
 	FieldSubscriptionType,
 	FieldQuotas,
 	FieldModelRouting,
@@ -132,6 +135,8 @@ var (
 	DefaultRateMultiplier float64
 	// DefaultIsExclusive holds the default value on creation for the "is_exclusive" field.
 	DefaultIsExclusive bool
+	// DefaultStatusVisible holds the default value on creation for the "status_visible" field.
+	DefaultStatusVisible bool
 	// DefaultServiceTier holds the default value on creation for the "service_tier" field.
 	DefaultServiceTier string
 	// DefaultForceInstructions holds the default value on creation for the "force_instructions" field.
@@ -200,6 +205,11 @@ func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 // ByIsExclusive orders the results by the is_exclusive field.
 func ByIsExclusive(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIsExclusive, opts...).ToFunc()
+}
+
+// ByStatusVisible orders the results by the status_visible field.
+func ByStatusVisible(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatusVisible, opts...).ToFunc()
 }
 
 // BySubscriptionType orders the results by the subscription_type field.

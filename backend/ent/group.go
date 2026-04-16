@@ -26,6 +26,8 @@ type Group struct {
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
 	// IsExclusive holds the value of the "is_exclusive" field.
 	IsExclusive bool `json:"is_exclusive,omitempty"`
+	// StatusVisible holds the value of the "status_visible" field.
+	StatusVisible bool `json:"status_visible,omitempty"`
 	// SubscriptionType holds the value of the "subscription_type" field.
 	SubscriptionType group.SubscriptionType `json:"subscription_type,omitempty"`
 	// Quotas holds the value of the "quotas" field.
@@ -119,7 +121,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case group.FieldQuotas, group.FieldModelRouting:
 			values[i] = new([]byte)
-		case group.FieldIsExclusive:
+		case group.FieldIsExclusive, group.FieldStatusVisible:
 			values[i] = new(sql.NullBool)
 		case group.FieldRateMultiplier:
 			values[i] = new(sql.NullFloat64)
@@ -173,6 +175,12 @@ func (gr *Group) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field is_exclusive", values[i])
 			} else if value.Valid {
 				gr.IsExclusive = value.Bool
+			}
+		case group.FieldStatusVisible:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field status_visible", values[i])
+			} else if value.Valid {
+				gr.StatusVisible = value.Bool
 			}
 		case group.FieldSubscriptionType:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -304,6 +312,9 @@ func (gr *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("is_exclusive=")
 	builder.WriteString(fmt.Sprintf("%v", gr.IsExclusive))
+	builder.WriteString(", ")
+	builder.WriteString("status_visible=")
+	builder.WriteString(fmt.Sprintf("%v", gr.StatusVisible))
 	builder.WriteString(", ")
 	builder.WriteString("subscription_type=")
 	builder.WriteString(fmt.Sprintf("%v", gr.SubscriptionType))

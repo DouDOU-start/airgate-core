@@ -96,6 +96,7 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 			SetPlatform(input.Platform).
 			SetRateMultiplier(input.RateMultiplier).
 			SetIsExclusive(input.IsExclusive).
+			SetStatusVisible(input.StatusVisible).
 			SetSubscriptionType(entgroup.SubscriptionType(input.SubscriptionType)).
 			SetServiceTier(input.ServiceTier).
 			SetForceInstructions(input.ForceInstructions).
@@ -165,6 +166,7 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 		SetPlatform(input.Platform).
 		SetRateMultiplier(input.RateMultiplier).
 		SetIsExclusive(input.IsExclusive).
+		SetStatusVisible(input.StatusVisible).
 		SetSubscriptionType(entgroup.SubscriptionType(input.SubscriptionType)).
 		SetServiceTier(input.ServiceTier).
 		SetForceInstructions(input.ForceInstructions).
@@ -205,6 +207,9 @@ func (s *GroupStore) Update(ctx context.Context, id int, input appgroup.UpdateIn
 	}
 	if input.IsExclusive != nil {
 		builder = builder.SetIsExclusive(*input.IsExclusive)
+	}
+	if input.StatusVisible != nil {
+		builder = builder.SetStatusVisible(*input.StatusVisible)
 	}
 	if input.SubscriptionType != nil {
 		builder = builder.SetSubscriptionType(entgroup.SubscriptionType(*input.SubscriptionType))
@@ -410,6 +415,7 @@ func mapGroup(item *ent.Group) appgroup.Group {
 		Platform:          item.Platform,
 		RateMultiplier:    item.RateMultiplier,
 		IsExclusive:       item.IsExclusive,
+		StatusVisible:     item.StatusVisible,
 		SubscriptionType:  string(item.SubscriptionType),
 		Quotas:            appgroupCloneQuotas(item.Quotas),
 		ModelRouting:      appgroupCloneModelRouting(item.ModelRouting),

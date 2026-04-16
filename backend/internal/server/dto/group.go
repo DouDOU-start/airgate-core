@@ -7,6 +7,7 @@ type GroupResp struct {
 	Platform          string                 `json:"platform"`
 	RateMultiplier    float64                `json:"rate_multiplier"`
 	IsExclusive       bool                   `json:"is_exclusive"`
+	StatusVisible     bool                   `json:"status_visible"`    // 是否在公开 /status 页展示
 	SubscriptionType  string                 `json:"subscription_type"` // standard / subscription
 	Quotas            map[string]interface{} `json:"quotas,omitempty"`  // 日/周/月限额
 	ModelRouting      map[string][]int64     `json:"model_routing,omitempty"`
@@ -30,10 +31,12 @@ type GroupResp struct {
 
 // CreateGroupReq 创建分组请求
 type CreateGroupReq struct {
-	Name              string                 `json:"name" binding:"required"`
-	Platform          string                 `json:"platform" binding:"required"`
-	RateMultiplier    float64                `json:"rate_multiplier"`
-	IsExclusive       bool                   `json:"is_exclusive"`
+	Name           string  `json:"name" binding:"required"`
+	Platform       string  `json:"platform" binding:"required"`
+	RateMultiplier float64 `json:"rate_multiplier"`
+	IsExclusive    bool    `json:"is_exclusive"`
+	// StatusVisible 用指针区分"字段未提交"和"显式置 false"，缺省视为 true（在公开状态页可见）。
+	StatusVisible     *bool                  `json:"status_visible"`
 	SubscriptionType  string                 `json:"subscription_type" binding:"oneof=standard subscription"`
 	Quotas            map[string]interface{} `json:"quotas"`
 	ModelRouting      map[string][]int64     `json:"model_routing"`
@@ -50,6 +53,7 @@ type UpdateGroupReq struct {
 	Name              *string                `json:"name"`
 	RateMultiplier    *float64               `json:"rate_multiplier"`
 	IsExclusive       *bool                  `json:"is_exclusive"`
+	StatusVisible     *bool                  `json:"status_visible"`
 	SubscriptionType  *string                `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
 	Quotas            map[string]interface{} `json:"quotas"`
 	ModelRouting      map[string][]int64     `json:"model_routing"`
