@@ -119,6 +119,7 @@ var (
 		{Name: "subscription_type", Type: field.TypeEnum, Enums: []string{"standard", "subscription"}, Default: "standard"},
 		{Name: "quotas", Type: field.TypeJSON, Nullable: true},
 		{Name: "model_routing", Type: field.TypeJSON, Nullable: true},
+		{Name: "plugin_settings", Type: field.TypeJSON, Nullable: true},
 		{Name: "service_tier", Type: field.TypeString, Default: ""},
 		{Name: "force_instructions", Type: field.TypeString, Default: ""},
 		{Name: "note", Type: field.TypeString, Default: ""},

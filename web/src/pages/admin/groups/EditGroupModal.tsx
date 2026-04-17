@@ -66,6 +66,14 @@ export function GroupFormModal({
     parseQuotas(group?.quotas as Record<string, unknown> | undefined),
   );
 
+  // 分组级插件开关（当前仅 Claude 插件使用 claude_code_only）
+  // 后端按 {"claude": {"claude_code_only": "true"}} 的约定存储。
+  const initialClaudeCodeOnly = (() => {
+    const raw = group?.plugin_settings?.claude?.claude_code_only;
+    return raw === 'true';
+  })();
+  const [claudeCodeOnly, setClaudeCodeOnly] = useState(initialClaudeCodeOnly);
+
   // 创建模式下：从分组复制账号（同平台，可多选，自动去重）
   const [copyFromGroupIds, setCopyFromGroupIds] = useState<number[]>([]);
 
@@ -81,10 +89,20 @@ export function GroupFormModal({
   const handleSubmit = () => {
     if (!isEdit && (!form.name || !form.platform)) return;
 
+    // plugin_settings：仅 Claude 平台发 claude 命名空间；切回"关闭"时显式写 "false"
+    // 让后端把字段真实清零，而不是留着旧值。
+    const pluginSettings: Record<string, Record<string, string>> = {};
+    if (form.platform === 'claude') {
+      pluginSettings.claude = {
+        claude_code_only: claudeCodeOnly ? 'true' : 'false',
+      };
+    }
+
     onSubmit({
       ...form,
       subscription_type: form.subscription_type as 'standard' | 'subscription',
       quotas: form.subscription_type === 'subscription' ? buildQuotas(quotas) : undefined,
+      plugin_settings: Object.keys(pluginSettings).length > 0 ? pluginSettings : undefined,
       // 不能用 `|| undefined` —— 那会把空字符串（即"不覆盖"）也吞掉，
       // 导致后端 ForceInstructions 指针为 nil 直接跳过更新，无法从 cc 切回不覆盖。
       // 空串需要真实下发，让后端把字段更新为空字符串。
@@ -345,6 +363,37 @@ export function GroupFormModal({
             />
           )}
         </div>}
+
+        {/* 仅 Claude 平台：Claude Code 客户端闸 */}
+        {form.platform === 'claude' && (
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm" style={{ color: 'var(--ag-text-secondary)' }}>
+                仅 Claude Code 客户端
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={claudeCodeOnly}
+                onClick={() => setClaudeCodeOnly(!claudeCodeOnly)}
+                className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+                style={{
+                  backgroundColor: claudeCodeOnly ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
+                }}
+              >
+                <span
+                  className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform"
+                  style={{
+                    transform: claudeCodeOnly ? 'translateX(18px)' : 'translateX(3px)',
+                  }}
+                />
+              </button>
+            </div>
+            <p className="text-[11px] mt-1" style={{ color: 'var(--ag-text-tertiary)' }}>
+              开启后，本分组的账号只接受官方 Claude CLI 发起的流量；非 CLI 请求返回 403。可显著降低 OAuth 额度被 Anthropic 行为模型识别为第三方的概率。
+            </p>
+          </div>
+        )}
 
         {/* 配额限制 -- 仅订阅制显示 */}
         {form.subscription_type === 'subscription' && (

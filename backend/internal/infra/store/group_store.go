@@ -109,6 +109,9 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 		if input.ModelRouting != nil {
 			builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
 		}
+		if input.PluginSettings != nil {
+			builder = builder.SetPluginSettings(appgroupClonePluginSettings(input.PluginSettings))
+		}
 
 		item, err := builder.Save(ctx)
 		if err != nil {
@@ -179,6 +182,9 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 	if input.ModelRouting != nil {
 		builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
 	}
+	if input.PluginSettings != nil {
+		builder = builder.SetPluginSettings(appgroupClonePluginSettings(input.PluginSettings))
+	}
 	if len(accountIDs) > 0 {
 		builder = builder.AddAccountIDs(accountIDs...)
 	}
@@ -219,6 +225,9 @@ func (s *GroupStore) Update(ctx context.Context, id int, input appgroup.UpdateIn
 	}
 	if input.ModelRouting != nil {
 		builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
+	}
+	if input.PluginSettings != nil {
+		builder = builder.SetPluginSettings(appgroupClonePluginSettings(input.PluginSettings))
 	}
 	if input.ServiceTier != nil {
 		builder = builder.SetServiceTier(*input.ServiceTier)
@@ -419,6 +428,7 @@ func mapGroup(item *ent.Group) appgroup.Group {
 		SubscriptionType:  string(item.SubscriptionType),
 		Quotas:            appgroupCloneQuotas(item.Quotas),
 		ModelRouting:      appgroupCloneModelRouting(item.ModelRouting),
+		PluginSettings:    appgroupClonePluginSettings(item.PluginSettings),
 		ServiceTier:       item.ServiceTier,
 		ForceInstructions: item.ForceInstructions,
 		Note:              item.Note,
@@ -446,6 +456,21 @@ func appgroupCloneModelRouting(input map[string][]int64) map[string][]int64 {
 	cloned := make(map[string][]int64, len(input))
 	for key, value := range input {
 		cloned[key] = append([]int64(nil), value...)
+	}
+	return cloned
+}
+
+func appgroupClonePluginSettings(input map[string]map[string]string) map[string]map[string]string {
+	if input == nil {
+		return nil
+	}
+	cloned := make(map[string]map[string]string, len(input))
+	for plugin, kv := range input {
+		inner := make(map[string]string, len(kv))
+		for k, v := range kv {
+			inner[k] = v
+		}
+		cloned[plugin] = inner
 	}
 	return cloned
 }

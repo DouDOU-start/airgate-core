@@ -55,6 +55,7 @@ type Group struct {
 	SubscriptionType  string
 	Quotas            map[string]any
 	ModelRouting      map[string][]int64
+	PluginSettings    map[string]map[string]string
 	ServiceTier       string
 	ForceInstructions string
 	Note              string
@@ -99,6 +100,7 @@ type CreateInput struct {
 	SubscriptionType  string
 	Quotas            map[string]any
 	ModelRouting      map[string][]int64
+	PluginSettings    map[string]map[string]string
 	ServiceTier       string
 	ForceInstructions string
 	Note              string
@@ -116,6 +118,7 @@ type UpdateInput struct {
 	SubscriptionType  *string
 	Quotas            map[string]any
 	ModelRouting      map[string][]int64
+	PluginSettings    map[string]map[string]string
 	ServiceTier       *string
 	ForceInstructions *string
 	Note              *string
@@ -150,6 +153,21 @@ func cloneModelRouting(input map[string][]int64) map[string][]int64 {
 	cloned := make(map[string][]int64, len(input))
 	for key, value := range input {
 		cloned[key] = append([]int64(nil), value...)
+	}
+	return cloned
+}
+
+func clonePluginSettings(input map[string]map[string]string) map[string]map[string]string {
+	if input == nil {
+		return nil
+	}
+	cloned := make(map[string]map[string]string, len(input))
+	for plugin, kv := range input {
+		inner := make(map[string]string, len(kv))
+		for k, v := range kv {
+			inner[k] = v
+		}
+		cloned[plugin] = inner
 	}
 	return cloned
 }

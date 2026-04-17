@@ -105,6 +105,12 @@ func (gc *GroupCreate) SetModelRouting(m map[string][]int64) *GroupCreate {
 	return gc
 }
 
+// SetPluginSettings sets the "plugin_settings" field.
+func (gc *GroupCreate) SetPluginSettings(m map[string]map[string]string) *GroupCreate {
+	gc.mutation.SetPluginSettings(m)
+	return gc
+}
+
 // SetServiceTier sets the "service_tier" field.
 func (gc *GroupCreate) SetServiceTier(s string) *GroupCreate {
 	gc.mutation.SetServiceTier(s)
@@ -451,6 +457,10 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := gc.mutation.ModelRouting(); ok {
 		_spec.SetField(group.FieldModelRouting, field.TypeJSON, value)
 		_node.ModelRouting = value
+	}
+	if value, ok := gc.mutation.PluginSettings(); ok {
+		_spec.SetField(group.FieldPluginSettings, field.TypeJSON, value)
+		_node.PluginSettings = value
 	}
 	if value, ok := gc.mutation.ServiceTier(); ok {
 		_spec.SetField(group.FieldServiceTier, field.TypeString, value)

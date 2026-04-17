@@ -16,6 +16,7 @@ func toGroupRespFromDomain(item appgroup.Group) dto.GroupResp {
 		SubscriptionType:  item.SubscriptionType,
 		Quotas:            item.Quotas,
 		ModelRouting:      item.ModelRouting,
+		PluginSettings:    item.PluginSettings,
 		ServiceTier:       item.ServiceTier,
 		ForceInstructions: item.ForceInstructions,
 		Note:              item.Note,

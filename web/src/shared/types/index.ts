@@ -259,6 +259,7 @@ export interface GroupResp {
   subscription_type: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
   model_routing?: Record<string, number[]>;
+  plugin_settings?: Record<string, Record<string, string>>;
   service_tier?: 'fast' | 'flex';
   force_instructions?: string;
   note?: string;
@@ -284,6 +285,7 @@ export interface CreateGroupReq {
   subscription_type: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
   model_routing?: Record<string, number[]>;
+  plugin_settings?: Record<string, Record<string, string>>;
   service_tier?: 'fast' | 'flex';
   force_instructions?: string;
   note?: string;
@@ -306,6 +308,7 @@ export interface UpdateGroupReq {
   subscription_type?: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
   model_routing?: Record<string, number[]>;
+  plugin_settings?: Record<string, Record<string, string>>;
   service_tier?: 'fast' | 'flex';
   force_instructions?: string;
   note?: string;

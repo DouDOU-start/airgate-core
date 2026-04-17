@@ -211,7 +211,40 @@ func buildForwardHeaders(source http.Header, keyInfo *auth.APIKeyInfo) http.Head
 	if keyInfo.GroupForceInstructions != "" {
 		headers.Set("X-Airgate-Force-Instructions", keyInfo.GroupForceInstructions)
 	}
+	// 分组级插件开关下发：按约定 key 映射到 X-Airgate-* 头，
+	// 插件侧无需改 SDK 即可读取。
+	for plugin, kv := range keyInfo.GroupPluginSettings {
+		for k, v := range kv {
+			if v == "" {
+				continue
+			}
+			// 约定：X-Airgate-Plugin-{plugin}-{key}
+			// 例如 claude.claude_code_only=true → X-Airgate-Plugin-Claude-Claude-Code-Only: true
+			headers.Set("X-Airgate-Plugin-"+canonicalHeaderToken(plugin)+"-"+canonicalHeaderToken(k), v)
+		}
+	}
 	return headers
+}
+
+// canonicalHeaderToken 将 snake_case / kebab-case 字符串规范化为 HTTP header token 风格（首字母大写，下划线变连字符）。
+// 用于 plugin_settings map 的 key → header 名组装。
+func canonicalHeaderToken(s string) string {
+	out := make([]byte, 0, len(s))
+	upNext := true
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '_' || c == '-' || c == '.' {
+			out = append(out, '-')
+			upNext = true
+			continue
+		}
+		if upNext && c >= 'a' && c <= 'z' {
+			c -= 'a' - 'A'
+		}
+		out = append(out, c)
+		upNext = false
+	}
+	return string(out)
 }
 
 func buildSDKAccount(account *ent.Account) *sdk.Account {

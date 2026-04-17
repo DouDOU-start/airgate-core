@@ -96,6 +96,7 @@ func (s *Service) Get(ctx context.Context, id int) (Group, error) {
 func (s *Service) Create(ctx context.Context, input CreateInput) (Group, error) {
 	input.Quotas = cloneQuotas(input.Quotas)
 	input.ModelRouting = cloneModelRouting(input.ModelRouting)
+	input.PluginSettings = clonePluginSettings(input.PluginSettings)
 	return s.repo.Create(ctx, input)
 }
 
@@ -103,6 +104,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Group, error) 
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Group, error) {
 	input.Quotas = cloneQuotas(input.Quotas)
 	input.ModelRouting = cloneModelRouting(input.ModelRouting)
+	input.PluginSettings = clonePluginSettings(input.PluginSettings)
 	return s.repo.Update(ctx, id, input)
 }
 

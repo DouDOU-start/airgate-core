@@ -148,6 +148,18 @@ func (gu *GroupUpdate) ClearModelRouting() *GroupUpdate {
 	return gu
 }
 
+// SetPluginSettings sets the "plugin_settings" field.
+func (gu *GroupUpdate) SetPluginSettings(m map[string]map[string]string) *GroupUpdate {
+	gu.mutation.SetPluginSettings(m)
+	return gu
+}
+
+// ClearPluginSettings clears the value of the "plugin_settings" field.
+func (gu *GroupUpdate) ClearPluginSettings() *GroupUpdate {
+	gu.mutation.ClearPluginSettings()
+	return gu
+}
+
 // SetServiceTier sets the "service_tier" field.
 func (gu *GroupUpdate) SetServiceTier(s string) *GroupUpdate {
 	gu.mutation.SetServiceTier(s)
@@ -502,6 +514,12 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if gu.mutation.ModelRoutingCleared() {
 		_spec.ClearField(group.FieldModelRouting, field.TypeJSON)
+	}
+	if value, ok := gu.mutation.PluginSettings(); ok {
+		_spec.SetField(group.FieldPluginSettings, field.TypeJSON, value)
+	}
+	if gu.mutation.PluginSettingsCleared() {
+		_spec.ClearField(group.FieldPluginSettings, field.TypeJSON)
 	}
 	if value, ok := gu.mutation.ServiceTier(); ok {
 		_spec.SetField(group.FieldServiceTier, field.TypeString, value)
@@ -878,6 +896,18 @@ func (guo *GroupUpdateOne) SetModelRouting(m map[string][]int64) *GroupUpdateOne
 // ClearModelRouting clears the value of the "model_routing" field.
 func (guo *GroupUpdateOne) ClearModelRouting() *GroupUpdateOne {
 	guo.mutation.ClearModelRouting()
+	return guo
+}
+
+// SetPluginSettings sets the "plugin_settings" field.
+func (guo *GroupUpdateOne) SetPluginSettings(m map[string]map[string]string) *GroupUpdateOne {
+	guo.mutation.SetPluginSettings(m)
+	return guo
+}
+
+// ClearPluginSettings clears the value of the "plugin_settings" field.
+func (guo *GroupUpdateOne) ClearPluginSettings() *GroupUpdateOne {
+	guo.mutation.ClearPluginSettings()
 	return guo
 }
 
@@ -1265,6 +1295,12 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 	}
 	if guo.mutation.ModelRoutingCleared() {
 		_spec.ClearField(group.FieldModelRouting, field.TypeJSON)
+	}
+	if value, ok := guo.mutation.PluginSettings(); ok {
+		_spec.SetField(group.FieldPluginSettings, field.TypeJSON, value)
+	}
+	if guo.mutation.PluginSettingsCleared() {
+		_spec.ClearField(group.FieldPluginSettings, field.TypeJSON)
 	}
 	if value, ok := guo.mutation.ServiceTier(); ok {
 		_spec.SetField(group.FieldServiceTier, field.TypeString, value)

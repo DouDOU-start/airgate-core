@@ -25,6 +25,11 @@ func (Group) Fields() []ent.Field {
 		field.Enum("subscription_type").Values("standard", "subscription").Default("standard"),
 		field.JSON("quotas", map[string]interface{}{}).Optional(),
 		field.JSON("model_routing", map[string][]int64{}).Optional(),
+		// plugin_settings 按插件命名空间存放细粒度开关，形如
+		//   {"claude": {"claude_code_only": "true"}}
+		// Core 在 buildForwardHeaders 时按约定映射成 X-Airgate-* 头下发给网关插件。
+		// 保持 string→string 嵌套是为了不侵入 SDK（零 SDK bump）。
+		field.JSON("plugin_settings", map[string]map[string]string{}).Optional(),
 		field.String("service_tier").Default(""),
 		field.String("force_instructions").Default(""),
 		field.String("note").Default(""),
