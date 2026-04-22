@@ -37,12 +37,14 @@ type Scheduler struct {
 	session    *SessionManager
 	msgQueue   *MessageQueue
 	state      *StateMachine
+	routeCache *routeCache
 }
 
 // NewScheduler 构造调度器。
 func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 	rpm := NewRPMCounter(rdb)
-	return &Scheduler{
+	rc := newRouteCache(routeCacheTTL)
+	s := &Scheduler{
 		db:         db,
 		rdb:        rdb,
 		sticky:     NewStickySession(rdb),
@@ -51,7 +53,20 @@ func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 		session:    NewSessionManager(rdb),
 		msgQueue:   NewMessageQueue(rdb, rpm),
 		state:      NewStateMachine(db, rdb),
+		routeCache: rc,
 	}
+	s.state.onCriticalTransition = rc.InvalidateAll
+	return s
+}
+
+// InvalidateRouteCache 清除指定分组的 route 缓存。admin 改分组 / 增删账号时调用。
+// groupID <= 0 时清空所有缓存。
+func (s *Scheduler) InvalidateRouteCache(groupID int) {
+	if groupID <= 0 {
+		s.routeCache.InvalidateAll()
+		return
+	}
+	s.routeCache.InvalidateGroup(groupID)
 }
 
 // Apply 把 forwarder 的判决交给状态机。是 forwarder 与 scheduler 的唯一接触面。

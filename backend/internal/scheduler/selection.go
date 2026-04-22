@@ -122,7 +122,15 @@ func (s *Scheduler) maybeRegisterSession(ctx context.Context, selected *ent.Acco
 // routeAccounts 取分组下匹配模型路由的账号；状态过滤延到 checkSchedulability。
 //
 // 不按 state 过滤的原因：新账号刚解除 disabled 后可立即被调度，不用等缓存失效。
+//
+// 首层命中 routeCache（key = (groupID, platform)）；miss 才查 DB。Model routing
+// 规则与账号列表一起缓存，按 model 过滤的动作每次都重新跑——避免"不同 model 复用同一条缓存"
+// 带来的错配。
 func (s *Scheduler) routeAccounts(ctx context.Context, platform, model string, groupID int) ([]*ent.Account, error) {
+	if accounts, routing, ok := s.routeCache.Get(groupID, platform); ok {
+		return applyModelRouting(accounts, routing, model), nil
+	}
+
 	grp, err := s.db.Group.Get(ctx, groupID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrGroupNotFound, err)
@@ -136,25 +144,33 @@ func (s *Scheduler) routeAccounts(ctx context.Context, platform, model string, g
 		return nil, fmt.Errorf("查询分组账户失败: %w", err)
 	}
 
-	if len(grp.ModelRouting) == 0 {
-		return accounts, nil
-	}
-	allowedIDs := matchModelRouting(grp.ModelRouting, model)
-	if len(allowedIDs) == 0 {
-		return accounts, nil
-	}
+	// 缓存全量 platform 账号（包含所有 state）+ group 的 ModelRouting
+	s.routeCache.Set(groupID, platform, accounts, grp.ModelRouting)
 
+	return applyModelRouting(accounts, grp.ModelRouting, model), nil
+}
+
+// applyModelRouting 按 model 过滤候选账号。routing 为 nil/空或未命中时原样返回。
+func applyModelRouting(accounts []*ent.Account, routing map[string][]int64, model string) []*ent.Account {
+	if len(routing) == 0 {
+		return accounts
+	}
+	allowedIDs := matchModelRouting(routing, model)
+	if len(allowedIDs) == 0 {
+		return accounts
+	}
 	idSet := make(map[int64]bool, len(allowedIDs))
 	for _, id := range allowedIDs {
 		idSet[id] = true
 	}
-	filtered := accounts[:0]
+	// 不能原地复用 accounts slice：那是缓存共享的底层数组，别处还在读
+	filtered := make([]*ent.Account, 0, len(accounts))
 	for _, acc := range accounts {
 		if idSet[int64(acc.ID)] {
 			filtered = append(filtered, acc)
 		}
 	}
-	return filtered, nil
+	return filtered
 }
 
 // matchModelRouting 匹配模型路由规则，返回允许的账号 ID 列表。nil 或空表示不限制。
