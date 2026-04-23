@@ -50,7 +50,7 @@ export default function PluginPage() {
 
   const PageComponent = matched.component;
   return (
-    <div className="ag-plugin-scope">
+    <div className="ag-plugin-scope h-full min-h-0">
       <PageComponent />
     </div>
   );
