@@ -172,10 +172,23 @@ export const api = {
 
 export async function chatCompletionsStream(
   apiKey: string,
-  body: { model: string; messages: Array<{ role: string; content: string }>; stream: true },
+  body: {
+    model: string;
+    messages: Array<{ role: string; content: string }>;
+    stream: true;
+    stream_options?: { include_usage?: boolean };
+  },
   callbacks: ChatCompletionCallbacks,
   signal?: AbortSignal,
 ): Promise<void> {
+  const requestBody = {
+    ...body,
+    stream_options: {
+      include_usage: true,
+      ...body.stream_options,
+    },
+  };
+
   const resp = await fetch('/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -183,7 +196,7 @@ export async function chatCompletionsStream(
       'Accept': 'text/event-stream',
       'Authorization': `Bearer ${apiKey}`,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(requestBody),
     signal,
   });
 
