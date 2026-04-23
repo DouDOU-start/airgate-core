@@ -276,12 +276,20 @@ export default function PlaygroundPage() {
     setIsStreaming(false);
   }, [streamContent, activeId, selectedModel]);
 
+  const activeConv = conversations.find(c => c.id === activeId);
+  const hasSelectedAPIKey = Boolean(userInfo?.api_key_id || selectedKeyId);
+  const canSendMessage = Boolean(input.trim()) && hasSelectedAPIKey && !isStreaming;
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      if (!hasSelectedAPIKey) {
+        setError('API key required');
+        return;
+      }
       sendMessage();
     }
-  }, [sendMessage]);
+  }, [hasSelectedAPIKey, sendMessage]);
 
   const autoResize = useCallback((el: HTMLTextAreaElement) => {
     el.style.height = 'auto';
@@ -294,8 +302,6 @@ export default function PlaygroundPage() {
       setSidebarOpen(false);
     }
   }, [isMobile]);
-
-  const activeConv = conversations.find(c => c.id === activeId);
 
   return (
     <div data-full-bleed style={styles.layout}>
@@ -585,10 +591,11 @@ export default function PlaygroundPage() {
                     style={{
                       ...styles.sendBtn,
                       ...(isMobile ? styles.actionBtnMobile : null),
-                      opacity: input.trim() && (userInfo?.api_key_id || selectedKeyId) ? 1 : 0.4,
+                      opacity: canSendMessage ? 1 : 0.4,
                     }}
                     onClick={sendMessage}
-                    disabled={!input.trim() || (!userInfo?.api_key_id && !selectedKeyId)}
+                    disabled={!canSendMessage}
+                    title={hasSelectedAPIKey ? undefined : 'Select an API key first'}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M22 2L11 13" />
@@ -623,6 +630,10 @@ const styles: Record<string, React.CSSProperties> = {
   layout: {
     display: 'flex',
     height: '100%',
+    minHeight: 0,
+    minWidth: 0,
+    position: 'relative',
+    isolation: 'isolate',
     background: cssVar('bgDeep'),
     fontFamily: cssVar('fontSans'),
     color: cssVar('text'),
@@ -635,16 +646,17 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: 280,
     display: 'flex',
     flexDirection: 'column',
+    minHeight: 0,
     background: cssVar('bg'),
     borderRight: `1px solid ${cssVar('borderSubtle')}`,
     position: 'relative',
-    zIndex: 2,
+    zIndex: 3,
   },
   sidebarBackdrop: {
     position: 'absolute',
     inset: 0,
     background: 'rgba(6, 10, 18, 0.64)',
-    zIndex: 1,
+    zIndex: 2,
   },
   sidebarMobile: {
     position: 'absolute',
@@ -752,7 +764,9 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
+    minHeight: 0,
     minWidth: 0,
+    overflow: 'hidden',
   },
 
   // ── Top bar ──
@@ -876,6 +890,7 @@ const styles: Record<string, React.CSSProperties> = {
   // ── Messages ──
   messagesArea: {
     flex: 1,
+    minHeight: 0,
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
