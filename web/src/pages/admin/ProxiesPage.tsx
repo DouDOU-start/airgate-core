@@ -335,6 +335,7 @@ export default function ProxiesPage() {
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             placeholder={editingProxy ? t('proxies.password_hint') : ''}
+            autoComplete="off"
           />
         </form>
       </Modal>

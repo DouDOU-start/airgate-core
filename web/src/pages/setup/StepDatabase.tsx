@@ -111,6 +111,7 @@ export default function StepDatabase({ data, onChange, onNext }: StepDatabasePro
           value={data.password || ''}
           onChange={(e) => update('password', e.target.value)}
           placeholder={t('setup.password')}
+          autoComplete="off"
         />
       </div>
       <div className="grid grid-cols-2 gap-4">

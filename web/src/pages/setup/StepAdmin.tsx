@@ -62,6 +62,7 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
         value={data.email}
         onChange={(e) => update('email', e.target.value)}
         placeholder="admin@example.com"
+        autoComplete="email"
         required
       />
       <div>
@@ -71,6 +72,7 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
           value={data.password}
           onChange={(e) => update('password', e.target.value)}
           placeholder={t('setup.password_too_short')}
+          autoComplete="new-password"
           required
           error={passwordTooShort ? t('setup.password_too_short') : undefined}
         />
@@ -97,6 +99,7 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
         value={data.confirmPassword}
         onChange={(e) => update('confirmPassword', e.target.value)}
         placeholder={t('profile.confirm_placeholder')}
+        autoComplete="new-password"
         required
         error={passwordMismatch ? t('profile.password_mismatch') : undefined}
       />

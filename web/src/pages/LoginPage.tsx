@@ -53,6 +53,7 @@ function LoginForm() {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder={t('auth.email_placeholder')}
+        autoComplete="username"
         icon={<Mail className="w-4 h-4" />}
         required
         autoFocus
@@ -63,6 +64,7 @@ function LoginForm() {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         placeholder={t('auth.password_placeholder')}
+        autoComplete="current-password"
         icon={<Lock className="w-4 h-4" />}
         required
       />
@@ -174,6 +176,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
           value={email}
           onChange={(e) => { setEmail(e.target.value); setError(''); }}
           placeholder={t('auth.email_placeholder')}
+          autoComplete="email"
           icon={<Mail className="w-4 h-4" />}
           required
           autoFocus
@@ -240,6 +243,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         placeholder={t('auth.password_hint')}
+        autoComplete="new-password"
         icon={<Lock className="w-4 h-4" />}
         required
       />
@@ -249,6 +253,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
         placeholder={t('auth.confirm_placeholder')}
+        autoComplete="new-password"
         icon={<Lock className="w-4 h-4" />}
         required
         error={passwordMismatch ? t('auth.password_mismatch') : undefined}
@@ -302,6 +307,7 @@ function APIKeyLoginForm() {
         value={apiKey}
         onChange={(e) => setApiKey(e.target.value)}
         placeholder="sk-..."
+        autoComplete="off"
         icon={<Key className="w-4 h-4" />}
         required
         autoFocus

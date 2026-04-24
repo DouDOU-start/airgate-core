@@ -100,6 +100,7 @@ export default function StepRedis({ data, onChange, onPrev, onNext }: StepRedisP
           value={data.password || ''}
           onChange={(e) => update('password', e.target.value)}
           placeholder={t('setup.password')}
+          autoComplete="off"
         />
         <Input
           label={t('setup.db_number')}

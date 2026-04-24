@@ -386,7 +386,7 @@ export default function SettingsPage() {
                   <Input value={val('smtp_username')} onChange={(e) => set('smtp_username', e.target.value)} />
                 </Field>
                 <Field label={t('settings.smtp_password')}>
-                  <Input type="password" value={val('smtp_password')} onChange={(e) => set('smtp_password', e.target.value)} />
+                  <Input type="password" value={val('smtp_password')} onChange={(e) => set('smtp_password', e.target.value)} autoComplete="off" />
                 </Field>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -57,10 +57,10 @@ export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUser
       }
     >
       <form id="create-user-form" className="space-y-4" onSubmit={handleSubmit} noValidate>
-        <Input label={t('users.email')} type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <Input label={t('users.email')} type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} autoComplete="email" />
         <div>
           <div className="relative">
-            <Input label={t('users.password')} type={showPassword ? 'text' : 'password'} required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            <Input label={t('users.password')} type={showPassword ? 'text' : 'password'} required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" />
             <button
               type="button"
               className="absolute right-3 bottom-[10px] text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer"

@@ -163,6 +163,7 @@ export default function ProfilePage() {
               setPasswords({ ...passwords, old_password: e.target.value })
             }
             placeholder={t('profile.old_password_placeholder')}
+            autoComplete="current-password"
             icon={<Lock className="w-4 h-4" />}
           />
           <Input
@@ -174,6 +175,7 @@ export default function ProfilePage() {
               setPasswords({ ...passwords, new_password: e.target.value })
             }
             placeholder={t('profile.new_password_placeholder')}
+            autoComplete="new-password"
             icon={<KeyRound className="w-4 h-4" />}
           />
           <Input
@@ -185,6 +187,7 @@ export default function ProfilePage() {
               setPasswords({ ...passwords, confirm_password: e.target.value })
             }
             placeholder={t('profile.confirm_placeholder')}
+            autoComplete="new-password"
             icon={<KeyRound className="w-4 h-4" />}
           />
           <Button
