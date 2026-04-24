@@ -16,17 +16,103 @@ const MOBILE_BREAKPOINT = 960;
 const DRAFT_CONVERSATION_ID = -1;
 const IMAGE_MARKDOWN_RE = /!\[[^\]]*\]\((data:image\/(?:png|jpeg|jpg|webp|gif);base64,[^)]+|https?:\/\/[^\s)]+)\)/g;
 const IMAGE_MARKDOWN_ITEM_RE = /!\[([^\]]*)\]\((data:image\/(?:png|jpeg|jpg|webp|gif);base64,[^)]+|https?:\/\/[^\s)]+)\)/g;
+const DATA_IMAGE_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,/i;
 const REASONING_MODEL_RE = /(^|[-_])(?:gpt-?5|o[134]|codex)(?:[-_.]|$)/i;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const IMAGE_SIZE_OPTIONS: Array<{ value: ImageSize; label: string }> = [
+  { value: '1024x1024', label: 'Square 1024x1024' },
+  { value: '1024x1536', label: 'Portrait 1024x1536' },
+  { value: '1536x1024', label: 'Landscape 1536x1024' },
+];
 type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+type ImageSize = '1024x1024' | '1024x1536' | '1536x1024';
 type PendingImage = { id: string; name: string; url: string };
+type MessageContentOptions = {
+  onImageDownload?: (url: string, alt: string) => void;
+  imageDownloadTitle?: string;
+};
 
 function stripImageMarkdown(content: string) {
   return content.replace(IMAGE_MARKDOWN_RE, '[Image generated]').trim() || '[Image generated]';
 }
 
+function copyableMessageText(content: string) {
+  return content.replace(IMAGE_MARKDOWN_RE, '[Image]').trim() || '[Image]';
+}
+
 function escapeMarkdownAlt(text: string) {
   return text.replace(/[\]\\]/g, '');
+}
+
+function imageExtensionFromUrl(url: string) {
+  const dataMatch = url.match(DATA_IMAGE_RE);
+  if (dataMatch) return dataMatch[1].toLowerCase() === 'jpeg' ? 'jpg' : dataMatch[1].toLowerCase();
+
+  try {
+    const pathname = new URL(url).pathname;
+    const extMatch = pathname.match(/\.([a-z0-9]{2,5})$/i);
+    return extMatch ? extMatch[1].toLowerCase() : 'png';
+  } catch {
+    return 'png';
+  }
+}
+
+function imageFilename(alt: string, url: string) {
+  const base = (alt || 'generated-image')
+    .replace(/\.[a-z0-9]{2,5}$/i, '')
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .trim()
+    .slice(0, 80) || 'generated-image';
+  return `${base}.${imageExtensionFromUrl(url)}`;
+}
+
+function clickDownload(href: string, filename: string) {
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = filename;
+  link.rel = 'noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+async function downloadImage(url: string, alt: string) {
+  const filename = imageFilename(alt, url);
+  if (DATA_IMAGE_RE.test(url)) {
+    clickDownload(url, filename);
+    return;
+  }
+
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const objectUrl = URL.createObjectURL(await resp.blob());
+    try {
+      clickDownload(objectUrl, filename);
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  } catch {
+    clickDownload(url, filename);
+  }
+}
+
+async function copyText(text: string) {
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  textarea.style.pointerEvents = 'none';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  textarea.remove();
+  if (!copied) throw new Error('copy failed');
 }
 
 function fileToDataURL(file: File) {
@@ -112,7 +198,37 @@ function pushTextWithBreaks(nodes: ReactNode[], text: string, keyPrefix: string)
   });
 }
 
-function renderInlineMarkdown(text: string, keyPrefix: string) {
+function renderGeneratedImage(key: string, url: string, alt: string, options: MessageContentOptions) {
+  const image = <img src={url} alt={alt} style={styles.generatedImage} loading="lazy" />;
+  if (!options.onImageDownload) {
+    return <span key={key} style={styles.generatedImageFrame}>{image}</span>;
+  }
+
+  return (
+    <span key={key} style={styles.generatedImageFrame}>
+      {image}
+      <button
+        type="button"
+        style={styles.imageDownloadBtn}
+        title={options.imageDownloadTitle || 'Download image'}
+        aria-label={options.imageDownloadTitle || 'Download image'}
+        onClick={(event) => {
+          event.stopPropagation();
+          options.onImageDownload?.(url, alt);
+        }}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <path d="M7 10l5 5 5-5" />
+          <path d="M12 15V3" />
+        </svg>
+        <span>Download</span>
+      </button>
+    </span>
+  );
+}
+
+function renderInlineMarkdown(text: string, keyPrefix: string, options: MessageContentOptions = {}) {
   const nodes: ReactNode[] = [];
   const inlineRe = /(!\[([^\]]*)\]\(([^)\s]+)\)|\[([^\]]+)\]\(([^)\s]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*]+)\*|_([^_]+)_)/g;
   let lastIndex = 0;
@@ -133,19 +249,19 @@ function renderInlineMarkdown(text: string, keyPrefix: string) {
     const italicText = match[9] || match[10];
 
     if (imageUrl && isSafeImageUrl(imageUrl)) {
-      nodes.push(<img key={key} src={imageUrl} alt={imageAlt || 'Generated image'} style={styles.generatedImage} loading="lazy" />);
+      nodes.push(renderGeneratedImage(key, imageUrl, imageAlt || 'Generated image', options));
     } else if (linkUrl && isSafeLinkUrl(linkUrl)) {
       nodes.push(
         <a key={key} href={linkUrl} style={styles.markdownLink} target="_blank" rel="noreferrer">
-          {renderInlineMarkdown(linkText, `${key}-link`)}
+          {renderInlineMarkdown(linkText, `${key}-link`, options)}
         </a>,
       );
     } else if (inlineCode) {
       nodes.push(<code key={key} style={styles.markdownInlineCode}>{inlineCode}</code>);
     } else if (boldText) {
-      nodes.push(<strong key={key}>{renderInlineMarkdown(boldText, `${key}-bold`)}</strong>);
+      nodes.push(<strong key={key}>{renderInlineMarkdown(boldText, `${key}-bold`, options)}</strong>);
     } else if (italicText) {
-      nodes.push(<em key={key}>{renderInlineMarkdown(italicText, `${key}-em`)}</em>);
+      nodes.push(<em key={key}>{renderInlineMarkdown(italicText, `${key}-em`, options)}</em>);
     } else {
       nodes.push(match[0]);
     }
@@ -160,15 +276,15 @@ function renderInlineMarkdown(text: string, keyPrefix: string) {
   return nodes.length > 0 ? nodes : text;
 }
 
-function renderHeading(level: number, text: string, key: string) {
-  const content = renderInlineMarkdown(text, `${key}-inline`);
+function renderHeading(level: number, text: string, key: string, options: MessageContentOptions = {}) {
+  const content = renderInlineMarkdown(text, `${key}-inline`, options);
   if (level === 1) return <h1 key={key} style={styles.markdownH1}>{content}</h1>;
   if (level === 2) return <h2 key={key} style={styles.markdownH2}>{content}</h2>;
   if (level === 3) return <h3 key={key} style={styles.markdownH3}>{content}</h3>;
   return <h4 key={key} style={styles.markdownH4}>{content}</h4>;
 }
 
-function renderImageGroup(text: string, key: string) {
+function renderImageGroup(text: string, key: string, options: MessageContentOptions = {}) {
   const images: Array<{ alt: string; url: string }> = [];
   let match: RegExpExecArray | null;
   IMAGE_MARKDOWN_ITEM_RE.lastIndex = 0;
@@ -182,20 +298,12 @@ function renderImageGroup(text: string, key: string) {
 
   return (
     <div key={key} style={styles.imageGroup}>
-      {images.map((image, index) => (
-        <img
-          key={`${key}-${index}`}
-          src={image.url}
-          alt={image.alt || 'Generated image'}
-          style={styles.generatedImage}
-          loading="lazy"
-        />
-      ))}
+      {images.map((image, index) => renderGeneratedImage(`${key}-${index}`, image.url, image.alt || 'Generated image', options))}
     </div>
   );
 }
 
-function renderMessageContent(content: string) {
+function renderMessageContent(content: string, options: MessageContentOptions = {}) {
   const lines = content.replace(/\r\n?/g, '\n').split('\n');
   const nodes: ReactNode[] = [];
   let paragraph: string[] = [];
@@ -210,20 +318,20 @@ function renderMessageContent(content: string) {
     if (!paragraph.length) return;
     const key = nextKey('p');
     const text = paragraph.join('\n');
-    nodes.push(renderImageGroup(text, key) || <p key={key} style={styles.markdownParagraph}>{renderInlineMarkdown(text, key)}</p>);
+    nodes.push(renderImageGroup(text, key, options) || <p key={key} style={styles.markdownParagraph}>{renderInlineMarkdown(text, key, options)}</p>);
     paragraph = [];
   };
   const flushQuote = () => {
     if (!quote.length) return;
     const key = nextKey('quote');
-    nodes.push(<blockquote key={key} style={styles.markdownBlockquote}>{renderInlineMarkdown(quote.join('\n'), key)}</blockquote>);
+    nodes.push(<blockquote key={key} style={styles.markdownBlockquote}>{renderInlineMarkdown(quote.join('\n'), key, options)}</blockquote>);
     quote = [];
   };
   const flushList = () => {
     if (!listItems.length) return;
     const key = nextKey('list');
     const children = listItems.map((item, index) => (
-      <li key={`${key}-${index}`} style={styles.markdownListItem}>{renderInlineMarkdown(item.text, `${key}-${index}`)}</li>
+      <li key={`${key}-${index}`} style={styles.markdownListItem}>{renderInlineMarkdown(item.text, `${key}-${index}`, options)}</li>
     ));
     nodes.push(listItems[0].ordered ? <ol key={key} style={styles.markdownList}>{children}</ol> : <ul key={key} style={styles.markdownList}>{children}</ul>);
     listItems = [];
@@ -265,7 +373,7 @@ function renderMessageContent(content: string) {
     const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
     if (headingMatch) {
       flushBlocks();
-      nodes.push(renderHeading(Math.min(headingMatch[1].length, 4), headingMatch[2].trim(), nextKey('heading')));
+      nodes.push(renderHeading(Math.min(headingMatch[1].length, 4), headingMatch[2].trim(), nextKey('heading'), options));
       continue;
     }
 
@@ -321,12 +429,14 @@ export default function PlaygroundPage() {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>('medium');
+  const [imageSize, setImageSize] = useState<ImageSize>('1024x1024');
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [availableKeys, setAvailableKeys] = useState<APIKeyItem[]>([]);
   const [availableGroups, setAvailableGroups] = useState<GroupItem[]>([]);
   const [selectedKeyId, setSelectedKeyId] = useState<number | null>(null);
   const [resolvedAPIKey, setResolvedAPIKey] = useState('');
   const [error, setError] = useState('');
+  const [interactionNotice, setInteractionNotice] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(() => (
     typeof window !== 'undefined' ? window.innerWidth <= MOBILE_BREAKPOINT : false
@@ -436,6 +546,12 @@ export default function PlaygroundPage() {
     setSidebarOpen(!isMobile);
   }, [isMobile]);
 
+  useEffect(() => {
+    if (!interactionNotice) return;
+    const timer = window.setTimeout(() => setInteractionNotice(''), 1400);
+    return () => window.clearTimeout(timer);
+  }, [interactionNotice]);
+
   const resolveGroupID = useCallback(() => {
     const keyID = selectedKeyId || userInfo?.api_key_id;
     const selectedKey = availableKeys.find(item => item.id === keyID);
@@ -451,6 +567,7 @@ export default function PlaygroundPage() {
   })();
 
   const selectedModelInfo = models.find(item => item.id === selectedModel);
+  const selectedModelIsImage = isImageModel(selectedModelInfo);
   const selectedModelSupportsReasoning = supportsReasoning(selectedModelInfo);
 
   const ensureAPIKey = useCallback(async () => {
@@ -597,6 +714,7 @@ export default function PlaygroundPage() {
           model: selectedModel,
           messages: requestMessages.map(msg => ({ role: msg.role, content: toChatMessageContent(msg.role, msg.content) })),
           stream: true,
+          ...(selectedModelIsImage ? { size: imageSize } : {}),
           ...(selectedModelSupportsReasoning ? { reasoning_effort: reasoningEffort } : {}),
         },
         {
@@ -669,7 +787,7 @@ export default function PlaygroundPage() {
       setStreamConversationId(null);
       streamContextRef.current = null;
     }
-  }, [activeId, ensureAPIKey, input, isStreaming, messages, pendingImages, reasoningEffort, resolveGroupID, selectedModel, selectedGroupPlatform, selectedModelSupportsReasoning, t]);
+  }, [activeId, ensureAPIKey, imageSize, input, isStreaming, messages, pendingImages, reasoningEffort, resolveGroupID, selectedModel, selectedGroupPlatform, selectedModelIsImage, selectedModelSupportsReasoning, t]);
 
   const addImageFiles = useCallback(async (files: File[]) => {
     if (!files.length) return;
@@ -760,6 +878,44 @@ export default function PlaygroundPage() {
       setSidebarOpen(false);
     }
   }, [isMobile]);
+
+  const handleImageDownload = useCallback((url: string, alt: string) => {
+    void downloadImage(url, alt)
+      .then(() => setInteractionNotice('Image download started'))
+      .catch(() => setInteractionNotice('Image download failed'));
+  }, []);
+
+  const handleMessageCopy = useCallback((content: string) => {
+    void copyText(content)
+      .then(() => setInteractionNotice('Message copied'))
+      .catch(() => setInteractionNotice('Copy failed'));
+  }, []);
+
+  const interactiveMessageOptions = {
+    onImageDownload: handleImageDownload,
+    imageDownloadTitle: 'Download image',
+  };
+
+  const renderCopyButton = (content: string, label = 'Copy message', preventToggle = false) => (
+    <button
+      type="button"
+      style={styles.messageCopyBtn}
+      title={label}
+      aria-label={label}
+      onClick={(event) => {
+        if (preventToggle) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        handleMessageCopy(content);
+      }}
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </svg>
+    </button>
+  );
 
   return (
     <div data-full-bleed style={styles.layout}>
@@ -892,6 +1048,24 @@ export default function PlaygroundPage() {
                 </select>
               </div>
 
+              {selectedModelIsImage && (
+                <>
+                  {!isMobile && <div style={styles.selectorDivider} />}
+                  <div style={{ ...styles.selectorGroup, ...(isMobile ? styles.selectorGroupMobile : null) }}>
+                    <label style={styles.selectorLabel}>Size</label>
+                    <select
+                      style={{ ...styles.select, ...(isMobile ? styles.selectMobile : null) }}
+                      value={imageSize}
+                      onChange={e => setImageSize(e.target.value as ImageSize)}
+                    >
+                      {IMAGE_SIZE_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
               {selectedModelSupportsReasoning && (
                 <>
                   {!isMobile && <div style={styles.selectorDivider} />}
@@ -958,16 +1132,26 @@ export default function PlaygroundPage() {
                 )}
               </div>
               <div style={styles.messageBody}>
-                <div style={styles.messageRole}>
-                  {msg.role === 'user' ? t('playground.you') : t('playground.assistant')}
+                <div style={styles.messageHeader}>
+                  <div style={styles.messageRole}>
+                    {msg.role === 'user' ? t('playground.you') : t('playground.assistant')}
+                  </div>
+                  {renderCopyButton(copyableMessageText(msg.content))}
                 </div>
                 {msg.role === 'assistant' && msg.reasoning && (
                   <details style={styles.reasoningBox} open>
-                    <summary style={styles.reasoningSummary}>Thinking</summary>
-                    <div style={styles.reasoningContent}>{renderMessageContent(msg.reasoning)}</div>
+                    <summary style={styles.reasoningSummary}>
+                      <span>Thinking</span>
+                      {renderCopyButton(msg.reasoning, 'Copy thinking', true)}
+                    </summary>
+                    <div style={styles.reasoningContent}>
+                      {renderMessageContent(msg.reasoning, interactiveMessageOptions)}
+                    </div>
                   </details>
                 )}
-                <div style={styles.messageContent}>{renderMessageContent(msg.content)}</div>
+                <div style={styles.messageContent}>
+                  {renderMessageContent(msg.content, interactiveMessageOptions)}
+                </div>
                 {msg.role === 'assistant' && msg.model && (
                   <div style={styles.messageMeta}>
                     <span style={styles.metaBadge}>{msg.model}</span>
@@ -986,14 +1170,24 @@ export default function PlaygroundPage() {
                 </svg>
               </div>
               <div style={styles.messageBody}>
-                <div style={styles.messageRole}>{t('playground.assistant')}</div>
+                <div style={styles.messageHeader}>
+                  <div style={styles.messageRole}>{t('playground.assistant')}</div>
+                  {renderCopyButton(copyableMessageText(streamContent))}
+                </div>
                 {streamReasoning && (
                   <details style={styles.reasoningBox} open>
-                    <summary style={styles.reasoningSummary}>Thinking</summary>
-                    <div style={styles.reasoningContent}>{renderMessageContent(streamReasoning)}</div>
+                    <summary style={styles.reasoningSummary}>
+                      <span>Thinking</span>
+                      {renderCopyButton(streamReasoning, 'Copy thinking', true)}
+                    </summary>
+                    <div style={styles.reasoningContent}>
+                      {renderMessageContent(streamReasoning, interactiveMessageOptions)}
+                    </div>
                   </details>
                 )}
-                <div style={styles.messageContent}>{renderMessageContent(streamContent)}</div>
+                <div style={styles.messageContent}>
+                  {renderMessageContent(streamContent, interactiveMessageOptions)}
+                </div>
                 <div style={styles.messageMeta}>
                   <span style={styles.streamingDot} />
                   <span>{t('playground.streaming')}</span>
@@ -1011,11 +1205,18 @@ export default function PlaygroundPage() {
                 </svg>
               </div>
               <div style={styles.messageBody}>
-                <div style={styles.messageRole}>{t('playground.assistant')}</div>
+                <div style={styles.messageHeader}>
+                  <div style={styles.messageRole}>{t('playground.assistant')}</div>
+                </div>
                 {streamReasoning ? (
                   <details style={styles.reasoningBox} open>
-                    <summary style={styles.reasoningSummary}>Thinking</summary>
-                    <div style={styles.reasoningContent}>{renderMessageContent(streamReasoning)}</div>
+                    <summary style={styles.reasoningSummary}>
+                      <span>Thinking</span>
+                      {renderCopyButton(streamReasoning, 'Copy thinking', true)}
+                    </summary>
+                    <div style={styles.reasoningContent}>
+                      {renderMessageContent(streamReasoning, interactiveMessageOptions)}
+                    </div>
                   </details>
                 ) : (
                   <div style={{ ...styles.messageContent, opacity: 0.5 }}>
@@ -1034,6 +1235,10 @@ export default function PlaygroundPage() {
               </svg>
               {error}
             </div>
+          )}
+
+          {interactionNotice && (
+            <div style={styles.interactionNotice}>{interactionNotice}</div>
           )}
 
           <div ref={messagesEndRef} />
@@ -1419,6 +1624,7 @@ const styles: Record<string, React.CSSProperties> = {
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
+    position: 'relative',
   },
 
   // ── Empty state ──
@@ -1507,11 +1713,30 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     minWidth: 0,
   },
+  messageHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 24,
+    marginBottom: 4,
+  },
   messageRole: {
     fontSize: 12,
     fontWeight: 600,
-    marginBottom: 4,
     color: cssVar('text'),
+  },
+  messageCopyBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 24,
+    height: 24,
+    border: `1px solid ${cssVar('borderSubtle')}`,
+    borderRadius: '999px',
+    background: 'transparent',
+    color: cssVar('textTertiary'),
+    cursor: 'pointer',
+    transition: cssVar('transition'),
   },
   messageContent: {
     fontSize: 14,
@@ -1608,6 +1833,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   reasoningSummary: {
     cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
     fontSize: 12,
     fontWeight: 600,
     color: cssVar('textSecondary'),
@@ -1627,16 +1855,52 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
     margin: '10px 0 12px',
   },
-  generatedImage: {
-    display: 'block',
+  generatedImageFrame: {
+    display: 'inline-flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 8,
     flex: '1 1 260px',
     maxWidth: 'min(100%, 420px)',
+  },
+  generatedImage: {
+    display: 'block',
     maxHeight: 420,
     width: '100%',
     height: 'auto',
     borderRadius: cssVar('radiusMd'),
     border: `1px solid ${cssVar('borderSubtle')}`,
     objectFit: 'contain',
+  },
+  imageDownloadBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 30,
+    padding: '5px 10px',
+    borderRadius: '999px',
+    border: `1px solid ${cssVar('borderSubtle')}`,
+    background: cssVar('bgSurface'),
+    color: cssVar('textSecondary'),
+    fontFamily: cssVar('fontSans'),
+    fontSize: 12,
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: cssVar('transition'),
+  },
+  interactionNotice: {
+    position: 'sticky',
+    bottom: 12,
+    alignSelf: 'center',
+    zIndex: 4,
+    padding: '7px 12px',
+    borderRadius: '999px',
+    background: 'rgba(10, 14, 24, 0.9)',
+    border: `1px solid ${cssVar('borderSubtle')}`,
+    color: cssVar('textSecondary'),
+    fontSize: 12,
+    boxShadow: '0 10px 28px rgba(0, 0, 0, 0.22)',
   },
   messageMeta: {
     display: 'flex',

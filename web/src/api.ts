@@ -222,6 +222,7 @@ export async function chatCompletionsStream(
     messages: Array<{ role: string; content: ChatMessageContent }>;
     stream: true;
     reasoning_effort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+    size?: string;
     stream_options?: { include_usage?: boolean };
   },
   callbacks: ChatCompletionCallbacks,
