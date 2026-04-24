@@ -974,6 +974,7 @@
     "no_conversations": "No conversations yet",
     "no_conversations_hint": "Create a conversation to get started",
     "delete_conversation": "Delete",
+    "delete_conversation_confirm": "Deleting this conversation permanently removes its history. Continue?",
     "empty_title": "Start a Conversation",
     "empty_description": "Select a model and start chatting with AI",
     "balance": "Balance",

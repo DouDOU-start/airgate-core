@@ -978,6 +978,7 @@
     "no_conversations": "暂无对话",
     "no_conversations_hint": "创建对话开始体验",
     "delete_conversation": "删除",
+    "delete_conversation_confirm": "删除后会话记录将无法恢复，确定要删除吗？",
     "empty_title": "开始对话",
     "empty_description": "选择模型，与 AI 开始聊天",
     "balance": "余额",

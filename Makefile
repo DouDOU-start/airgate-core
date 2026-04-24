@@ -9,12 +9,14 @@ SDK_FRONTEND := ../airgate-sdk/frontend
 # data/plugins/<id>/assets 读。这样三个插件的 dev 体验完全一致，没有特例。
 OPENAI_PLUGIN := ../airgate-openai/web
 CLAUDE_PLUGIN := ../airgate-claude/web
+PLAYGROUND_PLUGIN := ../airgate-playground/web
 EPAY_PLUGIN := ../airgate-epay/web
 HEALTH_PLUGIN := ../airgate-health/web
 # build-plugins 阶段（生产）同步各插件的 admin dist/index.js 到
 # core 的 plugin assets dir；health 的公开状态页仍走 /status 反代，不经过这套 assets。
 OPENAI_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-openai/assets
 CLAUDE_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-anthropic/assets
+PLAYGROUND_ASSETS := $(BACKEND_DIR)/data/plugins/airgate-playground/assets
 EPAY_ASSETS := $(BACKEND_DIR)/data/plugins/payment-epay/assets
 HEALTH_ASSETS := $(BACKEND_DIR)/data/plugins/airgate-health/assets
 BINARY := $(BACKEND_DIR)/server
@@ -25,7 +27,7 @@ GO := GOTOOLCHAIN=local go
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X github.com/DouDOU-start/airgate-core/internal/version.Version=$(VERSION)
 
-.PHONY: help dev dev-backend dev-frontend dev-sdk dev-plugins dev-plugin-openai dev-plugin-claude dev-plugin-epay dev-plugin-health \
+.PHONY: help dev dev-backend dev-frontend dev-sdk dev-plugins dev-plugin-openai dev-plugin-claude dev-plugin-playground dev-plugin-epay dev-plugin-health \
         build build-backend build-frontend \
         build-plugins sync-plugins \
         ent lint fmt test clean install ci pre-commit setup-hooks \
@@ -50,12 +52,14 @@ dev-sdk: ## 启动 SDK 主题 watch 模式（修改 token 自动编译）
 
 dev-plugins: ## 启动所有插件前端 watch 模式
 	@echo "启动插件前端 watch（统一输出到 <plugin>/web/dist，core 在 dev 模式下直读）："
-	@echo "  - openai  → ../airgate-openai/web/dist/"
-	@echo "  - claude  → ../airgate-claude/web/dist/"
-	@echo "  - epay    → ../airgate-epay/web/dist/"
-	@echo "  - health  → ../airgate-health/web/dist/  （含 admin index.js + standalone status page）"
+	@echo "  - openai      → ../airgate-openai/web/dist/"
+	@echo "  - claude      → ../airgate-claude/web/dist/"
+	@echo "  - playground  → ../airgate-playground/web/dist/"
+	@echo "  - epay        → ../airgate-epay/web/dist/"
+	@echo "  - health      → ../airgate-health/web/dist/  （含 admin index.js + standalone status page）"
 	@$(MAKE) dev-plugin-openai &
 	@$(MAKE) dev-plugin-claude &
+	@$(MAKE) dev-plugin-playground &
 	@$(MAKE) dev-plugin-epay &
 	@$(MAKE) dev-plugin-health &
 	@wait
@@ -72,6 +76,13 @@ dev-plugin-claude: ## 单独 watch claude 插件前端（输出到 ../airgate-cl
 		cd $(CLAUDE_PLUGIN) && npx vite build --watch; \
 	else \
 		echo "跳过 claude 插件前端 watch：$(CLAUDE_PLUGIN) 不存在"; \
+	fi
+
+dev-plugin-playground: ## 单独 watch playground 插件前端（输出到 ../airgate-playground/web/dist）
+	@if [ -d $(PLAYGROUND_PLUGIN) ]; then \
+		cd $(PLAYGROUND_PLUGIN) && npx vite build --watch; \
+	else \
+		echo "跳过 playground 插件前端 watch：$(PLAYGROUND_PLUGIN) 不存在"; \
 	fi
 
 dev-plugin-epay: ## 单独 watch epay 插件前端（输出到 ../airgate-epay/web/dist）
@@ -131,7 +142,7 @@ build-plugins: sync-plugins ## 构建插件前端并同步到 core
 sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 	@if [ -d $(OPENAI_PLUGIN) ]; then \
 		echo "构建并同步 openai 插件前端..."; \
-		cd $(OPENAI_PLUGIN) && npm run build; \
+		(cd $(OPENAI_PLUGIN) && npm run build); \
 		mkdir -p $(OPENAI_ASSETS); \
 		cp $(OPENAI_PLUGIN)/dist/index.js $(OPENAI_ASSETS)/index.js; \
 		echo "openai 插件前端已同步到 $(OPENAI_ASSETS)/"; \
@@ -140,16 +151,25 @@ sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 	fi
 	@if [ -d $(CLAUDE_PLUGIN) ]; then \
 		echo "构建并同步 claude 插件前端..."; \
-		cd $(CLAUDE_PLUGIN) && npm run build; \
+		(cd $(CLAUDE_PLUGIN) && npm run build); \
 		mkdir -p $(CLAUDE_ASSETS); \
 		cp $(CLAUDE_PLUGIN)/dist/index.js $(CLAUDE_ASSETS)/index.js; \
 		echo "claude 插件前端已同步到 $(CLAUDE_ASSETS)/"; \
 	else \
 		echo "跳过 claude 插件前端构建：$(CLAUDE_PLUGIN) 不存在"; \
 	fi
+	@if [ -d $(PLAYGROUND_PLUGIN) ]; then \
+		echo "构建并同步 playground 插件前端..."; \
+		(cd $(PLAYGROUND_PLUGIN) && npm run build); \
+		mkdir -p $(PLAYGROUND_ASSETS); \
+		cp $(PLAYGROUND_PLUGIN)/dist/index.js $(PLAYGROUND_ASSETS)/index.js; \
+		echo "playground 插件前端已同步到 $(PLAYGROUND_ASSETS)/"; \
+	else \
+		echo "跳过 playground 插件前端构建：$(PLAYGROUND_PLUGIN) 不存在"; \
+	fi
 	@if [ -d $(EPAY_PLUGIN) ]; then \
 		echo "构建并同步 epay 插件前端..."; \
-		cd $(EPAY_PLUGIN) && npm run build; \
+		(cd $(EPAY_PLUGIN) && npm run build); \
 		mkdir -p $(EPAY_ASSETS); \
 		cp $(EPAY_PLUGIN)/dist/index.js $(EPAY_ASSETS)/index.js; \
 		echo "epay 插件前端已同步到 $(EPAY_ASSETS)/"; \
@@ -158,7 +178,7 @@ sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 	fi
 	@if [ -d $(HEALTH_PLUGIN) ]; then \
 		echo "构建并同步 health 插件前端..."; \
-		cd $(HEALTH_PLUGIN) && npm run build; \
+		(cd $(HEALTH_PLUGIN) && npm run build); \
 		mkdir -p $(HEALTH_ASSETS); \
 		cp $(HEALTH_PLUGIN)/dist/index.js $(HEALTH_ASSETS)/index.js; \
 		echo "health 插件 admin 前端已同步到 $(HEALTH_ASSETS)/"; \

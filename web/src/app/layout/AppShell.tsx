@@ -317,7 +317,7 @@ export function AppShell({ children }: AppShellProps) {
   );
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen" style={{ height: '100dvh' }}>
       {/* Mobile backdrop */}
       {isMobile && mobileOpen && (
         <div
