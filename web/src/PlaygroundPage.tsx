@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { Children, cloneElement, isValidElement, useState, useEffect, useRef, useCallback, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cssVar } from '@airgate/theme';
 import { api, chatCompletionsStream } from './api';
@@ -16,6 +16,7 @@ const MOBILE_BREAKPOINT = 960;
 const DRAFT_CONVERSATION_ID = -1;
 const IMAGE_MARKDOWN_RE = /!\[[^\]]*\]\((data:image\/(?:png|jpeg|jpg|webp|gif);base64,[^)]+|https?:\/\/[^\s)]+)\)/g;
 const IMAGE_MARKDOWN_ITEM_RE = /!\[([^\]]*)\]\((data:image\/(?:png|jpeg|jpg|webp|gif);base64,[^)]+|https?:\/\/[^\s)]+)\)/g;
+const IMAGE_MARKDOWN_TEST_RE = /!\[[^\]]*\]\((data:image\/(?:png|jpeg|jpg|webp|gif);base64,[^)]+|https?:\/\/[^\s)]+)\)/;
 const DATA_IMAGE_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,/i;
 const REASONING_MODEL_RE = /(^|[-_])(?:gpt-?5|o[134]|codex)(?:[-_.]|$)/i;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -27,9 +28,23 @@ const IMAGE_SIZE_OPTIONS: Array<{ value: ImageSize; label: string }> = [
 type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 type ImageSize = '1024x1024' | '1024x1536' | '1536x1024';
 type PendingImage = { id: string; name: string; url: string };
+type PreviewImage = { url: string; alt: string };
+type StreamAssistantOptions = {
+  conversationID: number;
+  requestMessages: Message[];
+  model: string;
+  groupID: number;
+  platform: string;
+  isImageRequest?: boolean;
+  supportsReasoning?: boolean;
+  apiKey?: string;
+  titleContent?: string;
+};
 type MessageContentOptions = {
-  onImageDownload?: (url: string, alt: string) => void;
-  imageDownloadTitle?: string;
+  onImagePreview?: (url: string, alt: string) => void;
+  imagePreviewTitle?: string;
+  generatedImageAlt?: string;
+  trailingInlineAction?: ReactNode;
 };
 
 function stripImageMarkdown(content: string) {
@@ -38,6 +53,22 @@ function stripImageMarkdown(content: string) {
 
 function copyableMessageText(content: string) {
   return content.replace(IMAGE_MARKDOWN_RE, '[Image]').trim() || '[Image]';
+}
+
+function messageHasGeneratedImage(content: string) {
+  return IMAGE_MARKDOWN_TEST_RE.test(content);
+}
+
+function firstGeneratedImage(content: string): PreviewImage | null {
+  IMAGE_MARKDOWN_ITEM_RE.lastIndex = 0;
+  const match = IMAGE_MARKDOWN_ITEM_RE.exec(content);
+  IMAGE_MARKDOWN_ITEM_RE.lastIndex = 0;
+  if (!match) return null;
+  return { alt: match[1], url: match[2] };
+}
+
+function hasCopyableMessageText(content: string) {
+  return content.replace(IMAGE_MARKDOWN_RE, '').trim().length > 0;
 }
 
 function escapeMarkdownAlt(text: string) {
@@ -200,30 +231,22 @@ function pushTextWithBreaks(nodes: ReactNode[], text: string, keyPrefix: string)
 
 function renderGeneratedImage(key: string, url: string, alt: string, options: MessageContentOptions) {
   const image = <img src={url} alt={alt} style={styles.generatedImage} loading="lazy" />;
-  if (!options.onImageDownload) {
-    return <span key={key} style={styles.generatedImageFrame}>{image}</span>;
-  }
+  const previewTitle = options.imagePreviewTitle || 'Preview image';
+  const previewableImage = options.onImagePreview ? (
+    <button
+      type="button"
+      style={styles.generatedImagePreviewBtn}
+      title={previewTitle}
+      aria-label={previewTitle}
+      onClick={() => options.onImagePreview?.(url, alt)}
+    >
+      {image}
+    </button>
+  ) : image;
 
   return (
     <span key={key} style={styles.generatedImageFrame}>
-      {image}
-      <button
-        type="button"
-        style={styles.imageDownloadBtn}
-        title={options.imageDownloadTitle || 'Download image'}
-        aria-label={options.imageDownloadTitle || 'Download image'}
-        onClick={(event) => {
-          event.stopPropagation();
-          options.onImageDownload?.(url, alt);
-        }}
-      >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <path d="M7 10l5 5 5-5" />
-          <path d="M12 15V3" />
-        </svg>
-        <span>Download</span>
-      </button>
+      {previewableImage}
     </span>
   );
 }
@@ -249,7 +272,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string, options: MessageC
     const italicText = match[9] || match[10];
 
     if (imageUrl && isSafeImageUrl(imageUrl)) {
-      nodes.push(renderGeneratedImage(key, imageUrl, imageAlt || 'Generated image', options));
+      nodes.push(renderGeneratedImage(key, imageUrl, imageAlt || options.generatedImageAlt || 'Generated image', options));
     } else if (linkUrl && isSafeLinkUrl(linkUrl)) {
       nodes.push(
         <a key={key} href={linkUrl} style={styles.markdownLink} target="_blank" rel="noreferrer">
@@ -298,9 +321,48 @@ function renderImageGroup(text: string, key: string, options: MessageContentOpti
 
   return (
     <div key={key} style={styles.imageGroup}>
-      {images.map((image, index) => renderGeneratedImage(`${key}-${index}`, image.url, image.alt || 'Generated image', options))}
+      {images.map((image, index) => renderGeneratedImage(`${key}-${index}`, image.url, image.alt || options.generatedImageAlt || 'Generated image', options))}
     </div>
   );
+}
+
+const INLINE_ACTION_TARGETS = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'li']);
+
+function appendTrailingInlineActionToNode(node: ReactNode, action: ReactNode): ReactNode | null {
+  if (!isValidElement<{ children?: ReactNode }>(node) || typeof node.type !== 'string') return null;
+
+  if (INLINE_ACTION_TARGETS.has(node.type)) {
+    return cloneElement(node, undefined, ...Children.toArray(node.props.children), action);
+  }
+
+  if (node.type === 'ol' || node.type === 'ul') {
+    const children: ReactNode[] = Children.toArray(node.props.children);
+    for (let index = children.length - 1; index >= 0; index--) {
+      const childWithAction = appendTrailingInlineActionToNode(children[index], action);
+      if (childWithAction) {
+        const nextChildren: ReactNode[] = [...children];
+        nextChildren[index] = childWithAction;
+        return cloneElement(node, undefined, ...nextChildren);
+      }
+    }
+  }
+
+  return null;
+}
+
+function appendTrailingInlineAction(nodes: ReactNode[], action?: ReactNode) {
+  if (!action) return nodes;
+
+  for (let index = nodes.length - 1; index >= 0; index--) {
+    const nodeWithAction = appendTrailingInlineActionToNode(nodes[index], action);
+    if (nodeWithAction) {
+      const nextNodes = [...nodes];
+      nextNodes[index] = nodeWithAction;
+      return nextNodes;
+    }
+  }
+
+  return nodes;
 }
 
 function renderMessageContent(content: string, options: MessageContentOptions = {}) {
@@ -410,7 +472,8 @@ function renderMessageContent(content: string, options: MessageContentOptions = 
   if (inCodeBlock) flushCodeBlock();
   flushBlocks();
 
-  return nodes.length > 0 ? nodes : content;
+  const renderedNodes = appendTrailingInlineAction(nodes, options.trailingInlineAction);
+  return renderedNodes.length > 0 ? renderedNodes : content;
 }
 
 export default function PlaygroundPage() {
@@ -425,6 +488,7 @@ export default function PlaygroundPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [input, setInput] = useState('');
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
 
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
@@ -437,6 +501,7 @@ export default function PlaygroundPage() {
   const [resolvedAPIKey, setResolvedAPIKey] = useState('');
   const [error, setError] = useState('');
   const [interactionNotice, setInteractionNotice] = useState('');
+  const [hoveredCopyTarget, setHoveredCopyTarget] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(() => (
     typeof window !== 'undefined' ? window.innerWidth <= MOBILE_BREAKPOINT : false
@@ -638,6 +703,114 @@ export default function PlaygroundPage() {
     } catch { /* ignore */ }
   }, [activeId, t]);
 
+  const streamAssistantResponse = useCallback(async ({
+    conversationID,
+    requestMessages,
+    model,
+    groupID,
+    platform,
+    isImageRequest,
+    supportsReasoning: requestSupportsReasoning,
+    apiKey: providedAPIKey,
+    titleContent,
+  }: StreamAssistantOptions) => {
+    setError('');
+    setIsStreaming(true);
+    setStreamConversationId(conversationID);
+    streamContextRef.current = { conversationId: conversationID, model };
+    setStreamContent('');
+    setStreamReasoning('');
+
+    try {
+      const apiKey = providedAPIKey || await ensureAPIKey();
+      const abort = new AbortController();
+      abortRef.current = abort;
+
+      let accumulated = '';
+      let accumulatedReasoning = '';
+      await chatCompletionsStream(
+        apiKey,
+        {
+          model,
+          messages: requestMessages.map(msg => ({ role: msg.role, content: toChatMessageContent(msg.role, msg.content) })),
+          stream: true,
+          ...(isImageRequest ? { size: imageSize } : {}),
+          ...(requestSupportsReasoning ? { reasoning_effort: reasoningEffort } : {}),
+        },
+        {
+          onData: (text) => {
+            accumulated += text;
+            setStreamContent(accumulated);
+          },
+          onReasoning: (text) => {
+            accumulatedReasoning += text;
+            setStreamReasoning(accumulatedReasoning);
+          },
+          onDone: async (usage) => {
+            if (!accumulated) {
+              if (activeIdRef.current === conversationID) {
+                setError(t('playground.no_response'));
+              }
+              setStreamContent('');
+              setStreamReasoning('');
+              setStreamConversationId(null);
+              streamContextRef.current = null;
+              setIsStreaming(false);
+              return;
+            }
+            const persisted = await api.persistMessage({
+              conversation_id: conversationID,
+              role: 'assistant',
+              content: accumulated,
+              reasoning: accumulatedReasoning,
+              platform,
+              model: usage.model || model,
+              group_id: groupID,
+              input_tokens: usage.input_tokens,
+              output_tokens: usage.output_tokens,
+              cost: usage.cost,
+            });
+            if (activeIdRef.current === conversationID) {
+              setMessages(prev => [...prev, persisted]);
+            }
+            if (titleContent) {
+              setConversations(prev => prev.map(c =>
+                c.id === conversationID && !c.title
+                  ? { ...c, title: titleFromMessageContent(titleContent), updated_at: new Date().toISOString() }
+                  : c
+              ));
+            }
+            setStreamContent('');
+            setStreamReasoning('');
+            setStreamConversationId(null);
+            streamContextRef.current = null;
+            setIsStreaming(false);
+          },
+          onError: (err) => {
+            if (activeIdRef.current === conversationID) {
+              setError(err);
+            }
+            setIsStreaming(false);
+            setStreamContent('');
+            setStreamReasoning('');
+            setStreamConversationId(null);
+            streamContextRef.current = null;
+          },
+        },
+        abort.signal,
+      );
+    } catch (e) {
+      if (activeIdRef.current === conversationID) {
+        setError(e instanceof Error ? e.message : 'stream failed');
+      }
+      setIsStreaming(false);
+      setStreamContent('');
+      setStreamReasoning('');
+      setStreamConversationId(null);
+      streamContextRef.current = null;
+    }
+  }, [ensureAPIKey, imageSize, reasoningEffort, t]);
+
   const sendMessage = useCallback(async () => {
     if ((!input.trim() && pendingImages.length === 0) || isStreaming || !activeId) return;
 
@@ -684,8 +857,6 @@ export default function PlaygroundPage() {
           model: selectedModel,
         });
         conversationID = conv.id;
-        streamContextRef.current = { conversationId: conv.id, model: selectedModel };
-        setStreamConversationId(conv.id);
         if (activeIdRef.current === DRAFT_CONVERSATION_ID) {
           activeIdRef.current = conv.id;
           skipNextMessagesLoadRef.current = conv.id;
@@ -703,80 +874,17 @@ export default function PlaygroundPage() {
         group_id: groupID,
       });
 
-      const abort = new AbortController();
-      abortRef.current = abort;
-
-      let accumulated = '';
-      let accumulatedReasoning = '';
-      await chatCompletionsStream(
+      await streamAssistantResponse({
+        conversationID,
+        requestMessages: requestMessages.map(msg => ({ ...msg, conversation_id: conversationID })),
+        model: selectedModel,
+        groupID,
+        platform: selectedGroupPlatform,
+        isImageRequest: selectedModelIsImage,
+        supportsReasoning: selectedModelSupportsReasoning,
         apiKey,
-        {
-          model: selectedModel,
-          messages: requestMessages.map(msg => ({ role: msg.role, content: toChatMessageContent(msg.role, msg.content) })),
-          stream: true,
-          ...(selectedModelIsImage ? { size: imageSize } : {}),
-          ...(selectedModelSupportsReasoning ? { reasoning_effort: reasoningEffort } : {}),
-        },
-        {
-          onData: (text) => {
-            accumulated += text;
-            setStreamContent(accumulated);
-          },
-          onReasoning: (text) => {
-            accumulatedReasoning += text;
-            setStreamReasoning(accumulatedReasoning);
-          },
-          onDone: async (usage) => {
-            if (!accumulated) {
-              if (activeIdRef.current === conversationID) {
-                setError(t('playground.no_response'));
-              }
-              setStreamContent('');
-              setStreamReasoning('');
-              setStreamConversationId(null);
-              streamContextRef.current = null;
-              setIsStreaming(false);
-              return;
-            }
-            const persisted = await api.persistMessage({
-              conversation_id: conversationID,
-              role: 'assistant',
-              content: accumulated,
-              reasoning: accumulatedReasoning,
-              platform: selectedGroupPlatform,
-              model: usage.model || selectedModel,
-              group_id: groupID,
-              input_tokens: usage.input_tokens,
-              output_tokens: usage.output_tokens,
-              cost: usage.cost,
-            });
-            if (activeIdRef.current === conversationID) {
-              setMessages(prev => [...prev, persisted]);
-            }
-            setConversations(prev => prev.map(c =>
-              c.id === conversationID && !c.title
-                ? { ...c, title: titleFromMessageContent(content), updated_at: new Date().toISOString() }
-                : c
-            ));
-            setStreamContent('');
-            setStreamReasoning('');
-            setStreamConversationId(null);
-            streamContextRef.current = null;
-            setIsStreaming(false);
-          },
-          onError: (err) => {
-            if (activeIdRef.current === conversationID) {
-              setError(err);
-            }
-            setIsStreaming(false);
-            setStreamContent('');
-            setStreamReasoning('');
-            setStreamConversationId(null);
-            streamContextRef.current = null;
-          },
-        },
-        abort.signal,
-      );
+        titleContent: content,
+      });
     } catch (e) {
       if (activeIdRef.current === conversationID) {
         setError(e instanceof Error ? e.message : 'stream failed');
@@ -787,7 +895,7 @@ export default function PlaygroundPage() {
       setStreamConversationId(null);
       streamContextRef.current = null;
     }
-  }, [activeId, ensureAPIKey, imageSize, input, isStreaming, messages, pendingImages, reasoningEffort, resolveGroupID, selectedModel, selectedGroupPlatform, selectedModelIsImage, selectedModelSupportsReasoning, t]);
+  }, [activeId, input, isStreaming, messages, pendingImages, resolveGroupID, selectedGroupPlatform, selectedModel, selectedModelIsImage, selectedModelSupportsReasoning, streamAssistantResponse]);
 
   const addImageFiles = useCallback(async (files: File[]) => {
     if (!files.length) return;
@@ -879,11 +987,40 @@ export default function PlaygroundPage() {
     }
   }, [isMobile]);
 
+  const handleImagePreview = useCallback((url: string, alt: string) => {
+    setPreviewImage({ url, alt });
+  }, []);
+
   const handleImageDownload = useCallback((url: string, alt: string) => {
     void downloadImage(url, alt)
-      .then(() => setInteractionNotice('Image download started'))
-      .catch(() => setInteractionNotice('Image download failed'));
-  }, []);
+      .then(() => setInteractionNotice(t('playground.download_started')))
+      .catch(() => setInteractionNotice(t('playground.download_failed')));
+  }, [t]);
+
+  const regenerateImage = useCallback((messageIndex: number) => {
+    if (isStreaming || !activeId || activeId === DRAFT_CONVERSATION_ID) return;
+
+    const sourceIndex = messages.slice(0, messageIndex).map(msg => msg.role).lastIndexOf('user');
+    if (sourceIndex < 0) {
+      setError(t('playground.no_image_prompt'));
+      return;
+    }
+
+    const sourceMessages = messages.slice(0, sourceIndex + 1);
+    const sourceMessage = messages[sourceIndex];
+    const assistantMessage = messages[messageIndex];
+    const requestModel = assistantMessage.model || selectedModel;
+    const requestModelInfo = models.find(item => item.id === requestModel);
+    void streamAssistantResponse({
+      conversationID: activeId,
+      requestMessages: sourceMessages,
+      model: requestModel,
+      groupID: assistantMessage.group_id || sourceMessage.group_id || resolveGroupID(),
+      platform: assistantMessage.platform || sourceMessage.platform || selectedGroupPlatform,
+      isImageRequest: true,
+      supportsReasoning: supportsReasoning(requestModelInfo),
+    });
+  }, [activeId, isStreaming, messages, models, resolveGroupID, selectedGroupPlatform, selectedModel, streamAssistantResponse, t]);
 
   const handleMessageCopy = useCallback((content: string) => {
     void copyText(content)
@@ -892,14 +1029,15 @@ export default function PlaygroundPage() {
   }, []);
 
   const interactiveMessageOptions = {
-    onImageDownload: handleImageDownload,
-    imageDownloadTitle: 'Download image',
+    onImagePreview: handleImagePreview,
+    imagePreviewTitle: t('playground.preview_image'),
+    generatedImageAlt: t('playground.generated_image'),
   };
 
-  const renderCopyButton = (content: string, label = 'Copy message', preventToggle = false) => (
+  const renderCopyButton = (content: string, label = 'Copy message', preventToggle = false, buttonStyle: CSSProperties = {}) => (
     <button
       type="button"
-      style={styles.messageCopyBtn}
+      style={{ ...styles.messageCopyBtn, ...buttonStyle }}
       title={label}
       aria-label={label}
       onClick={(event) => {
@@ -917,6 +1055,39 @@ export default function PlaygroundPage() {
     </button>
   );
 
+  const renderCopyableMessageContent = (targetID: string, content: string) => {
+    const copyVisible = isMobile || hoveredCopyTarget === targetID;
+    const copyableText = copyableMessageText(content);
+    const showCopyButton = hasCopyableMessageText(content);
+    const trailingInlineAction = showCopyButton ? (
+      <span style={{
+        ...styles.messageCopyAfterText,
+        ...(copyVisible ? styles.messageCopyAfterTextVisible : null),
+      }}>
+        {renderCopyButton(copyableText, 'Copy message', false, styles.messageCopyAfterTextBtn)}
+      </span>
+    ) : undefined;
+
+    return (
+      <div
+        style={styles.messageContent}
+        onMouseEnter={() => setHoveredCopyTarget(targetID)}
+        onMouseLeave={() => setHoveredCopyTarget(current => (current === targetID ? null : current))}
+        onFocus={() => setHoveredCopyTarget(targetID)}
+        onBlur={event => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setHoveredCopyTarget(current => (current === targetID ? null : current));
+          }
+        }}
+      >
+        {renderMessageContent(content, {
+          ...interactiveMessageOptions,
+          trailingInlineAction,
+        })}
+      </div>
+    );
+  };
+
   return (
     <div data-full-bleed style={styles.layout}>
       {sidebarOpen && isMobile && (
@@ -924,6 +1095,28 @@ export default function PlaygroundPage() {
           style={styles.sidebarBackdrop}
           onClick={() => setSidebarOpen(false)}
         />
+      )}
+
+      {previewImage && (
+        <div
+          style={styles.imagePreviewOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label={previewImage.alt || t('playground.image_preview')}
+          onClick={() => setPreviewImage(null)}
+        >
+          <div style={styles.imagePreviewModal} onClick={(event) => event.stopPropagation()}>
+            <img src={previewImage.url} alt={previewImage.alt} style={styles.imagePreviewLarge} />
+            <button
+              type="button"
+              style={styles.imagePreviewCloseBtn}
+              onClick={() => setPreviewImage(null)}
+              aria-label={t('playground.close_image_preview')}
+            >
+              ×
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ── Sidebar ── */}
@@ -1116,7 +1309,7 @@ export default function PlaygroundPage() {
             </div>
           )}
 
-          {activeId && messages.map(msg => (
+          {activeId && messages.map((msg, messageIndex) => (
             <div key={msg.id} style={{ ...styles.messageRow, ...(isMobile ? styles.messageRowMobile : null) }}>
               <div style={msg.role === 'user' ? styles.avatarUser : styles.avatarAssistant}>
                 {msg.role === 'user' ? (
@@ -1136,7 +1329,6 @@ export default function PlaygroundPage() {
                   <div style={styles.messageRole}>
                     {msg.role === 'user' ? t('playground.you') : t('playground.assistant')}
                   </div>
-                  {renderCopyButton(copyableMessageText(msg.content))}
                 </div>
                 {msg.role === 'assistant' && msg.reasoning && (
                   <details style={styles.reasoningBox} open>
@@ -1149,14 +1341,47 @@ export default function PlaygroundPage() {
                     </div>
                   </details>
                 )}
-                <div style={styles.messageContent}>
-                  {renderMessageContent(msg.content, interactiveMessageOptions)}
-                </div>
-                {msg.role === 'assistant' && msg.model && (
-                  <div style={styles.messageMeta}>
-                    <span style={styles.metaBadge}>{msg.model}</span>
-                  </div>
-                )}
+                {renderCopyableMessageContent(`message-${msg.id}`, msg.content)}
+                {msg.role === 'assistant' && (messageHasGeneratedImage(msg.content) || msg.model) && (() => {
+                  const generatedImage = firstGeneratedImage(msg.content);
+                  return (
+                    <div style={messageHasGeneratedImage(msg.content) ? styles.imageMessageActions : styles.messageMeta}>
+                      {generatedImage && (
+                        <button
+                          type="button"
+                          style={styles.imageDownloadBtn}
+                          title={t('playground.download_image')}
+                          aria-label={t('playground.download_image')}
+                          onClick={() => handleImageDownload(generatedImage.url, generatedImage.alt || t('playground.generated_image'))}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <path d="M7 10l5 5 5-5" />
+                            <path d="M12 15V3" />
+                          </svg>
+                        </button>
+                      )}
+                      {generatedImage && (
+                        <button
+                          type="button"
+                          style={{ ...styles.regenerateImageBtn, opacity: isStreaming ? 0.5 : 1 }}
+                          onClick={() => regenerateImage(messageIndex)}
+                          disabled={isStreaming}
+                          title={t('playground.retry_image')}
+                          aria-label={t('playground.retry_image')}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 12a9 9 0 0 1-15.6 6" />
+                            <path d="M3 12a9 9 0 0 1 15.6-6" />
+                            <path d="M19 2v4h-4" />
+                            <path d="M5 22v-4h4" />
+                          </svg>
+                        </button>
+                      )}
+                      {msg.model && <span style={styles.metaBadge}>{msg.model}</span>}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ))}
@@ -1172,7 +1397,6 @@ export default function PlaygroundPage() {
               <div style={styles.messageBody}>
                 <div style={styles.messageHeader}>
                   <div style={styles.messageRole}>{t('playground.assistant')}</div>
-                  {renderCopyButton(copyableMessageText(streamContent))}
                 </div>
                 {streamReasoning && (
                   <details style={styles.reasoningBox} open>
@@ -1185,9 +1409,7 @@ export default function PlaygroundPage() {
                     </div>
                   </details>
                 )}
-                <div style={styles.messageContent}>
-                  {renderMessageContent(streamContent, interactiveMessageOptions)}
-                </div>
+                {renderCopyableMessageContent(`stream-${streamConversationId || 'active'}`, streamContent)}
                 <div style={styles.messageMeta}>
                   <span style={styles.streamingDot} />
                   <span>{t('playground.streaming')}</span>
@@ -1738,6 +1960,23 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     transition: cssVar('transition'),
   },
+  messageCopyAfterText: {
+    display: 'inline-flex',
+    verticalAlign: 'text-bottom',
+    marginLeft: 6,
+    opacity: 0,
+    pointerEvents: 'none',
+    transform: 'translateY(1px)',
+    transition: cssVar('transition'),
+  },
+  messageCopyAfterTextVisible: {
+    opacity: 1,
+    pointerEvents: 'auto',
+  },
+  messageCopyAfterTextBtn: {
+    width: 22,
+    height: 22,
+  },
   messageContent: {
     fontSize: 14,
     lineHeight: 1.72,
@@ -1853,7 +2092,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
     alignItems: 'flex-start',
     gap: 16,
-    margin: '10px 0 12px',
+    margin: '10px 0 6px',
   },
   generatedImageFrame: {
     display: 'inline-flex',
@@ -1862,6 +2101,16 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
     flex: '1 1 260px',
     maxWidth: 'min(100%, 420px)',
+  },
+  generatedImagePreviewBtn: {
+    display: 'block',
+    width: '100%',
+    padding: 0,
+    border: 'none',
+    background: 'transparent',
+    cursor: 'zoom-in',
+    textAlign: 'left',
+    font: 'inherit',
   },
   generatedImage: {
     display: 'block',
@@ -1876,18 +2125,86 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    minHeight: 30,
-    padding: '5px 10px',
+    width: 32,
+    height: 32,
+    padding: 0,
     borderRadius: '999px',
     border: `1px solid ${cssVar('borderSubtle')}`,
     background: cssVar('bgSurface'),
     color: cssVar('textSecondary'),
-    fontFamily: cssVar('fontSans'),
-    fontSize: 12,
-    fontWeight: 500,
     cursor: 'pointer',
     transition: cssVar('transition'),
+  },
+  imageMessageActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 0,
+  },
+  regenerateImageBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+    padding: 0,
+    borderRadius: '999px',
+    border: `1px solid ${cssVar('borderSubtle')}`,
+    background: cssVar('bgSurface'),
+    color: cssVar('textSecondary'),
+    cursor: 'pointer',
+    transition: cssVar('transition'),
+  },
+  imagePreviewOverlay: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 10,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    background: 'rgba(4, 7, 13, 0.78)',
+    backdropFilter: 'blur(10px)',
+  },
+  imagePreviewModal: {
+    position: 'relative',
+    display: 'flex',
+    maxWidth: 'min(94vw, 1120px)',
+    maxHeight: '90vh',
+    width: 'fit-content',
+    borderRadius: cssVar('radiusLg'),
+    border: `1px solid ${cssVar('border')}`,
+    background: cssVar('bgDeep'),
+    boxShadow: '0 28px 90px rgba(0, 0, 0, 0.45)',
+    overflow: 'hidden',
+  },
+  imagePreviewCloseBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+    border: `1px solid rgba(255, 255, 255, 0.16)`,
+    borderRadius: '999px',
+    background: 'rgba(8, 12, 20, 0.72)',
+    color: '#edf4ff',
+    fontSize: 22,
+    lineHeight: 1,
+    cursor: 'pointer',
+    backdropFilter: 'blur(10px)',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.24)',
+  },
+  imagePreviewLarge: {
+    display: 'block',
+    maxWidth: 'min(94vw, 1120px)',
+    maxHeight: '90vh',
+    width: 'auto',
+    height: 'auto',
+    objectFit: 'contain',
+    background: cssVar('bgDeep'),
   },
   interactionNotice: {
     position: 'sticky',
