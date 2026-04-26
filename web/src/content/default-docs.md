@@ -77,6 +77,7 @@ resp = client.images.generate(
     size="1024x1024",               # 1024x1024 | 1024x1536 | 1536x1024 | auto
     quality="medium",               # low | medium | high | auto
     n=1,
+    extra_body={"stream": True},    # AirGate 长任务分块/保活，返回值仍是 ImagesResponse
 )
 
 img = resp.data[0]
@@ -96,6 +97,7 @@ with open("in.png", "rb") as f:
         prompt="把这张图变成梵高星空风格的油画",
         size="1024x1024",
         n=1,
+        extra_body={"stream": True},  # AirGate 长任务分块/保活，返回值仍是 ImagesResponse
     )
 
 img = resp.data[0]
