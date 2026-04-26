@@ -436,6 +436,9 @@ func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (
 	if req.UserId <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "user_id 必须 > 0")
 	}
+	if err := h.checkHostForwardBalance(ctx, req.UserId); err != nil {
+		return nil, err
+	}
 
 	routes, err := h.hostForwardRoutes(ctx, req)
 	if err != nil {
@@ -537,6 +540,9 @@ func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (
 func (h *HostService) forwardStream(ctx context.Context, req *pb.HostForwardRequest, stream pb.HostService_ForwardStreamServer) error {
 	if req.UserId <= 0 {
 		return status.Error(codes.InvalidArgument, "user_id 必须 > 0")
+	}
+	if err := h.checkHostForwardBalance(ctx, req.UserId); err != nil {
+		return err
 	}
 
 	routes, err := h.hostForwardRoutes(ctx, req)
@@ -1012,8 +1018,27 @@ func (h *HostService) applyHostOutcome(ctx context.Context, accountID int, accFu
 	})
 }
 
+func (h *HostService) checkHostForwardBalance(ctx context.Context, userID int64) error {
+	u, err := h.db.User.Query().Where(user.IDEQ(int(userID))).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return status.Error(codes.NotFound, "用户不存在")
+		}
+		slog.Error("HostService 余额预检查询用户失败", "user_id", userID, "error", err)
+		return hostForwardGenericError()
+	}
+	if u.Balance <= 0 {
+		return hostForwardInsufficientQuotaError()
+	}
+	return nil
+}
+
 func hostForwardGenericError() error {
 	return status.Error(codes.Unavailable, "请求暂时无法完成，请稍后重试")
+}
+
+func hostForwardInsufficientQuotaError() error {
+	return status.Error(codes.ResourceExhausted, "余额不足")
 }
 
 func protoHeadersToHTTPHost(ph map[string]*pb.HeaderValues) http.Header {
