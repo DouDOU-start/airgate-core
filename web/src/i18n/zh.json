@@ -989,6 +989,11 @@
     "no_response": "AI 服务未返回结果",
     "send": "发送",
     "stop": "停止",
+    "edit": "编辑",
+    "image": "图片",
+    "attach_images": "添加图片",
+    "select_model_first": "请先选择模型",
+    "select_image_model_first": "请先选择图片模型",
     "input_placeholder": "输入消息...",
     "input_hint": "Enter 发送，Shift+Enter 换行",
     "platform": "平台",
@@ -1008,6 +1013,18 @@
     "retry": "重试",
     "regenerate": "重新生成",
     "retry_image": "重试图片生成",
-    "no_image_prompt": "未找到这张图片对应的提示词"
+    "no_image_prompt": "未找到这张图片对应的提示词",
+    "edit_image_region": "编辑图片区域",
+    "edit_image_region_hint": "在图片上拖拽框选要替换的区域。",
+    "choose_source_image_region_hint": "选择一张源图片并框选区域。",
+    "replace_source": "替换源图",
+    "choose_source": "选择源图",
+    "region_selected": "已选择区域",
+    "drag_to_select": "拖拽选择",
+    "clear_selection": "清除选择",
+    "choose_source_image_for_regional_editing": "选择源图片以进行区域编辑",
+    "choose_source_image_first": "请先选择源图片",
+    "select_edit_area_first": "请先选择要编辑的区域",
+    "describe_image_change_first": "请先描述图片修改内容"
   }
 }

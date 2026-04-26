@@ -985,6 +985,11 @@
     "no_response": "No response from AI service",
     "send": "Send",
     "stop": "Stop",
+    "edit": "Edit",
+    "image": "Image",
+    "attach_images": "Attach images",
+    "select_model_first": "Select a model first",
+    "select_image_model_first": "Select an image model first",
     "input_placeholder": "Type a message...",
     "input_hint": "Enter to send, Shift+Enter for newline",
     "platform": "Platform",
@@ -1004,6 +1009,18 @@
     "retry": "Retry",
     "regenerate": "Regenerate",
     "retry_image": "Retry image",
-    "no_image_prompt": "No prompt found for this image"
+    "no_image_prompt": "No prompt found for this image",
+    "edit_image_region": "Edit image region",
+    "edit_image_region_hint": "Drag on the image to box-select the area to replace.",
+    "choose_source_image_region_hint": "Choose a source image and select a region.",
+    "replace_source": "Replace source",
+    "choose_source": "Choose source",
+    "region_selected": "Region selected",
+    "drag_to_select": "Drag to select",
+    "clear_selection": "Clear selection",
+    "choose_source_image_for_regional_editing": "Choose a source image for regional editing",
+    "choose_source_image_first": "Choose a source image first",
+    "select_edit_area_first": "Select the area to edit first",
+    "describe_image_change_first": "Describe the image change first"
   }
 }

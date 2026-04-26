@@ -3,6 +3,7 @@ package plugin
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -78,14 +79,9 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	}
 	defer releaseClientQuota()
 
-	routes, err := routing.ListEligibleGroups(c.Request.Context(), f.db, state.keyInfo.UserID, state.requestedPlatform, state.keyInfo.UserGroupRates, routing.Requirements{
+	routes := routesForAPIKey(state, routing.Requirements{
 		NeedsImage: requestNeedsImage(state.requestPath, state.model),
 	})
-	if err != nil {
-		slog.Error("查询候选分组失败", "platform", state.requestedPlatform, "model", state.model, "error", err)
-		openAIError(c, http.StatusServiceUnavailable, "server_error", "routing_unavailable", "请求暂时无法完成，请稍后重试")
-		return
-	}
 	if len(routes) == 0 {
 		slog.Warn("没有可用候选分组", "platform", state.requestedPlatform, "model", state.model, "user_id", state.keyInfo.UserID)
 		openAIError(c, http.StatusServiceUnavailable, "server_error", "no_available_route", "请求暂时无法完成，请稍后重试")
@@ -196,6 +192,69 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		"model", state.model,
 		"tried_accounts", hardExclude)
 	openAIError(c, 503, "server_error", "all_routes_failed", "请求暂时无法完成，请稍后重试")
+}
+
+func routesForAPIKey(state *forwardState, requirements routing.Requirements) []routing.Candidate {
+	if state == nil || state.keyInfo == nil {
+		return nil
+	}
+	if !apiKeyGroupMatchesRequirements(state.keyInfo, requirements) {
+		return nil
+	}
+	return []routing.Candidate{keyInfoRoute(state.keyInfo)}
+}
+
+func apiKeyGroupMatchesRequirements(keyInfo *auth.APIKeyInfo, requirements routing.Requirements) bool {
+	if keyInfo == nil {
+		return false
+	}
+	if requirements.NeedsImage && strings.EqualFold(keyInfo.GroupPlatform, "openai") {
+		return pluginSettingEnabledForKey(keyInfo.GroupPluginSettings, "openai", "image_enabled")
+	}
+	return true
+}
+
+func pluginSettingEnabledForKey(settings map[string]map[string]string, plugin, key string) bool {
+	for pluginName, kv := range settings {
+		if !strings.EqualFold(pluginName, plugin) {
+			continue
+		}
+		for k, v := range kv {
+			if strings.EqualFold(k, key) {
+				return strings.EqualFold(strings.TrimSpace(v), "true")
+			}
+		}
+	}
+	return false
+}
+
+func keyInfoRoute(keyInfo *auth.APIKeyInfo) routing.Candidate {
+	return routing.Candidate{
+		GroupID:                keyInfo.GroupID,
+		Platform:               keyInfo.GroupPlatform,
+		EffectiveRate:          billing.ResolveBillingRateForGroup(keyInfo.UserGroupRates, keyInfo.GroupID, keyInfo.GroupRateMultiplier),
+		GroupRateMultiplier:    keyInfo.GroupRateMultiplier,
+		GroupServiceTier:       keyInfo.GroupServiceTier,
+		GroupForceInstructions: keyInfo.GroupForceInstructions,
+		GroupPluginSettings:    clonePluginSettingsForKey(keyInfo.GroupPluginSettings),
+	}
+}
+
+func clonePluginSettingsForKey(in map[string]map[string]string) map[string]map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]map[string]string, len(in))
+	for plugin, settings := range in {
+		if len(settings) == 0 {
+			continue
+		}
+		out[plugin] = make(map[string]string, len(settings))
+		for k, v := range settings {
+			out[plugin][k] = v
+		}
+	}
+	return out
 }
 
 func keyInfoForRoute(base *auth.APIKeyInfo, route routing.Candidate) *auth.APIKeyInfo {
