@@ -5,6 +5,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
+	"github.com/DouDOU-start/airgate-core/internal/routing"
 	sdk "github.com/DouDOU-start/airgate-sdk"
 )
 
@@ -19,6 +20,9 @@ type forwardState struct {
 	model     string
 	stream    bool
 	sessionID string
+
+	requestedPlatform string
+	selectedRoute     routing.Candidate
 
 	keyInfo *auth.APIKeyInfo
 	plugin  *PluginInstance

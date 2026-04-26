@@ -1006,6 +1006,7 @@
     "download_failed": "图片下载失败",
     "close_image_preview": "关闭图片预览",
     "retry": "重试",
+    "regenerate": "重新生成",
     "retry_image": "重试图片生成",
     "no_image_prompt": "未找到这张图片对应的提示词"
   }

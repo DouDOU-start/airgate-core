@@ -213,9 +213,11 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 			SetUserAgent(rec.UserAgent).
 			SetIPAddress(rec.IPAddress).
 			SetUserID(rec.UserID).
-			SetAPIKeyID(rec.APIKeyID).
 			SetAccountID(rec.AccountID).
 			SetGroupID(rec.GroupID)
+		if rec.APIKeyID > 0 {
+			b.SetAPIKeyID(rec.APIKeyID)
+		}
 		builders = append(builders, b)
 	}
 
@@ -235,9 +237,11 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 	for _, rec := range batch {
 		if rec.ActualCost > 0 {
 			userActualCosts[rec.UserID] += rec.ActualCost
-			keyActualCosts[rec.APIKeyID] += rec.ActualCost
+			if rec.APIKeyID > 0 {
+				keyActualCosts[rec.APIKeyID] += rec.ActualCost
+			}
 		}
-		if rec.BilledCost > 0 {
+		if rec.APIKeyID > 0 && rec.BilledCost > 0 {
 			keyBilledCosts[rec.APIKeyID] += rec.BilledCost
 		}
 	}

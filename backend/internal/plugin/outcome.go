@@ -53,9 +53,14 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 			writeUpstream(c, execution.outcome.Upstream)
 		}
 	case sdk.OutcomeClientError:
-		// 客户端自己的问题，原样透传让客户端看到原始错误
+		slog.Warn("上游返回客户端错误，脱敏响应给客户端",
+			"plugin", state.plugin.Name,
+			"account_id", state.account.ID,
+			"group_id", state.keyInfo.GroupID,
+			"status_code", execution.outcome.Upstream.StatusCode,
+			"reason", execution.outcome.Reason)
 		if !state.stream {
-			writeUpstream(c, execution.outcome.Upstream)
+			openAIError(c, http.StatusBadRequest, "invalid_request_error", "invalid_request", "请求无法完成，请检查输入后重试")
 		}
 		if execution.outcome.Usage != nil {
 			f.recordUsage(c, state, execution)
@@ -71,9 +76,22 @@ func writeFailureResponse(c *gin.Context, state *forwardState, execution forward
 	if state.stream && c.Writer.Written() {
 		return
 	}
+	pluginName := ""
+	if state.plugin != nil {
+		pluginName = state.plugin.Name
+	}
+	accountID := 0
+	if state.account != nil {
+		accountID = state.account.ID
+	}
+	groupID := 0
+	if state.keyInfo != nil {
+		groupID = state.keyInfo.GroupID
+	}
 	slog.Warn("判决为失败，脱敏响应给客户端",
-		"plugin", state.plugin.Name,
-		"account_id", state.account.ID,
+		"plugin", pluginName,
+		"account_id", accountID,
+		"group_id", groupID,
 		"kind", execution.outcome.Kind,
 		"status_code", execution.outcome.Upstream.StatusCode,
 		"reason", execution.outcome.Reason)

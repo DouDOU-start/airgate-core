@@ -1002,6 +1002,7 @@
     "download_failed": "Image download failed",
     "close_image_preview": "Close image preview",
     "retry": "Retry",
+    "regenerate": "Regenerate",
     "retry_image": "Retry image",
     "no_image_prompt": "No prompt found for this image"
   }

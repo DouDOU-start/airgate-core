@@ -15,7 +15,9 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/account"
+	"github.com/DouDOU-start/airgate-core/ent/user"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
+	"github.com/DouDOU-start/airgate-core/internal/routing"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	sdk "github.com/DouDOU-start/airgate-sdk"
 	pb "github.com/DouDOU-start/airgate-sdk/proto"
@@ -431,247 +433,214 @@ func (h *HostService) reportAccountResult(ctx context.Context, req *pb.HostRepor
 // 与 probeForward 的区别：走完整计费管线，不跳过 usage_log / 余额扣款。
 // 账号级故障自动 failover，最多 maxHostForwardAttempts 次。
 func (h *HostService) forward(ctx context.Context, req *pb.HostForwardRequest) (*pb.HostForwardResponse, error) {
-	if req.GroupId <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "group_id 必须 > 0")
-	}
 	if req.UserId <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "user_id 必须 > 0")
 	}
 
-	g, err := h.db.Group.Get(ctx, int(req.GroupId))
+	routes, err := h.hostForwardRoutes(ctx, req)
 	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, status.Error(codes.NotFound, "分组不存在")
-		}
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, err
 	}
-
-	model := req.Model
-	if model == "" {
-		if models := h.manager.GetModels(g.Platform); len(models) > 0 {
-			model = models[0].ID
-		}
-	}
-	if model == "" {
-		return nil, status.Errorf(codes.NotFound, "platform %s 没有可用 model", g.Platform)
-	}
-
-	inst := h.manager.GetPluginByPlatform(g.Platform)
-	if inst == nil || inst.Gateway == nil {
-		return nil, status.Errorf(codes.Unavailable, "platform %s 没有可用插件", g.Platform)
-	}
-
 	fwdCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
-	var excludeIDs []int
-
-	for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
-		acc, err := h.scheduler.SelectAccount(ctx, g.Platform, model, 0, int(req.GroupId), "", excludeIDs...)
-		if err != nil {
-			if errors.Is(err, scheduler.ErrNoAvailableAccount) {
-				return nil, status.Error(codes.Unavailable, err.Error())
-			}
-			return nil, status.Error(codes.Internal, err.Error())
+	var hardExclude []int
+	for _, route := range routes {
+		model := h.resolveHostModel(route.Platform, req.Model)
+		if model == "" {
+			slog.Warn("HostService Forward 候选分组没有可用模型", "platform", route.Platform, "group_id", route.GroupID)
+			continue
 		}
-
-		accFull, err := h.db.Account.Query().Where(account.IDEQ(acc.ID)).WithProxy().Only(ctx)
-		if err != nil {
-			return nil, status.Error(codes.Internal, "加载账号失败: "+err.Error())
-		}
-
-		headers := protoHeadersToHTTPHost(req.Headers)
-		headers.Set("X-Forwarded-Path", req.Path)
-		headers.Set("X-Forwarded-Method", req.Method)
-		headers.Set("X-Airgate-Internal", "host-forward")
-		if headers.Get("Content-Type") == "" {
-			headers.Set("Content-Type", "application/json")
-		}
-
-		fwdReq := &sdk.ForwardRequest{
-			Account: &sdk.Account{
-				ID:          int64(accFull.ID),
-				Name:        accFull.Name,
-				Platform:    accFull.Platform,
-				Type:        accFull.Type,
-				Credentials: cloneStringMapHost(accFull.Credentials),
-				ProxyURL:    proxyURLFromAccount(accFull),
-			},
-			Body:    req.Body,
-			Headers: headers,
-			Model:   model,
-			Stream:  false,
-		}
-
-		start := time.Now()
-		outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
-		duration := time.Since(start)
-
-		h.scheduler.Apply(ctx, acc.ID, scheduler.Judgment{
-			Kind:       outcome.Kind,
-			RetryAfter: outcome.RetryAfter,
-			Reason:     outcome.Reason,
-			Duration:   duration,
-			IsPool:     accFull.UpstreamIsPool,
-		})
-
-		if (fwdErr != nil || outcome.Kind.ShouldFailover()) && attempt < maxHostForwardAttempts-1 {
-			slog.Warn("HostService Forward failover",
-				"account_id", acc.ID, "attempt", attempt+1,
-				"kind", outcome.Kind, "reason", outcome.Reason, "error", fwdErr)
-			excludeIDs = append(excludeIDs, acc.ID)
+		inst := h.manager.GetPluginByPlatform(route.Platform)
+		if inst == nil || inst.Gateway == nil {
+			slog.Warn("HostService Forward 候选分组没有可用插件", "platform", route.Platform, "group_id", route.GroupID)
 			continue
 		}
 
-		if fwdErr != nil {
-			return nil, status.Errorf(codes.Internal, "网关插件调用失败: %s", fwdErr.Error())
-		}
-
-		resp := &pb.HostForwardResponse{
-			StatusCode: int32(outcome.Upstream.StatusCode),
-			Headers:    httpHeadersToProtoHost(outcome.Upstream.Headers),
-			Body:       outcome.Upstream.Body,
-		}
-
-		if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
-			h.recordHostForwardUsage(ctx, req, acc.ID, g.Platform, model, accFull, outcome, duration)
-			resp.Usage = &pb.HostForwardUsage{
-				InputTokens:  int64(outcome.Usage.InputTokens),
-				OutputTokens: int64(outcome.Usage.OutputTokens),
-				Cost:         outcome.Usage.InputCost + outcome.Usage.OutputCost + outcome.Usage.CachedInputCost + outcome.Usage.CacheCreationCost,
-				Model:        model,
+		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
+			acc, err := h.scheduler.SelectAccount(ctx, route.Platform, model, 0, route.GroupID, "", hardExclude...)
+			if err != nil {
+				slog.Warn("HostService Forward 调度失败",
+					"platform", route.Platform, "model", model, "group_id", route.GroupID,
+					"effective_rate", route.EffectiveRate, "error", err)
+				break
 			}
-		}
 
-		return resp, nil
+			accFull, err := h.db.Account.Query().Where(account.IDEQ(acc.ID)).WithProxy().Only(ctx)
+			if err != nil {
+				slog.Error("HostService Forward 加载账号失败", "account_id", acc.ID, "error", err)
+				return nil, hostForwardGenericError()
+			}
+
+			headers := hostForwardHeaders(req, route)
+			fwdReq := &sdk.ForwardRequest{
+				Account: hostSDKAccount(accFull),
+				Body:    req.Body,
+				Headers: headers,
+				Model:   model,
+				Stream:  false,
+			}
+
+			start := time.Now()
+			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
+			duration := time.Since(start)
+			h.applyHostOutcome(ctx, acc.ID, accFull, outcome, duration)
+
+			if fwdErr != nil || outcome.Kind.ShouldFailover() {
+				slog.Warn("HostService Forward failover",
+					"group_id", route.GroupID, "effective_rate", route.EffectiveRate,
+					"account_id", acc.ID, "attempt", attempt+1,
+					"kind", outcome.Kind, "reason", outcome.Reason, "error", fwdErr)
+				hardExclude = append(hardExclude, acc.ID)
+				continue
+			}
+
+			if outcome.Kind == sdk.OutcomeClientError {
+				slog.Warn("HostService Forward 上游客户端错误，脱敏返回",
+					"group_id", route.GroupID, "account_id", acc.ID,
+					"status_code", outcome.Upstream.StatusCode, "reason", outcome.Reason)
+				return nil, status.Error(codes.InvalidArgument, "请求无法完成，请检查输入后重试")
+			}
+			if outcome.Kind != sdk.OutcomeSuccess {
+				slog.Warn("HostService Forward 判决失败",
+					"group_id", route.GroupID, "account_id", acc.ID,
+					"kind", outcome.Kind, "reason", outcome.Reason)
+				break
+			}
+
+			resp := &pb.HostForwardResponse{
+				StatusCode: int32(outcome.Upstream.StatusCode),
+				Headers:    httpHeadersToProtoHost(outcome.Upstream.Headers),
+				Body:       outcome.Upstream.Body,
+			}
+
+			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
+				h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, outcome, duration)
+				resp.Usage = &pb.HostForwardUsage{
+					InputTokens:  int64(outcome.Usage.InputTokens),
+					OutputTokens: int64(outcome.Usage.OutputTokens),
+					Cost:         outcome.Usage.InputCost + outcome.Usage.OutputCost + outcome.Usage.CachedInputCost + outcome.Usage.CacheCreationCost,
+					Model:        model,
+				}
+			}
+
+			return resp, nil
+		}
 	}
 
-	return nil, status.Error(codes.Unavailable, "所有可用账户均失败，请稍后重试")
+	return nil, hostForwardGenericError()
 }
 
 // forwardStream 流式业务转发。
 // 账号级故障自动 failover：通过 failoverStreamWriter 延迟提交，
 // 成功（< 400）时立即切换到真流式，失败时缓冲数据后丢弃重试。
 func (h *HostService) forwardStream(ctx context.Context, req *pb.HostForwardRequest, stream pb.HostService_ForwardStreamServer) error {
-	if req.GroupId <= 0 {
-		return status.Error(codes.InvalidArgument, "group_id 必须 > 0")
-	}
 	if req.UserId <= 0 {
 		return status.Error(codes.InvalidArgument, "user_id 必须 > 0")
 	}
 
-	g, err := h.db.Group.Get(ctx, int(req.GroupId))
+	routes, err := h.hostForwardRoutes(ctx, req)
 	if err != nil {
-		if ent.IsNotFound(err) {
-			return status.Error(codes.NotFound, "分组不存在")
-		}
-		return status.Error(codes.Internal, err.Error())
+		return err
 	}
-
-	model := req.Model
-	if model == "" {
-		if models := h.manager.GetModels(g.Platform); len(models) > 0 {
-			model = models[0].ID
-		}
-	}
-	if model == "" {
-		return status.Errorf(codes.NotFound, "platform %s 没有可用 model", g.Platform)
-	}
-
-	inst := h.manager.GetPluginByPlatform(g.Platform)
-	if inst == nil || inst.Gateway == nil {
-		return status.Errorf(codes.Unavailable, "platform %s 没有可用插件", g.Platform)
-	}
-
 	fwdCtx, cancel := context.WithTimeout(ctx, 300*time.Second)
 	defer cancel()
 
 	sw := &hostStreamWriter{stream: stream}
-	var excludeIDs []int
+	var hardExclude []int
 
-	for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
-		acc, err := h.scheduler.SelectAccount(ctx, g.Platform, model, 0, int(req.GroupId), "", excludeIDs...)
-		if err != nil {
-			if errors.Is(err, scheduler.ErrNoAvailableAccount) {
-				return status.Error(codes.Unavailable, err.Error())
-			}
-			return status.Error(codes.Internal, err.Error())
+	for _, route := range routes {
+		model := h.resolveHostModel(route.Platform, req.Model)
+		if model == "" {
+			slog.Warn("HostService ForwardStream 候选分组没有可用模型", "platform", route.Platform, "group_id", route.GroupID)
+			continue
 		}
-
-		accFull, err := h.db.Account.Query().Where(account.IDEQ(acc.ID)).WithProxy().Only(ctx)
-		if err != nil {
-			return status.Error(codes.Internal, "加载账号失败: "+err.Error())
-		}
-
-		headers := protoHeadersToHTTPHost(req.Headers)
-		headers.Set("X-Forwarded-Path", req.Path)
-		headers.Set("X-Forwarded-Method", req.Method)
-		headers.Set("X-Airgate-Internal", "host-forward")
-		if headers.Get("Content-Type") == "" {
-			headers.Set("Content-Type", "application/json")
-		}
-
-		fw := &failoverStreamWriter{target: sw}
-		fwdReq := &sdk.ForwardRequest{
-			Account: &sdk.Account{
-				ID:          int64(accFull.ID),
-				Name:        accFull.Name,
-				Platform:    accFull.Platform,
-				Type:        accFull.Type,
-				Credentials: cloneStringMapHost(accFull.Credentials),
-				ProxyURL:    proxyURLFromAccount(accFull),
-			},
-			Body:    req.Body,
-			Headers: headers,
-			Model:   model,
-			Stream:  true,
-			Writer:  fw,
-		}
-
-		start := time.Now()
-		outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
-		duration := time.Since(start)
-
-		h.scheduler.Apply(ctx, acc.ID, scheduler.Judgment{
-			Kind:       outcome.Kind,
-			RetryAfter: outcome.RetryAfter,
-			Reason:     outcome.Reason,
-			Duration:   duration,
-			IsPool:     accFull.UpstreamIsPool,
-		})
-
-		canRetry := !fw.committed && (fwdErr != nil || outcome.Kind.ShouldFailover())
-		if canRetry && attempt < maxHostForwardAttempts-1 {
-			slog.Warn("HostService ForwardStream failover",
-				"account_id", acc.ID, "attempt", attempt+1,
-				"kind", outcome.Kind, "reason", outcome.Reason, "error", fwdErr)
-			excludeIDs = append(excludeIDs, acc.ID)
+		inst := h.manager.GetPluginByPlatform(route.Platform)
+		if inst == nil || inst.Gateway == nil {
+			slog.Warn("HostService ForwardStream 候选分组没有可用插件", "platform", route.Platform, "group_id", route.GroupID)
 			continue
 		}
 
-		if !fw.committed {
-			fw.flush()
-		}
-
-		if fwdErr != nil {
-			return status.Errorf(codes.Internal, "网关插件调用失败: %s", fwdErr.Error())
-		}
-
-		var usage *pb.HostForwardUsage
-		if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
-			h.recordHostForwardUsage(ctx, req, acc.ID, g.Platform, model, accFull, outcome, duration)
-			usage = &pb.HostForwardUsage{
-				InputTokens:  int64(outcome.Usage.InputTokens),
-				OutputTokens: int64(outcome.Usage.OutputTokens),
-				Cost:         outcome.Usage.InputCost + outcome.Usage.OutputCost + outcome.Usage.CachedInputCost + outcome.Usage.CacheCreationCost,
-				Model:        model,
+		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
+			acc, err := h.scheduler.SelectAccount(ctx, route.Platform, model, 0, route.GroupID, "", hardExclude...)
+			if err != nil {
+				slog.Warn("HostService ForwardStream 调度失败",
+					"platform", route.Platform, "model", model, "group_id", route.GroupID,
+					"effective_rate", route.EffectiveRate, "error", err)
+				break
 			}
-		}
 
-		return stream.Send(&pb.HostForwardChunk{Done: true, Usage: usage})
+			accFull, err := h.db.Account.Query().Where(account.IDEQ(acc.ID)).WithProxy().Only(ctx)
+			if err != nil {
+				slog.Error("HostService ForwardStream 加载账号失败", "account_id", acc.ID, "error", err)
+				return hostForwardGenericError()
+			}
+
+			fw := &failoverStreamWriter{target: sw}
+			fwdReq := &sdk.ForwardRequest{
+				Account: hostSDKAccount(accFull),
+				Body:    req.Body,
+				Headers: hostForwardHeaders(req, route),
+				Model:   model,
+				Stream:  true,
+				Writer:  fw,
+			}
+
+			start := time.Now()
+			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
+			duration := time.Since(start)
+			h.applyHostOutcome(ctx, acc.ID, accFull, outcome, duration)
+
+			canRetry := !fw.committed && (fwdErr != nil || outcome.Kind.ShouldFailover())
+			if canRetry {
+				slog.Warn("HostService ForwardStream failover",
+					"group_id", route.GroupID, "effective_rate", route.EffectiveRate,
+					"account_id", acc.ID, "attempt", attempt+1,
+					"kind", outcome.Kind, "reason", outcome.Reason, "error", fwdErr)
+				hardExclude = append(hardExclude, acc.ID)
+				continue
+			}
+
+			if outcome.Kind == sdk.OutcomeClientError {
+				slog.Warn("HostService ForwardStream 上游客户端错误，脱敏返回",
+					"group_id", route.GroupID, "account_id", acc.ID,
+					"status_code", outcome.Upstream.StatusCode, "reason", outcome.Reason)
+				return status.Error(codes.InvalidArgument, "请求无法完成，请检查输入后重试")
+			}
+
+			if !fw.committed {
+				fw.flush()
+			}
+
+			if outcome.Kind != sdk.OutcomeSuccess && fwdErr == nil {
+				slog.Warn("HostService ForwardStream 上游失败，流已提交无法重试",
+					"group_id", route.GroupID, "effective_rate", route.EffectiveRate,
+					"account_id", acc.ID, "kind", outcome.Kind,
+					"status_code", outcome.Upstream.StatusCode, "reason", outcome.Reason,
+					"stream_committed", fw.committed)
+			}
+
+			if fwdErr != nil {
+				slog.Warn("HostService ForwardStream 插件调用失败", "group_id", route.GroupID, "account_id", acc.ID, "error", fwdErr)
+				return hostForwardGenericError()
+			}
+
+			var usage *pb.HostForwardUsage
+			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
+				h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, outcome, duration)
+				usage = &pb.HostForwardUsage{
+					InputTokens:  int64(outcome.Usage.InputTokens),
+					OutputTokens: int64(outcome.Usage.OutputTokens),
+					Cost:         outcome.Usage.InputCost + outcome.Usage.OutputCost + outcome.Usage.CachedInputCost + outcome.Usage.CacheCreationCost,
+					Model:        model,
+				}
+			}
+
+			return stream.Send(&pb.HostForwardChunk{Done: true, Usage: usage})
+		}
 	}
 
-	return status.Error(codes.Unavailable, "所有可用账户均失败，请稍后重试")
+	return hostForwardGenericError()
 }
 
 // maxHostForwardAttempts 最大 failover 次数，与 Forwarder 保持一致。
@@ -789,10 +758,11 @@ func (w *hostStreamWriter) Write(data []byte) (int, error) {
 func (w *hostStreamWriter) Flush() {}
 
 // recordHostForwardUsage 为 Host.Forward 发起的请求记录 usage_log 并扣费。
-// 与 forwarder.recordUsage 的区别：没有 APIKeyInfo，APIKeyID=0，billingRate 取分组倍率。
+// 与 forwarder.recordUsage 的区别：没有 APIKeyInfo，APIKeyID=0。
 func (h *HostService) recordHostForwardUsage(
 	ctx context.Context,
 	req *pb.HostForwardRequest,
+	route routing.Candidate,
 	accountID int,
 	platform, model string,
 	accFull *ent.Account,
@@ -804,18 +774,12 @@ func (h *HostService) recordHostForwardUsage(
 		return
 	}
 
-	g, _ := h.db.Group.Get(ctx, int(req.GroupId))
-	billingRate := 1.0
-	if g != nil && g.RateMultiplier > 0 {
-		billingRate = g.RateMultiplier
-	}
-
 	calc := h.calculator.Calculate(billing.CalculateInput{
 		InputCost:         usage.InputCost,
 		OutputCost:        usage.OutputCost,
 		CachedInputCost:   usage.CachedInputCost,
 		CacheCreationCost: usage.CacheCreationCost,
-		BillingRate:       billingRate,
+		BillingRate:       route.EffectiveRate,
 		AccountRate:       accFull.RateMultiplier,
 	})
 
@@ -830,7 +794,7 @@ func (h *HostService) recordHostForwardUsage(
 		UserID:                int(req.UserId),
 		APIKeyID:              0,
 		AccountID:             accountID,
-		GroupID:               int(req.GroupId),
+		GroupID:               route.GroupID,
 		Platform:              platform,
 		Model:                 actualModel,
 		InputTokens:           usage.InputTokens,
@@ -932,6 +896,115 @@ func (h *HostService) getUserInfo(ctx context.Context, req *pb.HostGetUserInfoRe
 
 // protoHeadersToHTTPHost / httpHeadersToProtoHost 是 host_service.go 内部的 header 转换。
 // 与 grpc/gateway_server.go 的同名函数等价，但跨包引用会引入循环依赖。
+func (h *HostService) hostForwardRoutes(ctx context.Context, req *pb.HostForwardRequest) ([]routing.Candidate, error) {
+	if req.GroupId > 0 {
+		u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserId))).Only(ctx)
+		if err != nil {
+			slog.Error("HostService 查询用户失败", "user_id", req.UserId, "error", err)
+			return nil, hostForwardGenericError()
+		}
+		g, err := h.db.Group.Get(ctx, int(req.GroupId))
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, status.Error(codes.NotFound, "分组不存在")
+			}
+			slog.Error("HostService 查询分组失败", "group_id", req.GroupId, "error", err)
+			return nil, hostForwardGenericError()
+		}
+		return []routing.Candidate{{
+			GroupID:                g.ID,
+			Platform:               g.Platform,
+			EffectiveRate:          billing.ResolveBillingRateForGroup(u.GroupRates, g.ID, g.RateMultiplier),
+			GroupRateMultiplier:    g.RateMultiplier,
+			GroupServiceTier:       g.ServiceTier,
+			GroupForceInstructions: g.ForceInstructions,
+			GroupPluginSettings:    clonePluginSettingsHost(g.PluginSettings),
+			SortWeight:             g.SortWeight,
+		}}, nil
+	}
+
+	platform := protoHeadersToHTTPHost(req.Headers).Get("X-Airgate-Platform")
+	if platform == "" {
+		return nil, status.Error(codes.InvalidArgument, "platform 不能为空")
+	}
+	u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserId))).Only(ctx)
+	if err != nil {
+		slog.Error("HostService 查询用户失败", "user_id", req.UserId, "error", err)
+		return nil, hostForwardGenericError()
+	}
+	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserId), platform, u.GroupRates)
+	if err != nil {
+		slog.Error("HostService 查询候选分组失败", "platform", platform, "user_id", req.UserId, "error", err)
+		return nil, hostForwardGenericError()
+	}
+	if len(routes) == 0 {
+		slog.Warn("HostService 没有可用候选分组", "platform", platform, "user_id", req.UserId)
+		return nil, hostForwardGenericError()
+	}
+	return routes, nil
+}
+
+func (h *HostService) resolveHostModel(platform, model string) string {
+	if model != "" {
+		return model
+	}
+	models := h.manager.GetModels(platform)
+	if len(models) == 0 {
+		return ""
+	}
+	return models[0].ID
+}
+
+func hostForwardHeaders(req *pb.HostForwardRequest, route routing.Candidate) http.Header {
+	headers := protoHeadersToHTTPHost(req.Headers)
+	headers.Set("X-Forwarded-Path", req.Path)
+	headers.Set("X-Forwarded-Method", req.Method)
+	headers.Set("X-Airgate-Internal", "host-forward")
+	if headers.Get("Content-Type") == "" {
+		headers.Set("Content-Type", "application/json")
+	}
+	if route.GroupServiceTier != "" {
+		headers.Set("X-Airgate-Service-Tier", route.GroupServiceTier)
+	}
+	if route.GroupForceInstructions != "" {
+		headers.Set("X-Airgate-Force-Instructions", route.GroupForceInstructions)
+	}
+	for plugin, kv := range route.GroupPluginSettings {
+		for k, v := range kv {
+			if v == "" {
+				continue
+			}
+			headers.Set("X-Airgate-Plugin-"+canonicalHeaderToken(plugin)+"-"+canonicalHeaderToken(k), v)
+		}
+	}
+	return headers
+}
+
+func hostSDKAccount(acc *ent.Account) *sdk.Account {
+	return &sdk.Account{
+		ID:          int64(acc.ID),
+		Name:        acc.Name,
+		Platform:    acc.Platform,
+		Type:        acc.Type,
+		Credentials: cloneStringMapHost(acc.Credentials),
+		ProxyURL:    proxyURLFromAccount(acc),
+	}
+}
+
+func (h *HostService) applyHostOutcome(ctx context.Context, accountID int, accFull *ent.Account, outcome sdk.ForwardOutcome, duration time.Duration) {
+	h.scheduler.Apply(ctx, accountID, scheduler.Judgment{
+		Kind:       outcome.Kind,
+		RetryAfter: outcome.RetryAfter,
+		Reason:     outcome.Reason,
+		Duration:   duration,
+		IsPool:     accFull.UpstreamIsPool,
+	})
+}
+
+func hostForwardGenericError() error {
+	return status.Error(codes.Unavailable, "请求暂时无法完成，请稍后重试")
+}
+
 func protoHeadersToHTTPHost(ph map[string]*pb.HeaderValues) http.Header {
 	h := make(http.Header, len(ph))
 	for k, v := range ph {
@@ -981,6 +1054,20 @@ func cloneStringMapHost(input map[string]string) map[string]string {
 	cloned := make(map[string]string, len(input))
 	for k, v := range input {
 		cloned[k] = v
+	}
+	return cloned
+}
+
+func clonePluginSettingsHost(input map[string]map[string]string) map[string]map[string]string {
+	if len(input) == 0 {
+		return nil
+	}
+	cloned := make(map[string]map[string]string, len(input))
+	for plugin, settings := range input {
+		if len(settings) == 0 {
+			continue
+		}
+		cloned[plugin] = cloneStringMapHost(settings)
 	}
 	return cloned
 }

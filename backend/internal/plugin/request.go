@@ -38,20 +38,22 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 
 	path := requestPath(c)
 	parsed := parseBody(body, c.GetHeader("Content-Type"))
-	inst := f.matchPlugin(c, keyInfo, path)
+	requestedPlatform := requestedPlatform(c, keyInfo)
+	inst := f.matchPlugin(c, keyInfo, requestedPlatform, path)
 	if inst == nil {
 		return nil, false
 	}
 
 	return &forwardState{
-		startedAt:   startedAt,
-		requestPath: path,
-		body:        body,
-		model:       parsed.Model,
-		stream:      parsed.Stream,
-		sessionID:   parsed.SessionID,
-		keyInfo:     keyInfo,
-		plugin:      inst,
+		startedAt:         startedAt,
+		requestPath:       path,
+		body:              body,
+		model:             parsed.Model,
+		stream:            parsed.Stream,
+		sessionID:         parsed.SessionID,
+		requestedPlatform: requestedPlatform,
+		keyInfo:           keyInfo,
+		plugin:            inst,
 	}, true
 }
 
@@ -84,6 +86,13 @@ func requestPath(c *gin.Context) string {
 		return p
 	}
 	return c.Request.URL.Path
+}
+
+func requestedPlatform(c *gin.Context, keyInfo *auth.APIKeyInfo) string {
+	if platform := strings.TrimSpace(c.GetHeader("X-Airgate-Platform")); platform != "" {
+		return platform
+	}
+	return keyInfo.GroupPlatform
 }
 
 func parseBody(body []byte, contentType string) parsedRequest {
@@ -125,22 +134,22 @@ func parseMultipartFields(body []byte, contentType string) parsedRequest {
 	return pr
 }
 
-// matchPlugin 按 (GroupPlatform, path) 路由到具体插件。
+// matchPlugin 按 (platform, path) 路由到具体插件。
 // 插件未运行返回 503；路由不匹配返回 404。
-func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, path string) *PluginInstance {
-	if keyInfo.GroupPlatform != "" {
-		inst := f.manager.MatchPluginByPlatformAndPath(keyInfo.GroupPlatform, path)
+func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, platform, path string) *PluginInstance {
+	if platform != "" {
+		inst := f.manager.MatchPluginByPlatformAndPath(platform, path)
 		if inst != nil {
 			return inst
 		}
-		slog.Warn("分组平台未找到可处理请求的插件",
+		slog.Warn("请求平台未找到可处理请求的插件",
 			"group_id", keyInfo.GroupID,
-			"platform", keyInfo.GroupPlatform,
+			"platform", platform,
 			"path", path)
-		if f.manager.GetPluginByPlatform(keyInfo.GroupPlatform) == nil {
+		if f.manager.GetPluginByPlatform(platform) == nil {
 			openAIError(c, http.StatusServiceUnavailable, "server_error", "plugin_unavailable", "插件不可用，请联系管理员")
 		} else {
-			openAIError(c, http.StatusNotFound, "invalid_request_error", "route_not_found", "当前 API Key 绑定的平台不支持该 API 路径")
+			openAIError(c, http.StatusNotFound, "invalid_request_error", "route_not_found", "当前平台不支持该 API 路径")
 		}
 		return nil
 	}

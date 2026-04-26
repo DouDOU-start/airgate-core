@@ -18,11 +18,18 @@ func ResolveBillingRate(keyInfo *auth.APIKeyInfo) float64 {
 	if keyInfo == nil {
 		return 1.0
 	}
-	if r, ok := keyInfo.UserGroupRate(); ok {
-		return r
+	return ResolveBillingRateForGroup(keyInfo.UserGroupRates, keyInfo.GroupID, keyInfo.GroupRateMultiplier)
+}
+
+// ResolveBillingRateForGroup 按指定 group 计算实际扣费倍率。
+func ResolveBillingRateForGroup(userGroupRates map[int64]float64, groupID int, groupRate float64) float64 {
+	if userGroupRates != nil {
+		if r, ok := userGroupRates[int64(groupID)]; ok && r > 0 {
+			return r
+		}
 	}
-	if keyInfo.GroupRateMultiplier > 0 {
-		return keyInfo.GroupRateMultiplier
+	if groupRate > 0 {
+		return groupRate
 	}
 	return 1.0
 }

@@ -90,7 +90,7 @@ func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func
 func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs ...int) error {
 	account, err := f.scheduler.SelectAccount(
 		c.Request.Context(),
-		state.plugin.Platform,
+		state.requestedPlatform,
 		state.model,
 		state.keyInfo.UserID,
 		state.keyInfo.GroupID,
@@ -162,7 +162,7 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 func (f *Forwarder) forwardMetadataOnly(c *gin.Context, state *forwardState) {
 	req := &sdk.ForwardRequest{
 		// Account 留空：插件对 metadata 路径的判断发生在访问 account 之前
-		Account: &sdk.Account{Platform: state.plugin.Platform},
+		Account: &sdk.Account{Platform: state.requestedPlatform},
 		Body:    state.body,
 		Headers: buildHeaders(c.Request.Header, state.keyInfo),
 		Model:   state.model,
