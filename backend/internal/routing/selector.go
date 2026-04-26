@@ -3,12 +3,17 @@ package routing
 import (
 	"context"
 	"sort"
+	"strings"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 )
+
+type Requirements struct {
+	NeedsImage bool
+}
 
 type Candidate struct {
 	GroupID                int
@@ -21,7 +26,7 @@ type Candidate struct {
 	SortWeight             int
 }
 
-func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platform string, userGroupRates map[int64]float64) ([]Candidate, error) {
+func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platform string, userGroupRates map[int64]float64, requirements Requirements) ([]Candidate, error) {
 	groups, err := db.Group.Query().
 		Where(group.PlatformEQ(platform)).
 		All(ctx)
@@ -31,6 +36,9 @@ func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platfor
 
 	candidates := make([]Candidate, 0, len(groups))
 	for _, g := range groups {
+		if !GroupMatchesRequirements(g, requirements) {
+			continue
+		}
 		if g.IsExclusive {
 			allowed, err := g.QueryAllowedUsers().Where(user.IDEQ(userID)).Exist(ctx)
 			if err != nil {
@@ -62,6 +70,30 @@ func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platfor
 		return candidates[i].GroupID < candidates[j].GroupID
 	})
 	return candidates, nil
+}
+
+func GroupMatchesRequirements(g *ent.Group, requirements Requirements) bool {
+	if g == nil {
+		return false
+	}
+	if requirements.NeedsImage && strings.EqualFold(g.Platform, "openai") {
+		return pluginSettingEnabled(g.PluginSettings, "openai", "image_enabled")
+	}
+	return true
+}
+
+func pluginSettingEnabled(settings map[string]map[string]string, plugin, key string) bool {
+	for pluginName, kv := range settings {
+		if !strings.EqualFold(pluginName, plugin) {
+			continue
+		}
+		for k, v := range kv {
+			if strings.EqualFold(k, key) {
+				return strings.EqualFold(strings.TrimSpace(v), "true")
+			}
+		}
+	}
+	return false
 }
 
 func clonePluginSettings(in map[string]map[string]string) map[string]map[string]string {

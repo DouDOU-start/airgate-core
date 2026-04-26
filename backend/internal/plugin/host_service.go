@@ -911,6 +911,10 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req *pb.HostForward
 			slog.Error("HostService 查询分组失败", "group_id", req.GroupId, "error", err)
 			return nil, hostForwardGenericError()
 		}
+		if !routing.GroupMatchesRequirements(g, hostForwardRequirements(req)) {
+			slog.Warn("HostService Forward 指定分组不满足请求能力", "group_id", req.GroupId, "model", req.Model, "path", req.Path)
+			return nil, hostForwardGenericError()
+		}
 		return []routing.Candidate{{
 			GroupID:                g.ID,
 			Platform:               g.Platform,
@@ -932,7 +936,7 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req *pb.HostForward
 		slog.Error("HostService 查询用户失败", "user_id", req.UserId, "error", err)
 		return nil, hostForwardGenericError()
 	}
-	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserId), platform, u.GroupRates)
+	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserId), platform, u.GroupRates, hostForwardRequirements(req))
 	if err != nil {
 		slog.Error("HostService 查询候选分组失败", "platform", platform, "user_id", req.UserId, "error", err)
 		return nil, hostForwardGenericError()
@@ -942,6 +946,13 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req *pb.HostForward
 		return nil, hostForwardGenericError()
 	}
 	return routes, nil
+}
+
+func hostForwardRequirements(req *pb.HostForwardRequest) routing.Requirements {
+	if req == nil {
+		return routing.Requirements{}
+	}
+	return routing.Requirements{NeedsImage: requestNeedsImage(req.Path, req.Model)}
 }
 
 func (h *HostService) resolveHostModel(platform, model string) string {

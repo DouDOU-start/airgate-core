@@ -9,6 +9,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -108,6 +109,27 @@ func parseBody(body []byte, contentType string) parsedRequest {
 		return parseMultipartFields(body, contentType)
 	}
 	return parsedRequest{}
+}
+
+func requestNeedsImage(path, model string) bool {
+	return isImageAPIPath(path) || isImageModel(model)
+}
+
+func isImageAPIPath(path string) bool {
+	if path == "" {
+		return false
+	}
+	u, err := url.Parse(path)
+	if err == nil {
+		path = u.Path
+	}
+	path = strings.TrimRight(strings.ToLower(path), "/")
+	return strings.HasSuffix(path, "/images/generations") ||
+		strings.HasSuffix(path, "/images/edits")
+}
+
+func isImageModel(model string) bool {
+	return strings.Contains(strings.ToLower(strings.TrimSpace(model)), "image")
 }
 
 func parseMultipartFields(body []byte, contentType string) parsedRequest {

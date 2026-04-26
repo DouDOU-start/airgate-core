@@ -78,7 +78,9 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	}
 	defer releaseClientQuota()
 
-	routes, err := routing.ListEligibleGroups(c.Request.Context(), f.db, state.keyInfo.UserID, state.requestedPlatform, state.keyInfo.UserGroupRates)
+	routes, err := routing.ListEligibleGroups(c.Request.Context(), f.db, state.keyInfo.UserID, state.requestedPlatform, state.keyInfo.UserGroupRates, routing.Requirements{
+		NeedsImage: requestNeedsImage(state.requestPath, state.model),
+	})
 	if err != nil {
 		slog.Error("查询候选分组失败", "platform", state.requestedPlatform, "model", state.model, "error", err)
 		openAIError(c, http.StatusServiceUnavailable, "server_error", "routing_unavailable", "请求暂时无法完成，请稍后重试")

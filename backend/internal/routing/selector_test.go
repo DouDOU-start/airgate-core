@@ -57,7 +57,7 @@ func TestListEligibleGroups(t *testing.T) {
 		SetRateMultiplier(0.01).
 		SaveX(ctx)
 
-	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", map[int64]float64{int64(publicSlow.ID): 0.3})
+	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", map[int64]float64{int64(publicSlow.ID): 0.3}, Requirements{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,5 +73,50 @@ func TestListEligibleGroups(t *testing.T) {
 	}
 	if routes[0].EffectiveRate != 0.3 {
 		t.Fatalf("routes[0].EffectiveRate = %v, want 0.3", routes[0].EffectiveRate)
+	}
+}
+
+func TestListEligibleGroupsFiltersImageDisabledOpenAIGroups(t *testing.T) {
+	ctx := context.Background()
+	db := enttest.Open(t, "sqlite3", "file:route_selector_image?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(migrate.WithGlobalUniqueID(false)))
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	})
+
+	u := db.User.Create().
+		SetEmail("image-user@example.com").
+		SetPasswordHash("hash").
+		SetGroupRates(map[int64]float64{}).
+		SaveX(ctx)
+
+	db.Group.Create().
+		SetName("image disabled").
+		SetPlatform("openai").
+		SetRateMultiplier(0.1).
+		SetPluginSettings(map[string]map[string]string{"openai": {"image_enabled": "false"}}).
+		SaveX(ctx)
+	imageEnabled := db.Group.Create().
+		SetName("image enabled").
+		SetPlatform("openai").
+		SetRateMultiplier(0.2).
+		SetPluginSettings(map[string]map[string]string{"openai": {"image_enabled": "true"}}).
+		SaveX(ctx)
+	db.Group.Create().
+		SetName("chat only implicit").
+		SetPlatform("openai").
+		SetRateMultiplier(0.3).
+		SaveX(ctx)
+
+	routes, err := ListEligibleGroups(ctx, db, u.ID, "openai", nil, Requirements{NeedsImage: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(routes) != 1 {
+		t.Fatalf("len(routes) = %d, want 1", len(routes))
+	}
+	if routes[0].GroupID != imageEnabled.ID {
+		t.Fatalf("routes[0].GroupID = %d, want %d", routes[0].GroupID, imageEnabled.ID)
 	}
 }
