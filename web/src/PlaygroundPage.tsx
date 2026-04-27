@@ -24,6 +24,8 @@ const IMAGE_MODEL_RE = /(^|[-_])(?:gpt[-_]?image|image)(?:[-_.]|\d|$)/i;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MIN_SELECTION_SIZE = 8;
 const DEFAULT_MODEL_ID = 'gpt-5.5';
+const ACTIVE_CONVERSATION_STORAGE_KEY = 'airgate.playground.activeConversationId';
+const SELECTED_MODEL_STORAGE_KEY = 'airgate.playground.selectedModel';
 const IMAGE_PROMPT_PLANNER_PLATFORM = 'openai';
 const IMAGE_PROMPT_PLANNER_MODEL = 'gpt-5.4-mini';
 const IMAGE_SIZE_ALIGNMENT = 16;
@@ -474,6 +476,19 @@ function defaultModelOptionValue(models: ModelInfo[]) {
   return preferred ? modelOptionValue(preferred) : (models[0] ? modelOptionValue(models[0]) : '');
 }
 
+function getStoredActiveConversationId() {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function getStoredSelectedModel() {
+  if (typeof window === 'undefined') return '';
+  return window.localStorage.getItem(SELECTED_MODEL_STORAGE_KEY) || '';
+}
+
 function platformDisplayName(platforms: PlatformInfo[], name?: string) {
   return platforms.find(item => item.name === name)?.display_name || name || '';
 }
@@ -807,6 +822,7 @@ export default function PlaygroundPage() {
   const { t } = useTranslation();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversationsLoaded, setConversationsLoaded] = useState(false);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamConversationId, setStreamConversationId] = useState<number | null>(null);
@@ -851,7 +867,16 @@ export default function PlaygroundPage() {
   const skipNextMessagesLoadRef = useRef<number | null>(null);
 
   useEffect(() => {
-    api.listConversations().then(setConversations).catch(() => {});
+    api.listConversations().then(nextConversations => {
+      setConversations(nextConversations);
+      setConversationsLoaded(true);
+      const storedActiveId = getStoredActiveConversationId();
+      if (storedActiveId && nextConversations.some(item => item.id === storedActiveId)) {
+        setActiveId(storedActiveId);
+      } else {
+        window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+      }
+    }).catch(() => {});
     api.getUserInfo().then(setUserInfo).catch(() => {});
     let cancelled = false;
     api.listPlatforms().then(async nextPlatforms => {
@@ -860,10 +885,12 @@ export default function PlaygroundPage() {
       const modelLists = await Promise.all(nextPlatforms.map(platform => api.listModels(platform.name).catch(() => [])));
       if (cancelled) return;
       const nextModels = modelLists.flat();
+      const storedModel = getStoredSelectedModel();
       setModels(nextModels);
-      setSelectedModel(current => (
-        nextModels.some(item => modelOptionValue(item) === current) ? current : defaultModelOptionValue(nextModels)
-      ));
+      setSelectedModel(current => {
+        const existingValue = current || storedModel;
+        return nextModels.some(item => modelOptionValue(item) === existingValue) ? existingValue : defaultModelOptionValue(nextModels);
+      });
     }).catch(e => {
       if (cancelled) return;
       setModels([]);
@@ -876,7 +903,22 @@ export default function PlaygroundPage() {
 
   useEffect(() => {
     activeIdRef.current = activeId;
-  }, [activeId]);
+    if (typeof window === 'undefined' || !conversationsLoaded) return;
+    if (activeId && activeId !== DRAFT_CONVERSATION_ID) {
+      window.localStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, String(activeId));
+    } else {
+      window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+    }
+  }, [activeId, conversationsLoaded]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || models.length === 0) return;
+    if (selectedModel && models.some(item => modelOptionValue(item) === selectedModel)) {
+      window.localStorage.setItem(SELECTED_MODEL_STORAGE_KEY, selectedModel);
+    } else {
+      window.localStorage.removeItem(SELECTED_MODEL_STORAGE_KEY);
+    }
+  }, [models, selectedModel]);
 
   useEffect(() => {
     if (!activeId || activeId === DRAFT_CONVERSATION_ID) { setMessages([]); return; }
