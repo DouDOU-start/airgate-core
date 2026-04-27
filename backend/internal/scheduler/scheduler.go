@@ -31,29 +31,32 @@ type Scheduler struct {
 	db  *ent.Client
 	rdb *redis.Client
 
-	sticky     *StickySession
-	windowCost *WindowCostChecker
-	rpm        *RPMCounter
-	session    *SessionManager
-	msgQueue   *MessageQueue
-	state      *StateMachine
-	routeCache *routeCache
+	sticky         *StickySession
+	windowCost     *WindowCostChecker
+	rpm            *RPMCounter
+	session        *SessionManager
+	msgQueue       *MessageQueue
+	state          *StateMachine
+	familyCooldown *FamilyCooldown
+	routeCache     *routeCache
 }
 
 // NewScheduler 构造调度器。
 func NewScheduler(db *ent.Client, rdb *redis.Client) *Scheduler {
 	rpm := NewRPMCounter(rdb)
 	rc := newRouteCache(routeCacheTTL)
+	fc := NewFamilyCooldown(rdb)
 	s := &Scheduler{
-		db:         db,
-		rdb:        rdb,
-		sticky:     NewStickySession(rdb),
-		windowCost: NewWindowCostChecker(db, rdb),
-		rpm:        rpm,
-		session:    NewSessionManager(rdb),
-		msgQueue:   NewMessageQueue(rdb, rpm),
-		state:      NewStateMachine(db, rdb),
-		routeCache: rc,
+		db:             db,
+		rdb:            rdb,
+		sticky:         NewStickySession(rdb),
+		windowCost:     NewWindowCostChecker(db, rdb),
+		rpm:            rpm,
+		session:        NewSessionManager(rdb),
+		msgQueue:       NewMessageQueue(rdb, rpm),
+		state:          NewStateMachine(db, rdb, fc),
+		familyCooldown: fc,
+		routeCache:     rc,
 	}
 	s.state.onCriticalTransition = rc.InvalidateAll
 	return s
@@ -174,4 +177,13 @@ func (s *Scheduler) EnforceMessageDelay(ctx context.Context, accountID int, extr
 // AddWindowCost 请求计费后增量更新窗口费用。
 func (s *Scheduler) AddWindowCost(ctx context.Context, accountID int, cost float64) {
 	s.windowCost.AddCost(ctx, accountID, cost)
+}
+
+// ListFamilyCooldowns 返回指定账号当前生效中的所有家族级限流冷却。
+// 后台管理页用来展示"哪个账号的哪个家族被限流了，还剩多久"。
+func (s *Scheduler) ListFamilyCooldowns(ctx context.Context, accountID int) []FamilyCooldownEntry {
+	if s.familyCooldown == nil {
+		return nil
+	}
+	return s.familyCooldown.List(ctx, accountID)
 }

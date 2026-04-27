@@ -77,6 +77,17 @@ const apiKeyMenuItems: MenuItem[] = [
  *   audience = "user"                    — 仅普通用户可见（管理员不显示），挂在「个人中心」分组
  *   audience = "all"                     — 所有登录用户可见，按当前角色挂分组
  */
+function pluginPagePath(pluginName: string, pagePath: string) {
+  if (pluginName === 'airgate-playground' && pagePath === '/playground') {
+    return '/plugins/playground';
+  }
+  return `/plugins/${pluginName}${pagePath}`;
+}
+
+function isPlaygroundPluginPath(path: string) {
+  return path === '/plugins/playground' || path.includes('/plugins/airgate-playground/');
+}
+
 function usePluginMenuItems(isAdmin: boolean): {
   adminItems: MenuItem[];
   userItems: MenuItem[];
@@ -109,7 +120,7 @@ function usePluginMenuItems(isAdmin: boolean): {
         isAdmin && (audience === 'admin' || audience === 'all');
 
       const item: MenuItem = {
-        path: `/plugins/${p.name}${page.path}`,
+        path: pluginPagePath(p.name, page.path),
         labelKey: page.title,
         icon: <Puzzle className="w-[18px] h-[18px]" />,
       };
@@ -179,7 +190,7 @@ export function AppShell({ children }: AppShellProps) {
   const pluginUserItemsMerged = pluginUserItems.map((item, i) =>
     i === 0 ? { path: item.path, labelKey: item.labelKey, icon: item.icon } : item,
   );
-  const apiKeyPluginItems = pluginUserItemsMerged.filter((item) => item.path.includes('/plugins/airgate-playground/'));
+  const apiKeyPluginItems = pluginUserItemsMerged.filter((item) => isPlaygroundPluginPath(item.path));
   const menuItems = isAPIKeySession
     ? [...apiKeyMenuItems, ...apiKeyPluginItems]
     : isAdmin

@@ -125,6 +125,17 @@ export interface BalanceLogResp {
 /** 账号状态枚举（与后端 scheduler 状态机对应）。 */
 export type AccountState = 'active' | 'rate_limited' | 'degraded' | 'disabled';
 
+/**
+ * 家族级限流冷却（Redis 侧）。account.state 仍可能是 active，
+ * 但该家族在 until 之前会被调度器跳过；其它家族不受影响。
+ */
+export interface FamilyCooldownDTO {
+  family: string;
+  /** RFC3339 UTC */
+  until: string;
+  reason?: string;
+}
+
 export interface AccountResp {
   id: number;
   name: string;
@@ -143,6 +154,14 @@ export interface AccountResp {
   upstream_is_pool: boolean;
   last_used_at?: string;
   group_ids: number[];
+  /** 当前在 Redis 上仍生效的家族级限流冷却列表；后端 omitempty，没有冷却时缺省。 */
+  family_cooldowns?: FamilyCooldownDTO[];
+  /**
+   * 仅 OpenAI 平台账号在列表接口下填充：今日 / 累计生图请求数（model 名前缀 "gpt-image"）。
+   * 0 也会显式给出（`{today: 0, total: 0}`）；非 OpenAI 平台字段缺省。
+   */
+  today_image_count?: number;
+  total_image_count?: number;
   created_at: string;
   updated_at: string;
 }

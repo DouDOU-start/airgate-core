@@ -56,6 +56,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 		body:              body,
 		model:             parsed.Model,
 		stream:            parsed.Stream,
+		realtime:          parsed.Stream,
 		sessionID:         parsed.SessionID,
 		requestedPlatform: requestedPlatform,
 		keyInfo:           keyInfo,
@@ -216,7 +217,7 @@ func buildPluginRequest(c *gin.Context, state *forwardState) *sdk.ForwardRequest
 		Model:   state.model,
 		Stream:  state.stream,
 	}
-	if state.stream {
+	if state.realtime {
 		req.Writer = c.Writer
 	}
 	return req

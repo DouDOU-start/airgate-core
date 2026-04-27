@@ -19,6 +19,7 @@ type forwardState struct {
 	body      []byte
 	model     string
 	stream    bool
+	realtime  bool
 	sessionID string
 
 	requestedPlatform string

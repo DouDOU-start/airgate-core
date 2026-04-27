@@ -2,10 +2,18 @@ package account
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
 )
+
+// isImageModel 判断 usage_log.model 是否属于生图家族。
+// 与 scheduler.ModelFamily 的 "gpt-image-*" 规则保持一致 —— 不直接 import scheduler
+// 包是为了避免 stats 这一层依赖调度模块。两边都改时记得同步更新。
+func isImageModel(model string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "gpt-image")
+}
 
 const (
 	defaultPage     = 1
@@ -85,6 +93,7 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 	for _, log := range logs {
 		// 按用户时区对齐日期 key，避免 UTC 切换导致跨日错位
 		dateKey := log.CreatedAt.In(location).Format("2006-01-02")
+		isImage := isImageModel(log.Model)
 
 		result.Range.Count++
 		result.Range.InputTokens += log.InputTokens
@@ -93,6 +102,10 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 		result.Range.AccountCost += log.AccountCost
 		result.Range.ActualCost += log.ActualCost
 		totalDurationMs += log.DurationMs
+		if isImage {
+			result.Range.ImageCount++
+			result.Range.ImageCost += log.AccountCost
+		}
 
 		if !log.CreatedAt.Before(today) {
 			result.Today.Count++
@@ -101,6 +114,10 @@ func BuildStatsResult(account Account, logs []UsageLog, now, startDate, endDate 
 			result.Today.TotalCost += log.TotalCost
 			result.Today.AccountCost += log.AccountCost
 			result.Today.ActualCost += log.ActualCost
+			if isImage {
+				result.Today.ImageCount++
+				result.Today.ImageCost += log.AccountCost
+			}
 		}
 
 		if stats, ok := dailyMap[dateKey]; ok {

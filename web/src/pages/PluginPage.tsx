@@ -6,19 +6,25 @@ import { loadPluginFrontend, type PluginFrontendModule } from '../app/plugin-loa
  * 插件页面容器
  * 根据 URL 中的 pluginName 加载对应插件的前端模块，并渲染匹配的子路由组件。
  */
-export default function PluginPage() {
+interface PluginPageProps {
+  pluginNameOverride?: string;
+  subPathOverride?: string;
+}
+
+export default function PluginPage({ pluginNameOverride, subPathOverride }: PluginPageProps = {}) {
   const { pluginName, _splat } = useParams({ strict: false });
+  const resolvedPluginName = pluginNameOverride || pluginName;
   const [mod, setMod] = useState<PluginFrontendModule | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!pluginName) return;
+    if (!resolvedPluginName) return;
     setLoading(true);
-    loadPluginFrontend(pluginName).then((m) => {
+    loadPluginFrontend(resolvedPluginName).then((m) => {
       setMod(m);
       setLoading(false);
     });
-  }, [pluginName]);
+  }, [resolvedPluginName]);
 
   if (loading) {
     return (
@@ -37,7 +43,7 @@ export default function PluginPage() {
   }
 
   // 从 _splat 匹配插件声明的路由
-  const subPath = '/' + (_splat || '');
+  const subPath = subPathOverride || '/' + (_splat || '');
   const matched = mod.routes.find((r) => r.path === subPath) || mod.routes[0];
 
   if (!matched) {

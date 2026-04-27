@@ -320,6 +320,76 @@ func (s *AccountStore) BatchWindowStats(ctx context.Context, accountIDs []int, s
 	return result, nil
 }
 
+// imageModelPrefix 与 app/account/stats.go::isImageModel 保持一致。
+// 改这里时记得同步那边，避免"统计口径"和"列表展示"对不上。
+const imageModelPrefix = "gpt-image"
+
+// BatchImageStats 一次拿"今日生图数"和"累计生图数"两组聚合，
+// 仅算 model 前缀 "gpt-image" 的请求。两条 GROUP BY 查询：
+//
+//	SELECT account_id, COUNT(*) FROM usage_log
+//	  WHERE account_id IN (...) AND model LIKE 'gpt-image%' [AND created_at >= ?]
+//	  GROUP BY account_id
+//
+// 调用方传 openai 平台的账号 ID 子集即可——chat-only 平台传进来不会出错（match 0 行），
+// 只是浪费一次查询。
+func (s *AccountStore) BatchImageStats(ctx context.Context, accountIDs []int, todayStart time.Time) (map[int]appaccount.AccountImageStats, error) {
+	result := map[int]appaccount.AccountImageStats{}
+	if len(accountIDs) == 0 {
+		return result, nil
+	}
+
+	type row struct {
+		AccountID int `json:"account_usage_logs"`
+		Count     int `json:"count"`
+	}
+
+	// 累计：不带 created_at 限制
+	var totalRows []row
+	if err := s.db.UsageLog.Query().
+		Where(
+			entusagelog.HasAccountWith(entaccount.IDIn(accountIDs...)),
+			entusagelog.ModelHasPrefix(imageModelPrefix),
+		).
+		GroupBy(entusagelog.AccountColumn).
+		Aggregate(ent.Count()).
+		Scan(ctx, &totalRows); err != nil {
+		return nil, err
+	}
+	for _, r := range totalRows {
+		if r.AccountID == 0 {
+			continue
+		}
+		entry := result[r.AccountID]
+		entry.TotalCount = int64(r.Count)
+		result[r.AccountID] = entry
+	}
+
+	// 今日：created_at >= todayStart
+	var todayRows []row
+	if err := s.db.UsageLog.Query().
+		Where(
+			entusagelog.HasAccountWith(entaccount.IDIn(accountIDs...)),
+			entusagelog.ModelHasPrefix(imageModelPrefix),
+			entusagelog.CreatedAtGTE(todayStart),
+		).
+		GroupBy(entusagelog.AccountColumn).
+		Aggregate(ent.Count()).
+		Scan(ctx, &todayRows); err != nil {
+		return nil, err
+	}
+	for _, r := range todayRows {
+		if r.AccountID == 0 {
+			continue
+		}
+		entry := result[r.AccountID]
+		entry.TodayCount = int64(r.Count)
+		result[r.AccountID] = entry
+	}
+
+	return result, nil
+}
+
 // SaveCredentials 保存账号凭证。
 func (s *AccountStore) SaveCredentials(ctx context.Context, id int, credentials map[string]string) error {
 	if err := s.db.Account.UpdateOneID(id).

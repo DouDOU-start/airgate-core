@@ -1,26 +1,43 @@
 package dto
 
+// FamilyCooldownDTO 家族级限流冷却（Redis 侧），AccountResp.FamilyCooldowns 元素。
+//
+// 与 state=rate_limited 的账号级状态区别：账号级是 DB 字段、影响整账号；
+// 家族级落 Redis、TTL 自然回收，只影响该 family 的请求。两者会同时存在或独立存在。
+type FamilyCooldownDTO struct {
+	Family string `json:"family"`
+	Until  string `json:"until"` // RFC3339 UTC
+	Reason string `json:"reason,omitempty"`
+}
+
 // AccountResp 账号响应。
 //
 // state 枚举：active / rate_limited / degraded / disabled
 // state_until 仅 rate_limited / degraded 有值（到期自动恢复 active）
+// family_cooldowns 当前在 Redis 上仍生效的家族级冷却列表（gpt-image 撞 4000/min 等），
+// state=active 也可能非空。
+// today_image_count / total_image_count 仅 OpenAI 平台账号在列表接口下填充；
+// 用户期望"账号管理页一眼看到今天/累计生了几张图"。
 type AccountResp struct {
-	ID                 int64             `json:"id"`
-	Name               string            `json:"name"`
-	Platform           string            `json:"platform"`
-	Type               string            `json:"type"`
-	Credentials        map[string]string `json:"credentials"`
-	State              string            `json:"state"`
-	StateUntil         *string           `json:"state_until,omitempty"`
-	Priority           int               `json:"priority"`
-	MaxConcurrency     int               `json:"max_concurrency"`
-	CurrentConcurrency int               `json:"current_concurrency"`
-	ProxyID            *int64            `json:"proxy_id,omitempty"`
-	RateMultiplier     float64           `json:"rate_multiplier"`
-	ErrorMsg           string            `json:"error_msg,omitempty"`
-	UpstreamIsPool     bool              `json:"upstream_is_pool"`
-	LastUsedAt         *string           `json:"last_used_at,omitempty"`
-	GroupIDs           []int64           `json:"group_ids"`
+	ID                 int64               `json:"id"`
+	Name               string              `json:"name"`
+	Platform           string              `json:"platform"`
+	Type               string              `json:"type"`
+	Credentials        map[string]string   `json:"credentials"`
+	State              string              `json:"state"`
+	StateUntil         *string             `json:"state_until,omitempty"`
+	Priority           int                 `json:"priority"`
+	MaxConcurrency     int                 `json:"max_concurrency"`
+	CurrentConcurrency int                 `json:"current_concurrency"`
+	ProxyID            *int64              `json:"proxy_id,omitempty"`
+	RateMultiplier     float64             `json:"rate_multiplier"`
+	ErrorMsg           string              `json:"error_msg,omitempty"`
+	UpstreamIsPool     bool                `json:"upstream_is_pool"`
+	LastUsedAt         *string             `json:"last_used_at,omitempty"`
+	GroupIDs           []int64             `json:"group_ids"`
+	FamilyCooldowns    []FamilyCooldownDTO `json:"family_cooldowns,omitempty"`
+	TodayImageCount    *int64              `json:"today_image_count,omitempty"`
+	TotalImageCount    *int64              `json:"total_image_count,omitempty"`
 	TimeMixin
 }
 

@@ -41,7 +41,11 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 
 	list := make([]dto.AccountResp, 0, len(result.List))
 	for _, item := range result.List {
-		list = append(list, toAccountResp(item))
+		resp := toAccountResp(item)
+		// 家族冷却落 Redis、不在 DB，handler 层叠加：N 次 Redis SCAN（每账号 0~3 个 key），
+		// page_size=20 默认下额外 RTT 可忽略；scheduler 不可用时直接为空，不影响主响应。
+		resp.FamilyCooldowns = h.familyCooldownsFor(c.Request.Context(), item.ID)
+		list = append(list, resp)
 	}
 
 	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
@@ -155,7 +159,9 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, toAccountResp(item))
+	resp := toAccountResp(item)
+	resp.FamilyCooldowns = h.familyCooldownsFor(c.Request.Context(), item.ID)
+	response.Success(c, resp)
 }
 
 // UpdateAccount 更新账号。
@@ -204,7 +210,9 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, toAccountResp(item))
+	resp := toAccountResp(item)
+	resp.FamilyCooldowns = h.familyCooldownsFor(c.Request.Context(), item.ID)
+	response.Success(c, resp)
 }
 
 // DeleteAccount 删除账号。

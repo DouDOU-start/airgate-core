@@ -78,6 +78,10 @@ func (s stubRepository) BatchWindowStats(context.Context, []int, time.Time) (map
 	return nil, nil
 }
 
+func (s stubRepository) BatchImageStats(context.Context, []int, time.Time) (map[int]AccountImageStats, error) {
+	return nil, nil
+}
+
 func (s stubRepository) SaveCredentials(context.Context, int, map[string]string) error { return nil }
 
 // stubStateWriter 捕获 StateWriter 调用。

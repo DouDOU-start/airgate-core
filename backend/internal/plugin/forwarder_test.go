@@ -1,8 +1,13 @@
 package plugin
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+
+	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/routing"
 )
@@ -38,6 +43,72 @@ func TestParseBody_StreamTrue(t *testing.T) {
 	}
 	if parsed.SessionID != "sess-1" {
 		t.Fatalf("SessionID = %q, want %q", parsed.SessionID, "sess-1")
+	}
+}
+
+func TestBuildPluginRequestUsesWriterForStreamRequest(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+	state := &forwardState{
+		requestPath: "/v1/images/generations",
+		stream:      true,
+		realtime:    true,
+		keyInfo:     &auth.APIKeyInfo{},
+		account:     &ent.Account{},
+	}
+
+	req := buildPluginRequest(c, state)
+	if !req.Stream {
+		t.Fatalf("Stream = false, want true")
+	}
+	if req.Writer == nil {
+		t.Fatalf("Writer = nil, want stream writer")
+	}
+}
+
+func TestBuildPluginRequestOmitsWriterForPlainNonStreamRequest(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	state := &forwardState{
+		requestPath: "/v1/chat/completions",
+		stream:      false,
+		realtime:    false,
+		keyInfo:     &auth.APIKeyInfo{},
+		account:     &ent.Account{},
+	}
+
+	req := buildPluginRequest(c, state)
+	if req.Writer != nil {
+		t.Fatalf("Writer = %T, want nil", req.Writer)
+	}
+}
+
+func TestBuildPluginRequestOmitsWriterForNonStreamImagesRequest(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+	state := &forwardState{
+		requestPath: "/v1/images/generations",
+		stream:      false,
+		realtime:    false,
+		keyInfo:     &auth.APIKeyInfo{},
+		account:     &ent.Account{},
+	}
+
+	req := buildPluginRequest(c, state)
+	if req.Stream {
+		t.Fatalf("Stream = true, want false")
+	}
+	if req.Writer != nil {
+		t.Fatalf("Writer = %T, want nil", req.Writer)
 	}
 }
 

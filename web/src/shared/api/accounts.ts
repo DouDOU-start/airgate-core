@@ -64,6 +64,9 @@ export const accountsApi = {
  *   - total_cost   原始上游定价（base，不含任何倍率）
  *   - account_cost 账号实际成本 = total × account_rate（"账号计费"统计）
  *   - actual_cost  用户扣费     = total × billing_rate
+ *
+ * image_count / image_cost 是 model 名 "gpt-image*" 的子集再聚一次，
+ * 不影响 count / *_cost（它们仍然是全部请求总和）。
  */
 export interface AccountPeriodStats {
   count: number;
@@ -72,6 +75,8 @@ export interface AccountPeriodStats {
   total_cost: number;
   account_cost: number;
   actual_cost: number;
+  image_count: number;
+  image_cost: number;
 }
 
 export interface AccountDailyStats {

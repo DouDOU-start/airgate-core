@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
@@ -68,6 +68,10 @@ function formatCountdown(ms: number): string {
  *   degraded     → 黄色 "降级 Xm"（池账号软降级，倒计时）
  *   disabled     → 红色 "已禁用"（tooltip 显示 error_msg）
  * 到期的 rate_limited / degraded 视作 active（后端 lazy 回收，前端可先显示 active）。
+ *
+ * 同一行还会叠加家族级冷却（family_cooldowns）：账号 state 可能仍是 active，
+ * 但某个 family（如 gpt-image）在 Redis 上仍处冷却中。用一个橙色小 pill
+ * 标出"限流家族数"，hover tooltip 列出每个家族剩余时间。
  */
 function AccountStatusCell({ row }: { row: AccountResp }) {
   const { t } = useTranslation();
@@ -75,13 +79,21 @@ function AccountStatusCell({ row }: { row: AccountResp }) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!untilMs || untilMs <= now) return;
+    if (!untilMs || untilMs <= now) {
+      // 即使账号 state 不需要倒计时，也可能有家族冷却需要刷新显示
+      if (!row.family_cooldowns || row.family_cooldowns.length === 0) return;
+    }
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [untilMs, now]);
+  }, [untilMs, now, row.family_cooldowns]);
 
   const remainingMs = untilMs - now;
   const hasCountdown = untilMs > 0 && remainingMs > 0;
+
+  // 过滤出仍生效的家族冷却（后端可能返回刚到期的）。
+  const liveFamilyCooldowns = (row.family_cooldowns || []).filter(
+    (fc) => Date.parse(fc.until) > now,
+  );
 
   const pill = (label: string, bg: string, fg: string, tooltip?: string) => (
     <span
@@ -94,27 +106,59 @@ function AccountStatusCell({ row }: { row: AccountResp }) {
     </span>
   );
 
+  // 主 state 徽标
+  let mainBadge: ReactElement;
   if (row.state === 'rate_limited' && hasCountdown) {
-    return pill(
+    mainBadge = pill(
       `${t('accounts.rate_limited_label', '限流中')} ${formatCountdown(remainingMs)}`,
       'var(--ag-warning-subtle)',
       'var(--ag-warning)',
       t('accounts.rate_limited_tooltip', '上游限流，到期自动恢复，不影响调度开关'),
     );
-  }
-  if (row.state === 'degraded' && hasCountdown) {
-    return pill(
+  } else if (row.state === 'degraded' && hasCountdown) {
+    mainBadge = pill(
       `${t('accounts.degraded_label', '降级')} ${formatCountdown(remainingMs)}`,
       'var(--ag-warning-subtle)',
       'var(--ag-warning)',
       t('accounts.degraded_tooltip', '上游池抖动，软降级仅做兜底，到期自动恢复'),
     );
+  } else if (row.state === 'disabled') {
+    mainBadge = <StatusBadge status="disabled" tooltip={row.error_msg || undefined} />;
+  } else {
+    // active，或 rate_limited/degraded 已到期（lazy 恢复）
+    mainBadge = <StatusBadge status="active" />;
   }
-  if (row.state === 'disabled') {
-    return <StatusBadge status="disabled" tooltip={row.error_msg || undefined} />;
+
+  if (liveFamilyCooldowns.length === 0) {
+    return mainBadge;
   }
-  // active，或 rate_limited/degraded 已到期（lazy 恢复）
-  return <StatusBadge status="active" />;
+
+  // tooltip 多行：每个家族 + 剩余时间，rate-limit 原因截断到 80 字符避免过宽
+  const familyTooltip = liveFamilyCooldowns
+    .map((fc) => {
+      const ms = Date.parse(fc.until) - now;
+      const reason = fc.reason ? ` — ${fc.reason.slice(0, 80)}` : '';
+      return `${fc.family} ${formatCountdown(ms)}${reason}`;
+    })
+    .join('\n');
+
+  const familyLabel = t(
+    'accounts.family_cooldown_label',
+    '{{count}} 家族限流',
+    { count: liveFamilyCooldowns.length },
+  );
+
+  return (
+    <div className="inline-flex flex-wrap items-center gap-1">
+      {mainBadge}
+      {pill(
+        familyLabel,
+        'var(--ag-warning-subtle)',
+        'var(--ag-warning)',
+        familyTooltip,
+      )}
+    </div>
+  );
 }
 
 export default function AccountsPage() {
@@ -730,6 +774,15 @@ export default function AccountsPage() {
                 <span title={t('accounts.window_user_cost', '用户消耗（平台计费）')}>
                   <span style={{ opacity: 0.6 }}>U </span>${todayStats.user_cost.toFixed(2)}
                 </span>
+                {row.platform === 'openai' && (row.today_image_count ?? 0) > 0 && (
+                  <>
+                    <span style={{ opacity: 0.4 }}>·</span>
+                    <span title={t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）')}>
+                      <span style={{ opacity: 0.6 }}>{t('accounts.image_count_inline_label', '图 ')}</span>
+                      {formatCompact(row.today_image_count ?? 0, false)}
+                    </span>
+                  </>
+                )}
               </div>
             )}
             {credits && (
@@ -1114,6 +1167,9 @@ export default function AccountsPage() {
       {statsAccountId !== null && (
         <AccountStatsModal
           accountId={statsAccountId}
+          // 累计生图数从列表行直接传：BatchImageStats 一次查到，避免再让 stats endpoint 多跑一次。
+          // 仅 OpenAI 平台账号有该字段；非 openai 时 modal 内部会跳过显示。
+          lifetimeImageCount={data?.list.find((a) => a.id === statsAccountId)?.total_image_count}
           onClose={() => setStatsAccountId(null)}
         />
       )}

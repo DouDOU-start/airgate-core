@@ -42,6 +42,9 @@ type Account struct {
 	Extra          map[string]any
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	// ImageStats 仅 OpenAI 平台账号在列表查询路径上填充；其它平台 / 详情查询路径为 nil。
+	// 取自 usage_log model 名前缀 "gpt-image" 的子集聚合。
+	ImageStats *AccountImageStats
 }
 
 // AccountWindowStats 单个账号在某个时间窗口内的聚合统计。
@@ -51,6 +54,17 @@ type AccountWindowStats struct {
 	Tokens      int64
 	AccountCost float64 // SUM(account_cost)，账号真实消耗（上游成本）
 	UserCost    float64 // SUM(actual_cost)，用户扣费总额（平台计费）
+}
+
+// AccountImageStats 单账号生图请求计数。
+//
+// 用于账号列表页"今日 N · 累计 M"展示。仅 OpenAI 平台账号填充（Claude / Anthropic
+// 等平台没有图像生成 endpoint，调用方按零值跳过）。
+//
+// "生图" 的判定与 stats.go::isImageModel 保持一致：model 名前缀 "gpt-image"。
+type AccountImageStats struct {
+	TodayCount int64 // 今日 00:00（服务器本地时区）至今的生图请求数
+	TotalCount int64 // 全部历史生图请求数
 }
 
 // UsageLog 使用记录聚合输入。
@@ -209,6 +223,9 @@ type StatsQuery struct {
 //   - TotalCost   = SUM(usage_log.total_cost)   原始上游定价
 //   - AccountCost = SUM(usage_log.account_cost) 账号实际成本 = total × account_rate（"账号计费"）
 //   - ActualCost  = SUM(usage_log.actual_cost)  用户扣费     = total × billing_rate
+//
+// ImageCount / ImageCost 把 model 名为 "gpt-image*" 的请求单独再聚一次，
+// 不影响 Count/cost（它们仍然是全部请求总和）。给后台展示"今日生图 N 张 / $X"用。
 type PeriodStats struct {
 	Count        int     `json:"count"`
 	InputTokens  int64   `json:"input_tokens"`
@@ -216,6 +233,8 @@ type PeriodStats struct {
 	TotalCost    float64 `json:"total_cost"`
 	AccountCost  float64 `json:"account_cost"`
 	ActualCost   float64 `json:"actual_cost"`
+	ImageCount   int     `json:"image_count"`
+	ImageCost    float64 `json:"image_cost"`
 }
 
 // DailyStats 每日统计。
@@ -314,5 +333,8 @@ type Repository interface {
 	FindUsageLogs(context.Context, int, time.Time, time.Time) ([]UsageLog, error)
 	// BatchWindowStats 批量聚合统计，没有记录的账号不出现在返回 map 中。
 	BatchWindowStats(ctx context.Context, accountIDs []int, startTime time.Time) (map[int]AccountWindowStats, error)
+	// BatchImageStats 批量统计指定账号的生图请求数（model 前缀 "gpt-image"）。
+	// 同时返回 [todayStart, now] 区间和 全部历史 两个计数。无记录的账号不出现在返回 map 中。
+	BatchImageStats(ctx context.Context, accountIDs []int, todayStart time.Time) (map[int]AccountImageStats, error)
 	SaveCredentials(context.Context, int, map[string]string) error
 }

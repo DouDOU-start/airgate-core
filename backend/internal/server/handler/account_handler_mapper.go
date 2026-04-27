@@ -38,6 +38,13 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 		proxyID := int64(account.Proxy.ID)
 		resp.ProxyID = &proxyID
 	}
+	// 生图计数仅 OpenAI 平台在列表路径上填充；其它平台 / 详情路径 ImageStats=nil → 字段缺省。
+	if account.ImageStats != nil {
+		today := account.ImageStats.TodayCount
+		total := account.ImageStats.TotalCount
+		resp.TodayImageCount = &today
+		resp.TotalImageCount = &total
+	}
 
 	return resp
 }

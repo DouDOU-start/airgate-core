@@ -60,9 +60,12 @@ function fmtDate(dateStr: string): string {
 
 export function AccountStatsModal({
   accountId,
+  lifetimeImageCount,
   onClose,
 }: {
   accountId: number;
+  /** 累计生图数（全部历史，不受时间范围限制）。由列表页直接透传，避免 stats endpoint 多查一遍。仅 OpenAI 平台账号有值。 */
+  lifetimeImageCount?: number;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -123,13 +126,13 @@ export function AccountStatsModal({
           {t('common.loading')}
         </div>
       ) : data ? (
-        <StatsContent data={data} />
+        <StatsContent data={data} lifetimeImageCount={lifetimeImageCount} />
       ) : null}
     </Modal>
   );
 }
 
-function StatsContent({ data }: { data: AccountStatsResp }) {
+function StatsContent({ data, lifetimeImageCount }: { data: AccountStatsResp; lifetimeImageCount?: number }) {
   const { t } = useTranslation();
   const range = data.range;
 
@@ -205,6 +208,12 @@ function StatsContent({ data }: { data: AccountStatsResp }) {
           <InfoRow label={t('accounts.stats_actual_cost')} value={fmtCost(data.today.actual_cost)} />
           <InfoRow label={t('accounts.stats_requests')} value={data.today.count.toLocaleString()} />
           <InfoRow label="Token" value={fmtNum(data.today.input_tokens + data.today.output_tokens)} />
+          {data.today.image_count > 0 && (
+            <InfoRow
+              label={t('accounts.stats_today_images', '今日生图')}
+              value={`${fmtNum(data.today.image_count)} · ${fmtCost(data.today.image_cost)}`}
+            />
+          )}
         </InfoCard>
 
         {/* 最高费用日 */}
@@ -243,6 +252,19 @@ function StatsContent({ data }: { data: AccountStatsResp }) {
           <InfoRow label={t('accounts.stats_today_requests')} value={data.today.count.toLocaleString()} />
           <InfoRow label={t('accounts.stats_today_tokens')} value={fmtNum(data.today.input_tokens + data.today.output_tokens)} />
           <InfoRow label={t('accounts.stats_today_cost')} value={fmtCost(data.today.account_cost)} />
+          {range.image_count > 0 && (
+            <InfoRow
+              label={t('accounts.stats_range_images', '区间生图')}
+              value={`${fmtNum(range.image_count)} · ${fmtCost(range.image_cost)}`}
+            />
+          )}
+          {/* 累计生图来自列表页透传，跨整段历史；仅 OpenAI 平台 + lifetime 列表查询有值。 */}
+          {lifetimeImageCount !== undefined && lifetimeImageCount > 0 && (
+            <InfoRow
+              label={t('accounts.stats_lifetime_images', '累计生图')}
+              value={fmtNum(lifetimeImageCount)}
+            />
+          )}
         </InfoCard>
       </div>
 

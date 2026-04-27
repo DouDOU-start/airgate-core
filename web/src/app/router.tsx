@@ -189,6 +189,16 @@ const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/pro
 const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/keys', component: UserKeysPage });
 const userUsageRoute = createRoute({ getParentRoute: () => authLayout, path: '/usage', component: UserUsagePage });
 
+const playgroundPluginRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/plugins/playground',
+  component: () => (
+    <Suspense fallback={null}>
+      <PluginPage pluginNameOverride="airgate-playground" subPathOverride="/playground" />
+    </Suspense>
+  ),
+});
+
 // 插件页面路由（catch-all）
 const pluginRoute = createRoute({
   getParentRoute: () => authLayout,
@@ -221,6 +231,7 @@ const routeTree = rootRoute.addChildren([
     profileRoute,
     userKeysRoute,
     userUsageRoute,
+    playgroundPluginRoute,
     pluginRoute,
   ]),
 ]);
