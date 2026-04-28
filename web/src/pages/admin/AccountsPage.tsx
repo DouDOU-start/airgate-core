@@ -873,14 +873,6 @@ export default function AccountsPage() {
           </button>
           <button
             className="p-1.5 rounded hover:bg-bg-hover transition-colors"
-            style={{ color: 'var(--ag-warning)' }}
-            title={t('accounts.clear_family_cooldowns')}
-            onClick={() => clearRateLimitMarkersMutation.mutate(row.id)}
-          >
-            <Eraser className="w-3.5 h-3.5" />
-          </button>
-          <button
-            className="p-1.5 rounded hover:bg-bg-hover transition-colors"
             style={{ color: 'var(--ag-danger)' }}
             title={t('common.delete')}
             onClick={() => setDeletingAccount(row)}
@@ -1144,6 +1136,14 @@ export default function AccountsPage() {
                     {t('accounts.refresh_quota')}
                   </button>
                 )}
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left"
+                  style={{ color: 'var(--ag-text-secondary)' }}
+                  onClick={() => { clearRateLimitMarkersMutation.mutate(row.id); setMoreMenu(null); }}
+                >
+                  <Eraser className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
+                  {t('accounts.clear_family_cooldowns')}
+                </button>
               </>
             );
           })()}
