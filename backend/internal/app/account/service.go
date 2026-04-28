@@ -52,6 +52,8 @@ type StateWriter interface {
 	MarkRateLimited(ctx context.Context, accountID int, until time.Time, reason string)
 	// ClearRateLimited 账号已从限流中恢复，回到 active。
 	ClearRateLimited(ctx context.Context, accountID int)
+	// ClearRateLimitMarkers 清除账号上的临时限流标记。
+	ClearRateLimitMarkers(ctx context.Context, accountID int) int
 	// MarkDisabled 永久禁用（凭证失效等，需要人工重新验证）。
 	MarkDisabled(ctx context.Context, accountID int, reason string)
 }
@@ -961,6 +963,9 @@ func (s *Service) RefreshQuota(ctx context.Context, id int) (QuotaRefreshResult,
 	// 主动调一次 usage/probe 把窗口数据灌进插件内存缓存，下次 usage/accounts 就能读到。
 	// 探测失败不阻断主流程——订阅信息已经成功返回，窗口数据下一个 5 分钟周期还会再试。
 	s.triggerUsageProbe(ctx, inst, id, credentials)
+	if s.stateWriter != nil {
+		s.stateWriter.ClearRateLimitMarkers(ctx, id)
+	}
 
 	return QuotaRefreshResult{
 		PlanType:                credentials["plan_type"],

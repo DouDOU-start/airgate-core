@@ -318,6 +318,8 @@
     "rate_limited_tooltip": "Upstream rate-limited. Auto-recovers at reset time; schedule toggle is unaffected.",
     "family_cooldown_label_one": "{{count}} family cooling",
     "family_cooldown_label_other": "{{count}} families cooling",
+    "clear_family_cooldowns": "Clear rate-limit markers",
+    "clear_family_cooldowns_success": "Rate-limit markers cleared",
     "image_count_tooltip": "Today image requests (gpt-image family)",
     "image_count_inline_label": "Img ",
     "stats_lifetime_images": "Lifetime images",

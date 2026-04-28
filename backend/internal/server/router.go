@@ -120,6 +120,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.DELETE("/accounts/:id", handlers.Account.DeleteAccount)
 		adminGroup.POST("/accounts/:id/test", handlers.Account.TestAccount)
 		adminGroup.PATCH("/accounts/:id/toggle", handlers.Account.ToggleScheduling)
+		adminGroup.DELETE("/accounts/:id/family-cooldowns", handlers.Account.ClearFamilyCooldowns)
 		adminGroup.GET("/accounts/:id/models", handlers.Account.GetAccountModels)
 		adminGroup.GET("/accounts/credentials-schema/:platform", handlers.Account.GetCredentialsSchema)
 		adminGroup.POST("/accounts/:id/refresh-quota", handlers.Account.RefreshQuota)

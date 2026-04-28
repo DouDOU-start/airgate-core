@@ -459,7 +459,21 @@ func (h *AccountHandler) GetCredentialsSchema(c *gin.Context) {
 	response.Success(c, toCredentialSchemaResp(schema))
 }
 
-// RefreshQuota 手动刷新账号额度。
+// ClearFamilyCooldowns 手动清除账号上的临时限流标记。
+func (h *AccountHandler) ClearFamilyCooldowns(c *gin.Context) {
+	id, err := parseAccountID(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "无效的账号 ID")
+		return
+	}
+	if h.scheduler == nil {
+		response.Error(c, http.StatusServiceUnavailable, http.StatusServiceUnavailable, "调度器不可用")
+		return
+	}
+	cleared := h.scheduler.ClearRateLimitMarkers(c.Request.Context(), id)
+	response.Success(c, gin.H{"cleared": cleared})
+}
+
 func (h *AccountHandler) RefreshQuota(c *gin.Context) {
 	id, err := parseAccountID(c.Param("id"))
 	if err != nil {

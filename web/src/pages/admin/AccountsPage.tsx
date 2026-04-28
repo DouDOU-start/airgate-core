@@ -61,6 +61,11 @@ function formatCountdown(ms: number): string {
   return `${sec}s`;
 }
 
+function hasAccountRateLimitMarker(row: AccountResp, now = Date.now()): boolean {
+  return (row.state === 'rate_limited' || row.state === 'degraded') &&
+    !!row.state_until && Date.parse(row.state_until) > now;
+}
+
 /**
  * AccountStatusCell 渲染账号状态徽标，按 state + state_until 动态展示：
  *   active       → 绿色 "活跃"
@@ -405,6 +410,16 @@ export default function AccountsPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
+  const clearRateLimitMarkersMutation = useMutation({
+    mutationFn: (id: number) => accountsApi.clearFamilyCooldowns(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
+      toast('success', t('accounts.clear_family_cooldowns_success'));
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
   // 批量操作通用的结果处理：全部成功 → success toast；部分成功 → warning；全部失败 → error。
   const handleBulkResult = (res: BulkOpResp, okKey: string) => {
     queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
@@ -647,6 +662,7 @@ export default function AccountsPage() {
           target.style.pointerEvents = 'none';
           try {
             await accountsApi.refreshQuota(row.id);
+            queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
             queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
             toast('success', t('accounts.refresh_usage_success', '用量刷新成功'));
           } catch (err) {
@@ -1101,6 +1117,16 @@ export default function AccountsPage() {
                   >
                     <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />
                     {t('accounts.refresh_quota')}
+                  </button>
+                )}
+                {(((row.family_cooldowns?.length ?? 0) > 0) || hasAccountRateLimitMarker(row)) && (
+                  <button
+                    className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left"
+                    style={{ color: 'var(--ag-text-secondary)' }}
+                    onClick={() => { clearRateLimitMarkersMutation.mutate(row.id); setMoreMenu(null); }}
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
+                    {t('accounts.clear_family_cooldowns')}
                   </button>
                 )}
               </>

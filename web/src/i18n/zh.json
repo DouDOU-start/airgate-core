@@ -317,6 +317,8 @@
     "rate_limited_auto_recover": "自动恢复",
     "rate_limited_tooltip": "上游限流，到期自动恢复，不影响调度开关",
     "family_cooldown_label": "{{count}} 家族限流",
+    "clear_family_cooldowns": "清除限流标记",
+    "clear_family_cooldowns_success": "限流标记已清除",
     "image_count_tooltip": "今日生图请求数（gpt-image 系列）",
     "image_count_inline_label": "图 ",
     "stats_lifetime_images": "累计生图",

@@ -86,16 +86,18 @@ func (s stubRepository) SaveCredentials(context.Context, int, map[string]string)
 
 // stubStateWriter 捕获 StateWriter 调用。
 type stubStateWriter struct {
-	rateLimited map[int]*time.Time
-	cleared     map[int]bool
-	disabled    map[int]string
+	rateLimited    map[int]*time.Time
+	cleared        map[int]bool
+	markersCleared map[int]int
+	disabled       map[int]string
 }
 
 func newStubStateWriter() *stubStateWriter {
 	return &stubStateWriter{
-		rateLimited: map[int]*time.Time{},
-		cleared:     map[int]bool{},
-		disabled:    map[int]string{},
+		rateLimited:    map[int]*time.Time{},
+		cleared:        map[int]bool{},
+		markersCleared: map[int]int{},
+		disabled:       map[int]string{},
 	}
 }
 
@@ -106,6 +108,11 @@ func (s *stubStateWriter) MarkRateLimited(_ context.Context, accountID int, unti
 
 func (s *stubStateWriter) ClearRateLimited(_ context.Context, accountID int) {
 	s.cleared[accountID] = true
+}
+
+func (s *stubStateWriter) ClearRateLimitMarkers(_ context.Context, accountID int) int {
+	s.markersCleared[accountID]++
+	return 0
 }
 
 func (s *stubStateWriter) MarkDisabled(_ context.Context, accountID int, reason string) {

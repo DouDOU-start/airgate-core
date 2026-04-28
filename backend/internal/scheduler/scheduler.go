@@ -187,3 +187,11 @@ func (s *Scheduler) ListFamilyCooldowns(ctx context.Context, accountID int) []Fa
 	}
 	return s.familyCooldown.List(ctx, accountID)
 }
+
+// ClearFamilyCooldowns 清除指定账号当前所有家族级限流冷却。
+func (s *Scheduler) ClearFamilyCooldowns(ctx context.Context, accountID int) int {
+	if s.familyCooldown == nil {
+		return 0
+	}
+	return s.familyCooldown.ClearAccount(ctx, accountID)
+}

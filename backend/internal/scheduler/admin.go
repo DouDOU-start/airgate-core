@@ -42,6 +42,22 @@ func (s *Scheduler) ClearRateLimited(ctx context.Context, accountID int) {
 	s.state.transitionActive(ctx, accountID)
 }
 
+// ClearRateLimitMarkers 清除账号上的临时限流标记，不会恢复手动禁用的账号。
+func (s *Scheduler) ClearRateLimitMarkers(ctx context.Context, accountID int) int {
+	cleared := s.ClearFamilyCooldowns(ctx, accountID)
+	dbCtx, cancel := context.WithTimeout(ctx, dbTimeout)
+	defer cancel()
+	item, err := s.db.Account.Get(dbCtx, accountID)
+	if err != nil {
+		return cleared
+	}
+	if item.State == account.StateRateLimited || item.State == account.StateDegraded {
+		s.state.transitionActive(ctx, accountID)
+		cleared++
+	}
+	return cleared
+}
+
 // MarkDisabled 把账号标记为 disabled（凭证失效等确定性错误）。
 func (s *Scheduler) MarkDisabled(ctx context.Context, accountID int, reason string) {
 	s.state.transition(ctx, accountID, account.StateDisabled, nil, reason)

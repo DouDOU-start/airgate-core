@@ -97,6 +97,33 @@ func (fc *FamilyCooldown) Clear(ctx context.Context, accountID int, family strin
 	_ = fc.rdb.Del(ctx, familyCooldownKey(accountID, family)).Err()
 }
 
+// ClearAccount 清除账号下所有家族冷却。管理员刷新额度或手动解除限流标记时使用。
+func (fc *FamilyCooldown) ClearAccount(ctx context.Context, accountID int) int {
+	if fc == nil || fc.rdb == nil {
+		return 0
+	}
+	prefix := familyCooldownKey(accountID, "")
+	pattern := prefix + "*"
+	cleared := 0
+	var cursor uint64
+	for {
+		keys, next, err := fc.rdb.Scan(ctx, cursor, pattern, 32).Result()
+		if err != nil {
+			return cleared
+		}
+		if len(keys) > 0 {
+			if n, err := fc.rdb.Del(ctx, keys...).Result(); err == nil {
+				cleared += int(n)
+			}
+		}
+		if next == 0 {
+			break
+		}
+		cursor = next
+	}
+	return cleared
+}
+
 // FamilyCooldownEntry 描述一条仍在生效的家族冷却。给后台展示用。
 type FamilyCooldownEntry struct {
 	Family string
