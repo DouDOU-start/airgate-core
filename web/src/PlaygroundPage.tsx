@@ -1814,9 +1814,9 @@ export default function PlaygroundPage() {
     }
   }, [draftEditSelection, selectionPointFromEvent]);
 
-  const createEditMaskBlob = useCallback(async () => {
+  const createEditMaskBlob = useCallback(async (selection: EditSelectionRect) => {
     const canvas = editCanvasRef.current;
-    if (!canvas || !editSource || !editSelection) throw new Error('Selection required');
+    if (!canvas || !editSource) throw new Error('Selection required');
 
     const image = await loadImageElement(editSource.url);
     const maskCanvas = document.createElement('canvas');
@@ -1830,13 +1830,13 @@ export default function PlaygroundPage() {
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
     ctx.clearRect(
-      Math.floor(editSelection.x * scaleX),
-      Math.floor(editSelection.y * scaleY),
-      Math.ceil(editSelection.width * scaleX),
-      Math.ceil(editSelection.height * scaleY),
+      Math.floor(selection.x * scaleX),
+      Math.floor(selection.y * scaleY),
+      Math.ceil(selection.width * scaleX),
+      Math.ceil(selection.height * scaleY),
     );
     return canvasToBlob(maskCanvas);
-  }, [editSelection, editSource]);
+  }, [editSource]);
 
   const submitImageEdit = useCallback(async () => {
     if (!activeId || isStreaming || isEditingImage) return;
@@ -1856,6 +1856,11 @@ export default function PlaygroundPage() {
       setError(t('playground.choose_source_image_first'));
       return;
     }
+    if (!editSelection) {
+      setRetryRequest(null);
+      setError(t('playground.select_image_region_first', { defaultValue: 'Select a region to edit first.' }));
+      return;
+    }
 
     const prompt = input.trim();
     if (!prompt) {
@@ -1867,13 +1872,14 @@ export default function PlaygroundPage() {
     const groupID = resolveGroupID();
     let conversationID = activeId;
     const canvas = editCanvasRef.current;
-    const editAnnotation = canvas && editSelection ? {
+    const selection = editSelection;
+    const editAnnotation = canvas ? {
       imageIndex: 0,
       rect: {
-        x: editSelection.x / canvas.width,
-        y: editSelection.y / canvas.height,
-        width: editSelection.width / canvas.width,
-        height: editSelection.height / canvas.height,
+        x: selection.x / canvas.width,
+        y: selection.y / canvas.height,
+        width: selection.width / canvas.width,
+        height: selection.height / canvas.height,
       },
     } : null;
     const userContent = messageContentWithImages(prompt, [editSource], editAnnotation ? [editAnnotation] : []);
@@ -1937,14 +1943,14 @@ export default function PlaygroundPage() {
 
       const abort = new AbortController();
       abortRef.current = abort;
-      const maskBlob = editSelection ? await createEditMaskBlob() : null;
+      const maskBlob = await createEditMaskBlob(selection);
       if (abort.signal.aborted) return;
 
       const form = new FormData();
       form.append('model', selectedModelID);
       form.append('prompt', prompt);
       form.append('image', editSource.file, editSource.name || 'image.png');
-      if (maskBlob) form.append('mask', maskBlob, 'mask.png');
+      form.append('mask', maskBlob, 'mask.png');
       if (resolvedImageSize) form.append('size', resolvedImageSize);
 
       const response = await requestImageEdit(selectedPlatform, form, abort.signal);
@@ -2037,7 +2043,7 @@ export default function PlaygroundPage() {
   const activeConv = conversations.find(c => c.id === activeId);
   const lastMessage = messages[messages.length - 1];
   const visibleEditSelection = draftEditSelection || editSelection;
-  const isImageEditReady = Boolean(isEditPanelOpen && editSource && input.trim() && selectedPlatform && selectedModelID && selectedModelIsImage);
+  const isImageEditReady = Boolean(isEditPanelOpen && editSource && editSelection && input.trim() && selectedPlatform && selectedModelID && selectedModelIsImage);
   const hasRecoverableUserMessage = Boolean(activeId && activeId !== DRAFT_CONVERSATION_ID && lastMessage?.role === 'user' && !error && !isStreaming);
   const isActiveConversationStreaming = isStreaming && streamConversationId === activeId;
   const canSendMessage = Boolean((isEditPanelOpen ? isImageEditReady : (input.trim() || pendingImages.length > 0)) && selectedPlatform && selectedModelID) && !isStreaming && !isEditingImage;
@@ -2281,7 +2287,7 @@ export default function PlaygroundPage() {
                 <span style={styles.imageEditTitle}>{t('playground.edit_image_region')}</span>
                 <span style={styles.imageEditSubtitle}>
                   {editSource
-                    ? t('playground.edit_image_modal_hint', { defaultValue: 'Drag a region for localized edits, or just describe the change for a full-image edit.' })
+                    ? t('playground.edit_image_modal_hint', { defaultValue: 'Drag a region on the image, then describe the change for that area.' })
                     : t('playground.choose_source_image_region_hint')}
                 </span>
               </div>
@@ -2391,7 +2397,7 @@ export default function PlaygroundPage() {
                 <span style={styles.editModalHint}>
                   {editSelection
                     ? t('playground.edit_modal_region_hint', { defaultValue: 'Region edit · only the selected area will change' })
-                    : t('playground.edit_modal_full_hint', { defaultValue: 'Full-image edit · drag a region above for localized edits' })}
+                    : t('playground.edit_modal_full_hint', { defaultValue: 'Select a region before generating an edit' })}
                 </span>
                 <div style={styles.editModalBtnGroup}>
                   <button
@@ -2425,7 +2431,7 @@ export default function PlaygroundPage() {
                         <path d="M22 2L11 13" />
                         <path d="M22 2l-7 20-4-9-9-4 20-7z" />
                       </svg>
-                      {t('playground.edit_modal_submit', { defaultValue: 'Generate edit' })}
+                      {t('playground.edit_modal_submit', { defaultValue: 'Generate region edit' })}
                     </button>
                   )}
                 </div>
