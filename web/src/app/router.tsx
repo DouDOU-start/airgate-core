@@ -13,25 +13,24 @@ import { ErrorBoundary } from './providers/ErrorBoundary';
 import { getToken } from '../shared/api/client';
 import { usersApi } from '../shared/api/users';
 import { setupApi } from '../shared/api/setup';
-import DashboardPage from '../pages/DashboardPage';
-import UserOverviewPage from '../pages/user/UserOverviewPage';
-import UsersPage from '../pages/admin/UsersPage';
-import AccountsPage from '../pages/admin/AccountsPage';
-import GroupsPage from '../pages/admin/GroupsPage';
-import SubscriptionsPage from '../pages/admin/SubscriptionsPage';
-import ProxiesPage from '../pages/admin/ProxiesPage';
-import UsagePage from '../pages/admin/UsagePage';
-import PluginsPage from '../pages/admin/PluginsPage';
-import SettingsPage from '../pages/admin/SettingsPage';
-import ProfilePage from '../pages/user/ProfilePage';
-import UserKeysPage from '../pages/user/UserKeysPage';
-import UserUsagePage from '../pages/user/UserUsagePage';
-// 登录、安装、首页不常用，保持懒加载
 const SetupPage = lazy(() => import('../pages/SetupPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
 const PluginPage = lazy(() => import('../pages/PluginPage'));
 const PublicHomePage = lazy(() => import('../pages/HomePage'));
 const DocsPage = lazy(() => import('../pages/DocsPage'));
+const DashboardPage = lazy(() => import('../pages/DashboardPage'));
+const UserOverviewPage = lazy(() => import('../pages/user/UserOverviewPage'));
+const UsersPage = lazy(() => import('../pages/admin/UsersPage'));
+const AccountsPage = lazy(() => import('../pages/admin/AccountsPage'));
+const GroupsPage = lazy(() => import('../pages/admin/GroupsPage'));
+const SubscriptionsPage = lazy(() => import('../pages/admin/SubscriptionsPage'));
+const ProxiesPage = lazy(() => import('../pages/admin/ProxiesPage'));
+const UsagePage = lazy(() => import('../pages/admin/UsagePage'));
+const PluginsPage = lazy(() => import('../pages/admin/PluginsPage'));
+const SettingsPage = lazy(() => import('../pages/admin/SettingsPage'));
+const ProfilePage = lazy(() => import('../pages/user/ProfilePage'));
+const UserKeysPage = lazy(() => import('../pages/user/UserKeysPage'));
+const UserUsagePage = lazy(() => import('../pages/user/UserUsagePage'));
 
 // 缓存安装状态，避免每次路由跳转都请求
 let setupChecked = false;
@@ -153,12 +152,16 @@ const authLayout = createRoute({
   ),
 });
 
-// 首页：API Key 登录重定向到使用记录，管理员看仪表盘，普通用户看个人概览
 function HomePage() {
   const { user, isAPIKeySession } = useAuth();
   if (!user) return null;
-  if (isAPIKeySession) return <UserUsagePage />;
-  return user.role === 'admin' ? <DashboardPage /> : <UserOverviewPage />;
+
+  const Page = isAPIKeySession ? UserUsagePage : user.role === 'admin' ? DashboardPage : UserOverviewPage;
+  return (
+    <Suspense fallback={null}>
+      <Page />
+    </Suspense>
+  );
 }
 const dashboardRoute = createRoute({ getParentRoute: () => authLayout, path: '/', component: HomePage });
 
@@ -175,20 +178,26 @@ const adminLayout = createRoute({
   component: Outlet,
 });
 
-// 管理员路由
-const adminUsersRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/users', component: UsersPage });
-const adminAccountsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/accounts', component: AccountsPage });
-const adminGroupsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/groups', component: GroupsPage });
-const adminSubscriptionsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/subscriptions', component: SubscriptionsPage });
-const adminProxiesRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/proxies', component: ProxiesPage });
-const adminUsageRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/usage', component: UsagePage });
-const adminPluginsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/plugins', component: PluginsPage });
-const adminSettingsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/settings', component: SettingsPage });
+function renderPage(Page: React.LazyExoticComponent<React.ComponentType>) {
+  return () => (
+    <Suspense fallback={null}>
+      <Page />
+    </Suspense>
+  );
+}
 
-// 用户路由
-const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/profile', component: ProfilePage });
-const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/keys', component: UserKeysPage });
-const userUsageRoute = createRoute({ getParentRoute: () => authLayout, path: '/usage', component: UserUsagePage });
+const adminUsersRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/users', component: renderPage(UsersPage) });
+const adminAccountsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/accounts', component: renderPage(AccountsPage) });
+const adminGroupsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/groups', component: renderPage(GroupsPage) });
+const adminSubscriptionsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/subscriptions', component: renderPage(SubscriptionsPage) });
+const adminProxiesRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/proxies', component: renderPage(ProxiesPage) });
+const adminUsageRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/usage', component: renderPage(UsagePage) });
+const adminPluginsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/plugins', component: renderPage(PluginsPage) });
+const adminSettingsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/settings', component: renderPage(SettingsPage) });
+
+const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/profile', component: renderPage(ProfilePage) });
+const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/keys', component: renderPage(UserKeysPage) });
+const userUsageRoute = createRoute({ getParentRoute: () => authLayout, path: '/usage', component: renderPage(UserUsagePage) });
 
 // /chat: 全屏沉浸式 AI 对话页（airgate-playground 插件），独立布局不挂 AppShell。
 // 仍要求登录 + 安装完成；走 ChatShell 极简顶栏。
