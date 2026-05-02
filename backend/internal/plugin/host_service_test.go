@@ -35,6 +35,21 @@ func TestHostForwardTimeout(t *testing.T) {
 	}
 }
 
+func TestHostForwardReasoningEffort(t *testing.T) {
+	t.Parallel()
+
+	req := &pb.HostForwardRequest{
+		Body: []byte(`{"model":"gpt-5","reasoning":{"effort":"x-high"}}`),
+		Headers: map[string]*pb.HeaderValues{
+			"Content-Type": {Values: []string{"application/json"}},
+		},
+	}
+
+	if got := hostForwardReasoningEffort(req); got != "xhigh" {
+		t.Fatalf("hostForwardReasoningEffort() = %q, want %q", got, "xhigh")
+	}
+}
+
 func TestCheckHostForwardBalance(t *testing.T) {
 	ctx := context.Background()
 	db := enttest.Open(t, "sqlite3", "file:host_forward_balance?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))

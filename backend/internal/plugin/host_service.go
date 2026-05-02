@@ -902,6 +902,7 @@ func (h *HostService) recordHostForwardUsage(
 		ServiceTier:           usage.ServiceTier,
 		ImageSize:             usage.ImageSize,
 		Endpoint:              req.Path,
+		ReasoningEffort:       hostForwardReasoningEffort(req),
 		Stream:                req.Stream,
 		DurationMs:            duration.Milliseconds(),
 		FirstTokenMs:          usage.FirstTokenMs,
@@ -1097,6 +1098,13 @@ func hostForwardRequirements(req *pb.HostForwardRequest) routing.Requirements {
 		return routing.Requirements{}
 	}
 	return routing.Requirements{NeedsImage: requestNeedsImage(req.Path, req.Model)}
+}
+
+func hostForwardReasoningEffort(req *pb.HostForwardRequest) string {
+	if req == nil {
+		return ""
+	}
+	return parseBody(req.Body, protoHeadersToHTTPHost(req.Headers).Get("Content-Type")).ReasoningEffort
 }
 
 func (h *HostService) resolveHostModel(platform, model string) string {
