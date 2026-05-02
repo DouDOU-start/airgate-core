@@ -306,6 +306,8 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		FirstTokenMs:          usage.FirstTokenMs,
 		UserAgent:             c.Request.UserAgent(),
 		IPAddress:             c.ClientIP(),
+		Endpoint:              state.requestPath,
+		ReasoningEffort:       state.reasoningEffort,
 	})
 }
 

@@ -1,5 +1,0 @@
-go 1.25.7
-
-use .
-
-replace github.com/DouDOU-start/airgate-sdk => ../../airgate-sdk

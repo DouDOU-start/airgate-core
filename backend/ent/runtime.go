@@ -431,8 +431,16 @@ func init() {
 	usagelogDescIPAddress := usagelogFields[31].Descriptor()
 	// usagelog.DefaultIPAddress holds the default value on creation for the ip_address field.
 	usagelog.DefaultIPAddress = usagelogDescIPAddress.Default.(string)
+	// usagelogDescEndpoint is the schema descriptor for endpoint field.
+	usagelogDescEndpoint := usagelogFields[32].Descriptor()
+	// usagelog.DefaultEndpoint holds the default value on creation for the endpoint field.
+	usagelog.DefaultEndpoint = usagelogDescEndpoint.Default.(string)
+	// usagelogDescReasoningEffort is the schema descriptor for reasoning_effort field.
+	usagelogDescReasoningEffort := usagelogFields[33].Descriptor()
+	// usagelog.DefaultReasoningEffort holds the default value on creation for the reasoning_effort field.
+	usagelog.DefaultReasoningEffort = usagelogDescReasoningEffort.Default.(string)
 	// usagelogDescCreatedAt is the schema descriptor for created_at field.
-	usagelogDescCreatedAt := usagelogFields[32].Descriptor()
+	usagelogDescCreatedAt := usagelogFields[34].Descriptor()
 	// usagelog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	usagelog.DefaultCreatedAt = usagelogDescCreatedAt.Default.(func() time.Time)
 	userFields := schema.User{}.Fields()

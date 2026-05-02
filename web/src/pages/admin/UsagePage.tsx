@@ -435,11 +435,23 @@ export default function UsagePage() {
     },
   ];
 
-  // 在 "model" 列后面插入 API Key 和 Account 列
+  // 插入管理列。
   const modelIdx = sharedColumns.findIndex((c) => c.key === 'model');
   const columns: Column<UsageLogResp>[] = [
     ...adminColumns,
     ...sharedColumns.slice(0, modelIdx + 1),
+    {
+      key: 'reasoning',
+      title: t('usage.reasoning', '推理强度'),
+      width: '100px',
+      hideOnMobile: true,
+      render: (row) => {
+        if (row.reasoning_effort) {
+          return <span className="font-mono text-[11px] text-text-secondary">{row.reasoning_effort}</span>;
+        }
+        return <span className="text-text-tertiary">-</span>;
+      },
+    },
     {
       key: 'api_key',
       title: 'API Key',
@@ -473,6 +485,17 @@ export default function UsagePage() {
       },
     },
     ...sharedColumns.slice(modelIdx + 1),
+    {
+      key: 'endpoint',
+      title: t('usage.endpoint', '端点'),
+      width: '180px',
+      hideOnMobile: true,
+      render: (row) => (
+        <span className="font-mono text-[11px] text-text-secondary truncate block" title={row.endpoint}>
+          {row.endpoint || '-'}
+        </span>
+      ),
+    },
   ];
 
   return (

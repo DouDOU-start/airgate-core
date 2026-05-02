@@ -49,6 +49,49 @@ func TestParseBody_StreamTrue(t *testing.T) {
 	}
 }
 
+func TestParseBody_ReasoningEffort(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "openai flat",
+			body: `{"model":"gpt-5","reasoning_effort":"x-high"}`,
+			want: "xhigh",
+		},
+		{
+			name: "openai nested",
+			body: `{"model":"gpt-5","reasoning":{"effort":"high"}}`,
+			want: "high",
+		},
+		{
+			name: "anthropic output effort",
+			body: `{"model":"claude-opus-4-6","output_config":{"effort":"max"}}`,
+			want: "max",
+		},
+		{
+			name: "anthropic default",
+			body: `{"model":"claude-opus-4-6","thinking":{"type":"enabled","budget_tokens":32768}}`,
+			want: "high",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			parsed := parseBody([]byte(tt.body), "application/json")
+			if parsed.ReasoningEffort != tt.want {
+				t.Fatalf("ReasoningEffort = %q, want %q", parsed.ReasoningEffort, tt.want)
+			}
+		})
+	}
+}
+
 func TestBuildPluginRequestUsesWriterForStreamRequest(t *testing.T) {
 	t.Parallel()
 

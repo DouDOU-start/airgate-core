@@ -22,6 +22,9 @@ type forwardState struct {
 	realtime  bool
 	sessionID string
 
+	// 推理强度档位快照。
+	reasoningEffort string
+
 	requestedPlatform string
 	selectedRoute     routing.Candidate
 
@@ -40,9 +43,10 @@ type forwardExecution struct {
 
 // parsedRequest 从 JSON body 提取的请求元信息。
 type parsedRequest struct {
-	Model     string
-	Stream    bool
-	SessionID string
+	Model           string
+	Stream          bool
+	SessionID       string
+	ReasoningEffort string // 推理强度档位
 }
 
 // requestFields 一次性 Unmarshal 的 JSON 字段结构。
@@ -52,4 +56,12 @@ type requestFields struct {
 	Metadata struct {
 		UserID string `json:"user_id"`
 	} `json:"metadata"`
+	ReasoningEffort string `json:"reasoning_effort"`
+	Reasoning       *struct {
+		Effort string `json:"effort"`
+	} `json:"reasoning"`
+	OutputConfig *struct {
+		Effort string `json:"effort"`
+	} `json:"output_config"`
+	Thinking *struct{} `json:"thinking"`
 }

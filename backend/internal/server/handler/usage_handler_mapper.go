@@ -48,9 +48,11 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 		Stream:                record.Stream,
 		DurationMs:            record.DurationMs,
 		FirstTokenMs:          record.FirstTokenMs,
-		UserAgent:             record.UserAgent,
-		IPAddress:             record.IPAddress,
-		CreatedAt:             record.CreatedAt,
+		UserAgent:       record.UserAgent,
+		IPAddress:       record.IPAddress,
+		Endpoint:        record.Endpoint,
+		ReasoningEffort: record.ReasoningEffort,
+		CreatedAt:       record.CreatedAt,
 	}
 }
 

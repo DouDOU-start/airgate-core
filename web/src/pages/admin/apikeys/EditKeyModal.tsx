@@ -116,7 +116,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
           onChange={(e) =>
             setForm({
               ...form,
-              expires_at: e.target.value ? `${e.target.value}T23:59:59Z` : undefined,
+              expires_at: e.target.value ? `${e.target.value}T23:59:59Z` : '',
             })
           }
           hint={t('api_keys.expire_hint')}

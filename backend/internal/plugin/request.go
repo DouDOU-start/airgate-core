@@ -58,6 +58,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 		stream:            parsed.Stream,
 		realtime:          parsed.Stream,
 		sessionID:         parsed.SessionID,
+		reasoningEffort:   parsed.ReasoningEffort,
 		requestedPlatform: requestedPlatform,
 		keyInfo:           keyInfo,
 		plugin:            inst,
@@ -105,16 +106,58 @@ func requestedPlatform(c *gin.Context, keyInfo *auth.APIKeyInfo) string {
 func parseBody(body []byte, contentType string) parsedRequest {
 	var fields requestFields
 	if json.Unmarshal(body, &fields) == nil {
+		effort := extractAndNormalizeReasoningEffort(fields)
 		return parsedRequest{
-			Model:     fields.Model,
-			Stream:    fields.Stream,
-			SessionID: fields.Metadata.UserID,
+			Model:           fields.Model,
+			Stream:          fields.Stream,
+			SessionID:       fields.Metadata.UserID,
+			ReasoningEffort: effort,
 		}
 	}
 	if strings.HasPrefix(contentType, "multipart/") {
 		return parseMultipartFields(body, contentType)
 	}
 	return parsedRequest{}
+}
+
+// extractAndNormalizeReasoningEffort 提取并归一化推理强度档位。
+func extractAndNormalizeReasoningEffort(fields requestFields) string {
+	effort := fields.ReasoningEffort
+	if effort == "" && fields.Reasoning != nil {
+		effort = fields.Reasoning.Effort
+	}
+
+	if effort == "" && fields.OutputConfig != nil {
+		effort = fields.OutputConfig.Effort
+	}
+
+	if effort == "" && (fields.OutputConfig != nil || fields.Thinking != nil) {
+		effort = "high"
+	}
+
+	return normalizeReasoningEffort(effort)
+}
+
+// normalizeReasoningEffort 归一化推理强度档位。
+func normalizeReasoningEffort(effort string) string {
+	normalized := strings.ToLower(strings.TrimSpace(effort))
+	normalized = strings.ReplaceAll(normalized, "-", "")
+	normalized = strings.ReplaceAll(normalized, "_", "")
+
+	switch normalized {
+	case "low":
+		return "low"
+	case "medium":
+		return "medium"
+	case "high":
+		return "high"
+	case "xhigh", "extrahigh":
+		return "xhigh"
+	case "max":
+		return "max"
+	default:
+		return ""
+	}
 }
 
 func requestNeedsImage(path, model string) bool {

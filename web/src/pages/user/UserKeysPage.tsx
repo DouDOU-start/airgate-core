@@ -163,8 +163,8 @@ export default function UserKeysPage() {
       return;
     }
 
-    // 后端要求 RFC3339 格式
-    const expiresAt = form.expires_at ? `${form.expires_at}T23:59:59Z` : undefined;
+    // 后端要求 RFC3339 格式；空字符串表示显式清除过期时间
+    const expiresAt = form.expires_at ? `${form.expires_at}T23:59:59Z` : '';
 
     if (editingKey) {
       const payload: UpdateAPIKeyReq = {

@@ -82,9 +82,11 @@ type LogRecord struct {
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64
-	UserAgent             string
-	IPAddress             string
-	CreatedAt             string
+	UserAgent       string
+	IPAddress       string
+	Endpoint        string
+	ReasoningEffort string
+	CreatedAt       string
 }
 
 // ListResult 使用记录列表结果。

@@ -67,6 +67,10 @@ func (UsageLog) Fields() []ent.Field {
 		field.Int64("first_token_ms").Default(0),
 		field.String("user_agent").Default(""),
 		field.String("ip_address").Default(""),
+		// 请求端点。
+		field.String("endpoint").Default(""),
+		// 推理强度档位。
+		field.String("reasoning_effort").Default(""),
 		field.Time("created_at").Default(timeNow).Immutable(),
 	}
 }

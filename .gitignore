@@ -37,8 +37,10 @@ backend/internal/web/webdist/*
 Thumbs.db
 
 # Runtime
+.dev/
 backend/config.yaml
 backend/config.docker.yaml
+web/tmp/
 
 # Config
 *.local

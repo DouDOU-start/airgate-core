@@ -42,9 +42,11 @@ type UsageLogResp struct {
 	Stream                bool    `json:"stream"`
 	DurationMs            int64   `json:"duration_ms"`
 	FirstTokenMs          int64   `json:"first_token_ms"`
-	UserAgent             string  `json:"user_agent,omitempty"`
-	IPAddress             string  `json:"ip_address,omitempty"`
-	CreatedAt             string  `json:"created_at"`
+	UserAgent       string `json:"user_agent,omitempty"`
+	IPAddress       string `json:"ip_address,omitempty"`
+	Endpoint        string `json:"endpoint,omitempty"`
+	ReasoningEffort string `json:"reasoning_effort,omitempty"` // 推理强度档位
+	CreatedAt       string `json:"created_at"`
 }
 
 // CustomerUsageLogResp 使用记录响应（end customer scope，剥离所有平台真实成本字段）

@@ -456,6 +456,34 @@ func (ulc *UsageLogCreate) SetNillableIPAddress(s *string) *UsageLogCreate {
 	return ulc
 }
 
+// SetEndpoint sets the "endpoint" field.
+func (ulc *UsageLogCreate) SetEndpoint(s string) *UsageLogCreate {
+	ulc.mutation.SetEndpoint(s)
+	return ulc
+}
+
+// SetNillableEndpoint sets the "endpoint" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableEndpoint(s *string) *UsageLogCreate {
+	if s != nil {
+		ulc.SetEndpoint(*s)
+	}
+	return ulc
+}
+
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (ulc *UsageLogCreate) SetReasoningEffort(s string) *UsageLogCreate {
+	ulc.mutation.SetReasoningEffort(s)
+	return ulc
+}
+
+// SetNillableReasoningEffort sets the "reasoning_effort" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableReasoningEffort(s *string) *UsageLogCreate {
+	if s != nil {
+		ulc.SetReasoningEffort(*s)
+	}
+	return ulc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (ulc *UsageLogCreate) SetCreatedAt(t time.Time) *UsageLogCreate {
 	ulc.mutation.SetCreatedAt(t)
@@ -693,6 +721,14 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultIPAddress
 		ulc.mutation.SetIPAddress(v)
 	}
+	if _, ok := ulc.mutation.Endpoint(); !ok {
+		v := usagelog.DefaultEndpoint
+		ulc.mutation.SetEndpoint(v)
+	}
+	if _, ok := ulc.mutation.ReasoningEffort(); !ok {
+		v := usagelog.DefaultReasoningEffort
+		ulc.mutation.SetReasoningEffort(v)
+	}
 	if _, ok := ulc.mutation.CreatedAt(); !ok {
 		v := usagelog.DefaultCreatedAt()
 		ulc.mutation.SetCreatedAt(v)
@@ -806,6 +842,12 @@ func (ulc *UsageLogCreate) check() error {
 	}
 	if _, ok := ulc.mutation.IPAddress(); !ok {
 		return &ValidationError{Name: "ip_address", err: errors.New(`ent: missing required field "UsageLog.ip_address"`)}
+	}
+	if _, ok := ulc.mutation.Endpoint(); !ok {
+		return &ValidationError{Name: "endpoint", err: errors.New(`ent: missing required field "UsageLog.endpoint"`)}
+	}
+	if _, ok := ulc.mutation.ReasoningEffort(); !ok {
+		return &ValidationError{Name: "reasoning_effort", err: errors.New(`ent: missing required field "UsageLog.reasoning_effort"`)}
 	}
 	if _, ok := ulc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "UsageLog.created_at"`)}
@@ -966,6 +1008,14 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := ulc.mutation.IPAddress(); ok {
 		_spec.SetField(usagelog.FieldIPAddress, field.TypeString, value)
 		_node.IPAddress = value
+	}
+	if value, ok := ulc.mutation.Endpoint(); ok {
+		_spec.SetField(usagelog.FieldEndpoint, field.TypeString, value)
+		_node.Endpoint = value
+	}
+	if value, ok := ulc.mutation.ReasoningEffort(); ok {
+		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
+		_node.ReasoningEffort = value
 	}
 	if value, ok := ulc.mutation.CreatedAt(); ok {
 		_spec.SetField(usagelog.FieldCreatedAt, field.TypeTime, value)

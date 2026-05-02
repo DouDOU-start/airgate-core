@@ -525,9 +525,11 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		Stream:                item.Stream,
 		DurationMs:            item.DurationMs,
 		FirstTokenMs:          item.FirstTokenMs,
-		UserAgent:             item.UserAgent,
-		IPAddress:             item.IPAddress,
-		CreatedAt:             item.CreatedAt.Format(time.RFC3339),
+		UserAgent:       item.UserAgent,
+		IPAddress:       item.IPAddress,
+		Endpoint:        item.Endpoint,
+		ReasoningEffort: item.ReasoningEffort,
+		CreatedAt:       item.CreatedAt.Format(time.RFC3339),
 	}
 
 	if item.Edges.User != nil {

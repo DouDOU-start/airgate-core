@@ -654,6 +654,34 @@ func (ulu *UsageLogUpdate) SetNillableIPAddress(s *string) *UsageLogUpdate {
 	return ulu
 }
 
+// SetEndpoint sets the "endpoint" field.
+func (ulu *UsageLogUpdate) SetEndpoint(s string) *UsageLogUpdate {
+	ulu.mutation.SetEndpoint(s)
+	return ulu
+}
+
+// SetNillableEndpoint sets the "endpoint" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableEndpoint(s *string) *UsageLogUpdate {
+	if s != nil {
+		ulu.SetEndpoint(*s)
+	}
+	return ulu
+}
+
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (ulu *UsageLogUpdate) SetReasoningEffort(s string) *UsageLogUpdate {
+	ulu.mutation.SetReasoningEffort(s)
+	return ulu
+}
+
+// SetNillableReasoningEffort sets the "reasoning_effort" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableReasoningEffort(s *string) *UsageLogUpdate {
+	if s != nil {
+		ulu.SetReasoningEffort(*s)
+	}
+	return ulu
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (ulu *UsageLogUpdate) SetUserID(id int) *UsageLogUpdate {
 	ulu.mutation.SetUserID(id)
@@ -978,6 +1006,12 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := ulu.mutation.IPAddress(); ok {
 		_spec.SetField(usagelog.FieldIPAddress, field.TypeString, value)
+	}
+	if value, ok := ulu.mutation.Endpoint(); ok {
+		_spec.SetField(usagelog.FieldEndpoint, field.TypeString, value)
+	}
+	if value, ok := ulu.mutation.ReasoningEffort(); ok {
+		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
 	}
 	if ulu.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1738,6 +1772,34 @@ func (uluo *UsageLogUpdateOne) SetNillableIPAddress(s *string) *UsageLogUpdateOn
 	return uluo
 }
 
+// SetEndpoint sets the "endpoint" field.
+func (uluo *UsageLogUpdateOne) SetEndpoint(s string) *UsageLogUpdateOne {
+	uluo.mutation.SetEndpoint(s)
+	return uluo
+}
+
+// SetNillableEndpoint sets the "endpoint" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableEndpoint(s *string) *UsageLogUpdateOne {
+	if s != nil {
+		uluo.SetEndpoint(*s)
+	}
+	return uluo
+}
+
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (uluo *UsageLogUpdateOne) SetReasoningEffort(s string) *UsageLogUpdateOne {
+	uluo.mutation.SetReasoningEffort(s)
+	return uluo
+}
+
+// SetNillableReasoningEffort sets the "reasoning_effort" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableReasoningEffort(s *string) *UsageLogUpdateOne {
+	if s != nil {
+		uluo.SetReasoningEffort(*s)
+	}
+	return uluo
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (uluo *UsageLogUpdateOne) SetUserID(id int) *UsageLogUpdateOne {
 	uluo.mutation.SetUserID(id)
@@ -2092,6 +2154,12 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if value, ok := uluo.mutation.IPAddress(); ok {
 		_spec.SetField(usagelog.FieldIPAddress, field.TypeString, value)
+	}
+	if value, ok := uluo.mutation.Endpoint(); ok {
+		_spec.SetField(usagelog.FieldEndpoint, field.TypeString, value)
+	}
+	if value, ok := uluo.mutation.ReasoningEffort(); ok {
+		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
 	}
 	if uluo.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -53,8 +53,10 @@ type UsageRecord struct {
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64
-	UserAgent             string
-	IPAddress             string
+	UserAgent       string
+	IPAddress       string
+	Endpoint        string
+	ReasoningEffort string
 }
 
 // Recorder 异步记录器
@@ -214,6 +216,8 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 			SetFirstTokenMs(rec.FirstTokenMs).
 			SetUserAgent(rec.UserAgent).
 			SetIPAddress(rec.IPAddress).
+			SetEndpoint(rec.Endpoint).
+			SetReasoningEffort(rec.ReasoningEffort).
 			SetUserID(rec.UserID).
 			SetAccountID(rec.AccountID).
 			SetGroupID(rec.GroupID)

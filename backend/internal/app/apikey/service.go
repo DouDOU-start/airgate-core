@@ -313,7 +313,12 @@ func (s *Service) ensureUserCanUseGroup(ctx context.Context, userID, groupID int
 
 func parseExpiresAt(raw *string) (*time.Time, bool, error) {
 	if raw == nil {
+		// 未传该字段：不修改
 		return nil, false, nil
+	}
+	if *raw == "" {
+		// 显式传空字符串：清除过期时间
+		return nil, true, nil
 	}
 	parsed, err := time.Parse(time.RFC3339, *raw)
 	if err != nil {

@@ -259,8 +259,12 @@ func applyAPIKeyMutationUpdate(builder *ent.APIKeyUpdateOne, mutation appapikey.
 	if mutation.MaxConcurrency != nil {
 		builder.SetMaxConcurrency(*mutation.MaxConcurrency)
 	}
-	if mutation.HasExpiresAt && mutation.ExpiresAt != nil {
-		builder.SetExpiresAt(*mutation.ExpiresAt)
+	if mutation.HasExpiresAt {
+		if mutation.ExpiresAt != nil {
+			builder.SetExpiresAt(*mutation.ExpiresAt)
+		} else {
+			builder.ClearExpiresAt()
+		}
 	}
 	if mutation.Status != nil {
 		builder.SetStatus(entapikey.Status(*mutation.Status))

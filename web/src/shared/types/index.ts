@@ -479,6 +479,10 @@ export interface UsageLogResp {
   first_token_ms: number;
   user_agent?: string;
   ip_address?: string;
+  /** 请求端点 */
+  endpoint?: string;
+  /** 推理强度档位 */
+  reasoning_effort?: string;
   created_at: string;
 }
 
