@@ -1,16 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, Card, Chip, Description, Form, Input, Label, Switch, TextField as HeroTextField } from '@heroui/react';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { usersApi } from '../../shared/api/users';
-import { useToast } from '../../shared/components/Toast';
+import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
-import { Badge } from '../../shared/components/Badge';
-import { Card } from '../../shared/components/Card';
-import { Button } from '../../shared/components/Button';
-import { Input } from '../../shared/components/Input';
 import { useMutation } from '@tanstack/react-query';
-import { Switch } from '../../shared/components/Switch';
 import {
   User,
   Mail,
@@ -84,43 +80,48 @@ export default function ProfilePage() {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       {/* 用户信息 */}
-      <Card title={t('profile.basic_info')} className="mb-6">
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 w-28 shrink-0">
-              <Mail className="w-4 h-4 text-text-tertiary" />
-              <span className="text-xs font-medium text-text-secondary">{t('profile.email')}</span>
+      <Card className="mb-6">
+        <Card.Header>
+          <Card.Title>{t('profile.basic_info')}</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 w-28 shrink-0">
+                <Mail className="w-4 h-4 text-text-tertiary" />
+                <span className="text-xs font-medium text-text-secondary">{t('profile.email')}</span>
+              </div>
+              <span className="text-sm text-text">{user.email}</span>
             </div>
-            <span className="text-sm text-text">{user.email}</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 w-28 shrink-0">
-              <Shield className="w-4 h-4 text-text-tertiary" />
-              <span className="text-xs font-medium text-text-secondary">{t('profile.role')}</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 w-28 shrink-0">
+                <Shield className="w-4 h-4 text-text-tertiary" />
+                <span className="text-xs font-medium text-text-secondary">{t('profile.role')}</span>
+              </div>
+              <Chip color={user.role === 'admin' ? 'accent' : 'default'} size="sm" variant="soft">
+                {user.role === 'admin' ? t('nav.admin') : t('nav.user')}
+              </Chip>
             </div>
-            <Badge variant={user.role === 'admin' ? 'info' : 'default'}>
-              {user.role === 'admin' ? t('nav.admin') : t('nav.user')}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 w-28 shrink-0">
-              <Wallet className="w-4 h-4 text-text-tertiary" />
-              <span className="text-xs font-medium text-text-secondary">{t('profile.balance')}</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 w-28 shrink-0">
+                <Wallet className="w-4 h-4 text-text-tertiary" />
+                <span className="text-xs font-medium text-text-secondary">{t('profile.balance')}</span>
+              </div>
+              <span className="text-sm text-text font-mono">
+                ${user.balance.toFixed(4)}
+              </span>
             </div>
-            <span className="text-sm text-text font-mono">
-              ${user.balance.toFixed(4)}
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 w-28 shrink-0">
-              <Layers className="w-4 h-4 text-text-tertiary" />
-              <span className="text-xs font-medium text-text-secondary">{t('profile.concurrency')}</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 w-28 shrink-0">
+                <Layers className="w-4 h-4 text-text-tertiary" />
+                <span className="text-xs font-medium text-text-secondary">{t('profile.concurrency')}</span>
+              </div>
+              <span className="text-sm text-text font-mono">
+                {user.max_concurrency}
+              </span>
             </div>
-            <span className="text-sm text-text font-mono">
-              {user.max_concurrency}
-            </span>
           </div>
-        </div>
+        </Card.Content>
       </Card>
 
       {/* 余额预警 */}
@@ -130,77 +131,111 @@ export default function ProfilePage() {
       />
 
       {/* 修改用户名 */}
-      <Card title={t('profile.change_username')} className="mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
-          <div className="flex-1">
-            <Input
-              label={t('profile.change_username')}
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder={t('profile.username_placeholder')}
-              icon={<User className="w-4 h-4" />}
-            />
+      <Card className="mb-6">
+        <Card.Header>
+          <Card.Title>{t('profile.change_username')}</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
+            <div className="flex-1">
+              <HeroTextField fullWidth>
+                <Label>{t('profile.change_username')}</Label>
+                <div className="relative">
+                  <User className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                  <Input
+                    className="pl-9"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder={t('profile.username_placeholder')}
+                  />
+                </div>
+              </HeroTextField>
+            </div>
+            <Button
+              onPress={handleUpdateUsername}
+              isDisabled={profileMutation.isPending}
+              variant="primary"
+              aria-busy={profileMutation.isPending}
+            >
+              <Save className="w-4 h-4" />
+              {t('common.save')}
+            </Button>
           </div>
-          <Button
-            onClick={handleUpdateUsername}
-            loading={profileMutation.isPending}
-            icon={<Save className="w-4 h-4" />}
-          >
-            {t('common.save')}
-          </Button>
-        </div>
+        </Card.Content>
       </Card>
 
       {/* 修改密码 */}
-      <Card title={t('profile.change_password')} className="mb-6">
-        <form className="space-y-4" onSubmit={handleChangePassword} noValidate>
-          <Input
-            label={t('profile.old_password')}
-            name="current-password"
-            type="password"
-            required
-            value={passwords.old_password}
-            onChange={(e) =>
-              setPasswords({ ...passwords, old_password: e.target.value })
-            }
-            placeholder={t('profile.old_password_placeholder')}
-            autoComplete="current-password"
-            icon={<Lock className="w-4 h-4" />}
-          />
-          <Input
-            label={t('profile.new_password')}
-            name="new-password"
-            type="password"
-            required
-            value={passwords.new_password}
-            onChange={(e) =>
-              setPasswords({ ...passwords, new_password: e.target.value })
-            }
-            placeholder={t('profile.new_password_placeholder')}
-            autoComplete="new-password"
-            icon={<KeyRound className="w-4 h-4" />}
-          />
-          <Input
-            label={t('profile.confirm_new_password')}
-            name="confirm-new-password"
-            type="password"
-            required
-            value={passwords.confirm_password}
-            onChange={(e) =>
-              setPasswords({ ...passwords, confirm_password: e.target.value })
-            }
-            placeholder={t('profile.confirm_placeholder')}
-            autoComplete="new-password"
-            icon={<KeyRound className="w-4 h-4" />}
-          />
-          <Button
-            type="submit"
-            loading={passwordMutation.isPending}
-            icon={<Lock className="w-4 h-4" />}
-          >
-            {t('profile.change_password')}
-          </Button>
-        </form>
+      <Card className="mb-6">
+        <Card.Header>
+          <Card.Title>{t('profile.change_password')}</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <Form className="space-y-4" onSubmit={handleChangePassword} noValidate>
+            <HeroTextField fullWidth isRequired>
+              <Label>{t('profile.old_password')}</Label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                <Input
+                  className="pl-9"
+                  name="current-password"
+                  type="password"
+                  value={passwords.old_password}
+                  onChange={(e) =>
+                    setPasswords({ ...passwords, old_password: e.target.value })
+                  }
+                  placeholder={t('profile.old_password_placeholder')}
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+            </HeroTextField>
+            <HeroTextField fullWidth isRequired>
+              <Label>{t('profile.new_password')}</Label>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                <Input
+                  className="pl-9"
+                  name="new-password"
+                  type="password"
+                  value={passwords.new_password}
+                  onChange={(e) =>
+                    setPasswords({ ...passwords, new_password: e.target.value })
+                  }
+                  placeholder={t('profile.new_password_placeholder')}
+                  autoComplete="new-password"
+                  required
+                />
+              </div>
+            </HeroTextField>
+            <HeroTextField fullWidth isRequired>
+              <Label>{t('profile.confirm_new_password')}</Label>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                <Input
+                  className="pl-9"
+                  name="confirm-new-password"
+                  type="password"
+                  value={passwords.confirm_password}
+                  onChange={(e) =>
+                    setPasswords({ ...passwords, confirm_password: e.target.value })
+                  }
+                  placeholder={t('profile.confirm_placeholder')}
+                  autoComplete="new-password"
+                  required
+                />
+              </div>
+            </HeroTextField>
+            <Button
+              type="submit"
+              isDisabled={passwordMutation.isPending}
+              variant="primary"
+              aria-busy={passwordMutation.isPending}
+            >
+              <Lock className="w-4 h-4" />
+              {t('profile.change_password')}
+            </Button>
+          </Form>
+        </Card.Content>
       </Card>
     </div>
   );
@@ -226,40 +261,61 @@ function BalanceAlertCard({ threshold, balance }: { threshold: number; balance: 
   }
 
   return (
-    <Card title={t('profile.balance_alert')} className="mb-6">
-      <div className="space-y-4">
-        <Switch
-          label={t('profile.balance_alert_enabled')}
-          description={t('profile.balance_alert_desc')}
-          checked={enabled}
-          onChange={(v) => {
-            setEnabled(v);
-            if (!v) mutation.mutate(0);
-          }}
-        />
-        {enabled && (
-          <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
-            <div className="flex-1">
-              <Input
-                label={t('profile.balance_alert_threshold')}
-                value={value}
-                inputMode="decimal"
-                onChange={(e) => setValue(e.target.value)}
-                placeholder="5.00"
-                icon={<Bell className="w-4 h-4" />}
-                hint={t('profile.balance_alert_hint', { balance: balance.toFixed(2) })}
-              />
+    <Card className="mb-6">
+      <Card.Header>
+        <Card.Title>{t('profile.balance_alert')}</Card.Title>
+      </Card.Header>
+      <Card.Content>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-text">{t('profile.balance_alert_enabled')}</div>
+              <p className="mt-0.5 text-xs text-text-tertiary">{t('profile.balance_alert_desc')}</p>
             </div>
-            <Button
-              onClick={handleSave}
-              loading={mutation.isPending}
-              icon={<Save className="w-4 h-4" />}
+            <Switch
+              aria-label={t('profile.balance_alert_enabled')}
+              isSelected={enabled}
+              onChange={(v) => {
+                setEnabled(v);
+                if (!v) mutation.mutate(0);
+              }}
             >
-              {t('common.save')}
-            </Button>
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
           </div>
-        )}
-      </div>
+          {enabled && (
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
+              <div className="flex-1">
+                <HeroTextField fullWidth>
+                  <Label>{t('profile.balance_alert_threshold')}</Label>
+                  <div className="relative">
+                    <Bell className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                    <Input
+                      className="pl-9"
+                      value={value}
+                      inputMode="decimal"
+                      onChange={(e) => setValue(e.target.value)}
+                      placeholder="5.00"
+                    />
+                  </div>
+                  <Description>{t('profile.balance_alert_hint', { balance: balance.toFixed(2) })}</Description>
+                </HeroTextField>
+              </div>
+              <Button
+                onPress={handleSave}
+                isDisabled={mutation.isPending}
+                variant="primary"
+                aria-busy={mutation.isPending}
+              >
+                <Save className="w-4 h-4" />
+                {t('common.save')}
+              </Button>
+            </div>
+          )}
+        </div>
+      </Card.Content>
     </Card>
   );
 }

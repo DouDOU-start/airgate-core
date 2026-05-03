@@ -1,11 +1,8 @@
 import { useState, useEffect, useRef, type ComponentType } from 'react';
+import type { AccountFormProps, PluginOAuthBridge } from '@airgate/theme/plugin';
 import { pluginsApi } from '../../../shared/api/plugins';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
-import {
-  loadPluginFrontend,
-  type AccountFormProps,
-  type PluginOAuthBridge,
-} from '../../../app/plugin-loader';
+import { loadPluginFrontend } from '../../../app/plugin-loader';
 import type {
   CredentialField,
   AccountTypeResp,

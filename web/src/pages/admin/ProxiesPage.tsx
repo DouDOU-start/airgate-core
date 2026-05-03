@@ -2,17 +2,16 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { proxiesApi } from '../../shared/api/proxies';
-import { useToast } from '../../shared/components/Toast';
+import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
-import { Table, type Column } from '../../shared/components/Table';
-import { Button } from '../../shared/components/Button';
-import { Input, Select } from '../../shared/components/Input';
-import { Modal, ConfirmModal } from '../../shared/components/Modal';
-import { Badge, StatusBadge } from '../../shared/components/Badge';
+import { AlertDialog, Button, Chip, EmptyState, Form, Input, Label, ListBox, Modal, Select, Skeleton, Spinner, Table as HeroTable, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { StatusChip } from '../../shared/ui';
 import { Plus, Pencil, Trash2, Zap, RefreshCw } from 'lucide-react';
 import type { ProxyResp, CreateProxyReq, UpdateProxyReq } from '../../shared/types';
+import { getTotalPages } from '../../shared/utils/pagination';
+import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 
 // 代理表单数据
 interface ProxyForm {
@@ -154,207 +153,285 @@ export default function ProxiesPage() {
     testMutation.mutate(id);
   }
 
-  const columns: Column<ProxyResp>[] = [
-    {
-      key: 'id',
-      title: t('common.id'),
-      width: '60px',
-      hideOnMobile: true,
-      render: (row) => (
-        <span className="text-text-tertiary font-mono">
-          {row.id}
-        </span>
-      ),
-    },
-    {
-      key: 'name',
-      title: t('common.name'),
-      render: (row) => <span className="text-text">{row.name}</span>,
-    },
-    {
-      key: 'protocol',
-      title: t('proxies.protocol'),
-      render: (row) => (
-        <Badge variant={row.protocol === 'http' ? 'info' : 'warning'}>
-          {row.protocol.toUpperCase()}
-        </Badge>
-      ),
-    },
-    {
-      key: 'endpoint',
-      title: t('proxies.address'),
-      render: (row) => (
-        <span className="font-mono">
-          {row.address}:{row.port}
-        </span>
-      ),
-    },
-    {
-      key: 'username',
-      title: t('proxies.username'),
-      hideOnMobile: true,
-      render: (row) => (
-        <span className="text-text-secondary">
-          {row.username || '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      title: t('common.status'),
-      render: (row) => <StatusBadge status={row.status} />,
-    },
-    {
-      key: 'actions',
-      title: t('common.actions'),
-      render: (row) => (
-        <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<Pencil className="w-3.5 h-3.5" />}
-            onClick={() => openEdit(row)}
-          >
-            {t('common.edit')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<Zap className="w-3.5 h-3.5" />}
-            loading={testingId === row.id}
-            onClick={() => handleTest(row.id)}
-          >
-            {t('common.test')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<Trash2 className="w-3.5 h-3.5" />}
-            className="text-danger"
-            onClick={() => setDeleteTarget(row)}
-          >
-            {t('common.delete')}
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
   const saving = createMutation.isPending || updateMutation.isPending;
+  const rows = data?.list ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = getTotalPages(total, pageSize);
+  const protocolOptions = [
+    { id: 'http', label: 'HTTP' },
+    { id: 'socks5', label: 'SOCKS5' },
+  ];
+  const selectedProtocolLabel = protocolOptions.find((item) => item.id === form.protocol)?.label ?? 'HTTP';
+  const proxyDialogState = useOverlayState({
+    isOpen: modalOpen,
+    onOpenChange: (open) => {
+      if (!open) closeModal();
+    },
+  });
 
   return (
     <div>
       <div className="flex justify-end mb-5">
         <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => refetch()}
-            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+          <Button
+            isIconOnly
+            aria-label={t('common.refresh', 'Refresh')}
+            size="md"
+            variant="ghost"
+            onPress={() => refetch()}
           >
             <RefreshCw className="w-4 h-4" />
-          </button>
-          <Button icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
+          </Button>
+          <Button variant="primary" onPress={openCreate}>
+            <Plus className="w-4 h-4" />
             {t('proxies.create')}
           </Button>
         </div>
       </div>
 
-      <Table
-        columns={columns}
-        data={data?.list ?? []}
-        loading={isLoading}
-        rowKey={(row) => row.id as number}
-        page={page}
-        pageSize={pageSize}
-        total={data?.total ?? 0}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
+      <HeroTable variant="primary">
+        <HeroTable.ScrollContainer>
+          <HeroTable.Content aria-label={t('proxies.title', 'Proxies')}>
+            <HeroTable.Header>
+              <HeroTable.Column id="id" style={{ width: 72 }}>
+                {t('common.id')}
+              </HeroTable.Column>
+              <HeroTable.Column id="name">{t('common.name')}</HeroTable.Column>
+              <HeroTable.Column id="protocol">{t('proxies.protocol')}</HeroTable.Column>
+              <HeroTable.Column id="endpoint">{t('proxies.address')}</HeroTable.Column>
+              <HeroTable.Column id="username">{t('proxies.username')}</HeroTable.Column>
+              <HeroTable.Column id="status">{t('common.status')}</HeroTable.Column>
+              <HeroTable.Column id="actions">{t('common.actions')}</HeroTable.Column>
+            </HeroTable.Header>
+            <HeroTable.Body>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
+                    {Array.from({ length: 7 }).map((__, cellIndex) => (
+                      <HeroTable.Cell key={cellIndex}>
+                        <Skeleton
+                          className="h-4 w-24"
+                          style={{ animationDelay: `${index * 90 + cellIndex * 20}ms` }}
+                        />
+                      </HeroTable.Cell>
+                    ))}
+                  </HeroTable.Row>
+                ))
+              ) : rows.length === 0 ? (
+                <HeroTable.Row id="empty">
+                  <HeroTable.Cell colSpan={7}>
+                    <EmptyState />
+                  </HeroTable.Cell>
+                </HeroTable.Row>
+              ) : (
+                rows.map((row) => (
+                  <HeroTable.Row id={String(row.id)} key={row.id}>
+                    <HeroTable.Cell>
+                      <span className="font-mono text-text-tertiary">{row.id}</span>
+                    </HeroTable.Cell>
+                    <HeroTable.Cell>
+                      <span className="text-text">{row.name}</span>
+                    </HeroTable.Cell>
+                    <HeroTable.Cell>
+                      <Chip color={row.protocol === 'http' ? 'accent' : 'warning'} size="sm" variant="soft">
+                        {row.protocol.toUpperCase()}
+                      </Chip>
+                    </HeroTable.Cell>
+                    <HeroTable.Cell>
+                      <span className="font-mono">
+                        {row.address}:{row.port}
+                      </span>
+                    </HeroTable.Cell>
+                    <HeroTable.Cell>
+                      <span className="text-text-secondary">{row.username || '-'}</span>
+                    </HeroTable.Cell>
+                    <HeroTable.Cell>
+                      <StatusChip status={row.status} />
+                    </HeroTable.Cell>
+                    <HeroTable.Cell>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onPress={() => openEdit(row)}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          {t('common.edit')}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          isDisabled={testingId === row.id}
+                          onPress={() => handleTest(row.id)}
+                        >
+                          {testingId === row.id ? <Spinner size="sm" /> : <Zap className="w-3.5 h-3.5" />}
+                          {t('common.test')}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-danger"
+                          onPress={() => setDeleteTarget(row)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          {t('common.delete')}
+                        </Button>
+                      </div>
+                    </HeroTable.Cell>
+                  </HeroTable.Row>
+                ))
+              )}
+            </HeroTable.Body>
+          </HeroTable.Content>
+        </HeroTable.ScrollContainer>
+        <HeroTable.Footer>
+          <TablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            setPage={setPage}
+            setPageSize={setPageSize}
+            total={total}
+            totalPages={totalPages}
+          />
+        </HeroTable.Footer>
+      </HeroTable>
 
       {/* 创建/编辑弹窗 */}
-      <Modal
-        open={modalOpen}
-        onClose={closeModal}
-        title={editingProxy ? t('proxies.edit') : t('proxies.create')}
-        footer={
-          <>
-            <Button type="button" variant="secondary" onClick={closeModal}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" form="proxy-form" loading={saving}>
-              {editingProxy ? t('common.save') : t('common.create')}
-            </Button>
-          </>
-        }
-      >
-        <form id="proxy-form" className="space-y-4" onSubmit={handleSubmit} noValidate>
-          <Input
-            label={t('common.name')}
-            name="name"
-            autoComplete="off"
-            required
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder={t('proxies.name_placeholder')}
-          />
-          <Select
-            label={t('proxies.protocol')}
-            required
-            value={form.protocol}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                protocol: e.target.value as 'http' | 'socks5',
-              })
-            }
-            options={[
-              { value: 'http', label: 'HTTP' },
-              { value: 'socks5', label: 'SOCKS5' },
-            ]}
-          />
-          <Input
-            label={t('proxies.address')}
-            required
-            value={form.address}
-            onChange={(e) => setForm({ ...form, address: e.target.value })}
-            placeholder={t('proxies.address_placeholder')}
-          />
-          <Input
-            label={t('proxies.port')}
-            required
-            type="number"
-            value={form.port}
-            onChange={(e) => setForm({ ...form, port: e.target.value })}
-            placeholder={t('proxies.port_placeholder')}
-          />
-          <Input
-            label={t('proxies.username')}
-            name="username"
-            autoComplete="username"
-            value={form.username}
-            onChange={(e) => setForm({ ...form, username: e.target.value })}
-          />
-          <Input
-            label={t('proxies.password_label')}
-            name="password"
-            type="password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            placeholder={editingProxy ? t('proxies.password_hint') : ''}
-            autoComplete="off"
-          />
-        </form>
+      <Modal state={proxyDialogState}>
+        <Modal.Backdrop>
+          <Modal.Container placement="center" scroll="inside" size="md">
+            <Modal.Dialog className="ag-elevation-modal">
+              <Modal.Header>
+                <Modal.Heading>{editingProxy ? t('proxies.edit') : t('proxies.create')}</Modal.Heading>
+                <Modal.CloseTrigger />
+              </Modal.Header>
+              <Modal.Body>
+                <Form id="proxy-form" className="space-y-4" onSubmit={handleSubmit} noValidate>
+                  <HeroTextField fullWidth isRequired>
+                    <Label>{t('common.name')}</Label>
+                    <Input
+                      name="name"
+                      autoComplete="off"
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      placeholder={t('proxies.name_placeholder')}
+                      required
+                    />
+                  </HeroTextField>
+                  <Select
+                    fullWidth
+                    isRequired
+                    selectedKey={form.protocol}
+                    onSelectionChange={(key) =>
+                      setForm({
+                        ...form,
+                        protocol: (key ?? 'http') as 'http' | 'socks5',
+                      })
+                    }
+                  >
+                    <Label>{t('proxies.protocol')}</Label>
+                    <Select.Trigger>
+                      <Select.Value>{selectedProtocolLabel}</Select.Value>
+                      <Select.Indicator />
+                    </Select.Trigger>
+                    <Select.Popover>
+                      <ListBox items={protocolOptions}>
+                        {(item) => (
+                          <ListBox.Item id={item.id} textValue={item.label}>
+                            {item.label}
+                          </ListBox.Item>
+                        )}
+                      </ListBox>
+                    </Select.Popover>
+                  </Select>
+                  <HeroTextField fullWidth isRequired>
+                    <Label>{t('proxies.address')}</Label>
+                    <Input
+                      value={form.address}
+                      onChange={(e) => setForm({ ...form, address: e.target.value })}
+                      placeholder={t('proxies.address_placeholder')}
+                      required
+                    />
+                  </HeroTextField>
+                  <HeroTextField fullWidth isRequired>
+                    <Label>{t('proxies.port')}</Label>
+                    <Input
+                      type="number"
+                      value={form.port}
+                      onChange={(e) => setForm({ ...form, port: e.target.value })}
+                      placeholder={t('proxies.port_placeholder')}
+                      required
+                    />
+                  </HeroTextField>
+                  <HeroTextField fullWidth>
+                    <Label>{t('proxies.username')}</Label>
+                    <Input
+                      name="username"
+                      autoComplete="username"
+                      value={form.username}
+                      onChange={(e) => setForm({ ...form, username: e.target.value })}
+                    />
+                  </HeroTextField>
+                  <HeroTextField fullWidth>
+                    <Label>{t('proxies.password_label')}</Label>
+                    <Input
+                      name="password"
+                      type="password"
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      placeholder={editingProxy ? t('proxies.password_hint') : ''}
+                      autoComplete="off"
+                    />
+                  </HeroTextField>
+                </Form>
+              </Modal.Body>
+              <Modal.Footer>
+                <Button variant="secondary" onPress={closeModal}>
+                  {t('common.cancel')}
+                </Button>
+                <Button variant="primary" isDisabled={saving} onPress={() => handleSubmit()}>
+                  {saving ? <Spinner size="sm" /> : null}
+                  {editingProxy ? t('common.save') : t('common.create')}
+                </Button>
+              </Modal.Footer>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
 
       {/* 删除确认 */}
-      <ConfirmModal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-        title={t('proxies.delete_proxy')}
-        message={t('proxies.delete_confirm', { name: deleteTarget?.name })}
-        loading={deleteMutation.isPending}
-        danger
-      />
+      <AlertDialog
+        isOpen={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container placement="center" size="sm">
+            <AlertDialog.Dialog className="ag-elevation-modal">
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>{t('proxies.delete_proxy')}</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>{t('proxies.delete_confirm', { name: deleteTarget?.name })}</AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button variant="secondary" onPress={() => setDeleteTarget(null)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  aria-busy={deleteMutation.isPending}
+                  isDisabled={deleteMutation.isPending}
+                  variant="danger"
+                  onPress={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+                >
+                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
+                  {t('common.confirm')}
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
     </div>
   );
 }

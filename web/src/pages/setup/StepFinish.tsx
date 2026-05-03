@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
-import { Button } from '../../shared/components/Button';
+import { Alert, Button, Card, Chip } from '@heroui/react';
 import { setupApi } from '../../shared/api/setup';
 import { resetSetupCache } from '../../app/router';
 import {
@@ -13,7 +13,6 @@ import {
   Play,
   Loader2,
   RefreshCw,
-  CircleDot,
 } from 'lucide-react';
 import type { TestDBReq, TestRedisReq, AdminSetup } from '../../shared/types';
 
@@ -133,119 +132,96 @@ export default function StepFinish({ dbConfig, redisConfig, adminConfig, envDBPr
         {summaryItems.map((item) => {
           const Icon = item.icon;
           return (
-            <div
-              key={item.title}
-              className="border border-glass-border bg-bg-elevated shadow-sm rounded-lg p-4"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Icon className="w-4 h-4 text-primary" />
-                <h4 className="text-sm font-semibold text-text">{item.title}</h4>
-                {item.fromEnv && (
-                  <span
-                    className="ml-auto text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded"
-                    style={{
-                      background: 'var(--ag-info-subtle)',
-                      color: 'var(--ag-info)',
-                      border: '1px solid var(--ag-info-subtle)',
-                    }}
-                    title={t('setup.from_env_hint')}
-                  >
-                    {t('setup.from_env')}
-                  </span>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                {item.details.map((d) => (
-                  <div key={d.label} className="flex items-center gap-2 text-xs">
-                    <span className="text-text-tertiary">{d.label}:</span>
-                    <span className="text-text-secondary font-mono">
-                      {d.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <Card key={item.title}>
+              <Card.Content className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Icon className="w-4 h-4 text-primary" />
+                  <h4 className="text-sm font-semibold text-text">{item.title}</h4>
+                  {item.fromEnv && (
+                    <Chip className="ml-auto font-mono uppercaser" color="accent" size="sm" variant="soft">
+                      {t('setup.from_env')}
+                    </Chip>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  {item.details.map((d) => (
+                    <div key={d.label} className="flex items-center gap-2 text-xs">
+                      <span className="text-text-tertiary">{d.label}:</span>
+                      <span className="text-text-secondary font-mono">
+                        {d.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Card.Content>
+            </Card>
           );
         })}
       </div>
 
       {/* 安装状态 */}
       {status === 'installing' && (
-        <div
-          className="flex items-center gap-2.5 rounded-md px-4 py-3 text-sm"
-          style={{
-            background: 'var(--ag-info-subtle)',
-            color: 'var(--ag-info)',
-            borderLeft: '3px solid var(--ag-info)',
-          }}
-        >
-          <Loader2 className="w-4 h-4 animate-spin" />
-          {t('setup.installing')}
-        </div>
+        <Alert status="accent">
+          <Alert.Content>
+            <Alert.Description>
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {t('setup.installing')}
+              </span>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
       )}
       {status === 'restarting' && (
-        <div
-          className="flex items-center gap-2.5 rounded-md px-4 py-3 text-sm"
-          style={{
-            background: 'var(--ag-warning-subtle)',
-            color: 'var(--ag-warning)',
-            borderLeft: '3px solid var(--ag-warning)',
-          }}
-        >
-          <RefreshCw className="w-4 h-4 animate-spin" />
-          {t('setup.install_waiting')}
-        </div>
+        <Alert status="warning">
+          <Alert.Content>
+            <Alert.Description>
+              <span className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                {t('setup.install_waiting')}
+              </span>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
       )}
       {status === 'done' && (
-        <div
-          className="relative overflow-hidden rounded-md px-4 py-3 text-sm"
-          style={{
-            background: 'var(--ag-success-subtle)',
-            color: 'var(--ag-success)',
-            borderLeft: '3px solid var(--ag-success)',
-          }}
-        >
-          {/* 成功发光效果 */}
-          <div
-            className="absolute inset-0 opacity-30 animate-pulse"
-            style={{ background: 'radial-gradient(circle at center, var(--ag-success), transparent 70%)' }}
-          />
-          <div className="relative flex items-center gap-2.5">
-            <CheckCircle2 className="w-4 h-4" />
-            {t('setup.install_complete')}
-          </div>
-        </div>
+        <Alert status="success">
+          <Alert.Content>
+            <Alert.Description>
+              <span className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4" />
+                {t('setup.install_complete')}
+              </span>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
       )}
       {status === 'error' && (
-        <div
-          className="flex items-start gap-2.5 rounded-md px-4 py-3 text-sm"
-          style={{
-            background: 'var(--ag-danger-subtle)',
-            color: 'var(--ag-danger)',
-            borderLeft: '3px solid var(--ag-danger)',
-          }}
-        >
-          <CircleDot className="w-4 h-4 mt-0.5 shrink-0" />
-          {t('setup.install_failed')}:{errorMsg}
-        </div>
+        <Alert status="danger">
+          <Alert.Content>
+            <Alert.Description>
+              {t('setup.install_failed')}:{errorMsg}
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
       )}
 
       {/* 操作按钮 */}
       <div className="flex justify-between pt-2">
         <Button
           variant="ghost"
-          onClick={onPrev}
-          disabled={installing}
-          icon={<ArrowLeft className="w-4 h-4" />}
+          onPress={onPrev}
+          isDisabled={installing}
         >
+          <ArrowLeft className="w-4 h-4" />
           {t('setup.step_admin')}
         </Button>
         <Button
-          onClick={handleInstall}
-          loading={installing}
-          disabled={status === 'done'}
-          icon={<Play className="w-4 h-4" />}
+          onPress={handleInstall}
+          isDisabled={installing || status === 'done'}
+          aria-busy={installing}
         >
+          <Play className="w-4 h-4" />
           {status === 'idle' || status === 'error' ? t('setup.run_install') : t('setup.installing_btn')}
         </Button>
       </div>

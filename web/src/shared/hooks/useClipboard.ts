@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useToast } from '../components/Toast';
+import { useToast } from '../ui';
 
 /**
  * useClipboard - 统一的剪贴板复制 hook

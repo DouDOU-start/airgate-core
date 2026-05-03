@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Alert, Button, Card, Checkbox, Link as HeroLink, Modal, useOverlayState } from '@heroui/react';
 import {
   Download, RefreshCw, ExternalLink, Copy, ShieldAlert, CheckCircle2,
   XCircle, Loader2, Info,
 } from 'lucide-react';
-import { Card } from '../../shared/components/Card';
-import { Button } from '../../shared/components/Button';
-import { Modal } from '../../shared/components/Modal';
-import { Alert } from '../../shared/components/Alert';
-import { useToast } from '../../shared/components/Toast';
+import { useToast } from '../../shared/ui';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { upgradeApi, type UpgradeInfo, type UpgradeStatus } from '../../shared/api/upgrade';
 
@@ -97,13 +94,13 @@ export function SystemUpdatePanel() {
     if (info.mode === 'systemd') {
       return (
         <Button
-          icon={<Download className="w-4 h-4" />}
-          disabled={!info.can_upgrade || running}
-          onClick={() => {
+          isDisabled={!info.can_upgrade || running}
+          onPress={() => {
             setConfirmBackup(false);
             setUpgradeOpen(true);
           }}
         >
+          <Download className="w-4 h-4" />
           {info.has_update
             ? t('settings.system_upgrade_to', { version: info.latest })
             : t('settings.system_no_update')}
@@ -124,18 +121,18 @@ export function SystemUpdatePanel() {
             <Button
               variant="secondary"
               size="sm"
-              icon={<Copy className="w-3.5 h-3.5" />}
-              onClick={() => copy(info.instructions || '')}
+              onPress={() => copy(info.instructions || '')}
             >
+              <Copy className="w-3.5 h-3.5" />
               {t('common.copy')}
             </Button>
             <Button
               variant="secondary"
               size="sm"
-              icon={<RefreshCw className={`w-3.5 h-3.5 ${infoLoading ? 'animate-spin' : ''}`} />}
-              onClick={() => refetchInfo()}
-              disabled={infoLoading}
+              onPress={() => refetchInfo()}
+              isDisabled={infoLoading}
             >
+              <RefreshCw className={`w-3.5 h-3.5 ${infoLoading ? 'animate-spin' : ''}`} />
               {t('settings.system_check_update')}
             </Button>
           </div>
@@ -148,7 +145,7 @@ export function SystemUpdatePanel() {
       <div className="text-xs text-text-tertiary">
         {t('settings.system_noop_hint')}
         {info.release_url && (
-          <a
+          <HeroLink
             href={info.release_url}
             target="_blank"
             rel="noopener noreferrer"
@@ -156,61 +153,65 @@ export function SystemUpdatePanel() {
           >
             {t('settings.system_view_release')}
             <ExternalLink className="w-3 h-3" />
-          </a>
+          </HeroLink>
         )}
       </div>
     );
   };
 
   return (
-    <Card title={t('settings.system_update_title')}>
-      <div className="space-y-5">
-        {/* 版本对照 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-xl border border-border bg-bg-subtle px-4 py-3">
-            <div className="text-[10px] uppercase tracking-wider text-text-tertiary mb-1">
-              {t('settings.system_current_version')}
-            </div>
-            <div className="text-lg font-mono font-semibold text-text">
-              {info?.current ?? '—'}
-            </div>
-            {info?.binary_path && (
-              <div className="text-[11px] text-text-tertiary mt-1 truncate" title={info.binary_path}>
-                {info.binary_path}
+    <Card>
+      <Card.Header>
+        <Card.Title>{t('settings.system_update_title')}</Card.Title>
+      </Card.Header>
+      <Card.Content>
+        <div className="space-y-5">
+          {/* 版本对照 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-xl border border-border bg-bg-subtle px-4 py-3">
+              <div className="text-[10px] uppercaser text-text-tertiary mb-1">
+                {t('settings.system_current_version')}
               </div>
+              <div className="text-lg font-mono font-semibold text-text">
+                {info?.current ?? '—'}
+              </div>
+              {info?.binary_path && (
+                <div className="text-[11px] text-text-tertiary mt-1 truncate" title={info.binary_path}>
+                  {info.binary_path}
+                </div>
+              )}
+            </div>
+            <div className="rounded-xl border border-border bg-bg-subtle px-4 py-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] uppercaser text-text-tertiary">
+                  {t('settings.system_latest_version')}
+                </span>
+                {renderStateBadge()}
+              </div>
+              <div className="text-lg font-mono font-semibold text-text">
+                {info?.latest ?? '—'}
+              </div>
+              <div className="text-[11px] text-text-tertiary mt-1">
+                {t('settings.system_mode')}：<span className="font-mono">{info?.mode ?? '—'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 操作区 */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex-1 min-w-[200px]">{renderActionArea()}</div>
+            {info?.mode !== 'docker' && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onPress={() => refetchInfo()}
+                isDisabled={infoLoading}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${infoLoading ? 'animate-spin' : ''}`} />
+                {t('settings.system_check_update')}
+              </Button>
             )}
           </div>
-          <div className="rounded-xl border border-border bg-bg-subtle px-4 py-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] uppercase tracking-wider text-text-tertiary">
-                {t('settings.system_latest_version')}
-              </span>
-              {renderStateBadge()}
-            </div>
-            <div className="text-lg font-mono font-semibold text-text">
-              {info?.latest ?? '—'}
-            </div>
-            <div className="text-[11px] text-text-tertiary mt-1">
-              {t('settings.system_mode')}：<span className="font-mono">{info?.mode ?? '—'}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 操作区 */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex-1 min-w-[200px]">{renderActionArea()}</div>
-          {info?.mode !== 'docker' && (
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<RefreshCw className={`w-3.5 h-3.5 ${infoLoading ? 'animate-spin' : ''}`} />}
-              onClick={() => refetchInfo()}
-              disabled={infoLoading}
-            >
-              {t('settings.system_check_update')}
-            </Button>
-          )}
-        </div>
 
         {/* Release notes */}
         {info?.release_notes && (
@@ -218,7 +219,7 @@ export function SystemUpdatePanel() {
             <summary className="px-4 py-3 cursor-pointer text-xs font-medium text-text-secondary select-none">
               {t('settings.system_release_notes')}
               {info.release_url && (
-                <a
+                <HeroLink
                   href={info.release_url}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -227,7 +228,7 @@ export function SystemUpdatePanel() {
                 >
                   GitHub
                   <ExternalLink className="w-3 h-3" />
-                </a>
+                </HeroLink>
               )}
             </summary>
             <pre className="px-4 pb-4 text-[11px] text-text-tertiary whitespace-pre-wrap font-mono max-h-80 overflow-y-auto">
@@ -237,15 +238,21 @@ export function SystemUpdatePanel() {
         )}
 
         {/* 上次失败时显示错误 */}
-        {status?.state === 'failed' && (
-          <Alert variant="error" title={t('settings.system_last_failed')}>
-            <div className="text-xs">
-              {status.message && <div>{status.message}</div>}
-              {status.error && <div className="font-mono mt-1">{status.error}</div>}
-            </div>
-          </Alert>
-        )}
-      </div>
+          {status?.state === 'failed' && (
+            <Alert status="danger">
+              <Alert.Content>
+                <Alert.Title>{t('settings.system_last_failed')}</Alert.Title>
+                <Alert.Description>
+                  <div className="text-xs">
+                    {status.message && <div>{status.message}</div>}
+                    {status.error && <div className="font-mono mt-1">{status.error}</div>}
+                  </div>
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
+        </div>
+      </Card.Content>
 
       <UpgradeRunModal
         open={upgradeOpen}
@@ -278,56 +285,56 @@ function UpgradeRunModal({
   open, onClose, info, status, running, submitting, confirmBackup, setConfirmBackup, onRun,
 }: UpgradeRunModalProps) {
   const { t } = useTranslation();
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) onClose();
+    },
+  });
+
   if (!info) return null;
 
   const showProgress = running || status?.state === 'failed' || status?.state === 'success';
   const progressPct = Math.round((status?.progress ?? 0) * 100);
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={t('settings.system_upgrade_to', { version: info.latest })}
-      footer={
-        !running && (
-          <div className="flex items-center justify-end gap-2">
-            <Button variant="secondary" onClick={onClose} disabled={submitting}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              onClick={onRun}
-              disabled={!confirmBackup || submitting}
-              loading={submitting}
-              icon={<Download className="w-4 h-4" />}
-            >
-              {t('settings.system_start_upgrade')}
-            </Button>
-          </div>
-        )
-      }
-    >
-      <div className="space-y-4">
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog
+            className="ag-elevation-modal"
+            style={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
+          >
+            <Modal.Header>
+              <Modal.Heading>{t('settings.system_upgrade_to', { version: info.latest })}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              <div className="space-y-4">
         {!showProgress && (
           <>
-            <Alert variant="warning" title={t('settings.system_warning_title')}>
-              <ul className="text-xs list-disc pl-4 space-y-1">
-                <li>{t('settings.system_warning_backup')}</li>
-                <li>{t('settings.system_warning_restart')}</li>
-                <li>{t('settings.system_warning_rollback')}</li>
-              </ul>
+            <Alert status="warning">
+              <Alert.Content>
+                <Alert.Title>{t('settings.system_warning_title')}</Alert.Title>
+                <Alert.Description>
+                  <ul className="text-xs list-disc pl-4 space-y-1">
+                    <li>{t('settings.system_warning_backup')}</li>
+                    <li>{t('settings.system_warning_restart')}</li>
+                    <li>{t('settings.system_warning_rollback')}</li>
+                  </ul>
+                </Alert.Description>
+              </Alert.Content>
             </Alert>
 
-            <label className="flex items-start gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={confirmBackup}
-                onChange={(e) => setConfirmBackup(e.target.checked)}
-                className="mt-0.5"
-              />
+            <Checkbox
+              className="items-start"
+              isSelected={confirmBackup}
+              onChange={setConfirmBackup}
+            >
               <span className="text-xs text-text-secondary">
                 {t('settings.system_confirm_backup')}
               </span>
-            </label>
+            </Checkbox>
           </>
         )}
 
@@ -367,22 +374,52 @@ function UpgradeRunModal({
             )}
 
             {status.state === 'failed' && status.error && (
-              <Alert variant="error" title={t('settings.system_failed_title')}>
-                <div className="text-xs font-mono break-all">{status.error}</div>
+              <Alert status="danger">
+                <Alert.Content>
+                  <Alert.Title>{t('settings.system_failed_title')}</Alert.Title>
+                  <Alert.Description>
+                    <div className="text-xs font-mono break-all">{status.error}</div>
+                  </Alert.Description>
+                </Alert.Content>
               </Alert>
             )}
 
             {status.state === 'restarting' && (
-              <Alert variant="info">
-                <div className="text-xs flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4 flex-shrink-0" />
-                  {t('settings.system_restarting_hint')}
-                </div>
+              <Alert status="accent">
+                <Alert.Content>
+                  <Alert.Description>
+                    <div className="text-xs flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4 flex-shrink-0" />
+                      {t('settings.system_restarting_hint')}
+                    </div>
+                  </Alert.Description>
+                </Alert.Content>
               </Alert>
             )}
           </div>
         )}
-      </div>
+              </div>
+            </Modal.Body>
+            {!running ? (
+              <Modal.Footer>
+                <div className="flex items-center justify-end gap-2">
+                  <Button variant="secondary" onPress={onClose} isDisabled={submitting}>
+                    {t('common.cancel')}
+                  </Button>
+                  <Button
+                    onPress={onRun}
+                    isDisabled={!confirmBackup || submitting}
+                    aria-busy={submitting}
+                  >
+                    <Download className="w-4 h-4" />
+                    {t('settings.system_start_upgrade')}
+                  </Button>
+                </div>
+              </Modal.Footer>
+            ) : null}
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }

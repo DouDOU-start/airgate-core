@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams } from '@tanstack/react-router';
-import { loadPluginFrontend, type PluginFrontendModule } from '../app/plugin-loader';
+import type { PluginFrontendModule } from '@airgate/theme/plugin';
+import { loadPluginFrontend } from '../app/plugin-loader';
+import { ChatPageLoading, PageLoading } from '../shared/components/PageLoading';
 
 /**
  * 插件页面容器
@@ -27,11 +29,7 @@ export default function PluginPage({ pluginNameOverride, subPathOverride }: Plug
   }, [resolvedPluginName]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-text-secondary">加载插件页面...</div>
-      </div>
-    );
+    return pluginNameOverride ? <ChatPageLoading /> : <PageLoading />;
   }
 
   if (!mod?.routes?.length) {

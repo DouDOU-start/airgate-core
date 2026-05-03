@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, Modal, useOverlayState } from '@heroui/react';
 import { Check, X, Loader2, AlertTriangle } from 'lucide-react';
-import { Modal } from '../../../shared/components/Modal';
-import { Button } from '../../../shared/components/Button';
 import { accountsApi } from '../../../shared/api/accounts';
 import { getToken } from '../../../shared/api/client';
 
@@ -178,20 +177,27 @@ export function BulkRefreshProgressModal({
   };
 
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) handleClose();
+    },
+  });
 
   return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={t('accounts.bulk_refresh_title')}
-      width="520px"
-      footer={
-        <Button variant={finished ? 'primary' : 'secondary'} onClick={handleClose}>
-          {finished ? t('common.close') : t('common.cancel')}
-        </Button>
-      }
-    >
-      <div className="space-y-4">
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog
+            className="ag-elevation-modal"
+            style={{ maxWidth: '520px', width: 'min(100%, calc(100vw - 2rem))' }}
+          >
+            <Modal.Header>
+              <Modal.Heading>{t('accounts.bulk_refresh_title')}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              <div className="space-y-4">
         {/* 进度条 */}
         <div>
           <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: 'var(--ag-text-secondary)' }}>
@@ -267,7 +273,16 @@ export function BulkRefreshProgressModal({
             {fatalError}
           </div>
         )}
-      </div>
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant={finished ? 'primary' : 'secondary'} onPress={handleClose}>
+                {finished ? t('common.close') : t('common.cancel')}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }

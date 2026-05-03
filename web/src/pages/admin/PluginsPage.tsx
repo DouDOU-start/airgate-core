@@ -2,16 +2,11 @@ import { useState, useRef, useEffect, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pluginsApi } from '../../shared/api/plugins';
-import { useToast } from '../../shared/components/Toast';
+import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../shared/constants';
-import { Table, type Column } from '../../shared/components/Table';
-import { Button } from '../../shared/components/Button';
-import { Modal, ConfirmModal } from '../../shared/components/Modal';
-import { Card } from '../../shared/components/Card';
-import { Badge } from '../../shared/components/Badge';
-import { Input } from '../../shared/components/Input';
+import { AlertDialog, Button, Card, Checkbox, Chip, Description, EmptyState, Input, Label, Modal, Skeleton, Spinner, Table as HeroTable, Tabs, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import {
   Trash2, Download, Loader2, RefreshCw,
   Package, User, Tag, Plus, Upload, Github, Settings,
@@ -19,8 +14,8 @@ import {
 import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
 
 // 插件类型 Badge 颜色
-const typeVariant: Record<string, 'info' | 'success' | 'warning'> = {
-  gateway: 'info',
+const typeVariant: Record<string, 'accent' | 'success' | 'warning'> = {
+  gateway: 'accent',
   payment: 'success',
   extension: 'warning',
 };
@@ -108,127 +103,45 @@ export default function PluginsPage() {
     queryKey: queryKeys.plugins(),
   });
 
-  const installedColumns: Column<PluginResp>[] = [
-    {
-      key: 'name',
-      title: t('common.name'),
-      render: (row) => (
-        <div className="min-w-0 inline-flex items-center gap-2">
-          <div className="text-text font-medium">
-            {row.display_name || row.name}
-          </div>
-          {row.display_name && row.display_name !== row.name && (
-            <span className="text-xs text-text-tertiary font-mono">
-              {row.name}
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'type',
-      title: `${t('common.type')} / ${t('plugins.platform')}`,
-      render: (row) => (
-        <div className="flex items-center justify-center gap-2">
-          <Badge variant={typeVariant[row.type || 'gateway'] || 'default'}>
-            {row.type || 'gateway'}
-          </Badge>
-          {row.platform && (
-            <span className="text-xs text-text-tertiary">{row.platform}</span>
-          )}
-          {row.version && (
-            <span className="text-xs text-text-tertiary">
-              {t('common.version')}: {row.version}
-            </span>
-          )}
-          {row.is_dev && (
-            <span className="text-[10px] font-medium uppercase tracking-wider text-warning/70 border border-warning/30 rounded px-1.5 py-px">
-              {t('plugins.dev_badge')}
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'actions',
-      title: t('common.actions'),
-      render: (row) => (
-        <div className="flex gap-1 justify-center">
-          {row.config_schema && row.config_schema.length > 0 && (
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={<Settings className="w-3.5 h-3.5" />}
-              onClick={() => setConfigTarget(row)}
-            >
-              配置
-            </Button>
-          )}
-          {row.is_dev && (() => {
-            // 只在当前正在重载的这一行显示 loading；用 mutation.variables 区分
-            // 哪个 plugin 在途，避免点一个插件转全部
-            const isReloadingThis =
-              reloadMutation.isPending && reloadMutation.variables === row.name;
-            return (
-              <Button
-                size="sm"
-                variant="ghost"
-                icon={<RefreshCw className={`w-3.5 h-3.5 ${isReloadingThis ? 'animate-spin' : ''}`} />}
-                onClick={() => reloadMutation.mutate(row.name)}
-                disabled={reloadMutation.isPending}
-              >
-                {t('plugins.reload')}
-              </Button>
-            );
-          })()}
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<Trash2 className="w-3.5 h-3.5" />}
-            className="text-danger"
-            onClick={() => setUninstallTarget(row)}
-          >
-            {t('common.uninstall')}
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
   const tabs = [
     { key: 'installed' as const, label: t('plugins.installed_tab') },
     { key: 'marketplace' as const, label: t('plugins.marketplace_tab') },
   ];
+  const installedRows = pluginsData?.list ?? [];
 
   return (
-    <div>
+    <div className="ag-plugins-page">
       {/* Tab 切换 + 操作按钮 */}
-      <div className="flex items-center gap-1 mb-6 border-b border-border">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all duration-200 cursor-pointer ${
-              activeTab === tab.key
-                ? 'border-primary text-primary shadow-[0_2px_8px_var(--ag-primary-glow)]'
-                : 'border-transparent text-text-tertiary hover:text-text-secondary'
-            }`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-        <div className="flex items-center gap-2 ml-auto pb-1">
-          <button
-            onClick={handleHeaderRefresh}
-            disabled={refreshMarketMutation.isPending}
-            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors disabled:opacity-50"
+      <div className="ag-page-toolbar">
+        <Tabs
+          className="ag-page-tabs ag-page-tabs-compact w-full sm:w-auto"
+          selectedKey={activeTab}
+          onSelectionChange={(key) => setActiveTab(key as typeof activeTab)}
+        >
+          <Tabs.List>
+            {tabs.map((tab) => (
+              <Tabs.Tab key={tab.key} id={tab.key}>
+                {tab.label}
+              </Tabs.Tab>
+            ))}
+          </Tabs.List>
+        </Tabs>
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <Button
+            isIconOnly
+            aria-label={t('common.refresh', 'Refresh')}
+            isDisabled={refreshMarketMutation.isPending}
+            size="md"
+            variant="ghost"
+            onPress={handleHeaderRefresh}
           >
             <RefreshCw className={`w-4 h-4 ${refreshMarketMutation.isPending ? 'animate-spin' : ''}`} />
-          </button>
+          </Button>
           <Button
-            icon={<Plus className="w-4 h-4" />}
-            onClick={() => setInstallOpen(true)}
+            variant="primary"
+            onPress={() => setInstallOpen(true)}
           >
+            <Plus className="w-4 h-4" />
             {t('plugins.install_plugin')}
           </Button>
         </div>
@@ -236,12 +149,118 @@ export default function PluginsPage() {
 
       {/* 已安装 Tab */}
       {activeTab === 'installed' && (
-        <Table
-          columns={installedColumns}
-          data={pluginsData?.list ?? []}
-          loading={pluginsLoading}
-          rowKey={(row) => row.name}
-        />
+        <HeroTable variant="primary">
+          <HeroTable.ScrollContainer>
+            <HeroTable.Content aria-label={t('plugins.installed_tab', 'Installed plugins')}>
+              <HeroTable.Header>
+                <HeroTable.Column id="name">{t('common.name')}</HeroTable.Column>
+                <HeroTable.Column id="type">
+                  {t('common.type')} / {t('plugins.platform')}
+                </HeroTable.Column>
+                <HeroTable.Column id="actions">{t('common.actions')}</HeroTable.Column>
+              </HeroTable.Header>
+              <HeroTable.Body>
+                {pluginsLoading ? (
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
+                      {Array.from({ length: 3 }).map((__, cellIndex) => (
+                        <HeroTable.Cell key={cellIndex}>
+                          <Skeleton
+                            className="h-4 w-24"
+                            style={{ animationDelay: `${index * 90 + cellIndex * 20}ms` }}
+                          />
+                        </HeroTable.Cell>
+                      ))}
+                    </HeroTable.Row>
+                  ))
+                ) : installedRows.length === 0 ? (
+                  <HeroTable.Row id="empty">
+                    <HeroTable.Cell colSpan={3}>
+                      <EmptyState />
+                    </HeroTable.Cell>
+                  </HeroTable.Row>
+                ) : (
+                  installedRows.map((row: PluginResp) => (
+                    <HeroTable.Row id={row.name} key={row.name}>
+                      <HeroTable.Cell>
+                        <div className="min-w-0 inline-flex items-center gap-2">
+                          <div className="text-text font-medium">
+                            {row.display_name || row.name}
+                          </div>
+                          {row.display_name && row.display_name !== row.name && (
+                            <span className="text-xs text-text-tertiary font-mono">
+                              {row.name}
+                            </span>
+                          )}
+                        </div>
+                      </HeroTable.Cell>
+                      <HeroTable.Cell>
+                        <div className="flex items-center justify-center gap-2">
+                          <Chip color={typeVariant[row.type || 'gateway'] || 'default'} size="sm" variant="soft">
+                            {row.type || 'gateway'}
+                          </Chip>
+                          {row.platform && (
+                            <span className="text-xs text-text-tertiary">{row.platform}</span>
+                          )}
+                          {row.version && (
+                            <span className="text-xs text-text-tertiary">
+                              {t('common.version')}: {row.version}
+                            </span>
+                          )}
+                          {row.is_dev && (
+                            <span className="text-[10px] font-medium uppercaser text-warning/70 border border-warning/30 rounded px-1.5 py-px">
+                              {t('plugins.dev_badge')}
+                            </span>
+                          )}
+                        </div>
+                      </HeroTable.Cell>
+                      <HeroTable.Cell>
+                        <div className="flex gap-1 justify-center">
+                          {row.config_schema && row.config_schema.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onPress={() => setConfigTarget(row)}
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                              配置
+                            </Button>
+                          )}
+                          {row.is_dev && (() => {
+                            // 只在当前正在重载的这一行显示 loading；用 mutation.variables 区分
+                            // 哪个 plugin 在途，避免点一个插件转全部
+                            const isReloadingThis =
+                              reloadMutation.isPending && reloadMutation.variables === row.name;
+                            return (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                isDisabled={reloadMutation.isPending}
+                                onPress={() => reloadMutation.mutate(row.name)}
+                              >
+                                <RefreshCw className={`w-3.5 h-3.5 ${isReloadingThis ? 'animate-spin' : ''}`} />
+                                {t('plugins.reload')}
+                              </Button>
+                            );
+                          })()}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-danger"
+                            onPress={() => setUninstallTarget(row)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            {t('common.uninstall')}
+                          </Button>
+                        </div>
+                      </HeroTable.Cell>
+                    </HeroTable.Row>
+                  ))
+                )}
+              </HeroTable.Body>
+            </HeroTable.Content>
+          </HeroTable.ScrollContainer>
+        </HeroTable>
       )}
 
       {/* 插件市场 Tab */}
@@ -284,15 +303,38 @@ export default function PluginsPage() {
       />
 
       {/* 卸载确认 */}
-      <ConfirmModal
-        open={!!uninstallTarget}
-        onClose={() => setUninstallTarget(null)}
-        onConfirm={() => uninstallTarget && uninstallMutation.mutate(uninstallTarget.name)}
-        title={t('plugins.uninstall_title')}
-        message={t('plugins.uninstall_confirm', { name: uninstallTarget?.name })}
-        loading={uninstallMutation.isPending}
-        danger
-      />
+      <AlertDialog
+        isOpen={!!uninstallTarget}
+        onOpenChange={(open) => {
+          if (!open) setUninstallTarget(null);
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container placement="center" size="sm">
+            <AlertDialog.Dialog className="ag-elevation-modal">
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>{t('plugins.uninstall_title')}</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>{t('plugins.uninstall_confirm', { name: uninstallTarget?.name })}</AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button variant="secondary" onPress={() => setUninstallTarget(null)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  aria-busy={uninstallMutation.isPending}
+                  isDisabled={uninstallMutation.isPending}
+                  variant="danger"
+                  onPress={() => uninstallTarget && uninstallMutation.mutate(uninstallTarget.name)}
+                >
+                  {uninstallMutation.isPending ? <Spinner size="sm" /> : null}
+                  {t('common.confirm')}
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
 
       {/* 配置编辑 */}
       <PluginConfigModal
@@ -368,30 +410,32 @@ function PluginConfigModal({
     }
     saveMutation.mutate(values);
   }
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) onClose();
+    },
+  });
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={`配置 - ${plugin?.display_name || plugin?.name || ''}`}
-      width="640px"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={saveMutation.isPending}>
-            取消
-          </Button>
-          <Button onClick={handleSave} loading={saveMutation.isPending}>
-            保存并重新加载
-          </Button>
-        </>
-      }
-    >
-      {isLoading ? (
-        <div className="flex items-center justify-center py-10">
-          <Loader2 className="w-5 h-5 animate-spin text-primary" />
-        </div>
-      ) : (
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog
+            className="ag-elevation-modal"
+            style={{ maxWidth: '640px', width: 'min(100%, calc(100vw - 2rem))' }}
+          >
+            <Modal.Header>
+              <Modal.Heading>{`配置 - ${plugin?.display_name || plugin?.name || ''}`}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
           {(plugin?.config_schema || []).map((field) => {
             const inputType =
               field.type === 'password' ? 'password' :
@@ -403,18 +447,13 @@ function PluginConfigModal({
               const checked = values[field.key] === 'true';
               return (
                 <div key={field.key}>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) => setValues({ ...values, [field.key]: e.target.checked ? 'true' : 'false' })}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-[13px] font-medium text-text-secondary">
-                      {field.label || field.key}
-                      {field.required && <span className="text-danger ml-1">*</span>}
-                    </span>
-                  </label>
+                  <Checkbox
+                    isSelected={checked}
+                    onChange={(selected) => setValues({ ...values, [field.key]: selected ? 'true' : 'false' })}
+                  >
+                    {field.label || field.key}
+                    {field.required && <span className="text-danger ml-1">*</span>}
+                  </Checkbox>
                   {field.description && (
                     <p className="mt-1 ml-6 text-xs text-text-tertiary">{field.description}</p>
                   )}
@@ -424,14 +463,20 @@ function PluginConfigModal({
 
             return (
               <div key={field.key}>
-                <Input
-                  type={inputType}
-                  label={`${field.label || field.key}${field.required ? ' *' : ''}`}
-                  value={values[field.key] || ''}
-                  placeholder={field.placeholder}
-                  onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
-                  hint={field.description}
-                />
+                <HeroTextField fullWidth isRequired={field.required}>
+                  <Label>
+                    {field.label || field.key}
+                    {field.required ? <span className="text-danger ml-1">*</span> : null}
+                  </Label>
+                  <Input
+                    type={inputType}
+                    value={values[field.key] || ''}
+                    placeholder={field.placeholder}
+                    onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+                    required={field.required}
+                  />
+                  {field.description ? <Description>{field.description}</Description> : null}
+                </HeroTextField>
               </div>
             );
           })}
@@ -440,8 +485,21 @@ function PluginConfigModal({
               该插件未声明任何配置项
             </p>
           )}
-        </div>
-      )}
+                </div>
+              )}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" isDisabled={saveMutation.isPending} onPress={onClose}>
+                取消
+              </Button>
+              <Button variant="primary" isDisabled={saveMutation.isPending} onPress={handleSave}>
+                {saveMutation.isPending ? <Spinner size="sm" /> : null}
+                保存并重新加载
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }
@@ -539,64 +597,55 @@ function InstallPluginModal({
     { key: 'upload' as const, label: t('plugins.upload_tab'), icon: <Upload className="w-3.5 h-3.5" /> },
     { key: 'github' as const, label: t('plugins.github_tab'), icon: <Github className="w-3.5 h-3.5" /> },
   ];
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) handleClose();
+    },
+  });
 
   return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={t('plugins.install_plugin')}
-      width="520px"
-      footer={
-        <>
-          <Button variant="secondary" onClick={handleClose} disabled={installing}>
-            {t('common.cancel')}
-          </Button>
-          {installTab === 'upload' ? (
-            <Button
-              onClick={() => uploadMutation.mutate()}
-              loading={uploadMutation.isPending}
-              disabled={!selectedFile}
-            >
-              {t('common.install')}
-            </Button>
-          ) : (
-            <Button
-              onClick={() => githubMutation.mutate()}
-              loading={githubMutation.isPending}
-              disabled={!githubRepo.trim()}
-            >
-              {t('common.install')}
-            </Button>
-          )}
-        </>
-      }
-    >
-      {/* 安装方式切换 */}
-      <div className="flex gap-2 mb-5">
-        {installTabs.map((tab) => (
-          <button
-            key={tab.key}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-              installTab === tab.key
-                ? 'bg-primary text-white'
-                : 'bg-surface text-text-secondary hover:bg-[var(--ag-bg-muted)]'
-            }`}
-            onClick={() => setInstallTab(tab.key)}
-            disabled={installing}
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog
+            className="ag-elevation-modal"
+            style={{ maxWidth: '520px', width: 'min(100%, calc(100vw - 2rem))' }}
           >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
-      </div>
+            <Modal.Header>
+              <Modal.Heading>{t('plugins.install_plugin')}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              {/* 安装方式切换 */}
+              <Tabs
+                className="ag-page-tabs ag-page-tabs-compact mb-5"
+                selectedKey={installTab}
+                onSelectionChange={(key) => {
+                  if (installing) return;
+                  setInstallTab(key as typeof installTab);
+                }}
+              >
+                <Tabs.List>
+                  {installTabs.map((tab) => (
+                    <Tabs.Tab
+                      key={tab.key}
+                      id={tab.key}
+                    >
+                      {tab.icon}
+                      {tab.label}
+                    </Tabs.Tab>
+                  ))}
+                </Tabs.List>
+              </Tabs>
 
-      {/* 上传安装 */}
-      {installTab === 'upload' && (
-        <div className="space-y-4">
+              {/* 上传安装 */}
+              {installTab === 'upload' && (
+                <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider mb-1.5">
+            <Label className="block text-xs font-medium text-text-secondary uppercaser mb-1.5">
               {t('plugins.plugin_file')} <span className="text-danger">*</span>
-            </label>
+            </Label>
             <div
               className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${selectedFile
                   ? 'border-primary bg-primary-subtle'
@@ -634,30 +683,62 @@ function InstallPluginModal({
               )}
             </div>
           </div>
-          <Input
-            label={t('plugins.plugin_name')}
-            value={pluginName}
-            onChange={(e) => setPluginName(e.target.value)}
-            placeholder={t('plugins.plugin_name_hint')}
-          />
-        </div>
-      )}
+          <HeroTextField fullWidth>
+            <Label>{t('plugins.plugin_name')}</Label>
+            <Input
+              value={pluginName}
+              onChange={(e) => setPluginName(e.target.value)}
+              placeholder={t('plugins.plugin_name_hint')}
+            />
+          </HeroTextField>
+                </div>
+              )}
 
-      {/* GitHub 安装 */}
-      {installTab === 'github' && (
-        <div className="space-y-4">
-          <Input
-            label={t('plugins.github_repo')}
-            value={githubRepo}
-            onChange={(e) => setGithubRepo(e.target.value)}
-            placeholder={t('plugins.github_repo_placeholder')}
-            required
-          />
+              {/* GitHub 安装 */}
+              {installTab === 'github' && (
+                <div className="space-y-4">
+          <HeroTextField fullWidth isRequired>
+            <Label>{t('plugins.github_repo')}</Label>
+            <Input
+              value={githubRepo}
+              onChange={(e) => setGithubRepo(e.target.value)}
+              placeholder={t('plugins.github_repo_placeholder')}
+              required
+            />
+          </HeroTextField>
           <p className="text-xs text-text-tertiary">
             {t('plugins.github_hint')}
           </p>
-        </div>
-      )}
+                </div>
+              )}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" isDisabled={installing} onPress={handleClose}>
+                {t('common.cancel')}
+              </Button>
+              {installTab === 'upload' ? (
+                <Button
+                  isDisabled={!selectedFile || uploadMutation.isPending}
+                  variant="primary"
+                  onPress={() => uploadMutation.mutate()}
+                >
+                  {uploadMutation.isPending ? <Spinner size="sm" /> : null}
+                  {t('common.install')}
+                </Button>
+              ) : (
+                <Button
+                  isDisabled={!githubRepo.trim() || githubMutation.isPending}
+                  variant="primary"
+                  onPress={() => githubMutation.mutate()}
+                >
+                  {githubMutation.isPending ? <Spinner size="sm" /> : null}
+                  {t('common.install')}
+                </Button>
+              )}
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }
@@ -676,14 +757,16 @@ function MarketplaceCard({
   const canInstall = !!plugin.github_repo;
 
   return (
-    <Card>
-      <div className="flex flex-col h-full">
+    <Card variant="default">
+      <Card.Content className="flex flex-col h-full">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2">
             <Package className="w-4 h-4 text-primary" />
             <h3 className="font-semibold text-text">{plugin.name}</h3>
           </div>
-          <Badge variant={typeVariant[plugin.type] || 'default'}>{plugin.type}</Badge>
+          <Chip color={typeVariant[plugin.type] || 'default'} size="sm" variant="soft">
+            {plugin.type}
+          </Chip>
         </div>
         <p className="text-sm text-text-tertiary flex-1 mb-4 leading-relaxed">
           {plugin.description || t('common.no_data_desc')}
@@ -711,11 +794,10 @@ function MarketplaceCard({
                 <Button
                   size="sm"
                   variant="primary"
-                  icon={<RefreshCw className="w-3.5 h-3.5" />}
-                  disabled={!canInstall || installing}
-                  loading={installing}
-                  onClick={() => plugin.github_repo && onInstall(plugin.github_repo, true)}
+                  isDisabled={!canInstall || installing}
+                  onPress={() => plugin.github_repo && onInstall(plugin.github_repo, true)}
                 >
+                  {installing ? <Spinner size="sm" /> : <RefreshCw className="w-3.5 h-3.5" />}
                   {t('plugins.update_to', { version: plugin.version })}
                 </Button>
                 {plugin.installed_version && (
@@ -725,21 +807,21 @@ function MarketplaceCard({
                 )}
               </div>
             ) : (
-              <Badge variant="success">{t('plugins.already_installed')}</Badge>
+              <Chip color="success" size="sm" variant="soft">{t('plugins.already_installed')}</Chip>
             )
           ) : (
             <Button
               size="sm"
-              icon={<Download className="w-3.5 h-3.5" />}
-              disabled={!canInstall || installing}
-              loading={installing}
-              onClick={() => plugin.github_repo && onInstall(plugin.github_repo)}
+              isDisabled={!canInstall || installing}
+              variant="primary"
+              onPress={() => plugin.github_repo && onInstall(plugin.github_repo)}
             >
+              {installing ? <Spinner size="sm" /> : <Download className="w-3.5 h-3.5" />}
               {t('common.install')}
             </Button>
           )}
         </div>
-      </div>
+      </Card.Content>
     </Card>
   );
 }

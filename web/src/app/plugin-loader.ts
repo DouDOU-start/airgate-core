@@ -1,74 +1,8 @@
 import { createElement, type ComponentType } from 'react';
-
-export interface PluginOAuthStartResult {
-  authorizeURL: string;
-  state: string;
-}
-
-export interface PluginOAuthExchangeResult {
-  accountType: string;
-  accountName: string;
-  credentials: Record<string, string>;
-}
-
-export interface PluginOAuthBatchExchangeResult {
-  accountType: string;
-  accountName: string;
-  credentials: Record<string, string>;
-  status: 'ok' | 'failed';
-  error?: string;
-}
-
-export interface PluginOAuthBridge {
-  start: () => Promise<PluginOAuthStartResult>;
-  exchange: (callbackURL: string) => Promise<PluginOAuthExchangeResult>;
-  batchExchange?: (sessionKeys: string[]) => Promise<PluginOAuthBatchExchangeResult[]>;
-  /** 用已有的 refresh_token 换取完整凭证（插件侧解析 id_token 自动补齐字段） */
-  importRefresh?: (refreshToken: string, clientId?: string) => Promise<PluginOAuthExchangeResult>;
-  /** 批量版 importRefresh */
-  batchImportRefresh?: (refreshTokens: string[], clientId?: string) => Promise<PluginOAuthBatchExchangeResult[]>;
-}
-
-/** 插件表单发起的批量导入账号项（由核心侧补全 platform/priority 等元数据） */
-export interface PluginBatchAccountInput {
-  name: string;
-  type: string;
-  credentials: Record<string, string>;
-}
-
-export interface PluginBatchImportResult {
-  imported: number;
-  failed: number;
-}
-
-/**
- * 插件账号表单组件 Props
- */
-export interface AccountFormProps {
-  credentials: Record<string, string>;
-  onChange: (credentials: Record<string, string>) => void;
-  mode: 'create' | 'edit';
-  accountType?: string;
-  onAccountTypeChange?: (type: string) => void;
-  onSuggestedName?: (name: string) => void;
-  /** 进入/退出批量模式时通知外层，用于隐藏"下一步/创建"按钮 */
-  onBatchModeChange?: (isBatch: boolean) => void;
-  /** 批量导入账号，由核心侧调用 accountsApi.import 完成落库 */
-  onBatchImport?: (accounts: PluginBatchAccountInput[]) => Promise<PluginBatchImportResult>;
-  oauth?: PluginOAuthBridge;
-}
-
-/**
- * 插件前端模块接口
- * 每个插件可选地暴露路由、菜单项和自定义账号表单组件，由核心 Shell 动态注入。
- */
-export interface PluginFrontendModule {
-  routes?: Array<{ path: string; component: ComponentType }>;
-  menuItems?: Array<{ path: string; title: string; icon: string }>;
-  accountForm?: ComponentType<AccountFormProps>;
-  /** 插件提供的平台图标组件，接收 className 和 style */
-  platformIcon?: ComponentType<{ className?: string; style?: React.CSSProperties }>;
-}
+import type {
+  PluginFrontendModule,
+  PluginPlatformIconProps,
+} from '@airgate/theme/plugin';
 
 function wrapPluginComponent<TProps extends object>(
   Component: ComponentType<TProps>,
@@ -203,20 +137,20 @@ export async function loadPluginFrontend(
 }
 
 /** 全局平台图标注册表：platform → Icon 组件 */
-const platformIconRegistry = new Map<string, ComponentType<{ className?: string; style?: React.CSSProperties }>>();
+const platformIconRegistry = new Map<string, ComponentType<PluginPlatformIconProps>>();
 
 /** 图标注册变更监听器 */
 const iconListeners = new Set<() => void>();
 
 /** 注册插件提供的平台图标 */
-export function registerPlatformIcon(platform: string, icon: ComponentType<{ className?: string; style?: React.CSSProperties }>) {
+export function registerPlatformIcon(platform: string, icon: ComponentType<PluginPlatformIconProps>) {
   platformIconRegistry.set(platform.toLowerCase(), icon);
   // 通知所有监听者图标已更新
   iconListeners.forEach((fn) => fn());
 }
 
 /** 获取插件提供的平台图标 */
-export function getPluginPlatformIcon(platform: string): ComponentType<{ className?: string; style?: React.CSSProperties }> | undefined {
+export function getPluginPlatformIcon(platform: string): ComponentType<PluginPlatformIconProps> | undefined {
   return platformIconRegistry.get(platform.toLowerCase());
 }
 

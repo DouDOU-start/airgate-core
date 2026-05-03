@@ -1,23 +1,19 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Layers, ArrowUpDown, X } from 'lucide-react';
-import { Modal } from '../../../shared/components/Modal';
-import { Button } from '../../../shared/components/Button';
-import { Input, Select } from '../../../shared/components/Input';
+import { Button, Chip, Description, Input, Label, ListBox, Modal, Select, Spinner, Switch, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { ArrowUpDown, Layers, X } from 'lucide-react';
 import { groupsApi } from '../../../shared/api/groups';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../../shared/types';
 
-// 从 quotas 对象解析为结构化值
 function parseQuotas(quotas?: Record<string, unknown>): { daily: string; weekly: string; monthly: string } {
   return {
     daily: quotas?.daily ? String(quotas.daily) : '',
-    weekly: quotas?.weekly ? String(quotas.weekly) : '',
     monthly: quotas?.monthly ? String(quotas.monthly) : '',
+    weekly: quotas?.weekly ? String(quotas.weekly) : '',
   };
 }
 
-// 从结构化值组装回 quotas 对象
 function buildQuotas(q: { daily: string; weekly: string; monthly: string }): Record<string, unknown> | undefined {
   const result: Record<string, number> = {};
   if (q.daily && Number(q.daily) > 0) result.daily = Number(q.daily);
@@ -49,426 +45,377 @@ export function GroupFormModal({
   const isEdit = !!group;
 
   const [form, setForm] = useState({
+    force_instructions: group?.force_instructions ?? '',
+    is_exclusive: group?.is_exclusive ?? false,
     name: group?.name ?? '',
+    note: group?.note ?? '',
     platform: group?.platform ?? '',
     rate_multiplier: group?.rate_multiplier ?? 1,
-    is_exclusive: group?.is_exclusive ?? false,
-    // status_visible 默认 true —— 与后端 ent schema 的 Default(true) 对齐。
-    // 旧记录在未跑迁移的情况下 GroupResp 不会带这个字段，所以用 ?? true 兜底。
+    sort_weight: group?.sort_weight ?? 0,
     status_visible: group?.status_visible ?? true,
     subscription_type: group?.subscription_type ?? 'standard' as const,
-    sort_weight: group?.sort_weight ?? 0,
-    force_instructions: group?.force_instructions ?? '',
-    note: group?.note ?? '',
   });
-
-  const [quotas, setQuotas] = useState(
-    parseQuotas(group?.quotas as Record<string, unknown> | undefined),
-  );
-
-  // 分组级插件开关
-  // 后端按 {"claude": {"claude_code_only": "true"}, "openai": {"image_enabled": "true"}} 的约定存储。
-  const initialClaudeCodeOnly = (() => {
-    const raw = group?.plugin_settings?.claude?.claude_code_only;
-    return raw === 'true';
-  })();
-  const [claudeCodeOnly, setClaudeCodeOnly] = useState(initialClaudeCodeOnly);
-
-  const initialImageEnabled = (() => {
-    const raw = group?.plugin_settings?.openai?.image_enabled;
-    return raw === 'true';
-  })();
-  const [imageEnabled, setImageEnabled] = useState(initialImageEnabled);
-
-  // 创建模式下：从分组复制账号（同平台，可多选，自动去重）
+  const [quotas, setQuotas] = useState(parseQuotas(group?.quotas as Record<string, unknown> | undefined));
+  const [claudeCodeOnly, setClaudeCodeOnly] = useState(group?.plugin_settings?.claude?.claude_code_only === 'true');
+  const [imageEnabled, setImageEnabled] = useState(group?.plugin_settings?.openai?.image_enabled === 'true');
   const [copyFromGroupIds, setCopyFromGroupIds] = useState<number[]>([]);
 
-  // 加载同平台的全部分组用于下拉（仅创建时需要，且已选定平台）
   const { data: copySourceData } = useQuery({
     queryKey: ['groups-for-copy', form.platform],
-    queryFn: () =>
-      groupsApi.list({ page: 1, page_size: 100, platform: form.platform }),
+    queryFn: () => groupsApi.list({ page: 1, page_size: 100, platform: form.platform }),
     enabled: !isEdit && !!form.platform && open,
   });
   const copySourceGroups: GroupResp[] = copySourceData?.list ?? [];
+  const platformOptions = [
+    { id: '', label: t('groups.select_platform') },
+    ...platforms.map((platform) => ({ id: platform, label: platform })),
+  ];
+  const selectedPlatformLabel = platformOptions.find((item) => item.id === form.platform)?.label ?? t('groups.select_platform');
+  const copyAccountOptions = [
+    {
+      id: '',
+      label: !form.platform
+        ? t('groups.copy_accounts_select_platform_first')
+        : copySourceGroups.length === 0
+          ? t('groups.copy_accounts_empty')
+          : t('groups.copy_accounts_placeholder'),
+    },
+    ...copySourceGroups
+      .filter((copyGroup) => !copyFromGroupIds.includes(copyGroup.id))
+      .map((copyGroup) => ({
+        id: String(copyGroup.id),
+        label: `${copyGroup.name} (${t('groups.copy_accounts_count', { count: copyGroup.account_total })})`,
+      })),
+  ];
+  const subscriptionTypeOptions = [
+    { id: 'standard', label: t('groups.type_standard') },
+    { id: 'subscription', label: t('groups.type_subscription') },
+  ];
+  const selectedSubscriptionTypeLabel =
+    subscriptionTypeOptions.find((item) => item.id === form.subscription_type)?.label ?? t('groups.type_standard');
 
   const handleSubmit = () => {
     if (!isEdit && (!form.name || !form.platform)) return;
 
-    // plugin_settings：按平台发对应命名空间；切回"关闭"时显式写 "false"
-    // 让后端把字段真实清零，而不是留着旧值。
     const pluginSettings: Record<string, Record<string, string>> = {};
     if (form.platform === 'claude') {
-      pluginSettings.claude = {
-        claude_code_only: claudeCodeOnly ? 'true' : 'false',
-      };
+      pluginSettings.claude = { claude_code_only: claudeCodeOnly ? 'true' : 'false' };
     }
     if (form.platform === 'openai') {
-      pluginSettings.openai = {
-        image_enabled: imageEnabled ? 'true' : 'false',
-      };
+      pluginSettings.openai = { image_enabled: imageEnabled ? 'true' : 'false' };
     }
 
     onSubmit({
       ...form,
-      subscription_type: form.subscription_type as 'standard' | 'subscription',
-      quotas: form.subscription_type === 'subscription' ? buildQuotas(quotas) : undefined,
-      plugin_settings: Object.keys(pluginSettings).length > 0 ? pluginSettings : undefined,
-      // 不能用 `|| undefined` —— 那会把空字符串（即"不覆盖"）也吞掉，
-      // 导致后端 ForceInstructions 指针为 nil 直接跳过更新，无法从 cc 切回不覆盖。
-      // 空串需要真实下发，让后端把字段更新为空字符串。
       force_instructions: form.force_instructions ?? '',
       note: form.note,
+      plugin_settings: Object.keys(pluginSettings).length > 0 ? pluginSettings : undefined,
+      quotas: form.subscription_type === 'subscription' ? buildQuotas(quotas) : undefined,
+      subscription_type: form.subscription_type as 'standard' | 'subscription',
       ...(!isEdit && copyFromGroupIds.length > 0
         ? { copy_accounts_from_group_ids: copyFromGroupIds }
         : {}),
     });
   };
 
+  const presets = instructionPresets(form.platform);
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) onClose();
+    },
+  });
+
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={title}
-      width="560px"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleSubmit} loading={loading}>
-            {isEdit ? t('common.save') : t('common.create')}
-          </Button>
-        </>
-      }
-    >
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog
+            className="ag-elevation-modal"
+            style={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
+          >
+            <Modal.Header>
+              <Modal.Heading>{title}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
       <div className="space-y-4">
-        <Input
-          label={t('common.name')}
-          required
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          icon={<Layers className="w-4 h-4" />}
-        />
+        <HeroTextField fullWidth isRequired>
+          <Label>{t('common.name')}</Label>
+          <div className="relative">
+            <Layers className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+            <Input
+              className="pl-9"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              required
+            />
+          </div>
+        </HeroTextField>
 
         {isEdit ? (
-          <Input label={t('groups.platform')} value={form.platform} disabled />
+          <HeroTextField fullWidth isDisabled>
+            <Label>{t('groups.platform')}</Label>
+            <Input value={form.platform} disabled />
+          </HeroTextField>
         ) : (
           <Select
-            label={t('groups.platform')}
-            required
-            value={form.platform}
-            onChange={(e) => {
-              setForm({ ...form, platform: e.target.value });
+            fullWidth
+            isRequired
+            selectedKey={form.platform}
+            onSelectionChange={(key) => {
+              setForm({ ...form, platform: key == null ? '' : String(key) });
               setCopyFromGroupIds([]);
             }}
-            options={[
-              { value: '', label: t('groups.select_platform') },
-              ...platforms.map((p) => ({ value: p, label: p })),
-            ]}
-          />
+          >
+            <Label>{t('groups.platform')}</Label>
+            <Select.Trigger>
+              <Select.Value>{selectedPlatformLabel}</Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={platformOptions}>
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.label}>
+                    {item.label}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
         )}
 
-        {/* 从分组复制账号 —— 仅创建时显示 */}
-        {!isEdit && (
+        {!isEdit ? (
           <div>
-            <label
-              className="block text-xs font-medium uppercase tracking-wider mb-1.5"
-              style={{ color: 'var(--ag-text-secondary)' }}
-            >
+            <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
               {t('groups.copy_accounts_title')}
-            </label>
-            {copyFromGroupIds.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {copyFromGroupIds.map((gid) => {
-                  const g = copySourceGroups.find((it) => it.id === gid);
+            </p>
+            {copyFromGroupIds.length > 0 ? (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {copyFromGroupIds.map((groupId) => {
+                  const sourceGroup = copySourceGroups.find((item) => item.id === groupId);
                   return (
-                    <span
-                      key={gid}
-                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs"
-                      style={{
-                        backgroundColor: 'var(--ag-primary-alpha)',
-                        color: 'var(--ag-primary)',
-                      }}
-                    >
-                      {g ? g.name : `#${gid}`}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCopyFromGroupIds(copyFromGroupIds.filter((id) => id !== gid))
-                        }
-                        className="inline-flex"
+                    <Chip key={groupId} color="accent" size="sm" variant="soft">
+                      {sourceGroup ? sourceGroup.name : `#${groupId}`}
+                      <Button
+                        isIconOnly
+                        aria-label="remove"
+                        size="sm"
+                        variant="ghost"
+                        onPress={() => setCopyFromGroupIds(copyFromGroupIds.filter((id) => id !== groupId))}
                       >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Chip>
                   );
                 })}
               </div>
-            )}
+            ) : null}
             <Select
-              value=""
-              disabled={!form.platform}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                if (val && !copyFromGroupIds.includes(val)) {
-                  setCopyFromGroupIds([...copyFromGroupIds, val]);
+              fullWidth
+              isDisabled={!form.platform}
+              selectedKey=""
+              onSelectionChange={(key) => {
+                const value = Number(key);
+                if (value && !copyFromGroupIds.includes(value)) {
+                  setCopyFromGroupIds([...copyFromGroupIds, value]);
                 }
               }}
-              options={[
-                {
-                  value: '',
-                  label: !form.platform
-                    ? t('groups.copy_accounts_select_platform_first')
-                    : copySourceGroups.length === 0
-                      ? t('groups.copy_accounts_empty')
-                      : t('groups.copy_accounts_placeholder'),
-                },
-                ...copySourceGroups
-                  .filter((g) => !copyFromGroupIds.includes(g.id))
-                  .map((g) => ({
-                    value: String(g.id),
-                    label: `${g.name} (${t('groups.copy_accounts_count', { count: g.account_total })})`,
-                  })),
-              ]}
-            />
-            <p
-              className="text-[11px] mt-1"
-              style={{ color: 'var(--ag-text-tertiary)' }}
             >
-              {t('groups.copy_accounts_hint')}
-            </p>
+              <Select.Trigger>
+                <Select.Value>{copyAccountOptions[0]?.label}</Select.Value>
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox items={copyAccountOptions}>
+                  {(item) => (
+                    <ListBox.Item id={item.id} textValue={item.label}>
+                      {item.label}
+                    </ListBox.Item>
+                  )}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+            <p className="mt-1 text-[11px] text-text-tertiary">{t('groups.copy_accounts_hint')}</p>
           </div>
-        )}
+        ) : null}
 
-        <Input
-          label={t('groups.rate_multiplier')}
-          type="number"
-          step="0.1"
-          value={String(form.rate_multiplier)}
-          onChange={(e) =>
-            setForm({ ...form, rate_multiplier: Number(e.target.value) })
-          }
-        />
+        <HeroTextField fullWidth>
+          <Label>{t('groups.rate_multiplier')}</Label>
+          <Input
+            type="number"
+            step="0.1"
+            value={String(form.rate_multiplier)}
+            onChange={(e) => setForm({ ...form, rate_multiplier: Number(e.target.value) })}
+          />
+        </HeroTextField>
 
-        <div className="flex items-center justify-between">
-          <span className="text-sm" style={{ color: 'var(--ag-text-secondary)' }}>
-            {t('groups.exclusive_hint')}
-          </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={form.is_exclusive}
-            onClick={() => setForm({ ...form, is_exclusive: !form.is_exclusive })}
-            className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
-            style={{
-              backgroundColor: form.is_exclusive ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
-            }}
-          >
-            <span
-              className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform"
-              style={{
-                transform: form.is_exclusive ? 'translateX(18px)' : 'translateX(3px)',
-              }}
-            />
-          </button>
-        </div>
+        <Switch
+          isSelected={form.is_exclusive}
+          onChange={(selected) => setForm({ ...form, is_exclusive: selected })}
+        >
+          <Switch.Control><Switch.Thumb /></Switch.Control>
+          <Switch.Content>{t('groups.exclusive_hint')}</Switch.Content>
+        </Switch>
 
-        {/* 是否在公开 /status 页展示 —— 关掉后访客看不到该分组（但 admin 监控视图仍然能看）*/}
-        <div className="flex items-center justify-between">
-          <span className="text-sm" style={{ color: 'var(--ag-text-secondary)' }}>
-            {t('groups.status_visible_hint')}
-          </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={form.status_visible}
-            onClick={() => setForm({ ...form, status_visible: !form.status_visible })}
-            className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
-            style={{
-              backgroundColor: form.status_visible ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
-            }}
-          >
-            <span
-              className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform"
-              style={{
-                transform: form.status_visible ? 'translateX(18px)' : 'translateX(3px)',
-              }}
-            />
-          </button>
-        </div>
+        <Switch
+          isSelected={form.status_visible}
+          onChange={(selected) => setForm({ ...form, status_visible: selected })}
+        >
+          <Switch.Control><Switch.Thumb /></Switch.Control>
+          <Switch.Content>{t('groups.status_visible_hint')}</Switch.Content>
+        </Switch>
 
         <Select
-          label={t('groups.subscription_type')}
-          value={form.subscription_type}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              subscription_type: e.target.value as 'standard' | 'subscription',
-            })
+          fullWidth
+          selectedKey={form.subscription_type}
+          onSelectionChange={(key) =>
+            setForm({ ...form, subscription_type: (key ?? 'standard') as 'standard' | 'subscription' })
           }
-          options={[
-            { value: 'standard', label: t('groups.type_standard') },
-            { value: 'subscription', label: t('groups.type_subscription') },
-          ]}
-        />
+        >
+          <Label>{t('groups.subscription_type')}</Label>
+          <Select.Trigger>
+            <Select.Value>{selectedSubscriptionTypeLabel}</Select.Value>
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox items={subscriptionTypeOptions}>
+              {(item) => (
+                <ListBox.Item id={item.id} textValue={item.label}>
+                  {item.label}
+                </ListBox.Item>
+              )}
+            </ListBox>
+          </Select.Popover>
+        </Select>
 
-        <Input
-          label={t('groups.sort_weight')}
-          type="number"
-          value={String(form.sort_weight)}
-          onChange={(e) =>
-            setForm({ ...form, sort_weight: Number(e.target.value) })
-          }
-          hint={t('groups.sort_weight_hint')}
-          icon={<ArrowUpDown className="w-4 h-4" />}
-        />
-
-        <Input
-          label={t('groups.note')}
-          value={form.note}
-          onChange={(e) => setForm({ ...form, note: e.target.value })}
-          hint={t('groups.note_hint')}
-          placeholder={t('groups.note_placeholder')}
-        />
-
-        {/* 强制 Instructions — 仅插件声明了预设时显示 */}
-        {instructionPresets(form.platform).length > 0 && <div>
-          <label className="block text-xs font-medium uppercase tracking-wider mb-1.5" style={{ color: 'var(--ag-text-secondary)' }}>
-            {t('groups.force_instructions')}
-          </label>
-          <p className="text-[11px] mb-2" style={{ color: 'var(--ag-text-tertiary)' }}>
-            {t('groups.force_instructions_hint')}
-          </p>
-          <div className="flex gap-2 mb-2 flex-wrap">
-            {['', ...instructionPresets(form.platform)].map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => setForm({ ...form, force_instructions: preset })}
-                className="px-2.5 py-1 text-xs rounded-md transition-colors"
-                style={{
-                  borderWidth: '1px', borderStyle: 'solid',
-                  borderColor: form.force_instructions === preset ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
-                  backgroundColor: form.force_instructions === preset ? 'var(--ag-primary-alpha)' : 'transparent',
-                  color: form.force_instructions === preset ? 'var(--ag-primary)' : 'var(--ag-text-secondary)',
-                }}
-              >
-                {preset || t('groups.instructions_none')}
-              </button>
-            ))}
-          </div>
-          {form.force_instructions && !instructionPresets(form.platform).includes(form.force_instructions) && (
-            <textarea
-              className="w-full rounded-lg px-3 py-2 text-sm"
-              style={{
-                borderWidth: '1px', borderStyle: 'solid',
-                borderColor: 'var(--ag-glass-border)',
-                backgroundColor: 'var(--ag-glass-bg)',
-                color: 'var(--ag-text-primary)',
-              }}
-              rows={4}
-              value={form.force_instructions}
-              onChange={(e) => setForm({ ...form, force_instructions: e.target.value })}
-              placeholder={t('groups.instructions_custom_placeholder')}
+        <HeroTextField fullWidth>
+          <Label>{t('groups.sort_weight')}</Label>
+          <div className="relative">
+            <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+            <Input
+              className="pl-9"
+              type="number"
+              value={String(form.sort_weight)}
+              onChange={(e) => setForm({ ...form, sort_weight: Number(e.target.value) })}
             />
-          )}
-        </div>}
+          </div>
+          <Description>{t('groups.sort_weight_hint')}</Description>
+        </HeroTextField>
 
-        {/* 仅 Claude 平台：Claude Code 客户端闸 */}
-        {form.platform === 'claude' && (
+        <HeroTextField fullWidth>
+          <Label>{t('groups.note')}</Label>
+          <Input
+            value={form.note}
+            onChange={(e) => setForm({ ...form, note: e.target.value })}
+            placeholder={t('groups.note_placeholder')}
+          />
+          <Description>{t('groups.note_hint')}</Description>
+        </HeroTextField>
+
+        {presets.length > 0 ? (
           <div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--ag-text-secondary)' }}>
-                仅 Claude Code 客户端
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={claudeCodeOnly}
-                onClick={() => setClaudeCodeOnly(!claudeCodeOnly)}
-                className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
-                style={{
-                  backgroundColor: claudeCodeOnly ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
-                }}
-              >
-                <span
-                  className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform"
-                  style={{
-                    transform: claudeCodeOnly ? 'translateX(18px)' : 'translateX(3px)',
-                  }}
-                />
-              </button>
-            </div>
-            <p className="text-[11px] mt-1" style={{ color: 'var(--ag-text-tertiary)' }}>
-              开启后，本分组的账号只接受官方 Claude CLI 发起的流量；非 CLI 请求返回 403。可显著降低 OAuth 额度被 Anthropic 行为模型识别为第三方的概率。
+            <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
+              {t('groups.force_instructions')}
             </p>
-          </div>
-        )}
-
-        {/* 仅 OpenAI 平台：图片生成开关 */}
-        {form.platform === 'openai' && (
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--ag-text-secondary)' }}>
-                图片生成
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={imageEnabled}
-                onClick={() => setImageEnabled(!imageEnabled)}
-                className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
-                style={{
-                  backgroundColor: imageEnabled ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
-                }}
-              >
-                <span
-                  className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform"
-                  style={{
-                    transform: imageEnabled ? 'translateX(18px)' : 'translateX(3px)',
-                  }}
-                />
-              </button>
+            <p className="mb-2 text-[11px] text-text-tertiary">{t('groups.force_instructions_hint')}</p>
+            <div className="mb-2 flex flex-wrap gap-2">
+              {['', ...presets].map((preset) => (
+                <Button
+                  key={preset}
+                  size="sm"
+                  variant={form.force_instructions === preset ? 'primary' : 'secondary'}
+                  onPress={() => setForm({ ...form, force_instructions: preset })}
+                >
+                  {preset || t('groups.instructions_none')}
+                </Button>
+              ))}
             </div>
+            {form.force_instructions && !presets.includes(form.force_instructions) ? (
+              <HeroTextField fullWidth>
+                <TextArea
+                  rows={4}
+                  value={form.force_instructions}
+                  onChange={(e) => setForm({ ...form, force_instructions: e.target.value })}
+                  placeholder={t('groups.instructions_custom_placeholder')}
+                />
+              </HeroTextField>
+            ) : null}
           </div>
-        )}
+        ) : null}
 
-        {/* 配额限制 -- 仅订阅制显示 */}
-        {form.subscription_type === 'subscription' && (
+        {form.platform === 'claude' ? (
+          <Switch isSelected={claudeCodeOnly} onChange={setClaudeCodeOnly}>
+            <Switch.Control><Switch.Thumb /></Switch.Control>
+            <Switch.Content>
+              <div>
+                <div className="text-sm">仅 Claude Code 客户端</div>
+                <p className="mt-1 text-[11px] text-text-tertiary">
+                  开启后，本分组的账号只接受官方 Claude CLI 发起的流量；非 CLI 请求返回 403。
+                </p>
+              </div>
+            </Switch.Content>
+          </Switch>
+        ) : null}
+
+        {form.platform === 'openai' ? (
+          <Switch isSelected={imageEnabled} onChange={setImageEnabled}>
+            <Switch.Control><Switch.Thumb /></Switch.Control>
+            <Switch.Content>图片生成</Switch.Content>
+          </Switch>
+        ) : null}
+
+        {form.subscription_type === 'subscription' ? (
           <div>
-            <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider mb-1.5">
+            <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
               {t('groups.quotas')}
-            </label>
-            <p className="text-[11px] mb-2" style={{ color: 'var(--ag-text-tertiary)' }}>
-              {t('groups.quota_hint')}
             </p>
+            <p className="mb-2 text-[11px] text-text-tertiary">{t('groups.quota_hint')}</p>
             <div className="grid grid-cols-3 gap-3">
-              <Input
-                label={t('groups.quota_daily')}
-                type="number"
-                min="0"
-                value={quotas.daily}
-                onChange={(e) => setQuotas({ ...quotas, daily: e.target.value })}
-              />
-              <Input
-                label={t('groups.quota_weekly')}
-                type="number"
-                min="0"
-                value={quotas.weekly}
-                onChange={(e) => setQuotas({ ...quotas, weekly: e.target.value })}
-              />
-              <Input
-                label={t('groups.quota_monthly')}
-                type="number"
-                min="0"
-                value={quotas.monthly}
-                onChange={(e) => setQuotas({ ...quotas, monthly: e.target.value })}
-              />
+              <HeroTextField fullWidth>
+                <Label>{t('groups.quota_daily')}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={quotas.daily}
+                  onChange={(e) => setQuotas({ ...quotas, daily: e.target.value })}
+                />
+              </HeroTextField>
+              <HeroTextField fullWidth>
+                <Label>{t('groups.quota_weekly')}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={quotas.weekly}
+                  onChange={(e) => setQuotas({ ...quotas, weekly: e.target.value })}
+                />
+              </HeroTextField>
+              <HeroTextField fullWidth>
+                <Label>{t('groups.quota_monthly')}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={quotas.monthly}
+                  onChange={(e) => setQuotas({ ...quotas, monthly: e.target.value })}
+                />
+              </HeroTextField>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onPress={onClose}>
+                {t('common.cancel')}
+              </Button>
+              <Button variant="primary" isDisabled={loading} onPress={handleSubmit}>
+                {loading ? <Spinner size="sm" /> : null}
+                {isEdit ? t('common.save') : t('common.create')}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }

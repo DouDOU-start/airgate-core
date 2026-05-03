@@ -1,6 +1,7 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { Card, ComboBox, Input, ListBox, Select, Switch, Tabs, TextField as HeroTextField } from '@heroui/react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
@@ -8,19 +9,77 @@ import {
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { usePagination } from '../../shared/hooks/usePagination';
-import { Table, type Column } from '../../shared/components/Table';
-import { Input, Select } from '../../shared/components/Input';
-import { SearchSelect, type SearchSelectOption } from '../../shared/components/SearchSelect';
-import { DatePicker } from '../../shared/components/DatePicker';
-import { Card, StatCard } from '../../shared/components/Card';
+import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
-import { Activity, Coins, Hash, DollarSign, Search, RefreshCw } from 'lucide-react';
-import { useUsageColumns, fmtNum, fmtCost } from '../../shared/columns/usageColumns';
+import { Activity, Coins, Hash, DollarSign, Search } from 'lucide-react';
+import { useUsageColumns, fmtNum, fmtCost, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
+import { CompactDataTable } from '../../shared/components/CompactDataTable';
+import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
+import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 
 import { decorativePalette } from '@airgate/theme';
 
 const PIE_COLORS = decorativePalette.slice(0, 10);
+
+function SectionCard({
+  children,
+  extra,
+  title,
+}: {
+  children: ReactNode;
+  extra?: ReactNode;
+  title: string;
+}) {
+  return (
+    <Card className="ag-dashboard-panel">
+      <div
+        className="flex min-w-0 items-center justify-between gap-3 p-3 pb-2 2xl:p-4 2xl:pb-2"
+      >
+        <h3 className="min-w-0 truncate text-base font-semibold leading-none text-text">{title}</h3>
+        {extra ? (
+          <div className="min-w-0 shrink">{extra}</div>
+        ) : null}
+      </div>
+      <Card.Content className="px-3 pb-3 2xl:px-4 2xl:pb-4">{children}</Card.Content>
+    </Card>
+  );
+}
+
+function StatCard({
+  accentColor,
+  icon,
+  title,
+  value,
+}: {
+  accentColor: string;
+  icon: ReactNode;
+  title: string;
+  value: string;
+}) {
+  return (
+    <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
+      <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+        <div className="ag-dashboard-metric-copy">
+          <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
+          <div className="mt-1 flex min-w-0 items-baseline gap-2">
+            <div className="min-w-0 truncate font-mono text-[22px] font-semibold leading-none text-text 2xl:text-2xl">{value}</div>
+          </div>
+        </div>
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:h-11 2xl:w-11"
+          style={{
+            background: `color-mix(in srgb, ${accentColor} 14%, transparent)`,
+            color: accentColor,
+            borderColor: `color-mix(in srgb, ${accentColor} 24%, transparent)`,
+          }}
+        >
+          {icon}
+        </div>
+      </Card.Content>
+    </Card>
+  );
+}
 
 /** 格式化时间标签 */
 function fmtTime(timeStr: string): string {
@@ -38,6 +97,17 @@ const groupByKeys: Record<string, string> = {
   account: 'usage.by_account',
   group: 'usage.by_group',
 };
+
+const groupByHeaderKeys: Record<string, string> = {
+  model: 'usage.model',
+  user: 'usage.user_id',
+  account: 'usage.by_account',
+  group: 'usage.by_group',
+};
+
+const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,account,user';
+const USAGE_AUTO_UPDATE_INTERVAL_MS = 1_000;
+const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.admin.usage.auto_update';
 
 // ==================== 分布饼图卡片 ====================
 
@@ -68,42 +138,37 @@ function DistributionCard({
     })),
     [data, metric],
   );
+  const metricTabs = (
+    <Tabs className="ag-segmented-tabs ag-segmented-tabs-compact" selectedKey={metric} onSelectionChange={(key) => setMetric(key as PieMetric)}>
+      <Tabs.List>
+        <Tabs.Tab id="token">
+          <Tabs.Indicator />
+          <span>{t('usage.by_token')}</span>
+        </Tabs.Tab>
+        <Tabs.Tab id="cost">
+          <Tabs.Separator />
+          <Tabs.Indicator />
+          <span>{t('usage.by_actual_cost')}</span>
+        </Tabs.Tab>
+      </Tabs.List>
+    </Tabs>
+  );
 
   return (
-    <Card
-      title={title}
-      extra={
-        <div className="flex gap-1">
-          {(['token', 'cost'] as const).map((m) => (
-            <button
-              key={m}
-              className={`px-2.5 py-1 text-[11px] rounded font-medium transition-all cursor-pointer ${
-                metric === m
-                  ? 'bg-primary-subtle text-primary'
-                  : 'text-text-tertiary hover:text-text'
-              }`}
-              onClick={() => setMetric(m)}
-            >
-              {m === 'token' ? t('usage.by_token') : t('usage.by_actual_cost')}
-            </button>
-          ))}
-        </div>
-      }
-    >
-      <div className="flex gap-4">
-        {/* 饼图 */}
-        <div className="w-48 h-48 flex-shrink-0">
-          <PieChart width={192} height={192}>
+    <SectionCard title={title} extra={metricTabs}>
+      <div className="ag-distribution-card-body grid items-start gap-3 lg:grid-cols-[176px_minmax(0,1fr)]">
+        <div className="ag-distribution-chart-frame">
+          <PieChart width={176} height={176}>
             <Pie
               data={pieData}
               cx="50%"
               cy="50%"
-              innerRadius={35}
-              outerRadius={70}
+              innerRadius={42}
+              outerRadius={68}
               dataKey="value"
               minAngle={3}
-              stroke="var(--ag-bg-elevated)"
-              strokeWidth={1}
+              stroke="var(--ag-surface)"
+              strokeWidth={2}
             >
               {pieData.map((_, i) => (
                 <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -123,57 +188,162 @@ function DistributionCard({
           </PieChart>
         </div>
 
-        {/* 数据表格 */}
-        <div className="flex-1 overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-border-subtle">
-                <th className="text-left py-2 pr-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
-                  {title}
-                </th>
-                <th className="text-right py-2 px-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
-                  {t('usage.requests')}
-                </th>
-                <th className="text-right py-2 px-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
-                  {t('usage.tokens')}
-                </th>
-                <th className="text-right py-2 px-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
-                  {t('usage.actual_cost')}
-                </th>
-                <th className="text-right py-2 pl-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
-                  {t('usage.standard_cost')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((item, i) => (
-                <tr key={item.name} className="border-b border-border-subtle last:border-0 hover:bg-bg-hover transition-colors">
-                  <td className="py-2 pr-3 text-text font-medium flex items-center gap-1.5">
-                    <div
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
-                    />
-                    <span className="truncate max-w-[180px]">{item.name}</span>
-                  </td>
-                  <td className="py-2 px-3 text-right text-text-secondary font-mono">
-                    {item.requests.toLocaleString()}
-                  </td>
-                  <td className="py-2 px-3 text-right text-text-secondary font-mono">
-                    {fmtNum(item.tokens)}
-                  </td>
-                  <td className="py-2 px-3 text-right font-mono text-warning">
-                    {fmtCost(item.actualCost)}
-                  </td>
-                  <td className="py-2 pl-3 text-right text-text-secondary font-mono">
-                    {fmtCost(item.totalCost)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="ag-distribution-table-scroll">
+          <CompactDataTable
+            ariaLabel={title}
+            className="ag-compact-data-table--dense"
+            emptyText={t('common.no_data')}
+            minWidth={620}
+            rowKey={(row) => row.name}
+            rows={data}
+            columns={[
+              {
+                key: 'name',
+                title,
+                width: '42%',
+                render: (item, index) => (
+                  <>
+                    <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                    <span className="min-w-0 truncate font-medium text-text" title={item.name}>{item.name}</span>
+                  </>
+                ),
+              },
+              {
+                align: 'end',
+                key: 'requests',
+                title: t('usage.requests'),
+                width: '14%',
+                render: (item) => <span className="truncate font-mono text-text-secondary">{item.requests.toLocaleString()}</span>,
+              },
+              {
+                align: 'end',
+                key: 'tokens',
+                title: t('usage.tokens'),
+                width: '16%',
+                render: (item) => <span className="truncate font-mono text-text-secondary">{fmtNum(item.tokens)}</span>,
+              },
+              {
+                align: 'end',
+                key: 'actualCost',
+                title: t('usage.actual_cost'),
+                width: '14%',
+                render: (item) => <span className="truncate font-mono text-warning">{fmtCost(item.actualCost)}</span>,
+              },
+              {
+                align: 'end',
+                key: 'totalCost',
+                title: t('usage.standard_cost'),
+                width: '14%',
+                render: (item) => <span className="truncate font-mono text-text-secondary">{fmtCost(item.totalCost)}</span>,
+              },
+            ]}
+          />
         </div>
       </div>
-    </Card>
+    </SectionCard>
+  );
+}
+
+type GroupStatsRow = {
+  key: string | number;
+  name: string;
+  requests: number;
+  tokens: number;
+  total_cost: number;
+  actual_cost: number;
+};
+
+function GroupStatsCard({
+  activeKey,
+  rows,
+  onActiveKeyChange,
+}: {
+  activeKey: string;
+  rows: GroupStatsRow[];
+  onActiveKeyChange: (key: string) => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <SectionCard
+      title={t('usage.group_stats')}
+      extra={
+        <Tabs
+          className="ag-segmented-tabs ag-segmented-tabs-compact ag-segmented-tabs-auto"
+          selectedKey={activeKey}
+          onSelectionChange={(key) => {
+            const nextKey = String(key);
+            if (nextKey !== activeKey) {
+              onActiveKeyChange(nextKey);
+            }
+          }}
+        >
+          <Tabs.List>
+            {Object.entries(groupByKeys).map(([key, i18nKey], index) => (
+              <Tabs.Tab id={key} key={key}>
+                {index > 0 ? <Tabs.Separator /> : null}
+                <Tabs.Indicator />
+                <span>{t(i18nKey)}</span>
+              </Tabs.Tab>
+            ))}
+          </Tabs.List>
+        </Tabs>
+      }
+    >
+      <div className="h-[248px] min-w-0 overflow-auto 2xl:h-[288px]">
+        <CompactDataTable
+          ariaLabel={t('usage.group_stats')}
+          className="ag-compact-data-table--dense"
+          emptyText={t('common.no_data')}
+          minWidth={620}
+          rowKey={(row) => row.key}
+          rows={rows}
+          columns={[
+            {
+              key: 'name',
+              title: t(groupByHeaderKeys[activeKey] ?? 'usage.model'),
+              width: '42%',
+              render: (row, index) => (
+                <>
+                  <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                  <span className="min-w-0 truncate font-medium text-text" title={row.name}>{row.name}</span>
+                </>
+              ),
+            },
+            {
+              align: 'end',
+              key: 'requests',
+              title: t('usage.requests'),
+              width: '14%',
+              render: (row) => <span className="truncate font-mono text-text-secondary">{row.requests.toLocaleString()}</span>,
+            },
+            {
+              align: 'end',
+              key: 'tokens',
+              title: t('usage.tokens'),
+              width: '16%',
+              render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.tokens)}</span>,
+            },
+            {
+              align: 'end',
+              key: 'actualCost',
+              title: t('usage.actual_cost'),
+              width: '14%',
+              render: (row) => <span className="truncate font-mono text-warning">{fmtCost(row.actual_cost)}</span>,
+            },
+            {
+              align: 'end',
+              key: 'totalCost',
+              title: t('usage.standard_cost'),
+              width: '14%',
+              render: (row) => <span className="truncate font-mono text-text-secondary">{fmtCost(row.total_cost)}</span>,
+            },
+          ]}
+        />
+      </div>
+    </SectionCard>
   );
 }
 
@@ -210,49 +380,47 @@ function TokenTrendCard({
     cacheCreation: t('usage.cache_creation'),
     cacheRead: t('usage.cache_read'),
   };
+  const granularityTabs = (
+    <Tabs className="ag-segmented-tabs ag-segmented-tabs-compact" selectedKey={granularity} onSelectionChange={(key) => onGranularityChange(String(key))}>
+      <Tabs.List>
+        {(['hour', 'day'] as const).map((g, index) => (
+          <Tabs.Tab id={g} key={g}>
+            {index > 0 ? <Tabs.Separator /> : null}
+            <Tabs.Indicator />
+            <span>{t(`usage.granularity_${g}`)}</span>
+          </Tabs.Tab>
+        ))}
+      </Tabs.List>
+    </Tabs>
+  );
 
   if (chartData.length === 0) {
     return (
-      <Card title={t('usage.token_trend')}>
-        <div className="flex items-center justify-center h-48 text-text-tertiary text-sm">
-          No data
+      <SectionCard title={t('usage.token_trend')} extra={granularityTabs}>
+        <div className="flex h-[248px] items-center justify-center text-sm text-text-tertiary 2xl:h-[288px]">
+          {t('common.no_data')}
         </div>
-      </Card>
+      </SectionCard>
     );
   }
 
   return (
-    <Card
+    <SectionCard
       title={t('usage.token_trend')}
-      extra={
-        <div className="flex gap-1">
-          {(['hour', 'day'] as const).map((g) => (
-            <button
-              key={g}
-              className={`px-2.5 py-1 text-[11px] rounded font-medium transition-all cursor-pointer ${
-                granularity === g
-                  ? 'bg-primary-subtle text-primary'
-                  : 'text-text-tertiary hover:text-text'
-              }`}
-              onClick={() => onGranularityChange(g)}
-            >
-              {t(`usage.granularity_${g}`)}
-            </button>
-          ))}
-        </div>
-      }
+      extra={granularityTabs}
     >
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--ag-border-subtle)" />
+      <div className="h-[248px] 2xl:h-[288px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
+          <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
           <XAxis
             dataKey="time"
-            tick={{ fontSize: 10, fill: 'var(--ag-text-tertiary)' }}
-            axisLine={{ stroke: 'var(--ag-border)' }}
+            tick={{ fontSize: 11, fill: 'var(--ag-text-tertiary)' }}
+            axisLine={false}
             tickLine={false}
           />
           <YAxis
-            tick={{ fontSize: 10, fill: 'var(--ag-text-tertiary)' }}
+            tick={{ fontSize: 11, fill: 'var(--ag-text-tertiary)' }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v: number) => fmtNum(v)}
@@ -307,8 +475,9 @@ function TokenTrendCard({
           <Line type="monotone" dataKey="cacheCreation" stroke="#f59e0b" strokeWidth={2} dot={false} />
           <Line type="monotone" dataKey="cacheRead" stroke="#8b5cf6" strokeWidth={2} dot={false} />
         </LineChart>
-      </ResponsiveContainer>
-    </Card>
+        </ResponsiveContainer>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -320,21 +489,39 @@ export default function UsagePage() {
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
   const [granularity, setGranularity] = useState<string>('hour');
+  const [autoRefresh, setAutoRefresh] = usePersistentBoolean(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, false);
   const { platforms, platformName } = usePlatforms();
+  const autoRefreshInterval = autoRefresh ? USAGE_AUTO_UPDATE_INTERVAL_MS : false;
 
   // 用户搜索
   const [userKeyword, setUserKeyword] = useState('');
-  const { data: usersData, isLoading: usersLoading } = useQuery({
+  const [selectedUserLabel, setSelectedUserLabel] = useState('');
+  const { data: usersData } = useQuery({
     queryKey: ['admin-users-search', userKeyword],
-    queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: userKeyword }),
-    enabled: userKeyword.length > 0,
+    queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: userKeyword.trim() }),
+    enabled: userKeyword.trim().length > 0,
   });
-  const userOptions: SearchSelectOption[] = (usersData?.list ?? []).map((u) => ({
-    value: String(u.id),
+  const userOptions = (usersData?.list ?? []).map((u) => ({
+    id: String(u.id),
     label: u.username || u.email,
     description: u.username ? u.email : undefined,
+    textValue: `${u.username || ''} ${u.email}`,
   }));
-  const handleUserSearch = useCallback((kw: string) => setUserKeyword(kw), []);
+  const visibleUserOptions = (() => {
+    const selectedId = filters.user_id ? String(filters.user_id) : '';
+    if (!selectedId || !selectedUserLabel || userOptions.some((option) => option.id === selectedId)) {
+      return userOptions;
+    }
+    return [
+      {
+        id: selectedId,
+        label: selectedUserLabel,
+        description: undefined,
+        textValue: selectedUserLabel,
+      },
+      ...userOptions,
+    ];
+  })();
 
   // 构建查询参数
   const queryParams: UsageQuery = {
@@ -344,32 +531,34 @@ export default function UsagePage() {
   };
 
   // 使用记录列表
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, refetch: refetchUsage } = useQuery({
     queryKey: ['admin-usage', queryParams],
     queryFn: () => usageApi.adminList(queryParams),
+    refetchInterval: autoRefreshInterval,
+    refetchIntervalInBackground: false,
+    refetchOnReconnect: autoRefresh,
+    refetchOnWindowFocus: autoRefresh,
   });
 
-  // 聚合统计
-  const allGroupBy = useMemo(() => {
-    const groups = new Set(['model', 'group', statsGroupBy]);
-    return Array.from(groups).join(',');
-  }, [statsGroupBy]);
-
-  const { data: stats } = useQuery({
-    queryKey: ['admin-usage-stats', allGroupBy, filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id],
+  const { data: stats, refetch: refetchStats } = useQuery({
+    queryKey: ['admin-usage-stats', filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id],
     queryFn: () =>
       usageApi.stats({
-        group_by: allGroupBy,
+        group_by: ADMIN_USAGE_STATS_GROUP_BY,
         start_date: filters.start_date,
         end_date: filters.end_date,
         platform: filters.platform,
         model: filters.model,
         user_id: filters.user_id ? Number(filters.user_id) : undefined,
-      }),
+    }),
+    refetchInterval: autoRefreshInterval,
+    refetchIntervalInBackground: false,
+    refetchOnReconnect: autoRefresh,
+    refetchOnWindowFocus: autoRefresh,
   });
 
   // Token 趋势
-  const { data: trendData } = useQuery({
+  const { data: trendData, refetch: refetchTrend } = useQuery({
     queryKey: ['admin-usage-trend', granularity, filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id],
     queryFn: () =>
       usageApi.trend({
@@ -379,8 +568,21 @@ export default function UsagePage() {
         platform: filters.platform,
         model: filters.model,
         user_id: filters.user_id ? Number(filters.user_id) : undefined,
-      }),
+    }),
+    refetchInterval: autoRefreshInterval,
+    refetchIntervalInBackground: false,
+    refetchOnReconnect: autoRefresh,
+    refetchOnWindowFocus: autoRefresh,
   });
+
+  function handleAutoRefreshChange(enabled: boolean) {
+    setAutoRefresh(enabled);
+    if (enabled) {
+      void refetchUsage();
+      void refetchStats();
+      void refetchTrend();
+    }
+  }
 
   function updateFilter(key: string, value: string) {
     setFilters((prev) => ({ ...prev, [key]: value || undefined }));
@@ -410,100 +612,108 @@ export default function UsagePage() {
     [stats?.by_group],
   );
 
-  // 分组统计表头
-  const groupByHeaderKeys: Record<string, string> = {
-    model: 'usage.model',
-    user: 'usage.user_id',
-    account: 'usage.by_account',
-    group: 'usage.by_group',
-  };
+  const groupStatsRows: GroupStatsRow[] = useMemo(() => {
+    if (!stats) return [];
+    const dataMap: Record<string, GroupStatsRow[]> = {
+      account: stats.by_account?.map((s) => ({ key: s.account_id, name: s.name, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      group: stats.by_group?.map((s) => ({ key: s.group_id, name: s.name || `#${s.group_id}`, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      model: stats.by_model?.map((s) => ({ key: s.model, name: s.model, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      user: stats.by_user?.map((s) => ({ key: s.user_id, name: s.email, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+    };
+    return dataMap[statsGroupBy] ?? [];
+  }, [stats, statsGroupBy]);
 
   const sharedColumns = useUsageColumns();
 
-  // 管理端额外的列（用户、API Key、账号），插入在共享列之前
-  const adminColumns: Column<UsageLogResp>[] = [
+  // 管理端额外的列（用户、API Key、上游凭证），插入在共享列之前
+  const adminColumns: UsageColumnConfig<UsageLogResp>[] = [
     {
       key: 'user_id',
       title: t('common.user'),
-      width: '180px',
-      fixed: 'left',
-      render: (row) => (
-        <span className="block max-w-full truncate text-text-tertiary font-mono" title={row.user_email || `#${row.user_id}`}>
-          {row.user_email || `#${row.user_id}`}
-        </span>
-      ),
+      width: '160px',
+      render: (row) => {
+        const label = row.user_email || `#${row.user_id}`;
+
+        return (
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0 font-mono text-[11px] text-text-tertiary">#{row.user_id}</span>
+            <span className="min-w-0 truncate text-xs font-medium text-text" title={label}>
+              {label}
+            </span>
+          </div>
+        );
+      },
     },
   ];
+  const platformOptions = [
+    { id: '', label: t('common.all') },
+    ...platforms.map((p) => ({ id: p, label: platformName(p) })),
+  ];
+  const selectedPlatformLabel = platformOptions.find((item) => item.id === (filters.platform || ''))?.label ?? t('common.all');
 
   // 插入管理列。
   const modelIdx = sharedColumns.findIndex((c) => c.key === 'model');
-  const columns: Column<UsageLogResp>[] = [
+  const streamColumn = sharedColumns.find((column) => column.key === 'stream');
+  const timingColumns = sharedColumns.filter((column) => column.key === 'first_token_ms' || column.key === 'duration_ms');
+  const sharedColumnsAfterModel = sharedColumns
+    .slice(modelIdx + 1)
+    .filter((column) => column.key !== 'first_token_ms' && column.key !== 'duration_ms' && column.key !== 'stream');
+  const endpointColumn: UsageColumnConfig<UsageLogResp> = {
+    key: 'endpoint',
+    title: t('usage.endpoint', '端点'),
+    width: '180px',
+    hideOnMobile: true,
+    render: (row) => (
+      <span className="block truncate font-mono text-[11px] leading-tight text-text-secondary" title={row.endpoint || '-'}>
+        {row.endpoint || '-'}
+      </span>
+    ),
+  };
+  const apiKeyColumn: UsageColumnConfig<UsageLogResp> = {
+    key: 'api_key',
+    title: 'API Key',
+    width: '124px',
+    hideOnMobile: true,
+    render: (row) => {
+      if (row.api_key_deleted) {
+        return <span className="block max-w-full truncate text-text-tertiary text-xs">{t('usage.api_key_deleted')}</span>;
+      }
+      const name = row.api_key_name || '-';
+      return (
+        <span className="block max-w-full truncate text-[11px] text-text-secondary" title={name}>{name}</span>
+      );
+    },
+  };
+  const accountColumn: UsageColumnConfig<UsageLogResp> = {
+    key: 'account_name',
+    title: t('usage.upstream_credential', '上游凭证'),
+    width: '172px',
+    hideOnMobile: true,
+    render: (row) => {
+      const label = row.account_name || '-';
+      return (
+        <span className="block max-w-full truncate text-[11px] text-text-secondary" title={label}>{label}</span>
+      );
+    },
+  };
+  const columns: UsageColumnConfig<UsageLogResp>[] = [
     ...adminColumns,
     ...sharedColumns.slice(0, modelIdx + 1),
-    {
-      key: 'reasoning',
-      title: t('usage.reasoning', '推理强度'),
-      width: '100px',
-      hideOnMobile: true,
-      render: (row) => {
-        if (row.reasoning_effort) {
-          return <span className="font-mono text-[11px] text-text-secondary">{row.reasoning_effort}</span>;
-        }
-        return <span className="text-text-tertiary">-</span>;
-      },
-    },
-    {
-      key: 'api_key',
-      title: 'API Key',
-      width: '160px',
-      hideOnMobile: true,
-      render: (row) => {
-        if (row.api_key_deleted) {
-          return <span className="block max-w-full truncate text-text-tertiary text-xs">-</span>;
-        }
-        const hint = row.api_key_hint || `#${row.api_key_id}`;
-        const name = row.api_key_name || hint;
-        return (
-          <span className="block max-w-full truncate text-text-secondary font-mono text-xs cursor-default" title={hint}>
-            {name}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'account_name',
-      title: t('usage.account'),
-      width: '160px',
-      hideOnMobile: true,
-      render: (row) => {
-        const label = row.account_name || `#${row.account_id}`;
-        return (
-          <span className="block max-w-full truncate text-text-tertiary font-mono" title={label}>
-            {label}
-          </span>
-        );
-      },
-    },
-    ...sharedColumns.slice(modelIdx + 1),
-    {
-      key: 'endpoint',
-      title: t('usage.endpoint', '端点'),
-      width: '180px',
-      hideOnMobile: true,
-      render: (row) => (
-        <span className="font-mono text-[11px] text-text-secondary truncate block" title={row.endpoint}>
-          {row.endpoint || '-'}
-        </span>
-      ),
-    },
+    ...(streamColumn ? [streamColumn] : []),
+    ...timingColumns,
+    ...sharedColumnsAfterModel,
+    endpointColumn,
+    apiKeyColumn,
+    accountColumn,
   ];
+  const total = data?.total ?? 0;
 
   return (
     <div>
       {/* 聚合统计 */}
       {stats && (
         <div className="mb-6 space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
             <StatCard
               title={t('usage.total_requests')}
               value={stats.total_requests.toLocaleString()}
@@ -530,8 +740,7 @@ export default function UsagePage() {
             />
           </div>
 
-          {/* 饼图区域 + Token 趋势 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <DistributionCard
               title={t('usage.model_distribution')}
               data={modelDistribution}
@@ -542,149 +751,160 @@ export default function UsagePage() {
             />
           </div>
 
-          {/* Token 使用趋势 */}
-          <TokenTrendCard
-            data={trendData ?? []}
-            granularity={granularity}
-            onGranularityChange={setGranularity}
-          />
-
-          {/* 分组统计切换 */}
-          <Card>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-xs text-text-tertiary uppercase tracking-wider">
-                {t('usage.group_stats')}
-              </span>
-              <div className="flex gap-1 ml-2">
-                {Object.entries(groupByKeys).map(([key, i18nKey]) => (
-                  <button
-                    key={key}
-                    className={`px-3 py-1.5 text-xs rounded-md font-medium transition-all duration-200 cursor-pointer ${
-                      statsGroupBy === key
-                        ? 'bg-primary-subtle text-primary shadow-[0_0_8px_var(--ag-primary-glow)]'
-                        : 'text-text-secondary hover:bg-bg-hover hover:text-text'
-                    }`}
-                    onClick={() => setStatsGroupBy(key)}
-                  >
-                    {t(i18nKey)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 统计表格 */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2.5 pr-4 text-[10px] font-semibold text-text-tertiary uppercase tracking-widest">
-                      {t(groupByHeaderKeys[statsGroupBy] ?? 'usage.model')}
-                    </th>
-                    <th className="text-left py-2.5 pr-4 text-[10px] font-semibold text-text-tertiary uppercase tracking-widest">
-                      {t('usage.requests')}
-                    </th>
-                    <th className="text-left py-2.5 pr-4 text-[10px] font-semibold text-text-tertiary uppercase tracking-widest">
-                      {t('usage.tokens')}
-                    </th>
-                    <th className="text-left py-2.5 pr-4 text-[10px] font-semibold text-text-tertiary uppercase tracking-widest">
-                      {t('usage.actual_cost')}
-                    </th>
-                    <th className="text-left py-2.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-widest">
-                      {t('usage.standard_cost')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const rowClass = "border-b border-border-subtle last:border-0 transition-colors hover:bg-bg-hover";
-                    const dataMap: Record<string, { items: Array<{ key: string | number; name: string; requests: number; tokens: number; total_cost: number; actual_cost: number }> }> = {
-                      model: { items: stats.by_model?.map((s) => ({ key: s.model, name: s.model, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [] },
-                      user: { items: stats.by_user?.map((s) => ({ key: s.user_id, name: s.email, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [] },
-                      account: { items: stats.by_account?.map((s) => ({ key: s.account_id, name: s.name, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [] },
-                      group: { items: stats.by_group?.map((s) => ({ key: s.group_id, name: s.name, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [] },
-                    };
-                    return dataMap[statsGroupBy]?.items.map((row) => (
-                      <tr key={row.key} className={rowClass}>
-                        <td className="py-2.5 pr-4 font-medium text-text">{row.name}</td>
-                        <td className="py-2.5 pr-4 text-text-secondary font-mono">{row.requests.toLocaleString()}</td>
-                        <td className="py-2.5 pr-4 text-text-secondary font-mono">{fmtNum(row.tokens)}</td>
-                        <td className="py-2.5 pr-4 font-mono text-warning">{fmtCost(row.actual_cost)}</td>
-                        <td className="py-2.5 text-text-secondary font-mono">{fmtCost(row.total_cost)}</td>
-                      </tr>
-                    ));
-                  })()}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <TokenTrendCard
+              data={trendData ?? []}
+              granularity={granularity}
+              onGranularityChange={setGranularity}
+            />
+            <GroupStatsCard
+              activeKey={statsGroupBy}
+              rows={groupStatsRows}
+              onActiveKeyChange={setStatsGroupBy}
+            />
+          </div>
         </div>
       )}
 
       {/* 筛选栏 */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
-        <div className="w-full sm:w-44">
-          <DatePicker
-            placeholder={t('usage.start_date')}
-            value={filters.start_date || ''}
-            onChange={(v) => updateFilter('start_date', v)}
-          />
-        </div>
-        <div className="w-full sm:w-44">
-          <DatePicker
-            placeholder={t('usage.end_date')}
-            value={filters.end_date || ''}
-            onChange={(v) => updateFilter('end_date', v)}
+        <div className="w-full sm:w-72">
+          <UsageDateRangeFilter
+            clearLabel={t('common.clear')}
+            endDate={filters.end_date}
+            label={t('usage.time_range')}
+            startDate={filters.start_date}
+            onChange={(startDate, endDate) => {
+              setPage(1);
+              setFilters((prev) => ({ ...prev, start_date: startDate, end_date: endDate }));
+            }}
           />
         </div>
         <div className="w-full sm:w-40">
           <Select
-            placeholder={t('common.all')}
-            value={filters.platform || ''}
-            onChange={(e) => updateFilter('platform', e.target.value)}
-            options={[
-              { label: t('common.all'), value: '' },
-              ...platforms.map((p) => ({ label: platformName(p), value: p })),
-            ]}
-          />
+            aria-label={t('usage.platform')}
+            fullWidth
+            selectedKey={filters.platform || ''}
+            onSelectionChange={(key) => updateFilter('platform', key == null ? '' : String(key))}
+          >
+            <Select.Trigger>
+              <Select.Value>
+                {filters.platform ? selectedPlatformLabel : (
+                  <span className="text-text-tertiary">{t('usage.platform')}</span>
+                )}
+              </Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={platformOptions}>
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.label}>
+                    {item.label}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
         </div>
         <div className="w-full sm:w-40">
-          <Input
-            placeholder={t('usage.model_placeholder')}
-            value={filters.model || ''}
-            onChange={(e) => updateFilter('model', e.target.value)}
-            icon={<Search className="w-4 h-4" />}
-          />
+          <HeroTextField fullWidth>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+              <Input
+                className="pl-9"
+                placeholder={t('usage.model_placeholder')}
+                value={filters.model || ''}
+                onChange={(e) => updateFilter('model', e.target.value)}
+              />
+            </div>
+          </HeroTextField>
         </div>
         <div className="w-full sm:w-48">
-          <SearchSelect
-            placeholder={t('usage.search_user')}
-            value={filters.user_id ? String(filters.user_id) : ''}
-            onChange={(v) => updateFilter('user_id', v)}
-            onSearch={handleUserSearch}
-            options={userOptions}
-            loading={usersLoading}
-          />
+          <ComboBox
+            aria-label={t('usage.search_user')}
+            allowsEmptyCollection
+            fullWidth
+            inputValue={userKeyword}
+            items={visibleUserOptions}
+            menuTrigger="focus"
+            selectedKey={filters.user_id ? String(filters.user_id) : null}
+            onInputChange={(value) => {
+              setUserKeyword(value);
+              if (!value) {
+                setSelectedUserLabel('');
+                updateFilter('user_id', '');
+                return;
+              }
+              if (filters.user_id && value !== selectedUserLabel) {
+                setSelectedUserLabel('');
+                updateFilter('user_id', '');
+              }
+            }}
+            onSelectionChange={(key) => {
+              const value = key == null ? '' : String(key);
+              updateFilter('user_id', value);
+              const option = visibleUserOptions.find((item) => item.id === value);
+              const label = option?.label ? String(option.label) : '';
+              setSelectedUserLabel(label);
+              setUserKeyword(label);
+            }}
+          >
+            <ComboBox.InputGroup className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+              <Input className="pl-9" placeholder={t('usage.search_user')} />
+            </ComboBox.InputGroup>
+            <ComboBox.Popover>
+              <ListBox
+                items={visibleUserOptions}
+                renderEmptyState={() => (
+                  <div className="px-3 py-6 text-center text-xs text-text-tertiary">
+                    {userKeyword.trim() ? t('common.no_data') : t('usage.search_user')}
+                  </div>
+                )}
+              >
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.textValue}>
+                    <div className="min-w-0">
+                      <div className="truncate">{item.label}</div>
+                      {item.description ? (
+                        <div className="truncate text-xs text-text-tertiary">{item.description}</div>
+                      ) : null}
+                    </div>
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </ComboBox.Popover>
+          </ComboBox>
         </div>
-        <button
-          onClick={() => refetch()}
-          className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
-          title={t('common.refresh')}
+        <Switch
+          aria-label="自动更新"
+          className="shrink-0"
+          isSelected={autoRefresh}
+          size="sm"
+          onChange={handleAutoRefreshChange}
         >
-          <RefreshCw className={`w-4 h-4${isFetching ? ' animate-spin' : ''}`} />
-        </button>
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
+          <Switch.Content>
+            <span className="text-sm text-text-secondary">自动更新</span>
+          </Switch.Content>
+        </Switch>
       </div>
 
       {/* 使用记录表格 */}
-      <Table
+      <UsageRecordsTable
+        ariaLabel={t('usage.title', 'Usage')}
         columns={columns}
-        data={data?.list ?? []}
-        loading={isLoading}
-        rowKey={(row) => row.id as number}
+        emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
+        emptyTitle={t('common.no_data')}
+        isLoading={isLoading}
         page={page}
         pageSize={pageSize}
-        total={data?.total ?? 0}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
+        rows={data?.list ?? []}
+        setPage={setPage}
+        setPageSize={setPageSize}
+        total={total}
       />
     </div>
   );

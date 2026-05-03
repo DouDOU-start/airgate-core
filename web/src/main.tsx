@@ -6,11 +6,11 @@ import { StrictMode, useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
+import { AlertDialog, Button } from '@heroui/react';
 import { AuthProvider } from './app/providers/AuthProvider';
 import { ThemeProvider } from './app/providers/ThemeProvider';
 import { SiteSettingsProvider } from './app/providers/SiteSettingsProvider';
-import { ToastProvider, useToast } from './shared/components/Toast';
-import { ConfirmModal } from './shared/components/Modal';
+import { ToastProvider, useToast } from './shared/ui';
 import { router } from './app/router';
 import './i18n';
 import './index.css';
@@ -72,14 +72,32 @@ function PluginAPIBridge() {
   };
 
   return (
-    <ConfirmModal
-      open={pending !== null}
-      onClose={() => handleClose(false)}
-      onConfirm={() => handleClose(true)}
-      title={pending?.title ?? '请确认'}
-      message={pending?.message ?? ''}
-      danger={pending?.danger}
-    />
+    <AlertDialog
+      isOpen={pending !== null}
+      onOpenChange={(open) => {
+        if (!open) handleClose(false);
+      }}
+    >
+      <AlertDialog.Backdrop>
+        <AlertDialog.Container placement="center" size="sm">
+          <AlertDialog.Dialog className="ag-elevation-modal">
+            <AlertDialog.Header>
+              <AlertDialog.Icon status={pending?.danger ? 'danger' : 'accent'} />
+              <AlertDialog.Heading>{pending?.title ?? '请确认'}</AlertDialog.Heading>
+            </AlertDialog.Header>
+            <AlertDialog.Body>{pending?.message ?? ''}</AlertDialog.Body>
+            <AlertDialog.Footer>
+              <Button variant="secondary" onPress={() => handleClose(false)}>
+                取消
+              </Button>
+              <Button variant={pending?.danger ? 'danger' : 'primary'} onPress={() => handleClose(true)}>
+                确认
+              </Button>
+            </AlertDialog.Footer>
+          </AlertDialog.Dialog>
+        </AlertDialog.Container>
+      </AlertDialog.Backdrop>
+    </AlertDialog>
   );
 }
 

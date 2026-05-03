@@ -1,10 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, Chip, Label, ListBox, Modal, Select, useOverlayState } from '@heroui/react';
 import { Play, RotateCcw, Copy, Check, X } from 'lucide-react';
-import { Modal } from '../../shared/components/Modal';
-import { Button } from '../../shared/components/Button';
-import { Select } from '../../shared/components/Input';
-import { Badge } from '../../shared/components/Badge';
 import { accountsApi } from '../../shared/api/accounts';
 import { getToken } from '../../shared/api/client';
 import { useClipboard } from '../../shared/hooks/useClipboard';
@@ -292,116 +289,147 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) handleClose();
+    },
+  });
 
   if (!account) return null;
 
   const canStart = status !== 'connecting' && status !== 'streaming' && !!selectedModel;
+  const modelOptions = loadingModels
+    ? [{ id: '', label: t('common.loading') }]
+    : models.map((m) => ({ id: m.id, label: m.name || m.id }));
+  const selectedModelLabel = modelOptions.find((item) => item.id === selectedModel)?.label ?? '';
   const isRunning = status === 'connecting' || status === 'streaming';
 
   return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={t('accounts.test_modal_title')}
-      width="560px"
-      footer={
-        <>
-          <Button variant="secondary" onClick={handleClose}>
-            {t('common.close')}
-          </Button>
-          <Button
-            variant={status === 'error' ? 'danger' : 'primary'}
-            icon={status === 'idle' || status === 'connecting' || status === 'streaming'
-              ? <Play className="w-3.5 h-3.5" />
-              : <RotateCcw className="w-3.5 h-3.5" />
-            }
-            onClick={startTest}
-            disabled={!canStart}
-            loading={isRunning}
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog
+            className="ag-elevation-modal"
+            style={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
           >
-            {status === 'success' || status === 'error'
-              ? t('accounts.retry')
-              : t('accounts.start_test')
-            }
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        {/* 账号信息卡片 */}
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--ag-bg-surface)] border border-[var(--ag-glass-border)]">
-          <div className="flex-1 min-w-0">
-            <div className="font-medium text-sm text-[var(--ag-text)] truncate">
-              {account.name}
-            </div>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge>{account.platform.toUpperCase()}</Badge>
-              {account.type && <Badge variant="info">{account.type}</Badge>}
-            </div>
-          </div>
-        </div>
-
-        {/* 模型选择 */}
-        <Select
-          label={t('accounts.select_model')}
-          value={selectedModel}
-          onChange={(e) => setSelectedModel(e.target.value)}
-          options={
-            loadingModels
-              ? [{ value: '', label: t('common.loading') }]
-              : models.map((m) => ({ value: m.id, label: m.name || m.id }))
-          }
-          disabled={isRunning}
-        />
-
-        {/* 终端输出区域 */}
-        <div className="relative group">
-          <div
-            ref={terminalRef}
-            className="bg-gray-900 rounded-lg border border-gray-700 p-4 font-mono text-xs leading-relaxed overflow-y-auto"
-            style={{ minHeight: 120, maxHeight: 240 }}
-          >
-            {status === 'idle' && outputLines.length === 0 ? (
-              <span className="text-gray-500">{t('accounts.test_ready')}</span>
-            ) : (
-              <>
-                {outputLines.map((line, i) => (
-                  <div key={i} className={line.color}>{line.text}</div>
-                ))}
-                {streamingContent && (
-                  <span className="text-green-400">
-                    {streamingContent}
-                    <span className="animate-pulse">_</span>
-                  </span>
-                )}
-                {status === 'success' && (
-                  <div className="text-green-400 mt-1">
-                    <Check className="w-3.5 h-3.5 inline mr-1" />
-                    {t('accounts.test_done')}
+            <Modal.Header>
+              <Modal.Heading>{t('accounts.test_modal_title')}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              <div className="space-y-4">
+                {/* 账号信息卡片 */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--ag-bg-surface)] border border-[var(--ag-glass-border)]">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm text-[var(--ag-text)] truncate">
+                      {account.name}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Chip color="default" size="sm" variant="soft">{account.platform.toUpperCase()}</Chip>
+                      {account.type && <Chip color="accent" size="sm" variant="soft">{account.type}</Chip>}
+                    </div>
                   </div>
-                )}
-                {status === 'error' && (
-                  <div className="text-red-400 mt-1">
-                    <X className="w-3.5 h-3.5 inline mr-1" />
-                    {errorMessage || t('accounts.test_error')}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+                </div>
 
-          {/* 复制按钮 */}
-          {outputLines.length > 0 && (
-            <button
-              onClick={handleCopy}
-              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-300"
-              title={t('common.copy')}
-            >
-              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            </button>
-          )}
-        </div>
-      </div>
+                {/* 模型选择 */}
+                <Select
+                  fullWidth
+                  selectedKey={selectedModel}
+                  onSelectionChange={(key) => setSelectedModel(key == null ? '' : String(key))}
+                  isDisabled={isRunning}
+                >
+                  <Label>{t('accounts.select_model')}</Label>
+                  <Select.Trigger>
+                    <Select.Value>{selectedModelLabel}</Select.Value>
+                    <Select.Indicator />
+                  </Select.Trigger>
+                  <Select.Popover>
+                    <ListBox items={modelOptions}>
+                      {(item) => (
+                        <ListBox.Item id={item.id} textValue={item.label}>
+                          {item.label}
+                        </ListBox.Item>
+                      )}
+                    </ListBox>
+                  </Select.Popover>
+                </Select>
+
+                {/* 终端输出区域 */}
+                <div className="relative group">
+                  <div
+                    ref={terminalRef}
+                    className="bg-gray-900 rounded-lg border border-gray-700 p-4 font-mono text-xs leading-relaxed overflow-y-auto"
+                    style={{ minHeight: 120, maxHeight: 240 }}
+                  >
+                    {status === 'idle' && outputLines.length === 0 ? (
+                      <span className="text-gray-500">{t('accounts.test_ready')}</span>
+                    ) : (
+                      <>
+                        {outputLines.map((line, i) => (
+                          <div key={i} className={line.color}>{line.text}</div>
+                        ))}
+                        {streamingContent && (
+                          <span className="text-green-400">
+                            {streamingContent}
+                            <span className="animate-pulse">_</span>
+                          </span>
+                        )}
+                        {status === 'success' && (
+                          <div className="text-green-400 mt-1">
+                            <Check className="w-3.5 h-3.5 inline mr-1" />
+                            {t('accounts.test_done')}
+                          </div>
+                        )}
+                        {status === 'error' && (
+                          <div className="text-red-400 mt-1">
+                            <X className="w-3.5 h-3.5 inline mr-1" />
+                            {errorMessage || t('accounts.test_error')}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* 复制按钮 */}
+                  {outputLines.length > 0 && (
+                    <Button
+                      aria-label={t('common.copy')}
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      isIconOnly
+                      size="sm"
+                      variant="secondary"
+                      onPress={handleCopy}
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onPress={handleClose}>
+                {t('common.close')}
+              </Button>
+              <Button
+                variant={status === 'error' ? 'danger' : 'primary'}
+                onPress={startTest}
+                isDisabled={!canStart}
+                aria-busy={isRunning}
+              >
+                {status === 'idle' || status === 'connecting' || status === 'streaming'
+                  ? <Play className="w-3.5 h-3.5" />
+                  : <RotateCcw className="w-3.5 h-3.5" />
+                }
+                {status === 'success' || status === 'error'
+                  ? t('accounts.retry')
+                  : t('accounts.start_test')
+                }
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }

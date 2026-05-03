@@ -1,6 +1,12 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { UserResp } from '../../shared/types';
-import { setToken, getToken, setSessionAPIKey } from '../../shared/api/client';
+import {
+  setToken,
+  getToken,
+  setSessionAPIKey,
+  getTokenAPIKeyID,
+  getTokenRole,
+} from '../../shared/api/client';
 import { usersApi } from '../../shared/api/users';
 
 interface AuthContextType {
@@ -20,6 +26,17 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
 });
 
+function normalizeSessionUser(user: UserResp, token = getToken()): UserResp {
+  const role = getTokenRole(token);
+  const apiKeyID = getTokenAPIKeyID(token);
+
+  return {
+    ...user,
+    role: role ?? user.role,
+    ...(apiKeyID ? { api_key_id: apiKeyID } : {}),
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserResp | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,8 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = getToken();
     if (token) {
       usersApi.me()
-        .then(setUser)
-        .catch(() => setToken(null))
+        .then((userData) => {
+          if (getToken() === token) setUser(normalizeSessionUser(userData, token));
+        })
+        .catch(() => {
+          if (getToken() === token) setToken(null);
+        })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
@@ -38,10 +59,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = (token: string, userData: UserResp) => {
     setToken(token);
-    setUser(userData);
+    setUser(normalizeSessionUser(userData, token));
     // 登录响应可能不包含全部用户字段（例如 API Key 登录时缺少 quota / expires_at），
     // 异步用 /me 拉一次完整数据补齐，避免首屏额度等信息显示不准。
-    usersApi.me().then(setUser).catch(() => {});
+    usersApi.me()
+      .then((freshUser) => {
+        if (getToken() === token) setUser(normalizeSessionUser(freshUser, token));
+      })
+      .catch(() => {});
   };
 
   const logout = () => {

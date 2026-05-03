@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, ComboBox, Description, Input, Label, ListBox, Modal, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { Key } from 'lucide-react';
-import { Modal } from '../../../shared/components/Modal';
-import { Button } from '../../../shared/components/Button';
-import { Input, Textarea } from '../../../shared/components/Input';
-import { SearchSelect } from '../../../shared/components/SearchSelect';
 import { parseIpList } from '../../../shared/utils/ip';
 import { useAuth } from '../../../app/providers/AuthProvider';
+import { AirGateDatePicker } from '../../../shared/components/AirGateDatePicker';
 import type { CreateAPIKeyReq, GroupResp } from '../../../shared/types';
 
 interface CreateKeyModalProps {
@@ -17,156 +15,210 @@ interface CreateKeyModalProps {
   loading: boolean;
 }
 
+const defaultForm: CreateAPIKeyReq = {
+  expires_at: '',
+  group_id: 0,
+  max_concurrency: 0,
+  name: '',
+  quota_usd: 0,
+  sell_rate: 0,
+};
+
 export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: CreateKeyModalProps) {
   const { t } = useTranslation();
-  const [form, setForm] = useState<CreateAPIKeyReq>({
-    name: '',
-    group_id: 0,
-    quota_usd: 0,
-    sell_rate: 0,
-    max_concurrency: 0,
-    expires_at: '',
-  });
+  const { user } = useAuth();
+  const [form, setForm] = useState<CreateAPIKeyReq>(defaultForm);
   const [ipWhitelist, setIpWhitelist] = useState('');
   const [ipBlacklist, setIpBlacklist] = useState('');
 
-  const handleSubmit = () => {
-    if (!form.name || !form.group_id) return;
-    onSubmit({
-      ...form,
-      quota_usd: form.quota_usd || undefined,
-      sell_rate: form.sell_rate || undefined,
-      // 0 代表"不限制"，依然显式传给后端以便明确语义；留空/undefined 后端也会按 0 处理
-      max_concurrency: form.max_concurrency ?? 0,
-      expires_at: form.expires_at || undefined,
-      ip_whitelist: parseIpList(ipWhitelist),
-      ip_blacklist: parseIpList(ipBlacklist),
-    });
-  };
-
   const handleClose = () => {
-    setForm({ name: '', group_id: 0, quota_usd: 0, sell_rate: 0, max_concurrency: 0, expires_at: '' });
+    setForm(defaultForm);
     setIpWhitelist('');
     setIpBlacklist('');
     onClose();
   };
 
-  const { user } = useAuth();
-  const userGroupRates = user?.group_rates;
-  const groupOptions = groups.map((g) => {
-    const override = userGroupRates?.[g.id];
-    const hasOverride = override != null && override > 0 && override !== g.rate_multiplier;
+  const handleSubmit = () => {
+    if (!form.name || !form.group_id) return;
+    onSubmit({
+      ...form,
+      expires_at: form.expires_at || undefined,
+      ip_blacklist: parseIpList(ipBlacklist),
+      ip_whitelist: parseIpList(ipWhitelist),
+      max_concurrency: form.max_concurrency ?? 0,
+      quota_usd: form.quota_usd || undefined,
+      sell_rate: form.sell_rate || undefined,
+    });
+  };
+
+  const groupOptions = groups.map((group) => {
+    const override = user?.group_rates?.[group.id];
+    const hasOverride = override != null && override > 0 && override !== group.rate_multiplier;
     return {
-      value: String(g.id),
-      label: `${g.name} (${g.platform})`,
-      suffix: hasOverride ? (
-        <span className="text-text-tertiary">
-          <span className="line-through opacity-60">{g.rate_multiplier}x</span>{' '}
-          <span className="text-primary font-medium">{override}x</span>
-        </span>
-      ) : (
-        <span className="text-text-tertiary">{g.rate_multiplier}x 倍率</span>
+      id: String(group.id),
+      label: (
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <span className="truncate">{group.name} ({group.platform})</span>
+          <span className="shrink-0 text-xs text-text-tertiary">
+            {hasOverride ? (
+              <>
+                <span className="line-through opacity-60">{group.rate_multiplier}x</span>{' '}
+                <span className="font-medium text-primary">{override}x</span>
+              </>
+            ) : (
+              <>{group.rate_multiplier}x 倍率</>
+            )}
+          </span>
+        </div>
       ),
+      textValue: `${group.name} ${group.platform}`,
     };
+  });
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) handleClose();
+    },
   });
 
   return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={t('api_keys.create')}
-      width="560px"
-      footer={
-        <>
-          <Button variant="secondary" onClick={handleClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleSubmit} loading={loading}>
-            {t('common.create')}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <Input
-          label={t('common.name')}
-          required
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          placeholder={t('api_keys.name_placeholder')}
-          icon={<Key className="w-4 h-4" />}
-        />
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+            <Modal.Dialog
+            className="ag-elevation-modal"
+            style={{ maxWidth: '720px', width: 'min(100%, calc(100vw - 2rem))' }}
+          >
+            <Modal.Header>
+              <Modal.Heading>{t('api_keys.create')}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              <div className="ag-form-scroll-safe">
+                <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
+                  <div className="space-y-5">
+                    <HeroTextField fullWidth isRequired>
+                      <Label>{t('common.name')}</Label>
+                      <div className="relative">
+                        <Key className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                        <Input
+                          className="pl-9"
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          placeholder={t('api_keys.name_placeholder')}
+                          required
+                        />
+                      </div>
+                    </HeroTextField>
 
-        <SearchSelect
-          label={t('api_keys.group')}
-          required
-          placeholder={t('api_keys.select_group')}
-          value={form.group_id ? String(form.group_id) : ''}
-          onChange={(v) => setForm({ ...form, group_id: Number(v) })}
-          options={groupOptions}
-        />
+                    <ComboBox
+                      allowsCustomValue
+                      fullWidth
+                      inputValue={groups.find((group) => group.id === form.group_id)?.name ?? ''}
+                      isRequired
+                      items={groupOptions}
+                      menuTrigger="focus"
+                      selectedKey={form.group_id ? String(form.group_id) : null}
+                      onSelectionChange={(key) => setForm({ ...form, group_id: key == null ? 0 : Number(key) })}
+                    >
+                      <Label>{t('api_keys.group')}</Label>
+                      <ComboBox.InputGroup>
+                        <Input placeholder={t('api_keys.select_group')} required />
+                        <ComboBox.Trigger />
+                      </ComboBox.InputGroup>
+                      <ComboBox.Popover>
+                        <ListBox items={groupOptions}>
+                          {(item) => (
+                            <ListBox.Item id={item.id} textValue={item.textValue}>
+                              {item.label}
+                            </ListBox.Item>
+                          )}
+                        </ListBox>
+                      </ComboBox.Popover>
+                    </ComboBox>
 
-        <Input
-          label={t('api_keys.quota_label')}
-          type="number"
-          step="0.01"
-          min="0"
-          value={String(form.quota_usd ?? 0)}
-          onChange={(e) => setForm({ ...form, quota_usd: Number(e.target.value) })}
-          hint={t('api_keys.quota_hint')}
-        />
+                    <HeroTextField fullWidth>
+                      <Label>{t('api_keys.quota_label')}</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={String(form.quota_usd ?? 0)}
+                        onChange={(e) => setForm({ ...form, quota_usd: Number(e.target.value) })}
+                      />
+                      <Description>{t('api_keys.quota_hint')}</Description>
+                    </HeroTextField>
 
-        <Input
-          label={t('api_keys.sell_rate_label', '销售倍率')}
-          type="number"
-          step="0.01"
-          min="0"
-          value={String(form.sell_rate ?? 0)}
-          onChange={(e) => setForm({ ...form, sell_rate: Number(e.target.value) })}
-          hint={t('api_keys.sell_rate_hint', '留空或 0 表示按平台原价计费')}
-        />
+                    <HeroTextField fullWidth>
+                      <Label>{t('api_keys.sell_rate_label', '销售倍率')}</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={String(form.sell_rate ?? 0)}
+                        onChange={(e) => setForm({ ...form, sell_rate: Number(e.target.value) })}
+                      />
+                      <Description>{t('api_keys.sell_rate_hint', '留空或 0 表示按平台原价计费')}</Description>
+                    </HeroTextField>
+                  </div>
 
-        <Input
-          label={t('api_keys.max_concurrency_label', '最大并发数')}
-          type="number"
-          step="1"
-          min="0"
-          value={String(form.max_concurrency ?? 0)}
-          onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
-          hint={t('api_keys.max_concurrency_hint', '留空或 0 表示不限制')}
-        />
+                  <div className="space-y-5">
+                    <HeroTextField fullWidth>
+                      <Label>{t('api_keys.max_concurrency_label', '最大并发数')}</Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={String(form.max_concurrency ?? 0)}
+                        onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
+                      />
+                      <Description>{t('api_keys.max_concurrency_hint', '留空或 0 表示不限制')}</Description>
+                    </HeroTextField>
 
-        <Input
-          label={t('api_keys.expire_time')}
-          type="date"
-          value={form.expires_at ? form.expires_at.split('T')[0] : ''}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              expires_at: e.target.value ? `${e.target.value}T23:59:59Z` : '',
-            })
-          }
-          hint={t('api_keys.expire_hint')}
-        />
+                    <AirGateDatePicker
+                      description={t('api_keys.expire_hint')}
+                      label={t('api_keys.expire_time')}
+                      value={form.expires_at ? form.expires_at.split('T')[0] : ''}
+                      onChange={(value) => setForm({ ...form, expires_at: value ? `${value}T23:59:59Z` : '' })}
+                    />
 
-        <Textarea
-          label={t('api_keys.ip_whitelist')}
-          placeholder={t('api_keys.ip_placeholder')}
-          value={ipWhitelist}
-          onChange={(e) => setIpWhitelist(e.target.value)}
-          className="font-mono"
-          rows={2}
-        />
+                    <HeroTextField fullWidth>
+                      <Label>{t('api_keys.ip_whitelist')}</Label>
+                      <TextArea
+                        className="font-mono"
+                        placeholder={t('api_keys.ip_placeholder')}
+                        value={ipWhitelist}
+                        onChange={(e) => setIpWhitelist(e.target.value)}
+                        rows={2}
+                      />
+                    </HeroTextField>
 
-        <Textarea
-          label={t('api_keys.ip_blacklist')}
-          placeholder={t('api_keys.ip_placeholder')}
-          value={ipBlacklist}
-          onChange={(e) => setIpBlacklist(e.target.value)}
-          className="font-mono"
-          rows={2}
-        />
-      </div>
+                    <HeroTextField fullWidth>
+                      <Label>{t('api_keys.ip_blacklist')}</Label>
+                      <TextArea
+                        className="font-mono"
+                        placeholder={t('api_keys.ip_placeholder')}
+                        value={ipBlacklist}
+                        onChange={(e) => setIpBlacklist(e.target.value)}
+                        rows={2}
+                      />
+                    </HeroTextField>
+                  </div>
+                </div>
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onPress={handleClose}>
+                {t('common.cancel')}
+              </Button>
+              <Button variant="primary" isDisabled={loading} onPress={handleSubmit}>
+                {loading ? <Spinner size="sm" /> : null}
+                {t('common.create')}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }

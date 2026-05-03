@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card } from '../shared/components/Card';
+import { Card } from '@heroui/react';
 import {
   Database,
   Server,
@@ -47,50 +47,35 @@ function Stepper({ current, steps }: { current: number; steps: StepKey[] }) {
           <div key={key} className="flex items-center">
             <div className="flex flex-col items-center">
               <div
-                className="relative flex items-center justify-center w-9 h-9 rounded-full transition-all duration-300"
-                style={{
-                  background: isCompleted || isCurrent
-                    ? 'var(--ag-primary)'
-                    : 'var(--ag-bg-surface)',
-                  border: isCompleted || isCurrent
-                    ? '1.5px solid var(--ag-primary)'
-                    : '1.5px solid var(--ag-glass-border)',
-                  boxShadow: isCurrent
-                    ? '0 0 16px var(--ag-primary-glow)'
-                    : 'none',
-                }}
+                className={[
+                  'relative flex items-center justify-center w-9 h-9 rounded-[var(--radius)] border transition-all duration-300',
+                  isCompleted || isCurrent
+                    ? 'border-primary bg-primary text-text-inverse'
+                    : 'border-glass-border bg-surface text-text-tertiary',
+                  isCurrent ? 'shadow-[0_0_16px_var(--ag-primary-glow)]' : '',
+                ].filter(Boolean).join(' ')}
               >
                 {isCompleted ? (
                   <CheckCircle2 className="w-4 h-4 text-text-inverse" />
                 ) : (
-                  <Icon
-                    className="w-4 h-4"
-                    style={{ color: isCurrent ? 'var(--ag-text-inverse)' : 'var(--ag-text-tertiary)' }}
-                  />
+                  <Icon className="w-4 h-4" />
                 )}
               </div>
               <span
-                className="text-[10px] mt-1.5 whitespace-nowrap font-medium font-mono uppercase tracking-wider transition-colors"
-                style={{
-                  color: isCompleted || isCurrent
-                    ? 'var(--ag-primary)'
-                    : 'var(--ag-text-tertiary)',
-                }}
+                className={[
+                  'text-[10px] mt-1.5 whitespace-nowrap font-medium font-mono uppercase transition-colors',
+                  isCompleted || isCurrent ? 'text-primary' : 'text-text-tertiary',
+                ].join(' ')}
               >
                 {t(step.labelKey)}
               </span>
             </div>
             {index < steps.length - 1 && (
               <div
-                className="w-12 h-px mx-2.5 mb-5 rounded-full transition-all duration-500"
-                style={{
-                  background: isCompleted
-                    ? 'var(--ag-primary)'
-                    : 'var(--ag-glass-border)',
-                  boxShadow: isCompleted
-                    ? '0 0 4px var(--ag-primary-glow)'
-                    : 'none',
-                }}
+                className={[
+                  'w-12 h-px mx-2.5 mb-5 rounded-[var(--radius)] transition-all duration-500',
+                  isCompleted ? 'bg-primary shadow-[0_0_4px_var(--ag-primary-glow)]' : 'bg-glass-border',
+                ].join(' ')}
               />
             )}
           </div>
@@ -190,14 +175,6 @@ export default function SetupPage() {
           }}
         />
         <div
-          className="absolute -top-[30%] -left-[15%] w-[700px] h-[700px] rounded-full opacity-[0.06]"
-          style={{ background: 'radial-gradient(circle, var(--ag-primary), transparent 65%)' }}
-        />
-        <div
-          className="absolute -bottom-[25%] -right-[10%] w-[500px] h-[500px] rounded-full opacity-[0.04]"
-          style={{ background: 'radial-gradient(circle, var(--ag-info), transparent 65%)' }}
-        />
-        <div
           className="absolute top-0 left-0 right-0 h-px"
           style={{ background: 'linear-gradient(90deg, transparent, var(--ag-primary-glow), transparent)' }}
         />
@@ -209,13 +186,13 @@ export default function SetupPage() {
       >
         {/* 标题 */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-subtle mb-4 shadow-glow">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-[var(--radius)] bg-primary-subtle mb-4 shadow-glow">
             <Zap className="w-6 h-6 text-primary" />
           </div>
-          <h1 className="text-xl font-semibold text-text tracking-tight">
+          <h1 className="text-xl font-semibold text-text">
             AirGate
           </h1>
-          <p className="text-xs text-text-tertiary mt-1.5 tracking-wide font-mono uppercase">
+          <p className="text-xs text-text-tertiary mt-1.5 font-mono uppercase">
             {t('setup.title')}
           </p>
         </div>
@@ -225,40 +202,42 @@ export default function SetupPage() {
 
         {/* 表单卡片 */}
         <Card>
-          {currentStepKey === 'db' && (
-            <StepDatabase data={dbConfig} onChange={setDBConfig} onNext={() => setStep(step + 1)} />
-          )}
-          {currentStepKey === 'redis' && (
-            <StepRedis
-              data={redisConfig}
-              onChange={setRedisConfig}
-              onPrev={() => setStep(step - 1)}
-              onNext={() => setStep(step + 1)}
-            />
-          )}
-          {currentStepKey === 'admin' && (
-            <StepAdmin
-              data={adminConfig}
-              onChange={setAdminConfig}
-              // 当 db / redis 都来自 env 时，admin 是第一步，没有上一步可返回
-              onPrev={step > 0 ? () => setStep(step - 1) : undefined}
-              onNext={() => setStep(step + 1)}
-            />
-          )}
-          {currentStepKey === 'finish' && (
-            <StepFinish
-              dbConfig={dbConfig}
-              redisConfig={redisConfig}
-              adminConfig={{ email: adminConfig.email, password: adminConfig.password }}
-              envDBProvided={envDBProvided}
-              envRedisProvided={envRedisProvided}
-              onPrev={() => setStep(step - 1)}
-            />
-          )}
+          <Card.Content className="p-6">
+            {currentStepKey === 'db' && (
+              <StepDatabase data={dbConfig} onChange={setDBConfig} onNext={() => setStep(step + 1)} />
+            )}
+            {currentStepKey === 'redis' && (
+              <StepRedis
+                data={redisConfig}
+                onChange={setRedisConfig}
+                onPrev={() => setStep(step - 1)}
+                onNext={() => setStep(step + 1)}
+              />
+            )}
+            {currentStepKey === 'admin' && (
+              <StepAdmin
+                data={adminConfig}
+                onChange={setAdminConfig}
+                // 当 db / redis 都来自 env 时，admin 是第一步，没有上一步可返回
+                onPrev={step > 0 ? () => setStep(step - 1) : undefined}
+                onNext={() => setStep(step + 1)}
+              />
+            )}
+            {currentStepKey === 'finish' && (
+              <StepFinish
+                dbConfig={dbConfig}
+                redisConfig={redisConfig}
+                adminConfig={{ email: adminConfig.email, password: adminConfig.password }}
+                envDBProvided={envDBProvided}
+                envRedisProvided={envRedisProvided}
+                onPrev={() => setStep(step - 1)}
+              />
+            )}
+          </Card.Content>
         </Card>
 
         {/* 底部 */}
-        <p className="text-center text-[10px] text-text-tertiary mt-8 font-mono uppercase tracking-[0.15em]">
+        <p className="text-center text-[10px] text-text-tertiary mt-8 font-mono uppercase">
           Powered by AirGate
         </p>
       </div>

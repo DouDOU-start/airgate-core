@@ -6,6 +6,11 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 // Token 管理
 let accessToken: string | null = localStorage.getItem('token');
 
+interface TokenClaims {
+  role?: string;
+  api_key_id?: number;
+}
+
 export function setToken(token: string | null) {
   accessToken = token;
   if (token) {
@@ -17,6 +22,34 @@ export function setToken(token: string | null) {
 
 export function getToken(): string | null {
   return accessToken;
+}
+
+export function getTokenClaims(token = accessToken): TokenClaims | null {
+  if (!token) return null;
+
+  const payload = token.split('.')[1];
+  if (!payload) return null;
+
+  try {
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    const json = new TextDecoder().decode(
+      Uint8Array.from(atob(padded), (char) => char.charCodeAt(0)),
+    );
+    return JSON.parse(json) as TokenClaims;
+  } catch {
+    return null;
+  }
+}
+
+export function getTokenRole(token = accessToken): 'admin' | 'user' | null {
+  const role = getTokenClaims(token)?.role;
+  return role === 'admin' || role === 'user' ? role : null;
+}
+
+export function getTokenAPIKeyID(token = accessToken): number | null {
+  const id = getTokenClaims(token)?.api_key_id;
+  return typeof id === 'number' && id > 0 ? id : null;
 }
 
 // API Key 登录场景下用户输入的原文 Key，仅保留在 sessionStorage 内，

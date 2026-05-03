@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '../components/Toast';
+import { useToast } from '../ui';
 
 interface CrudMutationOptions<TData, TVariables = void> {
   mutationFn: (variables: TVariables) => Promise<TData>;

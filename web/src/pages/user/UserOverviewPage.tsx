@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { Card, Tabs } from '@heroui/react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -11,13 +12,59 @@ import {
 import { useAuth } from '../../app/providers/AuthProvider';
 import { usageApi } from '../../shared/api/usage';
 import { queryKeys } from '../../shared/queryKeys';
-import { Card, StatCard } from '../../shared/components/Card';
+import { CompactDataTable } from '../../shared/components/CompactDataTable';
 
 import { decorativePalette } from '@airgate/theme';
 
 const PIE_COLORS = decorativePalette.slice(0, 10);
 
 type RangePreset = 'today' | '7d' | '30d' | '90d';
+
+function SectionCard({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <Card>
+      <Card.Header>
+        <Card.Title>{title}</Card.Title>
+      </Card.Header>
+      <Card.Content>{children}</Card.Content>
+    </Card>
+  );
+}
+
+function StatCard({
+  accentColor,
+  icon,
+  title,
+  value,
+}: {
+  accentColor: string;
+  icon: ReactNode;
+  title: string;
+  value: string;
+}) {
+  return (
+    <Card className="relative overflow-hidden">
+      <div
+        className="absolute inset-x-0 top-0 h-px opacity-70"
+        style={{ background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)` }}
+      />
+      <Card.Content>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 space-y-2">
+            <p className="text-xs font-medium uppercase text-text-tertiary">{title}</p>
+            <p className="font-mono text-2xl font-bold">{value}</p>
+          </div>
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm"
+            style={{ background: `color-mix(in srgb, ${accentColor} 12%, transparent)`, color: accentColor }}
+          >
+            {icon}
+          </div>
+        </div>
+      </Card.Content>
+    </Card>
+  );
+}
 
 function fmtNum(n: number | undefined | null): string {
   if (n == null) return '0';
@@ -128,28 +175,28 @@ export default function UserOverviewPage() {
       {/* 时间范围选择 */}
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xs text-text-tertiary">{t('dashboard.time_range')}</span>
-        {(['today', '7d', '30d', '90d'] as const).map((r) => (
-          <button
-            key={r}
-            onClick={() => setRange(r)}
-            className={`px-3 py-1 text-xs rounded-lg font-medium transition-all cursor-pointer ${
-              range === r
-                ? 'bg-primary-subtle text-primary'
-                : 'text-text-tertiary hover:text-text hover:bg-bg-hover'
-            }`}
-          >
-            {t(`dashboard.range_${r}`)}
-          </button>
-        ))}
+        <Tabs
+          selectedKey={range}
+          onSelectionChange={(key) => setRange(key as RangePreset)}
+          variant="secondary"
+        >
+          <Tabs.List>
+            {(['today', '7d', '30d', '90d'] as const).map((r) => (
+              <Tabs.Tab key={r} id={r}>
+                {t(`dashboard.range_${r}`)}
+              </Tabs.Tab>
+            ))}
+          </Tabs.List>
+        </Tabs>
       </div>
 
       {/* 模型分布 + Token 趋势 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         {/* 模型分布饼图 */}
-        <Card title={t('dashboard.model_distribution')}>
+        <SectionCard title={t('dashboard.model_distribution')}>
           {models.length > 0 ? (
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="w-44 h-44 flex-shrink-0 mx-auto sm:mx-0">
+            <div className="ag-distribution-card-body flex flex-col gap-3 sm:flex-row">
+              <div className="ag-distribution-chart-frame">
                 <PieChart width={176} height={176}>
                   <Pie data={models.map((m) => ({ name: m.model, value: m.tokens }))} cx="50%" cy="50%" innerRadius={35} outerRadius={65} dataKey="value" minAngle={3} stroke="var(--ag-bg-elevated)" strokeWidth={1}>
                     {models.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -160,39 +207,58 @@ export default function UserOverviewPage() {
                   />
                 </PieChart>
               </div>
-              <div className="flex-1 overflow-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-text-tertiary">
-                      <th className="text-left font-medium pb-2">{t('usage.model')}</th>
-                      <th className="text-right font-medium pb-2">{t('dashboard.requests')}</th>
-                      <th className="text-right font-medium pb-2">TOKEN</th>
-                      <th className="text-right font-medium pb-2">{t('usage.cost')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {models.map((m, i) => (
-                      <tr key={m.model} className="border-t border-border-subtle">
-                        <td className="py-1.5 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                          <span className="text-text truncate max-w-[120px]">{m.model}</span>
-                        </td>
-                        <td className="text-right text-text-secondary py-1.5">{m.requests}</td>
-                        <td className="text-right text-text-secondary py-1.5 font-mono">{fmtNum(m.tokens)}</td>
-                        <td className="text-right py-1.5 font-mono" style={{ color: 'var(--ag-primary)' }}>{fmtCost(m.actual_cost)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="ag-distribution-table-scroll">
+                <CompactDataTable
+                  ariaLabel={t('dashboard.model_distribution')}
+                  className="ag-compact-data-table--dense"
+                  emptyText={t('common.no_data')}
+                  minWidth={420}
+                  rowKey={(row) => row.model}
+                  rows={models}
+                  columns={[
+                    {
+                      key: 'model',
+                      title: t('usage.model'),
+                      width: '40%',
+                      render: (row, index) => (
+                        <>
+                          <span className="w-2 h-2 shrink-0 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
+                          <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
+                        </>
+                      ),
+                    },
+                    {
+                      align: 'end',
+                      key: 'requests',
+                      title: t('dashboard.requests'),
+                      width: '20%',
+                      render: (row) => <span className="truncate text-text-secondary">{row.requests}</span>,
+                    },
+                    {
+                      align: 'end',
+                      key: 'tokens',
+                      title: 'TOKEN',
+                      width: '20%',
+                      render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.tokens)}</span>,
+                    },
+                    {
+                      align: 'end',
+                      key: 'cost',
+                      title: t('usage.cost'),
+                      width: '20%',
+                      render: (row) => <span className="truncate font-mono text-primary">{fmtCost(row.actual_cost)}</span>,
+                    },
+                  ]}
+                />
               </div>
             </div>
           ) : (
             <div className="flex items-center justify-center h-44 text-text-tertiary text-sm">{t('common.no_data')}</div>
           )}
-        </Card>
+        </SectionCard>
 
         {/* Token 趋势 */}
-        <Card title={t('dashboard.token_trend')}>
+        <SectionCard title={t('dashboard.token_trend')}>
           {trendData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -226,7 +292,7 @@ export default function UserOverviewPage() {
             <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded bg-emerald-500" /> {t('usage.output')}</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded bg-violet-500" /> {t('usage.cache_read')}</span>
           </div>
-        </Card>
+        </SectionCard>
       </div>
     </div>
   );

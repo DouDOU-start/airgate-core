@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Chip, EmptyState, Modal, Skeleton, Table as HeroTable, useOverlayState } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
-import { Modal } from '../../../shared/components/Modal';
-import { Table, type Column } from '../../../shared/components/Table';
-import { Badge } from '../../../shared/components/Badge';
 import { usersApi } from '../../../shared/api/users';
+import { getTotalPages } from '../../../shared/utils/pagination';
+import { TablePaginationFooter } from '../../../shared/components/TablePaginationFooter';
 import type { UserResp, BalanceLogResp } from '../../../shared/types';
 
 interface BalanceHistoryModalProps {
@@ -32,79 +32,123 @@ export function BalanceHistoryModal({ open, user, onClose }: BalanceHistoryModal
     }
   };
 
-  const actionVariant = (action: string): 'success' | 'warning' | 'info' => {
+  const actionColor = (action: string): 'success' | 'warning' | 'accent' => {
     switch (action) {
       case 'add': return 'success';
       case 'subtract': return 'warning';
-      default: return 'info';
+      default: return 'accent';
     }
   };
 
-  const columns: Column<BalanceLogResp>[] = [
-    {
-      key: 'action',
-      title: t('users.action_type'),
-      width: '80px',
-      render: (row) => <Badge variant={actionVariant(row.action)}>{actionLabel(row.action)}</Badge>,
+  const rows = data?.list ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = getTotalPages(total, 10);
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) onClose();
     },
-    {
-      key: 'amount',
-      title: t('users.amount'),
-      render: (row) => (
-        <span className={`font-mono text-xs font-semibold ${row.action === 'add' ? 'text-success' : row.action === 'subtract' ? 'text-danger' : 'text-info'}`}>
-          {row.action === 'add' ? '+' : row.action === 'subtract' ? '-' : '='}{row.amount.toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      key: 'balance_change',
-      title: `${t('users.before_balance')} → ${t('users.after_balance')}`,
-      render: (row) => (
-        <span className="font-mono text-xs text-text-secondary">
-          ${row.before_balance.toFixed(2)} → ${row.after_balance.toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      key: 'remark',
-      title: t('users.remark'),
-      render: (row) => <span className="text-xs text-text-tertiary">{row.remark || '-'}</span>,
-    },
-    {
-      key: 'created_at',
-      title: t('users.created_at'),
-      render: (row) => (
-        <span className="text-xs text-text-secondary">
-          {new Date(row.created_at).toLocaleString('zh-CN', {
-            month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-          })}
-        </span>
-      ),
-    },
-  ];
+  });
 
   return (
-    <Modal open={open} onClose={onClose} title={`${t('users.balance_history')} - ${user.email}`} width="750px">
-      <div className="rounded-md bg-surface border border-glass-border px-4 py-3 mb-4">
-        <p className="text-xs text-text-tertiary uppercase tracking-wider">{t('users.current_balance')}</p>
-        <p className="text-lg font-bold mt-1 font-mono">${user.balance.toFixed(2)}</p>
-      </div>
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog
+            className="ag-elevation-modal"
+            style={{ maxWidth: '750px', width: 'min(100%, calc(100vw - 2rem))' }}
+          >
+            <Modal.Header>
+              <Modal.Heading>{`${t('users.balance_history')} - ${user.email}`}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              <div className="mb-4 rounded-md border border-glass-border bg-surface px-4 py-3">
+                <p className="text-xs uppercaser text-text-tertiary">{t('users.current_balance')}</p>
+                <p className="mt-1 font-mono text-lg font-bold">${user.balance.toFixed(2)}</p>
+              </div>
 
-      {!isLoading && (!data?.list || data.list.length === 0) ? (
-        <p className="text-sm text-text-tertiary text-center py-8">{t('users.no_balance_history')}</p>
-      ) : (
-        <Table<BalanceLogResp>
-          columns={columns}
-          data={data?.list ?? []}
-          loading={isLoading}
-          rowKey={(row) => row.id}
-          page={page}
-          pageSize={10}
-          total={data?.total ?? 0}
-          onPageChange={setPage}
-          autoHeight
-        />
-      )}
+              <HeroTable variant="primary">
+                <HeroTable.ScrollContainer>
+                  <HeroTable.Content aria-label={t('users.balance_history')}>
+            <HeroTable.Header>
+              <HeroTable.Column id="action" style={{ width: 96 }}>
+                {t('users.action_type')}
+              </HeroTable.Column>
+              <HeroTable.Column id="amount">{t('users.amount')}</HeroTable.Column>
+              <HeroTable.Column id="balance_change">
+                {t('users.before_balance')} → {t('users.after_balance')}
+              </HeroTable.Column>
+              <HeroTable.Column id="remark">{t('users.remark')}</HeroTable.Column>
+              <HeroTable.Column id="created_at">{t('users.created_at')}</HeroTable.Column>
+            </HeroTable.Header>
+            <HeroTable.Body>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
+                    {Array.from({ length: 5 }).map((__, cellIndex) => (
+                      <HeroTable.Cell key={cellIndex}>
+                        <Skeleton className="h-4 w-24" />
+                      </HeroTable.Cell>
+                    ))}
+                  </HeroTable.Row>
+                ))
+              ) : rows.length === 0 ? (
+                <HeroTable.Row id="empty">
+                  <HeroTable.Cell colSpan={5}>
+                    <EmptyState />
+                  </HeroTable.Cell>
+                </HeroTable.Row>
+              ) : (
+                rows.map((row: BalanceLogResp) => (
+                  <HeroTable.Row id={String(row.id)} key={row.id}>
+                    <HeroTable.Cell>
+                      <Chip color={actionColor(row.action)} size="sm" variant="soft">
+                        {actionLabel(row.action)}
+                      </Chip>
+                    </HeroTable.Cell>
+                    <HeroTable.Cell>
+                      <span className={`font-mono text-xs font-semibold ${row.action === 'add' ? 'text-success' : row.action === 'subtract' ? 'text-danger' : 'text-info'}`}>
+                        {row.action === 'add' ? '+' : row.action === 'subtract' ? '-' : '='}{row.amount.toFixed(2)}
+                      </span>
+                    </HeroTable.Cell>
+                    <HeroTable.Cell>
+                      <span className="font-mono text-xs text-text-secondary">
+                        ${row.before_balance.toFixed(2)} → ${row.after_balance.toFixed(2)}
+                      </span>
+                    </HeroTable.Cell>
+                    <HeroTable.Cell>
+                      <span className="text-xs text-text-tertiary">{row.remark || '-'}</span>
+                    </HeroTable.Cell>
+                    <HeroTable.Cell>
+                      <span className="text-xs text-text-secondary">
+                        {new Date(row.created_at).toLocaleString('zh-CN', {
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          month: '2-digit',
+                        })}
+                      </span>
+                    </HeroTable.Cell>
+                  </HeroTable.Row>
+                ))
+              )}
+            </HeroTable.Body>
+          </HeroTable.Content>
+                </HeroTable.ScrollContainer>
+                <HeroTable.Footer>
+                  <TablePaginationFooter
+                    page={page}
+                    setPage={setPage}
+                    total={total}
+                    totalPages={totalPages}
+                  />
+                </HeroTable.Footer>
+              </HeroTable>
+            </Modal.Body>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }

@@ -1,7 +1,6 @@
 import { type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '../../shared/components/Button';
-import { Input } from '../../shared/components/Input';
+import { Button, FieldError, Form, Input, Label, Meter, TextField as HeroTextField } from '@heroui/react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -24,17 +23,17 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
   };
 
   // 密码强度检查
-  const getPasswordStrength = (pwd: string): { label: string; color: string; width: string } => {
-    if (pwd.length < 6) return { label: t('setup.password_too_short'), color: 'var(--ag-danger)', width: '20%' };
-    if (pwd.length < 8) return { label: t('setup.strength_weak'), color: 'var(--ag-danger)', width: '35%' };
+  const getPasswordStrength = (pwd: string): { label: string; status: 'danger' | 'warning' | 'success'; value: number } => {
+    if (pwd.length < 6) return { label: t('setup.password_too_short'), status: 'danger', value: 20 };
+    if (pwd.length < 8) return { label: t('setup.strength_weak'), status: 'danger', value: 35 };
     const hasUpper = /[A-Z]/.test(pwd);
     const hasLower = /[a-z]/.test(pwd);
     const hasNumber = /\d/.test(pwd);
     const hasSpecial = /[^A-Za-z0-9]/.test(pwd);
     const score = [hasUpper, hasLower, hasNumber, hasSpecial].filter(Boolean).length;
-    if (score >= 3 && pwd.length >= 10) return { label: t('setup.strength_strong'), color: 'var(--ag-success)', width: '100%' };
-    if (score >= 2) return { label: t('setup.strength_fair'), color: 'var(--ag-warning)', width: '65%' };
-    return { label: t('setup.strength_weak'), color: 'var(--ag-danger)', width: '35%' };
+    if (score >= 3 && pwd.length >= 10) return { label: t('setup.strength_strong'), status: 'success', value: 100 };
+    if (score >= 2) return { label: t('setup.strength_fair'), status: 'warning', value: 65 };
+    return { label: t('setup.strength_weak'), status: 'danger', value: 35 };
   };
 
   const passwordMismatch = data.confirmPassword && data.password !== data.confirmPassword;
@@ -52,60 +51,70 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
   };
 
   return (
-    <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+    <Form className="space-y-4" onSubmit={handleSubmit} noValidate>
       <p className="text-sm text-text-secondary mb-2">
         {t('setup.step_admin_desc')}
       </p>
-      <Input
-        label={t('setup.admin_email')}
-        name="email"
-        type="email"
-        value={data.email}
-        onChange={(e) => update('email', e.target.value)}
-        placeholder="admin@example.com"
-        autoComplete="email"
-        required
-      />
-      <div>
+      <HeroTextField fullWidth isRequired>
+        <Label>{t('setup.admin_email')}</Label>
         <Input
-          label={t('profile.new_password')}
-          name="new-password"
-          type="password"
-          value={data.password}
-          onChange={(e) => update('password', e.target.value)}
-          placeholder={t('setup.password_too_short')}
-          autoComplete="new-password"
+          name="email"
+          type="email"
+          value={data.email}
+          onChange={(e) => update('email', e.target.value)}
+          placeholder="admin@example.com"
+          autoComplete="email"
           required
-          error={passwordTooShort ? t('setup.password_too_short') : undefined}
         />
+      </HeroTextField>
+      <div>
+        <HeroTextField fullWidth isInvalid={passwordTooShort} isRequired>
+          <Label>{t('profile.new_password')}</Label>
+          <Input
+            name="new-password"
+            type="password"
+            value={data.password}
+            onChange={(e) => update('password', e.target.value)}
+            placeholder={t('setup.password_too_short')}
+            autoComplete="new-password"
+            aria-invalid={passwordTooShort || undefined}
+            required
+          />
+          {passwordTooShort ? <FieldError>{t('setup.password_too_short')}</FieldError> : null}
+        </HeroTextField>
         {strength && !passwordTooShort && (
-          <div className="mt-2 space-y-1">
-            <div
-              className="h-1 rounded-full overflow-hidden"
-              style={{ background: 'var(--ag-bg-surface)' }}
-            >
-              <div
-                className="h-full rounded-full transition-all duration-300"
-                style={{ width: strength.width, background: strength.color }}
-              />
-            </div>
-            <p className="text-xs" style={{ color: strength.color }}>
+          <Meter
+            aria-label={t('setup.password_strength')}
+            className="mt-2"
+            color={strength.status}
+            maxValue={100}
+            minValue={0}
+            size="sm"
+            value={strength.value}
+          >
+            <Meter.Track>
+              <Meter.Fill />
+            </Meter.Track>
+            <Meter.Output>
               {t('setup.password_strength')}:{strength.label}
-            </p>
-          </div>
+            </Meter.Output>
+          </Meter>
         )}
       </div>
-      <Input
-        label={t('profile.confirm_new_password')}
-        name="confirm-new-password"
-        type="password"
-        value={data.confirmPassword}
-        onChange={(e) => update('confirmPassword', e.target.value)}
-        placeholder={t('profile.confirm_placeholder')}
-        autoComplete="new-password"
-        required
-        error={passwordMismatch ? t('profile.password_mismatch') : undefined}
-      />
+      <HeroTextField fullWidth isInvalid={Boolean(passwordMismatch)} isRequired>
+        <Label>{t('profile.confirm_new_password')}</Label>
+        <Input
+          name="confirm-new-password"
+          type="password"
+          value={data.confirmPassword}
+          onChange={(e) => update('confirmPassword', e.target.value)}
+          placeholder={t('profile.confirm_placeholder')}
+          autoComplete="new-password"
+          aria-invalid={Boolean(passwordMismatch) || undefined}
+          required
+        />
+        {passwordMismatch ? <FieldError>{t('profile.password_mismatch')}</FieldError> : null}
+      </HeroTextField>
 
       {/* 操作按钮 */}
       <div className="flex justify-between pt-4">
@@ -113,9 +122,9 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
           <Button
             type="button"
             variant="ghost"
-            onClick={onPrev}
-            icon={<ArrowLeft className="w-4 h-4" />}
+            onPress={onPrev}
           >
+            <ArrowLeft className="w-4 h-4" />
             {t('setup.step_redis')}
           </Button>
         ) : (
@@ -123,12 +132,12 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
         )}
         <Button
           type="submit"
-          disabled={!canProceed}
-          icon={<ArrowRight className="w-4 h-4" />}
+          isDisabled={!canProceed}
         >
+          <ArrowRight className="w-4 h-4" />
           {t('setup.step_finish')}
         </Button>
       </div>
-    </form>
+    </Form>
   );
 }

@@ -1,9 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, Input, Label, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { Eye, EyeOff, RefreshCw } from 'lucide-react';
-import { Modal } from '../../../shared/components/Modal';
-import { Button } from '../../../shared/components/Button';
-import { Input } from '../../../shared/components/Input';
 import { useClipboard } from '../../../shared/hooks/useClipboard';
 import type { CreateUserReq } from '../../../shared/types';
 
@@ -15,7 +13,11 @@ interface CreateUserModalProps {
 }
 
 const defaultForm: CreateUserReq = {
-  email: '', password: '', username: '', role: 'user', max_concurrency: 0,
+  email: '',
+  max_concurrency: 0,
+  password: '',
+  role: 'user',
+  username: '',
 };
 
 export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUserModalProps) {
@@ -23,6 +25,11 @@ export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUser
   const copy = useClipboard();
   const [form, setForm] = useState<CreateUserReq>(defaultForm);
   const [showPassword, setShowPassword] = useState(false);
+
+  const handleClose = () => {
+    setForm(defaultForm);
+    onClose();
+  };
 
   const generatePassword = () => {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*';
@@ -33,60 +40,102 @@ export function CreateUserModal({ open, onClose, onSubmit, loading }: CreateUser
     copy(pwd);
   };
 
-  const handleSubmit = (event?: FormEvent<HTMLFormElement>) => {
-    event?.preventDefault();
+  const handleSubmit = () => {
     if (!form.email || !form.password) return;
     onSubmit(form);
   };
-
-  const handleClose = () => {
-    setForm(defaultForm);
-    onClose();
-  };
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) handleClose();
+    },
+  });
 
   return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={t('users.create')}
-      footer={
-        <>
-          <Button type="button" variant="secondary" onClick={handleClose}>{t('common.cancel')}</Button>
-          <Button type="submit" form="create-user-form" loading={loading}>{t('common.create')}</Button>
-        </>
-      }
-    >
-      <form id="create-user-form" className="space-y-4" onSubmit={handleSubmit} noValidate>
-        <Input label={t('users.email')} name="email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} autoComplete="email" />
-        <div>
-          <div className="relative">
-            <Input label={t('users.password')} name="new-password" type={showPassword ? 'text' : 'password'} required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" />
-            <button
-              type="button"
-              className="absolute right-3 bottom-[10px] text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          <button
-            type="button"
-            className="mt-1.5 flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 transition-colors cursor-pointer"
-            onClick={generatePassword}
-          >
-            <RefreshCw className="w-3 h-3" />
-            {t('users.generate_password')}
-          </button>
-        </div>
-        <Input label={t('users.username')} name="username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} autoComplete="username" />
-        <Input
-          label={t('users.max_concurrency')}
-          type="number"
-          min="0"
-          value={String(form.max_concurrency ?? 0)}
-          onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
-        />
-      </form>
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog className="ag-elevation-modal">
+            <Modal.Header>
+              <Modal.Heading>{t('users.create')}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              <div className="space-y-4">
+                <HeroTextField fullWidth isRequired>
+                  <Label>{t('users.email')}</Label>
+                  <Input
+                    name="email"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    autoComplete="email"
+                    required
+                  />
+                </HeroTextField>
+                <div className="space-y-1.5">
+                  <HeroTextField fullWidth isRequired>
+                    <Label>{t('users.password')}</Label>
+                    <div className="relative">
+                      <Input
+                        className="pr-10"
+                        name="new-password"
+                        type={showPassword ? 'text' : 'password'}
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        autoComplete="new-password"
+                        required
+                      />
+                      <Button
+                        isIconOnly
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                        onPress={() => setShowPassword((value) => !value)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </HeroTextField>
+                  <Button size="sm" variant="ghost" onPress={generatePassword}>
+                    <RefreshCw className="h-3 w-3" />
+                    {t('users.generate_password')}
+                  </Button>
+                </div>
+                <HeroTextField fullWidth>
+                  <Label>{t('users.username')}</Label>
+                  <Input
+                    name="username"
+                    value={form.username}
+                    onChange={(e) => setForm({ ...form, username: e.target.value })}
+                    autoComplete="username"
+                  />
+                </HeroTextField>
+                <HeroTextField fullWidth>
+                  <Label>{t('users.max_concurrency')}</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={String(form.max_concurrency ?? 0)}
+                    onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
+                  />
+                </HeroTextField>
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onPress={handleClose}>
+                {t('common.cancel')}
+              </Button>
+              <Button variant="primary" isDisabled={loading} onPress={handleSubmit}>
+                {loading ? <Spinner size="sm" /> : null}
+                {t('common.create')}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }

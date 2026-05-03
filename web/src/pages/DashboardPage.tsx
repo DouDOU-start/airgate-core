@@ -1,34 +1,70 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Alert, Button, Card, Label, ListBox, Select, Skeleton, Tabs } from '@heroui/react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
 import {
-  Key, Monitor, Activity, Users,
-  Coins, Database, Zap, Clock,
+  Activity,
+  CalendarDays,
+  Clock,
+  Coins,
+  Database,
+  KeyRound,
+  Monitor,
+  RefreshCw,
+  UserRound,
+  Users,
+  Zap,
 } from 'lucide-react';
-import { Card } from '../shared/components/Card';
-import { Alert } from '../shared/components/Alert';
-import { Select } from '../shared/components/Input';
-import { Tabs } from '../shared/components/Tabs';
+import { decorativePalette } from '@airgate/theme';
 import { dashboardApi } from '../shared/api/dashboard';
 import { usersApi } from '../shared/api/users';
 import { queryKeys } from '../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../shared/constants';
+import { CompactDataTable } from '../shared/components/CompactDataTable';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
-import { decorativePalette } from '@airgate/theme';
-
-// 饼图 & 用户趋势线颜色（引用 SDK 装饰色）
 const PIE_COLORS = decorativePalette.slice(0, 10);
 const USER_COLORS = [...decorativePalette];
 
 type RangePreset = 'today' | '7d' | '30d' | '90d';
 type Granularity = 'hour' | 'day';
 
-// 格式化数字
+const RANGE_PRESETS = ['today', '7d', '30d', '90d'] as const;
+type MetricTone = 'blue' | 'violet' | 'emerald' | 'teal' | 'amber' | 'indigo' | 'purple' | 'rose';
+type MetaTone = 'default' | 'success' | 'warning' | 'danger' | 'accent';
+
+const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
+  amber: 'bg-amber-100 text-amber-600 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25',
+  blue: 'bg-blue-100 text-blue-600 ring-blue-200 dark:bg-blue-400/15 dark:text-blue-300 dark:ring-blue-400/25',
+  emerald: 'bg-emerald-100 text-emerald-600 ring-emerald-200 dark:bg-emerald-400/15 dark:text-emerald-300 dark:ring-emerald-400/25',
+  indigo: 'bg-indigo-100 text-indigo-600 ring-indigo-200 dark:bg-indigo-400/15 dark:text-indigo-300 dark:ring-indigo-400/25',
+  purple: 'bg-purple-100 text-purple-600 ring-purple-200 dark:bg-purple-400/15 dark:text-purple-300 dark:ring-purple-400/25',
+  rose: 'bg-rose-100 text-rose-600 ring-rose-200 dark:bg-rose-400/15 dark:text-rose-300 dark:ring-rose-400/25',
+  teal: 'bg-teal-100 text-teal-600 ring-teal-200 dark:bg-teal-400/15 dark:text-teal-300 dark:ring-teal-400/25',
+  violet: 'bg-violet-100 text-violet-600 ring-violet-200 dark:bg-violet-400/15 dark:text-violet-300 dark:ring-violet-400/25',
+};
+
+const META_TONE_CLASSES: Record<MetaTone, string> = {
+  accent: 'text-primary',
+  danger: 'text-danger',
+  default: 'text-text-tertiary',
+  success: 'text-emerald-600 dark:text-emerald-400',
+  warning: 'text-amber-600 dark:text-amber-400',
+};
+
 function fmtNum(n: number | undefined | null): string {
   if (n == null) return '0';
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
@@ -37,11 +73,464 @@ function fmtNum(n: number | undefined | null): string {
   return n.toLocaleString();
 }
 
-// 格式化费用
 function fmtCost(n: number | undefined | null): string {
   if (n == null) return '$0.00';
   if (n >= 1000) return `$${(n / 1000).toFixed(2)}K`;
   return `$${n.toFixed(2)}`;
+}
+
+function fmtTime(timeStr: string): string {
+  if (timeStr.includes(' ')) {
+    const time = timeStr.split(' ')[1] ?? '';
+    return time.slice(0, 5) || timeStr;
+  }
+  const parts = timeStr.split('-');
+  if (parts.length === 3) return `${parts[1]}/${parts[2]}`;
+  return timeStr;
+}
+
+function DashboardCard({
+  children,
+  extra,
+  title,
+}: {
+  children: ReactNode;
+  extra?: ReactNode;
+  title?: string;
+}) {
+  const hasHeader = Boolean(title || extra);
+
+  return (
+    <Card className="ag-dashboard-panel">
+      {hasHeader ? (
+        <div
+          className={`flex items-center gap-3 p-3 pb-2 2xl:p-4 2xl:pb-2 ${title ? 'justify-between' : 'justify-end'}`}
+        >
+          {title ? <h3 className="text-base font-semibold leading-none text-text">{title}</h3> : null}
+          {extra ? (
+            <div className="shrink-0">{extra}</div>
+          ) : null}
+        </div>
+      ) : null}
+      <Card.Content className={hasHeader ? 'px-3 pb-3 2xl:px-4 2xl:pb-4' : 'p-3 2xl:p-4'}>{children}</Card.Content>
+    </Card>
+  );
+}
+
+function MetricCard({
+  icon,
+  meta,
+  metaTone = 'default',
+  title,
+  tone,
+  value,
+  valueSuffix,
+}: {
+  icon: ReactNode;
+  meta: string;
+  metaTone?: MetaTone;
+  title: string;
+  tone: MetricTone;
+  value: ReactNode;
+  valueSuffix?: string;
+}) {
+  return (
+    <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
+      <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+        <div className="ag-dashboard-metric-copy">
+          <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
+          <div className="mt-1 flex min-w-0 items-baseline gap-2">
+            <div className="flex min-w-0 items-baseline font-mono text-[22px] font-semibold leading-none text-text 2xl:text-2xl">
+              {value}
+              {valueSuffix ? <span className="ml-1.5 text-sm font-medium text-text-tertiary">{valueSuffix}</span> : null}
+            </div>
+            <div className={`min-w-0 truncate text-xs font-semibold ${META_TONE_CLASSES[metaTone]}`}>{meta}</div>
+          </div>
+        </div>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:h-11 2xl:w-11 ${METRIC_TONE_CLASSES[tone]}`}>
+          {icon}
+        </span>
+      </Card.Content>
+    </Card>
+  );
+}
+
+function StatsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]" key={index}>
+          <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
+            <div className="ag-dashboard-metric-copy space-y-2">
+              <Skeleton className="h-3 w-24" />
+              <div className="flex items-baseline gap-2">
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            </div>
+            <Skeleton className="h-10 w-10 shrink-0 rounded-[var(--field-radius)]" />
+          </Card.Content>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function StatsCards({ stats }: { stats: DashboardStatsResp }) {
+  const { t } = useTranslation();
+  return (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+      <MetricCard
+        icon={<KeyRound className="h-5 w-5" />}
+        tone="blue"
+        metaTone="success"
+        title={t('dashboard.api_keys')}
+        value={stats.total_api_keys}
+        meta={t('dashboard.api_keys_enabled', { count: stats.enabled_api_keys })}
+      />
+      <MetricCard
+        icon={<Monitor className="h-5 w-5" />}
+        tone="violet"
+        metaTone={stats.error_accounts > 0 ? 'danger' : 'success'}
+        title={t('dashboard.accounts')}
+        value={stats.total_accounts}
+        meta={t('dashboard.accounts_status', { enabled: stats.enabled_accounts, errors: stats.error_accounts })}
+      />
+      <MetricCard
+        icon={<Activity className="h-5 w-5" />}
+        tone="emerald"
+        title={t('dashboard.today_requests')}
+        value={fmtNum(stats.today_requests)}
+        meta={t('dashboard.alltime_requests', { count: fmtNum(stats.alltime_requests) } as Record<string, string>)}
+      />
+      <MetricCard
+        icon={<Users className="h-5 w-5" />}
+        tone="teal"
+        metaTone="success"
+        title={t('dashboard.users')}
+        value={t('dashboard.new_users', { count: stats.new_users_today })}
+        meta={t('dashboard.total_count', { count: stats.total_users })}
+      />
+      <MetricCard
+        icon={<Coins className="h-5 w-5" />}
+        tone="amber"
+        metaTone="warning"
+        title={t('dashboard.today_tokens')}
+        value={fmtNum(stats.today_tokens)}
+        meta={`${fmtCost(stats.today_cost)} / ${fmtCost(stats.today_standard_cost)}`}
+      />
+      <MetricCard
+        icon={<Database className="h-5 w-5" />}
+        tone="indigo"
+        metaTone="success"
+        title={t('dashboard.total_tokens')}
+        value={fmtNum(stats.alltime_tokens)}
+        meta={`${fmtCost(stats.alltime_cost)} / ${fmtCost(stats.alltime_standard_cost)}`}
+      />
+      <MetricCard
+        icon={<Zap className="h-5 w-5" />}
+        tone="purple"
+        metaTone="accent"
+        title={t('dashboard.performance')}
+        value={Math.round(stats.rpm ?? 0)}
+        valueSuffix={t('dashboard.rpm')}
+        meta={`${fmtNum(stats.tpm ?? 0)} ${t('dashboard.tpm')}`}
+      />
+      <MetricCard
+        icon={<Clock className="h-5 w-5" />}
+        tone="rose"
+        title={t('dashboard.avg_response')}
+        value={`${((stats.avg_duration_ms ?? 0) / 1000).toFixed(2)}s`}
+        meta={t('dashboard.active_users', { count: stats.active_users })}
+      />
+    </div>
+  );
+}
+
+function ChartTooltip({
+  active,
+  label,
+  payload,
+}: {
+  active?: boolean;
+  label?: string;
+  payload?: Array<{ color?: string; dataKey?: string; name?: string; payload?: Record<string, unknown>; value?: number }>;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-surface px-3 py-2 text-xs text-text shadow-lg">
+      <div className="mb-1 font-medium">{label}</div>
+      <div className="space-y-1">
+        {payload.map((item) => (
+          <div key={`${item.dataKey}-${item.name}`} className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
+            <span className="text-text-tertiary">{item.name ?? item.dataKey}</span>
+            <span className="font-mono">{fmtNum(Number(item.value ?? 0))}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TokenTrendTooltip({
+  active,
+  label,
+  payload,
+}: {
+  active?: boolean;
+  label?: string;
+  payload?: Array<{ color?: string; dataKey?: string; payload?: { actualCost?: number; standardCost?: number }; value?: number }>;
+}) {
+  const { t } = useTranslation();
+  if (!active || !payload?.length) return null;
+  const datum = payload[0]?.payload;
+  const labels: Record<string, string> = {
+    cachedInput: t('dashboard.cached_input'),
+    input: t('dashboard.input'),
+    output: t('dashboard.output'),
+  };
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-surface px-3 py-2 text-xs text-text shadow-lg">
+      <div className="mb-1 font-medium">{label}</div>
+      <div className="space-y-1">
+        {payload.map((item) => (
+          <div key={item.dataKey} className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
+            <span className="text-text-tertiary">{labels[item.dataKey ?? ''] ?? item.dataKey}</span>
+            <span className="font-mono">{fmtNum(Number(item.value ?? 0))}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 border-t border-border pt-2 text-text-tertiary">
+        {t('dashboard.actual')}: <span className="text-warning">{fmtCost(datum?.actualCost)}</span>
+        {' / '}
+        {t('dashboard.standard')}: {fmtCost(datum?.standardCost)}
+      </div>
+    </div>
+  );
+}
+
+type DashboardDistributionTableRow = {
+  actualCost: number;
+  key: string | number;
+  name: string;
+  requests: number;
+  standardCost: number;
+  tokens: number;
+};
+
+function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
+  const { t } = useTranslation();
+  const [tab, setTab] = useState<'model' | 'user'>('model');
+  const models = trend.model_distribution ?? [];
+  const users = trend.user_ranking ?? [];
+  const modelPieData = useMemo(() => models.map((item) => ({ name: item.model, value: item.requests })), [models]);
+  const userPieData = useMemo(() => users.map((item) => ({ name: item.email, value: item.tokens })), [users]);
+  const activePieData = tab === 'model' ? modelPieData : userPieData;
+  const activeTitle = tab === 'model' ? t('dashboard.model_distribution') : t('dashboard.user_ranking');
+  const tableRows: DashboardDistributionTableRow[] = useMemo(
+    () => (
+      tab === 'model'
+        ? models.map((item, index) => ({
+            actualCost: item.actual_cost,
+            key: item.model || index,
+            name: item.model,
+            requests: item.requests,
+            standardCost: item.standard_cost,
+            tokens: item.tokens,
+          }))
+        : users.map((item, index) => ({
+            actualCost: item.actual_cost,
+            key: item.user_id || index,
+            name: item.email,
+            requests: item.requests,
+            standardCost: item.standard_cost,
+            tokens: item.tokens,
+          }))
+    ),
+    [models, tab, users],
+  );
+  const firstColumnTitle = tab === 'model' ? t('dashboard.model') : t('dashboard.email');
+  const distributionTabs = (
+    <Tabs className="ag-segmented-tabs ag-segmented-tabs-compact" selectedKey={tab} onSelectionChange={(key) => setTab(key as 'model' | 'user')}>
+      <Tabs.List>
+        <Tabs.Tab id="model">
+          <Tabs.Indicator />
+          <span>{t('dashboard.model_distribution')}</span>
+        </Tabs.Tab>
+        <Tabs.Tab id="user">
+          <Tabs.Separator />
+          <Tabs.Indicator />
+          <span>{t('dashboard.user_ranking')}</span>
+        </Tabs.Tab>
+      </Tabs.List>
+    </Tabs>
+  );
+
+  return (
+    <DashboardCard title={activeTitle} extra={distributionTabs}>
+      <div className="ag-distribution-card-body grid items-start gap-3 lg:grid-cols-[176px_minmax(0,1fr)]">
+        <div className="ag-distribution-chart-frame">
+          {activePieData.length > 0 ? (
+            <PieChart width={176} height={176}>
+              <Pie data={activePieData} cx="50%" cy="50%" dataKey="value" innerRadius={42} minAngle={3} outerRadius={68} stroke="var(--ag-surface)" strokeWidth={2}>
+                {activePieData.map((_, index) => (
+                  <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                ))}
+              </Pie>
+              <RechartsTooltip content={<ChartTooltip />} />
+            </PieChart>
+          ) : (
+            <div className="flex h-44 w-44 items-center justify-center text-xs text-text-tertiary">{t('common.no_data')}</div>
+          )}
+        </div>
+
+        <div className="ag-distribution-table-scroll">
+          <CompactDataTable
+            ariaLabel={activeTitle}
+            className="ag-compact-data-table--dense"
+            emptyText={t('common.no_data')}
+            minWidth={620}
+            rowKey={(row) => row.key}
+            rows={tableRows}
+            columns={[
+              {
+                key: 'name',
+                title: firstColumnTitle,
+                width: '42%',
+                render: (row, index) => (
+                  <>
+                    <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                    <span className="min-w-0 truncate font-medium text-text" title={row.name}>{row.name}</span>
+                  </>
+                ),
+              },
+              {
+                align: 'end',
+                key: 'requests',
+                title: t('dashboard.requests'),
+                width: '14%',
+                render: (row) => <span className="truncate font-mono text-text-secondary">{row.requests.toLocaleString()}</span>,
+              },
+              {
+                align: 'end',
+                key: 'tokens',
+                title: t('dashboard.tokens'),
+                width: '16%',
+                render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.tokens)}</span>,
+              },
+              {
+                align: 'end',
+                key: 'actual',
+                title: t('dashboard.actual'),
+                width: '14%',
+                render: (row) => <span className="truncate font-mono text-warning">{fmtCost(row.actualCost)}</span>,
+              },
+              {
+                align: 'end',
+                key: 'standard',
+                title: t('dashboard.standard'),
+                width: '14%',
+                render: (row) => <span className="truncate font-mono text-text-secondary">{fmtCost(row.standardCost)}</span>,
+              },
+            ]}
+          />
+        </div>
+      </div>
+    </DashboardCard>
+  );
+}
+
+function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
+  const { t } = useTranslation();
+  const chartData = useMemo(
+    () => (trend.token_trend ?? []).map((item) => ({
+      actualCost: item.actual_cost,
+      cachedInput: item.cached_input,
+      input: item.input_tokens,
+      output: item.output_tokens,
+      standardCost: item.standard_cost,
+      time: fmtTime(item.time),
+    })),
+    [trend],
+  );
+
+  return (
+    <DashboardCard>
+      {chartData.length > 0 ? (
+        <div className="h-[248px] 2xl:h-[288px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 8, top: 4 }}>
+              <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
+              <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickLine={false} />
+              <YAxis axisLine={false} tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
+              <RechartsTooltip content={<TokenTrendTooltip />} />
+              <Legend iconSize={8} iconType="circle" wrapperStyle={{ color: 'var(--ag-text-tertiary)', fontSize: 11 }} />
+              <Line dataKey="input" dot={false} name={t('dashboard.input')} stroke="#3b82f6" strokeWidth={2.5} type="monotone" />
+              <Line dataKey="output" dot={false} name={t('dashboard.output')} stroke="#10b981" strokeWidth={2.5} type="monotone" />
+              <Line dataKey="cachedInput" dot={false} name={t('dashboard.cached_input')} stroke="#8b5cf6" strokeWidth={2.5} type="monotone" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="flex h-[248px] items-center justify-center text-sm text-text-tertiary 2xl:h-[288px]">{t('common.no_data')}</div>
+      )}
+    </DashboardCard>
+  );
+}
+
+function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
+  const { t } = useTranslation();
+  const topUsers = trend.top_users ?? [];
+  const chartData = useMemo(() => {
+    if (topUsers.length === 0) return [];
+    const timeSet = new Set<string>();
+    topUsers.forEach((user) => user.trend.forEach((point) => timeSet.add(point.time)));
+    return Array.from(timeSet).sort().map((time) => {
+      const row: Record<string, number | string> = { time: fmtTime(time) };
+      topUsers.forEach((user) => {
+        row[user.email] = user.trend.find((point) => point.time === time)?.tokens ?? 0;
+      });
+      return row;
+    });
+  }, [topUsers]);
+
+  return (
+    <DashboardCard title={t('dashboard.top_users')}>
+      {topUsers.length > 0 ? (
+        <div className="h-[268px] 2xl:h-[320px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ bottom: 0, left: -18, right: 8, top: 4 }}>
+              <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
+              <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickLine={false} />
+              <YAxis axisLine={false} tick={{ fill: 'var(--ag-text-tertiary)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
+              <RechartsTooltip content={<ChartTooltip />} />
+              <Legend iconSize={8} iconType="circle" wrapperStyle={{ color: 'var(--ag-text-tertiary)', fontSize: 11 }} />
+              {topUsers.map((user, index) => (
+                <Line key={user.user_id} dataKey={user.email} dot={false} stroke={USER_COLORS[index % USER_COLORS.length]} strokeWidth={2.5} type="monotone" />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="flex h-[268px] items-center justify-center text-sm text-text-tertiary 2xl:h-[320px]">{t('common.no_data')}</div>
+      )}
+    </DashboardCard>
+  );
+}
+
+function TrendCharts({ trend }: { trend: DashboardTrendResp }) {
+  return (
+    <div className="ag-dashboard-trends space-y-4 2xl:space-y-5">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <ModelDistributionCard trend={trend} />
+        <TokenTrendCard trend={trend} />
+      </div>
+      <TopUsersCard trend={trend} />
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -50,584 +539,152 @@ export default function DashboardPage() {
   const [granularity, setGranularity] = useState<Granularity>('day');
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>();
 
-  // 用户列表（用于筛选）
   const { data: usersData } = useQuery({
     queryKey: queryKeys.usersAll(),
     queryFn: () => usersApi.list(FETCH_ALL_PARAMS),
   });
 
+  const userOptions = [
+    { id: '', label: t('dashboard.all_users') },
+    ...(usersData?.list ?? []).map((item) => ({ id: String(item.id), label: item.email })),
+  ];
+  const selectedUserLabel = userOptions.find((item) => item.id === String(selectedUserId ?? ''))?.label ?? t('dashboard.all_users');
+  const granularityOptions = [
+    { id: 'day', label: t('dashboard.granularity_day') },
+    { id: 'hour', label: t('dashboard.granularity_hour') },
+  ];
+  const selectedGranularity = range === 'today' ? 'hour' : granularity;
+  const selectedGranularityLabel = granularityOptions.find((item) => item.id === selectedGranularity)?.label ?? '';
   const userFilter = selectedUserId ? { user_id: selectedUserId } : undefined;
 
-  // 统计数据
-  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
+  const statsQuery = useQuery({
     queryKey: queryKeys.dashboard(selectedUserId),
     queryFn: () => dashboardApi.stats(userFilter),
   });
 
-  // 趋势数据
   const trendParams = useMemo(() => ({
     range,
     granularity: range === 'today' ? 'hour' as const : granularity,
     ...(selectedUserId ? { user_id: selectedUserId } : {}),
   }), [range, granularity, selectedUserId]);
 
-  const { data: trend, isLoading: trendLoading } = useQuery({
+  const trendQuery = useQuery({
     queryKey: queryKeys.dashboardTrend(trendParams),
     queryFn: () => dashboardApi.trend(trendParams),
   });
 
+  const refresh = () => {
+    statsQuery.refetch();
+    trendQuery.refetch();
+  };
+
   return (
-    <div>
-      {/* 错误提示 */}
-      {statsError && (
-        <Alert variant="error">{t('dashboard.load_failed', { error: statsError instanceof Error ? statsError.message : '' })}</Alert>
-      )}
+    <div className="space-y-5 2xl:space-y-6">
+      {statsQuery.error ? (
+        <Alert status="danger">
+          {t('dashboard.load_failed', { error: statsQuery.error instanceof Error ? statsQuery.error.message : '' })}
+        </Alert>
+      ) : null}
 
-      {/* 统计卡片 */}
-      {statsLoading ? <StatsSkeleton /> : stats ? <StatsCards stats={stats} /> : null}
+      {statsQuery.isLoading ? <StatsSkeleton /> : statsQuery.data ? <StatsCards stats={statsQuery.data} /> : null}
 
-      {/* 时间范围选择 */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-6 mb-4 gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-text-tertiary">{t('dashboard.time_range')}</span>
-          {(['today', '7d', '30d', '90d'] as const).map((r) => (
-            <button
-              key={r}
-              className={`px-3 py-1.5 text-xs rounded-md font-medium transition-all cursor-pointer ${
-                range === r
-                  ? 'bg-primary-subtle text-primary shadow-[0_0_8px_var(--ag-primary-glow)]'
-                  : 'text-text-secondary hover:bg-bg-hover hover:text-text border border-border-subtle'
-              }`}
-              onClick={() => setRange(r)}
-            >
-              {t(`dashboard.range_${r}`)}
-            </button>
-          ))}
+      <div className="ag-dashboard-toolbar flex flex-col gap-3 p-4 2xl:p-5 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <span className="shrink-0 text-sm font-semibold text-text-tertiary">{t('dashboard.time_range')}</span>
+          <Tabs className="ag-segmented-tabs" selectedKey={range} onSelectionChange={(key) => setRange(key as RangePreset)}>
+            <Tabs.List>
+              {RANGE_PRESETS.map((item, index) => (
+                <Tabs.Tab id={item} key={item}>
+                  {index > 0 ? <Tabs.Separator /> : null}
+                  <Tabs.Indicator />
+                  <span>{t(`dashboard.range_${item}`)}</span>
+                </Tabs.Tab>
+              ))}
+            </Tabs.List>
+          </Tabs>
+          <Button isIconOnly aria-label={t('common.refresh', 'Refresh')} variant="secondary" onPress={refresh}>
+            <RefreshCw className={`h-4 w-4 ${statsQuery.isFetching || trendQuery.isFetching ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-text-tertiary">{t('dashboard.filter_user')}</span>
-            <Select
-              className="text-xs rounded-md px-3 py-1.5 max-w-[180px]"
-              value={selectedUserId ? String(selectedUserId) : ''}
-              onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : undefined)}
-              options={[
-                { value: '', label: t('dashboard.all_users') },
-                ...(usersData?.list ?? []).map((u) => ({ value: String(u.id), label: u.email })),
-              ]}
-            />
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span className="shrink-0 text-sm font-semibold text-text-tertiary">{t('dashboard.filter_user')}</span>
+            <div className="w-full sm:w-64">
+              <Select
+                fullWidth
+                selectedKey={selectedUserId ? String(selectedUserId) : ''}
+                onSelectionChange={(key) => setSelectedUserId(key ? Number(key) : undefined)}
+              >
+                <Label className="sr-only">{t('dashboard.filter_user')}</Label>
+                <Select.Trigger>
+                  <UserRound className="mr-2 h-4 w-4 text-text-tertiary" />
+                  <Select.Value>{selectedUserLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={userOptions}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-text-tertiary">{t('dashboard.granularity')}</span>
-            <Select
-              className="text-xs rounded-md px-3 py-1.5"
-              value={range === 'today' ? 'hour' : granularity}
-              onChange={(e) => setGranularity(e.target.value as Granularity)}
-              disabled={range === 'today'}
-              options={[
-                { value: 'day', label: t('dashboard.granularity_day') },
-                { value: 'hour', label: t('dashboard.granularity_hour') },
-              ]}
-            />
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span className="shrink-0 text-sm font-semibold text-text-tertiary">{t('dashboard.granularity')}</span>
+            <div className="w-full sm:w-40">
+              <Select
+                fullWidth
+                isDisabled={range === 'today'}
+                selectedKey={selectedGranularity}
+                onSelectionChange={(key) => setGranularity(key as Granularity)}
+              >
+                <Label className="sr-only">{t('dashboard.granularity')}</Label>
+                <Select.Trigger>
+                  <CalendarDays className="mr-2 h-4 w-4 text-text-tertiary" />
+                  <Select.Value>{selectedGranularityLabel}</Select.Value>
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox items={granularityOptions}>
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.label}>
+                        {item.label}
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 模型分布 + Token 趋势 */}
-      {trendLoading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          <div className="rounded-lg border border-glass-border bg-bg-elevated p-5 h-96 ag-shimmer" />
-          <div className="rounded-lg border border-glass-border bg-bg-elevated p-5 h-96 ag-shimmer" />
+      {trendQuery.isLoading ? (
+        <div className="ag-dashboard-trends space-y-4 2xl:space-y-5">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <Card className="ag-dashboard-panel" key={index}>
+                <Card.Content>
+                  <Skeleton className="h-[280px] w-full 2xl:h-[320px]" />
+                </Card.Content>
+              </Card>
+            ))}
+          </div>
+          <Card className="ag-dashboard-panel">
+            <Card.Content>
+              <Skeleton className="h-[300px] w-full 2xl:h-[360px]" />
+            </Card.Content>
+          </Card>
         </div>
-      ) : trend ? (
-        <TrendCharts trend={trend} />
+      ) : trendQuery.data ? (
+        <TrendCharts trend={trendQuery.data} />
       ) : null}
     </div>
   );
-}
-
-// ==================== 趋势图组合 ====================
-
-function TrendCharts({ trend }: { trend: DashboardTrendResp }) {
-  return (
-    <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        <ModelDistributionCard trend={trend} />
-        <TokenTrendCard trend={trend} />
-      </div>
-      <TopUsersCard trend={trend} />
-    </>
-  );
-}
-
-// ==================== 统计卡片 ====================
-
-function StatsCards({ stats }: { stats: DashboardStatsResp }) {
-  const { t } = useTranslation();
-
-  const cards = [
-    {
-      title: t('dashboard.api_keys'),
-      value: stats.total_api_keys,
-      sub: t('dashboard.api_keys_enabled', { count: stats.enabled_api_keys }),
-      icon: <Key className="w-5 h-5" />,
-      color: 'var(--ag-primary)',
-    },
-    {
-      title: t('dashboard.accounts'),
-      value: stats.total_accounts,
-      sub: t('dashboard.accounts_status', { enabled: stats.enabled_accounts, errors: stats.error_accounts }),
-      subHighlight: stats.error_accounts > 0,
-      icon: <Monitor className="w-5 h-5" />,
-      color: 'var(--ag-info)',
-    },
-    {
-      title: t('dashboard.today_requests'),
-      value: fmtNum(stats.today_requests),
-      sub: t('dashboard.alltime_requests', { count: fmtNum(stats.alltime_requests) } as Record<string, string>),
-      icon: <Activity className="w-5 h-5" />,
-      color: 'var(--ag-success)',
-    },
-    {
-      title: t('dashboard.users'),
-      value: t('dashboard.new_users', { count: stats.new_users_today }),
-      sub: t('dashboard.total_count', { count: stats.total_users }),
-      icon: <Users className="w-5 h-5" />,
-      color: 'var(--ag-warning)',
-    },
-    {
-      title: t('dashboard.today_tokens'),
-      value: fmtNum(stats.today_tokens),
-      sub: `${fmtCost(stats.today_cost)} / ${fmtCost(stats.today_standard_cost)}`,
-      icon: <Coins className="w-5 h-5" />,
-      color: 'var(--ag-primary)',
-    },
-    {
-      title: t('dashboard.total_tokens'),
-      value: fmtNum(stats.alltime_tokens),
-      sub: `${fmtCost(stats.alltime_cost)} / ${fmtCost(stats.alltime_standard_cost)}`,
-      icon: <Database className="w-5 h-5" />,
-      color: 'var(--ag-info)',
-    },
-    {
-      title: t('dashboard.performance'),
-      value: `${Math.round(stats.rpm ?? 0)}`,
-      valueSuffix: t('dashboard.rpm'),
-      sub: `${fmtNum(stats.tpm ?? 0)} ${t('dashboard.tpm')}`,
-      icon: <Zap className="w-5 h-5" />,
-      color: 'var(--ag-success)',
-    },
-    {
-      title: t('dashboard.avg_response'),
-      value: `${((stats.avg_duration_ms ?? 0) / 1000).toFixed(2)}s`,
-      sub: t('dashboard.active_users', { count: stats.active_users }),
-      icon: <Clock className="w-5 h-5" />,
-      color: 'var(--ag-warning)',
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {cards.map((card, i) => (
-        <div
-          key={i}
-          className="group relative overflow-hidden rounded-lg border border-glass-border bg-bg-elevated p-5 transition-all duration-200 hover:border-border hover:shadow-md"
-          style={{ animation: `ag-slide-up 0.4s ease-out ${i * 50}ms both` }}
-        >
-          {/* 顶部发光线 */}
-          <div
-            className="absolute top-0 left-0 right-0 h-px opacity-40 group-hover:opacity-80 transition-opacity"
-            style={{ background: `linear-gradient(90deg, transparent, ${card.color}, transparent)` }}
-          />
-          <div className="flex items-start justify-between">
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-text-tertiary">{card.title}</p>
-              <p className="text-2xl font-bold tracking-tight font-mono">
-                {card.value}
-                {card.valueSuffix && (
-                  <span className="text-sm font-medium text-text-secondary ml-1.5">{card.valueSuffix}</span>
-                )}
-              </p>
-              <p className={`text-xs ${card.subHighlight ? 'text-danger' : 'text-text-tertiary'}`}>
-                {card.sub}
-              </p>
-            </div>
-            <div
-              className="flex items-center justify-center w-10 h-10 rounded-md"
-              style={{ background: `color-mix(in srgb, ${card.color} 12%, transparent)`, color: card.color }}
-            >
-              {card.icon}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function StatsSkeleton() {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div
-          key={i}
-          className="rounded-lg border border-glass-border bg-bg-elevated p-5"
-          style={{ animationDelay: `${i * 60}ms` }}
-        >
-          <div className="space-y-3">
-            <div className="h-3 w-16 ag-shimmer rounded" />
-            <div className="h-7 w-20 ag-shimmer rounded" />
-            <div className="h-3 w-28 ag-shimmer rounded" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ==================== 模型分布 ====================
-
-function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
-  const { t } = useTranslation();
-  const [tab, setTab] = useState<'model' | 'user'>('model');
-
-  const models = trend.model_distribution ?? [];
-  const users = trend.user_ranking ?? [];
-
-  const pieData = useMemo(() =>
-    models.map((m) => ({ name: m.model, value: m.requests })),
-    [models],
-  );
-
-  return (
-    <Card title={t('dashboard.model_distribution')} extra={
-      <Tabs
-        items={[
-          { key: 'model', label: t('dashboard.model_distribution') },
-          { key: 'user', label: t('dashboard.user_ranking') },
-        ]}
-        activeKey={tab}
-        onChange={(k) => setTab(k as 'model' | 'user')}
-      />
-    }>
-      {tab === 'model' ? (
-        <div className="flex gap-4">
-          {/* 饼图 */}
-          <div className="w-48 h-48 flex-shrink-0">
-            <PieChart width={192} height={192}>
-              <Pie
-                data={pieData}
-                cx="50%"
-                cy="50%"
-                innerRadius={35}
-                outerRadius={70}
-                dataKey="value"
-                minAngle={3}
-                stroke="var(--ag-bg-elevated)"
-                strokeWidth={1}
-              >
-                {pieData.map((_, i) => (
-                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <RechartsTooltip
-                contentStyle={{
-                  background: 'var(--ag-bg-elevated)',
-                  border: '1px solid var(--ag-border)',
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
-              />
-            </PieChart>
-          </div>
-
-          {/* 模型表格 */}
-          <div className="flex-1 overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border-subtle">
-                  <th className="text-left py-2 pr-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('dashboard.model')}</th>
-                  <th className="text-right py-2 px-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('dashboard.requests')}</th>
-                  <th className="text-right py-2 px-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('dashboard.tokens')}</th>
-                  <th className="text-right py-2 px-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('dashboard.actual')}</th>
-                  <th className="text-right py-2 pl-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('dashboard.standard')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {models.map((m, i) => (
-                  <tr key={m.model} className="border-b border-border-subtle last:border-0 hover:bg-bg-hover transition-colors">
-                    <td className="py-2 pr-3 text-text font-medium flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                      <span className="truncate max-w-[180px]">{m.model}</span>
-                    </td>
-                    <td className="py-2 px-3 text-right text-text-secondary font-mono">{m.requests.toLocaleString()}</td>
-                    <td className="py-2 px-3 text-right text-text-secondary font-mono">{fmtNum(m.tokens)}</td>
-                    <td className="py-2 px-3 text-right font-mono text-warning">{fmtCost(m.actual_cost)}</td>
-                    <td className="py-2 pl-3 text-right text-text-secondary font-mono">{fmtCost(m.standard_cost)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        /* 用户消费榜 */
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-border-subtle">
-                <th className="text-left py-2 pr-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('dashboard.email')}</th>
-                <th className="text-right py-2 px-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('dashboard.requests')}</th>
-                <th className="text-right py-2 px-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('dashboard.tokens')}</th>
-                <th className="text-right py-2 px-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('dashboard.actual')}</th>
-                <th className="text-right py-2 pl-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('dashboard.standard')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.user_id} className="border-b border-border-subtle last:border-0 hover:bg-bg-hover transition-colors">
-                  <td className="py-2 pr-3 text-text font-medium truncate max-w-[200px]">{u.email}</td>
-                  <td className="py-2 px-3 text-right text-text-secondary font-mono">{u.requests.toLocaleString()}</td>
-                  <td className="py-2 px-3 text-right text-text-secondary font-mono">{fmtNum(u.tokens)}</td>
-                  <td className="py-2 px-3 text-right font-mono text-warning">{fmtCost(u.actual_cost)}</td>
-                  <td className="py-2 pl-3 text-right text-text-secondary font-mono">{fmtCost(u.standard_cost)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-// ==================== Token 趋势 ====================
-
-type TokenTrendDatum = {
-  time: string;
-  input: number;
-  output: number;
-  cachedInput: number;
-  actualCost: number;
-  standardCost: number;
-};
-
-type TokenTrendTooltipPayload = {
-  dataKey: string;
-  value: number;
-  color: string;
-  payload: TokenTrendDatum;
-};
-
-function TokenTrendTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: TokenTrendTooltipPayload[];
-  label?: string;
-}) {
-  const { t } = useTranslation();
-  const first = payload?.[0];
-  if (!active || !first) return null;
-  const datum = first.payload;
-  const labels: Record<string, string> = {
-    input: t('dashboard.input'),
-    output: t('dashboard.output'),
-    cachedInput: t('dashboard.cached_input'),
-  };
-  return (
-    <div
-      style={{
-        background: 'var(--ag-bg-elevated)',
-        border: '1px solid var(--ag-border)',
-        borderRadius: 8,
-        fontSize: 12,
-        padding: '8px 12px',
-        color: 'var(--ag-text)',
-      }}
-    >
-      <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      {payload.map((p) => (
-        <div key={p.dataKey} style={{ color: p.color, lineHeight: 1.6 }}>
-          {labels[p.dataKey] || p.dataKey} : {fmtNum(Number(p.value))}
-        </div>
-      ))}
-      <div
-        style={{
-          marginTop: 6,
-          paddingTop: 6,
-          borderTop: '1px solid var(--ag-border-subtle)',
-          color: 'var(--ag-text-secondary)',
-        }}
-      >
-        {t('dashboard.actual')} : <span style={{ color: 'var(--ag-warning)' }}>{fmtCost(datum.actualCost)}</span>
-        {' | '}
-        {t('dashboard.standard')} : {fmtCost(datum.standardCost)}
-      </div>
-    </div>
-  );
-}
-
-function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
-  const { t } = useTranslation();
-
-  const chartData = useMemo(() =>
-    (trend.token_trend ?? []).map((d) => ({
-      time: fmtTime(d.time),
-      input: d.input_tokens,
-      output: d.output_tokens,
-      cachedInput: d.cached_input,
-      actualCost: d.actual_cost,
-      standardCost: d.standard_cost,
-    })),
-    [trend.token_trend],
-  );
-
-  if (chartData.length === 0) {
-    return (
-      <Card title={t('dashboard.token_trend')}>
-        <div className="flex items-center justify-center h-48 text-text-tertiary text-sm">
-          No data
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card title={t('dashboard.token_trend')}>
-      <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--ag-border-subtle)" />
-          <XAxis
-            dataKey="time"
-            tick={{ fontSize: 10, fill: 'var(--ag-text-tertiary)' }}
-            axisLine={{ stroke: 'var(--ag-border)' }}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 10, fill: 'var(--ag-text-tertiary)' }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) => fmtNum(v)}
-          />
-          <RechartsTooltip content={<TokenTrendTooltip />} />
-          <Legend
-            iconType="circle"
-            iconSize={8}
-            wrapperStyle={{ fontSize: 11, color: 'var(--ag-text-tertiary)' }}
-            formatter={(value: string) => {
-              const labels: Record<string, string> = {
-                input: t('dashboard.input'),
-                output: t('dashboard.output'),
-                cachedInput: t('dashboard.cached_input'),
-              };
-              return labels[value] || value;
-            }}
-          />
-          <Line type="monotone" dataKey="input" stroke="#3b82f6" strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="output" stroke="#10b981" strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="cachedInput" stroke="#8b5cf6" strokeWidth={2} dot={false} />
-        </LineChart>
-      </ResponsiveContainer>
-    </Card>
-  );
-}
-
-// ==================== Top 用户 ====================
-
-function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
-  const { t } = useTranslation();
-  const topUsers = trend.top_users ?? [];
-
-  // 收集所有时间点并合并为一行
-  const chartData = useMemo(() => {
-    if (topUsers.length === 0) return [];
-
-    // 收集所有唯一时间点
-    const timeSet = new Set<string>();
-    topUsers.forEach((u) => u.trend.forEach((p) => timeSet.add(p.time)));
-    const times = Array.from(timeSet).sort();
-
-    return times.map((time) => {
-      const row: Record<string, string | number> = { time: fmtTime(time) };
-      topUsers.forEach((u) => {
-        const point = u.trend.find((p) => p.time === time);
-        row[u.email] = point?.tokens ?? 0;
-      });
-      return row;
-    });
-  }, [topUsers]);
-
-  if (topUsers.length === 0) return null;
-
-  return (
-    <Card title={t('dashboard.top_users')}>
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--ag-border-subtle)" />
-          <XAxis
-            dataKey="time"
-            tick={{ fontSize: 10, fill: 'var(--ag-text-tertiary)' }}
-            axisLine={{ stroke: 'var(--ag-border)' }}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 10, fill: 'var(--ag-text-tertiary)' }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) => fmtNum(v)}
-          />
-          <RechartsTooltip
-            contentStyle={{
-              background: 'var(--ag-bg-elevated)',
-              border: '1px solid var(--ag-border)',
-              borderRadius: 8,
-              fontSize: 12,
-              padding: '8px 12px',
-            }}
-            labelStyle={{ color: 'var(--ag-text)', fontWeight: 600, marginBottom: 4 }}
-            formatter={(value, name) => [fmtNum(Number(value)), name]}
-          />
-          <Legend
-            iconType="circle"
-            iconSize={8}
-            wrapperStyle={{ fontSize: 11, color: 'var(--ag-text-tertiary)' }}
-          />
-          {topUsers.map((u, i) => (
-            <Line
-              key={u.user_id}
-              type="monotone"
-              dataKey={u.email}
-              stroke={USER_COLORS[i % USER_COLORS.length]}
-              strokeWidth={2}
-              dot={false}
-            />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
-    </Card>
-  );
-}
-
-// ==================== 工具函数 ====================
-
-/** 格式化趋势图时间标签：含小时取 HH:00，纯日期取 MM/DD。
- *
- * 后端从 v1 起会按调用方时区（client.ts 自动附带的 tz 参数）格式化桶 key，
- * 因此 timeStr 已经是用户本地时区下的字符串，前端只需直接截取，不要再做时区换算。
- */
-function fmtTime(timeStr: string): string {
-  if (timeStr.includes(' ')) {
-    // "2026-04-10 17:00" → "17:00"
-    const time = timeStr.split(' ')[1] ?? '';
-    return time.slice(0, 5) || timeStr;
-  }
-  // "2026-04-10" → "04/10"
-  const parts = timeStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[1]}/${parts[2]}`;
-  }
-  return timeStr;
 }

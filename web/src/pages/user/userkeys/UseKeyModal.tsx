@@ -1,9 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, Modal, useOverlayState } from '@heroui/react';
 import { AlertTriangle, Copy } from 'lucide-react';
-import { Modal } from '../../../shared/components/Modal';
-import { Button } from '../../../shared/components/Button';
-import { useToast } from '../../../shared/components/Toast';
+import { useToast } from '../../../shared/ui';
 import { useClipboard } from '../../../shared/hooks/useClipboard';
 import { useSiteSettings } from '../../../app/providers/SiteSettingsProvider';
 import { apikeysApi } from '../../../shared/api/apikeys';
@@ -190,19 +189,26 @@ export function UseKeyModal({
   const copy = useClipboard();
   const site = useSiteSettings();
   const baseUrl = site.api_base_url || window.location.origin;
+  const modalState = useOverlayState({
+    isOpen: !!useKeyTarget,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) onClose();
+    },
+  });
 
   return (
-    <Modal
-      open={!!useKeyTarget}
-      onClose={onClose}
-      title={t('user_keys.use_key_title')}
-      width="560px"
-      footer={
-        <Button onClick={onClose}>
-          {t('common.close')}
-        </Button>
-      }
-    >
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog
+            className="ag-elevation-modal"
+            style={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
+          >
+            <Modal.Header>
+              <Modal.Heading>{t('user_keys.use_key_title')}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
       {useKeyValue ? (
         useKeyPlatform ? (
           <div className="space-y-4">
@@ -212,75 +218,63 @@ export function UseKeyModal({
 
             {/* 客户端选择 Tab（OpenAI 平台时显示） */}
             {showClientTabs && (
-              <div className="flex gap-1 p-0.5 rounded-md bg-bg-hover">
-                <button
-                  onClick={() => setUseKeyTab('claude')}
-                  className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    useKeyTab === 'claude'
-                      ? 'bg-bg-elevated text-text shadow-sm'
-                      : 'text-text-tertiary hover:text-text-secondary'
-                  }`}
+              <div className="flex gap-1">
+                <Button
+                  fullWidth
+                  size="sm"
+                  variant={useKeyTab === 'claude' ? 'primary' : 'secondary'}
+                  onPress={() => setUseKeyTab('claude')}
                 >
                   Claude Code
-                </button>
-                <button
-                  onClick={() => setUseKeyTab('codex')}
-                  className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    useKeyTab === 'codex'
-                      ? 'bg-bg-elevated text-text shadow-sm'
-                      : 'text-text-tertiary hover:text-text-secondary'
-                  }`}
+                </Button>
+                <Button
+                  fullWidth
+                  size="sm"
+                  variant={useKeyTab === 'codex' ? 'primary' : 'secondary'}
+                  onPress={() => setUseKeyTab('codex')}
                 >
                   Codex CLI
-                </button>
+                </Button>
               </div>
             )}
 
             {/* OS/Shell Tab */}
-            <div className="flex gap-1 p-0.5 rounded-md bg-bg-hover">
-              <button
-                onClick={() => setUseKeyShell('unix')}
-                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                  useKeyShell === 'unix'
-                    ? 'bg-bg-elevated text-text shadow-sm'
-                    : 'text-text-tertiary hover:text-text-secondary'
-                }`}
+            <div className="flex gap-1">
+              <Button
+                fullWidth
+                size="sm"
+                variant={useKeyShell === 'unix' ? 'primary' : 'secondary'}
+                onPress={() => setUseKeyShell('unix')}
               >
                 macOS / Linux
-              </button>
+              </Button>
               {useKeyTab === 'codex' ? (
-                <button
-                  onClick={() => setUseKeyShell('cmd')}
-                  className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    useKeyShell !== 'unix'
-                      ? 'bg-bg-elevated text-text shadow-sm'
-                      : 'text-text-tertiary hover:text-text-secondary'
-                  }`}
+                <Button
+                  fullWidth
+                  size="sm"
+                  variant={useKeyShell !== 'unix' ? 'primary' : 'secondary'}
+                  onPress={() => setUseKeyShell('cmd')}
                 >
                   Windows
-                </button>
+                </Button>
               ) : (
                 <>
-                  <button
-                    onClick={() => setUseKeyShell('cmd')}
-                    className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                      useKeyShell === 'cmd'
-                        ? 'bg-bg-elevated text-text shadow-sm'
-                        : 'text-text-tertiary hover:text-text-secondary'
-                    }`}
+                  <Button
+                    fullWidth
+                    size="sm"
+                    variant={useKeyShell === 'cmd' ? 'primary' : 'secondary'}
+                    onPress={() => setUseKeyShell('cmd')}
                   >
                     Windows CMD
-                  </button>
-                  <button
-                    onClick={() => setUseKeyShell('powershell')}
-                    className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                      useKeyShell === 'powershell'
-                        ? 'bg-bg-elevated text-text shadow-sm'
-                        : 'text-text-tertiary hover:text-text-secondary'
-                    }`}
+                  </Button>
+                  <Button
+                    fullWidth
+                    size="sm"
+                    variant={useKeyShell === 'powershell' ? 'primary' : 'secondary'}
+                    onPress={() => setUseKeyShell('powershell')}
                   >
                     PowerShell
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
@@ -298,13 +292,14 @@ export function UseKeyModal({
                   <div className="rounded-md overflow-hidden border border-glass-border">
                     <div className="flex items-center justify-between px-3 py-1.5 bg-bg-hover border-b border-glass-border">
                       <span className="text-xs text-text-tertiary font-mono">{file.path}</span>
-                      <button
-                        onClick={() => copy(file.content, t('user_keys.copied'))}
-                        className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-bg-elevated text-text-secondary transition-colors"
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onPress={() => copy(file.content, t('user_keys.copied'))}
                       >
                         <Copy className="w-3 h-3" />
                         {t('user_keys.copy')}
-                      </button>
+                      </Button>
                     </div>
                     <pre className="p-3 text-sm font-mono text-text bg-surface overflow-x-auto whitespace-pre-wrap">
                       {file.content}
@@ -324,6 +319,15 @@ export function UseKeyModal({
           {t('common.loading')}
         </div>
       )}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="primary" onPress={onClose}>
+                {t('common.close')}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }

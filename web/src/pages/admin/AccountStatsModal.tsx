@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { Chip, Modal, Tabs, useOverlayState } from '@heroui/react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -9,11 +10,10 @@ import {
   DollarSign, Activity, TrendingUp, Clock, Calendar,
   Cpu, Zap,
 } from 'lucide-react';
-import { Modal } from '../../shared/components/Modal';
-import { StatusBadge } from '../../shared/components/Badge';
-import { PlatformIcon } from '../../shared/components/PlatformIcon';
-import { DatePicker } from '../../shared/components/DatePicker';
+import { PlatformIcon } from '../../shared/ui';
 import { accountsApi, type AccountStatsResp } from '../../shared/api/accounts';
+import { AirGateDatePicker } from '../../shared/components/AirGateDatePicker';
+import { CompactDataTable } from '../../shared/components/CompactDataTable';
 
 import { decorativePalette } from '@airgate/theme';
 
@@ -86,48 +86,71 @@ export function AccountStatsModal({
     queryKey: ['account-stats', accountId, queryParams],
     queryFn: () => accountsApi.stats(accountId, queryParams),
   });
+  const modalState = useOverlayState({
+    isOpen: true,
+    onOpenChange: (open) => {
+      if (!open) onClose();
+    },
+  });
 
   return (
-    <Modal open onClose={onClose} title={t('accounts.view_stats')} width="880px">
-      {/* 时间范围选择器 */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        {(['7d', '30d', '90d', 'custom'] as const).map((p) => (
-          <button
-            key={p}
-            className={`px-3 py-1.5 text-xs rounded-md font-medium transition-all cursor-pointer ${
-              preset === p
-                ? 'bg-primary-subtle text-primary shadow-[0_0_8px_var(--ag-primary-glow)]'
-                : 'text-text-secondary hover:bg-bg-hover hover:text-text border border-border-subtle'
-            }`}
-            onClick={() => setPreset(p)}
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="lg">
+          <Modal.Dialog
+            className="ag-elevation-modal"
+            style={{ maxWidth: '880px', width: 'min(100%, calc(100vw - 2rem))' }}
           >
-            {t(`accounts.stats_range_${p}`)}
-          </button>
-        ))}
-        {preset === 'custom' && (
-          <div className="flex items-center gap-2 ml-2">
-            <DatePicker
-              value={customStart}
-              onChange={setCustomStart}
-              placeholder={t('accounts.stats_start_date')}
-            />
-            <span className="text-text-tertiary text-xs">—</span>
-            <DatePicker
-              value={customEnd}
-              onChange={setCustomEnd}
-              placeholder={t('accounts.stats_end_date')}
-            />
-          </div>
-        )}
-      </div>
+            <Modal.Header>
+              <Modal.Heading>{t('accounts.view_stats')}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              {/* 时间范围选择器 */}
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                <Tabs
+                  selectedKey={preset}
+                  onSelectionChange={(key) => setPreset(key as RangePreset)}
+                  variant="secondary"
+                >
+                  <Tabs.List>
+                    {(['7d', '30d', '90d', 'custom'] as const).map((p) => (
+                      <Tabs.Tab key={p} id={p}>
+                        {t(`accounts.stats_range_${p}`)}
+                      </Tabs.Tab>
+                    ))}
+                  </Tabs.List>
+                </Tabs>
+                {preset === 'custom' && (
+                  <div className="ml-2 grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-[minmax(10rem,1fr)_auto_minmax(10rem,1fr)] sm:items-end">
+                    <AirGateDatePicker
+                      className="w-full sm:w-40"
+                      label={t('accounts.stats_start_date')}
+                      value={customStart}
+                      onChange={setCustomStart}
+                    />
+                    <span className="text-text-tertiary text-xs">—</span>
+                    <AirGateDatePicker
+                      className="w-full sm:w-40"
+                      label={t('accounts.stats_end_date')}
+                      value={customEnd}
+                      onChange={setCustomEnd}
+                    />
+                  </div>
+                )}
+              </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16 text-text-tertiary text-sm">
-          {t('common.loading')}
-        </div>
-      ) : data ? (
-        <StatsContent data={data} lifetimeImageCount={lifetimeImageCount} />
-      ) : null}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-16 text-text-tertiary text-sm">
+                  {t('common.loading')}
+                </div>
+              ) : data ? (
+                <StatsContent data={data} lifetimeImageCount={lifetimeImageCount} />
+              ) : null}
+            </Modal.Body>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }
@@ -165,7 +188,9 @@ function StatsContent({ data, lifetimeImageCount }: { data: AccountStatsResp; li
             {rangeLabel} · {t('accounts.stats_range_summary', { days: data.total_days, active: activeDays })}
           </span>
         </div>
-        <StatusBadge status={data.state === 'disabled' ? 'disabled' : 'active'} />
+        <Chip color={data.state === 'disabled' ? 'default' : 'success'} size="sm" variant="soft">
+          {data.state === 'disabled' ? t('status.disabled') : t('status.active')}
+        </Chip>
       </div>
 
       {/* 顶部 4 个统计卡片 */}
@@ -456,31 +481,54 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
 
         {/* 模型表格 */}
         <div className="flex-1 overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-border-subtle">
-                <th className="text-left py-2 pr-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('accounts.stats_model')}</th>
-                <th className="text-right py-2 px-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('accounts.stats_requests')}</th>
-                <th className="text-right py-2 px-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">Token</th>
-                <th className="text-right py-2 px-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('accounts.stats_actual')}</th>
-                <th className="text-right py-2 pl-3 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">{t('accounts.stats_standard')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {models.map((m, i) => (
-                <tr key={m.model} className="border-b border-border-subtle last:border-0 hover:bg-bg-hover transition-colors">
-                  <td className="py-2 pr-3 text-text font-medium flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                    <span className="truncate max-w-[180px]">{m.model}</span>
-                  </td>
-                  <td className="py-2 px-3 text-right text-text-secondary font-mono">{m.count.toLocaleString()}</td>
-                  <td className="py-2 px-3 text-right text-text-secondary font-mono">{fmtNum(m.input_tokens + m.output_tokens)}</td>
-                  <td className="py-2 px-3 text-right font-mono text-warning">{fmtCost(m.actual_cost, 2)}</td>
-                  <td className="py-2 pl-3 text-right text-text-secondary font-mono">{fmtCost(m.total_cost, 2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <CompactDataTable
+            ariaLabel={t('accounts.stats_model')}
+            emptyText={t('common.no_data')}
+            minWidth={620}
+            rowKey={(row) => row.model}
+            rows={models}
+            columns={[
+              {
+                key: 'model',
+                title: t('accounts.stats_model'),
+                width: '42%',
+                render: (row, index) => (
+                  <>
+                    <span className="w-2 h-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                    <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
+                  </>
+                ),
+              },
+              {
+                align: 'end',
+                key: 'requests',
+                title: t('accounts.stats_requests'),
+                width: '14%',
+                render: (row) => <span className="truncate font-mono text-text-secondary">{row.count.toLocaleString()}</span>,
+              },
+              {
+                align: 'end',
+                key: 'tokens',
+                title: 'Token',
+                width: '16%',
+                render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.input_tokens + row.output_tokens)}</span>,
+              },
+              {
+                align: 'end',
+                key: 'actual',
+                title: t('accounts.stats_actual'),
+                width: '14%',
+                render: (row) => <span className="truncate font-mono text-warning">{fmtCost(row.actual_cost, 2)}</span>,
+              },
+              {
+                align: 'end',
+                key: 'standard',
+                title: t('accounts.stats_standard'),
+                width: '14%',
+                render: (row) => <span className="truncate font-mono text-text-secondary">{fmtCost(row.total_cost, 2)}</span>,
+              },
+            ]}
+          />
         </div>
       </div>
     </div>

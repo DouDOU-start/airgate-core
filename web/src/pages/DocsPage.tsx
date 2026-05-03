@@ -1,6 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { useState, useMemo, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { Button, Link as HeroLink } from '@heroui/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
@@ -162,28 +163,33 @@ export default function DocsPage() {
         <div className="flex items-center justify-between px-6 md:px-12 py-4 max-w-7xl mx-auto">
           <Link to="/home" className="flex items-center gap-2.5">
             <img src={site.site_logo || defaultLogoUrl} alt="" className="w-8 h-8 rounded-sm object-cover" />
-            <span className="text-base font-bold tracking-tight">{siteName}</span>
+            <span className="text-base font-bold">{siteName}</span>
           </Link>
           <div className="flex items-center gap-2">
-            <a
+            <HeroLink
               href="/status"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text transition-colors"
             >
               <Activity className="w-3.5 h-3.5" />
               {t('nav.status')}
-            </a>
-            <button
-              onClick={toggleTheme}
-              className="flex items-center justify-center w-8 h-8 rounded-lg text-text-tertiary hover:text-text hover:bg-bg-hover transition-colors"
+            </HeroLink>
+            <Button
+              aria-label={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              onPress={toggleTheme}
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={() => navigate({ to: isLoggedIn ? '/' : '/login' })}
-              className="ml-2 px-4 py-1.5 text-xs font-medium rounded-lg bg-[var(--ag-primary)] text-white hover:opacity-90 transition-opacity"
+            </Button>
+            <Button
+              className="ml-2"
+              size="sm"
+              variant="primary"
+              onPress={() => navigate({ to: isLoggedIn ? '/' : '/login' })}
             >
               {isLoggedIn ? t('home.go_dashboard') : t('home.login')}
-            </button>
+            </Button>
           </div>
         </div>
       </nav>
@@ -195,22 +201,19 @@ export default function DocsPage() {
           <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-2">
             <div className="flex items-center gap-2 mb-3 text-text-secondary">
               <BookOpen className="w-4 h-4" />
-              <span className="text-xs font-semibold uppercase tracking-wider">{t('docs.toc')}</span>
+              <span className="text-xs font-semibold uppercaser">{t('docs.toc')}</span>
             </div>
             <nav className="space-y-0.5">
               {toc.map((item, idx) => (
-                <button
+                <Button
                   key={item.id}
-                  type="button"
-                  onClick={() => scrollToIndex(idx)}
-                  className={`block w-full text-left px-3 py-1.5 rounded-lg text-[13px] transition-colors ${
-                    activeIndex === idx
-                      ? 'bg-[var(--ag-primary-subtle)] text-[var(--ag-primary)] font-medium'
-                      : 'text-text-tertiary hover:text-text hover:bg-bg-hover'
-                  }`}
+                  className="w-full justify-start text-left"
+                  size="sm"
+                  variant={activeIndex === idx ? 'secondary' : 'ghost'}
+                  onPress={() => scrollToIndex(idx)}
                 >
                   {item.text}
-                </button>
+                </Button>
               ))}
             </nav>
           </div>
@@ -267,13 +270,13 @@ export default function DocsPage() {
               a: ({ href, children }) => {
                 const isExternal = !!href && /^https?:\/\//.test(href);
                 return (
-                  <a
+                  <HeroLink
                     href={href}
                     {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     className="text-[var(--ag-primary)] hover:underline"
                   >
                     {children}
-                  </a>
+                  </HeroLink>
                 );
               },
               blockquote: ({ children }) => (
@@ -283,18 +286,20 @@ export default function DocsPage() {
               ),
               hr: () => <hr className="my-8 border-border" />,
               table: ({ children }) => (
-                <div className="my-4 overflow-x-auto rounded-xl border border-glass-border">
-                  <table className="w-full text-[13px]">{children}</table>
+                <div className="ag-markdown-table table-root table-root--secondary my-4">
+                  <div className="table__scroll-container">
+                    <table className="table__content w-full text-[13px]">{children}</table>
+                  </div>
                 </div>
               ),
-              thead: ({ children }) => <thead className="bg-surface">{children}</thead>,
+              thead: ({ children }) => <thead className="table__header">{children}</thead>,
               th: ({ children }) => (
-                <th className="px-3 py-2 text-left font-semibold text-text border-b border-border">
+                <th className="table__column px-3 py-2 text-left font-semibold text-text">
                   {children}
                 </th>
               ),
               td: ({ children }) => (
-                <td className="px-3 py-2 text-text-secondary border-b border-border last:border-0">
+                <td className="table__cell px-3 py-2 text-text-secondary">
                   {children}
                 </td>
               ),
@@ -326,13 +331,13 @@ export default function DocsPage() {
           {/* 底部 CTA */}
           <div className="border-t border-border mt-12 pt-8 flex items-center justify-between">
             <span className="text-sm text-text-tertiary">{t('docs.cta_hint')}</span>
-            <button
-              onClick={() => navigate({ to: isLoggedIn ? '/' : '/login' })}
-              className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium rounded-xl bg-[var(--ag-primary)] text-white hover:opacity-90 transition-opacity"
+            <Button
+              variant="primary"
+              onPress={() => navigate({ to: isLoggedIn ? '/' : '/login' })}
             >
               {isLoggedIn ? t('home.go_dashboard') : t('home.login')}
               <ArrowRight className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         </article>
 
@@ -407,15 +412,15 @@ function CodeBlock({ code, language }: { code: string; language: string }): Reac
   return (
     <div className="my-4 rounded-xl border border-glass-border bg-bg-elevated overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-surface">
-        <span className="text-[11px] uppercase tracking-wider text-text-tertiary">{language}</span>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="inline-flex items-center gap-1 text-[11px] text-text-tertiary hover:text-text transition-colors"
+        <span className="text-[11px] uppercaser text-text-tertiary">{language}</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={handleCopy}
         >
           {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
           {copied ? 'Copied' : 'Copy'}
-        </button>
+        </Button>
       </div>
       <pre className="px-4 py-3 overflow-x-auto text-[12px] font-mono text-text leading-relaxed">
         <code>{code}</code>

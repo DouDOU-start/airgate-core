@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, Checkbox, Input, Label, ListBox, Select, TextArea, TextField as HeroTextField } from '@heroui/react';
 import { ChevronDown } from 'lucide-react';
-import { Input, Textarea, Select } from '../../../shared/components/Input';
 import {
   getSchemaAccountTypes,
   getSchemaSelectedAccountType,
@@ -28,16 +28,18 @@ export function CredentialFieldInput({
 
   if (field.type === 'textarea') {
     return (
-      <Textarea
-        label={field.label}
-        name={field.key}
-        required={field.required}
-        placeholder={hint}
-        value={value}
-        rows={3}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-      />
+      <HeroTextField fullWidth isDisabled={disabled} isRequired={field.required}>
+        <Label>{field.label}</Label>
+        <TextArea
+          name={field.key}
+          placeholder={hint}
+          value={value}
+          rows={3}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          required={field.required}
+        />
+      </HeroTextField>
     );
   }
 
@@ -45,18 +47,20 @@ export function CredentialFieldInput({
   // 密码字段使用 type="text" + CSS 遮蔽，避免浏览器检测到 password 字段自动填充
   const isPassword = field.type === 'password';
   return (
-    <Input
-      label={field.label}
-      name={field.key}
-      type="text"
-      required={field.required}
-      placeholder={hint}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={disabled}
-      autoComplete="off"
-      style={isPassword ? { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties : undefined}
-    />
+    <HeroTextField fullWidth isDisabled={disabled} isRequired={field.required}>
+      <Label>{field.label}</Label>
+      <Input
+        name={field.key}
+        type="text"
+        placeholder={hint}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        autoComplete="off"
+        required={field.required}
+        style={isPassword ? { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as CSSProperties : undefined}
+      />
+    </HeroTextField>
   );
 }
 
@@ -86,7 +90,7 @@ export function SchemaCredentialsForm({
       style={{ borderTop: '1px solid var(--ag-border)' }}
     >
       <p
-        className="text-xs font-medium uppercase tracking-wider"
+        className="text-xs font-medium uppercaser"
         style={{ color: 'var(--ag-text-secondary)' }}
       >
         {t('accounts.credentials')}
@@ -95,14 +99,25 @@ export function SchemaCredentialsForm({
       {accountTypes.length > 0 && mode === 'create' && (
         <>
           <Select
-            label={t('common.type')}
-            value={selectedType?.key ?? ''}
-            onChange={(e) => onAccountTypeChange(e.target.value)}
-            options={accountTypes.map((item) => ({
-              value: item.key,
-              label: item.label,
-            }))}
-          />
+            fullWidth
+            selectedKey={selectedType?.key ?? ''}
+            onSelectionChange={(key) => onAccountTypeChange(key == null ? '' : String(key))}
+          >
+            <Label>{t('common.type')}</Label>
+            <Select.Trigger>
+              <Select.Value>{selectedType?.label ?? ''}</Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={accountTypes}>
+                {(item) => (
+                  <ListBox.Item id={item.key} textValue={item.label}>
+                    {item.label}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
           {selectedType?.description && (
             <p className="text-xs text-text-tertiary -mt-2">
               {selectedType.description}
@@ -165,17 +180,17 @@ export function GroupCheckboxList({
 
   return (
     <div ref={ref} className="relative">
-      <label
+      <Label
         className="block text-xs font-medium mb-1.5"
         style={{ color: 'var(--ag-text-secondary)' }}
       >
         {t('accounts.groups')}
-      </label>
-      <button
+      </Label>
+      <Button
         type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center justify-between w-full px-3 py-2 rounded-lg text-sm text-left transition-colors"
-        style={{ borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--ag-glass-border)', background: 'var(--ag-bg-surface)', color: 'var(--ag-text)' }}
+        onPress={() => setOpen(!open)}
+        className="w-full justify-between"
+        variant="outline"
       >
         <span className="truncate" style={selectedGroups.length === 0 ? { color: 'var(--ag-text-tertiary)' } : undefined}>
           {selectedGroups.length === 0
@@ -183,36 +198,24 @@ export function GroupCheckboxList({
             : selectedGroups.map((g) => g.name).join('、')}
         </span>
         <ChevronDown className={`w-4 h-4 flex-shrink-0 ml-2 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} style={{ color: 'var(--ag-text-tertiary)' }} />
-      </button>
+      </Button>
       {open && (
         <div
           className="absolute z-50 mt-1 w-full rounded-lg shadow-lg max-h-48 overflow-y-auto py-1"
           style={{ borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--ag-glass-border)', background: 'var(--ag-bg-elevated)' }}
         >
           {groups.map((g) => (
-            <button
+            <Checkbox
               key={g.id}
-              type="button"
-              onClick={() => toggle(g.id)}
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-bg-hover transition-colors text-left"
-              style={{ color: 'var(--ag-text)' }}
+              className="w-full px-3 py-2"
+              isSelected={selectedIds.includes(g.id)}
+              onChange={() => toggle(g.id)}
             >
-              <span
-                className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0 transition-colors"
-                style={{
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                  borderColor: selectedIds.includes(g.id) ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
-                  background: selectedIds.includes(g.id) ? 'var(--ag-primary)' : 'transparent',
-                }}
-              >
-                {selectedIds.includes(g.id) && (
-                  <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none"><path d="M2.5 6l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                )}
+              <span className="inline-flex items-center gap-2">
+                <span>{g.name}</span>
+                <span className="text-[10px]" style={{ color: 'var(--ag-text-tertiary)' }}>{g.platform}</span>
               </span>
-              <span>{g.name}</span>
-              <span className="text-[10px]" style={{ color: 'var(--ag-text-tertiary)' }}>{g.platform}</span>
-            </button>
+            </Checkbox>
           ))}
         </div>
       )}

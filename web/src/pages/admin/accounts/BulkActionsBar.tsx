@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Button } from '@heroui/react';
 import { Pencil, Trash2, RefreshCw, Power, PowerOff, X, Eraser } from 'lucide-react';
 
 /**
@@ -38,15 +39,15 @@ export function BulkActionsBar({
       <span className="text-sm font-medium" style={{ color: 'var(--ag-primary)' }}>
         {t('accounts.bulk_selected', { count: selectedCount })}
       </span>
-      <button
-        onClick={onClear}
-        className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded hover:bg-bg-hover transition-colors"
-        style={{ color: 'var(--ag-text-tertiary)' }}
-        title={t('accounts.bulk_clear')}
+      <Button
+        size="sm"
+        variant="ghost"
+        onPress={onClear}
+        aria-label={t('accounts.bulk_clear')}
       >
         <X className="w-3 h-3" />
         {t('accounts.bulk_clear')}
-      </button>
+      </Button>
 
       <div className="flex-1" />
 
@@ -85,17 +86,13 @@ function ActionButton({
   danger?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors"
-      style={{
-        background: 'var(--ag-bg-elevated)',
-        border: '1px solid var(--ag-glass-border)',
-        color: danger ? 'var(--ag-danger)' : 'var(--ag-text-secondary)',
-      }}
+    <Button
+      size="sm"
+      variant={danger ? 'danger-soft' : 'outline'}
+      onPress={onClick}
     >
       {icon}
       <span>{label}</span>
-    </button>
+    </Button>
   );
 }

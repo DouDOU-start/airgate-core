@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, type ReactElement } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useEffect, useRef, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { AlertDialog, Button, Checkbox, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Skeleton, Spinner, Switch, Table as HeroTable, TextField as HeroTextField, Tooltip } from '@heroui/react';
 import {
   Plus,
   Pencil,
@@ -16,13 +16,8 @@ import {
   Upload,
   Eraser,
 } from 'lucide-react';
-import { useToast } from '../../shared/components/Toast';
-import { Button } from '../../shared/components/Button';
-import { Input, Select } from '../../shared/components/Input';
-import { Table, type Column } from '../../shared/components/Table';
-import { ConfirmModal } from '../../shared/components/Modal';
-import { StatusBadge } from '../../shared/components/Badge';
-import { PlatformIcon } from '../../shared/components/PlatformIcon';
+import { useToast } from '../../shared/ui';
+import { PlatformIcon } from '../../shared/ui';
 import { accountsApi } from '../../shared/api/accounts';
 import { groupsApi } from '../../shared/api/groups';
 import { proxiesApi } from '../../shared/api/proxies';
@@ -32,6 +27,8 @@ import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
+import { getTotalPages } from '../../shared/utils/pagination';
+import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { BulkActionsBar } from './accounts/BulkActionsBar';
@@ -47,6 +44,32 @@ import type {
   AccountExportItem,
   PagedData,
 } from '../../shared/types';
+
+interface AccountTableColumn {
+  key: string;
+  title: ReactNode;
+  width?: string;
+  align?: 'left' | 'center' | 'right';
+  hideOnMobile?: boolean;
+  render: (row: AccountResp) => ReactNode;
+}
+
+function StatusPill({ status, tooltip }: { status: 'active' | 'disabled'; tooltip?: string }) {
+  const { t } = useTranslation();
+  const chip = (
+    <Chip color={status === 'active' ? 'success' : 'default'} size="sm" variant="soft">
+      {status === 'active' ? t('status.active') : t('status.disabled')}
+    </Chip>
+  );
+
+  if (!tooltip) return chip;
+  return (
+    <Tooltip>
+      <Tooltip.Trigger>{chip}</Tooltip.Trigger>
+      <Tooltip.Content className="max-w-[360px] whitespace-pre-wrap">{tooltip}</Tooltip.Content>
+    </Tooltip>
+  );
+}
 
 // formatCountdown 把剩余毫秒格式化成 "Xd Yh"/"Xh Ym"/"Ym" 样式，
 // 与 sub2api 的"限流中 10h 16m 自动恢复"徽标一致。
@@ -125,10 +148,10 @@ function AccountStatusCell({ row }: { row: AccountResp }) {
       t('accounts.degraded_tooltip', '上游池抖动，软降级仅做兜底，到期自动恢复'),
     );
   } else if (row.state === 'disabled') {
-    mainBadge = <StatusBadge status="disabled" tooltip={row.error_msg || undefined} />;
+    mainBadge = <StatusPill status="disabled" tooltip={row.error_msg || undefined} />;
   } else {
     // active，或 rate_limited/degraded 已到期（lazy 恢复）
-    mainBadge = <StatusBadge status="active" />;
+    mainBadge = <StatusPill status="active" />;
   }
 
   if (liveFamilyCooldowns.length === 0) {
@@ -201,16 +224,16 @@ export default function AccountsPage() {
   };
 
   const PLATFORM_OPTIONS = [
-    { value: '', label: t('accounts.all_platforms') },
-    ...platforms.map((p) => ({ value: p, label: platformName(p) })),
+    { id: '', label: t('accounts.all_platforms') },
+    ...platforms.map((p) => ({ id: p, label: platformName(p) })),
   ];
 
   const STATE_OPTIONS = [
-    { value: '', label: t('users.all_status') },
-    { value: 'active', label: t('status.active') },
-    { value: 'rate_limited', label: t('status.rate_limited', '限流中') },
-    { value: 'degraded', label: t('status.degraded', '降级中') },
-    { value: 'disabled', label: t('status.disabled') },
+    { id: '', label: t('users.all_status') },
+    { id: 'active', label: t('status.active') },
+    { id: 'rate_limited', label: t('status.rate_limited', '限流中') },
+    { id: 'degraded', label: t('status.degraded', '降级中') },
+    { id: 'disabled', label: t('status.disabled') },
   ];
 
   // 筛选状态
@@ -226,17 +249,7 @@ export default function AccountsPage() {
   // 自动刷新
   const AUTO_REFRESH_OPTIONS = [0, 5, 10, 15, 30];
   const [autoRefresh, setAutoRefresh] = useState(0); // 秒，0=关闭
-  const [showRefreshMenu, setShowRefreshMenu] = useState(false);
-  const refreshMenuRef = useRef<HTMLDivElement>(null);
   const [countdown, setCountdown] = useState(0);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (refreshMenuRef.current && !refreshMenuRef.current.contains(e.target as Node)) setShowRefreshMenu(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   useEffect(() => {
     if (!autoRefresh) { setCountdown(0); return; }
@@ -516,36 +529,15 @@ export default function AccountsPage() {
     setBulkRefreshTargets(oauthRows);
   };
 
-  // 更多菜单状态（合并 id 和位置为单一状态，避免分步更新导致闪跳）
-  const [moreMenu, setMoreMenu] = useState<{ id: number; top: number; left: number } | null>(null);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
-  const moreMenuBtnRef = useRef<HTMLButtonElement>(null);
-
   // 统计弹窗
   const [statsAccountId, setStatsAccountId] = useState<number | null>(null);
 
-  // 点击外部关闭更多菜单
-  useEffect(() => {
-    if (!moreMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node) &&
-        moreMenuBtnRef.current && !moreMenuBtnRef.current.contains(e.target as Node)
-      ) {
-        setMoreMenu(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [moreMenu]);
-
   // 表格列定义
-  const columns: Column<AccountResp>[] = [
+  const columns: AccountTableColumn[] = [
     {
       key: 'name',
       title: t('common.name'),
       width: '150px',
-      fixed: 'left',
       render: (row) => {
         const email = row.credentials?.email;
         return (
@@ -583,7 +575,7 @@ export default function AccountsPage() {
         return (
           <div className="flex flex-col items-center gap-1.5">
             <span className="inline-flex items-center gap-1">
-              <PlatformIcon platform={row.platform} className="w-3.5 h-3.5" style={{ color: 'var(--ag-text-tertiary)' }} />
+              <PlatformIcon platform={row.platform} className="w-3.5 h-3.5" />
               <span>{platformName(row.platform)}</span>
             </span>
             <div className="flex items-center gap-1">
@@ -622,6 +614,7 @@ export default function AccountsPage() {
     {
       key: 'status',
       title: t('common.status'),
+      width: '84px',
       render: (row) => <AccountStatusCell row={row} />,
     },
     {
@@ -630,22 +623,19 @@ export default function AccountsPage() {
       width: '80px',
       hideOnMobile: true,
       render: (row) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
+        <Switch
+          aria-label={t('accounts.scheduling')}
+          isDisabled={toggleMutation.isPending}
+          isSelected={row.state !== 'disabled'}
+          size="sm"
+          onChange={() => {
             toggleMutation.mutate(row.id);
           }}
-          disabled={toggleMutation.isPending}
-          className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none"
-          style={{
-            backgroundColor: row.state !== 'disabled' ? 'var(--ag-primary)' : 'var(--ag-glass-border)',
-          }}
         >
-          <span
-            className="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform duration-200"
-            style={{ transform: row.state !== 'disabled' ? 'translateX(17px)' : 'translateX(3px)' }}
-          />
-        </button>
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
+        </Switch>
       ),
     },
     {
@@ -691,7 +681,7 @@ export default function AccountsPage() {
     ...[{
       key: 'usage_window',
       title: t('accounts.usage_window'),
-      width: '200px',
+      width: '260px',
       hideOnMobile: true,
       render: (row: AccountResp) => {
         const usage = usageData?.accounts?.[String(row.id)];
@@ -795,6 +785,12 @@ export default function AccountsPage() {
         };
 
         const badgeStyle = { background: 'var(--ag-bg-surface)', border: '1px solid var(--ag-glass-border)', minWidth: 24 };
+        const todayMetricClass = 'inline-grid h-5 min-w-0 grid-cols-[2.5rem_1fr] items-center gap-1 rounded-[var(--field-radius)] border px-1.5 text-[10px] leading-none shadow-sm';
+        const todayMetricStyle = (color: string, foreground = color) => ({
+          background: `color-mix(in srgb, ${color} 10%, transparent)`,
+          borderColor: `color-mix(in srgb, ${color} 22%, var(--ag-border))`,
+          color: foreground,
+        });
 
         return (
           <div
@@ -803,7 +799,7 @@ export default function AccountsPage() {
                 ? 'flex flex-col gap-1.5 text-[11px] cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[var(--ag-glass-border)]'
                 : 'flex flex-col gap-1.5 text-[11px] rounded px-1 py-0.5'
             }
-            style={{ fontFamily: 'var(--ag-font-mono)', minWidth: 160 }}
+            style={{ fontFamily: 'var(--ag-font-mono)', minWidth: 232, width: '100%' }}
             title={canRefresh ? t('accounts.refresh_usage', '点击刷新用量') : undefined}
             onClick={canRefresh ? handleRefreshClick : undefined}
           >
@@ -828,30 +824,42 @@ export default function AccountsPage() {
             ))}
             {hasTodayStats && todayStats && (
               <div
-                className="flex items-center gap-1.5 mt-0.5"
-                style={{ fontSize: 9, color: 'var(--ag-text-tertiary)', lineHeight: 1.3 }}
+                className="mt-0.5 grid grid-cols-2 gap-1"
                 title={t('accounts.today_stats_tooltip', '今日账号消耗（本地时区自然日）')}
               >
-                <span style={{ opacity: 0.5 }}>{t('accounts.today', '今日')}</span>
-                <span>{formatCompact(todayStats.requests, false)} req</span>
-                <span style={{ opacity: 0.4 }}>·</span>
-                <span>{formatCompact(todayStats.tokens)}</span>
-                <span style={{ opacity: 0.4 }}>·</span>
-                <span title={t('accounts.window_account_cost', '账号成本（上游计费）')}>
-                  <span style={{ opacity: 0.6 }}>A </span>${todayStats.account_cost.toFixed(2)}
+                <span className={todayMetricClass} style={todayMetricStyle('var(--ag-info)')}>
+                  <span className="truncate text-text-tertiary">{t('accounts.today_access_count', '访问')}</span>
+                  <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.requests, false)}</span>
                 </span>
-                <span style={{ opacity: 0.4 }}>·</span>
-                <span title={t('accounts.window_user_cost', '用户消耗（平台计费）')}>
-                  <span style={{ opacity: 0.6 }}>U </span>${todayStats.user_cost.toFixed(2)}
+                <span className={todayMetricClass} style={todayMetricStyle('var(--ag-primary)')}>
+                  <span className="truncate text-text-tertiary">Token</span>
+                  <span className="text-right font-semibold tabular-nums">{formatCompact(todayStats.tokens)}</span>
+                </span>
+                <span
+                  className={todayMetricClass}
+                  style={todayMetricStyle('var(--ag-warning)')}
+                  title={t('accounts.window_account_cost', '账号成本（上游计费）')}
+                >
+                  <span className="truncate text-text-tertiary">{t('accounts.account_cost_short', '成本')}</span>
+                  <span className="text-right tabular-nums">${todayStats.account_cost.toFixed(2)}</span>
+                </span>
+                <span
+                  className={todayMetricClass}
+                  style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
+                  title={t('accounts.window_user_cost', '用户消耗（平台计费）')}
+                >
+                  <span className="truncate text-text-tertiary">{t('accounts.user_cost_short', '消费')}</span>
+                  <span className="text-right tabular-nums">${todayStats.user_cost.toFixed(2)}</span>
                 </span>
                 {row.platform === 'openai' && (row.today_image_count ?? 0) > 0 && (
-                  <>
-                    <span style={{ opacity: 0.4 }}>·</span>
-                    <span title={t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）')}>
-                      <span style={{ opacity: 0.6 }}>{t('accounts.image_count_inline_label', '图 ')}</span>
-                      {formatCompact(row.today_image_count ?? 0, false)}
-                    </span>
-                  </>
+                  <span
+                    className={todayMetricClass}
+                    style={todayMetricStyle('var(--ag-success)', 'var(--ag-success-foreground)')}
+                    title={t('accounts.image_count_tooltip', '今日生图请求数（gpt-image 系列）')}
+                  >
+                    <span className="truncate text-text-tertiary">{t('accounts.image_count_inline_label', '图')}</span>
+                    <span className="text-right font-semibold tabular-nums">{formatCompact(row.today_image_count ?? 0, false)}</span>
+                  </span>
                 )}
               </div>
             )}
@@ -868,7 +876,7 @@ export default function AccountsPage() {
           </div>
         );
       },
-    } as Column<AccountResp>],
+    }],
     {
       key: 'last_used_at',
       title: t('accounts.last_used'),
@@ -898,161 +906,293 @@ export default function AccountsPage() {
     {
       key: 'actions',
       title: t('common.actions'),
-      fixed: 'right',
+      width: '128px',
       render: (row) => (
-        <div className="flex items-center justify-center gap-0.5">
-          <button
-            className="p-1.5 rounded hover:bg-bg-hover transition-colors"
-            style={{ color: 'var(--ag-text-secondary)' }}
-            title={t('common.edit')}
-            onClick={() => setEditingAccount(row)}
+        <div className="flex items-center justify-center gap-1">
+          <Button
+            isIconOnly
+            aria-label={t('common.edit')}
+            size="sm"
+            variant="secondary"
+            onPress={() => setEditingAccount(row)}
           >
             <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button
-            className="p-1.5 rounded hover:bg-bg-hover transition-colors"
-            style={{ color: 'var(--ag-danger)' }}
-            title={t('common.delete')}
-            onClick={() => setDeletingAccount(row)}
+          </Button>
+          <Button
+            isIconOnly
+            aria-label={t('common.delete')}
+            size="sm"
+            variant="danger-soft"
+            className="text-danger"
+            onPress={() => setDeletingAccount(row)}
           >
             <Trash2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            ref={moreMenu?.id === row.id ? moreMenuBtnRef : undefined}
-            className="p-1.5 rounded hover:bg-bg-hover transition-colors"
-            style={{ color: 'var(--ag-text-secondary)' }}
-            title={t('common.more')}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (moreMenu?.id === row.id) {
-                setMoreMenu(null);
-              } else {
-                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                setMoreMenu({ id: row.id, top: rect.bottom + 4, left: rect.right });
-              }
-            }}
-          >
-            <MoreHorizontal className="w-3.5 h-3.5" />
-          </button>
+          </Button>
+          <Dropdown>
+            <Dropdown.Trigger>
+              <Button isIconOnly aria-label={t('common.more')} size="sm" variant="secondary">
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </Button>
+            </Dropdown.Trigger>
+            <Dropdown.Popover placement="bottom end">
+              <Dropdown.Menu
+                aria-label={t('common.actions')}
+                onAction={(key) => {
+                  switch (String(key)) {
+                    case 'test':
+                      setTestingAccount(row);
+                      break;
+                    case 'stats':
+                      setStatsAccountId(row.id);
+                      break;
+                    case 'refresh_quota':
+                      refreshQuotaMutation.mutate(row.id);
+                      break;
+                    case 'clear_cooldowns':
+                      clearRateLimitMarkersMutation.mutate(row.id);
+                      break;
+                  }
+                }}
+              >
+                <Dropdown.Item id="test" textValue={t('accounts.test_connection')}>
+                  <span className="flex items-center gap-2">
+                    <Zap className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
+                    {t('accounts.test_connection')}
+                  </span>
+                </Dropdown.Item>
+                <Dropdown.Item id="stats" textValue={t('accounts.view_stats')}>
+                  <span className="flex items-center gap-2">
+                    <BarChart3 className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
+                    {t('accounts.view_stats')}
+                  </span>
+                </Dropdown.Item>
+                {row.type === 'oauth' ? (
+                  <Dropdown.Item id="refresh_quota" textValue={t('accounts.refresh_quota')}>
+                    <span className="flex items-center gap-2">
+                      <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />
+                      {t('accounts.refresh_quota')}
+                    </span>
+                  </Dropdown.Item>
+                ) : null}
+                <Dropdown.Item id="clear_cooldowns" textValue={t('accounts.clear_family_cooldowns')}>
+                  <span className="flex items-center gap-2">
+                    <Eraser className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
+                    {t('accounts.clear_family_cooldowns')}
+                  </span>
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
         </div>
       ),
     },
   ];
+  const rows = data?.list ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = getTotalPages(total, pageSize);
+  const selectedKeys = new Set(selectedIds.map(String));
+  const typeOptions = [
+    { id: '', label: t('accounts.all_types', '全部类型') },
+    { id: 'oauth', label: 'OAuth' },
+    { id: 'apikey', label: 'API Key' },
+  ];
+  const groupOptions = [
+    { id: '', label: t('accounts.all_groups') },
+    ...(allGroupsData?.list ?? []).map((g) => ({ id: String(g.id), label: g.name })),
+  ];
+  const proxyOptions = [
+    { id: '', label: t('accounts.all_proxies') },
+    ...(allProxiesData?.list ?? []).map((p) => ({ id: String(p.id), label: p.name })),
+  ];
+  const selectedPlatformLabel = PLATFORM_OPTIONS.find((item) => item.id === platformFilter)?.label ?? t('accounts.all_platforms');
+  const selectedStateLabel = STATE_OPTIONS.find((item) => item.id === stateFilter)?.label ?? t('users.all_status');
+  const selectedTypeLabel = typeOptions.find((item) => item.id === typeFilter)?.label ?? t('accounts.all_types', '全部类型');
+  const selectedGroupLabel = groupOptions.find((item) => item.id === groupFilter)?.label ?? t('accounts.all_groups');
+  const selectedProxyLabel = proxyOptions.find((item) => item.id === proxyFilter)?.label ?? t('accounts.all_proxies');
 
   return (
     <div>
       {/* 筛选 */}
       <div className="flex items-end gap-3 mb-5 flex-wrap">
         <div className="w-full sm:w-[200px]">
-          <Input
-            value={keyword}
-            onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-            placeholder={t('common.search')}
-            icon={<Search className="w-4 h-4" />}
-          />
+          <HeroTextField fullWidth>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+              <Input
+                className="pl-9"
+                value={keyword}
+                onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+                placeholder={t('common.search')}
+              />
+            </div>
+          </HeroTextField>
         </div>
-        <Select
-          className="min-w-0"
-          value={platformFilter}
-          onChange={(e) => { setPlatformFilter(e.target.value); setPage(1); }}
-          options={PLATFORM_OPTIONS}
-        />
-        <Select
-          className="min-w-0"
-          value={stateFilter}
-          onChange={(e) => { setStateFilter(e.target.value); setPage(1); }}
-          options={STATE_OPTIONS}
-        />
-        <Select
-          className="min-w-0"
-          value={typeFilter}
-          onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-          options={[
-            { value: '', label: t('accounts.all_types', '全部类型') },
-            { value: 'oauth', label: 'OAuth' },
-            { value: 'apikey', label: 'API Key' },
-          ]}
-        />
-        <Select
-          className="min-w-0"
-          value={groupFilter}
-          onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }}
-          options={[
-            { value: '', label: t('accounts.all_groups') },
-            ...(allGroupsData?.list ?? []).map((g) => ({ value: String(g.id), label: g.name })),
-          ]}
-        />
-        <Select
-          className="min-w-0"
-          value={proxyFilter}
-          onChange={(e) => { setProxyFilter(e.target.value); setPage(1); }}
-          options={[
-            { value: '', label: t('accounts.all_proxies') },
-            ...(allProxiesData?.list ?? []).map((p) => ({ value: String(p.id), label: p.name })),
-          ]}
-        />
+        <div className="w-40">
+          <Select
+            fullWidth
+            selectedKey={platformFilter}
+            onSelectionChange={(key) => { setPlatformFilter(key == null ? '' : String(key)); setPage(1); }}
+          >
+            <Label className="sr-only">{t('groups.platform')}</Label>
+            <Select.Trigger>
+              <Select.Value>{selectedPlatformLabel}</Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={PLATFORM_OPTIONS}>
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.label}>
+                    {item.label}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+        </div>
+        <div className="w-40">
+          <Select
+            fullWidth
+            selectedKey={stateFilter}
+            onSelectionChange={(key) => { setStateFilter(key == null ? '' : String(key)); setPage(1); }}
+          >
+            <Label className="sr-only">{t('common.status')}</Label>
+            <Select.Trigger>
+              <Select.Value>{selectedStateLabel}</Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={STATE_OPTIONS}>
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.label}>
+                    {item.label}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+        </div>
+        <div className="w-40">
+          <Select
+            fullWidth
+            selectedKey={typeFilter}
+            onSelectionChange={(key) => { setTypeFilter(key == null ? '' : String(key)); setPage(1); }}
+          >
+            <Label className="sr-only">{t('common.type')}</Label>
+            <Select.Trigger>
+              <Select.Value>{selectedTypeLabel}</Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={typeOptions}>
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.label}>
+                    {item.label}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+        </div>
+        <div className="w-40">
+          <Select
+            fullWidth
+            selectedKey={groupFilter}
+            onSelectionChange={(key) => { setGroupFilter(key == null ? '' : String(key)); setPage(1); }}
+          >
+            <Label className="sr-only">{t('accounts.group')}</Label>
+            <Select.Trigger>
+              <Select.Value>{selectedGroupLabel}</Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={groupOptions}>
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.label}>
+                    {item.label}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+        </div>
+        <div className="w-40">
+          <Select
+            fullWidth
+            selectedKey={proxyFilter}
+            onSelectionChange={(key) => { setProxyFilter(key == null ? '' : String(key)); setPage(1); }}
+          >
+            <Label className="sr-only">{t('accounts.proxy')}</Label>
+            <Select.Trigger>
+              <Select.Value>{selectedProxyLabel}</Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={proxyOptions}>
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.label}>
+                    {item.label}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+        </div>
 
         {/* 刷新 & 自动刷新 & 创建 */}
         <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
-            className="flex items-center justify-center w-9 h-9 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
-            title={t('common.refresh')}
+          <Button
+            isIconOnly
+            aria-label={t('common.refresh')}
+            variant="ghost"
+            onPress={() => queryClient.invalidateQueries({ queryKey: queryKeys.accounts() })}
           >
             <RefreshCw className="w-4 h-4" />
-          </button>
-          <div className="relative" ref={refreshMenuRef}>
-            <button
-              onClick={() => setShowRefreshMenu(!showRefreshMenu)}
-              className={`flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs transition-colors ${
-                autoRefresh ? 'text-primary bg-primary-subtle' : 'text-text-tertiary hover:text-text-secondary hover:bg-bg-hover'
-              }`}
-            >
-              {autoRefresh ? (
-                <span>{t('accounts.auto_refresh')}{countdown}s</span>
-              ) : (
-                <span>{t('accounts.auto_refresh_off')}</span>
-              )}
-              <ChevronDown className={`w-3 h-3 transition-transform ${showRefreshMenu ? 'rotate-180' : ''}`} />
-            </button>
-            {showRefreshMenu && (
-              <div
-                className="absolute right-0 mt-1 w-40 rounded-lg shadow-lg py-1 z-50"
-                style={{ background: 'var(--ag-bg-elevated)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--ag-glass-border)' }}
+          </Button>
+          <Dropdown>
+            <Dropdown.Trigger>
+              <Button size="sm" variant={autoRefresh ? 'secondary' : 'ghost'}>
+                {autoRefresh ? `${t('accounts.auto_refresh')}${countdown}s` : t('accounts.auto_refresh_off')}
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </Dropdown.Trigger>
+            <Dropdown.Popover placement="bottom end">
+              <Dropdown.Menu
+                aria-label={t('accounts.auto_refresh')}
+                selectedKeys={new Set([String(autoRefresh)])}
+                selectionMode="single"
+                onAction={(key) => setAutoRefresh(Number(key))}
               >
                 {AUTO_REFRESH_OPTIONS.map((sec) => (
-                  <button
-                    key={sec}
-                    onClick={() => { setAutoRefresh(sec); setShowRefreshMenu(false); }}
-                    className="flex items-center justify-between w-full px-3 py-2 text-sm hover:bg-bg-hover transition-colors text-left"
-                    style={{ color: 'var(--ag-text)' }}
-                  >
-                    <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${sec}s`}</span>
-                    {autoRefresh === sec && <span className="text-primary">✓</span>}
-                  </button>
+                  <Dropdown.Item key={sec} id={String(sec)} textValue={sec === 0 ? t('accounts.auto_refresh_off') : `${sec}s`}>
+                    <span className="flex items-center justify-between gap-4">
+                      <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${sec}s`}</span>
+                      {autoRefresh === sec ? <span className="text-primary">✓</span> : null}
+                    </span>
+                  </Dropdown.Item>
                 ))}
-              </div>
-            )}
-          </div>
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
           <Button
             variant="secondary"
-            icon={<Upload className="w-4 h-4" />}
-            onClick={() => importInputRef.current?.click()}
-            loading={importMutation.isPending}
-            title={t('accounts.import')}
+            onPress={() => importInputRef.current?.click()}
+            isDisabled={importMutation.isPending}
+            aria-busy={importMutation.isPending}
           >
+            <Upload className="w-4 h-4" />
             {t('accounts.import')}
           </Button>
           <Button
             variant="secondary"
-            icon={<Download className="w-4 h-4" />}
-            onClick={() => exportMutation.mutate()}
-            loading={exportMutation.isPending}
-            title={t('accounts.export')}
+            onPress={() => exportMutation.mutate()}
+            isDisabled={exportMutation.isPending}
+            aria-busy={exportMutation.isPending}
           >
+            <Download className="w-4 h-4" />
             {t('accounts.export')}
           </Button>
-          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
+          <Button variant="primary" onPress={() => setShowCreateModal(true)}>
+            <Plus className="w-4 h-4" />
             {t('accounts.create')}
           </Button>
         </div>
@@ -1079,21 +1219,103 @@ export default function AccountsPage() {
       />
 
       {/* 表格 */}
-      <Table<AccountResp>
-        columns={columns}
-        data={data?.list ?? []}
-        loading={isLoading}
-        rowKey={(row) => row.id}
-        selectable
-        selectedKeys={selectedIds}
-        onSelectionChange={(keys) => setSelectedIds(keys.map(Number))}
-        page={page}
-        pageSize={pageSize}
-        total={data?.total ?? 0}
-        onPageChange={setPage}
-        pageSizeOptions={PAGE_SIZE_OPTIONS as unknown as number[]}
-        onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-      />
+      <HeroTable variant="primary">
+        <HeroTable.ScrollContainer>
+          <HeroTable.Content
+            aria-label={t('accounts.title', 'Accounts')}
+            selectionMode="multiple"
+            selectedKeys={selectedKeys}
+            onSelectionChange={(keys) => {
+              if (keys === 'all') {
+                setSelectedIds(rows.map((row) => row.id));
+                return;
+              }
+              setSelectedIds(Array.from(keys).map((key) => Number(key)));
+            }}
+          >
+            <HeroTable.Header>
+              <HeroTable.Column id="__selection__" style={{ width: 52 }}>
+                <Checkbox slot="selection" aria-label={t('common.select_all', 'Select all')} />
+              </HeroTable.Column>
+              {columns.map((column) => (
+                <HeroTable.Column
+                  id={column.key}
+                  key={column.key}
+                  className={column.hideOnMobile ? 'hidden md:table-cell' : undefined}
+                  style={column.width ? { minWidth: column.width, width: column.width } : undefined}
+                >
+                  {column.title}
+                </HeroTable.Column>
+              ))}
+            </HeroTable.Header>
+            <HeroTable.Body>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, rowIndex) => (
+                  <HeroTable.Row id={`loading-${rowIndex}`} key={`loading-${rowIndex}`}>
+                    <HeroTable.Cell>
+                      <Skeleton className="h-4 w-4" />
+                    </HeroTable.Cell>
+                    {columns.map((column, cellIndex) => (
+                      <HeroTable.Cell
+                        key={column.key}
+                        className={column.hideOnMobile ? 'hidden md:table-cell' : undefined}
+                      >
+                        <Skeleton
+                          className="h-4 w-24"
+                          style={{ animationDelay: `${rowIndex * 90 + cellIndex * 20}ms` }}
+                        />
+                      </HeroTable.Cell>
+                    ))}
+                  </HeroTable.Row>
+                ))
+              ) : rows.length === 0 ? (
+                <HeroTable.Row id="empty">
+                  <HeroTable.Cell colSpan={columns.length + 1}>
+                    <EmptyState />
+                  </HeroTable.Cell>
+                </HeroTable.Row>
+              ) : (
+                rows.map((row) => (
+                  <HeroTable.Row id={String(row.id)} key={row.id}>
+                    <HeroTable.Cell>
+                      <Checkbox slot="selection" aria-label={t('common.select', 'Select')} />
+                    </HeroTable.Cell>
+                    {columns.map((column) => (
+                      <HeroTable.Cell
+                        key={column.key}
+                        className={column.hideOnMobile ? 'hidden md:table-cell' : undefined}
+                      >
+                        <div
+                          className={`flex items-center ${
+                            column.align === 'left'
+                              ? 'justify-start'
+                              : column.align === 'right'
+                                ? 'justify-end'
+                                : 'justify-center'
+                          }`}
+                        >
+                          {column.render(row)}
+                        </div>
+                      </HeroTable.Cell>
+                    ))}
+                  </HeroTable.Row>
+                ))
+              )}
+            </HeroTable.Body>
+          </HeroTable.Content>
+        </HeroTable.ScrollContainer>
+        <HeroTable.Footer>
+          <TablePaginationFooter
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            setPage={setPage}
+            setPageSize={setPageSize}
+            total={total}
+            totalPages={totalPages}
+          />
+        </HeroTable.Footer>
+      </HeroTable>
 
       {/* 创建弹窗 */}
       <CreateAccountModal
@@ -1129,76 +1351,39 @@ export default function AccountsPage() {
         />
       )}
 
-      {/* 更多操作下拉菜单 (Portal) */}
-      {moreMenu && createPortal(
-        <div
-          ref={moreMenuRef}
-          className="fixed py-1 rounded-lg shadow-lg min-w-[140px]"
-          style={{
-            top: moreMenu.top,
-            left: moreMenu.left,
-            transform: 'translateX(-100%)',
-            zIndex: 9999,
-            background: 'var(--ag-bg-elevated)',
-            border: '1px solid var(--ag-glass-border)',
-          }}
-        >
-          {(() => {
-            const row = data?.list?.find((a) => a.id === moreMenu.id);
-            if (!row) return null;
-            return (
-              <>
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left"
-                  style={{ color: 'var(--ag-text-secondary)' }}
-                  onClick={() => { setTestingAccount(row); setMoreMenu(null); }}
-                >
-                  <Zap className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
-                  {t('accounts.test_connection')}
-                </button>
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left"
-                  style={{ color: 'var(--ag-text-secondary)' }}
-                  onClick={() => { setStatsAccountId(row.id); setMoreMenu(null); }}
-                >
-                  <BarChart3 className="w-3.5 h-3.5" style={{ color: 'var(--ag-primary)' }} />
-                  {t('accounts.view_stats')}
-                </button>
-                {row.type === 'oauth' && (
-                  <button
-                    className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left"
-                    style={{ color: 'var(--ag-text-secondary)' }}
-                    onClick={() => { refreshQuotaMutation.mutate(row.id); setMoreMenu(null); }}
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--ag-success)' }} />
-                    {t('accounts.refresh_quota')}
-                  </button>
-                )}
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-bg-hover transition-colors text-left"
-                  style={{ color: 'var(--ag-text-secondary)' }}
-                  onClick={() => { clearRateLimitMarkersMutation.mutate(row.id); setMoreMenu(null); }}
-                >
-                  <Eraser className="w-3.5 h-3.5" style={{ color: 'var(--ag-warning)' }} />
-                  {t('accounts.clear_family_cooldowns')}
-                </button>
-              </>
-            );
-          })()}
-        </div>,
-        document.body,
-      )}
-
       {/* 删除确认 */}
-      <ConfirmModal
-        open={!!deletingAccount}
-        onClose={() => setDeletingAccount(null)}
-        onConfirm={() => deletingAccount && deleteMutation.mutate(deletingAccount.id)}
-        title={t('accounts.delete_title')}
-        message={t('accounts.delete_confirm', { name: deletingAccount?.name })}
-        loading={deleteMutation.isPending}
-        danger
-      />
+      <AlertDialog
+        isOpen={!!deletingAccount}
+        onOpenChange={(open) => {
+          if (!open) setDeletingAccount(null);
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container placement="center" size="sm">
+            <AlertDialog.Dialog className="ag-elevation-modal">
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>{t('accounts.delete_title')}</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>{t('accounts.delete_confirm', { name: deletingAccount?.name })}</AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button variant="secondary" onPress={() => setDeletingAccount(null)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  aria-busy={deleteMutation.isPending}
+                  isDisabled={deleteMutation.isPending}
+                  variant="danger"
+                  onPress={() => deletingAccount && deleteMutation.mutate(deletingAccount.id)}
+                >
+                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
+                  {t('common.confirm')}
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
 
       {/* 批量编辑弹窗 */}
       <BulkEditAccountModal
@@ -1212,15 +1397,33 @@ export default function AccountsPage() {
       />
 
       {/* 批量删除确认 */}
-      <ConfirmModal
-        open={showBulkDeleteConfirm}
-        onClose={() => setShowBulkDeleteConfirm(false)}
-        onConfirm={() => bulkDeleteMutation.mutate(selectedIds)}
-        title={t('accounts.bulk_delete_title')}
-        message={t('accounts.bulk_delete_confirm', { count: selectedIds.length })}
-        loading={bulkDeleteMutation.isPending}
-        danger
-      />
+      <AlertDialog isOpen={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container placement="center" size="sm">
+            <AlertDialog.Dialog className="ag-elevation-modal">
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>{t('accounts.bulk_delete_title')}</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>{t('accounts.bulk_delete_confirm', { count: selectedIds.length })}</AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button variant="secondary" onPress={() => setShowBulkDeleteConfirm(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  aria-busy={bulkDeleteMutation.isPending}
+                  isDisabled={bulkDeleteMutation.isPending}
+                  variant="danger"
+                  onPress={() => bulkDeleteMutation.mutate(selectedIds)}
+                >
+                  {bulkDeleteMutation.isPending ? <Spinner size="sm" /> : null}
+                  {t('common.confirm')}
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
 
       {/* 批量刷新令牌进度弹窗 */}
       {bulkRefreshTargets && (

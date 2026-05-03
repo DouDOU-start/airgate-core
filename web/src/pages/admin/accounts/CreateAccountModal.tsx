@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { Button, Checkbox, Form, Input, Label, ListBox, Modal, Select, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { Layers, Hash, Gauge } from 'lucide-react';
-import { Button } from '../../../shared/components/Button';
-import { Input, Select } from '../../../shared/components/Input';
-import { Modal } from '../../../shared/components/Modal';
+import type {
+  PluginBatchAccountInput,
+  PluginBatchImportResult,
+} from '@airgate/theme/plugin';
 import { accountsApi } from '../../../shared/api/accounts';
 import { groupsApi } from '../../../shared/api/groups';
 import { proxiesApi } from '../../../shared/api/proxies';
@@ -18,12 +20,8 @@ import {
   getSchemaVisibleFields,
   filterCredentialsForAccountType,
 } from './accountUtils';
-import { SchemaCredentialsForm, GroupCheckboxList } from './CredentialForm';
+import { SchemaCredentialsForm } from './CredentialForm';
 import type { CreateAccountReq, AccountExportItem } from '../../../shared/types';
-import type {
-  PluginBatchAccountInput,
-  PluginBatchImportResult,
-} from '../../../app/plugin-loader';
 
 export function CreateAccountModal({
   open,
@@ -52,7 +50,6 @@ export function CreateAccountModal({
   });
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [groupIds, setGroupIds] = useState<number[]>([]);
-  const [step, setStep] = useState(1);
   const [batchMode, setBatchMode] = useState(false);
 
   // 根据平台获取凭证字段定义
@@ -93,7 +90,6 @@ export function CreateAccountModal({
     setForm({ name: '', priority: 0, max_concurrency: 5, rate_multiplier: 1, upstream_is_pool: false });
     setCredentials({});
     setGroupIds([]);
-    setStep(1);
     setBatchMode(false);
   }, [open]);
 
@@ -102,6 +98,7 @@ export function CreateAccountModal({
     setPlatform(newPlatform);
     setCredentials({});
     setAccountType('');
+    setGroupIds([]);
     setBatchMode(false);
   };
 
@@ -152,166 +149,254 @@ export function CreateAccountModal({
     setForm({ name: '', priority: 0, max_concurrency: 5, rate_multiplier: 1, upstream_is_pool: false });
     setCredentials({});
     setGroupIds([]);
-    setStep(1);
     setBatchMode(false);
     onClose();
   };
+  const platformOptions = [
+    { id: '', label: t('accounts.select_platform') },
+    ...platforms.map((p) => ({ id: p, label: pName(p) })),
+  ];
+  const selectedPlatformLabel = platformOptions.find((item) => item.id === platform)?.label ?? t('accounts.select_platform');
+  const proxyOptions = [
+    { id: '', label: t('accounts.no_proxy') },
+    ...(proxiesData?.list ?? []).map((p) => ({
+      id: String(p.id),
+      label: `${p.name} (${p.protocol}://${p.address}:${p.port})`,
+    })),
+  ];
+  const selectedProxyLabel =
+    proxyOptions.find((item) => item.id === (form.proxy_id == null ? '' : String(form.proxy_id)))?.label ?? t('accounts.no_proxy');
+  const availableGroups = groupsData?.list ?? [];
+  const toggleGroup = (id: number) => {
+    setGroupIds((prev) =>
+      prev.includes(id) ? prev.filter((groupId) => groupId !== id) : [...prev, id],
+    );
+  };
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) handleClose();
+    },
+  });
 
   return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={`${t('accounts.create')} (${step}/2)`}
-      width="560px"
-      footer={
-        <div className="flex justify-between w-full">
-          <div>
-            {step > 1 && !batchMode && (
-              <Button variant="secondary" onClick={() => setStep(1)}>
-                {t('common.back', '上一步')}
-              </Button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={handleClose}>
-              {t('common.cancel')}
-            </Button>
-            {!batchMode && (step === 1 ? (
-              <Button onClick={() => setStep(2)} disabled={!platform || !form.name}>
-                {t('common.next', '下一步')}
-              </Button>
-            ) : (
-              <Button onClick={handleSubmit} loading={loading}>
-                {t('common.create')}
-              </Button>
-            ))}
-          </div>
-        </div>
-      }
-    >
-      {step === 1 ? (
-        <form className="space-y-4" onSubmit={(e) => e.preventDefault()} noValidate>
-          <Select
-            label={t('accounts.platform')}
-            name="platform"
-            required
-            value={platform}
-            onChange={(e) => handlePlatformChange(e.target.value)}
-            options={[
-              { value: '', label: t('accounts.select_platform') },
-              ...platforms.map((p) => ({ value: p, label: pName(p) })),
-            ]}
-          />
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="lg">
+          <Modal.Dialog
+            className="ag-elevation-modal ag-create-account-modal"
+          >
+            <Modal.Header>
+              <Modal.Heading>{t('accounts.create')}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              <Form className="ag-form-scroll-safe ag-create-account-form" onSubmit={(e) => e.preventDefault()} noValidate>
+                <section className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Select
+                      fullWidth
+                      isRequired
+                      selectedKey={platform}
+                      onSelectionChange={(key) => handlePlatformChange(key == null ? '' : String(key))}
+                    >
+                      <Label>{t('accounts.platform')}</Label>
+                      <Select.Trigger>
+                        <Select.Value>{selectedPlatformLabel}</Select.Value>
+                        <Select.Indicator />
+                      </Select.Trigger>
+                      <Select.Popover>
+                        <ListBox items={platformOptions}>
+                          {(item) => (
+                            <ListBox.Item id={item.id} textValue={item.label}>
+                              {item.label}
+                            </ListBox.Item>
+                          )}
+                        </ListBox>
+                      </Select.Popover>
+                    </Select>
 
-          <Input
-            label={t('common.name')}
-            name="name"
-            autoComplete="off"
-            required={!batchMode}
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            icon={<Layers className="w-4 h-4" />}
-          />
+                    <HeroTextField fullWidth isRequired={!batchMode}>
+                      <Label>{t('common.name')}</Label>
+                      <div className="relative">
+                        <Layers className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                        <Input
+                          className="pl-9"
+                          name="name"
+                          autoComplete="off"
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          required={!batchMode}
+                        />
+                      </div>
+                    </HeroTextField>
+                  </div>
+                </section>
 
-          {/* 凭证区域：插件自定义表单 or 默认 schema 驱动 */}
-          {PluginAccountForm ? (
-            <div
-              className="ag-plugin-scope pt-4"
-              style={{ borderTop: '1px solid var(--ag-border)' }}
-            >
-              <PluginAccountForm
-                credentials={credentials}
-                onChange={setCredentials}
-                mode="create"
-                accountType={accountType}
-                onAccountTypeChange={setAccountType}
-                onSuggestedName={(name) =>
-                  setForm((prev) => (prev.name ? prev : { ...prev, name }))
-                }
-                onBatchModeChange={setBatchMode}
-                onBatchImport={handlePluginBatchImport}
-                oauth={pluginOAuth}
-              />
-            </div>
-          ) : schema && getSchemaVisibleFields(schema, accountType).length > 0 ? (
-            <SchemaCredentialsForm
-              schema={schema}
-              accountType={accountType}
-              onAccountTypeChange={handleSchemaAccountTypeChange}
-              credentials={credentials}
-              onCredentialsChange={setCredentials}
-            />
-          ) : null}
-        </form>
-      ) : (
-        <div className="space-y-4">
-          <Input
-            label={t('accounts.priority_hint')}
-            type="number"
-            min={0}
-            max={999}
-            step={1}
-            value={String(form.priority ?? 50)}
-            onChange={(e) => {
-              const v = Math.round(Number(e.target.value));
-              setForm({ ...form, priority: Math.max(0, Math.min(999, v)) });
-            }}
-            icon={<Hash className="w-4 h-4" />}
-          />
+                {PluginAccountForm ? (
+                  <section
+                    className="ag-plugin-scope border-t border-border pt-4"
+                  >
+                    <PluginAccountForm
+                      credentials={credentials}
+                      onChange={setCredentials}
+                      mode="create"
+                      accountType={accountType}
+                      onAccountTypeChange={setAccountType}
+                      onSuggestedName={(name) =>
+                        setForm((prev) => (prev.name ? prev : { ...prev, name }))
+                      }
+                      onBatchModeChange={setBatchMode}
+                      onBatchImport={handlePluginBatchImport}
+                      oauth={pluginOAuth}
+                    />
+                  </section>
+                ) : schema && getSchemaVisibleFields(schema, accountType).length > 0 ? (
+                  <SchemaCredentialsForm
+                    schema={schema}
+                    accountType={accountType}
+                    onAccountTypeChange={handleSchemaAccountTypeChange}
+                    credentials={credentials}
+                    onCredentialsChange={setCredentials}
+                  />
+                ) : null}
 
-          <GroupCheckboxList
-            groups={(groupsData?.list ?? []).filter(g => g.platform === platform)}
-            selectedIds={groupIds}
-            onChange={setGroupIds}
-          />
+                <section className="ag-create-account-advanced space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <HeroTextField fullWidth>
+                      <Label>{t('accounts.priority_hint')}</Label>
+                      <div className="relative">
+                        <Hash className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                        <Input
+                          className="pl-9"
+                          type="number"
+                          min={0}
+                          max={999}
+                          step={1}
+                          value={String(form.priority ?? 50)}
+                          onChange={(e) => {
+                            const v = Math.round(Number(e.target.value));
+                            setForm({ ...form, priority: Math.max(0, Math.min(999, v)) });
+                          }}
+                        />
+                      </div>
+                    </HeroTextField>
 
-          <Input
-            label={t('accounts.concurrency')}
-            type="number"
-            value={String(form.max_concurrency ?? 5)}
-            onChange={(e) =>
-              setForm({ ...form, max_concurrency: Number(e.target.value) })
-            }
-            icon={<Gauge className="w-4 h-4" />}
-          />
-          <Input
-            label={t('accounts.rate_multiplier')}
-            type="number"
-            step="0.1"
-            value={String(form.rate_multiplier ?? 1)}
-            onChange={(e) =>
-              setForm({ ...form, rate_multiplier: Number(e.target.value) })
-            }
-          />
-          <Select
-            label={t('accounts.proxy')}
-            value={form.proxy_id == null ? '' : String(form.proxy_id)}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                proxy_id: e.target.value ? Number(e.target.value) : undefined,
-              })
-            }
-            options={[
-              { value: '', label: t('accounts.no_proxy') },
-              ...(proxiesData?.list ?? []).map((p) => ({
-                value: String(p.id),
-                label: `${p.name} (${p.protocol}://${p.address}:${p.port})`,
-              })),
-            ]}
-          />
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={form.upstream_is_pool ?? false}
-              onChange={(e) =>
-                setForm({ ...form, upstream_is_pool: e.target.checked })
-              }
-            />
-            <span>{t('accounts.upstream_is_pool', '池模式')}</span>
-          </label>
-        </div>
-      )}
+                    <HeroTextField fullWidth>
+                      <Label>{t('accounts.concurrency')}</Label>
+                      <div className="relative">
+                        <Gauge className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+                        <Input
+                          className="pl-9"
+                          type="number"
+                          value={String(form.max_concurrency ?? 5)}
+                          onChange={(e) =>
+                            setForm({ ...form, max_concurrency: Number(e.target.value) })
+                          }
+                        />
+                      </div>
+                    </HeroTextField>
+
+                    <HeroTextField fullWidth>
+                      <Label>{t('accounts.rate_multiplier')}</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={String(form.rate_multiplier ?? 1)}
+                        onChange={(e) =>
+                          setForm({ ...form, rate_multiplier: Number(e.target.value) })
+                        }
+                      />
+                    </HeroTextField>
+
+                    <Select
+                      fullWidth
+                      selectedKey={form.proxy_id == null ? '' : String(form.proxy_id)}
+                      onSelectionChange={(key) =>
+                        setForm({
+                          ...form,
+                          proxy_id: key ? Number(key) : undefined,
+                        })
+                      }
+                    >
+                      <Label>{t('accounts.proxy')}</Label>
+                      <Select.Trigger>
+                        <Select.Value>{selectedProxyLabel}</Select.Value>
+                        <Select.Indicator />
+                      </Select.Trigger>
+                      <Select.Popover>
+                        <ListBox items={proxyOptions}>
+                          {(item) => (
+                            <ListBox.Item id={item.id} textValue={item.label}>
+                              {item.label}
+                            </ListBox.Item>
+                          )}
+                        </ListBox>
+                      </Select.Popover>
+                    </Select>
+                  </div>
+
+                  <Switch
+                    className="ag-create-account-pool-switch"
+                    isSelected={form.upstream_is_pool ?? false}
+                    onChange={(checked) => setForm({ ...form, upstream_is_pool: checked })}
+                  >
+                    <Switch.Control>
+                      <Switch.Thumb />
+                    </Switch.Control>
+                    <Switch.Content>{t('accounts.upstream_is_pool', '池模式')}</Switch.Content>
+                  </Switch>
+
+                  {availableGroups.length > 0 && (
+                    <div className="ag-create-account-groups">
+                      <Label>{t('accounts.groups')}</Label>
+                      <div className="ag-create-account-group-list">
+                        {availableGroups.map((group) => (
+                          <Checkbox
+                            key={group.id}
+                            className="ag-create-account-group-item"
+                            isSelected={groupIds.includes(group.id)}
+                            onChange={() => toggleGroup(group.id)}
+                          >
+                            <Checkbox.Control>
+                              <Checkbox.Indicator />
+                            </Checkbox.Control>
+                            <Checkbox.Content>
+                              <span className="min-w-0">
+                                <span className="block truncate">{group.name}</span>
+                                <span className="block truncate text-[10px] text-text-tertiary">
+                                  {pName(group.platform)}
+                                </span>
+                              </span>
+                            </Checkbox.Content>
+                          </Checkbox>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </section>
+              </Form>
+            </Modal.Body>
+            <Modal.Footer>
+              <div className="flex justify-end gap-2 w-full">
+                <Button variant="secondary" onPress={handleClose}>
+                  {t('common.cancel')}
+                </Button>
+                {!batchMode && (
+                  <Button
+                    variant="primary"
+                    onPress={handleSubmit}
+                    isDisabled={loading || !platform || !form.name}
+                    aria-busy={loading}
+                  >
+                    {t('common.create')}
+                  </Button>
+                )}
+              </div>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }

@@ -10,9 +10,10 @@ import { AppShell } from './layout/AppShell';
 import { ChatShell } from './layout/ChatShell';
 import { useAuth } from './providers/AuthProvider';
 import { ErrorBoundary } from './providers/ErrorBoundary';
-import { getToken } from '../shared/api/client';
+import { getToken, getTokenRole } from '../shared/api/client';
 import { usersApi } from '../shared/api/users';
 import { setupApi } from '../shared/api/setup';
+import { ChatPageLoading, FullPageLoading, PageLoading } from '../shared/components/PageLoading';
 const SetupPage = lazy(() => import('../pages/SetupPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
 const PluginPage = lazy(() => import('../pages/PluginPage'));
@@ -76,7 +77,7 @@ const setupRoute = createRoute({
     }
   },
   component: () => (
-    <Suspense fallback={null}>
+    <Suspense fallback={<FullPageLoading />}>
       <SetupPage />
     </Suspense>
   ),
@@ -93,14 +94,14 @@ const homeRoute = createRoute({
     }
   },
   component: () => (
-    <Suspense fallback={null}>
+    <Suspense fallback={<FullPageLoading />}>
       <PublicHomePage />
     </Suspense>
   ),
 });
 
 // 注意：/status 不再注册客户端路由，整个公开状态页交给 airgate-health 插件维护。
-// 后端 GET /status 直接反代到插件的 handlePublicIndex，前端用 <a href="/status"> 跳转。
+// 后端 GET /status 直接反代到插件的 handlePublicIndex，前端用普通 href 跳转。
 // 这样避免 core 与插件出现两份重复的状态页实现。
 
 // 内置默认文档页 —— 当管理员未在 系统设置 → 站点品牌 → 文档链接 中填写外部 URL 时，
@@ -109,7 +110,7 @@ const docsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/docs',
   component: () => (
-    <Suspense fallback={null}>
+    <Suspense fallback={<FullPageLoading />}>
       <DocsPage />
     </Suspense>
   ),
@@ -126,7 +127,7 @@ const loginRoute = createRoute({
     }
   },
   component: () => (
-    <Suspense fallback={null}>
+    <Suspense fallback={<FullPageLoading />}>
       <LoginPage />
     </Suspense>
   ),
@@ -156,9 +157,10 @@ function HomePage() {
   const { user, isAPIKeySession } = useAuth();
   if (!user) return null;
 
-  const Page = isAPIKeySession ? UserUsagePage : user.role === 'admin' ? DashboardPage : UserOverviewPage;
+  const isAdmin = getTokenRole() === 'admin' || user.role === 'admin';
+  const Page = isAPIKeySession ? UserUsagePage : isAdmin ? DashboardPage : UserOverviewPage;
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoading />}>
       <Page />
     </Suspense>
   );
@@ -170,6 +172,8 @@ const adminLayout = createRoute({
   getParentRoute: () => authLayout,
   id: 'admin',
   beforeLoad: async () => {
+    if (getTokenRole() === 'admin') return;
+
     const user = await usersApi.me();
     if (user.role !== 'admin') {
       throw redirect({ to: '/' });
@@ -180,7 +184,7 @@ const adminLayout = createRoute({
 
 function renderPage(Page: React.LazyExoticComponent<React.ComponentType>) {
   return () => (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoading />}>
       <Page />
     </Suspense>
   );
@@ -215,7 +219,7 @@ const chatRoute = createRoute({
   },
   component: () => (
     <ChatShell>
-      <Suspense fallback={null}>
+      <Suspense fallback={<ChatPageLoading />}>
         <PluginPage pluginNameOverride="airgate-playground" subPathOverride="/playground" />
       </Suspense>
     </ChatShell>
@@ -237,7 +241,7 @@ const pluginRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/plugins/$pluginName/$',
   component: () => (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoading />}>
       <PluginPage />
     </Suspense>
   ),

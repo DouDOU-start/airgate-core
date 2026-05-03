@@ -1,13 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '../../shared/components/Button';
-import { Input, Select } from '../../shared/components/Input';
+import { Alert, Button, Form, Input, Label, ListBox, Select, TextField as HeroTextField } from '@heroui/react';
 import { setupApi } from '../../shared/api/setup';
 import {
   ArrowRight,
   Plug2,
-  CheckCircle2,
-  CircleDot,
 } from 'lucide-react';
 import type { TestDBReq } from '../../shared/types';
 
@@ -16,21 +13,13 @@ function TestResultBanner({ result }: { result: { success: boolean; error_msg?: 
   if (!result) return null;
 
   return (
-    <div
-      className="flex items-start gap-2.5 rounded-md px-4 py-3 text-sm"
-      style={{
-        background: result.success ? 'var(--ag-success-subtle)' : 'var(--ag-danger-subtle)',
-        color: result.success ? 'var(--ag-success)' : 'var(--ag-danger)',
-        borderLeft: `3px solid ${result.success ? 'var(--ag-success)' : 'var(--ag-danger)'}`,
-      }}
-    >
-      {result.success ? (
-        <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
-      ) : (
-        <CircleDot className="w-4 h-4 mt-0.5 shrink-0" />
-      )}
-      <span>{result.success ? t('setup.test_success') : t('setup.test_failed', { error: result.error_msg || '' })}</span>
-    </div>
+    <Alert status={result.success ? 'success' : 'danger'}>
+      <Alert.Content>
+        <Alert.Description>
+          {result.success ? t('setup.test_success') : t('setup.test_failed', { error: result.error_msg || '' })}
+        </Alert.Description>
+      </Alert.Content>
+    </Alert>
   );
 }
 
@@ -64,10 +53,10 @@ export default function StepDatabase({ data, onChange, onNext }: StepDatabasePro
   };
 
   const sslOptions = [
-    { value: 'disable', label: 'disable' },
-    { value: 'require', label: 'require' },
-    { value: 'verify-ca', label: 'verify-ca' },
-    { value: 'verify-full', label: 'verify-full' },
+    { id: 'disable', label: 'disable' },
+    { id: 'require', label: 'require' },
+    { id: 'verify-ca', label: 'verify-ca' },
+    { id: 'verify-full', label: 'verify-full' },
   ];
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -76,63 +65,89 @@ export default function StepDatabase({ data, onChange, onNext }: StepDatabasePro
   };
 
   return (
-    <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+    <Form className="space-y-4" onSubmit={handleSubmit} noValidate>
       <p className="text-sm text-text-secondary mb-2">
         {t('setup.step_db_desc')}
       </p>
       <div className="grid grid-cols-2 gap-4">
-        <Input
-          label={t('setup.host')}
-          name="host"
-          autoComplete="off"
-          value={data.host}
-          onChange={(e) => update('host', e.target.value)}
-          placeholder="localhost"
-          required
-        />
-        <Input
-          label={t('setup.port')}
-          type="number"
-          value={data.port}
-          onChange={(e) => update('port', Number(e.target.value))}
-          placeholder="5432"
-          required
-        />
+        <HeroTextField fullWidth isRequired>
+          <Label>{t('setup.host')}</Label>
+          <Input
+            name="host"
+            autoComplete="off"
+            value={data.host}
+            onChange={(e) => update('host', e.target.value)}
+            placeholder="localhost"
+            required
+          />
+        </HeroTextField>
+        <HeroTextField fullWidth isRequired>
+          <Label>{t('setup.port')}</Label>
+          <Input
+            name="port"
+            type="number"
+            value={data.port}
+            onChange={(e) => update('port', Number(e.target.value))}
+            placeholder="5432"
+            required
+          />
+        </HeroTextField>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Input
-          label={t('setup.username')}
-          name="username"
-          autoComplete="username"
-          value={data.user}
-          onChange={(e) => update('user', e.target.value)}
-          placeholder="airgate"
-          required
-        />
-        <Input
-          label={t('setup.password')}
-          name="password"
-          type="password"
-          value={data.password || ''}
-          onChange={(e) => update('password', e.target.value)}
-          placeholder={t('setup.password')}
-          autoComplete="off"
-        />
+        <HeroTextField fullWidth isRequired>
+          <Label>{t('setup.username')}</Label>
+          <Input
+            name="username"
+            autoComplete="username"
+            value={data.user}
+            onChange={(e) => update('user', e.target.value)}
+            placeholder="airgate"
+            required
+          />
+        </HeroTextField>
+        <HeroTextField fullWidth>
+          <Label>{t('setup.password')}</Label>
+          <Input
+            name="password"
+            type="password"
+            value={data.password || ''}
+            onChange={(e) => update('password', e.target.value)}
+            placeholder={t('setup.password')}
+            autoComplete="off"
+          />
+        </HeroTextField>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Input
-          label={t('setup.db_name')}
-          value={data.dbname}
-          onChange={(e) => update('dbname', e.target.value)}
-          placeholder="airgate"
-          required
-        />
+        <HeroTextField fullWidth isRequired>
+          <Label>{t('setup.db_name')}</Label>
+          <Input
+            name="dbname"
+            value={data.dbname}
+            onChange={(e) => update('dbname', e.target.value)}
+            placeholder="airgate"
+            required
+          />
+        </HeroTextField>
         <Select
-          label={t('setup.ssl_mode')}
-          value={data.sslmode || 'disable'}
-          onChange={(e) => update('sslmode', e.target.value)}
-          options={sslOptions}
-        />
+          fullWidth
+          selectedKey={data.sslmode || 'disable'}
+          onSelectionChange={(key) => update('sslmode', String(key ?? 'disable'))}
+        >
+          <Label>{t('setup.ssl_mode')}</Label>
+          <Select.Trigger>
+            <Select.Value>{data.sslmode || 'disable'}</Select.Value>
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox items={sslOptions}>
+              {(item) => (
+                <ListBox.Item id={item.id} textValue={item.label}>
+                  {item.label}
+                </ListBox.Item>
+              )}
+            </ListBox>
+          </Select.Popover>
+        </Select>
       </div>
 
       <TestResultBanner result={testResult} />
@@ -142,20 +157,21 @@ export default function StepDatabase({ data, onChange, onNext }: StepDatabasePro
         <Button
           type="button"
           variant="secondary"
-          onClick={handleTest}
-          loading={testing}
-          icon={<Plug2 className="w-4 h-4" />}
+          onPress={handleTest}
+          isDisabled={testing}
+          aria-busy={testing}
         >
+          <Plug2 className="w-4 h-4" />
           {t('setup.test_connection')}
         </Button>
         <Button
           type="submit"
-          disabled={!testResult?.success}
-          icon={<ArrowRight className="w-4 h-4" />}
+          isDisabled={!testResult?.success}
         >
+          <ArrowRight className="w-4 h-4" />
           {t('setup.step_redis')}
         </Button>
       </div>
-    </form>
+    </Form>
   );
 }

@@ -2,7 +2,9 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Link, useMatchRoute, useRouterState } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { Button, Link as HeroLink, Tooltip } from '@heroui/react';
 import { useAuth } from '../providers/AuthProvider';
+import { getTokenRole } from '../../shared/api/client';
 import { pluginsApi } from '../../shared/api/plugins';
 import { settingsApi } from '../../shared/api/settings';
 import { queryKeys } from '../../shared/queryKeys';
@@ -13,18 +15,17 @@ import { useIsMobile } from '../../shared/hooks/useMediaQuery';
 import {
   LayoutDashboard,
   Users,
-  KeyRound,
+  IdCard,
   FolderTree,
-  Key,
+  KeyRound,
   CreditCard,
   Globe,
-  BarChart3,
+  ChartNoAxesCombined,
+  ReceiptText,
   Puzzle,
   Settings,
-  User,
+  UserRoundCog,
   LogOut,
-  PanelLeftClose,
-  PanelLeft,
   Languages,
   Sun,
   Moon,
@@ -34,6 +35,9 @@ import {
   MessageCircle,
   Github,
   Activity,
+  HelpCircle,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -48,27 +52,27 @@ interface MenuItem {
 }
 
 const adminMenuItems: MenuItem[] = [
-  { path: '/', labelKey: 'nav.dashboard', icon: <LayoutDashboard className="w-[18px] h-[18px]" />, sectionKey: 'nav.overview' },
-  { path: '/admin/users', labelKey: 'nav.users', icon: <Users className="w-[18px] h-[18px]" />, sectionKey: 'nav.management' },
-  { path: '/admin/accounts', labelKey: 'nav.accounts', icon: <KeyRound className="w-[18px] h-[18px]" /> },
-  { path: '/admin/groups', labelKey: 'nav.groups', icon: <FolderTree className="w-[18px] h-[18px]" /> },
-  { path: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: <CreditCard className="w-[18px] h-[18px]" /> },
-  { path: '/admin/proxies', labelKey: 'nav.proxies', icon: <Globe className="w-[18px] h-[18px]" /> },
-  { path: '/admin/usage', labelKey: 'nav.usage', icon: <BarChart3 className="w-[18px] h-[18px]" /> },
-  { path: '/admin/plugins', labelKey: 'nav.plugins', icon: <Puzzle className="w-[18px] h-[18px]" />, sectionKey: 'nav.system' },
-  { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="w-[18px] h-[18px]" /> },
+  { path: '/', labelKey: 'nav.dashboard', icon: <LayoutDashboard className="h-5 w-5" />, sectionKey: 'nav.overview' },
+  { path: '/admin/users', labelKey: 'nav.users', icon: <Users className="h-5 w-5" />, sectionKey: 'nav.management' },
+  { path: '/admin/accounts', labelKey: 'nav.accounts', icon: <IdCard className="h-5 w-5" /> },
+  { path: '/admin/groups', labelKey: 'nav.groups', icon: <FolderTree className="h-5 w-5" /> },
+  { path: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: <CreditCard className="h-5 w-5" /> },
+  { path: '/admin/proxies', labelKey: 'nav.proxies', icon: <Globe className="h-5 w-5" /> },
+  { path: '/admin/usage', labelKey: 'nav.usage', icon: <ChartNoAxesCombined className="h-5 w-5" /> },
+  { path: '/admin/plugins', labelKey: 'nav.plugins', icon: <Puzzle className="h-5 w-5" />, sectionKey: 'nav.system' },
+  { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="h-5 w-5" /> },
 ];
 
 const userMenuItems: MenuItem[] = [
-  { path: '/', labelKey: 'nav.my_overview', icon: <LayoutDashboard className="w-[18px] h-[18px]" />, sectionKey: 'nav.personal' },
-  { path: '/profile', labelKey: 'nav.profile', icon: <User className="w-[18px] h-[18px]" /> },
-  { path: '/keys', labelKey: 'nav.my_keys', icon: <Key className="w-[18px] h-[18px]" /> },
-  { path: '/usage', labelKey: 'nav.my_usage', icon: <BarChart3 className="w-[18px] h-[18px]" /> },
+  { path: '/', labelKey: 'nav.my_overview', icon: <LayoutDashboard className="h-5 w-5" />, sectionKey: 'nav.personal' },
+  { path: '/profile', labelKey: 'nav.profile', icon: <UserRoundCog className="h-5 w-5" /> },
+  { path: '/keys', labelKey: 'nav.my_keys', icon: <KeyRound className="h-5 w-5" /> },
+  { path: '/usage', labelKey: 'nav.my_usage', icon: <ReceiptText className="h-5 w-5" /> },
 ];
 
 // API Key 登录只能看使用记录
 const apiKeyMenuItems: MenuItem[] = [
-  { path: '/usage', labelKey: 'nav.my_usage', icon: <BarChart3 className="w-[18px] h-[18px]" />, sectionKey: 'nav.personal' },
+  { path: '/usage', labelKey: 'nav.my_usage', icon: <ReceiptText className="h-5 w-5" />, sectionKey: 'nav.personal' },
 ];
 
 /**
@@ -123,7 +127,7 @@ function usePluginMenuItems(isAdmin: boolean): {
       const item: MenuItem = {
         path: pluginPagePath(p.name, page.path),
         labelKey: page.title,
-        icon: <Puzzle className="w-[18px] h-[18px]" />,
+        icon: <Puzzle className="h-5 w-5" />,
       };
 
       if (showInAdmin) {
@@ -169,7 +173,7 @@ export function AppShell({ children }: AppShellProps) {
     }
   }, [mobileOpen]);
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = getTokenRole() === 'admin' || user?.role === 'admin';
   const isAPIKeySession = !!(user?.api_key_id && user.api_key_id > 0);
 
   // 仅管理员拉取 core 版本号；普通用户和 API Key 会话不暴露版本指纹。
@@ -219,11 +223,8 @@ export function AppShell({ children }: AppShellProps) {
     localStorage.setItem('lang', nextLang);
   };
 
-  const activeItem = menuItems.find((item) => {
-    if (item.path === '/') return !!matchRoute({ to: '/' });
-    return !!matchRoute({ to: item.path, fuzzy: true });
-  });
-  const pageTitle = activeItem ? t(activeItem.labelKey, { defaultValue: activeItem.labelKey }) : '';
+  const displayName = user?.username || user?.email?.split('@')[0] || site.site_name || 'AirGate';
+  const roleLabel = isAdmin ? t('users.role_admin', 'Admin') : t('users.role_user', 'User');
   useEffect(() => {
     document.title = site.site_name || 'AirGate';
   }, [site.site_name]);
@@ -233,103 +234,131 @@ export function AppShell({ children }: AppShellProps) {
 
   const sidebarContent = (
     <>
-      {/* Logo */}
-      <div className="flex items-center h-16 px-4 border-b border-border">
-        <div className="flex items-center gap-2.5 overflow-hidden">
-          <img src={site.site_logo || defaultLogoUrl} alt="" className="w-8 h-8 rounded-sm flex-shrink-0 object-cover" />
+      <div className="flex h-20 items-center px-4">
+        <div className={`flex min-w-0 ${sidebarCollapsed ? 'w-full flex-col items-center justify-center' : 'w-full items-center gap-3'}`}>
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius)] bg-primary-subtle">
+            <img src={site.site_logo || defaultLogoUrl} alt="" className="h-full w-full object-cover" />
+          </div>
           {!sidebarCollapsed && (
-            <div className="overflow-hidden">
-              <div className="flex items-baseline gap-1.5">
-                <h1 className="text-sm font-semibold text-text tracking-tight whitespace-nowrap">
-                  {site.site_name || 'AirGate'}
-                </h1>
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <h1 className="truncate text-sm font-semibold text-text">{displayName}</h1>
                 {coreVersion?.version && (
                   <span
-                    className="text-[9px] text-text-tertiary font-mono whitespace-nowrap"
+                    className="shrink-0 text-[9px] text-text-tertiary font-mono"
                     title={`${coreVersion.version} · ${coreVersion.platform} · ${coreVersion.go_version}`}
                   >
                     {coreVersion.version}
                   </span>
                 )}
               </div>
-              <p className="text-[9px] text-text-tertiary font-mono tracking-[0.1em] uppercase">
-                {site.site_subtitle || 'Control Panel'}
-              </p>
+              <p className="mt-0.5 truncate text-xs text-text-tertiary">{roleLabel}</p>
             </div>
+          )}
+          {!isMobile && !sidebarCollapsed && (
+            <Button
+              aria-label={t('nav.collapse_sidebar', 'Collapse sidebar')}
+              className="ag-sidebar-collapse-button shrink-0"
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              onPress={() => setCollapsed(true)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
           )}
         </div>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2.5 space-y-5">
+      {!isMobile && sidebarCollapsed && (
+        <div className="mb-1 flex justify-center">
+          <Button
+            aria-label={t('nav.expand_sidebar', 'Expand sidebar')}
+            className="ag-sidebar-collapse-button"
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            onPress={() => setCollapsed(false)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      <nav className={`ag-sidebar-nav flex-1 overflow-y-auto pb-4 space-y-5 ${sidebarCollapsed ? 'px-0' : 'px-3'}`}>
         {sections.map((section, si) => (
           <div key={si}>
             {section.titleKey && !sidebarCollapsed && (
-              <p className="text-[10px] font-medium text-text-tertiary uppercase tracking-[0.12em] px-2.5 mb-2">
+              <p className="px-2.5 pb-2 text-[10px] font-medium uppercase text-text-tertiary">
                 {t(section.titleKey)}
               </p>
             )}
             {sidebarCollapsed && si > 0 && (
-              <div className="h-px mx-3 mb-2.5 bg-border" />
+              <div className="mx-3 mb-2.5 h-px bg-border" />
             )}
             <div className="space-y-1">
               {section.items.map((item) => {
                 const isActive = !!matchRoute({ to: item.path, fuzzy: item.path !== '/' });
                 const isExactDashboard = item.path === '/' && !!matchRoute({ to: '/' });
                 const active = item.path === '/' ? isExactDashboard : isActive;
+                const label = t(item.labelKey, { defaultValue: item.labelKey });
 
-                return (
+                const link = (
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`group flex items-center gap-2.5 rounded-[10px] transition-all duration-150 relative ${
-                      sidebarCollapsed ? 'justify-center px-0 py-2.5 mx-1' : 'px-2.5 py-2'
-                    } ${
-                      active
-                        ? 'bg-primary-subtle text-primary'
-                        : 'text-text-tertiary hover:text-text-secondary hover:bg-bg-hover'
-                    }`}
+                    data-active={active ? 'true' : undefined}
+                    className={`ag-sidebar-nav-item group relative flex items-center transition-colors duration-150 ${sidebarCollapsed ? 'mx-auto h-10 w-10 justify-center p-0' : 'px-2 py-1.5'}`}
                   >
-                    {active && (
-                      <div className="absolute left-0 top-0 bottom-0 flex items-center"><div className="w-[2px] h-3.5 rounded-r-full bg-primary" /></div>
-                    )}
-                    <span className="flex-shrink-0">{item.icon}</span>
+                    <span className="flex shrink-0 items-center justify-center">{item.icon}</span>
                     {!sidebarCollapsed && (
-                      <span className="text-[13px] font-medium truncate">{t(item.labelKey, { defaultValue: item.labelKey })}</span>
-                    )}
-                    {sidebarCollapsed && (
-                      <div className="ag-glass-dropdown absolute left-full ml-2 px-2.5 py-1.5 rounded-lg text-xs text-text whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                        {t(item.labelKey, { defaultValue: item.labelKey })}
-                      </div>
+                      <span className="ag-sidebar-nav-item-label truncate">{label}</span>
                     )}
                   </Link>
                 );
+
+                return sidebarCollapsed ? (
+                  <Tooltip key={item.path}>
+                    <Tooltip.Trigger className="block w-full">{link}</Tooltip.Trigger>
+                    <Tooltip.Content>{label}</Tooltip.Content>
+                  </Tooltip>
+                ) : link;
               })}
             </div>
           </div>
         ))}
       </nav>
 
-      {/* Links + Collapse toggle */}
-      <div className="border-t border-border p-2.5 space-y-1">
-        {!isMobile && (
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="flex items-center justify-center w-full h-7 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+      <div className="space-y-1 border-t border-border p-3">
+        {!sidebarCollapsed && (
+          <Button
+            className="w-full justify-start"
+            size="sm"
+            variant="ghost"
+            onPress={() => { window.location.href = effectiveDocUrl(site.doc_url).href; }}
           >
-            {collapsed ? (
-              <PanelLeft className="w-3.5 h-3.5" />
-            ) : (
-              <PanelLeftClose className="w-3.5 h-3.5" />
-            )}
-          </button>
+            <HelpCircle className="h-4 w-4" />
+            {t('nav.docs')}
+          </Button>
+        )}
+        {!isMobile && sidebarCollapsed && (
+          <Button
+            aria-label={t('nav.docs')}
+            className="w-full"
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            onPress={() => { window.location.href = effectiveDocUrl(site.doc_url).href; }}
+          >
+            <HelpCircle className="h-4 w-4" />
+          </Button>
         )}
       </div>
     </>
   );
 
   return (
-    <div className="flex h-screen" style={{ height: '100dvh' }}>
+    <div className="fixed inset-0 flex overflow-hidden bg-bg text-text">
       {/* Mobile backdrop */}
       {isMobile && mobileOpen && (
         <div
@@ -342,14 +371,14 @@ export function AppShell({ children }: AppShellProps) {
       {/* Sidebar */}
       {isMobile ? (
         <aside
-          className="fixed inset-y-0 left-0 z-50 flex flex-col bg-bg border-r border-border transition-transform duration-300 ease-in-out"
+          className="fixed inset-y-0 left-0 z-50 flex flex-col bg-surface border-r border-border transition-transform duration-300 ease-in-out"
           style={{ width: 'var(--ag-sidebar-width)', transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)' }}
         >
           {sidebarContent}
         </aside>
       ) : (
         <aside
-          className="relative flex flex-col border-r border-border bg-bg transition-all duration-300 ease-in-out"
+          className="relative flex flex-col border-r border-border bg-surface transition-all duration-300 ease-in-out"
           style={{ width: collapsed ? 'var(--ag-sidebar-collapsed)' : 'var(--ag-sidebar-width)' }}
         >
           {sidebarContent}
@@ -357,118 +386,132 @@ export function AppShell({ children }: AppShellProps) {
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="flex items-center justify-between h-16 px-4 md:px-6 border-b border-border bg-bg shrink-0">
-          <div className="flex items-center gap-3">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="ag-topbar pointer-events-auto absolute inset-x-0 top-0 z-20 flex h-12 items-center justify-between gap-3 px-4 md:px-5">
+          <div className="flex shrink-0 items-center gap-3">
             {isMobile && (
-              <button
-                onClick={() => setMobileOpen(true)}
-                className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text hover:bg-bg-hover transition-colors"
+              <Button
+                aria-label={t('nav.open_menu', 'Open menu')}
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                onPress={() => {
+                  setMobileOpen(true);
+                }}
               >
-                <Menu className="w-5 h-5" />
-              </button>
+                <Menu className="h-5 w-5" />
+              </Button>
             )}
-            <h2 className="text-sm font-semibold text-text">{pageTitle}</h2>
           </div>
-          <div className="flex items-center gap-1.5">
+
+          <div className="flex shrink-0 items-center gap-2">
             {/* Service status — 仅当 airgate-health 插件已安装时显示
-                注意：用普通 <a> 而非 <Link>，因为 /status 由后端反代到 health 插件
+                注意：用普通 href 而非 SPA Link，因为 /status 由后端反代到 health 插件
                 的 standalone 页面，不在 SPA 路由树里 */}
             {showStatusEntry && (
-              <a
+              <HeroLink
                 href="/status"
-                className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+                className="flex h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text"
                 title={t('nav.status')}
               >
-                <Activity className="w-3.5 h-3.5" />
-              </a>
+                <Activity className="h-5 w-5" />
+              </HeroLink>
             )}
             {/* GitHub */}
-            <a
+            <HeroLink
               href="https://github.com/DouDOU-start/airgate-core"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+              className="hidden h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text sm:flex"
               title="GitHub"
             >
-              <Github className="w-3.5 h-3.5" />
-            </a>
+              <Github className="h-5 w-5" />
+            </HeroLink>
             {/* Docs：未配置外部链接时回退到内置 /docs */}
             {(() => {
               const docs = effectiveDocUrl(site.doc_url);
               return (
-                <a
+                <HeroLink
                   href={docs.href}
                   {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                  className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
+                  className="hidden h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text sm:flex"
                   title={t('nav.docs')}
                 >
-                  <BookOpen className="w-3.5 h-3.5" />
-                </a>
+                  <BookOpen className="h-5 w-5" />
+                </HeroLink>
               );
             })()}
             {/* Contact */}
             {site.contact_info && (
-              <div className="flex items-center gap-1.5 text-text-tertiary hidden sm:flex">
-                <MessageCircle className="w-3.5 h-3.5 shrink-0" />
-                <span className="text-xs">{site.contact_info}</span>
+              <div className="hidden items-center gap-2 text-text-tertiary lg:flex">
+                <MessageCircle className="h-5 w-5 shrink-0" />
+                <span className="text-sm">{site.contact_info}</span>
               </div>
             )}
             {/* Language toggle */}
-            <button
-              onClick={toggleLanguage}
-              className="flex items-center justify-center h-8 px-2.5 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors gap-1.5"
-              title={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
+            <Button
+              aria-label={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
+              className="h-10 px-3"
+              size="sm"
+              variant="ghost"
+              onPress={toggleLanguage}
             >
-              <Languages className="w-3.5 h-3.5" />
-              <span className="text-[10px] font-mono uppercase hidden sm:inline">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
-            </button>
+              <Languages className="h-5 w-5" />
+              <span className="hidden w-8 text-center font-mono text-xs uppercase sm:inline-block">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
+            </Button>
             {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
-              title={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+            <Button
+              aria-label={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+              className="h-10 w-10"
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              onPress={toggleTheme}
             >
-              {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-            </button>
+              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
 
-            <div className="w-px h-5 bg-border mx-1.5" />
+            <div className="mx-1.5 hidden h-6 w-px bg-border sm:block" />
 
-            {/* User info */}
-            <div className="flex items-center gap-2 pl-1">
+            <div className="hidden items-center gap-2.5 pl-1 sm:flex">
               {!isAPIKeySession && (
-                <div className="hidden sm:block text-center">
-                  <p className="text-xs font-medium text-text leading-tight">
-                    {user?.username || user?.email?.split('@')[0]}
+                <div className="hidden text-right md:block">
+                  <p className="text-sm font-medium leading-tight text-text">
+                    {displayName}
                   </p>
-                  <p className="text-[10px] text-text-tertiary leading-tight">
+                  <p className="text-xs leading-tight text-text-tertiary">
                     {user?.email}
                   </p>
                 </div>
               )}
               {isAdmin ? (
-                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary-subtle text-primary shrink-0">
-                  <ShieldCheck className="w-3.5 h-3.5" />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius)] text-primary">
+                  <ShieldCheck className="h-5 w-5" />
                 </div>
               ) : (
-                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary-subtle text-[11px] font-bold text-primary shrink-0">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius)] text-sm font-bold text-primary">
                   {(user?.username || user?.email || 'U').charAt(0).toUpperCase()}
                 </div>
               )}
-              <button
-                onClick={logout}
-                className="flex items-center justify-center w-7 h-7 rounded-[10px] text-text-tertiary hover:text-danger hover:bg-danger-subtle transition-all"
-                title={t('common.logout')}
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
             </div>
+
+            {/* Logout button */}
+            <div className="mx-1 hidden h-6 w-px bg-border sm:block" />
+            <Button
+              aria-label={t('common.logout')}
+              className="h-10 w-10 text-text-secondary hover:bg-danger/10 hover:text-danger"
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              onPress={logout}
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto ag-main">
-          <div className="ag-main-content p-4 md:p-6 lg:p-8 max-w-[1400px] mx-auto">
+        <main className="min-h-0 flex-1 overflow-auto bg-bg pt-12 ag-main">
+          <div className="ag-main-content mx-auto w-full max-w-[1920px] p-4 md:p-6 2xl:p-8">
             {children}
           </div>
         </main>

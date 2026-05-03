@@ -1,11 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { Button, Checkbox, Input, Label, ListBox, Modal, Select, Switch, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { Hash, Gauge } from 'lucide-react';
-import { Button } from '../../../shared/components/Button';
-import { Input, Select } from '../../../shared/components/Input';
-import { Switch } from '../../../shared/components/Switch';
-import { Modal } from '../../../shared/components/Modal';
 import { groupsApi } from '../../../shared/api/groups';
 import { proxiesApi } from '../../../shared/api/proxies';
 import { queryKeys } from '../../../shared/queryKeys';
@@ -76,25 +73,36 @@ export function BulkEditAccountModal({
     if (enableProxy && proxyId != null) patch.proxy_id = proxyId;
     onSubmit(patch);
   };
+  const proxyOptions = [
+    { id: '', label: t('accounts.select_proxy') },
+    ...(proxiesData?.list ?? []).map((p) => ({
+      id: String(p.id),
+      label: `${p.name} (${p.protocol}://${p.address}:${p.port})`,
+    })),
+  ];
+  const selectedProxyLabel =
+    proxyOptions.find((item) => item.id === (proxyId == null ? '' : String(proxyId)))?.label ?? t('accounts.select_proxy');
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) onClose();
+    },
+  });
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={`${t('accounts.bulk_update_title')} (${count})`}
-      width="560px"
-      footer={
-        <div className="flex justify-end gap-2 w-full">
-          <Button variant="secondary" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleSubmit} loading={loading} disabled={!hasAnyField}>
-            {t('common.save')}
-          </Button>
-        </div>
-      }
-    >
-      <div className="space-y-4">
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog
+            className="ag-elevation-modal"
+            style={{ maxWidth: '560px', width: 'min(100%, calc(100vw - 2rem))' }}
+          >
+            <Modal.Header>
+              <Modal.Heading>{`${t('accounts.bulk_update_title')} (${count})`}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              <div className="space-y-4">
         <div
           className="text-xs px-3 py-2 rounded"
           style={{
@@ -113,9 +121,13 @@ export function BulkEditAccountModal({
           label={t('accounts.enable_dispatch')}
         >
           <Switch
-            checked={status === 'active'}
+            isSelected={status === 'active'}
             onChange={(on) => setStatus(on ? 'active' : 'disabled')}
-          />
+          >
+            <Switch.Control>
+              <Switch.Thumb />
+            </Switch.Control>
+          </Switch>
         </FieldRow>
 
         {/* 优先级 */}
@@ -124,19 +136,24 @@ export function BulkEditAccountModal({
           onToggle={setEnablePriority}
           label={t('accounts.priority')}
         >
-          <Input
-            type="number"
-            min={0}
-            max={999}
-            step={1}
-            value={String(priority)}
-            disabled={!enablePriority}
-            onChange={(e) => {
-              const v = Math.round(Number(e.target.value));
-              setPriority(Math.max(0, Math.min(999, v)));
-            }}
-            icon={<Hash className="w-4 h-4" />}
-          />
+          <HeroTextField fullWidth isDisabled={!enablePriority}>
+            <div className="relative">
+              <Hash className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+              <Input
+                className="pl-9"
+                type="number"
+                min={0}
+                max={999}
+                step={1}
+                value={String(priority)}
+                disabled={!enablePriority}
+                onChange={(e) => {
+                  const v = Math.round(Number(e.target.value));
+                  setPriority(Math.max(0, Math.min(999, v)));
+                }}
+              />
+            </div>
+          </HeroTextField>
         </FieldRow>
 
         {/* 并发数 */}
@@ -145,13 +162,18 @@ export function BulkEditAccountModal({
           onToggle={setEnableConcurrency}
           label={t('accounts.concurrency')}
         >
-          <Input
-            type="number"
-            value={String(maxConcurrency)}
-            disabled={!enableConcurrency}
-            onChange={(e) => setMaxConcurrency(Number(e.target.value))}
-            icon={<Gauge className="w-4 h-4" />}
-          />
+          <HeroTextField fullWidth isDisabled={!enableConcurrency}>
+            <div className="relative">
+              <Gauge className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+              <Input
+                className="pl-9"
+                type="number"
+                value={String(maxConcurrency)}
+                disabled={!enableConcurrency}
+                onChange={(e) => setMaxConcurrency(Number(e.target.value))}
+              />
+            </div>
+          </HeroTextField>
         </FieldRow>
 
         {/* 费率倍率 */}
@@ -160,13 +182,15 @@ export function BulkEditAccountModal({
           onToggle={setEnableRateMultiplier}
           label={t('accounts.rate_multiplier')}
         >
-          <Input
-            type="number"
-            step="0.1"
-            value={String(rateMultiplier)}
-            disabled={!enableRateMultiplier}
-            onChange={(e) => setRateMultiplier(Number(e.target.value))}
-          />
+          <HeroTextField fullWidth isDisabled={!enableRateMultiplier}>
+            <Input
+              type="number"
+              step="0.1"
+              value={String(rateMultiplier)}
+              disabled={!enableRateMultiplier}
+              onChange={(e) => setRateMultiplier(Number(e.target.value))}
+            />
+          </HeroTextField>
         </FieldRow>
 
         {/* 所属分组（直接替换） */}
@@ -191,19 +215,42 @@ export function BulkEditAccountModal({
           label={t('accounts.proxy')}
         >
           <Select
-            value={proxyId == null ? '' : String(proxyId)}
-            disabled={!enableProxy}
-            onChange={(e) => setProxyId(e.target.value ? Number(e.target.value) : null)}
-            options={[
-              { value: '', label: t('accounts.select_proxy') },
-              ...(proxiesData?.list ?? []).map((p) => ({
-                value: String(p.id),
-                label: `${p.name} (${p.protocol}://${p.address}:${p.port})`,
-              })),
-            ]}
-          />
+            fullWidth
+            selectedKey={proxyId == null ? '' : String(proxyId)}
+            isDisabled={!enableProxy}
+            onSelectionChange={(key) => setProxyId(key ? Number(key) : null)}
+          >
+            <Label>{t('accounts.proxy')}</Label>
+            <Select.Trigger>
+              <Select.Value>{selectedProxyLabel}</Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={proxyOptions}>
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.label}>
+                    {item.label}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
         </FieldRow>
-      </div>
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <div className="flex justify-end gap-2 w-full">
+                <Button variant="secondary" onPress={onClose}>
+                  {t('common.cancel')}
+                </Button>
+                <Button variant="primary" onPress={handleSubmit} isDisabled={loading || !hasAnyField} aria-busy={loading}>
+                  {t('common.save')}
+                </Button>
+              </div>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }
@@ -224,21 +271,19 @@ function FieldRow({
       className="flex items-start gap-3 py-2"
       style={{ borderTop: '1px solid var(--ag-border-subtle)' }}
     >
-      <label className="flex items-center gap-2 shrink-0 pt-2 cursor-pointer" style={{ minWidth: 120 }}>
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => onToggle(e.target.checked)}
-          className="w-4 h-4 cursor-pointer"
-          style={{ accentColor: 'var(--ag-primary)' }}
-        />
+      <Checkbox
+        className="shrink-0 pt-2"
+        style={{ minWidth: 120 }}
+        isSelected={enabled}
+        onChange={onToggle}
+      >
         <span
           className="text-sm"
           style={{ color: enabled ? 'var(--ag-text)' : 'var(--ag-text-tertiary)' }}
         >
           {label}
         </span>
-      </label>
+      </Checkbox>
       <div className="flex-1 min-w-0">{children}</div>
     </div>
   );

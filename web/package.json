@@ -12,6 +12,11 @@
   },
   "dependencies": {
     "@airgate/theme": "file:../../airgate-sdk/frontend",
+    "@fontsource/geist-mono": "^5.2.7",
+    "@fontsource/geist-sans": "^5.2.5",
+    "@heroui/react": "^3.0.3",
+    "@heroui/styles": "^3.0.3",
+    "@internationalized/date": "^3.12.1",
     "@tanstack/react-query": "^5.62.0",
     "@tanstack/react-router": "^1.92.0",
     "i18next": "^24.2.0",

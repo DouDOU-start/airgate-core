@@ -1,7 +1,9 @@
 import { type ReactNode, useEffect } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@heroui/react';
 import { useAuth } from '../providers/AuthProvider';
+import { getTokenRole } from '../../shared/api/client';
 import { useTheme } from '../providers/ThemeProvider';
 import { useSiteSettings, defaultLogoUrl } from '../providers/SiteSettingsProvider';
 import {
@@ -26,7 +28,7 @@ export function ChatShell({ children }: ChatShellProps) {
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const site = useSiteSettings();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = getTokenRole() === 'admin' || user?.role === 'admin';
 
   useEffect(() => {
     document.title = site.site_name || 'AirGate';
@@ -58,29 +60,32 @@ export function ChatShell({ children }: ChatShellProps) {
             alt=""
             className="w-6 h-6 rounded-sm flex-shrink-0 object-cover"
           />
-          <span className="text-[13px] font-semibold text-text tracking-tight truncate">
+          <span className="text-[13px] font-semibold text-text truncate">
             {site.site_name || 'AirGate'}
           </span>
         </div>
 
         <div className="flex items-center gap-1">
-          <button
-            onClick={toggleLanguage}
-            className="flex items-center justify-center h-8 px-2 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors gap-1.5"
-            title={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
+          <Button
+            aria-label={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
+            size="sm"
+            variant="ghost"
+            onPress={toggleLanguage}
           >
             <Languages className="w-3.5 h-3.5" />
             <span className="text-[10px] font-mono uppercase hidden sm:inline">
               {i18n.language === 'zh' ? 'EN' : '中文'}
             </span>
-          </button>
-          <button
-            onClick={toggleTheme}
-            className="flex items-center justify-center w-8 h-8 rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
-            title={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+          </Button>
+          <Button
+            aria-label={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            onPress={toggleTheme}
           >
             {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-          </button>
+          </Button>
 
           <div className="w-px h-5 bg-border mx-1.5" />
 
@@ -104,13 +109,15 @@ export function ChatShell({ children }: ChatShellProps) {
                 {(user?.username || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
             )}
-            <button
-              onClick={logout}
-              className="flex items-center justify-center w-7 h-7 rounded-[10px] text-text-tertiary hover:text-danger hover:bg-danger-subtle transition-all"
-              title={t('common.logout')}
+            <Button
+              aria-label={t('common.logout')}
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              onPress={logout}
             >
               <LogOut className="w-3.5 h-3.5" />
-            </button>
+            </Button>
           </div>
         </div>
       </header>

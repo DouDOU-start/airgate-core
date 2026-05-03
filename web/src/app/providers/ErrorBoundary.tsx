@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Button } from '@heroui/react'
 
 interface Props {
   children: ReactNode
@@ -48,21 +49,15 @@ export class ErrorBoundary extends Component<Props, State> {
           <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
             {this.state.error?.message || '未知错误'}
           </p>
-          <button
-            onClick={() => {
+          <Button
+            variant="secondary"
+            onPress={() => {
               this.setState({ hasError: false, error: null })
               window.location.reload()
             }}
-            style={{
-              padding: '0.5rem 1.5rem',
-              borderRadius: '0.375rem',
-              border: '1px solid #d1d5db',
-              background: '#fff',
-              cursor: 'pointer',
-            }}
           >
             刷新页面
-          </button>
+          </Button>
         </div>
       )
     }

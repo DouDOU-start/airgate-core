@@ -1,9 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, Modal, useOverlayState } from '@heroui/react';
 import { Terminal } from 'lucide-react';
-import { Modal } from '../../../shared/components/Modal';
-import { Button } from '../../../shared/components/Button';
-import { useToast } from '../../../shared/components/Toast';
+import { useToast } from '../../../shared/ui';
 import { apikeysApi } from '../../../shared/api/apikeys';
 import type { APIKeyResp, GroupResp } from '../../../shared/types';
 
@@ -150,21 +149,23 @@ export function CcsImportModal({
   const { t } = useTranslation();
   const { toast } = useToast();
   const baseUrl = window.location.origin;
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) onClose();
+    },
+  });
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={t('user_keys.ccs_select_client')}
-      footer={
-        <Button
-          variant="secondary"
-          onClick={onClose}
-        >
-          {t('common.cancel')}
-        </Button>
-      }
-    >
+    <Modal state={modalState}>
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="md">
+          <Modal.Dialog className="ag-elevation-modal">
+            <Modal.Header>
+              <Modal.Heading>{t('user_keys.ccs_select_client')}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
       {ccsKeyValue ? (
         ccsPlatform ? (
           <div className="space-y-3">
@@ -173,12 +174,13 @@ export function CcsImportModal({
             </p>
             <div className="grid grid-cols-2 gap-3">
               {/* 始终显示 Claude Code */}
-              <button
-                onClick={() => {
+              <Button
+                variant="secondary"
+                className="h-auto flex-col gap-2 p-4"
+                onPress={() => {
                   executeCcsImport(baseUrl, ccsKeyValue, 'claude', ccsPlatform, toast, t);
                   onClose();
                 }}
-                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-glass-border bg-surface hover:bg-bg-hover hover:border-text-tertiary transition-colors"
               >
                 <div className="w-10 h-10 rounded-lg bg-info-subtle flex items-center justify-center">
                   <Terminal className="w-5 h-5 text-info" />
@@ -187,16 +189,17 @@ export function CcsImportModal({
                 <span className="text-xs text-text-tertiary text-center">
                   {t('user_keys.ccs_claude_desc')}
                 </span>
-              </button>
+              </Button>
 
               {/* OpenAI 平台额外显示 Codex CLI */}
               {ccsPlatform === 'openai' && (
-                <button
-                  onClick={() => {
+                <Button
+                  variant="secondary"
+                  className="h-auto flex-col gap-2 p-4"
+                  onPress={() => {
                     executeCcsImport(baseUrl, ccsKeyValue, 'codex', ccsPlatform, toast, t);
                     onClose();
                   }}
-                  className="flex flex-col items-center gap-2 p-4 rounded-lg border border-glass-border bg-surface hover:bg-bg-hover hover:border-text-tertiary transition-colors"
                 >
                   <div className="w-10 h-10 rounded-lg bg-success-subtle flex items-center justify-center">
                     <Terminal className="w-5 h-5 text-success" />
@@ -205,7 +208,7 @@ export function CcsImportModal({
                   <span className="text-xs text-text-tertiary text-center">
                     {t('user_keys.ccs_codex_desc')}
                   </span>
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -219,6 +222,18 @@ export function CcsImportModal({
           {t('common.loading')}
         </div>
       )}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                variant="secondary"
+                onPress={onClose}
+              >
+                {t('common.cancel')}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }

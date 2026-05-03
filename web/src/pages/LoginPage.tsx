@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { Button } from '../shared/components/Button';
-import { Input } from '../shared/components/Input';
-import { Alert } from '../shared/components/Alert';
+import { Alert, Button, Card, FieldError, Form, Input, Label, Link as HeroLink, Tabs, TextField as HeroTextField } from '@heroui/react';
 import { useAuth } from '../app/providers/AuthProvider';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
 import { authApi } from '../shared/api/auth';
@@ -46,35 +44,52 @@ function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Input
-        label={t('auth.email')}
-        name="email"
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder={t('auth.email_placeholder')}
-        autoComplete="username"
-        icon={<Mail className="w-4 h-4" />}
-        required
-        autoFocus
-      />
-      <Input
-        label={t('auth.password')}
-        name="password"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder={t('auth.password_placeholder')}
-        autoComplete="current-password"
-        icon={<Lock className="w-4 h-4" />}
-        required
-      />
-      {error && <Alert variant="error">{error}</Alert>}
-      <Button type="submit" loading={loading} className="w-full h-11" icon={<ArrowRight className="w-4 h-4" />}>
+    <Form onSubmit={handleSubmit} className="space-y-4">
+      <HeroTextField fullWidth isRequired>
+        <Label>{t('auth.email')}</Label>
+        <div className="relative">
+          <Mail className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+          <Input
+            className="pl-9"
+            name="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder={t('auth.email_placeholder')}
+            autoComplete="username"
+            autoFocus
+            required
+          />
+        </div>
+      </HeroTextField>
+      <HeroTextField fullWidth isRequired>
+        <Label>{t('auth.password')}</Label>
+        <div className="relative">
+          <Lock className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+          <Input
+            className="pl-9"
+            name="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={t('auth.password_placeholder')}
+            autoComplete="current-password"
+            required
+          />
+        </div>
+      </HeroTextField>
+      {error && (
+        <Alert status="danger">
+          <Alert.Content>
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      )}
+      <Button type="submit" isDisabled={loading} className="w-full h-11" variant="primary" aria-busy={loading}>
+        <ArrowRight className="w-4 h-4" />
         {t('common.login')}
       </Button>
-    </form>
+    </Form>
   );
 }
 
@@ -171,106 +186,144 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   // 第一步：输入邮箱（+ 验证码）
   if (step === 1) {
     return (
-      <form onSubmit={handleStep1} className="space-y-4">
-        <Input
-          label={t('auth.email')}
-          name="email"
-          type="email"
-          value={email}
-          onChange={(e) => { setEmail(e.target.value); setError(''); }}
-          placeholder={t('auth.email_placeholder')}
-          autoComplete="email"
-          icon={<Mail className="w-4 h-4" />}
-          required
-          autoFocus
-        />
+      <Form onSubmit={handleStep1} className="space-y-4">
+        <HeroTextField fullWidth isRequired>
+          <Label>{t('auth.email')}</Label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+            <Input
+              className="pl-9"
+              name="email"
+              type="email"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setError(''); }}
+              placeholder={t('auth.email_placeholder')}
+              autoComplete="email"
+              autoFocus
+              required
+            />
+          </div>
+        </HeroTextField>
         {needVerify && (
-          <div>
-            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">
-              {t('auth.verify_code')}
-            </label>
-            <div className="flex gap-2">
-              <div className="flex-1">
+          <div className="flex items-end gap-2">
+            <HeroTextField fullWidth isRequired>
+              <Label>{t('auth.verify_code')}</Label>
+              <div className="relative">
+                <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
                 <Input
+                  className="pl-9"
                   name="verify_code"
                   value={verifyCode}
                   onChange={(e) => { setVerifyCode(e.target.value); setError(''); }}
                   placeholder={t('auth.verify_code_placeholder')}
-                  icon={<ShieldCheck className="w-4 h-4" />}
                   maxLength={6}
                   required
                 />
               </div>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleSendCode}
-                loading={sendingCode}
-                disabled={countdown > 0 || !email}
-                className="shrink-0 h-[42px]"
-              >
-                {countdown > 0 ? `${countdown}s` : codeSent ? t('auth.resend_code') : t('auth.send_code')}
-              </Button>
-            </div>
+            </HeroTextField>
+            <Button
+              type="button"
+              variant="secondary"
+              onPress={handleSendCode}
+              isDisabled={sendingCode || countdown > 0 || !email}
+              className="shrink-0 h-[42px]"
+              aria-busy={sendingCode}
+            >
+              {countdown > 0 ? `${countdown}s` : codeSent ? t('auth.resend_code') : t('auth.send_code')}
+            </Button>
           </div>
         )}
-        {error && <Alert variant="error">{error}</Alert>}
-        <Button type="submit" className="w-full h-11" icon={<ArrowRight className="w-4 h-4" />}>
+        {error && (
+          <Alert status="danger">
+            <Alert.Content>
+              <Alert.Description>{error}</Alert.Description>
+            </Alert.Content>
+          </Alert>
+        )}
+        <Button type="submit" className="w-full h-11" variant="primary">
+          <ArrowRight className="w-4 h-4" />
           {t('auth.next_step')}
         </Button>
-      </form>
+      </Form>
     );
   }
 
   // 第二步：填写密码等信息
   return (
-    <form onSubmit={handleStep2} className="space-y-4">
+    <Form onSubmit={handleStep2} className="space-y-4">
       {/* 已验证的邮箱（只读展示） */}
       <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-[10px] border border-glass-border bg-surface text-sm text-text-secondary">
         <Mail className="w-4 h-4 text-text-tertiary shrink-0" />
         <span className="truncate">{email}</span>
-        <button type="button" onClick={() => setStep(1)} className="ml-auto text-xs text-primary hover:underline shrink-0">
+        <Button
+          className="ml-auto shrink-0"
+          size="sm"
+          variant="ghost"
+          onPress={() => setStep(1)}
+        >
           {t('auth.change_email')}
-        </button>
+        </Button>
       </div>
-      <Input
-        label={t('auth.username')}
-        name="username"
-        autoComplete="username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        placeholder={t('auth.username_placeholder')}
-        icon={<User className="w-4 h-4" />}
-        autoFocus
-      />
-      <Input
-        label={t('auth.password')}
-        name="new-password"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder={t('auth.password_hint')}
-        autoComplete="new-password"
-        icon={<Lock className="w-4 h-4" />}
-        required
-      />
-      <Input
-        label={t('auth.confirm_password')}
-        name="confirm-new-password"
-        type="password"
-        value={confirmPassword}
-        onChange={(e) => setConfirmPassword(e.target.value)}
-        placeholder={t('auth.confirm_placeholder')}
-        autoComplete="new-password"
-        icon={<Lock className="w-4 h-4" />}
-        required
-        error={passwordMismatch ? t('auth.password_mismatch') : undefined}
-      />
-      {error && <Alert variant="error">{error}</Alert>}
-      <Button type="submit" loading={loading} className="w-full h-11">
+      <HeroTextField fullWidth>
+        <Label>{t('auth.username')}</Label>
+        <div className="relative">
+          <User className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+          <Input
+            className="pl-9"
+            name="username"
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder={t('auth.username_placeholder')}
+            autoFocus
+          />
+        </div>
+      </HeroTextField>
+      <HeroTextField fullWidth isRequired>
+        <Label>{t('auth.password')}</Label>
+        <div className="relative">
+          <Lock className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+          <Input
+            className="pl-9"
+            name="new-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={t('auth.password_hint')}
+            autoComplete="new-password"
+            required
+          />
+        </div>
+      </HeroTextField>
+      <HeroTextField fullWidth isInvalid={passwordMismatch} isRequired>
+        <Label>{t('auth.confirm_password')}</Label>
+        <div className="relative">
+          <Lock className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+          <Input
+            className="pl-9"
+            name="confirm-new-password"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder={t('auth.confirm_placeholder')}
+            autoComplete="new-password"
+            aria-invalid={passwordMismatch || undefined}
+            required
+          />
+        </div>
+        {passwordMismatch ? <FieldError>{t('auth.password_mismatch')}</FieldError> : null}
+      </HeroTextField>
+      {error && (
+        <Alert status="danger">
+          <Alert.Content>
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      )}
+      <Button type="submit" isDisabled={loading} className="w-full h-11" variant="primary" aria-busy={loading}>
         {t('common.register')}
       </Button>
-    </form>
+    </Form>
   );
 }
 
@@ -308,25 +361,37 @@ function APIKeyLoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Input
-        label="API Key"
-        name="api_key"
-        type="password"
-        value={apiKey}
-        onChange={(e) => setApiKey(e.target.value)}
-        placeholder="sk-..."
-        autoComplete="off"
-        icon={<Key className="w-4 h-4" />}
-        required
-        autoFocus
-      />
+    <Form onSubmit={handleSubmit} className="space-y-4">
+      <HeroTextField fullWidth isRequired>
+        <Label>API Key</Label>
+        <div className="relative">
+          <Key className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+          <Input
+            className="pl-9"
+            name="api_key"
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="sk-..."
+            autoComplete="off"
+            autoFocus
+            required
+          />
+        </div>
+      </HeroTextField>
       <p className="text-[11px] text-text-tertiary">{t('auth.apikey_login_hint')}</p>
-      {error && <Alert variant="error">{error}</Alert>}
-      <Button type="submit" loading={loading} className="w-full h-11" icon={<ArrowRight className="w-4 h-4" />}>
+      {error && (
+        <Alert status="danger">
+          <Alert.Content>
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      )}
+      <Button type="submit" isDisabled={loading} className="w-full h-11" variant="primary" aria-busy={loading}>
+        <ArrowRight className="w-4 h-4" />
         {t('common.login')}
       </Button>
-    </form>
+    </Form>
   );
 }
 
@@ -355,39 +420,11 @@ export default function LoginPage() {
             : 'linear-gradient(135deg, var(--ag-primary), color-mix(in srgb, var(--ag-primary) 60%, var(--ag-info)))',
         }}
       >
-        {/* 装饰纹理 */}
-        <div
-          className="absolute inset-0"
-          style={{
-            opacity: theme === 'dark' ? 0.04 : 0.1,
-            backgroundImage: `radial-gradient(circle at 25% 25%, ${theme === 'dark' ? 'var(--ag-primary)' : 'white'} 1px, transparent 1px), radial-gradient(circle at 75% 75%, ${theme === 'dark' ? 'var(--ag-primary)' : 'white'} 1px, transparent 1px)`,
-            backgroundSize: '48px 48px',
-          }}
-        />
-        {/* 暗色模式主题色光晕 */}
-        {theme === 'dark' && (
-          <>
-            <div className="absolute top-[5%] left-[10%] w-[400px] h-[400px] rounded-full opacity-[0.08]"
-              style={{ background: 'radial-gradient(circle, var(--ag-primary), transparent 65%)' }}
-            />
-            <div className="absolute bottom-[10%] right-[5%] w-[300px] h-[300px] rounded-full opacity-[0.05]"
-              style={{ background: 'radial-gradient(circle, var(--ag-info), transparent 65%)' }}
-            />
-          </>
-        )}
-        {/* 装饰大圆 */}
-        <div className="absolute top-[10%] right-[-5%] w-[300px] h-[300px] rounded-full"
-          style={{ border: `1px solid color-mix(in srgb, ${theme === 'dark' ? 'var(--ag-primary)' : 'white'} 15%, transparent)` }}
-        />
-        <div className="absolute bottom-[15%] left-[-8%] w-[200px] h-[200px] rounded-full"
-          style={{ border: `1px solid color-mix(in srgb, ${theme === 'dark' ? 'var(--ag-primary)' : 'white'} 10%, transparent)` }}
-        />
-
         {/* 内容 */}
         <div className={`relative z-10 px-12 max-w-md ${theme === 'dark' ? 'text-text' : 'text-white'}`}>
           <div className="flex items-center gap-3 mb-8">
             <img src={site.site_logo || defaultLogoUrl} alt="" className={`w-10 h-10 rounded-sm object-cover ${theme === 'dark' ? '' : (!site.site_logo ? '' : 'brightness-0 invert')}`} />
-            <span className="text-xl font-bold tracking-tight">{site.site_name || 'AirGate'}</span>
+            <span className="text-xl font-bold">{site.site_name || 'AirGate'}</span>
           </div>
           <h2 className="text-3xl font-bold leading-snug mb-4">
             {t('auth.welcome_title')}
@@ -399,7 +436,7 @@ export default function LoginPage() {
             {[t('auth.feature_1'), t('auth.feature_2'), t('auth.feature_3')].map((f) => (
               <span
                 key={f}
-                className="text-[11px] px-3 py-1.5 rounded-full font-medium"
+                className="text-[11px] px-3 py-1.5 rounded-[var(--radius)] font-medium"
                 style={{
                   background: theme === 'dark' ? 'var(--ag-primary-subtle)' : 'rgba(255,255,255,0.1)',
                   border: `1px solid ${theme === 'dark' ? 'var(--ag-glass-border)' : 'rgba(255,255,255,0.1)'}`,
@@ -416,57 +453,53 @@ export default function LoginPage() {
       {/* ===== 右侧表单区 ===== */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-8 bg-bg-deep relative">
         {/* 主题切换按钮 */}
-        <button
-          onClick={toggleTheme}
-          className="absolute top-4 right-4 z-10 flex items-center justify-center w-9 h-9 rounded-xl text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-colors"
-          title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        <Button
+          aria-label={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          className="absolute top-4 right-4 z-10"
+          isIconOnly
+          size="sm"
+          variant="ghost"
+          onPress={toggleTheme}
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
-        {/* 背景装饰（移动端 + 桌面右侧） */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute -top-[40%] -right-[20%] w-[600px] h-[600px] rounded-full opacity-[0.05]"
-            style={{ background: 'radial-gradient(circle, var(--ag-primary), transparent 65%)' }}
-          />
-          <div className="absolute -bottom-[30%] -left-[15%] w-[400px] h-[400px] rounded-full opacity-[0.03]"
-            style={{ background: 'radial-gradient(circle, var(--ag-info), transparent 65%)' }}
-          />
-        </div>
-
+        </Button>
         <div className="relative w-full max-w-[420px]" style={{ animation: 'ag-slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1)' }}>
           {/* 移动端 Logo */}
           <div className="text-center mb-8 lg:hidden">
             <img src={site.site_logo || defaultLogoUrl} alt="" className="w-11 h-11 rounded-sm mb-3 mx-auto object-cover" />
-            <h1 className="text-lg font-bold text-text tracking-tight">
+            <h1 className="text-lg font-bold text-text">
               {site.site_name || t('app_name')}
             </h1>
           </div>
 
           {/* Tab 切换 */}
-          <div className="flex gap-1 mb-6 p-1 rounded-xl bg-bg-hover/60">
-            {([
-              { key: 'login' as const, label: t('common.login') },
-              ...(site.registration_enabled ? [{ key: 'register' as const, label: t('common.register') }] : []),
-              { key: 'apikey' as const, label: 'API Key' },
-            ]).map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => { setActiveTab(tab.key); setRegisterSuccess(false); }}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
-                  activeTab === tab.key
-                    ? 'bg-bg-elevated text-text shadow-sm'
-                    : 'text-text-tertiary hover:text-text-secondary'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          <Tabs
+            className="mb-6 w-full"
+            selectedKey={activeTab}
+            onSelectionChange={(key) => {
+              setActiveTab(key as TabKey);
+              setRegisterSuccess(false);
+            }}
+            variant="secondary"
+          >
+            <Tabs.List className="w-full">
+              <Tabs.Tab id="login">{t('common.login')}</Tabs.Tab>
+              {site.registration_enabled ? (
+                <Tabs.Tab id="register">{t('common.register')}</Tabs.Tab>
+              ) : null}
+              <Tabs.Tab id="apikey">API Key</Tabs.Tab>
+            </Tabs.List>
+          </Tabs>
 
           {/* 表单 */}
-          <div className="border border-glass-border bg-bg-elevated shadow-sm rounded-xl p-6">
+          <Card>
+            <Card.Content className="p-6">
             {registerSuccess && activeTab === 'login' && (
-              <Alert variant="success" className="mb-5">{t('auth.register_success')}</Alert>
+              <Alert status="success" className="mb-5">
+                <Alert.Content>
+                  <Alert.Description>{t('auth.register_success')}</Alert.Description>
+                </Alert.Content>
+              </Alert>
             )}
 
             {activeTab === 'apikey' ? (
@@ -476,18 +509,19 @@ export default function LoginPage() {
             ) : (
               <LoginForm />
             )}
-          </div>
+            </Card.Content>
+          </Card>
 
           {/* 底部 */}
           <div className="mt-6 flex flex-col items-center gap-2">
-            <a
+            <HeroLink
               href="/status"
               className="inline-flex items-center gap-1.5 text-[11px] text-text-tertiary hover:text-primary transition-colors"
             >
               <Activity className="w-3 h-3" />
               {t('nav.status')}
-            </a>
-            <p className="text-center text-[10px] text-text-tertiary font-mono uppercase tracking-[0.15em]">
+            </HeroLink>
+            <p className="text-center text-[10px] text-text-tertiary font-mono uppercase">
               Powered by {site.site_name || 'AirGate'}
             </p>
           </div>
