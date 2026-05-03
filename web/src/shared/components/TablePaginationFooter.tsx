@@ -44,7 +44,6 @@ export function TablePaginationFooter({
               aria-label="每页数量"
               className="ag-table-page-size-select"
               selectedKey={selectedPageSize}
-              variant="secondary"
               onSelectionChange={(key) => {
                 if (!setPageSize || key == null) return;
                 setPageSize(Number(key));

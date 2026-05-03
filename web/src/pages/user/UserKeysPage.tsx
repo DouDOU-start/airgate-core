@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { groupsApi } from '../../shared/api/groups';
 import { useToast } from '../../shared/ui';
-import { Alert, AlertDialog, Button, Dropdown, EmptyState, Modal, Skeleton, Spinner, Table as HeroTable, useOverlayState } from '@heroui/react';
+import { Alert, AlertDialog, Button, Dropdown, EmptyState, Modal, Spinner, Table as HeroTable, useOverlayState } from '@heroui/react';
 import {
   StatusChip,
 } from '../../shared/ui';
@@ -14,6 +14,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import {
   AlertTriangle,
@@ -59,6 +60,7 @@ export default function UserKeysPage() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: queryKeys.userKeys(page, pageSize),
     queryFn: () => apikeysApi.list({ page, page_size: pageSize }),
+    placeholderData: keepPreviousData,
   });
 
   // 分组列表（用于选择）
@@ -291,18 +293,7 @@ export default function UserKeysPage() {
             </HeroTable.Header>
             <HeroTable.Body>
               {isLoading ? (
-                Array.from({ length: 5 }).map((_, index) => (
-                  <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
-                    {Array.from({ length: 9 }).map((__, cellIndex) => (
-                      <HeroTable.Cell key={cellIndex}>
-                        <Skeleton
-                          className="h-4 w-24"
-                          style={{ animationDelay: `${index * 90 + cellIndex * 20}ms` }}
-                        />
-                      </HeroTable.Cell>
-                    ))}
-                  </HeroTable.Row>
-                ))
+                <TableLoadingRow colSpan={9} />
               ) : rows.length === 0 ? (
                 <HeroTable.Row id="empty">
                   <HeroTable.Cell colSpan={9}>

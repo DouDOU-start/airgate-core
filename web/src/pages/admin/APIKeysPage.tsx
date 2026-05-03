@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Copy, Plus, Pencil, Trash2, Key, Layers, Eye, RefreshCw } from 'lucide-react';
-import { Alert, AlertDialog, Button, EmptyState, Modal, Skeleton, Spinner, Table as HeroTable, useOverlayState } from '@heroui/react';
+import { Alert, AlertDialog, Button, EmptyState, Modal, Spinner, Table as HeroTable, useOverlayState } from '@heroui/react';
 import {
   StatusChip,
 } from '../../shared/ui';
@@ -15,6 +15,7 @@ import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { formatExpiry } from '../../shared/utils/format';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { CreateKeyModal } from './apikeys/CreateKeyModal';
 import { EditKeyModal } from './apikeys/EditKeyModal';
@@ -34,6 +35,7 @@ export default function APIKeysPage() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: queryKeys.apikeys(page, pageSize),
     queryFn: () => apikeysApi.list({ page, page_size: pageSize }),
+    placeholderData: keepPreviousData,
   });
 
   const { data: groupsData } = useQuery({
@@ -128,18 +130,7 @@ export default function APIKeysPage() {
             </HeroTable.Header>
             <HeroTable.Body>
               {isLoading ? (
-                Array.from({ length: 5 }).map((_, index) => (
-                  <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
-                    {Array.from({ length: 9 }).map((__, cellIndex) => (
-                      <HeroTable.Cell key={cellIndex}>
-                        <Skeleton
-                          className="h-4 w-24"
-                          style={{ animationDelay: `${index * 90 + cellIndex * 20}ms` }}
-                        />
-                      </HeroTable.Cell>
-                    ))}
-                  </HeroTable.Row>
-                ))
+                <TableLoadingRow colSpan={9} />
               ) : rows.length === 0 ? (
                 <HeroTable.Row id="empty">
                   <HeroTable.Cell colSpan={9}>

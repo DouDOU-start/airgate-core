@@ -18,6 +18,30 @@ import { decorativePalette } from '@airgate/theme';
 
 const PIE_COLORS = decorativePalette.slice(0, 10);
 
+type PieTooltipPayload = Array<{
+  name?: unknown;
+  payload?: {
+    name?: unknown;
+  };
+}>;
+
+function PieNameTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: PieTooltipPayload;
+}) {
+  const name = payload?.[0]?.payload?.name ?? payload?.[0]?.name;
+  if (!active || name == null || name === '') return null;
+
+  return (
+    <div className="max-w-56 truncate rounded-[var(--radius)] border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text shadow-lg">
+      {String(name)}
+    </div>
+  );
+}
+
 type RangePreset = 'today' | '7d' | '30d' | '90d';
 
 function SectionCard({ children, title }: { children: ReactNode; title: string }) {
@@ -195,15 +219,17 @@ export default function UserOverviewPage() {
         {/* 模型分布饼图 */}
         <SectionCard title={t('dashboard.model_distribution')}>
           {models.length > 0 ? (
-            <div className="ag-distribution-card-body flex flex-col gap-3 sm:flex-row">
+            <div className="ag-distribution-card-body flex flex-col gap-3 xl:flex-row">
               <div className="ag-distribution-chart-frame">
                 <PieChart width={176} height={176}>
                   <Pie data={models.map((m) => ({ name: m.model, value: m.tokens }))} cx="50%" cy="50%" innerRadius={35} outerRadius={65} dataKey="value" minAngle={3} stroke="var(--ag-bg-elevated)" strokeWidth={1}>
                     {models.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                   </Pie>
                   <RechartsTooltip
-                    contentStyle={{ background: 'var(--ag-bg-elevated)', border: '1px solid var(--ag-border)', borderRadius: 8, fontSize: 12 }}
-                    formatter={(value) => [fmtNum(Number(value)), 'Token']}
+                    animationDuration={0}
+                    content={<PieNameTooltip />}
+                    cursor={false}
+                    isAnimationActive={false}
                   />
                 </PieChart>
               </div>
@@ -212,14 +238,14 @@ export default function UserOverviewPage() {
                   ariaLabel={t('dashboard.model_distribution')}
                   className="ag-compact-data-table--dense"
                   emptyText={t('common.no_data')}
-                  minWidth={420}
+                  minWidth={380}
                   rowKey={(row) => row.model}
                   rows={models}
                   columns={[
                     {
                       key: 'model',
                       title: t('usage.model'),
-                      width: '40%',
+                      width: '30%',
                       render: (row, index) => (
                         <>
                           <span className="w-2 h-2 shrink-0 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
@@ -231,21 +257,21 @@ export default function UserOverviewPage() {
                       align: 'end',
                       key: 'requests',
                       title: t('dashboard.requests'),
-                      width: '20%',
+                      width: '22%',
                       render: (row) => <span className="truncate text-text-secondary">{row.requests}</span>,
                     },
                     {
                       align: 'end',
                       key: 'tokens',
                       title: 'TOKEN',
-                      width: '20%',
+                      width: '24%',
                       render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.tokens)}</span>,
                     },
                     {
                       align: 'end',
                       key: 'cost',
                       title: t('usage.cost'),
-                      width: '20%',
+                      width: '24%',
                       render: (row) => <span className="truncate font-mono text-primary">{fmtCost(row.actual_cost)}</span>,
                     },
                   ]}

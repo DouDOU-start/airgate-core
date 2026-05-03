@@ -1,6 +1,6 @@
 import { useState, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Card, ComboBox, Input, ListBox, Select, Switch, Tabs, TextField as HeroTextField } from '@heroui/react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip,
@@ -21,6 +21,30 @@ import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilt
 import { decorativePalette } from '@airgate/theme';
 
 const PIE_COLORS = decorativePalette.slice(0, 10);
+
+type PieTooltipPayload = Array<{
+  name?: unknown;
+  payload?: {
+    name?: unknown;
+  };
+}>;
+
+function PieNameTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: PieTooltipPayload;
+}) {
+  const name = payload?.[0]?.payload?.name ?? payload?.[0]?.name;
+  if (!active || name == null || name === '') return null;
+
+  return (
+    <div className="max-w-56 truncate rounded-[var(--radius)] border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text shadow-lg">
+      {String(name)}
+    </div>
+  );
+}
 
 function SectionCard({
   children,
@@ -124,9 +148,13 @@ interface DistributionItem {
 function DistributionCard({
   title,
   data,
+  firstColumnTitle,
+  firstColumnWidth = '30%',
 }: {
   title: string;
   data: DistributionItem[];
+  firstColumnTitle: string;
+  firstColumnWidth?: string;
 }) {
   const { t } = useTranslation();
   const [metric, setMetric] = useState<PieMetric>('token');
@@ -156,7 +184,7 @@ function DistributionCard({
 
   return (
     <SectionCard title={title} extra={metricTabs}>
-      <div className="ag-distribution-card-body grid items-start gap-3 lg:grid-cols-[176px_minmax(0,1fr)]">
+      <div className="ag-distribution-card-body grid items-start gap-3 2xl:grid-cols-[176px_minmax(0,1fr)]">
         <div className="ag-distribution-chart-frame">
           <PieChart width={176} height={176}>
             <Pie
@@ -175,15 +203,10 @@ function DistributionCard({
               ))}
             </Pie>
             <RechartsTooltip
-              contentStyle={{
-                background: 'var(--ag-bg-elevated)',
-                border: '1px solid var(--ag-border)',
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              formatter={(value) => [
-                metric === 'token' ? fmtNum(Number(value)) : fmtCost(Number(value)),
-              ]}
+              animationDuration={0}
+              content={<PieNameTooltip />}
+              cursor={false}
+              isAnimationActive={false}
             />
           </PieChart>
         </div>
@@ -193,14 +216,14 @@ function DistributionCard({
             ariaLabel={title}
             className="ag-compact-data-table--dense"
             emptyText={t('common.no_data')}
-            minWidth={620}
+            minWidth={480}
             rowKey={(row) => row.name}
             rows={data}
             columns={[
               {
                 key: 'name',
-                title,
-                width: '42%',
+                title: firstColumnTitle,
+                width: firstColumnWidth,
                 render: (item, index) => (
                   <>
                     <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
@@ -213,28 +236,28 @@ function DistributionCard({
                 align: 'end',
                 key: 'requests',
                 title: t('usage.requests'),
-                width: '14%',
+                width: '16%',
                 render: (item) => <span className="truncate font-mono text-text-secondary">{item.requests.toLocaleString()}</span>,
               },
               {
                 align: 'end',
                 key: 'tokens',
                 title: t('usage.tokens'),
-                width: '16%',
+                width: '18%',
                 render: (item) => <span className="truncate font-mono text-text-secondary">{fmtNum(item.tokens)}</span>,
               },
               {
                 align: 'end',
                 key: 'actualCost',
                 title: t('usage.actual_cost'),
-                width: '14%',
+                width: '18%',
                 render: (item) => <span className="truncate font-mono text-warning">{fmtCost(item.actualCost)}</span>,
               },
               {
                 align: 'end',
                 key: 'totalCost',
                 title: t('usage.standard_cost'),
-                width: '14%',
+                width: '18%',
                 render: (item) => <span className="truncate font-mono text-text-secondary">{fmtCost(item.totalCost)}</span>,
               },
             ]}
@@ -296,14 +319,14 @@ function GroupStatsCard({
           ariaLabel={t('usage.group_stats')}
           className="ag-compact-data-table--dense"
           emptyText={t('common.no_data')}
-          minWidth={620}
+          minWidth={520}
           rowKey={(row) => row.key}
           rows={rows}
           columns={[
             {
               key: 'name',
               title: t(groupByHeaderKeys[activeKey] ?? 'usage.model'),
-              width: '42%',
+              width: '30%',
               render: (row, index) => (
                 <>
                   <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
@@ -316,28 +339,28 @@ function GroupStatsCard({
               align: 'end',
               key: 'requests',
               title: t('usage.requests'),
-              width: '14%',
+              width: '16%',
               render: (row) => <span className="truncate font-mono text-text-secondary">{row.requests.toLocaleString()}</span>,
             },
             {
               align: 'end',
               key: 'tokens',
               title: t('usage.tokens'),
-              width: '16%',
+              width: '18%',
               render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.tokens)}</span>,
             },
             {
               align: 'end',
               key: 'actualCost',
               title: t('usage.actual_cost'),
-              width: '14%',
+              width: '18%',
               render: (row) => <span className="truncate font-mono text-warning">{fmtCost(row.actual_cost)}</span>,
             },
             {
               align: 'end',
               key: 'totalCost',
               title: t('usage.standard_cost'),
-              width: '14%',
+              width: '18%',
               render: (row) => <span className="truncate font-mono text-text-secondary">{fmtCost(row.total_cost)}</span>,
             },
           ]}
@@ -531,13 +554,20 @@ export default function UsagePage() {
   };
 
   // 使用记录列表
-  const { data, isLoading, refetch: refetchUsage } = useQuery({
+  const {
+    data,
+    dataUpdatedAt,
+    isLoading,
+    isPlaceholderData,
+    refetch: refetchUsage,
+  } = useQuery({
     queryKey: ['admin-usage', queryParams],
     queryFn: () => usageApi.adminList(queryParams),
     refetchInterval: autoRefreshInterval,
     refetchIntervalInBackground: false,
     refetchOnReconnect: autoRefresh,
     refetchOnWindowFocus: autoRefresh,
+    placeholderData: keepPreviousData,
   });
 
   const { data: stats, refetch: refetchStats } = useQuery({
@@ -743,10 +773,14 @@ export default function UsagePage() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <DistributionCard
               title={t('usage.model_distribution')}
+              firstColumnTitle={t('usage.model')}
+              firstColumnWidth="30%"
               data={modelDistribution}
             />
             <DistributionCard
               title={t('usage.group_distribution')}
+              firstColumnTitle={t('groups.group')}
+              firstColumnWidth="26%"
               data={groupDistribution}
             />
           </div>
@@ -896,14 +930,18 @@ export default function UsagePage() {
       <UsageRecordsTable
         ariaLabel={t('usage.title', 'Usage')}
         columns={columns}
+        dataVersion={dataUpdatedAt}
         emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
         emptyTitle={t('common.no_data')}
+        highlightNewRows={autoRefresh && page === 1}
+        highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
         isLoading={isLoading}
         page={page}
         pageSize={pageSize}
         rows={data?.list ?? []}
         setPage={setPage}
         setPageSize={setPageSize}
+        suppressHighlight={isPlaceholderData}
         total={total}
       />
     </div>

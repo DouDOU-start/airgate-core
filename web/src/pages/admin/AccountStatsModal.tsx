@@ -19,6 +19,30 @@ import { decorativePalette } from '@airgate/theme';
 
 const PIE_COLORS = decorativePalette.slice(0, 10);
 
+type PieTooltipPayload = Array<{
+  name?: unknown;
+  payload?: {
+    name?: unknown;
+  };
+}>;
+
+function PieNameTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: PieTooltipPayload;
+}) {
+  const name = payload?.[0]?.payload?.name ?? payload?.[0]?.name;
+  if (!active || name == null || name === '') return null;
+
+  return (
+    <div className="max-w-56 truncate rounded-[var(--radius)] border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text shadow-lg">
+      {String(name)}
+    </div>
+  );
+}
+
 // 预设时间范围
 type RangePreset = '7d' | '30d' | '90d' | 'custom';
 
@@ -449,7 +473,7 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
   return (
     <div className="rounded-lg border border-border-subtle p-4">
       <h4 className="text-xs font-semibold text-text mb-3">{t('accounts.stats_model_distribution')}</h4>
-      <div className="flex gap-4">
+      <div className="flex flex-col gap-4 xl:flex-row">
         {/* 饼图 */}
         <div className="w-48 h-48 flex-shrink-0">
           <PieChart width={192} height={192}>
@@ -469,12 +493,10 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
               ))}
             </Pie>
             <RechartsTooltip
-              contentStyle={{
-                background: 'var(--ag-bg-elevated)',
-                border: '1px solid var(--ag-border)',
-                borderRadius: 8,
-                fontSize: 12,
-              }}
+              animationDuration={0}
+              content={<PieNameTooltip />}
+              cursor={false}
+              isAnimationActive={false}
             />
           </PieChart>
         </div>
@@ -484,14 +506,14 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
           <CompactDataTable
             ariaLabel={t('accounts.stats_model')}
             emptyText={t('common.no_data')}
-            minWidth={620}
+            minWidth={520}
             rowKey={(row) => row.model}
             rows={models}
             columns={[
               {
                 key: 'model',
                 title: t('accounts.stats_model'),
-                width: '42%',
+                width: '30%',
                 render: (row, index) => (
                   <>
                     <span className="w-2 h-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
@@ -503,28 +525,28 @@ function ModelDistribution({ data }: { data: AccountStatsResp }) {
                 align: 'end',
                 key: 'requests',
                 title: t('accounts.stats_requests'),
-                width: '14%',
+                width: '16%',
                 render: (row) => <span className="truncate font-mono text-text-secondary">{row.count.toLocaleString()}</span>,
               },
               {
                 align: 'end',
                 key: 'tokens',
                 title: 'Token',
-                width: '16%',
+                width: '18%',
                 render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.input_tokens + row.output_tokens)}</span>,
               },
               {
                 align: 'end',
                 key: 'actual',
                 title: t('accounts.stats_actual'),
-                width: '14%',
+                width: '18%',
                 render: (row) => <span className="truncate font-mono text-warning">{fmtCost(row.actual_cost, 2)}</span>,
               },
               {
                 align: 'end',
                 key: 'standard',
                 title: t('accounts.stats_standard'),
-                width: '14%',
+                width: '18%',
                 render: (row) => <span className="truncate font-mono text-text-secondary">{fmtCost(row.total_cost, 2)}</span>,
               },
             ]}

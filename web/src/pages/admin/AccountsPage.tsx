@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { AlertDialog, Button, Checkbox, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Skeleton, Spinner, Switch, Table as HeroTable, TextField as HeroTextField, Tooltip } from '@heroui/react';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertDialog, Button, Checkbox, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, Table as HeroTable, TextField as HeroTextField, Tooltip } from '@heroui/react';
 import {
   Plus,
   Pencil,
@@ -29,6 +29,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { BulkActionsBar } from './accounts/BulkActionsBar';
@@ -298,6 +299,7 @@ export default function AccountsPage() {
         group_id: groupFilter ? Number(groupFilter) : undefined,
         proxy_id: proxyFilter ? Number(proxyFilter) : undefined,
       }),
+    placeholderData: keepPreviousData,
   });
 
   // 查询分组列表（用于表格中 ID→名称映射）
@@ -1250,24 +1252,7 @@ export default function AccountsPage() {
             </HeroTable.Header>
             <HeroTable.Body>
               {isLoading ? (
-                Array.from({ length: 5 }).map((_, rowIndex) => (
-                  <HeroTable.Row id={`loading-${rowIndex}`} key={`loading-${rowIndex}`}>
-                    <HeroTable.Cell>
-                      <Skeleton className="h-4 w-4" />
-                    </HeroTable.Cell>
-                    {columns.map((column, cellIndex) => (
-                      <HeroTable.Cell
-                        key={column.key}
-                        className={column.hideOnMobile ? 'hidden md:table-cell' : undefined}
-                      >
-                        <Skeleton
-                          className="h-4 w-24"
-                          style={{ animationDelay: `${rowIndex * 90 + cellIndex * 20}ms` }}
-                        />
-                      </HeroTable.Cell>
-                    ))}
-                  </HeroTable.Row>
-                ))
+                <TableLoadingRow colSpan={columns.length + 1} />
               ) : rows.length === 0 ? (
                 <HeroTable.Row id="empty">
                   <HeroTable.Cell colSpan={columns.length + 1}>

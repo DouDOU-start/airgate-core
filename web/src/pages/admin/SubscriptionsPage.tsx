@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   Plus,
   Users,
@@ -9,7 +9,7 @@ import {
   User,
   RefreshCw,
 } from 'lucide-react';
-import { Button, EmptyState, Label, ListBox, Select, Skeleton, Table as HeroTable } from '@heroui/react';
+import { Button, EmptyState, Label, ListBox, Select, Table as HeroTable } from '@heroui/react';
 import {
   StatusChip,
 } from '../../shared/ui';
@@ -22,6 +22,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { AssignModal } from './subscriptions/AssignModal';
 import { BulkAssignModal } from './subscriptions/BulkAssignModal';
 import { AdjustModal } from './subscriptions/AdjustModal';
@@ -61,6 +62,7 @@ export default function SubscriptionsPage() {
         page_size: pageSize,
         status: statusFilter || undefined,
       }),
+    placeholderData: keepPreviousData,
   });
 
   // 查询分组列表
@@ -191,18 +193,7 @@ export default function SubscriptionsPage() {
             </HeroTable.Header>
             <HeroTable.Body>
               {isLoading ? (
-                Array.from({ length: 5 }).map((_, index) => (
-                  <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
-                    {Array.from({ length: 7 }).map((__, cellIndex) => (
-                      <HeroTable.Cell key={cellIndex}>
-                        <Skeleton
-                          className="h-4 w-24"
-                          style={{ animationDelay: `${index * 90 + cellIndex * 20}ms` }}
-                        />
-                      </HeroTable.Cell>
-                    ))}
-                  </HeroTable.Row>
-                ))
+                <TableLoadingRow colSpan={7} />
               ) : rows.length === 0 ? (
                 <HeroTable.Row id="empty">
                   <HeroTable.Cell colSpan={7}>

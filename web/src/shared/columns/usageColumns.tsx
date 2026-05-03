@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { CSSProperties, ReactNode } from 'react';
 import { Chip, Tooltip } from '@heroui/react';
-import { BookOpen, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowUp, BookOpen, Sparkles } from 'lucide-react';
 import type { UsageLogResp, CustomerUsageLogResp } from '../types';
 
 /**
@@ -31,7 +31,7 @@ function RichTooltip({
 }) {
   return (
     <Tooltip delay={0} closeDelay={0}>
-      <Tooltip.Trigger className="flex h-[var(--ag-usage-table-row-height)] w-full cursor-default items-center justify-end rounded-[var(--radius)] px-2.5 py-1 text-right transition-colors hover:bg-bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+      <Tooltip.Trigger className="flex h-[var(--ag-usage-table-row-height)] w-full cursor-default items-center justify-end rounded-[var(--radius)] px-2.5 py-0 text-right transition-colors hover:bg-bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
         {children}
       </Tooltip.Trigger>
       <Tooltip.Content
@@ -127,6 +127,40 @@ function getImageSizeStyle(): CSSProperties {
     borderColor: `color-mix(in srgb, ${color} 28%, transparent)`,
     color,
   };
+}
+
+function getTokenBadgeStyle(color: string): CSSProperties {
+  return {
+    background: `color-mix(in srgb, ${color} 14%, transparent)`,
+    borderColor: `color-mix(in srgb, ${color} 28%, transparent)`,
+    color,
+  };
+}
+
+function TokenBadge({
+  icon,
+  label,
+  title,
+  value,
+  color,
+}: {
+  color: string;
+  icon?: ReactNode;
+  label?: ReactNode;
+  title?: string;
+  value: ReactNode;
+}) {
+  return (
+    <span
+      className="inline-flex h-3.5 items-center gap-0.5 rounded-[var(--radius)] border px-1 font-mono text-[11px] font-medium leading-none"
+      style={getTokenBadgeStyle(color)}
+      title={title}
+    >
+      {icon ? <span className="flex h-2.5 w-2.5 shrink-0 items-center justify-center">{icon}</span> : null}
+      {label ? <span className="text-[9px] font-semibold leading-none opacity-75">{label}</span> : null}
+      <span className="tabular-nums leading-none">{value}</span>
+    </span>
+  );
 }
 
 /** 大数字友好显示：33518599 -> "33.52M"，1234 -> "1,234" */
@@ -344,41 +378,41 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
               </TooltipPanel>
             }
           >
-            <div className="flex w-full flex-col items-end gap-1">
-              <div className="font-mono text-sm font-semibold leading-none text-text">
+            <div className="flex h-full max-h-[var(--ag-usage-table-row-height)] w-full flex-col items-end justify-center gap-0.5 overflow-visible">
+              <div className="font-mono text-[13px] font-semibold leading-[1.05] text-text">
                 {fmtNum(total)}
               </div>
-              <div className="flex items-center gap-1.5 font-mono text-[11px] leading-none">
-                <span className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-emerald-600 dark:text-emerald-400" style={{ background: 'color-mix(in srgb, #10b981 12%, transparent)' }}>
-                  <span className="text-[10px] font-semibold opacity-70">in</span>
-                  <span className="tabular-nums">{fmtNum(row.input_tokens)}</span>
-                </span>
-                <span className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-sky-600 dark:text-sky-400" style={{ background: 'color-mix(in srgb, #0ea5e9 12%, transparent)' }}>
-                  <span className="text-[10px] font-semibold opacity-70">out</span>
-                  <span className="tabular-nums">{fmtNum(row.output_tokens)}</span>
-                </span>
+              <div className="flex items-center justify-end gap-1 leading-none">
+                <TokenBadge
+                  color="#10b981"
+                  icon={<ArrowDown className="h-2.5 w-2.5 shrink-0" />}
+                  title={t('usage.input_tokens')}
+                  value={fmtNum(row.input_tokens)}
+                />
+                <TokenBadge
+                  color="#0ea5e9"
+                  icon={<ArrowUp className="h-2.5 w-2.5 shrink-0" />}
+                  title={t('usage.output_tokens')}
+                  value={fmtNum(row.output_tokens)}
+                />
               </div>
               {(row.cached_input_tokens > 0 || cacheCreation > 0) && (
-                <div className="flex items-center gap-1.5 font-mono text-[11px] leading-none">
+                <div className="flex items-center justify-end gap-1 leading-none">
                   {row.cached_input_tokens > 0 && (
-                    <span
-                      className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-text-tertiary"
-                      style={{ background: 'color-mix(in srgb, currentColor 10%, transparent)' }}
+                    <TokenBadge
+                      color="var(--ag-muted)"
+                      icon={<BookOpen className="h-2.5 w-2.5 shrink-0" />}
                       title={t('usage.cache_read')}
-                    >
-                      <BookOpen className="h-2.5 w-2.5 shrink-0" />
-                      <span className="tabular-nums">{fmtNum(row.cached_input_tokens)}</span>
-                    </span>
+                      value={fmtNum(row.cached_input_tokens)}
+                    />
                   )}
                   {cacheCreation > 0 && (
-                    <span
-                      className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-amber-600 dark:text-amber-400"
-                      style={{ background: 'color-mix(in srgb, #f59e0b 12%, transparent)' }}
+                    <TokenBadge
+                      color="#f59e0b"
+                      icon={<Sparkles className="h-2.5 w-2.5 shrink-0" />}
                       title={t('usage.cache_creation')}
-                    >
-                      <Sparkles className="h-2.5 w-2.5 shrink-0" />
-                      <span className="tabular-nums">{fmtNum(cacheCreation)}</span>
-                    </span>
+                      value={fmtNum(cacheCreation)}
+                    />
                   )}
                 </div>
               )}

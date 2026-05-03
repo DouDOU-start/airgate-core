@@ -39,6 +39,30 @@ import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 const PIE_COLORS = decorativePalette.slice(0, 10);
 const USER_COLORS = [...decorativePalette];
 
+type PieTooltipPayload = Array<{
+  name?: unknown;
+  payload?: {
+    name?: unknown;
+  };
+}>;
+
+function PieNameTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: PieTooltipPayload;
+}) {
+  const name = payload?.[0]?.payload?.name ?? payload?.[0]?.name;
+  if (!active || name == null || name === '') return null;
+
+  return (
+    <div className="max-w-56 truncate rounded-[var(--radius)] border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text shadow-lg">
+      {String(name)}
+    </div>
+  );
+}
+
 type RangePreset = 'today' | '7d' | '30d' | '90d';
 type Granularity = 'hour' | 'day';
 
@@ -370,7 +394,7 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
 
   return (
     <DashboardCard title={activeTitle} extra={distributionTabs}>
-      <div className="ag-distribution-card-body grid items-start gap-3 lg:grid-cols-[176px_minmax(0,1fr)]">
+      <div className="ag-distribution-card-body grid items-start gap-3 2xl:grid-cols-[176px_minmax(0,1fr)]">
         <div className="ag-distribution-chart-frame">
           {activePieData.length > 0 ? (
             <PieChart width={176} height={176}>
@@ -379,7 +403,12 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
                   <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                 ))}
               </Pie>
-              <RechartsTooltip content={<ChartTooltip />} />
+              <RechartsTooltip
+                animationDuration={0}
+                content={<PieNameTooltip />}
+                cursor={false}
+                isAnimationActive={false}
+              />
             </PieChart>
           ) : (
             <div className="flex h-44 w-44 items-center justify-center text-xs text-text-tertiary">{t('common.no_data')}</div>
@@ -391,14 +420,14 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
             ariaLabel={activeTitle}
             className="ag-compact-data-table--dense"
             emptyText={t('common.no_data')}
-            minWidth={620}
+            minWidth={480}
             rowKey={(row) => row.key}
             rows={tableRows}
             columns={[
               {
                 key: 'name',
                 title: firstColumnTitle,
-                width: '42%',
+                width: tab === 'model' ? '30%' : '34%',
                 render: (row, index) => (
                   <>
                     <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
@@ -411,28 +440,28 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
                 align: 'end',
                 key: 'requests',
                 title: t('dashboard.requests'),
-                width: '14%',
+                width: tab === 'model' ? '16%' : '15%',
                 render: (row) => <span className="truncate font-mono text-text-secondary">{row.requests.toLocaleString()}</span>,
               },
               {
                 align: 'end',
                 key: 'tokens',
                 title: t('dashboard.tokens'),
-                width: '16%',
+                width: tab === 'model' ? '18%' : '17%',
                 render: (row) => <span className="truncate font-mono text-text-secondary">{fmtNum(row.tokens)}</span>,
               },
               {
                 align: 'end',
                 key: 'actual',
                 title: t('dashboard.actual'),
-                width: '14%',
+                width: '18%',
                 render: (row) => <span className="truncate font-mono text-warning">{fmtCost(row.actualCost)}</span>,
               },
               {
                 align: 'end',
                 key: 'standard',
                 title: t('dashboard.standard'),
-                width: '14%',
+                width: tab === 'model' ? '18%' : '16%',
                 render: (row) => <span className="truncate font-mono text-text-secondary">{fmtCost(row.standardCost)}</span>,
               },
             ]}

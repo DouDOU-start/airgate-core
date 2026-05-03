@@ -1,17 +1,18 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { proxiesApi } from '../../shared/api/proxies';
 import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
-import { AlertDialog, Button, Chip, EmptyState, Form, Input, Label, ListBox, Modal, Select, Skeleton, Spinner, Table as HeroTable, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { AlertDialog, Button, Chip, EmptyState, Form, Input, Label, ListBox, Modal, Select, Spinner, Table as HeroTable, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { StatusChip } from '../../shared/ui';
 import { Plus, Pencil, Trash2, Zap, RefreshCw } from 'lucide-react';
 import type { ProxyResp, CreateProxyReq, UpdateProxyReq } from '../../shared/types';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 
 // 代理表单数据
 interface ProxyForm {
@@ -47,6 +48,7 @@ export default function ProxiesPage() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: queryKeys.proxies(page, pageSize),
     queryFn: () => proxiesApi.list({ page, page_size: pageSize }),
+    placeholderData: keepPreviousData,
   });
 
   // 创建代理
@@ -205,18 +207,7 @@ export default function ProxiesPage() {
             </HeroTable.Header>
             <HeroTable.Body>
               {isLoading ? (
-                Array.from({ length: 5 }).map((_, index) => (
-                  <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
-                    {Array.from({ length: 7 }).map((__, cellIndex) => (
-                      <HeroTable.Cell key={cellIndex}>
-                        <Skeleton
-                          className="h-4 w-24"
-                          style={{ animationDelay: `${index * 90 + cellIndex * 20}ms` }}
-                        />
-                      </HeroTable.Cell>
-                    ))}
-                  </HeroTable.Row>
-                ))
+                <TableLoadingRow colSpan={7} />
               ) : rows.length === 0 ? (
                 <HeroTable.Row id="empty">
                   <HeroTable.Cell colSpan={7}>

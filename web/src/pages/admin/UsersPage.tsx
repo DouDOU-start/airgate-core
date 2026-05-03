@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Skeleton, Spinner, Switch, Table as HeroTable, TextField as HeroTextField } from '@heroui/react';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertDialog, Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, Switch, Table as HeroTable, TextField as HeroTextField } from '@heroui/react';
 import { usersApi } from '../../shared/api/users';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -9,6 +9,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { getAvatarColor } from '../../shared/utils/avatar';
 import { formatDateTime } from '../../shared/utils/format';
 import { CreateUserModal } from './users/CreateUserModal';
@@ -49,6 +50,7 @@ export default function UsersPage() {
         keyword: keyword || undefined,
         status: statusFilter || undefined,
       }),
+    placeholderData: keepPreviousData,
   });
 
   const createMutation = useCrudMutation({
@@ -177,18 +179,7 @@ export default function UsersPage() {
             </HeroTable.Header>
             <HeroTable.Body>
               {isLoading ? (
-                Array.from({ length: 5 }).map((_, index) => (
-                  <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
-                    {Array.from({ length: 8 }).map((__, cellIndex) => (
-                      <HeroTable.Cell key={cellIndex}>
-                        <Skeleton
-                          className="h-4 w-24"
-                          style={{ animationDelay: `${index * 90 + cellIndex * 20}ms` }}
-                        />
-                      </HeroTable.Cell>
-                    ))}
-                  </HeroTable.Row>
-                ))
+                <TableLoadingRow colSpan={8} />
               ) : rows.length === 0 ? (
                 <HeroTable.Row id="empty">
                   <HeroTable.Cell colSpan={8}>

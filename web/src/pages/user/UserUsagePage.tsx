@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button, Card, Input, ListBox, Meter, Select, Switch, TextField as HeroTextField } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { queryKeys } from '../../shared/queryKeys';
@@ -202,13 +202,20 @@ export default function UserUsagePage() {
   ];
   const selectedPlatformLabel = platformOptions.find((item) => item.id === (filters.platform || ''))?.label ?? t('common.all');
 
-  const { data, isLoading, refetch: refetchUsage } = useQuery({
+  const {
+    data,
+    dataUpdatedAt,
+    isLoading,
+    isPlaceholderData,
+    refetch: refetchUsage,
+  } = useQuery({
     queryKey: queryKeys.userUsage(queryParams),
     queryFn: () => usageApi.list(queryParams),
     refetchInterval: autoRefreshInterval,
     refetchIntervalInBackground: false,
     refetchOnReconnect: autoRefresh,
     refetchOnWindowFocus: autoRefresh,
+    placeholderData: keepPreviousData,
   });
 
   // 聚合统计（跟随筛选条件，独立于分页）
@@ -402,14 +409,18 @@ export default function UserUsagePage() {
       <UsageRecordsTable
         ariaLabel={t('usage.title', 'Usage')}
         columns={columns}
+        dataVersion={dataUpdatedAt}
         emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
         emptyTitle={t('common.no_data')}
+        highlightNewRows={autoRefresh && page === 1}
+        highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
         isLoading={isLoading}
         page={page}
         pageSize={pageSize}
         rows={list}
         setPage={setPage}
         setPageSize={setPageSize}
+        suppressHighlight={isPlaceholderData}
         total={total}
       />
     </div>

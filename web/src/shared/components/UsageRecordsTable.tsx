@@ -1,12 +1,14 @@
-import { useMemo, type ReactNode } from 'react';
-import { EmptyState, Skeleton, Table as HeroTable } from '@heroui/react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { EmptyState, Table as HeroTable } from '@heroui/react';
 import { Inbox } from 'lucide-react';
 import type { UsageColumnConfig, UsageRow } from '../columns/usageColumns';
 import { getTotalPages } from '../utils/pagination';
+import { TableLoadingRow } from './TableLoadingRow';
 import { TablePaginationFooter } from './TablePaginationFooter';
 
 const END_ALIGNED_COLUMNS = new Set(['tokens', 'cost', 'first_token_ms', 'duration_ms']);
 const FULL_CELL_CONTENT_COLUMNS = new Set(['cost', 'tokens']);
+const NEW_ROW_MARK_DURATION_MS = 5000;
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
@@ -30,12 +32,91 @@ function ColumnHeader({ children, alignEnd }: { children: ReactNode; alignEnd: b
   );
 }
 
+function useNewRowMarkers<T extends UsageRow>({
+  dataVersion,
+  enabled,
+  paused,
+  resetKey,
+  rows,
+}: {
+  dataVersion?: number;
+  enabled: boolean;
+  paused: boolean;
+  resetKey?: string;
+  rows: T[];
+}) {
+  const rowIds = useMemo(() => rows.map((row) => String(row.id)), [rows]);
+  const previousRowIdsRef = useRef<Set<string> | null>(null);
+  const previousResetKeyRef = useRef<string | undefined>(undefined);
+  const batchClearTimerRef = useRef<number | null>(null);
+  const [markedRowIds, setMarkedRowIds] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => () => {
+    if (batchClearTimerRef.current != null) {
+      window.clearTimeout(batchClearTimerRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    const clearActiveBatch = () => {
+      if (batchClearTimerRef.current != null) {
+        window.clearTimeout(batchClearTimerRef.current);
+        batchClearTimerRef.current = null;
+      }
+      setMarkedRowIds((current) => (current.size === 0 ? current : new Set()));
+    };
+
+    if (paused) {
+      clearActiveBatch();
+      return;
+    }
+
+    const currentIds = new Set(rowIds);
+    const resetChanged = previousResetKeyRef.current !== resetKey;
+
+    if (resetChanged || !enabled || rowIds.length === 0) {
+      previousResetKeyRef.current = resetKey;
+      previousRowIdsRef.current = currentIds;
+      clearActiveBatch();
+      return;
+    }
+
+    const previousIds = previousRowIdsRef.current;
+    previousResetKeyRef.current = resetKey;
+    previousRowIdsRef.current = currentIds;
+
+    if (!previousIds) {
+      return;
+    }
+
+    const addedIds = rowIds.filter((id) => !previousIds.has(id));
+    if (addedIds.length === 0) {
+      return;
+    }
+
+    if (batchClearTimerRef.current != null) {
+      window.clearTimeout(batchClearTimerRef.current);
+    }
+    setMarkedRowIds(new Set(addedIds));
+    batchClearTimerRef.current = window.setTimeout(() => {
+      batchClearTimerRef.current = null;
+      setMarkedRowIds(new Set());
+    }, NEW_ROW_MARK_DURATION_MS);
+  }, [dataVersion, enabled, paused, resetKey, rowIds]);
+
+  return markedRowIds;
+}
+
 export function UsageRecordsTable<T extends UsageRow>({
   ariaLabel,
   columns,
+  dataVersion,
   emptyDescription,
   emptyTitle,
+  highlightNewRows = false,
+  highlightResetKey,
   isLoading,
+  suppressHighlight = false,
   page,
   pageSize,
   rows,
@@ -45,9 +126,13 @@ export function UsageRecordsTable<T extends UsageRow>({
 }: {
   ariaLabel: string;
   columns: UsageColumnConfig<T>[];
+  dataVersion?: number;
   emptyDescription?: string;
   emptyTitle: string;
+  highlightNewRows?: boolean;
+  highlightResetKey?: string;
   isLoading: boolean;
+  suppressHighlight?: boolean;
   page: number;
   pageSize: number;
   rows: T[];
@@ -60,6 +145,13 @@ export function UsageRecordsTable<T extends UsageRow>({
     () => Math.max(760, columns.reduce((sum, column) => sum + parseColumnWidth(column.width), 0) + 24),
     [columns],
   );
+  const markedRowIds = useNewRowMarkers({
+    dataVersion,
+    enabled: highlightNewRows,
+    paused: isLoading || suppressHighlight,
+    resetKey: highlightResetKey,
+    rows,
+  });
 
   return (
     <HeroTable className="ag-usage-records-table min-h-[240px]" variant="primary">
@@ -106,33 +198,13 @@ export function UsageRecordsTable<T extends UsageRow>({
             )}
           >
             {isLoading
-              ? Array.from({ length: 6 }).map((_, rowIndex) => (
-                  <HeroTable.Row id={`loading-${rowIndex}`} key={`loading-${rowIndex}`}>
-                    {columns.map((column, cellIndex) => {
-                      const alignEnd = END_ALIGNED_COLUMNS.has(column.key);
-
-                      return (
-                      <HeroTable.Cell
-                        key={column.key}
-                        className={cx(
-                          column.hideOnMobile && 'hidden md:table-cell',
-                          alignEnd && 'text-right',
-                        )}
-                      >
-                        <div className={cx('flex h-[var(--ag-usage-table-row-height)] w-full items-center gap-2.5 px-2.5 py-1', alignEnd && 'justify-end')}>
-                          {cellIndex === 0 ? <Skeleton className="h-7 w-7 rounded-full" /> : null}
-                          <Skeleton
-                            className={cx('h-4 rounded-md', cellIndex === 0 ? 'w-28' : 'w-24')}
-                            style={{ animationDelay: `${rowIndex * 90 + cellIndex * 20}ms` }}
-                          />
-                        </div>
-                      </HeroTable.Cell>
-                      );
-                    })}
-                  </HeroTable.Row>
-                ))
+              ? <TableLoadingRow colSpan={columns.length} />
               : rows.map((row) => (
-                  <HeroTable.Row id={String(row.id)} key={row.id}>
+                  <HeroTable.Row
+                    id={String(row.id)}
+                    key={row.id}
+                    className={markedRowIds.has(String(row.id)) ? 'ag-usage-table-row--new' : undefined}
+                  >
                     {columns.map((column) => {
                       const alignEnd = END_ALIGNED_COLUMNS.has(column.key);
                       const fullCellContent = FULL_CELL_CONTENT_COLUMNS.has(column.key);

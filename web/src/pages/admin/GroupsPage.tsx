@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   Plus,
   Pencil,
@@ -10,7 +10,7 @@ import {
   RefreshCw,
   Percent,
 } from 'lucide-react';
-import { AlertDialog, Button, Chip, EmptyState, Label, ListBox, Select, Skeleton, Spinner, Table as HeroTable } from '@heroui/react';
+import { AlertDialog, Button, Chip, EmptyState, Label, ListBox, Select, Spinner, Table as HeroTable } from '@heroui/react';
 import { PlatformIcon } from '../../shared/ui';
 import { groupsApi } from '../../shared/api/groups';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
@@ -20,6 +20,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { GroupFormModal } from './groups/EditGroupModal';
 import { GroupRateOverridesModal } from './groups/GroupRateOverridesModal';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/types';
@@ -51,6 +52,7 @@ export default function GroupsPage() {
         page_size: pageSize,
         platform: platformFilter || undefined,
       }),
+    placeholderData: keepPreviousData,
   });
 
   // 创建分组
@@ -167,18 +169,7 @@ export default function GroupsPage() {
             </HeroTable.Header>
             <HeroTable.Body>
               {isLoading ? (
-                Array.from({ length: 5 }).map((_, index) => (
-                  <HeroTable.Row id={`loading-${index}`} key={`loading-${index}`}>
-                    {Array.from({ length: 10 }).map((__, cellIndex) => (
-                      <HeroTable.Cell key={cellIndex}>
-                        <Skeleton
-                          className="h-4 w-24"
-                          style={{ animationDelay: `${index * 90 + cellIndex * 20}ms` }}
-                        />
-                      </HeroTable.Cell>
-                    ))}
-                  </HeroTable.Row>
-                ))
+                <TableLoadingRow colSpan={10} />
               ) : rows.length === 0 ? (
                 <HeroTable.Row id="empty">
                   <HeroTable.Cell colSpan={10}>
