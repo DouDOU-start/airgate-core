@@ -23,6 +23,9 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 		return
 	}
 
+	groupID := parseOptionalInt(c.Query("group_id"))
+	ungrouped := groupID == nil && parseOptionalBool(c.Query("ungrouped"))
+
 	result, err := h.service.List(c.Request.Context(), appaccount.ListFilter{
 		Page:        page.Page,
 		PageSize:    page.PageSize,
@@ -30,7 +33,8 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 		Platform:    c.Query("platform"),
 		State:       c.Query("state"),
 		AccountType: c.Query("account_type"),
-		GroupID:     parseOptionalInt(c.Query("group_id")),
+		GroupID:     groupID,
+		Ungrouped:   ungrouped,
 		ProxyID:     parseOptionalInt(c.Query("proxy_id")),
 	})
 	if err != nil {
@@ -54,12 +58,16 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 // ExportAccounts 按当前筛选条件导出账号（返回 JSON 数据，前端落盘为文件）。
 // 当前端传入 ids=1,2,3 时只导出这些账号；否则按查询条件导出全部匹配的账号。
 func (h *AccountHandler) ExportAccounts(c *gin.Context) {
+	groupID := parseOptionalInt(c.Query("group_id"))
+	ungrouped := groupID == nil && parseOptionalBool(c.Query("ungrouped"))
+
 	accounts, err := h.service.ExportAll(c.Request.Context(), appaccount.ListFilter{
 		Keyword:     c.Query("keyword"),
 		Platform:    c.Query("platform"),
 		State:       c.Query("state"),
 		AccountType: c.Query("account_type"),
-		GroupID:     parseOptionalInt(c.Query("group_id")),
+		GroupID:     groupID,
+		Ungrouped:   ungrouped,
 		ProxyID:     parseOptionalInt(c.Query("proxy_id")),
 		IDs:         parseIDList(c.Query("ids")),
 	})

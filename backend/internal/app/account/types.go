@@ -88,6 +88,7 @@ type ListFilter struct {
 	State       string // active / rate_limited / degraded / disabled
 	AccountType string
 	GroupID     *int
+	Ungrouped   bool
 	ProxyID     *int
 	IDs         []int
 }

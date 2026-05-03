@@ -48,6 +48,8 @@ import type {
   PagedData,
 } from '../../shared/types';
 
+const UNGROUPED_GROUP_FILTER = '__ungrouped__';
+
 // formatCountdown 把剩余毫秒格式化成 "Xd Yh"/"Xh Ym"/"Ym" 样式，
 // 与 sub2api 的"限流中 10h 16m 自动恢复"徽标一致。
 function formatCountdown(ms: number): string {
@@ -282,7 +284,8 @@ export default function AccountsPage() {
         platform: platformFilter || undefined,
         state: stateFilter || undefined,
         account_type: typeFilter || undefined,
-        group_id: groupFilter ? Number(groupFilter) : undefined,
+        group_id: groupFilter && groupFilter !== UNGROUPED_GROUP_FILTER ? Number(groupFilter) : undefined,
+        ungrouped: groupFilter === UNGROUPED_GROUP_FILTER ? true : undefined,
         proxy_id: proxyFilter ? Number(proxyFilter) : undefined,
       }),
   });
@@ -334,7 +337,8 @@ export default function AccountsPage() {
         platform: platformFilter || undefined,
         state: stateFilter || undefined,
         account_type: typeFilter || undefined,
-        group_id: groupFilter ? Number(groupFilter) : undefined,
+        group_id: groupFilter && groupFilter !== UNGROUPED_GROUP_FILTER ? Number(groupFilter) : undefined,
+        ungrouped: groupFilter === UNGROUPED_GROUP_FILTER ? true : undefined,
         proxy_id: proxyFilter ? Number(proxyFilter) : undefined,
       });
     },
@@ -979,6 +983,7 @@ export default function AccountsPage() {
           onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }}
           options={[
             { value: '', label: t('accounts.all_groups') },
+            { value: UNGROUPED_GROUP_FILTER, label: t('accounts.ungrouped') },
             ...(allGroupsData?.list ?? []).map((g) => ({ value: String(g.id), label: g.name })),
           ]}
         />

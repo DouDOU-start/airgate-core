@@ -6,7 +6,14 @@ import type {
   CredentialSchemaResp, ModelInfo, PageReq, PagedData,
 } from '../types';
 
-export type AccountListFilter = { platform?: string; state?: string; account_type?: string; group_id?: number; proxy_id?: number };
+export type AccountListFilter = {
+  platform?: string;
+  state?: string;
+  account_type?: string;
+  group_id?: number;
+  ungrouped?: boolean;
+  proxy_id?: number;
+};
 
 export const accountsApi = {
   list: (params: PageReq & AccountListFilter) =>

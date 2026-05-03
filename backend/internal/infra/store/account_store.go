@@ -41,6 +41,8 @@ func (s *AccountStore) List(ctx context.Context, filter appaccount.ListFilter) (
 	}
 	if filter.GroupID != nil {
 		query = query.Where(entaccount.HasGroupsWith(entgroup.ID(*filter.GroupID)))
+	} else if filter.Ungrouped {
+		query = query.Where(entaccount.Not(entaccount.HasGroups()))
 	}
 	if filter.ProxyID != nil {
 		query = query.Where(entaccount.HasProxyWith(entproxy.IDEQ(*filter.ProxyID)))
@@ -83,6 +85,8 @@ func (s *AccountStore) ListAll(ctx context.Context, filter appaccount.ListFilter
 	}
 	if filter.GroupID != nil {
 		query = query.Where(entaccount.HasGroupsWith(entgroup.ID(*filter.GroupID)))
+	} else if filter.Ungrouped {
+		query = query.Where(entaccount.Not(entaccount.HasGroups()))
 	}
 	if filter.ProxyID != nil {
 		query = query.Where(entaccount.HasProxyWith(entproxy.IDEQ(*filter.ProxyID)))

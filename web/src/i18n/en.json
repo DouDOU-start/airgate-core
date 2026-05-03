@@ -426,6 +426,7 @@
     "enable_dispatch": "Enable Dispatch",
     "select_groups": "Select groups",
     "all_groups": "All groups",
+    "ungrouped": "Ungrouped",
     "all_proxies": "All proxies",
     "delete_title": "Delete Account",
     "delete_confirm": "Are you sure you want to delete account \"{{name}}\"? It will no longer participate in dispatch.",

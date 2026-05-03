@@ -64,6 +64,15 @@ func parseOptionalInt(raw string) *int {
 	return &value
 }
 
+func parseOptionalBool(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "y", "on":
+		return true
+	default:
+		return false
+	}
+}
+
 // parseIDList 解析逗号分隔的整数列表（如 "1,2,3"），忽略空项与非法项。
 func parseIDList(raw string) []int {
 	if raw == "" {

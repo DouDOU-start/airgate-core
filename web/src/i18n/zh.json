@@ -425,6 +425,7 @@
     "enable_dispatch": "启用调度",
     "select_groups": "选择分组",
     "all_groups": "全部分组",
+    "ungrouped": "未分组",
     "all_proxies": "全部代理",
     "delete_title": "删除账号",
     "delete_confirm": "确定要删除账号「{{name}}」吗？删除后该账号将不再参与调度。",
