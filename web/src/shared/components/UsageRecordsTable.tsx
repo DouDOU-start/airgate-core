@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { EmptyState, Table as HeroTable } from '@heroui/react';
 import { Inbox } from 'lucide-react';
 import type { UsageColumnConfig, UsageRow } from '../columns/usageColumns';
@@ -30,6 +30,10 @@ function ColumnHeader({ children, alignEnd }: { children: ReactNode; alignEnd: b
       {children}
     </span>
   );
+}
+
+function getColumnClassName(key: string) {
+  return `ag-usage-col-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 }
 
 function useNewRowMarkers<T extends UsageRow>({
@@ -145,6 +149,21 @@ export function UsageRecordsTable<T extends UsageRow>({
     () => Math.max(760, columns.reduce((sum, column) => sum + parseColumnWidth(column.width), 0) + 24),
     [columns],
   );
+  const tableMobileWidthDelta = useMemo(
+    () => columns.reduce((sum, column) => {
+      if (column.key !== 'created_at') return sum;
+      return sum + Math.max(0, parseColumnWidth(column.width) - 92);
+    }, 0),
+    [columns],
+  );
+  const tableStyle = useMemo(
+    () => ({
+      minWidth: tableMinWidth,
+      '--ag-usage-table-min-width': `${tableMinWidth}px`,
+      '--ag-usage-table-mobile-delta': `${tableMobileWidthDelta}px`,
+    }) as CSSProperties,
+    [tableMinWidth, tableMobileWidthDelta],
+  );
   const markedRowIds = useNewRowMarkers({
     dataVersion,
     enabled: highlightNewRows,
@@ -155,11 +174,11 @@ export function UsageRecordsTable<T extends UsageRow>({
 
   return (
     <HeroTable className="ag-usage-records-table min-h-[240px]" variant="primary">
-      <HeroTable.ScrollContainer>
+      <HeroTable.ScrollContainer className="ag-usage-table-scroll">
         <HeroTable.Content
           aria-label={ariaLabel}
           className="ag-usage-table"
-          style={{ minWidth: tableMinWidth }}
+          style={tableStyle}
         >
           <HeroTable.Header>
             {columns.map((column, index) => {
@@ -170,7 +189,7 @@ export function UsageRecordsTable<T extends UsageRow>({
                   id={column.key}
                   key={column.key}
                   className={cx(
-                    column.hideOnMobile && 'hidden md:table-cell',
+                    getColumnClassName(column.key),
                     alignEnd && 'text-end',
                     index === 0 && 'after:hidden',
                   )}
@@ -213,14 +232,14 @@ export function UsageRecordsTable<T extends UsageRow>({
                       <HeroTable.Cell
                         key={column.key}
                         className={cx(
-                          column.hideOnMobile && 'hidden md:table-cell',
+                          getColumnClassName(column.key),
                           alignEnd && 'text-right',
                         )}
                       >
                         <div
                           className={cx(
                             'flex h-[var(--ag-usage-table-row-height)] w-full items-center overflow-hidden',
-                            !fullCellContent && 'px-2.5 py-1',
+                            fullCellContent ? 'px-1 py-0.5' : 'px-2.5 py-0.5',
                             alignEnd && 'justify-end text-right',
                           )}
                         >

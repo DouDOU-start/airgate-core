@@ -401,7 +401,7 @@ export default function SettingsPage() {
               </Button>
             </Card.Header>
             <Card.Content>
-              <Form className="space-y-4" onSubmit={(e) => e.preventDefault()} noValidate>
+              <Form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label={t('settings.smtp_host')}>
                     <Input value={val('smtp_host')} onChange={(e) => set('smtp_host', e.target.value)} placeholder="smtp.gmail.com" />
@@ -896,7 +896,7 @@ function StoragePanel({
         <Card.Title>{t('settings.storage_config')}</Card.Title>
       </Card.Header>
       <Card.Content>
-        <Form className="space-y-5" onSubmit={(e) => e.preventDefault()} noValidate>
+        <Form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label={t('settings.s3_endpoint')} hint={t('settings.s3_endpoint_hint')}>
               <Input

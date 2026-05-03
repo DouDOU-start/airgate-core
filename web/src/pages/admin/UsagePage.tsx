@@ -666,8 +666,8 @@ export default function UsagePage() {
 
         return (
           <div className="flex min-w-0 items-center gap-1.5">
-            <span className="shrink-0 font-mono text-[11px] text-text-tertiary">#{row.user_id}</span>
-            <span className="min-w-0 truncate text-xs font-medium text-text" title={label}>
+            <span className="shrink-0 font-mono text-xs text-text-tertiary">#{row.user_id}</span>
+            <span className="min-w-0 truncate text-[13px] font-medium text-text" title={label}>
               {label}
             </span>
           </div>
@@ -694,7 +694,7 @@ export default function UsagePage() {
     width: '180px',
     hideOnMobile: true,
     render: (row) => (
-      <span className="block truncate font-mono text-[11px] leading-tight text-text-secondary" title={row.endpoint || '-'}>
+      <span className="block truncate font-mono text-xs leading-tight text-text-secondary" title={row.endpoint || '-'}>
         {row.endpoint || '-'}
       </span>
     ),
@@ -706,11 +706,11 @@ export default function UsagePage() {
     hideOnMobile: true,
     render: (row) => {
       if (row.api_key_deleted) {
-        return <span className="block max-w-full truncate text-text-tertiary text-xs">{t('usage.api_key_deleted')}</span>;
+        return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_deleted')}</span>;
       }
       const name = row.api_key_name || '-';
       return (
-        <span className="block max-w-full truncate text-[11px] text-text-secondary" title={name}>{name}</span>
+        <span className="block max-w-full truncate text-xs text-text-secondary" title={name}>{name}</span>
       );
     },
   };
@@ -722,7 +722,7 @@ export default function UsagePage() {
     render: (row) => {
       const label = row.account_name || '-';
       return (
-        <span className="block max-w-full truncate text-[11px] text-text-secondary" title={label}>{label}</span>
+        <span className="block max-w-full truncate text-xs text-text-secondary" title={label}>{label}</span>
       );
     },
   };

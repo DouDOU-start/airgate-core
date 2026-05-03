@@ -65,7 +65,7 @@ export default function StepDatabase({ data, onChange, onNext }: StepDatabasePro
   };
 
   return (
-    <Form className="space-y-4" onSubmit={handleSubmit} noValidate>
+    <Form className="space-y-4" onSubmit={handleSubmit}>
       <p className="text-sm text-text-secondary mb-2">
         {t('setup.step_db_desc')}
       </p>

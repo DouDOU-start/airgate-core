@@ -31,7 +31,7 @@ function RichTooltip({
 }) {
   return (
     <Tooltip delay={0} closeDelay={0}>
-      <Tooltip.Trigger className="flex h-[var(--ag-usage-table-row-height)] w-full cursor-default items-center justify-end rounded-[var(--radius)] px-2.5 py-0 text-right transition-colors hover:bg-bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+      <Tooltip.Trigger className="flex h-full w-full cursor-default items-center justify-end rounded-[var(--radius)] px-1.5 py-0 text-right transition-colors hover:bg-bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
         {children}
       </Tooltip.Trigger>
       <Tooltip.Content
@@ -86,9 +86,9 @@ function TooltipRow({
             : 'text-text-secondary';
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[var(--radius)] bg-surface px-2 py-1 text-xs">
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,max-content)] items-center gap-3 rounded-[var(--radius)] bg-surface px-2 py-1 text-xs">
       <span className="min-w-0 truncate text-text-tertiary">{label}</span>
-      <span className={`min-w-0 max-w-[12rem] truncate text-right font-mono font-medium ${toneClass}`}>{value}</span>
+      <span className={`min-w-0 max-w-[12rem] justify-self-end truncate text-right font-mono font-medium ${toneClass}`}>{value}</span>
     </div>
   );
 }
@@ -113,8 +113,8 @@ function getReasoningEffortStyle(effort: string): CSSProperties {
   const color = reasoningEffortColorMap[normalized] ?? 'var(--ag-primary)';
 
   return {
-    background: `color-mix(in srgb, ${color} 14%, transparent)`,
-    borderColor: `color-mix(in srgb, ${color} 28%, transparent)`,
+    background: `color-mix(in srgb, ${color} 20%, transparent)`,
+    borderColor: `color-mix(in srgb, ${color} 40%, transparent)`,
     color,
   };
 }
@@ -129,37 +129,35 @@ function getImageSizeStyle(): CSSProperties {
   };
 }
 
-function getTokenBadgeStyle(color: string): CSSProperties {
-  return {
-    background: `color-mix(in srgb, ${color} 14%, transparent)`,
-    borderColor: `color-mix(in srgb, ${color} 28%, transparent)`,
-    color,
-  };
-}
 
-function TokenBadge({
-  icon,
-  label,
-  title,
-  value,
+/** 单行 token 数据行：固定宽度图标 + 右对齐等宽数字 */
+function TokenRow({
   color,
+  icon,
+  value,
 }: {
   color: string;
-  icon?: ReactNode;
-  label?: ReactNode;
-  title?: string;
-  value: ReactNode;
+  icon: ReactNode;
+  value: string;
 }) {
   return (
-    <span
-      className="inline-flex h-3.5 items-center gap-0.5 rounded-[var(--radius)] border px-1 font-mono text-[11px] font-medium leading-none"
-      style={getTokenBadgeStyle(color)}
-      title={title}
-    >
-      {icon ? <span className="flex h-2.5 w-2.5 shrink-0 items-center justify-center">{icon}</span> : null}
-      {label ? <span className="text-[9px] font-semibold leading-none opacity-75">{label}</span> : null}
-      <span className="tabular-nums leading-none">{value}</span>
-    </span>
+    <div className="grid grid-cols-[1rem_minmax(0,1fr)] items-center gap-1">
+      <span
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[var(--radius)] leading-none"
+        style={{
+          background: `color-mix(in srgb, ${color} 18%, transparent)`,
+          color,
+        }}
+      >
+        <span className="flex h-3 w-3 shrink-0 items-center justify-center">{icon}</span>
+      </span>
+      <span
+        className="w-[3.5rem] justify-self-end truncate text-right font-mono text-xs font-semibold tabular-nums leading-none"
+        style={{ color }}
+      >
+        {value}
+      </span>
+    </div>
   );
 }
 
@@ -230,13 +228,13 @@ function buildResellerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
           <div className="flex w-full flex-col items-end font-mono text-xs text-right">
             {row.sell_rate > 0 && row.billed_cost !== row.actual_cost ? (
               <>
-                <div className="text-sm font-semibold leading-none text-text">${row.billed_cost.toFixed(6)}</div>
-                <div className="mt-1 text-[11px] text-text-tertiary">
+                <div className="text-[15px] font-semibold leading-none text-text">${row.billed_cost.toFixed(6)}</div>
+                <div className="mt-0.5 text-xs leading-none text-text-tertiary">
                   {t('usage.cost_actual_short', '成本')} ${row.actual_cost.toFixed(6)}
                 </div>
               </>
             ) : (
-              <div className="text-sm font-semibold leading-none text-text">${row.actual_cost.toFixed(6)}</div>
+              <div className="text-[15px] font-semibold leading-none text-text">${row.actual_cost.toFixed(6)}</div>
             )}
           </div>
         </RichTooltip>
@@ -263,7 +261,7 @@ function buildCustomerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
           }
         >
           <div className="flex w-full flex-col items-end font-mono text-xs text-right">
-            <div className="text-sm font-semibold leading-none text-text">${cost.toFixed(6)}</div>
+            <div className="text-[15px] font-semibold leading-none text-text">${cost.toFixed(6)}</div>
           </div>
         </RichTooltip>
       );
@@ -290,14 +288,17 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
       width: '142px',
       render: (row) => {
         const date = new Date(row.created_at);
+        const timeLabel = date.toLocaleTimeString('zh-CN', { hour12: false });
+        const dateLabel = date.toLocaleDateString('zh-CN');
+        const fullLabel = `${dateLabel} ${timeLabel}`;
 
         return (
-          <div className="flex min-w-0 items-center gap-1.5 font-mono text-[11px]">
-            <span className="font-mono text-xs font-medium text-text">
-              {date.toLocaleTimeString('zh-CN', { hour12: false })}
+          <div className="flex min-w-0 items-center gap-1.5 font-mono text-xs" title={fullLabel}>
+            <span className="font-mono text-[13px] font-medium text-text">
+              {timeLabel}
             </span>
-            <span className="text-text-tertiary">
-              {date.toLocaleDateString('zh-CN')}
+            <span className="hidden text-text-tertiary lg:inline">
+              {dateLabel}
             </span>
           </div>
         );
@@ -306,37 +307,28 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
     {
       key: 'model',
       title: t('usage.model'),
-      width: '210px',
+      width: '250px',
       render: (row) => {
         const reasoningEffort = (row as UsageLogResp).reasoning_effort;
+        const badgeValue = row.image_size || reasoningEffort || '';
+        const badgeStyle = row.image_size
+          ? getImageSizeStyle()
+          : reasoningEffort
+            ? getReasoningEffortStyle(reasoningEffort)
+            : undefined;
 
         return (
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="block max-w-full truncate text-sm font-medium text-text" title={row.model}>
-                {row.model}
-              </span>
-            </div>
-            {(reasoningEffort || row.image_size) ? (
-              <div className="flex min-w-0 items-center gap-1.5">
-                {reasoningEffort ? (
-                  <span
-                    className="truncate rounded-[var(--radius)] border px-1.5 py-0.5 text-[11px] font-medium"
-                    style={getReasoningEffortStyle(reasoningEffort)}
-                  >
-                    {reasoningEffort}
-                  </span>
-                ) : null}
-                {row.image_size ? (
-                  <span
-                    className="truncate rounded-[var(--radius)] border px-1.5 py-0.5 font-mono text-[11px] font-medium"
-                    style={getImageSizeStyle()}
-                  >
-                    {row.image_size}
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
+          <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2">
+            <span
+              className={`inline-flex h-4 w-[5.5rem] shrink-0 items-center justify-center truncate rounded-[var(--radius)] border px-1 font-mono text-[11px] leading-none ${row.image_size ? 'font-medium' : 'font-bold uppercase tracking-wide'} ${badgeValue ? '' : 'invisible'}`}
+              style={badgeStyle}
+              title={badgeValue || undefined}
+            >
+              {badgeValue || '0000x0000'}
+            </span>
+            <span className="block min-w-0 truncate text-sm font-medium leading-none text-text" title={row.model}>
+              {row.model}
+            </span>
           </div>
         );
       },
@@ -344,7 +336,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
     {
       key: 'tokens',
       title: 'TOKEN',
-      width: '136px',
+      width: '220px',
       render: (row) => {
         // 注意：cached_input_tokens 表示 cache read；cache_creation_tokens 为 5m+1h 之和，
         // 两者与 input/output 互斥计入 total_tokens。
@@ -352,6 +344,8 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
         const cacheCreation = (row as UsageLogResp).cache_creation_tokens ?? 0;
         const cacheCreation5m = (row as UsageLogResp).cache_creation_5m_tokens ?? 0;
         const cacheCreation1h = (row as UsageLogResp).cache_creation_1h_tokens ?? 0;
+        const hasCacheRead = row.cached_input_tokens > 0;
+        const hasCacheWrite = cacheCreation > 0;
         const total =
           row.input_tokens + row.output_tokens + row.cached_input_tokens + cacheCreation;
         return (
@@ -361,10 +355,10 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
               <TooltipPanel title={`Token ${t('usage.detail')}`} subtitle={row.model}>
                 <TooltipRow label={t('usage.input_tokens')} value={row.input_tokens.toLocaleString()} tone="success" />
                 <TooltipRow label={t('usage.output_tokens')} value={row.output_tokens.toLocaleString()} tone="info" />
-                {row.cached_input_tokens > 0 && (
+                {hasCacheRead && (
                   <TooltipRow label={t('usage.cache_read')} value={row.cached_input_tokens.toLocaleString()} />
                 )}
-                {cacheCreation > 0 && (
+                {hasCacheWrite && (
                   <TooltipRow label={t('usage.cache_creation')} value={cacheCreation.toLocaleString()} tone="warning" />
                 )}
                 {cacheCreation5m > 0 && (
@@ -373,49 +367,44 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
                 {cacheCreation1h > 0 && (
                   <TooltipRow label={t('usage.cache_creation_1h')} value={cacheCreation1h.toLocaleString()} tone="warning" />
                 )}
-                <TooltipDivider />
                 <TooltipRow label={t('usage.total_tokens')} value={total.toLocaleString()} tone="strong" />
               </TooltipPanel>
             }
           >
-            <div className="flex h-full max-h-[var(--ag-usage-table-row-height)] w-full flex-col items-end justify-center gap-0.5 overflow-visible">
-              <div className="font-mono text-[13px] font-semibold leading-[1.05] text-text">
-                {fmtNum(total)}
-              </div>
-              <div className="flex items-center justify-end gap-1 leading-none">
-                <TokenBadge
+            <div className="grid h-full max-h-[var(--ag-usage-table-row-height)] w-full grid-cols-[minmax(0,8.75rem)_4.75rem] items-center justify-end gap-2 overflow-visible px-1">
+              <div className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-px">
+                <TokenRow
                   color="#10b981"
-                  icon={<ArrowDown className="h-2.5 w-2.5 shrink-0" />}
-                  title={t('usage.input_tokens')}
+                  icon={<ArrowDown className="h-3 w-3 shrink-0" />}
                   value={fmtNum(row.input_tokens)}
                 />
-                <TokenBadge
+                <TokenRow
                   color="#0ea5e9"
-                  icon={<ArrowUp className="h-2.5 w-2.5 shrink-0" />}
-                  title={t('usage.output_tokens')}
+                  icon={<ArrowUp className="h-3 w-3 shrink-0" />}
                   value={fmtNum(row.output_tokens)}
                 />
+                {(hasCacheRead || hasCacheWrite) ? (
+                  <>
+                    {hasCacheRead ? (
+                      <TokenRow
+                        color="var(--ag-muted)"
+                        icon={<BookOpen className="h-3 w-3 shrink-0" />}
+                        value={fmtNum(row.cached_input_tokens)}
+                      />
+                    ) : <div />}
+                    {hasCacheWrite ? (
+                      <TokenRow
+                        color="#f59e0b"
+                        icon={<Sparkles className="h-3 w-3 shrink-0" />}
+                        value={fmtNum(cacheCreation)}
+                      />
+                    ) : <div />}
+                  </>
+                ) : null}
               </div>
-              {(row.cached_input_tokens > 0 || cacheCreation > 0) && (
-                <div className="flex items-center justify-end gap-1 leading-none">
-                  {row.cached_input_tokens > 0 && (
-                    <TokenBadge
-                      color="var(--ag-muted)"
-                      icon={<BookOpen className="h-2.5 w-2.5 shrink-0" />}
-                      title={t('usage.cache_read')}
-                      value={fmtNum(row.cached_input_tokens)}
-                    />
-                  )}
-                  {cacheCreation > 0 && (
-                    <TokenBadge
-                      color="#f59e0b"
-                      icon={<Sparkles className="h-2.5 w-2.5 shrink-0" />}
-                      title={t('usage.cache_creation')}
-                      value={fmtNum(cacheCreation)}
-                    />
-                  )}
-                </div>
-              )}
+              <div className="w-[4.75rem] text-right font-mono text-base font-semibold tabular-nums leading-none text-text">
+                {fmtNum(total)}
+              </div>
             </div>
           </RichTooltip>
         );
@@ -428,7 +417,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
       width: '72px',
       hideOnMobile: true,
       render: (row) => (
-        <Chip className="px-1.5 text-xs" color={row.stream ? 'accent' : 'default'} size="sm" variant="soft">
+        <Chip className="px-1.5 text-[13px]" color={row.stream ? 'accent' : 'default'} size="sm" variant="soft">
           {row.stream ? t('usage.type_stream') : t('usage.type_sync')}
         </Chip>
       ),
@@ -439,7 +428,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
       width: '78px',
       hideOnMobile: true,
       render: (row) => (
-        <span className="block text-right font-mono text-xs text-text-secondary">
+        <span className="block text-right font-mono text-[13px] text-text-secondary">
           {row.first_token_ms > 0 ? (row.first_token_ms >= 1000 ? `${(row.first_token_ms / 1000).toFixed(2)}s` : `${row.first_token_ms}ms`) : '-'}
         </span>
       ),
@@ -450,7 +439,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean }): UsageColumn
       width: '76px',
       hideOnMobile: true,
       render: (row) => (
-        <span className="block text-right font-mono text-xs text-text-secondary">
+        <span className="block text-right font-mono text-[13px] text-text-secondary">
           {row.duration_ms >= 1000 ? `${(row.duration_ms / 1000).toFixed(2)}s` : `${row.duration_ms}ms`}
         </span>
       ),

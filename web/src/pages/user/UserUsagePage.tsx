@@ -268,7 +268,7 @@ export default function UserUsagePage() {
       const endpoint = 'endpoint' in row && row.endpoint ? row.endpoint : '-';
 
       return (
-        <span className="block truncate font-mono text-[11px] leading-tight text-text-secondary" title={endpoint}>
+        <span className="block truncate font-mono text-xs leading-tight text-text-secondary" title={endpoint}>
           {endpoint}
         </span>
       );
@@ -277,17 +277,17 @@ export default function UserUsagePage() {
   const apiKeyColumn: UsageColumnConfig<UsageRow> = {
     key: 'api_key',
     title: 'API Key',
-    width: '124px',
+    width: '96px',
     hideOnMobile: true,
     render: (row) => {
       if ('api_key_deleted' in row && row.api_key_deleted) {
-        return <span className="block max-w-full truncate text-xs text-text-tertiary">{t('usage.api_key_deleted')}</span>;
+        return <span className="block max-w-full truncate text-[13px] text-text-tertiary">{t('usage.api_key_deleted')}</span>;
       }
 
       const name = 'api_key_name' in row && row.api_key_name ? row.api_key_name : '-';
 
       return (
-        <span className="block max-w-full truncate text-[11px] text-text-secondary" title={name}>{name}</span>
+        <span className="block max-w-full truncate text-xs text-text-secondary" title={name}>{name}</span>
       );
     },
   };

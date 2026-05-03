@@ -297,7 +297,7 @@ export default function ProxiesPage() {
                 <Modal.CloseTrigger />
               </Modal.Header>
               <Modal.Body>
-                <Form id="proxy-form" className="space-y-4" onSubmit={handleSubmit} noValidate>
+                <Form id="proxy-form" className="space-y-4" onSubmit={handleSubmit}>
                   <HeroTextField fullWidth isRequired>
                     <Label>{t('common.name')}</Label>
                     <Input

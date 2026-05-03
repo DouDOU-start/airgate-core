@@ -411,8 +411,8 @@ export function AppShell({ children }: AppShellProps) {
             {showStatusEntry && (
               <HeroLink
                 href="/status"
+                aria-label={t('nav.status')}
                 className="flex h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text"
-                title={t('nav.status')}
               >
                 <Activity className="h-5 w-5" />
               </HeroLink>
@@ -422,8 +422,8 @@ export function AppShell({ children }: AppShellProps) {
               href="https://github.com/DouDOU-start/airgate-core"
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="GitHub"
               className="hidden h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text sm:flex"
-              title="GitHub"
             >
               <Github className="h-5 w-5" />
             </HeroLink>
@@ -434,8 +434,8 @@ export function AppShell({ children }: AppShellProps) {
                 <HeroLink
                   href={docs.href}
                   {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                  aria-label={t('nav.docs')}
                   className="hidden h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text sm:flex"
-                  title={t('nav.docs')}
                 >
                   <BookOpen className="h-5 w-5" />
                 </HeroLink>

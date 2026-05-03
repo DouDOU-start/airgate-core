@@ -51,7 +51,7 @@ export default function StepAdmin({ data, onChange, onPrev, onNext }: StepAdminP
   };
 
   return (
-    <Form className="space-y-4" onSubmit={handleSubmit} noValidate>
+    <Form className="space-y-4" onSubmit={handleSubmit}>
       <p className="text-sm text-text-secondary mb-2">
         {t('setup.step_admin_desc')}
       </p>

@@ -175,7 +175,6 @@ export function EditAccountModal({
               <Form
                 className="ag-form-scroll-safe ag-create-account-form"
                 onSubmit={(event) => event.preventDefault()}
-                noValidate
               >
                 <section className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">

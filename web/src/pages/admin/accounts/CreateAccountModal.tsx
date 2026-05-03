@@ -191,7 +191,7 @@ export function CreateAccountModal({
               <Modal.CloseTrigger />
             </Modal.Header>
             <Modal.Body>
-              <Form className="ag-form-scroll-safe ag-create-account-form" onSubmit={(e) => e.preventDefault()} noValidate>
+              <Form className="ag-form-scroll-safe ag-create-account-form" onSubmit={(e) => e.preventDefault()}>
                 <section className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
                     <Select

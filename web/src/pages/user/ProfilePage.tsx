@@ -170,7 +170,7 @@ export default function ProfilePage() {
           <Card.Title>{t('profile.change_password')}</Card.Title>
         </Card.Header>
         <Card.Content>
-          <Form className="space-y-4" onSubmit={handleChangePassword} noValidate>
+          <Form className="space-y-4" onSubmit={handleChangePassword}>
             <HeroTextField fullWidth isRequired>
               <Label>{t('profile.old_password')}</Label>
               <div className="relative">
