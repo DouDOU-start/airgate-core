@@ -203,6 +203,63 @@ type PersistMessageRequest struct {
 	Cost            float64 `json:"cost"`
 }
 
+type UpdateMessageRequest struct {
+	Content      string  `json:"content"`
+	InputTokens  int     `json:"input_tokens"`
+	OutputTokens int     `json:"output_tokens"`
+	Cost         float64 `json:"cost"`
+}
+
+func (s *Service) UpdateMessage(ctx context.Context, userID int, msgID int64, req UpdateMessageRequest) (*Message, error) {
+	if msgID <= 0 {
+		return nil, fmt.Errorf("message_id required")
+	}
+
+	var msg Message
+	var convUserID int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT m.id, m.conversation_id, m.role, m.content, m.reasoning, m.reasoning_effort, m.platform, m.model, m.group_id, m.input_tokens, m.output_tokens, m.cost, m.created_at, c.user_id
+		 FROM playground_messages m
+		 JOIN playground_conversations c ON c.id = m.conversation_id
+		 WHERE m.id = $1`, msgID,
+	).Scan(&msg.ID, &msg.ConversationID, &msg.Role, &msg.Content, &msg.Reasoning, &msg.ReasoningEffort, &msg.Platform, &msg.Model, &msg.GroupID, &msg.InputTokens, &msg.OutputTokens, &msg.Cost, &msg.CreatedAt, &convUserID); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("message not found")
+		}
+		return nil, fmt.Errorf("get message: %w", err)
+	}
+	if convUserID != userID {
+		return nil, fmt.Errorf("message not found")
+	}
+
+	content, err := s.storeContentAssets(ctx, userID, msg.ConversationID, req.Content)
+	if err != nil {
+		return nil, fmt.Errorf("store message assets: %w", err)
+	}
+	msg.Content = content
+	msg.InputTokens += req.InputTokens
+	msg.OutputTokens += req.OutputTokens
+	msg.Cost += req.Cost
+
+	if _, err := s.db.ExecContext(ctx,
+		`UPDATE playground_messages
+		 SET content = $1, input_tokens = $2, output_tokens = $3, cost = $4
+		 WHERE id = $5`,
+		msg.Content, msg.InputTokens, msg.OutputTokens, msg.Cost, msg.ID,
+	); err != nil {
+		return nil, fmt.Errorf("update message: %w", err)
+	}
+	if _, err := s.db.ExecContext(ctx, "UPDATE playground_conversations SET updated_at = NOW() WHERE id = $1", msg.ConversationID); err != nil {
+		s.logger.Error("failed to refresh conversation timestamp", "error", err, "conv_id", msg.ConversationID)
+	}
+	if resolved, err := s.resolveAssetURLs(ctx, userID, msg.Content); err != nil {
+		s.logger.Warn("failed to resolve updated message assets", "error", err, "message_id", msg.ID)
+	} else {
+		msg.Content = resolved
+	}
+	return &msg, nil
+}
+
 func (s *Service) PersistMessage(ctx context.Context, userID int, req PersistMessageRequest) (*Message, error) {
 	if req.ConversationID <= 0 {
 		return nil, fmt.Errorf("conversation_id required")

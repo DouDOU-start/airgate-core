@@ -195,7 +195,7 @@ export interface ChatCompletionResponse {
 export interface ChatCompletionCallbacks {
   onData: (text: string) => void;
   onReasoning: (text: string) => void;
-  onDone: (usage: { input_tokens: number; output_tokens: number; model: string; cost: number }) => void;
+  onDone: (usage: { input_tokens: number; output_tokens: number; model: string; cost: number }) => void | Promise<void>;
   onError: (err: string) => void;
 }
 
@@ -235,6 +235,9 @@ export const api = {
   listMessages: (convId: number) => request<Message[]>('GET', `/messages/${convId}`),
 
   persistMessage: (data: PersistedMessageRequest) => request<Message>('POST', '/messages', data),
+
+  updateMessage: (id: number, data: { content: string; input_tokens?: number; output_tokens?: number; cost?: number }) =>
+    request<Message>('PUT', `/messages/${id}`, data),
 
   listPlatforms: async () => {
     const payload = await request<ProviderPlatformInfo[]>('GET', '/platforms');
@@ -413,7 +416,7 @@ export async function chatCompletionsStream(
         if (!trimmed.startsWith('data: ')) continue;
         const payload = trimmed.slice(6);
         if (payload === '[DONE]') {
-          callbacks.onDone(usage);
+          await callbacks.onDone(usage);
           return;
         }
         try {
@@ -440,7 +443,7 @@ export async function chatCompletionsStream(
         }
       }
     }
-    callbacks.onDone(usage);
+    await callbacks.onDone(usage);
   } catch (err) {
     if (signal?.aborted) return;
     callbacks.onError(err instanceof Error ? err.message : 'stream failed');

@@ -67,11 +67,13 @@ type ImageSizeSettings = {
   value: string;
 };
 type SelectOption = { value: string; label: string };
-type PendingImage = { id: string; name: string; url: string };
+type PendingImage = { id: string; name: string; url: string; file?: File };
 type EditImage = PendingImage & { file: File };
 type EditSelectionRect = { x: number; y: number; width: number; height: number };
+type ConfirmedImageEdit = { source: EditImage; selection: EditSelectionRect; sourceWidth: number; sourceHeight: number };
 type ImageEditAnnotation = { imageIndex: number; rect: EditSelectionRect };
 type PreviewImage = { url: string; alt: string };
+type ImagePreviewState = { images: PreviewImage[]; index: number };
 type StreamAssistantOptions = {
   conversationID: number;
   requestMessages: Message[];
@@ -86,10 +88,11 @@ type StreamAssistantOptions = {
 };
 type RetryRequest = Omit<StreamAssistantOptions, 'titleContent'>;
 type MessageContentOptions = {
-  onImagePreview?: (url: string, alt: string) => void;
+  onImagePreview?: (url: string, alt: string, imageIndex: number) => void;
   imagePreviewTitle?: string;
   generatedImageAlt?: string;
   imageEditAnnotations?: ImageEditAnnotation[];
+  imageActions?: (image: PreviewImage, imageIndex: number) => ReactNode;
   takeImageIndex?: () => number;
   trailingInlineAction?: ReactNode;
   isMobile?: boolean;
@@ -265,12 +268,17 @@ function parseImageEditAnnotations(content: string): ImageEditAnnotation[] {
   return annotations;
 }
 
-function firstGeneratedImage(content: string): PreviewImage | null {
+function generatedImages(content: string): PreviewImage[] {
+  const images: PreviewImage[] = [];
+  let match: RegExpExecArray | null;
   IMAGE_MARKDOWN_ITEM_RE.lastIndex = 0;
-  const match = IMAGE_MARKDOWN_ITEM_RE.exec(content);
+
+  while ((match = IMAGE_MARKDOWN_ITEM_RE.exec(content)) !== null) {
+    images.push({ alt: match[1], url: match[2] });
+  }
+
   IMAGE_MARKDOWN_ITEM_RE.lastIndex = 0;
-  if (!match) return null;
-  return { alt: match[1], url: match[2] };
+  return images;
 }
 
 function hasCopyableMessageText(content: string) {
@@ -399,6 +407,7 @@ async function imagesFromFiles(files: File[]) {
     id: `${file.name}-${file.lastModified}-${file.size}`,
     name: file.name || 'pasted-image',
     url: await fileToDataURL(file),
+    file,
   })));
 }
 
@@ -457,6 +466,17 @@ function imageEditUsage(response: ImageEditResponse) {
 
 function appendImageContent(content: string, nextImageContent: string) {
   return [content.trim(), nextImageContent.trim()].filter(Boolean).join('\n\n');
+}
+
+function replaceImageMarkdownAtIndex(content: string, imageIndex: number, nextImageMarkdown: string) {
+  let currentIndex = -1;
+  IMAGE_MARKDOWN_RE.lastIndex = 0;
+  const nextContent = content.replace(IMAGE_MARKDOWN_RE, (match) => {
+    currentIndex += 1;
+    return currentIndex === imageIndex ? nextImageMarkdown : match;
+  });
+  IMAGE_MARKDOWN_RE.lastIndex = 0;
+  return currentIndex >= imageIndex ? nextContent : content;
 }
 
 function normalizeImageShotPrompts(prompts: string[]) {
@@ -601,11 +621,13 @@ function pushTextWithBreaks(nodes: ReactNode[], text: string, keyPrefix: string)
 
 function renderGeneratedImage(key: string, url: string, alt: string, options: MessageContentOptions) {
   const imageIndex = options.takeImageIndex?.() ?? -1;
+  const image = { url, alt };
   const annotation = options.imageEditAnnotations?.find(item => item.imageIndex === imageIndex);
-  const image = <img src={url} alt={alt} style={styles.generatedImage} loading="lazy" />;
+  const imageActions = options.imageActions?.(image, imageIndex);
+  const imageNode = <img src={url} alt={alt} style={styles.generatedImage} loading="lazy" />;
   const annotatedImage = annotation ? (
     <span style={styles.generatedImageOverlayWrap}>
-      {image}
+      {imageNode}
       <span style={styles.generatedImageDimOverlay} />
       <span
         style={{
@@ -617,7 +639,7 @@ function renderGeneratedImage(key: string, url: string, alt: string, options: Me
         }}
       />
     </span>
-  ) : image;
+  ) : imageNode;
   const previewTitle = options.imagePreviewTitle || 'Preview image';
   const previewableImage = options.onImagePreview ? (
     <button
@@ -625,7 +647,7 @@ function renderGeneratedImage(key: string, url: string, alt: string, options: Me
       style={styles.generatedImagePreviewBtn}
       title={previewTitle}
       aria-label={previewTitle}
-      onClick={() => options.onImagePreview?.(url, alt)}
+      onClick={() => options.onImagePreview?.(url, alt, imageIndex)}
     >
       {annotatedImage}
     </button>
@@ -634,6 +656,7 @@ function renderGeneratedImage(key: string, url: string, alt: string, options: Me
   return (
     <span key={key} style={{ ...styles.generatedImageFrame, ...(options.isMobile ? styles.generatedImageFrameMobile : null) }}>
       {previewableImage}
+      {imageActions && <span style={styles.generatedImageActions}>{imageActions}</span>}
     </span>
   );
 }
@@ -983,12 +1006,13 @@ export default function PlaygroundPage() {
   const [input, setInput] = useState('');
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [editSource, setEditSource] = useState<EditImage | null>(null);
+  const [confirmedImageEdit, setConfirmedImageEdit] = useState<ConfirmedImageEdit | null>(null);
   const [isEditPanelOpen, setIsEditPanelOpen] = useState(false);
   const [isEditingImage, setIsEditingImage] = useState(false);
   const [editSelection, setEditSelection] = useState<EditSelectionRect | null>(null);
   const [draftEditSelection, setDraftEditSelection] = useState<EditSelectionRect | null>(null);
   const [editStageSize, setEditStageSize] = useState<{ width: number; height: number } | null>(null);
-  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
+  const [previewImage, setPreviewImage] = useState<ImagePreviewState | null>(null);
 
   const [platforms, setPlatforms] = useState<PlatformInfo[]>([]);
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -999,6 +1023,7 @@ export default function PlaygroundPage() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [error, setError] = useState('');
   const [retryRequest, setRetryRequest] = useState<RetryRequest | null>(null);
+  const [regeneratingImage, setRegeneratingImage] = useState<{ messageID: number; imageIndex: number } | null>(null);
   const [interactionNotice, setInteractionNotice] = useState('');
   const [hoveredCopyTarget, setHoveredCopyTarget] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -1336,6 +1361,7 @@ export default function PlaygroundPage() {
     setMessages([]);
     setPendingImages([]);
     setEditSource(null);
+    setConfirmedImageEdit(null);
     setIsEditPanelOpen(false);
     setEditSelection(null);
     setDraftEditSelection(null);
@@ -1648,6 +1674,7 @@ export default function PlaygroundPage() {
 
     setInput('');
     setPendingImages([]);
+    setConfirmedImageEdit(null);
     if (inputRef.current) {
       inputRef.current.style.height = '24px';
     }
@@ -1737,6 +1764,7 @@ export default function PlaygroundPage() {
     try {
       const nextSource = await editImageFromFile(file);
       setEditSource(nextSource);
+      setConfirmedImageEdit(null);
       setIsEditPanelOpen(true);
       setEditSelection(null);
       setDraftEditSelection(null);
@@ -1788,6 +1816,7 @@ export default function PlaygroundPage() {
       }
 
       setEditSource(nextSource);
+      setConfirmedImageEdit(null);
       setIsEditPanelOpen(true);
       setEditSelection(null);
       setDraftEditSelection(null);
@@ -1804,29 +1833,63 @@ export default function PlaygroundPage() {
     editFileInputRef.current?.click();
   }, []);
 
+  const openPendingImageForEdit = useCallback(async (image: PendingImage) => {
+    if (isStreaming || !image.file) return;
+    setPendingImages([image]);
+    await selectEditImage(image.file);
+  }, [isStreaming, selectEditImage]);
+
   const clearEditSelection = useCallback(() => {
     setEditSelection(null);
     setDraftEditSelection(null);
     selectionStartRef.current = null;
   }, []);
 
-  const closeEditPanel = useCallback(() => {
+  const cancelEditPanel = useCallback(() => {
     setIsEditPanelOpen(false);
     setEditSource(null);
+    setConfirmedImageEdit(null);
     setEditSelection(null);
     setDraftEditSelection(null);
     setEditStageSize(null);
     selectionStartRef.current = null;
   }, []);
 
+  const confirmEditSelection = useCallback(async () => {
+    if (!editSource || !editSelection) return;
+    const canvas = editCanvasRef.current;
+    if (!canvas) return;
+    const image = await loadImageElement(editSource.url);
+    const scaleX = image.naturalWidth / canvas.width;
+    const scaleY = image.naturalHeight / canvas.height;
+    setConfirmedImageEdit({
+      source: editSource,
+      sourceWidth: image.naturalWidth,
+      sourceHeight: image.naturalHeight,
+      selection: {
+        x: Math.floor(editSelection.x * scaleX),
+        y: Math.floor(editSelection.y * scaleY),
+        width: Math.ceil(editSelection.width * scaleX),
+        height: Math.ceil(editSelection.height * scaleY),
+      },
+    });
+    setPendingImages([editSource]);
+    setIsEditPanelOpen(false);
+    setDraftEditSelection(null);
+    setEditStageSize(null);
+    selectionStartRef.current = null;
+    pendingRefocusRef.current = true;
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [editSelection, editSource]);
+
   useEffect(() => {
     if (!isEditPanelOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeEditPanel();
+      if (event.key === 'Escape') cancelEditPanel();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isEditPanelOpen, closeEditPanel]);
+  }, [isEditPanelOpen, cancelEditPanel]);
 
   const selectionPointFromEvent = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = editCanvasRef.current;
@@ -1870,29 +1933,18 @@ export default function PlaygroundPage() {
     }
   }, [draftEditSelection, selectionPointFromEvent]);
 
-  const createEditMaskBlob = useCallback(async (selection: EditSelectionRect) => {
-    const canvas = editCanvasRef.current;
-    if (!canvas || !editSource) throw new Error('Selection required');
-
-    const image = await loadImageElement(editSource.url);
+  const createEditMaskBlob = useCallback(async (edit: ConfirmedImageEdit) => {
     const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = image.naturalWidth;
-    maskCanvas.height = image.naturalHeight;
+    maskCanvas.width = edit.sourceWidth;
+    maskCanvas.height = edit.sourceHeight;
     const ctx = maskCanvas.getContext('2d');
     if (!ctx) throw new Error('Failed to create mask');
 
-    const scaleX = image.naturalWidth / canvas.width;
-    const scaleY = image.naturalHeight / canvas.height;
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
-    ctx.clearRect(
-      Math.floor(selection.x * scaleX),
-      Math.floor(selection.y * scaleY),
-      Math.ceil(selection.width * scaleX),
-      Math.ceil(selection.height * scaleY),
-    );
+    ctx.clearRect(edit.selection.x, edit.selection.y, edit.selection.width, edit.selection.height);
     return canvasToBlob(maskCanvas);
-  }, [editSource]);
+  }, []);
 
   const submitImageEdit = useCallback(async () => {
     if (!activeId || isStreaming || isEditingImage) return;
@@ -1907,12 +1959,7 @@ export default function PlaygroundPage() {
       setError(t('playground.select_image_model_first'));
       return;
     }
-    if (!editSource) {
-      setRetryRequest(null);
-      setError(t('playground.choose_source_image_first'));
-      return;
-    }
-    if (!editSelection) {
+    if (!confirmedImageEdit) {
       setRetryRequest(null);
       setError(t('playground.select_image_region_first', { defaultValue: 'Select a region to edit first.' }));
       return;
@@ -1927,18 +1974,16 @@ export default function PlaygroundPage() {
 
     const groupID = resolveGroupID();
     let conversationID = activeId;
-    const canvas = editCanvasRef.current;
-    const selection = editSelection;
-    const editAnnotation = canvas ? {
+    const editAnnotation = {
       imageIndex: 0,
       rect: {
-        x: selection.x / canvas.width,
-        y: selection.y / canvas.height,
-        width: selection.width / canvas.width,
-        height: selection.height / canvas.height,
+        x: confirmedImageEdit.selection.x / confirmedImageEdit.sourceWidth,
+        y: confirmedImageEdit.selection.y / confirmedImageEdit.sourceHeight,
+        width: confirmedImageEdit.selection.width / confirmedImageEdit.sourceWidth,
+        height: confirmedImageEdit.selection.height / confirmedImageEdit.sourceHeight,
       },
-    } : null;
-    const userContent = messageContentWithImages(prompt, [editSource], editAnnotation ? [editAnnotation] : []);
+    };
+    const userContent = messageContentWithImages(prompt, [confirmedImageEdit.source], [editAnnotation]);
     const localUserMessage: Message = {
       id: Date.now(),
       conversation_id: activeId,
@@ -1999,17 +2044,17 @@ export default function PlaygroundPage() {
 
       const abort = new AbortController();
       abortRef.current = abort;
-      const maskBlob = await createEditMaskBlob(selection);
+      const maskBlob = await createEditMaskBlob(confirmedImageEdit);
       if (abort.signal.aborted) return;
 
-      const editImageElement = await loadImageElement(editSource.url);
-      const editSize = resolvedImageSize || sourceAlignedImageSize(editImageElement.naturalWidth, editImageElement.naturalHeight);
+      const editSize = resolvedImageSize || sourceAlignedImageSize(confirmedImageEdit.sourceWidth, confirmedImageEdit.sourceHeight);
       if (abort.signal.aborted) return;
 
+      const editPrompt = `${prompt}\n\nEdit only the transparent area indicated by the mask. Keep everything outside the mask unchanged.`;
       const form = new FormData();
       form.append('model', selectedModelID);
-      form.append('prompt', prompt);
-      form.append('image', editSource.file, editSource.name || 'image.png');
+      form.append('prompt', editPrompt);
+      form.append('image', confirmedImageEdit.source.file, confirmedImageEdit.source.name || 'image.png');
       form.append('mask', maskBlob, 'mask.png');
       if (editSize) form.append('size', editSize);
 
@@ -2038,7 +2083,9 @@ export default function PlaygroundPage() {
           ? { ...c, title: titleFromMessageContent(userContent), updated_at: new Date().toISOString() }
           : c
       ));
+      setPendingImages([]);
       setEditSource(null);
+      setConfirmedImageEdit(null);
       setIsEditPanelOpen(false);
       setEditSelection(null);
       setDraftEditSelection(null);
@@ -2056,7 +2103,7 @@ export default function PlaygroundPage() {
       setStreamConversationId(null);
       streamContextRef.current = null;
     }
-  }, [activeId, createEditMaskBlob, editSelection, editSource, input, isEditingImage, isStreaming, resolveGroupID, resolvedImageSize, selectedModelID, selectedModelIsImage, selectedPlatform, t]);
+  }, [activeId, confirmedImageEdit, createEditMaskBlob, input, isEditingImage, isStreaming, resolveGroupID, resolvedImageSize, selectedModelID, selectedModelIsImage, selectedPlatform, t]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const files = Array.from(e.clipboardData.items)
@@ -2071,6 +2118,7 @@ export default function PlaygroundPage() {
 
   const removePendingImage = useCallback((id: string) => {
     setPendingImages(prev => prev.filter(image => image.id !== id));
+    setConfirmedImageEdit(current => current?.source.id === id ? null : current);
   }, []);
 
   const stopStreaming = useCallback(() => {
@@ -2103,10 +2151,10 @@ export default function PlaygroundPage() {
   const activeConv = conversations.find(c => c.id === activeId);
   const lastMessage = messages[messages.length - 1];
   const visibleEditSelection = draftEditSelection || editSelection;
-  const isImageEditReady = Boolean(isEditPanelOpen && editSource && editSelection && input.trim() && selectedPlatform && selectedModelID && selectedModelIsImage);
+  const isEditSelectionConfirmable = Boolean(isEditPanelOpen && editSource && editSelection);
   const hasRecoverableUserMessage = Boolean(activeId && activeId !== DRAFT_CONVERSATION_ID && lastMessage?.role === 'user' && !error && !isStreaming);
   const isActiveConversationStreaming = isStreaming && streamConversationId === activeId;
-  const canSendMessage = Boolean((isEditPanelOpen ? isImageEditReady : (input.trim() || pendingImages.length > 0)) && selectedPlatform && selectedModelID) && !isStreaming && !isEditingImage;
+  const canSendMessage = Boolean((input.trim() || (pendingImages.length > 0 && !confirmedImageEdit)) && selectedPlatform && selectedModelID) && !isStreaming && !isEditingImage;
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -2116,13 +2164,13 @@ export default function PlaygroundPage() {
         setError(t('playground.select_model_first'));
         return;
       }
-      if (isEditPanelOpen) {
+      if (confirmedImageEdit) {
         void submitImageEdit();
         return;
       }
       sendMessage();
     }
-  }, [isEditPanelOpen, selectedModelID, selectedPlatform, sendMessage, submitImageEdit, t]);
+  }, [confirmedImageEdit, selectedModelID, selectedPlatform, sendMessage, submitImageEdit, t]);
 
   const triggerImagePicker = useCallback(() => {
     fileInputRef.current?.click();
@@ -2184,8 +2232,8 @@ export default function PlaygroundPage() {
     });
   }, [activeConv, activeId, isStreaming, messages, models, reasoningEffort, resolveGroupID, resolvedImageSize, selectedModelID, selectedPlatform, streamAssistantResponse]);
 
-  const handleImagePreview = useCallback((url: string, alt: string) => {
-    setPreviewImage({ url, alt });
+  const handleImagePreview = useCallback((url: string, alt: string, imageIndex = 0) => {
+    setPreviewImage({ images: [{ url, alt }], index: imageIndex });
   }, []);
 
   const handleImageDownload = useCallback((url: string, alt: string) => {
@@ -2194,7 +2242,33 @@ export default function PlaygroundPage() {
       .catch(() => setInteractionNotice(t('playground.download_failed')));
   }, [t]);
 
-  const regenerateImage = useCallback((messageIndex: number) => {
+  const showImagePreview = useCallback((images: PreviewImage[], index: number) => {
+    if (!images.length) return;
+    setPreviewImage({ images, index: clampNumber(index, 0, images.length - 1) });
+  }, []);
+
+  const showNextPreviewImage = useCallback((direction: -1 | 1) => {
+    setPreviewImage(current => {
+      if (!current || current.images.length < 2) return current;
+      return {
+        ...current,
+        index: (current.index + direction + current.images.length) % current.images.length,
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!previewImage) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreviewImage(null);
+      if (event.key === 'ArrowLeft') showNextPreviewImage(-1);
+      if (event.key === 'ArrowRight') showNextPreviewImage(1);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [previewImage, showNextPreviewImage]);
+
+  const regenerateImage = useCallback((messageIndex: number, imageIndex: number) => {
     if (isStreaming || !activeId || activeId === DRAFT_CONVERSATION_ID) return;
 
     const sourceIndex = messages.slice(0, messageIndex).map(msg => msg.role).lastIndexOf('user');
@@ -2204,23 +2278,120 @@ export default function PlaygroundPage() {
       return;
     }
 
-    const sourceMessages = messages.slice(0, sourceIndex + 1);
     const sourceMessage = messages[sourceIndex];
     const assistantMessage = messages[messageIndex];
+    if (!assistantMessage) {
+      setError(t('playground.no_image_prompt'));
+      return;
+    }
+    const images = generatedImages(assistantMessage.content);
+    const targetImage = images[imageIndex];
+    if (!targetImage) {
+      setError(t('playground.no_image_prompt'));
+      return;
+    }
+
     const requestModel = assistantMessage.model || selectedModelID;
     const requestPlatform = assistantMessage.platform || sourceMessage.platform || selectedPlatform;
+    if (!requestModel || !requestPlatform) {
+      setError('Model required');
+      return;
+    }
+
     const requestModelInfo = models.find(item => item.id === requestModel && item.platform === requestPlatform) || models.find(item => item.id === requestModel);
-    void streamAssistantResponse({
-      conversationID: activeId,
-      requestMessages: sourceMessages,
-      model: requestModel,
-      groupID: assistantMessage.group_id || sourceMessage.group_id || resolveGroupID(),
-      platform: requestPlatform,
-      isImageRequest: true,
-      imageSize: resolvedImageSize,
-      supportsReasoning: supportsReasoning(requestModelInfo),
+    const retryPrompt = [
+      `Regenerate only image ${imageIndex + 1} of ${images.length}.`,
+      'Generate exactly one standalone replacement image for this slot.',
+      'Do not create a collage, grid, contact sheet, split-screen, infographic, or multi-panel layout.',
+      'Original request:',
+      stripImagePlannerNoise(sourceMessage.content),
+    ].filter(Boolean).join('\n\n');
+    const prompt = contentWithImageShotPrompt(sourceMessage.content, retryPrompt);
+    const requestMessages = messages.slice(0, sourceIndex + 1).map((msg, index) => index === sourceIndex ? { ...msg, content: prompt } : { ...msg });
+
+    setError('');
+    setRetryRequest(null);
+    setRegeneratingImage({ messageID: assistantMessage.id, imageIndex });
+    setInteractionNotice(t('playground.regenerating_image', { defaultValue: 'Regenerating image…' }));
+    setIsStreaming(true);
+    setStreamConversationId(activeId);
+    streamContextRef.current = { conversationId: activeId, model: requestModel };
+    setStreamContent('');
+    setStreamReasoning('');
+
+    const abort = new AbortController();
+    abortRef.current = abort;
+    let accumulated = '';
+    let accumulatedReasoning = '';
+
+    void chatCompletionsStream(
+      requestPlatform,
+      {
+        model: requestModel,
+        messages: requestMessages.map(msg => ({
+          role: msg.role,
+          content: toChatMessageContent(msg.role, replaceBlobUrlsWithBase64(msg.content, blobUrlRegistryRef.current)),
+        })),
+        stream: true,
+        n: 1,
+        ...(resolvedImageSize ? { size: resolvedImageSize } : {}),
+        ...(supportsReasoning(requestModelInfo) ? { reasoning_effort: reasoningEffort } : {}),
+      },
+      {
+        onData: (text) => {
+          accumulated += replaceBase64WithBlobUrls(text, blobUrlRegistryRef.current);
+        },
+        onReasoning: (text) => {
+          accumulatedReasoning += text;
+          setStreamReasoning(accumulatedReasoning);
+        },
+        onDone: async (usage) => {
+          if (!accumulated || abort.signal.aborted) return;
+          const nextImages = generatedImages(accumulated);
+          const replacement = nextImages[0];
+          if (!replacement) {
+            setError(t('playground.no_response'));
+            return;
+          }
+
+          const replacementMarkdown = `![${escapeMarkdownAlt(replacement.alt || targetImage.alt || t('playground.generated_image'))}](${replacement.url})`;
+          const retryLabel = t('playground.regenerated_image_label', { defaultValue: 'Regenerated image for image {{index}}', index: imageIndex + 1 });
+          const nextContent = `${retryLabel}\n\n${replacementMarkdown}`;
+          const persisted = await api.persistMessage({
+            conversation_id: activeId,
+            role: 'assistant',
+            content: replaceBlobUrlsWithBase64(nextContent, blobUrlRegistryRef.current),
+            reasoning: accumulatedReasoning,
+            platform: requestPlatform,
+            model: usage.model || requestModel,
+            group_id: assistantMessage.group_id,
+            input_tokens: usage.input_tokens,
+            output_tokens: usage.output_tokens,
+            cost: usage.cost,
+          });
+          if (activeIdRef.current === activeId) {
+            setMessagesRaw(prev => [...prev, { ...persisted, content: nextContent }]);
+            setInteractionNotice(t('playground.image_regenerated', { defaultValue: 'Image regenerated' }));
+          }
+        },
+        onError: (err) => {
+          if (activeIdRef.current === activeId) setError(err);
+        },
+      },
+      abort.signal,
+    ).catch(err => {
+      if (activeIdRef.current === activeId && err instanceof Error) setError(err.message);
+    }).finally(() => {
+      if (activeIdRef.current === activeId) {
+        setStreamContent('');
+        setStreamReasoning('');
+        setStreamConversationId(null);
+        streamContextRef.current = null;
+        setRegeneratingImage(null);
+        setIsStreaming(false);
+      }
     });
-  }, [activeId, isStreaming, messages, models, resolveGroupID, resolvedImageSize, selectedPlatform, selectedModelID, streamAssistantResponse, t]);
+  }, [activeId, isStreaming, messages, models, reasoningEffort, resolvedImageSize, selectedPlatform, selectedModelID, t]);
 
   const handleMessageCopy = useCallback((content: string) => {
     void copyText(content)
@@ -2234,6 +2405,50 @@ export default function PlaygroundPage() {
     generatedImageAlt: t('playground.generated_image'),
     isMobile,
   };
+
+  const renderImageDownloadButton = (image: PreviewImage, preventToggle = false) => (
+    <button
+      type="button"
+      style={styles.imageDownloadBtn}
+      title={t('playground.download_image')}
+      aria-label={t('playground.download_image')}
+      onClick={(event) => {
+        if (preventToggle) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        handleImageDownload(image.url, image.alt || t('playground.generated_image'));
+      }}
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <path d="M7 10l5 5 5-5" />
+        <path d="M12 15V3" />
+      </svg>
+    </button>
+  );
+
+  const renderImageEditButton = (image: PreviewImage, model?: string, platform?: string, preventToggle = false) => (
+    <button
+      type="button"
+      style={{ ...styles.regenerateImageBtn, opacity: isStreaming ? 0.5 : 1 }}
+      onClick={(event) => {
+        if (preventToggle) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        void editGeneratedImage(image.url, image.alt || t('playground.generated_image'), model, platform);
+      }}
+      disabled={isStreaming}
+      title={t('playground.edit_generated_image', { defaultValue: 'Edit this image' })}
+      aria-label={t('playground.edit_generated_image', { defaultValue: 'Edit this image' })}
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+      </svg>
+    </button>
+  );
 
   const renderCopyButton = (content: string, label = 'Copy message', preventToggle = false, buttonStyle: CSSProperties = {}) => (
     <button
@@ -2256,10 +2471,46 @@ export default function PlaygroundPage() {
     </button>
   );
 
-  const renderCopyableMessageContent = (targetID: string, content: string) => {
+  const renderCopyableMessageContent = (targetID: string, content: string, message?: Message) => {
     const copyVisible = isMobile || hoveredCopyTarget === targetID;
     const copyableText = copyableMessageText(content);
     const showCopyButton = hasCopyableMessageText(content);
+    const images = generatedImages(content);
+    const imageOptions: Partial<MessageContentOptions> = message && images.length > 0 ? {
+      onImagePreview: (_url, _alt, imageIndex) => showImagePreview(images, imageIndex),
+      imageActions: (image, imageIndex) => {
+        const isRegeneratingThisImage = regeneratingImage?.messageID === message.id && regeneratingImage.imageIndex === imageIndex;
+        return (
+          <>
+            {renderImageDownloadButton(image)}
+            {renderImageEditButton(image, message.model, message.platform)}
+            <button
+              type="button"
+              style={{ ...styles.regenerateImageBtn, opacity: isStreaming ? 0.5 : 1 }}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                regenerateImage(messages.findIndex(item => item.id === message.id), imageIndex);
+              }}
+              disabled={isStreaming}
+              title={isRegeneratingThisImage ? t('playground.regenerating_image', { defaultValue: 'Regenerating image…' }) : t('playground.retry_image')}
+              aria-label={isRegeneratingThisImage ? t('playground.regenerating_image', { defaultValue: 'Regenerating image…' }) : t('playground.retry_image')}
+            >
+              {isRegeneratingThisImage ? (
+                <span style={styles.imageRetrySpinner} />
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12a9 9 0 0 1-15.6 6" />
+                  <path d="M3 12a9 9 0 0 1 15.6-6" />
+                  <path d="M19 2v4h-4" />
+                  <path d="M5 22v-4h4" />
+                </svg>
+              )}
+            </button>
+          </>
+        );
+      },
+    } : {};
     const trailingInlineAction = showCopyButton ? (
       <span style={{
         ...styles.messageCopyAfterText,
@@ -2283,6 +2534,7 @@ export default function PlaygroundPage() {
       >
         {renderMessageContent(content, {
           ...interactiveMessageOptions,
+          ...imageOptions,
           trailingInlineAction,
         })}
       </div>
@@ -2308,27 +2560,56 @@ export default function PlaygroundPage() {
         />
       )}
 
-      {previewImage && (
-        <div
-          style={styles.imagePreviewOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-label={previewImage.alt || t('playground.image_preview')}
-          onClick={() => setPreviewImage(null)}
-        >
-          <div style={styles.imagePreviewModal} onClick={(event) => event.stopPropagation()}>
-            <img src={previewImage.url} alt={previewImage.alt} style={styles.imagePreviewLarge} />
-            <button
-              type="button"
-              style={styles.imagePreviewCloseBtn}
-              onClick={() => setPreviewImage(null)}
-              aria-label={t('playground.close_image_preview')}
-            >
-              ×
-            </button>
+      {previewImage && (() => {
+        const currentPreviewImage = previewImage.images[previewImage.index] || previewImage.images[0];
+        const hasPreviewNavigation = previewImage.images.length > 1;
+        return currentPreviewImage ? (
+          <div
+            style={styles.imagePreviewOverlay}
+            role="dialog"
+            aria-modal="true"
+            aria-label={currentPreviewImage.alt || t('playground.image_preview')}
+            onClick={() => setPreviewImage(null)}
+          >
+            <div style={styles.imagePreviewModal} onClick={(event) => event.stopPropagation()}>
+              <img src={currentPreviewImage.url} alt={currentPreviewImage.alt} style={styles.imagePreviewLarge} />
+              {hasPreviewNavigation && (
+                <>
+                  <button
+                    type="button"
+                    style={{ ...styles.imagePreviewNavBtn, left: 12 }}
+                    onClick={() => showNextPreviewImage(-1)}
+                    aria-label={t('playground.previous_image', { defaultValue: 'Previous image' })}
+                    title={t('playground.previous_image', { defaultValue: 'Previous image' })}
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...styles.imagePreviewNavBtn, right: 12 }}
+                    onClick={() => showNextPreviewImage(1)}
+                    aria-label={t('playground.next_image', { defaultValue: 'Next image' })}
+                    title={t('playground.next_image', { defaultValue: 'Next image' })}
+                  >
+                    ›
+                  </button>
+                  <div style={styles.imagePreviewCounter}>
+                    {previewImage.index + 1} / {previewImage.images.length}
+                  </div>
+                </>
+              )}
+              <button
+                type="button"
+                style={styles.imagePreviewCloseBtn}
+                onClick={() => setPreviewImage(null)}
+                aria-label={t('playground.close_image_preview')}
+              >
+                ×
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        ) : null;
+      })()}
 
       {selectedModelIsImage && isEditPanelOpen && (
         <div
@@ -2336,7 +2617,7 @@ export default function PlaygroundPage() {
           role="dialog"
           aria-modal="true"
           aria-label={t('playground.edit_image_region')}
-          onClick={closeEditPanel}
+          onClick={cancelEditPanel}
         >
           <div
             style={{ ...styles.editModalCard, ...(isMobile ? styles.editModalCardMobile : null) }}
@@ -2363,7 +2644,7 @@ export default function PlaygroundPage() {
                 <button
                   type="button"
                   style={styles.imageEditIconBtn}
-                  onClick={closeEditPanel}
+                  onClick={cancelEditPanel}
                   aria-label={t('playground.close_image_preview', { defaultValue: 'Close' })}
                 >
                   ×
@@ -2443,57 +2724,30 @@ export default function PlaygroundPage() {
                   <span>{error}</span>
                 </div>
               )}
-              <textarea
-                style={styles.editModalPrompt}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={t('playground.edit_prompt_placeholder', { defaultValue: 'Describe the change you want — e.g. "make the sky overcast" or "remove the person on the left".' })}
-                rows={3}
-                disabled={isActiveConversationStreaming}
-                autoFocus
-              />
               <div style={styles.editModalActions}>
                 <span style={styles.editModalHint}>
                   {editSelection
-                    ? t('playground.edit_modal_region_hint', { defaultValue: 'Region edit · only the selected area will change' })
-                    : t('playground.edit_modal_full_hint', { defaultValue: 'Select a region before generating an edit' })}
+                    ? t('playground.edit_modal_region_hint', { defaultValue: 'Selection confirmed here; describe the edit in the main chat input.' })
+                    : t('playground.edit_modal_full_hint', { defaultValue: 'Select a region, then confirm it before returning to chat.' })}
                 </span>
                 <div style={styles.editModalBtnGroup}>
                   <button
                     type="button"
                     style={styles.imageEditGhostBtn}
-                    onClick={closeEditPanel}
+                    onClick={cancelEditPanel}
                   >
                     {isActiveConversationStreaming
                       ? t('playground.edit_modal_run_in_background', { defaultValue: 'Run in background' })
                       : t('playground.cancel', { defaultValue: 'Cancel' })}
                   </button>
-                  {isActiveConversationStreaming ? (
-                    <button
-                      type="button"
-                      style={styles.editModalSubmitBtn}
-                      onClick={stopStreaming}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                        <rect x="2" y="2" width="8" height="8" rx="1" />
-                      </svg>
-                      {t('playground.stop')}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      style={{ ...styles.editModalSubmitBtn, opacity: isImageEditReady ? 1 : 0.4 }}
-                      onClick={() => void submitImageEdit()}
-                      disabled={!isImageEditReady}
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 2L11 13" />
-                        <path d="M22 2l-7 20-4-9-9-4 20-7z" />
-                      </svg>
-                      {t('playground.edit_modal_submit', { defaultValue: 'Generate region edit' })}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    style={{ ...styles.editModalSubmitBtn, opacity: isEditSelectionConfirmable ? 1 : 0.4 }}
+                    onClick={() => void confirmEditSelection()}
+                    disabled={!isEditSelectionConfirmable || isActiveConversationStreaming}
+                  >
+                    {t('playground.confirm_selection', { defaultValue: 'Confirm selection' })}
+                  </button>
                 </div>
               </div>
             </div>
@@ -2667,62 +2921,12 @@ export default function PlaygroundPage() {
                     </div>
                   </details>
                 )}
-                {renderCopyableMessageContent(`message-${msg.id}`, msg.content)}
-                {!isUser && (messageHasGeneratedImage(msg.content) || msg.model) && (() => {
-                  const generatedImage = firstGeneratedImage(msg.content);
-                  return (
-                    <div style={messageHasGeneratedImage(msg.content) ? styles.imageMessageActions : styles.messageMeta}>
-                      {generatedImage && (
-                        <button
-                          type="button"
-                          style={styles.imageDownloadBtn}
-                          title={t('playground.download_image')}
-                          aria-label={t('playground.download_image')}
-                          onClick={() => handleImageDownload(generatedImage.url, generatedImage.alt || t('playground.generated_image'))}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                            <path d="M7 10l5 5 5-5" />
-                            <path d="M12 15V3" />
-                          </svg>
-                        </button>
-                      )}
-                      {generatedImage && (
-                        <button
-                          type="button"
-                          style={{ ...styles.regenerateImageBtn, opacity: isStreaming ? 0.5 : 1 }}
-                          onClick={() => editGeneratedImage(generatedImage.url, generatedImage.alt || t('playground.generated_image'), msg.model, msg.platform)}
-                          disabled={isStreaming}
-                          title={t('playground.edit_generated_image', { defaultValue: 'Edit this image' })}
-                          aria-label={t('playground.edit_generated_image', { defaultValue: 'Edit this image' })}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M12 20h9" />
-                            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                          </svg>
-                        </button>
-                      )}
-                      {generatedImage && (
-                        <button
-                          type="button"
-                          style={{ ...styles.regenerateImageBtn, opacity: isStreaming ? 0.5 : 1 }}
-                          onClick={() => regenerateImage(messageIndex)}
-                          disabled={isStreaming}
-                          title={t('playground.retry_image')}
-                          aria-label={t('playground.retry_image')}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 12a9 9 0 0 1-15.6 6" />
-                            <path d="M3 12a9 9 0 0 1 15.6-6" />
-                            <path d="M19 2v4h-4" />
-                            <path d="M5 22v-4h4" />
-                          </svg>
-                        </button>
-                      )}
-                      {msg.model && <span style={styles.metaBadge}>{msg.model}</span>}
-                    </div>
-                  );
-                })()}
+                {renderCopyableMessageContent(`message-${msg.id}`, msg.content, msg)}
+                {!isUser && msg.model && (
+                  <div style={styles.messageMeta}>
+                    <span style={styles.metaBadge}>{msg.model}</span>
+                  </div>
+                )}
               </div>
             </div>
             );
@@ -2851,12 +3055,35 @@ export default function PlaygroundPage() {
               {pendingImages.length > 0 && (
                 <div style={styles.imagePreviewList}>
                   {pendingImages.map(image => (
-                    <div key={image.id} style={styles.imagePreviewItem}>
+                    <div
+                      key={image.id}
+                      role="button"
+                      tabIndex={isActiveConversationStreaming ? -1 : 0}
+                      style={{
+                        ...styles.imagePreviewItem,
+                        ...(editSource?.id === image.id ? styles.imagePreviewItemActive : null),
+                        ...(isActiveConversationStreaming ? { cursor: 'default', opacity: 0.6 } : null),
+                      }}
+                      onClick={() => void openPendingImageForEdit(image)}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                        event.preventDefault();
+                        void openPendingImageForEdit(image);
+                      }}
+                      title={t('playground.edit_generated_image', { defaultValue: 'Edit this image' })}
+                      aria-label={t('playground.edit_generated_image', { defaultValue: 'Edit this image' })}
+                      aria-disabled={isActiveConversationStreaming}
+                    >
                       <img src={image.url} alt={image.name} style={styles.imagePreview} />
+                      <span style={styles.imagePreviewEditBadge}>{t('playground.edit')}</span>
                       <button
                         type="button"
                         style={styles.removeImageBtn}
-                        onClick={() => removePendingImage(image.id)}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          removePendingImage(image.id);
+                        }}
                         aria-label={`Remove ${image.name}`}
                       >
                         ×
@@ -2937,32 +3164,6 @@ export default function PlaygroundPage() {
                   })}
                 </div>
                 <div style={{ ...styles.inputButtonGroup, ...(isMobile ? styles.inputButtonGroupMobile : null) }}>
-                  {selectedModelIsImage && (
-                    <button
-                      type="button"
-                      style={{
-                        ...styles.attachBtn,
-                        ...(isEditPanelOpen ? styles.attachBtnActive : null),
-                        ...(isMobile ? styles.actionBtnMobile : null),
-                      }}
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => {
-                        if (editSource) {
-                          setIsEditPanelOpen(current => !current);
-                          return;
-                        }
-                        triggerEditImagePicker();
-                      }}
-                      disabled={isActiveConversationStreaming}
-                      title={t('playground.edit_image_region')}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 20h9" />
-                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                      </svg>
-                      {t('playground.edit')}
-                    </button>
-                  )}
                   <button
                     type="button"
                     style={{ ...styles.attachBtn, ...(isMobile ? styles.actionBtnMobile : null) }}
@@ -2998,7 +3199,7 @@ export default function PlaygroundPage() {
                       }}
                       onMouseDown={e => e.preventDefault()}
                       onClick={() => {
-                        if (isEditPanelOpen) {
+                        if (confirmedImageEdit) {
                           void submitImageEdit();
                           return;
                         }
@@ -3034,6 +3235,9 @@ const keyframes = `
 @keyframes pg-fadein {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pg-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ── Quiet Modern aesthetic ──
@@ -3742,6 +3946,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 8,
   },
   generatedImageFrame: {
+    position: 'relative',
     display: 'inline-flex',
     flexDirection: 'column',
     alignItems: 'flex-start',
@@ -3763,6 +3968,21 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'zoom-in',
     textAlign: 'left',
     font: 'inherit',
+  },
+  generatedImageActions: {
+    position: 'absolute',
+    left: 8,
+    bottom: 8,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: 4,
+    borderRadius: '999px',
+    border: `1px solid ${cssVar('borderSubtle')}`,
+    background: 'rgba(8, 12, 20, 0.72)',
+    color: '#edf4ff',
+    backdropFilter: 'blur(10px)',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.24)',
   },
   generatedImageOverlayWrap: {
     position: 'relative',
@@ -3804,15 +4024,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '999px',
     border: `1px solid ${cssVar('borderSubtle')}`,
     background: cssVar('bgSurface'),
-    color: cssVar('textSecondary'),
+    color: 'inherit',
     cursor: 'pointer',
     transition: cssVar('transition'),
-  },
-  imageMessageActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 0,
   },
   regenerateImageBtn: {
     display: 'inline-flex',
@@ -3824,9 +4038,17 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '999px',
     border: `1px solid ${cssVar('borderSubtle')}`,
     background: cssVar('bgSurface'),
-    color: cssVar('textSecondary'),
+    color: 'inherit',
     cursor: 'pointer',
     transition: cssVar('transition'),
+  },
+  imageRetrySpinner: {
+    width: 14,
+    height: 14,
+    borderRadius: '999px',
+    border: '2px solid currentColor',
+    borderTopColor: 'transparent',
+    animation: 'pg-spin 0.75s linear infinite',
   },
   imagePreviewOverlay: {
     position: 'absolute',
@@ -3850,6 +4072,38 @@ const styles: Record<string, React.CSSProperties> = {
     background: cssVar('bgDeep'),
     boxShadow: '0 28px 90px rgba(0, 0, 0, 0.45)',
     overflow: 'hidden',
+  },
+  imagePreviewNavBtn: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 42,
+    height: 42,
+    border: `1px solid rgba(255, 255, 255, 0.16)`,
+    borderRadius: '999px',
+    background: 'rgba(8, 12, 20, 0.72)',
+    color: '#edf4ff',
+    fontSize: 34,
+    lineHeight: 1,
+    cursor: 'pointer',
+    backdropFilter: 'blur(10px)',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.24)',
+  },
+  imagePreviewCounter: {
+    position: 'absolute',
+    left: '50%',
+    bottom: 12,
+    transform: 'translateX(-50%)',
+    padding: '5px 10px',
+    borderRadius: '999px',
+    background: 'rgba(8, 12, 20, 0.72)',
+    color: '#edf4ff',
+    fontSize: 12,
+    backdropFilter: 'blur(10px)',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.24)',
   },
   imagePreviewCloseBtn: {
     position: 'absolute',
@@ -4325,16 +4579,34 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'relative',
     width: 76,
     height: 76,
+    padding: 0,
     borderRadius: cssVar('radiusSm'),
     overflow: 'hidden',
     border: `1px solid ${cssVar('borderSubtle')}`,
     background: cssVar('bgHover'),
+    cursor: 'pointer',
+  },
+  imagePreviewItemActive: {
+    borderColor: cssVar('primary'),
+    boxShadow: `0 0 0 1px ${cssVar('primary')}`,
   },
   imagePreview: {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
     display: 'block',
+  },
+  imagePreviewEditBadge: {
+    position: 'absolute',
+    left: 4,
+    bottom: 4,
+    padding: '2px 6px',
+    borderRadius: 999,
+    background: 'rgba(0, 0, 0, 0.62)',
+    color: '#fff',
+    fontSize: 11,
+    lineHeight: '14px',
+    pointerEvents: 'none',
   },
   removeImageBtn: {
     position: 'absolute',

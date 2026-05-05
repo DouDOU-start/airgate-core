@@ -34,6 +34,7 @@ func (p *Plugin) RegisterRoutes(r sdk.RouteRegistrar) {
 
 	// Messages
 	r.Handle(http.MethodGet, "/messages/", p.requireUser(p.handleListMessages))
+	r.Handle(http.MethodPut, "/messages/", p.requireUser(p.handleUpdateMessage))
 	r.Handle(http.MethodPost, "/messages", p.requireUser(p.handlePersistMessage))
 	r.Handle(http.MethodPost, "/chat/completions", p.requireUser(p.handleChatCompletions))
 	r.Handle(http.MethodPost, "/images/edits", p.requireUser(p.handleImageEdits))
@@ -193,6 +194,27 @@ func (p *Plugin) handlePersistMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, msg)
+}
+
+func (p *Plugin) handleUpdateMessage(w http.ResponseWriter, r *http.Request) {
+	msgID := parsePathID(r.URL.Path, "/messages/")
+	if msgID <= 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid message id"})
+		return
+	}
+
+	var req UpdateMessageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	msg, err := p.svc.UpdateMessage(r.Context(), parseUserID(r), msgID, req)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, msg)
 }
 
 func (p *Plugin) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
