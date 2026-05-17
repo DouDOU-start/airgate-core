@@ -43,6 +43,10 @@ Plugins can be **released, installed, uninstalled, and hot-reloaded independentl
 | Plugin | Type | Capabilities | Repository |
 |---|---|---|---|
 | **gateway-openai** | gateway | OpenAI Responses / Chat Completions / ChatGPT OAuth / Anthropic protocol translation / WebSocket | [DouDOU-start/airgate-openai](https://github.com/DouDOU-start/airgate-openai) |
+| **gateway-claude** | gateway | Claude Messages API gateway: OAuth authorization, TLS fingerprinting, usage monitoring | [DouDOU-start/airgate-claude](https://github.com/DouDOU-start/airgate-claude) |
+| **gateway-kiro** | gateway | Kiro (AWS CodeWhisperer) reverse proxy gateway compatible with Anthropic Messages API | [DouDOU-start/airgate-kiro](https://github.com/DouDOU-start/airgate-kiro) |
+| **airgate-playground** | extension | AI chat plugin: web chat, multi-model switching, conversation management | [DouDOU-start/airgate-playground](https://github.com/DouDOU-start/airgate-playground) |
+| **airgate-studio** | extension | Unified creation center for multimodal image, video, and audio generation | [DouDOU-start/airgate-studio](https://github.com/DouDOU-start/airgate-studio) |
 | **payment-epay** | extension | Multi-channel payment: EPay (Xunhu/Rainbow) / Alipay Official / WeChat Pay Official, with recharge page, order management, provider configuration | [DouDOU-start/airgate-epay](https://github.com/DouDOU-start/airgate-epay) |
 | **airgate-health** | extension | AI provider health monitoring: active probing, availability/latency aggregation, public status page | [DouDOU-start/airgate-health](https://github.com/DouDOU-start/airgate-health) |
 
@@ -122,7 +126,7 @@ sudo systemctl enable airgate-core
 # Final config gets written to /etc/airgate-core/config.yaml
 ```
 
-After the admin UI is up, go to **Plugin Management → Marketplace** to install gateway-openai / payment-epay / airgate-health on demand (`/var/lib/airgate-core/plugins` is the persistent location).
+After the admin UI is up, go to **Plugin Management → Marketplace** to install gateway-openai / gateway-claude / gateway-kiro / airgate-playground / airgate-studio / payment-epay / airgate-health on demand (`/var/lib/airgate-core/plugins` is the persistent location).
 
 **Upgrade / uninstall**:
 

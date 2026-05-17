@@ -668,6 +668,12 @@ func TestPersistRateLimitFromWindows(t *testing.T) {
 				map[string]any{"key": "5h", "used_percent": 42.0, "reset_seconds": float64(600)},
 			},
 		},
+		// 插件显式声明忽略限流：即使用量超过 100%，也不写 rate_limited
+		"9": map[string]any{
+			"windows": []any{
+				map[string]any{"key": "monthly", "used_percent": 180.0, "reset_seconds": float64(3600), "ignore_limit": true},
+			},
+		},
 		// 无 windows：跳过
 		"1": map[string]any{},
 	}
@@ -688,6 +694,12 @@ func TestPersistRateLimitFromWindows(t *testing.T) {
 
 	if !writer.cleared[3] {
 		t.Errorf("account 3 should have ClearRateLimited called")
+	}
+	if _, ok := writer.rateLimited[9]; ok {
+		t.Errorf("account 9 uses ignore_limit, should not call MarkRateLimited")
+	}
+	if !writer.cleared[9] {
+		t.Errorf("account 9 uses ignore_limit, should have ClearRateLimited called")
 	}
 	if _, ok := writer.rateLimited[1]; ok {
 		t.Errorf("account 1 has no windows, should not call MarkRateLimited")

@@ -882,6 +882,7 @@ func (s *Service) getUpstreamUsage(ctx context.Context, platform string) (map[st
 
 // persistRateLimitFromWindows 扫描每个账号的 windows，把"有窗口已 100%"的情况
 // 当作限流态通过状态机写入（与真实 429 走同一入口）。
+// 插件可在 window 上返回 ignore_limit=true，表示该窗口仅用于展示，不参与调度限流。
 //
 //   - 任意窗口 used_percent >= 100 → MarkRateLimited 到所有已满窗口中最晚的 reset_at
 //   - 所有窗口 < 100%              → ClearRateLimited，账号回到 active
@@ -910,6 +911,9 @@ func (s *Service) persistRateLimitFromWindows(ctx context.Context, accounts map[
 			if !ok {
 				continue
 			}
+			if usageWindowIgnoresLimit(wm) {
+				continue
+			}
 			pct, _ := wm["used_percent"].(float64)
 			if pct < 100 {
 				continue
@@ -931,6 +935,16 @@ func (s *Service) persistRateLimitFromWindows(ctx context.Context, accounts map[
 			s.stateWriter.ClearRateLimited(ctx, id)
 		}
 	}
+}
+
+func usageWindowIgnoresLimit(w map[string]any) bool {
+	if ignore, ok := w["ignore_limit"].(bool); ok && ignore {
+		return true
+	}
+	if enforce, ok := w["enforce_limit"].(bool); ok && !enforce {
+		return true
+	}
+	return false
 }
 
 // parseWindowReset 从 window map 解析 reset 时间。

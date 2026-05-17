@@ -79,7 +79,7 @@ type Marketplace struct {
 }
 
 // 默认刷新间隔：6 小时
-// 6 个插件 × 4 次/天 = 24 次/天，未认证 IP 配额 60/h 也绰绰有余；
+// 7 个插件 × 4 次/天 = 28 次/天，未认证 IP 配额 60/h 也绰绰有余；
 // 配合 ETag 条件请求，未变更时返回 304 不计配额。
 const defaultRefreshInterval = 6 * time.Hour
 
@@ -142,6 +142,22 @@ var officialPlugins = []MarketplacePlugin{
 		Author:      "AirGate",
 		Type:        "gateway",
 		GithubRepo:  "DouDOU-start/airgate-claude",
+	},
+	{
+		Name:        "gateway-kiro",
+		Version:     "1.0.0",
+		Description: "Kiro (AWS CodeWhisperer) 反代网关，兼容 Anthropic Messages API",
+		Author:      "AirGate",
+		Type:        "gateway",
+		GithubRepo:  "DouDOU-start/airgate-kiro",
+	},
+	{
+		Name:        "airgate-studio",
+		Version:     "0.1.0",
+		Description: "面向图片、视频、音频等多模态内容生成的统一创作中心",
+		Author:      "AirGate",
+		Type:        "extension",
+		GithubRepo:  "DouDOU-start/airgate-studio",
 	},
 }
 
