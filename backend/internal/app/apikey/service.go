@@ -72,6 +72,31 @@ func (s *Service) ListByUser(ctx context.Context, userID int, filter ListFilter,
 	}, nil
 }
 
+// ListAdmin 查询全局 API Key 列表。
+// 仅用于管理员选择器等轻量查询，不附加用量聚合，避免搜索时触发额外统计查询。
+func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult, error) {
+	logger := sdk.LoggerFromContext(ctx)
+	page, pageSize := normalizePage(filter.Page, filter.PageSize)
+	filter.Page = page
+	filter.PageSize = pageSize
+
+	list, total, err := s.repo.ListAdmin(ctx, filter)
+	if err != nil {
+		logger.Error("api_key_lookup_failed",
+			sdk.LogFieldReason, "admin_list",
+			sdk.LogFieldError, err,
+		)
+		return ListResult{}, err
+	}
+
+	return ListResult{
+		List:     list,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
+}
+
 // CreateOwned 创建当前用户的 API Key。
 func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput) (Key, error) {
 	logger := sdk.LoggerFromContext(ctx)

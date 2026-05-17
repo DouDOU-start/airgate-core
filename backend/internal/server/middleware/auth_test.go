@@ -59,6 +59,7 @@ func TestAdminOnlyRejectsMissingOrNonAdminRole(t *testing.T) {
 	}{
 		{"missing_role", ""},
 		{"user_role", "user"},
+		{"api_key_role", "api_key"},
 	}
 
 	for _, tt := range tests {
@@ -84,40 +85,38 @@ func TestAdminOnlyRejectsMissingOrNonAdminRole(t *testing.T) {
 	}
 }
 
-func TestAdminOnlyRejectsAPIKeyScopedAdminRole(t *testing.T) {
-	router := gin.New()
-	router.Use(func(c *gin.Context) {
-		c.Set(CtxKeyRole, "admin")
-		c.Set(CtxKeyAPIKeyID, 17)
-	})
-	router.Use(AdminOnly())
-	router.GET("/admin", func(c *gin.Context) {
-		c.String(http.StatusOK, "ok")
-	})
-
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/admin", nil))
-
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("状态码 = %d，期望 %d", w.Code, http.StatusForbidden)
+func TestRequireRoles(t *testing.T) {
+	tests := []struct {
+		name     string
+		role     string
+		wantCode int
+	}{
+		{"missing_role", "", http.StatusForbidden},
+		{"api_key_role", "api_key", http.StatusForbidden},
+		{"user_role", "user", http.StatusOK},
+		{"admin_role", "admin", http.StatusOK},
 	}
-}
 
-func TestRejectAPIKeySession(t *testing.T) {
-	router := gin.New()
-	router.Use(func(c *gin.Context) {
-		c.Set(CtxKeyAPIKeyID, 17)
-	})
-	router.Use(RejectAPIKeySession())
-	router.GET("/account", func(c *gin.Context) {
-		c.String(http.StatusOK, "ok")
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := gin.New()
+			router.Use(func(c *gin.Context) {
+				if tt.role != "" {
+					c.Set(CtxKeyRole, tt.role)
+				}
+			})
+			router.Use(RequireRoles("admin", "user"))
+			router.GET("/account", func(c *gin.Context) {
+				c.String(http.StatusOK, "ok")
+			})
 
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/account", nil))
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/account", nil))
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("状态码 = %d，期望 %d", w.Code, http.StatusForbidden)
+			if w.Code != tt.wantCode {
+				t.Fatalf("状态码 = %d，期望 %d", w.Code, tt.wantCode)
+			}
+		})
 	}
 }
 

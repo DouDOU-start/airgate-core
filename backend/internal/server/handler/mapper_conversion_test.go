@@ -116,8 +116,17 @@ func TestDashboardAndUsageMappers(t *testing.T) {
 	}
 
 	logResp := toUsageLogResp(appusage.LogRecord{ID: 9, Model: "gpt", ActualCost: 1.2, BilledCost: 2.4})
-	customerResp := toCustomerUsageLogResp(appusage.LogRecord{ID: 9, Model: "gpt", ActualCost: 1.2, BilledCost: 2.4})
-	if logResp.ActualCost != 1.2 || customerResp.BilledCost != 2.4 || customerResp.Model != "gpt" {
+	customerResp := toCustomerUsageLogResp(appusage.LogRecord{
+		ID:                    9,
+		Model:                 "gpt",
+		ActualCost:            1.2,
+		BilledCost:            2.4,
+		CacheCreationTokens:   11,
+		ReasoningOutputTokens: 22,
+		ReasoningEffort:       "high",
+	})
+	if logResp.ActualCost != 1.2 || customerResp.BilledCost != 2.4 || customerResp.Model != "gpt" ||
+		customerResp.CacheCreationTokens != 11 || customerResp.ReasoningOutputTokens != 22 || customerResp.ReasoningEffort != "high" {
 		t.Fatalf("用量日志响应异常: full=%+v customer=%+v", logResp, customerResp)
 	}
 

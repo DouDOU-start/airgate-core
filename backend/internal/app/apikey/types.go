@@ -101,6 +101,7 @@ type Mutation struct {
 // Repository API Key 持久化接口。
 type Repository interface {
 	ListByUser(context.Context, int, ListFilter) ([]Key, int64, error)
+	ListAdmin(context.Context, ListFilter) ([]Key, int64, error)
 	// KeyUsage 返回每个 key 的"今日"和"近 30 天"实际成本。
 	// todayStart 必须由调用方按用户时区计算好。
 	KeyUsage(ctx context.Context, keyIDs []int, todayStart time.Time) (map[int]float64, map[int]float64, error)

@@ -6,7 +6,7 @@ type UserResp struct {
 	Email                 string            `json:"email"`
 	Username              string            `json:"username"`
 	Balance               float64           `json:"balance"`
-	Role                  string            `json:"role"` // admin / user
+	Role                  string            `json:"role"` // admin / user / api_key
 	MaxConcurrency        int               `json:"max_concurrency"`
 	GroupRates            map[int64]float64 `json:"group_rates,omitempty"`       // 用户专属分组倍率
 	AllowedGroupIDs       []int64           `json:"allowed_group_ids,omitempty"` // 已分配的专属分组 ID

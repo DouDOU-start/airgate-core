@@ -9,7 +9,7 @@ import { Suspense, useEffect } from 'react';
 import type { ElementType, ReactNode } from 'react';
 import { useAuth } from './providers/AuthProvider';
 import { ErrorBoundary } from './providers/ErrorBoundary';
-import { getToken, getTokenAPIKeyID, getTokenRole } from '../shared/api/client';
+import { getToken, getTokenRole } from '../shared/api/client';
 import { ChatPageLoading, FullPageLoading, PageLoading } from '../shared/components/PageLoading';
 import { checkAdmin, withSetupCheck } from './routeGuards';
 import {
@@ -229,7 +229,7 @@ const userUsageRoute = createRoute({ getParentRoute: () => authLayout, path: '/u
 const chatBeforeLoad = () => withSetupCheck((needs) => {
   if (needs) throw redirect({ to: '/setup' });
   if (!getToken()) throw redirect({ to: '/home' });
-  if (getTokenAPIKeyID()) throw redirect({ to: '/' });
+  if (getTokenRole() === 'api_key') throw redirect({ to: '/' });
 });
 const chatRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -270,7 +270,7 @@ const pluginRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/plugins/$pluginName/$',
   beforeLoad: () => {
-    if (getTokenAPIKeyID()) throw redirect({ to: '/' });
+    if (getTokenRole() === 'api_key') throw redirect({ to: '/' });
   },
   component: () => (
     <Suspense fallback={<PageLoading />}>

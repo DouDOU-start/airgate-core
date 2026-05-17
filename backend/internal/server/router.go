@@ -63,29 +63,30 @@ func (s *Server) registerRoutes() {
 	userGroup := v1.Group("")
 	userGroup.Use(middleware.JWTAuth(s.jwtMgr))
 	{
-		fullSessionOnly := middleware.RejectAPIKeySession()
+		accountGroup := userGroup.Group("")
+		accountGroup.Use(middleware.RequireRoles("admin", "user"))
 
 		// 用户资料
 		userGroup.GET("/users/me", handlers.User.GetMe)
-		userGroup.PUT("/users/me", fullSessionOnly, handlers.User.UpdateProfile)
-		userGroup.POST("/users/me/password", fullSessionOnly, handlers.User.ChangePassword)
-		userGroup.PUT("/users/me/balance-alert", fullSessionOnly, handlers.User.UpdateBalanceAlert)
-		userGroup.GET("/users/me/balance-history", fullSessionOnly, handlers.User.GetMyBalanceHistory)
+		accountGroup.PUT("/users/me", handlers.User.UpdateProfile)
+		accountGroup.POST("/users/me/password", handlers.User.ChangePassword)
+		accountGroup.PUT("/users/me/balance-alert", handlers.User.UpdateBalanceAlert)
+		accountGroup.GET("/users/me/balance-history", handlers.User.GetMyBalanceHistory)
 
 		// API Key 管理
-		userGroup.GET("/api-keys", fullSessionOnly, handlers.APIKey.ListKeys)
-		userGroup.POST("/api-keys", fullSessionOnly, handlers.APIKey.CreateKey)
-		userGroup.PUT("/api-keys/:id", fullSessionOnly, handlers.APIKey.UpdateKey)
-		userGroup.DELETE("/api-keys/:id", fullSessionOnly, handlers.APIKey.DeleteKey)
-		userGroup.GET("/api-keys/:id/reveal", fullSessionOnly, handlers.APIKey.RevealKey)
+		accountGroup.GET("/api-keys", handlers.APIKey.ListKeys)
+		accountGroup.POST("/api-keys", handlers.APIKey.CreateKey)
+		accountGroup.PUT("/api-keys/:id", handlers.APIKey.UpdateKey)
+		accountGroup.DELETE("/api-keys/:id", handlers.APIKey.DeleteKey)
+		accountGroup.GET("/api-keys/:id/reveal", handlers.APIKey.RevealKey)
 
 		// 分组
-		userGroup.GET("/groups", fullSessionOnly, handlers.Group.ListAvailableGroups)
+		accountGroup.GET("/groups", handlers.Group.ListAvailableGroups)
 
 		// 订阅
-		userGroup.GET("/subscriptions", fullSessionOnly, handlers.Subscription.UserSubscriptions)
-		userGroup.GET("/subscriptions/active", fullSessionOnly, handlers.Subscription.ActiveSubscriptions)
-		userGroup.GET("/subscriptions/progress", fullSessionOnly, handlers.Subscription.SubscriptionProgress)
+		accountGroup.GET("/subscriptions", handlers.Subscription.UserSubscriptions)
+		accountGroup.GET("/subscriptions/active", handlers.Subscription.ActiveSubscriptions)
+		accountGroup.GET("/subscriptions/progress", handlers.Subscription.SubscriptionProgress)
 
 		// 使用记录
 		userGroup.GET("/usage", handlers.Usage.UserUsage)
@@ -94,7 +95,7 @@ func (s *Server) registerRoutes() {
 
 		// 插件菜单（精简元信息：仅返回 name + frontend_pages，普通账号会话可访问，
 		// 用于前端 AppShell 渲染插件提供的页面菜单项）
-		userGroup.GET("/plugins/menu", fullSessionOnly, handlers.Plugin.ListPluginMenu)
+		accountGroup.GET("/plugins/menu", handlers.Plugin.ListPluginMenu)
 	}
 
 	// === 管理员路由（需要管理员 JWT + AdminOnly，支持 admin- 管理员 API Key） ===
@@ -144,6 +145,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.DELETE("/groups/:id/rate-overrides/:userId", handlers.User.DeleteGroupRateOverride)
 
 		// API 密钥管理（管理员）
+		adminGroup.GET("/api-keys", handlers.APIKey.AdminListKeys)
 		adminGroup.PUT("/api-keys/:id", handlers.APIKey.AdminUpdateKey)
 
 		// 订阅管理
@@ -213,7 +215,7 @@ func (s *Server) registerRoutes() {
 	// 用于支付插件等面向用户的扩展，让普通用户能调用插件接口（创建充值订单、查询自己订单等）。
 	// 插件需自行根据 X-Airgate-User-ID 头识别用户，并校验数据归属。
 	extUserGroup := r.Group("/api/v1/ext-user")
-	extUserGroup.Use(middleware.JWTAuth(s.jwtMgr), middleware.RejectAPIKeySession())
+	extUserGroup.Use(middleware.JWTAuth(s.jwtMgr), middleware.RequireRoles("admin", "user"))
 	{
 		extUserGroup.Any("/:pluginName/*path", s.extensionProxy.Handle)
 	}

@@ -30,7 +30,7 @@ const AuthContext = createContext<AuthContextType>({
 function normalizeSessionUser(user: UserResp, token = getToken()): UserResp {
   const role = getTokenRole(token);
   const apiKeyID = getTokenAPIKeyID(token);
-  const effectiveRole = apiKeyID ? 'user' : (role ?? user.role);
+  const effectiveRole: UserResp['role'] = apiKeyID ? 'api_key' : (role ?? user.role);
 
   return {
     ...user,
@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = '/login';
   }, []);
 
-  const isAPIKeySession = !!(user?.api_key_id && user.api_key_id > 0);
+  const isAPIKeySession = user?.role === 'api_key' || !!(user?.api_key_id && user.api_key_id > 0);
   const value = useMemo(
     () => ({ user, loading, isAPIKeySession, login, logout }),
     [isAPIKeySession, loading, login, logout, user],

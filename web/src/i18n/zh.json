@@ -641,6 +641,7 @@
     "model_placeholder": "模型名称",
     "user_id": "用户 ID",
     "search_user": "搜索用户",
+    "search_api_key": "搜索 API Key",
     "total_requests": "总请求数",
     "total_tokens": "总 Token",
     "total_cost": "总费用",

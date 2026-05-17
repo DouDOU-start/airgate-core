@@ -183,7 +183,7 @@ export function AppShell({ children }: AppShellProps) {
     }
   }, [mobileOpen]);
 
-  const isAPIKeySession = !!(user?.api_key_id && user.api_key_id > 0);
+  const isAPIKeySession = user?.role === 'api_key' || !!(user?.api_key_id && user.api_key_id > 0);
   const isAdmin = !isAPIKeySession && (getTokenRole() === 'admin' || user?.role === 'admin');
 
   // 仅管理员拉取 core 版本号；普通用户和 API Key 会话不暴露版本指纹。
@@ -237,7 +237,9 @@ export function AppShell({ children }: AppShellProps) {
   };
 
   const displayName = user?.username || user?.email?.split('@')[0] || site.site_name || 'AirGate';
-  const roleLabel = isAdmin ? t('users.role_admin', 'Admin') : t('users.role_user', 'User');
+  const roleLabel = user?.role === 'api_key'
+    ? 'API Key'
+    : isAdmin ? t('users.role_admin', 'Admin') : t('users.role_user', 'User');
   useEffect(() => {
     document.title = site.site_name || 'AirGate';
   }, [site.site_name]);

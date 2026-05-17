@@ -40,6 +40,32 @@ func (h *APIKeyHandler) ListKeys(c *gin.Context) {
 	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
 }
 
+// AdminListKeys 查询全局 API 密钥列表。
+func (h *APIKeyHandler) AdminListKeys(c *gin.Context) {
+	var page dto.PageReq
+	if err := c.ShouldBindQuery(&page); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	result, err := h.service.ListAdmin(c.Request.Context(), appapikey.ListFilter{
+		Page:     page.Page,
+		PageSize: page.PageSize,
+		Keyword:  page.Keyword,
+	})
+	if err != nil {
+		httpCode, message := h.handleError("管理员查询密钥列表失败", "查询失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	list := make([]dto.APIKeyResp, 0, len(result.List))
+	for _, item := range result.List {
+		list = append(list, toAPIKeyResp(item))
+	}
+	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
+}
+
 // CreateKey 创建 API 密钥。
 func (h *APIKeyHandler) CreateKey(c *gin.Context) {
 	userID, ok := currentUserID(c)

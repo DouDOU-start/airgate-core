@@ -159,15 +159,9 @@ func abortWithOpenAIError(c *gin.Context, status int, code, message string) {
 // AdminOnly 管理员权限中间件（需要在 JWTAuth 之后使用）
 func AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if id := APIKeySessionID(c); id > 0 {
-			slog.Warn("admin_access_denied", sdk.LogFieldReason, "scoped_api_key_session", sdk.LogFieldAPIKeyID, id, sdk.LogFieldRequestID, RequestIDFromGinContext(c))
-			response.Forbidden(c, "API Key 登录会话不能访问管理员接口")
-			c.Abort()
-			return
-		}
-
 		role, exists := c.Get(CtxKeyRole)
-		if !exists || role.(string) != "admin" {
+		roleStr, ok := role.(string)
+		if !exists || !ok || roleStr != "admin" {
 			slog.Warn("admin_access_denied", sdk.LogFieldReason, "non_admin_role", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
 			response.Forbidden(c, "需要管理员权限")
 			c.Abort()
@@ -177,27 +171,29 @@ func AdminOnly() gin.HandlerFunc {
 	}
 }
 
-// RejectAPIKeySession 禁止 API Key 登录拿到的 scoped JWT 访问普通账号会话接口。
-func RejectAPIKeySession() gin.HandlerFunc {
+// RequireRoles 要求 JWT 中的 role 属于给定集合。
+func RequireRoles(roles ...string) gin.HandlerFunc {
+	allowed := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		allowed[role] = struct{}{}
+	}
 	return func(c *gin.Context) {
-		if id := APIKeySessionID(c); id > 0 {
-			slog.Warn("api_key_session_access_denied", sdk.LogFieldAPIKeyID, id, sdk.LogFieldRequestID, RequestIDFromGinContext(c))
-			response.Forbidden(c, "API Key 登录会话只能查看该 Key 的使用记录")
+		role, exists := c.Get(CtxKeyRole)
+		roleStr, ok := role.(string)
+		if !exists || !ok {
+			slog.Warn("role_access_denied", sdk.LogFieldReason, "missing_role", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+			response.Forbidden(c, "权限不足")
+			c.Abort()
+			return
+		}
+		if _, ok := allowed[roleStr]; !ok {
+			slog.Warn("role_access_denied", sdk.LogFieldReason, "role_not_allowed", "role", roleStr, sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+			response.Forbidden(c, "权限不足")
 			c.Abort()
 			return
 		}
 		c.Next()
 	}
-}
-
-// APIKeySessionID 返回 JWT 中携带的 API Key ID，0 表示普通账号会话。
-func APIKeySessionID(c *gin.Context) int {
-	if apiKeyID, exists := c.Get(CtxKeyAPIKeyID); exists {
-		if id, ok := apiKeyID.(int); ok && id > 0 {
-			return id
-		}
-	}
-	return 0
 }
 
 // extractBearerToken 从 Authorization 头或 x-api-key 头提取 API Key

@@ -15,9 +15,10 @@ interface EditUserModalProps {
 
 export function EditUserModal({ open, user, onClose, onSubmit, loading }: EditUserModalProps) {
   const { t } = useTranslation();
+  const editableRole = user.role === 'admin' ? 'admin' : 'user';
   const [form, setForm] = useState<UpdateUserReq>({
     max_concurrency: user.max_concurrency,
-    role: user.role,
+    role: editableRole,
     status: user.status as 'active' | 'disabled',
     username: user.username,
   });

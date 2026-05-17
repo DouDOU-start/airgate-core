@@ -61,24 +61,29 @@ type UsageLogResp struct {
 // 当请求来自 end customer（通过 API key 登录拿到的 scoped JWT）时返回此结构，
 // 不暴露 actual_cost / total_cost / 单价 / rate_multiplier 等会泄漏 reseller 毛利的字段。
 type CustomerUsageLogResp struct {
-	ID                int64                `json:"id"`
-	APIKeyID          int64                `json:"api_key_id"`
-	Platform          string               `json:"platform"`
-	Model             string               `json:"model"`
-	InputTokens       int                  `json:"input_tokens"`
-	OutputTokens      int                  `json:"output_tokens"`
-	CachedInputTokens int                  `json:"cached_input_tokens"`
-	BilledCost        float64              `json:"cost"` // 客户视角："本次消耗 = X 美元"
-	ServiceTier       string               `json:"service_tier,omitempty"`
-	ImageSize         string               `json:"image_size,omitempty"` // 图像生成实际出图尺寸（"WxH"），非图像请求空
-	Stream            bool                 `json:"stream"`
-	DurationMs        int64                `json:"duration_ms"`
-	FirstTokenMs      int64                `json:"first_token_ms"`
-	Endpoint          string               `json:"endpoint,omitempty"`
-	UsageAttributes   []sdk.UsageAttribute `json:"usage_attributes,omitempty"`
-	UsageMetrics      []sdk.UsageMetric    `json:"usage_metrics,omitempty"`
-	UsageMetadata     map[string]string    `json:"usage_metadata,omitempty"`
-	CreatedAt         string               `json:"created_at"`
+	ID                    int64                `json:"id"`
+	APIKeyID              int64                `json:"api_key_id"`
+	Platform              string               `json:"platform"`
+	Model                 string               `json:"model"`
+	InputTokens           int                  `json:"input_tokens"`
+	OutputTokens          int                  `json:"output_tokens"`
+	CachedInputTokens     int                  `json:"cached_input_tokens"`
+	CacheCreationTokens   int                  `json:"cache_creation_tokens"`
+	CacheCreation5mTokens int                  `json:"cache_creation_5m_tokens"`
+	CacheCreation1hTokens int                  `json:"cache_creation_1h_tokens"`
+	ReasoningOutputTokens int                  `json:"reasoning_output_tokens"`
+	BilledCost            float64              `json:"cost"` // 客户视角："本次消耗 = X 美元"
+	ServiceTier           string               `json:"service_tier,omitempty"`
+	ImageSize             string               `json:"image_size,omitempty"` // 图像生成实际出图尺寸（"WxH"），非图像请求空
+	Stream                bool                 `json:"stream"`
+	DurationMs            int64                `json:"duration_ms"`
+	FirstTokenMs          int64                `json:"first_token_ms"`
+	Endpoint              string               `json:"endpoint,omitempty"`
+	ReasoningEffort       string               `json:"reasoning_effort,omitempty"` // 推理强度档位
+	UsageAttributes       []sdk.UsageAttribute `json:"usage_attributes,omitempty"`
+	UsageMetrics          []sdk.UsageMetric    `json:"usage_metrics,omitempty"`
+	UsageMetadata         map[string]string    `json:"usage_metadata,omitempty"`
+	CreatedAt             string               `json:"created_at"`
 }
 
 // UsageQuery 使用记录查询参数
@@ -163,6 +168,7 @@ type GroupStats struct {
 type UsageStatsQuery struct {
 	GroupBy   string `form:"group_by" binding:"required"` // 聚合维度，支持逗号分隔多值（如 model,group）
 	UserID    *int64 `form:"user_id"`
+	APIKeyID  *int64 `form:"api_key_id"`
 	Platform  string `form:"platform"`
 	Model     string `form:"model"`
 	StartDate string `form:"start_date"`
@@ -173,6 +179,7 @@ type UsageStatsQuery struct {
 type UsageTrendQuery struct {
 	Granularity string `form:"granularity" binding:"required,oneof=hour day"`
 	UserID      *int64 `form:"user_id"`
+	APIKeyID    *int64 `form:"api_key_id"`
 	Platform    string `form:"platform"`
 	Model       string `form:"model"`
 	StartDate   string `form:"start_date"`

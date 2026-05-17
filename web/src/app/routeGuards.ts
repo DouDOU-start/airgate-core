@@ -1,5 +1,5 @@
 import { redirect } from '@tanstack/react-router';
-import { getToken, getTokenAPIKeyID, getTokenRole } from '../shared/api/client';
+import { getToken, getTokenRole } from '../shared/api/client';
 import { setupApi } from '../shared/api/setup';
 import { usersApi } from '../shared/api/users';
 
@@ -81,10 +81,6 @@ let adminCheckToken: string | null = null;
 
 export function checkAdmin(): void | Promise<void> {
   const token = getToken();
-  if (getTokenAPIKeyID(token)) {
-    throw redirect({ to: '/' });
-  }
-
   if (getTokenRole(token) === 'admin') {
     adminVerified = true;
     adminVerifiedToken = token;

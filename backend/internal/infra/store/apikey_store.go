@@ -2,11 +2,14 @@ package store
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
+	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
 	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
@@ -29,9 +32,7 @@ func (s *APIKeyStore) ListByUser(ctx context.Context, userID int, filter appapik
 		WithUser().
 		WithGroup()
 
-	if filter.Keyword != "" {
-		query = query.Where(entapikey.NameContains(filter.Keyword))
-	}
+	query = applyAPIKeyKeyword(query, filter.Keyword)
 
 	total, err := query.Count(ctx)
 	if err != nil {
@@ -52,6 +53,47 @@ func (s *APIKeyStore) ListByUser(ctx context.Context, userID int, filter appapik
 		result = append(result, mapAPIKey(item))
 	}
 	return result, int64(total), nil
+}
+
+// ListAdmin 查询全局 API Key 列表。
+func (s *APIKeyStore) ListAdmin(ctx context.Context, filter appapikey.ListFilter) ([]appapikey.Key, int64, error) {
+	query := applyAPIKeyKeyword(s.db.APIKey.Query().WithUser().WithGroup(), filter.Keyword)
+
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	keys, err := query.
+		Offset((filter.Page - 1) * filter.PageSize).
+		Limit(filter.PageSize).
+		Order(ent.Desc(entapikey.FieldCreatedAt)).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	result := make([]appapikey.Key, 0, len(keys))
+	for _, item := range keys {
+		result = append(result, mapAPIKey(item))
+	}
+	return result, int64(total), nil
+}
+
+func applyAPIKeyKeyword(query *ent.APIKeyQuery, keyword string) *ent.APIKeyQuery {
+	keyword = strings.TrimSpace(keyword)
+	if keyword == "" {
+		return query
+	}
+	predicates := []predicate.APIKey{
+		entapikey.NameContainsFold(keyword),
+		entapikey.KeyHintContainsFold(keyword),
+		entapikey.HasUserWith(entuser.EmailContainsFold(keyword)),
+	}
+	if id, err := strconv.Atoi(keyword); err == nil && id > 0 {
+		predicates = append(predicates, entapikey.IDEQ(id))
+	}
+	return query.Where(entapikey.Or(predicates...))
 }
 
 // KeyUsage 查询 API Key 今日与近 30 天用量。

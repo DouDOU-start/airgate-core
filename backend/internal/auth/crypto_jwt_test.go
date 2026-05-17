@@ -51,7 +51,7 @@ func TestJWTGenerateParseAndRefresh(t *testing.T) {
 	if err != nil {
 		t.Fatalf("解析 token 失败: %v", err)
 	}
-	if claims.UserID != 7 || claims.Role != "user" || claims.Email != "u@example.com" || claims.APIKeyID != 11 {
+	if claims.UserID != 7 || claims.Role != APIKeySessionRole || claims.Email != "u@example.com" || claims.APIKeyID != 11 {
 		t.Fatalf("claims 异常: %+v", claims)
 	}
 
@@ -68,7 +68,7 @@ func TestJWTGenerateParseAndRefresh(t *testing.T) {
 	}
 }
 
-func TestAPIKeyTokenAlwaysUsesScopedUserRole(t *testing.T) {
+func TestAPIKeyTokenAlwaysUsesAPIKeySessionRole(t *testing.T) {
 	mgr := NewJWTManager("jwt-secret", 1)
 	token, err := mgr.GenerateAPIKeyToken(7, "admin", "admin@example.com", 11)
 	if err != nil {

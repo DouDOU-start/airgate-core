@@ -24,6 +24,9 @@ export interface PageReq {
 
 // ==================== Auth ====================
 
+export type UserRole = 'admin' | 'user';
+export type SessionRole = UserRole | 'api_key';
+
 export interface LoginReq {
   email: string;
   password: string;
@@ -58,7 +61,7 @@ export interface UserResp {
   email: string;
   username: string;
   balance: number;
-  role: 'admin' | 'user';
+  role: SessionRole;
   max_concurrency: number;
 
   group_rates?: Record<number, number>;
@@ -89,7 +92,7 @@ export interface CreateUserReq {
   email: string;
   password: string;
   username?: string;
-  role: 'admin' | 'user';
+  role: UserRole;
   max_concurrency?: number;
   group_rates?: Record<number, number>;
 }
@@ -97,7 +100,7 @@ export interface CreateUserReq {
 export interface UpdateUserReq {
   username?: string;
   password?: string;
-  role?: 'admin' | 'user';
+  role?: UserRole;
   max_concurrency?: number;
   group_rates?: Record<number, number>;
   allowed_group_ids?: number[];
@@ -537,6 +540,13 @@ export interface CustomerUsageLogResp {
   input_tokens: number;
   output_tokens: number;
   cached_input_tokens: number;
+  /** Anthropic 缓存创建总量（= 5m + 1h） */
+  cache_creation_tokens: number;
+  /** Anthropic 缓存创建 5m 档 */
+  cache_creation_5m_tokens: number;
+  /** Anthropic 缓存创建 1h 档 */
+  cache_creation_1h_tokens: number;
+  reasoning_output_tokens: number;
   /** 客户视角："本次消耗 = X 美元" */
   cost: number;
   service_tier?: string;
@@ -547,6 +557,8 @@ export interface CustomerUsageLogResp {
   first_token_ms: number;
   /** 请求端点 */
   endpoint?: string;
+  /** 推理强度档位 */
+  reasoning_effort?: string;
   usage_attributes?: UsageAttribute[];
   usage_metrics?: UsageMetric[];
   usage_metadata?: Record<string, string>;

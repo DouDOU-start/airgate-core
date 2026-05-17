@@ -1,4 +1,4 @@
-import type { ApiResponse } from '../types';
+import type { ApiResponse, SessionRole } from '../types';
 import i18n from '../../i18n';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -58,9 +58,9 @@ export function getTokenClaims(token = accessToken): TokenClaims | null {
   }
 }
 
-export function getTokenRole(token = accessToken): 'admin' | 'user' | null {
+export function getTokenRole(token = accessToken): SessionRole | null {
   const role = getTokenClaims(token)?.role;
-  return role === 'admin' || role === 'user' ? role : null;
+  return role === 'admin' || role === 'user' || role === 'api_key' ? role : null;
 }
 
 export function getTokenAPIKeyID(token = accessToken): number | null {

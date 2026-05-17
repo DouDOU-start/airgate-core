@@ -14,7 +14,7 @@ import {
   subscribeUsageMetricDetailChange,
   subscribeUsageModelMetaChange,
 } from '../../app/plugin-frontend-registry';
-import type { UsageLogResp, CustomerUsageLogResp, UsageMetric } from '../types';
+import type { UsageLogResp, CustomerUsageLogResp, UsageAttribute, UsageMetric } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
 import { CostValue } from '../components/CostValue';
 
@@ -127,6 +127,7 @@ const META_CHIP_LOW_COLOR = 'rgb(34,197,94)';
 const META_CHIP_MEDIUM_COLOR = 'rgb(59,130,246)';
 const META_CHIP_HIGH_COLOR = 'rgb(249,115,22)';
 const META_CHIP_XHIGH_COLOR = 'rgb(239,68,68)';
+const META_CHIP_SERVICE_TIER_COLOR = 'rgb(168,85,247)';
 
 const META_CHIP_EFFORT_COLORS: Record<string, string> = {
   low: META_CHIP_LOW_COLOR,
@@ -179,6 +180,12 @@ function getImageSizeDotColor(imageSize: string): string {
   if (maxDimension > 2048) return META_CHIP_HIGH_COLOR;
   if (maxDimension > 1536) return META_CHIP_MEDIUM_COLOR;
   return META_CHIP_LOW_COLOR;
+}
+
+function serviceTierMetaLabel(serviceTier: string): string {
+  const normalized = serviceTier.trim().toLowerCase();
+  if (normalized === 'fast' || normalized === 'priority' || normalized === 'scale') return 'fast';
+  return serviceTier;
 }
 
 const HEROUI_BLUE = 'oklch(62.04% 0.1950 253.83)';
@@ -234,9 +241,12 @@ export function fmtCost(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
+function normalizeUsageKey(value?: string): string {
+  return (value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
 function normalizeMetricKey(metric: Pick<UsageMetric, 'key' | 'kind' | 'label'>): string {
-  const raw = metric.key || metric.kind || metric.label || '';
-  return raw.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return normalizeUsageKey(metric.key || metric.kind || metric.label);
 }
 
 function metricNumber(value: unknown): number {
@@ -251,6 +261,33 @@ function metricMatches(metric: UsageMetric, keys: string[]) {
 function metricValue(metrics: UsageMetric[], keys: string[]): number | undefined {
   const item = metrics.find((metric) => metricMatches(metric, keys));
   return item ? metricNumber(item.value) : undefined;
+}
+
+function firstText(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const text = value.trim();
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function usageAttributeValue(attributes: UsageAttribute[], keys: string[]): string | undefined {
+  const normalizedKeys = new Set(keys.map(normalizeUsageKey));
+  const item = attributes.find((attr) => (
+    normalizedKeys.has(normalizeUsageKey(attr.key || attr.kind || attr.label))
+  ));
+  return firstText(item?.value);
+}
+
+function usageMetadataValue(metadata: Record<string, string>, keys: string[]): string | undefined {
+  const normalizedKeys = new Set(keys.map(normalizeUsageKey));
+  for (const [key, value] of Object.entries(metadata)) {
+    if (!normalizedKeys.has(normalizeUsageKey(key))) continue;
+    const text = firstText(value);
+    if (text) return text;
+  }
+  return undefined;
 }
 
 function isTotalMetric(metric: UsageMetric) {
@@ -298,6 +335,24 @@ function buildUsageRecordContext(row: UsageRow, customerScope: boolean) {
   const usageAttributes = row.usage_attributes ?? [];
   const usageMetrics = row.usage_metrics ?? [];
   const usageMetadata = row.usage_metadata ?? {};
+  const imageSize = firstText(
+    row.image_size,
+    usageAttributeValue(usageAttributes, ['image_size', 'resolution', 'size']),
+    usageMetadataValue(usageMetadata, ['image_size', 'resolution', 'size']),
+  );
+  const serviceTier = firstText(
+    row.service_tier,
+    usageAttributeValue(usageAttributes, ['service_tier', 'tier']),
+    usageMetadataValue(usageMetadata, ['service_tier', 'tier']),
+  );
+  const reasoningEffort = firstText(
+    (row as Partial<UsageLogResp>).reasoning_effort,
+    usageAttributeValue(usageAttributes, ['reasoning_effort', 'reasoning']),
+    usageMetadataValue(usageMetadata, ['reasoning_effort', 'reasoning']),
+  );
+  const reasoningTokens =
+    (row as Partial<UsageLogResp>).reasoning_output_tokens
+    ?? metricValue(usageMetrics, ['reasoning_output_tokens', 'reasoning_tokens', 'reasoning_token']);
 
   const ctx: Record<string, unknown> = {
     record: row,
@@ -313,20 +368,16 @@ function buildUsageRecordContext(row: UsageRow, customerScope: boolean) {
     // 常用的行级别字段做扁平化，方便插件扩展渲染器直接取值。
     model: row.model,
     platform: row.platform,
-    service_tier: row.service_tier,
-    image_size: row.image_size,
+    service_tier: serviceTier,
+    image_size: imageSize,
     endpoint: row.endpoint,
     stream: row.stream,
     created_at: row.created_at,
   };
 
-  // reasoning_effort / reasoning_output_tokens 后端在 end customer scope 默认不返回，
-  // 这里做容错：字段存在就透传给插件扩展渲染器。
-  const maybeReasoningEffort = (row as Partial<UsageLogResp>).reasoning_effort;
-  if (maybeReasoningEffort) ctx.reasoning_effort = maybeReasoningEffort;
-  const maybeReasoningTokens = (row as Partial<UsageLogResp>).reasoning_output_tokens;
-  if (typeof maybeReasoningTokens === 'number' && maybeReasoningTokens > 0) {
-    ctx.reasoning_output_tokens = maybeReasoningTokens;
+  if (reasoningEffort) ctx.reasoning_effort = reasoningEffort;
+  if (typeof reasoningTokens === 'number' && reasoningTokens > 0) {
+    ctx.reasoning_output_tokens = reasoningTokens;
   }
 
   return ctx;
@@ -522,24 +573,33 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         const metaContext = buildUsageRecordContext(row, customerScope);
         const fallbackMeta = (() => {
           if (PluginUsageModelMeta) return null;
-          if (row.image_size) {
+          const imageSize = typeof metaContext.image_size === 'string' ? metaContext.image_size : '';
+          if (imageSize) {
             return (
               <MetaChip
                 color={MODEL_META_IMAGE_COLOR}
-                dotColor={getImageSizeDotColor(row.image_size)}
-                label={row.image_size}
+                dotColor={getImageSizeDotColor(imageSize)}
+                label={imageSize}
               />
             );
           }
 
-          const reasoningEffort = (row as UsageLogResp).reasoning_effort;
-          if (customerScope) return null;
+          const reasoningEffort = typeof metaContext.reasoning_effort === 'string' ? metaContext.reasoning_effort : '';
+          if (reasoningEffort) {
+            return (
+              <MetaChip
+                color={META_CHIP_EFFORT_COLORS[reasoningEffort.toLowerCase()] ?? 'rgb(148,163,184)'}
+                label={reasoningEffort}
+              />
+            );
+          }
 
-          if (!reasoningEffort) return null;
+          const serviceTier = typeof metaContext.service_tier === 'string' ? metaContext.service_tier : '';
+          if (!serviceTier) return null;
           return (
             <MetaChip
-              color={META_CHIP_EFFORT_COLORS[reasoningEffort] ?? 'rgb(148,163,184)'}
-              label={reasoningEffort}
+              color={META_CHIP_SERVICE_TIER_COLOR}
+              label={serviceTierMetaLabel(serviceTier)}
             />
           );
         })();

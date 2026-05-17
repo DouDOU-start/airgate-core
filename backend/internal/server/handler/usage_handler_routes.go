@@ -271,6 +271,7 @@ func (h *UsageHandler) AdminUsageStats(c *gin.Context) {
 
 	result, err := h.service.AdminStats(c.Request.Context(), appusage.StatsFilter{
 		UserID:    query.UserID,
+		APIKeyID:  query.APIKeyID,
 		Platform:  query.Platform,
 		Model:     query.Model,
 		StartDate: query.StartDate,
@@ -297,6 +298,7 @@ func (h *UsageHandler) AdminUsageTrend(c *gin.Context) {
 	result, err := h.service.AdminTrend(c.Request.Context(), appusage.TrendFilter{
 		StatsFilter: appusage.StatsFilter{
 			UserID:    query.UserID,
+			APIKeyID:  query.APIKeyID,
 			Platform:  query.Platform,
 			Model:     query.Model,
 			StartDate: query.StartDate,
