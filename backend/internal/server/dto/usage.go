@@ -168,6 +168,7 @@ type GroupStats struct {
 type UsageStatsQuery struct {
 	GroupBy   string `form:"group_by" binding:"required"` // 聚合维度，支持逗号分隔多值（如 model,group）
 	UserID    *int64 `form:"user_id"`
+	APIKeyID  *int64 `form:"api_key_id"`
 	Platform  string `form:"platform"`
 	Model     string `form:"model"`
 	StartDate string `form:"start_date"`
@@ -178,6 +179,7 @@ type UsageStatsQuery struct {
 type UsageTrendQuery struct {
 	Granularity string `form:"granularity" binding:"required,oneof=hour day"`
 	UserID      *int64 `form:"user_id"`
+	APIKeyID    *int64 `form:"api_key_id"`
 	Platform    string `form:"platform"`
 	Model       string `form:"model"`
 	StartDate   string `form:"start_date"`

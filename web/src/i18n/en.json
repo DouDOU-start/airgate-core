@@ -638,6 +638,7 @@
     "model_placeholder": "Model name",
     "user_id": "User ID",
     "search_user": "Search user",
+    "search_api_key": "Search API Key",
     "total_requests": "Total Requests",
     "total_tokens": "Total Tokens",
     "total_cost": "Total Cost",

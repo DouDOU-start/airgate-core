@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button, Card, ComboBox, Input, ListBox, Select, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
+import { apikeysApi } from '../../shared/api/apikeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
@@ -11,7 +12,7 @@ import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
 import { Activity, Coins, Hash, DollarSign, Search, RefreshCw } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
-import type { UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
+import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
@@ -434,6 +435,41 @@ export default function UsagePage() {
     ];
   })();
 
+  // API Key 搜索：防抖 + 服务端分页，只取前 20 条候选，避免全量加载大量 key。
+  const [apiKeyKeyword, setAPIKeyKeyword] = useState('');
+  const debouncedAPIKeyKeyword = useDebouncedValue(apiKeyKeyword.trim(), 250);
+  const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState('');
+  const { data: apiKeysData } = useQuery({
+    queryKey: ['admin-api-keys-search', debouncedAPIKeyKeyword],
+    queryFn: ({ signal }) => apikeysApi.adminList({ page: 1, page_size: 20, keyword: debouncedAPIKeyKeyword }, { signal }),
+    enabled: pageActive && debouncedAPIKeyKeyword.length > 0,
+  });
+  const apiKeyOptions = (apiKeysData?.list ?? []).map((key: APIKeyResp) => ({
+    id: String(key.id),
+    label: key.name || key.key_prefix || `#${key.id}`,
+    description: [
+      `#${key.id}`,
+      key.key_prefix,
+      key.user_id ? `User #${key.user_id}` : '',
+    ].filter(Boolean).join(' · '),
+    textValue: `${key.name || ''} ${key.key_prefix || ''} ${key.user_id || ''}`,
+  }));
+  const visibleAPIKeyOptions = (() => {
+    const selectedId = filters.api_key_id ? String(filters.api_key_id) : '';
+    if (!selectedId || !selectedAPIKeyLabel || apiKeyOptions.some((option) => option.id === selectedId)) {
+      return apiKeyOptions;
+    }
+    return [
+      {
+        id: selectedId,
+        label: selectedAPIKeyLabel,
+        description: undefined,
+        textValue: selectedAPIKeyLabel,
+      },
+      ...apiKeyOptions,
+    ];
+  })();
+
   // 构建查询参数
   const queryParams = useMemo<UsageQuery>(() => ({
     page,
@@ -461,7 +497,7 @@ export default function UsagePage() {
   });
 
   const { data: stats, isFetching: isStatsFetching, refetch: refetchStats } = useQuery({
-    queryKey: ['admin-usage-stats', filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id],
+    queryKey: ['admin-usage-stats', filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id, filters.api_key_id],
     queryFn: ({ signal }) =>
       usageApi.stats({
         group_by: ADMIN_USAGE_STATS_GROUP_BY,
@@ -470,6 +506,7 @@ export default function UsagePage() {
         platform: filters.platform,
         model: filters.model,
         user_id: filters.user_id ? Number(filters.user_id) : undefined,
+        api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
       }, { signal }),
     enabled: pageActive,
     refetchInterval: autoRefreshInterval,
@@ -481,7 +518,7 @@ export default function UsagePage() {
 
   // Token 趋势
   const { data: trendData, isFetching: isTrendFetching, refetch: refetchTrend } = useQuery({
-    queryKey: ['admin-usage-trend', granularity, filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id],
+    queryKey: ['admin-usage-trend', granularity, filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id, filters.api_key_id],
     queryFn: ({ signal }) =>
       usageApi.trend({
         granularity,
@@ -490,6 +527,7 @@ export default function UsagePage() {
         platform: filters.platform,
         model: filters.model,
         user_id: filters.user_id ? Number(filters.user_id) : undefined,
+        api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
       }, { signal }),
     enabled: pageActive,
     refetchInterval: autoRefreshInterval,
@@ -515,8 +553,11 @@ export default function UsagePage() {
     }
   }
 
-  function updateFilter(key: string, value: string) {
-    setFilters((prev) => ({ ...prev, [key]: value || undefined }));
+  function updateFilter(key: keyof UsageQuery, value: string) {
+    const nextValue = (key === 'user_id' || key === 'api_key_id')
+      ? (value ? Number(value) : undefined)
+      : value || undefined;
+    setFilters((prev) => ({ ...prev, [key]: nextValue }));
     setPage(1);
   }
 
@@ -792,6 +833,63 @@ export default function UsagePage() {
                 renderEmptyState={() => (
                   <div className="px-3 py-6 text-center text-xs text-text-tertiary">
                     {userKeyword.trim() ? t('common.no_data') : t('usage.search_user')}
+                  </div>
+                )}
+              >
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.textValue}>
+                    <div className="min-w-0">
+                      <div className="truncate">{item.label}</div>
+                      {item.description ? (
+                        <div className="truncate text-xs text-text-tertiary">{item.description}</div>
+                      ) : null}
+                    </div>
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </ComboBox.Popover>
+          </ComboBox>
+        </div>
+        <div className="w-full sm:w-48">
+          <ComboBox
+            aria-label={t('usage.search_api_key', '搜索 API Key')}
+            allowsEmptyCollection
+            fullWidth
+            inputValue={apiKeyKeyword}
+            items={visibleAPIKeyOptions}
+            menuTrigger="focus"
+            selectedKey={filters.api_key_id ? String(filters.api_key_id) : null}
+            onInputChange={(value) => {
+              setAPIKeyKeyword(value);
+              if (!value) {
+                setSelectedAPIKeyLabel('');
+                updateFilter('api_key_id', '');
+                return;
+              }
+              if (filters.api_key_id && value !== selectedAPIKeyLabel) {
+                setSelectedAPIKeyLabel('');
+                updateFilter('api_key_id', '');
+              }
+            }}
+            onSelectionChange={(key) => {
+              const value = key == null ? '' : String(key);
+              updateFilter('api_key_id', value);
+              const option = visibleAPIKeyOptions.find((item) => item.id === value);
+              const label = option?.label ? String(option.label) : '';
+              setSelectedAPIKeyLabel(label);
+              setAPIKeyKeyword(label);
+            }}
+          >
+            <ComboBox.InputGroup className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+              <Input className="pl-9" placeholder={t('usage.search_api_key', '搜索 API Key')} />
+            </ComboBox.InputGroup>
+            <ComboBox.Popover>
+              <ListBox
+                items={visibleAPIKeyOptions}
+                renderEmptyState={() => (
+                  <div className="px-3 py-6 text-center text-xs text-text-tertiary">
+                    {apiKeyKeyword.trim() ? t('common.no_data') : t('usage.search_api_key', '搜索 API Key')}
                   </div>
                 )}
               >

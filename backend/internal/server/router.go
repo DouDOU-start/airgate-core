@@ -145,6 +145,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.DELETE("/groups/:id/rate-overrides/:userId", handlers.User.DeleteGroupRateOverride)
 
 		// API 密钥管理（管理员）
+		adminGroup.GET("/api-keys", handlers.APIKey.AdminListKeys)
 		adminGroup.PUT("/api-keys/:id", handlers.APIKey.AdminUpdateKey)
 
 		// 订阅管理

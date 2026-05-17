@@ -79,6 +79,35 @@ func TestListByUserNormalizesPaginationAndAttachesUsage(t *testing.T) {
 	}
 }
 
+func TestListAdminNormalizesPaginationWithoutUsageAggregation(t *testing.T) {
+	var capturedFilter ListFilter
+	var usageCalled bool
+	service := NewService(apiKeyStubRepository{
+		listAdmin: func(_ context.Context, filter ListFilter) ([]Key, int64, error) {
+			capturedFilter = filter
+			return []Key{{ID: 3, Name: "admin-key"}}, 1, nil
+		},
+		keyUsage: func(_ context.Context, _ []int, _ time.Time) (map[int]float64, map[int]float64, error) {
+			usageCalled = true
+			return nil, nil, nil
+		},
+	}, testAPIKeySecret)
+
+	result, err := service.ListAdmin(t.Context(), ListFilter{Keyword: "prod"})
+	if err != nil {
+		t.Fatalf("管理员查询 API Key 失败: %v", err)
+	}
+	if capturedFilter.Page != 1 || capturedFilter.PageSize != 20 || capturedFilter.Keyword != "prod" {
+		t.Fatalf("分页或关键词未归一化: %+v", capturedFilter)
+	}
+	if usageCalled {
+		t.Fatal("管理员搜索列表不应触发用量聚合")
+	}
+	if result.Total != 1 || len(result.List) != 1 || result.List[0].ID != 3 {
+		t.Fatalf("列表结果异常: %+v", result)
+	}
+}
+
 func TestCreateOwnedBuildsMutationAndReturnsPlainKey(t *testing.T) {
 	expiresAt := "2026-05-15T10:00:00Z"
 	var captured Mutation
@@ -241,6 +270,7 @@ func TestUpdateAdminDoesNotCheckGroupAccess(t *testing.T) {
 
 type apiKeyStubRepository struct {
 	listByUser  func(context.Context, int, ListFilter) ([]Key, int64, error)
+	listAdmin   func(context.Context, ListFilter) ([]Key, int64, error)
 	keyUsage    func(context.Context, []int, time.Time) (map[int]float64, map[int]float64, error)
 	groupAccess func(context.Context, int, int) (GroupAccess, error)
 	create      func(context.Context, Mutation) (Key, error)
@@ -255,6 +285,13 @@ func (s apiKeyStubRepository) ListByUser(ctx context.Context, userID int, filter
 		return nil, 0, nil
 	}
 	return s.listByUser(ctx, userID, filter)
+}
+
+func (s apiKeyStubRepository) ListAdmin(ctx context.Context, filter ListFilter) ([]Key, int64, error) {
+	if s.listAdmin == nil {
+		return nil, 0, nil
+	}
+	return s.listAdmin(ctx, filter)
 }
 
 func (s apiKeyStubRepository) KeyUsage(ctx context.Context, keyIDs []int, todayStart time.Time) (map[int]float64, map[int]float64, error) {
