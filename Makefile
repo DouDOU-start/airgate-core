@@ -25,7 +25,7 @@ KIRO_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-kiro/assets
 STUDIO_ASSETS := $(BACKEND_DIR)/data/plugins/airgate-studio/assets
 BINARY := $(BACKEND_DIR)/server
 WEBDIST := $(BACKEND_DIR)/internal/web/webdist
-GO := GOTOOLCHAIN=local GOPRIVATE=github.com/DouDOU-start/airgate-sdk GONOPROXY=github.com/DouDOU-start/airgate-sdk go
+GO := GOTOOLCHAIN=local go
 
 # 版本号：默认从 git 派生（dirty 检测），release workflow 通过 -ldflags 注入。
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
