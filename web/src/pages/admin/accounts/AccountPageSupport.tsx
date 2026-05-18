@@ -837,7 +837,7 @@ export function AccountStatusCell({ row }: { row: AccountResp }) {
   );
 
   return (
-    <div className="inline-flex flex-wrap items-center gap-1">
+    <div className="flex w-full max-w-full flex-wrap items-center justify-center gap-1 text-center">
       {mainBadge}
       {pill(
         familyLabel,
