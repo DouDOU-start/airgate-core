@@ -32,7 +32,7 @@ func (s *APIKeyStore) ListByUser(ctx context.Context, userID int, filter appapik
 		WithUser().
 		WithGroup()
 
-	query = applyAPIKeyKeyword(query, filter.Keyword)
+	query = applyAPIKeyKeyword(query, filter.Keyword, filter.SearchScope)
 
 	total, err := query.Count(ctx)
 	if err != nil {
@@ -57,7 +57,7 @@ func (s *APIKeyStore) ListByUser(ctx context.Context, userID int, filter appapik
 
 // ListAdmin 查询全局 API Key 列表。
 func (s *APIKeyStore) ListAdmin(ctx context.Context, filter appapikey.ListFilter) ([]appapikey.Key, int64, error) {
-	query := applyAPIKeyKeyword(s.db.APIKey.Query().WithUser().WithGroup(), filter.Keyword)
+	query := applyAPIKeyKeyword(s.db.APIKey.Query().WithUser().WithGroup(), filter.Keyword, filter.SearchScope)
 
 	total, err := query.Count(ctx)
 	if err != nil {
@@ -80,7 +80,7 @@ func (s *APIKeyStore) ListAdmin(ctx context.Context, filter appapikey.ListFilter
 	return result, int64(total), nil
 }
 
-func applyAPIKeyKeyword(query *ent.APIKeyQuery, keyword string) *ent.APIKeyQuery {
+func applyAPIKeyKeyword(query *ent.APIKeyQuery, keyword string, searchScope string) *ent.APIKeyQuery {
 	keyword = strings.TrimSpace(keyword)
 	if keyword == "" {
 		return query
@@ -88,10 +88,12 @@ func applyAPIKeyKeyword(query *ent.APIKeyQuery, keyword string) *ent.APIKeyQuery
 	predicates := []predicate.APIKey{
 		entapikey.NameContainsFold(keyword),
 		entapikey.KeyHintContainsFold(keyword),
-		entapikey.HasUserWith(entuser.EmailContainsFold(keyword)),
 	}
 	if id, err := strconv.Atoi(keyword); err == nil && id > 0 {
 		predicates = append(predicates, entapikey.IDEQ(id))
+	}
+	if searchScope != appapikey.SearchScopeAPIKey {
+		predicates = append(predicates, entapikey.HasUserWith(entuser.EmailContainsFold(keyword)))
 	}
 	return query.Where(entapikey.Or(predicates...))
 }

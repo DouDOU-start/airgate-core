@@ -28,6 +28,10 @@ export type AccountUsageCredits = { balance: number; unlimited: boolean };
 export type AccountUsageWindow = {
   key?: string;
   label: string;
+  display_label?: string;
+  slot?: string;
+  group?: string;
+  sort_order?: number;
   used_percent: number;
   reset_at?: string;
   reset_after_seconds?: number;
@@ -63,6 +67,9 @@ export function renderAccountTypeFilterOption(option: AccountTypeFilterOption, s
 function getUsageWindowIdentity(window: AccountUsageWindow) {
   const key = window.key?.trim();
   if (key) return key;
+  const group = window.group?.trim();
+  const slot = window.slot?.trim();
+  if (group || slot) return `${group || 'base'}:${slot || window.display_label?.trim() || window.label.trim()}`;
   return window.label.trim();
 }
 
@@ -702,6 +709,41 @@ function useCooldownClock(enabled: boolean): number {
     enabled ? subscribeCooldownClock : subscribeIdleClock,
     getCooldownClockSnapshot,
     getCooldownClockSnapshot,
+  );
+}
+
+let usageResetClockNow = Date.now();
+let usageResetClockTimer: number | null = null;
+const usageResetClockListeners = new Set<() => void>();
+
+function subscribeUsageResetClock(listener: () => void) {
+  usageResetClockNow = Date.now();
+  usageResetClockListeners.add(listener);
+  if (usageResetClockTimer == null) {
+    usageResetClockTimer = window.setInterval(() => {
+      usageResetClockNow = Date.now();
+      usageResetClockListeners.forEach((notify) => notify());
+    }, 30_000);
+  }
+
+  return () => {
+    usageResetClockListeners.delete(listener);
+    if (usageResetClockListeners.size === 0 && usageResetClockTimer != null) {
+      window.clearInterval(usageResetClockTimer);
+      usageResetClockTimer = null;
+    }
+  };
+}
+
+function getUsageResetClockSnapshot() {
+  return usageResetClockNow;
+}
+
+export function useUsageResetClock(enabled: boolean): number {
+  return useSyncExternalStore(
+    enabled ? subscribeUsageResetClock : subscribeIdleClock,
+    getUsageResetClockSnapshot,
+    getUsageResetClockSnapshot,
   );
 }
 

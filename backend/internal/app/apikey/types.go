@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const SearchScopeAPIKey = "api_key"
+
 // Key API Key 领域对象。
 type Key struct {
 	ID              int
@@ -32,9 +34,10 @@ type Key struct {
 
 // ListFilter API Key 列表查询参数。
 type ListFilter struct {
-	Page     int
-	PageSize int
-	Keyword  string
+	Page        int
+	PageSize    int
+	Keyword     string
+	SearchScope string
 }
 
 // ListResult API Key 列表结果。

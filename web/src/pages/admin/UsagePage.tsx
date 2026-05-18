@@ -440,8 +440,8 @@ export default function UsagePage() {
   const debouncedAPIKeyKeyword = useDebouncedValue(apiKeyKeyword.trim(), 250);
   const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState('');
   const { data: apiKeysData } = useQuery({
-    queryKey: ['admin-api-keys-search', debouncedAPIKeyKeyword],
-    queryFn: ({ signal }) => apikeysApi.adminList({ page: 1, page_size: 20, keyword: debouncedAPIKeyKeyword }, { signal }),
+    queryKey: ['admin-api-keys-search', 'api_key', debouncedAPIKeyKeyword],
+    queryFn: ({ signal }) => apikeysApi.adminList({ page: 1, page_size: 20, keyword: debouncedAPIKeyKeyword, search_scope: 'api_key' }, { signal }),
     enabled: pageActive && debouncedAPIKeyKeyword.length > 0,
   });
   const apiKeyOptions = (apiKeysData?.list ?? []).map((key: APIKeyResp) => ({
@@ -452,7 +452,7 @@ export default function UsagePage() {
       key.key_prefix,
       key.user_id ? `User #${key.user_id}` : '',
     ].filter(Boolean).join(' · '),
-    textValue: `${key.name || ''} ${key.key_prefix || ''} ${key.user_id || ''}`,
+    textValue: `${key.name || ''} ${key.key_prefix || ''} ${key.id || ''}`,
   }));
   const visibleAPIKeyOptions = (() => {
     const selectedId = filters.api_key_id ? String(filters.api_key_id) : '';

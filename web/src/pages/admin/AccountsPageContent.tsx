@@ -19,9 +19,7 @@ import { AccountStatsModal } from './AccountStatsModal';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import {
   getAccountIdentityVersion,
-  getUsageWindowVersion,
   subscribeAccountIdentityChange,
-  subscribeUsageWindowChange,
 } from '../../app/plugin-frontend-registry';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
@@ -74,7 +72,6 @@ export default function AccountsPageContent() {
   const platformsKey = platforms.join('\u0000');
   const { toast } = useToast();
   useSyncExternalStore(subscribeAccountIdentityChange, getAccountIdentityVersion);
-  useSyncExternalStore(subscribeUsageWindowChange, getUsageWindowVersion);
 
   const applyQuotaRefreshResult = useCallback((
     id: number,

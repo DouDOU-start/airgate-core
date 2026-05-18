@@ -22,6 +22,12 @@ type APIKeyResp struct {
 	TimeMixin
 }
 
+// APIKeyListQuery API Key 列表查询参数。
+type APIKeyListQuery struct {
+	PageReq
+	SearchScope string `form:"search_scope"`
+}
+
 // CreateAPIKeyReq 创建 API 密钥请求
 type CreateAPIKeyReq struct {
 	Name           string   `json:"name" binding:"required"`

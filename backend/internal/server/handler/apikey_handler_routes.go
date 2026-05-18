@@ -16,16 +16,17 @@ func (h *APIKeyHandler) ListKeys(c *gin.Context) {
 		return
 	}
 
-	var page dto.PageReq
-	if err := c.ShouldBindQuery(&page); err != nil {
+	var query dto.APIKeyListQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
 		response.BindError(c, err)
 		return
 	}
 
 	result, err := h.service.ListByUser(c.Request.Context(), userID, appapikey.ListFilter{
-		Page:     page.Page,
-		PageSize: page.PageSize,
-		Keyword:  page.Keyword,
+		Page:        query.Page,
+		PageSize:    query.PageSize,
+		Keyword:     query.Keyword,
+		SearchScope: query.SearchScope,
 	}, c.Query("tz"))
 	if err != nil {
 		httpCode, message := h.handleError("查询密钥列表失败", "查询失败", err)
@@ -42,16 +43,17 @@ func (h *APIKeyHandler) ListKeys(c *gin.Context) {
 
 // AdminListKeys 查询全局 API 密钥列表。
 func (h *APIKeyHandler) AdminListKeys(c *gin.Context) {
-	var page dto.PageReq
-	if err := c.ShouldBindQuery(&page); err != nil {
+	var query dto.APIKeyListQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
 		response.BindError(c, err)
 		return
 	}
 
 	result, err := h.service.ListAdmin(c.Request.Context(), appapikey.ListFilter{
-		Page:     page.Page,
-		PageSize: page.PageSize,
-		Keyword:  page.Keyword,
+		Page:        query.Page,
+		PageSize:    query.PageSize,
+		Keyword:     query.Keyword,
+		SearchScope: query.SearchScope,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("管理员查询密钥列表失败", "查询失败", err)
