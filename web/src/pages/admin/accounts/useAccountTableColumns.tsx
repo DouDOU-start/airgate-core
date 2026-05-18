@@ -342,17 +342,11 @@ export function useAccountTableColumns({
 
           return groups.flatMap((group) => {
             const rows: UsageWindowRow[] = [];
-            if (group.five || group.seven) {
-              if (group.five) {
-                rows.push({ id: `${group.id}:5h`, window: group.five });
-              } else {
-                rows.push({ id: `${group.id}:5h-placeholder` });
-              }
-              if (group.seven) {
-                rows.push({ id: `${group.id}:7d`, window: group.seven });
-              } else {
-                rows.push({ id: `${group.id}:7d-placeholder` });
-              }
+            if (group.five) {
+              rows.push({ id: `${group.id}:5h`, window: group.five });
+            }
+            if (group.seven) {
+              rows.push({ id: `${group.id}:7d`, window: group.seven });
             }
             for (const window of group.other) {
               const { slot } = getWindowSlot(window);

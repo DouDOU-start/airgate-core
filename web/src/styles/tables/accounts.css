@@ -397,7 +397,7 @@
   width: 100%;
   min-width: 0;
   grid-template-columns: minmax(11.25rem, 1fr) 0.25rem minmax(11.25rem, 1fr);
-  align-items: start;
+  align-items: center;
 }
 
 .ag-account-usage-layout--centered {
