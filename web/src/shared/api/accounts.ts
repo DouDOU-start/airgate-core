@@ -41,7 +41,7 @@ export const accountsApi = {
   models: (id: number) => get<ModelInfo[]>(`/api/v1/admin/accounts/${id}/models`),
   // 测试连接 URL（SSE 流式，前端用 fetch 消费）
   testUrl: (id: number) => `/api/v1/admin/accounts/${id}/test`,
-  // 获取指定平台账号的用量窗口（插件提供，格式因平台而异）
+  // 获取指定平台账号的用量窗口（core 规范化插件返回契约后输出）
   usage: (platform: string) =>
     get<{ accounts: Record<string, any> }>('/api/v1/admin/accounts/usage', { platform }),
   credentialsSchema: (platform: string) =>

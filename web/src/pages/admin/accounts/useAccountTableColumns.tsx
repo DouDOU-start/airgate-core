@@ -2,10 +2,7 @@ import { useMemo, useRef, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
-import {
-  getPluginAccountIdentity,
-  getPluginUsageWindow,
-} from '../../../app/plugin-frontend-registry';
+import { getPluginAccountIdentity } from '../../../app/plugin-frontend-registry';
 import { accountsApi } from '../../../shared/api/accounts';
 import { queryKeys } from '../../../shared/queryKeys';
 import type { AccountResp } from '../../../shared/types';
@@ -310,48 +307,54 @@ export function useAccountTableColumns({
           return 'var(--ag-danger)';
         };
 
-        const shortLabel = (label: string) => {
-          const parts = label.split(/[\s]+/);
-          const timePart = parts[0];
-          if (parts.length <= 1) return timePart;
-          const modelPart = parts.slice(1).join(' ');
-          const segments = modelPart.split('-');
-          return `${timePart} ${segments[segments.length - 1]}`;
-        };
+        const normalizeWindowToken = (value?: string) => value?.trim().toLowerCase().replace(/_/g, '-') || '';
         const getWindowSlot = (w: AccountUsageWindow) => {
           const key = w.key || '';
           const label = w.label || '';
-          const slot = key.includes(':7d') || key === '7d' || label.startsWith('7d') ? '7d' : '5h';
-          const group = key.startsWith('model:')
-            ? key.replace(/^model:(5h|7d):/, 'model:')
-            : 'base';
+          const normalizedKey = normalizeWindowToken(key);
+          const normalizedLabel = normalizeWindowToken(label);
+          const slot = normalizeWindowToken(w.slot)
+            || (normalizedKey.includes(':7d') || normalizedKey === '7d' || normalizedLabel.startsWith('7d') ? '7d'
+              : normalizedKey === 'monthly' || normalizedKey.includes('monthly') || normalizedLabel.includes('monthly') ? 'monthly'
+                : '5h');
+          const group = w.group?.trim()
+            || (key.startsWith('model:') ? key.replace(/^model:(5h|7d):/, 'model:') : 'base');
           return { group, slot };
         };
         const buildWindowRows = (items: AccountUsageWindow[]): UsageWindowRow[] => {
-          const groups: Array<{ id: string; five?: AccountUsageWindow; seven?: AccountUsageWindow }> = [];
-          const groupMap = new Map<string, { id: string; five?: AccountUsageWindow; seven?: AccountUsageWindow }>();
+          const groups: Array<{ id: string; five?: AccountUsageWindow; seven?: AccountUsageWindow; other: AccountUsageWindow[] }> = [];
+          const groupMap = new Map<string, { id: string; five?: AccountUsageWindow; seven?: AccountUsageWindow; other: AccountUsageWindow[] }>();
 
           for (const item of items) {
             const { group, slot } = getWindowSlot(item);
             let bucket = groupMap.get(group);
             if (!bucket) {
-              bucket = { id: group };
+              bucket = { id: group, other: [] };
               groupMap.set(group, bucket);
               groups.push(bucket);
             }
             if (slot === '7d') bucket.seven = item;
-            else bucket.five = item;
+            else if (slot === '5h') bucket.five = item;
+            else bucket.other.push(item);
           }
 
           return groups.flatMap((group) => {
             const rows: UsageWindowRow[] = [];
-            if (group.five) {
-              rows.push({ id: `${group.id}:5h`, window: group.five });
-            } else if (group.seven) {
-              rows.push({ id: `${group.id}:5h-placeholder` });
+            if (group.five || group.seven) {
+              if (group.five) {
+                rows.push({ id: `${group.id}:5h`, window: group.five });
+              } else {
+                rows.push({ id: `${group.id}:5h-placeholder` });
+              }
+              if (group.seven) {
+                rows.push({ id: `${group.id}:7d`, window: group.seven });
+              } else {
+                rows.push({ id: `${group.id}:7d-placeholder` });
+              }
             }
-            if (group.seven) {
-              rows.push({ id: `${group.id}:7d`, window: group.seven });
+            for (const window of group.other) {
+              const { slot } = getWindowSlot(window);
+              rows.push({ id: `${group.id}:${window.key || slot}:${rows.length}`, window });
             }
             return rows;
           });
@@ -447,47 +450,37 @@ export function useAccountTableColumns({
           >
             <div className={todayMetricChips ? 'ag-account-usage-layout' : 'ag-account-usage-layout ag-account-usage-layout--centered'}>
               <div className="ag-account-usage-windows">
-                {(() => {
-                  const PluginUsageWindow = getPluginUsageWindow(row.platform);
-                  if (PluginUsageWindow && windows.length > 0) {
-                    return (
-                      <PluginUsageWindow
-                        accountId={row.id}
-                        accountType={row.type}
-                        context={{ windows }}
-                      />
-                    );
+                {windowRows.map((item) => {
+                  const w = item.window;
+                  if (!w) {
+                    return <div key={item.id} className="h-5" aria-hidden="true" />;
                   }
-                  return windowRows.map((item) => {
-                    const w = item.window;
-                    if (!w) {
-                      return <div key={item.id} className="h-5" aria-hidden="true" />;
-                    }
-                    const percent = Math.round(w.used_percent);
-                    const barPercent = Math.max(0, Math.min(100, percent));
-                    const color = usageColor(w.used_percent);
-                    const resetText = formatReset(getResetSeconds(w));
-                    return (
-                      <div key={item.id} className="ag-account-usage-window-row">
-                        <span className="ag-account-usage-window-label text-text-secondary" style={badgeStyle} title={w.label}>
-                          {shortLabel(w.label)}
-                        </span>
-                        <div className="ag-account-usage-bar" style={{ background: 'var(--ag-glass-border)' }}>
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${barPercent}%`, background: color }}
-                          />
-                        </div>
-                        <span className="ag-account-usage-percent" style={{ color }}>
-                          {percent}%
-                        </span>
-                        <span className="ag-account-usage-reset" title={resetText}>
-                          {resetText}
-                        </span>
+                  const percent = Math.round(w.used_percent);
+                  const barPercent = Math.max(0, Math.min(100, percent));
+                  const color = usageColor(w.used_percent);
+                  const resetText = formatReset(getResetSeconds(w));
+                  const { slot } = getWindowSlot(w);
+                  const displayLabel = w.display_label?.trim() || slot;
+                  return (
+                    <div key={item.id} className="ag-account-usage-window-row">
+                      <span className="ag-account-usage-window-label text-text-secondary" style={badgeStyle} title={w.label}>
+                        {displayLabel}
+                      </span>
+                      <div className="ag-account-usage-bar" style={{ background: 'var(--ag-glass-border)' }}>
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${barPercent}%`, background: color }}
+                        />
                       </div>
-                    );
-                  });
-                })()}
+                      <span className="ag-account-usage-percent" style={{ color }}>
+                        {percent}%
+                      </span>
+                      <span className="ag-account-usage-reset" title={resetText}>
+                        {resetText}
+                      </span>
+                    </div>
+                  );
+                })}
                 {credits && (
                   <div className="flex h-5 items-center gap-1">
                     <span className="inline-flex items-center justify-center px-1 py-0 rounded text-[10px] font-medium" style={badgeStyle}>
