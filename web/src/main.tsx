@@ -12,6 +12,7 @@ import { AuthProvider } from './app/providers/AuthProvider';
 import { ThemeProvider } from './app/providers/ThemeProvider';
 import { SiteSettingsProvider } from './app/providers/SiteSettingsProvider';
 import { ToastProvider, useToast } from './shared/ui';
+import { DialogTriggerShim } from './shared/components/DialogTriggerShim';
 import { router } from './app/router';
 import './i18n';
 import './index.css';
@@ -94,6 +95,7 @@ function PluginAPIBridge() {
         if (!open) handleClose(false);
       }}
     >
+      <DialogTriggerShim />
       <AlertDialog.Backdrop>
         <AlertDialog.Container placement="center" size="sm">
           <AlertDialog.Dialog className="ag-elevation-modal">

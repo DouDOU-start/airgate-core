@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Alert, Button, Modal, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { AlertTriangle, Copy } from 'lucide-react';
 import { useClipboard } from '../../../shared/hooks/useClipboard';
 
@@ -23,6 +24,7 @@ export function CreateKeyModal({
 
   return (
     <Modal state={state}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog className="ag-elevation-modal">

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Chip, Description, Input, Label, ListBox, Modal, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { ArrowUpDown, Layers, X } from 'lucide-react';
 import { groupsApi } from '../../../shared/api/groups';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
@@ -183,6 +184,7 @@ export function GroupFormModal({
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog

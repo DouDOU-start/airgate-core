@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Description, Input, Label, ListBox, Modal, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { Key } from 'lucide-react';
 import { parseIpList, formatIpList } from '../../../shared/utils/ip';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
@@ -60,6 +61,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog

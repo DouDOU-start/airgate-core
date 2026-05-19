@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Label, ListBox, Modal, Select, Spinner, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import type {
   SubscriptionResp,
@@ -39,6 +40,7 @@ export function AdjustModal({
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog className="ag-elevation-modal">

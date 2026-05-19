@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Card, Checkbox, Link as HeroLink, Modal, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
   Download, RefreshCw, ExternalLink, Copy, ShieldAlert, CheckCircle2,
   XCircle, Loader2, Info,
@@ -299,6 +300,7 @@ function UpgradeRunModal({
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog

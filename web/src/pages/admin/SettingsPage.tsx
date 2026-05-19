@@ -2,6 +2,7 @@ import { type FormEvent, useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDialog, Button, Card, Form, Input, Label, Modal, Spinner, Tabs, TextArea, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { settingsApi } from '../../shared/api/settings';
 import { adminApiKeyApi, type AdminAPIKeyResp } from '../../shared/api/adminApiKey';
 import { defaultLogoUrl } from '../../app/providers/SiteSettingsProvider';
@@ -812,6 +813,7 @@ function SecurityPanel() {
       </SettingsSection>
 
       <Modal state={showKeyModalState}>
+        <DialogTriggerShim />
         <Modal.Backdrop>
           <Modal.Container placement="center" scroll="inside" size="md">
             <Modal.Dialog
@@ -860,6 +862,7 @@ function SecurityPanel() {
       </Modal>
 
       <AlertDialog isOpen={confirmRegen} onOpenChange={setConfirmRegen}>
+        <DialogTriggerShim />
         <AlertDialog.Backdrop>
           <AlertDialog.Container placement="center" size="sm">
             <AlertDialog.Dialog className="ag-elevation-modal">
@@ -888,6 +891,7 @@ function SecurityPanel() {
       </AlertDialog>
 
       <AlertDialog isOpen={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogTriggerShim />
         <AlertDialog.Backdrop>
           <AlertDialog.Container placement="center" size="sm">
             <AlertDialog.Dialog className="ag-elevation-modal">
@@ -979,6 +983,7 @@ function EmailTemplateEditor({
       </div>
       {isPreviewOpen ? (
         <Modal state={previewModalState}>
+          <DialogTriggerShim />
           <Modal.Backdrop>
             <Modal.Container placement="center" scroll="inside" size="lg">
               <Modal.Dialog

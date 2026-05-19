@@ -22,6 +22,7 @@ AirGate 对外暴露 OpenAI 兼容协议，并通过协议翻译同时兼容 Ant
 | `POST` | `/v1/responses` | OpenAI Responses API（OpenAI 较新协议） |
 | `POST` | `/v1/images/generations` | OpenAI Images API（文生图，支持 `gpt-image-1.5` / `gpt-image-2`） |
 | `POST` | `/v1/images/edits` | OpenAI Images API（图生图，支持 `gpt-image-1.5` / `gpt-image-2`） |
+| `GET`  | `/v1/images/tasks` | 查询异步生图任务状态（配合请求头 `Prefer: respond-async` 使用，详见下文「异步任务模式」） |
 | `POST` | `/v1/messages` | Anthropic Messages（Claude Code 等 Anthropic 客户端走这条；当前为协议翻译，未来对接原生 Claude 上游后将自动切换） |
 | `GET`  | `/v1/models` | 列出当前可用模型 |
 
@@ -72,14 +73,14 @@ client = OpenAI(
 )
 
 resp = client.images.generate(
-    model="gpt-image-2",            # gpt-image-1 | gpt-image-1.5 | gpt-image-2
+    model="gpt-image-2",            # gpt-image-1.5 | gpt-image-2
     prompt="一只可爱的柴犬坐在樱花树下，日系水彩风格",
     size="2048x2048",               # gpt-image-2 支持任意合规 WIDTHxHEIGHT，或 auto
     quality="medium",               # low | medium | high | auto
     background="opaque",            # opaque | transparent
     output_format="png",            # png | jpeg | webp
     n=1,
-    extra_body={"stream": True},    # AirGate 长任务分块/保活，返回值仍是 ImagesResponse
+    extra_body={"stream": True},    # 可选：上游耗时较长时，AirGate 会在等待期间通过 SSE 发送 keepalive ping 防止客户端/网关超时；响应体仍是标准 ImagesResponse
 )
 
 img = resp.data[0]
@@ -100,13 +101,110 @@ with open("in.png", "rb") as f:
         background="opaque",
         output_format="png",
         n=1,
-        extra_body={"stream": True},  # AirGate 长任务分块/保活，返回值仍是 ImagesResponse
+        extra_body={"stream": True},  # 可选：等同上面，SSE keepalive ping 防超时，响应体仍是 ImagesResponse
     )
 
 img = resp.data[0]
 with open("out.png", "wb") as f:
     f.write(base64.b64decode(img.b64_json))
 ```
+
+### 生图：异步任务模式（`Prefer: respond-async`）
+
+上面的 `stream: True` 只是在同步等待时发心跳防超时，**响应仍是阻塞等到图片生成完才返回**。如果你想立即拿到一个 `task_id` 后台轮询、不占用一个长连接（适合移动端、Serverless、批量任务场景），给请求加 `Prefer: respond-async` HTTP header 即可。
+
+服务端行为：
+
+- 立即返回 `202 Accepted`，响应体包含 `task_id` 和 `status_url`
+- 响应头 `Preference-Applied: respond-async` 表示已切到异步模式
+- 响应头 `Location` 指向任务查询地址
+
+> 注意：异步模式的响应体不是标准 `ImagesResponse`，OpenAI 官方 SDK 的类型化解析（`client.images.generate(...)`）无法直接套用。推荐用 `httpx` / `requests` 等通用 HTTP 客户端，或调用 SDK 的 raw response 接口拿原始 JSON。
+
+Python（用 `httpx` 直发）：
+
+```python
+import time
+import httpx
+
+BASE = "https://your-airgate.example.com/v1"
+AUTH = {"Authorization": "Bearer sk-你的key"}
+
+# 1. 提交任务，立即拿到 task_id
+resp = httpx.post(
+    f"{BASE}/images/generations",
+    headers={**AUTH, "Prefer": "respond-async"},
+    json={
+        "model": "gpt-image-2",
+        "prompt": "一只可爱的柴犬坐在樱花树下",
+        "size": "2048x2048",
+    },
+    timeout=30,
+)
+resp.raise_for_status()                          # 期望 202 Accepted
+task_id = resp.json()["task_id"]                 # AirGate task id
+
+# 2. 轮询任务状态
+while True:
+    status = httpx.get(
+        f"{BASE}/images/tasks",
+        params={"task_id": task_id},
+        headers=AUTH,
+        timeout=10,
+    ).json()
+    if status["status"] in ("completed", "failed"):
+        break
+    time.sleep(2)
+
+# 3. 任务完成后：
+#    - status["result_content"] 是 Markdown 形式的图片引用，URL 为相对路径
+#      如 "![image](/assets-runtime/...)"，需拼上 base URL 才能直接访问
+#    - status["model"] / "input_tokens" / "output_tokens" / "cost" 提供计费摘要
+#    - 失败时 status["error"] 带原因
+print(status)
+```
+
+curl 等价示例：
+
+```bash
+# 提交任务
+curl -i https://your-airgate.example.com/v1/images/generations \
+  -H "Authorization: Bearer sk-你的key" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: respond-async" \
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "一只可爱的柴犬坐在樱花树下",
+    "size": "2048x2048"
+  }'
+# → HTTP/1.1 202 Accepted
+#   Preference-Applied: respond-async
+#   Location: /v1/images/tasks?task_id=01933e4f-89a0-7c1e-8b3f-d4a92a1f00aa
+#   {
+#     "object": "image.task",
+#     "task_id": "01933e4f-89a0-7c1e-8b3f-d4a92a1f00aa",
+#     "status": "pending",
+#     "status_url": "/v1/images/tasks?task_id=01933e4f-89a0-7c1e-8b3f-d4a92a1f00aa"
+#   }
+
+# 轮询任务
+curl "https://your-airgate.example.com/v1/images/tasks?task_id=01933e4f-89a0-7c1e-8b3f-d4a92a1f00aa" \
+  -H "Authorization: Bearer sk-你的key"
+# → {
+#     "task_id": "01933e4f-89a0-7c1e-8b3f-d4a92a1f00aa",
+#     "status": "completed",
+#     "progress": 100,
+#     "result_content": "![image](/assets-runtime/...)",
+#     "model": "gpt-image-2",
+#     "input_tokens": 12,
+#     "output_tokens": 0,
+#     "cost": 0.012
+#   }
+```
+
+任务状态字段：`pending` / `processing` / `completed` / `failed`。失败时 `error` 字段带上原因。
+
+`/v1/images/edits` 完全相同，只是请求体多 `image` / `mask` 字段。
 
 ### Anthropic Python SDK
 

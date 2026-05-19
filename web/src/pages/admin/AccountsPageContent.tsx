@@ -28,6 +28,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
+import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { AccountTypeFilterSelect } from './accounts/AccountTypeFilterSelect';
@@ -684,7 +685,7 @@ export default function AccountsPageContent() {
         <div className="min-w-0 flex-1">
           <div className="flex min-h-12 flex-col flex-wrap items-stretch gap-3 sm:flex-row sm:items-center">
             <div className="w-full sm:w-48">
-              <HeroTextField fullWidth>
+              <HeroTextField fullWidth aria-label={t('accounts.search_placeholder', '搜索账号名称...')}>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
                   <Input
@@ -953,6 +954,7 @@ export default function AccountsPageContent() {
           if (!open) setDeletingAccount(null);
         }}
       >
+        <DialogTriggerShim />
         <AlertDialog.Backdrop>
           <AlertDialog.Container placement="center" size="sm">
             <AlertDialog.Dialog className="ag-elevation-modal">
@@ -993,6 +995,7 @@ export default function AccountsPageContent() {
 
       {/* 批量删除确认 */}
       <AlertDialog isOpen={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <DialogTriggerShim />
         <AlertDialog.Backdrop>
           <AlertDialog.Container placement="center" size="sm">
             <AlertDialog.Dialog className="ag-elevation-modal">

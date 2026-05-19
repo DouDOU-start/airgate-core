@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Checkbox, Input, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { usersApi } from '../../../shared/api/users';
 import { groupsApi } from '../../../shared/api/groups';
 import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
@@ -126,6 +127,7 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog

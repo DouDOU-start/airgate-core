@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Input, Label, Modal, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import type { UserResp, AdjustBalanceReq } from '../../../shared/types';
 
 interface BalanceModalProps {
@@ -35,6 +36,7 @@ export function BalanceModal({ open, user, defaultAction, onClose, onSubmit, loa
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="sm">
           <Modal.Dialog

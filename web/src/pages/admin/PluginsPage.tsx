@@ -8,6 +8,7 @@ import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../shared/constants';
 import { AlertDialog, Button, Card, Checkbox, Chip, Description, EmptyState, Input, Label, Modal, Skeleton, Spinner, Tabs, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
   Trash2, Download, Loader2, RefreshCw,
   Package, User, Tag, Plus, Upload, Github, Settings, Store,
@@ -322,6 +323,7 @@ export default function PluginsPage() {
           if (!open) setUninstallTarget(null);
         }}
       >
+        <DialogTriggerShim />
         <AlertDialog.Backdrop>
           <AlertDialog.Container placement="center" size="sm">
             <AlertDialog.Dialog className="ag-elevation-modal">
@@ -435,6 +437,7 @@ function PluginConfigModal({
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog
@@ -622,6 +625,7 @@ function InstallPluginModal({
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Input, Label, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { Eye, EyeOff } from 'lucide-react';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { UserResp, UpdateUserReq } from '../../../shared/types';
@@ -32,6 +33,7 @@ export function EditUserModal({ open, user, onClose, onSubmit, loading }: EditUs
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog className="ag-elevation-modal">

@@ -7,6 +7,7 @@ import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { AlertDialog, Button, Chip, EmptyState, Form, Input, Label, ListBox, Modal, Select, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { StatusChip } from '../../shared/ui';
 import { Plus, Pencil, Trash2, Zap, RefreshCw } from 'lucide-react';
 import type { ProxyResp, CreateProxyReq, UpdateProxyReq } from '../../shared/types';
@@ -291,6 +292,7 @@ export default function ProxiesPage() {
 
       {/* 创建/编辑弹窗 */}
       <Modal state={proxyDialogState}>
+        <DialogTriggerShim />
         <Modal.Backdrop>
           <Modal.Container placement="center" scroll="inside" size="md">
             <Modal.Dialog className="ag-elevation-modal">
@@ -399,6 +401,7 @@ export default function ProxiesPage() {
           if (!open) setDeleteTarget(null);
         }}
       >
+        <DialogTriggerShim />
         <AlertDialog.Backdrop>
           <AlertDialog.Container placement="center" size="sm">
             <AlertDialog.Dialog className="ag-elevation-modal">

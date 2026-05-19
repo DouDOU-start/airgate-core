@@ -1,5 +1,6 @@
 import type { ComponentProps, CSSProperties, ReactNode } from 'react';
 import { Modal, Surface } from '@heroui/react';
+import { DialogTriggerShim } from './DialogTriggerShim';
 
 type ModalContainerProps = ComponentProps<typeof Modal.Container>;
 type ModalRootProps = ComponentProps<typeof Modal>;
@@ -47,6 +48,7 @@ export function CommonModal({
 }: CommonModalProps) {
   return (
     <Modal state={state}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement={placement} scroll={scroll} size={size}>
           <Modal.Dialog className={cx('ag-elevation-modal', className)} style={dialogStyle}>

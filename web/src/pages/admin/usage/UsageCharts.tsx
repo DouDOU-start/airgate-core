@@ -125,7 +125,7 @@ export function UsageTokenTrendChart({
   }, [data]);
 
   return (
-    <ResponsiveContainer width="100%" height="100%" debounce={80}>
+    <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={{ width: 800, height: 300 }}>
       <LineChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
         <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
         <XAxis

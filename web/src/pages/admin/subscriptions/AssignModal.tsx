@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, ComboBox, Input, Label, ListBox, Modal, Select, Spinner, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { Search } from 'lucide-react';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import type {
@@ -100,6 +101,7 @@ export function AssignModal({
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog className="ag-elevation-modal">

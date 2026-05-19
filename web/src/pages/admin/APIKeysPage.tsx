@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Check, Copy, Plus, Pencil, Trash2, Key, Layers, Eye, RefreshCw } from 'lucide-react';
 import { Alert, AlertDialog, Button, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
   StatusChip,
 } from '../../shared/ui';
@@ -274,6 +275,7 @@ export default function APIKeysPage() {
       />
 
       <Modal state={createdKeyModalState}>
+        <DialogTriggerShim />
         <Modal.Backdrop>
           <Modal.Container placement="center" scroll="inside" size="md">
             <Modal.Dialog className="ag-elevation-modal">
@@ -313,6 +315,7 @@ export default function APIKeysPage() {
       </Modal>
 
       <Modal state={revealedKeyModalState}>
+        <DialogTriggerShim />
         <Modal.Backdrop>
           <Modal.Container placement="center" scroll="inside" size="md">
             <Modal.Dialog className="ag-elevation-modal">
@@ -372,6 +375,7 @@ export default function APIKeysPage() {
           if (!open) setDeletingKey(null);
         }}
       >
+        <DialogTriggerShim />
         <AlertDialog.Backdrop>
           <AlertDialog.Container placement="center" size="sm">
             <AlertDialog.Dialog className="ag-elevation-modal">

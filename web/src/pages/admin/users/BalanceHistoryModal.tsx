@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Chip, EmptyState, Modal, Skeleton, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { useQuery } from '@tanstack/react-query';
 import { usersApi } from '../../../shared/api/users';
 import { getTotalPages } from '../../../shared/utils/pagination';
@@ -53,6 +54,7 @@ export function BalanceHistoryModal({ open, user, onClose }: BalanceHistoryModal
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog

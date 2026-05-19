@@ -368,6 +368,12 @@ func servePluginAsset(mgr *plugin.Manager, baseDir string) gin.HandlerFunc {
 		full := filepath.Join(baseDir, name, "assets", rel)
 		data, err := os.ReadFile(full)
 		if err != nil {
+			// 插件可选 CSS：若 index.css 不存在，返回空 CSS 而非 404。
+			// 否则浏览器会在 network 面板打印 404，污染开发者控制台。
+			if rel == "index.css" {
+				c.Data(http.StatusOK, "text/css; charset=utf-8", nil)
+				return
+			}
 			c.Status(http.StatusNotFound)
 			return
 		}

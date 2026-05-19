@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { Terminal } from 'lucide-react';
 import { useToast } from '../../../shared/ui';
 import { apikeysApi } from '../../../shared/api/apikeys';
@@ -158,6 +159,7 @@ export function CcsImportModal({
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog className="ag-elevation-modal">

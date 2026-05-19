@@ -337,8 +337,8 @@ export default function UserOverviewPage() {
         {/* Token 趋势 */}
         <DashboardCard title={t('dashboard.token_trend')}>
           {trendData.length > 0 ? (
-            <div className="h-[248px] 2xl:h-[288px]">
-              <ResponsiveContainer width="100%" height="100%" debounce={80}>
+            <div className="h-[248px] w-full min-w-0 2xl:h-[288px]">
+              <ResponsiveContainer width="100%" height="100%" debounce={80} initialDimension={{ width: 600, height: 248 }}>
                 <LineChart data={trendData} margin={{ bottom: 0, left: -18, right: 4, top: 4 }}>
                   <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
                   <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />

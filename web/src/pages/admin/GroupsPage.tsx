@@ -11,6 +11,7 @@ import {
   Percent,
 } from 'lucide-react';
 import { AlertDialog, Button, Chip, EmptyState, Label, ListBox, Select, Spinner } from '@heroui/react';
+import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { PlatformIcon } from '../../shared/ui';
 import { groupsApi } from '../../shared/api/groups';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
@@ -355,6 +356,7 @@ export default function GroupsPage() {
           if (!open) setDeletingGroup(null);
         }}
       >
+        <DialogTriggerShim />
         <AlertDialog.Backdrop>
           <AlertDialog.Container placement="center" size="sm">
             <AlertDialog.Dialog className="ag-elevation-modal">

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { AlertTriangle, Copy } from 'lucide-react';
 import { useToast } from '../../../shared/ui';
 import { useClipboard } from '../../../shared/hooks/useClipboard';
@@ -198,6 +199,7 @@ export function UseKeyModal({
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog

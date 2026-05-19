@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Card, Chip, Description, EmptyState, Form, Input, Label, Modal, Skeleton, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { usersApi } from '../../shared/api/users';
 import { useToast } from '../../shared/ui';
@@ -302,6 +303,7 @@ function MyBalanceHistoryModal({ open, balance, onClose }: { open: boolean; bala
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog

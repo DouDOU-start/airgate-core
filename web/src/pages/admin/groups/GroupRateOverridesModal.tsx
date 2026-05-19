@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Button, ComboBox, Input, ListBox, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { Check, Plus, Search, Trash2, X } from 'lucide-react';
 import { PlatformIcon } from '../../../shared/ui';
 import { groupsApi } from '../../../shared/api/groups';
@@ -115,6 +116,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
 
   return (
     <Modal state={modalState}>
+      <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField } from '@heroui/react';
+import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { usersApi } from '../../shared/api/users';
 import { settingsApi } from '../../shared/api/settings';
 import { usePagination } from '../../shared/hooks/usePagination';
@@ -122,7 +123,7 @@ export default function UsersPage() {
     <div>
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
         <div className="w-full sm:w-48">
-          <HeroTextField fullWidth>
+          <HeroTextField fullWidth aria-label={t('users.search_placeholder')}>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
               <Input
@@ -393,6 +394,7 @@ export default function UsersPage() {
           if (!open) setDisablingUser(null);
         }}
       >
+        <DialogTriggerShim />
         <AlertDialog.Backdrop>
           <AlertDialog.Container placement="center" size="sm">
             <AlertDialog.Dialog className="ag-elevation-modal">
@@ -426,6 +428,7 @@ export default function UsersPage() {
           if (!open) setDeletingUser(null);
         }}
       >
+        <DialogTriggerShim />
         <AlertDialog.Backdrop>
           <AlertDialog.Container placement="center" size="sm">
             <AlertDialog.Dialog className="ag-elevation-modal">

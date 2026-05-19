@@ -6,6 +6,7 @@ import { usePagination } from '../../shared/hooks/usePagination';
 import { groupsApi } from '../../shared/api/groups';
 import { useToast } from '../../shared/ui';
 import { Alert, AlertDialog, Button, Dropdown, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
+import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
   StatusChip,
 } from '../../shared/ui';
@@ -552,6 +553,7 @@ export default function UserKeysPage() {
 
       {/* 查看密钥弹窗 */}
       <Modal state={revealedKeyModalState}>
+        <DialogTriggerShim />
         <Modal.Backdrop>
           <Modal.Container placement="center" scroll="inside" size="md">
             <Modal.Dialog className="ag-elevation-modal">
@@ -622,6 +624,7 @@ export default function UserKeysPage() {
           if (!open) setDeleteTarget(null);
         }}
       >
+        <DialogTriggerShim />
         <AlertDialog.Backdrop>
           <AlertDialog.Container placement="center" size="sm">
             <AlertDialog.Dialog className="ag-elevation-modal">
