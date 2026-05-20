@@ -192,6 +192,19 @@ func (h *HostService) createTask(ctx context.Context, pluginID string, req hostC
 		}
 	}
 
+	// 把 input 里内嵌的 data:image/* base64 大图落盘换成 /assets-runtime/... URL。
+	// 这一步必须在持久化和后续 dispatch 之前完成 —— 任何 base64 大图留在 input 里
+	// 都会让 task.list/get/idempotency 查询以及 ProcessTask 派发 RPC 撞 64MB gRPC 上限。
+	if len(req.Input) > 0 {
+		storage, err := newAssetStorage(ctx, h.db)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "init asset storage: %v", err)
+		}
+		if err := normalizeTaskInputAssets(ctx, storage, pluginID, req.UserID, req.Input); err != nil {
+			return nil, status.Errorf(codes.Internal, "normalize task input assets: %v", err)
+		}
+	}
+
 	create := h.db.Task.Create().
 		SetPluginID(pluginID).
 		SetTaskType(taskType).

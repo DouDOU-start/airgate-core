@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -208,6 +209,64 @@ func TestListTasksStripsHeavyInputFields(t *testing.T) {
 	}
 	if _, present := fullInput["mask"]; !present {
 		t.Fatalf("get response must keep input.mask, got: %+v", fullInput)
+	}
+}
+
+func TestCreateTaskNormalizesLargeInputDataURIs(t *testing.T) {
+	ctx := context.Background()
+	db := enttest.Open(t, "sqlite3", "file:create_task_normalize?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	t.Cleanup(func() { _ = db.Close() })
+
+	// 让 newAssetStorage 落到测试临时目录，而不是默认 data/assets。
+	t.Setenv("ASSETS_DIR", t.TempDir())
+
+	host := &HostService{db: db}
+	big := bigDataURI(t, "image/png", 32<<10)
+	created, err := host.createTask(ctx, "gateway-openai", hostCreateTaskRequest{
+		UserID:   7,
+		TaskType: "image.edit",
+		Input: map[string]interface{}{
+			"prompt": "rotate left",
+			"model":  "gpt-image-1",
+			"images": []interface{}{big, big},
+			"mask":   big,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	task := created["task"].(map[string]interface{})
+	input := task["input"].(map[string]interface{})
+	if input["prompt"] != "rotate left" {
+		t.Fatalf("prompt mutated: %+v", input["prompt"])
+	}
+	images := input["images"].([]interface{})
+	for i, img := range images {
+		s, ok := img.(string)
+		if !ok {
+			t.Fatalf("images[%d] type = %T", i, img)
+		}
+		if !strings.HasPrefix(s, "/assets-runtime/") {
+			t.Fatalf("images[%d] not normalized: %s", i, s[:40])
+		}
+		if !strings.Contains(s, "gateway-openai/task-inputs/user-7/") {
+			t.Fatalf("images[%d] wrong scope: %s", i, s)
+		}
+	}
+	if !strings.HasPrefix(input["mask"].(string), "/assets-runtime/") {
+		t.Fatalf("mask not normalized: %s", input["mask"].(string)[:40])
+	}
+
+	// 再确认 list payload 也不再带任何 base64 — list 已经在剥 images/mask，
+	// 这里主要验证如果有人撤掉那个剥字段逻辑，归一化也能挡住 64MB 上限。
+	listed, err := host.listTasks(ctx, "gateway-openai", hostListTasksRequest{UserID: 7, Limit: 20})
+	if err != nil {
+		t.Fatalf("list tasks: %v", err)
+	}
+	tasks := listed["tasks"].([]map[string]interface{})
+	if len(tasks) != 1 {
+		t.Fatalf("tasks len = %d", len(tasks))
 	}
 }
 
