@@ -338,7 +338,24 @@ func (s *Server) handleRuntimeAsset(c *gin.Context) {
 		return
 	}
 	c.Header("Cache-Control", "public, max-age=31536000, immutable")
-	c.File(filepath.Join(localDir, filepath.FromSlash(rel)))
+	srcPath := filepath.Join(localDir, filepath.FromSlash(rel))
+
+	if width := resolveThumbWidth(c.Query("w")); width > 0 && thumbnailableExt(rel) {
+		cachePath := thumbCachePath(srcPath, width)
+		if data, err := os.ReadFile(cachePath); err == nil {
+			c.Data(http.StatusOK, "image/jpeg", data)
+			return
+		}
+		data, err := generateThumbnail(srcPath, cachePath, width)
+		if err == nil {
+			c.Data(http.StatusOK, "image/jpeg", data)
+			return
+		}
+		// Fall through to original on any thumb failure (decode error, source
+		// missing, source already smaller). Asset URLs stay non-destructive.
+	}
+
+	c.File(srcPath)
 }
 
 func servePluginAsset(mgr *plugin.Manager, baseDir string) gin.HandlerFunc {
