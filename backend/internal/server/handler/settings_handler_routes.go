@@ -172,7 +172,16 @@ func (h *SettingsHandler) TestSMTP(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// UploadFile 上传文件（图片等）。
+// UploadFile 上传站点级静态资源（logo / favicon 等）。
+//
+// 注意：这里**有意**保持本地磁盘存储，不接入 asset storage 抽象 / R2。理由：
+//   - 这类资源是站点全局共享、几乎不变、每次页面加载都被请求；
+//   - 走 R2 签名 URL 会让浏览器 / CDN 缓存失效（签名带过期参数），徒增请求数；
+//   - 万一 R2 抖动，首页 logo 都会挂；
+//   - 对象存储应该承载"用户产生内容/AI 生成产物"，不是站点装饰资源。
+//
+// 用户级上传（聊天附件、头像等）应该走 plugin.NewAssetStorage + purpose=upload，
+// 不走这个端点。
 func (h *SettingsHandler) UploadFile(c *gin.Context) {
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {

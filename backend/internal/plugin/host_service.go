@@ -179,6 +179,7 @@ const (
 	hostMethodAssetsStoreURL         = "assets.store_url"
 	hostMethodAssetsGetURL           = "assets.get_url"
 	hostMethodAssetsGetBytes         = "assets.get_bytes"
+	hostMethodAssetsDelete           = "assets.delete"
 	hostMethodTasksCreate            = "tasks.create"
 	hostMethodTasksUpdate            = "tasks.update"
 	hostMethodTasksGet               = "tasks.get"
@@ -259,6 +260,12 @@ func (h *HostService) invoke(
 			return nil, err
 		}
 		return h.getAssetBytes(ctx, req)
+	case hostMethodAssetsDelete:
+		var req hostDeleteAssetRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.deleteAsset(ctx, req)
 	case hostMethodTasksCreate:
 		var req hostCreateTaskRequest
 		if err := decodeHostPayload(payload, &req); err != nil {
@@ -367,7 +374,7 @@ type hostGetUserInfoRequest struct {
 
 type hostStoreAssetRequest struct {
 	UserID        int64  `json:"user_id"`
-	Scope         string `json:"scope"`
+	Purpose       string `json:"purpose"` // core 枚举：chat/upload/generated/task-input/temp
 	ContentType   string `json:"content_type"`
 	FileExtension string `json:"file_extension"`
 	Data          []byte `json:"data"`
@@ -375,7 +382,7 @@ type hostStoreAssetRequest struct {
 
 type hostStoreAssetFromURLRequest struct {
 	UserID    int64  `json:"user_id"`
-	Scope     string `json:"scope"`
+	Purpose   string `json:"purpose"` // core 枚举：chat/upload/generated/task-input/temp
 	SourceURL string `json:"source_url"`
 }
 
@@ -384,6 +391,10 @@ type hostGetAssetURLRequest struct {
 }
 
 type hostGetAssetBytesRequest struct {
+	ObjectKey string `json:"object_key"`
+}
+
+type hostDeleteAssetRequest struct {
 	ObjectKey string `json:"object_key"`
 }
 
@@ -1232,11 +1243,15 @@ func (h *HostService) storeAsset(ctx context.Context, req hostStoreAssetRequest)
 	if len(req.Data) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "asset data is required")
 	}
-	storage, err := newAssetStorage(ctx, h.db)
+	purpose, ok := parseAssetPurpose(req.Purpose)
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid purpose %q (allowed: chat/upload/generated/task-input/temp)", req.Purpose)
+	}
+	storage, err := NewAssetStorage(ctx, h.db)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	asset, err := storage.store(ctx, req.UserID, req.Scope, req.ContentType, req.FileExtension, req.Data)
+	asset, err := storage.Store(ctx, req.UserID, purpose, req.ContentType, req.FileExtension, req.Data)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -1256,11 +1271,15 @@ func (h *HostService) storeAssetFromURL(ctx context.Context, req hostStoreAssetF
 	if req.SourceURL == "" {
 		return nil, status.Error(codes.InvalidArgument, "source_url is required")
 	}
-	storage, err := newAssetStorage(ctx, h.db)
+	purpose, ok := parseAssetPurpose(req.Purpose)
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid purpose %q (allowed: chat/upload/generated/task-input/temp)", req.Purpose)
+	}
+	storage, err := NewAssetStorage(ctx, h.db)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	asset, err := storage.storeFromURL(ctx, req.UserID, req.Scope, req.SourceURL)
+	asset, err := storage.StoreFromURL(ctx, req.UserID, purpose, req.SourceURL)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -1274,11 +1293,11 @@ func (h *HostService) storeAssetFromURL(ctx context.Context, req hostStoreAssetF
 }
 
 func (h *HostService) getAssetURL(ctx context.Context, req hostGetAssetURLRequest) (map[string]interface{}, error) {
-	storage, err := newAssetStorage(ctx, h.db)
+	storage, err := NewAssetStorage(ctx, h.db)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	publicURL, err := storage.publicURL(ctx, req.ObjectKey)
+	publicURL, err := storage.PublicURL(ctx, req.ObjectKey)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -1286,15 +1305,29 @@ func (h *HostService) getAssetURL(ctx context.Context, req hostGetAssetURLReques
 }
 
 func (h *HostService) getAssetBytes(ctx context.Context, req hostGetAssetBytesRequest) (map[string]interface{}, error) {
-	storage, err := newAssetStorage(ctx, h.db)
+	storage, err := NewAssetStorage(ctx, h.db)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	data, contentType, err := storage.getBytes(ctx, req.ObjectKey)
+	data, contentType, err := storage.GetBytes(ctx, req.ObjectKey)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return map[string]interface{}{"data": data, "content_type": contentType}, nil
+}
+
+func (h *HostService) deleteAsset(ctx context.Context, req hostDeleteAssetRequest) (map[string]interface{}, error) {
+	if req.ObjectKey == "" {
+		return nil, status.Error(codes.InvalidArgument, "object_key 不能为空")
+	}
+	storage, err := NewAssetStorage(ctx, h.db)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := storage.Delete(ctx, req.ObjectKey); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return map[string]interface{}{"deleted": true}, nil
 }
 
 // protoHeadersToHTTPHost / httpHeadersToProtoHost 是 host_service.go 内部的 header 转换。

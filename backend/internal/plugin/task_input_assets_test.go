@@ -8,9 +8,9 @@ import (
 )
 
 // newTestAssetStorage 在临时目录起一个本地（非 S3）asset storage 用于单测。
-func newTestAssetStorage(t *testing.T) *assetStorage {
+func newTestAssetStorage(t *testing.T) *AssetStorage {
 	t.Helper()
-	return &assetStorage{
+	return &AssetStorage{
 		localDir: t.TempDir(),
 		useS3:    false,
 	}
@@ -36,8 +36,12 @@ func TestNormalizeTaskInputAssets_ReplacesLargeDataURI(t *testing.T) {
 		"mask":   bigPNG,
 	}
 
-	if err := normalizeTaskInputAssets(ctx, storage, "gateway-openai", 42, input); err != nil {
+	keys, err := normalizeTaskInputAssets(ctx, storage, 42, input)
+	if err != nil {
 		t.Fatalf("normalize: %v", err)
+	}
+	if len(keys) != 3 {
+		t.Fatalf("object keys len = %d, want 3", len(keys))
 	}
 
 	if input["prompt"] != "make it blue" {
@@ -55,8 +59,8 @@ func TestNormalizeTaskInputAssets_ReplacesLargeDataURI(t *testing.T) {
 		if !strings.HasPrefix(s, "/assets-runtime/") {
 			t.Fatalf("images[%d] not replaced: %s", i, s[:40])
 		}
-		if !strings.Contains(s, "gateway-openai/task-inputs/user-42/") {
-			t.Fatalf("images[%d] wrong scope: %s", i, s)
+		if !strings.Contains(s, "/task-input/42/") {
+			t.Fatalf("images[%d] wrong object_key prefix: %s", i, s)
 		}
 	}
 	mask, ok := input["mask"].(string)
@@ -72,7 +76,7 @@ func TestNormalizeTaskInputAssets_LeavesSmallDataURI(t *testing.T) {
 	input := map[string]any{
 		"images": []any{smallPNG},
 	}
-	if err := normalizeTaskInputAssets(ctx, storage, "gateway-openai", 1, input); err != nil {
+	if _, err := normalizeTaskInputAssets(ctx, storage, 1, input); err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
 	images := input["images"].([]any)
@@ -90,7 +94,7 @@ func TestNormalizeTaskInputAssets_LeavesNonImageDataURI(t *testing.T) {
 	input := map[string]any{
 		"font": fontDataURI,
 	}
-	if err := normalizeTaskInputAssets(ctx, storage, "any", 1, input); err != nil {
+	if _, err := normalizeTaskInputAssets(ctx, storage, 1, input); err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
 	if input["font"].(string) != fontDataURI {
@@ -103,7 +107,7 @@ func TestNormalizeTaskInputAssets_LeavesHTTPURL(t *testing.T) {
 	storage := newTestAssetStorage(t)
 	url := "https://cdn.example.com/" + strings.Repeat("a", 20<<10) + ".png"
 	input := map[string]any{"images": []any{url}}
-	if err := normalizeTaskInputAssets(ctx, storage, "any", 1, input); err != nil {
+	if _, err := normalizeTaskInputAssets(ctx, storage, 1, input); err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
 	if input["images"].([]any)[0].(string) != url {
@@ -114,9 +118,9 @@ func TestNormalizeTaskInputAssets_LeavesHTTPURL(t *testing.T) {
 func TestNormalizeTaskInputAssets_IdempotentOnPublicURL(t *testing.T) {
 	ctx := context.Background()
 	storage := newTestAssetStorage(t)
-	already := "/assets-runtime/gateway-openai/task-inputs/user-1/abcdef.png"
+	already := "/assets-runtime/task-input/1/202605/abcdef.png"
 	input := map[string]any{"images": []any{already}}
-	if err := normalizeTaskInputAssets(ctx, storage, "gateway-openai", 1, input); err != nil {
+	if _, err := normalizeTaskInputAssets(ctx, storage, 1, input); err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
 	if got := input["images"].([]any)[0].(string); got != already {
@@ -130,7 +134,7 @@ func TestNormalizeTaskInputAssets_RejectsOversizedInput(t *testing.T) {
 	// 51 MB > 50 MB 上限
 	huge := bigDataURI(t, "image/png", 51<<20)
 	input := map[string]any{"images": []any{huge}}
-	err := normalizeTaskInputAssets(ctx, storage, "any", 1, input)
+	_, err := normalizeTaskInputAssets(ctx, storage, 1, input)
 	if err == nil {
 		t.Fatalf("expected error for oversized input")
 	}
@@ -148,7 +152,7 @@ func TestNormalizeTaskInputAssets_NestedMap(t *testing.T) {
 			"primary": bigPNG,
 		},
 	}
-	if err := normalizeTaskInputAssets(ctx, storage, "any", 1, input); err != nil {
+	if _, err := normalizeTaskInputAssets(ctx, storage, 1, input); err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
 	nested := input["reference"].(map[string]any)
@@ -159,10 +163,10 @@ func TestNormalizeTaskInputAssets_NestedMap(t *testing.T) {
 
 func TestNormalizeTaskInputAssets_NoopOnEmpty(t *testing.T) {
 	ctx := context.Background()
-	if err := normalizeTaskInputAssets(ctx, nil, "any", 1, nil); err != nil {
+	if _, err := normalizeTaskInputAssets(ctx, nil, 1, nil); err != nil {
 		t.Fatalf("nil storage + nil input should noop, got: %v", err)
 	}
-	if err := normalizeTaskInputAssets(ctx, newTestAssetStorage(t), "any", 0, map[string]any{"a": "b"}); err != nil {
+	if _, err := normalizeTaskInputAssets(ctx, newTestAssetStorage(t), 0, map[string]any{"a": "b"}); err != nil {
 		t.Fatalf("userID=0 should noop, got: %v", err)
 	}
 }

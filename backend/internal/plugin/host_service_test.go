@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -68,6 +69,89 @@ func TestHostInvokeRequiresDeclaredCapability(t *testing.T) {
 	if err := handle.requireMethod(hostMethodTasksCreate); err != nil {
 		t.Fatalf("expected declared method capability to pass, got %v", err)
 	}
+}
+
+func TestHostDeleteAssetLocal(t *testing.T) {
+	ctx := context.Background()
+	db := enttest.Open(t, "sqlite3", "file:host_delete_asset?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	t.Cleanup(func() { _ = db.Close() })
+
+	db.Setting.Create().SetGroup("storage").SetKey("local_storage_dir").SetValue(t.TempDir()).SaveX(ctx)
+	storage, err := NewAssetStorage(ctx, db)
+	if err != nil {
+		t.Fatalf("初始化资产存储失败: %v", err)
+	}
+	asset := mustStoreTestAsset(t, storage, ctx, 42, AssetPurposeChat)
+	assertAssetExists(t, storage, asset.ObjectKey)
+
+	host := &HostService{db: db}
+	if _, err := host.deleteAsset(ctx, hostDeleteAssetRequest{ObjectKey: asset.ObjectKey}); err != nil {
+		t.Fatalf("删除资产失败: %v", err)
+	}
+	assertAssetMissing(t, storage, asset.ObjectKey)
+}
+
+func TestDeleteTaskDeletesAssociatedAssets(t *testing.T) {
+	ctx := context.Background()
+	db := enttest.Open(t, "sqlite3", "file:delete_task_assets?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	t.Cleanup(func() { _ = db.Close() })
+
+	db.Setting.Create().SetGroup("storage").SetKey("local_storage_dir").SetValue(t.TempDir()).SaveX(ctx)
+	storage, err := NewAssetStorage(ctx, db)
+	if err != nil {
+		t.Fatalf("初始化资产存储失败: %v", err)
+	}
+
+	host := &HostService{db: db}
+	big := bigDataURI(t, "image/png", 32<<10)
+	created, err := host.createTask(ctx, "gateway-openai", hostCreateTaskRequest{
+		UserID:   42,
+		TaskType: "image.edit",
+		Input: map[string]interface{}{
+			"prompt": "edit",
+			"images": []interface{}{big},
+		},
+	})
+	if err != nil {
+		t.Fatalf("创建任务失败: %v", err)
+	}
+
+	task := created["task"].(map[string]interface{})
+	taskID := task["id"].(int64)
+	input := task["input"].(map[string]interface{})
+	inputAssetURL := input["images"].([]interface{})[0].(string)
+	inputObjectKey, err := runtimeAssetURLToObjectKey(inputAssetURL)
+	if err != nil {
+		t.Fatalf("解析输入资产 URL 失败: %v", err)
+	}
+	assertAssetExists(t, storage, inputObjectKey)
+
+	generated := mustStoreTestAsset(t, storage, ctx, 42, AssetPurposeGenerated)
+	if _, err := host.updateTask(ctx, "gateway-openai", hostUpdateTaskRequest{
+		TaskID: taskID,
+		Status: "processing",
+	}); err != nil {
+		t.Fatalf("启动任务失败: %v", err)
+	}
+	if _, err := host.updateTask(ctx, "gateway-openai", hostUpdateTaskRequest{
+		TaskID: taskID,
+		Status: "completed",
+		Output: map[string]interface{}{
+			"content":           fmt.Sprintf("![image](%s)", generated.PublicURL),
+			"asset_object_keys": []interface{}{generated.ObjectKey},
+		},
+	}); err != nil {
+		t.Fatalf("完成任务失败: %v", err)
+	}
+
+	if _, err := host.deleteTask(ctx, "gateway-openai", hostDeleteTaskRequest{
+		TaskID: taskID,
+		UserID: 42,
+	}); err != nil {
+		t.Fatalf("删除任务失败: %v", err)
+	}
+	assertAssetMissing(t, storage, inputObjectKey)
+	assertAssetMissing(t, storage, generated.ObjectKey)
 }
 
 func TestTaskPublicIDIsIndependentFromIdempotencyKey(t *testing.T) {
@@ -217,7 +301,7 @@ func TestCreateTaskNormalizesLargeInputDataURIs(t *testing.T) {
 	db := enttest.Open(t, "sqlite3", "file:create_task_normalize?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
 	t.Cleanup(func() { _ = db.Close() })
 
-	// 让 newAssetStorage 落到测试临时目录，而不是默认 data/assets。
+	// 让 NewAssetStorage 落到测试临时目录，而不是默认 data/assets。
 	t.Setenv("ASSETS_DIR", t.TempDir())
 
 	host := &HostService{db: db}
@@ -250,8 +334,8 @@ func TestCreateTaskNormalizesLargeInputDataURIs(t *testing.T) {
 		if !strings.HasPrefix(s, "/assets-runtime/") {
 			t.Fatalf("images[%d] not normalized: %s", i, s[:40])
 		}
-		if !strings.Contains(s, "gateway-openai/task-inputs/user-7/") {
-			t.Fatalf("images[%d] wrong scope: %s", i, s)
+		if !strings.Contains(s, "/task-input/7/") {
+			t.Fatalf("images[%d] wrong object_key prefix: %s", i, s)
 		}
 	}
 	if !strings.HasPrefix(input["mask"].(string), "/assets-runtime/") {

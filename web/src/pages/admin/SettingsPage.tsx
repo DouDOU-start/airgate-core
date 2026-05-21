@@ -46,6 +46,8 @@ const STORAGE_KEYS = [
   's3_endpoint', 's3_bucket', 's3_access_key', 's3_secret_key',
   's3_region', 's3_use_ssl', 's3_public_base_url',
   's3_presign_ttl_minutes', 's3_path_prefix', 'local_storage_dir',
+  'asset_retention_generated_days', 'asset_retention_task_input_days', 'asset_retention_temp_days',
+  'asset_retention_chat_days', 'asset_retention_upload_days',
 ] as const;
 
 // OpenClaw 一键接入相关 setting key。所有 key 统一加 "openclaw." 前缀，便于在 Setting 表中识别。
@@ -1043,12 +1045,12 @@ function StoragePanel({
   const { t } = useTranslation();
 
   return (
-    <Card>
-      <Card.Header>
-        <Card.Title>{t('settings.storage_config')}</Card.Title>
-      </Card.Header>
-      <Card.Content>
-        <Form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={(e) => e.preventDefault()}>
+      <Card>
+        <Card.Header>
+          <Card.Title>{t('settings.storage_config')}</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <Form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={(e) => e.preventDefault()}>
           <Field label={t('settings.s3_endpoint')} hint={t('settings.s3_endpoint_hint')}>
             <Input
               value={val('s3_endpoint')}
@@ -1126,6 +1128,50 @@ function StoragePanel({
             )}
             onChange={(v) => set('s3_use_ssl', String(v))}
           />
+          <div className="col-span-1 md:col-span-2 pt-2 border-t border-border">
+            <div className="text-sm font-medium text-text">{t('settings.asset_retention_section')}</div>
+            <div className="mt-1 text-xs text-text-tertiary">{t('settings.asset_retention_section_hint')}</div>
+          </div>
+          <Field label={t('settings.asset_retention_generated_days')} hint={t('settings.asset_retention_generated_days_hint')}>
+            <Input
+              type="number"
+              value={val('asset_retention_generated_days')}
+              onChange={(e) => set('asset_retention_generated_days', e.target.value)}
+              placeholder="7"
+            />
+          </Field>
+          <Field label={t('settings.asset_retention_task_input_days')} hint={t('settings.asset_retention_task_input_days_hint')}>
+            <Input
+              type="number"
+              value={val('asset_retention_task_input_days')}
+              onChange={(e) => set('asset_retention_task_input_days', e.target.value)}
+              placeholder="30"
+            />
+          </Field>
+          <Field label={t('settings.asset_retention_temp_days')} hint={t('settings.asset_retention_temp_days_hint')}>
+            <Input
+              type="number"
+              value={val('asset_retention_temp_days')}
+              onChange={(e) => set('asset_retention_temp_days', e.target.value)}
+              placeholder="7"
+            />
+          </Field>
+          <Field label={t('settings.asset_retention_chat_days')} hint={t('settings.asset_retention_chat_days_hint')}>
+            <Input
+              type="number"
+              value={val('asset_retention_chat_days')}
+              onChange={(e) => set('asset_retention_chat_days', e.target.value)}
+              placeholder="0"
+            />
+          </Field>
+          <Field label={t('settings.asset_retention_upload_days')} hint={t('settings.asset_retention_upload_days_hint')}>
+            <Input
+              type="number"
+              value={val('asset_retention_upload_days')}
+              onChange={(e) => set('asset_retention_upload_days', e.target.value)}
+              placeholder="0"
+            />
+          </Field>
         </Form>
         {footer}
       </Card.Content>

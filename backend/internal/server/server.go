@@ -157,6 +157,8 @@ func (s *Server) StartPlugins(ctx context.Context) {
 	pluginCtx, cancel := context.WithCancel(ctx)
 	s.pluginStartCancel = cancel
 
+	go plugin.StartAssetCleanupLoop(pluginCtx, s.db)
+
 	go func() {
 		// 加载已编译的插件。后台执行，避免坏插件阻塞 core 监听端口。
 		if err := s.pluginMgr.LoadAll(pluginCtx); err != nil {
