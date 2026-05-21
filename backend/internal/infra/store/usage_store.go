@@ -571,10 +571,9 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 	if item.Edges.Account != nil {
 		record.AccountID = int64(item.Edges.Account.ID)
 		if email, ok := item.Edges.Account.Credentials["email"]; ok && email != "" {
-			record.AccountName = email
-		} else {
-			record.AccountName = item.Edges.Account.Name
+			record.AccountEmail = email
 		}
+		record.AccountName = item.Edges.Account.Name
 	} else {
 		record.AccountName = "-"
 	}

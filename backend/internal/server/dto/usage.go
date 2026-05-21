@@ -14,6 +14,7 @@ type UsageLogResp struct {
 	APIKeyDeleted         bool                  `json:"api_key_deleted"`
 	AccountID             int64                 `json:"account_id"`
 	AccountName           string                `json:"account_name,omitempty"`
+	AccountEmail          string                `json:"account_email,omitempty"`
 	GroupID               int64                 `json:"group_id"`
 	Platform              string                `json:"platform"`
 	Model                 string                `json:"model"`

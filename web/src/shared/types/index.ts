@@ -473,6 +473,7 @@ export interface UsageLogResp {
   api_key_deleted: boolean;
   account_id: number;
   account_name?: string;
+  account_email?: string;
   group_id: number;
   platform: string;
   model: string;

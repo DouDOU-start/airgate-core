@@ -56,6 +56,7 @@ type LogRecord struct {
 	APIKeyDeleted         bool
 	AccountID             int64
 	AccountName           string
+	AccountEmail          string
 	GroupID               int64
 	Platform              string
 	Model                 string
