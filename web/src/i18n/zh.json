@@ -700,6 +700,7 @@
     "cache_ratio": "缓存比例",
     "cache_cumulative_ratio": "缓存累计比例",
     "auto_update": "自动更新",
+    "auto_update_off": "关闭自动更新",
     "granularity_hour": "按小时",
     "granularity_day": "按天"
   },

@@ -6,11 +6,10 @@ import { usageApi } from '../../shared/api/usage';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
-import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useToast } from '../../shared/ui';
-import { Activity, Hash, DollarSign, Coins, Clock, Gauge, Percent, Upload, RefreshCw } from 'lucide-react';
+import { Activity, Hash, DollarSign, Coins, Clock, Gauge, Percent, Upload } from 'lucide-react';
 import type { UsageQuery } from '../../shared/types';
 import { useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '../../shared/columns/usageColumns';
 import { getSessionAPIKey } from '../../shared/api/client';
@@ -19,10 +18,10 @@ import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { CostValue } from '../../shared/components/CostValue';
-import { NativeSwitch } from '../../shared/components/NativeSwitch';
+import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { FETCH_ALL_PARAMS } from '../../shared/constants';
+import { USER_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 
-const USAGE_AUTO_UPDATE_INTERVAL_MS = 3_000;
 const USER_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.user.usage.auto_update';
 
 function StatCard({
@@ -188,8 +187,10 @@ export default function UserUsageContent() {
   const customerScope = !!user?.api_key_id;
   const { page, setPage, pageSize, setPageSize } = usePagination(20, 'user.usage');
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
-  const [autoRefresh, setAutoRefresh] = usePersistentBoolean(USER_USAGE_AUTO_UPDATE_STORAGE_KEY, false);
-  const autoRefreshInterval = autoRefresh ? USAGE_AUTO_UPDATE_INTERVAL_MS : false;
+  const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(USER_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, USER_AUTO_REFRESH_OPTIONS);
+  const autoRefreshEnabled = autoRefresh > 0;
+  const autoRefreshLabel = `${t('usage.auto_update')} `;
+  const autoRefreshOffLabel = t('usage.auto_update_off', '关闭自动更新');
 
   const handleModelChange = useCallback((model: string) => {
     const nextModel = model || undefined;
@@ -231,10 +232,9 @@ export default function UserUsageContent() {
   } = useQuery({
     queryKey: queryKeys.userUsage(queryParams),
     queryFn: ({ signal }) => usageApi.list(queryParams, { signal }),
-    refetchInterval: autoRefreshInterval,
-    refetchIntervalInBackground: false,
-    refetchOnReconnect: autoRefresh,
-    refetchOnWindowFocus: autoRefresh,
+    meta: { globalLoading: false },
+    refetchOnReconnect: autoRefreshEnabled,
+    refetchOnWindowFocus: autoRefreshEnabled,
     placeholderData: keepPreviousData,
   });
 
@@ -242,25 +242,22 @@ export default function UserUsageContent() {
   const { data: stats, isFetching: isStatsFetching, refetch: refetchStats } = useQuery({
     queryKey: queryKeys.userUsageStats(filters),
     queryFn: ({ signal }) => usageApi.userStats(filters, { signal }),
-    refetchInterval: autoRefreshInterval,
-    refetchIntervalInBackground: false,
-    refetchOnReconnect: autoRefresh,
-    refetchOnWindowFocus: autoRefresh,
+    meta: { globalLoading: false },
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
   });
 
   const isRefreshing = isUsageFetching || isStatsFetching;
+  const isUsageTableRefreshing = isUsageFetching;
 
-  function handleManualRefresh() {
-    void refetchUsage();
-    void refetchStats();
-  }
+  const handleManualRefresh = useCallback(() => {
+    void refetchUsage({ cancelRefetch: false });
+    void refetchStats({ cancelRefetch: false });
+  }, [refetchStats, refetchUsage]);
 
-  function handleAutoRefreshChange(enabled: boolean) {
-    setAutoRefresh(enabled);
-    if (enabled) {
-      handleManualRefresh();
-    }
-  }
+  const handleAutoRefresh = useCallback(() => {
+    void refetchUsage({ cancelRefetch: false });
+  }, [refetchUsage]);
 
   function updateFilter(key: string, value: string) {
     const nextValue = key === 'api_key_id' && value ? Number(value) : value || undefined;
@@ -439,22 +436,18 @@ export default function UserUsageContent() {
             onModelChange={handleModelChange}
           />
         </div>
-        <Button
-          isIconOnly
-          aria-label={t('common.refresh', 'Refresh')}
-          isDisabled={isRefreshing}
-          size="sm"
-          variant="ghost"
-          onPress={handleManualRefresh}
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-        </Button>
-        <NativeSwitch
+        <AutoRefreshControl
+          value={autoRefresh}
+          options={USER_AUTO_REFRESH_OPTIONS}
+          label={autoRefreshLabel}
+          offLabel={autoRefreshOffLabel}
           ariaLabel={t('usage.auto_update')}
-          className="shrink-0"
-          isSelected={autoRefresh}
-          label={<span className="text-sm text-text-secondary">{t('usage.auto_update')}</span>}
-          onChange={handleAutoRefreshChange}
+          refreshAriaLabel={t('common.refresh', 'Refresh')}
+          onChange={setAutoRefresh}
+          onAutoRefresh={handleAutoRefresh}
+          onRefresh={handleManualRefresh}
+          isAutoRefreshing={isUsageTableRefreshing}
+          isRefreshing={isRefreshing}
         />
       </div>
 
@@ -465,7 +458,7 @@ export default function UserUsageContent() {
         dataVersion={dataUpdatedAt}
         emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
         emptyTitle={t('common.no_data')}
-        highlightNewRows={autoRefresh && page === 1}
+        highlightNewRows={autoRefreshEnabled && page === 1}
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
         isLoading={isLoading}
         page={page}

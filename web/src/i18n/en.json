@@ -697,6 +697,7 @@
     "cache_ratio": "Cache Ratio",
     "cache_cumulative_ratio": "Cumulative Cache Ratio",
     "auto_update": "Auto update",
+    "auto_update_off": "Auto update off",
     "granularity_hour": "Hourly",
     "granularity_day": "Daily"
   },
