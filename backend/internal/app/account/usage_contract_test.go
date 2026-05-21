@@ -120,11 +120,11 @@ func TestMergeAccountUsageInfoPreservesLiveMissingWindows(t *testing.T) {
 	if len(merged.Windows) != 2 {
 		t.Fatalf("len(windows) = %d, want 2: %+v", len(merged.Windows), merged.Windows)
 	}
-	if got := merged.Windows[0]; got.Key != "7d" || got.UsedPercent != 55 || got.ResetSeconds <= 0 {
-		t.Fatalf("merged 7d window = %+v, want incoming usage with preserved reset", got)
+	if got := merged.Windows[0]; got.Key != "5h" || got.UsedPercent != 31 || got.ResetSeconds <= 0 {
+		t.Fatalf("preserved 5h window = %+v, want live cached 5h sorted first", got)
 	}
-	if got := merged.Windows[1]; got.Key != "5h" || got.UsedPercent != 31 || got.ResetSeconds <= 0 {
-		t.Fatalf("preserved 5h window = %+v, want live cached 5h", got)
+	if got := merged.Windows[1]; got.Key != "7d" || got.UsedPercent != 55 || got.ResetSeconds <= 0 {
+		t.Fatalf("merged 7d window = %+v, want incoming usage with preserved reset", got)
 	}
 }
 
@@ -145,5 +145,84 @@ func TestMergeAccountUsageInfoDropsExpiredMissingWindows(t *testing.T) {
 	merged := mergeAccountUsageInfo(existing, incoming, now)
 	if len(merged.Windows) != 1 || merged.Windows[0].Key != "7d" {
 		t.Fatalf("windows = %+v, want only incoming 7d", merged.Windows)
+	}
+}
+
+func TestMergeAccountUsageInfoStableSortByDuration(t *testing.T) {
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	existing := AccountUsageInfo{}
+	incoming := AccountUsageInfo{
+		Windows: []AccountUsageWindow{
+			{Key: "monthly", Slot: "monthly", Label: "monthly", UsedPercent: 11, ResetAt: now.Add(15 * 24 * time.Hour).Format(time.RFC3339)},
+			{Key: "7d", Slot: "7d", Label: "7d", UsedPercent: 22, ResetAt: now.Add(48 * time.Hour).Format(time.RFC3339)},
+			{Key: "5h", Slot: "5h", Label: "5h", UsedPercent: 33, ResetAt: now.Add(2 * time.Hour).Format(time.RFC3339)},
+		},
+	}
+
+	merged := mergeAccountUsageInfo(existing, incoming, now)
+	got := []string{merged.Windows[0].Slot, merged.Windows[1].Slot, merged.Windows[2].Slot}
+	want := []string{"5h", "7d", "monthly"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("window[%d] slot = %q, want %q (full order %v)", i, got[i], want[i], got)
+		}
+	}
+}
+
+func TestMergeAccountUsageWindowCarriesMissingFieldsAndReset(t *testing.T) {
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	existing := AccountUsageWindow{
+		Key:          "5h",
+		Label:        "5h",
+		DisplayLabel: "5h window",
+		Slot:         "5h",
+		Group:        "base",
+		UpdatedAt:    "2026-05-20T11:55:00Z",
+		UsedPercent:  10,
+		ResetAt:      now.Add(2 * time.Hour).Format(time.RFC3339),
+	}
+	incoming := AccountUsageWindow{Key: "5h", UsedPercent: 42}
+
+	merged := mergeAccountUsageWindow(existing, incoming, now)
+	if merged.Label != "5h" || merged.DisplayLabel != "5h window" || merged.Slot != "5h" || merged.Group != "base" {
+		t.Fatalf("label-family not carried: %+v", merged)
+	}
+	if merged.UpdatedAt != existing.UpdatedAt {
+		t.Fatalf("UpdatedAt = %q, want carry-over %q", merged.UpdatedAt, existing.UpdatedAt)
+	}
+	if merged.ResetSeconds <= 0 || merged.ResetAfterSeconds <= 0 || merged.ResetAt == "" {
+		t.Fatalf("expected reset fields to be filled from existing window: %+v", merged)
+	}
+}
+
+func TestMergeAccountUsageWindowKeepsIncomingResetWhenProvided(t *testing.T) {
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	existing := AccountUsageWindow{Key: "5h", ResetAt: now.Add(10 * time.Hour).Format(time.RFC3339)}
+	incoming := AccountUsageWindow{Key: "5h", ResetAfterSeconds: 60}
+
+	merged := mergeAccountUsageWindow(existing, incoming, now)
+	if merged.ResetAfterSeconds != 60 || merged.ResetAt != "" {
+		t.Fatalf("expected incoming reset to win: %+v", merged)
+	}
+}
+
+func TestAccountUsageWindowIdentityFallbacks(t *testing.T) {
+	cases := []struct {
+		name   string
+		window AccountUsageWindow
+		want   string
+	}{
+		{"key wins", AccountUsageWindow{Key: " primary ", Group: "base", Slot: "5h", Label: "5h"}, "primary"},
+		{"group+slot+display", AccountUsageWindow{Group: "base", Slot: "5h", DisplayLabel: "5h window"}, "base:5h:5h window"},
+		{"group+slot+label fallback", AccountUsageWindow{Group: "model:opus", Slot: "7d", Label: "7d Opus"}, "model:opus:7d:7d Opus"},
+		{"label-only", AccountUsageWindow{Label: " 5h "}, "5h"},
+		{"empty", AccountUsageWindow{}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := accountUsageWindowIdentity(tc.window); got != tc.want {
+				t.Fatalf("identity = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }

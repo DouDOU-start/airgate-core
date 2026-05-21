@@ -1,6 +1,7 @@
 package account
 
 import (
+	"sort"
 	"strings"
 	"time"
 )
@@ -165,6 +166,7 @@ func mergeAccountUsageInfo(existing, incoming AccountUsageInfo, now time.Time) A
 		merged.Credits = existing.Credits
 	}
 	if len(existing.Windows) == 0 {
+		sortAccountUsageWindows(merged.Windows)
 		return merged
 	}
 	if len(merged.Windows) == 0 {
@@ -207,8 +209,39 @@ func mergeAccountUsageInfo(existing, incoming AccountUsageInfo, now time.Time) A
 		}
 		windows = append(windows, windowWithResetAt(window, resetAt, now))
 	}
+	sortAccountUsageWindows(windows)
 	merged.Windows = windows
 	return merged
+}
+
+// 让窗口在合并后顺序不依赖上游本次返回的顺序，避免 UI 在两次刷新之间出现 5h/7d 调换的视觉抖动。
+func sortAccountUsageWindows(windows []AccountUsageWindow) {
+	sort.SliceStable(windows, func(i, j int) bool {
+		si, sj := slotSortRank(windows[i].Slot), slotSortRank(windows[j].Slot)
+		if si != sj {
+			return si < sj
+		}
+		if windows[i].Group != windows[j].Group {
+			return windows[i].Group < windows[j].Group
+		}
+		if windows[i].Key != windows[j].Key {
+			return windows[i].Key < windows[j].Key
+		}
+		return windows[i].Label < windows[j].Label
+	})
+}
+
+func slotSortRank(slot string) int {
+	switch normalizeUsageWindowToken(slot) {
+	case "5h":
+		return 0
+	case "7d":
+		return 1
+	case "monthly":
+		return 2
+	default:
+		return 3
+	}
 }
 
 func liveAccountUsageWindows(windows []AccountUsageWindow, now time.Time) []AccountUsageWindow {
@@ -220,6 +253,7 @@ func liveAccountUsageWindows(windows []AccountUsageWindow, now time.Time) []Acco
 		}
 		result = append(result, windowWithResetAt(window, resetAt, now))
 	}
+	sortAccountUsageWindows(result)
 	return result
 }
 

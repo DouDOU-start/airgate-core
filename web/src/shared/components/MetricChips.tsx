@@ -65,8 +65,8 @@ export function MetricChips({
 
   return (
     <div className={`ag-metric-chips ${className ?? ''}`} title={title}>
-      {items.map((item) => (
-        <MetricChip key={item.label} {...item} />
+      {items.map((item, idx) => (
+        <MetricChip key={`${idx}-${item.label}`} {...item} />
       ))}
     </div>
   );

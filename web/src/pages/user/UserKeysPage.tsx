@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apikeysApi } from '../../shared/api/apikeys';
@@ -18,6 +18,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { MetricChips } from '../../shared/components/MetricChips';
+import { GROUP_CHIP_STYLE } from '../../shared/components/groupChipStyle';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
 import {
@@ -44,12 +45,6 @@ import { UseKeyModal, useUseKeyModal } from './userkeys/UseKeyModal';
 import { CcsImportModal, useCcsImportModal } from './userkeys/CcsImportModal';
 import { type KeyForm, emptyForm } from './userkeys/types';
 
-const GROUP_CHIP_COLOR = 'oklch(62.04% 0.1950 253.83)';
-const GROUP_CHIP_STYLE: CSSProperties = {
-  background: `color-mix(in srgb, ${GROUP_CHIP_COLOR} 18%, transparent)`,
-  boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${GROUP_CHIP_COLOR} 34%, transparent)`,
-  color: GROUP_CHIP_COLOR,
-};
 export default function UserKeysPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
