@@ -26,6 +26,15 @@ func TestHostForwardTimeout(t *testing.T) {
 		{name: "chat request", req: hostForwardRequest{Path: "/v1/chat/completions", Model: "gpt-4o"}, want: defaultHostForwardTimeout},
 		{name: "images API request", req: hostForwardRequest{Path: "/v1/images/generations", Model: "gpt-4o"}, want: imageHostForwardTimeout},
 		{name: "image model request", req: hostForwardRequest{Path: "/v1/responses", Model: "gpt-image-2"}, want: imageHostForwardTimeout},
+		{
+			name: "responses image tool request",
+			req: hostForwardRequest{
+				Path:  "/v1/responses",
+				Model: "gpt-5.4",
+				Body:  []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation"}]}`),
+			},
+			want: imageHostForwardTimeout,
+		},
 	}
 
 	for _, tc := range cases {

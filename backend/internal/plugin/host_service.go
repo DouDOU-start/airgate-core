@@ -962,7 +962,7 @@ const (
 )
 
 func hostForwardTimeout(req hostForwardRequest) time.Duration {
-	if requestNeedsImage(req.Path, req.Model) {
+	if requestNeedsImage(req.Path, req.Model, hostForwardBody(req.Body)) {
 		return imageHostForwardTimeout
 	}
 	return defaultHostForwardTimeout
@@ -1402,7 +1402,7 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 }
 
 func hostForwardRequirements(req hostForwardRequest) routing.Requirements {
-	return routing.Requirements{NeedsImage: requestNeedsImage(req.Path, req.Model)}
+	return routing.Requirements{NeedsImage: requestNeedsImage(req.Path, req.Model, hostForwardBody(req.Body))}
 }
 
 func hostForwardReasoningEffort(req hostForwardRequest) string {

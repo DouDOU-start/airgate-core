@@ -168,8 +168,10 @@ func normalizeReasoningEffort(effort string) string {
 	}
 }
 
-func requestNeedsImage(path, model string) bool {
-	return isImageAPIPath(path) || isImageModel(model)
+// requestNeedsImage 判断请求是否应走图片分组。Responses API 的生图请求通常使用
+// gpt-5.x 这类对话模型 + image_generation 内置工具，不能只靠 model 名判断。
+func requestNeedsImage(path, model string, body []byte) bool {
+	return isImageAPIPath(path) || isImageModel(model) || hasImageGenerationTool(body)
 }
 
 func isImageAPIPath(path string) bool {
@@ -189,6 +191,46 @@ func isImageAPIPath(path string) bool {
 
 func isImageModel(model string) bool {
 	return strings.Contains(strings.ToLower(strings.TrimSpace(model)), "image")
+}
+
+func hasImageGenerationTool(body []byte) bool {
+	if len(body) == 0 {
+		return false
+	}
+	var payload struct {
+		Tools []struct {
+			Type string `json:"type"`
+		} `json:"tools"`
+		ToolChoice json.RawMessage `json:"tool_choice"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return false
+	}
+	for _, tool := range payload.Tools {
+		if strings.EqualFold(strings.TrimSpace(tool.Type), "image_generation") {
+			return true
+		}
+	}
+	if len(payload.ToolChoice) == 0 {
+		return false
+	}
+	var choiceString string
+	if err := json.Unmarshal(payload.ToolChoice, &choiceString); err == nil {
+		return strings.EqualFold(strings.TrimSpace(choiceString), "image_generation")
+	}
+	var choice struct {
+		Type string `json:"type"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(payload.ToolChoice, &choice); err == nil {
+		if strings.EqualFold(strings.TrimSpace(choice.Type), "image_generation") {
+			return true
+		}
+		if strings.EqualFold(strings.TrimSpace(choice.Name), "image_generation") {
+			return true
+		}
+	}
+	return false
 }
 
 func parseMultipartFields(body []byte, contentType string) parsedRequest {
