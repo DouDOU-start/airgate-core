@@ -1,16 +1,15 @@
 import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Button, Card, ComboBox, Input, ListBox, Select, Tabs } from '@heroui/react';
+import { Card, ComboBox, Input, ListBox, Select, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { usePagination } from '../../shared/hooks/usePagination';
-import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
-import { Activity, Coins, Hash, DollarSign, Search, RefreshCw } from 'lucide-react';
+import { Activity, Coins, Hash, DollarSign, Search } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
@@ -19,7 +18,8 @@ import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilt
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { PIE_CHART_COLORS } from '../../shared/constants';
 import { CostValue } from '../../shared/components/CostValue';
-import { NativeSwitch } from '../../shared/components/NativeSwitch';
+import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
+import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 
 const UsagePieChart = lazy(() =>
   import('./usage/UsageCharts').then((m) => ({ default: m.UsagePieChart })),
@@ -105,7 +105,6 @@ const groupByHeaderKeys: Record<string, string> = {
 };
 
 const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,account,user';
-const USAGE_AUTO_UPDATE_INTERVAL_MS = 3_000;
 const USAGE_PAGE_ACTIVATION_DELAY_MS = 180;
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.admin.usage.auto_update';
 
@@ -393,10 +392,12 @@ export default function UsagePage() {
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
   const [granularity, setGranularity] = useState<string>('hour');
-  const [autoRefresh, setAutoRefresh] = usePersistentBoolean(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, false);
+  const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, ADMIN_AUTO_REFRESH_OPTIONS);
   const { platforms, platformName } = usePlatforms();
   const pageActive = useDeferredActivation(USAGE_PAGE_ACTIVATION_DELAY_MS);
-  const autoRefreshInterval = autoRefresh ? USAGE_AUTO_UPDATE_INTERVAL_MS : false;
+  const autoRefreshEnabled = autoRefresh > 0;
+  const autoRefreshLabel = `${t('usage.auto_update')} `;
+  const autoRefreshOffLabel = t('usage.auto_update_off', '关闭自动更新');
 
   const handleModelChange = useCallback((model: string) => {
     const nextModel = model || undefined;
@@ -488,11 +489,10 @@ export default function UsagePage() {
   } = useQuery({
     queryKey: ['admin-usage', queryParams],
     queryFn: ({ signal }) => usageApi.adminList(queryParams, { signal }),
+    meta: { globalLoading: false },
     enabled: pageActive,
-    refetchInterval: autoRefreshInterval,
-    refetchIntervalInBackground: false,
-    refetchOnReconnect: autoRefresh,
-    refetchOnWindowFocus: autoRefresh,
+    refetchOnReconnect: autoRefreshEnabled,
+    refetchOnWindowFocus: autoRefreshEnabled,
     placeholderData: keepPreviousData,
   });
 
@@ -508,11 +508,10 @@ export default function UsagePage() {
         user_id: filters.user_id ? Number(filters.user_id) : undefined,
         api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
       }, { signal }),
+    meta: { globalLoading: false },
     enabled: pageActive,
-    refetchInterval: autoRefreshInterval,
-    refetchIntervalInBackground: false,
-    refetchOnReconnect: autoRefresh,
-    refetchOnWindowFocus: autoRefresh,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 
@@ -529,29 +528,27 @@ export default function UsagePage() {
         user_id: filters.user_id ? Number(filters.user_id) : undefined,
         api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
       }, { signal }),
+    meta: { globalLoading: false },
     enabled: pageActive,
-    refetchInterval: autoRefreshInterval,
-    refetchIntervalInBackground: false,
-    refetchOnReconnect: autoRefresh,
-    refetchOnWindowFocus: autoRefresh,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 
   const isRefreshing = pageActive && (isUsageFetching || isStatsFetching || isTrendFetching);
+  const isUsageTableRefreshing = pageActive && isUsageFetching;
 
-  function handleManualRefresh() {
+  const handleManualRefresh = useCallback(() => {
     if (!pageActive) return;
-    void refetchUsage();
-    void refetchStats();
-    void refetchTrend();
-  }
+    void refetchUsage({ cancelRefetch: false });
+    void refetchStats({ cancelRefetch: false });
+    void refetchTrend({ cancelRefetch: false });
+  }, [pageActive, refetchStats, refetchTrend, refetchUsage]);
 
-  function handleAutoRefreshChange(enabled: boolean) {
-    setAutoRefresh(enabled);
-    if (enabled && pageActive) {
-      handleManualRefresh();
-    }
-  }
+  const handleAutoRefresh = useCallback(() => {
+    if (!pageActive) return;
+    void refetchUsage({ cancelRefetch: false });
+  }, [pageActive, refetchUsage]);
 
   function updateFilter(key: keyof UsageQuery, value: string) {
     const nextValue = (key === 'user_id' || key === 'api_key_id')
@@ -914,22 +911,19 @@ export default function UsagePage() {
             </ComboBox.Popover>
           </ComboBox>
         </div>
-        <Button
-          isIconOnly
-          aria-label={t('common.refresh', 'Refresh')}
-          isDisabled={!pageActive || isRefreshing}
-          size="sm"
-          variant="ghost"
-          onPress={handleManualRefresh}
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-        </Button>
-        <NativeSwitch
+        <AutoRefreshControl
+          value={autoRefresh}
+          options={ADMIN_AUTO_REFRESH_OPTIONS}
+          label={autoRefreshLabel}
+          offLabel={autoRefreshOffLabel}
           ariaLabel={t('usage.auto_update')}
-          className="shrink-0"
-          isSelected={autoRefresh}
-          label={<span className="text-sm text-text-secondary">{t('usage.auto_update')}</span>}
-          onChange={handleAutoRefreshChange}
+          refreshAriaLabel={t('common.refresh', 'Refresh')}
+          onChange={setAutoRefresh}
+          onAutoRefresh={handleAutoRefresh}
+          onRefresh={handleManualRefresh}
+          isAutoRefreshing={isUsageTableRefreshing}
+          isRefreshing={isRefreshing}
+          isDisabled={!pageActive}
         />
       </div>
 
@@ -940,7 +934,7 @@ export default function UsagePage() {
         dataVersion={pageActive ? dataUpdatedAt : undefined}
         emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
         emptyTitle={t('common.no_data')}
-        highlightNewRows={pageActive && autoRefresh && page === 1}
+        highlightNewRows={pageActive && autoRefreshEnabled && page === 1}
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
         isLoading={!pageActive || isLoading}
         page={page}

@@ -602,56 +602,6 @@ export function AccountsTableLoadingRow({ colSpan, minHeight = 220 }: { colSpan:
   );
 }
 
-export const AutoRefreshCountdownLabel = memo(function AutoRefreshCountdownLabel({
-  autoRefresh,
-  label,
-  offLabel,
-  onRefresh,
-}: {
-  autoRefresh: number;
-  label: string;
-  offLabel: string;
-  onRefresh: () => void;
-}) {
-  const labelRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const renderCountdown = (seconds: number) => {
-      if (labelRef.current) {
-        labelRef.current.textContent = autoRefresh ? `${label}${seconds}s` : offLabel;
-      }
-    };
-
-    if (!autoRefresh) {
-      renderCountdown(0);
-      return undefined;
-    }
-
-    let remaining = autoRefresh;
-    renderCountdown(remaining);
-    const timer = window.setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        onRefresh();
-        remaining = autoRefresh;
-      }
-      renderCountdown(remaining);
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [autoRefresh, label, offLabel, onRefresh]);
-
-  return (
-    <span ref={labelRef}>
-      {autoRefresh ? `${label}${autoRefresh}s` : offLabel}
-    </span>
-  );
-}, (prev, next) => (
-  prev.autoRefresh === next.autoRefresh
-  && prev.label === next.label
-  && prev.offLabel === next.offLabel
-  && prev.onRefresh === next.onRefresh
-));
-
 // formatCountdown 把剩余毫秒格式化成 "Xd Yh"/"Xh Ym"/"Ym" 样式，
 // 与 sub2api 的"限流中 10h 16m 自动恢复"徽标一致。
 function formatCountdown(ms: number): string {

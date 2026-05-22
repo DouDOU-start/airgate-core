@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type AnimationEvent, type CSSProperties, type ReactNode } from 'react';
 import { EmptyState } from '@heroui/react';
 import { Inbox } from 'lucide-react';
 import type { UsageColumnConfig, UsageRow } from '../columns/usageColumns';
@@ -8,7 +8,7 @@ import { TablePaginationFooter } from './TablePaginationFooter';
 
 const FULL_CELL_CONTENT_COLUMNS = new Set(['cost', 'tokens']);
 const LEFT_ALIGNED_CONTENT_COLUMNS = new Set<string>(['model']);
-const NEW_ROW_MARK_DURATION_MS = 5000;
+const NEW_ROW_ANIMATION_NAME = 'ag-usage-row-new-enter';
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
@@ -47,21 +47,21 @@ function useNewRowMarkers<T extends UsageRow>({
   const rowIds = useMemo(() => rows.map((row) => String(row.id)), [rows]);
   const previousRowIdsRef = useRef<Set<string> | null>(null);
   const previousResetKeyRef = useRef<string | undefined>(undefined);
-  const batchClearTimerRef = useRef<number | null>(null);
   const [markedRowIds, setMarkedRowIds] = useState<Set<string>>(() => new Set());
 
-  useEffect(() => () => {
-    if (batchClearTimerRef.current != null) {
-      window.clearTimeout(batchClearTimerRef.current);
-    }
+  const clearMarkedRowId = useCallback((rowId: string) => {
+    setMarkedRowIds((current) => {
+      if (!current.has(rowId)) {
+        return current;
+      }
+      const next = new Set(current);
+      next.delete(rowId);
+      return next;
+    });
   }, []);
 
   useEffect(() => {
     const clearActiveBatch = () => {
-      if (batchClearTimerRef.current != null) {
-        window.clearTimeout(batchClearTimerRef.current);
-        batchClearTimerRef.current = null;
-      }
       setMarkedRowIds((current) => (current.size === 0 ? current : new Set()));
     };
 
@@ -93,33 +93,36 @@ function useNewRowMarkers<T extends UsageRow>({
       return;
     }
 
-    if (batchClearTimerRef.current != null) {
-      window.clearTimeout(batchClearTimerRef.current);
-    }
     setMarkedRowIds(new Set(addedIds));
-    batchClearTimerRef.current = window.setTimeout(() => {
-      batchClearTimerRef.current = null;
-      setMarkedRowIds(new Set());
-    }, NEW_ROW_MARK_DURATION_MS);
   }, [dataVersion, enabled, paused, resetKey, rowIds]);
 
-  return markedRowIds;
+  return { clearMarkedRowId, markedRowIds };
 }
 
 const UsageTableRow = memo(function UsageTableRow({
   columns,
   isNew,
+  onNewAnimationEnd,
   row,
 }: {
   columns: UsageColumnConfig[];
   isNew: boolean;
+  onNewAnimationEnd: (rowId: string) => void;
   row: UsageRow;
 }) {
+  const rowId = String(row.id);
+  const handleAnimationEnd = (event: AnimationEvent<HTMLTableRowElement>) => {
+    if (event.animationName === NEW_ROW_ANIMATION_NAME) {
+      onNewAnimationEnd(rowId);
+    }
+  };
+
   return (
     <tr
-      data-key={String(row.id)}
+      data-key={rowId}
       data-slot="tr"
       className={isNew ? 'ag-usage-table-row--new' : undefined}
+      onAnimationEnd={isNew ? handleAnimationEnd : undefined}
     >
       {columns.map((column) => {
         const fullCellContent = FULL_CELL_CONTENT_COLUMNS.has(column.key);
@@ -200,7 +203,7 @@ export function UsageRecordsTable<T extends UsageRow>({
     }) as CSSProperties,
     [tableMinWidth, tableMobileWidthDelta],
   );
-  const markedRowIds = useNewRowMarkers({
+  const { clearMarkedRowId, markedRowIds } = useNewRowMarkers({
     dataVersion,
     enabled: highlightNewRows,
     paused: isLoading || suppressHighlight,
@@ -267,6 +270,7 @@ export function UsageRecordsTable<T extends UsageRow>({
                     key={row.id}
                     columns={columns as UsageColumnConfig[]}
                     isNew={markedRowIds.has(String(row.id))}
+                    onNewAnimationEnd={clearMarkedRowId}
                     row={row}
                   />
                 ))}

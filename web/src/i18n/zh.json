@@ -200,7 +200,7 @@
     "active_users": "{{count}} 活跃用户",
     "active_users_label": "活跃用户: {{count}}",
     "image_suffix": "PIC",
-    "image_response_time": "图片响应时间: {{time}}",
+    "image_response_time": "图片: {{time}}",
     "time_range": "时间范围：",
     "range_today": "今天",
     "range_7d": "近 7 天",
@@ -700,6 +700,7 @@
     "cache_ratio": "缓存比例",
     "cache_cumulative_ratio": "缓存累计比例",
     "auto_update": "自动更新",
+    "auto_update_off": "关闭自动更新",
     "granularity_hour": "按小时",
     "granularity_day": "按天"
   },

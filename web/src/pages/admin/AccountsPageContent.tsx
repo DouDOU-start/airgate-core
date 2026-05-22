@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField } from '@heroui/react';
+import { AlertDialog, Button, EmptyState, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField } from '@heroui/react';
 import {
   Plus,
-  RefreshCw,
-  ChevronDown,
   Search,
   Download,
   Upload,
@@ -24,11 +22,13 @@ import {
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { usePagination } from '../../shared/hooks/usePagination';
+import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 import { queryKeys } from '../../shared/queryKeys';
 import { PAGE_SIZE_OPTIONS, FETCH_ALL_PARAMS } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
+import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { CreateAccountModal } from './accounts/CreateAccountModal';
 import { EditAccountModal } from './accounts/EditAccountModal';
 import { AccountTypeFilterSelect } from './accounts/AccountTypeFilterSelect';
@@ -52,7 +52,6 @@ import {
   AccountSelectionStore,
   AccountTableRow,
   AccountsTableLoadingRow,
-  AutoRefreshCountdownLabel,
   TableSelectionCheckbox,
   UNGROUPED_GROUP_FILTER,
   columnAlignClass,
@@ -65,6 +64,8 @@ import {
   type AccountUsageInfo,
   type AccountUsageWindowCache,
 } from './accounts/AccountPageSupport';
+
+const ACCOUNT_AUTO_REFRESH_STORAGE_KEY = 'airgate.admin.accounts.auto_refresh';
 
 export default function AccountsPageContent() {
   const { t } = useTranslation();
@@ -131,10 +132,9 @@ export default function AccountsPageContent() {
   const [proxyFilter, setProxyFilter] = useState('');
 
   // 自动刷新
-  const AUTO_REFRESH_OPTIONS = [0, 5, 10, 15, 30];
-  const [autoRefresh, setAutoRefresh] = useState(0); // 秒，0=关闭
+  const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ACCOUNT_AUTO_REFRESH_STORAGE_KEY, 0, ADMIN_AUTO_REFRESH_OPTIONS); // 秒，0=关闭
   const refreshAccounts = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.accounts() }, { cancelRefetch: false });
   }, [queryClient]);
   const autoRefreshLabel = t('accounts.auto_refresh');
   const autoRefreshOffLabel = t('accounts.auto_refresh_off');
@@ -175,7 +175,7 @@ export default function AccountsPageContent() {
   }, [groupFilter, keyword, page, pageSize, platformFilter, proxyFilter, selectionStore, stateFilter, typeFilter]);
 
   // 查询账号列表
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching: isAccountsFetching } = useQuery({
     queryKey: queryKeys.accounts(page, pageSize, debouncedKeyword, platformFilter, stateFilter, typeFilter, groupFilter, proxyFilter),
     queryFn: () =>
       accountsApi.list({
@@ -189,6 +189,7 @@ export default function AccountsPageContent() {
         ungrouped: groupFilter === UNGROUPED_GROUP_FILTER ? true : undefined,
         proxy_id: proxyFilter ? Number(proxyFilter) : undefined,
       }),
+    meta: { globalLoading: false },
     placeholderData: keepPreviousData,
   });
   const rows = data?.list ?? [];
@@ -750,49 +751,17 @@ export default function AccountsPageContent() {
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 xl:ml-auto xl:justify-end">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh')}
-            size="sm"
-            variant="ghost"
-            className="h-8 w-8 min-w-8"
-            onPress={refreshAccounts}
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Dropdown>
-            <Dropdown.Trigger
-              className={`ag-account-auto-refresh-trigger button button--sm ${autoRefresh ? 'button--secondary' : 'button--ghost'} h-8 min-w-[7.5rem] whitespace-nowrap px-3`}
-            >
-              <AutoRefreshCountdownLabel
-                autoRefresh={autoRefresh}
-                label={autoRefreshLabel}
-                offLabel={autoRefreshOffLabel}
-                onRefresh={refreshAccounts}
-              />
-              <ChevronDown className="h-3 w-3 shrink-0" />
-            </Dropdown.Trigger>
-            <Dropdown.Popover placement="bottom end">
-              <Dropdown.Menu
-                aria-label={t('accounts.auto_refresh')}
-                selectedKeys={new Set([`auto_${autoRefresh}`])}
-                selectionMode="single"
-                onAction={(key) => {
-                  const action = String(key);
-                  setAutoRefresh(Number(action.replace('auto_', '')));
-                }}
-              >
-                {AUTO_REFRESH_OPTIONS.map((sec) => (
-                  <Dropdown.Item key={sec} id={`auto_${sec}`} textValue={sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}>
-                    <span className="flex items-center justify-between gap-6">
-                      <span>{sec === 0 ? t('accounts.auto_refresh_off') : `${t('accounts.auto_refresh')}${sec}s`}</span>
-                      {autoRefresh === sec ? <span className="text-primary">✓</span> : null}
-                    </span>
-                  </Dropdown.Item>
-                ))}
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
+          <AutoRefreshControl
+            value={autoRefresh}
+            options={ADMIN_AUTO_REFRESH_OPTIONS}
+            label={autoRefreshLabel}
+            offLabel={autoRefreshOffLabel}
+            ariaLabel={t('accounts.auto_refresh')}
+            refreshAriaLabel={t('common.refresh')}
+            onChange={setAutoRefresh}
+            onRefresh={refreshAccounts}
+            isRefreshing={isAccountsFetching}
+          />
           <Button
             variant="secondary"
             onPress={() => importInputRef.current?.click()}
