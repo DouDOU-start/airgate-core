@@ -481,8 +481,7 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 				return forwardErr
 			}
 			// 测试路径严格判定：只有 OutcomeSuccess 算通过；任何其它 Kind 都报告失败。
-			// 正常请求路径的"4xx 透传给客户端"在这里被故意跳过——测试就是要把
-			// invalid api key / rate limit / upstream 5xx 都暴露出来。
+			// 这是管理员工具，失败原因要保留真实上游诊断，方便直接排查账号态 / 上游态问题。
 			if outcome.Kind == sdk.OutcomeSuccess {
 				return nil
 			}

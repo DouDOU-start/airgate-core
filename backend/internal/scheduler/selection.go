@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -145,7 +146,7 @@ func (s *Scheduler) routeAccounts(ctx context.Context, platform, model string, g
 
 	grp, err := s.db.Group.Get(ctx, groupID)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrGroupNotFound, err)
+		return nil, normalizeGroupLookupError(err)
 	}
 
 	accounts, err := grp.QueryAccounts().
@@ -153,13 +154,36 @@ func (s *Scheduler) routeAccounts(ctx context.Context, platform, model string, g
 		WithProxy().
 		All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("查询分组账户失败: %w", err)
+		return nil, normalizeGroupAccountsLookupError(err)
 	}
 
 	// 缓存全量 platform 账号（包含所有 state）+ group 的 ModelRouting
 	s.routeCache.Set(groupID, platform, accounts, grp.ModelRouting)
 
 	return applyModelRouting(accounts, grp.ModelRouting, model), nil
+}
+
+func normalizeGroupLookupError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	if ent.IsNotFound(err) {
+		return fmt.Errorf("%w: %v", ErrGroupNotFound, err)
+	}
+	return fmt.Errorf("查询分组失败: %w", err)
+}
+
+func normalizeGroupAccountsLookupError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	return fmt.Errorf("查询分组账户失败: %w", err)
 }
 
 // applyModelRouting 按 model 过滤候选账号。routing 为 nil/空时原样返回；有规则但未命中时无候选。

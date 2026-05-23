@@ -454,6 +454,9 @@ func (h *HostService) selectAccount(ctx context.Context, req hostSelectAccountRe
 	}
 	g, err := h.db.Group.Get(ctx, int(req.GroupID))
 	if err != nil {
+		if cerr := hostContextError(err); cerr != nil {
+			return nil, cerr
+		}
 		if ent.IsNotFound(err) {
 			return nil, status.Error(codes.NotFound, "分组不存在")
 		}
@@ -474,6 +477,9 @@ func (h *HostService) selectAccount(ctx context.Context, req hostSelectAccountRe
 
 	acc, err := h.scheduler.SelectAccount(ctx, g.Platform, model, 0, int(req.GroupID), req.SessionID, excludeIDs...)
 	if err != nil {
+		if cerr := hostContextError(err); cerr != nil {
+			return nil, cerr
+		}
 		// scheduler 自身的"无可用账户"是业务可预期错误，用 NotFound 让插件区分
 		if errors.Is(err, scheduler.ErrNoAvailableAccount) {
 			return nil, status.Error(codes.NotFound, err.Error())
@@ -509,6 +515,9 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 
 	g, err := h.db.Group.Get(ctx, int(req.GroupID))
 	if err != nil {
+		if cerr := hostContextError(err); cerr != nil {
+			return nil, cerr
+		}
 		if ent.IsNotFound(err) {
 			return errProbeResp("group_not_found", err.Error(), start), nil
 		}
@@ -530,6 +539,9 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 	// 调度选号
 	acc, err := h.scheduler.SelectAccount(ctx, g.Platform, model, 0, int(req.GroupID), "")
 	if err != nil {
+		if cerr := hostContextError(err); cerr != nil {
+			return nil, cerr
+		}
 		return errProbeResp("no_account", err.Error(), start), nil
 	}
 	resp["account_id"] = int64(acc.ID)
@@ -540,6 +552,9 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 		WithProxy().
 		Only(ctx)
 	if err != nil {
+		if cerr := hostContextError(err); cerr != nil {
+			return nil, cerr
+		}
 		return errProbeResp("internal", "加载账号失败: "+err.Error(), start), nil
 	}
 
@@ -635,6 +650,9 @@ func (h *HostService) listGroups(ctx context.Context) (map[string]interface{}, e
 	slog.Debug("host_service_list_groups", "module", "host")
 	groups, err := h.db.Group.Query().All(ctx)
 	if err != nil {
+		if cerr := hostContextError(err); cerr != nil {
+			return nil, cerr
+		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	items := make([]map[string]interface{}, 0, len(groups))
@@ -709,6 +727,9 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
 			acc, err := h.scheduler.SelectAccount(ctx, route.Platform, model, 0, route.GroupID, "", hardExclude...)
 			if err != nil {
+				if cerr := hostContextError(err); cerr != nil {
+					return nil, cerr
+				}
 				slog.Warn("host_forward_pick_account_failed",
 					sdk.LogFieldPlatform, route.Platform,
 					sdk.LogFieldModel, model,
@@ -721,6 +742,9 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 
 			accFull, err := h.db.Account.Query().Where(account.IDEQ(acc.ID)).WithProxy().Only(ctx)
 			if err != nil {
+				if cerr := hostContextError(err); cerr != nil {
+					return nil, cerr
+				}
 				slog.Error("host_forward_account_load_failed",
 					sdk.LogFieldAccountID, acc.ID, sdk.LogFieldError, err)
 				return nil, hostForwardGenericError()
@@ -742,6 +766,9 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			if returnableUpstream(outcome.Upstream) {
 				lastUpstream = outcome.Upstream
 				hasLastUpstream = true
+			}
+			if cerr := hostContextError(fwdErr); cerr != nil {
+				return nil, cerr
 			}
 
 			if fwdErr != nil || outcome.Kind.ShouldFailover() {
@@ -846,6 +873,9 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
 			acc, err := h.scheduler.SelectAccount(ctx, route.Platform, model, 0, route.GroupID, "", hardExclude...)
 			if err != nil {
+				if cerr := hostContextError(err); cerr != nil {
+					return cerr
+				}
 				slog.Warn("host_forward_stream_pick_account_failed",
 					sdk.LogFieldPlatform, route.Platform,
 					sdk.LogFieldModel, model,
@@ -858,6 +888,9 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 
 			accFull, err := h.db.Account.Query().Where(account.IDEQ(acc.ID)).WithProxy().Only(ctx)
 			if err != nil {
+				if cerr := hostContextError(err); cerr != nil {
+					return cerr
+				}
 				slog.Error("host_forward_stream_account_load_failed",
 					sdk.LogFieldAccountID, acc.ID, sdk.LogFieldError, err)
 				return hostForwardGenericError()
@@ -877,6 +910,9 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 			outcome, fwdErr := inst.Gateway.Forward(fwdCtx, fwdReq)
 			duration := time.Since(start)
 			h.applyHostOutcome(ctx, acc.ID, accFull, model, outcome, duration)
+			if cerr := hostContextError(fwdErr); cerr != nil {
+				return cerr
+			}
 
 			canRetry := !fw.committed && (fwdErr != nil || outcome.Kind.ShouldFailover())
 			if canRetry {
@@ -1336,12 +1372,18 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 	if req.GroupID > 0 {
 		u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserID))).Only(ctx)
 		if err != nil {
+			if cerr := hostContextError(err); cerr != nil {
+				return nil, cerr
+			}
 			slog.Error("host_forward_user_lookup_failed",
 				sdk.LogFieldUserID, req.UserID, sdk.LogFieldError, err)
 			return nil, hostForwardGenericError()
 		}
 		g, err := h.db.Group.Get(ctx, int(req.GroupID))
 		if err != nil {
+			if cerr := hostContextError(err); cerr != nil {
+				return nil, cerr
+			}
 			if ent.IsNotFound(err) {
 				return nil, status.Error(codes.NotFound, "分组不存在")
 			}
@@ -1378,12 +1420,18 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 	}
 	u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserID))).Only(ctx)
 	if err != nil {
+		if cerr := hostContextError(err); cerr != nil {
+			return nil, cerr
+		}
 		slog.Error("host_forward_user_lookup_failed",
 			sdk.LogFieldUserID, req.UserID, sdk.LogFieldError, err)
 		return nil, hostForwardGenericError()
 	}
 	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserID), platform, u.GroupRates, hostForwardRequirements(req))
 	if err != nil {
+		if cerr := hostContextError(err); cerr != nil {
+			return nil, cerr
+		}
 		slog.Error("host_forward_routes_lookup_failed",
 			sdk.LogFieldPlatform, platform,
 			sdk.LogFieldUserID, req.UserID,
@@ -1481,6 +1529,9 @@ func (h *HostService) applyHostOutcome(ctx context.Context, accountID int, accFu
 func (h *HostService) checkHostForwardBalance(ctx context.Context, userID int64) error {
 	u, err := h.db.User.Query().Where(user.IDEQ(int(userID))).Only(ctx)
 	if err != nil {
+		if cerr := hostContextError(err); cerr != nil {
+			return cerr
+		}
 		if ent.IsNotFound(err) {
 			return status.Error(codes.NotFound, "用户不存在")
 		}
@@ -1496,6 +1547,17 @@ func (h *HostService) checkHostForwardBalance(ctx context.Context, userID int64)
 
 func hostForwardGenericError() error {
 	return status.Error(codes.Unavailable, "请求暂时无法完成，请稍后重试")
+}
+
+func hostContextError(err error) error {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return status.Error(codes.Canceled, err.Error())
+	case errors.Is(err, context.DeadlineExceeded):
+		return status.Error(codes.DeadlineExceeded, err.Error())
+	default:
+		return nil
+	}
 }
 
 func hostForwardClientError(outcome sdk.ForwardOutcome) error {

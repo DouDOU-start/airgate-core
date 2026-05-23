@@ -82,6 +82,75 @@ func TestParseBody_MultipartIgnoresFileParts(t *testing.T) {
 	}
 }
 
+func TestCanceledRequestStatus(t *testing.T) {
+	t.Parallel()
+
+	if got := canceledRequestStatus(context.Canceled); got != statusClientClosedRequest {
+		t.Fatalf("canceledRequestStatus(context.Canceled) = %d, want %d", got, statusClientClosedRequest)
+	}
+	if got := canceledRequestStatus(context.DeadlineExceeded); got != http.StatusGatewayTimeout {
+		t.Fatalf("canceledRequestStatus(context.DeadlineExceeded) = %d, want %d", got, http.StatusGatewayTimeout)
+	}
+	if got := canceledRequestStatus(nil); got != 0 {
+		t.Fatalf("canceledRequestStatus(nil) = %d, want 0", got)
+	}
+}
+
+func TestFinalizeRequestContextUsesBackgroundForCanceled(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if got := finalizeRequestContext(ctx); got.Err() != nil {
+		t.Fatalf("finalizeRequestContext(canceled).Err() = %v, want nil", got.Err())
+	}
+}
+
+func TestHasForwardResult(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		execution forwardExecution
+		want      bool
+	}{
+		{
+			name: "success",
+			execution: forwardExecution{
+				outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeSuccess},
+			},
+			want: true,
+		},
+		{
+			name: "unknown-empty",
+			execution: forwardExecution{
+				outcome: sdk.ForwardOutcome{Kind: sdk.OutcomeUnknown},
+			},
+			want: false,
+		},
+		{
+			name: "status-only",
+			execution: forwardExecution{
+				outcome: sdk.ForwardOutcome{
+					Upstream: sdk.UpstreamResponse{StatusCode: http.StatusBadGateway},
+				},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := hasForwardResult(tt.execution); got != tt.want {
+				t.Fatalf("hasForwardResult() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseBody_ReasoningEffort(t *testing.T) {
 	t.Parallel()
 

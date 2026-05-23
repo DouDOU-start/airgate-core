@@ -49,6 +49,34 @@ func TestWriteFailureResponse_StreamBeforeResponseStarts(t *testing.T) {
 	}
 }
 
+func TestWriteFailureResponse_SanitizesUpstreamBody(t *testing.T) {
+	t.Parallel()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+
+	writeFailureResponse(c, fakeState(false), forwardExecution{
+		outcome: sdk.ForwardOutcome{
+			Kind: sdk.OutcomeAccountDead,
+			Upstream: sdk.UpstreamResponse{
+				StatusCode: http.StatusUnauthorized,
+				Body:       []byte(`{"error":{"message":"Your authentication token has been invalidated"}}`),
+			},
+			Reason: "HTTP 401: Your authentication token has been invalidated",
+		},
+	})
+
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadGateway)
+	}
+	if body := recorder.Body.String(); strings.Contains(body, "authentication token has been invalidated") {
+		t.Fatalf("body = %q, want sanitized upstream error", body)
+	}
+	if body := recorder.Body.String(); !strings.Contains(body, "上游账号不可用") {
+		t.Fatalf("body = %q, want contain '上游账号不可用'", body)
+	}
+}
+
 func TestWriteFailureResponse_StreamAfterResponseStarts(t *testing.T) {
 	t.Parallel()
 
@@ -134,12 +162,12 @@ func TestWriteFailureResponse_NonStreamAlwaysWrites(t *testing.T) {
 	}
 }
 
-func TestWriteAllRoutesFailed_PassesThroughLastUpstream(t *testing.T) {
+func TestWriteAllRoutesFailed_SanitizesUpstreamBody(t *testing.T) {
 	t.Parallel()
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
-	body := `{"error":{"message":"上游服务暂不可用"}}`
+	body := `{"error":{"message":"upstream secret request ID 349f8894"}}`
 	var summary allRoutesFailureSummary
 	summary.recordExecution(forwardExecution{
 		outcome: sdk.ForwardOutcome{
@@ -149,6 +177,7 @@ func TestWriteAllRoutesFailed_PassesThroughLastUpstream(t *testing.T) {
 				Headers:    http.Header{"Content-Type": []string{"application/json"}},
 				Body:       []byte(body),
 			},
+			Reason: "HTTP 502: upstream secret request ID 349f8894",
 		},
 	})
 
@@ -157,8 +186,12 @@ func TestWriteAllRoutesFailed_PassesThroughLastUpstream(t *testing.T) {
 	if recorder.Code != http.StatusBadGateway {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadGateway)
 	}
-	if got := recorder.Body.String(); got != body {
-		t.Fatalf("body = %q, want upstream body", got)
+	got := recorder.Body.String()
+	if strings.Contains(got, "upstream secret") || strings.Contains(got, "349f8894") {
+		t.Fatalf("body = %q, want sanitized upstream error", got)
+	}
+	if !strings.Contains(got, "上游服务暂不可用") {
+		t.Fatalf("body = %q, want contain sanitized upstream message", got)
 	}
 }
 

@@ -48,12 +48,12 @@ func openAIRateLimitError(c *gin.Context, status int, code, message string, retr
 
 // writeResult 是一次 forward 的终点。按 outcome.Kind 分派响应写入。
 //
-//	系统错误（err != nil）    → 记录判决 + 尽量透传插件回传的上游响应
+//	系统错误（err != nil）    → 记录判决 + 返回脱敏失败响应
 //	Success                   → 计费 + 透传上游响应
 //	ClientError               → 透传插件回传的上游响应，可选计费
-//	账号级 / 上游抖动 / 流中断 → 未触发 failover 或最终失败时，优先透传插件回传的上游响应
+//	账号级 / 上游抖动 / 流中断 → 未触发 failover 或最终失败时，返回脱敏失败响应
 func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution forwardExecution) {
-	ctx := c.Request.Context()
+	ctx := finalizeRequestContext(c.Request.Context())
 
 	f.applyOutcome(ctx, state, execution)
 	f.persistUpdatedCredentials(state.account.ID, execution.outcome.UpdatedCredentials)
@@ -158,9 +158,6 @@ func writeFailureResponse(c *gin.Context, state *forwardState, execution forward
 	if state.stream && c.Writer.Written() {
 		return
 	}
-	if writeUpstreamIfPresent(c, execution.outcome.Upstream) {
-		return
-	}
 	pluginName := ""
 	if state.plugin != nil {
 		pluginName = state.plugin.Name
@@ -258,6 +255,7 @@ func (f *Forwarder) persistUpdatedCredentials(accountID int, updated map[string]
 
 // recordUsage 写 usage_log 并更新 scheduler 的窗口费用。调用前 outcome.Usage 必须非 nil。
 func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution forwardExecution) {
+	ctx := finalizeRequestContext(c.Request.Context())
 	usage := execution.outcome.Usage
 	if usage == nil {
 		return
@@ -288,7 +286,7 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 	calc := f.calculator.Calculate(calcInput)
 
 	// 窗口费用沿用 account_cost（= total × account_rate），与用户账单解耦。
-	f.scheduler.AddWindowCost(c.Request.Context(), state.account.ID, calc.AccountCost)
+	f.scheduler.AddWindowCost(ctx, state.account.ID, calc.AccountCost)
 
 	f.recorder.Record(billing.UsageRecord{
 		UserID:                state.keyInfo.UserID,

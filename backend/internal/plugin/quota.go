@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -53,6 +54,7 @@ func isMetadataOnlyPath(path string) bool {
 // 跨整个 Forward 请求稳定，必须有稳定 ID 保证 SREM 能匹配上。
 func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func() {
 	ctx := c.Request.Context()
+	releaseCtx := context.Background()
 	slotID := uuid.New().String()
 	userID, keyID := state.keyInfo.UserID, state.keyInfo.KeyID
 
@@ -80,10 +82,10 @@ func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func
 	// 反向释放：apikey 先，user 后。
 	return func() {
 		if keyHeld {
-			f.concurrency.ReleaseAPIKeySlot(ctx, keyID, slotID)
+			f.concurrency.ReleaseAPIKeySlot(releaseCtx, keyID, slotID)
 		}
 		if userHeld {
-			f.concurrency.ReleaseUserSlot(ctx, userID, slotID)
+			f.concurrency.ReleaseUserSlot(releaseCtx, userID, slotID)
 		}
 	}
 }
@@ -126,6 +128,7 @@ func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs 
 // 每次 failover attempt 都要重新 acquire。release 顺序和 acquire 顺序相反。
 func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (func(), bool) {
 	ctx := c.Request.Context()
+	releaseCtx := context.Background()
 	state.requestID = uuid.New().String()
 
 	// 1. RPM 原子检查并递增
@@ -142,7 +145,7 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 		acquired, _ := f.scheduler.AcquireMessageLock(ctx, state.account.ID, state.requestID, state.account.Extra)
 		if acquired {
 			releaseMsgLock = func() {
-				f.scheduler.ReleaseMessageLock(ctx, state.account.ID, state.requestID)
+				f.scheduler.ReleaseMessageLock(releaseCtx, state.account.ID, state.requestID)
 			}
 			f.scheduler.EnforceMessageDelay(ctx, state.account.ID, state.account.Extra)
 		}
@@ -166,7 +169,7 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 	// 反向释放：slot → msg lock。RPM 不在 release 里回退——正常完成流程会通过
 	// scheduler.Apply 决定是否 DecrementRPM（非 Success 判决都会回退）。
 	return func() {
-		f.concurrency.ReleaseSlot(ctx, state.account.ID, state.requestID)
+		f.concurrency.ReleaseSlot(releaseCtx, state.account.ID, state.requestID)
 		releaseMsgLock()
 	}, true
 }

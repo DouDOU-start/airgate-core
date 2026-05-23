@@ -793,11 +793,30 @@ func TestConnectivityTestErrorMessage(t *testing.T) {
 			want: "上游未返回有效响应，请检查测试模型是否被该上游账号支持或查看上游日志",
 		},
 		{
+			name: "上游暂时错误保留原因",
+			outcome: sdk.ForwardOutcome{
+				Kind:     sdk.OutcomeUpstreamTransient,
+				Upstream: sdk.UpstreamResponse{StatusCode: http.StatusBadGateway},
+				Reason:   "HTTP 502: upstream secret request ID 349f8894",
+			},
+			want: "上游服务暂不可用: HTTP 502: upstream secret request ID 349f8894",
+		},
+		{
 			name: "账号限流使用统一提示",
 			outcome: sdk.ForwardOutcome{
-				Kind: sdk.OutcomeAccountRateLimited,
+				Kind:       sdk.OutcomeAccountRateLimited,
+				RetryAfter: 3 * time.Minute,
+				Reason:     "HTTP 429: The usage limit has been reached",
 			},
-			want: "上游账号当前被限流，请稍后重试",
+			want: "上游账号当前被限流，请在 3m0s 后重试",
+		},
+		{
+			name: "账号失效使用统一提示",
+			outcome: sdk.ForwardOutcome{
+				Kind:   sdk.OutcomeAccountDead,
+				Reason: "HTTP 401: Your authentication token has been invalidated",
+			},
+			want: "上游账号不可用: HTTP 401: Your authentication token has been invalidated",
 		},
 	}
 

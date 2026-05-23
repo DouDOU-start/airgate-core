@@ -81,8 +81,9 @@ func (f *Forwarder) runForwardEndChain(c *gin.Context, state *forwardState, exec
 		return
 	}
 	evt := buildMiddlewareEvent(state, execution, bag)
+	ctx := finalizeRequestContext(c.Request.Context())
 	for i := len(plugins) - 1; i >= 0; i-- {
-		callMiddlewareEnd(c.Request.Context(), plugins[i], evt)
+		callMiddlewareEnd(ctx, plugins[i], evt)
 	}
 }
 

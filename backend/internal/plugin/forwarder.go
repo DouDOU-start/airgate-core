@@ -65,6 +65,9 @@ const queueWaitTimeout = 60 * time.Second
 // queuePollInterval slot 未释放时的轮询间隔。
 const queuePollInterval = 200 * time.Millisecond
 
+// 499 是 nginx 风格的 Client Closed Request，仅用于本地日志和状态归类。
+const statusClientClosedRequest = 499
+
 // allRoutesFailedDefaultRetryAfter 客户端最终被拒时，若没有任何上游 RetryAfter 可参考
 // （比如 max_concurrency 打满、所有账号都在冷却但 state_until 没回填到这一层），
 // 给客户端一个保守的退避建议。1s 既能避免雪崩，又比 60s 更贴合"瞬时打满"的真实恢复节奏。
@@ -145,16 +148,41 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		queueDeadline := time.Now().Add(queueWaitTimeout)
 
 		for attempt < maxFailoverAttempts {
+			if status := canceledRequestStatus(ctx.Err()); status != 0 {
+				markCanceledRequest(c, status)
+				logger.Debug("forward_request_canceled",
+					"status_code", status,
+					"attempts", totalAttempts,
+				)
+				return
+			}
+
 			exclude := make([]int, 0, len(hardExclude)+len(softExclude))
 			exclude = append(exclude, hardExclude...)
 			exclude = append(exclude, softExclude...)
 
 			if err := f.pickAccount(c, state, exclude...); err != nil {
+				if status := canceledRequestStatus(ctx.Err()); status != 0 {
+					markCanceledRequest(c, status)
+					logger.Debug("forward_request_canceled",
+						"status_code", status,
+						"attempts", totalAttempts,
+					)
+					return
+				}
 				failureSummary.recordPickAccountError(err)
 				if len(softExclude) > 0 && time.Now().Before(queueDeadline) {
 					softExclude = softExclude[:0]
 					select {
 					case <-ctx.Done():
+						if status := canceledRequestStatus(ctx.Err()); status != 0 {
+							markCanceledRequest(c, status)
+							logger.Debug("forward_request_canceled",
+								"status_code", status,
+								"attempts", totalAttempts,
+							)
+							return
+						}
 						return
 					case <-time.After(queuePollInterval):
 					}
@@ -199,7 +227,24 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			attempt++
 			totalAttempts++
 
-			if f.canFailover(c, state, execution) {
+			requestCanceled := canceledRequestStatus(ctx.Err())
+			if requestCanceled != 0 {
+				if !hasForwardResult(execution) {
+					releaseAccountSlot()
+					f.scheduler.DecrementRPM(context.Background(), accountID)
+					c.Set(ginCtxKeyAccountID, accountID)
+					c.Set(ginCtxKeyAttempts, totalAttempts)
+					markCanceledRequest(c, requestCanceled)
+					logger.Debug("forward_request_canceled",
+						"status_code", requestCanceled,
+						"attempts", totalAttempts,
+					)
+					return
+				}
+				execution.err = nil
+			}
+
+			if requestCanceled == 0 && f.canFailover(c, state, execution) {
 				failureSummary.recordExecution(execution)
 				attrs := []any{
 					"attempt", attempt,
@@ -269,6 +314,43 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	writeAllRoutesFailed(c, failureSummary)
 }
 
+func canceledRequestStatus(err error) int {
+	switch {
+	case err == nil:
+		return 0
+	case errors.Is(err, context.Canceled):
+		return statusClientClosedRequest
+	case errors.Is(err, context.DeadlineExceeded):
+		return http.StatusGatewayTimeout
+	default:
+		return 0
+	}
+}
+
+func markCanceledRequest(c *gin.Context, status int) {
+	if c == nil || status == 0 || c.Writer.Written() {
+		return
+	}
+	c.Status(status)
+}
+
+func finalizeRequestContext(ctx context.Context) context.Context {
+	if canceledRequestStatus(ctx.Err()) != 0 {
+		return context.Background()
+	}
+	return ctx
+}
+
+func hasForwardResult(execution forwardExecution) bool {
+	if execution.outcome.Kind != sdk.OutcomeUnknown {
+		return true
+	}
+	if execution.outcome.Upstream.StatusCode > 0 || len(execution.outcome.Upstream.Body) > 0 || len(execution.outcome.Upstream.Headers) > 0 {
+		return true
+	}
+	return execution.outcome.Usage != nil || len(execution.outcome.UpdatedCredentials) > 0
+}
+
 type allRoutesFailureSummary struct {
 	rateLimitedSeen       bool
 	rateLimitedRetryAfter time.Duration
@@ -277,15 +359,9 @@ type allRoutesFailureSummary struct {
 	accountDeadSeen       bool
 	upstreamTimeoutSeen   bool
 	upstreamFailureSeen   bool
-	lastUpstream          sdk.UpstreamResponse
-	hasLastUpstream       bool
 }
 
 func (s *allRoutesFailureSummary) recordExecution(execution forwardExecution) {
-	if returnableUpstream(execution.outcome.Upstream) {
-		s.lastUpstream = execution.outcome.Upstream
-		s.hasLastUpstream = true
-	}
 	switch execution.outcome.Kind {
 	case sdk.OutcomeAccountRateLimited:
 		s.rateLimitedSeen = true
@@ -331,10 +407,6 @@ type allRoutesFailureResponse struct {
 }
 
 func writeAllRoutesFailed(c *gin.Context, summary allRoutesFailureSummary) {
-	if summary.hasLastUpstream {
-		writeUpstream(c, summary.lastUpstream)
-		return
-	}
 	response := selectAllRoutesFailureResponse(summary)
 	if response.status == http.StatusTooManyRequests {
 		openAIRateLimitError(c, response.status, response.code, response.message, response.retryAfter)
