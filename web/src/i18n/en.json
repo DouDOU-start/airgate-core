@@ -129,6 +129,14 @@
     "back_to_console": "Back to Console"
   },
 
+  "plugin_shell": {
+    "breadcrumbs": "Breadcrumbs",
+    "console": "Console",
+    "workspace": "Plugin workspace",
+    "plugin_workbench": "{{name}} plugin workbench",
+    "playground_title": "AI Chat"
+  },
+
   "auth": {
     "email": "Email",
     "password": "Password",

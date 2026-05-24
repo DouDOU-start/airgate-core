@@ -2,6 +2,7 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import * as ReactJSXRuntime from 'react/jsx-runtime';
 import * as ReactI18next from 'react-i18next';
+import * as AirGatePluginUI from './shared/plugin-ui';
 import { StrictMode, useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +24,7 @@ import './index.css';
   'react-dom': ReactDOM,
   'react/jsx-runtime': ReactJSXRuntime,
   'react-i18next': ReactI18next,
+  '@doudou-start/airgate-core/plugin-ui': AirGatePluginUI,
 };
 
 // PluginAPIBridge 把 core 内的运行时能力暴露到 window.airgate，供插件前端调用。

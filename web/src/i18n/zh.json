@@ -129,6 +129,14 @@
     "back_to_console": "返回控制台"
   },
 
+  "plugin_shell": {
+    "breadcrumbs": "面包屑",
+    "console": "控制台",
+    "workspace": "插件工作区",
+    "plugin_workbench": "{{name}}插件工作台",
+    "playground_title": "AI 对话"
+  },
+
   "auth": {
     "email": "邮箱",
     "password": "密码",

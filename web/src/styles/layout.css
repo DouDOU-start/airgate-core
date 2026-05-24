@@ -82,6 +82,12 @@
   }
 }
 
+.ag-plugin-breadcrumbs {
+  flex: 1 1 auto;
+  max-width: 100%;
+  min-width: 0;
+}
+
 .ag-page-toolbar {
   display: flex;
   flex-wrap: wrap;

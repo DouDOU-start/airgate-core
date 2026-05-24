@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-router';
 import { Suspense, useEffect } from 'react';
 import type { ElementType, ReactNode } from 'react';
+import type { PluginBreadcrumbItem } from '../shared/components/PluginBreadcrumbs';
 import { useAuth } from './providers/AuthProvider';
 import { ErrorBoundary } from './providers/ErrorBoundary';
 import { getToken, getTokenRole } from '../shared/api/client';
@@ -55,8 +56,14 @@ function requestIdle(work: () => void) {
 const AppShell = lazyWithPreload<{ children: ReactNode }>(() =>
   import('./layout/AppShell').then((m) => ({ default: m.AppShell })),
 );
-const ChatShell = lazyWithPreload<{ children: ReactNode }>(() =>
-  import('./layout/ChatShell').then((m) => ({ default: m.ChatShell })),
+const PluginShell = lazyWithPreload<{
+  children: ReactNode;
+  pluginName?: string;
+  titleKey?: string;
+  titleFallback?: string;
+  breadcrumbs?: PluginBreadcrumbItem[];
+}>(() =>
+  import('./layout/PluginShell').then((m) => ({ default: m.PluginShell })),
 );
 
 function RoutePreloader() {
@@ -225,7 +232,7 @@ const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/ke
 const userUsageRoute = createRoute({ getParentRoute: () => authLayout, path: '/usage', component: renderPage(UserUsagePage) });
 
 // /chat: 全屏沉浸式 AI 对话页（airgate-playground 插件），独立布局不挂 AppShell。
-// 仍要求登录 + 安装完成；走 ChatShell 极简顶栏。
+// 仍要求登录 + 安装完成；走 PluginShell 通用插件顶栏。
 const chatBeforeLoad = () => withSetupCheck((needs) => {
   if (needs) throw redirect({ to: '/setup' });
   if (!getToken()) throw redirect({ to: '/home' });
@@ -237,9 +244,17 @@ const chatRoute = createRoute({
   beforeLoad: chatBeforeLoad,
   component: () => (
     <Suspense fallback={<ChatPageLoading />}>
-      <ChatShell>
+      <PluginShell
+        pluginName="airgate-playground"
+        titleKey="plugin_shell.playground_title"
+        titleFallback="AI 对话"
+        breadcrumbs={[
+          { to: '/', labelKey: 'plugin_shell.console', labelFallback: '控制台' },
+          { labelKey: 'plugin_shell.playground_title', labelFallback: 'AI 对话' },
+        ]}
+      >
         <PluginPage pluginNameOverride="airgate-playground" subPathOverride="/chat" />
-      </ChatShell>
+      </PluginShell>
     </Suspense>
   ),
 });
