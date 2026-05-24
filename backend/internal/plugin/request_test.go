@@ -35,7 +35,7 @@ func TestRequestNeedsImage(t *testing.T) {
 			path:  "/v1/responses",
 			model: "gpt-5.4",
 			body:  []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation"}]}`),
-			want:  true,
+			want:  false,
 		},
 		{
 			name:  "responses other tool",

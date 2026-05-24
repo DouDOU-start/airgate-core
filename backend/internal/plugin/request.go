@@ -168,9 +168,17 @@ func normalizeReasoningEffort(effort string) string {
 	}
 }
 
-// requestNeedsImage 判断请求是否应走图片分组。Responses API 的生图请求通常使用
-// gpt-5.x 这类对话模型 + image_generation 内置工具，不能只靠 model 名判断。
-func requestNeedsImage(path, model string, body []byte) bool {
+// requestNeedsImage 判断请求是否应走图片分组。
+// 对话模型携带 image_generation tool 仍按对话请求路由，避免普通 Responses
+// 工具调用被图片分组开关挡住；只有 Images API 路径和图像专用模型才强制图片分组。
+func requestNeedsImage(path, model string, _ []byte) bool {
+	return isImageAPIPath(path) || isImageModel(model)
+}
+
+// requestHasImageWorkload 判断请求是否需要更长的图片工作超时。
+// 这里仍保留 Responses API 的 image_generation tool 识别，用于放宽生成链路
+// 的等待时间，但不参与图片分组路由。
+func requestHasImageWorkload(path, model string, body []byte) bool {
 	return isImageAPIPath(path) || isImageModel(model) || hasImageGenerationTool(body)
 }
 

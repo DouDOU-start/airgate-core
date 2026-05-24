@@ -998,7 +998,7 @@ const (
 )
 
 func hostForwardTimeout(req hostForwardRequest) time.Duration {
-	if requestNeedsImage(req.Path, req.Model, hostForwardBody(req.Body)) {
+	if requestHasImageWorkload(req.Path, req.Model, hostForwardBody(req.Body)) {
 		return imageHostForwardTimeout
 	}
 	return defaultHostForwardTimeout
