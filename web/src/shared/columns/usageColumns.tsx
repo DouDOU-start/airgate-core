@@ -294,12 +294,31 @@ function isTotalMetric(metric: UsageMetric) {
   return metricMatches(metric, ['total_tokens', 'total_token', 'total']);
 }
 
-function formatMetricValue(metric: UsageMetric): string {
-  const value = metricNumber(metric.value);
-  const formatted = Number.isInteger(value)
+function isReasoningMetric(metric: UsageMetric) {
+  return metricMatches(metric, ['reasoning_output_tokens', 'reasoning_tokens', 'reasoning_token']);
+}
+
+function isOutputMetric(metric: UsageMetric) {
+  return metricMatches(metric, ['output_tokens', 'output_token', 'completion_tokens', 'completion_token']);
+}
+
+function isTokenUnit(unit?: string) {
+  const normalized = normalizeUsageKey(unit);
+  return normalized === 'token' || normalized === 'tokens';
+}
+
+function formatMetricNumber(value: number): string {
+  return Number.isInteger(value)
     ? value.toLocaleString()
     : value.toLocaleString(undefined, { maximumFractionDigits: 4 });
-  return metric.unit ? `${formatted} ${metric.unit}` : formatted;
+}
+
+function formatMetricValue(metric: UsageMetric): string {
+  const value = metricNumber(metric.value);
+  const formatted = formatMetricNumber(value);
+  const unit = metric.unit?.trim();
+  if (!unit || isTokenUnit(unit)) return formatted;
+  return `${formatted} ${unit}`;
 }
 
 function metricColor(metric: UsageMetric, index: number): string | undefined {
@@ -392,8 +411,13 @@ function buildCostDetailContext(row: UsageLogResp, adminView: boolean) {
 function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
   const allMetrics = rowMetrics(row);
   const hasSDKMetrics = (row.usage_metrics?.length ?? 0) > 0;
+  const reasoningTokens = metricValue(allMetrics, ['reasoning_output_tokens', 'reasoning_tokens', 'reasoning_token'])
+    ?? (row as Partial<UsageLogResp>).reasoning_output_tokens
+    ?? 0;
   const metrics = allMetrics.filter((metric) => (
-    !isTotalMetric(metric) && (metricNumber(metric.value) > 0 || !hasSDKMetrics)
+    !isTotalMetric(metric)
+    && !isReasoningMetric(metric)
+    && (metricNumber(metric.value) > 0 || !hasSDKMetrics || (isOutputMetric(metric) && reasoningTokens > 0))
   ));
   const totalMetric = allMetrics.find(isTotalMetric);
   const tokenTotal =
@@ -407,7 +431,12 @@ function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
         <TooltipRow
           key={metric.key || `${metric.label}:${index}`}
           label={metric.label || metric.key || t('usage.metric', '计量')}
-          value={formatMetricValue(metric)}
+          value={isOutputMetric(metric) && reasoningTokens > 0 ? (
+            <span className="inline-flex min-w-0 max-w-full items-baseline justify-end gap-1">
+              <span className="min-w-0 truncate text-text-tertiary">(推理 {formatMetricNumber(reasoningTokens)})</span>
+              <span className="shrink-0">{formatMetricValue(metric)}</span>
+            </span>
+          ) : formatMetricValue(metric)}
           color={metricColor(metric, index)}
         />
       ))}
