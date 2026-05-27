@@ -164,6 +164,7 @@ export function UsageRecordsTable<T extends UsageRow>({
   emptyTitle,
   highlightNewRows = false,
   highlightResetKey,
+  hasMore,
   isLoading,
   suppressHighlight = false,
   page,
@@ -172,6 +173,7 @@ export function UsageRecordsTable<T extends UsageRow>({
   setPage,
   setPageSize,
   total,
+  totalExact,
 }: {
   ariaLabel: string;
   columns: UsageColumnConfig<T>[];
@@ -180,6 +182,7 @@ export function UsageRecordsTable<T extends UsageRow>({
   emptyTitle: string;
   highlightNewRows?: boolean;
   highlightResetKey?: string;
+  hasMore?: boolean;
   isLoading: boolean;
   suppressHighlight?: boolean;
   page: number;
@@ -188,6 +191,7 @@ export function UsageRecordsTable<T extends UsageRow>({
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
   total: number;
+  totalExact?: boolean;
 }) {
   const totalPages = getTotalPages(total, pageSize);
   const tableMinWidth = useMemo(
@@ -290,6 +294,8 @@ export function UsageRecordsTable<T extends UsageRow>({
           setPage={setPage}
           setPageSize={setPageSize}
           total={total}
+          hasMore={hasMore}
+          totalExact={totalExact}
           totalPages={totalPages}
         />
       </div>

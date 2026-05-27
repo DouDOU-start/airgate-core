@@ -34,6 +34,7 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 	result, err := h.service.ListUser(c.Request.Context(), int64(userID), appusage.ListFilter{
 		Page:        query.Page,
 		PageSize:    query.PageSize,
+		BeforeID:    ptrInt64Value(query.BeforeID),
 		APIKeyID:    apiKeyFilter,
 		AccountID:   query.AccountID,
 		GroupID:     query.GroupID,
@@ -56,7 +57,7 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		for _, item := range result.List {
 			list = append(list, toCustomerUsageLogResp(item))
 		}
-		response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
+		response.Success(c, response.CursorPagedData(list, result.Total, result.Page, result.PageSize, result.HasMore, result.NextCursor, result.TotalExact))
 		return
 	}
 
@@ -69,7 +70,7 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		resp.AccountRateMultiplier = 0
 		list = append(list, resp)
 	}
-	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
+	response.Success(c, response.CursorPagedData(list, result.Total, result.Page, result.PageSize, result.HasMore, result.NextCursor, result.TotalExact))
 }
 
 // UserUsageStats 用户聚合统计。
@@ -238,6 +239,7 @@ func (h *UsageHandler) AdminUsage(c *gin.Context) {
 	result, err := h.service.ListAdmin(c.Request.Context(), appusage.ListFilter{
 		Page:      query.Page,
 		PageSize:  query.PageSize,
+		BeforeID:  ptrInt64Value(query.BeforeID),
 		UserID:    query.UserID,
 		APIKeyID:  query.APIKeyID,
 		AccountID: query.AccountID,
@@ -258,7 +260,14 @@ func (h *UsageHandler) AdminUsage(c *gin.Context) {
 	for _, item := range result.List {
 		list = append(list, toUsageLogResp(item))
 	}
-	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
+	response.Success(c, response.CursorPagedData(list, result.Total, result.Page, result.PageSize, result.HasMore, result.NextCursor, result.TotalExact))
+}
+
+func ptrInt64Value(value *int64) int64 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 // AdminUsageStats 管理员聚合统计。

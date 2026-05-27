@@ -5,7 +5,7 @@ import { Button, Card, ListBox, Meter, Select } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { queryKeys } from '../../shared/queryKeys';
-import { usePagination } from '../../shared/hooks/usePagination';
+import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useToast } from '../../shared/ui';
@@ -185,7 +185,7 @@ export default function UserUsageContent() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const customerScope = !!user?.api_key_id;
-  const { page, setPage, pageSize, setPageSize } = usePagination(20, 'user.usage');
+  const { beforeId, page, setPage, pageSize, setPageSize, resetCursorPagination } = useCursorPagination(20, 'user.usage');
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(USER_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, USER_AUTO_REFRESH_OPTIONS);
   const autoRefreshEnabled = autoRefresh > 0;
@@ -194,15 +194,16 @@ export default function UserUsageContent() {
 
   const handleModelChange = useCallback((model: string) => {
     const nextModel = model || undefined;
-    setPage(1);
+    resetCursorPagination();
     setFilters((prev) => (prev.model === nextModel ? prev : { ...prev, model: nextModel }));
-  }, [setPage]);
+  }, [resetCursorPagination]);
 
   const queryParams = useMemo<UsageQuery>(() => ({
     page,
     page_size: pageSize,
+    before_id: beforeId,
     ...filters,
-  }), [filters, page, pageSize]);
+  }), [beforeId, filters, page, pageSize]);
 
   const { platforms, platformName } = usePlatforms();
   const platformOptions = [
@@ -262,11 +263,12 @@ export default function UserUsageContent() {
   function updateFilter(key: string, value: string) {
     const nextValue = key === 'api_key_id' && value ? Number(value) : value || undefined;
     setFilters((prev) => ({ ...prev, [key]: nextValue }));
-    setPage(1);
+    resetCursorPagination();
   }
 
   const list = data?.list ?? [];
   const total = data?.total ?? 0;
+  const canUseCursor = !isPlaceholderData;
   const visibleActualCost = customerScope ? (stats?.total_billed_cost ?? 0) : (stats?.total_actual_cost ?? 0);
 
   const sharedColumns = useUsageColumns({ customerScope, adminView: false });
@@ -369,7 +371,7 @@ export default function UserUsageContent() {
             label={t('usage.time_range')}
             startDate={filters.start_date}
             onChange={(startDate, endDate) => {
-              setPage(1);
+              resetCursorPagination();
               setFilters((prev) => ({ ...prev, start_date: startDate, end_date: endDate }));
             }}
           />
@@ -460,14 +462,16 @@ export default function UserUsageContent() {
         emptyTitle={t('common.no_data')}
         highlightNewRows={autoRefreshEnabled && page === 1}
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
+        hasMore={canUseCursor ? data?.has_more : false}
         isLoading={isLoading}
         page={page}
         pageSize={pageSize}
         rows={list}
-        setPage={setPage}
+        setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
         setPageSize={setPageSize}
         suppressHighlight={isPlaceholderData}
         total={total}
+        totalExact={canUseCursor ? data?.total_exact : true}
       />
     </div>
   );

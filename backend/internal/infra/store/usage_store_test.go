@@ -36,41 +36,53 @@ func TestUsageStoreListPaginationUsesStableIDOrder(t *testing.T) {
 	store := NewUsageStore(db)
 
 	t.Run("admin list", func(t *testing.T) {
-		page1, total, err := store.ListAdmin(ctx, appusage.ListFilter{Page: 1, PageSize: 2})
+		page1, hasMore, nextCursor, err := store.ListAdmin(ctx, appusage.ListFilter{Page: 1, PageSize: 2})
 		if err != nil {
 			t.Fatalf("ListAdmin page 1 returned error: %v", err)
 		}
-		if total != 3 {
-			t.Fatalf("ListAdmin page 1 total = %d, want 3", total)
+		if !hasMore {
+			t.Fatalf("ListAdmin page 1 hasMore = false, want true")
+		}
+		if nextCursor == nil || *nextCursor != 2 {
+			t.Fatalf("ListAdmin page 1 nextCursor = %v, want 2", nextCursor)
 		}
 		assertLogIDs(t, page1, 3, 2)
 
-		page2, total, err := store.ListAdmin(ctx, appusage.ListFilter{Page: 2, PageSize: 2})
+		page2, hasMore, nextCursor, err := store.ListAdmin(ctx, appusage.ListFilter{Page: 2, PageSize: 2, BeforeID: *nextCursor})
 		if err != nil {
 			t.Fatalf("ListAdmin page 2 returned error: %v", err)
 		}
-		if total != 3 {
-			t.Fatalf("ListAdmin page 2 total = %d, want 3", total)
+		if hasMore {
+			t.Fatalf("ListAdmin page 2 hasMore = true, want false")
+		}
+		if nextCursor != nil {
+			t.Fatalf("ListAdmin page 2 nextCursor = %v, want nil", *nextCursor)
 		}
 		assertLogIDs(t, page2, 1)
 	})
 
 	t.Run("user list", func(t *testing.T) {
-		page1, total, err := store.ListUser(ctx, int64(user.ID), appusage.ListFilter{Page: 1, PageSize: 2})
+		page1, hasMore, nextCursor, err := store.ListUser(ctx, int64(user.ID), appusage.ListFilter{Page: 1, PageSize: 2})
 		if err != nil {
 			t.Fatalf("ListUser page 1 returned error: %v", err)
 		}
-		if total != 3 {
-			t.Fatalf("ListUser page 1 total = %d, want 3", total)
+		if !hasMore {
+			t.Fatalf("ListUser page 1 hasMore = false, want true")
+		}
+		if nextCursor == nil || *nextCursor != 2 {
+			t.Fatalf("ListUser page 1 nextCursor = %v, want 2", nextCursor)
 		}
 		assertLogIDs(t, page1, 3, 2)
 
-		page2, total, err := store.ListUser(ctx, int64(user.ID), appusage.ListFilter{Page: 2, PageSize: 2})
+		page2, hasMore, nextCursor, err := store.ListUser(ctx, int64(user.ID), appusage.ListFilter{Page: 2, PageSize: 2, BeforeID: *nextCursor})
 		if err != nil {
 			t.Fatalf("ListUser page 2 returned error: %v", err)
 		}
-		if total != 3 {
-			t.Fatalf("ListUser page 2 total = %d, want 3", total)
+		if hasMore {
+			t.Fatalf("ListUser page 2 hasMore = true, want false")
+		}
+		if nextCursor != nil {
+			t.Fatalf("ListUser page 2 nextCursor = %v, want nil", *nextCursor)
 		}
 		assertLogIDs(t, page2, 1)
 	})

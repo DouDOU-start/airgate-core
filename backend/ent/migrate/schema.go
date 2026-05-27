@@ -339,6 +339,18 @@ var (
 				OnDelete:   schema.SetNull,
 			},
 		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "usage_log_model",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[2]},
+			},
+			{
+				Name:    "usage_log_api_key",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[35]},
+			},
+		},
 	}
 	// UsersColumns holds the columns for the "users" table.
 	UsersColumns = []*schema.Column{

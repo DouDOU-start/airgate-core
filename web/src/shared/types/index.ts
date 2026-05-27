@@ -11,6 +11,9 @@ export interface PagedData<T> {
   total: number;
   page: number;
   page_size: number;
+  has_more?: boolean;
+  next_cursor?: number;
+  total_exact?: boolean;
 }
 
 // 分页请求参数
@@ -520,6 +523,7 @@ export interface CustomerUsageLogResp {
 }
 
 export interface UsageQuery extends PageReq {
+  before_id?: number;
   user_id?: number;
   api_key_id?: number;
   account_id?: number;

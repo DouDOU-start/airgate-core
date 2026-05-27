@@ -72,3 +72,14 @@ func PagedData(list interface{}, total int64, page, pageSize int) map[string]int
 		"page_size": pageSize,
 	}
 }
+
+// CursorPagedData 构建基于游标的分页响应数据。
+func CursorPagedData(list interface{}, total int64, page, pageSize int, hasMore bool, nextCursor *int64, totalExact bool) map[string]interface{} {
+	data := PagedData(list, total, page, pageSize)
+	data["has_more"] = hasMore
+	data["total_exact"] = totalExact
+	if nextCursor != nil {
+		data["next_cursor"] = *nextCursor
+	}
+	return data
+}

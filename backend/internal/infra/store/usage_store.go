@@ -5,9 +5,10 @@ import (
 	"sort"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
+
 	"github.com/DouDOU-start/airgate-core/ent"
 	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
-	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -69,14 +70,12 @@ func NewUsageStore(db *ent.Client) *UsageStore {
 }
 
 // ListUser 查询用户使用记录。
-func (s *UsageStore) ListUser(ctx context.Context, userID int64, filter appusage.ListFilter) ([]appusage.LogRecord, int64, error) {
+func (s *UsageStore) ListUser(ctx context.Context, userID int64, filter appusage.ListFilter) ([]appusage.LogRecord, bool, *int64, error) {
 	query := s.db.UsageLog.Query().
 		Where(usageUserPredicate(userID))
 	query = applyUsageListFilter(query, filter)
-
-	total, err := query.Count(ctx)
-	if err != nil {
-		return nil, 0, err
+	if filter.BeforeID > 0 {
+		query = query.Where(entusagelog.IDLT(int(filter.BeforeID)))
 	}
 
 	logs, err := query.
@@ -85,32 +84,25 @@ func (s *UsageStore) ListUser(ctx context.Context, userID int64, filter appusage
 		WithAPIKey().
 		WithAccount().
 		WithGroup().
-		Offset((filter.Page - 1) * filter.PageSize).
-		Limit(filter.PageSize).
+		Limit(filter.PageSize + 1).
 		Order(ent.Desc(entusagelog.FieldID)).
 		All(ctx)
 	if err != nil {
-		return nil, 0, err
+		return nil, false, nil, err
 	}
 
-	result := make([]appusage.LogRecord, 0, len(logs))
-	for _, item := range logs {
-		result = append(result, mapUsageLog(item))
-	}
-	return result, int64(total), nil
+	return mapUsageLogPage(logs, filter.PageSize)
 }
 
 // ListAdmin 查询管理员使用记录。
-func (s *UsageStore) ListAdmin(ctx context.Context, filter appusage.ListFilter) ([]appusage.LogRecord, int64, error) {
+func (s *UsageStore) ListAdmin(ctx context.Context, filter appusage.ListFilter) ([]appusage.LogRecord, bool, *int64, error) {
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
 		query = query.Where(usageUserPredicate(*filter.UserID))
 	}
 	query = applyUsageListFilter(query, filter)
-
-	total, err := query.Count(ctx)
-	if err != nil {
-		return nil, 0, err
+	if filter.BeforeID > 0 {
+		query = query.Where(entusagelog.IDLT(int(filter.BeforeID)))
 	}
 
 	logs, err := query.
@@ -119,19 +111,33 @@ func (s *UsageStore) ListAdmin(ctx context.Context, filter appusage.ListFilter) 
 		WithAPIKey().
 		WithAccount().
 		WithGroup().
-		Offset((filter.Page - 1) * filter.PageSize).
-		Limit(filter.PageSize).
+		Limit(filter.PageSize + 1).
 		Order(ent.Desc(entusagelog.FieldID)).
 		All(ctx)
 	if err != nil {
-		return nil, 0, err
+		return nil, false, nil, err
+	}
+
+	return mapUsageLogPage(logs, filter.PageSize)
+}
+
+func mapUsageLogPage(logs []*ent.UsageLog, pageSize int) ([]appusage.LogRecord, bool, *int64, error) {
+	hasMore := len(logs) > pageSize
+	if hasMore {
+		logs = logs[:pageSize]
 	}
 
 	result := make([]appusage.LogRecord, 0, len(logs))
 	for _, item := range logs {
 		result = append(result, mapUsageLog(item))
 	}
-	return result, int64(total), nil
+
+	var nextCursor *int64
+	if hasMore && len(result) > 0 {
+		cursor := result[len(result)-1].ID
+		nextCursor = &cursor
+	}
+	return result, hasMore, nextCursor, nil
 }
 
 // SummaryUser 查询用户汇总统计。
@@ -463,6 +469,12 @@ func usageUserPredicate(userID int64) predicate.UsageLog {
 	)
 }
 
+func usageLogColumnEQ(column string, value int) predicate.UsageLog {
+	return predicate.UsageLog(func(s *sql.Selector) {
+		s.Where(sql.EQ(s.C(column), value))
+	})
+}
+
 func coalesceString(primary, fallback string) string {
 	if primary != "" {
 		return primary
@@ -472,7 +484,7 @@ func coalesceString(primary, fallback string) string {
 
 func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) *ent.UsageLogQuery {
 	if filter.APIKeyID != nil {
-		query = query.Where(entusagelog.HasAPIKeyWith(entapikey.IDEQ(int(*filter.APIKeyID))))
+		query = query.Where(usageLogColumnEQ(entusagelog.APIKeyColumn, int(*filter.APIKeyID)))
 	}
 	if filter.AccountID != nil {
 		query = query.Where(entusagelog.HasAccountWith(entaccount.IDEQ(int(*filter.AccountID))))
@@ -492,7 +504,7 @@ func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) 
 
 func applyUsageStatsFilter(query *ent.UsageLogQuery, filter appusage.StatsFilter) *ent.UsageLogQuery {
 	if filter.APIKeyID != nil {
-		query = query.Where(entusagelog.HasAPIKeyWith(entapikey.IDEQ(int(*filter.APIKeyID))))
+		query = query.Where(usageLogColumnEQ(entusagelog.APIKeyColumn, int(*filter.APIKeyID)))
 	}
 	if filter.Platform != "" {
 		query = query.Where(entusagelog.PlatformEQ(filter.Platform))

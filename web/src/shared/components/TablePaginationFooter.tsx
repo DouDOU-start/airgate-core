@@ -2,25 +2,32 @@ import { ListBox, Pagination, Select } from '@heroui/react';
 import { DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS, getPaginationItems } from '../utils/pagination';
 
 interface TablePaginationFooterProps {
+  hasMore?: boolean;
   page: number;
   pageSize?: number;
   pageSizeOptions?: readonly number[];
   setPage: (page: number) => void;
   setPageSize?: (pageSize: number) => void;
   total: number;
+  totalExact?: boolean;
   totalPages: number;
 }
 
 export function TablePaginationFooter({
+  hasMore,
   page,
   pageSize,
   pageSizeOptions = DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS,
   setPage,
   setPageSize,
   total,
+  totalExact = true,
   totalPages,
 }: TablePaginationFooterProps) {
-  const safeTotalPages = Math.max(totalPages, 1);
+  const safeTotalPages = totalExact
+    ? Math.max(totalPages, 1)
+    : Math.max(totalPages, page + (hasMore ? 1 : 0), 1);
+  const canGoNext = totalExact ? page < safeTotalPages : !!hasMore;
   const showPageSize = pageSize != null && setPageSize != null;
   const selectedPageSize = pageSize == null ? '' : String(pageSize);
   const pageSizeItems = pageSizeOptions.map((size) => ({ id: String(size), label: String(size) }));
@@ -28,7 +35,7 @@ export function TablePaginationFooter({
   return (
     <Pagination className="ag-table-pagination" size="sm">
       <Pagination.Summary className="ag-table-pagination-summary">
-        <span>共</span>
+        <span>{totalExact ? '共' : '至少'}</span>
         <span className="ag-table-pagination-number">{total.toLocaleString()}</span>
         <span>条</span>
         <span className="ag-table-pagination-separator" aria-hidden="true" />
@@ -36,7 +43,7 @@ export function TablePaginationFooter({
         <span className="ag-table-pagination-number">{page}</span>
         <span>/</span>
         <span className="ag-table-pagination-number">{safeTotalPages}</span>
-        <span>页</span>
+        <span>{totalExact ? '页' : '页+'}</span>
         {showPageSize ? (
           <div className="ag-table-page-size">
             <span>每页</span>
@@ -90,7 +97,7 @@ export function TablePaginationFooter({
           ),
         )}
         <Pagination.Item>
-          <Pagination.Next isDisabled={page >= safeTotalPages} onPress={() => setPage(Math.min(safeTotalPages, page + 1))}>
+          <Pagination.Next isDisabled={!canGoNext} onPress={() => setPage(page + 1)}>
             <span>下一页</span>
             <Pagination.NextIcon />
           </Pagination.Next>

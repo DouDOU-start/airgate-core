@@ -76,6 +76,7 @@ type CustomerUsageLogResp struct {
 // UsageQuery 使用记录查询参数
 type UsageQuery struct {
 	PageReq
+	BeforeID  *int64 `form:"before_id"`
 	UserID    *int64 `form:"user_id"`
 	APIKeyID  *int64 `form:"api_key_id"`
 	AccountID *int64 `form:"account_id"`

@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 )
 
 // UsageLog 使用日志（只追加）
@@ -79,5 +80,14 @@ func (UsageLog) Edges() []ent.Edge {
 		edge.From("api_key", APIKey.Type).Ref("usage_logs").Unique(),
 		edge.From("account", Account.Type).Ref("usage_logs").Unique(),
 		edge.From("group", Group.Type).Ref("usage_logs").Unique(),
+	}
+}
+
+func (UsageLog) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("model").
+			StorageKey("usage_log_model"),
+		index.Edges("api_key").
+			StorageKey("usage_log_api_key"),
 	}
 }

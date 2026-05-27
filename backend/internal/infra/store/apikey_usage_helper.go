@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
+
 	"github.com/DouDOU-start/airgate-core/ent"
-	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 )
 
@@ -28,7 +30,7 @@ func queryAPIKeyUsage(ctx context.Context, db *ent.Client, keyIDs []int, todaySt
 	var todayRows []costRow
 	if err := db.UsageLog.Query().
 		Where(
-			entusagelog.HasAPIKeyWith(entapikey.IDIn(keyIDs...)),
+			usageLogColumnIn(entusagelog.APIKeyColumn, keyIDs),
 			entusagelog.CreatedAtGTE(todayStart),
 		).
 		GroupBy(entusagelog.ForeignKeys[0]).
@@ -43,7 +45,7 @@ func queryAPIKeyUsage(ctx context.Context, db *ent.Client, keyIDs []int, todaySt
 	var thirtyDayRows []costRow
 	if err := db.UsageLog.Query().
 		Where(
-			entusagelog.HasAPIKeyWith(entapikey.IDIn(keyIDs...)),
+			usageLogColumnIn(entusagelog.APIKeyColumn, keyIDs),
 			entusagelog.CreatedAtGTE(thirtyDaysAgo),
 		).
 		GroupBy(entusagelog.ForeignKeys[0]).
@@ -56,4 +58,10 @@ func queryAPIKeyUsage(ctx context.Context, db *ent.Client, keyIDs []int, todaySt
 	}
 
 	return todayMap, thirtyDayMap, nil
+}
+
+func usageLogColumnIn(column string, values []int) predicate.UsageLog {
+	return predicate.UsageLog(func(s *sql.Selector) {
+		s.Where(sql.InInts(s.C(column), values...))
+	})
 }

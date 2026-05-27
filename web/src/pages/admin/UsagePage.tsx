@@ -5,7 +5,7 @@ import { Card, ComboBox, Input, ListBox, Select, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { apikeysApi } from '../../shared/api/apikeys';
-import { usePagination } from '../../shared/hooks/usePagination';
+import { useCursorPagination } from '../../shared/hooks/useCursorPagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
@@ -388,7 +388,7 @@ function TokenTrendCard({
 
 export default function UsagePage() {
   const { t } = useTranslation();
-  const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.usage');
+  const { beforeId, page, setPage, pageSize, setPageSize, resetCursorPagination } = useCursorPagination(20, 'admin.usage');
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
   const [granularity, setGranularity] = useState<string>('hour');
@@ -401,9 +401,9 @@ export default function UsagePage() {
 
   const handleModelChange = useCallback((model: string) => {
     const nextModel = model || undefined;
-    setPage(1);
+    resetCursorPagination();
     setFilters((prev) => (prev.model === nextModel ? prev : { ...prev, model: nextModel }));
-  }, [setPage]);
+  }, [resetCursorPagination]);
 
   // 用户搜索
   const [userKeyword, setUserKeyword] = useState('');
@@ -475,8 +475,9 @@ export default function UsagePage() {
   const queryParams = useMemo<UsageQuery>(() => ({
     page,
     page_size: pageSize,
+    before_id: beforeId,
     ...filters,
-  }), [filters, page, pageSize]);
+  }), [beforeId, filters, page, pageSize]);
 
   // 使用记录列表
   const {
@@ -555,7 +556,7 @@ export default function UsagePage() {
       ? (value ? Number(value) : undefined)
       : value || undefined;
     setFilters((prev) => ({ ...prev, [key]: nextValue }));
-    setPage(1);
+    resetCursorPagination();
   }
 
   const activeStats = pageActive ? stats : undefined;
@@ -686,6 +687,7 @@ export default function UsagePage() {
     ] as UsageColumnConfig<UsageLogResp>[];
   }, [sharedColumns, t]);
   const total = data?.total ?? 0;
+  const canUseCursor = pageActive && !isPlaceholderData;
 
   return (
     <div>
@@ -758,7 +760,7 @@ export default function UsagePage() {
             label={t('usage.time_range')}
             startDate={filters.start_date}
             onChange={(startDate, endDate) => {
-              setPage(1);
+              resetCursorPagination();
               setFilters((prev) => ({ ...prev, start_date: startDate, end_date: endDate }));
             }}
           />
@@ -936,14 +938,16 @@ export default function UsagePage() {
         emptyTitle={t('common.no_data')}
         highlightNewRows={pageActive && autoRefreshEnabled && page === 1}
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
+        hasMore={canUseCursor ? data?.has_more : false}
         isLoading={!pageActive || isLoading}
         page={page}
         pageSize={pageSize}
         rows={pageActive ? data?.list ?? [] : []}
-        setPage={setPage}
+        setPage={(nextPage) => setPage(nextPage, canUseCursor ? data?.next_cursor : undefined)}
         setPageSize={setPageSize}
         suppressHighlight={!pageActive || isPlaceholderData}
         total={pageActive ? total : 0}
+        totalExact={canUseCursor ? data?.total_exact : true}
       />
     </div>
   );

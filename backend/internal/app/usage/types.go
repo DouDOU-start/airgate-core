@@ -6,6 +6,7 @@ import "context"
 type ListFilter struct {
 	Page      int
 	PageSize  int
+	BeforeID  int64
 	UserID    *int64
 	APIKeyID  *int64
 	AccountID *int64
@@ -90,10 +91,13 @@ type LogRecord struct {
 
 // ListResult 使用记录列表结果。
 type ListResult struct {
-	List     []LogRecord
-	Total    int64
-	Page     int
-	PageSize int
+	List       []LogRecord
+	Total      int64
+	Page       int
+	PageSize   int
+	HasMore    bool
+	NextCursor *int64
+	TotalExact bool
 }
 
 // Summary 汇总统计。
@@ -185,8 +189,8 @@ type TrendBucket struct {
 
 // Repository 使用记录仓储接口。
 type Repository interface {
-	ListUser(context.Context, int64, ListFilter) ([]LogRecord, int64, error)
-	ListAdmin(context.Context, ListFilter) ([]LogRecord, int64, error)
+	ListUser(context.Context, int64, ListFilter) ([]LogRecord, bool, *int64, error)
+	ListAdmin(context.Context, ListFilter) ([]LogRecord, bool, *int64, error)
 	SummaryUser(context.Context, int64, StatsFilter) (Summary, error)
 	SummaryAdmin(context.Context, StatsFilter) (Summary, error)
 	StatsByModel(context.Context, StatsFilter) ([]ModelStats, error)

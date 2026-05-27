@@ -20,10 +20,13 @@ func NewService(repo Repository) *Service {
 // ListUser 查询当前用户的使用记录。
 func (s *Service) ListUser(ctx context.Context, userID int64, filter ListFilter) (ListResult, error) {
 	page, pageSize := NormalizePage(filter.Page, filter.PageSize)
+	if filter.BeforeID <= 0 {
+		page = 1
+	}
 	filter.Page = page
 	filter.PageSize = pageSize
 
-	list, total, err := s.repo.ListUser(ctx, userID, filter)
+	list, hasMore, nextCursor, err := s.repo.ListUser(ctx, userID, filter)
 	if err != nil {
 		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
 			"scope", "user_list",
@@ -33,10 +36,13 @@ func (s *Service) ListUser(ctx context.Context, userID int64, filter ListFilter)
 	}
 
 	return ListResult{
-		List:     list,
-		Total:    total,
-		Page:     page,
-		PageSize: pageSize,
+		List:       list,
+		Total:      usageListTotal(page, pageSize, len(list), hasMore),
+		Page:       page,
+		PageSize:   pageSize,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+		TotalExact: !hasMore,
 	}, nil
 }
 
@@ -55,10 +61,13 @@ func (s *Service) UserStats(ctx context.Context, userID int64, filter StatsFilte
 // ListAdmin 查询管理员使用记录列表。
 func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult, error) {
 	page, pageSize := NormalizePage(filter.Page, filter.PageSize)
+	if filter.BeforeID <= 0 {
+		page = 1
+	}
 	filter.Page = page
 	filter.PageSize = pageSize
 
-	list, total, err := s.repo.ListAdmin(ctx, filter)
+	list, hasMore, nextCursor, err := s.repo.ListAdmin(ctx, filter)
 	if err != nil {
 		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
 			"scope", "admin_list",
@@ -67,11 +76,28 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult,
 	}
 
 	return ListResult{
-		List:     list,
-		Total:    total,
-		Page:     page,
-		PageSize: pageSize,
+		List:       list,
+		Total:      usageListTotal(page, pageSize, len(list), hasMore),
+		Page:       page,
+		PageSize:   pageSize,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+		TotalExact: !hasMore,
 	}, nil
+}
+
+func usageListTotal(page, pageSize, listLen int, hasMore bool) int64 {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = defaultPageSize
+	}
+	total := int64((page-1)*pageSize + listLen)
+	if hasMore {
+		total++
+	}
+	return total
 }
 
 // StatsByModel 按模型分组统计。
