@@ -1,7 +1,6 @@
 package plugin
 
 import (
-	"math"
 	"strconv"
 	"strings"
 
@@ -16,24 +15,20 @@ const (
 	imagePrice4KKey = "image_price_4k"
 )
 
-func imageOutputBillingOverride(usage *sdk.Usage, settings map[string]map[string]string) (float64, bool) {
+func imageBillingCostOverride(usage *sdk.Usage, settings map[string]map[string]string) (float64, bool) {
 	snap := usageSnapshotFromSDK(usage)
-	if strings.TrimSpace(snap.ImageSize) == "" || snap.OutputCost <= 0 {
+	if strings.TrimSpace(snap.ImageSize) == "" || snap.ImageCount <= 0 {
 		return 0, false
 	}
-	tier, basePrice, ok := imageTierForSize(snap.ImageSize)
-	if !ok || basePrice <= 0 {
+	tier, _, ok := imageTierForSize(snap.ImageSize)
+	if !ok {
 		return 0, false
 	}
 	price, ok := imageTierPriceFromSettings(settings, tier)
 	if !ok {
 		return 0, false
 	}
-	imageCount := int(math.Round(snap.OutputCost / basePrice))
-	if imageCount < 1 {
-		imageCount = 1
-	}
-	return float64(imageCount) * price, true
+	return float64(snap.ImageCount) * price, true
 }
 
 func shouldForwardPluginSetting(plugin, key string) bool {

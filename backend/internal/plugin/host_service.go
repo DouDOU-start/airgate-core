@@ -1154,8 +1154,8 @@ func (h *HostService) recordHostForwardUsage(
 		BillingRate:       route.EffectiveRate,
 		AccountRate:       accFull.RateMultiplier,
 	}
-	if override, ok := imageOutputBillingOverride(usage, route.GroupPluginSettings); ok {
-		calcInput.OutputBillingCostOverride = &override
+	if override, ok := imageBillingCostOverride(usage, route.GroupPluginSettings); ok {
+		calcInput.BillingCostOverride = &override
 	}
 	calc := h.calculator.Calculate(calcInput)
 	reasoningEffort := resolveReasoningEffort(hostForwardReasoningEffort(req), usage)

@@ -30,10 +30,10 @@ type CalculateInput struct {
 	// 与用户计费 (BillingRate) 完全独立，不影响 actual_cost / User.balance。
 	AccountRate float64
 
-	// OutputBillingCostOverride 可覆盖 output_cost 在 actual_cost 管道里的计价结果。
-	// 用于分组图片 1K/2K/4K 固定价：配置后 output 不再乘 BillingRate，
-	// 未配置时保持 output_cost × BillingRate 的旧行为。
-	OutputBillingCostOverride *float64
+	// BillingCostOverride 可覆盖 actual_cost / billed_cost 的最终计费结果。
+	// 用于分组图片 1K/2K/4K 固定价：配置后整次请求按图片单张价 × 数量计费，
+	// 不再叠加 token × BillingRate / SellRate 的结果。
+	BillingCostOverride *float64
 }
 
 // CalculateResult 计算结果
@@ -75,15 +75,15 @@ func (c *Calculator) Calculate(input CalculateInput) CalculateResult {
 		accountRate = 1.0
 	}
 
-	nonOutputCost := input.InputCost + input.CachedInputCost + input.CacheCreationCost
-	actualCost := nonOutputCost*billingRate + input.OutputCost*billingRate
-	if input.OutputBillingCostOverride != nil {
-		actualCost = nonOutputCost*billingRate + *input.OutputBillingCostOverride
-	}
+	actualCost := totalCost * billingRate
 
 	billedCost := actualCost
 	if input.SellRate > 0 {
 		billedCost = totalCost * input.SellRate
+	}
+	if input.BillingCostOverride != nil {
+		actualCost = *input.BillingCostOverride
+		billedCost = *input.BillingCostOverride
 	}
 
 	accountCost := totalCost * accountRate

@@ -7,10 +7,13 @@ import (
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
-func TestImageOutputBillingOverride_UsesConfiguredTier(t *testing.T) {
+func TestImageBillingCostOverride_UsesConfiguredTier(t *testing.T) {
 	usage := &sdk.Usage{
 		OutputCost: 0.40,
-		Metadata:   map[string]string{"openai.image.size": "1672x941"},
+		Metadata: map[string]string{
+			"openai.image.size":  "1672x941",
+			"openai.image.count": "2",
+		},
 	}
 	settings := map[string]map[string]string{
 		"openai": {
@@ -18,7 +21,7 @@ func TestImageOutputBillingOverride_UsesConfiguredTier(t *testing.T) {
 		},
 	}
 
-	got, ok := imageOutputBillingOverride(usage, settings)
+	got, ok := imageBillingCostOverride(usage, settings)
 	if !ok {
 		t.Fatal("expected override")
 	}
@@ -27,10 +30,13 @@ func TestImageOutputBillingOverride_UsesConfiguredTier(t *testing.T) {
 	}
 }
 
-func TestImageOutputBillingOverride_FallsBackWhenTierUnset(t *testing.T) {
+func TestImageBillingCostOverride_FallsBackWhenTierUnset(t *testing.T) {
 	usage := &sdk.Usage{
 		OutputCost: 0.40,
-		Metadata:   map[string]string{"openai.image.size": "3840x2160"},
+		Metadata: map[string]string{
+			"openai.image.size":  "3840x2160",
+			"openai.image.count": "2",
+		},
 	}
 	settings := map[string]map[string]string{
 		"openai": {
@@ -38,7 +44,7 @@ func TestImageOutputBillingOverride_FallsBackWhenTierUnset(t *testing.T) {
 		},
 	}
 
-	if got, ok := imageOutputBillingOverride(usage, settings); ok {
+	if got, ok := imageBillingCostOverride(usage, settings); ok {
 		t.Fatalf("override = %v, want fallback", got)
 	}
 }

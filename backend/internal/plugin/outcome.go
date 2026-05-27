@@ -282,8 +282,8 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 		SellRate:          state.keyInfo.SellRate,
 		AccountRate:       state.account.RateMultiplier,
 	}
-	if override, ok := imageOutputBillingOverride(usage, state.keyInfo.GroupPluginSettings); ok {
-		calcInput.OutputBillingCostOverride = &override
+	if override, ok := imageBillingCostOverride(usage, state.keyInfo.GroupPluginSettings); ok {
+		calcInput.BillingCostOverride = &override
 	}
 	calc := f.calculator.Calculate(calcInput)
 	reasoningEffort := resolveReasoningEffort(state.reasoningEffort, usage)
