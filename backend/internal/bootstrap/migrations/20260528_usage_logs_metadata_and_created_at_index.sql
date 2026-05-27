@@ -25,5 +25,4 @@ ALTER TABLE public.usage_logs DROP COLUMN IF EXISTS usage_attributes;
 ALTER TABLE public.usage_logs DROP COLUMN IF EXISTS usage_metrics;
 ALTER TABLE public.usage_logs DROP COLUMN IF EXISTS usage_cost_details;
 
-DROP INDEX CONCURRENTLY IF EXISTS public.usage_log_created_at;
-CREATE INDEX CONCURRENTLY usage_log_created_at ON public.usage_logs (created_at);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS usage_log_created_at ON public.usage_logs (created_at);
