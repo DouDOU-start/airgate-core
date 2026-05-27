@@ -21,7 +21,32 @@ func RunStartupTasks(db *ent.Client, drv *entsql.Driver, apiKeySecret string) {
 	backfillResellerMarkupColumns(drv)
 	migrateAccountState(drv)
 	migrateUserHistoryRefs(drv)
+	dropUsageLogLegacyDetailColumns(drv)
 	slog.Info("bootstrap_startup_tasks_done")
+}
+
+func dropUsageLogLegacyDetailColumns(drv *entsql.Driver) {
+	if drv == nil {
+		return
+	}
+	ctx := context.Background()
+	statements := []string{
+		`ALTER TABLE usage_logs DROP COLUMN IF EXISTS image_size`,
+		`ALTER TABLE usage_logs DROP COLUMN IF EXISTS cache_creation_5m_tokens`,
+		`ALTER TABLE usage_logs DROP COLUMN IF EXISTS cache_creation_1h_tokens`,
+		`ALTER TABLE usage_logs DROP COLUMN IF EXISTS cache_creation_1h_price`,
+		`ALTER TABLE usage_logs DROP COLUMN IF EXISTS usage_attributes`,
+		`ALTER TABLE usage_logs DROP COLUMN IF EXISTS usage_metrics`,
+		`ALTER TABLE usage_logs DROP COLUMN IF EXISTS usage_cost_details`,
+	}
+	for _, sql := range statements {
+		var r entsql.Result
+		if err := drv.Exec(ctx, sql, []any{}, &r); err != nil {
+			slog.Warn("bootstrap_usage_log_legacy_column_drop_failed", "sql", sql, sdk.LogFieldError, err)
+			return
+		}
+	}
+	slog.Info("bootstrap_usage_log_legacy_columns_dropped")
 }
 
 // migrateUserHistoryRefs 允许硬删除用户，同时保留历史使用记录和余额流水。

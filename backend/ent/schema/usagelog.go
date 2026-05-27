@@ -5,8 +5,6 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
-
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // UsageLog 使用日志（只追加）
@@ -22,8 +20,6 @@ func (UsageLog) Fields() []ent.Field {
 		field.Int("output_tokens").Default(0),
 		field.Int("cached_input_tokens").Default(0),
 		field.Int("cache_creation_tokens").Default(0),
-		field.Int("cache_creation_5m_tokens").Default(0),
-		field.Int("cache_creation_1h_tokens").Default(0),
 		field.Int("reasoning_output_tokens").Default(0),
 		field.Float("input_price").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
@@ -32,8 +28,6 @@ func (UsageLog) Fields() []ent.Field {
 		field.Float("cached_input_price").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("cache_creation_price").Default(0).
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
-		field.Float("cache_creation_1h_price").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("input_cost").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
@@ -61,9 +55,6 @@ func (UsageLog) Fields() []ent.Field {
 		field.Float("account_rate_multiplier").Default(1.0).
 			Comment("快照：本次请求生效的 account_rate"),
 		field.String("service_tier").Default(""),
-		// image_size 图像生成请求实际出图尺寸（"WxH"）。非图像请求留空。
-		// admin 后台展示用，让用户能直观看出"为什么这次图扣了 0.40"——按 1K/2K/4K 分档计费。
-		field.String("image_size").Default(""),
 		field.Bool("stream").Default(false),
 		field.Int64("duration_ms").Default(0),
 		field.Int64("first_token_ms").Default(0),
@@ -73,10 +64,6 @@ func (UsageLog) Fields() []ent.Field {
 		field.String("endpoint").Default(""),
 		// 推理强度档位。
 		field.String("reasoning_effort").Default(""),
-		// SDK 原始用量明细：Core 只保存和透出，具体展示由插件前端 slot 负责。
-		field.JSON("usage_attributes", []sdk.UsageAttribute{}).Optional(),
-		field.JSON("usage_metrics", []sdk.UsageMetric{}).Optional(),
-		field.JSON("usage_cost_details", []sdk.UsageCostDetail{}).Optional(),
 		field.JSON("usage_metadata", map[string]string{}).Optional(),
 		field.Int("user_id_snapshot").Default(0).
 			Comment("用户 ID 快照。用户硬删除后保留历史使用记录与计费归属。"),

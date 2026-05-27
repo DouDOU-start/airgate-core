@@ -332,7 +332,7 @@ function rowMetrics(row: UsageRow): MetricDisplay[] {
     { key: 'cached_input_tokens', label: '缓存读取 Token', kind: 'token', unit: 'token', value: row.cached_input_tokens },
     { key: 'cache_creation_tokens', label: '缓存写入 Token', kind: 'token', unit: 'token', value: cacheCreation },
   ];
-  const imageCount = usageMetadataNumber(row.usage_metadata ?? {}, ['images', 'image_count']);
+  const imageCount = usageMetadataNumber(row.usage_metadata ?? {}, ['openai.image.count']);
   if (imageCount > 0) {
     metrics.push({ key: 'images', label: '图片数量', kind: 'image', unit: 'image', value: imageCount });
   }
@@ -341,33 +341,18 @@ function rowMetrics(row: UsageRow): MetricDisplay[] {
 
 function buildUsageRecordContext(row: UsageRow, customerScope: boolean) {
   const usageMetadata = row.usage_metadata ?? {};
-  const imageSize = firstText(
-    row.image_size,
-    usageMetadataValue(usageMetadata, ['image_size', 'resolution', 'size']),
-  );
-  const serviceTier = firstText(
-    row.service_tier,
-    usageMetadataValue(usageMetadata, ['service_tier', 'tier']),
-  );
-  const reasoningEffort = firstText(
-    (row as Partial<UsageLogResp>).reasoning_effort,
-    usageMetadataValue(usageMetadata, ['reasoning_effort', 'reasoning']),
-  );
+  const serviceTier = firstText(row.service_tier);
+  const reasoningEffort = firstText((row as Partial<UsageLogResp>).reasoning_effort);
   const reasoningTokens = (row as Partial<UsageLogResp>).reasoning_output_tokens;
-  const inputTextTokens = usageMetadataNumber(usageMetadata, ['input_text_tokens', 'text_input_tokens', 'text_tokens']);
-  const inputImageTokens = usageMetadataNumber(usageMetadata, ['input_image_tokens', 'image_input_tokens', 'image_tokens']);
-  const images = usageMetadataNumber(usageMetadata, ['images', 'image_count']);
 
   const ctx: Record<string, unknown> = {
     record: row,
     customerScope,
-    usageMetadata,
     usage_metadata: usageMetadata,
     // 常用的行级别字段做扁平化，方便插件扩展渲染器直接取值。
     model: row.model,
     platform: row.platform,
     service_tier: serviceTier,
-    image_size: imageSize,
     endpoint: row.endpoint,
     stream: row.stream,
     created_at: row.created_at,
@@ -377,9 +362,6 @@ function buildUsageRecordContext(row: UsageRow, customerScope: boolean) {
   if (typeof reasoningTokens === 'number' && reasoningTokens > 0) {
     ctx.reasoning_output_tokens = reasoningTokens;
   }
-  if (inputTextTokens > 0) ctx.input_text_tokens = inputTextTokens;
-  if (inputImageTokens > 0) ctx.input_image_tokens = inputImageTokens;
-  if (images > 0) ctx.images = images;
 
   return ctx;
 }
@@ -454,6 +436,9 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 )}
                 {row.output_price > 0 && (
                   <TooltipRow label={t('usage.output_unit_price')} value={`$${row.output_price.toFixed(4)} / 1M Token`} />
+                )}
+                {row.cache_creation_price > 0 && (
+                  <TooltipRow label={t('usage.cache_creation_unit_price', '缓存写入单价')} value={`$${row.cache_creation_price.toFixed(4)} / 1M Token`} />
                 )}
                 {row.cached_input_cost > 0 && (
                   <TooltipRow label={t('usage.cached_input_cost')} value={`$${row.cached_input_cost.toFixed(6)}`} />
@@ -579,7 +564,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         const metaContext = buildUsageRecordContext(row, customerScope);
         const fallbackMeta = (() => {
           if (PluginUsageModelMeta) return null;
-          const imageSize = typeof metaContext.image_size === 'string' ? metaContext.image_size : '';
+          const imageSize = usageMetadataValue(row.usage_metadata ?? {}, ['openai.image.size']) ?? '';
           if (imageSize) {
             return (
               <MetaChip

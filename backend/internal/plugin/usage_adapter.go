@@ -12,20 +12,17 @@ type usageSnapshot struct {
 	OutputTokens          int
 	CachedInputTokens     int
 	CacheCreationTokens   int
-	CacheCreation5mTokens int
-	CacheCreation1hTokens int
 	ReasoningOutputTokens int
 	TextInputTokens       int
 	ImageInputTokens      int
 	ImageCount            int
 
-	InputPrice           float64
-	OutputPrice          float64
-	CachedInputPrice     float64
-	CacheCreationPrice   float64
-	CacheCreation1hPrice float64
-	ImageUnitPrice       float64
-	ImageUnit            string
+	InputPrice         float64
+	OutputPrice        float64
+	CachedInputPrice   float64
+	CacheCreationPrice float64
+	ImageUnitPrice     float64
+	ImageUnit          string
 
 	InputCost         float64
 	OutputCost        float64
@@ -46,58 +43,85 @@ func usageSnapshotFromSDK(usage *sdk.Usage) usageSnapshot {
 		OutputTokens:          usage.OutputTokens,
 		CachedInputTokens:     usage.CachedInputTokens,
 		CacheCreationTokens:   usage.CacheCreationTokens,
-		CacheCreation5mTokens: usage.CacheCreation5mTokens,
-		CacheCreation1hTokens: usage.CacheCreation1hTokens,
 		ReasoningOutputTokens: usage.ReasoningOutputTokens,
-		TextInputTokens:       usage.TextInputTokens,
-		ImageInputTokens:      usage.ImageInputTokens,
-		ImageCount:            usage.ImageCount,
 		InputPrice:            usage.InputPrice,
 		OutputPrice:           usage.OutputPrice,
 		CachedInputPrice:      usage.CachedInputPrice,
 		CacheCreationPrice:    usage.CacheCreationPrice,
-		CacheCreation1hPrice:  usage.CacheCreation1hPrice,
-		ImageUnitPrice:        usage.ImageUnitPrice,
-		ImageUnit:             usage.ImageUnit,
 		InputCost:             usage.InputCost,
 		OutputCost:            usage.OutputCost,
 		CachedInputCost:       usage.CachedInputCost,
 		CacheCreationCost:     usage.CacheCreationCost,
-		ServiceTier:           usage.ServiceTier,
-		ImageSize:             usage.ImageSize,
 		FirstTokenMs:          usage.FirstTokenMs,
 	}
 
-	if usage.Metadata != nil {
-		if snap.ImageSize == "" {
-			snap.ImageSize = usage.Metadata["image_size"]
-		}
-	}
+	meta := usage.Metadata
+	snap.TextInputTokens = metadataInt(meta, "openai.image.input_text_tokens")
+	snap.ImageInputTokens = metadataInt(meta, "openai.image.input_image_tokens")
+	snap.ImageCount = metadataInt(meta, "openai.image.count")
+	snap.ImageUnitPrice = metadataFloat(meta, "openai.image.unit_price")
+	snap.ImageUnit = metadataText(meta, "openai.image.unit")
+	snap.ServiceTier = metadataText(meta, "service_tier", "tier")
+	snap.ImageSize = metadataText(meta, "openai.image.size")
 
 	return snap
 }
 
 func usageMetadataFromSDK(usage *sdk.Usage, snap usageSnapshot) map[string]string {
 	meta := map[string]string{}
-	if usage != nil {
-		if snap.ImageSize == "" {
-			putMetadata(meta, "image_size", usage.Metadata["image_size"])
-			putMetadata(meta, "image_size", usage.Metadata["resolution"])
-			putMetadata(meta, "image_size", usage.Metadata["size"])
-		}
-		if snap.ImageUnit == "" {
-			putMetadata(meta, "image_unit", usage.Metadata["image_unit"])
-			putMetadata(meta, "image_unit", usage.Metadata["unit"])
-		}
+	if usage == nil {
+		return meta
 	}
 
-	putMetadata(meta, "image_size", snap.ImageSize)
-	putMetadataInt(meta, "input_text_tokens", snap.TextInputTokens)
-	putMetadataInt(meta, "input_image_tokens", snap.ImageInputTokens)
-	putMetadataInt(meta, "images", snap.ImageCount)
-	putMetadataFloat(meta, "image_unit_price", snap.ImageUnitPrice)
-	putMetadata(meta, "image_unit", snap.ImageUnit)
+	for key, value := range usage.Metadata {
+		putMetadata(meta, key, value)
+	}
+	putMetadata(meta, "openai.image.size", snap.ImageSize)
+	putMetadataInt(meta, "openai.image.input_text_tokens", snap.TextInputTokens)
+	putMetadataInt(meta, "openai.image.input_image_tokens", snap.ImageInputTokens)
+	putMetadataInt(meta, "openai.image.count", snap.ImageCount)
+	putMetadataFloat(meta, "openai.image.unit_price", snap.ImageUnitPrice)
+	putMetadata(meta, "openai.image.unit", snap.ImageUnit)
 	return meta
+}
+
+func metadataText(meta map[string]string, keys ...string) string {
+	for _, key := range keys {
+		value := strings.TrimSpace(meta[key])
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func metadataInt(meta map[string]string, keys ...string) int {
+	for _, key := range keys {
+		raw := strings.TrimSpace(meta[key])
+		if raw == "" {
+			continue
+		}
+		if value, err := strconv.Atoi(raw); err == nil {
+			return value
+		}
+		if value, err := strconv.ParseFloat(raw, 64); err == nil {
+			return int(value)
+		}
+	}
+	return 0
+}
+
+func metadataFloat(meta map[string]string, keys ...string) float64 {
+	for _, key := range keys {
+		raw := strings.TrimSpace(meta[key])
+		if raw == "" {
+			continue
+		}
+		if value, err := strconv.ParseFloat(raw, 64); err == nil {
+			return value
+		}
+	}
+	return 0
 }
 
 func putMetadata(meta map[string]string, key, value string) {

@@ -20,14 +20,11 @@ type UsageLogResp struct {
 	OutputTokens          int               `json:"output_tokens"`
 	CachedInputTokens     int               `json:"cached_input_tokens"`
 	CacheCreationTokens   int               `json:"cache_creation_tokens"`
-	CacheCreation5mTokens int               `json:"cache_creation_5m_tokens"`
-	CacheCreation1hTokens int               `json:"cache_creation_1h_tokens"`
 	ReasoningOutputTokens int               `json:"reasoning_output_tokens"`
 	InputPrice            float64           `json:"input_price"`
 	OutputPrice           float64           `json:"output_price"`
 	CachedInputPrice      float64           `json:"cached_input_price"`
 	CacheCreationPrice    float64           `json:"cache_creation_price"`
-	CacheCreation1hPrice  float64           `json:"cache_creation_1h_price"`
 	InputCost             float64           `json:"input_cost"`
 	OutputCost            float64           `json:"output_cost"`
 	CachedInputCost       float64           `json:"cached_input_cost"`
@@ -40,7 +37,6 @@ type UsageLogResp struct {
 	SellRate              float64           `json:"sell_rate"`               // 销售倍率快照
 	AccountRateMultiplier float64           `json:"account_rate_multiplier"` // 账号倍率快照
 	ServiceTier           string            `json:"service_tier,omitempty"`
-	ImageSize             string            `json:"image_size,omitempty"` // 图像生成实际出图尺寸（"WxH"），非图像请求空
 	Stream                bool              `json:"stream"`
 	DurationMs            int64             `json:"duration_ms"`
 	FirstTokenMs          int64             `json:"first_token_ms"`
@@ -65,12 +61,9 @@ type CustomerUsageLogResp struct {
 	OutputTokens          int               `json:"output_tokens"`
 	CachedInputTokens     int               `json:"cached_input_tokens"`
 	CacheCreationTokens   int               `json:"cache_creation_tokens"`
-	CacheCreation5mTokens int               `json:"cache_creation_5m_tokens"`
-	CacheCreation1hTokens int               `json:"cache_creation_1h_tokens"`
 	ReasoningOutputTokens int               `json:"reasoning_output_tokens"`
 	BilledCost            float64           `json:"cost"` // 客户视角："本次消耗 = X 美元"
 	ServiceTier           string            `json:"service_tier,omitempty"`
-	ImageSize             string            `json:"image_size,omitempty"` // 图像生成实际出图尺寸（"WxH"），非图像请求空
 	Stream                bool              `json:"stream"`
 	DurationMs            int64             `json:"duration_ms"`
 	FirstTokenMs          int64             `json:"first_token_ms"`

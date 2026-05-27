@@ -29,14 +29,11 @@ type UsageRecord struct {
 	OutputTokens          int
 	CachedInputTokens     int
 	CacheCreationTokens   int
-	CacheCreation5mTokens int
-	CacheCreation1hTokens int
 	ReasoningOutputTokens int
 	InputPrice            float64
 	OutputPrice           float64
 	CachedInputPrice      float64
 	CacheCreationPrice    float64
-	CacheCreation1hPrice  float64
 	InputCost             float64
 	OutputCost            float64
 	CachedInputCost       float64
@@ -49,7 +46,6 @@ type UsageRecord struct {
 	SellRate              float64 // 快照：本次生效的销售倍率（0 表示未启用 markup）
 	AccountRateMultiplier float64 // 快照：本次生效的 account_rate
 	ServiceTier           string
-	ImageSize             string // 图像生成请求的实际出图尺寸（"WxH"），非图像请求留空
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64
@@ -234,14 +230,11 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
 		SetOutputTokens(rec.OutputTokens).
 		SetCachedInputTokens(rec.CachedInputTokens).
 		SetCacheCreationTokens(rec.CacheCreationTokens).
-		SetCacheCreation5mTokens(rec.CacheCreation5mTokens).
-		SetCacheCreation1hTokens(rec.CacheCreation1hTokens).
 		SetReasoningOutputTokens(rec.ReasoningOutputTokens).
 		SetInputPrice(rec.InputPrice).
 		SetOutputPrice(rec.OutputPrice).
 		SetCachedInputPrice(rec.CachedInputPrice).
 		SetCacheCreationPrice(rec.CacheCreationPrice).
-		SetCacheCreation1hPrice(rec.CacheCreation1hPrice).
 		SetInputCost(rec.InputCost).
 		SetOutputCost(rec.OutputCost).
 		SetCachedInputCost(rec.CachedInputCost).
@@ -254,7 +247,6 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
 		SetSellRate(rec.SellRate).
 		SetAccountRateMultiplier(rec.AccountRateMultiplier).
 		SetServiceTier(rec.ServiceTier).
-		SetImageSize(rec.ImageSize).
 		SetStream(rec.Stream).
 		SetDurationMs(rec.DurationMs).
 		SetFirstTokenMs(rec.FirstTokenMs).

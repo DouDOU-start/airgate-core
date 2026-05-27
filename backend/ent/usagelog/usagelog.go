@@ -26,10 +26,6 @@ const (
 	FieldCachedInputTokens = "cached_input_tokens"
 	// FieldCacheCreationTokens holds the string denoting the cache_creation_tokens field in the database.
 	FieldCacheCreationTokens = "cache_creation_tokens"
-	// FieldCacheCreation5mTokens holds the string denoting the cache_creation_5m_tokens field in the database.
-	FieldCacheCreation5mTokens = "cache_creation_5m_tokens"
-	// FieldCacheCreation1hTokens holds the string denoting the cache_creation_1h_tokens field in the database.
-	FieldCacheCreation1hTokens = "cache_creation_1h_tokens"
 	// FieldReasoningOutputTokens holds the string denoting the reasoning_output_tokens field in the database.
 	FieldReasoningOutputTokens = "reasoning_output_tokens"
 	// FieldInputPrice holds the string denoting the input_price field in the database.
@@ -40,8 +36,6 @@ const (
 	FieldCachedInputPrice = "cached_input_price"
 	// FieldCacheCreationPrice holds the string denoting the cache_creation_price field in the database.
 	FieldCacheCreationPrice = "cache_creation_price"
-	// FieldCacheCreation1hPrice holds the string denoting the cache_creation_1h_price field in the database.
-	FieldCacheCreation1hPrice = "cache_creation_1h_price"
 	// FieldInputCost holds the string denoting the input_cost field in the database.
 	FieldInputCost = "input_cost"
 	// FieldOutputCost holds the string denoting the output_cost field in the database.
@@ -66,8 +60,6 @@ const (
 	FieldAccountRateMultiplier = "account_rate_multiplier"
 	// FieldServiceTier holds the string denoting the service_tier field in the database.
 	FieldServiceTier = "service_tier"
-	// FieldImageSize holds the string denoting the image_size field in the database.
-	FieldImageSize = "image_size"
 	// FieldStream holds the string denoting the stream field in the database.
 	FieldStream = "stream"
 	// FieldDurationMs holds the string denoting the duration_ms field in the database.
@@ -82,12 +74,6 @@ const (
 	FieldEndpoint = "endpoint"
 	// FieldReasoningEffort holds the string denoting the reasoning_effort field in the database.
 	FieldReasoningEffort = "reasoning_effort"
-	// FieldUsageAttributes holds the string denoting the usage_attributes field in the database.
-	FieldUsageAttributes = "usage_attributes"
-	// FieldUsageMetrics holds the string denoting the usage_metrics field in the database.
-	FieldUsageMetrics = "usage_metrics"
-	// FieldUsageCostDetails holds the string denoting the usage_cost_details field in the database.
-	FieldUsageCostDetails = "usage_cost_details"
 	// FieldUsageMetadata holds the string denoting the usage_metadata field in the database.
 	FieldUsageMetadata = "usage_metadata"
 	// FieldUserIDSnapshot holds the string denoting the user_id_snapshot field in the database.
@@ -145,14 +131,11 @@ var Columns = []string{
 	FieldOutputTokens,
 	FieldCachedInputTokens,
 	FieldCacheCreationTokens,
-	FieldCacheCreation5mTokens,
-	FieldCacheCreation1hTokens,
 	FieldReasoningOutputTokens,
 	FieldInputPrice,
 	FieldOutputPrice,
 	FieldCachedInputPrice,
 	FieldCacheCreationPrice,
-	FieldCacheCreation1hPrice,
 	FieldInputCost,
 	FieldOutputCost,
 	FieldCachedInputCost,
@@ -165,7 +148,6 @@ var Columns = []string{
 	FieldSellRate,
 	FieldAccountRateMultiplier,
 	FieldServiceTier,
-	FieldImageSize,
 	FieldStream,
 	FieldDurationMs,
 	FieldFirstTokenMs,
@@ -173,9 +155,6 @@ var Columns = []string{
 	FieldIPAddress,
 	FieldEndpoint,
 	FieldReasoningEffort,
-	FieldUsageAttributes,
-	FieldUsageMetrics,
-	FieldUsageCostDetails,
 	FieldUsageMetadata,
 	FieldUserIDSnapshot,
 	FieldUserEmailSnapshot,
@@ -219,10 +198,6 @@ var (
 	DefaultCachedInputTokens int
 	// DefaultCacheCreationTokens holds the default value on creation for the "cache_creation_tokens" field.
 	DefaultCacheCreationTokens int
-	// DefaultCacheCreation5mTokens holds the default value on creation for the "cache_creation_5m_tokens" field.
-	DefaultCacheCreation5mTokens int
-	// DefaultCacheCreation1hTokens holds the default value on creation for the "cache_creation_1h_tokens" field.
-	DefaultCacheCreation1hTokens int
 	// DefaultReasoningOutputTokens holds the default value on creation for the "reasoning_output_tokens" field.
 	DefaultReasoningOutputTokens int
 	// DefaultInputPrice holds the default value on creation for the "input_price" field.
@@ -233,8 +208,6 @@ var (
 	DefaultCachedInputPrice float64
 	// DefaultCacheCreationPrice holds the default value on creation for the "cache_creation_price" field.
 	DefaultCacheCreationPrice float64
-	// DefaultCacheCreation1hPrice holds the default value on creation for the "cache_creation_1h_price" field.
-	DefaultCacheCreation1hPrice float64
 	// DefaultInputCost holds the default value on creation for the "input_cost" field.
 	DefaultInputCost float64
 	// DefaultOutputCost holds the default value on creation for the "output_cost" field.
@@ -259,8 +232,6 @@ var (
 	DefaultAccountRateMultiplier float64
 	// DefaultServiceTier holds the default value on creation for the "service_tier" field.
 	DefaultServiceTier string
-	// DefaultImageSize holds the default value on creation for the "image_size" field.
-	DefaultImageSize string
 	// DefaultStream holds the default value on creation for the "stream" field.
 	DefaultStream bool
 	// DefaultDurationMs holds the default value on creation for the "duration_ms" field.
@@ -321,16 +292,6 @@ func ByCacheCreationTokens(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCacheCreationTokens, opts...).ToFunc()
 }
 
-// ByCacheCreation5mTokens orders the results by the cache_creation_5m_tokens field.
-func ByCacheCreation5mTokens(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldCacheCreation5mTokens, opts...).ToFunc()
-}
-
-// ByCacheCreation1hTokens orders the results by the cache_creation_1h_tokens field.
-func ByCacheCreation1hTokens(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldCacheCreation1hTokens, opts...).ToFunc()
-}
-
 // ByReasoningOutputTokens orders the results by the reasoning_output_tokens field.
 func ByReasoningOutputTokens(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldReasoningOutputTokens, opts...).ToFunc()
@@ -354,11 +315,6 @@ func ByCachedInputPrice(opts ...sql.OrderTermOption) OrderOption {
 // ByCacheCreationPrice orders the results by the cache_creation_price field.
 func ByCacheCreationPrice(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCacheCreationPrice, opts...).ToFunc()
-}
-
-// ByCacheCreation1hPrice orders the results by the cache_creation_1h_price field.
-func ByCacheCreation1hPrice(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldCacheCreation1hPrice, opts...).ToFunc()
 }
 
 // ByInputCost orders the results by the input_cost field.
@@ -419,11 +375,6 @@ func ByAccountRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 // ByServiceTier orders the results by the service_tier field.
 func ByServiceTier(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldServiceTier, opts...).ToFunc()
-}
-
-// ByImageSize orders the results by the image_size field.
-func ByImageSize(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldImageSize, opts...).ToFunc()
 }
 
 // ByStream orders the results by the stream field.

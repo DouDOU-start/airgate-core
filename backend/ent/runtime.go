@@ -424,128 +424,112 @@ func init() {
 	usagelogDescCacheCreationTokens := usagelogFields[5].Descriptor()
 	// usagelog.DefaultCacheCreationTokens holds the default value on creation for the cache_creation_tokens field.
 	usagelog.DefaultCacheCreationTokens = usagelogDescCacheCreationTokens.Default.(int)
-	// usagelogDescCacheCreation5mTokens is the schema descriptor for cache_creation_5m_tokens field.
-	usagelogDescCacheCreation5mTokens := usagelogFields[6].Descriptor()
-	// usagelog.DefaultCacheCreation5mTokens holds the default value on creation for the cache_creation_5m_tokens field.
-	usagelog.DefaultCacheCreation5mTokens = usagelogDescCacheCreation5mTokens.Default.(int)
-	// usagelogDescCacheCreation1hTokens is the schema descriptor for cache_creation_1h_tokens field.
-	usagelogDescCacheCreation1hTokens := usagelogFields[7].Descriptor()
-	// usagelog.DefaultCacheCreation1hTokens holds the default value on creation for the cache_creation_1h_tokens field.
-	usagelog.DefaultCacheCreation1hTokens = usagelogDescCacheCreation1hTokens.Default.(int)
 	// usagelogDescReasoningOutputTokens is the schema descriptor for reasoning_output_tokens field.
-	usagelogDescReasoningOutputTokens := usagelogFields[8].Descriptor()
+	usagelogDescReasoningOutputTokens := usagelogFields[6].Descriptor()
 	// usagelog.DefaultReasoningOutputTokens holds the default value on creation for the reasoning_output_tokens field.
 	usagelog.DefaultReasoningOutputTokens = usagelogDescReasoningOutputTokens.Default.(int)
 	// usagelogDescInputPrice is the schema descriptor for input_price field.
-	usagelogDescInputPrice := usagelogFields[9].Descriptor()
+	usagelogDescInputPrice := usagelogFields[7].Descriptor()
 	// usagelog.DefaultInputPrice holds the default value on creation for the input_price field.
 	usagelog.DefaultInputPrice = usagelogDescInputPrice.Default.(float64)
 	// usagelogDescOutputPrice is the schema descriptor for output_price field.
-	usagelogDescOutputPrice := usagelogFields[10].Descriptor()
+	usagelogDescOutputPrice := usagelogFields[8].Descriptor()
 	// usagelog.DefaultOutputPrice holds the default value on creation for the output_price field.
 	usagelog.DefaultOutputPrice = usagelogDescOutputPrice.Default.(float64)
 	// usagelogDescCachedInputPrice is the schema descriptor for cached_input_price field.
-	usagelogDescCachedInputPrice := usagelogFields[11].Descriptor()
+	usagelogDescCachedInputPrice := usagelogFields[9].Descriptor()
 	// usagelog.DefaultCachedInputPrice holds the default value on creation for the cached_input_price field.
 	usagelog.DefaultCachedInputPrice = usagelogDescCachedInputPrice.Default.(float64)
 	// usagelogDescCacheCreationPrice is the schema descriptor for cache_creation_price field.
-	usagelogDescCacheCreationPrice := usagelogFields[12].Descriptor()
+	usagelogDescCacheCreationPrice := usagelogFields[10].Descriptor()
 	// usagelog.DefaultCacheCreationPrice holds the default value on creation for the cache_creation_price field.
 	usagelog.DefaultCacheCreationPrice = usagelogDescCacheCreationPrice.Default.(float64)
-	// usagelogDescCacheCreation1hPrice is the schema descriptor for cache_creation_1h_price field.
-	usagelogDescCacheCreation1hPrice := usagelogFields[13].Descriptor()
-	// usagelog.DefaultCacheCreation1hPrice holds the default value on creation for the cache_creation_1h_price field.
-	usagelog.DefaultCacheCreation1hPrice = usagelogDescCacheCreation1hPrice.Default.(float64)
 	// usagelogDescInputCost is the schema descriptor for input_cost field.
-	usagelogDescInputCost := usagelogFields[14].Descriptor()
+	usagelogDescInputCost := usagelogFields[11].Descriptor()
 	// usagelog.DefaultInputCost holds the default value on creation for the input_cost field.
 	usagelog.DefaultInputCost = usagelogDescInputCost.Default.(float64)
 	// usagelogDescOutputCost is the schema descriptor for output_cost field.
-	usagelogDescOutputCost := usagelogFields[15].Descriptor()
+	usagelogDescOutputCost := usagelogFields[12].Descriptor()
 	// usagelog.DefaultOutputCost holds the default value on creation for the output_cost field.
 	usagelog.DefaultOutputCost = usagelogDescOutputCost.Default.(float64)
 	// usagelogDescCachedInputCost is the schema descriptor for cached_input_cost field.
-	usagelogDescCachedInputCost := usagelogFields[16].Descriptor()
+	usagelogDescCachedInputCost := usagelogFields[13].Descriptor()
 	// usagelog.DefaultCachedInputCost holds the default value on creation for the cached_input_cost field.
 	usagelog.DefaultCachedInputCost = usagelogDescCachedInputCost.Default.(float64)
 	// usagelogDescCacheCreationCost is the schema descriptor for cache_creation_cost field.
-	usagelogDescCacheCreationCost := usagelogFields[17].Descriptor()
+	usagelogDescCacheCreationCost := usagelogFields[14].Descriptor()
 	// usagelog.DefaultCacheCreationCost holds the default value on creation for the cache_creation_cost field.
 	usagelog.DefaultCacheCreationCost = usagelogDescCacheCreationCost.Default.(float64)
 	// usagelogDescTotalCost is the schema descriptor for total_cost field.
-	usagelogDescTotalCost := usagelogFields[18].Descriptor()
+	usagelogDescTotalCost := usagelogFields[15].Descriptor()
 	// usagelog.DefaultTotalCost holds the default value on creation for the total_cost field.
 	usagelog.DefaultTotalCost = usagelogDescTotalCost.Default.(float64)
 	// usagelogDescActualCost is the schema descriptor for actual_cost field.
-	usagelogDescActualCost := usagelogFields[19].Descriptor()
+	usagelogDescActualCost := usagelogFields[16].Descriptor()
 	// usagelog.DefaultActualCost holds the default value on creation for the actual_cost field.
 	usagelog.DefaultActualCost = usagelogDescActualCost.Default.(float64)
 	// usagelogDescBilledCost is the schema descriptor for billed_cost field.
-	usagelogDescBilledCost := usagelogFields[20].Descriptor()
+	usagelogDescBilledCost := usagelogFields[17].Descriptor()
 	// usagelog.DefaultBilledCost holds the default value on creation for the billed_cost field.
 	usagelog.DefaultBilledCost = usagelogDescBilledCost.Default.(float64)
 	// usagelogDescAccountCost is the schema descriptor for account_cost field.
-	usagelogDescAccountCost := usagelogFields[21].Descriptor()
+	usagelogDescAccountCost := usagelogFields[18].Descriptor()
 	// usagelog.DefaultAccountCost holds the default value on creation for the account_cost field.
 	usagelog.DefaultAccountCost = usagelogDescAccountCost.Default.(float64)
 	// usagelogDescRateMultiplier is the schema descriptor for rate_multiplier field.
-	usagelogDescRateMultiplier := usagelogFields[22].Descriptor()
+	usagelogDescRateMultiplier := usagelogFields[19].Descriptor()
 	// usagelog.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
 	usagelog.DefaultRateMultiplier = usagelogDescRateMultiplier.Default.(float64)
 	// usagelogDescSellRate is the schema descriptor for sell_rate field.
-	usagelogDescSellRate := usagelogFields[23].Descriptor()
+	usagelogDescSellRate := usagelogFields[20].Descriptor()
 	// usagelog.DefaultSellRate holds the default value on creation for the sell_rate field.
 	usagelog.DefaultSellRate = usagelogDescSellRate.Default.(float64)
 	// usagelogDescAccountRateMultiplier is the schema descriptor for account_rate_multiplier field.
-	usagelogDescAccountRateMultiplier := usagelogFields[24].Descriptor()
+	usagelogDescAccountRateMultiplier := usagelogFields[21].Descriptor()
 	// usagelog.DefaultAccountRateMultiplier holds the default value on creation for the account_rate_multiplier field.
 	usagelog.DefaultAccountRateMultiplier = usagelogDescAccountRateMultiplier.Default.(float64)
 	// usagelogDescServiceTier is the schema descriptor for service_tier field.
-	usagelogDescServiceTier := usagelogFields[25].Descriptor()
+	usagelogDescServiceTier := usagelogFields[22].Descriptor()
 	// usagelog.DefaultServiceTier holds the default value on creation for the service_tier field.
 	usagelog.DefaultServiceTier = usagelogDescServiceTier.Default.(string)
-	// usagelogDescImageSize is the schema descriptor for image_size field.
-	usagelogDescImageSize := usagelogFields[26].Descriptor()
-	// usagelog.DefaultImageSize holds the default value on creation for the image_size field.
-	usagelog.DefaultImageSize = usagelogDescImageSize.Default.(string)
 	// usagelogDescStream is the schema descriptor for stream field.
-	usagelogDescStream := usagelogFields[27].Descriptor()
+	usagelogDescStream := usagelogFields[23].Descriptor()
 	// usagelog.DefaultStream holds the default value on creation for the stream field.
 	usagelog.DefaultStream = usagelogDescStream.Default.(bool)
 	// usagelogDescDurationMs is the schema descriptor for duration_ms field.
-	usagelogDescDurationMs := usagelogFields[28].Descriptor()
+	usagelogDescDurationMs := usagelogFields[24].Descriptor()
 	// usagelog.DefaultDurationMs holds the default value on creation for the duration_ms field.
 	usagelog.DefaultDurationMs = usagelogDescDurationMs.Default.(int64)
 	// usagelogDescFirstTokenMs is the schema descriptor for first_token_ms field.
-	usagelogDescFirstTokenMs := usagelogFields[29].Descriptor()
+	usagelogDescFirstTokenMs := usagelogFields[25].Descriptor()
 	// usagelog.DefaultFirstTokenMs holds the default value on creation for the first_token_ms field.
 	usagelog.DefaultFirstTokenMs = usagelogDescFirstTokenMs.Default.(int64)
 	// usagelogDescUserAgent is the schema descriptor for user_agent field.
-	usagelogDescUserAgent := usagelogFields[30].Descriptor()
+	usagelogDescUserAgent := usagelogFields[26].Descriptor()
 	// usagelog.DefaultUserAgent holds the default value on creation for the user_agent field.
 	usagelog.DefaultUserAgent = usagelogDescUserAgent.Default.(string)
 	// usagelogDescIPAddress is the schema descriptor for ip_address field.
-	usagelogDescIPAddress := usagelogFields[31].Descriptor()
+	usagelogDescIPAddress := usagelogFields[27].Descriptor()
 	// usagelog.DefaultIPAddress holds the default value on creation for the ip_address field.
 	usagelog.DefaultIPAddress = usagelogDescIPAddress.Default.(string)
 	// usagelogDescEndpoint is the schema descriptor for endpoint field.
-	usagelogDescEndpoint := usagelogFields[32].Descriptor()
+	usagelogDescEndpoint := usagelogFields[28].Descriptor()
 	// usagelog.DefaultEndpoint holds the default value on creation for the endpoint field.
 	usagelog.DefaultEndpoint = usagelogDescEndpoint.Default.(string)
 	// usagelogDescReasoningEffort is the schema descriptor for reasoning_effort field.
-	usagelogDescReasoningEffort := usagelogFields[33].Descriptor()
+	usagelogDescReasoningEffort := usagelogFields[29].Descriptor()
 	// usagelog.DefaultReasoningEffort holds the default value on creation for the reasoning_effort field.
 	usagelog.DefaultReasoningEffort = usagelogDescReasoningEffort.Default.(string)
 	// usagelogDescUserIDSnapshot is the schema descriptor for user_id_snapshot field.
-	usagelogDescUserIDSnapshot := usagelogFields[38].Descriptor()
+	usagelogDescUserIDSnapshot := usagelogFields[31].Descriptor()
 	// usagelog.DefaultUserIDSnapshot holds the default value on creation for the user_id_snapshot field.
 	usagelog.DefaultUserIDSnapshot = usagelogDescUserIDSnapshot.Default.(int)
 	// usagelogDescUserEmailSnapshot is the schema descriptor for user_email_snapshot field.
-	usagelogDescUserEmailSnapshot := usagelogFields[39].Descriptor()
+	usagelogDescUserEmailSnapshot := usagelogFields[32].Descriptor()
 	// usagelog.DefaultUserEmailSnapshot holds the default value on creation for the user_email_snapshot field.
 	usagelog.DefaultUserEmailSnapshot = usagelogDescUserEmailSnapshot.Default.(string)
 	// usagelogDescCreatedAt is the schema descriptor for created_at field.
-	usagelogDescCreatedAt := usagelogFields[40].Descriptor()
+	usagelogDescCreatedAt := usagelogFields[33].Descriptor()
 	// usagelog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	usagelog.DefaultCreatedAt = usagelogDescCreatedAt.Default.(func() time.Time)
 	userFields := schema.User{}.Fields()

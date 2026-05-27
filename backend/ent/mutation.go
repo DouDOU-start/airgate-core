@@ -24,7 +24,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 	"github.com/DouDOU-start/airgate-core/ent/usersubscription"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 const (
@@ -10511,91 +10510,78 @@ func (m *TaskMutation) ResetEdge(name string) error {
 // UsageLogMutation represents an operation that mutates the UsageLog nodes in the graph.
 type UsageLogMutation struct {
 	config
-	op                          Op
-	typ                         string
-	id                          *int
-	platform                    *string
-	model                       *string
-	input_tokens                *int
-	addinput_tokens             *int
-	output_tokens               *int
-	addoutput_tokens            *int
-	cached_input_tokens         *int
-	addcached_input_tokens      *int
-	cache_creation_tokens       *int
-	addcache_creation_tokens    *int
-	cache_creation_5m_tokens    *int
-	addcache_creation_5m_tokens *int
-	cache_creation_1h_tokens    *int
-	addcache_creation_1h_tokens *int
-	reasoning_output_tokens     *int
-	addreasoning_output_tokens  *int
-	input_price                 *float64
-	addinput_price              *float64
-	output_price                *float64
-	addoutput_price             *float64
-	cached_input_price          *float64
-	addcached_input_price       *float64
-	cache_creation_price        *float64
-	addcache_creation_price     *float64
-	cache_creation_1h_price     *float64
-	addcache_creation_1h_price  *float64
-	input_cost                  *float64
-	addinput_cost               *float64
-	output_cost                 *float64
-	addoutput_cost              *float64
-	cached_input_cost           *float64
-	addcached_input_cost        *float64
-	cache_creation_cost         *float64
-	addcache_creation_cost      *float64
-	total_cost                  *float64
-	addtotal_cost               *float64
-	actual_cost                 *float64
-	addactual_cost              *float64
-	billed_cost                 *float64
-	addbilled_cost              *float64
-	account_cost                *float64
-	addaccount_cost             *float64
-	rate_multiplier             *float64
-	addrate_multiplier          *float64
-	sell_rate                   *float64
-	addsell_rate                *float64
-	account_rate_multiplier     *float64
-	addaccount_rate_multiplier  *float64
-	service_tier                *string
-	image_size                  *string
-	stream                      *bool
-	duration_ms                 *int64
-	addduration_ms              *int64
-	first_token_ms              *int64
-	addfirst_token_ms           *int64
-	user_agent                  *string
-	ip_address                  *string
-	endpoint                    *string
-	reasoning_effort            *string
-	usage_attributes            *[]sdk.UsageAttribute
-	appendusage_attributes      []sdk.UsageAttribute
-	usage_metrics               *[]sdk.UsageMetric
-	appendusage_metrics         []sdk.UsageMetric
-	usage_cost_details          *[]sdk.UsageCostDetail
-	appendusage_cost_details    []sdk.UsageCostDetail
-	usage_metadata              *map[string]string
-	user_id_snapshot            *int
-	adduser_id_snapshot         *int
-	user_email_snapshot         *string
-	created_at                  *time.Time
-	clearedFields               map[string]struct{}
-	user                        *int
-	cleareduser                 bool
-	api_key                     *int
-	clearedapi_key              bool
-	account                     *int
-	clearedaccount              bool
-	group                       *int
-	clearedgroup                bool
-	done                        bool
-	oldValue                    func(context.Context) (*UsageLog, error)
-	predicates                  []predicate.UsageLog
+	op                         Op
+	typ                        string
+	id                         *int
+	platform                   *string
+	model                      *string
+	input_tokens               *int
+	addinput_tokens            *int
+	output_tokens              *int
+	addoutput_tokens           *int
+	cached_input_tokens        *int
+	addcached_input_tokens     *int
+	cache_creation_tokens      *int
+	addcache_creation_tokens   *int
+	reasoning_output_tokens    *int
+	addreasoning_output_tokens *int
+	input_price                *float64
+	addinput_price             *float64
+	output_price               *float64
+	addoutput_price            *float64
+	cached_input_price         *float64
+	addcached_input_price      *float64
+	cache_creation_price       *float64
+	addcache_creation_price    *float64
+	input_cost                 *float64
+	addinput_cost              *float64
+	output_cost                *float64
+	addoutput_cost             *float64
+	cached_input_cost          *float64
+	addcached_input_cost       *float64
+	cache_creation_cost        *float64
+	addcache_creation_cost     *float64
+	total_cost                 *float64
+	addtotal_cost              *float64
+	actual_cost                *float64
+	addactual_cost             *float64
+	billed_cost                *float64
+	addbilled_cost             *float64
+	account_cost               *float64
+	addaccount_cost            *float64
+	rate_multiplier            *float64
+	addrate_multiplier         *float64
+	sell_rate                  *float64
+	addsell_rate               *float64
+	account_rate_multiplier    *float64
+	addaccount_rate_multiplier *float64
+	service_tier               *string
+	stream                     *bool
+	duration_ms                *int64
+	addduration_ms             *int64
+	first_token_ms             *int64
+	addfirst_token_ms          *int64
+	user_agent                 *string
+	ip_address                 *string
+	endpoint                   *string
+	reasoning_effort           *string
+	usage_metadata             *map[string]string
+	user_id_snapshot           *int
+	adduser_id_snapshot        *int
+	user_email_snapshot        *string
+	created_at                 *time.Time
+	clearedFields              map[string]struct{}
+	user                       *int
+	cleareduser                bool
+	api_key                    *int
+	clearedapi_key             bool
+	account                    *int
+	clearedaccount             bool
+	group                      *int
+	clearedgroup               bool
+	done                       bool
+	oldValue                   func(context.Context) (*UsageLog, error)
+	predicates                 []predicate.UsageLog
 }
 
 var _ ent.Mutation = (*UsageLogMutation)(nil)
@@ -10992,118 +10978,6 @@ func (m *UsageLogMutation) ResetCacheCreationTokens() {
 	m.addcache_creation_tokens = nil
 }
 
-// SetCacheCreation5mTokens sets the "cache_creation_5m_tokens" field.
-func (m *UsageLogMutation) SetCacheCreation5mTokens(i int) {
-	m.cache_creation_5m_tokens = &i
-	m.addcache_creation_5m_tokens = nil
-}
-
-// CacheCreation5mTokens returns the value of the "cache_creation_5m_tokens" field in the mutation.
-func (m *UsageLogMutation) CacheCreation5mTokens() (r int, exists bool) {
-	v := m.cache_creation_5m_tokens
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldCacheCreation5mTokens returns the old "cache_creation_5m_tokens" field's value of the UsageLog entity.
-// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UsageLogMutation) OldCacheCreation5mTokens(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldCacheCreation5mTokens is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldCacheCreation5mTokens requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldCacheCreation5mTokens: %w", err)
-	}
-	return oldValue.CacheCreation5mTokens, nil
-}
-
-// AddCacheCreation5mTokens adds i to the "cache_creation_5m_tokens" field.
-func (m *UsageLogMutation) AddCacheCreation5mTokens(i int) {
-	if m.addcache_creation_5m_tokens != nil {
-		*m.addcache_creation_5m_tokens += i
-	} else {
-		m.addcache_creation_5m_tokens = &i
-	}
-}
-
-// AddedCacheCreation5mTokens returns the value that was added to the "cache_creation_5m_tokens" field in this mutation.
-func (m *UsageLogMutation) AddedCacheCreation5mTokens() (r int, exists bool) {
-	v := m.addcache_creation_5m_tokens
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetCacheCreation5mTokens resets all changes to the "cache_creation_5m_tokens" field.
-func (m *UsageLogMutation) ResetCacheCreation5mTokens() {
-	m.cache_creation_5m_tokens = nil
-	m.addcache_creation_5m_tokens = nil
-}
-
-// SetCacheCreation1hTokens sets the "cache_creation_1h_tokens" field.
-func (m *UsageLogMutation) SetCacheCreation1hTokens(i int) {
-	m.cache_creation_1h_tokens = &i
-	m.addcache_creation_1h_tokens = nil
-}
-
-// CacheCreation1hTokens returns the value of the "cache_creation_1h_tokens" field in the mutation.
-func (m *UsageLogMutation) CacheCreation1hTokens() (r int, exists bool) {
-	v := m.cache_creation_1h_tokens
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldCacheCreation1hTokens returns the old "cache_creation_1h_tokens" field's value of the UsageLog entity.
-// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UsageLogMutation) OldCacheCreation1hTokens(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldCacheCreation1hTokens is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldCacheCreation1hTokens requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldCacheCreation1hTokens: %w", err)
-	}
-	return oldValue.CacheCreation1hTokens, nil
-}
-
-// AddCacheCreation1hTokens adds i to the "cache_creation_1h_tokens" field.
-func (m *UsageLogMutation) AddCacheCreation1hTokens(i int) {
-	if m.addcache_creation_1h_tokens != nil {
-		*m.addcache_creation_1h_tokens += i
-	} else {
-		m.addcache_creation_1h_tokens = &i
-	}
-}
-
-// AddedCacheCreation1hTokens returns the value that was added to the "cache_creation_1h_tokens" field in this mutation.
-func (m *UsageLogMutation) AddedCacheCreation1hTokens() (r int, exists bool) {
-	v := m.addcache_creation_1h_tokens
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetCacheCreation1hTokens resets all changes to the "cache_creation_1h_tokens" field.
-func (m *UsageLogMutation) ResetCacheCreation1hTokens() {
-	m.cache_creation_1h_tokens = nil
-	m.addcache_creation_1h_tokens = nil
-}
-
 // SetReasoningOutputTokens sets the "reasoning_output_tokens" field.
 func (m *UsageLogMutation) SetReasoningOutputTokens(i int) {
 	m.reasoning_output_tokens = &i
@@ -11382,62 +11256,6 @@ func (m *UsageLogMutation) AddedCacheCreationPrice() (r float64, exists bool) {
 func (m *UsageLogMutation) ResetCacheCreationPrice() {
 	m.cache_creation_price = nil
 	m.addcache_creation_price = nil
-}
-
-// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
-func (m *UsageLogMutation) SetCacheCreation1hPrice(f float64) {
-	m.cache_creation_1h_price = &f
-	m.addcache_creation_1h_price = nil
-}
-
-// CacheCreation1hPrice returns the value of the "cache_creation_1h_price" field in the mutation.
-func (m *UsageLogMutation) CacheCreation1hPrice() (r float64, exists bool) {
-	v := m.cache_creation_1h_price
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldCacheCreation1hPrice returns the old "cache_creation_1h_price" field's value of the UsageLog entity.
-// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UsageLogMutation) OldCacheCreation1hPrice(ctx context.Context) (v float64, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldCacheCreation1hPrice is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldCacheCreation1hPrice requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldCacheCreation1hPrice: %w", err)
-	}
-	return oldValue.CacheCreation1hPrice, nil
-}
-
-// AddCacheCreation1hPrice adds f to the "cache_creation_1h_price" field.
-func (m *UsageLogMutation) AddCacheCreation1hPrice(f float64) {
-	if m.addcache_creation_1h_price != nil {
-		*m.addcache_creation_1h_price += f
-	} else {
-		m.addcache_creation_1h_price = &f
-	}
-}
-
-// AddedCacheCreation1hPrice returns the value that was added to the "cache_creation_1h_price" field in this mutation.
-func (m *UsageLogMutation) AddedCacheCreation1hPrice() (r float64, exists bool) {
-	v := m.addcache_creation_1h_price
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetCacheCreation1hPrice resets all changes to the "cache_creation_1h_price" field.
-func (m *UsageLogMutation) ResetCacheCreation1hPrice() {
-	m.cache_creation_1h_price = nil
-	m.addcache_creation_1h_price = nil
 }
 
 // SetInputCost sets the "input_cost" field.
@@ -12092,42 +11910,6 @@ func (m *UsageLogMutation) ResetServiceTier() {
 	m.service_tier = nil
 }
 
-// SetImageSize sets the "image_size" field.
-func (m *UsageLogMutation) SetImageSize(s string) {
-	m.image_size = &s
-}
-
-// ImageSize returns the value of the "image_size" field in the mutation.
-func (m *UsageLogMutation) ImageSize() (r string, exists bool) {
-	v := m.image_size
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldImageSize returns the old "image_size" field's value of the UsageLog entity.
-// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UsageLogMutation) OldImageSize(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldImageSize is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldImageSize requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldImageSize: %w", err)
-	}
-	return oldValue.ImageSize, nil
-}
-
-// ResetImageSize resets all changes to the "image_size" field.
-func (m *UsageLogMutation) ResetImageSize() {
-	m.image_size = nil
-}
-
 // SetStream sets the "stream" field.
 func (m *UsageLogMutation) SetStream(b bool) {
 	m.stream = &b
@@ -12418,201 +12200,6 @@ func (m *UsageLogMutation) OldReasoningEffort(ctx context.Context) (v string, er
 // ResetReasoningEffort resets all changes to the "reasoning_effort" field.
 func (m *UsageLogMutation) ResetReasoningEffort() {
 	m.reasoning_effort = nil
-}
-
-// SetUsageAttributes sets the "usage_attributes" field.
-func (m *UsageLogMutation) SetUsageAttributes(sa []sdk.UsageAttribute) {
-	m.usage_attributes = &sa
-	m.appendusage_attributes = nil
-}
-
-// UsageAttributes returns the value of the "usage_attributes" field in the mutation.
-func (m *UsageLogMutation) UsageAttributes() (r []sdk.UsageAttribute, exists bool) {
-	v := m.usage_attributes
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldUsageAttributes returns the old "usage_attributes" field's value of the UsageLog entity.
-// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UsageLogMutation) OldUsageAttributes(ctx context.Context) (v []sdk.UsageAttribute, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldUsageAttributes is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldUsageAttributes requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldUsageAttributes: %w", err)
-	}
-	return oldValue.UsageAttributes, nil
-}
-
-// AppendUsageAttributes adds sa to the "usage_attributes" field.
-func (m *UsageLogMutation) AppendUsageAttributes(sa []sdk.UsageAttribute) {
-	m.appendusage_attributes = append(m.appendusage_attributes, sa...)
-}
-
-// AppendedUsageAttributes returns the list of values that were appended to the "usage_attributes" field in this mutation.
-func (m *UsageLogMutation) AppendedUsageAttributes() ([]sdk.UsageAttribute, bool) {
-	if len(m.appendusage_attributes) == 0 {
-		return nil, false
-	}
-	return m.appendusage_attributes, true
-}
-
-// ClearUsageAttributes clears the value of the "usage_attributes" field.
-func (m *UsageLogMutation) ClearUsageAttributes() {
-	m.usage_attributes = nil
-	m.appendusage_attributes = nil
-	m.clearedFields[usagelog.FieldUsageAttributes] = struct{}{}
-}
-
-// UsageAttributesCleared returns if the "usage_attributes" field was cleared in this mutation.
-func (m *UsageLogMutation) UsageAttributesCleared() bool {
-	_, ok := m.clearedFields[usagelog.FieldUsageAttributes]
-	return ok
-}
-
-// ResetUsageAttributes resets all changes to the "usage_attributes" field.
-func (m *UsageLogMutation) ResetUsageAttributes() {
-	m.usage_attributes = nil
-	m.appendusage_attributes = nil
-	delete(m.clearedFields, usagelog.FieldUsageAttributes)
-}
-
-// SetUsageMetrics sets the "usage_metrics" field.
-func (m *UsageLogMutation) SetUsageMetrics(sm []sdk.UsageMetric) {
-	m.usage_metrics = &sm
-	m.appendusage_metrics = nil
-}
-
-// UsageMetrics returns the value of the "usage_metrics" field in the mutation.
-func (m *UsageLogMutation) UsageMetrics() (r []sdk.UsageMetric, exists bool) {
-	v := m.usage_metrics
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldUsageMetrics returns the old "usage_metrics" field's value of the UsageLog entity.
-// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UsageLogMutation) OldUsageMetrics(ctx context.Context) (v []sdk.UsageMetric, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldUsageMetrics is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldUsageMetrics requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldUsageMetrics: %w", err)
-	}
-	return oldValue.UsageMetrics, nil
-}
-
-// AppendUsageMetrics adds sm to the "usage_metrics" field.
-func (m *UsageLogMutation) AppendUsageMetrics(sm []sdk.UsageMetric) {
-	m.appendusage_metrics = append(m.appendusage_metrics, sm...)
-}
-
-// AppendedUsageMetrics returns the list of values that were appended to the "usage_metrics" field in this mutation.
-func (m *UsageLogMutation) AppendedUsageMetrics() ([]sdk.UsageMetric, bool) {
-	if len(m.appendusage_metrics) == 0 {
-		return nil, false
-	}
-	return m.appendusage_metrics, true
-}
-
-// ClearUsageMetrics clears the value of the "usage_metrics" field.
-func (m *UsageLogMutation) ClearUsageMetrics() {
-	m.usage_metrics = nil
-	m.appendusage_metrics = nil
-	m.clearedFields[usagelog.FieldUsageMetrics] = struct{}{}
-}
-
-// UsageMetricsCleared returns if the "usage_metrics" field was cleared in this mutation.
-func (m *UsageLogMutation) UsageMetricsCleared() bool {
-	_, ok := m.clearedFields[usagelog.FieldUsageMetrics]
-	return ok
-}
-
-// ResetUsageMetrics resets all changes to the "usage_metrics" field.
-func (m *UsageLogMutation) ResetUsageMetrics() {
-	m.usage_metrics = nil
-	m.appendusage_metrics = nil
-	delete(m.clearedFields, usagelog.FieldUsageMetrics)
-}
-
-// SetUsageCostDetails sets the "usage_cost_details" field.
-func (m *UsageLogMutation) SetUsageCostDetails(scd []sdk.UsageCostDetail) {
-	m.usage_cost_details = &scd
-	m.appendusage_cost_details = nil
-}
-
-// UsageCostDetails returns the value of the "usage_cost_details" field in the mutation.
-func (m *UsageLogMutation) UsageCostDetails() (r []sdk.UsageCostDetail, exists bool) {
-	v := m.usage_cost_details
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldUsageCostDetails returns the old "usage_cost_details" field's value of the UsageLog entity.
-// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UsageLogMutation) OldUsageCostDetails(ctx context.Context) (v []sdk.UsageCostDetail, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldUsageCostDetails is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldUsageCostDetails requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldUsageCostDetails: %w", err)
-	}
-	return oldValue.UsageCostDetails, nil
-}
-
-// AppendUsageCostDetails adds scd to the "usage_cost_details" field.
-func (m *UsageLogMutation) AppendUsageCostDetails(scd []sdk.UsageCostDetail) {
-	m.appendusage_cost_details = append(m.appendusage_cost_details, scd...)
-}
-
-// AppendedUsageCostDetails returns the list of values that were appended to the "usage_cost_details" field in this mutation.
-func (m *UsageLogMutation) AppendedUsageCostDetails() ([]sdk.UsageCostDetail, bool) {
-	if len(m.appendusage_cost_details) == 0 {
-		return nil, false
-	}
-	return m.appendusage_cost_details, true
-}
-
-// ClearUsageCostDetails clears the value of the "usage_cost_details" field.
-func (m *UsageLogMutation) ClearUsageCostDetails() {
-	m.usage_cost_details = nil
-	m.appendusage_cost_details = nil
-	m.clearedFields[usagelog.FieldUsageCostDetails] = struct{}{}
-}
-
-// UsageCostDetailsCleared returns if the "usage_cost_details" field was cleared in this mutation.
-func (m *UsageLogMutation) UsageCostDetailsCleared() bool {
-	_, ok := m.clearedFields[usagelog.FieldUsageCostDetails]
-	return ok
-}
-
-// ResetUsageCostDetails resets all changes to the "usage_cost_details" field.
-func (m *UsageLogMutation) ResetUsageCostDetails() {
-	m.usage_cost_details = nil
-	m.appendusage_cost_details = nil
-	delete(m.clearedFields, usagelog.FieldUsageCostDetails)
 }
 
 // SetUsageMetadata sets the "usage_metadata" field.
@@ -12982,7 +12569,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 41)
+	fields := make([]string, 0, 34)
 	if m.platform != nil {
 		fields = append(fields, usagelog.FieldPlatform)
 	}
@@ -13001,12 +12588,6 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.cache_creation_tokens != nil {
 		fields = append(fields, usagelog.FieldCacheCreationTokens)
 	}
-	if m.cache_creation_5m_tokens != nil {
-		fields = append(fields, usagelog.FieldCacheCreation5mTokens)
-	}
-	if m.cache_creation_1h_tokens != nil {
-		fields = append(fields, usagelog.FieldCacheCreation1hTokens)
-	}
 	if m.reasoning_output_tokens != nil {
 		fields = append(fields, usagelog.FieldReasoningOutputTokens)
 	}
@@ -13021,9 +12602,6 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.cache_creation_price != nil {
 		fields = append(fields, usagelog.FieldCacheCreationPrice)
-	}
-	if m.cache_creation_1h_price != nil {
-		fields = append(fields, usagelog.FieldCacheCreation1hPrice)
 	}
 	if m.input_cost != nil {
 		fields = append(fields, usagelog.FieldInputCost)
@@ -13061,9 +12639,6 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.service_tier != nil {
 		fields = append(fields, usagelog.FieldServiceTier)
 	}
-	if m.image_size != nil {
-		fields = append(fields, usagelog.FieldImageSize)
-	}
 	if m.stream != nil {
 		fields = append(fields, usagelog.FieldStream)
 	}
@@ -13084,15 +12659,6 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.reasoning_effort != nil {
 		fields = append(fields, usagelog.FieldReasoningEffort)
-	}
-	if m.usage_attributes != nil {
-		fields = append(fields, usagelog.FieldUsageAttributes)
-	}
-	if m.usage_metrics != nil {
-		fields = append(fields, usagelog.FieldUsageMetrics)
-	}
-	if m.usage_cost_details != nil {
-		fields = append(fields, usagelog.FieldUsageCostDetails)
 	}
 	if m.usage_metadata != nil {
 		fields = append(fields, usagelog.FieldUsageMetadata)
@@ -13126,10 +12692,6 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.CachedInputTokens()
 	case usagelog.FieldCacheCreationTokens:
 		return m.CacheCreationTokens()
-	case usagelog.FieldCacheCreation5mTokens:
-		return m.CacheCreation5mTokens()
-	case usagelog.FieldCacheCreation1hTokens:
-		return m.CacheCreation1hTokens()
 	case usagelog.FieldReasoningOutputTokens:
 		return m.ReasoningOutputTokens()
 	case usagelog.FieldInputPrice:
@@ -13140,8 +12702,6 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.CachedInputPrice()
 	case usagelog.FieldCacheCreationPrice:
 		return m.CacheCreationPrice()
-	case usagelog.FieldCacheCreation1hPrice:
-		return m.CacheCreation1hPrice()
 	case usagelog.FieldInputCost:
 		return m.InputCost()
 	case usagelog.FieldOutputCost:
@@ -13166,8 +12726,6 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.AccountRateMultiplier()
 	case usagelog.FieldServiceTier:
 		return m.ServiceTier()
-	case usagelog.FieldImageSize:
-		return m.ImageSize()
 	case usagelog.FieldStream:
 		return m.Stream()
 	case usagelog.FieldDurationMs:
@@ -13182,12 +12740,6 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.Endpoint()
 	case usagelog.FieldReasoningEffort:
 		return m.ReasoningEffort()
-	case usagelog.FieldUsageAttributes:
-		return m.UsageAttributes()
-	case usagelog.FieldUsageMetrics:
-		return m.UsageMetrics()
-	case usagelog.FieldUsageCostDetails:
-		return m.UsageCostDetails()
 	case usagelog.FieldUsageMetadata:
 		return m.UsageMetadata()
 	case usagelog.FieldUserIDSnapshot:
@@ -13217,10 +12769,6 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCachedInputTokens(ctx)
 	case usagelog.FieldCacheCreationTokens:
 		return m.OldCacheCreationTokens(ctx)
-	case usagelog.FieldCacheCreation5mTokens:
-		return m.OldCacheCreation5mTokens(ctx)
-	case usagelog.FieldCacheCreation1hTokens:
-		return m.OldCacheCreation1hTokens(ctx)
 	case usagelog.FieldReasoningOutputTokens:
 		return m.OldReasoningOutputTokens(ctx)
 	case usagelog.FieldInputPrice:
@@ -13231,8 +12779,6 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCachedInputPrice(ctx)
 	case usagelog.FieldCacheCreationPrice:
 		return m.OldCacheCreationPrice(ctx)
-	case usagelog.FieldCacheCreation1hPrice:
-		return m.OldCacheCreation1hPrice(ctx)
 	case usagelog.FieldInputCost:
 		return m.OldInputCost(ctx)
 	case usagelog.FieldOutputCost:
@@ -13257,8 +12803,6 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldAccountRateMultiplier(ctx)
 	case usagelog.FieldServiceTier:
 		return m.OldServiceTier(ctx)
-	case usagelog.FieldImageSize:
-		return m.OldImageSize(ctx)
 	case usagelog.FieldStream:
 		return m.OldStream(ctx)
 	case usagelog.FieldDurationMs:
@@ -13273,12 +12817,6 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldEndpoint(ctx)
 	case usagelog.FieldReasoningEffort:
 		return m.OldReasoningEffort(ctx)
-	case usagelog.FieldUsageAttributes:
-		return m.OldUsageAttributes(ctx)
-	case usagelog.FieldUsageMetrics:
-		return m.OldUsageMetrics(ctx)
-	case usagelog.FieldUsageCostDetails:
-		return m.OldUsageCostDetails(ctx)
 	case usagelog.FieldUsageMetadata:
 		return m.OldUsageMetadata(ctx)
 	case usagelog.FieldUserIDSnapshot:
@@ -13338,20 +12876,6 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCacheCreationTokens(v)
 		return nil
-	case usagelog.FieldCacheCreation5mTokens:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetCacheCreation5mTokens(v)
-		return nil
-	case usagelog.FieldCacheCreation1hTokens:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetCacheCreation1hTokens(v)
-		return nil
 	case usagelog.FieldReasoningOutputTokens:
 		v, ok := value.(int)
 		if !ok {
@@ -13386,13 +12910,6 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCacheCreationPrice(v)
-		return nil
-	case usagelog.FieldCacheCreation1hPrice:
-		v, ok := value.(float64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetCacheCreation1hPrice(v)
 		return nil
 	case usagelog.FieldInputCost:
 		v, ok := value.(float64)
@@ -13478,13 +12995,6 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetServiceTier(v)
 		return nil
-	case usagelog.FieldImageSize:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetImageSize(v)
-		return nil
 	case usagelog.FieldStream:
 		v, ok := value.(bool)
 		if !ok {
@@ -13534,27 +13044,6 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetReasoningEffort(v)
 		return nil
-	case usagelog.FieldUsageAttributes:
-		v, ok := value.([]sdk.UsageAttribute)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetUsageAttributes(v)
-		return nil
-	case usagelog.FieldUsageMetrics:
-		v, ok := value.([]sdk.UsageMetric)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetUsageMetrics(v)
-		return nil
-	case usagelog.FieldUsageCostDetails:
-		v, ok := value.([]sdk.UsageCostDetail)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetUsageCostDetails(v)
-		return nil
 	case usagelog.FieldUsageMetadata:
 		v, ok := value.(map[string]string)
 		if !ok {
@@ -13603,12 +13092,6 @@ func (m *UsageLogMutation) AddedFields() []string {
 	if m.addcache_creation_tokens != nil {
 		fields = append(fields, usagelog.FieldCacheCreationTokens)
 	}
-	if m.addcache_creation_5m_tokens != nil {
-		fields = append(fields, usagelog.FieldCacheCreation5mTokens)
-	}
-	if m.addcache_creation_1h_tokens != nil {
-		fields = append(fields, usagelog.FieldCacheCreation1hTokens)
-	}
 	if m.addreasoning_output_tokens != nil {
 		fields = append(fields, usagelog.FieldReasoningOutputTokens)
 	}
@@ -13623,9 +13106,6 @@ func (m *UsageLogMutation) AddedFields() []string {
 	}
 	if m.addcache_creation_price != nil {
 		fields = append(fields, usagelog.FieldCacheCreationPrice)
-	}
-	if m.addcache_creation_1h_price != nil {
-		fields = append(fields, usagelog.FieldCacheCreation1hPrice)
 	}
 	if m.addinput_cost != nil {
 		fields = append(fields, usagelog.FieldInputCost)
@@ -13685,10 +13165,6 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedCachedInputTokens()
 	case usagelog.FieldCacheCreationTokens:
 		return m.AddedCacheCreationTokens()
-	case usagelog.FieldCacheCreation5mTokens:
-		return m.AddedCacheCreation5mTokens()
-	case usagelog.FieldCacheCreation1hTokens:
-		return m.AddedCacheCreation1hTokens()
 	case usagelog.FieldReasoningOutputTokens:
 		return m.AddedReasoningOutputTokens()
 	case usagelog.FieldInputPrice:
@@ -13699,8 +13175,6 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedCachedInputPrice()
 	case usagelog.FieldCacheCreationPrice:
 		return m.AddedCacheCreationPrice()
-	case usagelog.FieldCacheCreation1hPrice:
-		return m.AddedCacheCreation1hPrice()
 	case usagelog.FieldInputCost:
 		return m.AddedInputCost()
 	case usagelog.FieldOutputCost:
@@ -13766,20 +13240,6 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddCacheCreationTokens(v)
 		return nil
-	case usagelog.FieldCacheCreation5mTokens:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddCacheCreation5mTokens(v)
-		return nil
-	case usagelog.FieldCacheCreation1hTokens:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddCacheCreation1hTokens(v)
-		return nil
 	case usagelog.FieldReasoningOutputTokens:
 		v, ok := value.(int)
 		if !ok {
@@ -13814,13 +13274,6 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddCacheCreationPrice(v)
-		return nil
-	case usagelog.FieldCacheCreation1hPrice:
-		v, ok := value.(float64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddCacheCreation1hPrice(v)
 		return nil
 	case usagelog.FieldInputCost:
 		v, ok := value.(float64)
@@ -13928,15 +13381,6 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *UsageLogMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(usagelog.FieldUsageAttributes) {
-		fields = append(fields, usagelog.FieldUsageAttributes)
-	}
-	if m.FieldCleared(usagelog.FieldUsageMetrics) {
-		fields = append(fields, usagelog.FieldUsageMetrics)
-	}
-	if m.FieldCleared(usagelog.FieldUsageCostDetails) {
-		fields = append(fields, usagelog.FieldUsageCostDetails)
-	}
 	if m.FieldCleared(usagelog.FieldUsageMetadata) {
 		fields = append(fields, usagelog.FieldUsageMetadata)
 	}
@@ -13954,15 +13398,6 @@ func (m *UsageLogMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *UsageLogMutation) ClearField(name string) error {
 	switch name {
-	case usagelog.FieldUsageAttributes:
-		m.ClearUsageAttributes()
-		return nil
-	case usagelog.FieldUsageMetrics:
-		m.ClearUsageMetrics()
-		return nil
-	case usagelog.FieldUsageCostDetails:
-		m.ClearUsageCostDetails()
-		return nil
 	case usagelog.FieldUsageMetadata:
 		m.ClearUsageMetadata()
 		return nil
@@ -13992,12 +13427,6 @@ func (m *UsageLogMutation) ResetField(name string) error {
 	case usagelog.FieldCacheCreationTokens:
 		m.ResetCacheCreationTokens()
 		return nil
-	case usagelog.FieldCacheCreation5mTokens:
-		m.ResetCacheCreation5mTokens()
-		return nil
-	case usagelog.FieldCacheCreation1hTokens:
-		m.ResetCacheCreation1hTokens()
-		return nil
 	case usagelog.FieldReasoningOutputTokens:
 		m.ResetReasoningOutputTokens()
 		return nil
@@ -14012,9 +13441,6 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldCacheCreationPrice:
 		m.ResetCacheCreationPrice()
-		return nil
-	case usagelog.FieldCacheCreation1hPrice:
-		m.ResetCacheCreation1hPrice()
 		return nil
 	case usagelog.FieldInputCost:
 		m.ResetInputCost()
@@ -14052,9 +13478,6 @@ func (m *UsageLogMutation) ResetField(name string) error {
 	case usagelog.FieldServiceTier:
 		m.ResetServiceTier()
 		return nil
-	case usagelog.FieldImageSize:
-		m.ResetImageSize()
-		return nil
 	case usagelog.FieldStream:
 		m.ResetStream()
 		return nil
@@ -14075,15 +13498,6 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldReasoningEffort:
 		m.ResetReasoningEffort()
-		return nil
-	case usagelog.FieldUsageAttributes:
-		m.ResetUsageAttributes()
-		return nil
-	case usagelog.FieldUsageMetrics:
-		m.ResetUsageMetrics()
-		return nil
-	case usagelog.FieldUsageCostDetails:
-		m.ResetUsageCostDetails()
 		return nil
 	case usagelog.FieldUsageMetadata:
 		m.ResetUsageMetadata()

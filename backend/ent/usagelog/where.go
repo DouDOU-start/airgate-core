@@ -85,16 +85,6 @@ func CacheCreationTokens(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCacheCreationTokens, v))
 }
 
-// CacheCreation5mTokens applies equality check predicate on the "cache_creation_5m_tokens" field. It's identical to CacheCreation5mTokensEQ.
-func CacheCreation5mTokens(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEQ(FieldCacheCreation5mTokens, v))
-}
-
-// CacheCreation1hTokens applies equality check predicate on the "cache_creation_1h_tokens" field. It's identical to CacheCreation1hTokensEQ.
-func CacheCreation1hTokens(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEQ(FieldCacheCreation1hTokens, v))
-}
-
 // ReasoningOutputTokens applies equality check predicate on the "reasoning_output_tokens" field. It's identical to ReasoningOutputTokensEQ.
 func ReasoningOutputTokens(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldReasoningOutputTokens, v))
@@ -118,11 +108,6 @@ func CachedInputPrice(v float64) predicate.UsageLog {
 // CacheCreationPrice applies equality check predicate on the "cache_creation_price" field. It's identical to CacheCreationPriceEQ.
 func CacheCreationPrice(v float64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCacheCreationPrice, v))
-}
-
-// CacheCreation1hPrice applies equality check predicate on the "cache_creation_1h_price" field. It's identical to CacheCreation1hPriceEQ.
-func CacheCreation1hPrice(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEQ(FieldCacheCreation1hPrice, v))
 }
 
 // InputCost applies equality check predicate on the "input_cost" field. It's identical to InputCostEQ.
@@ -183,11 +168,6 @@ func AccountRateMultiplier(v float64) predicate.UsageLog {
 // ServiceTier applies equality check predicate on the "service_tier" field. It's identical to ServiceTierEQ.
 func ServiceTier(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldServiceTier, v))
-}
-
-// ImageSize applies equality check predicate on the "image_size" field. It's identical to ImageSizeEQ.
-func ImageSize(v string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEQ(FieldImageSize, v))
 }
 
 // Stream applies equality check predicate on the "stream" field. It's identical to StreamEQ.
@@ -530,86 +510,6 @@ func CacheCreationTokensLTE(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldLTE(FieldCacheCreationTokens, v))
 }
 
-// CacheCreation5mTokensEQ applies the EQ predicate on the "cache_creation_5m_tokens" field.
-func CacheCreation5mTokensEQ(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEQ(FieldCacheCreation5mTokens, v))
-}
-
-// CacheCreation5mTokensNEQ applies the NEQ predicate on the "cache_creation_5m_tokens" field.
-func CacheCreation5mTokensNEQ(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNEQ(FieldCacheCreation5mTokens, v))
-}
-
-// CacheCreation5mTokensIn applies the In predicate on the "cache_creation_5m_tokens" field.
-func CacheCreation5mTokensIn(vs ...int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldIn(FieldCacheCreation5mTokens, vs...))
-}
-
-// CacheCreation5mTokensNotIn applies the NotIn predicate on the "cache_creation_5m_tokens" field.
-func CacheCreation5mTokensNotIn(vs ...int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNotIn(FieldCacheCreation5mTokens, vs...))
-}
-
-// CacheCreation5mTokensGT applies the GT predicate on the "cache_creation_5m_tokens" field.
-func CacheCreation5mTokensGT(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldGT(FieldCacheCreation5mTokens, v))
-}
-
-// CacheCreation5mTokensGTE applies the GTE predicate on the "cache_creation_5m_tokens" field.
-func CacheCreation5mTokensGTE(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldGTE(FieldCacheCreation5mTokens, v))
-}
-
-// CacheCreation5mTokensLT applies the LT predicate on the "cache_creation_5m_tokens" field.
-func CacheCreation5mTokensLT(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldLT(FieldCacheCreation5mTokens, v))
-}
-
-// CacheCreation5mTokensLTE applies the LTE predicate on the "cache_creation_5m_tokens" field.
-func CacheCreation5mTokensLTE(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldLTE(FieldCacheCreation5mTokens, v))
-}
-
-// CacheCreation1hTokensEQ applies the EQ predicate on the "cache_creation_1h_tokens" field.
-func CacheCreation1hTokensEQ(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEQ(FieldCacheCreation1hTokens, v))
-}
-
-// CacheCreation1hTokensNEQ applies the NEQ predicate on the "cache_creation_1h_tokens" field.
-func CacheCreation1hTokensNEQ(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNEQ(FieldCacheCreation1hTokens, v))
-}
-
-// CacheCreation1hTokensIn applies the In predicate on the "cache_creation_1h_tokens" field.
-func CacheCreation1hTokensIn(vs ...int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldIn(FieldCacheCreation1hTokens, vs...))
-}
-
-// CacheCreation1hTokensNotIn applies the NotIn predicate on the "cache_creation_1h_tokens" field.
-func CacheCreation1hTokensNotIn(vs ...int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNotIn(FieldCacheCreation1hTokens, vs...))
-}
-
-// CacheCreation1hTokensGT applies the GT predicate on the "cache_creation_1h_tokens" field.
-func CacheCreation1hTokensGT(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldGT(FieldCacheCreation1hTokens, v))
-}
-
-// CacheCreation1hTokensGTE applies the GTE predicate on the "cache_creation_1h_tokens" field.
-func CacheCreation1hTokensGTE(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldGTE(FieldCacheCreation1hTokens, v))
-}
-
-// CacheCreation1hTokensLT applies the LT predicate on the "cache_creation_1h_tokens" field.
-func CacheCreation1hTokensLT(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldLT(FieldCacheCreation1hTokens, v))
-}
-
-// CacheCreation1hTokensLTE applies the LTE predicate on the "cache_creation_1h_tokens" field.
-func CacheCreation1hTokensLTE(v int) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldLTE(FieldCacheCreation1hTokens, v))
-}
-
 // ReasoningOutputTokensEQ applies the EQ predicate on the "reasoning_output_tokens" field.
 func ReasoningOutputTokensEQ(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldReasoningOutputTokens, v))
@@ -808,46 +708,6 @@ func CacheCreationPriceLT(v float64) predicate.UsageLog {
 // CacheCreationPriceLTE applies the LTE predicate on the "cache_creation_price" field.
 func CacheCreationPriceLTE(v float64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldLTE(FieldCacheCreationPrice, v))
-}
-
-// CacheCreation1hPriceEQ applies the EQ predicate on the "cache_creation_1h_price" field.
-func CacheCreation1hPriceEQ(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEQ(FieldCacheCreation1hPrice, v))
-}
-
-// CacheCreation1hPriceNEQ applies the NEQ predicate on the "cache_creation_1h_price" field.
-func CacheCreation1hPriceNEQ(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNEQ(FieldCacheCreation1hPrice, v))
-}
-
-// CacheCreation1hPriceIn applies the In predicate on the "cache_creation_1h_price" field.
-func CacheCreation1hPriceIn(vs ...float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldIn(FieldCacheCreation1hPrice, vs...))
-}
-
-// CacheCreation1hPriceNotIn applies the NotIn predicate on the "cache_creation_1h_price" field.
-func CacheCreation1hPriceNotIn(vs ...float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNotIn(FieldCacheCreation1hPrice, vs...))
-}
-
-// CacheCreation1hPriceGT applies the GT predicate on the "cache_creation_1h_price" field.
-func CacheCreation1hPriceGT(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldGT(FieldCacheCreation1hPrice, v))
-}
-
-// CacheCreation1hPriceGTE applies the GTE predicate on the "cache_creation_1h_price" field.
-func CacheCreation1hPriceGTE(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldGTE(FieldCacheCreation1hPrice, v))
-}
-
-// CacheCreation1hPriceLT applies the LT predicate on the "cache_creation_1h_price" field.
-func CacheCreation1hPriceLT(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldLT(FieldCacheCreation1hPrice, v))
-}
-
-// CacheCreation1hPriceLTE applies the LTE predicate on the "cache_creation_1h_price" field.
-func CacheCreation1hPriceLTE(v float64) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldLTE(FieldCacheCreation1hPrice, v))
 }
 
 // InputCostEQ applies the EQ predicate on the "input_cost" field.
@@ -1355,71 +1215,6 @@ func ServiceTierContainsFold(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldContainsFold(FieldServiceTier, v))
 }
 
-// ImageSizeEQ applies the EQ predicate on the "image_size" field.
-func ImageSizeEQ(v string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEQ(FieldImageSize, v))
-}
-
-// ImageSizeNEQ applies the NEQ predicate on the "image_size" field.
-func ImageSizeNEQ(v string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNEQ(FieldImageSize, v))
-}
-
-// ImageSizeIn applies the In predicate on the "image_size" field.
-func ImageSizeIn(vs ...string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldIn(FieldImageSize, vs...))
-}
-
-// ImageSizeNotIn applies the NotIn predicate on the "image_size" field.
-func ImageSizeNotIn(vs ...string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNotIn(FieldImageSize, vs...))
-}
-
-// ImageSizeGT applies the GT predicate on the "image_size" field.
-func ImageSizeGT(v string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldGT(FieldImageSize, v))
-}
-
-// ImageSizeGTE applies the GTE predicate on the "image_size" field.
-func ImageSizeGTE(v string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldGTE(FieldImageSize, v))
-}
-
-// ImageSizeLT applies the LT predicate on the "image_size" field.
-func ImageSizeLT(v string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldLT(FieldImageSize, v))
-}
-
-// ImageSizeLTE applies the LTE predicate on the "image_size" field.
-func ImageSizeLTE(v string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldLTE(FieldImageSize, v))
-}
-
-// ImageSizeContains applies the Contains predicate on the "image_size" field.
-func ImageSizeContains(v string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldContains(FieldImageSize, v))
-}
-
-// ImageSizeHasPrefix applies the HasPrefix predicate on the "image_size" field.
-func ImageSizeHasPrefix(v string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldHasPrefix(FieldImageSize, v))
-}
-
-// ImageSizeHasSuffix applies the HasSuffix predicate on the "image_size" field.
-func ImageSizeHasSuffix(v string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldHasSuffix(FieldImageSize, v))
-}
-
-// ImageSizeEqualFold applies the EqualFold predicate on the "image_size" field.
-func ImageSizeEqualFold(v string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldEqualFold(FieldImageSize, v))
-}
-
-// ImageSizeContainsFold applies the ContainsFold predicate on the "image_size" field.
-func ImageSizeContainsFold(v string) predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldContainsFold(FieldImageSize, v))
-}
-
 // StreamEQ applies the EQ predicate on the "stream" field.
 func StreamEQ(v bool) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldStream, v))
@@ -1768,36 +1563,6 @@ func ReasoningEffortEqualFold(v string) predicate.UsageLog {
 // ReasoningEffortContainsFold applies the ContainsFold predicate on the "reasoning_effort" field.
 func ReasoningEffortContainsFold(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldContainsFold(FieldReasoningEffort, v))
-}
-
-// UsageAttributesIsNil applies the IsNil predicate on the "usage_attributes" field.
-func UsageAttributesIsNil() predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldIsNull(FieldUsageAttributes))
-}
-
-// UsageAttributesNotNil applies the NotNil predicate on the "usage_attributes" field.
-func UsageAttributesNotNil() predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNotNull(FieldUsageAttributes))
-}
-
-// UsageMetricsIsNil applies the IsNil predicate on the "usage_metrics" field.
-func UsageMetricsIsNil() predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldIsNull(FieldUsageMetrics))
-}
-
-// UsageMetricsNotNil applies the NotNil predicate on the "usage_metrics" field.
-func UsageMetricsNotNil() predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNotNull(FieldUsageMetrics))
-}
-
-// UsageCostDetailsIsNil applies the IsNil predicate on the "usage_cost_details" field.
-func UsageCostDetailsIsNil() predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldIsNull(FieldUsageCostDetails))
-}
-
-// UsageCostDetailsNotNil applies the NotNil predicate on the "usage_cost_details" field.
-func UsageCostDetailsNotNil() predicate.UsageLog {
-	return predicate.UsageLog(sql.FieldNotNull(FieldUsageCostDetails))
 }
 
 // UsageMetadataIsNil applies the IsNil predicate on the "usage_metadata" field.

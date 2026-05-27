@@ -451,18 +451,13 @@ export interface UsageLogResp {
   input_tokens: number;
   output_tokens: number;
   cached_input_tokens: number;
-  /** Anthropic 缓存创建总量（= 5m + 1h） */
+  /** 缓存创建总量；Claude 的 5m/1h 拆分在 usage_metadata 的 claude.* 中。 */
   cache_creation_tokens: number;
-  /** Anthropic 缓存创建 5m 档 */
-  cache_creation_5m_tokens: number;
-  /** Anthropic 缓存创建 1h 档 */
-  cache_creation_1h_tokens: number;
   reasoning_output_tokens: number;
   input_price: number;
   output_price: number;
   cached_input_price: number;
   cache_creation_price: number;
-  cache_creation_1h_price: number;
   input_cost: number;
   output_cost: number;
   cached_input_cost: number;
@@ -480,8 +475,6 @@ export interface UsageLogResp {
   /** 快照：本次请求生效的 account_rate */
   account_rate_multiplier: number;
   service_tier?: string;
-  /** 图像生成实际出图尺寸（"WxH"），非图像请求不返。admin 后台显示在模型名下方做计费分档解释。 */
-  image_size?: string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;
@@ -509,18 +502,12 @@ export interface CustomerUsageLogResp {
   input_tokens: number;
   output_tokens: number;
   cached_input_tokens: number;
-  /** Anthropic 缓存创建总量（= 5m + 1h） */
+  /** 缓存创建总量；Claude 的 5m/1h 拆分在 usage_metadata 的 claude.* 中。 */
   cache_creation_tokens: number;
-  /** Anthropic 缓存创建 5m 档 */
-  cache_creation_5m_tokens: number;
-  /** Anthropic 缓存创建 1h 档 */
-  cache_creation_1h_tokens: number;
   reasoning_output_tokens: number;
   /** 客户视角："本次消耗 = X 美元" */
   cost: number;
   service_tier?: string;
-  /** 图像生成实际出图尺寸（"WxH"），非图像请求不返。 */
-  image_size?: string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;
