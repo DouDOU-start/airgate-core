@@ -8,7 +8,7 @@ import (
 	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
 )
 
-func TestUsageStoreListPaginationIsStableForIdenticalCreatedAt(t *testing.T) {
+func TestUsageStoreListPaginationUsesStableIDOrder(t *testing.T) {
 	db := enttestOpen(t)
 	defer func() {
 		if err := db.Close(); err != nil {

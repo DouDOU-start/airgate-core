@@ -44,7 +44,7 @@ func (s *UsageStore) ListUser(ctx context.Context, userID int64, filter appusage
 		WithGroup().
 		Offset((filter.Page-1)*filter.PageSize).
 		Limit(filter.PageSize).
-		Order(ent.Desc(entusagelog.FieldCreatedAt), ent.Desc(entusagelog.FieldID)).
+		Order(ent.Desc(entusagelog.FieldID)).
 		All(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -77,7 +77,7 @@ func (s *UsageStore) ListAdmin(ctx context.Context, filter appusage.ListFilter) 
 		WithGroup().
 		Offset((filter.Page-1)*filter.PageSize).
 		Limit(filter.PageSize).
-		Order(ent.Desc(entusagelog.FieldCreatedAt), ent.Desc(entusagelog.FieldID)).
+		Order(ent.Desc(entusagelog.FieldID)).
 		All(ctx)
 	if err != nil {
 		return nil, 0, err
