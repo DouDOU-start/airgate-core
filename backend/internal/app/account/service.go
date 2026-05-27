@@ -523,6 +523,11 @@ func connectivityTestErrorMessage(outcome sdk.ForwardOutcome) string {
 			return "上游账号不可用: " + reason
 		}
 		return "上游账号不可用，请检查凭证或账号状态"
+	case sdk.OutcomeAccountUnavailable:
+		if reason != "" {
+			return "上游账号403暂不可用: " + reason
+		}
+		return "上游账号403暂不可用，请稍后重试"
 	case sdk.OutcomeStreamAborted:
 		return "上游响应流中断，请稍后重试或查看上游日志"
 	case sdk.OutcomeUpstreamTransient:

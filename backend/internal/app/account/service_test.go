@@ -818,6 +818,14 @@ func TestConnectivityTestErrorMessage(t *testing.T) {
 			},
 			want: "上游账号不可用: HTTP 401: Your authentication token has been invalidated",
 		},
+		{
+			name: "账号暂时不可用使用统一提示",
+			outcome: sdk.ForwardOutcome{
+				Kind:   sdk.OutcomeAccountUnavailable,
+				Reason: "HTTP 403: 访问被拒绝，账号可能已被禁用或无权限",
+			},
+			want: "上游账号403暂不可用: HTTP 403: 访问被拒绝，账号可能已被禁用或无权限",
+		},
 	}
 
 	for _, c := range cases {

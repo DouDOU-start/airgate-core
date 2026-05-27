@@ -368,6 +368,8 @@ func (s *allRoutesFailureSummary) recordExecution(execution forwardExecution) {
 		s.recordRetryAfter(execution.outcome.RetryAfter)
 	case sdk.OutcomeAccountDead:
 		s.accountDeadSeen = true
+	case sdk.OutcomeAccountUnavailable:
+		s.accountUnavailable = true
 	case sdk.OutcomeUpstreamTransient:
 		if isTimeoutFailure(execution) {
 			s.upstreamTimeoutSeen = true

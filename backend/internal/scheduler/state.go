@@ -26,6 +26,10 @@ const (
 	degradedDefault = 60 * time.Second
 	// degradedMax 池账号最长降级窗口。
 	degradedMax = 10 * time.Minute
+	// accountUnavailableThreshold 账号短暂 403 连续达到该次数后升级为 disabled。
+	accountUnavailableThreshold = 3
+
+	accountUnavailableCountExtraKey = "_airgate_account_unavailable_count"
 )
 
 // Judgment forwarder 对一次调用的判决，交给状态机做状态转移。
@@ -78,6 +82,7 @@ func (sm *StateMachine) notifyCritical() {
 //	Success             → state=active，清 state_until，last_used_at=now
 //	AccountRateLimited  → state=rate_limited，state_until=now+RetryAfter
 //	AccountDead         → state=disabled（凭证失效，需人工介入）
+//	AccountUnavailable  → state=degraded，累计 3 次后升级 disabled
 //	UpstreamTransient   → 非池：**不动状态**（上游抖动不扣账号分，靠 failover 切走就行）；池：state=degraded
 //	ClientError / StreamAborted / Unknown → 不改状态（账号无辜）
 func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
@@ -120,6 +125,9 @@ func (sm *StateMachine) Apply(ctx context.Context, accountID int, j Judgment) {
 		}
 		sm.transition(ctx, accountID, account.StateDisabled, nil, j.Reason)
 
+	case sdk.OutcomeAccountUnavailable:
+		sm.applyAccountUnavailable(ctx, accountID, j.Reason)
+
 	case sdk.OutcomeUpstreamTransient:
 		// 按定义，UpstreamTransient 是"上游侧瞬时故障"（SSE 提前断流、网络抖动、上游 5xx 等），
 		// 账号本身没问题——不动 state，让 failover 切到下一账号就够了。
@@ -145,6 +153,74 @@ func (sm *StateMachine) applyDegraded(ctx context.Context, accountID int, reason
 	sm.transition(ctx, accountID, account.StateDegraded, &until, reason)
 }
 
+func (sm *StateMachine) applyAccountUnavailable(ctx context.Context, accountID int, reason string) {
+	dbCtx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	existing, err := sm.db.Account.Get(dbCtx, accountID)
+	if err != nil {
+		slog.Warn("scheduler_account_unavailable_load_failed",
+			sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
+		return
+	}
+
+	extra := cloneExtra(existing.Extra)
+	now := time.Now()
+	if existing.State == account.StateDegraded && existing.StateUntil != nil && existing.StateUntil.After(now) && extraInt(extra, accountUnavailableCountExtraKey) > 0 {
+		slog.Warn("scheduler_account_unavailable_degraded_skip_count",
+			sdk.LogFieldAccountID, accountID,
+			"count", extraInt(extra, accountUnavailableCountExtraKey),
+			"until", existing.StateUntil,
+			sdk.LogFieldReason, reason,
+		)
+		return
+	}
+
+	count := extraInt(extra, accountUnavailableCountExtraKey) + 1
+	extra[accountUnavailableCountExtraKey] = count
+
+	if count >= accountUnavailableThreshold {
+		delete(extra, accountUnavailableCountExtraKey)
+		err = sm.db.Account.UpdateOneID(accountID).
+			SetState(account.StateDisabled).
+			ClearStateUntil().
+			SetErrorMsg(truncateReason(reason)).
+			SetExtra(extra).
+			Exec(dbCtx)
+		if err != nil {
+			slog.Error("scheduler_account_unavailable_disable_failed",
+				sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
+			return
+		}
+		slog.Warn("scheduler_account_unavailable_escalated",
+			sdk.LogFieldAccountID, accountID,
+			"count", count,
+			sdk.LogFieldReason, reason,
+		)
+		sm.notifyCritical()
+		return
+	}
+
+	until := now.Add(degradedDefault)
+	err = sm.db.Account.UpdateOneID(accountID).
+		SetState(account.StateDegraded).
+		SetStateUntil(until).
+		SetErrorMsg(truncateReason(reason)).
+		SetExtra(extra).
+		Exec(dbCtx)
+	if err != nil {
+		slog.Error("scheduler_account_unavailable_degrade_failed",
+			sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
+		return
+	}
+	slog.Warn("scheduler_account_unavailable_degraded",
+		sdk.LogFieldAccountID, accountID,
+		"count", count,
+		"until", until,
+		sdk.LogFieldReason, reason,
+	)
+}
+
 // transitionActive 成功时回到 active：清 state_until、清 reason、清失败计数、更新 last_used_at。
 //
 // disabled 状态受保护：只有管理员操作（ManualRecover / ToggleScheduling）才能解除，
@@ -155,7 +231,8 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int) {
 	defer cancel()
 
 	prevState := account.StateActive
-	if existing, err := sm.db.Account.Get(dbCtx, accountID); err == nil {
+	existing, getErr := sm.db.Account.Get(dbCtx, accountID)
+	if getErr == nil {
 		prevState = existing.State
 	}
 
@@ -166,12 +243,20 @@ func (sm *StateMachine) transitionActive(ctx context.Context, accountID int) {
 		return
 	}
 
-	err := sm.db.Account.UpdateOneID(accountID).
+	upd := sm.db.Account.UpdateOneID(accountID).
 		SetState(account.StateActive).
 		ClearStateUntil().
 		SetErrorMsg("").
-		SetLastUsedAt(now).
-		Exec(dbCtx)
+		SetLastUsedAt(now)
+	if getErr == nil {
+		if extraInt(existing.Extra, accountUnavailableCountExtraKey) > 0 {
+			extra := cloneExtra(existing.Extra)
+			delete(extra, accountUnavailableCountExtraKey)
+			upd = upd.SetExtra(extra)
+		}
+	}
+
+	err := upd.Exec(dbCtx)
 	if err != nil {
 		slog.Warn("scheduler_state_active_failed",
 			sdk.LogFieldAccountID, accountID, sdk.LogFieldError, err)
@@ -251,4 +336,32 @@ func truncateReason(s string) string {
 		return s[:maxLen]
 	}
 	return s
+}
+
+func cloneExtra(input map[string]interface{}) map[string]interface{} {
+	if len(input) == 0 {
+		return map[string]interface{}{}
+	}
+	out := make(map[string]interface{}, len(input))
+	for k, v := range input {
+		out[k] = v
+	}
+	return out
+}
+
+func extraInt(extra map[string]interface{}, key string) int {
+	switch v := extra[key].(type) {
+	case int:
+		return v
+	case int32:
+		return int(v)
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	case float32:
+		return int(v)
+	default:
+		return 0
+	}
 }

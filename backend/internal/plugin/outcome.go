@@ -192,6 +192,8 @@ func sanitizedMessage(kind sdk.OutcomeKind) string {
 		return "上游账号当前被限流，请稍后重试"
 	case sdk.OutcomeAccountDead:
 		return "上游账号不可用，请联系管理员"
+	case sdk.OutcomeAccountUnavailable:
+		return "上游账号403暂不可用，请稍后重试"
 	case sdk.OutcomeStreamAborted:
 		return "响应流中断"
 	case sdk.OutcomeUpstreamTransient:

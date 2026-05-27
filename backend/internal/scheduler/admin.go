@@ -14,11 +14,20 @@ import (
 func (s *Scheduler) ManualRecover(ctx context.Context, accountID int) error {
 	dbCtx, cancel := context.WithTimeout(ctx, dbTimeout)
 	defer cancel()
-	err := s.db.Account.UpdateOneID(accountID).
+
+	upd := s.db.Account.UpdateOneID(accountID).
 		SetState(account.StateActive).
 		ClearStateUntil().
-		SetErrorMsg("").
-		Exec(dbCtx)
+		SetErrorMsg("")
+	if existing, getErr := s.db.Account.Get(dbCtx, accountID); getErr == nil {
+		if extraInt(existing.Extra, accountUnavailableCountExtraKey) > 0 {
+			extra := cloneExtra(existing.Extra)
+			delete(extra, accountUnavailableCountExtraKey)
+			upd = upd.SetExtra(extra)
+		}
+	}
+
+	err := upd.Exec(dbCtx)
 	if err == nil {
 		s.routeCache.InvalidateAll()
 	}
