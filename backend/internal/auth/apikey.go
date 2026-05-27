@@ -5,11 +5,14 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 
@@ -40,6 +43,7 @@ type apiKeyCacheEntry struct {
 var (
 	apiKeyCache   sync.Map // map[hash] → apiKeyCacheEntry
 	apiKeyCacheMu sync.Mutex
+	apiKeyRedis   *redis.Client
 )
 
 var (
@@ -51,12 +55,19 @@ var (
 
 const apiKeyPrefix = "sk-"
 const adminKeyPrefix = "admin-"
+const apiKeyRedisCacheTTL = apiKeyCacheTTL
+
+type apiKeyRedisEntry struct {
+	Info *APIKeyInfo `json:"info,omitempty"`
+	Err  string      `json:"err,omitempty"`
+}
 
 // APIKeyInfo API Key 验证后的信息
 type APIKeyInfo struct {
 	KeyID         int
 	KeyName       string
 	UserID        int
+	UserEmail     string
 	GroupID       int
 	GroupPlatform string
 	QuotaUSD      float64
@@ -162,9 +173,10 @@ func ValidateAPIKeyForLogin(ctx context.Context, db *ent.Client, key string) (*A
 	}
 
 	return &APIKeyInfo{
-		KeyID:   ak.ID,
-		KeyName: ak.Name,
-		UserID:  u.ID,
+		KeyID:     ak.ID,
+		KeyName:   ak.Name,
+		UserID:    u.ID,
+		UserEmail: u.Email,
 	}, nil
 }
 
@@ -189,6 +201,16 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 			}
 			return e.info, e.err
 		}
+		apiKeyCache.Delete(hash)
+	}
+	if info, err, ok := loadAPIKeyCacheFromRedis(ctx, hash); ok {
+		if info != nil {
+			slog.Debug("api_key_cache_hit_shared", sdk.LogFieldAPIKeyID, info.KeyID)
+		} else {
+			slog.Debug("api_key_cache_hit_negative_shared", sdk.LogFieldError, err)
+		}
+		storeAPIKeyLocalCache(hash, info, err)
+		return info, err
 	}
 	slog.Debug("api_key_cache_miss")
 
@@ -240,6 +262,7 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 		KeyID:              ak.ID,
 		KeyName:            ak.Name,
 		UserID:             u.ID,
+		UserEmail:          u.Email,
 		GroupID:            g.ID,
 		GroupPlatform:      g.Platform,
 		QuotaUSD:           ak.QuotaUsd,
@@ -263,6 +286,11 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 // 成功结果的 UserBalance / UsedQuota 会在 TTL 内"陈旧"，但缓存 TTL 很短（5s），
 // 用户主流程不会明显感知到；balance 余额在并发扣费时的准确性由别处的数据库事务保证。
 func cacheAPIKeyResult(hash string, info *APIKeyInfo, err error) {
+	storeAPIKeyLocalCache(hash, info, err)
+	storeAPIKeyRedisCache(hash, info, err)
+}
+
+func storeAPIKeyLocalCache(hash string, info *APIKeyInfo, err error) {
 	apiKeyCache.Store(hash, apiKeyCacheEntry{
 		info:      info,
 		err:       err,
@@ -270,19 +298,133 @@ func cacheAPIKeyResult(hash string, info *APIKeyInfo, err error) {
 	})
 }
 
+func storeAPIKeyRedisCache(hash string, info *APIKeyInfo, err error) {
+	if apiKeyRedis == nil {
+		return
+	}
+	entry := apiKeyRedisEntry{}
+	if info != nil {
+		entry.Info = info
+	} else if err != nil {
+		entry.Err = apiKeyCacheErrorCode(err)
+	}
+	if entry.Info == nil && entry.Err == "" {
+		return
+	}
+	raw, marshalErr := json.Marshal(entry)
+	if marshalErr != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	_ = apiKeyRedis.Set(ctx, apiKeyRedisCacheKey(hash), raw, apiKeyRedisCacheTTL).Err()
+}
+
+func loadAPIKeyCacheFromRedis(ctx context.Context, hash string) (*APIKeyInfo, error, bool) {
+	if apiKeyRedis == nil {
+		return nil, nil, false
+	}
+	raw, err := apiKeyRedis.Get(ctx, apiKeyRedisCacheKey(hash)).Bytes()
+	if err != nil {
+		return nil, nil, false
+	}
+	var entry apiKeyRedisEntry
+	if err := json.Unmarshal(raw, &entry); err != nil {
+		_ = apiKeyRedis.Del(ctx, apiKeyRedisCacheKey(hash)).Err()
+		return nil, nil, false
+	}
+	if entry.Info != nil {
+		return entry.Info, nil, true
+	}
+	if entry.Err != "" {
+		if cacheErr := apiKeyCacheErrorFromCode(entry.Err); cacheErr != nil {
+			return nil, cacheErr, true
+		}
+	}
+	return nil, nil, false
+}
+
+func apiKeyRedisCacheKey(hash string) string {
+	return "airgate:auth:v1:apikey:" + hash
+}
+
+func apiKeyCacheErrorCode(err error) string {
+	switch err {
+	case ErrInvalidAPIKey:
+		return "invalid"
+	case ErrAPIKeyExpired:
+		return "expired"
+	case ErrAPIKeyQuota:
+		return "quota"
+	case ErrAPIKeyGroupUnbound:
+		return "group_unbound"
+	default:
+		return ""
+	}
+}
+
+func apiKeyCacheErrorFromCode(code string) error {
+	switch code {
+	case "invalid":
+		return ErrInvalidAPIKey
+	case "expired":
+		return ErrAPIKeyExpired
+	case "quota":
+		return ErrAPIKeyQuota
+	case "group_unbound":
+		return ErrAPIKeyGroupUnbound
+	default:
+		return nil
+	}
+}
+
+// SetAPIKeyCacheRedis 配置跨进程 API Key 验证缓存。
+func SetAPIKeyCacheRedis(rdb *redis.Client) {
+	apiKeyRedis = rdb
+}
+
 // InvalidateAPIKeyCache 清除指定 key 的缓存（用于运维手动禁用 / 改配额等场景）。
 // 传空字符串清除所有缓存。
 func InvalidateAPIKeyCache(key string) {
 	if key == "" {
 		apiKeyCacheMu.Lock()
-		defer apiKeyCacheMu.Unlock()
 		apiKeyCache.Range(func(k, _ any) bool {
 			apiKeyCache.Delete(k)
 			return true
 		})
+		apiKeyCacheMu.Unlock()
+		deleteAllAPIKeyRedisCache()
 		return
 	}
-	apiKeyCache.Delete(HashAPIKey(key))
+	hash := HashAPIKey(key)
+	apiKeyCache.Delete(hash)
+	if apiKeyRedis != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		defer cancel()
+		_, _ = apiKeyRedis.Del(ctx, apiKeyRedisCacheKey(hash)).Result()
+	}
+}
+
+func deleteAllAPIKeyRedisCache() {
+	if apiKeyRedis == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	var cursor uint64
+	for {
+		keys, next, err := apiKeyRedis.Scan(ctx, cursor, "airgate:auth:v1:apikey:*", 100).Result()
+		if err != nil {
+			return
+		}
+		if len(keys) > 0 {
+			_, _ = apiKeyRedis.Del(ctx, keys...).Result()
+		}
+		if next == 0 {
+			return
+		}
+		cursor = next
+	}
 }
 
 // ValidateAdminAPIKey 验证管理员 API Key，返回 nil 表示验证通过。

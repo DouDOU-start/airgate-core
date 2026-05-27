@@ -62,8 +62,10 @@ const maxFailoverAttempts = 3
 // 1 分钟对号池小 / 并发高的场景能把毛刺吸收掉；超过这个时长意味着号池真的不够用。
 const queueWaitTimeout = 60 * time.Second
 
-// queuePollInterval slot 未释放时的轮询间隔。
+// queuePollInterval slot 未释放时的初始轮询间隔；连续排队会指数退避到上限。
 const queuePollInterval = 200 * time.Millisecond
+
+const queueMaxPollInterval = 2 * time.Second
 
 // 499 是 nginx 风格的 Client Closed Request，仅用于本地日志和状态归类。
 const statusClientClosedRequest = 499
@@ -146,6 +148,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 		softExclude := make([]int, 0, maxFailoverAttempts)
 		attempt := 0
 		queueDeadline := time.Now().Add(queueWaitTimeout)
+		queuePollDelay := queuePollInterval
 
 		for attempt < maxFailoverAttempts {
 			if status := canceledRequestStatus(ctx.Err()); status != 0 {
@@ -173,18 +176,37 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				failureSummary.recordPickAccountError(err)
 				if len(softExclude) > 0 && time.Now().Before(queueDeadline) {
 					softExclude = softExclude[:0]
-					select {
-					case <-ctx.Done():
-						if status := canceledRequestStatus(ctx.Err()); status != 0 {
-							markCanceledRequest(c, status)
-							logger.Debug("forward_request_canceled",
-								"status_code", status,
-								"attempts", totalAttempts,
-							)
+					wait := queuePollDelay
+					if remaining := time.Until(queueDeadline); remaining < wait {
+						wait = remaining
+					}
+					if wait > 0 {
+						timer := time.NewTimer(wait)
+						select {
+						case <-ctx.Done():
+							if !timer.Stop() {
+								select {
+								case <-timer.C:
+								default:
+								}
+							}
+							if status := canceledRequestStatus(ctx.Err()); status != 0 {
+								markCanceledRequest(c, status)
+								logger.Debug("forward_request_canceled",
+									"status_code", status,
+									"attempts", totalAttempts,
+								)
+								return
+							}
 							return
+						case <-timer.C:
 						}
-						return
-					case <-time.After(queuePollInterval):
+					}
+					if queuePollDelay < queueMaxPollInterval {
+						queuePollDelay *= 2
+						if queuePollDelay > queueMaxPollInterval {
+							queuePollDelay = queueMaxPollInterval
+						}
 					}
 					continue
 				}
@@ -201,6 +223,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 				logger.Warn("forward_pick_account_failed", attrs...)
 				break
 			}
+			queuePollDelay = queuePollInterval
 
 			accountID := state.account.ID
 			// logger 已经从 auth middleware 继承了 group_id，这里只补 account_id 避免重复字段。

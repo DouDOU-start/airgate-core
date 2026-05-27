@@ -12,11 +12,14 @@ import (
 )
 
 const (
-	defaultLockTTL  = 6 * time.Minute // 需大于 HTTP 超时（5min），预留 1min 缓冲
-	defaultMinDelay = 200 * time.Millisecond
-	defaultMaxDelay = 2000 * time.Millisecond
-	defaultBaseRPM  = 60
-	jitterFactor    = 0.15 // ±15% 抖动
+	defaultLockTTL    = 6 * time.Minute // 需大于 HTTP 超时（5min），预留 1min 缓冲
+	defaultMinDelay   = 200 * time.Millisecond
+	defaultMaxDelay   = 2000 * time.Millisecond
+	defaultBaseRPM    = 60
+	jitterFactor      = 0.15 // ±15% 抖动
+	waitPollFloor     = 100 * time.Millisecond
+	waitPollCeil      = 1 * time.Second
+	defaultMaxWaiters = 8
 )
 
 // MessageQueue 用户消息串行队列
@@ -76,6 +79,45 @@ var releaseLockScript = redis.NewScript(`
 	return 0
 `)
 
+// waitersCounterKey 等待队列计数 key。
+func waitersCounterKey(accountID int) string {
+	return fmt.Sprintf("umq:{%d}:waiters", accountID)
+}
+
+var registerWaiterScript = redis.NewScript(`
+	local key = KEYS[1]
+	local maxWaiters = tonumber(ARGV[1])
+	local ttlMs = tonumber(ARGV[2])
+
+	local current = tonumber(redis.call('GET', key) or '0')
+	if current >= maxWaiters then
+		return 0
+	end
+
+	redis.call('INCR', key)
+	if ttlMs > 0 then
+		redis.call('PEXPIRE', key, ttlMs)
+	end
+	return 1
+`)
+
+var releaseWaiterScript = redis.NewScript(`
+	local key = KEYS[1]
+	local ttlMs = tonumber(ARGV[1])
+
+	local current = tonumber(redis.call('GET', key) or '0')
+	if current <= 1 then
+		redis.call('DEL', key)
+		return 1
+	end
+
+	redis.call('DECR', key)
+	if ttlMs > 0 then
+		redis.call('PEXPIRE', key, ttlMs)
+	end
+	return 1
+`)
+
 // TryAcquire 尝试获取账户级消息锁
 // 返回是否获取成功。如果获取失败，调用方应等待重试或放弃
 func (m *MessageQueue) TryAcquire(ctx context.Context, accountID int, requestID string, lockTTL time.Duration) (bool, error) {
@@ -98,13 +140,33 @@ func (m *MessageQueue) TryAcquire(ctx context.Context, accountID int, requestID 
 	return result == 1, nil
 }
 
-// WaitAcquire 等待获取锁，最多等待 timeout 时间
-func (m *MessageQueue) WaitAcquire(ctx context.Context, accountID int, requestID string, lockTTL, timeout time.Duration) (bool, error) {
+// WaitAcquire 等待获取锁，最多等待 timeout 时间。
+// maxWaiters 用于限制同一账号同时排队的请求数，防止 goroutine 堆积。
+func (m *MessageQueue) WaitAcquire(ctx context.Context, accountID int, requestID string, lockTTL, timeout time.Duration, maxWaiters ...int) (bool, error) {
 	if m.rdb == nil {
 		return true, nil
 	}
+	if lockTTL <= 0 {
+		lockTTL = defaultLockTTL
+	}
+	if timeout <= 0 {
+		return m.TryAcquire(ctx, accountID, requestID, lockTTL)
+	}
 
 	deadline := time.Now().Add(timeout)
+	poll := waitPollFloor
+	waiterLimit := defaultMaxWaiters
+	if len(maxWaiters) > 0 && maxWaiters[0] > 0 {
+		waiterLimit = maxWaiters[0]
+	}
+	waiterKey := waitersCounterKey(accountID)
+	waiterTTL := lockTTL + timeout + 60*time.Second
+	waiterRegistered := false
+	defer func() {
+		if waiterRegistered {
+			_, _ = releaseWaiterScript.Run(context.Background(), m.rdb, []string{waiterKey}, waiterTTL.Milliseconds()).Result()
+		}
+	}()
 	for {
 		acquired, err := m.TryAcquire(ctx, accountID, requestID, lockTTL)
 		if err != nil {
@@ -112,6 +174,17 @@ func (m *MessageQueue) WaitAcquire(ctx context.Context, accountID int, requestID
 		}
 		if acquired {
 			return true, nil
+		}
+
+		if !waiterRegistered {
+			registered, err := registerWaiterScript.Run(ctx, m.rdb, []string{waiterKey}, waiterLimit, waiterTTL.Milliseconds()).Int()
+			if err != nil {
+				return true, nil // fail-open
+			}
+			if registered != 1 {
+				return false, nil
+			}
+			waiterRegistered = true
 		}
 
 		// 检测孤立锁：TTL <= 0 表示 key 没有设置过期时间（orphaned）
@@ -129,19 +202,44 @@ func (m *MessageQueue) WaitAcquire(ctx context.Context, accountID int, requestID
 			return false, nil
 		}
 
-		// 短暂等待后重试
+		wait := poll
+		if ttl > 0 && ttl < wait {
+			wait = ttl
+		}
+		if remaining := time.Until(deadline); remaining < wait {
+			wait = remaining
+		}
+		if wait <= 0 {
+			return false, nil
+		}
+
+		timer := time.NewTimer(wait)
 		select {
 		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
 			return false, ctx.Err()
-		case <-time.After(100 * time.Millisecond):
+		case <-timer.C:
+		}
+		if poll < waitPollCeil {
+			poll *= 2
+			if poll > waitPollCeil {
+				poll = waitPollCeil
+			}
 		}
 	}
 }
 
 // ForceRelease 无条件删除账户的消息队列锁（用于管理员清理孤立锁）
 func (m *MessageQueue) ForceRelease(ctx context.Context, accountID int) error {
-	key := fmt.Sprintf("umq:{%d}:lock", accountID)
-	return m.rdb.Del(ctx, key).Err()
+	if m.rdb == nil {
+		return nil
+	}
+	return m.rdb.Del(ctx, msgQueueLockKey(accountID)).Err()
 }
 
 // Release 释放锁并记录完成时间

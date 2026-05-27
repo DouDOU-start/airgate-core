@@ -700,7 +700,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 		return nil, err
 	}
 
-	routes, err := h.hostForwardRoutes(ctx, req)
+	routes, userEmail, err := h.hostForwardRoutes(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -813,7 +813,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			resp := hostForwardPayload(outcome)
 
 			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
-				if usageID, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, outcome, duration); err != nil {
+				if usageID, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, userEmail, outcome, duration); err != nil {
 					slog.Error("host_forward_record_usage_failed",
 						sdk.LogFieldUserID, req.UserID,
 						sdk.LogFieldAccountID, acc.ID,
@@ -846,7 +846,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 		return err
 	}
 
-	routes, err := h.hostForwardRoutes(ctx, req)
+	routes, userEmail, err := h.hostForwardRoutes(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -966,7 +966,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 
 			var usage *sdk.Usage
 			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
-				if _, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, outcome, duration); err != nil {
+				if _, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, userEmail, outcome, duration); err != nil {
 					slog.Error("host_forward_stream_record_usage_failed",
 						sdk.LogFieldUserID, req.UserID,
 						sdk.LogFieldAccountID, acc.ID,
@@ -1133,6 +1133,7 @@ func (h *HostService) recordHostForwardUsage(
 	accountID int,
 	platform, model string,
 	accFull *ent.Account,
+	userEmail string,
 	outcome sdk.ForwardOutcome,
 	duration time.Duration,
 ) (int, error) {
@@ -1164,6 +1165,7 @@ func (h *HostService) recordHostForwardUsage(
 
 	record := billing.UsageRecord{
 		UserID:                int(req.UserID),
+		UserEmail:             userEmail,
 		APIKeyID:              int(req.APIKeyID),
 		AccountID:             accountID,
 		GroupID:               route.GroupID,
@@ -1368,28 +1370,28 @@ func (h *HostService) deleteAsset(ctx context.Context, req hostDeleteAssetReques
 
 // protoHeadersToHTTPHost / httpHeadersToProtoHost 是 host_service.go 内部的 header 转换。
 // 与 grpc/gateway_server.go 的同名函数等价，但跨包引用会引入循环依赖。
-func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequest) ([]routing.Candidate, error) {
+func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequest) ([]routing.Candidate, string, error) {
 	if req.GroupID > 0 {
 		u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserID))).Only(ctx)
 		if err != nil {
 			if cerr := hostContextError(err); cerr != nil {
-				return nil, cerr
+				return nil, "", cerr
 			}
 			slog.Error("host_forward_user_lookup_failed",
 				sdk.LogFieldUserID, req.UserID, sdk.LogFieldError, err)
-			return nil, hostForwardGenericError()
+			return nil, "", hostForwardGenericError()
 		}
 		g, err := h.db.Group.Get(ctx, int(req.GroupID))
 		if err != nil {
 			if cerr := hostContextError(err); cerr != nil {
-				return nil, cerr
+				return nil, "", cerr
 			}
 			if ent.IsNotFound(err) {
-				return nil, status.Error(codes.NotFound, "分组不存在")
+				return nil, "", status.Error(codes.NotFound, "分组不存在")
 			}
 			slog.Error("host_forward_group_lookup_failed",
 				sdk.LogFieldGroupID, req.GroupID, sdk.LogFieldError, err)
-			return nil, hostForwardGenericError()
+			return nil, "", hostForwardGenericError()
 		}
 		if !routing.GroupMatchesRequirements(g, hostForwardRequirements(req)) {
 			slog.Warn("host_forward_group_requirement_unmet",
@@ -1397,7 +1399,7 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 				sdk.LogFieldModel, req.Model,
 				sdk.LogFieldPath, req.Path,
 			)
-			return nil, hostForwardGenericError()
+			return nil, "", hostForwardGenericError()
 		}
 		return []routing.Candidate{{
 			GroupID:                g.ID,
@@ -1408,7 +1410,7 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 			GroupForceInstructions: g.ForceInstructions,
 			GroupPluginSettings:    clonePluginSettingsHost(g.PluginSettings),
 			SortWeight:             g.SortWeight,
-		}}, nil
+		}}, u.Email, nil
 	}
 
 	platform := protoHeadersToHTTPHost(req.Headers).Get("X-Airgate-Platform")
@@ -1416,37 +1418,37 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 		platform = h.manager.FindPlatformByModel(req.Model)
 	}
 	if platform == "" {
-		return nil, status.Error(codes.InvalidArgument, "platform 不能为空")
+		return nil, "", status.Error(codes.InvalidArgument, "platform 不能为空")
 	}
 	u, err := h.db.User.Query().Where(user.IDEQ(int(req.UserID))).Only(ctx)
 	if err != nil {
 		if cerr := hostContextError(err); cerr != nil {
-			return nil, cerr
+			return nil, "", cerr
 		}
 		slog.Error("host_forward_user_lookup_failed",
 			sdk.LogFieldUserID, req.UserID, sdk.LogFieldError, err)
-		return nil, hostForwardGenericError()
+		return nil, "", hostForwardGenericError()
 	}
 	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserID), platform, u.GroupRates, hostForwardRequirements(req))
 	if err != nil {
 		if cerr := hostContextError(err); cerr != nil {
-			return nil, cerr
+			return nil, "", cerr
 		}
 		slog.Error("host_forward_routes_lookup_failed",
 			sdk.LogFieldPlatform, platform,
 			sdk.LogFieldUserID, req.UserID,
 			sdk.LogFieldError, err,
 		)
-		return nil, hostForwardGenericError()
+		return nil, "", hostForwardGenericError()
 	}
 	if len(routes) == 0 {
 		slog.Warn("host_forward_no_eligible_route",
 			sdk.LogFieldPlatform, platform,
 			sdk.LogFieldUserID, req.UserID,
 		)
-		return nil, hostForwardGenericError()
+		return nil, "", hostForwardGenericError()
 	}
-	return routes, nil
+	return routes, u.Email, nil
 }
 
 func hostForwardRequirements(req hostForwardRequest) routing.Requirements {

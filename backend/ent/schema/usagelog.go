@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
@@ -92,5 +93,24 @@ func (UsageLog) Edges() []ent.Edge {
 		edge.From("api_key", APIKey.Type).Ref("usage_logs").Unique(),
 		edge.From("account", Account.Type).Ref("usage_logs").Unique(),
 		edge.From("group", Group.Type).Ref("usage_logs").Unique(),
+	}
+}
+
+func (UsageLog) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("created_at").
+			StorageKey("usage_log_created_at"),
+		index.Fields("platform", "created_at").
+			StorageKey("usage_log_platform_created_at"),
+		index.Fields("user_id_snapshot", "created_at").
+			StorageKey("usage_log_user_snapshot_created_at"),
+		index.Edges("user").
+			StorageKey("usage_log_user"),
+		index.Edges("api_key").
+			StorageKey("usage_log_api_key"),
+		index.Edges("account").
+			StorageKey("usage_log_account"),
+		index.Edges("group").
+			StorageKey("usage_log_group"),
 	}
 }

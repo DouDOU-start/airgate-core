@@ -64,6 +64,27 @@ func TestResolveTrendTimeRangeCustomIncludesEndDate(t *testing.T) {
 	}
 }
 
+func TestTrendCacheKeyBucketsMovingEndTime(t *testing.T) {
+	query := TrendQuery{Range: "today", Granularity: "hour", UserID: 7}
+	start := time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC)
+	key1 := trendCacheKey(query, time.UTC, start, time.Date(2026, 5, 27, 12, 0, 1, 0, time.UTC))
+	key2 := trendCacheKey(query, time.UTC, start, time.Date(2026, 5, 27, 12, 0, 14, 0, time.UTC))
+	key3 := trendCacheKey(query, time.UTC, start, time.Date(2026, 5, 27, 12, 0, 16, 0, time.UTC))
+
+	if key1 != key2 {
+		t.Fatalf("same cache bucket keys differ: %q vs %q", key1, key2)
+	}
+	if key1 == key3 {
+		t.Fatalf("different cache bucket keys unexpectedly match: %q", key1)
+	}
+
+	otherUser := query
+	otherUser.UserID = 8
+	if key1 == trendCacheKey(otherUser, time.UTC, start, time.Date(2026, 5, 27, 12, 0, 1, 0, time.UTC)) {
+		t.Fatal("cache key must include user scope")
+	}
+}
+
 func TestTrendAggregatesTopUsersAndBuckets(t *testing.T) {
 	now := time.Date(2026, 4, 2, 12, 0, 0, 0, time.UTC)
 	service := NewService(dashboardStubRepository{

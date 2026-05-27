@@ -2,8 +2,13 @@ package dashboard
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sort"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
@@ -12,16 +17,38 @@ import (
 // Service 提供仪表盘用例编排。
 type Service struct {
 	repo Repository
+	rdb  *redis.Client
 	now  func() time.Time
 }
 
 // NewService 创建仪表盘服务。
-func NewService(repo Repository) *Service {
+func NewService(repo Repository, rdb ...*redis.Client) *Service {
+	var cache *redis.Client
+	if len(rdb) > 0 {
+		cache = rdb[0]
+	}
 	return &Service{
 		repo: repo,
+		rdb:  cache,
 		now:  time.Now,
 	}
 }
+
+const (
+	trendCacheTTL   = 15 * time.Second
+	trendLockTTL    = 5 * time.Second
+	trendLockWait   = 1 * time.Second
+	trendCacheV1Key = "airgate:dashboard:v1:trend"
+)
+
+var trendLockReleaseScript = redis.NewScript(`
+	local key = KEYS[1]
+	local token = ARGV[1]
+	if redis.call('GET', key) == token then
+		return redis.call('DEL', key)
+	end
+	return 0
+`)
 
 // Stats 查询仪表盘统计。userID 为 0 表示查全部。
 // tz 为调用方的 IANA 时区名（如 "Asia/Shanghai"、"America/New_York"），决定"今天"的起点；
@@ -82,13 +109,51 @@ func (s *Service) Trend(ctx context.Context, query TrendQuery) (Trend, error) {
 	loc := timezone.Resolve(query.TZ)
 	now := s.now().In(loc)
 	startTime, endTime := resolveTrendTimeRange(query, now)
-	logs, err := s.repo.ListTrendLogs(ctx, startTime, endTime, query.UserID)
+	cacheKey := trendCacheKey(query, loc, startTime, endTime)
+	if trend, ok := s.loadTrendCache(ctx, cacheKey); ok {
+		return trend, nil
+	}
+
+	if token, ok, lockBusy := s.tryLockTrendCache(ctx, cacheKey); ok {
+		defer s.releaseTrendCacheLock(context.Background(), cacheKey, token)
+
+		if trend, ok := s.loadTrendCache(ctx, cacheKey); ok {
+			return trend, nil
+		}
+
+		trend, err := s.loadTrendFresh(ctx, query, loc, startTime, endTime)
+		if err != nil {
+			sdk.LoggerFromContext(ctx).Error("dashboard_query_failed",
+				sdk.LogFieldUserID, query.UserID,
+				sdk.LogFieldReason, "trend_logs",
+				sdk.LogFieldError, err,
+			)
+			return Trend{}, err
+		}
+		s.storeTrendCache(ctx, cacheKey, trend)
+		return trend, nil
+	} else if lockBusy {
+		if trend, ok := s.waitForTrendCache(ctx, cacheKey, trendLockWait); ok {
+			return trend, nil
+		}
+	}
+
+	trend, err := s.loadTrendFresh(ctx, query, loc, startTime, endTime)
 	if err != nil {
 		sdk.LoggerFromContext(ctx).Error("dashboard_query_failed",
 			sdk.LogFieldUserID, query.UserID,
 			sdk.LogFieldReason, "trend_logs",
 			sdk.LogFieldError, err,
 		)
+		return Trend{}, err
+	}
+	s.storeTrendCache(ctx, cacheKey, trend)
+	return trend, nil
+}
+
+func (s *Service) loadTrendFresh(ctx context.Context, query TrendQuery, loc *time.Location, startTime, endTime time.Time) (Trend, error) {
+	logs, err := s.repo.ListTrendLogs(ctx, startTime, endTime, query.UserID)
+	if err != nil {
 		return Trend{}, err
 	}
 
@@ -98,6 +163,107 @@ func (s *Service) Trend(ctx context.Context, query TrendQuery) (Trend, error) {
 		TokenTrend:        aggregateTokenTrend(logs, query.Granularity, loc),
 		TopUsers:          aggregateTopUsers(logs, query.Granularity, loc),
 	}, nil
+}
+
+func trendCacheKey(query TrendQuery, loc *time.Location, startTime, endTime time.Time) string {
+	const trendBucketSeconds = 15
+	return fmt.Sprintf("%s:%s:%s:%d:%d:%d:%d:%s:%s:%s",
+		trendCacheV1Key,
+		loc.String(),
+		query.Range,
+		query.UserID,
+		startTime.UTC().Unix(),
+		endTime.UTC().Unix()/trendBucketSeconds,
+		trendBucketSeconds,
+		query.Granularity,
+		query.StartDate,
+		query.EndDate,
+	)
+}
+
+func (s *Service) loadTrendCache(ctx context.Context, key string) (Trend, bool) {
+	if s.rdb == nil {
+		return Trend{}, false
+	}
+	raw, err := s.rdb.Get(ctx, key).Bytes()
+	if err != nil {
+		return Trend{}, false
+	}
+	var trend Trend
+	if err := json.Unmarshal(raw, &trend); err != nil {
+		_ = s.rdb.Del(ctx, key).Err()
+		return Trend{}, false
+	}
+	return trend, true
+}
+
+func (s *Service) storeTrendCache(ctx context.Context, key string, trend Trend) {
+	if s.rdb == nil {
+		return
+	}
+	raw, err := json.Marshal(trend)
+	if err != nil {
+		return
+	}
+	_ = s.rdb.Set(ctx, key, raw, trendCacheTTL).Err()
+}
+
+func (s *Service) tryLockTrendCache(ctx context.Context, key string) (string, bool, bool) {
+	if s.rdb == nil {
+		return "", false, false
+	}
+	token := uuid.NewString()
+	ok, err := s.rdb.SetNX(ctx, key+":lock", token, trendLockTTL).Result()
+	if err != nil {
+		return "", false, false
+	}
+	if !ok {
+		return "", false, true
+	}
+	return token, true, false
+}
+
+func (s *Service) releaseTrendCacheLock(ctx context.Context, key, token string) {
+	if s.rdb == nil || token == "" {
+		return
+	}
+	_, _ = trendLockReleaseScript.Run(ctx, s.rdb, []string{key + ":lock"}, token).Result()
+}
+
+func (s *Service) waitForTrendCache(ctx context.Context, key string, timeout time.Duration) (Trend, bool) {
+	if s.rdb == nil {
+		return Trend{}, false
+	}
+	deadline := time.Now().Add(timeout)
+	delay := 50 * time.Millisecond
+	for {
+		if trend, ok := s.loadTrendCache(ctx, key); ok {
+			return trend, true
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return Trend{}, false
+		}
+		wait := delay
+		if remaining < wait {
+			wait = remaining
+		}
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			return Trend{}, false
+		case <-timer.C:
+		}
+		if delay < 250*time.Millisecond {
+			delay *= 2
+		}
+	}
 }
 
 // resolveTrendTimeRange 根据查询计算 [startTime, endTime) 区间。

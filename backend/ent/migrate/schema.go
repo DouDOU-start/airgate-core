@@ -346,6 +346,43 @@ var (
 				OnDelete:   schema.SetNull,
 			},
 		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "usage_log_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[41]},
+			},
+			{
+				Name:    "usage_log_platform_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[1], UsageLogsColumns[41]},
+			},
+			{
+				Name:    "usage_log_user_snapshot_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[39], UsageLogsColumns[41]},
+			},
+			{
+				Name:    "usage_log_user",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[45]},
+			},
+			{
+				Name:    "usage_log_api_key",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[42]},
+			},
+			{
+				Name:    "usage_log_account",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[43]},
+			},
+			{
+				Name:    "usage_log_group",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[44]},
+			},
+		},
 	}
 	// UsersColumns holds the columns for the "users" table.
 	UsersColumns = []*schema.Column{

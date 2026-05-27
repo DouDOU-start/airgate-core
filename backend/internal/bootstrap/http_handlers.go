@@ -71,6 +71,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	apiKeyStore := store.NewAPIKeyStore(dep.DB)
 	apiKeyService := appapikey.NewService(apiKeyStore, dep.Config.APIKeySecret())
 	authStore := store.NewAuthStore(dep.DB)
+	auth.SetAPIKeyCacheRedis(dep.Redis)
 	authService := appauth.NewService(authStore, dep.JWTMgr)
 	verifyCodeStore := mailer.NewVerifyCodeStore()
 	accountStore := store.NewAccountStore(dep.DB)
@@ -82,8 +83,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	proxyService := appproxy.NewService(proxyStore)
 	subscriptionStore := store.NewSubscriptionStore(dep.DB)
 	subscriptionService := appsubscription.NewService(subscriptionStore)
-	dashboardStore := store.NewDashboardStore(dep.DB)
-	dashboardService := appdashboard.NewService(dashboardStore)
+	dashboardStore := store.NewDashboardStore(dep.DB, dep.Redis)
+	dashboardService := appdashboard.NewService(dashboardStore, dep.Redis)
 	pluginAdminService := apppluginadmin.NewService(dep.PluginMgr, dep.Marketplace)
 	settingsStore := store.NewSettingsStore(dep.DB)
 	settingsService := appsettings.NewService(settingsStore)
@@ -96,7 +97,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		balanceAlertSendEmail(settingsService, email, balance, threshold)
 	})
 	usageStore := store.NewUsageStore(dep.DB)
-	usageService := appusage.NewService(usageStore)
+	usageService := appusage.NewService(usageStore, dep.Redis)
 
 	upgradeService := upgrade.NewService(upgrade.DetectMode(), dep.Redis)
 

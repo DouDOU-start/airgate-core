@@ -156,6 +156,7 @@ const defaultMsgLockWait = 3 * time.Second
 
 // AcquireMessageLock 真实用户消息的账号级串行锁。
 // wait timeout：extra.msg_lock_wait_seconds > 0 时用配置值，否则用 defaultMsgLockWait。
+// max waiters：extra.msg_lock_max_waiters > 0 时限制同账号排队请求数，默认 defaultMaxWaiters。
 func (s *Scheduler) AcquireMessageLock(ctx context.Context, accountID int, requestID string, extra map[string]interface{}) (bool, error) {
 	lockTTL := defaultLockTTL
 	if ttlSec := ExtraInt(extra, "msg_lock_ttl_seconds"); ttlSec > 0 {
@@ -165,7 +166,11 @@ func (s *Scheduler) AcquireMessageLock(ctx context.Context, accountID int, reque
 	if waitSec := ExtraInt(extra, "msg_lock_wait_seconds"); waitSec > 0 {
 		wait = time.Duration(waitSec) * time.Second
 	}
-	return s.msgQueue.WaitAcquire(ctx, accountID, requestID, lockTTL, wait)
+	maxWaiters := ExtraInt(extra, "msg_lock_max_waiters")
+	if maxWaiters <= 0 {
+		maxWaiters = defaultMaxWaiters
+	}
+	return s.msgQueue.WaitAcquire(ctx, accountID, requestID, lockTTL, wait, maxWaiters)
 }
 
 // ReleaseMessageLock 释放消息锁。

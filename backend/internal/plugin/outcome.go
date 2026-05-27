@@ -290,6 +290,7 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 
 	f.recorder.Record(billing.UsageRecord{
 		UserID:                state.keyInfo.UserID,
+		UserEmail:             state.keyInfo.UserEmail,
 		APIKeyID:              state.keyInfo.KeyID,
 		AccountID:             state.account.ID,
 		GroupID:               state.keyInfo.GroupID,

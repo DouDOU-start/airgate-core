@@ -193,8 +193,13 @@ func (s *UsageStore) StatsByUser(ctx context.Context, filter appusage.StatsFilte
 	}
 
 	userIDs := make([]int, 0, len(rows))
+	seenUserIDs := make(map[int]struct{}, len(rows))
 	for _, row := range rows {
-		if row.UserID > 0 {
+		if row.UserID > 0 && row.UserEmail == "" {
+			if _, ok := seenUserIDs[row.UserID]; ok {
+				continue
+			}
+			seenUserIDs[row.UserID] = struct{}{}
 			userIDs = append(userIDs, row.UserID)
 		}
 	}
@@ -213,7 +218,7 @@ func (s *UsageStore) StatsByUser(ctx context.Context, filter appusage.StatsFilte
 	for _, row := range rows {
 		result = append(result, appusage.UserStats{
 			UserID:     int64(row.UserID),
-			Email:      coalesceString(emailMap[row.UserID], row.UserEmail),
+			Email:      coalesceString(row.UserEmail, emailMap[row.UserID]),
 			Requests:   int64(row.Count),
 			Tokens:     row.InputTokens + row.OutputTokens,
 			TotalCost:  row.TotalCost,
@@ -413,9 +418,14 @@ func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilt
 
 func usageUserPredicate(userID int64) predicate.UsageLog {
 	id := int(userID)
+	// 新写入的 usage_log 都带 user_id_snapshot，因此先走快路径；
+	// 仅对极少量历史老数据回退到 relation，避免 OR 直接把规划器打回全表扫。
 	return entusagelog.Or(
 		entusagelog.UserIDSnapshotEQ(id),
-		entusagelog.HasUserWith(entuser.IDEQ(id)),
+		entusagelog.And(
+			entusagelog.UserIDSnapshotEQ(0),
+			entusagelog.HasUserWith(entuser.IDEQ(id)),
+		),
 	)
 }
 

@@ -170,6 +170,12 @@ type StatsResult struct {
 	ByGroup   []GroupStats
 }
 
+// UserStatsResult 当前用户统计页需要的完整聚合结果。
+type UserStatsResult struct {
+	Summary Summary
+	ByModel []ModelStats
+}
+
 // TrendEntry 趋势聚合的原始项。
 type TrendEntry struct {
 	CreatedAt           string

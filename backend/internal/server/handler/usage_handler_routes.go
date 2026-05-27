@@ -94,7 +94,7 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 	}
 
 	tz := c.Query("tz")
-	summary, err := h.service.UserStats(c.Request.Context(), int64(userID), appusage.StatsFilter{
+	result, err := h.service.UserStatsWithModels(c.Request.Context(), int64(userID), appusage.StatsFilter{
 		APIKeyID:    apiKeyFilter,
 		Platform:    query.Platform,
 		Model:       query.Model,
@@ -109,27 +109,14 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 		return
 	}
 
-	// 查询模型分布
-	uid64 := int64(userID)
-	modelStats, _ := h.service.StatsByModel(c.Request.Context(), appusage.StatsFilter{
-		UserID:      &uid64,
-		APIKeyID:    apiKeyFilter,
-		Platform:    query.Platform,
-		Model:       query.Model,
-		StartDate:   query.StartDate,
-		EndDate:     query.EndDate,
-		TZ:          tz,
-		ScopedToKey: scoped,
-	})
-
 	// End customer scope：只暴露 billed_cost，剥离 actual_cost / total_cost
 	if scoped {
 		resp := dto.UsageStatsResp{
-			TotalRequests:   summary.TotalRequests,
-			TotalTokens:     summary.TotalTokens,
-			TotalBilledCost: summary.TotalBilledCost,
+			TotalRequests:   result.Summary.TotalRequests,
+			TotalTokens:     result.Summary.TotalTokens,
+			TotalBilledCost: result.Summary.TotalBilledCost,
 		}
-		for _, m := range modelStats {
+		for _, m := range result.ByModel {
 			resp.ByModel = append(resp.ByModel, dto.ModelStats{
 				Model:      m.Model,
 				Requests:   m.Requests,
@@ -143,13 +130,13 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 
 	// Reseller scope：完整字段（actual + billed），前端按需展示
 	resp := dto.UsageStatsResp{
-		TotalRequests:   summary.TotalRequests,
-		TotalTokens:     summary.TotalTokens,
-		TotalCost:       summary.TotalCost,
-		TotalActualCost: summary.TotalActualCost,
-		TotalBilledCost: summary.TotalBilledCost,
+		TotalRequests:   result.Summary.TotalRequests,
+		TotalTokens:     result.Summary.TotalTokens,
+		TotalCost:       result.Summary.TotalCost,
+		TotalActualCost: result.Summary.TotalActualCost,
+		TotalBilledCost: result.Summary.TotalBilledCost,
 	}
-	for _, m := range modelStats {
+	for _, m := range result.ByModel {
 		resp.ByModel = append(resp.ByModel, dto.ModelStats{
 			Model:      m.Model,
 			Requests:   m.Requests,

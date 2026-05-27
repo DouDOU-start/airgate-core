@@ -142,13 +142,29 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 	// 2. 消息锁 + 均摊延迟（仅真实用户消息）
 	releaseMsgLock := func() {}
 	if scheduler.IsRealUserMessage(state.body) {
-		acquired, _ := f.scheduler.AcquireMessageLock(ctx, state.account.ID, state.requestID, state.account.Extra)
-		if acquired {
-			releaseMsgLock = func() {
-				f.scheduler.ReleaseMessageLock(releaseCtx, state.account.ID, state.requestID)
-			}
-			f.scheduler.EnforceMessageDelay(ctx, state.account.ID, state.account.Extra)
+		acquired, err := f.scheduler.AcquireMessageLock(ctx, state.account.ID, state.requestID, state.account.Extra)
+		if err != nil {
+			releaseMsgLock()
+			f.scheduler.DecrementRPM(ctx, state.account.ID)
+			slog.Info("账号消息锁获取失败，尝试 failover",
+				"account_id", state.account.ID,
+				"error", err,
+			)
+			return nil, false
 		}
+		if !acquired {
+			releaseMsgLock()
+			f.scheduler.DecrementRPM(ctx, state.account.ID)
+			slog.Info("账号消息锁排队已满，尝试 failover",
+				"account_id", state.account.ID,
+				"max_waiters", scheduler.ExtraInt(state.account.Extra, "msg_lock_max_waiters"),
+			)
+			return nil, false
+		}
+		releaseMsgLock = func() {
+			f.scheduler.ReleaseMessageLock(releaseCtx, state.account.ID, state.requestID)
+		}
+		f.scheduler.EnforceMessageDelay(ctx, state.account.ID, state.account.Extra)
 	}
 
 	// 3. 账号并发槽
