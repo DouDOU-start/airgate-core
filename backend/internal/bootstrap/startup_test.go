@@ -28,3 +28,22 @@ CREATE INDEX CONCURRENTLY idx_example ON public.example (created_at);
 		t.Fatalf("stmt[2] = %q", got[2])
 	}
 }
+
+func TestValidateSystemUpgradeFilename(t *testing.T) {
+	valid := "20260528143015_usage_logs_upgrade.sql"
+	if err := validateSystemUpgradeFilename(valid); err != nil {
+		t.Fatalf("valid filename rejected: %v", err)
+	}
+
+	invalid := []string{
+		"20260528_usage_logs_upgrade.sql",
+		"202605281430_usage_logs_upgrade.sql",
+		"20260528143015.sql",
+		"20261328143015_usage_logs_upgrade.sql",
+	}
+	for _, name := range invalid {
+		if err := validateSystemUpgradeFilename(name); err == nil {
+			t.Fatalf("invalid filename accepted: %s", name)
+		}
+	}
+}

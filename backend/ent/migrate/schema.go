@@ -351,6 +351,11 @@ var (
 				Columns: []*schema.Column{UsageLogsColumns[34]},
 			},
 			{
+				Name:    "usage_log_user_id_snapshot",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[32]},
+			},
+			{
 				Name:    "usage_log_api_key",
 				Unique:  false,
 				Columns: []*schema.Column{UsageLogsColumns[35]},

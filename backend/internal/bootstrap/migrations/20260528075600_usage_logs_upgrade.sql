@@ -1,4 +1,4 @@
--- description: Move legacy usage_logs image fields into metadata and add created_at index.
+-- description: Upgrade usage_logs table.
 
 ALTER TABLE public.usage_logs ADD COLUMN IF NOT EXISTS image_size text NOT NULL DEFAULT '';
 
@@ -26,3 +26,4 @@ ALTER TABLE public.usage_logs DROP COLUMN IF EXISTS usage_metrics;
 ALTER TABLE public.usage_logs DROP COLUMN IF EXISTS usage_cost_details;
 
 CREATE INDEX CONCURRENTLY IF NOT EXISTS usage_log_created_at ON public.usage_logs (created_at);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS usage_log_user_id_snapshot ON public.usage_logs (user_id_snapshot);
