@@ -231,6 +231,9 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			releaseAccountSlot, ok := f.acquireAccountSlot(c, state)
 			if !ok {
 				failureSummary.recordLocalCapacityFailure()
+				if state.requireContinuationAffinity {
+					break
+				}
 				softExclude = append(softExclude, accountID)
 				continue
 			}
@@ -417,6 +420,10 @@ func (s *allRoutesFailureSummary) recordRetryAfter(retryAfter time.Duration) {
 }
 
 func (s *allRoutesFailureSummary) recordPickAccountError(err error) {
+	if errors.Is(err, scheduler.ErrContinuationCapacityExceeded) {
+		s.localCapacitySeen = true
+		return
+	}
 	if errors.Is(err, scheduler.ErrContinuationAffinityMissing) {
 		s.continuationAffinityMissing = true
 		return

@@ -75,7 +75,7 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 				return acc, nil
 			}
 			if opts.RequireContinuationAffinity {
-				return nil, ErrContinuationAffinityMissing
+				return nil, continuationBlockedError(candidates, accountID)
 			}
 		}
 	}
@@ -89,6 +89,7 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 					s.sticky.Set(ctx, userID, platform, sessionID, accountID)
 					return acc, nil
 				}
+				return nil, continuationBlockedError(candidates, accountID)
 			} else if acc := selectSoftStickyAccount(softStickyCandidates(normalCandidates, stickyCandidates), accountID); acc != nil {
 				s.sticky.Set(ctx, userID, platform, sessionID, accountID)
 				return acc, nil
@@ -121,6 +122,13 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		return nil, ErrNoAvailableAccount
 	}
 	return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, normalCandidates, now)
+}
+
+func continuationBlockedError(candidates []*ent.Account, accountID int) error {
+	if findAccountByID(candidates, accountID) != nil {
+		return ErrContinuationCapacityExceeded
+	}
+	return ErrContinuationAffinityMissing
 }
 
 func findAccountByID(candidates []*ent.Account, accountID int) *ent.Account {

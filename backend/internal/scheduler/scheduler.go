@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	ErrNoAvailableAccount          = errors.New("无可用账户")
-	ErrGroupNotFound               = errors.New("分组不存在")
-	ErrContinuationAffinityMissing = errors.New("续链请求无法定位原上游账号")
+	ErrNoAvailableAccount           = errors.New("无可用账户")
+	ErrGroupNotFound                = errors.New("分组不存在")
+	ErrContinuationAffinityMissing  = errors.New("续链请求无法定位原上游账号")
+	ErrContinuationCapacityExceeded = errors.New("续链请求原上游账号容量不足")
 )
 
 // dbTimeout 后台 DB 操作超时，防止 goroutine 泄漏。

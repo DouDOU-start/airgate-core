@@ -57,6 +57,18 @@ func TestSoftStickyPrefersNormalPriorityPool(t *testing.T) {
 	}
 }
 
+func TestContinuationBlockedErrorDistinguishesCapacityFromMissingAffinity(t *testing.T) {
+	t.Parallel()
+
+	candidates := []*ent.Account{{ID: 1}}
+	if err := continuationBlockedError(candidates, 1); !errors.Is(err, ErrContinuationCapacityExceeded) {
+		t.Fatalf("continuationBlockedError(existing) = %v, want ErrContinuationCapacityExceeded", err)
+	}
+	if err := continuationBlockedError(candidates, 2); !errors.Is(err, ErrContinuationAffinityMissing) {
+		t.Fatalf("continuationBlockedError(missing) = %v, want ErrContinuationAffinityMissing", err)
+	}
+}
+
 func TestNormalizeGroupLookupErrorPreservesCancellation(t *testing.T) {
 	t.Parallel()
 

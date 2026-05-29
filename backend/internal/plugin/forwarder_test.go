@@ -14,6 +14,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/routing"
+	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
@@ -499,5 +500,26 @@ func TestAllRoutesFailureSummaryRecordsTimeout(t *testing.T) {
 	}
 	if summary.upstreamFailureSeen {
 		t.Fatalf("upstreamFailureSeen = true, want false")
+	}
+}
+
+func TestAllRoutesFailureSummaryRecordsContinuationCapacity(t *testing.T) {
+	t.Parallel()
+
+	summary := allRoutesFailureSummary{}
+	summary.recordPickAccountError(scheduler.ErrContinuationCapacityExceeded)
+
+	if !summary.localCapacitySeen {
+		t.Fatalf("localCapacitySeen = false, want true")
+	}
+	if summary.continuationAffinityMissing {
+		t.Fatalf("continuationAffinityMissing = true, want false")
+	}
+	response := selectAllRoutesFailureResponse(summary)
+	if response.status != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d", response.status, http.StatusTooManyRequests)
+	}
+	if response.code != "all_routes_capacity_exhausted" {
+		t.Fatalf("code = %q, want all_routes_capacity_exhausted", response.code)
 	}
 }
