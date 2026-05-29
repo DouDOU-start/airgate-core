@@ -3,7 +3,7 @@
 # AirGate Core - 裸金属安装脚本（systemd）
 #
 # 用法：
-#   curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/install.sh | sudo bash
+#   curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/master/deploy/install.sh | sudo bash
 #
 # 或带子命令：
 #   sudo bash install.sh install    # 安装最新版本（默认动作）
@@ -39,7 +39,7 @@ set -e
 
 # ---- Constants ----
 GITHUB_REPO="${GITHUB_REPO:-DevilGenius/airgate-core}"
-AIRGATE_BRANCH="${AIRGATE_BRANCH:-apex}"
+AIRGATE_BRANCH="${AIRGATE_BRANCH:-master}"
 INSTALL_DIR="/opt/airgate-core"
 CONFIG_DIR="/etc/airgate-core"
 DATA_DIR="/var/lib/airgate-core"

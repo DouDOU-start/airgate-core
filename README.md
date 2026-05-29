@@ -8,7 +8,7 @@
   <p>
     <a href="https://github.com/DevilGenius/airgate-core/releases"><img src="https://img.shields.io/github/v/release/DevilGenius/airgate-core?style=flat-square" alt="release" /></a>
     <a href="https://github.com/DevilGenius/airgate-core/pkgs/container/airgate-core"><img src="https://img.shields.io/badge/ghcr.io-airgate--core-blue?style=flat-square&logo=docker" alt="ghcr.io" /></a>
-    <a href="https://github.com/DevilGenius/airgate-core/blob/apex/LICENSE"><img src="https://img.shields.io/github/license/DevilGenius/airgate-core?style=flat-square" alt="license" /></a>
+    <a href="https://github.com/DevilGenius/airgate-core/blob/master/LICENSE"><img src="https://img.shields.io/github/license/DevilGenius/airgate-core?style=flat-square" alt="license" /></a>
     <img src="https://img.shields.io/badge/Go-1.25-00ADD8?style=flat-square&logo=go" alt="go" />
     <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react" alt="react" />
   </p>
@@ -102,7 +102,7 @@ type GatewayPlugin interface {
 ### 方式 1A：裸金属安装（systemd，自备 PostgreSQL + Redis）
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/master/deploy/install.sh | sudo bash
 ```
 
 [install.sh](deploy/install.sh) 会：
@@ -132,13 +132,13 @@ sudo systemctl enable airgate-core
 
 ```bash
 # 升级到最新版本（保留配置和数据）
-curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/install.sh | sudo bash -s -- upgrade
+curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/master/deploy/install.sh | sudo bash -s -- upgrade
 
 # 安装指定版本
-curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/install.sh | sudo bash -s -- -v v0.1.0
+curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/master/deploy/install.sh | sudo bash -s -- -v v0.1.0
 
 # 卸载（默认保留 /etc/airgate-core 与 /var/lib/airgate-core）
-curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/install.sh | sudo bash -s -- uninstall -y
+curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/master/deploy/install.sh | sudo bash -s -- uninstall -y
 ```
 
 **常用命令**：
@@ -153,7 +153,7 @@ sudo systemctl restart airgate-core   # 重启
 
 ```bash
 mkdir airgate && cd airgate
-curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/docker-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/master/deploy/docker-deploy.sh | bash
 
 # 检查生成的文件后启动
 docker compose up -d
@@ -411,7 +411,7 @@ airgate-core/
 > docker run --rm -v <project>_redis_data:/from    -v $(pwd)/data/redis:/to    alpine cp -a /from/. /to/
 > docker run --rm -v <project>_airgate_plugins:/from -v $(pwd)/data/plugins:/to alpine cp -a /from/. /to/
 > docker run --rm -v <project>_airgate_uploads:/from -v $(pwd)/data/uploads:/to alpine cp -a /from/. /to/
-> curl -O https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/docker-compose.yml
+> curl -O https://raw.githubusercontent.com/DevilGenius/airgate-core/master/deploy/docker-compose.yml
 > docker compose up -d
 > # 验证一切正常后再删除旧的命名 volume
 > docker volume rm <project>_postgres_data <project>_redis_data <project>_airgate_plugins <project>_airgate_uploads

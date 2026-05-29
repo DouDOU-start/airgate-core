@@ -16,7 +16,7 @@
 #
 # 用法：
 #   mkdir airgate && cd airgate
-#   curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/docker-deploy.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/DevilGenius/airgate-core/master/deploy/docker-deploy.sh | bash
 #
 # 或带参数：
 #   curl -sSL .../docker-deploy.sh -o docker-deploy.sh
@@ -25,7 +25,7 @@
 # 环境变量覆盖（可选）：
 #   AIRGATE_DIR     安装目录            默认: 当前目录
 #   AIRGATE_PORT    HTTP 端口           默认: 9517
-#   AIRGATE_BRANCH  从 GitHub 拉哪个分支 默认: apex
+#   AIRGATE_BRANCH  从 GitHub 拉哪个分支 默认: master
 #   AIRGATE_TAG     固定镜像版本         默认: latest
 #   NON_INTERACTIVE 跳过所有交互（CI 用） 默认: 0
 #
@@ -65,7 +65,7 @@ BANNER
 # ---- 默认参数 ----
 AIRGATE_DIR="${AIRGATE_DIR:-.}"
 AIRGATE_PORT="${AIRGATE_PORT:-9517}"
-AIRGATE_BRANCH="${AIRGATE_BRANCH:-apex}"
+AIRGATE_BRANCH="${AIRGATE_BRANCH:-master}"
 AIRGATE_TAG="${AIRGATE_TAG:-latest}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
 

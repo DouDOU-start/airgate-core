@@ -2,7 +2,7 @@
 # AirGate Core 生产部署
 #
 # 推荐用法（一行安装）：
-#   curl -fsSL https://raw.githubusercontent.com/DevilGenius/airgate-core/apex/deploy/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/DevilGenius/airgate-core/master/deploy/install.sh | bash
 #
 # 手动用法：
 #   1. 在本目录（或任意空目录）准备 docker-compose.yml + .env：
