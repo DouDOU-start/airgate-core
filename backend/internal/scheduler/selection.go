@@ -21,7 +21,7 @@ import (
 // SelectAccount 选一个可用账户。流程：
 //
 //	模型路由 → 状态过滤 → 软约束过滤（RPM / window / session）→
-//	粘性会话 → 负载均衡。
+//	硬续链亲和 → 同优先级软粘连 → 负载均衡。
 //
 // excludeIDs 为 failover 时已尝试过的账户。
 func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, userID, groupID int, sessionID string, excludeIDs ...int) (*ent.Account, error) {
@@ -34,7 +34,8 @@ type AccountSelectionOptions struct {
 }
 
 // SelectAccountWithOptions 在常规调度前优先按 previous_response_id 命中原账号。
-// RequireContinuationAffinity=true 时，请求不是自包含重放，不能安全切换到其它账号。
+// RequireContinuationAffinity=true 时，请求不是自包含重放，previous_response_id 或 session sticky
+// 都是硬亲和，不能被 priority 覆盖。普通 session sticky 只在当前可用最高优先级层内生效。
 func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, model string, userID, groupID int, sessionID string, opts AccountSelectionOptions, excludeIDs ...int) (*ent.Account, error) {
 	candidates, err := s.routeAccounts(ctx, platform, model, groupID)
 	if err != nil {
@@ -66,14 +67,12 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 
 	if previousResponseID := strings.TrimSpace(opts.PreviousResponseID); previousResponseID != "" && s.responseAffinity != nil {
 		if accountID, found := s.responseAffinity.Get(ctx, groupID, platform, previousResponseID); found {
-			for _, acc := range stickyCandidates {
-				if acc.ID == accountID {
-					s.responseAffinity.Refresh(ctx, groupID, platform, previousResponseID, accountID)
-					if sessionID != "" {
-						s.sticky.Set(ctx, userID, platform, sessionID, accountID)
-					}
-					return acc, nil
+			if acc := findAccountByID(stickyCandidates, accountID); acc != nil {
+				s.responseAffinity.Refresh(ctx, groupID, platform, previousResponseID, accountID)
+				if sessionID != "" {
+					s.sticky.Set(ctx, userID, platform, sessionID, accountID)
 				}
+				return acc, nil
 			}
 			if opts.RequireContinuationAffinity {
 				return nil, ErrContinuationAffinityMissing
@@ -81,14 +80,18 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		}
 	}
 
-	// 粘性会话优先（可命中 StickyOnly + Normal）
+	// 续链请求的 session sticky 是硬亲和；普通 session sticky 只是软粘连，
+	// 低优先级旧账号不能抢过当前可用最高优先级账号。
 	if sessionID != "" {
 		if accountID, found := s.sticky.Get(ctx, userID, platform, sessionID); found {
-			for _, acc := range stickyCandidates {
-				if acc.ID == accountID {
+			if opts.RequireContinuationAffinity {
+				if acc := findAccountByID(stickyCandidates, accountID); acc != nil {
 					s.sticky.Set(ctx, userID, platform, sessionID, accountID)
 					return acc, nil
 				}
+			} else if acc := selectSoftStickyAccount(softStickyCandidates(normalCandidates, stickyCandidates), accountID); acc != nil {
+				s.sticky.Set(ctx, userID, platform, sessionID, accountID)
+				return acc, nil
 			}
 		}
 	}
@@ -118,6 +121,42 @@ func (s *Scheduler) SelectAccountWithOptions(ctx context.Context, platform, mode
 		return nil, ErrNoAvailableAccount
 	}
 	return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, normalCandidates, now)
+}
+
+func findAccountByID(candidates []*ent.Account, accountID int) *ent.Account {
+	if accountID <= 0 {
+		return nil
+	}
+	for _, acc := range candidates {
+		if acc != nil && acc.ID == accountID {
+			return acc
+		}
+	}
+	return nil
+}
+
+func softStickyCandidates(normalCandidates, stickyCandidates []*ent.Account) []*ent.Account {
+	if len(normalCandidates) > 0 {
+		return normalCandidates
+	}
+	return stickyCandidates
+}
+
+func selectSoftStickyAccount(candidates []*ent.Account, accountID int) *ent.Account {
+	acc := findAccountByID(candidates, accountID)
+	if acc == nil {
+		return nil
+	}
+	maxPriority := acc.Priority
+	for _, candidate := range candidates {
+		if candidate != nil && candidate.Priority > maxPriority {
+			maxPriority = candidate.Priority
+		}
+	}
+	if acc.Priority != maxPriority {
+		return nil
+	}
+	return acc
 }
 
 // excludeAccounts 过滤掉 excludeIDs 中的账号（failover 已尝试过的）。

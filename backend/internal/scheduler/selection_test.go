@@ -22,6 +22,41 @@ func TestExcludeAccountsDoesNotMutateCandidates(t *testing.T) {
 	}
 }
 
+func TestSelectSoftStickyAccountHonorsHighestPriority(t *testing.T) {
+	t.Parallel()
+
+	candidates := []*ent.Account{
+		{ID: 1, Priority: 10},
+		{ID: 2, Priority: 20},
+		{ID: 3, Priority: 20},
+	}
+
+	if got := selectSoftStickyAccount(candidates, 1); got != nil {
+		t.Fatalf("low priority sticky account selected: %+v", got)
+	}
+	if got := selectSoftStickyAccount(candidates, 2); got == nil || got.ID != 2 {
+		t.Fatalf("top priority sticky account = %+v, want account 2", got)
+	}
+}
+
+func TestSoftStickyPrefersNormalPriorityPool(t *testing.T) {
+	t.Parallel()
+
+	normalCandidates := []*ent.Account{{ID: 2, Priority: 20}}
+	stickyCandidates := []*ent.Account{
+		{ID: 1, Priority: 30},
+		{ID: 2, Priority: 20},
+	}
+
+	pool := softStickyCandidates(normalCandidates, stickyCandidates)
+	if got := selectSoftStickyAccount(pool, 1); got != nil {
+		t.Fatalf("sticky-only account selected while normal candidates exist: %+v", got)
+	}
+	if got := selectSoftStickyAccount(pool, 2); got == nil || got.ID != 2 {
+		t.Fatalf("normal top priority sticky account = %+v, want account 2", got)
+	}
+}
+
 func TestNormalizeGroupLookupErrorPreservesCancellation(t *testing.T) {
 	t.Parallel()
 
