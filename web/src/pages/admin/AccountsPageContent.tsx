@@ -453,6 +453,7 @@ export default function AccountsPageContent() {
     onSuccess: (res, id) => {
       applyQuotaRefreshResult(id, res);
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
       if (res?.reauth_warning) {
         toast('warning', t('accounts.refresh_quota_reauth_warning'));
       } else {
@@ -1000,6 +1001,7 @@ export default function AccountsPageContent() {
           onClose={() => setBulkRefreshTargets(null)}
           onFinished={() => {
             queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+            queryClient.invalidateQueries({ queryKey: queryKeys.accountUsage(platformFilter) });
             clearSelection();
           }}
         />
