@@ -351,14 +351,34 @@ var (
 				Columns: []*schema.Column{UsageLogsColumns[34]},
 			},
 			{
-				Name:    "usage_log_user_id_snapshot",
+				Name:    "usage_log_platform_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[32]},
+				Columns: []*schema.Column{UsageLogsColumns[1], UsageLogsColumns[34]},
+			},
+			{
+				Name:    "usage_log_user_snapshot_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[32], UsageLogsColumns[34]},
+			},
+			{
+				Name:    "usage_log_user",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[38]},
 			},
 			{
 				Name:    "usage_log_api_key",
 				Unique:  false,
 				Columns: []*schema.Column{UsageLogsColumns[35]},
+			},
+			{
+				Name:    "usage_log_account",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[36]},
+			},
+			{
+				Name:    "usage_log_group",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[37]},
 			},
 		},
 	}
