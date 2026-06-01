@@ -9,6 +9,28 @@ import { useSiteSettings } from '../../../app/providers/SiteSettingsProvider';
 import { apikeysApi } from '../../../shared/api/apikeys';
 import type { APIKeyResp, GroupResp } from '../../../shared/types';
 
+const CODEX_AUTH_ACCOUNT_ID = 'workspace-1';
+const CODEX_AUTH_ID_TOKEN =
+  'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF91c2VyX2lkIjoidXNlci0xIiwiY2hhdGdwdF9hY2NvdW50X2lkIjoid29ya3NwYWNlLTEiLCJjaGF0Z3B0X3BsYW5fdHlwZSI6InBybyJ9LCJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20ifQ.sig';
+const CODEX_AUTH_LAST_REFRESH = '2026-05-24T00:00:00Z';
+
+function buildCodexAuthJson(): string {
+  return JSON.stringify(
+    {
+      auth_mode: 'chatgptAuthTokens',
+      tokens: {
+        id_token: CODEX_AUTH_ID_TOKEN,
+        access_token: 'dummy-access-token',
+        refresh_token: 'dummy-refresh-token',
+        account_id: CODEX_AUTH_ACCOUNT_ID,
+      },
+      last_refresh: CODEX_AUTH_LAST_REFRESH,
+    },
+    null,
+    2,
+  );
+}
+
 function getUseKeyConfig(
   baseUrl: string,
   platform: string,
@@ -51,28 +73,29 @@ function getUseKeyConfig(
       }
     } else {
       // Codex CLI 配置 — 写入 ~/.codex/config.toml 与 ~/.codex/auth.json
-      const configDir = shell === 'unix' ? '~/.codex' : '%userprofile%\\.codex';
+      const configDir = shell === 'unix' ? '~/.codex' : '%USERPROFILE%\\.codex';
+      const configPath = shell === 'unix' ? `${configDir}/config.toml` : `${configDir}\\config.toml`;
+      const authPath = shell === 'unix' ? `${configDir}/auth.json` : `${configDir}\\auth.json`;
       const configToml = `model_provider = "airgate"
 model = "gpt-5.5"
 model_reasoning_effort = "xhigh"
-disable_response_storage = true
 
-[model_providers]
 [model_providers.airgate]
 name = "airgate"
-base_url = "${baseUrl}"
 wire_api = "responses"
-requires_openai_auth = true`;
-      const authJson = `{\n  "OPENAI_API_KEY": "${apiKey}"\n}`;
+requires_openai_auth = true
+base_url = "${baseUrl}"
+experimental_bearer_token = "${apiKey}"`;
+      const authJson = buildCodexAuthJson();
       return {
         files: [
           {
-            path: `${configDir}/config.toml`,
+            path: configPath,
             content: configToml,
             hint: t('user_keys.codex_config_toml_hint'),
           },
           {
-            path: `${configDir}/auth.json`,
+            path: authPath,
             content: authJson,
           },
         ],
