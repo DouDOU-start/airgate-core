@@ -50,6 +50,8 @@ const (
 	FieldCachedInputCost = "cached_input_cost"
 	// FieldCacheCreationCost holds the string denoting the cache_creation_cost field in the database.
 	FieldCacheCreationCost = "cache_creation_cost"
+	// FieldImageCost holds the string denoting the image_cost field in the database.
+	FieldImageCost = "image_cost"
 	// FieldTotalCost holds the string denoting the total_cost field in the database.
 	FieldTotalCost = "total_cost"
 	// FieldActualCost holds the string denoting the actual_cost field in the database.
@@ -157,6 +159,7 @@ var Columns = []string{
 	FieldOutputCost,
 	FieldCachedInputCost,
 	FieldCacheCreationCost,
+	FieldImageCost,
 	FieldTotalCost,
 	FieldActualCost,
 	FieldBilledCost,
@@ -243,6 +246,8 @@ var (
 	DefaultCachedInputCost float64
 	// DefaultCacheCreationCost holds the default value on creation for the "cache_creation_cost" field.
 	DefaultCacheCreationCost float64
+	// DefaultImageCost holds the default value on creation for the "image_cost" field.
+	DefaultImageCost float64
 	// DefaultTotalCost holds the default value on creation for the "total_cost" field.
 	DefaultTotalCost float64
 	// DefaultActualCost holds the default value on creation for the "actual_cost" field.
@@ -379,6 +384,11 @@ func ByCachedInputCost(opts ...sql.OrderTermOption) OrderOption {
 // ByCacheCreationCost orders the results by the cache_creation_cost field.
 func ByCacheCreationCost(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCacheCreationCost, opts...).ToFunc()
+}
+
+// ByImageCost orders the results by the image_cost field.
+func ByImageCost(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImageCost, opts...).ToFunc()
 }
 
 // ByTotalCost orders the results by the total_cost field.

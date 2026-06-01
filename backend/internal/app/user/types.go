@@ -15,6 +15,7 @@ type User struct {
 	Role                  string
 	MaxConcurrency        int
 	GroupRates            map[int64]float64
+	GroupPluginSettings   map[int64]map[string]map[string]string
 	AllowedGroupIDs       []int64
 	BalanceAlertThreshold float64
 	BalanceAlertNotified  bool
@@ -42,25 +43,28 @@ type ListResult struct {
 
 // CreateInput 创建用户输入。
 type CreateInput struct {
-	Email          string
-	Password       string
-	Username       string
-	Role           string
-	MaxConcurrency int
-	GroupRates     map[int64]float64
+	Email               string
+	Password            string
+	Username            string
+	Role                string
+	MaxConcurrency      int
+	GroupRates          map[int64]float64
+	GroupPluginSettings map[int64]map[string]map[string]string
 }
 
 // UpdateInput 更新用户输入。
 type UpdateInput struct {
-	Username           *string
-	Password           *string
-	Role               *string
-	MaxConcurrency     *int
-	GroupRates         map[int64]float64
-	HasGroupRates      bool
-	AllowedGroupIDs    []int64
-	HasAllowedGroupIDs bool
-	Status             *string
+	Username               *string
+	Password               *string
+	Role                   *string
+	MaxConcurrency         *int
+	GroupRates             map[int64]float64
+	HasGroupRates          bool
+	GroupPluginSettings    map[int64]map[string]map[string]string
+	HasGroupPluginSettings bool
+	AllowedGroupIDs        []int64
+	HasAllowedGroupIDs     bool
+	Status                 *string
 }
 
 // BalanceChange 余额变更输入。
@@ -139,16 +143,18 @@ type APIKeyList struct {
 
 // Mutation 用户持久化变更。
 type Mutation struct {
-	Email              *string
-	Username           *string
-	PasswordHash       *string
-	Role               *string
-	MaxConcurrency     *int
-	GroupRates         map[int64]float64
-	HasGroupRates      bool
-	AllowedGroupIDs    []int64
-	HasAllowedGroupIDs bool
-	Status             *string
+	Email                  *string
+	Username               *string
+	PasswordHash           *string
+	Role                   *string
+	MaxConcurrency         *int
+	GroupRates             map[int64]float64
+	HasGroupRates          bool
+	GroupPluginSettings    map[int64]map[string]map[string]string
+	HasGroupPluginSettings bool
+	AllowedGroupIDs        []int64
+	HasAllowedGroupIDs     bool
+	Status                 *string
 }
 
 // BalanceUpdate 余额更新数据。
@@ -162,10 +168,11 @@ type BalanceUpdate struct {
 
 // GroupRateOverride 表示某个用户对某个分组的专属倍率。
 type GroupRateOverride struct {
-	UserID   int
-	Email    string
-	Username string
-	Rate     float64
+	UserID         int
+	Email          string
+	Username       string
+	Rate           float64
+	PluginSettings map[string]map[string]string
 }
 
 // Repository 用户持久化接口。

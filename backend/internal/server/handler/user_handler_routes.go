@@ -191,12 +191,13 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	}
 
 	item, err := h.service.Create(c.Request.Context(), appuser.CreateInput{
-		Email:          req.Email,
-		Password:       req.Password,
-		Username:       req.Username,
-		Role:           req.Role,
-		MaxConcurrency: maxConcurrency,
-		GroupRates:     req.GroupRates,
+		Email:               req.Email,
+		Password:            req.Password,
+		Username:            req.Username,
+		Role:                req.Role,
+		MaxConcurrency:      maxConcurrency,
+		GroupRates:          req.GroupRates,
+		GroupPluginSettings: req.GroupPluginSettings,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("创建用户失败", "创建失败", err)
@@ -221,15 +222,17 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	}
 
 	item, err := h.service.Update(c.Request.Context(), id, appuser.UpdateInput{
-		Username:           req.Username,
-		Password:           req.Password,
-		Role:               req.Role,
-		MaxConcurrency:     req.MaxConcurrency,
-		GroupRates:         req.GroupRates,
-		HasGroupRates:      req.GroupRates != nil,
-		AllowedGroupIDs:    derefInt64Slice(req.AllowedGroupIDs),
-		HasAllowedGroupIDs: req.AllowedGroupIDs != nil,
-		Status:             req.Status,
+		Username:               req.Username,
+		Password:               req.Password,
+		Role:                   req.Role,
+		MaxConcurrency:         req.MaxConcurrency,
+		GroupRates:             req.GroupRates,
+		HasGroupRates:          req.GroupRates != nil,
+		GroupPluginSettings:    req.GroupPluginSettings,
+		HasGroupPluginSettings: req.GroupPluginSettings != nil,
+		AllowedGroupIDs:        derefInt64Slice(req.AllowedGroupIDs),
+		HasAllowedGroupIDs:     req.AllowedGroupIDs != nil,
+		Status:                 req.Status,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("更新用户失败", "更新失败", err)

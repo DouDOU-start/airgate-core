@@ -38,6 +38,7 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 		OutputCost:            record.OutputCost,
 		CachedInputCost:       record.CachedInputCost,
 		CacheCreationCost:     record.CacheCreationCost,
+		ImageCost:             record.ImageCost,
 		TotalCost:             record.TotalCost,
 		ActualCost:            record.ActualCost,
 		BilledCost:            record.BilledCost,

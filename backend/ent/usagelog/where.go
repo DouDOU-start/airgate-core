@@ -145,6 +145,11 @@ func CacheCreationCost(v float64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCacheCreationCost, v))
 }
 
+// ImageCost applies equality check predicate on the "image_cost" field. It's identical to ImageCostEQ.
+func ImageCost(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldImageCost, v))
+}
+
 // TotalCost applies equality check predicate on the "total_cost" field. It's identical to TotalCostEQ.
 func TotalCost(v float64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldTotalCost, v))
@@ -1008,6 +1013,46 @@ func CacheCreationCostLT(v float64) predicate.UsageLog {
 // CacheCreationCostLTE applies the LTE predicate on the "cache_creation_cost" field.
 func CacheCreationCostLTE(v float64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldLTE(FieldCacheCreationCost, v))
+}
+
+// ImageCostEQ applies the EQ predicate on the "image_cost" field.
+func ImageCostEQ(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldImageCost, v))
+}
+
+// ImageCostNEQ applies the NEQ predicate on the "image_cost" field.
+func ImageCostNEQ(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldImageCost, v))
+}
+
+// ImageCostIn applies the In predicate on the "image_cost" field.
+func ImageCostIn(vs ...float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldImageCost, vs...))
+}
+
+// ImageCostNotIn applies the NotIn predicate on the "image_cost" field.
+func ImageCostNotIn(vs ...float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldImageCost, vs...))
+}
+
+// ImageCostGT applies the GT predicate on the "image_cost" field.
+func ImageCostGT(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldImageCost, v))
+}
+
+// ImageCostGTE applies the GTE predicate on the "image_cost" field.
+func ImageCostGTE(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldImageCost, v))
+}
+
+// ImageCostLT applies the LT predicate on the "image_cost" field.
+func ImageCostLT(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldImageCost, v))
+}
+
+// ImageCostLTE applies the LTE predicate on the "image_cost" field.
+func ImageCostLTE(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldImageCost, v))
 }
 
 // TotalCostEQ applies the EQ predicate on the "total_cost" field.

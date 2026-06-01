@@ -65,6 +65,7 @@ export interface UserResp {
   max_concurrency: number;
 
   group_rates?: Record<number, number>;
+  group_plugin_settings?: Record<number, Record<string, Record<string, string>>>;
   allowed_group_ids?: number[];
   balance_alert_threshold: number;
   status: string;
@@ -95,6 +96,7 @@ export interface CreateUserReq {
   role: UserRole;
   max_concurrency?: number;
   group_rates?: Record<number, number>;
+  group_plugin_settings?: Record<number, Record<string, Record<string, string>>>;
 }
 
 export interface UpdateUserReq {
@@ -103,6 +105,7 @@ export interface UpdateUserReq {
   role?: UserRole;
   max_concurrency?: number;
   group_rates?: Record<number, number>;
+  group_plugin_settings?: Record<number, Record<string, Record<string, string>>>;
   allowed_group_ids?: number[];
   status?: 'active' | 'disabled';
 }
@@ -326,6 +329,7 @@ export interface GroupRateOverrideResp {
   email: string;
   username: string;
   rate: number;
+  plugin_settings?: Record<string, Record<string, string>>;
 }
 
 export interface UpdateGroupReq {

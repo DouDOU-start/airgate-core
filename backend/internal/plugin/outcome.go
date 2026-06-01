@@ -273,15 +273,26 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 	//   accountRate: 账号自身的真实成本系数（"账号计费"统计管道）
 	calcInput := billing.CalculateInput{
 		InputCost:         usageValues.InputCost,
+		ImageInputCost:    usageValues.ImageInputCost,
 		OutputCost:        usageValues.OutputCost,
 		CachedInputCost:   usageValues.CachedInputCost,
 		CacheCreationCost: usageValues.CacheCreationCost,
+		ImageCost:         usageValues.ImageCost,
 		BillingRate:       billing.ResolveBillingRate(state.keyInfo),
 		SellRate:          state.keyInfo.SellRate,
 		AccountRate:       state.account.RateMultiplier,
 	}
-	if override, ok := imageOutputBillingOverride(usage, state.keyInfo.GroupPluginSettings); ok {
-		calcInput.OutputBillingCostOverride = &override
+	userPluginSettings := map[string]map[string]string(nil)
+	if state.keyInfo.UserGroupPluginSettings != nil {
+		userPluginSettings = state.keyInfo.UserGroupPluginSettings[int64(state.keyInfo.GroupID)]
+	}
+	var imageFixedPriceApplied bool
+	var imageFixedPriceReplacesTotal bool
+	if override, ok := imageOutputBillingOverride(usage, userPluginSettings, state.keyInfo.GroupPluginSettings); ok {
+		calcInput.ImageBillingCostOverride = &override.cost
+		calcInput.ImageBillingCostOverrideReplacesTotal = override.replacesTotal
+		imageFixedPriceApplied = true
+		imageFixedPriceReplacesTotal = override.replacesTotal
 	}
 	calc := f.calculator.Calculate(calcInput)
 
@@ -289,49 +300,52 @@ func (f *Forwarder) recordUsage(c *gin.Context, state *forwardState, execution f
 	f.scheduler.AddWindowCost(ctx, state.account.ID, calc.AccountCost)
 
 	f.recorder.Record(billing.UsageRecord{
-		UserID:                state.keyInfo.UserID,
-		UserEmail:             state.keyInfo.UserEmail,
-		APIKeyID:              state.keyInfo.KeyID,
-		AccountID:             state.account.ID,
-		GroupID:               state.keyInfo.GroupID,
-		Platform:              state.plugin.Platform,
-		Model:                 actualModel,
-		InputTokens:           usageValues.InputTokens,
-		OutputTokens:          usageValues.OutputTokens,
-		CachedInputTokens:     usageValues.CachedInputTokens,
-		CacheCreationTokens:   usageValues.CacheCreationTokens,
-		CacheCreation5mTokens: usageValues.CacheCreation5mTokens,
-		CacheCreation1hTokens: usageValues.CacheCreation1hTokens,
-		ReasoningOutputTokens: usageValues.ReasoningOutputTokens,
-		InputPrice:            usageValues.InputPrice,
-		OutputPrice:           usageValues.OutputPrice,
-		CachedInputPrice:      usageValues.CachedInputPrice,
-		CacheCreationPrice:    usageValues.CacheCreationPrice,
-		CacheCreation1hPrice:  usageValues.CacheCreation1hPrice,
-		InputCost:             calc.InputCost,
-		OutputCost:            calc.OutputCost,
-		CachedInputCost:       calc.CachedInputCost,
-		CacheCreationCost:     calc.CacheCreationCost,
-		TotalCost:             calc.TotalCost,
-		ActualCost:            calc.ActualCost,
-		BilledCost:            calc.BilledCost,
-		AccountCost:           calc.AccountCost,
-		RateMultiplier:        calc.RateMultiplier,
-		SellRate:              calc.SellRate,
-		AccountRateMultiplier: calc.AccountRateMultiplier,
-		ServiceTier:           usageValues.ServiceTier,
-		ImageSize:             usageValues.ImageSize,
-		Stream:                state.stream,
-		DurationMs:            execution.duration.Milliseconds(),
-		FirstTokenMs:          usageValues.FirstTokenMs,
-		UserAgent:             c.Request.UserAgent(),
-		IPAddress:             c.ClientIP(),
-		Endpoint:              state.requestPath,
-		ReasoningEffort:       resolveReasoningEffort(state.reasoningEffort, usage),
-		UsageAttributes:       usage.Attributes,
-		UsageMetrics:          usage.Metrics,
-		UsageCostDetails:      usage.CostDetails,
-		UsageMetadata:         usage.Metadata,
+		UserID:                       state.keyInfo.UserID,
+		UserEmail:                    state.keyInfo.UserEmail,
+		APIKeyID:                     state.keyInfo.KeyID,
+		AccountID:                    state.account.ID,
+		GroupID:                      state.keyInfo.GroupID,
+		Platform:                     state.plugin.Platform,
+		Model:                        actualModel,
+		InputTokens:                  usageValues.InputTokens,
+		OutputTokens:                 usageValues.OutputTokens,
+		CachedInputTokens:            usageValues.CachedInputTokens,
+		CacheCreationTokens:          usageValues.CacheCreationTokens,
+		CacheCreation5mTokens:        usageValues.CacheCreation5mTokens,
+		CacheCreation1hTokens:        usageValues.CacheCreation1hTokens,
+		ReasoningOutputTokens:        usageValues.ReasoningOutputTokens,
+		InputPrice:                   usageValues.InputPrice,
+		OutputPrice:                  usageValues.OutputPrice,
+		CachedInputPrice:             usageValues.CachedInputPrice,
+		CacheCreationPrice:           usageValues.CacheCreationPrice,
+		CacheCreation1hPrice:         usageValues.CacheCreation1hPrice,
+		InputCost:                    calc.InputCost,
+		OutputCost:                   calc.OutputCost,
+		CachedInputCost:              calc.CachedInputCost,
+		CacheCreationCost:            calc.CacheCreationCost,
+		ImageCost:                    calc.ImageCost,
+		ImageFixedPriceApplied:       imageFixedPriceApplied,
+		ImageFixedPriceReplacesTotal: imageFixedPriceReplacesTotal,
+		TotalCost:                    calc.TotalCost,
+		ActualCost:                   calc.ActualCost,
+		BilledCost:                   calc.BilledCost,
+		AccountCost:                  calc.AccountCost,
+		RateMultiplier:               calc.RateMultiplier,
+		SellRate:                     calc.SellRate,
+		AccountRateMultiplier:        calc.AccountRateMultiplier,
+		ServiceTier:                  usageValues.ServiceTier,
+		ImageSize:                    usageValues.ImageSize,
+		Stream:                       state.stream,
+		DurationMs:                   execution.duration.Milliseconds(),
+		FirstTokenMs:                 usageValues.FirstTokenMs,
+		UserAgent:                    c.Request.UserAgent(),
+		IPAddress:                    c.ClientIP(),
+		Endpoint:                     state.requestPath,
+		ReasoningEffort:              resolveReasoningEffort(state.reasoningEffort, usage),
+		UsageAttributes:              usage.Attributes,
+		UsageMetrics:                 usage.Metrics,
+		UsageCostDetails:             usage.CostDetails,
+		UsageMetadata:                usage.Metadata,
 	})
 }
 

@@ -485,6 +485,16 @@ func GroupRatesNotNil() predicate.User {
 	return predicate.User(sql.FieldNotNull(FieldGroupRates))
 }
 
+// GroupPluginSettingsIsNil applies the IsNil predicate on the "group_plugin_settings" field.
+func GroupPluginSettingsIsNil() predicate.User {
+	return predicate.User(sql.FieldIsNull(FieldGroupPluginSettings))
+}
+
+// GroupPluginSettingsNotNil applies the NotNil predicate on the "group_plugin_settings" field.
+func GroupPluginSettingsNotNil() predicate.User {
+	return predicate.User(sql.FieldNotNull(FieldGroupPluginSettings))
+}
+
 // BalanceAlertThresholdEQ applies the EQ predicate on the "balance_alert_threshold" field.
 func BalanceAlertThresholdEQ(v float64) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldBalanceAlertThreshold, v))

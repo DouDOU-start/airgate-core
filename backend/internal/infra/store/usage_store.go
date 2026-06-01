@@ -541,6 +541,7 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		OutputCost:            item.OutputCost,
 		CachedInputCost:       item.CachedInputCost,
 		CacheCreationCost:     item.CacheCreationCost,
+		ImageCost:             item.ImageCost,
 		TotalCost:             item.TotalCost,
 		ActualCost:            item.ActualCost,
 		BilledCost:            item.BilledCost,

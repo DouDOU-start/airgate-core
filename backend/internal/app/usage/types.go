@@ -76,6 +76,7 @@ type LogRecord struct {
 	OutputCost            float64
 	CachedInputCost       float64
 	CacheCreationCost     float64
+	ImageCost             float64
 	TotalCost             float64
 	ActualCost            float64 // 平台真实成本（用户扣费）
 	BilledCost            float64 // 客户账面消耗（reseller 销售管道）

@@ -28,10 +28,46 @@ function initialRateState(groupRates?: Record<number, number>): Record<number, s
   return out;
 }
 
+type ImagePrices = {
+  oneK: string;
+  twoK: string;
+  fourK: string;
+};
+
+const IMAGE_PRICE_FIELDS: Array<{ key: keyof ImagePrices; setting: string; label: string }> = [
+  { key: 'oneK', setting: 'image_price_1k', label: '1K' },
+  { key: 'twoK', setting: 'image_price_2k', label: '2K' },
+  { key: 'fourK', setting: 'image_price_4k', label: '4K' },
+];
+
+const emptyImagePrices = (): ImagePrices => ({ oneK: '', twoK: '', fourK: '' });
+
+function isOpenAIImageEnabled(group?: GroupResp): boolean {
+  return group?.platform === 'openai' && group.plugin_settings?.openai?.image_enabled === 'true';
+}
+
+function initialImagePriceState(
+  settings?: Record<number, Record<string, Record<string, string>>>,
+): Record<number, ImagePrices> {
+  const out: Record<number, ImagePrices> = {};
+  for (const [groupId, pluginSettings] of Object.entries(settings ?? {})) {
+    const openai = pluginSettings.openai ?? {};
+    out[Number(groupId)] = {
+      oneK: openai.image_price_1k ?? '',
+      twoK: openai.image_price_2k ?? '',
+      fourK: openai.image_price_4k ?? '',
+    };
+  }
+  return out;
+}
+
 export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModalProps) {
   const { t } = useTranslation();
   const [selectedIds, setSelectedIds] = useState<number[]>(user.allowed_group_ids ?? []);
   const [customRates, setCustomRates] = useState<Record<number, string>>(() => initialRateState(user.group_rates));
+  const [customImagePrices, setCustomImagePrices] = useState<Record<number, ImagePrices>>(() =>
+    initialImagePriceState(user.group_plugin_settings),
+  );
 
   const { data: groupsData, isLoading: groupsLoading } = useQuery({
     queryKey: queryKeys.groupsAll(),
@@ -51,9 +87,27 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
       if (!Number.isFinite(value) || value <= 0) continue;
       group_rates[Number(key)] = value;
     }
+    const group_plugin_settings: Record<number, Record<string, Record<string, string>>> = {};
+    for (const [key, prices] of Object.entries(customImagePrices)) {
+      const group = allGroups.find((item) => item.id === Number(key));
+      if (!isOpenAIImageEnabled(group)) continue;
+      const openai: Record<string, string> = {};
+      for (const field of IMAGE_PRICE_FIELDS) {
+        const raw = prices[field.key]?.trim();
+        if (!raw) continue;
+        const value = Number(raw);
+        if (Number.isFinite(value) && value >= 0) {
+          openai[field.setting] = raw;
+        }
+      }
+      if (Object.keys(openai).length > 0) {
+        group_plugin_settings[Number(key)] = { openai };
+      }
+    }
     return {
       allowed_group_ids: selectedIds,
       group_rates,
+      group_plugin_settings,
     };
   };
 
@@ -70,8 +124,17 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
       const value = Number(raw);
       if (!Number.isFinite(value) || value < 0) return true;
     }
+    for (const [key, prices] of Object.entries(customImagePrices)) {
+      const groupId = Number(key);
+      if (!isOpenAIImageEnabled(allGroups.find((group) => group.id === groupId))) continue;
+      for (const raw of Object.values(prices)) {
+        if (raw === '' || raw == null) continue;
+        const value = Number(raw);
+        if (!Number.isFinite(value) || value < 0) return true;
+      }
+    }
     return false;
-  }, [customRates]);
+  }, [allGroups, customImagePrices, customRates]);
 
   const toggleExclusiveGroup = (groupId: number, isSelected: boolean) => {
     setSelectedIds((current) =>
@@ -83,6 +146,7 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
 
   const renderRateField = (group: GroupResp, enabled: boolean) => (
     <div className="ml-auto w-24 shrink-0">
+      <div className="mb-1 text-[10px] text-text-tertiary">{t('groups.rate_multiplier')}</div>
       <HeroTextField fullWidth isDisabled={!enabled}>
         <div className="relative">
           <Input
@@ -102,6 +166,46 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
     </div>
   );
 
+  const renderImagePriceFields = (group: GroupResp, enabled: boolean) => {
+    if (!isOpenAIImageEnabled(group)) return null;
+    const prices = customImagePrices[group.id] ?? emptyImagePrices();
+    return (
+      <div className="ml-2 w-56 shrink-0">
+        <div className="mb-1 flex items-center justify-between text-[10px] text-text-tertiary">
+          <span>{t('groups.image_pricing_short')}</span>
+          <span>{t('groups.image_price_fallback')}</span>
+        </div>
+        <div className="grid grid-cols-3 gap-1">
+          {IMAGE_PRICE_FIELDS.map((field) => (
+            <HeroTextField key={field.key} fullWidth isDisabled={!enabled}>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-2 top-1/2 z-10 -translate-y-1/2 text-[10px] text-text-tertiary">
+                  {field.label}
+                </span>
+                <Input
+                  aria-label={`${group.name} ${field.label} ${t('groups.image_pricing')}`}
+                  className="pl-7"
+                  type="number"
+                  min="0"
+                  step="0.000001"
+                  disabled={!enabled}
+                  value={prices[field.key]}
+                  placeholder={group.plugin_settings?.openai?.[field.setting] ?? ''}
+                  onChange={(e) =>
+                    setCustomImagePrices((prev) => ({
+                      ...prev,
+                      [group.id]: { ...(prev[group.id] ?? emptyImagePrices()), [field.key]: e.target.value },
+                    }))
+                  }
+                />
+              </div>
+            </HeroTextField>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const renderGroupRow = (group: GroupResp, selected: boolean, locked: boolean) => (
     <div
       key={group.id}
@@ -116,6 +220,7 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
       </Checkbox>
       <span className="text-[10px] text-text-tertiary">{group.platform}</span>
       {renderRateField(group, !group.is_exclusive || selected)}
+      {renderImagePriceFields(group, !group.is_exclusive || selected)}
     </div>
   );
   const modalState = useOverlayState({
@@ -132,7 +237,7 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog
             className="ag-elevation-modal"
-            style={{ maxWidth: '540px', width: 'min(100%, calc(100vw - 2rem))' }}
+            style={{ maxWidth: '720px', width: 'min(100%, calc(100vw - 2rem))' }}
           >
             <Modal.Header>
               <Modal.Heading>{`${t('users.groups')} - ${user.email}`}</Modal.Heading>
@@ -146,6 +251,7 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
               ) : (
                 <div className="max-h-[26rem] space-y-4 overflow-y-auto">
                   <p className="text-[11px] text-text-tertiary">{t('users.group_rate_hint')}</p>
+                  <p className="text-[11px] text-text-tertiary">{t('groups.image_pricing_hint')}</p>
 
                   {normalGroups.length > 0 ? (
                     <div>

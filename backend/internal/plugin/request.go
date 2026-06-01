@@ -168,16 +168,15 @@ func normalizeReasoningEffort(effort string) string {
 	}
 }
 
-// requestNeedsImage 判断请求是否应走图片分组。
-// 对话模型携带 image_generation tool 仍按对话请求路由，避免普通 Responses
-// 工具调用被图片分组开关挡住；只有 Images API 路径和图像专用模型才强制图片分组。
-func requestNeedsImage(path, model string, _ []byte) bool {
-	return isImageAPIPath(path) || isImageModel(model)
+// requestNeedsImage 判断请求是否需要图片生成授权。
+// OpenAI 分组默认都可服务普通对话；Images API、图像专用模型和 Responses
+// image_generation tool 需要 group.plugin_settings.openai.image_enabled=true。
+func requestNeedsImage(path, model string, body []byte) bool {
+	return isImageAPIPath(path) || isImageModel(model) || hasImageGenerationTool(body)
 }
 
 // requestHasImageWorkload 判断请求是否需要更长的图片工作超时。
-// 这里仍保留 Responses API 的 image_generation tool 识别，用于放宽生成链路
-// 的等待时间，但不参与图片分组路由。
+// 这里也保留 Responses API 的 image_generation tool 识别，用于放宽生成链路等待时间。
 func requestHasImageWorkload(path, model string, body []byte) bool {
 	return isImageAPIPath(path) || isImageModel(model) || hasImageGenerationTool(body)
 }

@@ -24,8 +24,12 @@ export const groupsApi = {
   // 分组专属倍率（reverse 视角）
   listRateOverrides: (groupId: number) =>
     get<GroupRateOverrideResp[]>(`/api/v1/admin/groups/${groupId}/rate-overrides`),
-  setRateOverride: (groupId: number, userId: number, rate: number) =>
-    put<GroupRateOverrideResp>(`/api/v1/admin/groups/${groupId}/rate-overrides/${userId}`, { rate }),
+  setRateOverride: (
+    groupId: number,
+    userId: number,
+    payload: { rate: number; plugin_settings?: Record<string, Record<string, string>> },
+  ) =>
+    put<GroupRateOverrideResp>(`/api/v1/admin/groups/${groupId}/rate-overrides/${userId}`, payload),
   deleteRateOverride: (groupId: number, userId: number) =>
     del<void>(`/api/v1/admin/groups/${groupId}/rate-overrides/${userId}`),
 };

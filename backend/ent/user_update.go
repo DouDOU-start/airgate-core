@@ -163,6 +163,18 @@ func (uu *UserUpdate) ClearGroupRates() *UserUpdate {
 	return uu
 }
 
+// SetGroupPluginSettings sets the "group_plugin_settings" field.
+func (uu *UserUpdate) SetGroupPluginSettings(m map[int64]map[string]map[string]string) *UserUpdate {
+	uu.mutation.SetGroupPluginSettings(m)
+	return uu
+}
+
+// ClearGroupPluginSettings clears the value of the "group_plugin_settings" field.
+func (uu *UserUpdate) ClearGroupPluginSettings() *UserUpdate {
+	uu.mutation.ClearGroupPluginSettings()
+	return uu
+}
+
 // SetBalanceAlertThreshold sets the "balance_alert_threshold" field.
 func (uu *UserUpdate) SetBalanceAlertThreshold(f float64) *UserUpdate {
 	uu.mutation.ResetBalanceAlertThreshold()
@@ -516,6 +528,12 @@ func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if uu.mutation.GroupRatesCleared() {
 		_spec.ClearField(user.FieldGroupRates, field.TypeJSON)
+	}
+	if value, ok := uu.mutation.GroupPluginSettings(); ok {
+		_spec.SetField(user.FieldGroupPluginSettings, field.TypeJSON, value)
+	}
+	if uu.mutation.GroupPluginSettingsCleared() {
+		_spec.ClearField(user.FieldGroupPluginSettings, field.TypeJSON)
 	}
 	if value, ok := uu.mutation.BalanceAlertThreshold(); ok {
 		_spec.SetField(user.FieldBalanceAlertThreshold, field.TypeFloat64, value)
@@ -907,6 +925,18 @@ func (uuo *UserUpdateOne) ClearGroupRates() *UserUpdateOne {
 	return uuo
 }
 
+// SetGroupPluginSettings sets the "group_plugin_settings" field.
+func (uuo *UserUpdateOne) SetGroupPluginSettings(m map[int64]map[string]map[string]string) *UserUpdateOne {
+	uuo.mutation.SetGroupPluginSettings(m)
+	return uuo
+}
+
+// ClearGroupPluginSettings clears the value of the "group_plugin_settings" field.
+func (uuo *UserUpdateOne) ClearGroupPluginSettings() *UserUpdateOne {
+	uuo.mutation.ClearGroupPluginSettings()
+	return uuo
+}
+
 // SetBalanceAlertThreshold sets the "balance_alert_threshold" field.
 func (uuo *UserUpdateOne) SetBalanceAlertThreshold(f float64) *UserUpdateOne {
 	uuo.mutation.ResetBalanceAlertThreshold()
@@ -1290,6 +1320,12 @@ func (uuo *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) 
 	}
 	if uuo.mutation.GroupRatesCleared() {
 		_spec.ClearField(user.FieldGroupRates, field.TypeJSON)
+	}
+	if value, ok := uuo.mutation.GroupPluginSettings(); ok {
+		_spec.SetField(user.FieldGroupPluginSettings, field.TypeJSON, value)
+	}
+	if uuo.mutation.GroupPluginSettingsCleared() {
+		_spec.ClearField(user.FieldGroupPluginSettings, field.TypeJSON)
 	}
 	if value, ok := uuo.mutation.BalanceAlertThreshold(); ok {
 		_spec.SetField(user.FieldBalanceAlertThreshold, field.TypeFloat64, value)

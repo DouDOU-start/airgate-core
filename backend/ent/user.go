@@ -34,6 +34,8 @@ type User struct {
 	TotpSecret *string `json:"-"`
 	// GroupRates holds the value of the "group_rates" field.
 	GroupRates map[int64]float64 `json:"group_rates,omitempty"`
+	// 用户级分组插件配置覆盖。用于 OpenAI 生图 1K/2K/4K 专属固定价等，不影响 group_rates 倍率。
+	GroupPluginSettings map[int64]map[string]map[string]string `json:"group_plugin_settings,omitempty"`
 	// BalanceAlertThreshold holds the value of the "balance_alert_threshold" field.
 	BalanceAlertThreshold float64 `json:"balance_alert_threshold,omitempty"`
 	// BalanceAlertNotified holds the value of the "balance_alert_notified" field.
@@ -117,7 +119,7 @@ func (*User) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case user.FieldGroupRates:
+		case user.FieldGroupRates, user.FieldGroupPluginSettings:
 			values[i] = new([]byte)
 		case user.FieldBalanceAlertNotified:
 			values[i] = new(sql.NullBool)
@@ -199,6 +201,14 @@ func (u *User) assignValues(columns []string, values []any) error {
 			} else if value != nil && len(*value) > 0 {
 				if err := json.Unmarshal(*value, &u.GroupRates); err != nil {
 					return fmt.Errorf("unmarshal field group_rates: %w", err)
+				}
+			}
+		case user.FieldGroupPluginSettings:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field group_plugin_settings", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &u.GroupPluginSettings); err != nil {
+					return fmt.Errorf("unmarshal field group_plugin_settings: %w", err)
 				}
 			}
 		case user.FieldBalanceAlertThreshold:
@@ -313,6 +323,9 @@ func (u *User) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("group_rates=")
 	builder.WriteString(fmt.Sprintf("%v", u.GroupRates))
+	builder.WriteString(", ")
+	builder.WriteString("group_plugin_settings=")
+	builder.WriteString(fmt.Sprintf("%v", u.GroupPluginSettings))
 	builder.WriteString(", ")
 	builder.WriteString("balance_alert_threshold=")
 	builder.WriteString(fmt.Sprintf("%v", u.BalanceAlertThreshold))

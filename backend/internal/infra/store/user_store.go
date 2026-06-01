@@ -85,7 +85,8 @@ func (s *UserStore) EmailExists(ctx context.Context, email string) (bool, error)
 	return s.db.User.Query().Where(entuser.EmailEQ(email)).Exist(ctx)
 }
 
-// ListWithGroupRateOverride 返回所有在 group_rates 中为 groupID 设置了 > 0 倍率的用户。
+// ListWithGroupRateOverride 返回所有在 group_rates 或 group_plugin_settings 中
+// 为 groupID 设置了专属价格配置的用户。
 //
 // 采用内存过滤：group_rates 是 JSON map 字段，ent 未生成 JSONB 包含谓词；
 // 管理员后台的用户规模较小（通常数百到数千），全表扫描 + 内存过滤成本可接受。
@@ -99,18 +100,20 @@ func (s *UserStore) ListWithGroupRateOverride(ctx context.Context, groupID int64
 	}
 	result := make([]appuser.GroupRateOverride, 0)
 	for _, u := range users {
-		if u.GroupRates == nil {
-			continue
+		rate := 0.0
+		if u.GroupRates != nil {
+			rate = u.GroupRates[groupID]
 		}
-		rate, ok := u.GroupRates[groupID]
-		if !ok || rate <= 0 {
+		pluginSettings := cloneOneGroupPluginSettings(u.GroupPluginSettings[groupID])
+		if rate <= 0 && len(pluginSettings) == 0 {
 			continue
 		}
 		result = append(result, appuser.GroupRateOverride{
-			UserID:   u.ID,
-			Email:    u.Email,
-			Username: u.Username,
-			Rate:     rate,
+			UserID:         u.ID,
+			Email:          u.Email,
+			Username:       u.Username,
+			Rate:           rate,
+			PluginSettings: pluginSettings,
 		})
 	}
 	return result, nil
@@ -373,6 +376,9 @@ func applyUserMutationCreate(builder *ent.UserCreate, mutation appuser.Mutation)
 	if mutation.HasGroupRates {
 		builder.SetGroupRates(cloneUserGroupRates(mutation.GroupRates))
 	}
+	if mutation.HasGroupPluginSettings {
+		builder.SetGroupPluginSettings(cloneUserGroupPluginSettings(mutation.GroupPluginSettings))
+	}
 }
 
 func applyUserMutationUpdate(builder *ent.UserUpdateOne, mutation appuser.Mutation) {
@@ -390,6 +396,9 @@ func applyUserMutationUpdate(builder *ent.UserUpdateOne, mutation appuser.Mutati
 	}
 	if mutation.HasGroupRates {
 		builder.SetGroupRates(cloneUserGroupRates(mutation.GroupRates))
+	}
+	if mutation.HasGroupPluginSettings {
+		builder.SetGroupPluginSettings(cloneUserGroupPluginSettings(mutation.GroupPluginSettings))
 	}
 	if mutation.HasAllowedGroupIDs {
 		builder.ClearAllowedGroups()
@@ -431,6 +440,7 @@ func mapUser(item *ent.User) appuser.User {
 		Role:                  item.Role.String(),
 		MaxConcurrency:        item.MaxConcurrency,
 		GroupRates:            cloneUserGroupRates(item.GroupRates),
+		GroupPluginSettings:   cloneUserGroupPluginSettings(item.GroupPluginSettings),
 		BalanceAlertThreshold: item.BalanceAlertThreshold,
 		BalanceAlertNotified:  item.BalanceAlertNotified,
 		Status:                item.Status.String(),
@@ -444,6 +454,38 @@ func mapUser(item *ent.User) appuser.User {
 		}
 	}
 	return result
+}
+
+func cloneUserGroupPluginSettings(input map[int64]map[string]map[string]string) map[int64]map[string]map[string]string {
+	if input == nil {
+		return nil
+	}
+	cloned := make(map[int64]map[string]map[string]string, len(input))
+	for groupID, settings := range input {
+		one := cloneOneGroupPluginSettings(settings)
+		if len(one) == 0 {
+			continue
+		}
+		cloned[groupID] = one
+	}
+	return cloned
+}
+
+func cloneOneGroupPluginSettings(input map[string]map[string]string) map[string]map[string]string {
+	if input == nil {
+		return nil
+	}
+	cloned := make(map[string]map[string]string, len(input))
+	for plugin, settings := range input {
+		if len(settings) == 0 {
+			continue
+		}
+		cloned[plugin] = make(map[string]string, len(settings))
+		for key, value := range settings {
+			cloned[plugin][key] = value
+		}
+	}
+	return cloned
 }
 
 func cloneUserGroupRates(input map[int64]float64) map[int64]float64 {

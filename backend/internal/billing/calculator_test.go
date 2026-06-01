@@ -3,6 +3,8 @@ package billing
 import (
 	"math"
 	"testing"
+
+	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 const epsilon = 1e-9
@@ -159,6 +161,79 @@ func TestCalculate_MarkupIndependentOfBillingRate(t *testing.T) {
 	}
 }
 
+func TestCalculate_ImageCostUsesRatesWhenNoOverride(t *testing.T) {
+	c := NewCalculator()
+	res := c.Calculate(CalculateInput{
+		InputCost:      0.1,
+		ImageInputCost: 0.05,
+		OutputCost:     0.2,
+		ImageCost:      0.3,
+		BillingRate:    0.5,
+		SellRate:       2.0,
+		AccountRate:    1.0,
+	})
+
+	if !almostEqual(res.TotalCost, 0.65) {
+		t.Fatalf("TotalCost = %v, want 0.65", res.TotalCost)
+	}
+	if !almostEqual(res.ActualCost, 0.325) {
+		t.Fatalf("ActualCost = %v, want 0.325", res.ActualCost)
+	}
+	if !almostEqual(res.BilledCost, 1.3) {
+		t.Fatalf("BilledCost = %v, want 1.3", res.BilledCost)
+	}
+}
+
+func TestCalculate_ImageFixedPriceKeepsNonImageTokenCosts(t *testing.T) {
+	c := NewCalculator()
+	fixedImagePrice := 0.08
+	res := c.Calculate(CalculateInput{
+		InputCost:                0.1,
+		ImageInputCost:           0.05,
+		OutputCost:               0.2,
+		ImageCost:                0.3,
+		BillingRate:              0.5,
+		SellRate:                 2.0,
+		AccountRate:              1.0,
+		ImageBillingCostOverride: &fixedImagePrice,
+	})
+
+	if !almostEqual(res.TotalCost, 0.65) {
+		t.Fatalf("TotalCost = %v, want 0.65", res.TotalCost)
+	}
+	if !almostEqual(res.ActualCost, 0.23) {
+		t.Fatalf("ActualCost = %v, want 0.23", res.ActualCost)
+	}
+	if !almostEqual(res.BilledCost, 0.68) {
+		t.Fatalf("BilledCost = %v, want 0.68", res.BilledCost)
+	}
+}
+
+func TestCalculate_ImageFixedPriceCanReplaceWholeRequest(t *testing.T) {
+	c := NewCalculator()
+	fixedImagePrice := 0.08
+	res := c.Calculate(CalculateInput{
+		InputCost:                             0.1,
+		OutputCost:                            0.2,
+		ImageCost:                             0.3,
+		BillingRate:                           0.5,
+		SellRate:                              2.0,
+		AccountRate:                           1.0,
+		ImageBillingCostOverride:              &fixedImagePrice,
+		ImageBillingCostOverrideReplacesTotal: true,
+	})
+
+	if !almostEqual(res.TotalCost, 0.6) {
+		t.Fatalf("TotalCost = %v, want 0.6", res.TotalCost)
+	}
+	if !almostEqual(res.ActualCost, 0.08) {
+		t.Fatalf("ActualCost = %v, want 0.08", res.ActualCost)
+	}
+	if !almostEqual(res.BilledCost, 0.08) {
+		t.Fatalf("BilledCost = %v, want 0.08", res.BilledCost)
+	}
+}
+
 func TestCalculate_OutputBillingCostOverride(t *testing.T) {
 	c := NewCalculator()
 	outputOverride := 0.08
@@ -184,5 +259,199 @@ func TestCalculate_OutputBillingCostOverride(t *testing.T) {
 	}
 	if !almostEqual(res.RateMultiplier, 0.50) {
 		t.Fatalf("RateMultiplier = %v, want original billing rate 0.50", res.RateMultiplier)
+	}
+}
+
+func TestEnrichUsageCostDetails_ResponseFixedImagePriceKeepsTokenUserCost(t *testing.T) {
+	items := enrichUsageCostDetails(UsageRecord{
+		InputCost:      0.00025,
+		ImageCost:      0.00613,
+		TotalCost:      0.00638,
+		ActualCost:     0.10025,
+		RateMultiplier: 1,
+		UsageCostDetails: []sdk.UsageCostDetail{
+			{Key: "input_tokens", Label: "输入 Token", AccountCost: 0.00025},
+			{Key: "image_input_tokens", Label: "图片输入 Token", AccountCost: 0.000375},
+			{
+				Key:         "images",
+				Label:       "图片生成",
+				AccountCost: 0.00613,
+				Metadata: map[string]string{
+					"image_count": "1",
+					"unit_price":  "30",
+					"unit":        "USD/1M output tokens",
+				},
+			},
+		},
+	})
+
+	if len(items) != 3 {
+		t.Fatalf("len(items) = %d, want 3", len(items))
+	}
+	if !almostEqual(items[0].UserCost, 0.00025) || !almostEqual(items[0].BillingMultiplier, 1) {
+		t.Fatalf("input detail = %+v, want token user cost/multiplier", items[0])
+	}
+	if !almostEqual(items[1].UserCost, 0) || !almostEqual(items[1].BillingMultiplier, 0) {
+		t.Fatalf("image input detail = %+v, want zero user cost/multiplier", items[1])
+	}
+	if !almostEqual(items[2].UserCost, 0.1) {
+		t.Fatalf("image user cost = %v, want 0.1", items[2].UserCost)
+	}
+	if got := items[2].Metadata["billing_mode"]; got != "fixed_image_price" {
+		t.Fatalf("billing_mode = %q, want fixed_image_price", got)
+	}
+	if got := items[2].Metadata["fixed_unit_price"]; got != "0.1" {
+		t.Fatalf("fixed_unit_price = %q, want 0.1", got)
+	}
+}
+
+func TestEnrichUsageCostDetails_ResponseImageTokenBillingMergesIntoInputAndOutput(t *testing.T) {
+	items := enrichUsageCostDetails(UsageRecord{
+		InputCost:       0.00937,
+		CachedInputCost: 0.002112,
+		OutputCost:      0.00258,
+		ImageCost:       0.05268,
+		TotalCost:       0.067097,
+		ActualCost:      0.0536776,
+		RateMultiplier:  0.8,
+		UsageCostDetails: []sdk.UsageCostDetail{
+			{Key: "input_tokens", Label: "输入 Token", AccountCost: 0.00937},
+			{Key: "cached_input_tokens", Label: "缓存输入 Token", AccountCost: 0.002112},
+			{Key: "output_tokens", Label: "输出 Token", AccountCost: 0.00258},
+			{Key: "image_input_tokens", Label: "图片输入 Token", AccountCost: 0.000355},
+			{
+				Key:         "image_tool",
+				Label:       "图片生成",
+				AccountCost: 0.05268,
+				Metadata: map[string]string{
+					"image_count": "1",
+					"unit_price":  "30",
+					"unit":        "USD/1M output tokens",
+				},
+			},
+		},
+	})
+
+	if len(items) != 3 {
+		t.Fatalf("len(items) = %d, want 3", len(items))
+	}
+	if items[0].Key != "input_tokens" || !almostEqual(items[0].UserCost, 0.00778) || !almostEqual(items[0].BillingMultiplier, 0.8) {
+		t.Fatalf("input detail = %+v, want merged input user cost/multiplier", items[0])
+	}
+	if items[2].Key != "output_tokens" || !almostEqual(items[2].UserCost, 0.044208) || !almostEqual(items[2].BillingMultiplier, 0.8) {
+		t.Fatalf("output detail = %+v, want merged output user cost/multiplier", items[2])
+	}
+	if got := items[2].Metadata["billing_mode"]; got != "" {
+		t.Fatalf("billing_mode = %q, want empty", got)
+	}
+	if _, ok := items[2].Metadata["fixed_unit_price"]; ok {
+		t.Fatalf("fixed_unit_price should be absent for token billing, got %q", items[2].Metadata["fixed_unit_price"])
+	}
+}
+
+func TestEnrichUsageCostDetails_ImageOnlyTokenBillingUsesInputAndOutputRows(t *testing.T) {
+	items := enrichUsageCostDetails(UsageRecord{
+		InputCost:      0.000215,
+		ImageCost:      0.01113,
+		TotalCost:      0.011345,
+		ActualCost:     0.009076,
+		RateMultiplier: 0.8,
+		UsageCostDetails: []sdk.UsageCostDetail{
+			{Key: "input_tokens", Label: "输入 Token", AccountCost: 0.000215},
+			{
+				Key:         "images",
+				Label:       "图片生成",
+				AccountCost: 0.01113,
+				Metadata: map[string]string{
+					"image_count": "1",
+					"unit_price":  "30",
+					"unit":        "USD/1M output tokens",
+				},
+			},
+		},
+	})
+
+	if len(items) != 2 {
+		t.Fatalf("len(items) = %d, want 2", len(items))
+	}
+	if items[0].Key != "input_tokens" || !almostEqual(items[0].UserCost, 0.000172) {
+		t.Fatalf("input detail = %+v, want input token cost", items[0])
+	}
+	if items[1].Key != "output_tokens" || items[1].Label != "输出 Token" || !almostEqual(items[1].UserCost, 0.008904) {
+		t.Fatalf("output detail = %+v, want image output merged into output token cost", items[1])
+	}
+	if got := items[1].Metadata["billing_mode"]; got != "" {
+		t.Fatalf("billing_mode = %q, want empty", got)
+	}
+}
+
+func TestEnrichUsageCostDetails_ImageOnlyFixedPriceZeroesTokenUserCost(t *testing.T) {
+	items := enrichUsageCostDetails(UsageRecord{
+		InputCost:                    0.00025,
+		ImageCost:                    0.00613,
+		TotalCost:                    0.00638,
+		ActualCost:                   0.1,
+		RateMultiplier:               1,
+		ImageFixedPriceReplacesTotal: true,
+		UsageCostDetails: []sdk.UsageCostDetail{
+			{Key: "input_tokens", Label: "输入 Token", AccountCost: 0.00025},
+			{
+				Key:         "images",
+				Label:       "图片生成",
+				AccountCost: 0.00613,
+				Metadata: map[string]string{
+					"image_count": "1",
+					"unit_price":  "30",
+					"unit":        "USD/1M output tokens",
+				},
+			},
+		},
+	})
+
+	if len(items) != 2 {
+		t.Fatalf("len(items) = %d, want 2", len(items))
+	}
+	if !almostEqual(items[0].UserCost, 0) || !almostEqual(items[0].BillingMultiplier, 0) {
+		t.Fatalf("input detail = %+v, want zero user cost/multiplier", items[0])
+	}
+	if !almostEqual(items[1].UserCost, 0.1) {
+		t.Fatalf("image user cost = %v, want 0.1", items[1].UserCost)
+	}
+}
+
+func TestEnrichUsageCostDetails_FreeFixedImagePriceDoesNotFallBackToTokenCost(t *testing.T) {
+	items := enrichUsageCostDetails(UsageRecord{
+		InputCost:                    0.00025,
+		ImageCost:                    0.00613,
+		TotalCost:                    0.00638,
+		ActualCost:                   0,
+		RateMultiplier:               1,
+		ImageFixedPriceReplacesTotal: true,
+		UsageCostDetails: []sdk.UsageCostDetail{
+			{Key: "input_tokens", Label: "输入 Token", AccountCost: 0.00025},
+			{
+				Key:         "images",
+				Label:       "图片生成",
+				AccountCost: 0.00613,
+				Metadata: map[string]string{
+					"image_count": "1",
+					"unit_price":  "30",
+					"unit":        "USD/1M output tokens",
+				},
+			},
+		},
+	})
+
+	if len(items) != 2 {
+		t.Fatalf("len(items) = %d, want 2", len(items))
+	}
+	if !almostEqual(items[0].UserCost, 0) || !almostEqual(items[1].UserCost, 0) {
+		t.Fatalf("user costs = %v/%v, want both zero", items[0].UserCost, items[1].UserCost)
+	}
+	if !almostEqual(items[1].BillingMultiplier, 0) {
+		t.Fatalf("image multiplier = %v, want 0", items[1].BillingMultiplier)
+	}
+	if got := items[1].Metadata["billing_mode"]; got != "fixed_image_price" {
+		t.Fatalf("billing_mode = %q, want fixed_image_price", got)
 	}
 }

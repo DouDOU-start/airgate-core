@@ -113,6 +113,12 @@ func (uc *UserCreate) SetGroupRates(m map[int64]float64) *UserCreate {
 	return uc
 }
 
+// SetGroupPluginSettings sets the "group_plugin_settings" field.
+func (uc *UserCreate) SetGroupPluginSettings(m map[int64]map[string]map[string]string) *UserCreate {
+	uc.mutation.SetGroupPluginSettings(m)
+	return uc
+}
+
 // SetBalanceAlertThreshold sets the "balance_alert_threshold" field.
 func (uc *UserCreate) SetBalanceAlertThreshold(f float64) *UserCreate {
 	uc.mutation.SetBalanceAlertThreshold(f)
@@ -448,6 +454,10 @@ func (uc *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := uc.mutation.GroupRates(); ok {
 		_spec.SetField(user.FieldGroupRates, field.TypeJSON, value)
 		_node.GroupRates = value
+	}
+	if value, ok := uc.mutation.GroupPluginSettings(); ok {
+		_spec.SetField(user.FieldGroupPluginSettings, field.TypeJSON, value)
+		_node.GroupPluginSettings = value
 	}
 	if value, ok := uc.mutation.BalanceAlertThreshold(); ok {
 		_spec.SetField(user.FieldBalanceAlertThreshold, field.TypeFloat64, value)

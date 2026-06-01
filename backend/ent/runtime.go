@@ -472,80 +472,84 @@ func init() {
 	usagelogDescCacheCreationCost := usagelogFields[17].Descriptor()
 	// usagelog.DefaultCacheCreationCost holds the default value on creation for the cache_creation_cost field.
 	usagelog.DefaultCacheCreationCost = usagelogDescCacheCreationCost.Default.(float64)
+	// usagelogDescImageCost is the schema descriptor for image_cost field.
+	usagelogDescImageCost := usagelogFields[18].Descriptor()
+	// usagelog.DefaultImageCost holds the default value on creation for the image_cost field.
+	usagelog.DefaultImageCost = usagelogDescImageCost.Default.(float64)
 	// usagelogDescTotalCost is the schema descriptor for total_cost field.
-	usagelogDescTotalCost := usagelogFields[18].Descriptor()
+	usagelogDescTotalCost := usagelogFields[19].Descriptor()
 	// usagelog.DefaultTotalCost holds the default value on creation for the total_cost field.
 	usagelog.DefaultTotalCost = usagelogDescTotalCost.Default.(float64)
 	// usagelogDescActualCost is the schema descriptor for actual_cost field.
-	usagelogDescActualCost := usagelogFields[19].Descriptor()
+	usagelogDescActualCost := usagelogFields[20].Descriptor()
 	// usagelog.DefaultActualCost holds the default value on creation for the actual_cost field.
 	usagelog.DefaultActualCost = usagelogDescActualCost.Default.(float64)
 	// usagelogDescBilledCost is the schema descriptor for billed_cost field.
-	usagelogDescBilledCost := usagelogFields[20].Descriptor()
+	usagelogDescBilledCost := usagelogFields[21].Descriptor()
 	// usagelog.DefaultBilledCost holds the default value on creation for the billed_cost field.
 	usagelog.DefaultBilledCost = usagelogDescBilledCost.Default.(float64)
 	// usagelogDescAccountCost is the schema descriptor for account_cost field.
-	usagelogDescAccountCost := usagelogFields[21].Descriptor()
+	usagelogDescAccountCost := usagelogFields[22].Descriptor()
 	// usagelog.DefaultAccountCost holds the default value on creation for the account_cost field.
 	usagelog.DefaultAccountCost = usagelogDescAccountCost.Default.(float64)
 	// usagelogDescRateMultiplier is the schema descriptor for rate_multiplier field.
-	usagelogDescRateMultiplier := usagelogFields[22].Descriptor()
+	usagelogDescRateMultiplier := usagelogFields[23].Descriptor()
 	// usagelog.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
 	usagelog.DefaultRateMultiplier = usagelogDescRateMultiplier.Default.(float64)
 	// usagelogDescSellRate is the schema descriptor for sell_rate field.
-	usagelogDescSellRate := usagelogFields[23].Descriptor()
+	usagelogDescSellRate := usagelogFields[24].Descriptor()
 	// usagelog.DefaultSellRate holds the default value on creation for the sell_rate field.
 	usagelog.DefaultSellRate = usagelogDescSellRate.Default.(float64)
 	// usagelogDescAccountRateMultiplier is the schema descriptor for account_rate_multiplier field.
-	usagelogDescAccountRateMultiplier := usagelogFields[24].Descriptor()
+	usagelogDescAccountRateMultiplier := usagelogFields[25].Descriptor()
 	// usagelog.DefaultAccountRateMultiplier holds the default value on creation for the account_rate_multiplier field.
 	usagelog.DefaultAccountRateMultiplier = usagelogDescAccountRateMultiplier.Default.(float64)
 	// usagelogDescServiceTier is the schema descriptor for service_tier field.
-	usagelogDescServiceTier := usagelogFields[25].Descriptor()
+	usagelogDescServiceTier := usagelogFields[26].Descriptor()
 	// usagelog.DefaultServiceTier holds the default value on creation for the service_tier field.
 	usagelog.DefaultServiceTier = usagelogDescServiceTier.Default.(string)
 	// usagelogDescImageSize is the schema descriptor for image_size field.
-	usagelogDescImageSize := usagelogFields[26].Descriptor()
+	usagelogDescImageSize := usagelogFields[27].Descriptor()
 	// usagelog.DefaultImageSize holds the default value on creation for the image_size field.
 	usagelog.DefaultImageSize = usagelogDescImageSize.Default.(string)
 	// usagelogDescStream is the schema descriptor for stream field.
-	usagelogDescStream := usagelogFields[27].Descriptor()
+	usagelogDescStream := usagelogFields[28].Descriptor()
 	// usagelog.DefaultStream holds the default value on creation for the stream field.
 	usagelog.DefaultStream = usagelogDescStream.Default.(bool)
 	// usagelogDescDurationMs is the schema descriptor for duration_ms field.
-	usagelogDescDurationMs := usagelogFields[28].Descriptor()
+	usagelogDescDurationMs := usagelogFields[29].Descriptor()
 	// usagelog.DefaultDurationMs holds the default value on creation for the duration_ms field.
 	usagelog.DefaultDurationMs = usagelogDescDurationMs.Default.(int64)
 	// usagelogDescFirstTokenMs is the schema descriptor for first_token_ms field.
-	usagelogDescFirstTokenMs := usagelogFields[29].Descriptor()
+	usagelogDescFirstTokenMs := usagelogFields[30].Descriptor()
 	// usagelog.DefaultFirstTokenMs holds the default value on creation for the first_token_ms field.
 	usagelog.DefaultFirstTokenMs = usagelogDescFirstTokenMs.Default.(int64)
 	// usagelogDescUserAgent is the schema descriptor for user_agent field.
-	usagelogDescUserAgent := usagelogFields[30].Descriptor()
+	usagelogDescUserAgent := usagelogFields[31].Descriptor()
 	// usagelog.DefaultUserAgent holds the default value on creation for the user_agent field.
 	usagelog.DefaultUserAgent = usagelogDescUserAgent.Default.(string)
 	// usagelogDescIPAddress is the schema descriptor for ip_address field.
-	usagelogDescIPAddress := usagelogFields[31].Descriptor()
+	usagelogDescIPAddress := usagelogFields[32].Descriptor()
 	// usagelog.DefaultIPAddress holds the default value on creation for the ip_address field.
 	usagelog.DefaultIPAddress = usagelogDescIPAddress.Default.(string)
 	// usagelogDescEndpoint is the schema descriptor for endpoint field.
-	usagelogDescEndpoint := usagelogFields[32].Descriptor()
+	usagelogDescEndpoint := usagelogFields[33].Descriptor()
 	// usagelog.DefaultEndpoint holds the default value on creation for the endpoint field.
 	usagelog.DefaultEndpoint = usagelogDescEndpoint.Default.(string)
 	// usagelogDescReasoningEffort is the schema descriptor for reasoning_effort field.
-	usagelogDescReasoningEffort := usagelogFields[33].Descriptor()
+	usagelogDescReasoningEffort := usagelogFields[34].Descriptor()
 	// usagelog.DefaultReasoningEffort holds the default value on creation for the reasoning_effort field.
 	usagelog.DefaultReasoningEffort = usagelogDescReasoningEffort.Default.(string)
 	// usagelogDescUserIDSnapshot is the schema descriptor for user_id_snapshot field.
-	usagelogDescUserIDSnapshot := usagelogFields[38].Descriptor()
+	usagelogDescUserIDSnapshot := usagelogFields[39].Descriptor()
 	// usagelog.DefaultUserIDSnapshot holds the default value on creation for the user_id_snapshot field.
 	usagelog.DefaultUserIDSnapshot = usagelogDescUserIDSnapshot.Default.(int)
 	// usagelogDescUserEmailSnapshot is the schema descriptor for user_email_snapshot field.
-	usagelogDescUserEmailSnapshot := usagelogFields[39].Descriptor()
+	usagelogDescUserEmailSnapshot := usagelogFields[40].Descriptor()
 	// usagelog.DefaultUserEmailSnapshot holds the default value on creation for the user_email_snapshot field.
 	usagelog.DefaultUserEmailSnapshot = usagelogDescUserEmailSnapshot.Default.(string)
 	// usagelogDescCreatedAt is the schema descriptor for created_at field.
-	usagelogDescCreatedAt := usagelogFields[40].Descriptor()
+	usagelogDescCreatedAt := usagelogFields[41].Descriptor()
 	// usagelog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	usagelog.DefaultCreatedAt = usagelogDescCreatedAt.Default.(func() time.Time)
 	userFields := schema.User{}.Fields()
@@ -573,19 +577,19 @@ func init() {
 	// user.MaxConcurrencyValidator is a validator for the "max_concurrency" field. It is called by the builders before save.
 	user.MaxConcurrencyValidator = userDescMaxConcurrency.Validators[0].(func(int) error)
 	// userDescBalanceAlertThreshold is the schema descriptor for balance_alert_threshold field.
-	userDescBalanceAlertThreshold := userFields[8].Descriptor()
+	userDescBalanceAlertThreshold := userFields[9].Descriptor()
 	// user.DefaultBalanceAlertThreshold holds the default value on creation for the balance_alert_threshold field.
 	user.DefaultBalanceAlertThreshold = userDescBalanceAlertThreshold.Default.(float64)
 	// userDescBalanceAlertNotified is the schema descriptor for balance_alert_notified field.
-	userDescBalanceAlertNotified := userFields[9].Descriptor()
+	userDescBalanceAlertNotified := userFields[10].Descriptor()
 	// user.DefaultBalanceAlertNotified holds the default value on creation for the balance_alert_notified field.
 	user.DefaultBalanceAlertNotified = userDescBalanceAlertNotified.Default.(bool)
 	// userDescCreatedAt is the schema descriptor for created_at field.
-	userDescCreatedAt := userFields[11].Descriptor()
+	userDescCreatedAt := userFields[12].Descriptor()
 	// user.DefaultCreatedAt holds the default value on creation for the created_at field.
 	user.DefaultCreatedAt = userDescCreatedAt.Default.(func() time.Time)
 	// userDescUpdatedAt is the schema descriptor for updated_at field.
-	userDescUpdatedAt := userFields[12].Descriptor()
+	userDescUpdatedAt := userFields[13].Descriptor()
 	// user.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	user.DefaultUpdatedAt = userDescUpdatedAt.Default.(func() time.Time)
 	// user.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

@@ -527,8 +527,8 @@ func apiKeyGroupMatchesRequirements(keyInfo *auth.APIKeyInfo, requirements routi
 		return false
 	}
 	if strings.EqualFold(keyInfo.GroupPlatform, "openai") {
-		imageEnabled := pluginSettingEnabledForKey(keyInfo.GroupPluginSettings, "openai", "image_enabled")
-		return imageEnabled == requirements.NeedsImage
+		return !requirements.NeedsImage ||
+			pluginSettingEnabledForKey(keyInfo.GroupPluginSettings, "openai", "image_enabled")
 	}
 	return true
 }
@@ -551,14 +551,6 @@ func apiKeyGroupRequirementError(keyInfo *auth.APIKeyInfo, requirements routing.
 			errType: "invalid_request_error",
 			code:    "image_generation_disabled",
 			message: "当前分组未开启图片生成功能",
-		}, true
-	}
-	if !requirements.NeedsImage && imageEnabled {
-		return groupRequirementError{
-			status:  http.StatusBadRequest,
-			errType: "invalid_request_error",
-			code:    "chat_generation_disabled",
-			message: "当前分组未开启对话功能",
 		}, true
 	}
 	return groupRequirementError{}, false
@@ -587,6 +579,7 @@ func keyInfoRoute(keyInfo *auth.APIKeyInfo) routing.Candidate {
 		GroupServiceTier:       keyInfo.GroupServiceTier,
 		GroupForceInstructions: keyInfo.GroupForceInstructions,
 		GroupPluginSettings:    clonePluginSettingsForKey(keyInfo.GroupPluginSettings),
+		UserPluginSettings:     clonePluginSettingsForKey(keyInfo.UserGroupPluginSettings[int64(keyInfo.GroupID)]),
 	}
 }
 
@@ -615,6 +608,11 @@ func keyInfoForRoute(base *auth.APIKeyInfo, route routing.Candidate) *auth.APIKe
 	info.GroupServiceTier = route.GroupServiceTier
 	info.GroupForceInstructions = route.GroupForceInstructions
 	info.GroupPluginSettings = route.GroupPluginSettings
+	if route.UserPluginSettings != nil {
+		info.UserGroupPluginSettings = map[int64]map[string]map[string]string{
+			int64(route.GroupID): clonePluginSettingsForKey(route.UserPluginSettings),
+		}
+	}
 	return &info
 }
 

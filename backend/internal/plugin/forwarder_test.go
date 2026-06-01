@@ -310,7 +310,7 @@ func TestRoutesForAPIKeyRejectsImageWhenBoundGroupDisabled(t *testing.T) {
 	}
 }
 
-func TestRoutesForAPIKeyRejectsChatWhenBoundGroupImageEnabled(t *testing.T) {
+func TestRoutesForAPIKeyAllowsChatWhenBoundGroupImageEnabled(t *testing.T) {
 	t.Parallel()
 
 	state := &forwardState{keyInfo: &auth.APIKeyInfo{
@@ -320,8 +320,8 @@ func TestRoutesForAPIKeyRejectsChatWhenBoundGroupImageEnabled(t *testing.T) {
 	}}
 
 	routes := routesForAPIKey(state, routing.Requirements{})
-	if len(routes) != 0 {
-		t.Fatalf("len(routes) = %d, want 0", len(routes))
+	if len(routes) != 1 {
+		t.Fatalf("len(routes) = %d, want 1", len(routes))
 	}
 }
 
@@ -346,24 +346,14 @@ func TestAPIKeyGroupRequirementErrorImageDisabled(t *testing.T) {
 	}
 }
 
-func TestAPIKeyGroupRequirementErrorChatDisabled(t *testing.T) {
+func TestAPIKeyGroupRequirementErrorAllowsChatOnImageEnabledGroup(t *testing.T) {
 	t.Parallel()
 
-	errResp, ok := apiKeyGroupRequirementError(&auth.APIKeyInfo{
+	if errResp, ok := apiKeyGroupRequirementError(&auth.APIKeyInfo{
 		GroupPlatform:       "openai",
 		GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "true"}},
-	}, routing.Requirements{})
-	if !ok {
-		t.Fatal("ok = false, want true")
-	}
-	if errResp.status != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", errResp.status, http.StatusBadRequest)
-	}
-	if errResp.code != "chat_generation_disabled" {
-		t.Fatalf("code = %q, want chat_generation_disabled", errResp.code)
-	}
-	if errResp.message != "当前分组未开启对话功能" {
-		t.Fatalf("message = %q", errResp.message)
+	}, routing.Requirements{}); ok {
+		t.Fatalf("errResp = %+v, want no error", errResp)
 	}
 }
 

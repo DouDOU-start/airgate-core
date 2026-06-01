@@ -44,6 +44,9 @@ func (UsageLog) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("cache_creation_cost").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("image_cost").Default(0).
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
+			Comment("图片输出基础成本。未配置固定价时按官方 image token 计费；配置固定价时记录原始 token 成本供审计。"),
 		field.Float("total_cost").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("actual_cost").Default(0).
@@ -63,7 +66,7 @@ func (UsageLog) Fields() []ent.Field {
 			Comment("快照：本次请求生效的 account_rate"),
 		field.String("service_tier").Default(""),
 		// image_size 图像生成请求实际出图尺寸（"WxH"）。非图像请求留空。
-		// admin 后台展示用，让用户能直观看出"为什么这次图扣了 0.40"——按 1K/2K/4K 分档计费。
+		// admin 后台展示用，让用户能直观看出固定图价命中的 1K/2K/4K 分档。
 		field.String("image_size").Default(""),
 		field.Bool("stream").Default(false),
 		field.Int64("duration_ms").Default(0),

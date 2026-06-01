@@ -10548,6 +10548,8 @@ type UsageLogMutation struct {
 	addcached_input_cost        *float64
 	cache_creation_cost         *float64
 	addcache_creation_cost      *float64
+	image_cost                  *float64
+	addimage_cost               *float64
 	total_cost                  *float64
 	addtotal_cost               *float64
 	actual_cost                 *float64
@@ -11662,6 +11664,62 @@ func (m *UsageLogMutation) AddedCacheCreationCost() (r float64, exists bool) {
 func (m *UsageLogMutation) ResetCacheCreationCost() {
 	m.cache_creation_cost = nil
 	m.addcache_creation_cost = nil
+}
+
+// SetImageCost sets the "image_cost" field.
+func (m *UsageLogMutation) SetImageCost(f float64) {
+	m.image_cost = &f
+	m.addimage_cost = nil
+}
+
+// ImageCost returns the value of the "image_cost" field in the mutation.
+func (m *UsageLogMutation) ImageCost() (r float64, exists bool) {
+	v := m.image_cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImageCost returns the old "image_cost" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldImageCost(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImageCost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImageCost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImageCost: %w", err)
+	}
+	return oldValue.ImageCost, nil
+}
+
+// AddImageCost adds f to the "image_cost" field.
+func (m *UsageLogMutation) AddImageCost(f float64) {
+	if m.addimage_cost != nil {
+		*m.addimage_cost += f
+	} else {
+		m.addimage_cost = &f
+	}
+}
+
+// AddedImageCost returns the value that was added to the "image_cost" field in this mutation.
+func (m *UsageLogMutation) AddedImageCost() (r float64, exists bool) {
+	v := m.addimage_cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetImageCost resets all changes to the "image_cost" field.
+func (m *UsageLogMutation) ResetImageCost() {
+	m.image_cost = nil
+	m.addimage_cost = nil
 }
 
 // SetTotalCost sets the "total_cost" field.
@@ -12982,7 +13040,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 41)
+	fields := make([]string, 0, 42)
 	if m.platform != nil {
 		fields = append(fields, usagelog.FieldPlatform)
 	}
@@ -13036,6 +13094,9 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.cache_creation_cost != nil {
 		fields = append(fields, usagelog.FieldCacheCreationCost)
+	}
+	if m.image_cost != nil {
+		fields = append(fields, usagelog.FieldImageCost)
 	}
 	if m.total_cost != nil {
 		fields = append(fields, usagelog.FieldTotalCost)
@@ -13150,6 +13211,8 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.CachedInputCost()
 	case usagelog.FieldCacheCreationCost:
 		return m.CacheCreationCost()
+	case usagelog.FieldImageCost:
+		return m.ImageCost()
 	case usagelog.FieldTotalCost:
 		return m.TotalCost()
 	case usagelog.FieldActualCost:
@@ -13241,6 +13304,8 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCachedInputCost(ctx)
 	case usagelog.FieldCacheCreationCost:
 		return m.OldCacheCreationCost(ctx)
+	case usagelog.FieldImageCost:
+		return m.OldImageCost(ctx)
 	case usagelog.FieldTotalCost:
 		return m.OldTotalCost(ctx)
 	case usagelog.FieldActualCost:
@@ -13421,6 +13486,13 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCacheCreationCost(v)
+		return nil
+	case usagelog.FieldImageCost:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImageCost(v)
 		return nil
 	case usagelog.FieldTotalCost:
 		v, ok := value.(float64)
@@ -13639,6 +13711,9 @@ func (m *UsageLogMutation) AddedFields() []string {
 	if m.addcache_creation_cost != nil {
 		fields = append(fields, usagelog.FieldCacheCreationCost)
 	}
+	if m.addimage_cost != nil {
+		fields = append(fields, usagelog.FieldImageCost)
+	}
 	if m.addtotal_cost != nil {
 		fields = append(fields, usagelog.FieldTotalCost)
 	}
@@ -13709,6 +13784,8 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedCachedInputCost()
 	case usagelog.FieldCacheCreationCost:
 		return m.AddedCacheCreationCost()
+	case usagelog.FieldImageCost:
+		return m.AddedImageCost()
 	case usagelog.FieldTotalCost:
 		return m.AddedTotalCost()
 	case usagelog.FieldActualCost:
@@ -13849,6 +13926,13 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddCacheCreationCost(v)
+		return nil
+	case usagelog.FieldImageCost:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddImageCost(v)
 		return nil
 	case usagelog.FieldTotalCost:
 		v, ok := value.(float64)
@@ -14027,6 +14111,9 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldCacheCreationCost:
 		m.ResetCacheCreationCost()
+		return nil
+	case usagelog.FieldImageCost:
+		m.ResetImageCost()
 		return nil
 	case usagelog.FieldTotalCost:
 		m.ResetTotalCost()
@@ -14245,6 +14332,7 @@ type UserMutation struct {
 	addmax_concurrency         *int
 	totp_secret                *string
 	group_rates                *map[int64]float64
+	group_plugin_settings      *map[int64]map[string]map[string]string
 	balance_alert_threshold    *float64
 	addbalance_alert_threshold *float64
 	balance_alert_notified     *bool
@@ -14722,6 +14810,55 @@ func (m *UserMutation) GroupRatesCleared() bool {
 func (m *UserMutation) ResetGroupRates() {
 	m.group_rates = nil
 	delete(m.clearedFields, user.FieldGroupRates)
+}
+
+// SetGroupPluginSettings sets the "group_plugin_settings" field.
+func (m *UserMutation) SetGroupPluginSettings(value map[int64]map[string]map[string]string) {
+	m.group_plugin_settings = &value
+}
+
+// GroupPluginSettings returns the value of the "group_plugin_settings" field in the mutation.
+func (m *UserMutation) GroupPluginSettings() (r map[int64]map[string]map[string]string, exists bool) {
+	v := m.group_plugin_settings
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGroupPluginSettings returns the old "group_plugin_settings" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldGroupPluginSettings(ctx context.Context) (v map[int64]map[string]map[string]string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGroupPluginSettings is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGroupPluginSettings requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGroupPluginSettings: %w", err)
+	}
+	return oldValue.GroupPluginSettings, nil
+}
+
+// ClearGroupPluginSettings clears the value of the "group_plugin_settings" field.
+func (m *UserMutation) ClearGroupPluginSettings() {
+	m.group_plugin_settings = nil
+	m.clearedFields[user.FieldGroupPluginSettings] = struct{}{}
+}
+
+// GroupPluginSettingsCleared returns if the "group_plugin_settings" field was cleared in this mutation.
+func (m *UserMutation) GroupPluginSettingsCleared() bool {
+	_, ok := m.clearedFields[user.FieldGroupPluginSettings]
+	return ok
+}
+
+// ResetGroupPluginSettings resets all changes to the "group_plugin_settings" field.
+func (m *UserMutation) ResetGroupPluginSettings() {
+	m.group_plugin_settings = nil
+	delete(m.clearedFields, user.FieldGroupPluginSettings)
 }
 
 // SetBalanceAlertThreshold sets the "balance_alert_threshold" field.
@@ -15228,7 +15365,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.email != nil {
 		fields = append(fields, user.FieldEmail)
 	}
@@ -15252,6 +15389,9 @@ func (m *UserMutation) Fields() []string {
 	}
 	if m.group_rates != nil {
 		fields = append(fields, user.FieldGroupRates)
+	}
+	if m.group_plugin_settings != nil {
+		fields = append(fields, user.FieldGroupPluginSettings)
 	}
 	if m.balance_alert_threshold != nil {
 		fields = append(fields, user.FieldBalanceAlertThreshold)
@@ -15292,6 +15432,8 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.TotpSecret()
 	case user.FieldGroupRates:
 		return m.GroupRates()
+	case user.FieldGroupPluginSettings:
+		return m.GroupPluginSettings()
 	case user.FieldBalanceAlertThreshold:
 		return m.BalanceAlertThreshold()
 	case user.FieldBalanceAlertNotified:
@@ -15327,6 +15469,8 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldTotpSecret(ctx)
 	case user.FieldGroupRates:
 		return m.OldGroupRates(ctx)
+	case user.FieldGroupPluginSettings:
+		return m.OldGroupPluginSettings(ctx)
 	case user.FieldBalanceAlertThreshold:
 		return m.OldBalanceAlertThreshold(ctx)
 	case user.FieldBalanceAlertNotified:
@@ -15401,6 +15545,13 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetGroupRates(v)
+		return nil
+	case user.FieldGroupPluginSettings:
+		v, ok := value.(map[int64]map[string]map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGroupPluginSettings(v)
 		return nil
 	case user.FieldBalanceAlertThreshold:
 		v, ok := value.(float64)
@@ -15512,6 +15663,9 @@ func (m *UserMutation) ClearedFields() []string {
 	if m.FieldCleared(user.FieldGroupRates) {
 		fields = append(fields, user.FieldGroupRates)
 	}
+	if m.FieldCleared(user.FieldGroupPluginSettings) {
+		fields = append(fields, user.FieldGroupPluginSettings)
+	}
 	return fields
 }
 
@@ -15531,6 +15685,9 @@ func (m *UserMutation) ClearField(name string) error {
 		return nil
 	case user.FieldGroupRates:
 		m.ClearGroupRates()
+		return nil
+	case user.FieldGroupPluginSettings:
+		m.ClearGroupPluginSettings()
 		return nil
 	}
 	return fmt.Errorf("unknown User nullable field %s", name)
@@ -15563,6 +15720,9 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldGroupRates:
 		m.ResetGroupRates()
+		return nil
+	case user.FieldGroupPluginSettings:
+		m.ResetGroupPluginSettings()
 		return nil
 	case user.FieldBalanceAlertThreshold:
 		m.ResetBalanceAlertThreshold()

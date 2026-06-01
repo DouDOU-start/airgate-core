@@ -4,13 +4,18 @@ import (
 	"math"
 	"testing"
 
+	"github.com/DouDOU-start/airgate-core/internal/billing"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 func TestImageOutputBillingOverride_UsesConfiguredTier(t *testing.T) {
 	usage := &sdk.Usage{
+		Model: "gpt-5.5",
 		Attributes: []sdk.UsageAttribute{
 			{Key: "image_size", Value: "1672x941"},
+		},
+		Metrics: []sdk.UsageMetric{
+			{Key: "images", Kind: "image", Value: 2},
 		},
 		CostDetails: []sdk.UsageCostDetail{
 			{Key: "images", AccountCost: 0.40},
@@ -22,12 +27,46 @@ func TestImageOutputBillingOverride_UsesConfiguredTier(t *testing.T) {
 		},
 	}
 
-	got, ok := imageOutputBillingOverride(usage, settings)
+	got, ok := imageOutputBillingOverride(usage, nil, settings)
 	if !ok {
 		t.Fatal("expected override")
 	}
-	if math.Abs(got-0.16) > 1e-9 {
-		t.Fatalf("override = %v, want 0.16 for two 2K images", got)
+	if math.Abs(got.cost-0.16) > 1e-9 {
+		t.Fatalf("override = %v, want 0.16 for two 2K images", got.cost)
+	}
+	if got.replacesTotal {
+		t.Fatal("responses model fixed image price should not replace token costs")
+	}
+}
+
+func TestImageOutputBillingOverride_ImageModelReplacesTotal(t *testing.T) {
+	usage := &sdk.Usage{
+		Model: "gpt-image-2",
+		Attributes: []sdk.UsageAttribute{
+			{Key: "image_size", Value: "1024x1024"},
+		},
+		Metrics: []sdk.UsageMetric{
+			{Key: "images", Kind: "image", Value: 1},
+		},
+		CostDetails: []sdk.UsageCostDetail{
+			{Key: "images", AccountCost: 0.40},
+		},
+	}
+	settings := map[string]map[string]string{
+		"openai": {
+			"image_price_1k": "0.10",
+		},
+	}
+
+	got, ok := imageOutputBillingOverride(usage, nil, settings)
+	if !ok {
+		t.Fatal("expected override")
+	}
+	if math.Abs(got.cost-0.10) > 1e-9 {
+		t.Fatalf("override = %v, want 0.10", got.cost)
+	}
+	if !got.replacesTotal {
+		t.Fatal("image model fixed image price should replace the whole request")
 	}
 }
 
@@ -36,6 +75,9 @@ func TestImageOutputBillingOverride_FallsBackWhenTierUnset(t *testing.T) {
 		Attributes: []sdk.UsageAttribute{
 			{Key: "image_size", Value: "3840x2160"},
 		},
+		Metrics: []sdk.UsageMetric{
+			{Key: "images", Kind: "image", Value: 1},
+		},
 		CostDetails: []sdk.UsageCostDetail{
 			{Key: "images", AccountCost: 0.40},
 		},
@@ -46,30 +88,29 @@ func TestImageOutputBillingOverride_FallsBackWhenTierUnset(t *testing.T) {
 		},
 	}
 
-	if got, ok := imageOutputBillingOverride(usage, settings); ok {
-		t.Fatalf("override = %v, want fallback", got)
+	if got, ok := imageOutputBillingOverride(usage, nil, settings); ok {
+		t.Fatalf("override = %+v, want fallback", got)
 	}
 }
 
 func TestImageTierForSize(t *testing.T) {
 	tests := []struct {
-		size      string
-		wantTier  string
-		wantPrice float64
+		size     string
+		wantTier string
 	}{
-		{size: "1024x1024", wantTier: "1k", wantPrice: 0.10},
-		{size: "1672x941", wantTier: "2k", wantPrice: 0.20},
-		{size: "3840x2160", wantTier: "4k", wantPrice: 0.40},
+		{size: "1024x1024", wantTier: "1k"},
+		{size: "1672x941", wantTier: "2k"},
+		{size: "3840x2160", wantTier: "4k"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.size, func(t *testing.T) {
-			tier, price, ok := imageTierForSize(tt.size)
+			tier, ok := billing.ImageTierForSize(tt.size)
 			if !ok {
 				t.Fatal("expected tier")
 			}
-			if tier != tt.wantTier || price != tt.wantPrice {
-				t.Fatalf("imageTierForSize() = (%q, %v), want (%q, %v)", tier, price, tt.wantTier, tt.wantPrice)
+			if tier != tt.wantTier {
+				t.Fatalf("ImageTierForSize() = %q, want %q", tier, tt.wantTier)
 			}
 		})
 	}

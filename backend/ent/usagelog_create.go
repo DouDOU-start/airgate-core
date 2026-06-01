@@ -261,6 +261,20 @@ func (ulc *UsageLogCreate) SetNillableCacheCreationCost(f *float64) *UsageLogCre
 	return ulc
 }
 
+// SetImageCost sets the "image_cost" field.
+func (ulc *UsageLogCreate) SetImageCost(f float64) *UsageLogCreate {
+	ulc.mutation.SetImageCost(f)
+	return ulc
+}
+
+// SetNillableImageCost sets the "image_cost" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableImageCost(f *float64) *UsageLogCreate {
+	if f != nil {
+		ulc.SetImageCost(*f)
+	}
+	return ulc
+}
+
 // SetTotalCost sets the "total_cost" field.
 func (ulc *UsageLogCreate) SetTotalCost(f float64) *UsageLogCreate {
 	ulc.mutation.SetTotalCost(f)
@@ -726,6 +740,10 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultCacheCreationCost
 		ulc.mutation.SetCacheCreationCost(v)
 	}
+	if _, ok := ulc.mutation.ImageCost(); !ok {
+		v := usagelog.DefaultImageCost
+		ulc.mutation.SetImageCost(v)
+	}
 	if _, ok := ulc.mutation.TotalCost(); !ok {
 		v := usagelog.DefaultTotalCost
 		ulc.mutation.SetTotalCost(v)
@@ -869,6 +887,9 @@ func (ulc *UsageLogCreate) check() error {
 	}
 	if _, ok := ulc.mutation.CacheCreationCost(); !ok {
 		return &ValidationError{Name: "cache_creation_cost", err: errors.New(`ent: missing required field "UsageLog.cache_creation_cost"`)}
+	}
+	if _, ok := ulc.mutation.ImageCost(); !ok {
+		return &ValidationError{Name: "image_cost", err: errors.New(`ent: missing required field "UsageLog.image_cost"`)}
 	}
 	if _, ok := ulc.mutation.TotalCost(); !ok {
 		return &ValidationError{Name: "total_cost", err: errors.New(`ent: missing required field "UsageLog.total_cost"`)}
@@ -1024,6 +1045,10 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := ulc.mutation.CacheCreationCost(); ok {
 		_spec.SetField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
 		_node.CacheCreationCost = value
+	}
+	if value, ok := ulc.mutation.ImageCost(); ok {
+		_spec.SetField(usagelog.FieldImageCost, field.TypeFloat64, value)
+		_node.ImageCost = value
 	}
 	if value, ok := ulc.mutation.TotalCost(); ok {
 		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)

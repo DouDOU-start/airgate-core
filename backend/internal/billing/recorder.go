@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,49 +23,52 @@ const (
 
 // UsageRecord 使用记录
 type UsageRecord struct {
-	UserID                int
-	UserEmail             string
-	APIKeyID              int
-	AccountID             int
-	GroupID               int
-	Platform              string
-	Model                 string
-	InputTokens           int
-	OutputTokens          int
-	CachedInputTokens     int
-	CacheCreationTokens   int
-	CacheCreation5mTokens int
-	CacheCreation1hTokens int
-	ReasoningOutputTokens int
-	InputPrice            float64
-	OutputPrice           float64
-	CachedInputPrice      float64
-	CacheCreationPrice    float64
-	CacheCreation1hPrice  float64
-	InputCost             float64
-	OutputCost            float64
-	CachedInputCost       float64
-	CacheCreationCost     float64
-	TotalCost             float64
-	ActualCost            float64 // 平台真实成本（扣 reseller 余额）
-	BilledCost            float64 // 客户账面消耗（累加到 APIKey.used_quota）
-	AccountCost           float64 // 账号实际成本（仅服务"账号计费"统计）
-	RateMultiplier        float64 // 快照：本次生效的平台计费倍率
-	SellRate              float64 // 快照：本次生效的销售倍率（0 表示未启用 markup）
-	AccountRateMultiplier float64 // 快照：本次生效的 account_rate
-	ServiceTier           string
-	ImageSize             string // 图像生成请求的实际出图尺寸（"WxH"），非图像请求留空
-	Stream                bool
-	DurationMs            int64
-	FirstTokenMs          int64
-	UserAgent             string
-	IPAddress             string
-	Endpoint              string
-	ReasoningEffort       string
-	UsageAttributes       []sdk.UsageAttribute
-	UsageMetrics          []sdk.UsageMetric
-	UsageCostDetails      []sdk.UsageCostDetail
-	UsageMetadata         map[string]string
+	UserID                       int
+	UserEmail                    string
+	APIKeyID                     int
+	AccountID                    int
+	GroupID                      int
+	Platform                     string
+	Model                        string
+	InputTokens                  int
+	OutputTokens                 int
+	CachedInputTokens            int
+	CacheCreationTokens          int
+	CacheCreation5mTokens        int
+	CacheCreation1hTokens        int
+	ReasoningOutputTokens        int
+	InputPrice                   float64
+	OutputPrice                  float64
+	CachedInputPrice             float64
+	CacheCreationPrice           float64
+	CacheCreation1hPrice         float64
+	InputCost                    float64
+	OutputCost                   float64
+	CachedInputCost              float64
+	CacheCreationCost            float64
+	ImageCost                    float64
+	ImageFixedPriceApplied       bool
+	ImageFixedPriceReplacesTotal bool
+	TotalCost                    float64
+	ActualCost                   float64 // 平台真实成本（扣 reseller 余额）
+	BilledCost                   float64 // 客户账面消耗（累加到 APIKey.used_quota）
+	AccountCost                  float64 // 账号实际成本（仅服务"账号计费"统计）
+	RateMultiplier               float64 // 快照：本次生效的平台计费倍率
+	SellRate                     float64 // 快照：本次生效的销售倍率（0 表示未启用 markup）
+	AccountRateMultiplier        float64 // 快照：本次生效的 account_rate
+	ServiceTier                  string
+	ImageSize                    string // 图像生成请求的实际出图尺寸（"WxH"），非图像请求留空
+	Stream                       bool
+	DurationMs                   int64
+	FirstTokenMs                 int64
+	UserAgent                    string
+	IPAddress                    string
+	Endpoint                     string
+	ReasoningEffort              string
+	UsageAttributes              []sdk.UsageAttribute
+	UsageMetrics                 []sdk.UsageMetric
+	UsageCostDetails             []sdk.UsageCostDetail
+	UsageMetadata                map[string]string
 }
 
 // Recorder 异步记录器
@@ -251,6 +257,7 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
 		SetOutputCost(rec.OutputCost).
 		SetCachedInputCost(rec.CachedInputCost).
 		SetCacheCreationCost(rec.CacheCreationCost).
+		SetImageCost(rec.ImageCost).
 		SetTotalCost(rec.TotalCost).
 		SetActualCost(rec.ActualCost).
 		SetBilledCost(rec.BilledCost).
@@ -290,33 +297,222 @@ func enrichUsageCostDetails(rec UsageRecord) []sdk.UsageCostDetail {
 	items := make([]sdk.UsageCostDetail, len(rec.UsageCostDetails))
 	copy(items, rec.UsageCostDetails)
 
-	var accountCostSum float64
+	var imageCostSum float64
+	var imageInputCostSum float64
 	for _, item := range items {
-		if item.AccountCost > 0 {
-			accountCostSum += item.AccountCost
+		if item.AccountCost > 0 && isImageCostDetail(item) {
+			imageCostSum += item.AccountCost
+		}
+		if item.AccountCost > 0 && isImageInputCostDetail(item) {
+			imageInputCostSum += item.AccountCost
+		}
+	}
+	rate := rec.RateMultiplier
+	if rate <= 0 {
+		rate = 1
+	}
+	nonImageBaseCost := rec.InputCost + rec.OutputCost + rec.CachedInputCost + rec.CacheCreationCost
+	expectedTokenActualCost := (nonImageBaseCost + imageInputCostSum + imageCostSum) * rate
+	fixedImagePricing := rec.ImageFixedPriceApplied || (imageCostSum > 0 && math.Abs(rec.ActualCost-expectedTokenActualCost) > 1e-9)
+	imageUserCost := imageCostSum * rate
+	if fixedImagePricing {
+		imageUserCost = rec.ActualCost
+		if !rec.ImageFixedPriceReplacesTotal {
+			imageUserCost = rec.ActualCost - nonImageBaseCost*rate
+			if imageUserCost < 0 {
+				imageUserCost = 0
+			}
 		}
 	}
 
 	for i := range items {
 		accountCost := items[i].AccountCost
 		if accountCost <= 0 {
-			if rec.RateMultiplier > 0 {
-				items[i].BillingMultiplier = rec.RateMultiplier
+			items[i].BillingMultiplier = rate
+			continue
+		}
+		if fixedImagePricing && isImageInputCostDetail(items[i]) {
+			items[i].BillingMultiplier = 0
+			items[i].UserCost = 0
+			continue
+		}
+		if fixedImagePricing && rec.ImageFixedPriceReplacesTotal && !isImageCostDetail(items[i]) {
+			items[i].BillingMultiplier = 0
+			items[i].UserCost = 0
+			continue
+		}
+		if isImageCostDetail(items[i]) {
+			if imageCostSum > 0 && (fixedImagePricing || imageUserCost > 0) {
+				if imageUserCost > 0 {
+					items[i].UserCost = imageUserCost * accountCost / imageCostSum
+					items[i].BillingMultiplier = items[i].UserCost / accountCost
+				} else {
+					items[i].UserCost = 0
+					items[i].BillingMultiplier = 0
+				}
+				items[i].Metadata = cloneCostMetadata(items[i].Metadata)
+				if fixedImagePricing {
+					items[i].Metadata["billing_mode"] = "fixed_image_price"
+					if imageCount := parseCostMetadataPositiveInt(items[i].Metadata, "image_count"); imageCount > 0 {
+						items[i].Metadata["fixed_unit_price"] = fmt.Sprintf("%.10g", items[i].UserCost/float64(imageCount))
+						items[i].Metadata["fixed_unit"] = "USD/image"
+					}
+				} else {
+					items[i].Metadata["billing_mode"] = "image_token"
+				}
+			} else {
+				items[i].BillingMultiplier = rate
+				items[i].UserCost = accountCost * rate
 			}
 			continue
 		}
-		if accountCostSum > 0 && rec.ActualCost > 0 {
-			items[i].UserCost = rec.ActualCost * accountCost / accountCostSum
-			items[i].BillingMultiplier = items[i].UserCost / accountCost
-			continue
-		}
-		if rec.RateMultiplier > 0 {
-			items[i].BillingMultiplier = rec.RateMultiplier
-			items[i].UserCost = accountCost * rec.RateMultiplier
-		}
+		items[i].BillingMultiplier = rate
+		items[i].UserCost = accountCost * rate
+	}
+
+	if !fixedImagePricing {
+		return mergeImageTokenCostDetails(items)
 	}
 
 	return items
+}
+
+func isImageCostDetail(item sdk.UsageCostDetail) bool {
+	key := strings.ToLower(strings.TrimSpace(item.Key))
+	key = strings.ReplaceAll(key, "-", "_")
+	if strings.Contains(key, "input") {
+		return false
+	}
+	switch key {
+	case "image", "images", "image_generation", "image_tool", "image_output", "image_outputs", "image_output_tokens":
+		return true
+	default:
+		return strings.Contains(key, "image")
+	}
+}
+
+func isImageInputCostDetail(item sdk.UsageCostDetail) bool {
+	key := strings.ToLower(strings.TrimSpace(item.Key))
+	key = strings.ReplaceAll(key, "-", "_")
+	label := strings.ToLower(strings.TrimSpace(item.Label))
+	return (strings.Contains(key, "image") || strings.Contains(label, "图片")) &&
+		(strings.Contains(key, "input") || strings.Contains(label, "输入"))
+}
+
+func mergeImageTokenCostDetails(items []sdk.UsageCostDetail) []sdk.UsageCostDetail {
+	merged := make([]sdk.UsageCostDetail, 0, len(items))
+	inputIndex := -1
+	outputIndex := -1
+	for _, item := range items {
+		switch {
+		case isImageInputCostDetail(item):
+			detail := normalizeTokenCostDetail(item, "input_tokens", "输入 Token")
+			if inputIndex >= 0 {
+				merged[inputIndex] = mergeCostDetail(merged[inputIndex], detail)
+			} else {
+				inputIndex = len(merged)
+				merged = append(merged, detail)
+			}
+		case isImageCostDetail(item):
+			detail := normalizeTokenCostDetail(item, "output_tokens", "输出 Token")
+			if outputIndex >= 0 {
+				merged[outputIndex] = mergeCostDetail(merged[outputIndex], detail)
+			} else {
+				outputIndex = len(merged)
+				merged = append(merged, detail)
+			}
+		default:
+			detail := item
+			if isInputTokenCostDetail(detail) {
+				if inputIndex >= 0 {
+					merged[inputIndex] = mergeCostDetail(merged[inputIndex], detail)
+					continue
+				}
+				inputIndex = len(merged)
+			}
+			if isOutputTokenCostDetail(detail) {
+				if outputIndex >= 0 {
+					merged[outputIndex] = mergeCostDetail(merged[outputIndex], detail)
+					continue
+				}
+				outputIndex = len(merged)
+			}
+			merged = append(merged, detail)
+		}
+	}
+	return merged
+}
+
+func normalizeTokenCostDetail(item sdk.UsageCostDetail, key, label string) sdk.UsageCostDetail {
+	item.Key = key
+	item.Label = label
+	item.Metadata = tokenCostMetadata(item.Metadata)
+	return item
+}
+
+func mergeCostDetail(base, extra sdk.UsageCostDetail) sdk.UsageCostDetail {
+	base.AccountCost += extra.AccountCost
+	base.UserCost += extra.UserCost
+	if base.Currency == "" {
+		base.Currency = extra.Currency
+	}
+	if len(base.Metadata) == 0 {
+		base.Metadata = extra.Metadata
+	}
+	if base.AccountCost > 0 && base.UserCost > 0 {
+		base.BillingMultiplier = base.UserCost / base.AccountCost
+	}
+	return base
+}
+
+func isInputTokenCostDetail(item sdk.UsageCostDetail) bool {
+	key := strings.ToLower(strings.TrimSpace(item.Key))
+	key = strings.ReplaceAll(key, "-", "_")
+	return (key == "input_tokens" || key == "input" || key == "prompt_tokens") && !isImageInputCostDetail(item)
+}
+
+func isOutputTokenCostDetail(item sdk.UsageCostDetail) bool {
+	key := strings.ToLower(strings.TrimSpace(item.Key))
+	key = strings.ReplaceAll(key, "-", "_")
+	return (key == "output_tokens" || key == "output" || key == "completion_tokens") && !isImageCostDetail(item)
+}
+
+func tokenCostMetadata(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string)
+	for _, key := range []string{"unit", "unit_price", "billing_model"} {
+		if value := strings.TrimSpace(in[key]); value != "" {
+			out[key] = value
+		}
+	}
+	if _, ok := out["unit"]; ok {
+		out["unit"] = "USD/1M tokens"
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func cloneCostMetadata(in map[string]string) map[string]string {
+	out := make(map[string]string, len(in)+1)
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func parseCostMetadataPositiveInt(metadata map[string]string, key string) int {
+	if len(metadata) == 0 {
+		return 0
+	}
+	value, err := strconv.Atoi(strings.TrimSpace(metadata[key]))
+	if err != nil || value <= 0 {
+		return 0
+	}
+	return value
 }
 
 func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) error {

@@ -138,13 +138,15 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (User, error) {
 	}
 
 	created, err := s.repo.Create(ctx, Mutation{
-		Email:          &input.Email,
-		PasswordHash:   stringPtr(string(hash)),
-		Username:       &input.Username,
-		Role:           &input.Role,
-		MaxConcurrency: intPtrIfPositive(input.MaxConcurrency),
-		GroupRates:     cloneGroupRates(input.GroupRates),
-		HasGroupRates:  input.GroupRates != nil,
+		Email:                  &input.Email,
+		PasswordHash:           stringPtr(string(hash)),
+		Username:               &input.Username,
+		Role:                   &input.Role,
+		MaxConcurrency:         intPtrIfPositive(input.MaxConcurrency),
+		GroupRates:             cloneGroupRates(input.GroupRates),
+		HasGroupRates:          input.GroupRates != nil,
+		GroupPluginSettings:    cloneGroupPluginSettings(input.GroupPluginSettings),
+		HasGroupPluginSettings: input.GroupPluginSettings != nil,
 	})
 	if err != nil {
 		logger.Error("user_create_failed",
@@ -172,14 +174,16 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (User, 
 		}
 	}
 	mutation := Mutation{
-		Username:           input.Username,
-		Role:               input.Role,
-		MaxConcurrency:     input.MaxConcurrency,
-		GroupRates:         cloneGroupRates(input.GroupRates),
-		HasGroupRates:      input.HasGroupRates,
-		AllowedGroupIDs:    append([]int64(nil), input.AllowedGroupIDs...),
-		HasAllowedGroupIDs: input.HasAllowedGroupIDs,
-		Status:             input.Status,
+		Username:               input.Username,
+		Role:                   input.Role,
+		MaxConcurrency:         input.MaxConcurrency,
+		GroupRates:             cloneGroupRates(input.GroupRates),
+		HasGroupRates:          input.HasGroupRates,
+		GroupPluginSettings:    cloneGroupPluginSettings(input.GroupPluginSettings),
+		HasGroupPluginSettings: input.HasGroupPluginSettings,
+		AllowedGroupIDs:        append([]int64(nil), input.AllowedGroupIDs...),
+		HasAllowedGroupIDs:     input.HasAllowedGroupIDs,
+		Status:                 input.Status,
 	}
 	if input.Password != nil {
 		hash, err := bcrypt.GenerateFromPassword([]byte(*input.Password), bcrypt.DefaultCost)
@@ -311,7 +315,7 @@ func (s *Service) ListGroupRateOverrides(ctx context.Context, groupID int64) ([]
 //
 // 读 - 改 - 写：先拉出用户当前的 group_rates map，修改单个条目，再整体写回。
 // 并发场景下存在理论上的写丢失窗口，但后台管理单用户操作可以接受。
-func (s *Service) SetGroupRate(ctx context.Context, userID int, groupID int64, rate float64) (GroupRateOverride, error) {
+func (s *Service) SetGroupRate(ctx context.Context, userID int, groupID int64, rate float64, pluginSettings map[string]map[string]string) (GroupRateOverride, error) {
 	if rate <= 0 {
 		return GroupRateOverride{}, ErrInvalidRateMultiplier
 	}
@@ -324,18 +328,30 @@ func (s *Service) SetGroupRate(ctx context.Context, userID int, groupID int64, r
 		rates = make(map[int64]float64)
 	}
 	rates[groupID] = rate
+	settings := cloneGroupPluginSettings(u.GroupPluginSettings)
+	if settings == nil {
+		settings = make(map[int64]map[string]map[string]string)
+	}
+	if len(pluginSettings) > 0 {
+		settings[groupID] = cloneOneGroupPluginSettings(pluginSettings)
+	} else {
+		delete(settings, groupID)
+	}
 	updated, err := s.repo.Update(ctx, userID, Mutation{
-		GroupRates:    rates,
-		HasGroupRates: true,
+		GroupRates:             rates,
+		HasGroupRates:          true,
+		GroupPluginSettings:    settings,
+		HasGroupPluginSettings: true,
 	})
 	if err != nil {
 		return GroupRateOverride{}, err
 	}
 	return GroupRateOverride{
-		UserID:   updated.ID,
-		Email:    updated.Email,
-		Username: updated.Username,
-		Rate:     rate,
+		UserID:         updated.ID,
+		Email:          updated.Email,
+		Username:       updated.Username,
+		Rate:           rate,
+		PluginSettings: cloneOneGroupPluginSettings(pluginSettings),
 	}, nil
 }
 
@@ -345,14 +361,20 @@ func (s *Service) DeleteGroupRate(ctx context.Context, userID int, groupID int64
 	if err != nil {
 		return err
 	}
-	if _, ok := u.GroupRates[groupID]; !ok {
+	_, hasRate := u.GroupRates[groupID]
+	_, hasPluginSettings := u.GroupPluginSettings[groupID]
+	if !hasRate && !hasPluginSettings {
 		return nil // 幂等：本来就没有，直接成功
 	}
 	rates := cloneGroupRates(u.GroupRates)
 	delete(rates, groupID)
+	settings := cloneGroupPluginSettings(u.GroupPluginSettings)
+	delete(settings, groupID)
 	_, err = s.repo.Update(ctx, userID, Mutation{
-		GroupRates:    rates,
-		HasGroupRates: true,
+		GroupRates:             rates,
+		HasGroupRates:          true,
+		GroupPluginSettings:    settings,
+		HasGroupPluginSettings: true,
 	})
 	return err
 }
@@ -470,6 +492,46 @@ func cloneGroupRates(input map[int64]float64) map[int64]float64 {
 	cloned := make(map[int64]float64, len(input))
 	for key, value := range input {
 		cloned[key] = value
+	}
+	return cloned
+}
+
+func cloneGroupPluginSettings(input map[int64]map[string]map[string]string) map[int64]map[string]map[string]string {
+	if input == nil {
+		return nil
+	}
+	cloned := make(map[int64]map[string]map[string]string, len(input))
+	for groupID, pluginSettings := range input {
+		if len(pluginSettings) == 0 {
+			continue
+		}
+		cloned[groupID] = make(map[string]map[string]string, len(pluginSettings))
+		for plugin, values := range pluginSettings {
+			if len(values) == 0 {
+				continue
+			}
+			cloned[groupID][plugin] = make(map[string]string, len(values))
+			for key, value := range values {
+				cloned[groupID][plugin][key] = value
+			}
+		}
+	}
+	return cloned
+}
+
+func cloneOneGroupPluginSettings(input map[string]map[string]string) map[string]map[string]string {
+	if input == nil {
+		return nil
+	}
+	cloned := make(map[string]map[string]string, len(input))
+	for plugin, values := range input {
+		if len(values) == 0 {
+			continue
+		}
+		cloned[plugin] = make(map[string]string, len(values))
+		for key, value := range values {
+			cloned[plugin][key] = value
+		}
 	}
 	return cloned
 }

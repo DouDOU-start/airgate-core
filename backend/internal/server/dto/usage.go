@@ -34,6 +34,7 @@ type UsageLogResp struct {
 	OutputCost            float64               `json:"output_cost"`
 	CachedInputCost       float64               `json:"cached_input_cost"`
 	CacheCreationCost     float64               `json:"cache_creation_cost"`
+	ImageCost             float64               `json:"image_cost"`
 	TotalCost             float64               `json:"total_cost"`
 	ActualCost            float64               `json:"actual_cost"`             // 平台真实成本/用户扣费
 	BilledCost            float64               `json:"billed_cost"`             // 客户账面消耗（reseller markup 后的金额）

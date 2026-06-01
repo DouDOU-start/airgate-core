@@ -15,6 +15,7 @@ func toUserRespFromDomain(item appuser.User) dto.UserResp {
 		Role:                  item.Role,
 		MaxConcurrency:        item.MaxConcurrency,
 		GroupRates:            item.GroupRates,
+		GroupPluginSettings:   item.GroupPluginSettings,
 		AllowedGroupIDs:       item.AllowedGroupIDs,
 		BalanceAlertThreshold: item.BalanceAlertThreshold,
 		Status:                item.Status,

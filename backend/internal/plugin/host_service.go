@@ -1145,14 +1145,21 @@ func (h *HostService) recordHostForwardUsage(
 
 	calcInput := billing.CalculateInput{
 		InputCost:         usageValues.InputCost,
+		ImageInputCost:    usageValues.ImageInputCost,
 		OutputCost:        usageValues.OutputCost,
 		CachedInputCost:   usageValues.CachedInputCost,
 		CacheCreationCost: usageValues.CacheCreationCost,
+		ImageCost:         usageValues.ImageCost,
 		BillingRate:       route.EffectiveRate,
 		AccountRate:       accFull.RateMultiplier,
 	}
-	if override, ok := imageOutputBillingOverride(usage, route.GroupPluginSettings); ok {
-		calcInput.OutputBillingCostOverride = &override
+	var imageFixedPriceApplied bool
+	var imageFixedPriceReplacesTotal bool
+	if override, ok := imageOutputBillingOverride(usage, route.UserPluginSettings, route.GroupPluginSettings); ok {
+		calcInput.ImageBillingCostOverride = &override.cost
+		calcInput.ImageBillingCostOverrideReplacesTotal = override.replacesTotal
+		imageFixedPriceApplied = true
+		imageFixedPriceReplacesTotal = override.replacesTotal
 	}
 	calc := h.calculator.Calculate(calcInput)
 
@@ -1164,46 +1171,49 @@ func (h *HostService) recordHostForwardUsage(
 	}
 
 	record := billing.UsageRecord{
-		UserID:                int(req.UserID),
-		UserEmail:             userEmail,
-		APIKeyID:              int(req.APIKeyID),
-		AccountID:             accountID,
-		GroupID:               route.GroupID,
-		Platform:              platform,
-		Model:                 actualModel,
-		InputTokens:           usageValues.InputTokens,
-		OutputTokens:          usageValues.OutputTokens,
-		CachedInputTokens:     usageValues.CachedInputTokens,
-		CacheCreationTokens:   usageValues.CacheCreationTokens,
-		CacheCreation5mTokens: usageValues.CacheCreation5mTokens,
-		CacheCreation1hTokens: usageValues.CacheCreation1hTokens,
-		ReasoningOutputTokens: usageValues.ReasoningOutputTokens,
-		InputPrice:            usageValues.InputPrice,
-		OutputPrice:           usageValues.OutputPrice,
-		CachedInputPrice:      usageValues.CachedInputPrice,
-		CacheCreationPrice:    usageValues.CacheCreationPrice,
-		CacheCreation1hPrice:  usageValues.CacheCreation1hPrice,
-		InputCost:             calc.InputCost,
-		OutputCost:            calc.OutputCost,
-		CachedInputCost:       calc.CachedInputCost,
-		CacheCreationCost:     calc.CacheCreationCost,
-		TotalCost:             calc.TotalCost,
-		ActualCost:            calc.ActualCost,
-		BilledCost:            calc.BilledCost,
-		AccountCost:           calc.AccountCost,
-		RateMultiplier:        calc.RateMultiplier,
-		AccountRateMultiplier: calc.AccountRateMultiplier,
-		ServiceTier:           usageValues.ServiceTier,
-		ImageSize:             usageValues.ImageSize,
-		Endpoint:              req.Path,
-		ReasoningEffort:       resolveReasoningEffort(hostForwardReasoningEffort(req), usage),
-		Stream:                req.Stream,
-		DurationMs:            duration.Milliseconds(),
-		FirstTokenMs:          usageValues.FirstTokenMs,
-		UsageAttributes:       usage.Attributes,
-		UsageMetrics:          usage.Metrics,
-		UsageCostDetails:      usage.CostDetails,
-		UsageMetadata:         usage.Metadata,
+		UserID:                       int(req.UserID),
+		UserEmail:                    userEmail,
+		APIKeyID:                     int(req.APIKeyID),
+		AccountID:                    accountID,
+		GroupID:                      route.GroupID,
+		Platform:                     platform,
+		Model:                        actualModel,
+		InputTokens:                  usageValues.InputTokens,
+		OutputTokens:                 usageValues.OutputTokens,
+		CachedInputTokens:            usageValues.CachedInputTokens,
+		CacheCreationTokens:          usageValues.CacheCreationTokens,
+		CacheCreation5mTokens:        usageValues.CacheCreation5mTokens,
+		CacheCreation1hTokens:        usageValues.CacheCreation1hTokens,
+		ReasoningOutputTokens:        usageValues.ReasoningOutputTokens,
+		InputPrice:                   usageValues.InputPrice,
+		OutputPrice:                  usageValues.OutputPrice,
+		CachedInputPrice:             usageValues.CachedInputPrice,
+		CacheCreationPrice:           usageValues.CacheCreationPrice,
+		CacheCreation1hPrice:         usageValues.CacheCreation1hPrice,
+		InputCost:                    calc.InputCost,
+		OutputCost:                   calc.OutputCost,
+		CachedInputCost:              calc.CachedInputCost,
+		CacheCreationCost:            calc.CacheCreationCost,
+		ImageCost:                    calc.ImageCost,
+		ImageFixedPriceApplied:       imageFixedPriceApplied,
+		ImageFixedPriceReplacesTotal: imageFixedPriceReplacesTotal,
+		TotalCost:                    calc.TotalCost,
+		ActualCost:                   calc.ActualCost,
+		BilledCost:                   calc.BilledCost,
+		AccountCost:                  calc.AccountCost,
+		RateMultiplier:               calc.RateMultiplier,
+		AccountRateMultiplier:        calc.AccountRateMultiplier,
+		ServiceTier:                  usageValues.ServiceTier,
+		ImageSize:                    usageValues.ImageSize,
+		Endpoint:                     req.Path,
+		ReasoningEffort:              resolveReasoningEffort(hostForwardReasoningEffort(req), usage),
+		Stream:                       req.Stream,
+		DurationMs:                   duration.Milliseconds(),
+		FirstTokenMs:                 usageValues.FirstTokenMs,
+		UsageAttributes:              usage.Attributes,
+		UsageMetrics:                 usage.Metrics,
+		UsageCostDetails:             usage.CostDetails,
+		UsageMetadata:                usage.Metadata,
 	}
 	if h.recorder == nil {
 		return 0, nil
@@ -1409,6 +1419,7 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 			GroupServiceTier:       g.ServiceTier,
 			GroupForceInstructions: g.ForceInstructions,
 			GroupPluginSettings:    clonePluginSettingsHost(g.PluginSettings),
+			UserPluginSettings:     clonePluginSettingsHost(u.GroupPluginSettings[int64(g.ID)]),
 			SortWeight:             g.SortWeight,
 		}}, u.Email, nil
 	}
@@ -1429,7 +1440,7 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 			sdk.LogFieldUserID, req.UserID, sdk.LogFieldError, err)
 		return nil, "", hostForwardGenericError()
 	}
-	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserID), platform, u.GroupRates, hostForwardRequirements(req))
+	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserID), platform, u.GroupRates, u.GroupPluginSettings, hostForwardRequirements(req))
 	if err != nil {
 		if cerr := hostContextError(err); cerr != nil {
 			return nil, "", cerr

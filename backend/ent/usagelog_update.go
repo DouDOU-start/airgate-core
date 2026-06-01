@@ -397,6 +397,27 @@ func (ulu *UsageLogUpdate) AddCacheCreationCost(f float64) *UsageLogUpdate {
 	return ulu
 }
 
+// SetImageCost sets the "image_cost" field.
+func (ulu *UsageLogUpdate) SetImageCost(f float64) *UsageLogUpdate {
+	ulu.mutation.ResetImageCost()
+	ulu.mutation.SetImageCost(f)
+	return ulu
+}
+
+// SetNillableImageCost sets the "image_cost" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableImageCost(f *float64) *UsageLogUpdate {
+	if f != nil {
+		ulu.SetImageCost(*f)
+	}
+	return ulu
+}
+
+// AddImageCost adds f to the "image_cost" field.
+func (ulu *UsageLogUpdate) AddImageCost(f float64) *UsageLogUpdate {
+	ulu.mutation.AddImageCost(f)
+	return ulu
+}
+
 // SetTotalCost sets the "total_cost" field.
 func (ulu *UsageLogUpdate) SetTotalCost(f float64) *UsageLogUpdate {
 	ulu.mutation.ResetTotalCost()
@@ -1046,6 +1067,12 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ulu.mutation.AddedCacheCreationCost(); ok {
 		_spec.AddField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
 	}
+	if value, ok := ulu.mutation.ImageCost(); ok {
+		_spec.SetField(usagelog.FieldImageCost, field.TypeFloat64, value)
+	}
+	if value, ok := ulu.mutation.AddedImageCost(); ok {
+		_spec.AddField(usagelog.FieldImageCost, field.TypeFloat64, value)
+	}
 	if value, ok := ulu.mutation.TotalCost(); ok {
 		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)
 	}
@@ -1666,6 +1693,27 @@ func (uluo *UsageLogUpdateOne) SetNillableCacheCreationCost(f *float64) *UsageLo
 // AddCacheCreationCost adds f to the "cache_creation_cost" field.
 func (uluo *UsageLogUpdateOne) AddCacheCreationCost(f float64) *UsageLogUpdateOne {
 	uluo.mutation.AddCacheCreationCost(f)
+	return uluo
+}
+
+// SetImageCost sets the "image_cost" field.
+func (uluo *UsageLogUpdateOne) SetImageCost(f float64) *UsageLogUpdateOne {
+	uluo.mutation.ResetImageCost()
+	uluo.mutation.SetImageCost(f)
+	return uluo
+}
+
+// SetNillableImageCost sets the "image_cost" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableImageCost(f *float64) *UsageLogUpdateOne {
+	if f != nil {
+		uluo.SetImageCost(*f)
+	}
+	return uluo
+}
+
+// AddImageCost adds f to the "image_cost" field.
+func (uluo *UsageLogUpdateOne) AddImageCost(f float64) *UsageLogUpdateOne {
+	uluo.mutation.AddImageCost(f)
 	return uluo
 }
 
@@ -2347,6 +2395,12 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if value, ok := uluo.mutation.AddedCacheCreationCost(); ok {
 		_spec.AddField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.ImageCost(); ok {
+		_spec.SetField(usagelog.FieldImageCost, field.TypeFloat64, value)
+	}
+	if value, ok := uluo.mutation.AddedImageCost(); ok {
+		_spec.AddField(usagelog.FieldImageCost, field.TypeFloat64, value)
 	}
 	if value, ok := uluo.mutation.TotalCost(); ok {
 		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)

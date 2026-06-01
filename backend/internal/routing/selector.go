@@ -26,10 +26,11 @@ type Candidate struct {
 	GroupServiceTier       string
 	GroupForceInstructions string
 	GroupPluginSettings    map[string]map[string]string
+	UserPluginSettings     map[string]map[string]string
 	SortWeight             int
 }
 
-func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platform string, userGroupRates map[int64]float64, requirements Requirements) ([]Candidate, error) {
+func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platform string, userGroupRates map[int64]float64, userGroupPluginSettings map[int64]map[string]map[string]string, requirements Requirements) ([]Candidate, error) {
 	groups, err := db.Group.Query().
 		Where(group.PlatformEQ(platform)).
 		All(ctx)
@@ -69,6 +70,7 @@ func ListEligibleGroups(ctx context.Context, db *ent.Client, userID int, platfor
 			GroupServiceTier:       g.ServiceTier,
 			GroupForceInstructions: g.ForceInstructions,
 			GroupPluginSettings:    clonePluginSettings(g.PluginSettings),
+			UserPluginSettings:     clonePluginSettings(userGroupPluginSettings[int64(g.ID)]),
 			SortWeight:             g.SortWeight,
 		})
 	}
@@ -105,8 +107,7 @@ func GroupMatchesRequirements(g *ent.Group, requirements Requirements) bool {
 		return false
 	}
 	if strings.EqualFold(g.Platform, "openai") {
-		imageEnabled := pluginSettingEnabled(g.PluginSettings, "openai", "image_enabled")
-		return imageEnabled == requirements.NeedsImage
+		return !requirements.NeedsImage || pluginSettingEnabled(g.PluginSettings, "openai", "image_enabled")
 	}
 	return true
 }

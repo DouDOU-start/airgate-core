@@ -427,6 +427,7 @@ export function GroupFormModal({
                 <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
                   {t('groups.image_pricing')}
                 </p>
+                <p className="mb-2 text-[11px] text-text-tertiary">{t('groups.image_pricing_hint')}</p>
                 <div className="grid grid-cols-3 gap-3">
                   {IMAGE_PRICE_FIELDS.map((field) => (
                     <HeroTextField key={field.key} fullWidth>
