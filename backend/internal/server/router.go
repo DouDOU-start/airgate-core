@@ -254,11 +254,8 @@ func (s *Server) registerRoutes() {
 	r.GET("/status/*path", statusProxy)
 
 	// === cc-switch 通用模板兼容端点（使用 sk-xxx API Key 自鉴权） ===
-	// cc-switch（https://github.com/farion1231/cc-switch）的"通用模板"会
-	// 打 GET {baseUrl}/v1/usage，extractor 依次读 response.remaining /
-	// response.quota.remaining / response.balance 作为剩余额度，并读
-	// response.is_active 作为 key 状态。这里注册 /v1/usage 返回
-	// { is_active, balance } 即可命中。
+	// AirGate 安装脚本和 cc-switch 通用脚本可使用 /v1/usage 做 Key 校验和
+	// 余额查询。该路径由 Core 直接处理，返回真实可用余额。
 	// 必须注册在 NoRoute 之前，否则会被插件动态路由吃掉。
 	// 实现见 cc_compat.go。
 	r.GET("/v1/usage", s.handleCCCompatUserBalance)
