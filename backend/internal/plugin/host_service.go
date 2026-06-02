@@ -812,7 +812,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 
 			resp := hostForwardPayload(outcome)
 
-			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
+			if outcome.Usage != nil {
 				if usageID, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, userEmail, outcome, duration); err != nil {
 					slog.Error("host_forward_record_usage_failed",
 						sdk.LogFieldUserID, req.UserID,
@@ -965,7 +965,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 			}
 
 			var usage *sdk.Usage
-			if outcome.Kind == sdk.OutcomeSuccess && outcome.Usage != nil {
+			if outcome.Usage != nil {
 				if _, err := h.recordHostForwardUsage(ctx, req, route, acc.ID, route.Platform, model, accFull, userEmail, outcome, duration); err != nil {
 					slog.Error("host_forward_stream_record_usage_failed",
 						sdk.LogFieldUserID, req.UserID,

@@ -87,6 +87,9 @@ func (f *Forwarder) writeResult(c *gin.Context, state *forwardState, execution f
 			f.recordUsage(c, state, execution)
 		}
 	default:
+		if execution.outcome.Usage != nil {
+			f.recordUsage(c, state, execution)
+		}
 		writeFailureResponse(c, state, execution)
 	}
 }

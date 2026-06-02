@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -8,9 +9,15 @@ import (
 	"strings"
 	"testing"
 
+	"entgo.io/ent/dialect/sql/schema"
 	"github.com/gin-gonic/gin"
+	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DouDOU-start/airgate-core/ent/enttest"
+	"github.com/DouDOU-start/airgate-core/internal/auth"
+	"github.com/DouDOU-start/airgate-core/internal/billing"
+	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
@@ -82,6 +89,7 @@ func TestWriteFailureResponse_StreamAfterResponseStarts(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 	c.Status(http.StatusOK)
 	c.Writer.WriteHeaderNow()
 
@@ -94,6 +102,105 @@ func TestWriteFailureResponse_StreamAfterResponseStarts(t *testing.T) {
 	}
 	if body := recorder.Body.String(); body != "" {
 		t.Fatalf("body = %q, want empty", body)
+	}
+}
+
+func TestWriteResultRecordsUsageForStreamAborted(t *testing.T) {
+	db := enttest.Open(t, "sqlite3", "file:forwarder_stream_aborted_usage?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	user := db.User.Create().
+		SetEmail("stream-aborted@example.com").
+		SetPasswordHash("secret").
+		SaveX(ctx)
+	group := db.Group.Create().
+		SetName("OpenAI").
+		SetPlatform("openai").
+		SaveX(ctx)
+	account := db.Account.Create().
+		SetName("acc").
+		SetPlatform("openai").
+		SaveX(ctx)
+	key := db.APIKey.Create().
+		SetName("key").
+		SetKeyHash("hash").
+		SetUserID(user.ID).
+		SetGroupID(group.ID).
+		SaveX(ctx)
+
+	usageRecorder := billing.NewRecorder(db, 0)
+	usageRecorder.Start()
+	t.Cleanup(usageRecorder.Stop)
+
+	f := &Forwarder{
+		scheduler:  scheduler.NewScheduler(db, nil),
+		calculator: billing.NewCalculator(),
+		recorder:   usageRecorder,
+	}
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	c.Status(http.StatusOK)
+	c.Writer.WriteHeaderNow()
+
+	f.writeResult(c, &forwardState{
+		stream:      true,
+		requestPath: "/v1/responses",
+		model:       "gpt-5.4",
+		plugin:      &PluginInstance{Name: "openai", Platform: "openai"},
+		account:     account,
+		keyInfo: &auth.APIKeyInfo{
+			KeyID:               key.ID,
+			UserID:              user.ID,
+			UserEmail:           user.Email,
+			GroupID:             group.ID,
+			GroupRateMultiplier: 1,
+			UserBalance:         100,
+		},
+	}, forwardExecution{
+		outcome: sdk.ForwardOutcome{
+			Kind: sdk.OutcomeStreamAborted,
+			Usage: &sdk.Usage{
+				Model:    "gpt-5.4",
+				Currency: "USD",
+				Metrics: []sdk.UsageMetric{{
+					Key:         "images",
+					Label:       "图片数量",
+					Kind:        "image",
+					Unit:        "image",
+					Value:       3,
+					AccountCost: 0.03,
+					Currency:    "USD",
+				}},
+				CostDetails: []sdk.UsageCostDetail{{
+					Key:         "image_tool",
+					Label:       "图片生成",
+					AccountCost: 0.03,
+					Currency:    "USD",
+					Metadata:    map[string]string{"image_count": "3", "size": "1024x1024"},
+				}},
+			},
+		},
+	})
+	usageRecorder.Stop()
+
+	logs, err := db.UsageLog.Query().All(ctx)
+	if err != nil {
+		t.Fatalf("query usage logs: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("usage log count = %d, want 1", len(logs))
+	}
+	if logs[0].ImageCost <= 0 {
+		t.Fatalf("image_cost = %v, want > 0", logs[0].ImageCost)
+	}
+	if len(logs[0].UsageMetrics) != 1 || logs[0].UsageMetrics[0].Key != "images" || logs[0].UsageMetrics[0].Value != 3 {
+		t.Fatalf("usage metrics = %+v, want images=3", logs[0].UsageMetrics)
 	}
 }
 
