@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
@@ -31,39 +32,145 @@ func migrateUserHistoryRefs(drv *entsql.Driver) {
 	if drv == nil {
 		return
 	}
+	if drv.Dialect() != dialect.Postgres {
+		return
+	}
 	ctx := context.Background()
-	statements := []string{
-		`ALTER TABLE usage_logs ADD COLUMN IF NOT EXISTS user_id_snapshot integer NOT NULL DEFAULT 0`,
-		`ALTER TABLE usage_logs ADD COLUMN IF NOT EXISTS user_email_snapshot text NOT NULL DEFAULT ''`,
-		`UPDATE usage_logs AS ul
-			SET user_id_snapshot = CASE WHEN ul.user_id_snapshot = 0 THEN u.id ELSE ul.user_id_snapshot END,
-				user_email_snapshot = CASE WHEN ul.user_email_snapshot = '' THEN u.email ELSE ul.user_email_snapshot END
-			FROM users AS u
-			WHERE ul.user_usage_logs = u.id`,
-		`ALTER TABLE usage_logs ALTER COLUMN user_usage_logs DROP NOT NULL`,
-		`ALTER TABLE usage_logs DROP CONSTRAINT IF EXISTS usage_logs_users_usage_logs`,
-		`ALTER TABLE usage_logs ADD CONSTRAINT usage_logs_users_usage_logs
-			FOREIGN KEY (user_usage_logs) REFERENCES users(id) ON DELETE SET NULL`,
-		`ALTER TABLE balance_logs ADD COLUMN IF NOT EXISTS user_id_snapshot integer NOT NULL DEFAULT 0`,
-		`ALTER TABLE balance_logs ADD COLUMN IF NOT EXISTS user_email_snapshot text NOT NULL DEFAULT ''`,
-		`UPDATE balance_logs AS bl
-			SET user_id_snapshot = CASE WHEN bl.user_id_snapshot = 0 THEN u.id ELSE bl.user_id_snapshot END,
-				user_email_snapshot = CASE WHEN bl.user_email_snapshot = '' THEN u.email ELSE bl.user_email_snapshot END
-			FROM users AS u
-			WHERE bl.user_balance_logs = u.id`,
-		`ALTER TABLE balance_logs ALTER COLUMN user_balance_logs DROP NOT NULL`,
-		`ALTER TABLE balance_logs DROP CONSTRAINT IF EXISTS balance_logs_users_balance_logs`,
-		`ALTER TABLE balance_logs ADD CONSTRAINT balance_logs_users_balance_logs
-			FOREIGN KEY (user_balance_logs) REFERENCES users(id) ON DELETE SET NULL`,
+
+	statements := []startupSQL{
+		{
+			label: "usage_logs.user_id_snapshot",
+			sql:   `ALTER TABLE usage_logs ADD COLUMN IF NOT EXISTS user_id_snapshot integer NOT NULL DEFAULT 0`,
+		},
+		{
+			label: "usage_logs.user_email_snapshot",
+			sql:   `ALTER TABLE usage_logs ADD COLUMN IF NOT EXISTS user_email_snapshot text NOT NULL DEFAULT ''`,
+		},
+		{
+			label: "usage_logs.snapshot_backfill",
+			sql: `UPDATE usage_logs AS ul
+				SET user_id_snapshot = CASE WHEN ul.user_id_snapshot = 0 THEN u.id ELSE ul.user_id_snapshot END,
+					user_email_snapshot = CASE WHEN ul.user_email_snapshot = '' THEN u.email ELSE ul.user_email_snapshot END
+				FROM users AS u
+				WHERE ul.user_usage_logs = u.id
+					AND (ul.user_id_snapshot = 0 OR ul.user_email_snapshot = '')`,
+			logRows: true,
+		},
+		{
+			label: "usage_logs.user_usage_logs_nullable",
+			sql:   `ALTER TABLE usage_logs ALTER COLUMN user_usage_logs DROP NOT NULL`,
+		},
+		{
+			label: "balance_logs.user_id_snapshot",
+			sql:   `ALTER TABLE balance_logs ADD COLUMN IF NOT EXISTS user_id_snapshot integer NOT NULL DEFAULT 0`,
+		},
+		{
+			label: "balance_logs.user_email_snapshot",
+			sql:   `ALTER TABLE balance_logs ADD COLUMN IF NOT EXISTS user_email_snapshot text NOT NULL DEFAULT ''`,
+		},
+		{
+			label: "balance_logs.snapshot_backfill",
+			sql: `UPDATE balance_logs AS bl
+				SET user_id_snapshot = CASE WHEN bl.user_id_snapshot = 0 THEN u.id ELSE bl.user_id_snapshot END,
+					user_email_snapshot = CASE WHEN bl.user_email_snapshot = '' THEN u.email ELSE bl.user_email_snapshot END
+				FROM users AS u
+				WHERE bl.user_balance_logs = u.id
+					AND (bl.user_id_snapshot = 0 OR bl.user_email_snapshot = '')`,
+			logRows: true,
+		},
+		{
+			label: "balance_logs.user_balance_logs_nullable",
+			sql:   `ALTER TABLE balance_logs ALTER COLUMN user_balance_logs DROP NOT NULL`,
+		},
 	}
 
-	for _, sql := range statements {
-		var r entsql.Result
-		if err := drv.Exec(ctx, sql, []any{}, &r); err != nil {
-			slog.Warn("bootstrap_user_history_refs_migration_failed", "sql", sql, sdk.LogFieldError, err)
+	for _, stmt := range statements {
+		if !execStartupSQL(ctx, drv, stmt, "bootstrap_user_history_refs_migration_failed") {
 			return
 		}
 	}
+
+	ensureUserHistoryForeignKey(ctx, drv, userHistoryForeignKey{
+		table:      "usage_logs",
+		constraint: "usage_logs_users_usage_logs",
+		column:     "user_usage_logs",
+	})
+	ensureUserHistoryForeignKey(ctx, drv, userHistoryForeignKey{
+		table:      "balance_logs",
+		constraint: "balance_logs_users_balance_logs",
+		column:     "user_balance_logs",
+	})
+}
+
+type startupSQL struct {
+	label   string
+	sql     string
+	logRows bool
+}
+
+func execStartupSQL(ctx context.Context, drv *entsql.Driver, stmt startupSQL, failureLog string) bool {
+	var r entsql.Result
+	if err := drv.Exec(ctx, stmt.sql, []any{}, &r); err != nil {
+		slog.Warn(failureLog, "label", stmt.label, "sql", stmt.sql, sdk.LogFieldError, err)
+		return false
+	}
+	if stmt.logRows {
+		if affected, err := r.RowsAffected(); err == nil && affected > 0 {
+			slog.Info("bootstrap_startup_sql_done", "label", stmt.label, "rows", affected)
+		}
+	}
+	return true
+}
+
+type userHistoryForeignKey struct {
+	table      string
+	constraint string
+	column     string
+}
+
+func ensureUserHistoryForeignKey(ctx context.Context, drv *entsql.Driver, fk userHistoryForeignKey) {
+	if userHistoryForeignKeyIsSetNull(ctx, drv, fk.constraint) {
+		return
+	}
+
+	statements := []startupSQL{
+		{
+			label: fk.constraint + ".drop",
+			sql:   "ALTER TABLE " + fk.table + " DROP CONSTRAINT IF EXISTS " + fk.constraint,
+		},
+		{
+			label: fk.constraint + ".add_set_null",
+			sql: "ALTER TABLE " + fk.table + " ADD CONSTRAINT " + fk.constraint +
+				" FOREIGN KEY (" + fk.column + ") REFERENCES users(id) ON DELETE SET NULL",
+		},
+	}
+	for _, stmt := range statements {
+		if !execStartupSQL(ctx, drv, stmt, "bootstrap_user_history_refs_fk_migration_failed") {
+			return
+		}
+	}
+}
+
+func userHistoryForeignKeyIsSetNull(ctx context.Context, drv *entsql.Driver, constraint string) bool {
+	var rows entsql.Rows
+	const query = `SELECT confdeltype = 'n'
+		FROM pg_constraint
+		WHERE conname = $1 AND contype = 'f'
+		LIMIT 1`
+	if err := drv.Query(ctx, query, []any{constraint}, &rows); err != nil {
+		slog.Warn("bootstrap_user_history_refs_fk_check_failed", "constraint", constraint, sdk.LogFieldError, err)
+		return false
+	}
+	defer func() { _ = rows.Close() }()
+	if !rows.Next() {
+		return false
+	}
+	var ok bool
+	if err := rows.Scan(&ok); err != nil {
+		slog.Warn("bootstrap_user_history_refs_fk_check_scan_failed", "constraint", constraint, sdk.LogFieldError, err)
+		return false
+	}
+	return ok
 }
 
 // migrateAccountState 把老的 status / rate_limit_reset_at 字段一次性迁移到新的
