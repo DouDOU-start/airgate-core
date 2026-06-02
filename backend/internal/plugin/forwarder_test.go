@@ -310,6 +310,27 @@ func TestRoutesForAPIKeyRejectsImageWhenBoundGroupDisabled(t *testing.T) {
 	}
 }
 
+func TestRoutesForAPIKeyAllowsChatWithDeclaredImageToolWhenBoundGroupDisabled(t *testing.T) {
+	t.Parallel()
+
+	state := &forwardState{
+		body: []byte(`{"model":"gpt-5.4","input":"hi","tools":[{"type":"image_generation"}]}`),
+		keyInfo: &auth.APIKeyInfo{
+			GroupID:             42,
+			GroupPlatform:       "openai",
+			GroupPluginSettings: map[string]map[string]string{"openai": {"image_enabled": "false"}},
+		},
+	}
+
+	requirements := routing.Requirements{
+		NeedsImage: requestNeedsImage("/v1/responses", "gpt-5.4", state.body),
+	}
+	routes := routesForAPIKey(state, requirements)
+	if len(routes) != 1 {
+		t.Fatalf("len(routes) = %d, want 1", len(routes))
+	}
+}
+
 func TestRoutesForAPIKeyAllowsChatWhenBoundGroupImageEnabled(t *testing.T) {
 	t.Parallel()
 

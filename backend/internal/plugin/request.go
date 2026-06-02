@@ -170,9 +170,11 @@ func normalizeReasoningEffort(effort string) string {
 
 // requestNeedsImage 判断请求是否需要图片生成授权。
 // OpenAI 分组默认都可服务普通对话；Images API、图像专用模型和 Responses
-// image_generation tool 需要 group.plugin_settings.openai.image_enabled=true。
+// 显式强制 image_generation tool 需要 group.plugin_settings.openai.image_enabled=true。
+// 普通 tools 声明不在这里拦截；未开启图片时由 OpenAI 插件过滤掉默认
+// image_generation 工具，避免普通对话被误判成生图请求。
 func requestNeedsImage(path, model string, body []byte) bool {
-	return isImageAPIPath(path) || isImageModel(model) || hasImageGenerationTool(body)
+	return isImageAPIPath(path) || isImageModel(model) || hasForcedImageGenerationTool(body)
 }
 
 // requestHasImageWorkload 判断请求是否需要更长的图片工作超时。
@@ -201,35 +203,62 @@ func isImageModel(model string) bool {
 }
 
 func hasImageGenerationTool(body []byte) bool {
+	payload, ok := parseImageToolPayload(body)
+	if !ok {
+		return false
+	}
+	return payload.imageGenerationToolCount() > 0
+}
+
+func hasForcedImageGenerationTool(body []byte) bool {
+	payload, ok := parseImageToolPayload(body)
+	if !ok || len(payload.ToolChoice) == 0 {
+		return false
+	}
+	if payload.toolChoiceForcesImageGeneration() {
+		return true
+	}
+	return payload.toolChoiceRequiresOnlyImageGeneration()
+}
+
+type imageToolPayload struct {
+	Tools []struct {
+		Type string `json:"type"`
+	} `json:"tools"`
+	ToolChoice json.RawMessage `json:"tool_choice"`
+}
+
+func parseImageToolPayload(body []byte) (imageToolPayload, bool) {
 	if len(body) == 0 {
-		return false
+		return imageToolPayload{}, false
 	}
-	var payload struct {
-		Tools []struct {
-			Type string `json:"type"`
-		} `json:"tools"`
-		ToolChoice json.RawMessage `json:"tool_choice"`
-	}
+	var payload imageToolPayload
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return false
+		return imageToolPayload{}, false
 	}
-	for _, tool := range payload.Tools {
+	return payload, true
+}
+
+func (p imageToolPayload) imageGenerationToolCount() int {
+	count := 0
+	for _, tool := range p.Tools {
 		if strings.EqualFold(strings.TrimSpace(tool.Type), "image_generation") {
-			return true
+			count++
 		}
 	}
-	if len(payload.ToolChoice) == 0 {
-		return false
-	}
+	return count
+}
+
+func (p imageToolPayload) toolChoiceForcesImageGeneration() bool {
 	var choiceString string
-	if err := json.Unmarshal(payload.ToolChoice, &choiceString); err == nil {
+	if err := json.Unmarshal(p.ToolChoice, &choiceString); err == nil {
 		return strings.EqualFold(strings.TrimSpace(choiceString), "image_generation")
 	}
 	var choice struct {
 		Type string `json:"type"`
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(payload.ToolChoice, &choice); err == nil {
+	if err := json.Unmarshal(p.ToolChoice, &choice); err == nil {
 		if strings.EqualFold(strings.TrimSpace(choice.Type), "image_generation") {
 			return true
 		}
@@ -238,6 +267,17 @@ func hasImageGenerationTool(body []byte) bool {
 		}
 	}
 	return false
+}
+
+func (p imageToolPayload) toolChoiceRequiresOnlyImageGeneration() bool {
+	var choiceString string
+	if err := json.Unmarshal(p.ToolChoice, &choiceString); err != nil {
+		return false
+	}
+	if !strings.EqualFold(strings.TrimSpace(choiceString), "required") {
+		return false
+	}
+	return len(p.Tools) > 0 && p.imageGenerationToolCount() == len(p.Tools)
 }
 
 func parseMultipartFields(body []byte, contentType string) parsedRequest {

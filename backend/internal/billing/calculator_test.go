@@ -279,7 +279,7 @@ func TestEnrichUsageCostDetails_ResponseFixedImagePriceKeepsTokenUserCost(t *tes
 				Metadata: map[string]string{
 					"image_count": "1",
 					"unit_price":  "30",
-					"unit":        "USD/1M output tokens",
+					"unit":        "USD/1M tokens",
 				},
 			},
 		},
@@ -326,7 +326,7 @@ func TestEnrichUsageCostDetails_ResponseImageTokenBillingMergesIntoInputAndOutpu
 				Metadata: map[string]string{
 					"image_count": "1",
 					"unit_price":  "30",
-					"unit":        "USD/1M output tokens",
+					"unit":        "USD/1M tokens",
 				},
 			},
 		},
@@ -365,7 +365,7 @@ func TestEnrichUsageCostDetails_ImageOnlyTokenBillingUsesInputAndOutputRows(t *t
 				Metadata: map[string]string{
 					"image_count": "1",
 					"unit_price":  "30",
-					"unit":        "USD/1M output tokens",
+					"unit":        "USD/1M tokens",
 				},
 			},
 		},
@@ -402,7 +402,7 @@ func TestEnrichUsageCostDetails_ImageOnlyFixedPriceZeroesTokenUserCost(t *testin
 				Metadata: map[string]string{
 					"image_count": "1",
 					"unit_price":  "30",
-					"unit":        "USD/1M output tokens",
+					"unit":        "USD/1M tokens",
 				},
 			},
 		},
@@ -436,7 +436,7 @@ func TestEnrichUsageCostDetails_FreeFixedImagePriceDoesNotFallBackToTokenCost(t 
 				Metadata: map[string]string{
 					"image_count": "1",
 					"unit_price":  "30",
-					"unit":        "USD/1M output tokens",
+					"unit":        "USD/1M tokens",
 				},
 			},
 		},
