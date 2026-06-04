@@ -52,11 +52,14 @@ func usageSnapshotFromSDK(usage *sdk.Usage) usageSnapshot {
 			snap.OutputTokens += int(metric.Value)
 		case "cached_input_tokens", "cached_input_token", "cache_read_tokens", "cache_read_token":
 			snap.CachedInputTokens += int(metric.Value)
-		case "cache_creation_tokens", "cache_creation_token":
+		case "cache_creation_tokens", "cache_creation_token",
+			"cache_creation_input_tokens", "cache_creation_input_token":
 			snap.CacheCreationTokens += int(metric.Value)
-		case "cache_creation_5m_tokens", "cache_creation_5m_token":
+		case "cache_creation_5m_tokens", "cache_creation_5m_token",
+			"cache_creation_5m_input_tokens", "cache_creation_5m_input_token":
 			snap.CacheCreation5mTokens += int(metric.Value)
-		case "cache_creation_1h_tokens", "cache_creation_1h_token":
+		case "cache_creation_1h_tokens", "cache_creation_1h_token",
+			"cache_creation_1h_input_tokens", "cache_creation_1h_input_token":
 			snap.CacheCreation1hTokens += int(metric.Value)
 		case "reasoning_output_tokens", "reasoning_tokens", "reasoning_token":
 			snap.ReasoningOutputTokens += int(metric.Value)
@@ -147,8 +150,11 @@ func applyUsageCost(snap *usageSnapshot, key string, cost float64, metadata map[
 	case "cached_input", "cached_input_tokens", "cached_input_token", "cache_read_tokens", "cache_read_token":
 		snap.CachedInputCost += cost
 	case "cache_creation", "cache_creation_tokens", "cache_creation_token",
+		"cache_creation_input_tokens", "cache_creation_input_token",
 		"cache_creation_5m", "cache_creation_5m_tokens", "cache_creation_5m_token",
-		"cache_creation_1h", "cache_creation_1h_tokens", "cache_creation_1h_token":
+		"cache_creation_5m_input_tokens", "cache_creation_5m_input_token",
+		"cache_creation_1h", "cache_creation_1h_tokens", "cache_creation_1h_token",
+		"cache_creation_1h_input_tokens", "cache_creation_1h_input_token":
 		snap.CacheCreationCost += cost
 	}
 }
@@ -170,9 +176,12 @@ func applyUsagePrice(snap *usageSnapshot, key string, metadata map[string]string
 	case "cached_input", "cached_input_tokens", "cached_input_token", "cache_read_tokens", "cache_read_token":
 		snap.CachedInputPrice = price
 	case "cache_creation", "cache_creation_tokens", "cache_creation_token",
-		"cache_creation_5m", "cache_creation_5m_tokens", "cache_creation_5m_token":
+		"cache_creation_input_tokens", "cache_creation_input_token",
+		"cache_creation_5m", "cache_creation_5m_tokens", "cache_creation_5m_token",
+		"cache_creation_5m_input_tokens", "cache_creation_5m_input_token":
 		snap.CacheCreationPrice = price
-	case "cache_creation_1h", "cache_creation_1h_tokens", "cache_creation_1h_token":
+	case "cache_creation_1h", "cache_creation_1h_tokens", "cache_creation_1h_token",
+		"cache_creation_1h_input_tokens", "cache_creation_1h_input_token":
 		snap.CacheCreation1hPrice = price
 	}
 }
