@@ -59,6 +59,7 @@ func toAccountExportItem(account appaccount.Account) dto.AccountExportItem {
 		Priority:       account.Priority,
 		MaxConcurrency: account.MaxConcurrency,
 		RateMultiplier: account.RateMultiplier,
+		Extra:          account.Extra,
 	}
 }
 

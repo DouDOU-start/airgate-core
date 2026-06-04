@@ -18,6 +18,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
+	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
@@ -67,6 +68,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 		realtime:          parsed.Stream,
 		sessionID:         parsed.SessionID,
 		reasoningEffort:   parsed.ReasoningEffort,
+		accountReq:        accountRequirementsForRequest(path, parsed.Model, body),
 		requestedPlatform: requestedPlatform,
 		keyInfo:           keyInfo,
 		plugin:            inst,
@@ -181,6 +183,25 @@ func requestNeedsImage(path, model string, body []byte) bool {
 // 这里也保留 Responses API 的 image_generation tool 识别，用于放宽生成链路等待时间。
 func requestHasImageWorkload(path, model string, body []byte) bool {
 	return isImageAPIPath(path) || isImageModel(model) || hasImageGenerationTool(body)
+}
+
+func accountRequirementsForRequest(path, model string, body []byte) scheduler.AccountRequirements {
+	if isImageAPIPath(path) || isImageModel(model) {
+		return scheduler.AccountRequirements{
+			Workload: scheduler.WorkloadImage,
+			ImageProtocols: []scheduler.ImageProtocol{
+				scheduler.ImageProtocolImagesAPI,
+				scheduler.ImageProtocolResponsesTool,
+			},
+		}
+	}
+	if hasForcedImageGenerationTool(body) {
+		return scheduler.AccountRequirements{
+			Workload:       scheduler.WorkloadImage,
+			ImageProtocols: []scheduler.ImageProtocol{scheduler.ImageProtocolResponsesTool},
+		}
+	}
+	return scheduler.AccountRequirements{Workload: scheduler.WorkloadChat}
 }
 
 func isImageAPIPath(path string) bool {
@@ -359,6 +380,7 @@ func buildPluginRequest(c *gin.Context, state *forwardState) *sdk.ForwardRequest
 	if qs := c.Request.URL.RawQuery; qs != "" {
 		headers.Set("X-Forwarded-Query", qs)
 	}
+	applyAccountCapabilityHeaders(headers, state.account)
 
 	req := &sdk.ForwardRequest{
 		Account: buildSDKAccount(state.account),
@@ -371,6 +393,15 @@ func buildPluginRequest(c *gin.Context, state *forwardState) *sdk.ForwardRequest
 		req.Writer = c.Writer
 	}
 	return req
+}
+
+func applyAccountCapabilityHeaders(headers http.Header, acc *ent.Account) {
+	if headers == nil || acc == nil {
+		return
+	}
+	if protocols := scheduler.AccountImageProtocols(acc); len(protocols) > 0 {
+		headers.Set("X-Airgate-Account-Image-Protocols", strings.Join(protocols, ","))
+	}
 }
 
 // buildHeaders 克隆请求头并附加 X-Airgate-* 系列（分组级 service_tier / 强制 instructions / 插件开关）。

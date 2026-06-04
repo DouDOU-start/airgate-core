@@ -725,7 +725,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 		}
 
 		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
-			acc, err := h.scheduler.SelectAccount(ctx, route.Platform, model, 0, route.GroupID, "", hardExclude...)
+			acc, err := h.scheduler.SelectAccountWithRequirements(ctx, route.Platform, model, 0, route.GroupID, "", hostAccountRequirements(req), hardExclude...)
 			if err != nil {
 				if cerr := hostContextError(err); cerr != nil {
 					return nil, cerr
@@ -751,6 +751,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 			}
 
 			headers := hostForwardHeaders(req, route)
+			applyAccountCapabilityHeaders(headers, accFull)
 			fwdReq := &sdk.ForwardRequest{
 				Account: hostSDKAccount(accFull),
 				Body:    hostForwardBody(req.Body),
@@ -871,7 +872,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 		}
 
 		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
-			acc, err := h.scheduler.SelectAccount(ctx, route.Platform, model, 0, route.GroupID, "", hardExclude...)
+			acc, err := h.scheduler.SelectAccountWithRequirements(ctx, route.Platform, model, 0, route.GroupID, "", hostAccountRequirements(req), hardExclude...)
 			if err != nil {
 				if cerr := hostContextError(err); cerr != nil {
 					return cerr
@@ -897,10 +898,12 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 			}
 
 			fw := &failoverStreamWriter{target: sw}
+			headers := hostForwardHeaders(req, route)
+			applyAccountCapabilityHeaders(headers, accFull)
 			fwdReq := &sdk.ForwardRequest{
 				Account: hostSDKAccount(accFull),
 				Body:    hostForwardBody(req.Body),
-				Headers: hostForwardHeaders(req, route),
+				Headers: headers,
 				Model:   model,
 				Stream:  true,
 				Writer:  fw,
@@ -1464,6 +1467,10 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 
 func hostForwardRequirements(req hostForwardRequest) routing.Requirements {
 	return routing.Requirements{NeedsImage: requestNeedsImage(req.Path, req.Model, hostForwardBody(req.Body))}
+}
+
+func hostAccountRequirements(req hostForwardRequest) scheduler.AccountRequirements {
+	return accountRequirementsForRequest(req.Path, req.Model, hostForwardBody(req.Body))
 }
 
 func hostForwardReasoningEffort(req hostForwardRequest) string {

@@ -18,7 +18,11 @@ func TestToAccountExportItemOmitsEnvironmentScopedIDs(t *testing.T) {
 		Priority:       2,
 		MaxConcurrency: 4,
 		RateMultiplier: 1.5,
-		GroupIDs:       []int64{2, 1},
+		Extra: map[string]any{
+			"allowed_workloads": []any{"image"},
+			"image_protocols":   []any{"responses_tool"},
+		},
+		GroupIDs: []int64{2, 1},
 		Proxy: &appaccount.Proxy{
 			ID: 7,
 		},
@@ -31,6 +35,9 @@ func TestToAccountExportItemOmitsEnvironmentScopedIDs(t *testing.T) {
 	}
 	if item.ProxyID != nil {
 		t.Fatalf("expected export item proxy ID to be nil, got %v", *item.ProxyID)
+	}
+	if got := item.Extra["allowed_workloads"]; got == nil {
+		t.Fatalf("expected export item to keep extra capabilities, got %#v", item.Extra)
 	}
 
 	payload, err := json.Marshal(item)

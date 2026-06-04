@@ -6,6 +6,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/routing"
+	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
@@ -29,6 +30,7 @@ type forwardState struct {
 
 	// 推理强度档位快照。
 	reasoningEffort string
+	accountReq      scheduler.AccountRequirements
 
 	requestedPlatform string
 	selectedRoute     routing.Candidate

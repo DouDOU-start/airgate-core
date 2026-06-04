@@ -240,6 +240,7 @@ export interface AccountExportItem {
   rate_multiplier: number;
   group_ids?: number[];
   proxy_id?: number;
+  extra?: Record<string, unknown>;
 }
 
 // 导出文件结构

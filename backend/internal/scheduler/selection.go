@@ -24,11 +24,18 @@ import (
 //
 // excludeIDs 为 failover 时已尝试过的账户。
 func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, userID, groupID int, sessionID string, excludeIDs ...int) (*ent.Account, error) {
+	return s.SelectAccountWithRequirements(ctx, platform, model, userID, groupID, sessionID, AccountRequirements{}, excludeIDs...)
+}
+
+func (s *Scheduler) SelectAccountWithRequirements(ctx context.Context, platform, model string, userID, groupID int, sessionID string, req AccountRequirements, excludeIDs ...int) (*ent.Account, error) {
 	candidates, err := s.routeAccounts(ctx, platform, model, groupID)
 	if err != nil {
 		return nil, err
 	}
 	if candidates = excludeAccounts(candidates, excludeIDs); len(candidates) == 0 {
+		return nil, ErrNoAvailableAccount
+	}
+	if candidates = filterAccountsByRequirements(candidates, req); len(candidates) == 0 {
 		return nil, ErrNoAvailableAccount
 	}
 	if fn, ok := s.accountFilters[platform]; ok {

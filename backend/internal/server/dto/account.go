@@ -87,6 +87,7 @@ type AccountExportItem struct {
 	RateMultiplier float64           `json:"rate_multiplier"`
 	GroupIDs       []int64           `json:"group_ids,omitempty"`
 	ProxyID        *int64            `json:"proxy_id,omitempty"`
+	Extra          map[string]any    `json:"extra,omitempty"`
 }
 
 // AccountExportFile 导出文件结构，仅包含可跨环境迁移的账号本体字段。

@@ -28,6 +28,7 @@ import {
   filterCredentialsForAccountType,
 } from './accountUtils';
 import { SchemaCredentialsForm } from './CredentialForm';
+import { AccountCapabilityForm } from './AccountCapabilityForm';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { AccountResp, UpdateAccountReq } from '../../../shared/types';
@@ -330,6 +331,12 @@ export function EditAccountModal({
                     isSelected={form.upstream_is_pool ?? false}
                     label={<span className="text-sm text-text">{t('accounts.upstream_is_pool', '池模式')}</span>}
                     onChange={(checked) => setForm({ ...form, upstream_is_pool: checked })}
+                  />
+
+                  <AccountCapabilityForm
+                    platform={account.platform}
+                    extra={form.extra}
+                    onChange={(extra) => setForm({ ...form, extra })}
                   />
 
                   {availableGroups.length > 0 && (
