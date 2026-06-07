@@ -403,8 +403,8 @@ func TestSelectAllRoutesFailureResponse(t *testing.T) {
 				localCapacitySeen:   true,
 				upstreamFailureSeen: true,
 			},
-			wantStatus: http.StatusTooManyRequests,
-			wantCode:   "all_routes_capacity_exhausted",
+			wantStatus: http.StatusServiceUnavailable,
+			wantCode:   "all_routes_failed",
 		},
 		{
 			name: "upstream timeout",

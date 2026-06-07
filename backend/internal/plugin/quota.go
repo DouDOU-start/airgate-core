@@ -121,12 +121,12 @@ func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs 
 	return scheduler.ErrNoAvailableAccount
 }
 
-// acquireAccountSlot 获取账号级闸门：RPM 配额 + 真实用户消息串行锁 + 账号并发槽。
+// acquireAccountSlot 获取账号级闸门：RPM 配额 + 账号并发槽。
 // 返回 release func 与 ok 标记。ok=false 表示当前账号暂不可用（RPM 已满 / 并发已满），
 // 调用方应把本账号加入 excludeIDs 并 failover 到下一个账号。失败时不写客户端响应——
 // 由主循环在 failover 全部用尽时兜底写 503。
 //
-// 每次 failover attempt 都要重新 acquire。release 顺序和 acquire 顺序相反。
+// 每次 failover attempt 都要重新 acquire。账号实际并发只由 MaxConcurrency 控制。
 func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (func(), bool) {
 	ctx := c.Request.Context()
 	releaseCtx := context.Background()
@@ -140,35 +140,7 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 		return nil, false
 	}
 
-	// 2. 消息锁 + 均摊延迟（仅真实用户消息）
-	releaseMsgLock := func() {}
-	if scheduler.IsRealUserMessage(state.body) {
-		acquired, err := f.scheduler.AcquireMessageLock(ctx, state.account.ID, state.requestID, state.account.Extra)
-		if err != nil {
-			releaseMsgLock()
-			f.scheduler.DecrementRPM(ctx, state.account.ID)
-			slog.Info("账号消息锁获取失败，尝试 failover",
-				"account_id", state.account.ID,
-				"error", err,
-			)
-			return nil, false
-		}
-		if !acquired {
-			releaseMsgLock()
-			f.scheduler.DecrementRPM(ctx, state.account.ID)
-			slog.Info("账号消息锁排队已满，尝试 failover",
-				"account_id", state.account.ID,
-				"max_waiters", scheduler.ExtraInt(state.account.Extra, "msg_lock_max_waiters"),
-			)
-			return nil, false
-		}
-		releaseMsgLock = func() {
-			f.scheduler.ReleaseMessageLock(releaseCtx, state.account.ID, state.requestID)
-		}
-		f.scheduler.EnforceMessageDelay(ctx, state.account.ID, state.account.Extra)
-	}
-
-	// 3. 账号并发槽
+	// 2. 账号并发槽
 	maxConc := state.account.MaxConcurrency
 	if maxConc <= 0 {
 		maxConc = scheduler.DefaultAccountMaxConcurrency
@@ -176,18 +148,16 @@ func (f *Forwarder) acquireAccountSlot(c *gin.Context, state *forwardState) (fun
 	slotTTL := time.Duration(scheduler.ExtraInt(state.account.Extra, "slot_ttl_seconds")) * time.Second
 
 	if err := f.concurrency.AcquireSlot(ctx, state.account.ID, state.requestID, maxConc, slotTTL); err != nil {
-		releaseMsgLock()
 		f.scheduler.DecrementRPM(ctx, state.account.ID)
 		slog.Info("账号并发已满，尝试 failover",
 			"account_id", state.account.ID, "max_concurrency", maxConc)
 		return nil, false
 	}
 
-	// 反向释放：slot → msg lock。RPM 不在 release 里回退——正常完成流程会通过
-	// scheduler.Apply 决定是否 DecrementRPM（非 Success 判决都会回退）。
+	// RPM 不在 release 里回退——正常完成流程会通过 scheduler.Apply 决定是否 DecrementRPM
+	//（非 Success 判决都会回退）。
 	return func() {
 		f.concurrency.ReleaseSlot(releaseCtx, state.account.ID, state.requestID)
-		releaseMsgLock()
 	}, true
 }
 

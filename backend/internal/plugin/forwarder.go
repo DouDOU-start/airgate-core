@@ -70,9 +70,8 @@ const queueMaxPollInterval = 2 * time.Second
 // 499 是 nginx 风格的 Client Closed Request，仅用于本地日志和状态归类。
 const statusClientClosedRequest = 499
 
-// allRoutesFailedDefaultRetryAfter 客户端最终被拒时，若没有任何上游 RetryAfter 可参考
-// （比如 max_concurrency 打满、所有账号都在冷却但 state_until 没回填到这一层），
-// 给客户端一个保守的退避建议。1s 既能避免雪崩，又比 60s 更贴合"瞬时打满"的真实恢复节奏。
+// allRoutesFailedDefaultRetryAfter 客户端最终因真实上游限流被拒时，若没有任何上游 RetryAfter 可参考，
+// 给客户端一个保守的退避建议。1s 既能避免雪崩，又比 60s 更贴合"瞬时限流"的真实恢复节奏。
 const allRoutesFailedDefaultRetryAfter = time.Second
 
 // Forward 入口。失败时自动 failover 到其它账号，最多 maxFailoverAttempts 次。
@@ -454,11 +453,10 @@ func selectAllRoutesFailureResponse(summary allRoutesFailureSummary) allRoutesFa
 	}
 	if summary.localCapacitySeen {
 		return allRoutesFailureResponse{
-			status:     http.StatusTooManyRequests,
-			errType:    "rate_limit_error",
-			code:       "all_routes_capacity_exhausted",
-			message:    "上游容量暂时不足，请稍后重试",
-			retryAfter: allRoutesFailedDefaultRetryAfter,
+			status:  http.StatusServiceUnavailable,
+			errType: "server_error",
+			code:    "all_routes_failed",
+			message: "请求暂时无法完成，请稍后重试",
 		}
 	}
 	if summary.upstreamTimeoutSeen {
