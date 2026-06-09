@@ -197,7 +197,7 @@ sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
 	@if [ -d $(PLAYGROUND_DIR) ]; then \
 		set -e; \
 		echo "构建并同步 playground 插件前端..."; \
-		$(MAKE) -C $(PLAYGROUND_DIR) webdist; \
+		(cd $(PLAYGROUND_PLUGIN) && pnpm build); \
 		mkdir -p $(PLAYGROUND_ASSETS); \
 		cp $(PLAYGROUND_PLUGIN)/dist/index.js $(PLAYGROUND_ASSETS)/index.js; \
 		echo "playground 插件前端已同步到 $(PLAYGROUND_ASSETS)/"; \
@@ -296,11 +296,13 @@ verify-ent: ## 验证 Ent 生成代码是否最新
 	fi
 	@echo "Ent 生成代码一致"
 
-setup-hooks: ## 安装 Git pre-commit hook
+setup-hooks: ## 安装 Git hooks（pre-commit + commit-msg）
 	@echo '#!/bin/sh' > .git/hooks/pre-commit
 	@echo 'make pre-commit' >> .git/hooks/pre-commit
 	@chmod +x .git/hooks/pre-commit
-	@echo "pre-commit hook 已安装"
+	@cp scripts/commit-msg .git/hooks/commit-msg
+	@chmod +x .git/hooks/commit-msg
+	@echo "Git hooks 已安装（pre-commit + commit-msg）"
 
 # ===================== 依赖安装 =====================
 

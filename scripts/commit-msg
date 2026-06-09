@@ -1,0 +1,21 @@
+#!/bin/sh
+# Conventional Commits 校验 —— 由 `make setup-hooks` 安装到 .git/hooks/commit-msg
+# 格式: <type>(<scope>)?: <subject>
+# type: feat fix docs style refactor perf test build ci chore revert
+commit_msg=$(head -n1 "$1")
+
+# 放行 merge / revert / fixup / squash 等自动生成的提交
+case "$commit_msg" in
+  "Merge "*|"Revert "*|fixup!*|squash!*) exit 0 ;;
+esac
+
+if printf '%s' "$commit_msg" | grep -Eq '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9_.-]+\))?!?: .+'; then
+  exit 0
+fi
+
+echo "✗ commit message 不符合 Conventional Commits 规范" >&2
+echo "  格式: <type>(<scope>)?: <subject>" >&2
+echo "  type: feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert" >&2
+echo "  示例: fix(scheduler): 修复账号冷却未清除" >&2
+echo "  当前: $commit_msg" >&2
+exit 1
