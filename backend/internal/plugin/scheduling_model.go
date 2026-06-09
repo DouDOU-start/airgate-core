@@ -8,11 +8,22 @@ import (
 
 // schedulingModelsForRequest 返回调度层使用的模型候选列表。
 //
-// OpenAI 插件的 /v1/messages 是 Anthropic Messages 协议翻译入口：客户端会传
-// claude-*，插件实际会先映射到 GPT 模型再调用 OpenAI Responses。因此 core 选号
-// 不能直接拿 claude-* 去套 OpenAI 分组的 model_routing，否则还没进插件就会报
-// "无可用账户"。
-func schedulingModelsForRequest(platform, path, requestedModel string) []string {
+// 优先查询插件模型目录的 Metadata["scheduling_model"]：插件可在 Models() 声明中
+// 标注"本模型调度时应映射为哪个模型"，Core 直接采纳，无需硬编码。
+//
+// 若目录中未找到（例如 Claude 模型不在 OpenAI 插件的 Models() 中——它们是 Anthropic
+// 协议翻译入口的模型，由客户端传入而非插件声明），则回退到硬编码映射以保持向后兼容。
+// TODO(tech-debt): 当所有跨协议模型均通过 Metadata["scheduling_model"] 声明后，
+// 可移除 openAIAnthropicSchedulingModels 硬编码回退。
+func schedulingModelsForRequest(mgr *Manager, platform, path, requestedModel string) []string {
+	// 优先查询插件模型目录的调度模型元数据
+	if mgr != nil {
+		if sm := mgr.SchedulingModel(requestedModel); sm != "" {
+			return compactUniqueModels(sm)
+		}
+	}
+
+	// 回退：硬编码映射（仅 OpenAI 插件 /v1/messages Anthropic 协议翻译入口）
 	if !strings.EqualFold(strings.TrimSpace(platform), "openai") || !isAnthropicMessagesForwardPath(path) {
 		return compactUniqueModels(requestedModel)
 	}

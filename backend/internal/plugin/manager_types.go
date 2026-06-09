@@ -76,6 +76,10 @@ type Manager struct {
 	credCache         map[string][]sdk.CredentialField
 	accountTypeCache  map[string][]sdk.AccountType
 	frontendPageCache map[string][]sdk.FrontendPage
+
+	// metadataOnlyPaths 汇总所有插件声明了 Metadata["metadata_only"]="true" 的路由路径。
+	// 由 rebuildMetadataOnlyPathsLocked 在路由缓存变更后重建。
+	metadataOnlyPaths map[string]bool
 }
 
 // SetHostService 注入 Core 实现的 HostService 工厂。
@@ -124,6 +128,7 @@ func NewManager(pluginDir, logLevel, coreDSN string, db *ent.Client) *Manager {
 		credCache:         make(map[string][]sdk.CredentialField),
 		accountTypeCache:  make(map[string][]sdk.AccountType),
 		frontendPageCache: make(map[string][]sdk.FrontendPage),
+		metadataOnlyPaths: make(map[string]bool),
 	}
 	if coreDSN != "" && db != nil {
 		m.pluginDB = newPluginDSNProvisioner(db, coreDSN)

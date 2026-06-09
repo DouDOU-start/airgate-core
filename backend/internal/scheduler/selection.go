@@ -244,7 +244,7 @@ func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, m
 
 	// 家族级冷却：撞过这个 family 的账号在冷却期内对该 family 不可调度，
 	// 但对其它 family 仍可用。Redis 不可用时退化为不冷却，不阻断主链路。
-	if family := ModelFamily(acc.Platform, model); family != "" && s.familyCooldown != nil {
+	if family := s.resolveModelFamily(acc.Platform, model); family != "" && s.familyCooldown != nil {
 		if _, inCooldown := s.familyCooldown.Until(ctx, acc.ID, family); inCooldown {
 			return NotSchedulable
 		}

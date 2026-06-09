@@ -11,8 +11,8 @@
 | # | 位置 | 现状(代码做了什么) | 应属哪层 | 严重度 |
 |---|---|---|---|---|
 | 1 | `internal/plugin/outcome.go:21`、`:34` | `openAIError`/`openAIRateLimitError` 硬编码 OpenAI 错误体 `{error:{message,type,code}}` + 429 Retry-After | Gateway(协议错误形态) | 高 |
-| 2 | `internal/plugin/quota.go:40` | `isMetadataOnlyPath` 硬编码 `/v1/models`、`/v1/images/tasks` 等 OpenAI API 路径作快车道 | Gateway(协议路由) | 高 |
-| 3 | `internal/scheduler/family.go:25-27` | `ModelFamily` 硬编码仅 OpenAI `gpt-image-*` 折叠为 `gpt-image` 家族 | Model catalog 声明 | 中 |
+| 2 | `internal/plugin/quota.go:40` | ~~已修复~~ `isMetadataOnlyPath` 优先查询插件 `RouteDefinition.Metadata["metadata_only"]` 声明的索引（`Manager.IsMetadataOnlyRoute`），硬编码列表保留为兜底；openai/claude/kiro 插件已声明 metadata_only | Gateway(协议路由) | ~~高~~ |
+| 3 | `internal/scheduler/family.go:25-27` | ~~已修复~~ `Manager.ModelFamily` 从插件目录查 `Metadata["family"]`，`Scheduler.resolveModelFamily` 与 `Forwarder`/`HostService` 均优先采纳插件声明，硬编码 `gpt-image-*` 保留为兜底；openai 插件已声明 `family` | Model catalog 声明 | ~~中~~ |
 | 4 | `internal/routing/selector.go` | ~~已修复~~ `GroupSupportsImageRequirement` 抽为共享函数，`forwarder.go` 与 `selector.go` 统一调用；平台硬编码保留但集中在一处并标注 TODO | capability 表达 | ~~中~~ |
 | 5 | `internal/plugin/scheduling_model.go:15-19` | 硬编码 `platform=openai` + Anthropic Messages 路径时 Claude→GPT 选号映射 | Gateway(请求规范化) | 中 |
 | 6 | `internal/plugin/forwarder.go` | ~~已修复~~ 图片授权特判合并至 `routing.GroupSupportsImageRequirement`，`forwarder.go` 不再重复平台判断逻辑 | capability 表达 | ~~中~~ |

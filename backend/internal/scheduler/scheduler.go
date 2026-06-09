@@ -36,15 +36,16 @@ type Scheduler struct {
 	db  *ent.Client
 	rdb *redis.Client
 
-	sticky         *StickySession
-	windowCost     *WindowCostChecker
-	rpm            *RPMCounter
-	session        *SessionManager
-	msgQueue       *MessageQueue
-	state          *StateMachine
-	familyCooldown *FamilyCooldown
-	routeCache     *routeCache
-	accountFilters map[string]AccountFilterFunc
+	sticky          *StickySession
+	windowCost      *WindowCostChecker
+	rpm             *RPMCounter
+	session         *SessionManager
+	msgQueue        *MessageQueue
+	state           *StateMachine
+	familyCooldown  *FamilyCooldown
+	routeCache      *routeCache
+	accountFilters  map[string]AccountFilterFunc
+	modelFamilyFunc func(modelID string) string // 插件目录查询回调，优先于硬编码规则
 }
 
 // SetAccountFilter 注册平台级账号过滤函数。
@@ -54,6 +55,13 @@ func (s *Scheduler) SetAccountFilter(platform string, fn AccountFilterFunc) {
 		s.accountFilters = make(map[string]AccountFilterFunc)
 	}
 	s.accountFilters[platform] = fn
+}
+
+// SetModelFamilyFunc 注入插件目录的模型家族查询回调。
+// 调度器据此优先从插件声明的 Metadata["family"] 获取家族键，
+// 未注入或返回空时回退到 ModelFamily 的硬编码规则。
+func (s *Scheduler) SetModelFamilyFunc(fn func(modelID string) string) {
+	s.modelFamilyFunc = fn
 }
 
 // NewScheduler 构造调度器。

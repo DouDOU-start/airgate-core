@@ -414,6 +414,7 @@ func (m *Manager) startGatewayPlugin(ctx context.Context, client *goplugin.Clien
 	m.registerAliasesLocked(canonicalName, requestedName, binaryDir)
 	m.modelCache[platform] = cloneModels(models)
 	m.routeCache[canonicalName] = cloneRoutes(routes)
+	m.rebuildMetadataOnlyPathsLocked()
 	if len(info.AccountTypes) > 0 {
 		m.credCache[platform] = cloneCredentialFields(info.AccountTypes[0].Fields)
 	} else {
@@ -642,6 +643,7 @@ func (m *Manager) stopPlugin(name string) {
 	delete(m.instances, resolvedName)
 	delete(m.modelCache, inst.Platform)
 	delete(m.routeCache, inst.Name)
+	m.rebuildMetadataOnlyPathsLocked()
 	delete(m.credCache, inst.Platform)
 	delete(m.accountTypeCache, inst.Platform)
 	delete(m.frontendPageCache, inst.Name)

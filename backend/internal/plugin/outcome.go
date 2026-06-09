@@ -221,7 +221,8 @@ func (f *Forwarder) applyOutcome(ctx context.Context, state *forwardState, execu
 		UpstreamStatus: execution.outcome.Upstream.StatusCode,
 		// Family 让限流冷却落到 (account, family) 维度。撞 gpt-image 4000/min
 		// 时账号上 chat 模型仍可调用，避免单模型限流误伤整账号。
-		Family: scheduler.ModelFamily(state.requestedPlatform, outcomeModel),
+		// 优先从插件目录查 Metadata["family"]，未声明时回退到硬编码规则。
+		Family: f.resolveModelFamily(state.requestedPlatform, outcomeModel),
 	}
 	f.scheduler.Apply(ctx, state.account.ID, j)
 

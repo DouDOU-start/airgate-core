@@ -55,6 +55,16 @@ func NewForwarder(
 	}
 }
 
+// resolveModelFamily 从插件目录优先获取家族键，未命中时回退到硬编码规则。
+func (f *Forwarder) resolveModelFamily(platform, model string) string {
+	if f.manager != nil {
+		if family := f.manager.ModelFamily(model); family != "" {
+			return family
+		}
+	}
+	return scheduler.ModelFamily(platform, model)
+}
+
 // maxFailoverAttempts 最大 failover 次数（账号级失败后切换新账号上游调用的上限）。
 const maxFailoverAttempts = 3
 
@@ -104,7 +114,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	)
 
 	// 只读元信息快车道：插件本地合成响应，跳过整条账号 / 闸门 / failover 链路。
-	if isMetadataOnlyPath(state.requestPath) {
+	if f.isMetadataOnlyPath(state.requestPath) {
 		f.forwardMetadataOnly(c, state)
 		return
 	}

@@ -614,7 +614,7 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 			Kind:     outcome.Kind,
 			Duration: latency,
 			IsPool:   accFull.UpstreamIsPool,
-			Family:   scheduler.ModelFamily(accFull.Platform, model),
+			Family:   h.resolveModelFamily(accFull.Platform, model),
 		})
 	}
 
@@ -1542,8 +1542,18 @@ func (h *HostService) applyHostOutcome(ctx context.Context, accountID int, accFu
 		Duration:       duration,
 		IsPool:         accFull.UpstreamIsPool,
 		UpstreamStatus: outcome.Upstream.StatusCode,
-		Family:         scheduler.ModelFamily(accFull.Platform, model),
+		Family:         h.resolveModelFamily(accFull.Platform, model),
 	})
+}
+
+// resolveModelFamily 从插件目录优先获取家族键，未命中时回退到硬编码规则。
+func (h *HostService) resolveModelFamily(platform, model string) string {
+	if h.manager != nil {
+		if family := h.manager.ModelFamily(model); family != "" {
+			return family
+		}
+	}
+	return scheduler.ModelFamily(platform, model)
 }
 
 func (h *HostService) checkHostForwardBalance(ctx context.Context, userID int64) error {

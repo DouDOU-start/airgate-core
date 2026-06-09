@@ -67,6 +67,47 @@ func (m *Manager) GetModels(platform string) []sdk.ModelInfo {
 	return cloneModels(m.modelCache[platform])
 }
 
+// SchedulingModel 查询模型目录中指定模型的 scheduling_model 元数据。
+// 插件可在 ModelInfo.Metadata["scheduling_model"] 中声明调度时应使用的替代模型，
+// 使 Core 无需硬编码跨协议的模型映射。未找到时返回空字符串。
+func (m *Manager) SchedulingModel(modelID string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, models := range m.modelCache {
+		for i := range models {
+			if models[i].ID == modelID {
+				if models[i].Metadata != nil {
+					return models[i].Metadata["scheduling_model"]
+				}
+				return ""
+			}
+		}
+	}
+	return ""
+}
+
+// ModelFamily 从已加载的模型目录中查询模型的家族标识（Metadata["family"]）。
+// 插件通过 Models() 声明 Metadata["family"] 表达"哪些模型共享同一个限流池"，
+// Core 据此做 (account, family) 维度的冷却隔离。
+// 返回空字符串表示该模型未声明家族，调用方应回退到 scheduler.ModelFamily 的兜底规则。
+func (m *Manager) ModelFamily(modelID string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, models := range m.modelCache {
+		for i := range models {
+			if models[i].ID == modelID {
+				if models[i].Metadata != nil {
+					if f := models[i].Metadata["family"]; f != "" {
+						return f
+					}
+				}
+				return ""
+			}
+		}
+	}
+	return ""
+}
+
 // FindPlatformByModel 根据模型 ID 反查所属平台。
 func (m *Manager) FindPlatformByModel(modelID string) string {
 	m.mu.RLock()
@@ -113,6 +154,29 @@ func (m *Manager) GetAllRoutes() map[string][]sdk.RouteDefinition {
 		result[key] = cloneRoutes(routes)
 	}
 	return result
+}
+
+// IsMetadataOnlyRoute 判断给定路径是否由插件声明为 metadata_only。
+// 插件在 RouteDefinition.Metadata 中设置 "metadata_only"="true" 表示该路径仅返回元信息，
+// 不需要账号调度、计费。
+func (m *Manager) IsMetadataOnlyRoute(path string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.metadataOnlyPaths[path]
+}
+
+// rebuildMetadataOnlyPathsLocked 从 routeCache 汇总所有声明了 metadata_only 的路径。
+// 调用方须持有 m.mu 写锁。
+func (m *Manager) rebuildMetadataOnlyPathsLocked() {
+	paths := make(map[string]bool)
+	for _, routes := range m.routeCache {
+		for _, route := range routes {
+			if route.Metadata["metadata_only"] == "true" {
+				paths[route.Path] = true
+			}
+		}
+	}
+	m.metadataOnlyPaths = paths
 }
 
 // MatchPluginByRoute 根据请求方法和路径匹配插件。

@@ -10,18 +10,17 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// ModelFamily 把 (platform, model) 折叠成上游限流共享的"家族"键。
+// ModelFamily 把 (platform, model) 折叠成上游限流共享的"家族"键（硬编码兜底）。
 //
-// 用于把"账号-家族"维度的限流冷却隔离开 —— 例如 gpt-image 撞 4000/min
-// 不应该影响同账号上 chat 模型的可用性。OpenAI 的限流维度大多是 per-model 或
-// per-family（同系列共享一个池），所以把限流冷却按家族打而不是按账号，更贴近上游真实行为。
+// 优先级：调用方应先通过插件目录查询 Metadata["family"]（Manager.ModelFamily /
+// Scheduler.resolveModelFamily），仅在插件未声明时才回退到此函数。
 //
-// 当前规则：
-//   - openai 平台下，gpt-image-* 系列共享 "gpt-image"
-//   - 其它情况：直接用 model 本身作为家族键（每个 model 独立冷却）
-//   - model 为空：用 platform 兜底，保持后向兼容
+// 兜底规则（向后兼容）：
+//   - gpt-image-* 系列 → "gpt-image"
+//   - 其它非空 model → model 本身（每个模型独立冷却）
+//   - model 为空 → platform
 //
-// 后续若发现有更多上游限流共享组（例如 gpt-5 家族共享 IPM），在此扩展即可。
+// 新增家族折叠应由插件在 ModelInfo.Metadata["family"] 声明，勿在此扩展硬编码。
 func ModelFamily(platform, model string) string {
 	m := strings.ToLower(strings.TrimSpace(model))
 	if strings.HasPrefix(m, "gpt-image") {
@@ -31,6 +30,16 @@ func ModelFamily(platform, model string) string {
 		return m
 	}
 	return strings.ToLower(strings.TrimSpace(platform))
+}
+
+// resolveModelFamily 从插件目录回调优先获取家族键，未命中时回退到硬编码规则。
+func (s *Scheduler) resolveModelFamily(platform, model string) string {
+	if s.modelFamilyFunc != nil {
+		if family := s.modelFamilyFunc(model); family != "" {
+			return family
+		}
+	}
+	return ModelFamily(platform, model)
 }
 
 // FamilyCooldown 维护"账号 × 模型家族"的限流冷却，落 Redis、按 TTL 自然恢复。

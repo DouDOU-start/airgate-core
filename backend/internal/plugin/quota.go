@@ -20,7 +20,7 @@ import (
 // 限流 / 并发闸门不在此处——它们分别在 acquireClientQuota（用户/API Key 级）
 // 和 acquireAccountSlot（账号级）中，各自带 release 回调。
 func (f *Forwarder) checkBalance(c *gin.Context, state *forwardState) bool {
-	if isMetadataOnlyPath(state.requestPath) {
+	if f.isMetadataOnlyPath(state.requestPath) {
 		return true
 	}
 	if state.keyInfo.UserBalance <= 0 {
@@ -36,8 +36,15 @@ func (f *Forwarder) checkBalance(c *gin.Context, state *forwardState) bool {
 	return true
 }
 
-// isMetadataOnlyPath 只读元信息（/v1/models、任务查询等）不打上游、不计费、不需要账号调度。
-func isMetadataOnlyPath(path string) bool {
+// isMetadataOnlyPath 判断路径是否为只读元信息（不打上游、不计费、不需要账号调度）。
+// 优先查询插件通过 RouteDefinition.Metadata["metadata_only"]="true" 声明的索引；
+// 若插件尚未声明，回退到硬编码列表以保持向后兼容。
+func (f *Forwarder) isMetadataOnlyPath(path string) bool {
+	if f.manager.IsMetadataOnlyRoute(path) {
+		return true
+	}
+	// 向后兼容：插件尚未在 RouteDefinition.Metadata 中声明 metadata_only 时，
+	// 保留硬编码列表兜底。待所有插件迁移完成后可移除。
 	switch path {
 	case "/v1/models", "/models",
 		"/v1/images/tasks", "/images/tasks",

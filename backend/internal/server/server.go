@@ -65,6 +65,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		pluginDir = "data/plugins"
 	}
 	pluginMgr := plugin.NewManager(pluginDir, cfg.Log.Level, cfg.Database.DSN(), db)
+	// 注入插件目录的模型家族查询：调度器据此优先从插件声明的 Metadata["family"]
+	// 获取家族键，替代 scheduler.ModelFamily 中的硬编码 gpt-image 前缀判定。
+	sched.SetModelFamilyFunc(pluginMgr.ModelFamily)
 	// HostService 通过 hashicorp/go-plugin GRPCBroker 暴露给所有插件子进程，
 	// 替代旧的 admin HTTP API + admin_api_key 模式。必须在加载任何插件之前注入。
 	pluginMgr.SetHostService(plugin.NewHostService(db, pluginMgr, sched, concurrency, calculator, recorder))
