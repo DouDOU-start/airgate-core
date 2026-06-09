@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { settingsApi } from '../../shared/api/settings';
+import { queryKeys } from '../../shared/queryKeys';
 import defaultLogoUrl from '../../assets/logo.svg';
 
 export { defaultLogoUrl };
@@ -37,7 +38,7 @@ const SiteSettingsContext = createContext<SiteSettings>(defaults);
 
 export function SiteSettingsProvider({ children }: { children: ReactNode }) {
   const { data, isPending } = useQuery({
-    queryKey: ['site-settings'],
+    queryKey: queryKeys.siteSettings(),
     queryFn: () => settingsApi.getPublic(),
     staleTime: 60_000,
     refetchOnWindowFocus: true,

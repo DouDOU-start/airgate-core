@@ -193,7 +193,7 @@ export default function SettingsPage() {
     queryKey: queryKeys.settings(),
     onSuccess: () => {
       setHasChanges(false);
-      queryClient.invalidateQueries({ queryKey: ['site-settings'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.siteSettings() });
     },
   });
 

@@ -193,7 +193,7 @@ export default function UserOverviewPage() {
 
   // 趋势数据
   const { data: trend } = useQuery({
-    queryKey: ['user-trend', dateRange, granularity],
+    queryKey: queryKeys.userTrend(dateRange, granularity),
     queryFn: () => usageApi.userTrend({ granularity, ...dateRange }),
   });
 

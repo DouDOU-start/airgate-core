@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Chip, EmptyState, Modal, Skeleton, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '../../../shared/queryKeys';
 import { usersApi } from '../../../shared/api/users';
 import { getTotalPages } from '../../../shared/utils/pagination';
 import { CommonTable } from '../../../shared/components/CommonTable';
@@ -20,7 +21,7 @@ export function BalanceHistoryModal({ open, user, onClose }: BalanceHistoryModal
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['user-balance-history', user.id, page],
+    queryKey: queryKeys.userBalanceHistory(user.id, page),
     queryFn: () => usersApi.balanceHistory(user.id, { page, page_size: 10 }),
     enabled: open,
   });

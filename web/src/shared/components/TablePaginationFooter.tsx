@@ -1,4 +1,5 @@
 import { ListBox, Pagination, Select } from '@heroui/react';
+import { useTranslation } from 'react-i18next';
 import { DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS, getPaginationItems } from '../utils/pagination';
 
 interface TablePaginationFooterProps {
@@ -20,6 +21,7 @@ export function TablePaginationFooter({
   total,
   totalPages,
 }: TablePaginationFooterProps) {
+  const { t } = useTranslation();
   const safeTotalPages = Math.max(totalPages, 1);
   const showPageSize = pageSize != null && setPageSize != null;
   const selectedPageSize = pageSize == null ? '' : String(pageSize);
@@ -28,20 +30,14 @@ export function TablePaginationFooter({
   return (
     <Pagination className="ag-table-pagination" size="sm">
       <Pagination.Summary className="ag-table-pagination-summary">
-        <span>共</span>
-        <span className="ag-table-pagination-number">{total.toLocaleString()}</span>
-        <span>条</span>
+        <span>{t('pagination.total', { count: total })}</span>
         <span className="ag-table-pagination-separator" aria-hidden="true" />
-        <span>第</span>
-        <span className="ag-table-pagination-number">{page}</span>
-        <span>/</span>
-        <span className="ag-table-pagination-number">{safeTotalPages}</span>
-        <span>页</span>
+        <span>{t('pagination.page', { page, total: safeTotalPages })}</span>
         {showPageSize ? (
           <div className="ag-table-page-size">
-            <span>每页</span>
+            <span>{t('pagination.perPage')}</span>
             <Select
-              aria-label="每页数量"
+              aria-label={t('pagination.perPage')}
               className="ag-table-page-size-select"
               selectedKey={selectedPageSize}
               onSelectionChange={(key) => {
@@ -64,7 +60,6 @@ export function TablePaginationFooter({
                 </ListBox>
               </Select.Popover>
             </Select>
-            <span>条</span>
           </div>
         ) : null}
       </Pagination.Summary>
@@ -73,7 +68,7 @@ export function TablePaginationFooter({
         <Pagination.Item>
           <Pagination.Previous isDisabled={page <= 1} onPress={() => setPage(Math.max(1, page - 1))}>
             <Pagination.PreviousIcon />
-            <span>上一页</span>
+            <span>{t('pagination.prev')}</span>
           </Pagination.Previous>
         </Pagination.Item>
         {getPaginationItems(page, safeTotalPages).map((item, index) =>
@@ -91,7 +86,7 @@ export function TablePaginationFooter({
         )}
         <Pagination.Item>
           <Pagination.Next isDisabled={page >= safeTotalPages} onPress={() => setPage(Math.min(safeTotalPages, page + 1))}>
-            <span>下一页</span>
+            <span>{t('pagination.next')}</span>
             <Pagination.NextIcon />
           </Pagination.Next>
         </Pagination.Item>

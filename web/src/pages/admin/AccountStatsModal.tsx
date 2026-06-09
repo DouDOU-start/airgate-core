@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '../../shared/queryKeys';
 import { Chip, Tabs, useOverlayState } from '@heroui/react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
@@ -107,7 +108,7 @@ export function AccountStatsModal({
   }, [preset, customStart, customEnd]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['account-stats', accountId, queryParams],
+    queryKey: queryKeys.accountStats(accountId, queryParams),
     queryFn: () => accountsApi.stats(accountId, queryParams),
   });
   const modalState = useOverlayState({

@@ -1177,5 +1177,25 @@
     "wf_contains": "Contains",
     "wf_equals": "Equals",
     "wf_regex": "Regex"
+  },
+
+  "pagination": {
+    "total": "{{count}} items total",
+    "page": "Page {{page}} / {{total}}",
+    "perPage": "Per page",
+    "prev": "Previous",
+    "next": "Next"
+  },
+
+  "dialog": {
+    "confirm_title": "Confirm",
+    "cancel": "Cancel",
+    "confirm": "OK"
+  },
+
+  "error": {
+    "page_error": "Something went wrong",
+    "unknown": "Unknown error",
+    "refresh": "Refresh page"
   }
 }

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '../queryKeys';
 
 // 探测公开状态页是否开启。
 //
@@ -11,7 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 // 避免用户点进去看到一片"加载失败"的空页面。
 export function useStatusPageEnabled(): boolean {
   const { data } = useQuery({
-    queryKey: ['status-page-enabled'],
+    queryKey: queryKeys.statusPageEnabled(),
     queryFn: async () => {
       try {
         const r = await fetch('/status/api/summary?window=7d', {

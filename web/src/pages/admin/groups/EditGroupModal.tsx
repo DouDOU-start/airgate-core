@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '../../../shared/queryKeys';
 import { Button, Chip, Description, Input, Label, ListBox, Modal, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { ArrowUpDown, Layers, X } from 'lucide-react';
@@ -114,7 +115,7 @@ export function GroupFormModal({
   const [copyFromGroupIds, setCopyFromGroupIds] = useState<number[]>([]);
 
   const { data: copySourceData } = useQuery({
-    queryKey: ['groups-for-copy', form.platform],
+    queryKey: queryKeys.groupsForCopy(form.platform),
     queryFn: () => groupsApi.list({ page: 1, page_size: 100, platform: form.platform }),
     enabled: !isEdit && !!form.platform && open,
   });

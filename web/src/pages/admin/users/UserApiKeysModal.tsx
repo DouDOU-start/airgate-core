@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '../../../shared/queryKeys';
 import { EmptyState, Modal, Skeleton, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import {
@@ -24,7 +25,7 @@ export function UserApiKeysModal({ open, user, onClose }: UserApiKeysModalProps)
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['user-api-keys', user.id, page],
+    queryKey: queryKeys.userApiKeys(user.id, page),
     queryFn: () => usersApi.apiKeys(user.id, { page, page_size: 10 }),
     enabled: open,
   });

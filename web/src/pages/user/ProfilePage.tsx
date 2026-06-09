@@ -269,7 +269,7 @@ function MyBalanceHistoryModal({ open, balance, onClose }: { open: boolean; bala
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['my-balance-history', page],
+    queryKey: queryKeys.myBalanceHistory(page),
     queryFn: () => usersApi.myBalanceHistory({ page, page_size: 10 }),
     enabled: open,
   });

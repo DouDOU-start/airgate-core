@@ -56,6 +56,7 @@ function AppProviders() {
 }
 
 function PluginAPIBridge() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   // 单 modal 队列：同一时刻最多展示一个 confirm；新的请求会直接 resolve(false)
   // 上一个未决的旧请求（这种"打断"语义跟原生 window.confirm 阻塞行为不同，
@@ -103,15 +104,15 @@ function PluginAPIBridge() {
           <AlertDialog.Dialog className="ag-elevation-modal">
             <AlertDialog.Header>
               <AlertDialog.Icon status={pending?.danger ? 'danger' : 'accent'} />
-              <AlertDialog.Heading>{pending?.title ?? '请确认'}</AlertDialog.Heading>
+              <AlertDialog.Heading>{pending?.title ?? t('dialog.confirm_title')}</AlertDialog.Heading>
             </AlertDialog.Header>
             <AlertDialog.Body>{pending?.message ?? ''}</AlertDialog.Body>
             <AlertDialog.Footer>
               <Button variant="secondary" onPress={() => handleClose(false)}>
-                取消
+                {t('dialog.cancel')}
               </Button>
               <Button variant={pending?.danger ? 'danger' : 'primary'} onPress={() => handleClose(true)}>
-                确认
+                {t('dialog.confirm')}
               </Button>
             </AlertDialog.Footer>
           </AlertDialog.Dialog>

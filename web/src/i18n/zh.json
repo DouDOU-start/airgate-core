@@ -1200,5 +1200,25 @@
     "wf_port_width": "宽度",
     "wf_port_height": "高度",
     "wf_port_resized": "缩放后"
+  },
+
+  "pagination": {
+    "total": "共 {{count}} 条",
+    "page": "第 {{page}} / {{total}} 页",
+    "perPage": "每页",
+    "prev": "上一页",
+    "next": "下一页"
+  },
+
+  "dialog": {
+    "confirm_title": "请确认",
+    "cancel": "取消",
+    "confirm": "确认"
+  },
+
+  "error": {
+    "page_error": "页面出现了错误",
+    "unknown": "未知错误",
+    "refresh": "刷新页面"
   }
 }

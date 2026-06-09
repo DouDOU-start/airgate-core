@@ -9,6 +9,7 @@ import { usePagination } from '../../shared/hooks/usePagination';
 import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
+import { queryKeys } from '../../shared/queryKeys';
 import { Activity, Coins, Hash, DollarSign, Search } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
@@ -410,7 +411,7 @@ export default function UsagePage() {
   const debouncedUserKeyword = useDebouncedValue(userKeyword.trim(), 250);
   const [selectedUserLabel, setSelectedUserLabel] = useState('');
   const { data: usersData } = useQuery({
-    queryKey: ['admin-users-search', debouncedUserKeyword],
+    queryKey: queryKeys.adminUsersSearch(debouncedUserKeyword),
     queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: debouncedUserKeyword }),
     enabled: pageActive && debouncedUserKeyword.length > 0,
   });
@@ -441,7 +442,7 @@ export default function UsagePage() {
   const debouncedAPIKeyKeyword = useDebouncedValue(apiKeyKeyword.trim(), 250);
   const [selectedAPIKeyLabel, setSelectedAPIKeyLabel] = useState('');
   const { data: apiKeysData } = useQuery({
-    queryKey: ['admin-api-keys-search', 'api_key', debouncedAPIKeyKeyword],
+    queryKey: queryKeys.adminApiKeysSearch('api_key', debouncedAPIKeyKeyword),
     queryFn: ({ signal }) => apikeysApi.adminList({ page: 1, page_size: 20, keyword: debouncedAPIKeyKeyword, search_scope: 'api_key' }, { signal }),
     enabled: pageActive && debouncedAPIKeyKeyword.length > 0,
   });
@@ -487,7 +488,7 @@ export default function UsagePage() {
     isPlaceholderData,
     refetch: refetchUsage,
   } = useQuery({
-    queryKey: ['admin-usage', queryParams],
+    queryKey: queryKeys.adminUsage(queryParams),
     queryFn: ({ signal }) => usageApi.adminList(queryParams, { signal }),
     meta: { globalLoading: false },
     enabled: pageActive,
@@ -497,7 +498,7 @@ export default function UsagePage() {
   });
 
   const { data: stats, isFetching: isStatsFetching, refetch: refetchStats } = useQuery({
-    queryKey: ['admin-usage-stats', filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id, filters.api_key_id],
+    queryKey: queryKeys.adminUsageStats(filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id, filters.api_key_id),
     queryFn: ({ signal }) =>
       usageApi.stats({
         group_by: ADMIN_USAGE_STATS_GROUP_BY,
@@ -517,7 +518,7 @@ export default function UsagePage() {
 
   // Token 趋势
   const { data: trendData, isFetching: isTrendFetching, refetch: refetchTrend } = useQuery({
-    queryKey: ['admin-usage-trend', granularity, filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id, filters.api_key_id],
+    queryKey: queryKeys.adminUsageTrend(granularity, filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id, filters.api_key_id),
     queryFn: ({ signal }) =>
       usageApi.trend({
         granularity,

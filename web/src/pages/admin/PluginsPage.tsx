@@ -382,7 +382,7 @@ function PluginConfigModal({
 
   // 拉取持久化配置作为初始值
   const { data: configData, isLoading } = useQuery({
-    queryKey: ['plugin-config', plugin?.name],
+    queryKey: queryKeys.pluginConfig(plugin?.name),
     queryFn: () => pluginsApi.getConfig(plugin!.name),
     enabled: open,
   });

@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Button } from '@heroui/react'
+import i18n from '../../i18n'
 
 interface Props {
   children: ReactNode
@@ -44,10 +45,10 @@ export class ErrorBoundary extends Component<Props, State> {
           fontFamily: 'system-ui, sans-serif',
         }}>
           <h2 style={{ marginBottom: '1rem', color: '#dc2626' }}>
-            页面出现了错误
+            {i18n.t('error.page_error')}
           </h2>
           <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
-            {this.state.error?.message || '未知错误'}
+            {this.state.error?.message || i18n.t('error.unknown')}
           </p>
           <Button
             variant="secondary"
@@ -56,7 +57,7 @@ export class ErrorBoundary extends Component<Props, State> {
               window.location.reload()
             }}
           >
-            刷新页面
+            {i18n.t('error.refresh')}
           </Button>
         </div>
       )

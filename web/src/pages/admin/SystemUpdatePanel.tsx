@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../shared/queryKeys';
 import { Alert, Button, Card, Checkbox, Link as HeroLink, Modal, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
@@ -27,14 +28,14 @@ export function SystemUpdatePanel() {
   const [submitting, setSubmitting] = useState(false);
 
   const { data: info, isFetching: infoLoading, refetch: refetchInfo } = useQuery({
-    queryKey: ['upgrade-info'],
+    queryKey: queryKeys.upgradeInfo(),
     queryFn: () => upgradeApi.info(),
     staleTime: 60_000,
   });
 
   // 初始拉一次状态；之后只在升级流程期间轮询
   const { data: status } = useQuery({
-    queryKey: ['upgrade-status'],
+    queryKey: queryKeys.upgradeStatus(),
     queryFn: () => upgradeApi.status(),
     refetchInterval: (q) => {
       const s = q.state.data?.state;
@@ -60,7 +61,7 @@ export function SystemUpdatePanel() {
       await upgradeApi.run({ confirm_db_backup: true });
       toast('success', t('settings.system_run_started'));
       // 立即拉一次 status，触发自动轮询
-      queryClient.invalidateQueries({ queryKey: ['upgrade-status'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.upgradeStatus() });
     } catch (err) {
       toast('error', err instanceof Error ? err.message : String(err));
     } finally {
