@@ -1,5 +1,7 @@
 # Core 任务状态机设计
 
+> **本文为任务子系统设计。** `tasks.create/update/get/list` 经 `Host.Invoke` 已实现(见 [`current/core-runtime.md`](current/core-runtime.md));版本化 capability、规范化操作等为目标态。现状以 `current/` 为准。
+
 ## 目标
 
 Core 需要对外无差别支持同步和异步上游，同时不能把图片、视频、音乐等业务类型写死到平台字段里。

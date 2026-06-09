@@ -1,5 +1,7 @@
 # Playground 生成任务改造规划
 
+> **本文为改造规划(尚未完成)。** Playground 现状见 [`current/plugins.md`](current/plugins.md)。
+
 ## 状态
 
 草案。

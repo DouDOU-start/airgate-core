@@ -1,5 +1,7 @@
 # AirGate 生态架构 v2
 
+> ⚠️ **本文为目标愿景(to-be),大部分尚未实现。** 当前真实实现见 [`current/`](current/README.md),已知差距见 [`current/tech-debt.md`](current/tech-debt.md)。**开发以 `current/` 为准;本文用于把握演进方向。**
+
 ## 状态
 
 草案 RFC。

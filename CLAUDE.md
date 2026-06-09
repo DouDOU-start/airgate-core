@@ -1,6 +1,7 @@
 # airgate-core — Claude 开发指南
 
-> 叠加于根 `../CLAUDE.md`，仅述 core 内部分层与流程。开发前先读「🚫 红线」，再按「分层」定位。架构背景见 `docs/architecture/ecosystem-v2.md`。
+> 叠加于根 `../CLAUDE.md`，仅述 core 内部分层与流程。开发前先读「🚫 红线」，再按「分层」定位。
+> **现状实现(权威)见 `docs/architecture/current/core-runtime.md`**。
 
 ## 🚫 红线
 
