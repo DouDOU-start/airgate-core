@@ -39,7 +39,7 @@ func TestHostForwardTimeout(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := hostForwardTimeout(tc.req); got != tc.want {
+			if got := hostForwardTimeout(nil, tc.req); got != tc.want {
 				t.Fatalf("hostForwardTimeout() = %s, want %s", got, tc.want)
 			}
 		})

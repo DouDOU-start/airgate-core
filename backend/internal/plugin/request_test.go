@@ -83,7 +83,7 @@ func TestRequestNeedsImage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := requestNeedsImage(tt.path, tt.model, tt.body); got != tt.want {
+			if got := requestNeedsImage(nil, tt.path, tt.model, tt.body); got != tt.want {
 				t.Fatalf("requestNeedsImage() = %v, want %v", got, tt.want)
 			}
 		})
@@ -129,7 +129,7 @@ func TestAccountRequirementsForRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := accountRequirementsForRequest(tt.path, tt.model, tt.body)
+			got := accountRequirementsForRequest(nil, tt.path, tt.model, tt.body)
 			if got.Workload != tt.wantWorkload {
 				t.Fatalf("Workload = %q, want %q", got.Workload, tt.wantWorkload)
 			}

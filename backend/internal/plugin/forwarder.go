@@ -116,7 +116,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	defer releaseClientQuota()
 
 	requirements := routing.Requirements{
-		NeedsImage: requestNeedsImage(state.requestPath, state.model, state.body),
+		NeedsImage: requestNeedsImage(f.manager, state.requestPath, state.model, state.body),
 	}
 	routes := routesForAPIKey(state, requirements)
 	if len(routes) == 0 {
@@ -520,15 +520,12 @@ func routesForAPIKey(state *forwardState, requirements routing.Requirements) []r
 	return []routing.Candidate{keyInfoRoute(state.keyInfo)}
 }
 
+// apiKeyGroupMatchesRequirements 使用 routing 包的统一判定逻辑。
 func apiKeyGroupMatchesRequirements(keyInfo *auth.APIKeyInfo, requirements routing.Requirements) bool {
 	if keyInfo == nil {
 		return false
 	}
-	if strings.EqualFold(keyInfo.GroupPlatform, "openai") {
-		return !requirements.NeedsImage ||
-			pluginSettingEnabledForKey(keyInfo.GroupPluginSettings, "openai", "image_enabled")
-	}
-	return true
+	return routing.GroupSupportsImageRequirement(keyInfo.GroupPlatform, keyInfo.GroupPluginSettings, requirements)
 }
 
 type groupRequirementError struct {
@@ -538,12 +535,16 @@ type groupRequirementError struct {
 	message string
 }
 
+// apiKeyGroupRequirementError 基于 routing 包统一判定逻辑返回结构化错误。
 func apiKeyGroupRequirementError(keyInfo *auth.APIKeyInfo, requirements routing.Requirements) (groupRequirementError, bool) {
-	if keyInfo == nil || !strings.EqualFold(keyInfo.GroupPlatform, "openai") {
+	if keyInfo == nil {
 		return groupRequirementError{}, false
 	}
-	imageEnabled := pluginSettingEnabledForKey(keyInfo.GroupPluginSettings, "openai", "image_enabled")
-	if requirements.NeedsImage && !imageEnabled {
+	if routing.GroupSupportsImageRequirement(keyInfo.GroupPlatform, keyInfo.GroupPluginSettings, requirements) {
+		return groupRequirementError{}, false
+	}
+	// 当前唯一的不满足场景：图片生成未开启
+	if requirements.NeedsImage {
 		return groupRequirementError{
 			status:  http.StatusForbidden,
 			errType: "invalid_request_error",
@@ -552,20 +553,6 @@ func apiKeyGroupRequirementError(keyInfo *auth.APIKeyInfo, requirements routing.
 		}, true
 	}
 	return groupRequirementError{}, false
-}
-
-func pluginSettingEnabledForKey(settings map[string]map[string]string, plugin, key string) bool {
-	for pluginName, kv := range settings {
-		if !strings.EqualFold(pluginName, plugin) {
-			continue
-		}
-		for k, v := range kv {
-			if strings.EqualFold(k, key) {
-				return strings.EqualFold(strings.TrimSpace(v), "true")
-			}
-		}
-	}
-	return false
 }
 
 func keyInfoRoute(keyInfo *auth.APIKeyInfo) routing.Candidate {

@@ -704,7 +704,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 	if err != nil {
 		return nil, err
 	}
-	fwdCtx, cancel := context.WithTimeout(ctx, hostForwardTimeout(req))
+	fwdCtx, cancel := context.WithTimeout(ctx, hostForwardTimeout(h.manager, req))
 	defer cancel()
 
 	hardExclude := make([]int, 0, maxHostForwardAttempts*len(routes))
@@ -725,7 +725,7 @@ func (h *HostService) forward(ctx context.Context, req hostForwardRequest) (map[
 		}
 
 		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
-			acc, err := h.scheduler.SelectAccountWithRequirements(ctx, route.Platform, model, 0, route.GroupID, "", hostAccountRequirements(req), hardExclude...)
+			acc, err := h.scheduler.SelectAccountWithRequirements(ctx, route.Platform, model, 0, route.GroupID, "", hostAccountRequirements(h.manager, req), hardExclude...)
 			if err != nil {
 				if cerr := hostContextError(err); cerr != nil {
 					return nil, cerr
@@ -872,7 +872,7 @@ func (h *HostService) forwardStream(ctx context.Context, req hostForwardRequest,
 		}
 
 		for attempt := 0; attempt < maxHostForwardAttempts; attempt++ {
-			acc, err := h.scheduler.SelectAccountWithRequirements(ctx, route.Platform, model, 0, route.GroupID, "", hostAccountRequirements(req), hardExclude...)
+			acc, err := h.scheduler.SelectAccountWithRequirements(ctx, route.Platform, model, 0, route.GroupID, "", hostAccountRequirements(h.manager, req), hardExclude...)
 			if err != nil {
 				if cerr := hostContextError(err); cerr != nil {
 					return cerr
@@ -1000,8 +1000,8 @@ const (
 	imageHostForwardTimeout   = 300 * time.Second
 )
 
-func hostForwardTimeout(req hostForwardRequest) time.Duration {
-	if requestHasImageWorkload(req.Path, req.Model, hostForwardBody(req.Body)) {
+func hostForwardTimeout(mgr *Manager, req hostForwardRequest) time.Duration {
+	if requestHasImageWorkload(mgr, req.Path, req.Model, hostForwardBody(req.Body)) {
 		return imageHostForwardTimeout
 	}
 	return defaultHostForwardTimeout
@@ -1406,7 +1406,7 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 				sdk.LogFieldGroupID, req.GroupID, sdk.LogFieldError, err)
 			return nil, "", hostForwardGenericError()
 		}
-		if !routing.GroupMatchesRequirements(g, hostForwardRequirements(req)) {
+		if !routing.GroupMatchesRequirements(g, hostForwardRequirements(h.manager, req)) {
 			slog.Warn("host_forward_group_requirement_unmet",
 				sdk.LogFieldGroupID, req.GroupID,
 				sdk.LogFieldModel, req.Model,
@@ -1443,7 +1443,7 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 			sdk.LogFieldUserID, req.UserID, sdk.LogFieldError, err)
 		return nil, "", hostForwardGenericError()
 	}
-	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserID), platform, u.GroupRates, u.GroupPluginSettings, hostForwardRequirements(req))
+	routes, err := routing.ListEligibleGroups(ctx, h.db, int(req.UserID), platform, u.GroupRates, u.GroupPluginSettings, hostForwardRequirements(h.manager, req))
 	if err != nil {
 		if cerr := hostContextError(err); cerr != nil {
 			return nil, "", cerr
@@ -1465,12 +1465,12 @@ func (h *HostService) hostForwardRoutes(ctx context.Context, req hostForwardRequ
 	return routes, u.Email, nil
 }
 
-func hostForwardRequirements(req hostForwardRequest) routing.Requirements {
-	return routing.Requirements{NeedsImage: requestNeedsImage(req.Path, req.Model, hostForwardBody(req.Body))}
+func hostForwardRequirements(mgr *Manager, req hostForwardRequest) routing.Requirements {
+	return routing.Requirements{NeedsImage: requestNeedsImage(mgr, req.Path, req.Model, hostForwardBody(req.Body))}
 }
 
-func hostAccountRequirements(req hostForwardRequest) scheduler.AccountRequirements {
-	return accountRequirementsForRequest(req.Path, req.Model, hostForwardBody(req.Body))
+func hostAccountRequirements(mgr *Manager, req hostForwardRequest) scheduler.AccountRequirements {
+	return accountRequirementsForRequest(mgr, req.Path, req.Model, hostForwardBody(req.Body))
 }
 
 func hostForwardReasoningEffort(req hostForwardRequest) string {
@@ -1675,9 +1675,10 @@ func errProbeResp(kind, msg string, start time.Time) map[string]interface{} {
 
 // pickProbeModel 从模型列表中选一个非图片模型用于探测。
 // 图片模型探测需要实际生图（成本高），跳过；如果全是图片模型则返回空。
+// 直接使用 ModelInfo.HasCapability 判断，无需经过 Manager 全局查找。
 func pickProbeModel(models []sdk.ModelInfo) string {
 	for _, m := range models {
-		if !isImageModel(m.ID) {
+		if !m.HasCapability(sdk.ModelCapImageGeneration) {
 			return m.ID
 		}
 	}

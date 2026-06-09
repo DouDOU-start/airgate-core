@@ -323,7 +323,7 @@ func TestRoutesForAPIKeyAllowsChatWithDeclaredImageToolWhenBoundGroupDisabled(t 
 	}
 
 	requirements := routing.Requirements{
-		NeedsImage: requestNeedsImage("/v1/responses", "gpt-5.4", state.body),
+		NeedsImage: requestNeedsImage(nil, "/v1/responses", "gpt-5.4", state.body),
 	}
 	routes := routesForAPIKey(state, requirements)
 	if len(routes) != 1 {

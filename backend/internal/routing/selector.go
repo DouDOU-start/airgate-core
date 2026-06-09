@@ -106,13 +106,21 @@ func GroupMatchesRequirements(g *ent.Group, requirements Requirements) bool {
 	if g == nil {
 		return false
 	}
-	if strings.EqualFold(g.Platform, "openai") {
-		return !requirements.NeedsImage || pluginSettingEnabled(g.PluginSettings, "openai", "image_enabled")
+	return GroupSupportsImageRequirement(g.Platform, g.PluginSettings, requirements)
+}
+
+// GroupSupportsImageRequirement 判断指定平台/插件配置的分组是否满足图片生成需求。
+// 当前仅 OpenAI 平台需要显式开启 image_enabled；其他平台默认满足。
+// TODO: 后续应基于模型目录的 capability 声明替代平台字符串硬编码。
+func GroupSupportsImageRequirement(platform string, pluginSettings map[string]map[string]string, requirements Requirements) bool {
+	if strings.EqualFold(platform, "openai") {
+		return !requirements.NeedsImage || PluginSettingEnabled(pluginSettings, "openai", "image_enabled")
 	}
 	return true
 }
 
-func pluginSettingEnabled(settings map[string]map[string]string, plugin, key string) bool {
+// PluginSettingEnabled 在插件配置中查找指定键是否为 "true"（忽略大小写）。
+func PluginSettingEnabled(settings map[string]map[string]string, plugin, key string) bool {
 	for pluginName, kv := range settings {
 		if !strings.EqualFold(pluginName, plugin) {
 			continue

@@ -81,6 +81,21 @@ func (m *Manager) FindPlatformByModel(modelID string) string {
 	return ""
 }
 
+// ModelHasCapability 判断已注册的模型是否具备指定能力（如 sdk.ModelCapImageGeneration）。
+// 遍历所有平台的模型目录；若模型未注册则返回 false。
+func (m *Manager) ModelHasCapability(modelID, capability string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, models := range m.modelCache {
+		for i := range models {
+			if models[i].ID == modelID {
+				return models[i].HasCapability(capability)
+			}
+		}
+	}
+	return false
+}
+
 // GetRoutes 获取指定插件的路由声明。
 func (m *Manager) GetRoutes(pluginName string) []sdk.RouteDefinition {
 	m.mu.RLock()
