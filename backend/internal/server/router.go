@@ -17,12 +17,19 @@ import (
 	webfs "github.com/DouDOU-start/airgate-core/internal/web"
 )
 
+// healthPluginName 健康监控插件名称（避免硬编码字符串散落在路由注册中）。
+const healthPluginName = "airgate-health"
+
 // registerRoutes 注册所有 API 路由
 func (s *Server) registerRoutes() {
 	r := s.engine
 	handlers := s.handlers
 
-	// 全局中间件：Recovery → RequestLogger → I18n → 业务
+	// 全局中间件：CORS → Recovery → RequestLogger → I18n → 业务
+	r.Use(middleware.CORS(middleware.CORSConfig{
+		// 默认不设置 AllowOrigins，仅同源可访问。
+		// 如需跨域请配置具体来源，例如：AllowOrigins: []string{"https://example.com"}
+	}))
 	r.Use(middleware.Recovery())
 	r.Use(middleware.RequestLogger())
 	r.Use(middleware.I18n())
@@ -43,10 +50,10 @@ func (s *Server) registerRoutes() {
 
 	// === 认证路由（无需 JWT） ===
 	//
-	// 注：原本这里挂了 middleware.RateLimit，但那个中间件依赖 c.Get(CtxKeyUserID)，
-	// 而登录/注册这些前置鉴权阶段根本还没设 user_id，中间件直接 c.Next() 放行，
-	// 实际是空转。随同硬编码 60 req/min 的用户限流一起移除了。
+	// 基于客户端 IP 的速率限制（10 req/min），防止暴力破解和验证码滥用。
+	// 替代原来依赖 CtxKeyUserID 的用户级限流（登录前无 user_id，实际空转已移除）。
 	authGroup := v1.Group("/auth")
+	authGroup.Use(middleware.IPRateLimit(10))
 	{
 		authGroup.POST("/login", handlers.Auth.Login)
 		authGroup.POST("/login-apikey", handlers.Auth.LoginByAPIKey)
@@ -226,7 +233,7 @@ func (s *Server) registerRoutes() {
 
 	// === 公开状态页路由 ===
 	// 设计：core 完全不维护一份状态页前端，所有 /status* 请求一律反代到
-	// airgate-health 插件，由插件内部 standalone 打包的 status.html + status-XXX.js
+	// healthPluginName 插件，由插件内部 standalone 打包的 status.html + status-XXX.js
 	// 渲染。这样状态页的 UI / 数据 / 粒度都由健康监控插件单点维护，避免 core
 	// 与插件出现两份重复实现（之前 core 自己有个 React StatusPage 组件并维护
 	// 90 天日级方格图，与 health 插件的 standalone 页严重重复，移除）。
@@ -234,7 +241,7 @@ func (s *Server) registerRoutes() {
 	// 反代规则：
 	//   - GET /status            → 插件看到 /        → handlePublicIndex 返回 status.html
 	//   - GET /status/*path      → 插件看到 /<path> → API + 静态资源
-	statusProxy := s.extensionProxy.HandleNamed("airgate-health", "public")
+	statusProxy := s.extensionProxy.HandleNamed(healthPluginName, "public")
 
 	// 加载嵌入的前端 SPA：所有静态资源通过 //go:embed 打进二进制
 	distFS, err := webfs.FS()
@@ -249,7 +256,7 @@ func (s *Server) registerRoutes() {
 		os.Exit(1)
 	}
 
-	// /status 与 /status/*path 都走 statusProxy 反代到 airgate-health 插件
+	// /status 与 /status/*path 都走 statusProxy 反代到 healthPluginName 插件
 	r.GET("/status", statusProxy)
 	r.GET("/status/*path", statusProxy)
 
@@ -276,6 +283,10 @@ func (s *Server) registerRoutes() {
 	}
 
 	// 上传文件静态服务（这部分仍然在磁盘上，因为是用户上传的运行时数据）
+	//
+	// ⚠️ 安全说明：此路径公开可访问，无需认证。上传的文件（如头像、聊天图片）可能
+	// 被嵌入外部链接中分享，因此保持公开。文件名使用 UUID 生成，不可枚举。
+	// 如未来需要访问控制，应替换为带鉴权的路由组。
 	r.Static("/uploads", "data/uploads")
 	r.GET("/assets-runtime/*path", s.handleRuntimeAsset)
 
