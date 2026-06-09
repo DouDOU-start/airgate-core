@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,6 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
+	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
 )
 
@@ -21,8 +24,13 @@ func TestVerifyCodeRejectsInvalidCode(t *testing.T) {
 		wrongCode = "111111"
 	}
 
+	// 构造 auth service 并注入验证码存储
+	jwtMgr := auth.NewJWTManager("secret", 24)
+	authService := appauth.NewService(stubAuthRepo{}, jwtMgr)
+	authService.SetVerifyCodeStore(store)
+
 	router := gin.New()
-	handler := &AuthHandler{codeStore: store}
+	handler := NewAuthHandler(authService, jwtMgr)
 	router.POST("/verify-code", handler.VerifyCode)
 
 	body := `{"email":"user@example.com","code":"` + wrongCode + `"}`
@@ -46,8 +54,13 @@ func TestVerifyCodeDoesNotConsumeValidCode(t *testing.T) {
 	store := mailer.NewVerifyCodeStore()
 	code := store.Generate("user@example.com")
 
+	// 构造 auth service 并注入验证码存储
+	jwtMgr := auth.NewJWTManager("secret", 24)
+	authService := appauth.NewService(stubAuthRepo{}, jwtMgr)
+	authService.SetVerifyCodeStore(store)
+
 	router := gin.New()
-	handler := &AuthHandler{codeStore: store}
+	handler := NewAuthHandler(authService, jwtMgr)
 	router.POST("/verify-code", handler.VerifyCode)
 
 	body := `{"email":"user@example.com","code":"` + code + `"}`
@@ -69,4 +82,29 @@ func TestVerifyCodeDoesNotConsumeValidCode(t *testing.T) {
 	if store.Check("user@example.com", code) {
 		t.Fatal("registration verification should consume the code")
 	}
+}
+
+// stubAuthRepo 空仓储桩（测试中不需要访问数据库）。
+type stubAuthRepo struct{}
+
+func (stubAuthRepo) FindByEmail(_ context.Context, _ string) (appauth.User, error) {
+	return appauth.User{}, appauth.ErrUserNotFound
+}
+func (stubAuthRepo) EmailExists(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}
+func (stubAuthRepo) Create(_ context.Context, _ appauth.CreateUserInput) (appauth.User, error) {
+	return appauth.User{}, nil
+}
+func (stubAuthRepo) FindByID(_ context.Context, _ int, _ bool) (appauth.User, error) {
+	return appauth.User{}, appauth.ErrUserNotFound
+}
+func (stubAuthRepo) ValidateAPIKeySession(_ context.Context, _, _ int) (appauth.User, error) {
+	return appauth.User{}, appauth.ErrInvalidAPIKeySession
+}
+func (stubAuthRepo) ValidateAPIKeyForLogin(_ context.Context, _ string) (appauth.APIKeyLoginInfo, error) {
+	return appauth.APIKeyLoginInfo{}, appauth.ErrInvalidAPIKey
+}
+func (stubAuthRepo) GetAPIKeyBrief(_ context.Context, _ int) (appauth.APIKeyBrief, error) {
+	return appauth.APIKeyBrief{}, nil
 }

@@ -287,17 +287,13 @@ func (h *AccountHandler) BulkClearFamilyCooldowns(c *gin.Context) {
 		response.BindError(c, err)
 		return
 	}
-	if h.scheduler == nil {
+
+	result := h.service.BulkClearFamilyCooldowns(c.Request.Context(), appaccount.BulkClearCooldownsInput{
+		AccountIDs: req.AccountIDs,
+	})
+	if result.Failed > 0 && result.Success == 0 {
 		response.Error(c, http.StatusServiceUnavailable, http.StatusServiceUnavailable, "调度器不可用")
 		return
-	}
-
-	result := appaccount.BulkResult{Results: make([]appaccount.BulkResultItem, 0, len(req.AccountIDs))}
-	for _, id := range req.AccountIDs {
-		h.scheduler.ClearRateLimitMarkers(c.Request.Context(), id)
-		result.Success++
-		result.SuccessIDs = append(result.SuccessIDs, id)
-		result.Results = append(result.Results, appaccount.BulkResultItem{ID: id, Success: true})
 	}
 	response.Success(c, toBulkOpResp(result))
 }

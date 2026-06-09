@@ -12,7 +12,7 @@ func TestUpdateClonesInput(t *testing.T) {
 			captured = append(captured, items...)
 			return nil
 		},
-	})
+	}, "")
 
 	input := []ItemInput{{Key: "site_name", Value: "Airgate"}}
 	if err := service.Update(t.Context(), input); err != nil {

@@ -169,6 +169,11 @@ type BulkUpdateInput struct {
 	HasProxyID     bool
 }
 
+// BulkClearCooldownsInput 批量清除限流标记输入。
+type BulkClearCooldownsInput struct {
+	AccountIDs []int
+}
+
 // BulkResultItem 批量操作单条结果。
 type BulkResultItem struct {
 	ID      int    `json:"id"`

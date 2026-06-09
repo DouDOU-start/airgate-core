@@ -5,33 +5,21 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/DouDOU-start/airgate-core/ent"
 	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
-	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
-	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
-	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
 )
 
 // AuthHandler 认证相关 Handler。
 type AuthHandler struct {
-	service         *appauth.Service
-	settingsService *appsettings.Service
-	userService     *appuser.Service
-	codeStore       *mailer.VerifyCodeStore
-	db              *ent.Client
-	jwtMgr          *auth.JWTManager
+	service *appauth.Service
+	jwtMgr  *auth.JWTManager
 }
 
 // NewAuthHandler 创建认证 Handler。
-func NewAuthHandler(service *appauth.Service, settingsService *appsettings.Service, userService *appuser.Service, codeStore *mailer.VerifyCodeStore, db *ent.Client, jwtMgr *auth.JWTManager) *AuthHandler {
+func NewAuthHandler(service *appauth.Service, jwtMgr *auth.JWTManager) *AuthHandler {
 	return &AuthHandler{
-		service:         service,
-		settingsService: settingsService,
-		userService:     userService,
-		codeStore:       codeStore,
-		db:              db,
-		jwtMgr:          jwtMgr,
+		service: service,
+		jwtMgr:  jwtMgr,
 	}
 }
 
@@ -49,10 +37,46 @@ func (h *AuthHandler) handleLoginError(err error) (int, string, bool) {
 
 func (h *AuthHandler) handleRegisterError(err error) (int, string) {
 	switch {
+	case errors.Is(err, appauth.ErrRegistrationDisabled):
+		return 403, err.Error()
+	case errors.Is(err, appauth.ErrVerifyCodeRequired):
+		return 400, err.Error()
+	case errors.Is(err, appauth.ErrVerifyCodeInvalid):
+		return 400, err.Error()
 	case errors.Is(err, appauth.ErrEmailAlreadyExists):
 		return 400, err.Error()
 	default:
 		slog.Error("注册失败", "error", err)
 		return 500, "注册失败"
+	}
+}
+
+func (h *AuthHandler) handleAPIKeyLoginError(err error) (int, string) {
+	switch {
+	case errors.Is(err, appauth.ErrInvalidAPIKeyFormat):
+		return 400, err.Error()
+	case errors.Is(err, appauth.ErrAPIKeyExpired):
+		return 401, "API Key 已过期"
+	case errors.Is(err, appauth.ErrInvalidAPIKey):
+		return 401, "无效的 API Key"
+	case errors.Is(err, appauth.ErrUserDisabled):
+		return 403, "用户已被禁用"
+	default:
+		slog.Error("API Key 登录失败", "error", err)
+		return 500, "登录失败"
+	}
+}
+
+func (h *AuthHandler) handleSendVerifyCodeError(err error) (int, string) {
+	switch {
+	case errors.Is(err, appauth.ErrEmailAlreadyExists):
+		return 400, "该邮箱已被注册"
+	case errors.Is(err, appauth.ErrMailerNotConfigured):
+		return 500, "邮件服务未配置"
+	case errors.Is(err, appauth.ErrSendMailFailed):
+		return 500, err.Error()
+	default:
+		slog.Error("发送验证码失败", "error", err)
+		return 500, "发送验证码失败"
 	}
 }

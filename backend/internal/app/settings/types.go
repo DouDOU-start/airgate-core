@@ -16,6 +16,23 @@ type ItemInput struct {
 	Group string
 }
 
+// TestSMTPInput 测试 SMTP 连接所需参数。
+type TestSMTPInput struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	UseTLS   bool
+	From     string
+	To       string
+}
+
+// GenerateAdminAPIKeyResult 生成管理员 API Key 的返回结果。
+type GenerateAdminAPIKeyResult struct {
+	Hint string // 脱敏显示
+	Key  string // 明文密钥（仅生成时返回一次）
+}
+
 // Repository 定义设置域持久化接口。
 type Repository interface {
 	List(context.Context, string) ([]Setting, error)

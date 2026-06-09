@@ -359,6 +359,23 @@ func (s *Service) BulkDelete(ctx context.Context, ids []int) BulkResult {
 	return result
 }
 
+// BulkClearFamilyCooldowns 批量清除账号上的临时限流标记。
+// stateWriter 为 nil 时所有账号标记为失败。
+func (s *Service) BulkClearFamilyCooldowns(ctx context.Context, input BulkClearCooldownsInput) BulkResult {
+	result := BulkResult{Results: make([]BulkResultItem, 0, len(input.AccountIDs))}
+	if s.stateWriter == nil {
+		for _, id := range input.AccountIDs {
+			result.appendFailure(id, ErrSchedulerUnavailable)
+		}
+		return result
+	}
+	for _, id := range input.AccountIDs {
+		s.stateWriter.ClearRateLimitMarkers(ctx, id)
+		result.appendSuccess(id)
+	}
+	return result
+}
+
 func (r *BulkResult) appendSuccess(id int) {
 	r.Success++
 	r.SuccessIDs = append(r.SuccessIDs, id)

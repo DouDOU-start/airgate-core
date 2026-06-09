@@ -74,6 +74,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	auth.SetAPIKeyCacheRedis(dep.Redis)
 	authService := appauth.NewService(authStore, dep.JWTMgr)
 	verifyCodeStore := mailer.NewVerifyCodeStore()
+	// 设置和验证码依赖延迟到 settingsService 创建后注入
 	accountStore := store.NewAccountStore(dep.DB)
 	accountService := appaccount.NewService(accountStore, dep.PluginMgr, dep.Concurrency, dep.Scheduler)
 	accountService.SetUsageCacheRedis(dep.Redis)
@@ -87,8 +88,14 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	dashboardService := appdashboard.NewService(dashboardStore, dep.Redis)
 	pluginAdminService := apppluginadmin.NewService(dep.PluginMgr, dep.Marketplace)
 	settingsStore := store.NewSettingsStore(dep.DB)
-	settingsService := appsettings.NewService(settingsStore)
+	settingsService := appsettings.NewService(settingsStore, dep.Config.APIKeySecret())
 	openclawService := appopenclaw.NewService(settingsService)
+
+	// 注入 auth 服务的设置/验证码/邮件依赖
+	authService.SetSettingsLister(&settingsAdapter{settingsService})
+	authService.SetVerifyCodeStore(verifyCodeStore)
+	authService.SetMailerFactory(buildMailerFactory(settingsService))
+
 	userStore := store.NewUserStore(dep.DB)
 	userService := appuser.NewService(userStore)
 
@@ -102,7 +109,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	upgradeService := upgrade.NewService(upgrade.DetectMode(), dep.Redis)
 
 	return &HTTPHandlers{
-		Auth:           handler.NewAuthHandler(authService, settingsService, userService, verifyCodeStore, dep.DB, dep.JWTMgr),
+		Auth:           handler.NewAuthHandler(authService, dep.JWTMgr),
 		User:           handler.NewUserHandler(userService, settingsService),
 		Account:        handler.NewAccountHandler(accountService, dep.Scheduler),
 		Group:          handler.NewGroupHandler(groupService),
@@ -110,13 +117,66 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Subscription:   handler.NewSubscriptionHandler(subscriptionService),
 		Usage:          handler.NewUsageHandler(usageService),
 		Proxy:          handler.NewProxyHandler(proxyService),
-		Settings:       handler.NewSettingsHandler(settingsService, dep.Config.APIKeySecret()),
+		Settings:       handler.NewSettingsHandler(settingsService),
 		Dashboard:      handler.NewDashboardHandler(dashboardService),
 		Plugin:         handler.NewPluginHandler(pluginAdminService),
 		OpenClaw:       handler.NewOpenClawHandler(openclawService),
 		Version:        handler.NewVersionHandler(),
 		Upgrade:        handler.NewUpgradeHandler(upgradeService),
 		AccountService: accountService,
+	}
+}
+
+// settingsAdapter 将 appsettings.Service 适配为 appauth.SettingsLister 接口。
+type settingsAdapter struct {
+	svc *appsettings.Service
+}
+
+func (a *settingsAdapter) List(ctx context.Context, group string) ([]appauth.Setting, error) {
+	items, err := a.svc.List(ctx, group)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]appauth.Setting, len(items))
+	for i, item := range items {
+		result[i] = appauth.Setting{Key: item.Key, Value: item.Value}
+	}
+	return result, nil
+}
+
+// buildMailerFactory 返回一个从系统设置构建邮件发送器的工厂函数。
+func buildMailerFactory(settingsService *appsettings.Service) appauth.MailSenderFactory {
+	return func(ctx context.Context) (appauth.MailSender, error) {
+		settings, err := settingsService.List(ctx, "smtp")
+		if err != nil {
+			return nil, err
+		}
+		cfg := mailer.Config{}
+		for _, s := range settings {
+			switch s.Key {
+			case "smtp_host":
+				cfg.Host = s.Value
+			case "smtp_port":
+				cfg.Port, _ = strconv.Atoi(s.Value)
+			case "smtp_username":
+				cfg.Username = s.Value
+			case "smtp_password":
+				cfg.Password = s.Value
+			case "smtp_from_email":
+				cfg.FromAddr = s.Value
+			case "smtp_from_name":
+				cfg.FromName = s.Value
+			case "smtp_use_tls":
+				cfg.UseTLS = s.Value == "true"
+			}
+		}
+		if cfg.Host == "" {
+			return nil, fmt.Errorf("SMTP 未配置")
+		}
+		if cfg.Port == 0 {
+			cfg.Port = 587
+		}
+		return mailer.New(cfg), nil
 	}
 }
 

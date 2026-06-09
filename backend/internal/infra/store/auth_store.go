@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
@@ -102,6 +104,65 @@ func (s *AuthStore) ValidateAPIKeySession(ctx context.Context, userID, keyID int
 		return appauth.User{}, appauth.ErrUserDisabled
 	}
 	return mapAuthUser(user), nil
+}
+
+// ValidateAPIKeyForLogin 验证 API Key 用于 Web 登录（不要求绑定分组）。
+func (s *AuthStore) ValidateAPIKeyForLogin(ctx context.Context, key string) (appauth.APIKeyLoginInfo, error) {
+	hash := hashAPIKey(key)
+
+	ak, err := s.db.APIKey.Query().
+		Where(
+			entapikey.KeyHash(hash),
+			entapikey.StatusEQ(entapikey.StatusActive),
+		).
+		WithUser().
+		Only(ctx)
+	if err != nil {
+		return appauth.APIKeyLoginInfo{}, appauth.ErrInvalidAPIKey
+	}
+
+	if ak.ExpiresAt != nil && ak.ExpiresAt.Before(time.Now()) {
+		return appauth.APIKeyLoginInfo{}, appauth.ErrAPIKeyExpired
+	}
+
+	u, err := ak.Edges.UserOrErr()
+	if err != nil {
+		return appauth.APIKeyLoginInfo{}, appauth.ErrInvalidAPIKey
+	}
+
+	return appauth.APIKeyLoginInfo{
+		KeyID:   ak.ID,
+		KeyName: ak.Name,
+		UserID:  u.ID,
+	}, nil
+}
+
+// GetAPIKeyBrief 获取 API Key 概要信息。
+func (s *AuthStore) GetAPIKeyBrief(ctx context.Context, keyID int) (appauth.APIKeyBrief, error) {
+	ak, err := s.db.APIKey.Query().
+		Where(entapikey.IDEQ(keyID)).
+		WithGroup().
+		Only(ctx)
+	if err != nil {
+		return appauth.APIKeyBrief{}, err
+	}
+
+	brief := appauth.APIKeyBrief{
+		QuotaUSD:  ak.QuotaUsd,
+		UsedQuota: ak.UsedQuota,
+		ExpiresAt: ak.ExpiresAt,
+		SellRate:  ak.SellRate,
+	}
+	if g := ak.Edges.Group; g != nil {
+		brief.GroupRate = g.RateMultiplier
+	}
+	return brief, nil
+}
+
+// hashAPIKey 对 API Key 进行 SHA256 哈希（与 auth 包的 HashAPIKey 逻辑一致）。
+func hashAPIKey(key string) string {
+	h := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(h[:])
 }
 
 func mapAuthUser(item *ent.User) appauth.User {

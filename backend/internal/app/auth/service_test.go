@@ -26,6 +26,33 @@ func TestRegisterRejectsDuplicateEmail(t *testing.T) {
 	}
 }
 
+func TestRegisterRejectsWhenDisabled(t *testing.T) {
+	service := NewService(authStubRepository{}, corauth.NewJWTManager("secret", 24))
+	// 注入返回"注册已关闭"的设置
+	service.SetSettingsLister(&stubSettingsLister{
+		data: map[string][]Setting{
+			"registration": {{Key: "registration_enabled", Value: "false"}},
+		},
+	})
+
+	_, err := service.Register(t.Context(), RegisterInput{
+		Email:    "u@test.com",
+		Password: "password123",
+	})
+	if !errors.Is(err, ErrRegistrationDisabled) {
+		t.Fatalf("Register() error = %v, want %v", err, ErrRegistrationDisabled)
+	}
+}
+
+// stubSettingsLister 设置桩实现。
+type stubSettingsLister struct {
+	data map[string][]Setting
+}
+
+func (s *stubSettingsLister) List(_ context.Context, group string) ([]Setting, error) {
+	return s.data[group], nil
+}
+
 func TestLoginIssuesTokenForActiveUser(t *testing.T) {
 	hash, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 	if err != nil {
@@ -118,17 +145,19 @@ func TestRegisterCreatesActiveUserAndToken(t *testing.T) {
 	}, jwtMgr)
 
 	result, err := service.Register(t.Context(), RegisterInput{
-		Email:          "new@test.com",
-		Password:       "password123",
-		Username:       "新用户",
-		Balance:        12.5,
-		MaxConcurrency: 3,
+		Email:    "new@test.com",
+		Password: "password123",
+		Username: "新用户",
 	})
 	if err != nil {
 		t.Fatalf("注册失败: %v", err)
 	}
 	if captured.Role != "user" || captured.Status != "active" || captured.PasswordHash == "password123" {
 		t.Fatalf("创建用户输入异常: %+v", captured)
+	}
+	// 默认并发数为 5（无设置时）
+	if captured.MaxConcurrency != 5 {
+		t.Fatalf("默认并发数异常: got %d, want 5", captured.MaxConcurrency)
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(captured.PasswordHash), []byte("password123")); err != nil {
 		t.Fatalf("密码 hash 无法校验: %v", err)
@@ -205,11 +234,13 @@ func TestFindAndEmailDelegatesToRepository(t *testing.T) {
 }
 
 type authStubRepository struct {
-	findByEmail           func() (User, error)
-	emailExists           func() (bool, error)
-	create                func(CreateUserInput) (User, error)
-	findByID              func() (User, error)
-	validateAPIKeySession func(userID, keyID int) (User, error)
+	findByEmail            func() (User, error)
+	emailExists            func() (bool, error)
+	create                 func(CreateUserInput) (User, error)
+	findByID               func() (User, error)
+	validateAPIKeySession  func(userID, keyID int) (User, error)
+	validateAPIKeyForLogin func(key string) (APIKeyLoginInfo, error)
+	getAPIKeyBrief         func(keyID int) (APIKeyBrief, error)
 }
 
 func (s authStubRepository) FindByEmail(_ context.Context, _ string) (User, error) {
@@ -257,4 +288,18 @@ func (s authStubRepository) ValidateAPIKeySession(_ context.Context, userID, key
 		return User{}, ErrInvalidAPIKeySession
 	}
 	return User{ID: userID, Email: "u@test.com", Role: "admin", Status: "active"}, nil
+}
+
+func (s authStubRepository) ValidateAPIKeyForLogin(_ context.Context, key string) (APIKeyLoginInfo, error) {
+	if s.validateAPIKeyForLogin != nil {
+		return s.validateAPIKeyForLogin(key)
+	}
+	return APIKeyLoginInfo{}, ErrInvalidAPIKey
+}
+
+func (s authStubRepository) GetAPIKeyBrief(_ context.Context, keyID int) (APIKeyBrief, error) {
+	if s.getAPIKeyBrief != nil {
+		return s.getAPIKeyBrief(keyID)
+	}
+	return APIKeyBrief{}, nil
 }

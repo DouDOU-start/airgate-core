@@ -15,4 +15,6 @@ var (
 	ErrInvalidDateRange = errors.New("日期范围无效")
 	// ErrReauthRequired OAuth 凭证已失效，需要重新授权（refresh_token 失效且无法本地降级）。
 	ErrReauthRequired = errors.New("账号凭证已失效，请重新授权")
+	// ErrSchedulerUnavailable 调度器不可用。
+	ErrSchedulerUnavailable = errors.New("调度器不可用")
 )
