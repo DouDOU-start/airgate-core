@@ -16,6 +16,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/account"
+	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/routing"
@@ -215,7 +216,11 @@ func (h *HostService) invoke(
 		}
 		return h.probeForward(ctx, req)
 	case hostMethodGroupsList:
-		return h.listGroups(ctx)
+		var req hostListGroupsRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		return h.listGroups(ctx, req)
 	case hostMethodGatewayForward:
 		var req hostForwardRequest
 		if err := decodeHostPayload(payload, &req); err != nil {
@@ -645,10 +650,32 @@ func (h *HostService) probeForward(ctx context.Context, req hostProbeForwardRequ
 	return resp, nil
 }
 
-// listGroups 列出所有分组。
-func (h *HostService) listGroups(ctx context.Context) (map[string]interface{}, error) {
-	slog.Debug("host_service_list_groups", "module", "host")
-	groups, err := h.db.Group.Query().All(ctx)
+// hostListGroupsRequest groups.list 的可选过滤参数。
+// 空 payload（旧调用方）等价于"列出全部分组"，保持向后兼容。
+type hostListGroupsRequest struct {
+	// PublicOnly=true 时按状态页可见性过滤：仅返回 status_visible=true 的分组；
+	// 若同时传 UserID>0，追加该用户在 user_allowed_groups 里被授权的专属分组。
+	// 可见性/授权判断留在 core——插件不应自行查 core 表实现这类过滤。
+	PublicOnly bool  `json:"public_only"`
+	UserID     int64 `json:"user_id"`
+}
+
+// listGroups 列出分组（默认全部；支持状态页可见性过滤）。
+func (h *HostService) listGroups(ctx context.Context, req hostListGroupsRequest) (map[string]interface{}, error) {
+	slog.Debug("host_service_list_groups", "module", "host",
+		"public_only", req.PublicOnly, "user_id", req.UserID)
+	q := h.db.Group.Query()
+	if req.PublicOnly {
+		if req.UserID > 0 {
+			q = q.Where(group.Or(
+				group.StatusVisible(true),
+				group.HasAllowedUsersWith(user.ID(int(req.UserID))),
+			))
+		} else {
+			q = q.Where(group.StatusVisible(true))
+		}
+	}
+	groups, err := q.All(ctx)
 	if err != nil {
 		if cerr := hostContextError(err); cerr != nil {
 			return nil, cerr
@@ -663,6 +690,8 @@ func (h *HostService) listGroups(ctx context.Context) (map[string]interface{}, e
 			"platform":        g.Platform,
 			"is_exclusive":    g.IsExclusive,
 			"rate_multiplier": g.RateMultiplier,
+			"note":            g.Note,
+			"status_visible":  g.StatusVisible,
 		})
 	}
 	return map[string]interface{}{"groups": items}, nil
