@@ -144,6 +144,36 @@ func (m *Manager) GetRoutes(pluginName string) []sdk.RouteDefinition {
 	return cloneRoutes(m.routeCache[m.resolveNameLocked(pluginName)])
 }
 
+// ErrorFormat 返回插件在指定路径下声明的对外错误格式（tech-debt #1 治理）。
+// 优先级：路由级 Metadata["error_format"]（精确路径命中优先于前缀命中）→
+// 插件级 PluginInfo.Metadata["error_format"]；均未声明返回空串，调用方回退
+// OpenAI 兼容格式。
+func (m *Manager) ErrorFormat(pluginName, path string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	name := m.resolveNameLocked(pluginName)
+	prefixFormat := ""
+	for _, route := range m.routeCache[name] {
+		format := route.Metadata["error_format"]
+		if format == "" {
+			continue
+		}
+		if route.Path == path {
+			return format
+		}
+		if prefixFormat == "" && matchRoutePath(route.Path, path) {
+			prefixFormat = format
+		}
+	}
+	if prefixFormat != "" {
+		return prefixFormat
+	}
+	if inst, ok := m.instances[name]; ok {
+		return inst.Metadata["error_format"]
+	}
+	return ""
+}
+
 // GetAllRoutes 获取所有运行中插件的路由。
 func (m *Manager) GetAllRoutes() map[string][]sdk.RouteDefinition {
 	m.mu.RLock()

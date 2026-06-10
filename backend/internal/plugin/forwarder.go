@@ -93,6 +93,9 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	if !ok {
 		return
 	}
+	// 对外错误格式跟随目标插件/路由声明（Metadata["error_format"]），
+	// 此后本请求所有 protocolError 按该格式写出；未声明回退 OpenAI 兼容格式
+	setRequestErrorFormat(c, f.manager.ErrorFormat(state.plugin.Name, state.requestPath))
 	if !f.checkBalance(c, state) {
 		return
 	}
@@ -134,10 +137,10 @@ func (f *Forwarder) Forward(c *gin.Context) {
 			sdk.LogFieldUserID, state.keyInfo.UserID,
 		)
 		if errResp, ok := apiKeyGroupRequirementError(state.keyInfo, requirements); ok {
-			openAIError(c, errResp.status, errResp.errType, errResp.code, errResp.message)
+			protocolError(c, errResp.status, errResp.errType, errResp.code, errResp.message)
 			return
 		}
-		openAIError(c, http.StatusServiceUnavailable, "server_error", "no_available_route", "请求暂时无法完成，请稍后重试")
+		protocolError(c, http.StatusServiceUnavailable, "server_error", "no_available_route", "请求暂时无法完成，请稍后重试")
 		return
 	}
 
@@ -441,10 +444,10 @@ type allRoutesFailureResponse struct {
 func writeAllRoutesFailed(c *gin.Context, summary allRoutesFailureSummary) {
 	response := selectAllRoutesFailureResponse(summary)
 	if response.status == http.StatusTooManyRequests {
-		openAIRateLimitError(c, response.status, response.code, response.message, response.retryAfter)
+		protocolRateLimitError(c, response.status, response.code, response.message, response.retryAfter)
 		return
 	}
-	openAIError(c, response.status, response.errType, response.code, response.message)
+	protocolError(c, response.status, response.errType, response.code, response.message)
 }
 
 func selectAllRoutesFailureResponse(summary allRoutesFailureSummary) allRoutesFailureResponse {

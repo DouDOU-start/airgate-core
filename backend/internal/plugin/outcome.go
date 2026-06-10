@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,35 +15,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
-
-// openAIError 以 OpenAI 兼容格式返回错误，保证 Claude Code 等客户端能识别。
-func openAIError(c *gin.Context, status int, errType, code, message string) {
-	c.JSON(status, gin.H{
-		"error": gin.H{
-			"message": message,
-			"type":    errType,
-			"code":    code,
-		},
-	})
-}
-
-// openAIRateLimitError 写 429 + Retry-After 头 + OpenAI 兼容的 rate_limit_error 错误体。
-// retryAfter < 1s 一律向上取整到 1s（OpenAI 客户端 SDK 普遍按整数秒读 Retry-After）。
-// 同时输出 retry-after-ms 头，便于精度敏感的客户端做更细粒度的退避。
-func openAIRateLimitError(c *gin.Context, status int, code, message string, retryAfter time.Duration) {
-	if retryAfter < 0 {
-		retryAfter = 0
-	}
-	if retryAfter > 0 {
-		secs := int64((retryAfter + time.Second - 1) / time.Second)
-		if secs < 1 {
-			secs = 1
-		}
-		c.Writer.Header().Set("Retry-After", strconv.FormatInt(secs, 10))
-		c.Writer.Header().Set("Retry-After-Ms", strconv.FormatInt(retryAfter.Milliseconds(), 10))
-	}
-	openAIError(c, status, "rate_limit_error", code, message)
-}
 
 // writeResult 是一次 forward 的终点。按 outcome.Kind 分派响应写入。
 //
@@ -112,7 +82,7 @@ func writeClientErrorResponse(c *gin.Context, outcome sdk.ForwardOutcome) {
 		return
 	}
 	statusCode := sanitizedClientErrorStatus(outcome)
-	openAIError(c, statusCode, "invalid_request_error", "invalid_request", sanitizedClientErrorMessage(outcome))
+	protocolError(c, statusCode, "invalid_request_error", "invalid_request", sanitizedClientErrorMessage(outcome))
 }
 
 func sanitizedClientErrorMessage(outcome sdk.ForwardOutcome) string {
@@ -182,11 +152,11 @@ func writeFailureResponse(c *gin.Context, state *forwardState, execution forward
 		"reason", execution.outcome.Reason)
 
 	if execution.outcome.Kind == sdk.OutcomeAccountRateLimited {
-		openAIRateLimitError(c, http.StatusTooManyRequests, "upstream_rate_limit",
+		protocolRateLimitError(c, http.StatusTooManyRequests, "upstream_rate_limit",
 			sanitizedMessage(execution.outcome.Kind), execution.outcome.RetryAfter)
 		return
 	}
-	openAIError(c, http.StatusBadGateway, "server_error", "upstream_error", sanitizedMessage(execution.outcome.Kind))
+	protocolError(c, http.StatusBadGateway, "server_error", "upstream_error", sanitizedMessage(execution.outcome.Kind))
 }
 
 func sanitizedMessage(kind sdk.OutcomeKind) string {

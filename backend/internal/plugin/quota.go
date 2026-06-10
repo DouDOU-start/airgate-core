@@ -24,13 +24,7 @@ func (f *Forwarder) checkBalance(c *gin.Context, state *forwardState) bool {
 		return true
 	}
 	if state.keyInfo.UserBalance <= 0 {
-		c.JSON(http.StatusPaymentRequired, gin.H{
-			"error": gin.H{
-				"message": "余额不足",
-				"type":    "insufficient_quota",
-				"code":    "insufficient_quota",
-			},
-		})
+		protocolError(c, http.StatusPaymentRequired, "insufficient_quota", "insufficient_quota", "余额不足")
 		return false
 	}
 	return true
@@ -68,7 +62,7 @@ func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func
 	userHeld := false
 	if max := state.keyInfo.UserMaxConcurrency; max > 0 {
 		if err := f.concurrency.AcquireUserSlot(ctx, userID, slotID, max, 0); err != nil {
-			openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "user_concurrency_limit", "用户并发已达上限，请稍后重试")
+			protocolError(c, http.StatusTooManyRequests, "rate_limit_error", "user_concurrency_limit", "用户并发已达上限，请稍后重试")
 			return nil
 		}
 		userHeld = true
@@ -80,7 +74,7 @@ func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func
 			if userHeld {
 				f.concurrency.ReleaseUserSlot(ctx, userID, slotID)
 			}
-			openAIError(c, http.StatusTooManyRequests, "rate_limit_error", "apikey_concurrency_limit", "API Key 并发已达上限，请稍后重试")
+			protocolError(c, http.StatusTooManyRequests, "rate_limit_error", "apikey_concurrency_limit", "API Key 并发已达上限，请稍后重试")
 			return nil
 		}
 		keyHeld = true
@@ -188,11 +182,11 @@ func (f *Forwarder) forwardMetadataOnly(c *gin.Context, state *forwardState) {
 	outcome, err := state.plugin.Gateway.Forward(c.Request.Context(), req)
 	if err != nil {
 		slog.Error("metadata 请求插件失败", "plugin", state.plugin.Name, "path", state.requestPath, "error", err)
-		openAIError(c, http.StatusBadGateway, "server_error", "upstream_error", "metadata 请求插件失败")
+		protocolError(c, http.StatusBadGateway, "server_error", "upstream_error", "metadata 请求插件失败")
 		return
 	}
 	if len(outcome.Upstream.Body) == 0 {
-		openAIError(c, http.StatusBadGateway, "server_error", "upstream_error", "metadata 请求插件返回空响应")
+		protocolError(c, http.StatusBadGateway, "server_error", "upstream_error", "metadata 请求插件返回空响应")
 		return
 	}
 	writeUpstream(c, outcome.Upstream)

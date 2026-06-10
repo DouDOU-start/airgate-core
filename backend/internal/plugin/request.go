@@ -41,7 +41,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 			sdk.LogFieldAPIKeyID, keyInfo.KeyID,
 			sdk.LogFieldError, err,
 		)
-		openAIError(c, http.StatusBadRequest, "invalid_request_error", "invalid_request", "读取请求体失败")
+		protocolError(c, http.StatusBadRequest, "invalid_request_error", "invalid_request", "读取请求体失败")
 		return nil, false
 	}
 
@@ -350,7 +350,7 @@ func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, platfo
 		if inst != nil {
 			return inst
 		}
-		if f.manager.GetPluginByPlatform(platform) == nil {
+		if platformInst := f.manager.GetPluginByPlatform(platform); platformInst == nil {
 			slog.Error("plugin_not_loaded_for_platform",
 				sdk.LogFieldPlatform, platform,
 				"available", availablePlatforms(f.manager),
@@ -358,7 +358,7 @@ func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, platfo
 				sdk.LogFieldGroupID, keyInfo.GroupID,
 				sdk.LogFieldPath, path,
 			)
-			openAIError(c, http.StatusServiceUnavailable, "server_error", "plugin_unavailable", "插件不可用，请联系管理员")
+			protocolError(c, http.StatusServiceUnavailable, "server_error", "plugin_unavailable", "插件不可用，请联系管理员")
 		} else {
 			slog.Warn("plugin_route_not_found",
 				sdk.LogFieldPlatform, platform,
@@ -366,7 +366,9 @@ func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, platfo
 				sdk.LogFieldGroupID, keyInfo.GroupID,
 				sdk.LogFieldUserID, keyInfo.UserID,
 			)
-			openAIError(c, http.StatusNotFound, "invalid_request_error", "route_not_found", "当前平台不支持该 API 路径")
+			// 平台插件已知但路径未命中：404 也按该插件声明的协议格式写出
+			setRequestErrorFormat(c, f.manager.ErrorFormat(platformInst.Name, path))
+			protocolError(c, http.StatusNotFound, "invalid_request_error", "route_not_found", "当前平台不支持该 API 路径")
 		}
 		return nil
 	}
@@ -377,7 +379,7 @@ func (f *Forwarder) matchPlugin(c *gin.Context, keyInfo *auth.APIKeyInfo, platfo
 			sdk.LogFieldPath, path,
 			sdk.LogFieldUserID, keyInfo.UserID,
 		)
-		openAIError(c, http.StatusNotFound, "invalid_request_error", "route_not_found", "未找到匹配的插件")
+		protocolError(c, http.StatusNotFound, "invalid_request_error", "route_not_found", "未找到匹配的插件")
 	}
 	return inst
 }

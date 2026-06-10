@@ -86,6 +86,20 @@ CapabilityMiddlewareReadBody = "middleware.read_body" // Middleware 收到 body
 插件在 `PluginInfo.Capabilities` 声明(`CapabilityForHostMethod("tasks.create")` 生成 `host.invoke.tasks.create`)。SDK 仅做类型自检,**真正授权由 Core 方法注册表在启动时执行**。
 > 现状:扁平方法级 capability + 单一 Invoke 通道。目标愿景的版本化分组(`host.routing@1`/`host.tasks@1`)未实现。
 
+## Metadata 约定(声明式扩展点,现状)
+
+SDK 的 `PluginInfo.Metadata` / `RouteDefinition.Metadata` / `ModelInfo.Metadata`(均为 `map[string]string`)是无需改 ABI 的扩展点。当前 Core 识别的约定键:
+
+| 键 | 位置 | 含义 | Core 消费点 |
+|---|---|---|---|
+| `metadata_only` | RouteDefinition | `"true"` = 只读元信息路由,跳过账号调度/计费 | `Manager.IsMetadataOnlyRoute` |
+| `error_format` | RouteDefinition(优先)/ PluginInfo | 对外错误体格式:`openai`(默认)/ `anthropic`;路由级用于混合协议网关(如 openai 插件的 `/v1/messages`) | `Manager.ErrorFormat` → `protocolError` |
+| `family` | ModelInfo | 限流冷却的模型家族键(如 `gpt-image`) | `Manager.ModelFamily` → scheduler FamilyCooldown |
+| `scheduling_model` | ModelInfo | 调度选号时的等价模型映射 | `internal/plugin/scheduling_model.go` |
+| `account.oauth_plans` | PluginInfo | 账号 OAuth 套餐识别规则(JSON) | 账号管理 UI / 调度过滤 |
+
+新增约定键须同步登记本表;未声明一律回退 Core 的历史默认行为(向后兼容)。
+
 ## Manifest(生成式,现状)
 
 `plugin.yaml` 由 `backend/cmd/genmanifest` 从 `PluginInfo` + `Models()` + `Routes()` 自动生成,**禁止手改**。真实结构:

@@ -66,7 +66,7 @@ func (f *Forwarder) runForwardBeginChain(c *gin.Context, state *forwardState) (b
 			if msg == "" {
 				msg = "请求被中间件拒绝"
 			}
-			openAIError(c, status, "middleware_denied", "middleware_denied", msg)
+			protocolError(c, status, "middleware_denied", "middleware_denied", msg)
 			return false, bag
 		}
 	}
