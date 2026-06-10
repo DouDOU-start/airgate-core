@@ -29,6 +29,8 @@ const (
 	FieldUserIDSnapshot = "user_id_snapshot"
 	// FieldUserEmailSnapshot holds the string denoting the user_email_snapshot field in the database.
 	FieldUserEmailSnapshot = "user_email_snapshot"
+	// FieldIdempotencyKey holds the string denoting the idempotency_key field in the database.
+	FieldIdempotencyKey = "idempotency_key"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeUser holds the string denoting the user edge name in mutations.
@@ -54,6 +56,7 @@ var Columns = []string{
 	FieldRemark,
 	FieldUserIDSnapshot,
 	FieldUserEmailSnapshot,
+	FieldIdempotencyKey,
 	FieldCreatedAt,
 }
 
@@ -154,6 +157,11 @@ func ByUserIDSnapshot(opts ...sql.OrderTermOption) OrderOption {
 // ByUserEmailSnapshot orders the results by the user_email_snapshot field.
 func ByUserEmailSnapshot(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUserEmailSnapshot, opts...).ToFunc()
+}
+
+// ByIdempotencyKey orders the results by the idempotency_key field.
+func ByIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIdempotencyKey, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

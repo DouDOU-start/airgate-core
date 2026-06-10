@@ -18,6 +18,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/user"
+	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/routing"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
@@ -44,6 +45,7 @@ type HostService struct {
 	concurrency *scheduler.ConcurrencyManager
 	calculator  *billing.Calculator
 	recorder    *billing.Recorder
+	users       *appuser.Service
 }
 
 // NewHostService 构造 HostService 工厂。
@@ -58,6 +60,7 @@ func NewHostService(
 	concurrency *scheduler.ConcurrencyManager,
 	calculator *billing.Calculator,
 	recorder *billing.Recorder,
+	users *appuser.Service,
 ) *HostService {
 	return &HostService{
 		db:          db,
@@ -66,6 +69,9 @@ func NewHostService(
 		concurrency: concurrency,
 		calculator:  calculator,
 		recorder:    recorder,
+		// users.update_balance 复用 app/user 的业务逻辑（流水落库 + 幂等键），
+		// 不在 host 层手写余额 SQL；实例由 server 注入（plugin 包不能 import store，会成环）
+		users: users,
 	}
 }
 
@@ -176,6 +182,7 @@ const (
 	hostMethodPlatformsList          = "platforms.list"
 	hostMethodModelsList             = "models.list"
 	hostMethodUsersGet               = "users.get"
+	hostMethodUsersUpdateBalance     = "users.update_balance"
 	hostMethodAssetsStore            = "assets.store"
 	hostMethodAssetsStoreURL         = "assets.store_url"
 	hostMethodAssetsGetURL           = "assets.get_url"
@@ -241,6 +248,15 @@ func (h *HostService) invoke(
 			return nil, err
 		}
 		return h.getUserInfo(ctx, req)
+	case hostMethodUsersUpdateBalance:
+		var req hostUpdateBalanceRequest
+		if err := decodeHostPayload(payload, &req); err != nil {
+			return nil, err
+		}
+		if idempotencyKey != "" && req.IdempotencyKey == "" {
+			req.IdempotencyKey = idempotencyKey
+		}
+		return h.updateUserBalance(ctx, pluginID, req)
 	case hostMethodAssetsStore:
 		var req hostStoreAssetRequest
 		if err := decodeHostPayload(payload, &req); err != nil {
@@ -1313,6 +1329,66 @@ func (h *HostService) getUserInfo(ctx context.Context, req hostGetUserInfoReques
 		"role":     string(u.Role),
 		"balance":  u.Balance,
 		"status":   string(u.Status),
+	}, nil
+}
+
+// hostUpdateBalanceRequest users.update_balance 请求体。
+type hostUpdateBalanceRequest struct {
+	UserID int64   `json:"user_id"`
+	Action string  `json:"action"` // add / subtract（set 不对插件开放）
+	Amount float64 `json:"amount"`
+	Remark string  `json:"remark"`
+	// IdempotencyKey 必填。同一键的变更只入账一次（balance_logs 唯一索引保证），
+	// 支付回调等场景重试不会重复加扣款。建议格式 "<plugin>:<业务单号>"。
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+// updateUserBalance 调整用户余额并写 balance_logs 流水。
+// 复用 app/user.Service.AdjustBalance——余额规则、流水、幂等均在 service 层闭环，
+// 插件不应也无需直写 core 的 users / balance_logs 表。
+func (h *HostService) updateUserBalance(ctx context.Context, pluginID string, req hostUpdateBalanceRequest) (map[string]interface{}, error) {
+	if req.UserID <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "user_id 必须 > 0")
+	}
+	if req.Action != "add" && req.Action != "subtract" {
+		return nil, status.Errorf(codes.InvalidArgument, "action 仅支持 add/subtract，收到 %q", req.Action)
+	}
+	if req.Amount <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "amount 必须 > 0")
+	}
+	if req.IdempotencyKey == "" {
+		return nil, status.Error(codes.InvalidArgument, "idempotency_key 必填（防止重试导致重复入账）")
+	}
+	slog.Info("host_service_update_balance",
+		"module", "host",
+		sdk.LogFieldPluginID, pluginID,
+		sdk.LogFieldUserID, req.UserID,
+		"action", req.Action,
+		"amount", req.Amount,
+		"idempotency_key", req.IdempotencyKey,
+	)
+	u, err := h.users.AdjustBalance(ctx, int(req.UserID), appuser.BalanceChange{
+		Action:         req.Action,
+		Amount:         req.Amount,
+		Remark:         req.Remark,
+		IdempotencyKey: req.IdempotencyKey,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, appuser.ErrUserNotFound):
+			return nil, status.Error(codes.NotFound, "用户不存在")
+		case errors.Is(err, appuser.ErrInsufficientBalance):
+			return nil, status.Error(codes.FailedPrecondition, "余额不足")
+		default:
+			if cerr := hostContextError(err); cerr != nil {
+				return nil, cerr
+			}
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+	return map[string]interface{}{
+		"user_id": int64(u.ID),
+		"balance": u.Balance,
 	}, nil
 }
 

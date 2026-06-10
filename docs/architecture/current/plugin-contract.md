@@ -71,7 +71,7 @@ type HostAware interface { Host() Host }   // host.go:33;可能返回 nil
 
 - `HostInvokeRequest`:`{Method(点分式,如 "tasks.create"), Payload(map[string]any), IdempotencyKey, Metadata}`。
 - 插件在 `Init` 中类型断言 `HostAware` 获取 `Host`(Core 版本不支持时为 nil)。
-- 可调 method 即 Core HostService 的 18 个(见 [`core-runtime.md`](core-runtime.md))。
+- 可调 method 即 Core HostService 的 19 个(见 [`core-runtime.md`](core-runtime.md))。
 
 ## Capability(扁平,现状)
 

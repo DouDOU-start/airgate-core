@@ -32,6 +32,8 @@ type BalanceLog struct {
 	UserIDSnapshot int `json:"user_id_snapshot,omitempty"`
 	// 用户邮箱快照。用户硬删除后保留余额流水归属。
 	UserEmailSnapshot string `json:"user_email_snapshot,omitempty"`
+	// 幂等键。插件经 user.update_balance 入账时防重复；NULL 表示无幂等要求。
+	IdempotencyKey *string `json:"idempotency_key,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -70,7 +72,7 @@ func (*BalanceLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case balancelog.FieldID, balancelog.FieldUserIDSnapshot:
 			values[i] = new(sql.NullInt64)
-		case balancelog.FieldAction, balancelog.FieldRemark, balancelog.FieldUserEmailSnapshot:
+		case balancelog.FieldAction, balancelog.FieldRemark, balancelog.FieldUserEmailSnapshot, balancelog.FieldIdempotencyKey:
 			values[i] = new(sql.NullString)
 		case balancelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -138,6 +140,13 @@ func (bl *BalanceLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field user_email_snapshot", values[i])
 			} else if value.Valid {
 				bl.UserEmailSnapshot = value.String
+			}
+		case balancelog.FieldIdempotencyKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field idempotency_key", values[i])
+			} else if value.Valid {
+				bl.IdempotencyKey = new(string)
+				*bl.IdempotencyKey = value.String
 			}
 		case balancelog.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -213,6 +222,11 @@ func (bl *BalanceLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("user_email_snapshot=")
 	builder.WriteString(bl.UserEmailSnapshot)
+	builder.WriteString(", ")
+	if v := bl.IdempotencyKey; v != nil {
+		builder.WriteString("idempotency_key=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(bl.CreatedAt.Format(time.ANSIC))

@@ -72,6 +72,9 @@ type BalanceChange struct {
 	Action string
 	Amount float64
 	Remark string
+	// IdempotencyKey 可选幂等键（如 "epay:<out_trade_no>"）。非空时同一键的变更
+	// 只入账一次，重复提交返回当前用户状态而不再变更余额。
+	IdempotencyKey string
 }
 
 // ToggleResult 用户状态切换结果。
@@ -164,6 +167,9 @@ type BalanceUpdate struct {
 	BeforeBalance float64
 	AfterBalance  float64
 	Remark        string
+	// IdempotencyKey 非空时随流水落库（balance_logs 唯一索引），重复键说明
+	// 同一笔变更已入账，store 返回 ErrDuplicateBalanceChange。
+	IdempotencyKey string
 }
 
 // GroupRateOverride 表示某个用户对某个分组的专属倍率。

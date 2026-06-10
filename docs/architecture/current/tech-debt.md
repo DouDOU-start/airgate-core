@@ -23,7 +23,7 @@
 
 | 位置 | 现状 | 目标 | 严重度 |
 |---|---|---|---|
-| `internal/plugin/host_service.go` | 单一 `CoreInvokeService.Invoke` 暴露 18 个 method(调度/转发/资产/任务/元数据混在一起) | 拆为版本化 capability service(`host.routing@1`/`host.tasks@1`/`host.assets@1` …),按 manifest `requires.host` 选择性注入 | 高 |
+| `internal/plugin/host_service.go` | 单一 `CoreInvokeService.Invoke` 暴露 19 个 method(调度/转发/资产/任务/用户/元数据混在一起) | 拆为版本化 capability service(`host.routing@1`/`host.tasks@1`/`host.assets@1` …),按 manifest `requires.host` 选择性注入 | 高 |
 
 ## 三、契约层架构缺口(目标态未实现)
 

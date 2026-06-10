@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -255,13 +256,22 @@ func (s *Service) AdjustBalance(ctx context.Context, id int, change BalanceChang
 	}
 
 	updated, err := s.repo.UpdateBalance(ctx, id, BalanceUpdate{
-		Action:        change.Action,
-		Amount:        change.Amount,
-		BeforeBalance: beforeBalance,
-		AfterBalance:  afterBalance,
-		Remark:        change.Remark,
+		Action:         change.Action,
+		Amount:         change.Amount,
+		BeforeBalance:  beforeBalance,
+		AfterBalance:   afterBalance,
+		Remark:         change.Remark,
+		IdempotencyKey: change.IdempotencyKey,
 	})
 	if err != nil {
+		// 幂等命中：同一键的变更已入账过，返回当前状态、不重复变更
+		if errors.Is(err, ErrDuplicateBalanceChange) {
+			logger.Info("user_balance_change_idempotent_hit",
+				sdk.LogFieldUserID, id,
+				"idempotency_key", change.IdempotencyKey,
+			)
+			return s.repo.FindByID(ctx, id, true)
+		}
 		logger.Error("user_balance_change_failed",
 			sdk.LogFieldUserID, id,
 			"action", change.Action,

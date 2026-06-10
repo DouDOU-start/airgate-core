@@ -3139,6 +3139,7 @@ type BalanceLogMutation struct {
 	user_id_snapshot    *int
 	adduser_id_snapshot *int
 	user_email_snapshot *string
+	idempotency_key     *string
 	created_at          *time.Time
 	clearedFields       map[string]struct{}
 	user                *int
@@ -3578,6 +3579,55 @@ func (m *BalanceLogMutation) ResetUserEmailSnapshot() {
 	m.user_email_snapshot = nil
 }
 
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (m *BalanceLogMutation) SetIdempotencyKey(s string) {
+	m.idempotency_key = &s
+}
+
+// IdempotencyKey returns the value of the "idempotency_key" field in the mutation.
+func (m *BalanceLogMutation) IdempotencyKey() (r string, exists bool) {
+	v := m.idempotency_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIdempotencyKey returns the old "idempotency_key" field's value of the BalanceLog entity.
+// If the BalanceLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BalanceLogMutation) OldIdempotencyKey(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIdempotencyKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIdempotencyKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIdempotencyKey: %w", err)
+	}
+	return oldValue.IdempotencyKey, nil
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (m *BalanceLogMutation) ClearIdempotencyKey() {
+	m.idempotency_key = nil
+	m.clearedFields[balancelog.FieldIdempotencyKey] = struct{}{}
+}
+
+// IdempotencyKeyCleared returns if the "idempotency_key" field was cleared in this mutation.
+func (m *BalanceLogMutation) IdempotencyKeyCleared() bool {
+	_, ok := m.clearedFields[balancelog.FieldIdempotencyKey]
+	return ok
+}
+
+// ResetIdempotencyKey resets all changes to the "idempotency_key" field.
+func (m *BalanceLogMutation) ResetIdempotencyKey() {
+	m.idempotency_key = nil
+	delete(m.clearedFields, balancelog.FieldIdempotencyKey)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *BalanceLogMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -3687,7 +3737,7 @@ func (m *BalanceLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BalanceLogMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.action != nil {
 		fields = append(fields, balancelog.FieldAction)
 	}
@@ -3708,6 +3758,9 @@ func (m *BalanceLogMutation) Fields() []string {
 	}
 	if m.user_email_snapshot != nil {
 		fields = append(fields, balancelog.FieldUserEmailSnapshot)
+	}
+	if m.idempotency_key != nil {
+		fields = append(fields, balancelog.FieldIdempotencyKey)
 	}
 	if m.created_at != nil {
 		fields = append(fields, balancelog.FieldCreatedAt)
@@ -3734,6 +3787,8 @@ func (m *BalanceLogMutation) Field(name string) (ent.Value, bool) {
 		return m.UserIDSnapshot()
 	case balancelog.FieldUserEmailSnapshot:
 		return m.UserEmailSnapshot()
+	case balancelog.FieldIdempotencyKey:
+		return m.IdempotencyKey()
 	case balancelog.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -3759,6 +3814,8 @@ func (m *BalanceLogMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldUserIDSnapshot(ctx)
 	case balancelog.FieldUserEmailSnapshot:
 		return m.OldUserEmailSnapshot(ctx)
+	case balancelog.FieldIdempotencyKey:
+		return m.OldIdempotencyKey(ctx)
 	case balancelog.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -3818,6 +3875,13 @@ func (m *BalanceLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUserEmailSnapshot(v)
+		return nil
+	case balancelog.FieldIdempotencyKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIdempotencyKey(v)
 		return nil
 	case balancelog.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -3906,7 +3970,11 @@ func (m *BalanceLogMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *BalanceLogMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(balancelog.FieldIdempotencyKey) {
+		fields = append(fields, balancelog.FieldIdempotencyKey)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -3919,6 +3987,11 @@ func (m *BalanceLogMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *BalanceLogMutation) ClearField(name string) error {
+	switch name {
+	case balancelog.FieldIdempotencyKey:
+		m.ClearIdempotencyKey()
+		return nil
+	}
 	return fmt.Errorf("unknown BalanceLog nullable field %s", name)
 }
 
@@ -3946,6 +4019,9 @@ func (m *BalanceLogMutation) ResetField(name string) error {
 		return nil
 	case balancelog.FieldUserEmailSnapshot:
 		m.ResetUserEmailSnapshot()
+		return nil
+	case balancelog.FieldIdempotencyKey:
+		m.ResetIdempotencyKey()
 		return nil
 	case balancelog.FieldCreatedAt:
 		m.ResetCreatedAt()

@@ -85,6 +85,11 @@ func UserEmailSnapshot(v string) predicate.BalanceLog {
 	return predicate.BalanceLog(sql.FieldEQ(FieldUserEmailSnapshot, v))
 }
 
+// IdempotencyKey applies equality check predicate on the "idempotency_key" field. It's identical to IdempotencyKeyEQ.
+func IdempotencyKey(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldIdempotencyKey, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.BalanceLog {
 	return predicate.BalanceLog(sql.FieldEQ(FieldCreatedAt, v))
@@ -398,6 +403,81 @@ func UserEmailSnapshotEqualFold(v string) predicate.BalanceLog {
 // UserEmailSnapshotContainsFold applies the ContainsFold predicate on the "user_email_snapshot" field.
 func UserEmailSnapshotContainsFold(v string) predicate.BalanceLog {
 	return predicate.BalanceLog(sql.FieldContainsFold(FieldUserEmailSnapshot, v))
+}
+
+// IdempotencyKeyEQ applies the EQ predicate on the "idempotency_key" field.
+func IdempotencyKeyEQ(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyNEQ applies the NEQ predicate on the "idempotency_key" field.
+func IdempotencyKeyNEQ(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNEQ(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyIn applies the In predicate on the "idempotency_key" field.
+func IdempotencyKeyIn(vs ...string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldIn(FieldIdempotencyKey, vs...))
+}
+
+// IdempotencyKeyNotIn applies the NotIn predicate on the "idempotency_key" field.
+func IdempotencyKeyNotIn(vs ...string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNotIn(FieldIdempotencyKey, vs...))
+}
+
+// IdempotencyKeyGT applies the GT predicate on the "idempotency_key" field.
+func IdempotencyKeyGT(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGT(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyGTE applies the GTE predicate on the "idempotency_key" field.
+func IdempotencyKeyGTE(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGTE(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyLT applies the LT predicate on the "idempotency_key" field.
+func IdempotencyKeyLT(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLT(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyLTE applies the LTE predicate on the "idempotency_key" field.
+func IdempotencyKeyLTE(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLTE(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyContains applies the Contains predicate on the "idempotency_key" field.
+func IdempotencyKeyContains(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldContains(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyHasPrefix applies the HasPrefix predicate on the "idempotency_key" field.
+func IdempotencyKeyHasPrefix(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldHasPrefix(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyHasSuffix applies the HasSuffix predicate on the "idempotency_key" field.
+func IdempotencyKeyHasSuffix(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldHasSuffix(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyIsNil applies the IsNil predicate on the "idempotency_key" field.
+func IdempotencyKeyIsNil() predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldIsNull(FieldIdempotencyKey))
+}
+
+// IdempotencyKeyNotNil applies the NotNil predicate on the "idempotency_key" field.
+func IdempotencyKeyNotNil() predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNotNull(FieldIdempotencyKey))
+}
+
+// IdempotencyKeyEqualFold applies the EqualFold predicate on the "idempotency_key" field.
+func IdempotencyKeyEqualFold(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEqualFold(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyContainsFold applies the ContainsFold predicate on the "idempotency_key" field.
+func IdempotencyKeyContainsFold(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldContainsFold(FieldIdempotencyKey, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

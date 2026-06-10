@@ -39,8 +39,8 @@
 
 - **playground**:Web 聊天 UI;现状也转发协议、解析 SSE/图像、创建任务(目标愿景应为 UI-only,经 Core 编排 API)。
 - **studio**:多模态内容创作;生成任务经 Core Task。
-- **epay**:支付渠道;`payment-callback` 路由无鉴权(回调)。
-- **health**:健康监控;`prober.go` 探测 + `aggregator.go` 聚合;Core 的 `/status` 反代至此(硬编码插件名于 `router.go:237`,路由注册于 `:253`,见 [`tech-debt.md`](tech-debt.md))。
+- **epay**:支付渠道;`payment-callback` 路由无鉴权(回调)。充值入账经 `users.update_balance`(幂等键 `epay:<out_trade_no>`),不直写 core 表;已知遗留:admin 订单列表只读 `LEFT JOIN users` 取邮箱。
+- **health**:健康监控;`prober.go` 探测 + `aggregator.go` 聚合;分组元信息/可见性过滤经 `groups.list`,自有 DB 连接仅读写 `group_health_probes`;Core 的 `/status` 反代至此(硬编码插件名于 `router.go:237`,路由注册于 `:253`,见 [`tech-debt.md`](tech-debt.md))。
 
 ## 前端机制
 

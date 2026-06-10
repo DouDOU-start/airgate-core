@@ -93,6 +93,7 @@ var (
 		{Name: "remark", Type: field.TypeString, Default: ""},
 		{Name: "user_id_snapshot", Type: field.TypeInt, Default: 0},
 		{Name: "user_email_snapshot", Type: field.TypeString, Default: ""},
+		{Name: "idempotency_key", Type: field.TypeString, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "user_balance_logs", Type: field.TypeInt, Nullable: true},
 	}
@@ -104,9 +105,16 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "balance_logs_users_balance_logs",
-				Columns:    []*schema.Column{BalanceLogsColumns[9]},
+				Columns:    []*schema.Column{BalanceLogsColumns[10]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "balancelog_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{BalanceLogsColumns[8]},
 			},
 		},
 	}

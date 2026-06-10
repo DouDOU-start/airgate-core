@@ -87,6 +87,20 @@ func (blc *BalanceLogCreate) SetNillableUserEmailSnapshot(s *string) *BalanceLog
 	return blc
 }
 
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (blc *BalanceLogCreate) SetIdempotencyKey(s string) *BalanceLogCreate {
+	blc.mutation.SetIdempotencyKey(s)
+	return blc
+}
+
+// SetNillableIdempotencyKey sets the "idempotency_key" field if the given value is not nil.
+func (blc *BalanceLogCreate) SetNillableIdempotencyKey(s *string) *BalanceLogCreate {
+	if s != nil {
+		blc.SetIdempotencyKey(*s)
+	}
+	return blc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (blc *BalanceLogCreate) SetCreatedAt(t time.Time) *BalanceLogCreate {
 	blc.mutation.SetCreatedAt(t)
@@ -257,6 +271,10 @@ func (blc *BalanceLogCreate) createSpec() (*BalanceLog, *sqlgraph.CreateSpec) {
 	if value, ok := blc.mutation.UserEmailSnapshot(); ok {
 		_spec.SetField(balancelog.FieldUserEmailSnapshot, field.TypeString, value)
 		_node.UserEmailSnapshot = value
+	}
+	if value, ok := blc.mutation.IdempotencyKey(); ok {
+		_spec.SetField(balancelog.FieldIdempotencyKey, field.TypeString, value)
+		_node.IdempotencyKey = &value
 	}
 	if value, ok := blc.mutation.CreatedAt(); ok {
 		_spec.SetField(balancelog.FieldCreatedAt, field.TypeTime, value)

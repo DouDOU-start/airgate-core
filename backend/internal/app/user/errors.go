@@ -17,4 +17,6 @@ var (
 	ErrDeleteAdminForbidden = errors.New("不能删除管理员用户")
 	// ErrInvalidRateMultiplier 专属倍率非法（不能为负）。
 	ErrInvalidRateMultiplier = errors.New("专属倍率不能为负数")
+	// ErrDuplicateBalanceChange 幂等键已存在，同一笔余额变更已入账。
+	ErrDuplicateBalanceChange = errors.New("余额变更已入账（幂等键重复）")
 )

@@ -153,6 +153,20 @@ func (s *UserStore) UpdateBalance(ctx context.Context, id int, update appuser.Ba
 		_ = tx.Rollback()
 	}()
 
+	// 幂等键预检：同一键已入账则整体放弃（事务回滚），由 service 返回当前状态。
+	// 唯一索引兜底并发竞态：两个相同键同时到达时，后提交者会触发唯一冲突。
+	if update.IdempotencyKey != "" {
+		exists, err := tx.BalanceLog.Query().
+			Where(entbalancelog.IdempotencyKeyEQ(update.IdempotencyKey)).
+			Exist(ctx)
+		if err != nil {
+			return appuser.User{}, err
+		}
+		if exists {
+			return appuser.User{}, appuser.ErrDuplicateBalanceChange
+		}
+	}
+
 	item, err := tx.User.UpdateOneID(id).
 		SetBalance(update.AfterBalance).
 		Save(ctx)
@@ -163,7 +177,7 @@ func (s *UserStore) UpdateBalance(ctx context.Context, id int, update appuser.Ba
 		return appuser.User{}, err
 	}
 
-	if _, err := tx.BalanceLog.Create().
+	logCreate := tx.BalanceLog.Create().
 		SetAction(entbalancelog.Action(update.Action)).
 		SetAmount(update.Amount).
 		SetBeforeBalance(update.BeforeBalance).
@@ -171,8 +185,14 @@ func (s *UserStore) UpdateBalance(ctx context.Context, id int, update appuser.Ba
 		SetRemark(update.Remark).
 		SetUserIDSnapshot(id).
 		SetUserEmailSnapshot(item.Email).
-		SetUserID(id).
-		Save(ctx); err != nil {
+		SetUserID(id)
+	if update.IdempotencyKey != "" {
+		logCreate = logCreate.SetIdempotencyKey(update.IdempotencyKey)
+	}
+	if _, err := logCreate.Save(ctx); err != nil {
+		if ent.IsConstraintError(err) && update.IdempotencyKey != "" {
+			return appuser.User{}, appuser.ErrDuplicateBalanceChange
+		}
 		return appuser.User{}, err
 	}
 

@@ -155,7 +155,7 @@ func init() {
 	// balancelog.DefaultUserEmailSnapshot holds the default value on creation for the user_email_snapshot field.
 	balancelog.DefaultUserEmailSnapshot = balancelogDescUserEmailSnapshot.Default.(string)
 	// balancelogDescCreatedAt is the schema descriptor for created_at field.
-	balancelogDescCreatedAt := balancelogFields[7].Descriptor()
+	balancelogDescCreatedAt := balancelogFields[8].Descriptor()
 	// balancelog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	balancelog.DefaultCreatedAt = balancelogDescCreatedAt.Default.(func() time.Time)
 	groupFields := schema.Group{}.Fields()

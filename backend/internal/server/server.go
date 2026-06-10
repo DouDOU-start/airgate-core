@@ -11,10 +11,12 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DouDOU-start/airgate-core/ent"
+	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
 	"github.com/DouDOU-start/airgate-core/internal/config"
+	"github.com/DouDOU-start/airgate-core/internal/infra/store"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 )
@@ -70,7 +72,10 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	sched.SetModelFamilyFunc(pluginMgr.ModelFamily)
 	// HostService 通过 hashicorp/go-plugin GRPCBroker 暴露给所有插件子进程，
 	// 替代旧的 admin HTTP API + admin_api_key 模式。必须在加载任何插件之前注入。
-	pluginMgr.SetHostService(plugin.NewHostService(db, pluginMgr, sched, concurrency, calculator, recorder))
+	// users.update_balance 复用 app/user 服务（独立实例，不挂余额预警邮件回调——
+	// 入账只会抬高余额，预警重置逻辑无需回调即可生效）。
+	hostUserSvc := appuser.NewService(store.NewUserStore(db))
+	pluginMgr.SetHostService(plugin.NewHostService(db, pluginMgr, sched, concurrency, calculator, recorder, hostUserSvc))
 	forwarder := plugin.NewForwarder(db, pluginMgr, sched, concurrency, calculator, recorder)
 
 	marketOpts := []plugin.MarketplaceOption{

@@ -154,6 +154,26 @@ func (blu *BalanceLogUpdate) SetNillableUserEmailSnapshot(s *string) *BalanceLog
 	return blu
 }
 
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (blu *BalanceLogUpdate) SetIdempotencyKey(s string) *BalanceLogUpdate {
+	blu.mutation.SetIdempotencyKey(s)
+	return blu
+}
+
+// SetNillableIdempotencyKey sets the "idempotency_key" field if the given value is not nil.
+func (blu *BalanceLogUpdate) SetNillableIdempotencyKey(s *string) *BalanceLogUpdate {
+	if s != nil {
+		blu.SetIdempotencyKey(*s)
+	}
+	return blu
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (blu *BalanceLogUpdate) ClearIdempotencyKey() *BalanceLogUpdate {
+	blu.mutation.ClearIdempotencyKey()
+	return blu
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (blu *BalanceLogUpdate) SetUserID(id int) *BalanceLogUpdate {
 	blu.mutation.SetUserID(id)
@@ -265,6 +285,12 @@ func (blu *BalanceLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := blu.mutation.UserEmailSnapshot(); ok {
 		_spec.SetField(balancelog.FieldUserEmailSnapshot, field.TypeString, value)
+	}
+	if value, ok := blu.mutation.IdempotencyKey(); ok {
+		_spec.SetField(balancelog.FieldIdempotencyKey, field.TypeString, value)
+	}
+	if blu.mutation.IdempotencyKeyCleared() {
+		_spec.ClearField(balancelog.FieldIdempotencyKey, field.TypeString)
 	}
 	if blu.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -441,6 +467,26 @@ func (bluo *BalanceLogUpdateOne) SetNillableUserEmailSnapshot(s *string) *Balanc
 	return bluo
 }
 
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (bluo *BalanceLogUpdateOne) SetIdempotencyKey(s string) *BalanceLogUpdateOne {
+	bluo.mutation.SetIdempotencyKey(s)
+	return bluo
+}
+
+// SetNillableIdempotencyKey sets the "idempotency_key" field if the given value is not nil.
+func (bluo *BalanceLogUpdateOne) SetNillableIdempotencyKey(s *string) *BalanceLogUpdateOne {
+	if s != nil {
+		bluo.SetIdempotencyKey(*s)
+	}
+	return bluo
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (bluo *BalanceLogUpdateOne) ClearIdempotencyKey() *BalanceLogUpdateOne {
+	bluo.mutation.ClearIdempotencyKey()
+	return bluo
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (bluo *BalanceLogUpdateOne) SetUserID(id int) *BalanceLogUpdateOne {
 	bluo.mutation.SetUserID(id)
@@ -582,6 +628,12 @@ func (bluo *BalanceLogUpdateOne) sqlSave(ctx context.Context) (_node *BalanceLog
 	}
 	if value, ok := bluo.mutation.UserEmailSnapshot(); ok {
 		_spec.SetField(balancelog.FieldUserEmailSnapshot, field.TypeString, value)
+	}
+	if value, ok := bluo.mutation.IdempotencyKey(); ok {
+		_spec.SetField(balancelog.FieldIdempotencyKey, field.TypeString, value)
+	}
+	if bluo.mutation.IdempotencyKeyCleared() {
+		_spec.ClearField(balancelog.FieldIdempotencyKey, field.TypeString)
 	}
 	if bluo.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
