@@ -54,7 +54,9 @@ func (s *Server) registerRoutes() {
 	// 基于客户端 IP 的速率限制（10 req/min），防止暴力破解和验证码滥用。
 	// 替代原来依赖 CtxKeyUserID 的用户级限流（登录前无 user_id，实际空转已移除）。
 	authGroup := v1.Group("/auth")
-	authGroup.Use(middleware.IPRateLimit(10))
+	ipRL := middleware.NewIPRateLimit(10)
+	s.ipRateLimiter = ipRL.Limiter
+	authGroup.Use(ipRL.Handler)
 	{
 		authGroup.POST("/login", handlers.Auth.Login)
 		authGroup.POST("/login-apikey", handlers.Auth.LoginByAPIKey)

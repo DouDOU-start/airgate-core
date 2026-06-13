@@ -19,6 +19,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
 	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
+	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 )
 
 // Server HTTP 服务器
@@ -43,6 +44,9 @@ type Server struct {
 	calculator  *billing.Calculator
 	recorder    *billing.Recorder
 	handlers    *bootstrap.HTTPHandlers
+
+	// 中间件组件（需 Shutdown 时释放）
+	ipRateLimiter *middleware.IPRateLimiter
 
 	pluginStartCancel context.CancelFunc
 }
@@ -209,6 +213,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 	if s.pluginStartCancel != nil {
 		s.pluginStartCancel()
+	}
+
+	// 停止 IP 限流器后台清理
+	if s.ipRateLimiter != nil {
+		s.ipRateLimiter.Stop()
 	}
 
 	// 停止使用量记录器

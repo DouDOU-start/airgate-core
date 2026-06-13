@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,7 +16,7 @@ import (
 // ipLimiterEntry 存储单个 IP 的限流器及最后访问时间（用于过期清理）。
 type ipLimiterEntry struct {
 	limiter  *rate.Limiter
-	lastSeen time.Time
+	lastSeen atomic.Int64 // UnixNano，原子操作避免并发竞争
 }
 
 // IPRateLimiter 基于客户端 IP 的速率限制器。
@@ -45,13 +46,15 @@ func NewIPRateLimiter(rps rate.Limit, burst int) *IPRateLimiter {
 
 // getLimiter 获取或创建指定 IP 的限流器。
 func (rl *IPRateLimiter) getLimiter(ip string) *rate.Limiter {
+	now := time.Now().UnixNano()
 	if v, ok := rl.limiters.Load(ip); ok {
 		entry := v.(*ipLimiterEntry)
-		entry.lastSeen = time.Now()
+		entry.lastSeen.Store(now)
 		return entry.limiter
 	}
 	limiter := rate.NewLimiter(rl.rate, rl.burst)
-	entry := &ipLimiterEntry{limiter: limiter, lastSeen: time.Now()}
+	entry := &ipLimiterEntry{limiter: limiter}
+	entry.lastSeen.Store(now)
 	actual, loaded := rl.limiters.LoadOrStore(ip, entry)
 	if loaded {
 		return actual.(*ipLimiterEntry).limiter
@@ -66,10 +69,10 @@ func (rl *IPRateLimiter) cleanup() {
 	for {
 		select {
 		case <-ticker.C:
-			now := time.Now()
+			cutoff := time.Now().Add(-rl.ttl).UnixNano()
 			rl.limiters.Range(func(key, value any) bool {
 				entry := value.(*ipLimiterEntry)
-				if now.Sub(entry.lastSeen) > rl.ttl {
+				if entry.lastSeen.Load() < cutoff {
 					rl.limiters.Delete(key)
 				}
 				return true
@@ -85,20 +88,24 @@ func (rl *IPRateLimiter) Stop() {
 	rl.stopOnce.Do(func() { close(rl.stopCh) })
 }
 
-// IPRateLimit 返回基于客户端 IP 的速率限制中间件。
-// 超出速率的请求返回 429 Too Many Requests。
+// IPRateLimitResult 包含中间件和底层限流器，便于 Server 在 Shutdown 时调用 Stop。
+type IPRateLimitResult struct {
+	Handler gin.HandlerFunc
+	Limiter *IPRateLimiter
+}
+
+// NewIPRateLimit 创建基于客户端 IP 的速率限制中间件，返回中间件和限流器引用。
 //
 // 参数 reqPerMin 为每分钟允许的请求数。
-// 例如 IPRateLimit(10) 表示每个 IP 每分钟最多 10 次请求。
-func IPRateLimit(reqPerMin float64) gin.HandlerFunc {
-	// 令牌桶：速率 = reqPerMin/60 token/s，突发 = reqPerMin（允许短时集中）
+// 例如 NewIPRateLimit(10) 表示每个 IP 每分钟最多 10 次请求。
+func NewIPRateLimit(reqPerMin float64) IPRateLimitResult {
 	burst := int(reqPerMin)
 	if burst < 1 {
 		burst = 1
 	}
 	rl := NewIPRateLimiter(rate.Limit(reqPerMin/60.0), burst)
 
-	return func(c *gin.Context) {
+	handler := func(c *gin.Context) {
 		ip := c.ClientIP()
 		limiter := rl.getLimiter(ip)
 		if !limiter.Allow() {
@@ -115,4 +122,6 @@ func IPRateLimit(reqPerMin float64) gin.HandlerFunc {
 		}
 		c.Next()
 	}
+
+	return IPRateLimitResult{Handler: handler, Limiter: rl}
 }
