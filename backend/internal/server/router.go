@@ -17,8 +17,9 @@ import (
 	webfs "github.com/DouDOU-start/airgate-core/internal/web"
 )
 
-// healthPluginName 健康监控插件名称（避免硬编码字符串散落在路由注册中）。
-const healthPluginName = "airgate-health"
+// defaultStatusPluginName 公开状态页反代目标插件的默认值；
+// 可经 config `plugins.status_plugin` 覆盖，core 不绑定具体插件实现。
+const defaultStatusPluginName = "airgate-health"
 
 // registerRoutes 注册所有 API 路由
 func (s *Server) registerRoutes() {
@@ -233,15 +234,20 @@ func (s *Server) registerRoutes() {
 
 	// === 公开状态页路由 ===
 	// 设计：core 完全不维护一份状态页前端，所有 /status* 请求一律反代到
-	// healthPluginName 插件，由插件内部 standalone 打包的 status.html + status-XXX.js
-	// 渲染。这样状态页的 UI / 数据 / 粒度都由健康监控插件单点维护，避免 core
-	// 与插件出现两份重复实现（之前 core 自己有个 React StatusPage 组件并维护
-	// 90 天日级方格图，与 health 插件的 standalone 页严重重复，移除）。
+	// 状态页插件（config `plugins.status_plugin`，默认 airgate-health），由插件内部
+	// standalone 打包的 status.html + status-XXX.js 渲染。这样状态页的 UI / 数据 /
+	// 粒度都由健康监控插件单点维护，避免 core 与插件出现两份重复实现（之前 core
+	// 自己有个 React StatusPage 组件并维护 90 天日级方格图，与 health 插件的
+	// standalone 页严重重复，移除）。
 	//
 	// 反代规则：
 	//   - GET /status            → 插件看到 /        → handlePublicIndex 返回 status.html
 	//   - GET /status/*path      → 插件看到 /<path> → API + 静态资源
-	statusProxy := s.extensionProxy.HandleNamed(healthPluginName, "public")
+	statusPluginName := s.cfg.Plugins.StatusPlugin
+	if statusPluginName == "" {
+		statusPluginName = defaultStatusPluginName
+	}
+	statusProxy := s.extensionProxy.HandleNamed(statusPluginName, "public")
 
 	// 加载嵌入的前端 SPA：所有静态资源通过 //go:embed 打进二进制
 	distFS, err := webfs.FS()
@@ -256,7 +262,7 @@ func (s *Server) registerRoutes() {
 		os.Exit(1)
 	}
 
-	// /status 与 /status/*path 都走 statusProxy 反代到 healthPluginName 插件
+	// /status 与 /status/*path 都走 statusProxy 反代到状态页插件
 	r.GET("/status", statusProxy)
 	r.GET("/status/*path", statusProxy)
 

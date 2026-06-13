@@ -1,7 +1,29 @@
 # airgate-core — Claude 开发指南
 
-> 叠加于根 `../CLAUDE.md`，仅述 core 内部分层与流程。开发前先读「🚫 红线」，再按「分层」定位。
-> **现状实现(权威)见 `docs/architecture/current/core-runtime.md`**。
+> 叠加于根 `../CLAUDE.md`。开发前先读「生态边界」「🚫 红线」，再按「后端分层」定位落点。
+> **现状实现（权威）见 `docs/architecture/current/`**：`core-runtime.md`（运行时）、`plugin-contract.md`（插件契约）、`tech-debt.md`（已知债务与勿加深清单）。
+
+## 生态边界（动手前先归位）
+
+全生态职责速查表见根 `../CLAUDE.md`「生态边界」，本节为 core 视角。
+
+**Core 负责**：身份/用户、账号、API Key、分组与路由、账号调度、转发管线（鉴权/限流/failover）、计费、任务/资产、模型目录、插件生命周期、后台 UI 框架。
+
+**Core 不负责（出现即越界）**：
+
+| 不写什么 | 归谁 | core 的正确做法 |
+|---|---|---|
+| 外部协议格式（OpenAI/Anthropic 的请求/响应/SSE/错误体形态） | Gateway 插件 | 转发层只认 `ForwardOutcome`；对外错误格式按插件 `Metadata["error_format"]` 声明选择格式化器，未声明回退 OpenAI 兼容默认 |
+| 上游认证（OAuth/token/session/TLS 指纹） | Provider（现混于网关插件） | 凭证只加密存取、不解释；刷新经 `ForwardOutcome.UpdatedCredentials` 回写 |
+| 插件产品页面 | UI 插件 | core 仅提供挂载点（FrontendWidgets slot / FrontendPages）与资产服务 |
+
+**边界纪律（新增/改动代码必须遵守）**：
+
+1. **禁止新增 provider/模型字符串特判**。协议/平台差异一律经插件 Metadata 约定键声明，Core 仅留历史默认兜底。现有 6 键：`metadata_only` / `error_format` / `family` / `scheduling_model` / `scheduling_model_map` / `account.oauth_plans`；新增约定键须同步登记 `docs/architecture/current/plugin-contract.md` 的约定表。
+2. **HostService 是插件调 core 的唯一通道**（`internal/plugin/host_service.go`，现 19 个 method：scheduler/probe/gateway/groups/platforms/models/users/assets/tasks 分组），已登记"单通道过宽"债务。新增 method 前先确认属**跨插件的平台能力**，单插件业务勿入；新增后同步登记 `core-runtime.md`。
+3. **core 禁止 import 插件包**，识别插件仅经 SDK 接口 + manifest；core 代码勿绑定具体插件名（`/status` 反代目标经 config `plugins.status_plugin` 指定即为此例）。
+4. 触碰 `tech-debt.md` 登记的热点时**勿加深**，治理按登记排期，无需顺手重构。
+5. 改动涉及分层/契约/转发/计费/调度，**同步更新 `docs/architecture/current/` 对应文档**（防漂移红线）。
 
 ## 🚫 红线
 
@@ -30,13 +52,13 @@
 - `internal/bootstrap/http_handlers.go` — `NewHTTPHandlers` 内按 `store → service → handler` 构造，挂载至 `HTTPHandlers`。
 - `internal/server/router.go` — `registerRoutes()` 集中注册路由（`v1`/`adminGroup`/`extGroup` 分组），引用 `handlers.<X>.<Method>`。
 
-`response` 包统一出口：`Success / Error / BadRequest / BindError / NotFound / Forbidden / Unauthorized / PagedData`（`internal/server/response/`）。
+`response` 包统一出口：`Success / Error / BadRequest / BindError / NotFound / Forbidden / Unauthorized / InternalError / PagedData`（`internal/server/response/`）。
 
 ## 子系统边界
 
 - `internal/scheduler/` — 账号调度/并发/家族冷却/sticky 路由，瞬态状态在 Redis。
 - `internal/billing/` — 用量计费、费率、记账（`calculator`/`rate`/`recorder`）。
-- `internal/plugin/` — 插件生命周期、转发、宿主能力、资产服务；core 经此调用插件，反向仅经 `Host.Invoke`。
+- `internal/plugin/` — 插件生命周期、转发管线、HostService 宿主能力、任务执行、资产服务；core 调插件经此，反向仅经 `Host.Invoke`。
 - `internal/routing/` — 模型 → 账号选择。
 - 任务状态机见 `docs/architecture/task-state-machine.md`。
 
@@ -47,7 +69,7 @@
 - **日志**：统一 `log/slog`，内部细节进日志、对外仅回 `publicMessage`，不泄露堆栈/内部错误。
 - **敏感凭证**：账号凭证、API key 须加密存储（`internal/auth/crypto.go` 的 `EncryptAPIKey`/`DecryptAPIKey`），不明文落库、不写日志。
 - **context 透传**：service/store 方法首参 `ctx context.Context`，自 `c.Request.Context()` 透传；勿新建 `context.Background()`（脱离请求的后台任务除外）。
-- **分页/时区**：分页入参 `dto.PageReq`、出参 `response.PagedData(...)`；时间 UTC 存储，对外展示用北京时区（参考 `account_handler.go` 的 `beijingTZ`）。
+- **分页/时区**：分页入参 `dto.PageReq`、出参 `response.PagedData(...)`；时间 UTC 存储，对外展示用北京时区（参考 `account_handler_routes.go` 的 `beijingTZ`）。
 
 ## 前端（`web/`，React 19 + Vite + TanStack Query）
 
@@ -71,8 +93,9 @@ make ci             # 完整 CI（lint + test + vet + verify-ent + build）
 
 单包测试（`backend/`）：`go test ./internal/app/account/... -run TestXxx -v -count=1`
 
-## 相关 skill
+## 相关 skill / 文档
 
 - 后端接口/领域逻辑 → `core-backend-feature`（含 Ent 变更）
 - 后台前端页面 → `core-frontend-page`
 - 提交前自检 → `airgate-ci-check`
+- 架构现状（权威） → `docs/architecture/current/`

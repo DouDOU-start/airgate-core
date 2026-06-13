@@ -14,10 +14,10 @@
 | 2 | `internal/plugin/quota.go:40` | ~~已修复~~ `isMetadataOnlyPath` 优先查询插件 `RouteDefinition.Metadata["metadata_only"]` 声明的索引（`Manager.IsMetadataOnlyRoute`），硬编码列表保留为兜底；openai/claude/kiro 插件已声明 metadata_only | Gateway(协议路由) | ~~高~~ |
 | 3 | `internal/scheduler/family.go:25-27` | ~~已修复~~ `Manager.ModelFamily` 从插件目录查 `Metadata["family"]`，`Scheduler.resolveModelFamily` 与 `Forwarder`/`HostService` 均优先采纳插件声明，硬编码 `gpt-image-*` 保留为兜底；openai 插件已声明 `family` | Model catalog 声明 | ~~中~~ |
 | 4 | `internal/routing/selector.go` | ~~已修复~~ `GroupSupportsImageRequirement` 抽为共享函数，`forwarder.go` 与 `selector.go` 统一调用；平台硬编码保留但集中在一处并标注 TODO | capability 表达 | ~~中~~ |
-| 5 | `internal/plugin/scheduling_model.go:15-19` | 硬编码 `platform=openai` + Anthropic Messages 路径时 Claude→GPT 选号映射 | Gateway(请求规范化) | 中 |
+| 5 | `internal/plugin/scheduling_model.go` | ~~已修复~~ 新增路由级 `Metadata["scheduling_model_map"]` 约定（JSON 前缀映射表,`Manager.SchedulingModelMap`),openai 插件已在 4 条 Anthropic 翻译路由声明(env 覆盖由插件读取,变量名不变);Core 硬编码映射保留为未声明插件的兜底 | Gateway(请求规范化) | ~~中~~ |
 | 6 | `internal/plugin/forwarder.go` | ~~已修复~~ 图片授权特判合并至 `routing.GroupSupportsImageRequirement`，`forwarder.go` 不再重复平台判断逻辑 | capability 表达 | ~~中~~ |
 | 7 | `internal/plugin/request.go` | ~~已修复~~ `isImageModel` 优先查询模型目录 `image_generation` 能力声明，回退到 `usagemodel.IsImageGen` 前缀匹配；`pickProbeModel` 直接用 `ModelInfo.HasCapability` | 声明式 capability | ~~中~~ |
-| 8 | `internal/server/router.go:253` | `/status` 硬编码反代到 `airgate-health` 插件名 | (设计有意不在 core 放状态页,但耦合具体插件名) | 低 |
+| 8 | `internal/server/router.go` | ~~已修复~~ `/status` 反代目标改为 config `plugins.status_plugin`(默认 `airgate-health`),core 不再绑定具体插件名 | (设计有意不在 core 放状态页) | ~~低~~ |
 
 ## 二、HostService 过宽
 
@@ -34,6 +34,7 @@
 | **版本化 capability** | 扁平 `host.invoke.<method>`(`sdkgo/capability.go`) | `host.routing@1` 等分组版本化 | 中 |
 | **Provider 拆分** | openai/claude/kiro 网关仓内混 provider(OAuth/session/TLS/EventStream)与 UI(账号 widget) | 拆为 `gateway-*` + `provider-*` + `ui-account-*` | 架构级 |
 | **Playground 职责** | 兼做协议转发/SSE 解析/任务编排 | UI-only,经 Core 编排 API | 中 |
+| **SDK TaskStatus 常量不全** | ~~已修复~~ `sdkgo/task.go` 已补 `TaskStatusRetrying`/`TaskStatusCancelling`,与 Core 7 态状态机对齐 | 与 [`task-state-machine.md`](../task-state-machine.md) 一致 | ~~低~~ |
 
 详见 [`plugins.md`](plugins.md)、[`plugin-contract.md`](plugin-contract.md)。
 

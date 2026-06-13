@@ -51,6 +51,6 @@ Core 经 hashicorp/go-plugin 将插件作为独立 gRPC 子进程加载。
 
 ## 演进方式
 
-已知的架构差距与改进方向登记于 [`tech-debt.md`](tech-debt.md)(原目标愿景文档 `ecosystem-v2.md` 已归档至 `docs/architecture/archived/`)。
+已知的架构差距与改进方向登记于 [`tech-debt.md`](tech-debt.md);分阶段治理路线见 [`../boundary-refactor-plan.md`](../boundary-refactor-plan.md)(原目标愿景文档 `ecosystem-v2.md` 已归档至 `docs/architecture/archived/`)。
 
 流程:先以本目录准确记录现状 → 决定标准如何改 → 改文档 → 改代码向新标准看齐。

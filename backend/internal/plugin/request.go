@@ -52,7 +52,7 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	if inst == nil {
 		return nil, false
 	}
-	schedulingModels := schedulingModelsForRequest(f.manager, requestedPlatform, path, parsed.Model)
+	schedulingModels := schedulingModelsForRequest(f.manager, requestedPlatform, inst.Name, path, parsed.Model)
 	schedulingModel := ""
 	if len(schedulingModels) > 0 {
 		schedulingModel = schedulingModels[0]

@@ -34,6 +34,7 @@ log:
 plugins:
   dir: data/plugins
   dev: []
+  # status_plugin: airgate-health   # 公开状态页 /status 反代的目标插件（默认 airgate-health）
   # dev:
   #   - name: airgate-openai
   #     path: ../../airgate-openai/backend

@@ -2,7 +2,9 @@ package plugin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -172,6 +174,47 @@ func (m *Manager) ErrorFormat(pluginName, path string) string {
 		return inst.Metadata["error_format"]
 	}
 	return ""
+}
+
+// SchedulingModelMap 查询插件路由声明的 Metadata["scheduling_model_map"]（tech-debt #5 治理）。
+// 值为 JSON 对象：键是模型 ID 前缀（大小写不敏感、最长前缀优先），值是调度候选模型列表（按优先级）。
+// 用于协议翻译路由（如 openai 插件的 /v1/messages）声明"请求模型 → 调度模型"映射，
+// 取代 Core 的平台/路径硬编码特判。精确路径命中优先于前缀命中；未声明返回 nil，
+// 调用方回退到历史默认行为。
+func (m *Manager) SchedulingModelMap(pluginName, path string) map[string][]string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	name := m.resolveNameLocked(pluginName)
+	prefixRaw := ""
+	for _, route := range m.routeCache[name] {
+		raw := route.Metadata["scheduling_model_map"]
+		if raw == "" {
+			continue
+		}
+		if route.Path == path {
+			return parseSchedulingModelMap(raw)
+		}
+		if prefixRaw == "" && matchRoutePath(route.Path, path) {
+			prefixRaw = raw
+		}
+	}
+	return parseSchedulingModelMap(prefixRaw)
+}
+
+// parseSchedulingModelMap 解析 scheduling_model_map 的 JSON 声明；解析失败按未声明处理。
+func parseSchedulingModelMap(raw string) map[string][]string {
+	if raw == "" {
+		return nil
+	}
+	out := make(map[string][]string)
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		slog.Warn("scheduling_model_map_invalid", "error", err)
+		return nil
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // GetAllRoutes 获取所有运行中插件的路由。

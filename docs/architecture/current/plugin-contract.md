@@ -95,7 +95,8 @@ SDK 的 `PluginInfo.Metadata` / `RouteDefinition.Metadata` / `ModelInfo.Metadata
 | `metadata_only` | RouteDefinition | `"true"` = 只读元信息路由,跳过账号调度/计费 | `Manager.IsMetadataOnlyRoute` |
 | `error_format` | RouteDefinition(优先)/ PluginInfo | 对外错误体格式:`openai`(默认)/ `anthropic`;路由级用于混合协议网关(如 openai 插件的 `/v1/messages`) | `Manager.ErrorFormat` → `protocolError` |
 | `family` | ModelInfo | 限流冷却的模型家族键(如 `gpt-image`) | `Manager.ModelFamily` → scheduler FamilyCooldown |
-| `scheduling_model` | ModelInfo | 调度选号时的等价模型映射 | `internal/plugin/scheduling_model.go` |
+| `scheduling_model` | ModelInfo | 调度选号时的等价模型映射(精确 ID) | `internal/plugin/scheduling_model.go` |
+| `scheduling_model_map` | RouteDefinition | 协议翻译路由的"请求模型 → 调度模型"前缀映射表(JSON:键=模型前缀,最长优先;值=候选列表)。如 openai 插件 `/v1/messages` 声明 claude-\*→GPT | `Manager.SchedulingModelMap` → `scheduling_model.go` |
 | `account.oauth_plans` | PluginInfo | 账号 OAuth 套餐识别规则(JSON) | 账号管理 UI / 调度过滤 |
 
 新增约定键须同步登记本表;未声明一律回退 Core 的历史默认行为(向后兼容)。

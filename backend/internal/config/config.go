@@ -58,9 +58,10 @@ type LogConfig struct {
 
 // PluginsConfig 插件配置
 type PluginsConfig struct {
-	Dir         string            `yaml:"dir"`         // 插件二进制目录，默认 data/plugins
-	Dev         []DevPlugin       `yaml:"dev"`         // 开发模式：直接从源码加载的插件
-	Marketplace MarketplaceConfig `yaml:"marketplace"` // 插件市场配置
+	Dir          string            `yaml:"dir"`           // 插件二进制目录，默认 data/plugins
+	Dev          []DevPlugin       `yaml:"dev"`           // 开发模式：直接从源码加载的插件
+	Marketplace  MarketplaceConfig `yaml:"marketplace"`   // 插件市场配置
+	StatusPlugin string            `yaml:"status_plugin"` // 公开状态页 /status 反代的目标插件，默认 airgate-health
 }
 
 // MarketplaceConfig 插件市场配置

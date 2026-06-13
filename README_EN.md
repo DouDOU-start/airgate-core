@@ -1,3 +1,4 @@
+<!-- 本文为 README.md 的英文镜像：改动任意一份须同步另一份（防漂移） -->
 <div align="center">
   <img src="web/src/assets/logo.svg" alt="AirGate" width="120" />
 
