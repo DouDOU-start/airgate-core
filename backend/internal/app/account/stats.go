@@ -14,22 +14,6 @@ func isImageModel(model string) bool {
 	return usagemodel.IsImageGen(model)
 }
 
-const (
-	defaultPage     = 1
-	defaultPageSize = 20
-)
-
-// NormalizePage 将分页参数规整为安全值。
-func NormalizePage(page, pageSize int) (int, int) {
-	if page <= 0 {
-		page = defaultPage
-	}
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	return page, pageSize
-}
-
 // ResolveStatsRange 解析统计时间范围。
 // now 应已处于调用方时区（即 now.In(timezone.Resolve(query.TZ))），
 // 这样 today / startDate / endDate 都按用户期望的"本地一天"对齐。

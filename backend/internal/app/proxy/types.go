@@ -5,11 +5,6 @@ import (
 	"time"
 )
 
-const (
-	defaultPage     = 1
-	defaultPageSize = 20
-)
-
 // Repository 定义代理域持久化接口。
 type Repository interface {
 	List(context.Context, ListFilter) ([]Proxy, int64, error)
@@ -79,14 +74,4 @@ type TestResult struct {
 	Country     string
 	CountryCode string
 	City        string
-}
-
-func normalizePage(page, pageSize int) (int, int) {
-	if page <= 0 {
-		page = defaultPage
-	}
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	return page, pageSize
 }

@@ -189,9 +189,14 @@ func (m *Manager) InstallFromGithub(ctx context.Context, repo string) error {
 		return fmt.Errorf("下载返回状态码 %d", dlResp.StatusCode)
 	}
 
-	binary, err := io.ReadAll(dlResp.Body)
+	// 限制插件二进制大小（500MB），防止恶意或异常下载导致 OOM
+	const maxPluginBinarySize = 500 << 20
+	binary, err := io.ReadAll(io.LimitReader(dlResp.Body, maxPluginBinarySize+1))
 	if err != nil {
 		return fmt.Errorf("读取下载内容失败: %w", err)
+	}
+	if int64(len(binary)) > maxPluginBinarySize {
+		return fmt.Errorf("插件文件过大（超过 500MB）")
 	}
 
 	return m.InstallFromBinary(ctx, repoName, binary)

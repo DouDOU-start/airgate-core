@@ -34,6 +34,8 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 		return nil, false
 	}
 
+	// 限制请求体大小，防止恶意大请求导致 OOM
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxExtensionBodySize)
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		slog.Error("request_body_read_failed",

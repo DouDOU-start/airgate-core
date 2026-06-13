@@ -5,11 +5,6 @@ import (
 	"time"
 )
 
-const (
-	defaultPage     = 1
-	defaultPageSize = 20
-)
-
 // Repository 定义订阅域持久化接口。
 type Repository interface {
 	ListByUser(context.Context, UserListFilter) ([]Subscription, int64, error)
@@ -115,14 +110,4 @@ type BulkCreateInput struct {
 type UpdateInput struct {
 	ExpiresAt *time.Time
 	Status    *string
-}
-
-func normalizePage(page, pageSize int) (int, int) {
-	if page <= 0 {
-		page = defaultPage
-	}
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	return page, pageSize
 }
