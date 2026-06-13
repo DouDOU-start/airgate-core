@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"log/slog"
-	"strconv"
 
 	appgroup "github.com/DouDOU-start/airgate-core/internal/app/group"
 )
@@ -18,9 +17,8 @@ func NewGroupHandler(service *appgroup.Service) *GroupHandler {
 	return &GroupHandler{service: service}
 }
 
-func parseGroupID(raw string) (int, error) {
-	return strconv.Atoi(raw)
-}
+// parseGroupID 解析分组 ID，委托给公共 ParseID。
+var parseGroupID = ParseID
 
 func (h *GroupHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	switch {

@@ -7,13 +7,9 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
-)
-
-const (
-	defaultPage     = 1
-	defaultPageSize = 20
 )
 
 // BalanceAlertFunc 余额预警回调（异步调用，不阻塞主流程）。
@@ -99,7 +95,7 @@ func (s *Service) ChangePassword(ctx context.Context, id int, oldPassword, newPa
 // List 查询用户列表。
 func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, error) {
 	logger := sdk.LoggerFromContext(ctx)
-	page, pageSize := normalizePage(filter.Page, filter.PageSize)
+	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 
@@ -454,7 +450,7 @@ func (s *Service) ToggleStatus(ctx context.Context, id int) (ToggleResult, error
 
 // ListBalanceLogs 查询用户余额历史。
 func (s *Service) ListBalanceLogs(ctx context.Context, userID, page, pageSize int) (BalanceLogList, error) {
-	page, pageSize = normalizePage(page, pageSize)
+	page, pageSize = pagination.Normalize(page, pageSize)
 	list, total, err := s.repo.ListBalanceLogs(ctx, userID, page, pageSize)
 	if err != nil {
 		return BalanceLogList{}, err
@@ -475,7 +471,7 @@ func (s *Service) GetAPIKeyInfo(ctx context.Context, keyID int) (APIKeyBrief, er
 // ListAPIKeys 查询指定用户的 API Key 列表。
 // tz 决定每个 key 的"今日成本"起点；为空时回退到服务器本地时区。
 func (s *Service) ListAPIKeys(ctx context.Context, userID, page, pageSize int, tz string) (APIKeyList, error) {
-	page, pageSize = normalizePage(page, pageSize)
+	page, pageSize = pagination.Normalize(page, pageSize)
 	loc := timezone.Resolve(tz)
 	todayStart := timezone.StartOfDay(time.Now().In(loc))
 	list, total, err := s.repo.ListAPIKeys(ctx, userID, page, pageSize, todayStart)
@@ -483,16 +479,6 @@ func (s *Service) ListAPIKeys(ctx context.Context, userID, page, pageSize int, t
 		return APIKeyList{}, err
 	}
 	return APIKeyList{List: list, Total: total, Page: page, PageSize: pageSize}, nil
-}
-
-func normalizePage(page, pageSize int) (int, int) {
-	if page <= 0 {
-		page = defaultPage
-	}
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	return page, pageSize
 }
 
 func cloneGroupRates(input map[int64]float64) map[int64]float64 {

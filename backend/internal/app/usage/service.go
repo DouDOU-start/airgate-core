@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
@@ -50,7 +51,7 @@ var usageCacheLockReleaseScript = redis.NewScript(`
 
 // ListUser 查询当前用户的使用记录。
 func (s *Service) ListUser(ctx context.Context, userID int64, filter ListFilter) (ListResult, error) {
-	page, pageSize := NormalizePage(filter.Page, filter.PageSize)
+	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 
@@ -116,7 +117,7 @@ func (s *Service) UserStatsWithModels(ctx context.Context, userID int64, filter 
 
 // ListAdmin 查询管理员使用记录列表。
 func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult, error) {
-	page, pageSize := NormalizePage(filter.Page, filter.PageSize)
+	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 

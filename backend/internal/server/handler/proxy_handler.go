@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"log/slog"
-	"strconv"
 
 	appproxy "github.com/DouDOU-start/airgate-core/internal/app/proxy"
 )
@@ -18,9 +17,8 @@ func NewProxyHandler(service *appproxy.Service) *ProxyHandler {
 	return &ProxyHandler{service: service}
 }
 
-func parseProxyID(raw string) (int, error) {
-	return strconv.Atoi(raw)
-}
+// parseProxyID 解析代理 ID，委托给公共 ParseID。
+var parseProxyID = ParseID
 
 func (h *ProxyHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	switch {

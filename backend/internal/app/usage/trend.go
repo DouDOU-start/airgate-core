@@ -7,22 +7,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
 )
 
-const (
-	defaultPage     = 1
-	defaultPageSize = 20
-)
-
-// NormalizePage 将分页参数规范化。
-func NormalizePage(page, pageSize int) (int, int) {
-	if page <= 0 {
-		page = defaultPage
-	}
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	return page, pageSize
-}
-
 // BuildTrendBuckets 生成趋势时间桶。
 // tz 决定时间桶的对齐时区；为空时回退到服务器本地时区。
 // 之前的实现固定按 UTC 格式化，导致非 UTC 用户看到的小时/天与本地不一致。

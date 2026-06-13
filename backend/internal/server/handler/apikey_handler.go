@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"log/slog"
-	"strconv"
 
 	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
 )
@@ -18,9 +17,8 @@ func NewAPIKeyHandler(service *appapikey.Service) *APIKeyHandler {
 	return &APIKeyHandler{service: service}
 }
 
-func parseKeyID(raw string) (int, error) {
-	return strconv.Atoi(raw)
-}
+// parseKeyID 解析密钥 ID，委托给公共 ParseID。
+var parseKeyID = ParseID
 
 func (h *APIKeyHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	switch {

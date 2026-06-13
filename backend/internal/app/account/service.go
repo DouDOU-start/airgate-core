@@ -17,6 +17,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
@@ -173,7 +174,7 @@ func shouldAutoRefreshQuota(item Account) bool {
 
 // List 查询账号列表。
 func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, error) {
-	page, pageSize := NormalizePage(filter.Page, filter.PageSize)
+	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 	filter = s.normalizeListFilter(filter)

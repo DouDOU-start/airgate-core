@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
@@ -21,7 +22,7 @@ func NewService(repo Repository, concurrency ConcurrencyReader) *Service {
 
 // List 查询管理员分组列表。
 func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, error) {
-	page, pageSize := normalizePage(filter.Page, filter.PageSize)
+	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 
@@ -74,7 +75,7 @@ func (s *Service) StatsForGroups(ctx context.Context, groupIDs []int, tz string)
 
 // ListAvailable 查询用户可用分组列表。
 func (s *Service) ListAvailable(ctx context.Context, filter AvailableFilter) (ListResult, error) {
-	page, pageSize := normalizePage(filter.Page, filter.PageSize)
+	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 

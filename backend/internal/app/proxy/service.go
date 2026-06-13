@@ -15,6 +15,7 @@ import (
 
 	xproxy "golang.org/x/net/proxy"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
@@ -39,7 +40,7 @@ func NewService(repo Repository) *Service {
 
 // List 查询代理列表。
 func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, error) {
-	page, pageSize := normalizePage(filter.Page, filter.PageSize)
+	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 

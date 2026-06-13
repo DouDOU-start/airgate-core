@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"log/slog"
-	"strconv"
 
 	appsubscription "github.com/DouDOU-start/airgate-core/internal/app/subscription"
 )
@@ -18,9 +17,8 @@ func NewSubscriptionHandler(service *appsubscription.Service) *SubscriptionHandl
 	return &SubscriptionHandler{service: service}
 }
 
-func parseSubscriptionID(raw string) (int, error) {
-	return strconv.Atoi(raw)
-}
+// parseSubscriptionID 解析订阅 ID，委托给公共 ParseID。
+var parseSubscriptionID = ParseID
 
 func (h *SubscriptionHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	switch {

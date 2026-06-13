@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
@@ -23,7 +24,7 @@ func NewService(repo Repository) *Service {
 
 // UserSubscriptions 用户查看自己的订阅列表。
 func (s *Service) UserSubscriptions(ctx context.Context, filter UserListFilter) (ListResult, error) {
-	page, pageSize := normalizePage(filter.Page, filter.PageSize)
+	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 
@@ -52,7 +53,7 @@ func (s *Service) SubscriptionProgress(_ context.Context, _ int) ([]Subscription
 
 // AdminListSubscriptions 管理员查看订阅列表。
 func (s *Service) AdminListSubscriptions(ctx context.Context, filter AdminListFilter) (ListResult, error) {
-	page, pageSize := normalizePage(filter.Page, filter.PageSize)
+	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 

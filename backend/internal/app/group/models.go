@@ -5,11 +5,6 @@ import (
 	"time"
 )
 
-const (
-	defaultPage     = 1
-	defaultPageSize = 20
-)
-
 // Repository 定义分组域持久化接口。
 type Repository interface {
 	List(context.Context, ListFilter) ([]Group, int64, error)
@@ -123,16 +118,6 @@ type UpdateInput struct {
 	ForceInstructions *string
 	Note              *string
 	SortWeight        *int
-}
-
-func normalizePage(page, pageSize int) (int, int) {
-	if page <= 0 {
-		page = defaultPage
-	}
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	return page, pageSize
 }
 
 func cloneQuotas(input map[string]any) map[string]any {

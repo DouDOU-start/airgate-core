@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"log/slog"
-	"strconv"
 
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
 	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
@@ -20,9 +19,8 @@ func NewUserHandler(service *appuser.Service, settingsService *appsettings.Servi
 	return &UserHandler{service: service, settingsService: settingsService}
 }
 
-func parseUserID(raw string) (int, error) {
-	return strconv.Atoi(raw)
-}
+// parseUserID 解析用户 ID，委托给公共 ParseID。
+var parseUserID = ParseID
 
 func (h *UserHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	switch {

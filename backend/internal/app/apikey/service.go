@@ -6,13 +6,9 @@ import (
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/auth"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
-)
-
-const (
-	defaultPage     = 1
-	defaultPageSize = 20
 )
 
 // Service API Key 应用服务。
@@ -30,7 +26,7 @@ func NewService(repo Repository, secret string) *Service {
 // tz 决定每个 key 的"今日成本"起点；为空时回退到服务器本地时区。
 func (s *Service) ListByUser(ctx context.Context, userID int, filter ListFilter, tz string) (ListResult, error) {
 	logger := sdk.LoggerFromContext(ctx)
-	page, pageSize := normalizePage(filter.Page, filter.PageSize)
+	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 
@@ -76,7 +72,7 @@ func (s *Service) ListByUser(ctx context.Context, userID int, filter ListFilter,
 // 仅用于管理员选择器等轻量查询，不附加用量聚合，避免搜索时触发额外统计查询。
 func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult, error) {
 	logger := sdk.LoggerFromContext(ctx)
-	page, pageSize := normalizePage(filter.Page, filter.PageSize)
+	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 
@@ -373,16 +369,6 @@ func DisplayKeyPrefix(item Key) string {
 		return "sk-" + item.KeyHash[:8] + "..."
 	}
 	return item.KeyHash
-}
-
-func normalizePage(page, pageSize int) (int, int) {
-	if page <= 0 {
-		page = defaultPage
-	}
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	return page, pageSize
 }
 
 func cloneStringSlice(input []string) []string {

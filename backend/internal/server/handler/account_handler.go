@@ -49,9 +49,8 @@ func (h *AccountHandler) familyCooldownsFor(ctx context.Context, accountID int) 
 	return out
 }
 
-func parseAccountID(raw string) (int, error) {
-	return strconv.Atoi(raw)
-}
+// parseAccountID 解析账号 ID，委托给公共 ParseID。
+var parseAccountID = ParseID
 
 func parseOptionalInt(raw string) *int {
 	if raw == "" {
