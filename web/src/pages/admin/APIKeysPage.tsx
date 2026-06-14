@@ -6,7 +6,6 @@ import { Alert, AlertDialog, Button, EmptyState, Modal, Spinner, useOverlayState
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
   StatusChip,
-  useToast,
 } from '../../shared/ui';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { groupsApi } from '../../shared/api/groups';
@@ -28,7 +27,6 @@ import type { APIKeyResp, GroupResp } from '../../shared/types';
 
 export default function APIKeysPage() {
   const { t } = useTranslation();
-  const { toast } = useToast();
   const copy = useClipboard();
 
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.api-keys');
@@ -201,9 +199,7 @@ export default function APIKeysPage() {
                       title={t('common.copy')}
                       onClick={async () => {
                         const resp = await apikeysApi.reveal(row.id);
-                        if (resp.key && await copy(resp.key)) {
-                          toast('success', t('api_keys.key_copied', '密钥已复制'));
-                        }
+                        if (resp.key) await copy(resp.key);
                       }}
                     >
                       {row.key_prefix}...

@@ -366,9 +366,7 @@ export default function UserKeysPage() {
                       title={t('common.copy')}
                       onClick={async () => {
                         const resp = await apikeysApi.reveal(row.id);
-                        if (resp.key && await copy(resp.key)) {
-                          toast('success', t('api_keys.key_copied', '密钥已复制'));
-                        }
+                        if (resp.key) await copy(resp.key);
                       }}
                     >
                       <Key className="w-3 h-3 text-text-tertiary" />
