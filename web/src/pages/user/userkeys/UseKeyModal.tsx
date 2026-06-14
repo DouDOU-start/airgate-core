@@ -12,12 +12,34 @@ import type { APIKeyResp, GroupResp } from '../../../shared/types';
 function getUseKeyConfig(
   baseUrl: string,
   platform: string,
-  tab: 'claude' | 'codex',
+  tab: 'claude' | 'codex' | 'desktop' | 'desktop',
   shell: 'unix' | 'cmd' | 'powershell',
   apiKey: string,
   siteName: string,
   t: (key: string) => string,
 ): { files: Array<{ path: string; content: string; hint?: string }> } {
+  // Claude Desktop — 3P profile 配置
+  if (tab === 'desktop') {
+    const profileJson = JSON.stringify({
+      inferenceProvider: 'gateway',
+      inferenceGatewayBaseUrl: baseUrl,
+      inferenceGatewayAuthScheme: 'bearer',
+      inferenceGatewayApiKey: apiKey,
+    }, null, 2);
+    const configPath = shell === 'unix'
+      ? '~/Library/Application Support/Claude/claude_desktop_config.json'
+      : '%LOCALAPPDATA%\\Claude\\claude_desktop_config.json';
+    return {
+      files: [
+        {
+          path: configPath,
+          content: profileJson,
+          hint: t('user_keys.desktop_config_hint'),
+        },
+      ],
+    };
+  }
+
   // OpenAI 平台同时支持 Claude Code（通过 /v1/messages 适配）和 Codex CLI
   if (platform === 'openai') {
     if (tab === 'claude') {
@@ -125,7 +147,7 @@ export function useUseKeyModal(groupMap: Map<number, GroupResp>) {
 
   const [useKeyTarget, setUseKeyTarget] = useState<APIKeyResp | null>(null);
   const [useKeyValue, setUseKeyValue] = useState<string | null>(null);
-  const [useKeyTab, setUseKeyTab] = useState<'claude' | 'codex'>('claude');
+  const [useKeyTab, setUseKeyTab] = useState<'claude' | 'codex' | 'desktop'>('claude');
   const [useKeyShell, setUseKeyShell] = useState<'unix' | 'cmd' | 'powershell'>('unix');
 
   const openUseKeyModal = useCallback(
@@ -184,8 +206,8 @@ export function UseKeyModal({
   useKeyValue: string | null;
   useKeyPlatform: string;
   showClientTabs: boolean;
-  useKeyTab: 'claude' | 'codex';
-  setUseKeyTab: (tab: 'claude' | 'codex') => void;
+  useKeyTab: 'claude' | 'codex' | 'desktop';
+  setUseKeyTab: (tab: 'claude' | 'codex' | 'desktop') => void;
   useKeyShell: 'unix' | 'cmd' | 'powershell';
   setUseKeyShell: (shell: 'unix' | 'cmd' | 'powershell') => void;
   onClose: () => void;
@@ -222,17 +244,25 @@ export function UseKeyModal({
               {t('user_keys.use_key_desc')}
             </p>
 
-            {/* 客户端选择 Tab（OpenAI 平台时显示） */}
-            {showClientTabs && (
-              <div className="flex gap-1">
-                <Button
-                  fullWidth
-                  size="sm"
-                  variant={useKeyTab === 'claude' ? 'primary' : 'secondary'}
-                  onPress={() => setUseKeyTab('claude')}
-                >
-                  Claude Code
-                </Button>
+            {/* 客户端选择 Tab */}
+            <div className="flex gap-1">
+              <Button
+                fullWidth
+                size="sm"
+                variant={useKeyTab === 'claude' ? 'primary' : 'secondary'}
+                onPress={() => setUseKeyTab('claude')}
+              >
+                Claude Code
+              </Button>
+              <Button
+                fullWidth
+                size="sm"
+                variant={useKeyTab === 'desktop' ? 'primary' : 'secondary'}
+                onPress={() => setUseKeyTab('desktop')}
+              >
+                Claude Desktop
+              </Button>
+              {showClientTabs && (
                 <Button
                   fullWidth
                   size="sm"
@@ -241,11 +271,11 @@ export function UseKeyModal({
                 >
                   Codex CLI
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* OS/Shell Tab */}
-            <div className="flex gap-1">
+            {/* OS/Shell Tab（Claude Desktop 不需要） */}
+            {useKeyTab !== 'desktop' && <div className="flex gap-1">
               <Button
                 fullWidth
                 size="sm"
@@ -283,7 +313,7 @@ export function UseKeyModal({
                   </Button>
                 </>
               )}
-            </div>
+            </div>}
 
             {/* 配置代码块 */}
             {getUseKeyConfig(baseUrl, useKeyPlatform, useKeyTab, useKeyShell, useKeyValue, site.site_name || document.title || 'AirGate', t).files.map(
