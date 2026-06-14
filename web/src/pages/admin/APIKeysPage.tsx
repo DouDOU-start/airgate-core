@@ -6,6 +6,7 @@ import { Alert, AlertDialog, Button, EmptyState, Modal, Spinner, useOverlayState
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
   StatusChip,
+  useToast,
 } from '../../shared/ui';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { groupsApi } from '../../shared/api/groups';
@@ -27,6 +28,7 @@ import type { APIKeyResp, GroupResp } from '../../shared/types';
 
 export default function APIKeysPage() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const copy = useClipboard();
 
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.api-keys');
@@ -187,17 +189,26 @@ export default function APIKeysPage() {
                     </span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <code
-                      className="text-xs px-2 py-0.5 rounded"
+                    <button
+                      type="button"
+                      className="text-xs px-2 py-0.5 rounded cursor-pointer transition-colors inline-flex items-center gap-1.5"
                       style={{
                         fontFamily: 'var(--ag-font-mono)',
                         background: 'var(--ag-bg-surface)',
                         color: 'var(--ag-text-secondary)',
                         border: '1px solid var(--ag-border-subtle)',
                       }}
+                      title={t('common.copy')}
+                      onClick={async () => {
+                        const resp = await apikeysApi.reveal(row.id);
+                        if (resp.key && await copy(resp.key)) {
+                          toast('success', t('api_keys.key_copied', '密钥已复制'));
+                        }
+                      }}
                     >
                       {row.key_prefix}...
-                    </code>
+                      <Copy className="w-3 h-3" style={{ color: 'var(--ag-text-tertiary)' }} />
+                    </button>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <span className="inline-flex items-center gap-1.5">

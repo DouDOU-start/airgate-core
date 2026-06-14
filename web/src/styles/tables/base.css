@@ -157,6 +157,23 @@
   table-layout: auto;
 }
 
+.ag-api-keys-table [data-slot="th"][id="actions"],
+.ag-api-keys-table [data-slot="td"]:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: var(--surface-secondary) !important;
+  box-shadow: -4px 0 8px -4px color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.ag-api-keys-table [data-slot="tbody"] [data-slot="td"]:last-child {
+  background: var(--surface) !important;
+}
+
+.ag-api-keys-table [data-slot="tbody"] [data-slot="tr"]:hover [data-slot="td"]:last-child {
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%) !important;
+}
+
 .ag-table-row-actions {
   min-height: 1.75rem;
   line-height: 1;

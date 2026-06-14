@@ -360,10 +360,21 @@ export default function UserKeysPage() {
                     <span className="font-medium text-text">{row.name}</span>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <span className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono cursor-pointer transition-colors hover:border-accent hover:text-accent"
+                      title={t('common.copy')}
+                      onClick={async () => {
+                        const resp = await apikeysApi.reveal(row.id);
+                        if (resp.key && await copy(resp.key)) {
+                          toast('success', t('api_keys.key_copied', '密钥已复制'));
+                        }
+                      }}
+                    >
                       <Key className="w-3 h-3 text-text-tertiary" />
                       {row.key_prefix}...
-                    </span>
+                      <Copy className="w-3 h-3 text-text-tertiary" />
+                    </button>
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <div className="space-y-0.5 text-center">
