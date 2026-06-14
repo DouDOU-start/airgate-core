@@ -180,7 +180,7 @@ export function CcsImportModal({
             <p className="text-sm text-text-secondary">
               {t('user_keys.ccs_select_desc')}
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="mx-auto grid max-w-sm grid-cols-2 gap-3">
               {/* Claude Code */}
               <Button
                 variant="secondary"
