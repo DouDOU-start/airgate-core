@@ -334,9 +334,14 @@ function UpgradeRunModal({
               isSelected={confirmBackup}
               onChange={setConfirmBackup}
             >
-              <span className="text-xs text-text-secondary">
-                {t('settings.system_confirm_backup')}
-              </span>
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              <Checkbox.Content>
+                <span className="text-xs text-text-secondary">
+                  {t('settings.system_confirm_backup')}
+                </span>
+              </Checkbox.Content>
             </Checkbox>
           </>
         )}

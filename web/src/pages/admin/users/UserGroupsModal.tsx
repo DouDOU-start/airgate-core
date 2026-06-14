@@ -216,6 +216,9 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
         isSelected={selected}
         onChange={(nextSelected) => toggleExclusiveGroup(group.id, nextSelected)}
       >
+        <Checkbox.Control>
+          <Checkbox.Indicator />
+        </Checkbox.Control>
         <span className="text-text">{group.name}</span>
       </Checkbox>
       <span className="text-[10px] text-text-tertiary">{group.platform}</span>
@@ -250,9 +253,6 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
                 <p className="py-8 text-center text-sm text-text-tertiary">{t('common.no_data')}</p>
               ) : (
                 <div className="max-h-[26rem] space-y-4 overflow-y-auto">
-                  <p className="text-[11px] text-text-tertiary">{t('users.group_rate_hint')}</p>
-                  <p className="text-[11px] text-text-tertiary">{t('groups.image_pricing_hint')}</p>
-
                   {normalGroups.length > 0 ? (
                     <div>
                       <p className="mb-2 text-xs font-medium uppercaser text-text-tertiary">

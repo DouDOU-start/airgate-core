@@ -470,8 +470,13 @@ function PluginConfigModal({
                     isSelected={checked}
                     onChange={(selected) => setValues({ ...values, [field.key]: selected ? 'true' : 'false' })}
                   >
-                    {field.label || field.key}
-                    {field.required && <span className="text-danger ml-1">*</span>}
+                    <Checkbox.Control>
+                      <Checkbox.Indicator />
+                    </Checkbox.Control>
+                    <Checkbox.Content>
+                      {field.label || field.key}
+                      {field.required && <span className="text-danger ml-1">*</span>}
+                    </Checkbox.Content>
                   </Checkbox>
                   {field.description && (
                     <p className="mt-1 ml-6 text-xs text-text-tertiary">{field.description}</p>
