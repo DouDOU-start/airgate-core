@@ -15,6 +15,7 @@ function getUseKeyConfig(
   tab: 'claude' | 'codex',
   shell: 'unix' | 'cmd' | 'powershell',
   apiKey: string,
+  siteName: string,
   t: (key: string) => string,
 ): { files: Array<{ path: string; content: string; hint?: string }> } {
   // OpenAI 平台同时支持 Claude Code（通过 /v1/messages 适配）和 Codex CLI
@@ -54,15 +55,16 @@ function getUseKeyConfig(
       const configDir = shell === 'unix' ? '~/.codex' : '%USERPROFILE%\\.codex';
       const configPath = shell === 'unix' ? `${configDir}/config.toml` : `${configDir}\\config.toml`;
       const authPath = shell === 'unix' ? `${configDir}/auth.json` : `${configDir}\\auth.json`;
-      const configToml = `model_provider = "OpenAI"
+      const providerName = siteName || 'AirGate';
+      const configToml = `model_provider = "${providerName}"
 model = "gpt-5.5"
 review_model = "gpt-5.5"
 model_reasoning_effort = "xhigh"
 disable_response_storage = true
 network_access = "enabled"
 
-[model_providers.OpenAI]
-name = "OpenAI"
+[model_providers.${providerName}]
+name = "${providerName}"
 base_url = "${baseUrl}"
 wire_api = "responses"
 requires_openai_auth = true
@@ -284,7 +286,7 @@ export function UseKeyModal({
             </div>
 
             {/* 配置代码块 */}
-            {getUseKeyConfig(baseUrl, useKeyPlatform, useKeyTab, useKeyShell, useKeyValue, t).files.map(
+            {getUseKeyConfig(baseUrl, useKeyPlatform, useKeyTab, useKeyShell, useKeyValue, site.site_name || document.title || 'AirGate', t).files.map(
               (file, idx) => (
                 <div key={idx}>
                   {file.hint && (
