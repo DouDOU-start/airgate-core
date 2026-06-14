@@ -173,13 +173,24 @@ func startMainServer(cfg *config.Config) {
 	slog.Info("db_pool_configured",
 		"max_open", maxOpen, "max_idle", maxIdle, "lifetime_min", lifeMin)
 
-	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	if err := drv.DB().PingContext(pingCtx); err != nil {
+	const dbPingMaxRetries = 30
+	const dbPingRetryInterval = 2 * time.Second
+	for attempt := 1; attempt <= dbPingMaxRetries; attempt++ {
+		pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := drv.DB().PingContext(pingCtx)
 		pingCancel()
-		slog.Error("db_ping_failed", sdk.LogFieldError, err)
-		os.Exit(1)
+		if err == nil {
+			break
+		}
+		if attempt == dbPingMaxRetries {
+			slog.Error("db_ping_failed_after_retries",
+				"attempts", dbPingMaxRetries, sdk.LogFieldError, err)
+			os.Exit(1)
+		}
+		slog.Warn("db_ping_retry",
+			"attempt", attempt, "max", dbPingMaxRetries, sdk.LogFieldError, err)
+		time.Sleep(dbPingRetryInterval)
 	}
-	pingCancel()
 
 	// 注入 slog 桥接，让 ent 内部 debug/error 日志走结构化通道
 	db := ent.NewClient(ent.Driver(drv), store.EntSlogLogger())
@@ -209,16 +220,30 @@ func startMainServer(cfg *config.Config) {
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.DB,
 	})
-	redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	if err := rdb.Ping(redisCtx).Err(); err != nil {
+	const redisPingMaxRetries = 30
+	const redisPingRetryInterval = 2 * time.Second
+	for attempt := 1; attempt <= redisPingMaxRetries; attempt++ {
+		redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := rdb.Ping(redisCtx).Err()
 		redisCancel()
-		slog.Error("redis_ping_failed",
+		if err == nil {
+			break
+		}
+		if attempt == redisPingMaxRetries {
+			slog.Error("redis_ping_failed_after_retries",
+				"host", cfg.Redis.Host,
+				"port", cfg.Redis.Port,
+				"attempts", redisPingMaxRetries,
+				sdk.LogFieldError, err)
+			os.Exit(1)
+		}
+		slog.Warn("redis_ping_retry",
 			"host", cfg.Redis.Host,
 			"port", cfg.Redis.Port,
+			"attempt", attempt, "max", redisPingMaxRetries,
 			sdk.LogFieldError, err)
-		os.Exit(1)
+		time.Sleep(redisPingRetryInterval)
 	}
-	redisCancel()
 	slog.Info("redis_connected",
 		"host", cfg.Redis.Host,
 		"port", cfg.Redis.Port,

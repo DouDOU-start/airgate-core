@@ -94,13 +94,15 @@ func EnvRedisConfig() *config.RedisConfig {
 // NeedsSetup 检查是否需要安装。
 // 判断逻辑：config.yaml 不存在 → 需要安装；
 // config.yaml 存在则尝试连接数据库，查询是否已有管理员账户。
+//
+// 当 config.yaml 已存在但 DB 暂不可达时（如服务器重启后 DB 尚未就绪），
+// 会重试等待 DB 就绪，而非直接判定为"未安装"进入安装向导。
 func NeedsSetup() bool {
 	configPath := config.ConfigPath()
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return true
 	}
 
-	// config.yaml 存在，尝试加载并连接数据库确认是否已初始化
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		slog.Warn("setup_config_load_failed", "stage", "config_load", sdk.LogFieldError, err)
@@ -115,19 +117,32 @@ func NeedsSetup() bool {
 	}
 	defer func() { _ = db.Close() }()
 
+	// config.yaml 存在说明曾经安装过，DB 不可达时重试等待而非直接判定未安装
+	const maxRetries = 30
+	const retryInterval = 2 * time.Second
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := db.PingContext(ctx)
+		cancel()
+		if err == nil {
+			break
+		}
+		if attempt == maxRetries {
+			slog.Error("db_ping_failed_after_retries", "stage", "needs_setup",
+				"attempts", maxRetries, sdk.LogFieldError, err)
+			os.Exit(1)
+		}
+		slog.Warn("db_ping_retry", "stage", "needs_setup",
+			"attempt", attempt, "max", maxRetries, sdk.LogFieldError, err)
+		time.Sleep(retryInterval)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := db.PingContext(ctx); err != nil {
-		slog.Warn("db_ping_failed", "stage", "needs_setup", sdk.LogFieldError, err)
-		return true
-	}
-
-	// 查询 users 表是否存在管理员记录
 	var count int
 	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&count)
 	if err != nil {
-		// 表不存在或查询失败，视为未安装
 		slog.Warn("setup_admin_query_failed", "stage", "needs_setup", sdk.LogFieldError, err)
 		return true
 	}
