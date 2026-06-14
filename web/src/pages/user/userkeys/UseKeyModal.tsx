@@ -50,23 +50,36 @@ function getUseKeyConfig(
         };
       }
     } else {
-      // Codex CLI 配置 — 写入 ~/.codex/config.toml
+      // Codex CLI 配置 — 写入 config.toml + auth.json，与 CCS 导入格式一致
       const configDir = shell === 'unix' ? '~/.codex' : '%USERPROFILE%\\.codex';
       const configPath = shell === 'unix' ? `${configDir}/config.toml` : `${configDir}\\config.toml`;
-      const configToml = `model_provider = "airgate"
-model = "o3"
+      const authPath = shell === 'unix' ? `${configDir}/auth.json` : `${configDir}\\auth.json`;
+      const configToml = `model_provider = "OpenAI"
+model = "gpt-5.5"
+review_model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+disable_response_storage = true
+network_access = "enabled"
 
-[model_providers.airgate]
-name = "airgate"
+[model_providers.OpenAI]
+name = "OpenAI"
 base_url = "${baseUrl}"
-api_key = "${apiKey}"
-wire_api = "responses"`;
+wire_api = "responses"
+requires_openai_auth = true
+
+[features]
+goals = true`;
+      const authJson = JSON.stringify({ OPENAI_API_KEY: apiKey }, null, 2);
       return {
         files: [
           {
             path: configPath,
             content: configToml,
             hint: t('user_keys.codex_config_toml_hint'),
+          },
+          {
+            path: authPath,
+            content: authJson,
           },
         ],
       };
