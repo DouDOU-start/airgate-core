@@ -433,7 +433,7 @@
 }
 
 .checkbox__control {
-  border: 1px solid var(--field-border);
+  border: 1.5px solid color-mix(in oklab, var(--foreground) 38%, transparent);
   background: var(--field-background);
   box-shadow: var(--field-shadow);
 }
