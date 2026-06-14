@@ -1,7 +1,7 @@
 # airgate-core — Claude 开发指南
 
 > 叠加于根 `../CLAUDE.md`。开发前先读「生态边界」「🚫 红线」，再按「后端分层」定位落点。
-> **现状实现（权威）见 `docs/architecture/current/`**：`core-runtime.md`（运行时）、`plugin-contract.md`（插件契约）、`tech-debt.md`（已知债务与勿加深清单）。
+> 子系统规则（转发/调度/计费/任务/插件契约）见 skill `core-dev`。
 
 ## 生态边界（动手前先归位）
 
@@ -19,11 +19,11 @@
 
 **边界纪律（新增/改动代码必须遵守）**：
 
-1. **禁止新增 provider/模型字符串特判**。协议/平台差异一律经插件 Metadata 约定键声明，Core 仅留历史默认兜底。现有 6 键：`metadata_only` / `error_format` / `family` / `scheduling_model` / `scheduling_model_map` / `account.oauth_plans`；新增约定键须同步登记 `docs/architecture/current/plugin-contract.md` 的约定表。
-2. **HostService 是插件调 core 的唯一通道**（`internal/plugin/host_service.go`，现 19 个 method：scheduler/probe/gateway/groups/platforms/models/users/assets/tasks 分组），已登记"单通道过宽"债务。新增 method 前先确认属**跨插件的平台能力**，单插件业务勿入；新增后同步登记 `core-runtime.md`。
+1. **禁止新增 provider/模型字符串特判**。协议/平台差异一律经插件 Metadata 约定键声明，Core 仅留历史默认兜底。现有 6 键：`metadata_only` / `error_format` / `family` / `scheduling_model` / `scheduling_model_map` / `account.oauth_plans`；新增约定键须同步登记 skill `core-dev` 的 Metadata 约定表。
+2. **HostService 是插件调 core 的唯一通道**（`internal/plugin/host_service.go`，现 19 个 method：scheduler/probe/gateway/groups/platforms/models/users/assets/tasks 分组），已登记"单通道过宽"债务。新增 method 前先确认属**跨插件的平台能力**，单插件业务勿入；新增后同步登记 skill `core-dev`。
 3. **core 禁止 import 插件包**，识别插件仅经 SDK 接口 + manifest；core 代码勿绑定具体插件名（`/status` 反代目标经 config `plugins.status_plugin` 指定即为此例）。
-4. 触碰 `tech-debt.md` 登记的热点时**勿加深**，治理按登记排期，无需顺手重构。
-5. 改动涉及分层/契约/转发/计费/调度，**同步更新 `docs/architecture/current/` 对应文档**（防漂移红线）。
+4. 触碰技术债登记的热点时**勿加深**（详见 skill `core-dev`「技术债」），治理按排期，无需顺手重构。
+5. 改动涉及转发/契约/计费/调度/任务，**同步更新 skill `core-dev`**（防漂移红线）。
 
 ## 🚫 红线
 
@@ -60,7 +60,7 @@
 - `internal/billing/` — 用量计费、费率、记账（`calculator`/`rate`/`recorder`）。
 - `internal/plugin/` — 插件生命周期、转发管线、HostService 宿主能力、任务执行、资产服务；core 调插件经此，反向仅经 `Host.Invoke`。
 - `internal/routing/` — 模型 → 账号选择。
-- 任务状态机见 `docs/architecture/task-state-machine.md`。
+- 任务状态机见 skill `core-dev`「任务状态机」。
 
 ## 后端编码约定（高频）
 
@@ -79,7 +79,7 @@
 | 复用 | `web/src/shared/{api,hooks,components,ui,columns}` | API 封装、查询 hook、通用组件 |
 | 装配 | `web/src/app/{router,providers,layout}` | 路由、Provider、布局、插件前端加载 |
 
-约定：服务端状态用 TanStack Query，query key 统一于 `shared/queryKeys.ts`；HTTP 经 `shared/api`；样式用 Tailwind + `@doudou-start/airgate-theme`。新页面参照现有 `pages/admin` 页面。详见 skill `core-frontend-page`。
+约定：服务端状态用 TanStack Query，query key 统一于 `shared/queryKeys.ts`；HTTP 经 `shared/api`；样式用 Tailwind + `@doudou-start/airgate-theme`。新页面参照现有 `pages/admin` 页面。详见 skill `core-dev`。
 
 ## 常用命令（`airgate-core/`）
 
@@ -95,7 +95,5 @@ make ci             # 完整 CI（lint + test + vet + verify-ent + build）
 
 ## 相关 skill / 文档
 
-- 后端接口/领域逻辑 → `core-backend-feature`（含 Ent 变更）
-- 后台前端页面 → `core-frontend-page`
-- 提交前自检 → `airgate-ci-check`
-- 架构现状（权威） → `docs/architecture/current/`
+- core 全栈开发（后端/前端/子系统） → skill `core-dev`
+- 提交前自检 → skill `airgate-ci-check`
