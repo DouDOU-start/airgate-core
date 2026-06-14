@@ -53,6 +53,7 @@ function executeCcsImport(
     resource: 'provider',
     app,
     name: siteName,
+    modelProvider: siteName,
     homepage: baseUrl,
     endpoint,
     apiKey,
