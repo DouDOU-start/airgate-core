@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
-import { Terminal, Monitor } from 'lucide-react';
+import { Terminal } from 'lucide-react';
 import { useToast } from '../../../shared/ui';
 import { apikeysApi } from '../../../shared/api/apikeys';
 import type { APIKeyResp, GroupResp } from '../../../shared/types';
@@ -180,8 +180,8 @@ export function CcsImportModal({
             <p className="text-sm text-text-secondary">
               {t('user_keys.ccs_select_desc')}
             </p>
-            <div className="grid grid-cols-3 gap-3">
-              {/* 始终显示 Claude Code */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Claude Code */}
               <Button
                 variant="secondary"
                 className="h-auto flex-col gap-2 p-4"
@@ -196,24 +196,6 @@ export function CcsImportModal({
                 <span className="text-sm font-medium text-text">Claude Code</span>
                 <span className="text-xs text-text-tertiary text-center">
                   {t('user_keys.ccs_claude_desc')}
-                </span>
-              </Button>
-
-              {/* Claude Desktop — 使用 claude 协议导入，用户在 CCS 中同步到 Desktop */}
-              <Button
-                variant="secondary"
-                className="h-auto flex-col gap-2 p-4"
-                onPress={() => {
-                  executeCcsImport(baseUrl, ccsKeyValue, 'claude', ccsPlatform, toast, t);
-                  onClose();
-                }}
-              >
-                <div className="w-10 h-10 rounded-lg bg-warning-subtle flex items-center justify-center">
-                  <Monitor className="w-5 h-5 text-warning" />
-                </div>
-                <span className="text-sm font-medium text-text">Claude Desktop</span>
-                <span className="text-xs text-text-tertiary text-center">
-                  {t('user_keys.ccs_claude_desktop_desc', '导入后在 CCS 同步到 Desktop')}
                 </span>
               </Button>
 
