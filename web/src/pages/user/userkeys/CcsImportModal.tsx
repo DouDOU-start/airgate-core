@@ -57,16 +57,18 @@ function executeCcsImport(
     endpoint,
     apiKey,
     configFormat: 'json',
-    model: 'gpt-5.5',
-    reviewModel: 'gpt-5.5',
-    modelReasoningEffort: 'xhigh',
-    disableResponseStorage: 'true',
-    networkAccess: 'enabled',
-    goals: 'true',
     usageEnabled: 'true',
     usageScript: btoa(usageScript),
     usageAutoInterval: '30',
   });
+  if (app === 'codex') {
+    params.set('model', 'gpt-5.5');
+    params.set('reviewModel', 'gpt-5.5');
+    params.set('modelReasoningEffort', 'xhigh');
+    params.set('disableResponseStorage', 'true');
+    params.set('networkAccess', 'enabled');
+    params.set('goals', 'true');
+  }
 
   const deeplink = `ccswitch://v1/import?${params.toString()}`;
 
