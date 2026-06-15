@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 )
 
 // UserSubscription 用户订阅
@@ -19,6 +20,12 @@ func (UserSubscription) Fields() []ent.Field {
 		field.Enum("status").Values("active", "expired", "suspended").Default("active"),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
+	}
+}
+
+func (UserSubscription) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("status"),
 	}
 }
 

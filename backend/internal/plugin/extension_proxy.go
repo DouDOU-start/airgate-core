@@ -239,7 +239,9 @@ func (ep *ExtensionProxy) handleStream(c *gin.Context, ext *sdkgrpc.ExtensionGRP
 		}
 
 		if len(chunk.Data) > 0 {
-			_, _ = c.Writer.Write(chunk.Data)
+			if _, err := c.Writer.Write(chunk.Data); err != nil {
+				return // 客户端已断开
+			}
 			c.Writer.Flush()
 		}
 

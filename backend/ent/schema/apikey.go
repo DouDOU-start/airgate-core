@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 )
 
 // APIKey API 密钥
@@ -32,6 +33,13 @@ func (APIKey) Fields() []ent.Field {
 		field.Enum("status").Values("active", "disabled").Default("active"),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
+	}
+}
+
+func (APIKey) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("key_hash").Unique(),
+		index.Fields("status", "created_at"),
 	}
 }
 

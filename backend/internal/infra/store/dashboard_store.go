@@ -92,6 +92,7 @@ func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime t
 		preds = append(preds, usageUserPredicate(int64(userID)))
 	}
 
+	const trendLogLimit = 50000
 	list, err := s.db.UsageLog.Query().
 		Where(preds...).
 		Select(
@@ -106,6 +107,8 @@ func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime t
 			entusagelog.FieldTotalCost,
 			entusagelog.FieldCreatedAt,
 		).
+		Order(ent.Desc(entusagelog.FieldCreatedAt)).
+		Limit(trendLogLimit).
 		All(ctx)
 	if err != nil {
 		return nil, err

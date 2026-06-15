@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 )
 
 // Account 上游 AI 账户。
@@ -44,6 +45,12 @@ func (Account) Fields() []ent.Field {
 			Comment("扩展配置（max_rpm / max_window_cost / max_sessions 等）"),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
+	}
+}
+
+func (Account) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("platform", "state"),
 	}
 }
 

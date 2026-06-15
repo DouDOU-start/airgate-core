@@ -48,6 +48,18 @@ var (
 				OnDelete:   schema.NoAction,
 			},
 		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "apikey_key_hash",
+				Unique:  true,
+				Columns: []*schema.Column{APIKeysColumns[3]},
+			},
+			{
+				Name:    "apikey_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{APIKeysColumns[13], APIKeysColumns[14]},
+			},
+		},
 	}
 	// AccountsColumns holds the columns for the "accounts" table.
 	AccountsColumns = []*schema.Column{
@@ -80,6 +92,13 @@ var (
 				Columns:    []*schema.Column{AccountsColumns[16]},
 				RefColumns: []*schema.Column{ProxiesColumns[0]},
 				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "account_platform_state",
+				Unique:  false,
+				Columns: []*schema.Column{AccountsColumns[2], AccountsColumns[5]},
 			},
 		},
 	}
@@ -115,6 +134,11 @@ var (
 				Name:    "balancelog_idempotency_key",
 				Unique:  true,
 				Columns: []*schema.Column{BalanceLogsColumns[8]},
+			},
+			{
+				Name:    "balancelog_user_id_snapshot_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{BalanceLogsColumns[6], BalanceLogsColumns[9]},
 			},
 		},
 	}
@@ -372,6 +396,11 @@ var (
 				Columns: []*schema.Column{UsageLogsColumns[40], UsageLogsColumns[42]},
 			},
 			{
+				Name:    "usage_log_model_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[2], UsageLogsColumns[42]},
+			},
+			{
 				Name:    "usage_log_user",
 				Unique:  false,
 				Columns: []*schema.Column{UsageLogsColumns[46]},
@@ -446,6 +475,13 @@ var (
 				Columns:    []*schema.Column{UserSubscriptionsColumns[8]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "usersubscription_status",
+				Unique:  false,
+				Columns: []*schema.Column{UserSubscriptionsColumns[4]},
 			},
 		},
 	}

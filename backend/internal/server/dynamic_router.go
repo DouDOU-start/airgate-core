@@ -33,25 +33,20 @@ func (dr *DynamicRouter) Handle(c *gin.Context) {
 		return
 	}
 
-	// 检查路由是否已注册
+	path := c.Param("path")
+	if path == "" {
+		path = c.Request.URL.Path
+	}
+	key := c.Request.Method + " " + path
+
 	dr.mu.RLock()
 	hasRoutes := len(dr.routes) > 0
+	matched := !hasRoutes || dr.routes[key]
 	dr.mu.RUnlock()
 
-	// 如果有注册路由，则检查当前请求是否匹配
-	if hasRoutes {
-		path := c.Param("path")
-		if path == "" {
-			path = c.Request.URL.Path
-		}
-		key := c.Request.Method + " " + path
-		dr.mu.RLock()
-		matched := dr.routes[key]
-		dr.mu.RUnlock()
-		if !matched {
-			c.JSON(http.StatusNotFound, gin.H{"error": "未知的 API 路径"})
-			return
-		}
+	if hasRoutes && !matched {
+		c.JSON(http.StatusNotFound, gin.H{"error": "未知的 API 路径"})
+		return
 	}
 
 	dr.forwarder.Forward(c)

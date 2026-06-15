@@ -43,5 +43,6 @@ func (BalanceLog) Indexes() []ent.Index {
 	return []ent.Index{
 		// Postgres 唯一索引对 NULL 不互斥，仅约束显式提供的幂等键
 		index.Fields("idempotency_key").Unique(),
+		index.Fields("user_id_snapshot", "created_at"),
 	}
 }

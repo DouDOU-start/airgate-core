@@ -32,6 +32,10 @@ type forwardState struct {
 	reasoningEffort string
 	accountReq      scheduler.AccountRequirements
 
+	// 缓存的 image tool payload，避免 forwarder 热路径上重复反序列化 body
+	imageToolPayloadValid bool
+	imageToolPayload      imageToolPayload
+
 	requestedPlatform string
 	selectedRoute     routing.Candidate
 
@@ -54,6 +58,10 @@ type parsedRequest struct {
 	Stream          bool
 	SessionID       string
 	ReasoningEffort string // 推理强度档位
+
+	// 缓存 image tool payload 解析结果，避免 requestNeedsImage / accountRequirementsForRequest 重复反序列化 body
+	imageToolPayloadValid bool
+	imageToolPayload      imageToolPayload
 }
 
 // requestFields 一次性 Unmarshal 的 JSON 字段结构。

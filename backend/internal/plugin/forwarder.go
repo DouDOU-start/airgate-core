@@ -129,7 +129,7 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	defer releaseClientQuota()
 
 	requirements := routing.Requirements{
-		NeedsImage: requestNeedsImage(f.manager, state.requestPath, state.model, state.body),
+		NeedsImage: requestNeedsImageCached(f.manager, state),
 	}
 	routes := routesForAPIKey(state, requirements)
 	if len(routes) == 0 {

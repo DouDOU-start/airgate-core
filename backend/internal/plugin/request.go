@@ -61,20 +61,22 @@ func (f *Forwarder) parseRequest(c *gin.Context) (*forwardState, bool) {
 	}
 
 	return &forwardState{
-		startedAt:         startedAt,
-		requestPath:       path,
-		body:              body,
-		model:             parsed.Model,
-		schedulingModels:  schedulingModels,
-		schedulingModel:   schedulingModel,
-		stream:            parsed.Stream,
-		realtime:          parsed.Stream,
-		sessionID:         parsed.SessionID,
-		reasoningEffort:   parsed.ReasoningEffort,
-		accountReq:        accountRequirementsForRequest(f.manager, path, parsed.Model, body),
-		requestedPlatform: requestedPlatform,
-		keyInfo:           keyInfo,
-		plugin:            inst,
+		startedAt:             startedAt,
+		requestPath:           path,
+		body:                  body,
+		model:                 parsed.Model,
+		schedulingModels:      schedulingModels,
+		schedulingModel:       schedulingModel,
+		stream:                parsed.Stream,
+		realtime:              parsed.Stream,
+		sessionID:             parsed.SessionID,
+		reasoningEffort:       parsed.ReasoningEffort,
+		accountReq:            accountRequirementsForRequestCached(f.manager, path, parsed.Model, &parsed),
+		imageToolPayloadValid: parsed.imageToolPayloadValid,
+		imageToolPayload:      parsed.imageToolPayload,
+		requestedPlatform:     requestedPlatform,
+		keyInfo:               keyInfo,
+		plugin:                inst,
 	}, true
 }
 
@@ -120,12 +122,18 @@ func parseBody(body []byte, contentType string) parsedRequest {
 	var fields requestFields
 	if json.Unmarshal(body, &fields) == nil {
 		effort := extractAndNormalizeReasoningEffort(fields)
-		return parsedRequest{
+		pr := parsedRequest{
 			Model:           fields.Model,
 			Stream:          fields.Stream,
 			SessionID:       fields.Metadata.UserID,
 			ReasoningEffort: effort,
 		}
+		// 一次性提取 image tool 信息，避免后续 requestNeedsImage / accountRequirementsForRequest 重复反序列化 body
+		if payload, ok := parseImageToolPayloadFromFields(body); ok {
+			pr.imageToolPayloadValid = true
+			pr.imageToolPayload = payload
+		}
+		return pr
 	}
 	if strings.HasPrefix(contentType, "multipart/") {
 		return parseMultipartFields(body, contentType)
@@ -182,6 +190,17 @@ func requestNeedsImage(mgr *Manager, path, model string, body []byte) bool {
 	return isImageAPIPath(path) || isImageModel(mgr, model) || hasForcedImageGenerationTool(body)
 }
 
+// requestNeedsImageCached 使用 forwardState 中缓存的 imageToolPayload，避免重复反序列化 body。
+func requestNeedsImageCached(mgr *Manager, state *forwardState) bool {
+	if isImageAPIPath(state.requestPath) || isImageModel(mgr, state.model) {
+		return true
+	}
+	if state.imageToolPayloadValid {
+		return hasForcedImageGenerationToolFromPayload(state.imageToolPayload)
+	}
+	return hasForcedImageGenerationTool(state.body)
+}
+
 // requestHasImageWorkload 判断请求是否需要更长的图片工作超时。
 // 这里也保留 Responses API 的 image_generation tool 识别，用于放宽生成链路等待时间。
 func requestHasImageWorkload(mgr *Manager, path, model string, body []byte) bool {
@@ -205,6 +224,36 @@ func accountRequirementsForRequest(mgr *Manager, path, model string, body []byte
 		}
 	}
 	return scheduler.AccountRequirements{Workload: scheduler.WorkloadChat}
+}
+
+// accountRequirementsForRequestCached 复用 parsedRequest 中已缓存的 imageToolPayload，避免重复反序列化 body。
+func accountRequirementsForRequestCached(mgr *Manager, path, model string, parsed *parsedRequest) scheduler.AccountRequirements {
+	if isImageAPIPath(path) || isImageModel(mgr, model) {
+		return scheduler.AccountRequirements{
+			Workload: scheduler.WorkloadImage,
+			ImageProtocols: []scheduler.ImageProtocol{
+				scheduler.ImageProtocolImagesAPI,
+				scheduler.ImageProtocolResponsesTool,
+			},
+		}
+	}
+	if parsed.imageToolPayloadValid && hasForcedImageGenerationToolFromPayload(parsed.imageToolPayload) {
+		return scheduler.AccountRequirements{
+			Workload:       scheduler.WorkloadImage,
+			ImageProtocols: []scheduler.ImageProtocol{scheduler.ImageProtocolResponsesTool},
+		}
+	}
+	return scheduler.AccountRequirements{Workload: scheduler.WorkloadChat}
+}
+
+func hasForcedImageGenerationToolFromPayload(payload imageToolPayload) bool {
+	if len(payload.ToolChoice) == 0 {
+		return false
+	}
+	if payload.toolChoiceForcesImageGeneration() {
+		return true
+	}
+	return payload.toolChoiceRequiresOnlyImageGeneration()
 }
 
 func isImageAPIPath(path string) bool {
@@ -273,6 +322,10 @@ func parseImageToolPayload(body []byte) (imageToolPayload, bool) {
 	}
 	return payload, true
 }
+
+// parseImageToolPayloadFromFields 复用 parseBody 阶段已经验证可解析的 body，
+// 只提取 tools/tool_choice 字段。与 parseImageToolPayload 逻辑相同，仅命名区分调用场景。
+var parseImageToolPayloadFromFields = parseImageToolPayload
 
 func (p imageToolPayload) imageGenerationToolCount() int {
 	count := 0
@@ -420,9 +473,20 @@ func applyAccountCapabilityHeaders(headers http.Header, acc *ent.Account) {
 	}
 }
 
-// buildHeaders 克隆请求头并附加 X-Airgate-* 系列（分组级 service_tier / 强制 instructions / 插件开关）。
+// buildHeaders 选择性拷贝请求头并附加 X-Airgate-* 系列（分组级 service_tier / 强制 instructions / 插件开关）。
+// 跳过 hop-by-hop 头和认证头（插件用 Account.Credentials 鉴权上游），避免全量 Clone 的分配开销。
 func buildHeaders(source http.Header, keyInfo *auth.APIKeyInfo) http.Header {
-	headers := source.Clone()
+	headers := make(http.Header, len(source)+8)
+	for k, v := range source {
+		lower := strings.ToLower(k)
+		if lower == "authorization" || lower == "x-api-key" ||
+			lower == "connection" || lower == "keep-alive" ||
+			lower == "proxy-authorization" || lower == "te" ||
+			lower == "transfer-encoding" || lower == "upgrade" {
+			continue
+		}
+		headers[k] = v
+	}
 	if keyInfo.UserID > 0 {
 		headers.Set("X-Airgate-User-ID", strconv.Itoa(keyInfo.UserID))
 	}

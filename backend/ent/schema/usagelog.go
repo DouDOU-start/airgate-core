@@ -107,6 +107,8 @@ func (UsageLog) Indexes() []ent.Index {
 			StorageKey("usage_log_platform_created_at"),
 		index.Fields("user_id_snapshot", "created_at").
 			StorageKey("usage_log_user_snapshot_created_at"),
+		index.Fields("model", "created_at").
+			StorageKey("usage_log_model_created_at"),
 		index.Edges("user").
 			StorageKey("usage_log_user"),
 		index.Edges("api_key").

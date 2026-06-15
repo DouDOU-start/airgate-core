@@ -45,10 +45,17 @@ func (s *Scheduler) SelectAccountWithRequirements(ctx context.Context, platform,
 	}
 
 	now := time.Now()
+
+	// 预获取所有候选账号的并发负载，避免 checkSchedulability 和 selectByLoadBalance 重复查 Redis
+	loadCache := make(map[int]int, len(candidates))
+	for _, acc := range candidates {
+		loadCache[acc.ID] = s.getCurrentLoad(ctx, acc.ID)
+	}
+
 	normalCandidates := make([]*ent.Account, 0, len(candidates))
 	stickyCandidates := make([]*ent.Account, 0, len(candidates))
 	for _, acc := range candidates {
-		switch s.checkSchedulability(ctx, acc, model, now) {
+		switch s.checkSchedulabilityWithLoad(ctx, acc, model, now, loadCache[acc.ID]) {
 		case Normal:
 			normalCandidates = append(normalCandidates, acc)
 			stickyCandidates = append(stickyCandidates, acc)
@@ -76,7 +83,7 @@ func (s *Scheduler) SelectAccountWithRequirements(ctx context.Context, platform,
 		if len(stickyCandidates) == 0 {
 			return nil, ErrNoAvailableAccount
 		}
-		selected := s.selectByLoadBalance(ctx, stickyCandidates, now)
+		selected := s.selectByLoadBalanceWithCache(ctx, stickyCandidates, now, loadCache)
 		if selected == nil {
 			return nil, ErrNoAvailableAccount
 		}
@@ -88,7 +95,7 @@ func (s *Scheduler) SelectAccountWithRequirements(ctx context.Context, platform,
 		return s.maybeRegisterSession(ctx, selected, userID, platform, sessionID, stickyCandidates, now)
 	}
 
-	selected := s.selectByLoadBalance(ctx, normalCandidates, now)
+	selected := s.selectByLoadBalanceWithCache(ctx, normalCandidates, now, loadCache)
 	if selected == nil {
 		return nil, ErrNoAvailableAccount
 	}
@@ -232,10 +239,11 @@ func matchModelRouting(routing map[string][]int64, model string) []int64 {
 	return nil
 }
 
-// checkSchedulability 先看状态（state + state_until），再叠加软约束（并发 / windowCost / RPM / session），取最严格者。
+// checkSchedulabilityWithLoad 先看状态（state + state_until），再叠加软约束（并发 / windowCost / RPM / session），取最严格者。
 // model 用于推导请求所属的家族（gpt-image / chat 各算一个池），仅当该家族正在
 // 冷却时才把账号当作 NotSchedulable —— 别的家族不受影响。
-func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, model string, now time.Time) Schedulability {
+// 使用预获取的并发负载值，避免重复查 Redis。
+func (s *Scheduler) checkSchedulabilityWithLoad(ctx context.Context, acc *ent.Account, model string, now time.Time, load int) Schedulability {
 	base := SchedulabilityOf(acc, now)
 	if base == NotSchedulable {
 		return NotSchedulable
@@ -250,7 +258,7 @@ func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, m
 		}
 	}
 
-	if sched := s.concurrencySchedulability(ctx, acc); sched > worst {
+	if sched := concurrencySchedulabilityFromLoad(acc, load); sched > worst {
 		worst = sched
 	}
 	if worst == NotSchedulable {
@@ -274,19 +282,18 @@ func (s *Scheduler) checkSchedulability(ctx context.Context, acc *ent.Account, m
 	return worst
 }
 
-// concurrencySchedulability 根据当前并发用量返回调度约束：
+// concurrencySchedulabilityFromLoad 根据当前并发用量返回调度约束：
 //
 //	load >= 100% → NotSchedulable（调度器直接跳过，避免下游 acquireSlot 失败浪费 failover）
 //	load >=  80% → StickyOnly（软降级：只有粘性会话能选中，新请求优先换账号）
 //	否则         → Normal
 //
 // 存在 TOCTOU（这里看没满、下一瞬 acquireSlot 却满）：forwarder 会 failover 到下一个账号兜底。
-func (s *Scheduler) concurrencySchedulability(ctx context.Context, acc *ent.Account) Schedulability {
+func concurrencySchedulabilityFromLoad(acc *ent.Account, load int) Schedulability {
 	maxConc := acc.MaxConcurrency
 	if maxConc <= 0 {
 		maxConc = DefaultAccountMaxConcurrency
 	}
-	load := s.getCurrentLoad(ctx, acc.ID)
 	if load >= maxConc {
 		return NotSchedulable
 	}
@@ -302,6 +309,15 @@ func (s *Scheduler) concurrencySchedulability(ctx context.Context, acc *ent.Acco
 // 低优先级账号只有在高优先级全部被 checkSchedulability 过滤掉后才能被选中。
 // 同层内从 top-N 随机选一个，避免高并发下全部命中同一账号。
 func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.Account, now time.Time) *ent.Account {
+	loadCache := make(map[int]int, len(candidates))
+	for _, acc := range candidates {
+		loadCache[acc.ID] = s.getCurrentLoad(ctx, acc.ID)
+	}
+	return s.selectByLoadBalanceWithCache(ctx, candidates, now, loadCache)
+}
+
+// selectByLoadBalanceWithCache 复用预获取的并发负载缓存，避免重复查 Redis。
+func (s *Scheduler) selectByLoadBalanceWithCache(_ context.Context, candidates []*ent.Account, now time.Time, loadCache map[int]int) *ent.Account {
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -338,7 +354,7 @@ func (s *Scheduler) selectByLoadBalance(ctx context.Context, candidates []*ent.A
 		if maxConc <= 0 {
 			maxConc = DefaultAccountMaxConcurrency
 		}
-		loadRate := float64(s.getCurrentLoad(ctx, acc.ID)) / float64(maxConc)
+		loadRate := float64(loadCache[acc.ID]) / float64(maxConc)
 		if loadRate > 1 {
 			loadRate = 1
 		}

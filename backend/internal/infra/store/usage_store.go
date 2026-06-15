@@ -384,6 +384,7 @@ func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilt
 		query = query.Where(entusagelog.CreatedAtGTE(time.Now().Add(-time.Duration(filter.DefaultRecentHours) * time.Hour)))
 	}
 
+	const trendEntryLimit = 50000
 	logs, err := query.
 		Select(
 			entusagelog.FieldInputTokens,
@@ -395,6 +396,8 @@ func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilt
 			entusagelog.FieldTotalCost,
 			entusagelog.FieldCreatedAt,
 		).
+		Order(ent.Desc(entusagelog.FieldCreatedAt)).
+		Limit(trendEntryLimit).
 		All(ctx)
 	if err != nil {
 		return nil, err

@@ -24,14 +24,11 @@ func NewRPMCounter(rdb *redis.Client) *RPMCounter {
 	return &RPMCounter{rdb: rdb}
 }
 
-// getMinuteKey 使用 Redis 服务器时间生成分钟粒度的 Redis key，避免分布式时钟偏差
-func (r *RPMCounter) getMinuteKey(ctx context.Context, accountID int) string {
-	t, err := r.rdb.Time(ctx).Result()
-	if err != nil {
-		// fallback to local time
-		t = time.Now()
-	}
-	minute := t.Unix() / 60
+// getMinuteKey 生成分钟粒度的 Redis key。
+// 使用本地时间：分钟级 key 粒度下各机器时钟偏差（通常 <1s）完全可接受，
+// 省去每次调用一次 Redis TIME 命令的额外 RTT。
+func (r *RPMCounter) getMinuteKey(_ context.Context, accountID int) string {
+	minute := time.Now().Unix() / 60
 	return fmt.Sprintf("rpm:%d:%d", accountID, minute)
 }
 
