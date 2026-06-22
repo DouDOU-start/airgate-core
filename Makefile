@@ -34,7 +34,7 @@ LDFLAGS := -X github.com/DouDOU-start/airgate-core/internal/version.Version=$(VE
 .PHONY: help dev dev-backend dev-frontend dev-plugins dev-plugin-openai dev-plugin-claude dev-plugin-playground dev-plugin-epay dev-plugin-health dev-plugin-kiro dev-plugin-studio \
         build build-backend build-frontend \
         build-plugins sync-plugins \
-        ent lint fmt test clean install ci pre-commit setup-hooks \
+        ent lint fmt test clean install ci pre-commit setup-hooks verify-readme \
         docker-build docker-rebuild docker-up docker-down docker-restart docker-dev
 
 help: ## 显示帮助信息
@@ -279,9 +279,9 @@ test: ## 运行测试
 
 # ===================== CI =====================
 
-ci: lint test vet verify-ent build-backend ## 本地运行与 CI 完全一致的检查
+ci: lint test vet verify-ent verify-readme build-backend ## 本地运行与 CI 完全一致的检查
 
-pre-commit: lint vet verify-ent build-backend ## pre-commit hook 调用（跳过耗时的测试）
+pre-commit: lint vet verify-ent verify-readme build-backend ## pre-commit hook 调用（跳过耗时的测试）
 
 vet: ## 静态分析
 	@cd $(BACKEND_DIR) && $(GO) vet ./...
@@ -295,6 +295,9 @@ verify-ent: ## 验证 Ent 生成代码是否最新
 		exit 1; \
 	fi
 	@echo "Ent 生成代码一致"
+
+verify-readme: ## 验证 README.md 与 README_EN.md 结构同步
+	@bash scripts/check-readme-sync.sh
 
 setup-hooks: ## 安装 Git hooks（pre-commit + commit-msg）
 	@echo '#!/bin/sh' > .git/hooks/pre-commit
