@@ -31,30 +31,7 @@ func (s *UsageStore) ListUser(ctx context.Context, userID int64, filter appusage
 	query := s.db.UsageLog.Query().
 		Where(usageUserPredicate(userID))
 	query = applyUsageListFilter(query, filter)
-
-	total, err := query.Count(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	logs, err := query.
-		WithUser().
-		WithAPIKey().
-		WithAccount().
-		WithGroup().
-		Offset((filter.Page-1)*filter.PageSize).
-		Limit(filter.PageSize).
-		Order(ent.Desc(entusagelog.FieldCreatedAt), ent.Desc(entusagelog.FieldID)).
-		All(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	result := make([]appusage.LogRecord, 0, len(logs))
-	for _, item := range logs {
-		result = append(result, mapUsageLog(item))
-	}
-	return result, int64(total), nil
+	return s.paginateUsageLogs(ctx, query, filter.Page, filter.PageSize)
 }
 
 // ListAdmin 查询管理员使用记录。
@@ -64,30 +41,7 @@ func (s *UsageStore) ListAdmin(ctx context.Context, filter appusage.ListFilter) 
 		query = query.Where(usageUserPredicate(*filter.UserID))
 	}
 	query = applyUsageListFilter(query, filter)
-
-	total, err := query.Count(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	logs, err := query.
-		WithUser().
-		WithAPIKey().
-		WithAccount().
-		WithGroup().
-		Offset((filter.Page-1)*filter.PageSize).
-		Limit(filter.PageSize).
-		Order(ent.Desc(entusagelog.FieldCreatedAt), ent.Desc(entusagelog.FieldID)).
-		All(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	result := make([]appusage.LogRecord, 0, len(logs))
-	for _, item := range logs {
-		result = append(result, mapUsageLog(item))
-	}
-	return result, int64(total), nil
+	return s.paginateUsageLogs(ctx, query, filter.Page, filter.PageSize)
 }
 
 // SummaryUser 查询用户汇总统计。
@@ -417,6 +371,49 @@ func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilt
 		})
 	}
 	return result, nil
+}
+
+// paginateUsageLogs 延迟 JOIN 分页：先查 ID（索引扫描），再按 ID 加载完整行，
+// 避免 OFFSET 丢弃行与 4 表 JOIN 叠加导致的深页性能劣化。
+func (s *UsageStore) paginateUsageLogs(ctx context.Context, query *ent.UsageLogQuery, page, pageSize int) ([]appusage.LogRecord, int64, error) {
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	if total == 0 {
+		return nil, 0, nil
+	}
+
+	ids, err := query.Clone().
+		Offset((page-1)*pageSize).
+		Limit(pageSize).
+		Order(ent.Desc(entusagelog.FieldCreatedAt), ent.Desc(entusagelog.FieldID)).
+		Select(entusagelog.FieldID).
+		Ints(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(ids) == 0 {
+		return nil, int64(total), nil
+	}
+
+	logs, err := s.db.UsageLog.Query().
+		Where(entusagelog.IDIn(ids...)).
+		WithUser().
+		WithAPIKey().
+		WithAccount().
+		WithGroup().
+		Order(ent.Desc(entusagelog.FieldCreatedAt), ent.Desc(entusagelog.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	result := make([]appusage.LogRecord, 0, len(logs))
+	for _, item := range logs {
+		result = append(result, mapUsageLog(item))
+	}
+	return result, int64(total), nil
 }
 
 func usageUserPredicate(userID int64) predicate.UsageLog {
