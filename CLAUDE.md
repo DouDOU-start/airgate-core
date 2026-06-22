@@ -19,7 +19,7 @@
 
 **边界纪律（新增/改动代码必须遵守）**：
 
-1. **禁止新增 provider/模型字符串特判**。协议/平台差异一律经插件 Metadata 约定键声明，Core 仅留历史默认兜底。现有 6 键：`metadata_only` / `error_format` / `family` / `scheduling_model` / `scheduling_model_map` / `account.oauth_plans`；新增约定键须同步登记 skill `core-dev` 的 Metadata 约定表。
+1. **禁止新增 provider/模型字符串特判**。协议/平台差异一律经插件 Metadata 约定键声明，Core 只留与厂商无关的默认兜底。现有 6 键：`metadata_only` / `error_format` / `family` / `scheduling_model` / `scheduling_model_map` / `account.oauth_plans`；新增约定键须同步登记 skill `core-dev` 的 Metadata 约定表。**现存硬编码越界**（`scheduling_model.go` 的 claude/openai 翻译映射、`selector.go`/`billing/image_pricing.go`/`asset_cleanup.go` 的图像 provider 假定）已逐条登记 skill `core-dev`「技术债」，**勿加深**，越界判定标准见该节。
 2. **HostService 是插件调 core 的唯一通道**（`internal/plugin/host_service.go`，现 19 个 method：scheduler/probe/gateway/groups/platforms/models/users/assets/tasks 分组），已登记"单通道过宽"债务。新增 method 前先确认属**跨插件的平台能力**，单插件业务勿入；新增后同步登记 skill `core-dev`。
 3. **core 禁止 import 插件包**，识别插件仅经 SDK 接口 + manifest；core 代码勿绑定具体插件名（`/status` 反代目标经 config `plugins.status_plugin` 指定即为此例）。
 4. 触碰技术债登记的热点时**勿加深**（详见 skill `core-dev`「技术债」），治理按排期，无需顺手重构。
