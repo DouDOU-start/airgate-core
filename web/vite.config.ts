@@ -67,7 +67,22 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
+    // 仓库在 WSL2 的 /mnt 盘（9p 文件系统）上时按需转换极慢：
+    // 服务一启动就预热首屏链路的转换缓存，避免浏览器首个请求才触发级联转换。
+    warmup: {
+      clientFiles: [
+        './src/main.tsx',
+        './src/index.css',
+        './src/app/providers/AuthProvider.tsx',
+        './src/app/router.tsx',
+        './src/app/routePreloads.ts',
+        './src/app/layout/AppShell.tsx',
+        './src/pages/LoginPage.tsx',
+        './src/pages/DashboardPage.tsx',
+      ],
+    },
     watch: {
+      // /mnt 盘 9p 文件系统不支持 inotify，只能轮询（仓库挪到 WSL 原生 ext4 后可移除）
       usePolling: true,
       interval: 1000,
     },
