@@ -2,7 +2,9 @@
 # 单位：USD / 1,000,000 tokens。per_request 为 USD/次（按次计费模型用，token 计费模型填 0）。
 # 来源：airgate-openai registry.go + airgate-claude models.go（standalone-gateway 分支提取）。
 # 字段映射：input←InputPrice，output←OutputPrice，cached_input←CachedPrice/CachedInputPrice，
-#   cache_creation←claude 的 CacheCreationPrice(5m 缓存写入档，openai 无此档填 0)，per_request←0。
+#   cache_creation←claude 的 CacheCreationPrice(5m 缓存写入档，openai 无此档填 0)，
+#   cache_creation_1h←claude 的 CacheCreation1hPrice(1h 缓存写入档)，per_request←0。
+#   pricing_extra←服务档倍率(service_tiers)+长上下文阶梯(long_context)，长尾维度，多数模型省略。
 # 语义：core 启动时 insert-if-absent——只导入价目表里尚不存在的 model，已存在的（含你手动改过的）不覆盖。
 # 手动修改：直接编辑本文件后重启即可补入新模型；已存在模型的调价请用后台价目表页或删除该行对应 DB 记录后重启。
 #
@@ -10,6 +12,8 @@
 #   - claude 别名（如 claude-sonnet-4-5）与其规范模型（claude-sonnet-4-5-20250929）同价，
 #     二者都作为独立条目导入，因为渠道化 core 按客户端请求的 model 名计价。
 #   - openai 纯图像模型（gpt-image-1 / gpt-image-1.5 / gpt-image-2）按次计价结构不同（属 P6），此处跳过。
+#   - openai service_tiers：priority/flex 为整单倍率（priority=2×标准，gpt-5.5=2.5×；flex=0.5×标准）。
+#   - openai long_context：仅 gpt-5.4 家族；完整 prompt 超阈值时各维度单价按倍率放大。
 models:
   # ── claude（airgate-claude / models.go，含别名）──
   - model: claude-fable-5
@@ -17,90 +21,105 @@ models:
     output: 50.0
     cached_input: 1.0
     cache_creation: 12.5
+    cache_creation_1h: 20.0
     per_request: 0
   - model: claude-haiku-4-5           # 别名 → claude-haiku-4-5-20251001
     input: 1.0
     output: 5.0
     cached_input: 0.1
     cache_creation: 1.25
+    cache_creation_1h: 2.0
     per_request: 0
   - model: claude-haiku-4-5-20251001
     input: 1.0
     output: 5.0
     cached_input: 0.1
     cache_creation: 1.25
+    cache_creation_1h: 2.0
     per_request: 0
   - model: claude-opus-4-1            # 别名 → claude-opus-4-1-20250805
     input: 15.0
     output: 75.0
     cached_input: 1.5
     cache_creation: 18.75
+    cache_creation_1h: 30.0
     per_request: 0
   - model: claude-opus-4-1-20250805
     input: 15.0
     output: 75.0
     cached_input: 1.5
     cache_creation: 18.75
+    cache_creation_1h: 30.0
     per_request: 0
   - model: claude-opus-4-5            # 别名 → claude-opus-4-5-20251101
     input: 5.0
     output: 25.0
     cached_input: 0.5
     cache_creation: 6.25
+    cache_creation_1h: 10.0
     per_request: 0
   - model: claude-opus-4-5-20251101
     input: 5.0
     output: 25.0
     cached_input: 0.5
     cache_creation: 6.25
+    cache_creation_1h: 10.0
     per_request: 0
   - model: claude-opus-4-6
     input: 5.0
     output: 25.0
     cached_input: 0.5
     cache_creation: 6.25
+    cache_creation_1h: 10.0
     per_request: 0
   - model: claude-opus-4-7
     input: 5.0
     output: 25.0
     cached_input: 0.5
     cache_creation: 6.25
+    cache_creation_1h: 10.0
     per_request: 0
   - model: claude-opus-4-8
     input: 5.0
     output: 25.0
     cached_input: 0.5
     cache_creation: 6.25
+    cache_creation_1h: 10.0
     per_request: 0
   - model: claude-sonnet-4-0          # 别名 → claude-sonnet-4-20250514
     input: 3.0
     output: 15.0
     cached_input: 0.3
     cache_creation: 3.75
+    cache_creation_1h: 6.0
     per_request: 0
   - model: claude-sonnet-4-20250514
     input: 3.0
     output: 15.0
     cached_input: 0.3
     cache_creation: 3.75
+    cache_creation_1h: 6.0
     per_request: 0
   - model: claude-sonnet-4-5          # 别名 → claude-sonnet-4-5-20250929
     input: 3.0
     output: 15.0
     cached_input: 0.3
     cache_creation: 3.75
+    cache_creation_1h: 6.0
     per_request: 0
   - model: claude-sonnet-4-5-20250929
     input: 3.0
     output: 15.0
     cached_input: 0.3
     cache_creation: 3.75
+    cache_creation_1h: 6.0
     per_request: 0
   - model: claude-sonnet-4-6
     input: 3.0
     output: 15.0
     cached_input: 0.3
     cache_creation: 3.75
+    cache_creation_1h: 6.0
     per_request: 0
   # ── openai（airgate-openai / registry.go，标准档；纯图像模型跳过）──
   - model: gpt-5.3-codex-spark
@@ -109,21 +128,42 @@ models:
     cached_input: 0.175
     cache_creation: 0
     per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+        flex: 0.5
   - model: gpt-5.4
     input: 2.5
     output: 15.0
     cached_input: 0.25
     cache_creation: 0
     per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+        flex: 0.5
+      long_context:
+        threshold_tokens: 272000
+        input_multiplier: 2.0
+        output_multiplier: 1.5
+        cached_multiplier: 2.0
   - model: gpt-5.4-mini
     input: 0.75
     output: 4.5
     cached_input: 0.075
     cache_creation: 0
     per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+        flex: 0.5
   - model: gpt-5.5
     input: 5.0
     output: 30.0
     cached_input: 0.5
     cache_creation: 0
     per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.5
+        flex: 0.5

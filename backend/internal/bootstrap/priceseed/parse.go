@@ -16,12 +16,14 @@ type seedFile struct {
 
 // seedModel 是单个模型的种子价格。字段单位见 YAML 头部注释。
 type seedModel struct {
-	Model         string  `yaml:"model"`
-	Input         float64 `yaml:"input"`
-	Output        float64 `yaml:"output"`
-	CachedInput   float64 `yaml:"cached_input"`
-	CacheCreation float64 `yaml:"cache_creation"`
-	PerRequest    float64 `yaml:"per_request"`
+	Model           string                 `yaml:"model"`
+	Input           float64                `yaml:"input"`
+	Output          float64                `yaml:"output"`
+	CachedInput     float64                `yaml:"cached_input"`
+	CacheCreation   float64                `yaml:"cache_creation"`    // 缓存写入 5m 档
+	CacheCreation1h float64                `yaml:"cache_creation_1h"` // 缓存写入 1h 档
+	PerRequest      float64                `yaml:"per_request"`
+	PricingExtra    map[string]interface{} `yaml:"pricing_extra"`
 }
 
 // Parse 解析种子 YAML 为 modelprice 的 CreateInput 列表。
@@ -39,12 +41,14 @@ func Parse(data []byte) ([]appmodelprice.CreateInput, error) {
 			continue
 		}
 		items = append(items, appmodelprice.CreateInput{
-			Model:              name,
-			InputPrice:         m.Input,
-			OutputPrice:        m.Output,
-			CachedInputPrice:   m.CachedInput,
-			CacheCreationPrice: m.CacheCreation,
-			PerRequestPrice:    m.PerRequest,
+			Model:                name,
+			InputPrice:           m.Input,
+			OutputPrice:          m.Output,
+			CachedInputPrice:     m.CachedInput,
+			CacheCreationPrice:   m.CacheCreation,
+			CacheCreation1hPrice: m.CacheCreation1h,
+			PerRequestPrice:      m.PerRequest,
+			PricingExtra:         m.PricingExtra,
 		})
 	}
 	return items, nil

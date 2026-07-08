@@ -6378,26 +6378,29 @@ func (m *GroupMutation) ResetEdge(name string) error {
 // ModelPriceMutation represents an operation that mutates the ModelPrice nodes in the graph.
 type ModelPriceMutation struct {
 	config
-	op                      Op
-	typ                     string
-	id                      *int
-	model                   *string
-	input_price             *float64
-	addinput_price          *float64
-	output_price            *float64
-	addoutput_price         *float64
-	cached_input_price      *float64
-	addcached_input_price   *float64
-	cache_creation_price    *float64
-	addcache_creation_price *float64
-	per_request_price       *float64
-	addper_request_price    *float64
-	created_at              *time.Time
-	updated_at              *time.Time
-	clearedFields           map[string]struct{}
-	done                    bool
-	oldValue                func(context.Context) (*ModelPrice, error)
-	predicates              []predicate.ModelPrice
+	op                         Op
+	typ                        string
+	id                         *int
+	model                      *string
+	input_price                *float64
+	addinput_price             *float64
+	output_price               *float64
+	addoutput_price            *float64
+	cached_input_price         *float64
+	addcached_input_price      *float64
+	cache_creation_price       *float64
+	addcache_creation_price    *float64
+	cache_creation_1h_price    *float64
+	addcache_creation_1h_price *float64
+	per_request_price          *float64
+	addper_request_price       *float64
+	pricing_extra              *map[string]interface{}
+	created_at                 *time.Time
+	updated_at                 *time.Time
+	clearedFields              map[string]struct{}
+	done                       bool
+	oldValue                   func(context.Context) (*ModelPrice, error)
+	predicates                 []predicate.ModelPrice
 }
 
 var _ ent.Mutation = (*ModelPriceMutation)(nil)
@@ -6758,6 +6761,62 @@ func (m *ModelPriceMutation) ResetCacheCreationPrice() {
 	m.addcache_creation_price = nil
 }
 
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (m *ModelPriceMutation) SetCacheCreation1hPrice(f float64) {
+	m.cache_creation_1h_price = &f
+	m.addcache_creation_1h_price = nil
+}
+
+// CacheCreation1hPrice returns the value of the "cache_creation_1h_price" field in the mutation.
+func (m *ModelPriceMutation) CacheCreation1hPrice() (r float64, exists bool) {
+	v := m.cache_creation_1h_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheCreation1hPrice returns the old "cache_creation_1h_price" field's value of the ModelPrice entity.
+// If the ModelPrice object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ModelPriceMutation) OldCacheCreation1hPrice(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheCreation1hPrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheCreation1hPrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheCreation1hPrice: %w", err)
+	}
+	return oldValue.CacheCreation1hPrice, nil
+}
+
+// AddCacheCreation1hPrice adds f to the "cache_creation_1h_price" field.
+func (m *ModelPriceMutation) AddCacheCreation1hPrice(f float64) {
+	if m.addcache_creation_1h_price != nil {
+		*m.addcache_creation_1h_price += f
+	} else {
+		m.addcache_creation_1h_price = &f
+	}
+}
+
+// AddedCacheCreation1hPrice returns the value that was added to the "cache_creation_1h_price" field in this mutation.
+func (m *ModelPriceMutation) AddedCacheCreation1hPrice() (r float64, exists bool) {
+	v := m.addcache_creation_1h_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCacheCreation1hPrice resets all changes to the "cache_creation_1h_price" field.
+func (m *ModelPriceMutation) ResetCacheCreation1hPrice() {
+	m.cache_creation_1h_price = nil
+	m.addcache_creation_1h_price = nil
+}
+
 // SetPerRequestPrice sets the "per_request_price" field.
 func (m *ModelPriceMutation) SetPerRequestPrice(f float64) {
 	m.per_request_price = &f
@@ -6812,6 +6871,55 @@ func (m *ModelPriceMutation) AddedPerRequestPrice() (r float64, exists bool) {
 func (m *ModelPriceMutation) ResetPerRequestPrice() {
 	m.per_request_price = nil
 	m.addper_request_price = nil
+}
+
+// SetPricingExtra sets the "pricing_extra" field.
+func (m *ModelPriceMutation) SetPricingExtra(value map[string]interface{}) {
+	m.pricing_extra = &value
+}
+
+// PricingExtra returns the value of the "pricing_extra" field in the mutation.
+func (m *ModelPriceMutation) PricingExtra() (r map[string]interface{}, exists bool) {
+	v := m.pricing_extra
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPricingExtra returns the old "pricing_extra" field's value of the ModelPrice entity.
+// If the ModelPrice object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ModelPriceMutation) OldPricingExtra(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPricingExtra is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPricingExtra requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPricingExtra: %w", err)
+	}
+	return oldValue.PricingExtra, nil
+}
+
+// ClearPricingExtra clears the value of the "pricing_extra" field.
+func (m *ModelPriceMutation) ClearPricingExtra() {
+	m.pricing_extra = nil
+	m.clearedFields[modelprice.FieldPricingExtra] = struct{}{}
+}
+
+// PricingExtraCleared returns if the "pricing_extra" field was cleared in this mutation.
+func (m *ModelPriceMutation) PricingExtraCleared() bool {
+	_, ok := m.clearedFields[modelprice.FieldPricingExtra]
+	return ok
+}
+
+// ResetPricingExtra resets all changes to the "pricing_extra" field.
+func (m *ModelPriceMutation) ResetPricingExtra() {
+	m.pricing_extra = nil
+	delete(m.clearedFields, modelprice.FieldPricingExtra)
 }
 
 // SetCreatedAt sets the "created_at" field.
@@ -6920,7 +7028,7 @@ func (m *ModelPriceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ModelPriceMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 10)
 	if m.model != nil {
 		fields = append(fields, modelprice.FieldModel)
 	}
@@ -6936,8 +7044,14 @@ func (m *ModelPriceMutation) Fields() []string {
 	if m.cache_creation_price != nil {
 		fields = append(fields, modelprice.FieldCacheCreationPrice)
 	}
+	if m.cache_creation_1h_price != nil {
+		fields = append(fields, modelprice.FieldCacheCreation1hPrice)
+	}
 	if m.per_request_price != nil {
 		fields = append(fields, modelprice.FieldPerRequestPrice)
+	}
+	if m.pricing_extra != nil {
+		fields = append(fields, modelprice.FieldPricingExtra)
 	}
 	if m.created_at != nil {
 		fields = append(fields, modelprice.FieldCreatedAt)
@@ -6963,8 +7077,12 @@ func (m *ModelPriceMutation) Field(name string) (ent.Value, bool) {
 		return m.CachedInputPrice()
 	case modelprice.FieldCacheCreationPrice:
 		return m.CacheCreationPrice()
+	case modelprice.FieldCacheCreation1hPrice:
+		return m.CacheCreation1hPrice()
 	case modelprice.FieldPerRequestPrice:
 		return m.PerRequestPrice()
+	case modelprice.FieldPricingExtra:
+		return m.PricingExtra()
 	case modelprice.FieldCreatedAt:
 		return m.CreatedAt()
 	case modelprice.FieldUpdatedAt:
@@ -6988,8 +7106,12 @@ func (m *ModelPriceMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldCachedInputPrice(ctx)
 	case modelprice.FieldCacheCreationPrice:
 		return m.OldCacheCreationPrice(ctx)
+	case modelprice.FieldCacheCreation1hPrice:
+		return m.OldCacheCreation1hPrice(ctx)
 	case modelprice.FieldPerRequestPrice:
 		return m.OldPerRequestPrice(ctx)
+	case modelprice.FieldPricingExtra:
+		return m.OldPricingExtra(ctx)
 	case modelprice.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case modelprice.FieldUpdatedAt:
@@ -7038,12 +7160,26 @@ func (m *ModelPriceMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCacheCreationPrice(v)
 		return nil
+	case modelprice.FieldCacheCreation1hPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheCreation1hPrice(v)
+		return nil
 	case modelprice.FieldPerRequestPrice:
 		v, ok := value.(float64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPerRequestPrice(v)
+		return nil
+	case modelprice.FieldPricingExtra:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPricingExtra(v)
 		return nil
 	case modelprice.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -7079,6 +7215,9 @@ func (m *ModelPriceMutation) AddedFields() []string {
 	if m.addcache_creation_price != nil {
 		fields = append(fields, modelprice.FieldCacheCreationPrice)
 	}
+	if m.addcache_creation_1h_price != nil {
+		fields = append(fields, modelprice.FieldCacheCreation1hPrice)
+	}
 	if m.addper_request_price != nil {
 		fields = append(fields, modelprice.FieldPerRequestPrice)
 	}
@@ -7098,6 +7237,8 @@ func (m *ModelPriceMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedCachedInputPrice()
 	case modelprice.FieldCacheCreationPrice:
 		return m.AddedCacheCreationPrice()
+	case modelprice.FieldCacheCreation1hPrice:
+		return m.AddedCacheCreation1hPrice()
 	case modelprice.FieldPerRequestPrice:
 		return m.AddedPerRequestPrice()
 	}
@@ -7137,6 +7278,13 @@ func (m *ModelPriceMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddCacheCreationPrice(v)
 		return nil
+	case modelprice.FieldCacheCreation1hPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCacheCreation1hPrice(v)
+		return nil
 	case modelprice.FieldPerRequestPrice:
 		v, ok := value.(float64)
 		if !ok {
@@ -7151,7 +7299,11 @@ func (m *ModelPriceMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *ModelPriceMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(modelprice.FieldPricingExtra) {
+		fields = append(fields, modelprice.FieldPricingExtra)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -7164,6 +7316,11 @@ func (m *ModelPriceMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *ModelPriceMutation) ClearField(name string) error {
+	switch name {
+	case modelprice.FieldPricingExtra:
+		m.ClearPricingExtra()
+		return nil
+	}
 	return fmt.Errorf("unknown ModelPrice nullable field %s", name)
 }
 
@@ -7186,8 +7343,14 @@ func (m *ModelPriceMutation) ResetField(name string) error {
 	case modelprice.FieldCacheCreationPrice:
 		m.ResetCacheCreationPrice()
 		return nil
+	case modelprice.FieldCacheCreation1hPrice:
+		m.ResetCacheCreation1hPrice()
+		return nil
 	case modelprice.FieldPerRequestPrice:
 		m.ResetPerRequestPrice()
+		return nil
+	case modelprice.FieldPricingExtra:
+		m.ResetPricingExtra()
 		return nil
 	case modelprice.FieldCreatedAt:
 		m.ResetCreatedAt()

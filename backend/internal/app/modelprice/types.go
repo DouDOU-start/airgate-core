@@ -20,15 +20,18 @@ type Repository interface {
 
 // ModelPrice 模型价格领域对象。价格单位 USD / 1M tokens；PerRequestPrice 为 USD / 次。
 type ModelPrice struct {
-	ID                 int
-	Model              string
-	InputPrice         float64
-	OutputPrice        float64
-	CachedInputPrice   float64
-	CacheCreationPrice float64
-	PerRequestPrice    float64
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                   int
+	Model                string
+	InputPrice           float64
+	OutputPrice          float64
+	CachedInputPrice     float64
+	CacheCreationPrice   float64 // 缓存写入 5m TTL 单价
+	CacheCreation1hPrice float64 // 缓存写入 1h TTL 单价
+	PerRequestPrice      float64
+	// PricingExtra 服务档倍率 + 长上下文阶梯等长尾维度（多数模型为空）。
+	PricingExtra map[string]interface{}
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // ListFilter 价目表列表查询参数。
@@ -48,32 +51,39 @@ type ListResult struct {
 
 // CreateInput 创建价格输入。
 type CreateInput struct {
-	Model              string
-	InputPrice         float64
-	OutputPrice        float64
-	CachedInputPrice   float64
-	CacheCreationPrice float64
-	PerRequestPrice    float64
+	Model                string
+	InputPrice           float64
+	OutputPrice          float64
+	CachedInputPrice     float64
+	CacheCreationPrice   float64
+	CacheCreation1hPrice float64
+	PerRequestPrice      float64
+	PricingExtra         map[string]interface{}
 }
 
 // UpdateInput 更新价格输入（partial，指针字段）。
+// PricingExtra 为整体替换语义：非 nil 时整块写入（空 map 清空扩展）。
 type UpdateInput struct {
-	Model              *string
-	InputPrice         *float64
-	OutputPrice        *float64
-	CachedInputPrice   *float64
-	CacheCreationPrice *float64
-	PerRequestPrice    *float64
+	Model                *string
+	InputPrice           *float64
+	OutputPrice          *float64
+	CachedInputPrice     *float64
+	CacheCreationPrice   *float64
+	CacheCreation1hPrice *float64
+	PerRequestPrice      *float64
+	PricingExtra         map[string]interface{}
 }
 
 // ImportItem 批量导入条目（按 model 名 upsert）。
 type ImportItem struct {
-	Model              string
-	InputPrice         float64
-	OutputPrice        float64
-	CachedInputPrice   float64
-	CacheCreationPrice float64
-	PerRequestPrice    float64
+	Model                string
+	InputPrice           float64
+	OutputPrice          float64
+	CachedInputPrice     float64
+	CacheCreationPrice   float64
+	CacheCreation1hPrice float64
+	PerRequestPrice      float64
+	PricingExtra         map[string]interface{}
 }
 
 // ImportResult 批量导入结果。

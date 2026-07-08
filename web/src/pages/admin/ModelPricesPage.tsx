@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -19,16 +19,21 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import type { CreateModelPriceReq, ImportModelPriceItem, ModelPriceResp } from '../../shared/types';
 
-const COLUMN_COUNT = 8;
+type Translate = (key: string) => string;
 
-// 价格表单（价格单位 USD / 1M tokens；per_request_price 为 USD / 次）
+const COLUMN_COUNT = 6;
+
+// 价格表单（价格单位 USD / 1M tokens；per_request_price 为 USD / 次）。
+// pricing_extra 为 JSON 文本域（服务档倍率 + 长上下文阶梯等长尾维度，可空）。
 interface PriceForm {
   model: string;
   input_price: string;
   output_price: string;
   cached_input_price: string;
   cache_creation_price: string;
+  cache_creation_1h_price: string;
   per_request_price: string;
+  pricing_extra: string;
 }
 
 const emptyForm: PriceForm = {
@@ -37,20 +42,138 @@ const emptyForm: PriceForm = {
   output_price: '',
   cached_input_price: '',
   cache_creation_price: '',
+  cache_creation_1h_price: '',
   per_request_price: '',
+  pricing_extra: '',
 };
 
-const PRICE_FIELDS = [
+type PriceFieldKey =
+  | 'input_price' | 'output_price' | 'cached_input_price'
+  | 'cache_creation_price' | 'cache_creation_1h_price' | 'per_request_price';
+
+const PRICE_FIELDS: readonly PriceFieldKey[] = [
   'input_price',
   'output_price',
   'cached_input_price',
   'cache_creation_price',
+  'cache_creation_1h_price',
   'per_request_price',
-] as const;
+];
+
+// 编辑弹窗的价格字段分组（基础 / 缓存 / 计费模式），让长表单有层次。
+const PRICE_SECTIONS: { titleKey: string; fields: readonly PriceFieldKey[] }[] = [
+  { titleKey: 'model_prices.section_base', fields: ['input_price', 'output_price'] },
+  { titleKey: 'model_prices.section_cache', fields: ['cached_input_price', 'cache_creation_price', 'cache_creation_1h_price'] },
+  { titleKey: 'model_prices.section_billing_mode', fields: ['per_request_price'] },
+];
+
+// pricing_extra 一键模板，方便管理员照着填服务档 / 长上下文。
+const PRICING_EXTRA_TEMPLATE = JSON.stringify({
+  service_tiers: { priority: 2.0, flex: 0.5 },
+  long_context: { threshold_tokens: 272000, input_multiplier: 2.0, output_multiplier: 1.5, cached_multiplier: 2.0 },
+}, null, 2);
 
 function fmtPrice(value: number): string {
-  if (!value) return '-';
+  if (!value) return '—';
   return `$${value}`;
+}
+
+// fmtThreshold 把阈值 token 数缩写为 272K 之类。
+function fmtThreshold(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '';
+  return value >= 1000 ? `>${value / 1000}K` : `>${value}`;
+}
+
+// tierLabel 已知服务档名译为中文（优先 / 弹性），未知档名原样显示。
+function tierLabel(name: string, t: Translate): string {
+  const key = `model_prices.tier_${name}`;
+  const label = t(key);
+  return label === key ? name : label;
+}
+
+// formatLongContext 把 long_context 阶梯拼成完整 tooltip 文案。
+function formatLongContext(extra: Record<string, unknown> | undefined, t: Translate): string {
+  const lc = extra?.long_context;
+  if (!lc || typeof lc !== 'object' || Array.isArray(lc)) return '';
+  const rec = lc as Record<string, unknown>;
+  const parts: string[] = [];
+  const push = (label: string, v: unknown) => {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) parts.push(`${label}×${n}`);
+  };
+  push(t('model_prices.lc_input'), rec.input_multiplier);
+  push(t('model_prices.lc_output'), rec.output_multiplier);
+  push(t('model_prices.lc_cached'), rec.cached_multiplier);
+  const threshold = fmtThreshold(Number(rec.threshold_tokens));
+  return [threshold, parts.join(' / ')].filter(Boolean).join(' ');
+}
+
+// CacheCell 缓存单价列：缓存读取一行、写入 5m/1h 折成一行；无缓存价显示 —。
+// 灰色小字呈现，主视觉留给输入/输出单价。
+function CacheCell({ row, t }: { row: ModelPriceResp; t: Translate }) {
+  const lines: string[] = [];
+  if (row.cached_input_price > 0) {
+    lines.push(`${t('model_prices.price_short_cached')} ${fmtPrice(row.cached_input_price)}`);
+  }
+  const writes: string[] = [];
+  if (row.cache_creation_price > 0) {
+    writes.push(`${t('model_prices.price_short_write5m')} ${fmtPrice(row.cache_creation_price)}`);
+  }
+  if (row.cache_creation_1h_price > 0) {
+    writes.push(`${t('model_prices.price_short_write1h')} ${fmtPrice(row.cache_creation_1h_price)}`);
+  }
+  if (writes.length > 0) lines.push(writes.join(' · '));
+
+  if (lines.length === 0) return <span className="text-text-tertiary">—</span>;
+  return (
+    <div className="flex flex-col gap-0.5 font-mono text-xs tabular-nums text-text-secondary">
+      {lines.map((line, i) => <span key={i}>{line}</span>)}
+    </div>
+  );
+}
+
+// SpecialBillingCell 特殊计费列：按次价 / 服务档倍率 / 长上下文阶梯；都没有时显示"标准计费"。
+// 同样以低调灰字呈现，不喧宾夺主。
+function SpecialBillingCell({ row, t }: { row: ModelPriceResp; t: Translate }) {
+  const items: ReactNode[] = [];
+  if (row.per_request_price > 0) {
+    items.push(
+      <span className="font-mono tabular-nums text-warning" key="pr">
+        {t('model_prices.price_short_per_request')} {fmtPrice(row.per_request_price)}
+      </span>,
+    );
+  }
+
+  const extra = row.pricing_extra;
+  const tiers = extra?.service_tiers;
+  if (tiers && typeof tiers === 'object' && !Array.isArray(tiers)) {
+    for (const [name, mul] of Object.entries(tiers as Record<string, unknown>)) {
+      const n = Number(mul);
+      if (Number.isFinite(n) && n > 0) {
+        items.push(
+          <span key={`t-${name}`}>
+            {tierLabel(name, t)} <span className="font-mono tabular-nums">×{n}</span>
+          </span>,
+        );
+      }
+    }
+  }
+
+  const lcFull = formatLongContext(extra, t);
+  if (lcFull) {
+    const rec = extra?.long_context as Record<string, unknown> | undefined;
+    const short = fmtThreshold(Number(rec?.threshold_tokens));
+    items.push(
+      <span key="lc" title={lcFull}>
+        {t('model_prices.pricing_extra_long_context')} {short}
+      </span>,
+    );
+  }
+
+  if (items.length === 0) {
+    return <span className="text-text-tertiary">{t('model_prices.billing_standard')}</span>;
+  }
+  return <div className="flex flex-col gap-0.5 text-xs text-text-secondary">{items}</div>;
 }
 
 // 归一导入 JSON：支持 {items:[...]} 或直接数组两种形态
@@ -74,6 +197,11 @@ function normalizeImportItems(raw: string): ImportModelPriceItem[] {
       const num = Number(value);
       if (!Number.isFinite(num) || num < 0) throw new Error(`bad ${field}`);
       item[field] = num;
+    }
+    const extra = record.pricing_extra;
+    if (extra !== undefined && extra !== null) {
+      if (typeof extra !== 'object' || Array.isArray(extra)) throw new Error('bad pricing_extra');
+      item.pricing_extra = extra as Record<string, unknown>;
     }
     return item;
   });
@@ -160,7 +288,11 @@ export default function ModelPricesPage() {
       output_price: String(price.output_price),
       cached_input_price: String(price.cached_input_price),
       cache_creation_price: String(price.cache_creation_price),
+      cache_creation_1h_price: String(price.cache_creation_1h_price),
       per_request_price: String(price.per_request_price),
+      pricing_extra: price.pricing_extra && Object.keys(price.pricing_extra).length > 0
+        ? JSON.stringify(price.pricing_extra, null, 2)
+        : '',
     });
     setModalOpen(true);
   }
@@ -185,6 +317,24 @@ export default function ModelPricesPage() {
         return;
       }
       payload[field] = num;
+    }
+    // pricing_extra：空文本视为清空（{}）；非空须为合法 JSON 对象。
+    const extraText = form.pricing_extra.trim();
+    if (extraText === '') {
+      payload.pricing_extra = {};
+    } else {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(extraText);
+      } catch {
+        toast('error', t('model_prices.pricing_extra_invalid'));
+        return;
+      }
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        toast('error', t('model_prices.pricing_extra_invalid'));
+        return;
+      }
+      payload.pricing_extra = parsed as Record<string, unknown>;
     }
     if (editingPrice) {
       updateMutation.mutate({ id: editingPrice.id, payload });
@@ -223,13 +373,37 @@ export default function ModelPricesPage() {
     },
   });
 
-  const priceFieldLabels: Record<(typeof PRICE_FIELDS)[number], string> = {
+  const priceFieldLabels: Record<PriceFieldKey, string> = {
     input_price: t('model_prices.input_price'),
     output_price: t('model_prices.output_price'),
     cached_input_price: t('model_prices.cached_input_price'),
     cache_creation_price: t('model_prices.cache_creation_price'),
+    cache_creation_1h_price: t('model_prices.cache_creation_1h_price'),
     per_request_price: t('model_prices.per_request_price'),
   };
+
+  function renderPriceField(field: PriceFieldKey) {
+    return (
+      <HeroTextField fullWidth key={field}>
+        <Label>
+          {priceFieldLabels[field]}
+          <span className="ml-1 text-[10px] font-normal text-text-tertiary">
+            {field === 'per_request_price'
+              ? t('model_prices.unit_per_request')
+              : t('model_prices.unit_per_1m')}
+          </span>
+        </Label>
+        <Input
+          min={0}
+          placeholder="0"
+          step="any"
+          type="number"
+          value={form[field]}
+          onChange={(event) => setForm((prev) => ({ ...prev, [field]: event.target.value }))}
+        />
+      </HeroTextField>
+    );
+  }
 
   return (
     <div>
@@ -281,34 +455,24 @@ export default function ModelPricesPage() {
             totalPages={totalPages}
           />
         )}
-        minWidth={960}
+        minWidth={820}
       >
         <CommonTable.Header>
-          <CommonTable.Column id="id" style={{ width: 64 }}>
-            {t('common.id')}
-          </CommonTable.Column>
-          <CommonTable.Column id="model">{t('model_prices.model')}</CommonTable.Column>
-          <CommonTable.Column id="input_price">
-            {t('model_prices.input_price')}
+          <CommonTable.Column id="model" style={{ width: 240 }}>{t('model_prices.model')}</CommonTable.Column>
+          <CommonTable.Column id="input" style={{ width: 120 }}>
+            {t('model_prices.price_short_input')}
             <span className="block text-[10px] font-normal text-text-tertiary">{t('model_prices.unit_per_1m')}</span>
           </CommonTable.Column>
-          <CommonTable.Column id="output_price">
-            {t('model_prices.output_price')}
+          <CommonTable.Column id="output" style={{ width: 120 }}>
+            {t('model_prices.price_short_output')}
             <span className="block text-[10px] font-normal text-text-tertiary">{t('model_prices.unit_per_1m')}</span>
           </CommonTable.Column>
-          <CommonTable.Column id="cached_input_price">
-            {t('model_prices.cached_input_price')}
-            <span className="block text-[10px] font-normal text-text-tertiary">{t('model_prices.unit_per_1m')}</span>
+          <CommonTable.Column id="cache" style={{ width: 200 }}>{t('model_prices.col_cache')}</CommonTable.Column>
+          <CommonTable.Column id="special_billing">
+            {t('model_prices.col_special_billing')}
+            <span className="block text-[10px] font-normal text-text-tertiary">{t('model_prices.col_special_billing_hint')}</span>
           </CommonTable.Column>
-          <CommonTable.Column id="cache_creation_price">
-            {t('model_prices.cache_creation_price')}
-            <span className="block text-[10px] font-normal text-text-tertiary">{t('model_prices.unit_per_1m')}</span>
-          </CommonTable.Column>
-          <CommonTable.Column id="per_request_price">
-            {t('model_prices.per_request_price')}
-            <span className="block text-[10px] font-normal text-text-tertiary">{t('model_prices.unit_per_request')}</span>
-          </CommonTable.Column>
-          <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
+          <CommonTable.Column id="actions" style={{ width: 168 }}>{t('common.actions')}</CommonTable.Column>
         </CommonTable.Header>
         <CommonTable.Body>
           {isLoading ? (
@@ -325,25 +489,19 @@ export default function ModelPricesPage() {
             rows.map((row) => (
               <CommonTable.Row id={String(row.id)} key={row.id}>
                 <CommonTable.Cell>
-                  <span className="font-mono text-text-tertiary">{row.id}</span>
+                  <span className="font-mono text-sm text-text" title={row.model}>{row.model}</span>
                 </CommonTable.Cell>
                 <CommonTable.Cell>
-                  <span className="font-mono text-text" title={row.model}>{row.model}</span>
+                  <span className="font-mono text-sm tabular-nums text-text">{fmtPrice(row.input_price)}</span>
                 </CommonTable.Cell>
                 <CommonTable.Cell>
-                  <span className="font-mono text-text-secondary">{fmtPrice(row.input_price)}</span>
+                  <span className="font-mono text-sm tabular-nums text-text">{fmtPrice(row.output_price)}</span>
                 </CommonTable.Cell>
                 <CommonTable.Cell>
-                  <span className="font-mono text-text-secondary">{fmtPrice(row.output_price)}</span>
+                  <CacheCell row={row} t={t} />
                 </CommonTable.Cell>
                 <CommonTable.Cell>
-                  <span className="font-mono text-text-secondary">{fmtPrice(row.cached_input_price)}</span>
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  <span className="font-mono text-text-secondary">{fmtPrice(row.cache_creation_price)}</span>
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  <span className="font-mono text-text-secondary">{fmtPrice(row.per_request_price)}</span>
+                  <SpecialBillingCell row={row} t={t} />
                 </CommonTable.Cell>
                 <CommonTable.Cell>
                   <div className="ag-table-row-actions flex justify-center gap-1">
@@ -379,7 +537,7 @@ export default function ModelPricesPage() {
                 <Modal.CloseTrigger />
               </Modal.Header>
               <Modal.Body>
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <HeroTextField fullWidth isRequired>
                     <Label>{t('model_prices.model')}</Label>
                     <Input
@@ -389,27 +547,40 @@ export default function ModelPricesPage() {
                       onChange={(event) => setForm((prev) => ({ ...prev, model: event.target.value }))}
                     />
                   </HeroTextField>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {PRICE_FIELDS.map((field) => (
-                      <HeroTextField fullWidth key={field}>
-                        <Label>
-                          {priceFieldLabels[field]}
-                          <span className="ml-1 text-[10px] font-normal text-text-tertiary">
-                            {field === 'per_request_price'
-                              ? t('model_prices.unit_per_request')
-                              : t('model_prices.unit_per_1m')}
-                          </span>
-                        </Label>
-                        <Input
-                          min={0}
-                          placeholder="0"
-                          step="any"
-                          type="number"
-                          value={form[field]}
-                          onChange={(event) => setForm((prev) => ({ ...prev, [field]: event.target.value }))}
-                        />
-                      </HeroTextField>
-                    ))}
+
+                  {PRICE_SECTIONS.map((section) => (
+                    <div className="space-y-2" key={section.titleKey}>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-text-tertiary">
+                        {t(section.titleKey)}
+                      </p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {section.fields.map((field) => renderPriceField(field))}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="space-y-2 border-t border-border pt-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-text-tertiary">
+                        {t('model_prices.section_advanced')}
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onPress={() => setForm((prev) => ({ ...prev, pricing_extra: PRICING_EXTRA_TEMPLATE }))}
+                      >
+                        {t('model_prices.pricing_extra_template')}
+                      </Button>
+                    </div>
+                    <p className="text-[11px] leading-4 text-text-tertiary">{t('model_prices.pricing_extra_hint')}</p>
+                    <TextArea
+                      aria-label={t('model_prices.pricing_extra')}
+                      className="w-full font-mono text-xs leading-5"
+                      placeholder={'{\n  "service_tiers": { "priority": 2.0, "flex": 0.5 }\n}'}
+                      rows={6}
+                      value={form.pricing_extra}
+                      onChange={(event) => setForm((prev) => ({ ...prev, pricing_extra: event.target.value }))}
+                    />
                   </div>
                 </div>
               </Modal.Body>

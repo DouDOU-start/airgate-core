@@ -126,6 +126,27 @@ func (mpu *ModelPriceUpdate) AddCacheCreationPrice(f float64) *ModelPriceUpdate 
 	return mpu
 }
 
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (mpu *ModelPriceUpdate) SetCacheCreation1hPrice(f float64) *ModelPriceUpdate {
+	mpu.mutation.ResetCacheCreation1hPrice()
+	mpu.mutation.SetCacheCreation1hPrice(f)
+	return mpu
+}
+
+// SetNillableCacheCreation1hPrice sets the "cache_creation_1h_price" field if the given value is not nil.
+func (mpu *ModelPriceUpdate) SetNillableCacheCreation1hPrice(f *float64) *ModelPriceUpdate {
+	if f != nil {
+		mpu.SetCacheCreation1hPrice(*f)
+	}
+	return mpu
+}
+
+// AddCacheCreation1hPrice adds f to the "cache_creation_1h_price" field.
+func (mpu *ModelPriceUpdate) AddCacheCreation1hPrice(f float64) *ModelPriceUpdate {
+	mpu.mutation.AddCacheCreation1hPrice(f)
+	return mpu
+}
+
 // SetPerRequestPrice sets the "per_request_price" field.
 func (mpu *ModelPriceUpdate) SetPerRequestPrice(f float64) *ModelPriceUpdate {
 	mpu.mutation.ResetPerRequestPrice()
@@ -144,6 +165,18 @@ func (mpu *ModelPriceUpdate) SetNillablePerRequestPrice(f *float64) *ModelPriceU
 // AddPerRequestPrice adds f to the "per_request_price" field.
 func (mpu *ModelPriceUpdate) AddPerRequestPrice(f float64) *ModelPriceUpdate {
 	mpu.mutation.AddPerRequestPrice(f)
+	return mpu
+}
+
+// SetPricingExtra sets the "pricing_extra" field.
+func (mpu *ModelPriceUpdate) SetPricingExtra(m map[string]interface{}) *ModelPriceUpdate {
+	mpu.mutation.SetPricingExtra(m)
+	return mpu
+}
+
+// ClearPricingExtra clears the value of the "pricing_extra" field.
+func (mpu *ModelPriceUpdate) ClearPricingExtra() *ModelPriceUpdate {
+	mpu.mutation.ClearPricingExtra()
 	return mpu
 }
 
@@ -243,11 +276,23 @@ func (mpu *ModelPriceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := mpu.mutation.AddedCacheCreationPrice(); ok {
 		_spec.AddField(modelprice.FieldCacheCreationPrice, field.TypeFloat64, value)
 	}
+	if value, ok := mpu.mutation.CacheCreation1hPrice(); ok {
+		_spec.SetField(modelprice.FieldCacheCreation1hPrice, field.TypeFloat64, value)
+	}
+	if value, ok := mpu.mutation.AddedCacheCreation1hPrice(); ok {
+		_spec.AddField(modelprice.FieldCacheCreation1hPrice, field.TypeFloat64, value)
+	}
 	if value, ok := mpu.mutation.PerRequestPrice(); ok {
 		_spec.SetField(modelprice.FieldPerRequestPrice, field.TypeFloat64, value)
 	}
 	if value, ok := mpu.mutation.AddedPerRequestPrice(); ok {
 		_spec.AddField(modelprice.FieldPerRequestPrice, field.TypeFloat64, value)
+	}
+	if value, ok := mpu.mutation.PricingExtra(); ok {
+		_spec.SetField(modelprice.FieldPricingExtra, field.TypeJSON, value)
+	}
+	if mpu.mutation.PricingExtraCleared() {
+		_spec.ClearField(modelprice.FieldPricingExtra, field.TypeJSON)
 	}
 	if value, ok := mpu.mutation.UpdatedAt(); ok {
 		_spec.SetField(modelprice.FieldUpdatedAt, field.TypeTime, value)
@@ -370,6 +415,27 @@ func (mpuo *ModelPriceUpdateOne) AddCacheCreationPrice(f float64) *ModelPriceUpd
 	return mpuo
 }
 
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (mpuo *ModelPriceUpdateOne) SetCacheCreation1hPrice(f float64) *ModelPriceUpdateOne {
+	mpuo.mutation.ResetCacheCreation1hPrice()
+	mpuo.mutation.SetCacheCreation1hPrice(f)
+	return mpuo
+}
+
+// SetNillableCacheCreation1hPrice sets the "cache_creation_1h_price" field if the given value is not nil.
+func (mpuo *ModelPriceUpdateOne) SetNillableCacheCreation1hPrice(f *float64) *ModelPriceUpdateOne {
+	if f != nil {
+		mpuo.SetCacheCreation1hPrice(*f)
+	}
+	return mpuo
+}
+
+// AddCacheCreation1hPrice adds f to the "cache_creation_1h_price" field.
+func (mpuo *ModelPriceUpdateOne) AddCacheCreation1hPrice(f float64) *ModelPriceUpdateOne {
+	mpuo.mutation.AddCacheCreation1hPrice(f)
+	return mpuo
+}
+
 // SetPerRequestPrice sets the "per_request_price" field.
 func (mpuo *ModelPriceUpdateOne) SetPerRequestPrice(f float64) *ModelPriceUpdateOne {
 	mpuo.mutation.ResetPerRequestPrice()
@@ -388,6 +454,18 @@ func (mpuo *ModelPriceUpdateOne) SetNillablePerRequestPrice(f *float64) *ModelPr
 // AddPerRequestPrice adds f to the "per_request_price" field.
 func (mpuo *ModelPriceUpdateOne) AddPerRequestPrice(f float64) *ModelPriceUpdateOne {
 	mpuo.mutation.AddPerRequestPrice(f)
+	return mpuo
+}
+
+// SetPricingExtra sets the "pricing_extra" field.
+func (mpuo *ModelPriceUpdateOne) SetPricingExtra(m map[string]interface{}) *ModelPriceUpdateOne {
+	mpuo.mutation.SetPricingExtra(m)
+	return mpuo
+}
+
+// ClearPricingExtra clears the value of the "pricing_extra" field.
+func (mpuo *ModelPriceUpdateOne) ClearPricingExtra() *ModelPriceUpdateOne {
+	mpuo.mutation.ClearPricingExtra()
 	return mpuo
 }
 
@@ -517,11 +595,23 @@ func (mpuo *ModelPriceUpdateOne) sqlSave(ctx context.Context) (_node *ModelPrice
 	if value, ok := mpuo.mutation.AddedCacheCreationPrice(); ok {
 		_spec.AddField(modelprice.FieldCacheCreationPrice, field.TypeFloat64, value)
 	}
+	if value, ok := mpuo.mutation.CacheCreation1hPrice(); ok {
+		_spec.SetField(modelprice.FieldCacheCreation1hPrice, field.TypeFloat64, value)
+	}
+	if value, ok := mpuo.mutation.AddedCacheCreation1hPrice(); ok {
+		_spec.AddField(modelprice.FieldCacheCreation1hPrice, field.TypeFloat64, value)
+	}
 	if value, ok := mpuo.mutation.PerRequestPrice(); ok {
 		_spec.SetField(modelprice.FieldPerRequestPrice, field.TypeFloat64, value)
 	}
 	if value, ok := mpuo.mutation.AddedPerRequestPrice(); ok {
 		_spec.AddField(modelprice.FieldPerRequestPrice, field.TypeFloat64, value)
+	}
+	if value, ok := mpuo.mutation.PricingExtra(); ok {
+		_spec.SetField(modelprice.FieldPricingExtra, field.TypeJSON, value)
+	}
+	if mpuo.mutation.PricingExtraCleared() {
+		_spec.ClearField(modelprice.FieldPricingExtra, field.TypeJSON)
 	}
 	if value, ok := mpuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(modelprice.FieldUpdatedAt, field.TypeTime, value)

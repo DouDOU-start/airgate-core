@@ -16,20 +16,49 @@ import (
 
 // Price 单模型价格快照。单位：USD / 1M tokens；PerRequest 为 USD / 次。
 type Price struct {
-	Input         float64
-	Output        float64
-	CachedInput   float64
-	CacheCreation float64
+	Input       float64
+	Output      float64
+	CachedInput float64
+	// CacheCreation5m 缓存写入 5m TTL 单价（modelprice.cache_creation_price）。
+	CacheCreation5m float64
+	// CacheCreation1h 缓存写入 1h TTL 单价（modelprice.cache_creation_1h_price）。
+	CacheCreation1h float64
 	// PerRequest 按次价：>0 时整单按次计费，忽略全部 token 单价。
 	PerRequest float64
+
+	// ServiceTiers 服务档倍率表（如 priority=2.0、flex=0.5）；命中时整单各维度统一乘该倍率。
+	ServiceTiers map[string]float64
+	// LongContext 长上下文阶梯：完整 prompt 超过阈值时各维度单价按各自倍率放大。
+	LongContext *LongContextRule
+}
+
+// LongContextRule 长上下文阶梯规则：Usage.PromptTokens > ThresholdTokens 时各维度单价乘对应倍率。
+type LongContextRule struct {
+	ThresholdTokens int
+	InputMul        float64
+	OutputMul       float64
+	CachedMul       float64
 }
 
 // Usage 一次请求的 token 用量（上游口径：PromptTokens 包含 CachedTokens）。
 type Usage struct {
-	PromptTokens        int
-	CompletionTokens    int
-	CachedTokens        int
+	PromptTokens     int
+	CompletionTokens int
+	CachedTokens     int
+	// CacheCreationTokens 泛化缓存写入 token（无 5m/1h 明细时按 5m 档计价的回退）。
 	CacheCreationTokens int
+	// CacheCreation5mTokens / CacheCreation1hTokens Claude 双档缓存写入明细；openai 入口恒 0。
+	CacheCreation5mTokens int
+	CacheCreation1hTokens int
+}
+
+// Costs ComputeCosts 的分段成本结果（缓存写入拆 5m/1h 两档，供分列落账）。
+type Costs struct {
+	Input           float64
+	Output          float64
+	Cached          float64
+	CacheCreation5m float64
+	CacheCreation1h float64
 }
 
 // Loader 全量加载价目表（由 modelprice service 实现）。
@@ -136,33 +165,76 @@ func (c *Cache) Invalidate() {
 	c.mu.Unlock()
 }
 
-// ComputeCosts 按价格与用量计算四段成本（纯函数）。
+// ComputeCosts 按价格与用量计算分段成本（纯函数）。
 //
-// 规则：
-//   - 入口对四个 token 计数统一钳 0（上游为不可信第三方，负数计数会导致
-//     input 费用虚增或负成本写入 usage_log）；
-//   - PerRequest > 0：整单按次计费，input=PerRequest，其余为 0；
-//   - 否则按 token 计费。上游口径 PromptTokens 包含 CachedTokens，
-//     为避免双计，input 按 (prompt-cached) 扣减后计价，cached 部分单独按
-//     CachedInput 计入 cached；cacheCreation 按 CacheCreation 单价另计。
-func ComputeCosts(p Price, u Usage) (input, output, cached, cacheCreation float64) {
+// 计算顺序（严格）：
+//  1. 全部 token 计数统一钳 0（上游为不可信第三方，负数会虚增 input 费用或写入负成本）。
+//  2. PerRequest > 0：整单按次计费，Input=PerRequest，其余为 0（忽略服务档/长上下文）。
+//  3. 取 base 单价 inR/outR/cachedR；若 LongContext!=nil 且 PromptTokens 超阈值，
+//     各单价乘对应倍率（长上下文阶梯，阈值比较对象是含 cached 的完整 prompt）。
+//  4. 缓存写入分档：cc5mTokens = CacheCreation5mTokens>0 ? 它 : CacheCreationTokens（泛化回退当 5m）；
+//     cc1hTokens = CacheCreation1hTokens。
+//  5. 分段计价：input 按 (prompt-cached) 扣减避免与 cached 双计。
+//  6. 服务档：serviceTier 非空且非 standard/auto，且 ServiceTiers[serviceTier]>0，
+//     则整单五项统一乘该倍率（priority/flex 对各维度倍率一致，按整单处理等价）。
+func ComputeCosts(p Price, u Usage, serviceTier string) Costs {
 	u.PromptTokens = clampNonNegative(u.PromptTokens)
 	u.CompletionTokens = clampNonNegative(u.CompletionTokens)
 	u.CachedTokens = clampNonNegative(u.CachedTokens)
 	u.CacheCreationTokens = clampNonNegative(u.CacheCreationTokens)
+	u.CacheCreation5mTokens = clampNonNegative(u.CacheCreation5mTokens)
+	u.CacheCreation1hTokens = clampNonNegative(u.CacheCreation1hTokens)
 
 	if p.PerRequest > 0 {
-		return p.PerRequest, 0, 0, 0
+		return Costs{Input: p.PerRequest}
 	}
+
+	inR, outR, cachedR := p.Input, p.Output, p.CachedInput
+	if p.LongContext != nil && u.PromptTokens > p.LongContext.ThresholdTokens {
+		inR *= p.LongContext.InputMul
+		outR *= p.LongContext.OutputMul
+		cachedR *= p.LongContext.CachedMul
+	}
+
+	cc5mTokens := u.CacheCreation5mTokens
+	if cc5mTokens == 0 {
+		cc5mTokens = u.CacheCreationTokens
+	}
+	cc1hTokens := u.CacheCreation1hTokens
+
 	promptTokens := u.PromptTokens - u.CachedTokens
 	if promptTokens < 0 {
 		promptTokens = 0
 	}
-	input = float64(promptTokens) / 1e6 * p.Input
-	output = float64(u.CompletionTokens) / 1e6 * p.Output
-	cached = float64(u.CachedTokens) / 1e6 * p.CachedInput
-	cacheCreation = float64(u.CacheCreationTokens) / 1e6 * p.CacheCreation
-	return input, output, cached, cacheCreation
+	costs := Costs{
+		Input:           float64(promptTokens) / 1e6 * inR,
+		Output:          float64(u.CompletionTokens) / 1e6 * outR,
+		Cached:          float64(u.CachedTokens) / 1e6 * cachedR,
+		CacheCreation5m: float64(cc5mTokens) / 1e6 * p.CacheCreation5m,
+		CacheCreation1h: float64(cc1hTokens) / 1e6 * p.CacheCreation1h,
+	}
+
+	if m, ok := serviceTierMultiplier(p.ServiceTiers, serviceTier); ok {
+		costs.Input *= m
+		costs.Output *= m
+		costs.Cached *= m
+		costs.CacheCreation5m *= m
+		costs.CacheCreation1h *= m
+	}
+	return costs
+}
+
+// serviceTierMultiplier 返回服务档倍率：tier 为空或 standard/auto（默认档）不生效；
+// 未在 ServiceTiers 声明或倍率 <=0 也不生效。
+func serviceTierMultiplier(tiers map[string]float64, tier string) (float64, bool) {
+	if tier == "" || tier == "standard" || tier == "auto" {
+		return 0, false
+	}
+	m, ok := tiers[tier]
+	if !ok || m <= 0 {
+		return 0, false
+	}
+	return m, true
 }
 
 // clampNonNegative 负值钳 0。

@@ -237,16 +237,20 @@ func init() {
 	modelpriceDescCacheCreationPrice := modelpriceFields[4].Descriptor()
 	// modelprice.DefaultCacheCreationPrice holds the default value on creation for the cache_creation_price field.
 	modelprice.DefaultCacheCreationPrice = modelpriceDescCacheCreationPrice.Default.(float64)
+	// modelpriceDescCacheCreation1hPrice is the schema descriptor for cache_creation_1h_price field.
+	modelpriceDescCacheCreation1hPrice := modelpriceFields[5].Descriptor()
+	// modelprice.DefaultCacheCreation1hPrice holds the default value on creation for the cache_creation_1h_price field.
+	modelprice.DefaultCacheCreation1hPrice = modelpriceDescCacheCreation1hPrice.Default.(float64)
 	// modelpriceDescPerRequestPrice is the schema descriptor for per_request_price field.
-	modelpriceDescPerRequestPrice := modelpriceFields[5].Descriptor()
+	modelpriceDescPerRequestPrice := modelpriceFields[6].Descriptor()
 	// modelprice.DefaultPerRequestPrice holds the default value on creation for the per_request_price field.
 	modelprice.DefaultPerRequestPrice = modelpriceDescPerRequestPrice.Default.(float64)
 	// modelpriceDescCreatedAt is the schema descriptor for created_at field.
-	modelpriceDescCreatedAt := modelpriceFields[6].Descriptor()
+	modelpriceDescCreatedAt := modelpriceFields[8].Descriptor()
 	// modelprice.DefaultCreatedAt holds the default value on creation for the created_at field.
 	modelprice.DefaultCreatedAt = modelpriceDescCreatedAt.Default.(func() time.Time)
 	// modelpriceDescUpdatedAt is the schema descriptor for updated_at field.
-	modelpriceDescUpdatedAt := modelpriceFields[7].Descriptor()
+	modelpriceDescUpdatedAt := modelpriceFields[9].Descriptor()
 	// modelprice.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	modelprice.DefaultUpdatedAt = modelpriceDescUpdatedAt.Default.(func() time.Time)
 	// modelprice.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

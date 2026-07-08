@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -25,10 +26,14 @@ type ModelPrice struct {
 	OutputPrice float64 `json:"output_price,omitempty"`
 	// CachedInputPrice holds the value of the "cached_input_price" field.
 	CachedInputPrice float64 `json:"cached_input_price,omitempty"`
-	// CacheCreationPrice holds the value of the "cache_creation_price" field.
+	// 缓存写入 5m TTL 单价（与 usage_log.cache_creation_price 口径一致）
 	CacheCreationPrice float64 `json:"cache_creation_price,omitempty"`
+	// 缓存写入 1h TTL 单价（Claude 双档缓存写入的长档）
+	CacheCreation1hPrice float64 `json:"cache_creation_1h_price,omitempty"`
 	// 按次价：>0 时整条请求按次计费，忽略 token 单价
 	PerRequestPrice float64 `json:"per_request_price,omitempty"`
+	// PricingExtra holds the value of the "pricing_extra" field.
+	PricingExtra map[string]interface{} `json:"pricing_extra,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -41,7 +46,9 @@ func (*ModelPrice) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case modelprice.FieldInputPrice, modelprice.FieldOutputPrice, modelprice.FieldCachedInputPrice, modelprice.FieldCacheCreationPrice, modelprice.FieldPerRequestPrice:
+		case modelprice.FieldPricingExtra:
+			values[i] = new([]byte)
+		case modelprice.FieldInputPrice, modelprice.FieldOutputPrice, modelprice.FieldCachedInputPrice, modelprice.FieldCacheCreationPrice, modelprice.FieldCacheCreation1hPrice, modelprice.FieldPerRequestPrice:
 			values[i] = new(sql.NullFloat64)
 		case modelprice.FieldID:
 			values[i] = new(sql.NullInt64)
@@ -100,11 +107,25 @@ func (mp *ModelPrice) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				mp.CacheCreationPrice = value.Float64
 			}
+		case modelprice.FieldCacheCreation1hPrice:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_creation_1h_price", values[i])
+			} else if value.Valid {
+				mp.CacheCreation1hPrice = value.Float64
+			}
 		case modelprice.FieldPerRequestPrice:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
 				return fmt.Errorf("unexpected type %T for field per_request_price", values[i])
 			} else if value.Valid {
 				mp.PerRequestPrice = value.Float64
+			}
+		case modelprice.FieldPricingExtra:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field pricing_extra", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &mp.PricingExtra); err != nil {
+					return fmt.Errorf("unmarshal field pricing_extra: %w", err)
+				}
 			}
 		case modelprice.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -169,8 +190,14 @@ func (mp *ModelPrice) String() string {
 	builder.WriteString("cache_creation_price=")
 	builder.WriteString(fmt.Sprintf("%v", mp.CacheCreationPrice))
 	builder.WriteString(", ")
+	builder.WriteString("cache_creation_1h_price=")
+	builder.WriteString(fmt.Sprintf("%v", mp.CacheCreation1hPrice))
+	builder.WriteString(", ")
 	builder.WriteString("per_request_price=")
 	builder.WriteString(fmt.Sprintf("%v", mp.PerRequestPrice))
+	builder.WriteString(", ")
+	builder.WriteString("pricing_extra=")
+	builder.WriteString(fmt.Sprintf("%v", mp.PricingExtra))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(mp.CreatedAt.Format(time.ANSIC))

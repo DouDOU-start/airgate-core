@@ -8,54 +8,128 @@ import (
 	"testing"
 )
 
+// checkCosts 逐段断言 Costs（eps 容差）。
+func checkCosts(t *testing.T, got, want Costs) {
+	t.Helper()
+	const eps = 1e-9
+	cmp := func(field string, g, w float64) {
+		if math.Abs(g-w) > eps {
+			t.Errorf("%s 期望 %v，实际 %v", field, w, g)
+		}
+	}
+	cmp("input", got.Input, want.Input)
+	cmp("output", got.Output, want.Output)
+	cmp("cached", got.Cached, want.Cached)
+	cmp("cacheCreation5m", got.CacheCreation5m, want.CacheCreation5m)
+	cmp("cacheCreation1h", got.CacheCreation1h, want.CacheCreation1h)
+}
+
+// longCtxRule gpt-5.4 家族长上下文阶梯：阈值 272k，input×2 / output×1.5 / cached×2。
+var longCtxRule = &LongContextRule{ThresholdTokens: 272_000, InputMul: 2, OutputMul: 1.5, CachedMul: 2}
+
 func TestComputeCosts(t *testing.T) {
 	cases := []struct {
-		name              string
-		price             Price
-		usage             Usage
-		wantInput         float64
-		wantOutput        float64
-		wantCached        float64
-		wantCacheCreation float64
+		name  string
+		price Price
+		usage Usage
+		tier  string
+		want  Costs
 	}{
 		{
 			name:  "常规 token 计费（无缓存）",
 			price: Price{Input: 3, Output: 15},
 			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 2_000_000},
-			// 1M * 3/1M = 3；2M * 15/1M = 30
-			wantInput:  3,
-			wantOutput: 30,
+			want:  Costs{Input: 3, Output: 30},
 		},
 		{
 			name:  "cached 从 prompt 扣减避免双计",
 			price: Price{Input: 3, Output: 15, CachedInput: 0.3},
 			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 500_000, CachedTokens: 400_000},
-			// input 按 (1M-0.4M)=0.6M 计：0.6*3=1.8；cached 按 0.4M*0.3=0.12
-			wantInput:  1.8,
-			wantOutput: 7.5,
-			wantCached: 0.12,
+			want:  Costs{Input: 1.8, Output: 7.5, Cached: 0.12},
 		},
 		{
-			name:  "cache_creation 独立计价",
-			price: Price{Input: 3, Output: 15, CachedInput: 0.3, CacheCreation: 3.75},
+			name:  "cache_creation 5m 泛化回退计价",
+			price: Price{Input: 3, CacheCreation5m: 3.75},
 			usage: Usage{PromptTokens: 100_000, CacheCreationTokens: 200_000},
-			// input 0.1M*3=0.3；cacheCreation 0.2M*3.75=0.75
-			wantInput:         0.3,
-			wantCacheCreation: 0.75,
+			// 无 5m 明细 → CacheCreationTokens 当 5m：0.2M*3.75=0.75
+			want: Costs{Input: 0.3, CacheCreation5m: 0.75},
+		},
+		{
+			name:  "cache_creation 5m 明细优先于泛化回退",
+			price: Price{CacheCreation5m: 3.75},
+			usage: Usage{CacheCreation5mTokens: 100_000, CacheCreationTokens: 999_000},
+			// 5m 明细 >0 → 用 100k，不用泛化的 999k：0.1M*3.75=0.375
+			want: Costs{CacheCreation5m: 0.375},
+		},
+		{
+			name:  "cache_creation 1h 独立档计价",
+			price: Price{CacheCreation5m: 3.75, CacheCreation1h: 6.0},
+			usage: Usage{CacheCreation5mTokens: 100_000, CacheCreation1hTokens: 200_000},
+			// 5m 0.1M*3.75=0.375；1h 0.2M*6=1.2
+			want: Costs{CacheCreation5m: 0.375, CacheCreation1h: 1.2},
 		},
 		{
 			name:  "cached 超过 prompt 时 input 钳制为 0",
 			price: Price{Input: 3, CachedInput: 0.3},
 			usage: Usage{PromptTokens: 100_000, CachedTokens: 200_000},
-			// prompt-cached 为负 → input 0；cached 仍按 0.2M 计
-			wantInput:  0,
-			wantCached: 0.06,
+			want:  Costs{Cached: 0.06},
 		},
 		{
-			name:      "per_request 整单替换，忽略全部 token 单价",
-			price:     Price{Input: 3, Output: 15, CachedInput: 0.3, CacheCreation: 3.75, PerRequest: 0.02},
-			usage:     Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000, CachedTokens: 500_000, CacheCreationTokens: 500_000},
-			wantInput: 0.02,
+			name:  "per_request 整单替换，忽略 token/服务档/长上下文",
+			price: Price{Input: 3, Output: 15, CachedInput: 0.3, CacheCreation5m: 3.75, CacheCreation1h: 6, PerRequest: 0.02, ServiceTiers: map[string]float64{"priority": 2}, LongContext: longCtxRule},
+			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000, CachedTokens: 500_000, CacheCreationTokens: 500_000},
+			tier:  "priority",
+			want:  Costs{Input: 0.02},
+		},
+		{
+			name:  "长上下文：prompt 未超阈值用 base 单价",
+			price: Price{Input: 2.5, Output: 15, CachedInput: 0.25, LongContext: longCtxRule},
+			usage: Usage{PromptTokens: 272_000, CompletionTokens: 0},
+			// 272000 == 阈值（非 >），不放大：0.272M*2.5=0.68
+			want: Costs{Input: 0.68},
+		},
+		{
+			name:  "长上下文：prompt 超阈值各维度单价翻倍",
+			price: Price{Input: 2.5, Output: 15, CachedInput: 0.25, LongContext: longCtxRule},
+			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000},
+			// input 1M*2.5*2=5；output 1M*15*1.5=22.5
+			want: Costs{Input: 5, Output: 22.5},
+		},
+		{
+			name:  "服务档 priority 整单乘倍率",
+			price: Price{Input: 2.5, Output: 15, ServiceTiers: map[string]float64{"priority": 2, "flex": 0.5}},
+			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000},
+			tier:  "priority",
+			want:  Costs{Input: 5, Output: 30},
+		},
+		{
+			name:  "服务档 flex 整单打折",
+			price: Price{Input: 2.5, Output: 15, ServiceTiers: map[string]float64{"priority": 2, "flex": 0.5}},
+			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000},
+			tier:  "flex",
+			want:  Costs{Input: 1.25, Output: 7.5},
+		},
+		{
+			name:  "长上下文 × priority 叠乘",
+			price: Price{Input: 2.5, Output: 15, ServiceTiers: map[string]float64{"priority": 2}, LongContext: longCtxRule},
+			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000},
+			tier:  "priority",
+			// input 2.5×2(longctx)×2(tier)=10；output 15×1.5×2=45
+			want: Costs{Input: 10, Output: 45},
+		},
+		{
+			name:  "未知 tier 不生效",
+			price: Price{Input: 2.5, ServiceTiers: map[string]float64{"priority": 2}},
+			usage: Usage{PromptTokens: 1_000_000},
+			tier:  "gold",
+			want:  Costs{Input: 2.5},
+		},
+		{
+			name:  "standard tier 视为默认档不套倍率",
+			price: Price{Input: 2.5, ServiceTiers: map[string]float64{"priority": 2}},
+			usage: Usage{PromptTokens: 1_000_000},
+			tier:  "standard",
+			want:  Costs{Input: 2.5},
 		},
 		{
 			name:  "零用量零成本",
@@ -64,20 +138,9 @@ func TestComputeCosts(t *testing.T) {
 		},
 	}
 
-	const eps = 1e-9
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			input, output, cached, cacheCreation := ComputeCosts(tc.price, tc.usage)
-			check := func(field string, got, want float64) {
-				t.Helper()
-				if math.Abs(got-want) > eps {
-					t.Errorf("%s 期望 %v，实际 %v", field, want, got)
-				}
-			}
-			check("input", input, tc.wantInput)
-			check("output", output, tc.wantOutput)
-			check("cached", cached, tc.wantCached)
-			check("cacheCreation", cacheCreation, tc.wantCacheCreation)
+			checkCosts(t, ComputeCosts(tc.price, tc.usage, tc.tier), tc.want)
 		})
 	}
 }
@@ -162,48 +225,38 @@ func TestCacheGetLoaderError(t *testing.T) {
 
 // TestComputeCostsClampsNegative 负数 token 一律钳 0：不虚增 input 费用、不产生负成本。
 func TestComputeCostsClampsNegative(t *testing.T) {
-	const eps = 1e-9
 	cases := []struct {
-		name       string
-		price      Price
-		usage      Usage
-		wantInput  float64
-		wantOutput float64
-		wantCached float64
-		wantCC     float64
+		name  string
+		price Price
+		usage Usage
+		want  Costs
 	}{
 		{
 			name:  "负 cached 不得虚增 input（1000-(-500) 的漏洞）",
 			price: Price{Input: 10, CachedInput: 5},
 			usage: Usage{PromptTokens: 1_000_000, CachedTokens: -500_000},
 			// cached 钳 0 → input 按 1M 计，而不是 1.5M
-			wantInput: 10,
+			want: Costs{Input: 10},
 		},
 		{
-			name:       "负 completion 不产生负 output 成本",
-			price:      Price{Output: 30},
-			usage:      Usage{CompletionTokens: -1_000_000},
-			wantOutput: 0,
+			name:  "负 completion 不产生负 output 成本",
+			price: Price{Output: 30},
+			usage: Usage{CompletionTokens: -1_000_000},
+		},
+		{
+			name:  "负 5m/1h 缓存写入不产生负成本",
+			price: Price{CacheCreation5m: 3.75, CacheCreation1h: 6},
+			usage: Usage{CacheCreation5mTokens: -100_000, CacheCreation1hTokens: -200_000},
 		},
 		{
 			name:  "全负用量全零成本",
-			price: Price{Input: 3, Output: 15, CachedInput: 0.3, CacheCreation: 3.75},
-			usage: Usage{PromptTokens: -1, CompletionTokens: -2, CachedTokens: -3, CacheCreationTokens: -4},
+			price: Price{Input: 3, Output: 15, CachedInput: 0.3, CacheCreation5m: 3.75, CacheCreation1h: 6},
+			usage: Usage{PromptTokens: -1, CompletionTokens: -2, CachedTokens: -3, CacheCreationTokens: -4, CacheCreation5mTokens: -5, CacheCreation1hTokens: -6},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			input, output, cached, cc := ComputeCosts(tc.price, tc.usage)
-			check := func(field string, got, want float64) {
-				t.Helper()
-				if math.Abs(got-want) > eps {
-					t.Errorf("%s 期望 %v，实际 %v", field, want, got)
-				}
-			}
-			check("input", input, tc.wantInput)
-			check("output", output, tc.wantOutput)
-			check("cached", cached, tc.wantCached)
-			check("cacheCreation", cc, tc.wantCC)
+			checkCosts(t, ComputeCosts(tc.price, tc.usage, ""), tc.want)
 		})
 	}
 }

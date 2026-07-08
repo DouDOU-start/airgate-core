@@ -203,6 +203,108 @@ func TestParseEmbeddedSeed(t *testing.T) {
 			t.Errorf("openai model %q cache_creation = %v, want 0", m, byModel[m].CacheCreationPrice)
 		}
 	}
+
+	// claude 1h 缓存写入档（值来自 airgate-claude/models.go 的 CacheCreation1hPrice 列）。
+	cc1hCases := map[string]float64{
+		"claude-fable-5":             20.0,
+		"claude-opus-4-8":            10.0,
+		"claude-opus-4-1-20250805":   30.0,
+		"claude-sonnet-4-6":          6.0,
+		"claude-haiku-4-5-20251001":  2.0,
+		"claude-sonnet-4-5-20250929": 6.0,
+	}
+	for m, want := range cc1hCases {
+		if got := byModel[m].CacheCreation1hPrice; got != want {
+			t.Errorf("model %q cache_creation_1h = %v, want %v", m, got, want)
+		}
+	}
+	// openai 无 1h 缓存写入档。
+	for _, m := range []string{"gpt-5.4", "gpt-5.5"} {
+		if byModel[m].CacheCreation1hPrice != 0 {
+			t.Errorf("openai model %q cache_creation_1h = %v, want 0", m, byModel[m].CacheCreation1hPrice)
+		}
+	}
+}
+
+// TestSeedPricingExtra 核对 openai 服务档倍率与 gpt-5.4 长上下文阶梯（值来自 airgate-openai/registry.go）。
+func TestSeedPricingExtra(t *testing.T) {
+	items, err := Parse(embeddedSeed)
+	if err != nil {
+		t.Fatalf("Parse(embeddedSeed) err = %v", err)
+	}
+	byModel := map[string]appmodelprice.CreateInput{}
+	for _, it := range items {
+		byModel[it.Model] = it
+	}
+
+	num := func(v interface{}) float64 {
+		switch n := v.(type) {
+		case float64:
+			return n
+		case int:
+			return float64(n)
+		default:
+			t.Fatalf("value %v (%T) not numeric", v, v)
+			return 0
+		}
+	}
+	serviceTiers := func(model string) map[string]interface{} {
+		extra := byModel[model].PricingExtra
+		if extra == nil {
+			t.Fatalf("model %q pricing_extra missing", model)
+		}
+		st, ok := extra["service_tiers"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("model %q service_tiers missing/typed wrong: %#v", model, extra["service_tiers"])
+		}
+		return st
+	}
+
+	// std 家族：priority=2×、flex=0.5×。
+	for _, m := range []string{"gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini"} {
+		st := serviceTiers(m)
+		if p := num(st["priority"]); p != 2.0 {
+			t.Errorf("%s priority = %v, want 2.0", m, p)
+		}
+		if f := num(st["flex"]); f != 0.5 {
+			t.Errorf("%s flex = %v, want 0.5", m, f)
+		}
+	}
+	// gpt-5.5：withPriorityMultiplier(...,2.5) → priority=2.5×、flex=0.5×。
+	st55 := serviceTiers("gpt-5.5")
+	if p := num(st55["priority"]); p != 2.5 {
+		t.Errorf("gpt-5.5 priority = %v, want 2.5", p)
+	}
+	if f := num(st55["flex"]); f != 0.5 {
+		t.Errorf("gpt-5.5 flex = %v, want 0.5", f)
+	}
+
+	// gpt-5.4 长上下文阶梯：阈值 272000，input×2 / output×1.5 / cached×2。
+	lc, ok := byModel["gpt-5.4"].PricingExtra["long_context"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("gpt-5.4 long_context missing")
+	}
+	if v := num(lc["threshold_tokens"]); v != 272000 {
+		t.Errorf("gpt-5.4 threshold_tokens = %v, want 272000", v)
+	}
+	if v := num(lc["input_multiplier"]); v != 2.0 {
+		t.Errorf("gpt-5.4 input_multiplier = %v, want 2.0", v)
+	}
+	if v := num(lc["output_multiplier"]); v != 1.5 {
+		t.Errorf("gpt-5.4 output_multiplier = %v, want 1.5", v)
+	}
+	if v := num(lc["cached_multiplier"]); v != 2.0 {
+		t.Errorf("gpt-5.4 cached_multiplier = %v, want 2.0", v)
+	}
+
+	// 非长上下文家族不应带 long_context。
+	if _, ok := byModel["gpt-5.5"].PricingExtra["long_context"]; ok {
+		t.Errorf("gpt-5.5 should not carry long_context")
+	}
+	// claude 家族无 pricing_extra。
+	if byModel["claude-opus-4-8"].PricingExtra != nil {
+		t.Errorf("claude-opus-4-8 pricing_extra should be nil, got %#v", byModel["claude-opus-4-8"].PricingExtra)
+	}
 }
 
 // TestEmbeddedSeedMatchesDataFile 确保内嵌副本与部署样例 backend/data 内容一致，防漂移。

@@ -23,8 +23,12 @@ const (
 	FieldCachedInputPrice = "cached_input_price"
 	// FieldCacheCreationPrice holds the string denoting the cache_creation_price field in the database.
 	FieldCacheCreationPrice = "cache_creation_price"
+	// FieldCacheCreation1hPrice holds the string denoting the cache_creation_1h_price field in the database.
+	FieldCacheCreation1hPrice = "cache_creation_1h_price"
 	// FieldPerRequestPrice holds the string denoting the per_request_price field in the database.
 	FieldPerRequestPrice = "per_request_price"
+	// FieldPricingExtra holds the string denoting the pricing_extra field in the database.
+	FieldPricingExtra = "pricing_extra"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -41,7 +45,9 @@ var Columns = []string{
 	FieldOutputPrice,
 	FieldCachedInputPrice,
 	FieldCacheCreationPrice,
+	FieldCacheCreation1hPrice,
 	FieldPerRequestPrice,
+	FieldPricingExtra,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -67,6 +73,8 @@ var (
 	DefaultCachedInputPrice float64
 	// DefaultCacheCreationPrice holds the default value on creation for the "cache_creation_price" field.
 	DefaultCacheCreationPrice float64
+	// DefaultCacheCreation1hPrice holds the default value on creation for the "cache_creation_1h_price" field.
+	DefaultCacheCreation1hPrice float64
 	// DefaultPerRequestPrice holds the default value on creation for the "per_request_price" field.
 	DefaultPerRequestPrice float64
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -108,6 +116,11 @@ func ByCachedInputPrice(opts ...sql.OrderTermOption) OrderOption {
 // ByCacheCreationPrice orders the results by the cache_creation_price field.
 func ByCacheCreationPrice(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCacheCreationPrice, opts...).ToFunc()
+}
+
+// ByCacheCreation1hPrice orders the results by the cache_creation_1h_price field.
+func ByCacheCreation1hPrice(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheCreation1hPrice, opts...).ToFunc()
 }
 
 // ByPerRequestPrice orders the results by the per_request_price field.

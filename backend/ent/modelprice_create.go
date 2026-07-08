@@ -82,6 +82,20 @@ func (mpc *ModelPriceCreate) SetNillableCacheCreationPrice(f *float64) *ModelPri
 	return mpc
 }
 
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (mpc *ModelPriceCreate) SetCacheCreation1hPrice(f float64) *ModelPriceCreate {
+	mpc.mutation.SetCacheCreation1hPrice(f)
+	return mpc
+}
+
+// SetNillableCacheCreation1hPrice sets the "cache_creation_1h_price" field if the given value is not nil.
+func (mpc *ModelPriceCreate) SetNillableCacheCreation1hPrice(f *float64) *ModelPriceCreate {
+	if f != nil {
+		mpc.SetCacheCreation1hPrice(*f)
+	}
+	return mpc
+}
+
 // SetPerRequestPrice sets the "per_request_price" field.
 func (mpc *ModelPriceCreate) SetPerRequestPrice(f float64) *ModelPriceCreate {
 	mpc.mutation.SetPerRequestPrice(f)
@@ -93,6 +107,12 @@ func (mpc *ModelPriceCreate) SetNillablePerRequestPrice(f *float64) *ModelPriceC
 	if f != nil {
 		mpc.SetPerRequestPrice(*f)
 	}
+	return mpc
+}
+
+// SetPricingExtra sets the "pricing_extra" field.
+func (mpc *ModelPriceCreate) SetPricingExtra(m map[string]interface{}) *ModelPriceCreate {
+	mpc.mutation.SetPricingExtra(m)
 	return mpc
 }
 
@@ -175,6 +195,10 @@ func (mpc *ModelPriceCreate) defaults() {
 		v := modelprice.DefaultCacheCreationPrice
 		mpc.mutation.SetCacheCreationPrice(v)
 	}
+	if _, ok := mpc.mutation.CacheCreation1hPrice(); !ok {
+		v := modelprice.DefaultCacheCreation1hPrice
+		mpc.mutation.SetCacheCreation1hPrice(v)
+	}
 	if _, ok := mpc.mutation.PerRequestPrice(); !ok {
 		v := modelprice.DefaultPerRequestPrice
 		mpc.mutation.SetPerRequestPrice(v)
@@ -210,6 +234,9 @@ func (mpc *ModelPriceCreate) check() error {
 	}
 	if _, ok := mpc.mutation.CacheCreationPrice(); !ok {
 		return &ValidationError{Name: "cache_creation_price", err: errors.New(`ent: missing required field "ModelPrice.cache_creation_price"`)}
+	}
+	if _, ok := mpc.mutation.CacheCreation1hPrice(); !ok {
+		return &ValidationError{Name: "cache_creation_1h_price", err: errors.New(`ent: missing required field "ModelPrice.cache_creation_1h_price"`)}
 	}
 	if _, ok := mpc.mutation.PerRequestPrice(); !ok {
 		return &ValidationError{Name: "per_request_price", err: errors.New(`ent: missing required field "ModelPrice.per_request_price"`)}
@@ -266,9 +293,17 @@ func (mpc *ModelPriceCreate) createSpec() (*ModelPrice, *sqlgraph.CreateSpec) {
 		_spec.SetField(modelprice.FieldCacheCreationPrice, field.TypeFloat64, value)
 		_node.CacheCreationPrice = value
 	}
+	if value, ok := mpc.mutation.CacheCreation1hPrice(); ok {
+		_spec.SetField(modelprice.FieldCacheCreation1hPrice, field.TypeFloat64, value)
+		_node.CacheCreation1hPrice = value
+	}
 	if value, ok := mpc.mutation.PerRequestPrice(); ok {
 		_spec.SetField(modelprice.FieldPerRequestPrice, field.TypeFloat64, value)
 		_node.PerRequestPrice = value
+	}
+	if value, ok := mpc.mutation.PricingExtra(); ok {
+		_spec.SetField(modelprice.FieldPricingExtra, field.TypeJSON, value)
+		_node.PricingExtra = value
 	}
 	if value, ok := mpc.mutation.CreatedAt(); ok {
 		_spec.SetField(modelprice.FieldCreatedAt, field.TypeTime, value)

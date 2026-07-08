@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -447,17 +448,20 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 	if result.usage != nil {
 		usage = *result.usage
 	}
-	inputCost, outputCost, cachedCost, cacheCreationCost := pricing.ComputeCosts(price, pricing.Usage{
-		PromptTokens:        usage.PromptTokens,
-		CompletionTokens:    usage.CompletionTokens,
-		CachedTokens:        usage.CachedTokens,
-		CacheCreationTokens: usage.CacheCreationTokens,
-	})
+	tier := serviceTierOf(req)
+	costs := pricing.ComputeCosts(price, pricing.Usage{
+		PromptTokens:          usage.PromptTokens,
+		CompletionTokens:      usage.CompletionTokens,
+		CachedTokens:          usage.CachedTokens,
+		CacheCreationTokens:   usage.CacheCreationTokens,
+		CacheCreation5mTokens: usage.CacheCreation5mTokens,
+		CacheCreation1hTokens: usage.CacheCreation1hTokens,
+	}, tier)
 	calc := p.calculator.Calculate(billing.CalculateInput{
-		InputCost:         inputCost,
-		OutputCost:        outputCost,
-		CachedInputCost:   cachedCost,
-		CacheCreationCost: cacheCreationCost,
+		InputCost:         costs.Input,
+		OutputCost:        costs.Output,
+		CachedInputCost:   costs.Cached,
+		CacheCreationCost: costs.CacheCreation5m + costs.CacheCreation1h,
 		BillingRate:       billing.ResolveBillingRate(keyInfo),
 		SellRate:          keyInfo.SellRate,
 		AccountRate:       ch.CostRatio,
@@ -488,11 +492,15 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		OutputTokens:          usage.CompletionTokens,
 		CachedInputTokens:     usage.CachedTokens,
 		CacheCreationTokens:   usage.CacheCreationTokens,
+		CacheCreation5mTokens: usage.CacheCreation5mTokens,
+		CacheCreation1hTokens: usage.CacheCreation1hTokens,
 		ReasoningOutputTokens: usage.ReasoningTokens,
 		InputPrice:            inputPrice,
 		OutputPrice:           price.Output,
 		CachedInputPrice:      price.CachedInput,
-		CacheCreationPrice:    price.CacheCreation,
+		CacheCreationPrice:    price.CacheCreation5m,
+		CacheCreation1hPrice:  price.CacheCreation1h,
+		ServiceTier:           tier,
 		InputCost:             calc.InputCost,
 		OutputCost:            calc.OutputCost,
 		CachedInputCost:       calc.CachedInputCost,
@@ -581,6 +589,20 @@ func sleepOrCancel(ctx context.Context, delay time.Duration, deadline time.Time)
 	case <-timer.C:
 		return true
 	}
+}
+
+// serviceTierOf 从请求体读取 OpenAI service_tier 字段（priority/flex/standard/auto）；
+// 缺失或非字符串返回 ""（计费按标准档，不套服务档倍率）。
+func serviceTierOf(req *dto.ChatRequest) string {
+	raw, ok := req.Get("service_tier")
+	if !ok {
+		return ""
+	}
+	var tier string
+	if err := json.Unmarshal(raw, &tier); err != nil {
+		return ""
+	}
+	return tier
 }
 
 // upstreamModel 经渠道 model_mapping 解析上游模型名；无映射用对外名。

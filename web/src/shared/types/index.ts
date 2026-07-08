@@ -662,7 +662,9 @@ export interface ModelPriceResp {
   output_price: number;
   cached_input_price: number;
   cache_creation_price: number;
+  cache_creation_1h_price: number;
   per_request_price: number;
+  pricing_extra?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -673,7 +675,9 @@ export interface CreateModelPriceReq {
   output_price?: number;
   cached_input_price?: number;
   cache_creation_price?: number;
+  cache_creation_1h_price?: number;
   per_request_price?: number;
+  pricing_extra?: Record<string, unknown>;
 }
 
 export interface UpdateModelPriceReq {
@@ -682,7 +686,9 @@ export interface UpdateModelPriceReq {
   output_price?: number;
   cached_input_price?: number;
   cache_creation_price?: number;
+  cache_creation_1h_price?: number;
   per_request_price?: number;
+  pricing_extra?: Record<string, unknown>;
 }
 
 export interface ImportModelPriceItem {
@@ -691,7 +697,9 @@ export interface ImportModelPriceItem {
   output_price?: number;
   cached_input_price?: number;
   cache_creation_price?: number;
+  cache_creation_1h_price?: number;
   per_request_price?: number;
+  pricing_extra?: Record<string, unknown>;
 }
 
 export interface ImportModelPricesReq {

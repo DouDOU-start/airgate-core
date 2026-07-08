@@ -72,6 +72,8 @@ func (s *ModelPriceStore) Create(ctx context.Context, input appmodelprice.Create
 		SetOutputPrice(input.OutputPrice).
 		SetCachedInputPrice(input.CachedInputPrice).
 		SetCacheCreationPrice(input.CacheCreationPrice).
+		SetCacheCreation1hPrice(input.CacheCreation1hPrice).
+		SetPricingExtra(input.PricingExtra).
 		SetPerRequestPrice(input.PerRequestPrice).
 		Save(ctx)
 	if err != nil {
@@ -85,14 +87,19 @@ func (s *ModelPriceStore) Create(ctx context.Context, input appmodelprice.Create
 
 // Update 更新价格条目。
 func (s *ModelPriceStore) Update(ctx context.Context, id int, input appmodelprice.UpdateInput) (appmodelprice.ModelPrice, error) {
-	item, err := s.db.ModelPrice.UpdateOneID(id).
+	builder := s.db.ModelPrice.UpdateOneID(id).
 		SetNillableModel(input.Model).
 		SetNillableInputPrice(input.InputPrice).
 		SetNillableOutputPrice(input.OutputPrice).
 		SetNillableCachedInputPrice(input.CachedInputPrice).
 		SetNillableCacheCreationPrice(input.CacheCreationPrice).
-		SetNillablePerRequestPrice(input.PerRequestPrice).
-		Save(ctx)
+		SetNillableCacheCreation1hPrice(input.CacheCreation1hPrice).
+		SetNillablePerRequestPrice(input.PerRequestPrice)
+	// pricing_extra 整体替换：非 nil 时整块写入（空 map 清空扩展）。
+	if input.PricingExtra != nil {
+		builder = builder.SetPricingExtra(input.PricingExtra)
+	}
+	item, err := builder.Save(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return appmodelprice.ModelPrice{}, appmodelprice.ErrModelPriceNotFound
@@ -135,6 +142,8 @@ func (s *ModelPriceStore) Upsert(ctx context.Context, items []appmodelprice.Impo
 				SetOutputPrice(item.OutputPrice).
 				SetCachedInputPrice(item.CachedInputPrice).
 				SetCacheCreationPrice(item.CacheCreationPrice).
+				SetCacheCreation1hPrice(item.CacheCreation1hPrice).
+				SetPricingExtra(item.PricingExtra).
 				SetPerRequestPrice(item.PerRequestPrice).
 				Save(ctx)
 			if err != nil {
@@ -148,6 +157,8 @@ func (s *ModelPriceStore) Upsert(ctx context.Context, items []appmodelprice.Impo
 				SetOutputPrice(item.OutputPrice).
 				SetCachedInputPrice(item.CachedInputPrice).
 				SetCacheCreationPrice(item.CacheCreationPrice).
+				SetCacheCreation1hPrice(item.CacheCreation1hPrice).
+				SetPricingExtra(item.PricingExtra).
 				SetPerRequestPrice(item.PerRequestPrice).
 				Save(ctx)
 			if err != nil {
@@ -183,14 +194,16 @@ func mapModelPriceList(items []*ent.ModelPrice) []appmodelprice.ModelPrice {
 
 func mapModelPrice(item *ent.ModelPrice) appmodelprice.ModelPrice {
 	return appmodelprice.ModelPrice{
-		ID:                 item.ID,
-		Model:              item.Model,
-		InputPrice:         item.InputPrice,
-		OutputPrice:        item.OutputPrice,
-		CachedInputPrice:   item.CachedInputPrice,
-		CacheCreationPrice: item.CacheCreationPrice,
-		PerRequestPrice:    item.PerRequestPrice,
-		CreatedAt:          item.CreatedAt,
-		UpdatedAt:          item.UpdatedAt,
+		ID:                   item.ID,
+		Model:                item.Model,
+		InputPrice:           item.InputPrice,
+		OutputPrice:          item.OutputPrice,
+		CachedInputPrice:     item.CachedInputPrice,
+		CacheCreationPrice:   item.CacheCreationPrice,
+		CacheCreation1hPrice: item.CacheCreation1hPrice,
+		PerRequestPrice:      item.PerRequestPrice,
+		PricingExtra:         item.PricingExtra,
+		CreatedAt:            item.CreatedAt,
+		UpdatedAt:            item.UpdatedAt,
 	}
 }

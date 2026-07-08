@@ -112,6 +112,10 @@ type Usage struct {
 	CompletionTokens    int
 	CachedTokens        int
 	CacheCreationTokens int
+	// CacheCreation5mTokens / CacheCreation1hTokens Claude 双档缓存写入明细
+	// （Anthropic usage.cache_creation.ephemeral_5m/1h_input_tokens）；OpenAI 上游恒 0。
+	CacheCreation5mTokens int
+	CacheCreation1hTokens int
 	// ReasoningTokens 推理 token 数（Responses output_tokens_details.reasoning_tokens）。
 	// 不单独计费（已含于 CompletionTokens），仅落账用于展示/统计。
 	ReasoningTokens int
@@ -142,6 +146,11 @@ type usageWire struct {
 	OutputTokens             *int `json:"output_tokens"`
 	CacheReadInputTokens     *int `json:"cache_read_input_tokens"`
 	CacheCreationInputTokens *int `json:"cache_creation_input_tokens"`
+	// Anthropic 双档缓存写入明细（usage.cache_creation 子对象）。
+	CacheCreation *struct {
+		Ephemeral5mInputTokens *int `json:"ephemeral_5m_input_tokens"`
+		Ephemeral1hInputTokens *int `json:"ephemeral_1h_input_tokens"`
+	} `json:"cache_creation"`
 }
 
 // ParseUsage 解析 usage 对象：OpenAI 命名优先，Anthropic 命名回退。
@@ -179,6 +188,11 @@ func ParseUsage(raw []byte) (Usage, bool) {
 	}
 	u.CachedTokens = pick(chatCached, responsesCached, w.CacheReadInputTokens)
 	u.CacheCreationTokens = pick(w.CacheCreationInputTokens)
+	// Anthropic 双档缓存写入明细（存在时供计费分档；OpenAI 上游无此字段 → 0）。
+	if w.CacheCreation != nil {
+		u.CacheCreation5mTokens = pick(w.CacheCreation.Ephemeral5mInputTokens)
+		u.CacheCreation1hTokens = pick(w.CacheCreation.Ephemeral1hInputTokens)
+	}
 
 	// reasoning 已含于 output/completion，不叠加计费也不影响 found 判定；负值钳 0。
 	if w.OutputTokensDetails != nil && w.OutputTokensDetails.ReasoningTokens != nil {

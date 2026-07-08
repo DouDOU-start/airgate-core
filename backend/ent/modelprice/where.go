@@ -79,6 +79,11 @@ func CacheCreationPrice(v float64) predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldEQ(FieldCacheCreationPrice, v))
 }
 
+// CacheCreation1hPrice applies equality check predicate on the "cache_creation_1h_price" field. It's identical to CacheCreation1hPriceEQ.
+func CacheCreation1hPrice(v float64) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldEQ(FieldCacheCreation1hPrice, v))
+}
+
 // PerRequestPrice applies equality check predicate on the "per_request_price" field. It's identical to PerRequestPriceEQ.
 func PerRequestPrice(v float64) predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldEQ(FieldPerRequestPrice, v))
@@ -319,6 +324,46 @@ func CacheCreationPriceLTE(v float64) predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldLTE(FieldCacheCreationPrice, v))
 }
 
+// CacheCreation1hPriceEQ applies the EQ predicate on the "cache_creation_1h_price" field.
+func CacheCreation1hPriceEQ(v float64) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldEQ(FieldCacheCreation1hPrice, v))
+}
+
+// CacheCreation1hPriceNEQ applies the NEQ predicate on the "cache_creation_1h_price" field.
+func CacheCreation1hPriceNEQ(v float64) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldNEQ(FieldCacheCreation1hPrice, v))
+}
+
+// CacheCreation1hPriceIn applies the In predicate on the "cache_creation_1h_price" field.
+func CacheCreation1hPriceIn(vs ...float64) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldIn(FieldCacheCreation1hPrice, vs...))
+}
+
+// CacheCreation1hPriceNotIn applies the NotIn predicate on the "cache_creation_1h_price" field.
+func CacheCreation1hPriceNotIn(vs ...float64) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldNotIn(FieldCacheCreation1hPrice, vs...))
+}
+
+// CacheCreation1hPriceGT applies the GT predicate on the "cache_creation_1h_price" field.
+func CacheCreation1hPriceGT(v float64) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldGT(FieldCacheCreation1hPrice, v))
+}
+
+// CacheCreation1hPriceGTE applies the GTE predicate on the "cache_creation_1h_price" field.
+func CacheCreation1hPriceGTE(v float64) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldGTE(FieldCacheCreation1hPrice, v))
+}
+
+// CacheCreation1hPriceLT applies the LT predicate on the "cache_creation_1h_price" field.
+func CacheCreation1hPriceLT(v float64) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldLT(FieldCacheCreation1hPrice, v))
+}
+
+// CacheCreation1hPriceLTE applies the LTE predicate on the "cache_creation_1h_price" field.
+func CacheCreation1hPriceLTE(v float64) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldLTE(FieldCacheCreation1hPrice, v))
+}
+
 // PerRequestPriceEQ applies the EQ predicate on the "per_request_price" field.
 func PerRequestPriceEQ(v float64) predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldEQ(FieldPerRequestPrice, v))
@@ -357,6 +402,16 @@ func PerRequestPriceLT(v float64) predicate.ModelPrice {
 // PerRequestPriceLTE applies the LTE predicate on the "per_request_price" field.
 func PerRequestPriceLTE(v float64) predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldLTE(FieldPerRequestPrice, v))
+}
+
+// PricingExtraIsNil applies the IsNil predicate on the "pricing_extra" field.
+func PricingExtraIsNil() predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldIsNull(FieldPricingExtra))
+}
+
+// PricingExtraNotNil applies the NotNil predicate on the "pricing_extra" field.
+func PricingExtraNotNil() predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldNotNull(FieldPricingExtra))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

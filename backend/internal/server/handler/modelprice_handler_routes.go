@@ -43,12 +43,14 @@ func (h *ModelPriceHandler) CreateModelPrice(c *gin.Context) {
 	}
 
 	item, err := h.service.Create(c.Request.Context(), appmodelprice.CreateInput{
-		Model:              req.Model,
-		InputPrice:         req.InputPrice,
-		OutputPrice:        req.OutputPrice,
-		CachedInputPrice:   req.CachedInputPrice,
-		CacheCreationPrice: req.CacheCreationPrice,
-		PerRequestPrice:    req.PerRequestPrice,
+		Model:                req.Model,
+		InputPrice:           req.InputPrice,
+		OutputPrice:          req.OutputPrice,
+		CachedInputPrice:     req.CachedInputPrice,
+		CacheCreationPrice:   req.CacheCreationPrice,
+		CacheCreation1hPrice: req.CacheCreation1hPrice,
+		PerRequestPrice:      req.PerRequestPrice,
+		PricingExtra:         req.PricingExtra,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("创建模型价格失败", "创建失败", err)
@@ -74,12 +76,14 @@ func (h *ModelPriceHandler) UpdateModelPrice(c *gin.Context) {
 	}
 
 	item, err := h.service.Update(c.Request.Context(), id, appmodelprice.UpdateInput{
-		Model:              req.Model,
-		InputPrice:         req.InputPrice,
-		OutputPrice:        req.OutputPrice,
-		CachedInputPrice:   req.CachedInputPrice,
-		CacheCreationPrice: req.CacheCreationPrice,
-		PerRequestPrice:    req.PerRequestPrice,
+		Model:                req.Model,
+		InputPrice:           req.InputPrice,
+		OutputPrice:          req.OutputPrice,
+		CachedInputPrice:     req.CachedInputPrice,
+		CacheCreationPrice:   req.CacheCreationPrice,
+		CacheCreation1hPrice: req.CacheCreation1hPrice,
+		PerRequestPrice:      req.PerRequestPrice,
+		PricingExtra:         req.PricingExtra,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("更新模型价格失败", "更新失败", err)
@@ -118,12 +122,14 @@ func (h *ModelPriceHandler) ImportModelPrices(c *gin.Context) {
 	items := make([]appmodelprice.ImportItem, 0, len(req.Items))
 	for _, item := range req.Items {
 		items = append(items, appmodelprice.ImportItem{
-			Model:              item.Model,
-			InputPrice:         item.InputPrice,
-			OutputPrice:        item.OutputPrice,
-			CachedInputPrice:   item.CachedInputPrice,
-			CacheCreationPrice: item.CacheCreationPrice,
-			PerRequestPrice:    item.PerRequestPrice,
+			Model:                item.Model,
+			InputPrice:           item.InputPrice,
+			OutputPrice:          item.OutputPrice,
+			CachedInputPrice:     item.CachedInputPrice,
+			CacheCreationPrice:   item.CacheCreationPrice,
+			CacheCreation1hPrice: item.CacheCreation1hPrice,
+			PerRequestPrice:      item.PerRequestPrice,
+			PricingExtra:         item.PricingExtra,
 		})
 	}
 

@@ -2,6 +2,8 @@ package modelprice
 
 import (
 	"context"
+	"encoding/json"
+	"log/slog"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
@@ -109,15 +111,87 @@ func (s *Service) LoadAllPrices(ctx context.Context) (map[string]pricing.Price, 
 	}
 	prices := make(map[string]pricing.Price, len(items))
 	for _, item := range items {
+		tiers, longCtx := parsePricingExtra(item.Model, item.PricingExtra)
 		prices[item.Model] = pricing.Price{
-			Input:         item.InputPrice,
-			Output:        item.OutputPrice,
-			CachedInput:   item.CachedInputPrice,
-			CacheCreation: item.CacheCreationPrice,
-			PerRequest:    item.PerRequestPrice,
+			Input:           item.InputPrice,
+			Output:          item.OutputPrice,
+			CachedInput:     item.CachedInputPrice,
+			CacheCreation5m: item.CacheCreationPrice,
+			CacheCreation1h: item.CacheCreation1hPrice,
+			PerRequest:      item.PerRequestPrice,
+			ServiceTiers:    tiers,
+			LongContext:     longCtx,
 		}
 	}
 	return prices, nil
+}
+
+// parsePricingExtra 把 pricing_extra JSON（map 形态）解析为服务档倍率与长上下文阶梯。
+// 解析失败或字段缺失时按"无该扩展"处理（记 warn，不阻断加载）。
+func parsePricingExtra(model string, extra map[string]interface{}) (map[string]float64, *pricing.LongContextRule) {
+	if len(extra) == 0 {
+		return nil, nil
+	}
+
+	var tiers map[string]float64
+	if raw, ok := extra["service_tiers"]; ok {
+		if m, ok := raw.(map[string]interface{}); ok {
+			tiers = make(map[string]float64, len(m))
+			for tier, v := range m {
+				if f, ok := toFloat(v); ok {
+					tiers[tier] = f
+				}
+			}
+			if len(tiers) == 0 {
+				tiers = nil
+			}
+		} else {
+			slog.Warn("model_price_pricing_extra_invalid", "model", model, "field", "service_tiers")
+		}
+	}
+
+	var longCtx *pricing.LongContextRule
+	if raw, ok := extra["long_context"]; ok {
+		if m, ok := raw.(map[string]interface{}); ok {
+			threshold, tok := toFloat(m["threshold_tokens"])
+			inMul, iok := toFloat(m["input_multiplier"])
+			outMul, ook := toFloat(m["output_multiplier"])
+			cachedMul, cok := toFloat(m["cached_multiplier"])
+			if tok && iok && ook && cok {
+				longCtx = &pricing.LongContextRule{
+					ThresholdTokens: int(threshold),
+					InputMul:        inMul,
+					OutputMul:       outMul,
+					CachedMul:       cachedMul,
+				}
+			} else {
+				slog.Warn("model_price_pricing_extra_invalid", "model", model, "field", "long_context")
+			}
+		} else {
+			slog.Warn("model_price_pricing_extra_invalid", "model", model, "field", "long_context")
+		}
+	}
+
+	return tiers, longCtx
+}
+
+// toFloat 把 JSON/YAML 反序列化出的数值（float64 / int / json.Number）归一为 float64。
+func toFloat(v interface{}) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case float32:
+		return float64(n), true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case json.Number:
+		f, err := n.Float64()
+		return f, err == nil
+	default:
+		return 0, false
+	}
 }
 
 // invalidate 写路径成功后使 pricing 缓存失效；未注入时为空操作。
