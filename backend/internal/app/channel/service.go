@@ -3,9 +3,6 @@ package channel
 import (
 	"context"
 	"fmt"
-	"net"
-	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -27,9 +24,8 @@ type Tester interface {
 }
 
 // ModelFetcher 上游模型列表拉取接口。
-// proxyURL 为渠道绑定的出口代理（空串直连），与转发/测试链路口径一致。
 type ModelFetcher interface {
-	FetchModels(ctx context.Context, channelType, baseURL, apiKey, proxyURL string) ([]string, error)
+	FetchModels(ctx context.Context, channelType, baseURL, apiKey string) ([]string, error)
 }
 
 // Service 提供渠道域用例编排。
@@ -238,17 +234,23 @@ func (s *Service) FetchModels(ctx context.Context, id int) ([]string, error) {
 		return nil, fmt.Errorf("%w: API Key 解密失败", ErrModelFetchFailed)
 	}
 
-	// 走渠道绑定的出口代理（与转发/测试链路一致），避免直连绕开渠道出口隔离。
-	models, err := s.fetcher.FetchModels(ctx, ch.Type, ch.BaseURL, apiKey, BuildProxyURL(ch.Proxy))
+	return s.FetchModelsWithKey(ctx, ch.Type, ch.BaseURL, apiKey)
+}
+
+// FetchModelsWithKey 按给定连接参数（明文 key）拉取上游模型列表。
+// 供渠道尚未保存时的预览拉取使用：表单填好 type/base_url/api_key 即可试拉，
+// 不要求渠道已落库，解开「保存要先有模型、拉模型要先保存」的死锁。
+func (s *Service) FetchModelsWithKey(ctx context.Context, channelType, baseURL, apiKey string) ([]string, error) {
+	models, err := s.fetcher.FetchModels(ctx, channelType, baseURL, apiKey)
 	if err != nil {
-		logger.Warn("channel_fetch_models_failed", "channel_id", id, "type", ch.Type, sdk.LogFieldError, err)
+		sdk.LoggerFromContext(ctx).Warn("channel_fetch_models_failed", "type", channelType, sdk.LogFieldError, err)
 		return nil, fmt.Errorf("%w: %v", ErrModelFetchFailed, err)
 	}
 	return models, nil
 }
 
 // LoadAllForRegistry 实现 registry.Loader：全量加载渠道并
-// 解密 api_keys、解析 proxy 边为 ProxyURL，产出运行时快照。
+// 解密 api_keys，产出运行时快照。
 func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelSnapshot, error) {
 	logger := sdk.LoggerFromContext(ctx)
 
@@ -296,7 +298,6 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelSna
 			Status:         ch.Status,
 			StatusUntil:    ch.StatusUntil,
 			GroupIDs:       groups,
-			ProxyURL:       BuildProxyURL(ch.Proxy),
 			TestModel:      ch.TestModel,
 			CustomConfig:   ch.CustomConfig,
 		})
@@ -359,20 +360,4 @@ func (s *Service) reloadRegistry(ctx context.Context) {
 	if err := s.reloader.Reload(ctx); err != nil {
 		sdk.LoggerFromContext(ctx).Error("channel_registry_reload_failed", sdk.LogFieldError, err)
 	}
-}
-
-// BuildProxyURL 将 proxy 边解析为出口代理 URL（http:// 或 socks5://）；无代理返回空串。
-// 导出供 server 层渠道测试适配器复用（构造 registry.ChannelSnapshot）。
-func BuildProxyURL(p *ProxyInfo) string {
-	if p == nil {
-		return ""
-	}
-	u := &url.URL{
-		Scheme: p.Protocol,
-		Host:   net.JoinHostPort(p.Address, strconv.Itoa(p.Port)),
-	}
-	if p.Username != "" {
-		u.User = url.UserPassword(p.Username, p.Password)
-	}
-	return u.String()
 }

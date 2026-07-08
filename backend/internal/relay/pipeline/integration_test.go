@@ -514,7 +514,7 @@ func TestBalancePrecheck(t *testing.T) {
 	}
 }
 
-// TestUnpricedModelRejected 缺价预检 400（默认 unpriced_model_allow=false）。
+// TestUnpricedModelRejected 缺价预检 400（缺价模型一律拒绝，无放行开关）。
 func TestUnpricedModelRejected(t *testing.T) {
 	env := newTestEnv(t, testSnap(1, "http://127.0.0.1:0", func(s *registry.ChannelSnapshot) {
 		s.Models["unpriced-model"] = struct{}{}

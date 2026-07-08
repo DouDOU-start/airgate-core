@@ -1,26 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Description, Input, Label, ListBox, Modal, Select, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Description, Input, Label, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { ArrowUpDown, Layers } from 'lucide-react';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../../shared/types';
-
-function parseQuotas(quotas?: Record<string, unknown>): { daily: string; weekly: string; monthly: string } {
-  return {
-    daily: quotas?.daily ? String(quotas.daily) : '',
-    monthly: quotas?.monthly ? String(quotas.monthly) : '',
-    weekly: quotas?.weekly ? String(quotas.weekly) : '',
-  };
-}
-
-function buildQuotas(q: { daily: string; weekly: string; monthly: string }): Record<string, unknown> | undefined {
-  const result: Record<string, number> = {};
-  if (q.daily && Number(q.daily) > 0) result.daily = Number(q.daily);
-  if (q.weekly && Number(q.weekly) > 0) result.weekly = Number(q.weekly);
-  if (q.monthly && Number(q.monthly) > 0) result.monthly = Number(q.monthly);
-  return Object.keys(result).length > 0 ? result : undefined;
-}
 
 export function GroupFormModal({
   open,
@@ -48,16 +32,7 @@ export function GroupFormModal({
     rate_multiplier: group?.rate_multiplier ?? 1,
     sort_weight: group?.sort_weight ?? 0,
     status_visible: group?.status_visible ?? true,
-    subscription_type: group?.subscription_type ?? 'standard' as const,
   });
-  const [quotas, setQuotas] = useState(parseQuotas(group?.quotas as Record<string, unknown> | undefined));
-
-  const subscriptionTypeOptions = [
-    { id: 'standard', label: t('groups.type_standard') },
-    { id: 'subscription', label: t('groups.type_subscription') },
-  ];
-  const selectedSubscriptionTypeLabel =
-    subscriptionTypeOptions.find((item) => item.id === form.subscription_type)?.label ?? t('groups.type_standard');
 
   const handleSubmit = () => {
     if (!isEdit && !form.name) return;
@@ -66,8 +41,6 @@ export function GroupFormModal({
       ...form,
       force_instructions: form.force_instructions ?? '',
       note: form.note,
-      quotas: form.subscription_type === 'subscription' ? buildQuotas(quotas) : undefined,
-      subscription_type: form.subscription_type as 'standard' | 'subscription',
     });
   };
 
@@ -130,29 +103,6 @@ export function GroupFormModal({
           />
         </div>
 
-        <Select
-          fullWidth
-          selectedKey={form.subscription_type}
-          onSelectionChange={(key) =>
-            setForm({ ...form, subscription_type: (key ?? 'standard') as 'standard' | 'subscription' })
-          }
-        >
-          <Label>{t('groups.subscription_type')}</Label>
-          <Select.Trigger>
-            <Select.Value>{selectedSubscriptionTypeLabel}</Select.Value>
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox items={subscriptionTypeOptions}>
-              {(item) => (
-                <ListBox.Item id={item.id} textValue={item.label}>
-                  {item.label}
-                </ListBox.Item>
-              )}
-            </ListBox>
-          </Select.Popover>
-        </Select>
-
         <HeroTextField fullWidth>
           <Label>{t('groups.sort_weight')}</Label>
           <div className="relative">
@@ -176,44 +126,6 @@ export function GroupFormModal({
           />
           <Description>{t('groups.note_hint')}</Description>
         </HeroTextField>
-
-        {form.subscription_type === 'subscription' ? (
-          <div>
-            <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
-              {t('groups.quotas')}
-            </p>
-            <p className="mb-2 text-[11px] text-text-tertiary">{t('groups.quota_hint')}</p>
-            <div className="grid grid-cols-3 gap-3">
-              <HeroTextField fullWidth>
-                <Label>{t('groups.quota_daily')}</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={quotas.daily}
-                  onChange={(e) => setQuotas({ ...quotas, daily: e.target.value })}
-                />
-              </HeroTextField>
-              <HeroTextField fullWidth>
-                <Label>{t('groups.quota_weekly')}</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={quotas.weekly}
-                  onChange={(e) => setQuotas({ ...quotas, weekly: e.target.value })}
-                />
-              </HeroTextField>
-              <HeroTextField fullWidth>
-                <Label>{t('groups.quota_monthly')}</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={quotas.monthly}
-                  onChange={(e) => setQuotas({ ...quotas, monthly: e.target.value })}
-                />
-              </HeroTextField>
-            </div>
-          </div>
-        ) : null}
       </div>
             </Modal.Body>
             <Modal.Footer>

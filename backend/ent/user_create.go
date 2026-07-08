@@ -15,7 +15,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
-	"github.com/DouDOU-start/airgate-core/ent/usersubscription"
 )
 
 // UserCreate is the builder for creating a User entity.
@@ -196,21 +195,6 @@ func (uc *UserCreate) AddAPIKeys(a ...*APIKey) *UserCreate {
 		ids[i] = a[i].ID
 	}
 	return uc.AddAPIKeyIDs(ids...)
-}
-
-// AddSubscriptionIDs adds the "subscriptions" edge to the UserSubscription entity by IDs.
-func (uc *UserCreate) AddSubscriptionIDs(ids ...int) *UserCreate {
-	uc.mutation.AddSubscriptionIDs(ids...)
-	return uc
-}
-
-// AddSubscriptions adds the "subscriptions" edges to the UserSubscription entity.
-func (uc *UserCreate) AddSubscriptions(u ...*UserSubscription) *UserCreate {
-	ids := make([]int, len(u))
-	for i := range u {
-		ids[i] = u[i].ID
-	}
-	return uc.AddSubscriptionIDs(ids...)
 }
 
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
@@ -478,22 +462,6 @@ func (uc *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := uc.mutation.SubscriptionsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.SubscriptionsTable,
-			Columns: []string{user.SubscriptionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

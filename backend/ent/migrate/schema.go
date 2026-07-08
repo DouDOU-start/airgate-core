@@ -61,6 +61,57 @@ var (
 			},
 		},
 	}
+	// AnnouncementsColumns holds the columns for the "announcements" table.
+	AnnouncementsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "title", Type: field.TypeString},
+		{Name: "content", Type: field.TypeString, Size: 2147483647},
+		{Name: "status", Type: field.TypeString, Default: "draft"},
+		{Name: "notify_mode", Type: field.TypeString, Default: "silent"},
+		{Name: "starts_at", Type: field.TypeTime, Nullable: true},
+		{Name: "ends_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// AnnouncementsTable holds the schema information for the "announcements" table.
+	AnnouncementsTable = &schema.Table{
+		Name:       "announcements",
+		Columns:    AnnouncementsColumns,
+		PrimaryKey: []*schema.Column{AnnouncementsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "announcement_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{AnnouncementsColumns[3], AnnouncementsColumns[7]},
+			},
+		},
+	}
+	// AnnouncementReadsColumns holds the columns for the "announcement_reads" table.
+	AnnouncementReadsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "announcement_id", Type: field.TypeInt},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "read_at", Type: field.TypeTime},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// AnnouncementReadsTable holds the schema information for the "announcement_reads" table.
+	AnnouncementReadsTable = &schema.Table{
+		Name:       "announcement_reads",
+		Columns:    AnnouncementReadsColumns,
+		PrimaryKey: []*schema.Column{AnnouncementReadsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "announcementread_announcement_id_user_id",
+				Unique:  true,
+				Columns: []*schema.Column{AnnouncementReadsColumns[1], AnnouncementReadsColumns[2]},
+			},
+			{
+				Name:    "announcementread_user_id",
+				Unique:  false,
+				Columns: []*schema.Column{AnnouncementReadsColumns[2]},
+			},
+		},
+	}
 	// BalanceLogsColumns holds the columns for the "balance_logs" table.
 	BalanceLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -128,21 +179,12 @@ var (
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "channel_proxy", Type: field.TypeInt, Nullable: true},
 	}
 	// ChannelsTable holds the schema information for the "channels" table.
 	ChannelsTable = &schema.Table{
 		Name:       "channels",
 		Columns:    ChannelsColumns,
 		PrimaryKey: []*schema.Column{ChannelsColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "channels_proxies_proxy",
-				Columns:    []*schema.Column{ChannelsColumns[25]},
-				RefColumns: []*schema.Column{ProxiesColumns[0]},
-				OnDelete:   schema.SetNull,
-			},
-		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "channel_type_status",
@@ -159,7 +201,6 @@ var (
 		{Name: "rate_multiplier", Type: field.TypeFloat64, Default: 1},
 		{Name: "is_exclusive", Type: field.TypeBool, Default: false},
 		{Name: "status_visible", Type: field.TypeBool, Default: true},
-		{Name: "subscription_type", Type: field.TypeEnum, Enums: []string{"standard", "subscription"}, Default: "standard"},
 		{Name: "quotas", Type: field.TypeJSON, Nullable: true},
 		{Name: "model_routing", Type: field.TypeJSON, Nullable: true},
 		{Name: "service_tier", Type: field.TypeString, Default: ""},
@@ -194,25 +235,6 @@ var (
 		Name:       "model_prices",
 		Columns:    ModelPricesColumns,
 		PrimaryKey: []*schema.Column{ModelPricesColumns[0]},
-	}
-	// ProxiesColumns holds the columns for the "proxies" table.
-	ProxiesColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "name", Type: field.TypeString},
-		{Name: "protocol", Type: field.TypeEnum, Enums: []string{"http", "socks5"}, Default: "http"},
-		{Name: "address", Type: field.TypeString},
-		{Name: "port", Type: field.TypeInt},
-		{Name: "username", Type: field.TypeString, Default: ""},
-		{Name: "password", Type: field.TypeString, Default: ""},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "disabled"}, Default: "active"},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-	}
-	// ProxiesTable holds the schema information for the "proxies" table.
-	ProxiesTable = &schema.Table{
-		Name:       "proxies",
-		Columns:    ProxiesColumns,
-		PrimaryKey: []*schema.Column{ProxiesColumns[0]},
 	}
 	// SettingsColumns holds the columns for the "settings" table.
 	SettingsColumns = []*schema.Column{
@@ -438,45 +460,6 @@ var (
 		Columns:    UsersColumns,
 		PrimaryKey: []*schema.Column{UsersColumns[0]},
 	}
-	// UserSubscriptionsColumns holds the columns for the "user_subscriptions" table.
-	UserSubscriptionsColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "effective_at", Type: field.TypeTime},
-		{Name: "expires_at", Type: field.TypeTime},
-		{Name: "usage", Type: field.TypeJSON, Nullable: true},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "expired", "suspended"}, Default: "active"},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "group_subscriptions", Type: field.TypeInt},
-		{Name: "user_subscriptions", Type: field.TypeInt},
-	}
-	// UserSubscriptionsTable holds the schema information for the "user_subscriptions" table.
-	UserSubscriptionsTable = &schema.Table{
-		Name:       "user_subscriptions",
-		Columns:    UserSubscriptionsColumns,
-		PrimaryKey: []*schema.Column{UserSubscriptionsColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "user_subscriptions_groups_subscriptions",
-				Columns:    []*schema.Column{UserSubscriptionsColumns[7]},
-				RefColumns: []*schema.Column{GroupsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "user_subscriptions_users_subscriptions",
-				Columns:    []*schema.Column{UserSubscriptionsColumns[8]},
-				RefColumns: []*schema.Column{UsersColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-		},
-		Indexes: []*schema.Index{
-			{
-				Name:    "usersubscription_status",
-				Unique:  false,
-				Columns: []*schema.Column{UserSubscriptionsColumns[4]},
-			},
-		},
-	}
 	// ChannelGroupsColumns holds the columns for the "channel_groups" table.
 	ChannelGroupsColumns = []*schema.Column{
 		{Name: "channel_id", Type: field.TypeInt},
@@ -530,16 +513,16 @@ var (
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		APIKeysTable,
+		AnnouncementsTable,
+		AnnouncementReadsTable,
 		BalanceLogsTable,
 		ChannelsTable,
 		GroupsTable,
 		ModelPricesTable,
-		ProxiesTable,
 		SettingsTable,
 		TasksTable,
 		UsageLogsTable,
 		UsersTable,
-		UserSubscriptionsTable,
 		ChannelGroupsTable,
 		UserAllowedGroupsTable,
 	}
@@ -549,13 +532,10 @@ func init() {
 	APIKeysTable.ForeignKeys[0].RefTable = GroupsTable
 	APIKeysTable.ForeignKeys[1].RefTable = UsersTable
 	BalanceLogsTable.ForeignKeys[0].RefTable = UsersTable
-	ChannelsTable.ForeignKeys[0].RefTable = ProxiesTable
 	UsageLogsTable.ForeignKeys[0].RefTable = APIKeysTable
 	UsageLogsTable.ForeignKeys[1].RefTable = ChannelsTable
 	UsageLogsTable.ForeignKeys[2].RefTable = GroupsTable
 	UsageLogsTable.ForeignKeys[3].RefTable = UsersTable
-	UserSubscriptionsTable.ForeignKeys[0].RefTable = GroupsTable
-	UserSubscriptionsTable.ForeignKeys[1].RefTable = UsersTable
 	ChannelGroupsTable.ForeignKeys[0].RefTable = ChannelsTable
 	ChannelGroupsTable.ForeignKeys[1].RefTable = GroupsTable
 	UserAllowedGroupsTable.ForeignKeys[0].RefTable = UsersTable

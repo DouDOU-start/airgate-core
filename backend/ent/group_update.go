@@ -17,7 +17,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
-	"github.com/DouDOU-start/airgate-core/ent/usersubscription"
 )
 
 // GroupUpdate is the builder for updating Group entities.
@@ -106,20 +105,6 @@ func (gu *GroupUpdate) SetStatusVisible(b bool) *GroupUpdate {
 func (gu *GroupUpdate) SetNillableStatusVisible(b *bool) *GroupUpdate {
 	if b != nil {
 		gu.SetStatusVisible(*b)
-	}
-	return gu
-}
-
-// SetSubscriptionType sets the "subscription_type" field.
-func (gu *GroupUpdate) SetSubscriptionType(gt group.SubscriptionType) *GroupUpdate {
-	gu.mutation.SetSubscriptionType(gt)
-	return gu
-}
-
-// SetNillableSubscriptionType sets the "subscription_type" field if the given value is not nil.
-func (gu *GroupUpdate) SetNillableSubscriptionType(gt *group.SubscriptionType) *GroupUpdate {
-	if gt != nil {
-		gu.SetSubscriptionType(*gt)
 	}
 	return gu
 }
@@ -262,21 +247,6 @@ func (gu *GroupUpdate) AddAPIKeys(a ...*APIKey) *GroupUpdate {
 	return gu.AddAPIKeyIDs(ids...)
 }
 
-// AddSubscriptionIDs adds the "subscriptions" edge to the UserSubscription entity by IDs.
-func (gu *GroupUpdate) AddSubscriptionIDs(ids ...int) *GroupUpdate {
-	gu.mutation.AddSubscriptionIDs(ids...)
-	return gu
-}
-
-// AddSubscriptions adds the "subscriptions" edges to the UserSubscription entity.
-func (gu *GroupUpdate) AddSubscriptions(u ...*UserSubscription) *GroupUpdate {
-	ids := make([]int, len(u))
-	for i := range u {
-		ids[i] = u[i].ID
-	}
-	return gu.AddSubscriptionIDs(ids...)
-}
-
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
 func (gu *GroupUpdate) AddUsageLogIDs(ids ...int) *GroupUpdate {
 	gu.mutation.AddUsageLogIDs(ids...)
@@ -360,27 +330,6 @@ func (gu *GroupUpdate) RemoveAPIKeys(a ...*APIKey) *GroupUpdate {
 	return gu.RemoveAPIKeyIDs(ids...)
 }
 
-// ClearSubscriptions clears all "subscriptions" edges to the UserSubscription entity.
-func (gu *GroupUpdate) ClearSubscriptions() *GroupUpdate {
-	gu.mutation.ClearSubscriptions()
-	return gu
-}
-
-// RemoveSubscriptionIDs removes the "subscriptions" edge to UserSubscription entities by IDs.
-func (gu *GroupUpdate) RemoveSubscriptionIDs(ids ...int) *GroupUpdate {
-	gu.mutation.RemoveSubscriptionIDs(ids...)
-	return gu
-}
-
-// RemoveSubscriptions removes "subscriptions" edges to UserSubscription entities.
-func (gu *GroupUpdate) RemoveSubscriptions(u ...*UserSubscription) *GroupUpdate {
-	ids := make([]int, len(u))
-	for i := range u {
-		ids[i] = u[i].ID
-	}
-	return gu.RemoveSubscriptionIDs(ids...)
-}
-
 // ClearUsageLogs clears all "usage_logs" edges to the UsageLog entity.
 func (gu *GroupUpdate) ClearUsageLogs() *GroupUpdate {
 	gu.mutation.ClearUsageLogs()
@@ -445,11 +394,6 @@ func (gu *GroupUpdate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Group.name": %w`, err)}
 		}
 	}
-	if v, ok := gu.mutation.SubscriptionType(); ok {
-		if err := group.SubscriptionTypeValidator(v); err != nil {
-			return &ValidationError{Name: "subscription_type", err: fmt.Errorf(`ent: validator failed for field "Group.subscription_type": %w`, err)}
-		}
-	}
 	return nil
 }
 
@@ -482,9 +426,6 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := gu.mutation.StatusVisible(); ok {
 		_spec.SetField(group.FieldStatusVisible, field.TypeBool, value)
-	}
-	if value, ok := gu.mutation.SubscriptionType(); ok {
-		_spec.SetField(group.FieldSubscriptionType, field.TypeEnum, value)
 	}
 	if value, ok := gu.mutation.Quotas(); ok {
 		_spec.SetField(group.FieldQuotas, field.TypeJSON, value)
@@ -651,51 +592,6 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if gu.mutation.SubscriptionsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   group.SubscriptionsTable,
-			Columns: []string{group.SubscriptionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := gu.mutation.RemovedSubscriptionsIDs(); len(nodes) > 0 && !gu.mutation.SubscriptionsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   group.SubscriptionsTable,
-			Columns: []string{group.SubscriptionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := gu.mutation.SubscriptionsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   group.SubscriptionsTable,
-			Columns: []string{group.SubscriptionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
 	if gu.mutation.UsageLogsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -838,20 +734,6 @@ func (guo *GroupUpdateOne) SetNillableStatusVisible(b *bool) *GroupUpdateOne {
 	return guo
 }
 
-// SetSubscriptionType sets the "subscription_type" field.
-func (guo *GroupUpdateOne) SetSubscriptionType(gt group.SubscriptionType) *GroupUpdateOne {
-	guo.mutation.SetSubscriptionType(gt)
-	return guo
-}
-
-// SetNillableSubscriptionType sets the "subscription_type" field if the given value is not nil.
-func (guo *GroupUpdateOne) SetNillableSubscriptionType(gt *group.SubscriptionType) *GroupUpdateOne {
-	if gt != nil {
-		guo.SetSubscriptionType(*gt)
-	}
-	return guo
-}
-
 // SetQuotas sets the "quotas" field.
 func (guo *GroupUpdateOne) SetQuotas(m map[string]interface{}) *GroupUpdateOne {
 	guo.mutation.SetQuotas(m)
@@ -990,21 +872,6 @@ func (guo *GroupUpdateOne) AddAPIKeys(a ...*APIKey) *GroupUpdateOne {
 	return guo.AddAPIKeyIDs(ids...)
 }
 
-// AddSubscriptionIDs adds the "subscriptions" edge to the UserSubscription entity by IDs.
-func (guo *GroupUpdateOne) AddSubscriptionIDs(ids ...int) *GroupUpdateOne {
-	guo.mutation.AddSubscriptionIDs(ids...)
-	return guo
-}
-
-// AddSubscriptions adds the "subscriptions" edges to the UserSubscription entity.
-func (guo *GroupUpdateOne) AddSubscriptions(u ...*UserSubscription) *GroupUpdateOne {
-	ids := make([]int, len(u))
-	for i := range u {
-		ids[i] = u[i].ID
-	}
-	return guo.AddSubscriptionIDs(ids...)
-}
-
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
 func (guo *GroupUpdateOne) AddUsageLogIDs(ids ...int) *GroupUpdateOne {
 	guo.mutation.AddUsageLogIDs(ids...)
@@ -1088,27 +955,6 @@ func (guo *GroupUpdateOne) RemoveAPIKeys(a ...*APIKey) *GroupUpdateOne {
 	return guo.RemoveAPIKeyIDs(ids...)
 }
 
-// ClearSubscriptions clears all "subscriptions" edges to the UserSubscription entity.
-func (guo *GroupUpdateOne) ClearSubscriptions() *GroupUpdateOne {
-	guo.mutation.ClearSubscriptions()
-	return guo
-}
-
-// RemoveSubscriptionIDs removes the "subscriptions" edge to UserSubscription entities by IDs.
-func (guo *GroupUpdateOne) RemoveSubscriptionIDs(ids ...int) *GroupUpdateOne {
-	guo.mutation.RemoveSubscriptionIDs(ids...)
-	return guo
-}
-
-// RemoveSubscriptions removes "subscriptions" edges to UserSubscription entities.
-func (guo *GroupUpdateOne) RemoveSubscriptions(u ...*UserSubscription) *GroupUpdateOne {
-	ids := make([]int, len(u))
-	for i := range u {
-		ids[i] = u[i].ID
-	}
-	return guo.RemoveSubscriptionIDs(ids...)
-}
-
 // ClearUsageLogs clears all "usage_logs" edges to the UsageLog entity.
 func (guo *GroupUpdateOne) ClearUsageLogs() *GroupUpdateOne {
 	guo.mutation.ClearUsageLogs()
@@ -1186,11 +1032,6 @@ func (guo *GroupUpdateOne) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Group.name": %w`, err)}
 		}
 	}
-	if v, ok := guo.mutation.SubscriptionType(); ok {
-		if err := group.SubscriptionTypeValidator(v); err != nil {
-			return &ValidationError{Name: "subscription_type", err: fmt.Errorf(`ent: validator failed for field "Group.subscription_type": %w`, err)}
-		}
-	}
 	return nil
 }
 
@@ -1240,9 +1081,6 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 	}
 	if value, ok := guo.mutation.StatusVisible(); ok {
 		_spec.SetField(group.FieldStatusVisible, field.TypeBool, value)
-	}
-	if value, ok := guo.mutation.SubscriptionType(); ok {
-		_spec.SetField(group.FieldSubscriptionType, field.TypeEnum, value)
 	}
 	if value, ok := guo.mutation.Quotas(); ok {
 		_spec.SetField(group.FieldQuotas, field.TypeJSON, value)
@@ -1402,51 +1240,6 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if guo.mutation.SubscriptionsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   group.SubscriptionsTable,
-			Columns: []string{group.SubscriptionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := guo.mutation.RemovedSubscriptionsIDs(); len(nodes) > 0 && !guo.mutation.SubscriptionsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   group.SubscriptionsTable,
-			Columns: []string{group.SubscriptionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := guo.mutation.SubscriptionsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   group.SubscriptionsTable,
-			Columns: []string{group.SubscriptionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

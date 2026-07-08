@@ -38,8 +38,6 @@ type GatewaySettings struct {
 	AutoBanEnabled bool
 	// BanKeywords 错误体关键词表（channel_ban_keywords，JSON 数组；已统一小写）。
 	BanKeywords []string
-	// UnpricedModelAllow 缺价放行开关（unpriced_model_allow，默认 false）。
-	UnpricedModelAllow bool
 }
 
 // defaultBanKeywords 关键词表默认种子（与契约 §5 一致，全小写）。
@@ -54,9 +52,8 @@ var defaultBanKeywords = []string{
 // defaultGatewaySettings 返回默认开关（lister 缺失或读失败时的兜底）。
 func defaultGatewaySettings() GatewaySettings {
 	return GatewaySettings{
-		AutoBanEnabled:     true,
-		BanKeywords:        defaultBanKeywords,
-		UnpricedModelAllow: false,
+		AutoBanEnabled: true,
+		BanKeywords:    defaultBanKeywords,
 	}
 }
 
@@ -136,8 +133,6 @@ func applySettings(s *GatewaySettings, items []Setting) {
 		switch item.Key {
 		case "channel_auto_ban_enabled":
 			s.AutoBanEnabled = value != "false"
-		case "unpriced_model_allow":
-			s.UnpricedModelAllow = value == "true"
 		case "channel_ban_keywords":
 			var keywords []string
 			if err := json.Unmarshal([]byte(value), &keywords); err != nil {

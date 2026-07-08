@@ -14,7 +14,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
-	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 )
 
@@ -26,9 +25,7 @@ type ChannelQuery struct {
 	inters        []Interceptor
 	predicates    []predicate.Channel
 	withGroups    *GroupQuery
-	withProxy     *ProxyQuery
 	withUsageLogs *UsageLogQuery
-	withFKs       bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -80,28 +77,6 @@ func (cq *ChannelQuery) QueryGroups() *GroupQuery {
 			sqlgraph.From(channel.Table, channel.FieldID, selector),
 			sqlgraph.To(group.Table, group.FieldID),
 			sqlgraph.Edge(sqlgraph.M2M, false, channel.GroupsTable, channel.GroupsPrimaryKey...),
-		)
-		fromU = sqlgraph.SetNeighbors(cq.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QueryProxy chains the current query on the "proxy" edge.
-func (cq *ChannelQuery) QueryProxy() *ProxyQuery {
-	query := (&ProxyClient{config: cq.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := cq.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := cq.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(channel.Table, channel.FieldID, selector),
-			sqlgraph.To(proxy.Table, proxy.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, channel.ProxyTable, channel.ProxyColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(cq.driver.Dialect(), step)
 		return fromU, nil
@@ -324,7 +299,6 @@ func (cq *ChannelQuery) Clone() *ChannelQuery {
 		inters:        append([]Interceptor{}, cq.inters...),
 		predicates:    append([]predicate.Channel{}, cq.predicates...),
 		withGroups:    cq.withGroups.Clone(),
-		withProxy:     cq.withProxy.Clone(),
 		withUsageLogs: cq.withUsageLogs.Clone(),
 		// clone intermediate query.
 		sql:  cq.sql.Clone(),
@@ -340,17 +314,6 @@ func (cq *ChannelQuery) WithGroups(opts ...func(*GroupQuery)) *ChannelQuery {
 		opt(query)
 	}
 	cq.withGroups = query
-	return cq
-}
-
-// WithProxy tells the query-builder to eager-load the nodes that are connected to
-// the "proxy" edge. The optional arguments are used to configure the query builder of the edge.
-func (cq *ChannelQuery) WithProxy(opts ...func(*ProxyQuery)) *ChannelQuery {
-	query := (&ProxyClient{config: cq.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	cq.withProxy = query
 	return cq
 }
 
@@ -442,20 +405,12 @@ func (cq *ChannelQuery) prepareQuery(ctx context.Context) error {
 func (cq *ChannelQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Channel, error) {
 	var (
 		nodes       = []*Channel{}
-		withFKs     = cq.withFKs
 		_spec       = cq.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [2]bool{
 			cq.withGroups != nil,
-			cq.withProxy != nil,
 			cq.withUsageLogs != nil,
 		}
 	)
-	if cq.withProxy != nil {
-		withFKs = true
-	}
-	if withFKs {
-		_spec.Node.Columns = append(_spec.Node.Columns, channel.ForeignKeys...)
-	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*Channel).scanValues(nil, columns)
 	}
@@ -478,12 +433,6 @@ func (cq *ChannelQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Chan
 		if err := cq.loadGroups(ctx, query, nodes,
 			func(n *Channel) { n.Edges.Groups = []*Group{} },
 			func(n *Channel, e *Group) { n.Edges.Groups = append(n.Edges.Groups, e) }); err != nil {
-			return nil, err
-		}
-	}
-	if query := cq.withProxy; query != nil {
-		if err := cq.loadProxy(ctx, query, nodes, nil,
-			func(n *Channel, e *Proxy) { n.Edges.Proxy = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -554,38 +503,6 @@ func (cq *ChannelQuery) loadGroups(ctx context.Context, query *GroupQuery, nodes
 		}
 		for kn := range nodes {
 			assign(kn, n)
-		}
-	}
-	return nil
-}
-func (cq *ChannelQuery) loadProxy(ctx context.Context, query *ProxyQuery, nodes []*Channel, init func(*Channel), assign func(*Channel, *Proxy)) error {
-	ids := make([]int, 0, len(nodes))
-	nodeids := make(map[int][]*Channel)
-	for i := range nodes {
-		if nodes[i].channel_proxy == nil {
-			continue
-		}
-		fk := *nodes[i].channel_proxy
-		if _, ok := nodeids[fk]; !ok {
-			ids = append(ids, fk)
-		}
-		nodeids[fk] = append(nodeids[fk], nodes[i])
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	query.Where(proxy.IDIn(ids...))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		nodes, ok := nodeids[n.ID]
-		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "channel_proxy" returned %v`, n.ID)
-		}
-		for i := range nodes {
-			assign(nodes[i], n)
 		}
 	}
 	return nil

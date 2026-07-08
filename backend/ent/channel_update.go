@@ -15,7 +15,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
-	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 )
 
@@ -413,25 +412,6 @@ func (cu *ChannelUpdate) AddGroups(g ...*Group) *ChannelUpdate {
 	return cu.AddGroupIDs(ids...)
 }
 
-// SetProxyID sets the "proxy" edge to the Proxy entity by ID.
-func (cu *ChannelUpdate) SetProxyID(id int) *ChannelUpdate {
-	cu.mutation.SetProxyID(id)
-	return cu
-}
-
-// SetNillableProxyID sets the "proxy" edge to the Proxy entity by ID if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableProxyID(id *int) *ChannelUpdate {
-	if id != nil {
-		cu = cu.SetProxyID(*id)
-	}
-	return cu
-}
-
-// SetProxy sets the "proxy" edge to the Proxy entity.
-func (cu *ChannelUpdate) SetProxy(p *Proxy) *ChannelUpdate {
-	return cu.SetProxyID(p.ID)
-}
-
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
 func (cu *ChannelUpdate) AddUsageLogIDs(ids ...int) *ChannelUpdate {
 	cu.mutation.AddUsageLogIDs(ids...)
@@ -471,12 +451,6 @@ func (cu *ChannelUpdate) RemoveGroups(g ...*Group) *ChannelUpdate {
 		ids[i] = g[i].ID
 	}
 	return cu.RemoveGroupIDs(ids...)
-}
-
-// ClearProxy clears the "proxy" edge to the Proxy entity.
-func (cu *ChannelUpdate) ClearProxy() *ChannelUpdate {
-	cu.mutation.ClearProxy()
-	return cu
 }
 
 // ClearUsageLogs clears all "usage_logs" edges to the UsageLog entity.
@@ -747,35 +721,6 @@ func (cu *ChannelUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if cu.mutation.ProxyCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   channel.ProxyTable,
-			Columns: []string{channel.ProxyColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(proxy.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := cu.mutation.ProxyIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   channel.ProxyTable,
-			Columns: []string{channel.ProxyColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(proxy.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1229,25 +1174,6 @@ func (cuo *ChannelUpdateOne) AddGroups(g ...*Group) *ChannelUpdateOne {
 	return cuo.AddGroupIDs(ids...)
 }
 
-// SetProxyID sets the "proxy" edge to the Proxy entity by ID.
-func (cuo *ChannelUpdateOne) SetProxyID(id int) *ChannelUpdateOne {
-	cuo.mutation.SetProxyID(id)
-	return cuo
-}
-
-// SetNillableProxyID sets the "proxy" edge to the Proxy entity by ID if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableProxyID(id *int) *ChannelUpdateOne {
-	if id != nil {
-		cuo = cuo.SetProxyID(*id)
-	}
-	return cuo
-}
-
-// SetProxy sets the "proxy" edge to the Proxy entity.
-func (cuo *ChannelUpdateOne) SetProxy(p *Proxy) *ChannelUpdateOne {
-	return cuo.SetProxyID(p.ID)
-}
-
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
 func (cuo *ChannelUpdateOne) AddUsageLogIDs(ids ...int) *ChannelUpdateOne {
 	cuo.mutation.AddUsageLogIDs(ids...)
@@ -1287,12 +1213,6 @@ func (cuo *ChannelUpdateOne) RemoveGroups(g ...*Group) *ChannelUpdateOne {
 		ids[i] = g[i].ID
 	}
 	return cuo.RemoveGroupIDs(ids...)
-}
-
-// ClearProxy clears the "proxy" edge to the Proxy entity.
-func (cuo *ChannelUpdateOne) ClearProxy() *ChannelUpdateOne {
-	cuo.mutation.ClearProxy()
-	return cuo
 }
 
 // ClearUsageLogs clears all "usage_logs" edges to the UsageLog entity.
@@ -1593,35 +1513,6 @@ func (cuo *ChannelUpdateOne) sqlSave(ctx context.Context) (_node *Channel, err e
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if cuo.mutation.ProxyCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   channel.ProxyTable,
-			Columns: []string{channel.ProxyColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(proxy.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := cuo.mutation.ProxyIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   channel.ProxyTable,
-			Columns: []string{channel.ProxyColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(proxy.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

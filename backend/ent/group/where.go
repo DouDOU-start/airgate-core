@@ -300,26 +300,6 @@ func StatusVisibleNEQ(v bool) predicate.Group {
 	return predicate.Group(sql.FieldNEQ(FieldStatusVisible, v))
 }
 
-// SubscriptionTypeEQ applies the EQ predicate on the "subscription_type" field.
-func SubscriptionTypeEQ(v SubscriptionType) predicate.Group {
-	return predicate.Group(sql.FieldEQ(FieldSubscriptionType, v))
-}
-
-// SubscriptionTypeNEQ applies the NEQ predicate on the "subscription_type" field.
-func SubscriptionTypeNEQ(v SubscriptionType) predicate.Group {
-	return predicate.Group(sql.FieldNEQ(FieldSubscriptionType, v))
-}
-
-// SubscriptionTypeIn applies the In predicate on the "subscription_type" field.
-func SubscriptionTypeIn(vs ...SubscriptionType) predicate.Group {
-	return predicate.Group(sql.FieldIn(FieldSubscriptionType, vs...))
-}
-
-// SubscriptionTypeNotIn applies the NotIn predicate on the "subscription_type" field.
-func SubscriptionTypeNotIn(vs ...SubscriptionType) predicate.Group {
-	return predicate.Group(sql.FieldNotIn(FieldSubscriptionType, vs...))
-}
-
 // QuotasIsNil applies the IsNil predicate on the "quotas" field.
 func QuotasIsNil() predicate.Group {
 	return predicate.Group(sql.FieldIsNull(FieldQuotas))
@@ -716,29 +696,6 @@ func HasAPIKeys() predicate.Group {
 func HasAPIKeysWith(preds ...predicate.APIKey) predicate.Group {
 	return predicate.Group(func(s *sql.Selector) {
 		step := newAPIKeysStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
-}
-
-// HasSubscriptions applies the HasEdge predicate on the "subscriptions" edge.
-func HasSubscriptions() predicate.Group {
-	return predicate.Group(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, SubscriptionsTable, SubscriptionsColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasSubscriptionsWith applies the HasEdge predicate on the "subscriptions" edge with a given conditions (other predicates).
-func HasSubscriptionsWith(preds ...predicate.UserSubscription) predicate.Group {
-	return predicate.Group(func(s *sql.Selector) {
-		step := newSubscriptionsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

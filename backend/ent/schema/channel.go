@@ -66,7 +66,6 @@ func (Channel) Indexes() []ent.Index {
 func (Channel) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("groups", Group.Type),
-		edge.To("proxy", Proxy.Type).Unique(),
 		// 渠道硬删除时置空存量 usage_log 的渠道外键（显式声明，与 ent 对可空 FK 的
 		// 默认行为一致）；删除后新插入的悬空引用由 billing recorder 的降级重插兜底。
 		// 注：FK 的 OnDelete 取自 assoc 边（edge.To）注解——声明在 UsageLog 侧的

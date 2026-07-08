@@ -3,7 +3,6 @@
 package group
 
 import (
-	"fmt"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -25,8 +24,6 @@ const (
 	FieldIsExclusive = "is_exclusive"
 	// FieldStatusVisible holds the string denoting the status_visible field in the database.
 	FieldStatusVisible = "status_visible"
-	// FieldSubscriptionType holds the string denoting the subscription_type field in the database.
-	FieldSubscriptionType = "subscription_type"
 	// FieldQuotas holds the string denoting the quotas field in the database.
 	FieldQuotas = "quotas"
 	// FieldModelRouting holds the string denoting the model_routing field in the database.
@@ -49,8 +46,6 @@ const (
 	EdgeAllowedUsers = "allowed_users"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
 	EdgeAPIKeys = "api_keys"
-	// EdgeSubscriptions holds the string denoting the subscriptions edge name in mutations.
-	EdgeSubscriptions = "subscriptions"
 	// EdgeUsageLogs holds the string denoting the usage_logs edge name in mutations.
 	EdgeUsageLogs = "usage_logs"
 	// Table holds the table name of the group in the database.
@@ -72,13 +67,6 @@ const (
 	APIKeysInverseTable = "api_keys"
 	// APIKeysColumn is the table column denoting the api_keys relation/edge.
 	APIKeysColumn = "group_api_keys"
-	// SubscriptionsTable is the table that holds the subscriptions relation/edge.
-	SubscriptionsTable = "user_subscriptions"
-	// SubscriptionsInverseTable is the table name for the UserSubscription entity.
-	// It exists in this package in order to avoid circular dependency with the "usersubscription" package.
-	SubscriptionsInverseTable = "user_subscriptions"
-	// SubscriptionsColumn is the table column denoting the subscriptions relation/edge.
-	SubscriptionsColumn = "group_subscriptions"
 	// UsageLogsTable is the table that holds the usage_logs relation/edge.
 	UsageLogsTable = "usage_logs"
 	// UsageLogsInverseTable is the table name for the UsageLog entity.
@@ -96,7 +84,6 @@ var Columns = []string{
 	FieldRateMultiplier,
 	FieldIsExclusive,
 	FieldStatusVisible,
-	FieldSubscriptionType,
 	FieldQuotas,
 	FieldModelRouting,
 	FieldServiceTier,
@@ -153,32 +140,6 @@ var (
 	UpdateDefaultUpdatedAt func() time.Time
 )
 
-// SubscriptionType defines the type for the "subscription_type" enum field.
-type SubscriptionType string
-
-// SubscriptionTypeStandard is the default value of the SubscriptionType enum.
-const DefaultSubscriptionType = SubscriptionTypeStandard
-
-// SubscriptionType values.
-const (
-	SubscriptionTypeStandard     SubscriptionType = "standard"
-	SubscriptionTypeSubscription SubscriptionType = "subscription"
-)
-
-func (st SubscriptionType) String() string {
-	return string(st)
-}
-
-// SubscriptionTypeValidator is a validator for the "subscription_type" field enum values. It is called by the builders before save.
-func SubscriptionTypeValidator(st SubscriptionType) error {
-	switch st {
-	case SubscriptionTypeStandard, SubscriptionTypeSubscription:
-		return nil
-	default:
-		return fmt.Errorf("group: invalid enum value for subscription_type field: %q", st)
-	}
-}
-
 // OrderOption defines the ordering options for the Group queries.
 type OrderOption func(*sql.Selector)
 
@@ -210,11 +171,6 @@ func ByIsExclusive(opts ...sql.OrderTermOption) OrderOption {
 // ByStatusVisible orders the results by the status_visible field.
 func ByStatusVisible(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatusVisible, opts...).ToFunc()
-}
-
-// BySubscriptionType orders the results by the subscription_type field.
-func BySubscriptionType(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldSubscriptionType, opts...).ToFunc()
 }
 
 // ByServiceTier orders the results by the service_tier field.
@@ -289,20 +245,6 @@ func ByAPIKeys(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
-// BySubscriptionsCount orders the results by subscriptions count.
-func BySubscriptionsCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newSubscriptionsStep(), opts...)
-	}
-}
-
-// BySubscriptions orders the results by subscriptions terms.
-func BySubscriptions(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newSubscriptionsStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
-
 // ByUsageLogsCount orders the results by usage_logs count.
 func ByUsageLogsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -335,13 +277,6 @@ func newAPIKeysStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(APIKeysInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, APIKeysTable, APIKeysColumn),
-	)
-}
-func newSubscriptionsStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(SubscriptionsInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.O2M, false, SubscriptionsTable, SubscriptionsColumn),
 	)
 }
 func newUsageLogsStep() *sqlgraph.Step {

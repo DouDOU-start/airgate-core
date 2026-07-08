@@ -10,7 +10,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
-	entusersubscription "github.com/DouDOU-start/airgate-core/ent/usersubscription"
 	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
 )
 
@@ -245,12 +244,6 @@ func (s *UserStore) Delete(ctx context.Context, id int) error {
 
 	if _, err := tx.APIKey.Delete().
 		Where(entapikey.HasUserWith(entuser.IDEQ(id))).
-		Exec(ctx); err != nil {
-		return err
-	}
-
-	if _, err := tx.UserSubscription.Delete().
-		Where(entusersubscription.HasUserWith(entuser.IDEQ(id))).
 		Exec(ctx); err != nil {
 		return err
 	}

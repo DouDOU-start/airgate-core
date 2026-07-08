@@ -13,6 +13,8 @@ import { effectiveDocUrl } from '../../shared/utils/docUrl';
 import { useIsMobile } from '../../shared/hooks/useMediaQuery';
 import { usePersistentBoolean } from '../../shared/hooks/usePersistentBoolean';
 import { TopLoadingLine } from '../../shared/components/PageLoading';
+import { AnnouncementBell } from '../../shared/components/announcements/AnnouncementBell';
+import { AnnouncementPopup } from '../../shared/components/announcements/AnnouncementPopup';
 import {
   LayoutDashboard,
   Users,
@@ -20,10 +22,9 @@ import {
   CircleDollarSign,
   FolderTree,
   KeyRound,
-  CreditCard,
-  Globe,
   ChartNoAxesCombined,
   ReceiptText,
+  Megaphone,
   Settings,
   UserRoundCog,
   LogOut,
@@ -57,9 +58,8 @@ const adminMenuItems: MenuItem[] = [
   { path: '/admin/channels', labelKey: 'nav.channels', icon: <Network className="h-5 w-5" /> },
   { path: '/admin/model-prices', labelKey: 'nav.model_prices', icon: <CircleDollarSign className="h-5 w-5" /> },
   { path: '/admin/groups', labelKey: 'nav.groups', icon: <FolderTree className="h-5 w-5" /> },
-  { path: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: <CreditCard className="h-5 w-5" /> },
-  { path: '/admin/proxies', labelKey: 'nav.proxies', icon: <Globe className="h-5 w-5" /> },
   { path: '/admin/usage', labelKey: 'nav.usage', icon: <ChartNoAxesCombined className="h-5 w-5" /> },
+  { path: '/admin/announcements', labelKey: 'nav.announcements', icon: <Megaphone className="h-5 w-5" /> },
   { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="h-5 w-5" />, sectionKey: 'nav.system' },
 ];
 
@@ -397,6 +397,8 @@ export function AppShell({ children }: AppShellProps) {
             >
               {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
+            {/* 公告铃铛（API Key 会话无公告接口权限，不展示） */}
+            {!isAPIKeySession && <AnnouncementBell />}
 
             <div className="mx-1.5 hidden h-6 w-px bg-border sm:block" />
 
@@ -436,6 +438,9 @@ export function AppShell({ children }: AppShellProps) {
             </Button>
           </div>
         </header>
+
+        {/* popup 模式未读公告弹窗（逐条强提醒） */}
+        {!isAPIKeySession && <AnnouncementPopup />}
 
         <main className="min-h-0 flex-1 overflow-auto bg-bg pt-12 ag-main">
           <div className="ag-main-content mx-auto w-full max-w-[1920px] p-4 md:p-6 2xl:p-8">

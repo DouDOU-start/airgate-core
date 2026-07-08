@@ -33,10 +33,7 @@ func (p *Pipeline) TestChannel(ctx context.Context, snap *registry.ChannelSnapsh
 	if err != nil {
 		return 0, err
 	}
-	client, err := p.clients.Get(snap.ProxyURL)
-	if err != nil {
-		return 0, err
-	}
+	client := p.client
 
 	req, err := dto.ParseChatRequest([]byte(fmt.Sprintf(channelTestBody, model)))
 	if err != nil {

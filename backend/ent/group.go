@@ -28,8 +28,6 @@ type Group struct {
 	IsExclusive bool `json:"is_exclusive,omitempty"`
 	// StatusVisible holds the value of the "status_visible" field.
 	StatusVisible bool `json:"status_visible,omitempty"`
-	// SubscriptionType holds the value of the "subscription_type" field.
-	SubscriptionType group.SubscriptionType `json:"subscription_type,omitempty"`
 	// Quotas holds the value of the "quotas" field.
 	Quotas map[string]interface{} `json:"quotas,omitempty"`
 	// ModelRouting holds the value of the "model_routing" field.
@@ -60,13 +58,11 @@ type GroupEdges struct {
 	AllowedUsers []*User `json:"allowed_users,omitempty"`
 	// APIKeys holds the value of the api_keys edge.
 	APIKeys []*APIKey `json:"api_keys,omitempty"`
-	// Subscriptions holds the value of the subscriptions edge.
-	Subscriptions []*UserSubscription `json:"subscriptions,omitempty"`
 	// UsageLogs holds the value of the usage_logs edge.
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [4]bool
 }
 
 // ChannelsOrErr returns the Channels value or an error if the edge
@@ -96,19 +92,10 @@ func (e GroupEdges) APIKeysOrErr() ([]*APIKey, error) {
 	return nil, &NotLoadedError{edge: "api_keys"}
 }
 
-// SubscriptionsOrErr returns the Subscriptions value or an error if the edge
-// was not loaded in eager-loading.
-func (e GroupEdges) SubscriptionsOrErr() ([]*UserSubscription, error) {
-	if e.loadedTypes[3] {
-		return e.Subscriptions, nil
-	}
-	return nil, &NotLoadedError{edge: "subscriptions"}
-}
-
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[3] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
@@ -127,7 +114,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case group.FieldID, group.FieldSortWeight:
 			values[i] = new(sql.NullInt64)
-		case group.FieldName, group.FieldPlatform, group.FieldSubscriptionType, group.FieldServiceTier, group.FieldForceInstructions, group.FieldNote:
+		case group.FieldName, group.FieldPlatform, group.FieldServiceTier, group.FieldForceInstructions, group.FieldNote:
 			values[i] = new(sql.NullString)
 		case group.FieldCreatedAt, group.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -181,12 +168,6 @@ func (gr *Group) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status_visible", values[i])
 			} else if value.Valid {
 				gr.StatusVisible = value.Bool
-			}
-		case group.FieldSubscriptionType:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field subscription_type", values[i])
-			} else if value.Valid {
-				gr.SubscriptionType = group.SubscriptionType(value.String)
 			}
 		case group.FieldQuotas:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -268,11 +249,6 @@ func (gr *Group) QueryAPIKeys() *APIKeyQuery {
 	return NewGroupClient(gr.config).QueryAPIKeys(gr)
 }
 
-// QuerySubscriptions queries the "subscriptions" edge of the Group entity.
-func (gr *Group) QuerySubscriptions() *UserSubscriptionQuery {
-	return NewGroupClient(gr.config).QuerySubscriptions(gr)
-}
-
 // QueryUsageLogs queries the "usage_logs" edge of the Group entity.
 func (gr *Group) QueryUsageLogs() *UsageLogQuery {
 	return NewGroupClient(gr.config).QueryUsageLogs(gr)
@@ -315,9 +291,6 @@ func (gr *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status_visible=")
 	builder.WriteString(fmt.Sprintf("%v", gr.StatusVisible))
-	builder.WriteString(", ")
-	builder.WriteString("subscription_type=")
-	builder.WriteString(fmt.Sprintf("%v", gr.SubscriptionType))
 	builder.WriteString(", ")
 	builder.WriteString("quotas=")
 	builder.WriteString(fmt.Sprintf("%v", gr.Quotas))

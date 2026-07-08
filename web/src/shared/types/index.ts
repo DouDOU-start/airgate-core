@@ -150,7 +150,6 @@ export interface GroupResp {
   rate_multiplier: number;
   is_exclusive: boolean;
   status_visible: boolean;
-  subscription_type: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
   force_instructions?: string;
   note?: string;
@@ -166,7 +165,6 @@ export interface CreateGroupReq {
   rate_multiplier?: number;
   is_exclusive?: boolean;
   status_visible?: boolean;
-  subscription_type: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
   force_instructions?: string;
   note?: string;
@@ -185,7 +183,6 @@ export interface UpdateGroupReq {
   rate_multiplier?: number;
   is_exclusive?: boolean;
   status_visible?: boolean;
-  subscription_type?: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
   force_instructions?: string;
   note?: string;
@@ -245,39 +242,6 @@ export interface UpdateAPIKeyReq {
   max_concurrency?: number;
   expires_at?: string;
   status?: 'active' | 'disabled';
-}
-
-// ==================== Subscription ====================
-
-export interface SubscriptionResp {
-  id: number;
-  user_id: number;
-  group_id: number;
-  group_name: string;
-  effective_at: string;
-  expires_at: string;
-  usage: Record<string, unknown>;
-  status: 'active' | 'expired' | 'suspended';
-  created_at: string;
-  updated_at: string;
-}
-
-
-export interface AssignSubscriptionReq {
-  user_id: number;
-  group_id: number;
-  expires_at: string;
-}
-
-export interface BulkAssignReq {
-  user_ids: number[];
-  group_id: number;
-  expires_at: string;
-}
-
-export interface AdjustSubscriptionReq {
-  expires_at?: string;
-  status?: 'active' | 'suspended';
 }
 
 // ==================== Usage ====================
@@ -488,49 +452,6 @@ export interface UsageTrendBucket {
   billed_cost?: number;
 }
 
-// ==================== Proxy ====================
-
-export interface ProxyResp {
-  id: number;
-  name: string;
-  protocol: 'http' | 'socks5';
-  address: string;
-  port: number;
-  username?: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateProxyReq {
-  name: string;
-  protocol: 'http' | 'socks5';
-  address: string;
-  port: number;
-  username?: string;
-  password?: string;
-}
-
-export interface UpdateProxyReq {
-  name?: string;
-  protocol?: 'http' | 'socks5';
-  address?: string;
-  port?: number;
-  username?: string;
-  password?: string;
-  status?: 'active' | 'disabled';
-}
-
-export interface TestProxyResp {
-  success: boolean;
-  latency_ms: number;
-  error_msg?: string;
-  ip_address?: string;
-  country?: string;
-  country_code?: string;
-  city?: string;
-}
-
 // ==================== Channel ====================
 
 /** 渠道协议类型 */
@@ -568,7 +489,6 @@ export interface ChannelResp {
   tested_at?: string;
   last_used_at?: string;
   group_ids: number[];
-  proxy_id?: number;
   created_at: string;
   updated_at: string;
 }
@@ -592,11 +512,10 @@ export interface CreateChannelReq {
   test_model?: string;
   custom_config?: Record<string, unknown>;
   group_ids?: number[];
-  proxy_id?: number;
 }
 
 // 更新渠道请求（partial）：字段缺省 = 不改；api_keys/models 提供非空数组 = 整组替换，
-// 留空 = 不改；映射/覆写/标签/分组提供（含空集合）= 整组替换；proxy_id 传 0 = 解绑代理。
+// 留空 = 不改；映射/覆写/标签/分组提供（含空集合）= 整组替换。
 export interface UpdateChannelReq {
   name?: string;
   type?: ChannelType;
@@ -616,7 +535,6 @@ export interface UpdateChannelReq {
   test_model?: string;
   custom_config?: Record<string, unknown>;
   group_ids?: number[];
-  proxy_id?: number;
 }
 
 export interface TestChannelReq {
@@ -631,6 +549,13 @@ export interface TestChannelResp {
 
 export interface FetchChannelModelsResp {
   models: string[];
+}
+
+// 预览拉取模型请求（渠道未保存，直接给连接参数）
+export interface FetchChannelModelsPreviewReq {
+  type: ChannelType;
+  base_url: string;
+  api_key: string;
 }
 
 export type BulkChannelAction = 'enable' | 'disable' | 'delete' | 'set_priority';
@@ -878,4 +803,52 @@ export interface TestConnectionResp {
 export interface ModelInfo {
   id: string;
   name: string;
+}
+
+// ==================== Announcement ====================
+
+export type AnnouncementStatus = 'draft' | 'active' | 'archived';
+export type AnnouncementNotifyMode = 'silent' | 'popup';
+
+export interface AnnouncementResp {
+  id: number;
+  title: string;
+  content: string;
+  status: AnnouncementStatus;
+  notify_mode: AnnouncementNotifyMode;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// 用户端公告：不含 status，附带当前用户已读时间
+export interface UserAnnouncementResp {
+  id: number;
+  title: string;
+  content: string;
+  notify_mode: AnnouncementNotifyMode;
+  read_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// 时间字段为 RFC3339 字符串；空串 = 立即生效 / 永久展示
+export interface CreateAnnouncementReq {
+  title: string;
+  content: string;
+  status?: AnnouncementStatus;
+  notify_mode?: AnnouncementNotifyMode;
+  starts_at?: string;
+  ends_at?: string;
+}
+
+// 更新时时间字段：不传 = 不修改，空串 = 清空
+export interface UpdateAnnouncementReq {
+  title?: string;
+  content?: string;
+  status?: AnnouncementStatus;
+  notify_mode?: AnnouncementNotifyMode;
+  starts_at?: string;
+  ends_at?: string;
 }

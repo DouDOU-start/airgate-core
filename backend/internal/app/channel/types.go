@@ -23,7 +23,7 @@ const (
 // Repository 定义渠道域持久化接口。
 type Repository interface {
 	List(context.Context, ListFilter) ([]Channel, int64, error)
-	// ListAll 全量加载（含 groups/proxy 边），供注册表 Reload 使用。
+	// ListAll 全量加载（含 groups 边），供注册表 Reload 使用。
 	ListAll(context.Context) ([]Channel, error)
 	FindByID(context.Context, int) (Channel, error)
 	Create(context.Context, CreateInput) (Channel, error)
@@ -65,20 +65,8 @@ type Channel struct {
 	TestedAt       *time.Time
 	LastUsedAt     *time.Time
 	GroupIDs       []int
-	ProxyID        *int
-	// Proxy 出口代理明细（proxy 边），供注册表解析 ProxyURL。
-	Proxy     *ProxyInfo
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
-// ProxyInfo 渠道出口代理连接信息。
-type ProxyInfo struct {
-	Protocol string
-	Address  string
-	Port     int
-	Username string
-	Password string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // ListFilter 渠道列表查询参数。
@@ -121,15 +109,13 @@ type CreateInput struct {
 	TestModel      string
 	CustomConfig   map[string]any
 	GroupIDs       []int
-	ProxyID        *int
 }
 
 // UpdateInput 更新渠道输入（partial）：
 //   - 指针字段 nil = 不改；
 //   - APIKeys/Models 非空 = 整组替换（空 = 不改）；
 //   - ModelMapping/ParamOverride/HeaderOverride/Tags/CustomConfig/GroupIDs
-//     非 nil = 整组替换（可传空集合清空）；
-//   - ProxyID 非 nil 且 0 = 清除代理绑定。
+//     非 nil = 整组替换（可传空集合清空）。
 type UpdateInput struct {
 	Name           *string
 	Type           *string
@@ -153,7 +139,6 @@ type UpdateInput struct {
 	TestModel        *string
 	CustomConfig     map[string]any
 	GroupIDs         []int
-	ProxyID          *int
 }
 
 // BulkUpdateInput 批量操作输入。

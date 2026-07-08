@@ -12,6 +12,7 @@ vendor/
 backend/server
 backend/bin/
 backend/tmp/
+tmp/
 backend/web
 
 # TypeScript

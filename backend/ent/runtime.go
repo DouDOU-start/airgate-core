@@ -5,18 +5,18 @@ package ent
 import (
 	"time"
 
+	"github.com/DouDOU-start/airgate-core/ent/announcement"
+	"github.com/DouDOU-start/airgate-core/ent/announcementread"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
-	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/schema"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/ent/task"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
-	"github.com/DouDOU-start/airgate-core/ent/usersubscription"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -71,6 +71,48 @@ func init() {
 	apikey.DefaultUpdatedAt = apikeyDescUpdatedAt.Default.(func() time.Time)
 	// apikey.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	apikey.UpdateDefaultUpdatedAt = apikeyDescUpdatedAt.UpdateDefault.(func() time.Time)
+	announcementFields := schema.Announcement{}.Fields()
+	_ = announcementFields
+	// announcementDescTitle is the schema descriptor for title field.
+	announcementDescTitle := announcementFields[0].Descriptor()
+	// announcement.TitleValidator is a validator for the "title" field. It is called by the builders before save.
+	announcement.TitleValidator = announcementDescTitle.Validators[0].(func(string) error)
+	// announcementDescStatus is the schema descriptor for status field.
+	announcementDescStatus := announcementFields[2].Descriptor()
+	// announcement.DefaultStatus holds the default value on creation for the status field.
+	announcement.DefaultStatus = announcementDescStatus.Default.(string)
+	// announcementDescNotifyMode is the schema descriptor for notify_mode field.
+	announcementDescNotifyMode := announcementFields[3].Descriptor()
+	// announcement.DefaultNotifyMode holds the default value on creation for the notify_mode field.
+	announcement.DefaultNotifyMode = announcementDescNotifyMode.Default.(string)
+	// announcementDescCreatedAt is the schema descriptor for created_at field.
+	announcementDescCreatedAt := announcementFields[6].Descriptor()
+	// announcement.DefaultCreatedAt holds the default value on creation for the created_at field.
+	announcement.DefaultCreatedAt = announcementDescCreatedAt.Default.(func() time.Time)
+	// announcementDescUpdatedAt is the schema descriptor for updated_at field.
+	announcementDescUpdatedAt := announcementFields[7].Descriptor()
+	// announcement.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	announcement.DefaultUpdatedAt = announcementDescUpdatedAt.Default.(func() time.Time)
+	// announcement.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	announcement.UpdateDefaultUpdatedAt = announcementDescUpdatedAt.UpdateDefault.(func() time.Time)
+	announcementreadFields := schema.AnnouncementRead{}.Fields()
+	_ = announcementreadFields
+	// announcementreadDescAnnouncementID is the schema descriptor for announcement_id field.
+	announcementreadDescAnnouncementID := announcementreadFields[0].Descriptor()
+	// announcementread.AnnouncementIDValidator is a validator for the "announcement_id" field. It is called by the builders before save.
+	announcementread.AnnouncementIDValidator = announcementreadDescAnnouncementID.Validators[0].(func(int) error)
+	// announcementreadDescUserID is the schema descriptor for user_id field.
+	announcementreadDescUserID := announcementreadFields[1].Descriptor()
+	// announcementread.UserIDValidator is a validator for the "user_id" field. It is called by the builders before save.
+	announcementread.UserIDValidator = announcementreadDescUserID.Validators[0].(func(int) error)
+	// announcementreadDescReadAt is the schema descriptor for read_at field.
+	announcementreadDescReadAt := announcementreadFields[2].Descriptor()
+	// announcementread.DefaultReadAt holds the default value on creation for the read_at field.
+	announcementread.DefaultReadAt = announcementreadDescReadAt.Default.(func() time.Time)
+	// announcementreadDescCreatedAt is the schema descriptor for created_at field.
+	announcementreadDescCreatedAt := announcementreadFields[3].Descriptor()
+	// announcementread.DefaultCreatedAt holds the default value on creation for the created_at field.
+	announcementread.DefaultCreatedAt = announcementreadDescCreatedAt.Default.(func() time.Time)
 	balancelogFields := schema.BalanceLog{}.Fields()
 	_ = balancelogFields
 	// balancelogDescRemark is the schema descriptor for remark field.
@@ -190,27 +232,27 @@ func init() {
 	// group.DefaultStatusVisible holds the default value on creation for the status_visible field.
 	group.DefaultStatusVisible = groupDescStatusVisible.Default.(bool)
 	// groupDescServiceTier is the schema descriptor for service_tier field.
-	groupDescServiceTier := groupFields[8].Descriptor()
+	groupDescServiceTier := groupFields[7].Descriptor()
 	// group.DefaultServiceTier holds the default value on creation for the service_tier field.
 	group.DefaultServiceTier = groupDescServiceTier.Default.(string)
 	// groupDescForceInstructions is the schema descriptor for force_instructions field.
-	groupDescForceInstructions := groupFields[9].Descriptor()
+	groupDescForceInstructions := groupFields[8].Descriptor()
 	// group.DefaultForceInstructions holds the default value on creation for the force_instructions field.
 	group.DefaultForceInstructions = groupDescForceInstructions.Default.(string)
 	// groupDescNote is the schema descriptor for note field.
-	groupDescNote := groupFields[10].Descriptor()
+	groupDescNote := groupFields[9].Descriptor()
 	// group.DefaultNote holds the default value on creation for the note field.
 	group.DefaultNote = groupDescNote.Default.(string)
 	// groupDescSortWeight is the schema descriptor for sort_weight field.
-	groupDescSortWeight := groupFields[11].Descriptor()
+	groupDescSortWeight := groupFields[10].Descriptor()
 	// group.DefaultSortWeight holds the default value on creation for the sort_weight field.
 	group.DefaultSortWeight = groupDescSortWeight.Default.(int)
 	// groupDescCreatedAt is the schema descriptor for created_at field.
-	groupDescCreatedAt := groupFields[12].Descriptor()
+	groupDescCreatedAt := groupFields[11].Descriptor()
 	// group.DefaultCreatedAt holds the default value on creation for the created_at field.
 	group.DefaultCreatedAt = groupDescCreatedAt.Default.(func() time.Time)
 	// groupDescUpdatedAt is the schema descriptor for updated_at field.
-	groupDescUpdatedAt := groupFields[13].Descriptor()
+	groupDescUpdatedAt := groupFields[12].Descriptor()
 	// group.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	group.DefaultUpdatedAt = groupDescUpdatedAt.Default.(func() time.Time)
 	// group.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -255,34 +297,6 @@ func init() {
 	modelprice.DefaultUpdatedAt = modelpriceDescUpdatedAt.Default.(func() time.Time)
 	// modelprice.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	modelprice.UpdateDefaultUpdatedAt = modelpriceDescUpdatedAt.UpdateDefault.(func() time.Time)
-	proxyFields := schema.Proxy{}.Fields()
-	_ = proxyFields
-	// proxyDescName is the schema descriptor for name field.
-	proxyDescName := proxyFields[0].Descriptor()
-	// proxy.NameValidator is a validator for the "name" field. It is called by the builders before save.
-	proxy.NameValidator = proxyDescName.Validators[0].(func(string) error)
-	// proxyDescAddress is the schema descriptor for address field.
-	proxyDescAddress := proxyFields[2].Descriptor()
-	// proxy.AddressValidator is a validator for the "address" field. It is called by the builders before save.
-	proxy.AddressValidator = proxyDescAddress.Validators[0].(func(string) error)
-	// proxyDescUsername is the schema descriptor for username field.
-	proxyDescUsername := proxyFields[4].Descriptor()
-	// proxy.DefaultUsername holds the default value on creation for the username field.
-	proxy.DefaultUsername = proxyDescUsername.Default.(string)
-	// proxyDescPassword is the schema descriptor for password field.
-	proxyDescPassword := proxyFields[5].Descriptor()
-	// proxy.DefaultPassword holds the default value on creation for the password field.
-	proxy.DefaultPassword = proxyDescPassword.Default.(string)
-	// proxyDescCreatedAt is the schema descriptor for created_at field.
-	proxyDescCreatedAt := proxyFields[7].Descriptor()
-	// proxy.DefaultCreatedAt holds the default value on creation for the created_at field.
-	proxy.DefaultCreatedAt = proxyDescCreatedAt.Default.(func() time.Time)
-	// proxyDescUpdatedAt is the schema descriptor for updated_at field.
-	proxyDescUpdatedAt := proxyFields[8].Descriptor()
-	// proxy.DefaultUpdatedAt holds the default value on creation for the updated_at field.
-	proxy.DefaultUpdatedAt = proxyDescUpdatedAt.Default.(func() time.Time)
-	// proxy.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
-	proxy.UpdateDefaultUpdatedAt = proxyDescUpdatedAt.UpdateDefault.(func() time.Time)
 	settingFields := schema.Setting{}.Fields()
 	_ = settingFields
 	// settingDescKey is the schema descriptor for key field.
@@ -591,16 +605,4 @@ func init() {
 	user.DefaultUpdatedAt = userDescUpdatedAt.Default.(func() time.Time)
 	// user.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	user.UpdateDefaultUpdatedAt = userDescUpdatedAt.UpdateDefault.(func() time.Time)
-	usersubscriptionFields := schema.UserSubscription{}.Fields()
-	_ = usersubscriptionFields
-	// usersubscriptionDescCreatedAt is the schema descriptor for created_at field.
-	usersubscriptionDescCreatedAt := usersubscriptionFields[4].Descriptor()
-	// usersubscription.DefaultCreatedAt holds the default value on creation for the created_at field.
-	usersubscription.DefaultCreatedAt = usersubscriptionDescCreatedAt.Default.(func() time.Time)
-	// usersubscriptionDescUpdatedAt is the schema descriptor for updated_at field.
-	usersubscriptionDescUpdatedAt := usersubscriptionFields[5].Descriptor()
-	// usersubscription.DefaultUpdatedAt holds the default value on creation for the updated_at field.
-	usersubscription.DefaultUpdatedAt = usersubscriptionDescUpdatedAt.Default.(func() time.Time)
-	// usersubscription.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
-	usersubscription.UpdateDefaultUpdatedAt = usersubscriptionDescUpdatedAt.UpdateDefault.(func() time.Time)
 }

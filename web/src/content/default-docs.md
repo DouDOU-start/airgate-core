@@ -2,7 +2,7 @@
 
 AirGate 是一个统一的 AI API 网关：把 OpenAI API Key 与 ChatGPT OAuth 等上游账号统一调度、计费、限流，并对外暴露 OpenAI 兼容协议（Chat Completions / Responses）以及 Anthropic Messages 协议翻译。
 
-你可以把现有的 OpenAI SDK、Anthropic SDK、Codex CLI、Claude Code、openclaw 等客户端工具直接指向 AirGate，无需改代码。
+你可以把现有的 OpenAI SDK、Anthropic SDK、Codex CLI、Claude Code 等客户端工具直接指向 AirGate，无需改代码。
 
 ## 快速开始
 
@@ -220,35 +220,6 @@ resp = client.messages.create(
     messages=[{"role": "user", "content": "你好"}],
 )
 print(resp.content[0].text)
-```
-
-## 一键接入 openclaw
-
-[openclaw](https://github.com/openclaw/openclaw) 是一款可以运行在本机的个人 AI 助理，可同时桥接 WhatsApp、Telegram、Slack、Discord 等十几种聊天平台。
-AirGate 已经兼容 openclaw 所需的全部协议，只需运行一行命令即可完成接入。
-
-**Linux / macOS**（终端）：
-
-```bash
-curl -fsSL https://your-airgate.example.com/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh
-```
-
-**Windows**（PowerShell 5 或更高版本）：
-
-```powershell
-iwr -useb https://your-airgate.example.com/openclaw/install.ps1 | iex
-```
-
-脚本会：
-
-1. 提示你粘贴一把 AirGate 的 API Key
-2. 拉取管理员预设的可选模型列表让你勾选
-3. 自动生成 `~/.openclaw/openclaw.json`（Windows 为 `%USERPROFILE%\.openclaw\openclaw.json`，旧配置会被备份）
-
-完成后启动 openclaw 即可：
-
-```bash
-openclaw gateway
 ```
 
 ## 常见问题

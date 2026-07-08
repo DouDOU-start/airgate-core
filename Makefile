@@ -3,26 +3,6 @@
 # 变量
 BACKEND_DIR := backend
 WEB_DIR := web
-# 插件前端目录。所有插件 dev watch 都输出到自己的 web/dist；core 的
-# servePluginAsset handler 在 dev 模式下从 <plugin>/web/dist 读，prod 模式从
-# data/plugins/<id>/assets 读。这样三个插件的 dev 体验完全一致，没有特例。
-OPENAI_PLUGIN := ../airgate-openai/web
-CLAUDE_PLUGIN := ../airgate-claude/web
-PLAYGROUND_DIR := ../airgate-playground
-PLAYGROUND_PLUGIN := $(PLAYGROUND_DIR)/web
-EPAY_PLUGIN := ../airgate-epay/web
-HEALTH_PLUGIN := ../airgate-health/web
-KIRO_PLUGIN := ../airgate-kiro/web
-STUDIO_PLUGIN := ../airgate-studio/web
-# build-plugins 阶段（生产）同步各插件的 admin dist/index.js 到
-# core 的 plugin assets dir；health 的公开状态页仍走 /status 反代，不经过这套 assets。
-OPENAI_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-openai/assets
-CLAUDE_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-anthropic/assets
-PLAYGROUND_ASSETS := $(BACKEND_DIR)/data/plugins/airgate-playground/assets
-EPAY_ASSETS := $(BACKEND_DIR)/data/plugins/payment-epay/assets
-HEALTH_ASSETS := $(BACKEND_DIR)/data/plugins/airgate-health/assets
-KIRO_ASSETS := $(BACKEND_DIR)/data/plugins/gateway-kiro/assets
-STUDIO_ASSETS := $(BACKEND_DIR)/data/plugins/airgate-studio/assets
 BINARY := $(BACKEND_DIR)/server
 WEBDIST := $(BACKEND_DIR)/internal/web/webdist
 GO := GOTOOLCHAIN=local go
@@ -31,9 +11,8 @@ GO := GOTOOLCHAIN=local go
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X github.com/DouDOU-start/airgate-core/internal/version.Version=$(VERSION)
 
-.PHONY: help dev dev-backend dev-frontend dev-plugins dev-plugin-openai dev-plugin-claude dev-plugin-playground dev-plugin-epay dev-plugin-health dev-plugin-kiro dev-plugin-studio \
+.PHONY: help dev dev-backend dev-frontend \
         build build-backend build-frontend \
-        build-plugins sync-plugins \
         ent lint fmt test clean install ci pre-commit setup-hooks verify-readme \
         docker-build docker-rebuild docker-up docker-down docker-restart docker-dev
 
@@ -42,11 +21,10 @@ help: ## 显示帮助信息
 
 # ===================== 开发 =====================
 
-dev: ## 同时启动插件 watch + 前后端开发服务器
+dev: ## 同时启动前后端开发服务器
 	@echo "启动开发环境..."
-	@$(MAKE) sync-plugins
 	@cleanup() { \
-		pids="$$(jobs -pr)"; \
+		pids="$$(jobs -p)"; \
 		if [ -n "$$pids" ]; then \
 			echo "停止开发子进程..."; \
 			kill $$pids 2>/dev/null || true; \
@@ -54,84 +32,8 @@ dev: ## 同时启动插件 watch + 前后端开发服务器
 		wait 2>/dev/null || true; \
 	}; \
 	trap cleanup INT TERM EXIT; \
-	$(MAKE) dev-plugins & \
 	$(MAKE) dev-backend & \
 	$(MAKE) dev-frontend
-
-dev-plugins: ## 启动所有插件前端 watch 模式
-	@echo "启动插件前端 watch（统一输出到 <plugin>/web/dist，core 在 dev 模式下直读）："
-	@echo "  - openai      → ../airgate-openai/web/dist/"
-	@echo "  - claude      → ../airgate-claude/web/dist/"
-	@echo "  - playground  → ../airgate-playground/web/dist/"
-	@echo "  - epay        → ../airgate-epay/web/dist/"
-	@echo "  - health      → ../airgate-health/web/dist/  （含 admin index.js + standalone status page）"
-	@echo "  - kiro        → ../airgate-kiro/web/dist/"
-	@echo "  - studio      → ../airgate-studio/web/dist/"
-	@cleanup() { \
-		pids="$$(jobs -pr)"; \
-		if [ -n "$$pids" ]; then \
-			kill $$pids 2>/dev/null || true; \
-		fi; \
-		wait 2>/dev/null || true; \
-	}; \
-	trap cleanup INT TERM EXIT; \
-	$(MAKE) dev-plugin-openai & \
-	$(MAKE) dev-plugin-claude & \
-	$(MAKE) dev-plugin-playground & \
-	$(MAKE) dev-plugin-epay & \
-	$(MAKE) dev-plugin-health & \
-	$(MAKE) dev-plugin-kiro & \
-	$(MAKE) dev-plugin-studio & \
-	wait
-
-dev-plugin-openai: ## 单独 watch openai 插件前端（输出到 ../airgate-openai/web/dist）
-	@if [ -d $(OPENAI_PLUGIN) ]; then \
-		cd $(OPENAI_PLUGIN) && pnpm dev; \
-	else \
-		echo "跳过 openai 插件前端 watch：$(OPENAI_PLUGIN) 不存在"; \
-	fi
-
-dev-plugin-claude: ## 单独 watch claude 插件前端（输出到 ../airgate-claude/web/dist）
-	@if [ -d $(CLAUDE_PLUGIN) ]; then \
-		cd $(CLAUDE_PLUGIN) && pnpm dev; \
-	else \
-		echo "跳过 claude 插件前端 watch：$(CLAUDE_PLUGIN) 不存在"; \
-	fi
-
-dev-plugin-playground: ## 单独 watch playground 插件前端（输出到 ../airgate-playground/web/dist）
-	@if [ -d $(PLAYGROUND_PLUGIN) ]; then \
-		cd $(PLAYGROUND_PLUGIN) && pnpm dev; \
-	else \
-		echo "跳过 playground 插件前端 watch：$(PLAYGROUND_PLUGIN) 不存在"; \
-	fi
-
-dev-plugin-epay: ## 单独 watch epay 插件前端（输出到 ../airgate-epay/web/dist）
-	@if [ -d $(EPAY_PLUGIN) ]; then \
-		cd $(EPAY_PLUGIN) && pnpm dev; \
-	else \
-		echo "跳过 epay 插件前端 watch：$(EPAY_PLUGIN) 不存在"; \
-	fi
-
-dev-plugin-health: ## 单独 watch health 插件前端（同时 watch admin index.js + status standalone）
-	@if [ -d $(HEALTH_PLUGIN) ]; then \
-		cd $(HEALTH_PLUGIN) && pnpm dev; \
-	else \
-		echo "跳过 health 插件前端 watch：$(HEALTH_PLUGIN) 不存在"; \
-	fi
-
-dev-plugin-kiro: ## 单独 watch kiro 插件前端（输出到 ../airgate-kiro/web/dist）
-	@if [ -d $(KIRO_PLUGIN) ]; then \
-		cd $(KIRO_PLUGIN) && pnpm dev; \
-	else \
-		echo "跳过 kiro 插件前端 watch：$(KIRO_PLUGIN) 不存在"; \
-	fi
-
-dev-plugin-studio: ## 单独 watch studio 插件前端（输出到 ../airgate-studio/web/dist）
-	@if [ -d $(STUDIO_PLUGIN) ]; then \
-		cd $(STUDIO_PLUGIN) && pnpm dev; \
-	else \
-		echo "跳过 studio 插件前端 watch：$(STUDIO_PLUGIN) 不存在"; \
-	fi
 
 dev-backend: ## 启动后端（带热重载，需要 air）
 	@cd $(BACKEND_DIR) && \
@@ -148,7 +50,7 @@ dev-frontend: ## 启动前端开发服务器
 
 # ===================== 构建 =====================
 
-build: build-frontend build-backend build-plugins ## 构建前后端及插件（顺序：前端 → 嵌入 → 后端）
+build: build-frontend build-backend ## 构建前后端（顺序：前端 → 嵌入 → 后端）
 
 ensure-webdist: ## 把 web/dist 同步到 backend/internal/web/webdist 供 go:embed 使用
 	@if [ -d $(WEB_DIR)/dist ] && [ "$$(ls -A $(WEB_DIR)/dist 2>/dev/null)" ]; then \
@@ -169,81 +71,6 @@ build-backend: ensure-webdist ## 编译后端二进制（自动嵌入最新前�
 build-frontend: ## 构建前端产物
 	@cd $(WEB_DIR) && pnpm build
 	@echo "前端构建完成: $(WEB_DIR)/dist/"
-
-build-plugins: sync-plugins ## 构建插件前端并同步到 core
-	@echo "插件前端构建完成"
-
-sync-plugins: ## 构建插件前端并同步 admin 资源到 data/plugins/
-	@if [ -d $(OPENAI_PLUGIN) ]; then \
-		set -e; \
-		echo "构建并同步 openai 插件前端..."; \
-		(cd $(OPENAI_PLUGIN) && pnpm build); \
-		mkdir -p $(OPENAI_ASSETS); \
-		cp $(OPENAI_PLUGIN)/dist/index.js $(OPENAI_ASSETS)/index.js; \
-		echo "openai 插件前端已同步到 $(OPENAI_ASSETS)/"; \
-	else \
-		echo "跳过 openai 插件前端构建：$(OPENAI_PLUGIN) 不存在"; \
-	fi
-	@if [ -d $(CLAUDE_PLUGIN) ]; then \
-		set -e; \
-		echo "构建并同步 claude 插件前端..."; \
-		(cd $(CLAUDE_PLUGIN) && pnpm build); \
-		mkdir -p $(CLAUDE_ASSETS); \
-		cp $(CLAUDE_PLUGIN)/dist/index.js $(CLAUDE_ASSETS)/index.js; \
-		echo "claude 插件前端已同步到 $(CLAUDE_ASSETS)/"; \
-	else \
-		echo "跳过 claude 插件前端构建：$(CLAUDE_PLUGIN) 不存在"; \
-	fi
-	@if [ -d $(PLAYGROUND_DIR) ]; then \
-		set -e; \
-		echo "构建并同步 playground 插件前端..."; \
-		(cd $(PLAYGROUND_PLUGIN) && pnpm build); \
-		mkdir -p $(PLAYGROUND_ASSETS); \
-		cp $(PLAYGROUND_PLUGIN)/dist/index.js $(PLAYGROUND_ASSETS)/index.js; \
-		echo "playground 插件前端已同步到 $(PLAYGROUND_ASSETS)/"; \
-	else \
-		echo "跳过 playground 插件前端构建：$(PLAYGROUND_DIR) 不存在"; \
-	fi
-	@if [ -d $(EPAY_PLUGIN) ]; then \
-		set -e; \
-		echo "构建并同步 epay 插件前端..."; \
-		(cd $(EPAY_PLUGIN) && pnpm build); \
-		mkdir -p $(EPAY_ASSETS); \
-		cp $(EPAY_PLUGIN)/dist/index.js $(EPAY_ASSETS)/index.js; \
-		echo "epay 插件前端已同步到 $(EPAY_ASSETS)/"; \
-	else \
-		echo "跳过 epay 插件前端构建：$(EPAY_PLUGIN) 不存在"; \
-	fi
-	@if [ -d $(HEALTH_PLUGIN) ]; then \
-		set -e; \
-		echo "构建并同步 health 插件前端..."; \
-		(cd $(HEALTH_PLUGIN) && pnpm build); \
-		mkdir -p $(HEALTH_ASSETS); \
-		cp $(HEALTH_PLUGIN)/dist/index.js $(HEALTH_ASSETS)/index.js; \
-		echo "health 插件 admin 前端已同步到 $(HEALTH_ASSETS)/"; \
-	else \
-		echo "跳过 health 插件前端构建：$(HEALTH_PLUGIN) 不存在"; \
-	fi
-	@if [ -d $(KIRO_PLUGIN) ]; then \
-		set -e; \
-		echo "构建并同步 kiro 插件前端..."; \
-		(cd $(KIRO_PLUGIN) && pnpm build); \
-		mkdir -p $(KIRO_ASSETS); \
-		cp $(KIRO_PLUGIN)/dist/index.js $(KIRO_ASSETS)/index.js; \
-		echo "kiro 插件前端已同步到 $(KIRO_ASSETS)/"; \
-	else \
-		echo "跳过 kiro 插件前端构建：$(KIRO_PLUGIN) 不存在"; \
-	fi
-	@if [ -d $(STUDIO_PLUGIN) ]; then \
-		set -e; \
-		echo "构建并同步 studio 插件前端..."; \
-		(cd $(STUDIO_PLUGIN) && pnpm build); \
-		mkdir -p $(STUDIO_ASSETS); \
-		cp $(STUDIO_PLUGIN)/dist/index.js $(STUDIO_ASSETS)/index.js; \
-		echo "studio 插件前端已同步到 $(STUDIO_ASSETS)/"; \
-	else \
-		echo "跳过 studio 插件前端构建：$(STUDIO_PLUGIN) 不存在"; \
-	fi
 
 # ===================== 代码生成 =====================
 
@@ -309,16 +136,10 @@ setup-hooks: ## 安装 Git hooks（pre-commit + commit-msg）
 
 # ===================== 依赖安装 =====================
 
-install: setup-hooks ## 安装全部依赖（含插件前端依赖、首次 webdist 构建）
+install: setup-hooks ## 安装全部依赖（含首次 webdist 构建）
 	@cd $(BACKEND_DIR) && $(GO) mod download
 	@rm -rf $(WEB_DIR)/node_modules/.vite
 	@cd $(WEB_DIR) && pnpm install
-	@for p in $(OPENAI_PLUGIN) $(CLAUDE_PLUGIN) $(PLAYGROUND_PLUGIN) $(EPAY_PLUGIN) $(HEALTH_PLUGIN) $(KIRO_PLUGIN) $(STUDIO_PLUGIN); do \
-		if [ -d $$p ]; then \
-			echo "安装插件前端依赖: $$p"; \
-			cd $$p && pnpm install && cd - > /dev/null; \
-		fi; \
-	done
 	@command -v air > /dev/null 2>&1 || (echo "安装 air（热重载工具）..."; $(GO) install github.com/air-verse/air@latest)
 	@$(MAKE) build-frontend ensure-webdist
 	@echo "依赖安装完成"

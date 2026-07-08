@@ -65,8 +65,6 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeGroups holds the string denoting the groups edge name in mutations.
 	EdgeGroups = "groups"
-	// EdgeProxy holds the string denoting the proxy edge name in mutations.
-	EdgeProxy = "proxy"
 	// EdgeUsageLogs holds the string denoting the usage_logs edge name in mutations.
 	EdgeUsageLogs = "usage_logs"
 	// Table holds the table name of the channel in the database.
@@ -76,13 +74,6 @@ const (
 	// GroupsInverseTable is the table name for the Group entity.
 	// It exists in this package in order to avoid circular dependency with the "group" package.
 	GroupsInverseTable = "groups"
-	// ProxyTable is the table that holds the proxy relation/edge.
-	ProxyTable = "channels"
-	// ProxyInverseTable is the table name for the Proxy entity.
-	// It exists in this package in order to avoid circular dependency with the "proxy" package.
-	ProxyInverseTable = "proxies"
-	// ProxyColumn is the table column denoting the proxy relation/edge.
-	ProxyColumn = "channel_proxy"
 	// UsageLogsTable is the table that holds the usage_logs relation/edge.
 	UsageLogsTable = "usage_logs"
 	// UsageLogsInverseTable is the table name for the UsageLog entity.
@@ -121,12 +112,6 @@ var Columns = []string{
 	FieldUpdatedAt,
 }
 
-// ForeignKeys holds the SQL foreign-keys that are owned by the "channels"
-// table and are not defined as standalone fields in the schema.
-var ForeignKeys = []string{
-	"channel_proxy",
-}
-
 var (
 	// GroupsPrimaryKey and GroupsColumn2 are the table columns denoting the
 	// primary key for the groups relation (M2M).
@@ -137,11 +122,6 @@ var (
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
-			return true
-		}
-	}
-	for i := range ForeignKeys {
-		if column == ForeignKeys[i] {
 			return true
 		}
 	}
@@ -344,13 +324,6 @@ func ByGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
-// ByProxyField orders the results by proxy field.
-func ByProxyField(field string, opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newProxyStep(), sql.OrderByField(field, opts...))
-	}
-}
-
 // ByUsageLogsCount orders the results by usage_logs count.
 func ByUsageLogsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -369,13 +342,6 @@ func newGroupsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(GroupsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2M, false, GroupsTable, GroupsPrimaryKey...),
-	)
-}
-func newProxyStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(ProxyInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, false, ProxyTable, ProxyColumn),
 	)
 }
 func newUsageLogsStep() *sqlgraph.Step {

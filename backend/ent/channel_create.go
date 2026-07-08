@@ -12,7 +12,6 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 )
 
@@ -292,25 +291,6 @@ func (cc *ChannelCreate) AddGroups(g ...*Group) *ChannelCreate {
 		ids[i] = g[i].ID
 	}
 	return cc.AddGroupIDs(ids...)
-}
-
-// SetProxyID sets the "proxy" edge to the Proxy entity by ID.
-func (cc *ChannelCreate) SetProxyID(id int) *ChannelCreate {
-	cc.mutation.SetProxyID(id)
-	return cc
-}
-
-// SetNillableProxyID sets the "proxy" edge to the Proxy entity by ID if the given value is not nil.
-func (cc *ChannelCreate) SetNillableProxyID(id *int) *ChannelCreate {
-	if id != nil {
-		cc = cc.SetProxyID(*id)
-	}
-	return cc
-}
-
-// SetProxy sets the "proxy" edge to the Proxy entity.
-func (cc *ChannelCreate) SetProxy(p *Proxy) *ChannelCreate {
-	return cc.SetProxyID(p.ID)
 }
 
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
@@ -633,23 +613,6 @@ func (cc *ChannelCreate) createSpec() (*Channel, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := cc.mutation.ProxyIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   channel.ProxyTable,
-			Columns: []string{channel.ProxyColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(proxy.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_node.channel_proxy = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := cc.mutation.UsageLogsIDs(); len(nodes) > 0 {

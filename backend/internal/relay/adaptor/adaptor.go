@@ -40,7 +40,7 @@ type RelayInfo struct {
 	Endpoint string
 	// EntryProtocol 入口协议（本阶段恒 "openai"）。
 	EntryProtocol string
-	// Client 出口 HTTP 客户端（按渠道 proxy 缓存复用）。
+	// Client 出口 HTTP 客户端（管线共享复用）。
 	Client *http.Client
 }
 

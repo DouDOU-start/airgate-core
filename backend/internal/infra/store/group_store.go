@@ -10,7 +10,6 @@ import (
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
-	entusersubscription "github.com/DouDOU-start/airgate-core/ent/usersubscription"
 	appgroup "github.com/DouDOU-start/airgate-core/internal/app/group"
 )
 
@@ -95,7 +94,6 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 		SetRateMultiplier(input.RateMultiplier).
 		SetIsExclusive(input.IsExclusive).
 		SetStatusVisible(input.StatusVisible).
-		SetSubscriptionType(entgroup.SubscriptionType(input.SubscriptionType)).
 		SetServiceTier(input.ServiceTier).
 		SetForceInstructions(input.ForceInstructions).
 		SetNote(input.Note).
@@ -130,9 +128,6 @@ func (s *GroupStore) Update(ctx context.Context, id int, input appgroup.UpdateIn
 	}
 	if input.StatusVisible != nil {
 		builder = builder.SetStatusVisible(*input.StatusVisible)
-	}
-	if input.SubscriptionType != nil {
-		builder = builder.SetSubscriptionType(entgroup.SubscriptionType(*input.SubscriptionType))
 	}
 	if input.Quotas != nil {
 		builder = builder.SetQuotas(appgroupCloneQuotas(input.Quotas))
@@ -181,16 +176,6 @@ func (s *GroupStore) Delete(ctx context.Context, id int) error {
 		return err
 	}
 
-	hasSubscription, err := tx.UserSubscription.Query().
-		Where(entusersubscription.HasGroupWith(entgroup.IDEQ(id))).
-		Exist(ctx)
-	if err != nil {
-		return err
-	}
-	if hasSubscription {
-		return appgroup.ErrGroupHasSubscriptions
-	}
-
 	// 渠道绑定守卫：channel_groups 对 group_id 是 ON DELETE CASCADE，
 	// 直接删除会静默解绑，使专属渠道变成公共渠道（对所有分组可调度）。
 	channelCount, err := tx.Channel.Query().
@@ -220,9 +205,6 @@ func (s *GroupStore) Delete(ctx context.Context, id int) error {
 	if err = tx.Group.DeleteOneID(id).Exec(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return appgroup.ErrGroupNotFound
-		}
-		if ent.IsConstraintError(err) {
-			return appgroup.ErrGroupHasSubscriptions
 		}
 		return err
 	}
@@ -316,7 +298,6 @@ func mapGroup(item *ent.Group) appgroup.Group {
 		RateMultiplier:    item.RateMultiplier,
 		IsExclusive:       item.IsExclusive,
 		StatusVisible:     item.StatusVisible,
-		SubscriptionType:  string(item.SubscriptionType),
 		Quotas:            appgroupCloneQuotas(item.Quotas),
 		ModelRouting:      appgroupCloneModelRouting(item.ModelRouting),
 		ServiceTier:       item.ServiceTier,

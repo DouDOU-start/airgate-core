@@ -56,7 +56,6 @@ func (s *ChannelStore) List(ctx context.Context, filter appchannel.ListFilter) (
 		Limit(filter.PageSize).
 		Order(ent.Desc(entchannel.FieldCreatedAt)).
 		WithGroups().
-		WithProxy().
 		All(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -65,11 +64,10 @@ func (s *ChannelStore) List(ctx context.Context, filter appchannel.ListFilter) (
 	return mapChannelList(items), int64(total), nil
 }
 
-// ListAll 全量加载渠道（含 groups/proxy 边），供注册表 Reload 使用。
+// ListAll 全量加载渠道（含 groups 边），供注册表 Reload 使用。
 func (s *ChannelStore) ListAll(ctx context.Context) ([]appchannel.Channel, error) {
 	items, err := s.db.Channel.Query().
 		WithGroups().
-		WithProxy().
 		All(ctx)
 	if err != nil {
 		return nil, err
@@ -77,12 +75,11 @@ func (s *ChannelStore) ListAll(ctx context.Context) ([]appchannel.Channel, error
 	return mapChannelList(items), nil
 }
 
-// FindByID 按 ID 查询渠道（含 groups/proxy 边）。
+// FindByID 按 ID 查询渠道（含 groups 边）。
 func (s *ChannelStore) FindByID(ctx context.Context, id int) (appchannel.Channel, error) {
 	item, err := s.db.Channel.Query().
 		Where(entchannel.IDEQ(id)).
 		WithGroups().
-		WithProxy().
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -131,9 +128,6 @@ func (s *ChannelStore) Create(ctx context.Context, input appchannel.CreateInput)
 	if len(input.GroupIDs) > 0 {
 		builder = builder.AddGroupIDs(input.GroupIDs...)
 	}
-	if input.ProxyID != nil && *input.ProxyID > 0 {
-		builder = builder.SetProxyID(*input.ProxyID)
-	}
 
 	item, err := builder.Save(ctx)
 	if err != nil {
@@ -142,7 +136,7 @@ func (s *ChannelStore) Create(ctx context.Context, input appchannel.CreateInput)
 		}
 		return appchannel.Channel{}, err
 	}
-	// 重新加载边，保证返回值带 group_ids/proxy_id。
+	// 重新加载边，保证返回值带 group_ids。
 	return s.FindByID(ctx, item.ID)
 }
 
@@ -191,13 +185,6 @@ func (s *ChannelStore) Update(ctx context.Context, id int, input appchannel.Upda
 	}
 	if input.GroupIDs != nil {
 		builder = builder.ClearGroups().AddGroupIDs(input.GroupIDs...)
-	}
-	if input.ProxyID != nil {
-		if *input.ProxyID > 0 {
-			builder = builder.SetProxyID(*input.ProxyID)
-		} else {
-			builder = builder.ClearProxy()
-		}
 	}
 
 	item, err := builder.Save(ctx)
@@ -331,17 +318,6 @@ func mapChannel(item *ent.Channel) appchannel.Channel {
 		ch.GroupIDs = make([]int, 0, len(groups))
 		for _, g := range groups {
 			ch.GroupIDs = append(ch.GroupIDs, g.ID)
-		}
-	}
-	if p, err := item.Edges.ProxyOrErr(); err == nil && p != nil {
-		proxyID := p.ID
-		ch.ProxyID = &proxyID
-		ch.Proxy = &appchannel.ProxyInfo{
-			Protocol: p.Protocol.String(),
-			Address:  p.Address,
-			Port:     p.Port,
-			Username: p.Username,
-			Password: p.Password,
 		}
 	}
 	return ch

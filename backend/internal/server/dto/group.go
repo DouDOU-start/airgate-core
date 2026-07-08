@@ -7,9 +7,8 @@ type GroupResp struct {
 	Platform          string                 `json:"platform"`
 	RateMultiplier    float64                `json:"rate_multiplier"`
 	IsExclusive       bool                   `json:"is_exclusive"`
-	StatusVisible     bool                   `json:"status_visible"`    // 是否在公开 /status 页展示
-	SubscriptionType  string                 `json:"subscription_type"` // standard / subscription
-	Quotas            map[string]interface{} `json:"quotas,omitempty"`  // 日/周/月限额
+	StatusVisible     bool                   `json:"status_visible"`   // 是否在公开 /status 页展示
+	Quotas            map[string]interface{} `json:"quotas,omitempty"` // 日/周/月限额
 	ModelRouting      map[string][]int64     `json:"model_routing,omitempty"`
 	ServiceTier       string                 `json:"service_tier,omitempty"`
 	ForceInstructions string                 `json:"force_instructions,omitempty"`
@@ -31,7 +30,6 @@ type CreateGroupReq struct {
 	IsExclusive    bool    `json:"is_exclusive"`
 	// StatusVisible 用指针区分"字段未提交"和"显式置 false"，缺省视为 true（在公开状态页可见）。
 	StatusVisible     *bool                  `json:"status_visible"`
-	SubscriptionType  string                 `json:"subscription_type" binding:"oneof=standard subscription"`
 	Quotas            map[string]interface{} `json:"quotas"`
 	ModelRouting      map[string][]int64     `json:"model_routing"`
 	ServiceTier       string                 `json:"service_tier" binding:"omitempty,oneof=fast flex"`
@@ -46,7 +44,6 @@ type UpdateGroupReq struct {
 	RateMultiplier    *float64               `json:"rate_multiplier"`
 	IsExclusive       *bool                  `json:"is_exclusive"`
 	StatusVisible     *bool                  `json:"status_visible"`
-	SubscriptionType  *string                `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
 	Quotas            map[string]interface{} `json:"quotas"`
 	ModelRouting      map[string][]int64     `json:"model_routing"`
 	ServiceTier       *string                `json:"service_tier" binding:"omitempty,oneof=fast flex"`

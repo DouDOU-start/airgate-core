@@ -11,7 +11,6 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
-	"github.com/DouDOU-start/airgate-core/ent/proxy"
 )
 
 // Channel is the model entity for the Channel schema.
@@ -69,22 +68,19 @@ type Channel struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ChannelQuery when eager-loading is set.
-	Edges         ChannelEdges `json:"edges"`
-	channel_proxy *int
-	selectValues  sql.SelectValues
+	Edges        ChannelEdges `json:"edges"`
+	selectValues sql.SelectValues
 }
 
 // ChannelEdges holds the relations/edges for other nodes in the graph.
 type ChannelEdges struct {
 	// Groups holds the value of the groups edge.
 	Groups []*Group `json:"groups,omitempty"`
-	// Proxy holds the value of the proxy edge.
-	Proxy *Proxy `json:"proxy,omitempty"`
 	// UsageLogs holds the value of the usage_logs edge.
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [2]bool
 }
 
 // GroupsOrErr returns the Groups value or an error if the edge
@@ -96,21 +92,10 @@ func (e ChannelEdges) GroupsOrErr() ([]*Group, error) {
 	return nil, &NotLoadedError{edge: "groups"}
 }
 
-// ProxyOrErr returns the Proxy value or an error if the edge
-// was not loaded in eager-loading, or loaded but was not found.
-func (e ChannelEdges) ProxyOrErr() (*Proxy, error) {
-	if e.Proxy != nil {
-		return e.Proxy, nil
-	} else if e.loadedTypes[1] {
-		return nil, &NotFoundError{label: proxy.Label}
-	}
-	return nil, &NotLoadedError{edge: "proxy"}
-}
-
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e ChannelEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[1] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
@@ -131,8 +116,6 @@ func (*Channel) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullString)
 		case channel.FieldStatusUntil, channel.FieldTestedAt, channel.FieldLastUsedAt, channel.FieldCreatedAt, channel.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
-		case channel.ForeignKeys[0]: // channel_proxy
-			values[i] = new(sql.NullInt64)
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -315,13 +298,6 @@ func (c *Channel) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				c.UpdatedAt = value.Time
 			}
-		case channel.ForeignKeys[0]:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for edge-field channel_proxy", value)
-			} else if value.Valid {
-				c.channel_proxy = new(int)
-				*c.channel_proxy = int(value.Int64)
-			}
 		default:
 			c.selectValues.Set(columns[i], values[i])
 		}
@@ -338,11 +314,6 @@ func (c *Channel) Value(name string) (ent.Value, error) {
 // QueryGroups queries the "groups" edge of the Channel entity.
 func (c *Channel) QueryGroups() *GroupQuery {
 	return NewChannelClient(c.config).QueryGroups(c)
-}
-
-// QueryProxy queries the "proxy" edge of the Channel entity.
-func (c *Channel) QueryProxy() *ProxyQuery {
-	return NewChannelClient(c.config).QueryProxy(c)
 }
 
 // QueryUsageLogs queries the "usage_logs" edge of the Channel entity.

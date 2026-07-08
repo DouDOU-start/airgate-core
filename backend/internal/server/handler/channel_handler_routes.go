@@ -68,7 +68,6 @@ func (h *ChannelHandler) CreateChannel(c *gin.Context) {
 		TestModel:      req.TestModel,
 		CustomConfig:   req.CustomConfig,
 		GroupIDs:       req.GroupIDs,
-		ProxyID:        req.ProxyID,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("创建渠道失败", "创建失败", err)
@@ -112,7 +111,6 @@ func (h *ChannelHandler) UpdateChannel(c *gin.Context) {
 		TestModel:      req.TestModel,
 		CustomConfig:   req.CustomConfig,
 		GroupIDs:       req.GroupIDs,
-		ProxyID:        req.ProxyID,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("更新渠道失败", "更新失败", err)
@@ -178,6 +176,24 @@ func (h *ChannelHandler) FetchChannelModels(c *gin.Context) {
 	models, err := h.service.FetchModels(c.Request.Context(), id)
 	if err != nil {
 		httpCode, message := h.handleError("拉取渠道模型失败", "拉取失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	response.Success(c, dto.FetchChannelModelsResp{Models: models})
+}
+
+// FetchChannelModelsPreview 按表单连接参数预览拉取模型列表（渠道未保存时使用）。
+func (h *ChannelHandler) FetchChannelModelsPreview(c *gin.Context) {
+	var req dto.FetchChannelModelsPreviewReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	models, err := h.service.FetchModelsWithKey(c.Request.Context(), req.Type, req.BaseURL, req.APIKey)
+	if err != nil {
+		httpCode, message := h.handleError("预览拉取渠道模型失败", "拉取失败", err)
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}

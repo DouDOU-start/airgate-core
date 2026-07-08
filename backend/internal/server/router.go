@@ -87,10 +87,10 @@ func (s *Server) registerRoutes() {
 		// 分组
 		accountGroup.GET("/groups", handlers.Group.ListAvailableGroups)
 
-		// 订阅
-		accountGroup.GET("/subscriptions", handlers.Subscription.UserSubscriptions)
-		accountGroup.GET("/subscriptions/active", handlers.Subscription.ActiveSubscriptions)
-		accountGroup.GET("/subscriptions/progress", handlers.Subscription.SubscriptionProgress)
+		// 公告（用户端：查看 + 标已读）
+		accountGroup.GET("/announcements", handlers.Announcement.ListMyAnnouncements)
+		accountGroup.POST("/announcements/read-all", handlers.Announcement.MarkAllAnnouncementsRead)
+		accountGroup.POST("/announcements/:id/read", handlers.Announcement.MarkAnnouncementRead)
 
 		// 使用记录
 		userGroup.GET("/usage", handlers.Usage.UserUsage)
@@ -119,6 +119,13 @@ func (s *Server) registerRoutes() {
 		adminGroup.PUT("/groups/:id", handlers.Group.UpdateGroup)
 		adminGroup.DELETE("/groups/:id", handlers.Group.DeleteGroup)
 
+		// 公告管理
+		adminGroup.GET("/announcements", handlers.Announcement.ListAnnouncements)
+		adminGroup.POST("/announcements", handlers.Announcement.CreateAnnouncement)
+		adminGroup.GET("/announcements/:id", handlers.Announcement.GetAnnouncement)
+		adminGroup.PUT("/announcements/:id", handlers.Announcement.UpdateAnnouncement)
+		adminGroup.DELETE("/announcements/:id", handlers.Announcement.DeleteAnnouncement)
+
 		// 分组专属倍率管理（reverse 视角：某个分组下哪些用户有专属倍率）
 		adminGroup.GET("/groups/:id/rate-overrides", handlers.User.ListGroupRateOverrides)
 		adminGroup.PUT("/groups/:id/rate-overrides/:userId", handlers.User.SetGroupRateOverride)
@@ -128,19 +135,6 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/api-keys", handlers.APIKey.AdminListKeys)
 		adminGroup.PUT("/api-keys/:id", handlers.APIKey.AdminUpdateKey)
 
-		// 订阅管理
-		adminGroup.GET("/subscriptions", handlers.Subscription.AdminListSubscriptions)
-		adminGroup.POST("/subscriptions/assign", handlers.Subscription.AdminAssign)
-		adminGroup.POST("/subscriptions/bulk-assign", handlers.Subscription.AdminBulkAssign)
-		adminGroup.PUT("/subscriptions/:id/adjust", handlers.Subscription.AdminAdjust)
-
-		// 代理池管理
-		adminGroup.GET("/proxies", handlers.Proxy.ListProxies)
-		adminGroup.POST("/proxies", handlers.Proxy.CreateProxy)
-		adminGroup.PUT("/proxies/:id", handlers.Proxy.UpdateProxy)
-		adminGroup.DELETE("/proxies/:id", handlers.Proxy.DeleteProxy)
-		adminGroup.POST("/proxies/:id/test", handlers.Proxy.TestProxy)
-
 		// 渠道管理
 		adminGroup.GET("/channels", handlers.Channel.ListChannels)
 		adminGroup.POST("/channels", handlers.Channel.CreateChannel)
@@ -148,6 +142,8 @@ func (s *Server) registerRoutes() {
 		adminGroup.DELETE("/channels/:id", handlers.Channel.DeleteChannel)
 		adminGroup.POST("/channels/:id/test", handlers.Channel.TestChannel)
 		adminGroup.POST("/channels/:id/fetch-models", handlers.Channel.FetchChannelModels)
+		// 预览拉取：渠道未保存时按表单连接参数试拉模型（静态段，先于 :id 匹配）
+		adminGroup.POST("/channels/fetch-models", handlers.Channel.FetchChannelModelsPreview)
 		adminGroup.POST("/channels/bulk-update", handlers.Channel.BulkUpdateChannels)
 
 		// 模型价格
@@ -213,19 +209,6 @@ func (s *Server) registerRoutes() {
 	// 余额查询。该路径由 Core 直接处理，返回真实可用余额。
 	// 实现见 cc_compat.go。
 	r.GET("/v1/usage", s.handleCCCompatUserBalance)
-
-	// === OpenClaw 一键接入（公共路由，无需认证） ===
-	// 设计：install.sh 通过 `curl | bash` 分发，因此必须公开；models/info
-	// 也无需鉴权，内容均为管理员已标记为 "可公开" 的元信息。
-	openclawGroup := r.Group("/openclaw")
-	{
-		openclawGroup.GET("/install.sh", handlers.OpenClaw.HandleInstallScript)
-		openclawGroup.GET("/install.ps1", handlers.OpenClaw.HandleInstallScriptPowerShell)
-		openclawGroup.GET("/models", handlers.OpenClaw.HandleModels)
-		openclawGroup.GET("/models.txt", handlers.OpenClaw.HandleModelsText)
-		openclawGroup.POST("/render-config", handlers.OpenClaw.HandleRenderConfig)
-		openclawGroup.GET("/info", handlers.OpenClaw.HandleInfo)
-	}
 
 	// 上传文件静态服务（这部分仍然在磁盘上，因为是用户上传的运行时数据）
 	//

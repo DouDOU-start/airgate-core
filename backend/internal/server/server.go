@@ -79,13 +79,11 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	})
 
 	// 渠道注册表与价目表缓存：
-	// channel service 充当注册表的 Loader/Persister（解密 api_keys、解析 proxy 边、状态落库），
+	// channel service 充当注册表的 Loader/Persister（解密 api_keys、状态落库），
 	// 注册表反向作为 channel service 的 Reloader（写操作成功后全量重载）；
 	// modelprice service 同理充当 pricing 缓存的 Loader，缓存作为其写后失效器。
 	s.channelRegistry = registry.New(s.handlers.ChannelService, s.handlers.ChannelService)
 	s.handlers.ChannelService.SetReloader(s.channelRegistry)
-	// 代理写操作（更新/删除）影响渠道快照的 ProxyURL，同样触发注册表重载。
-	s.handlers.ProxyService.SetReloader(s.channelRegistry)
 	s.pricingCache = pricing.NewCache(s.handlers.ModelPriceService)
 	s.handlers.ModelPriceService.SetInvalidator(s.pricingCache)
 

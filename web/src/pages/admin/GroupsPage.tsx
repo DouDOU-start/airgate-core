@@ -121,7 +121,6 @@ export default function GroupsPage() {
       >
             <CommonTable.Header>
               <CommonTable.Column id="name" style={{ width: 200 }}>{t('common.name')}</CommonTable.Column>
-              <CommonTable.Column id="subscription_type" style={{ width: 96 }}>{t('groups.subscription_type')}</CommonTable.Column>
               <CommonTable.Column id="rate_multiplier" style={{ width: 88 }}>
                 {t('groups.rate_multiplier')}
               </CommonTable.Column>
@@ -140,10 +139,10 @@ export default function GroupsPage() {
             </CommonTable.Header>
             <CommonTable.Body>
               {isLoading ? (
-                <TableLoadingRow colSpan={7} />
+                <TableLoadingRow colSpan={6} />
               ) : rows.length === 0 ? (
                 <CommonTable.Row id="empty">
-                  <CommonTable.Cell colSpan={7}>
+                  <CommonTable.Cell colSpan={6}>
                     <EmptyState>
                       <div className="text-sm text-default-500">{t('common.no_data')}</div>
                     </EmptyState>
@@ -158,11 +157,6 @@ export default function GroupsPage() {
                           {row.name}
                         </span>
                       </span>
-                    </CommonTable.Cell>
-                    <CommonTable.Cell>
-                      <Chip color={row.subscription_type === 'subscription' ? 'accent' : 'default'} size="sm" variant="soft">
-                        {row.subscription_type === 'subscription' ? t('groups.type_subscription') : t('groups.type_standard')}
-                      </Chip>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <div className="min-w-0">

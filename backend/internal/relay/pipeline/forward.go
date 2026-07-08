@@ -93,11 +93,11 @@ func (p *Pipeline) forward(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto.Ch
 
 	settings := p.settings.Get(ctx)
 
-	// 2. 缺价预检：未配置模型价格且未开放行开关 → 400。
+	// 2. 缺价预检：未配置模型价格一律 400 拒绝（无放行开关，杜绝零成本记账漏洞）。
 	// 解析到的 Price 随请求传递到计费收尾复用（不二次 Get），
 	// 避免请求期间缓存失效/重载失败把已定价模型静默记 0。
 	price, priced := p.pricing.Get(req.Model)
-	if !priced && !settings.UnpricedModelAllow {
+	if !priced {
 		writeError(c, http.StatusBadRequest, "invalid_request_error", "model_price_not_configured",
 			"模型 "+req.Model+" 未配置价格")
 		return
@@ -148,7 +148,7 @@ func (p *Pipeline) forward(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto.Ch
 			break
 		}
 
-		// 渠道级配置检查：适配器 / 密钥 / 出口代理，任一缺失即硬排除（不消耗 attempt）。
+		// 渠道级配置检查：适配器 / 密钥，任一缺失即硬排除（不消耗 attempt）。
 		ad, err := adaptor.GetAdaptor(ch.Type)
 		if err != nil {
 			slog.Warn("relay_channel_type_unsupported", "channel_id", ch.ID, "type", ch.Type)
@@ -158,12 +158,6 @@ func (p *Pipeline) forward(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto.Ch
 		apiKey := p.registry.NextKey(ch.ID)
 		if apiKey == "" {
 			slog.Warn("relay_channel_no_api_key", "channel_id", ch.ID)
-			hardExclude = append(hardExclude, ch.ID)
-			continue
-		}
-		client, err := p.clients.Get(ch.ProxyURL)
-		if err != nil {
-			slog.Warn("relay_channel_proxy_invalid", "channel_id", ch.ID, "error", err)
 			hardExclude = append(hardExclude, ch.ID)
 			continue
 		}
@@ -194,7 +188,7 @@ func (p *Pipeline) forward(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto.Ch
 			Stream:        req.Stream,
 			Endpoint:      endpoint,
 			EntryProtocol: entryProtocolOpenAI,
-			Client:        client,
+			Client:        p.client,
 		}
 		result := p.executeAttempt(c, ad, info, req, start, ch.ID, requestID, rpmMinute)
 		attempts++
@@ -219,7 +213,7 @@ func (p *Pipeline) forward(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto.Ch
 						"channel_id", ch.ID, "model", req.Model)
 				}
 			}
-			p.recordUsage(c, keyInfo, ch, req, result, start, price, priced)
+			p.recordUsage(c, keyInfo, ch, req, result, start, price)
 			return
 		}
 
@@ -240,7 +234,7 @@ func (p *Pipeline) forward(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto.Ch
 		switch o.verdict {
 		case verdictSuccess:
 			p.registry.MarkRecovered(ch.ID)
-			p.recordUsage(c, keyInfo, ch, req, result, start, price, priced)
+			p.recordUsage(c, keyInfo, ch, req, result, start, price)
 			writeUpstreamBody(c, result)
 			return
 
@@ -276,7 +270,7 @@ func (p *Pipeline) forward(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto.Ch
 
 		default: // verdictClientError：透传终止，不重试；带 usage 仍计费。
 			if result.usage != nil {
-				p.recordUsage(c, keyInfo, ch, req, result, start, price, priced)
+				p.recordUsage(c, keyInfo, ch, req, result, start, price)
 			}
 			// 透传前对错误体做精确 key 替换（上游 400 可能回显凭证），其余内容不动。
 			result.body = []byte(sanitizeKeyLeak(string(result.body), ch.APIKeys))
@@ -432,16 +426,11 @@ func isSSEContentType(contentType string) bool {
 }
 
 // recordUsage 计费收尾：ComputeCosts → Calculate 三管道 → UsageRecord 落账。
-// price/priced 为转发前缺价预检解析的快照（每请求解析一次，不二次 Get，
-// 避免请求期间缓存失效把已定价请求静默记 0）；缺价放行时零价零成本并打 WARN。
-func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *registry.ChannelSnapshot, req *dto.ChatRequest, result attemptResult, start time.Time, price pricing.Price, priced bool) {
+// price 为转发前缺价预检解析的快照（每请求解析一次，不二次 Get，
+// 避免请求期间缓存失效把已定价请求静默记 0）；缺价请求在预检已被拒绝，进不到这里。
+func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *registry.ChannelSnapshot, req *dto.ChatRequest, result attemptResult, start time.Time, price pricing.Price) {
 	if p.sink == nil {
 		return
-	}
-
-	if !priced {
-		slog.Warn("relay_unpriced_model_billed_zero",
-			"channel_id", ch.ID, "model", req.Model)
 	}
 
 	var usage dto.Usage

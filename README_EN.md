@@ -23,7 +23,7 @@
 
 AirGate is **not** another monolithic gateway that hard-codes a list of AI providers. It is an open architecture where **provider capabilities are shipped as plugins** and loaded by the runtime on demand.
 
-- **Core** (this repo) = users, accounts, scheduling, billing, rate limiting, subscriptions, admin dashboard — everything provider-agnostic.
+- **Core** (this repo) = users, accounts, scheduling, billing, rate limiting, admin dashboard — everything provider-agnostic.
 - **Plugin** = a standalone Go process that talks gRPC to Core and implements the SDK contract for a specific upstream.
 
 Plugins can be **released, installed, uninstalled, and hot-reloaded independently**, with zero downtime to Core or other plugins. You only ship the capabilities you need, and writing a private plugin for an internal service is a first-class workflow.
@@ -33,8 +33,8 @@ Plugins can be **released, installed, uninstalled, and hot-reloaded independentl
 - **🔌 Plugin runtime** — Provider capabilities run as gRPC subprocesses (powered by hashicorp/go-plugin). Install via marketplace, GitHub Release, binary upload, or dev hot-reload — all without restarting Core.
 - **🧩 Dynamic route injection** — Routes declared by a plugin are auto-registered into the HTTP gateway. Account form fields and React components are auto-mounted into the admin dashboard.
 - **🎯 Smart account scheduling** — Priority + health + concurrency limit drive automatic account selection, with degraded accounts auto-quarantined.
-- **💰 Accurate billing** — Token × per-model price metering in real time, with rate multipliers, user balances, subscriptions, and quotas.
-- **🛡 Complete admin dashboard** — Users, groups, accounts, subscriptions, IPs, proxy pool, plugin marketplace, and settings in one place. Account import/export, auto-refresh, and admin API key authentication included.
+- **💰 Accurate billing** — Token × per-model price metering in real time, with rate multipliers and user balances.
+- **🛡 Complete admin dashboard** — Users, groups, accounts, plugin marketplace, and settings in one place. Account import/export, auto-refresh, and admin API key authentication included.
 - **📦 One-command deploy** — Multi-arch images (amd64/arm64) on `ghcr.io`. End users only need `docker compose up -d`.
 
 ## 🧩 Plugin Ecosystem
@@ -329,7 +329,7 @@ See `make help` for more commands.
                      │         AirGate Core (this repo)         │
                      │  ┌─────────┐  ┌─────────┐  ┌──────────┐  │
    Users / Admin ──► │  │  HTTP   │  │ Sched.  │  │ Billing  │  │
-                     │  │  Router │  │ + Limit │  │ + Subs   │  │
+                     │  │  Router │  │ + Limit │  │          │  │
                      │  └────┬────┘  └────┬────┘  └────┬─────┘  │
                      │       │  Plugin Manager (gRPC)  │        │
                      │       └────────────┬─────────────┘       │

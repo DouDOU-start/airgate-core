@@ -30,7 +30,6 @@ type ChannelResp struct {
 	TestedAt       *time.Time        `json:"tested_at,omitempty"`
 	LastUsedAt     *time.Time        `json:"last_used_at,omitempty"`
 	GroupIDs       []int             `json:"group_ids"`
-	ProxyID        *int              `json:"proxy_id,omitempty"`
 	TimeMixin
 }
 
@@ -54,15 +53,13 @@ type CreateChannelReq struct {
 	TestModel      string            `json:"test_model"`
 	CustomConfig   map[string]any    `json:"custom_config"`
 	GroupIDs       []int             `json:"group_ids"`
-	ProxyID        *int              `json:"proxy_id" binding:"omitempty,min=0"`
 }
 
 // UpdateChannelReq 更新渠道请求（partial）：
 //   - 指针字段缺省 = 不改；
 //   - api_keys/models 提供非空数组 = 整组替换，留空 = 不改；
 //   - model_mapping/param_override/header_override/tags/custom_config/group_ids
-//     提供（含空集合）= 整组替换；
-//   - proxy_id 传 0 = 解绑代理。
+//     提供（含空集合）= 整组替换。
 type UpdateChannelReq struct {
 	Name           *string           `json:"name"`
 	Type           *string           `json:"type" binding:"omitempty,oneof=openai_compatible anthropic gemini custom"`
@@ -82,7 +79,6 @@ type UpdateChannelReq struct {
 	TestModel      *string           `json:"test_model"`
 	CustomConfig   map[string]any    `json:"custom_config"`
 	GroupIDs       []int             `json:"group_ids"`
-	ProxyID        *int              `json:"proxy_id" binding:"omitempty,min=0"`
 }
 
 // TestChannelReq 渠道测试请求（model 缺省时取渠道 test_model 或首个模型）。
@@ -99,6 +95,13 @@ type TestChannelResp struct {
 // FetchChannelModelsResp 拉取上游模型列表响应。
 type FetchChannelModelsResp struct {
 	Models []string `json:"models"`
+}
+
+// FetchChannelModelsPreviewReq 预览拉取模型请求（渠道未保存，直接给连接参数）。
+type FetchChannelModelsPreviewReq struct {
+	Type    string `json:"type" binding:"required,oneof=openai_compatible anthropic gemini custom"`
+	BaseURL string `json:"base_url" binding:"required"`
+	APIKey  string `json:"api_key" binding:"required"`
 }
 
 // BulkUpdateChannelsReq 批量操作请求。

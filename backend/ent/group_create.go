@@ -15,7 +15,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
-	"github.com/DouDOU-start/airgate-core/ent/usersubscription"
 )
 
 // GroupCreate is the builder for creating a Group entity.
@@ -83,20 +82,6 @@ func (gc *GroupCreate) SetStatusVisible(b bool) *GroupCreate {
 func (gc *GroupCreate) SetNillableStatusVisible(b *bool) *GroupCreate {
 	if b != nil {
 		gc.SetStatusVisible(*b)
-	}
-	return gc
-}
-
-// SetSubscriptionType sets the "subscription_type" field.
-func (gc *GroupCreate) SetSubscriptionType(gt group.SubscriptionType) *GroupCreate {
-	gc.mutation.SetSubscriptionType(gt)
-	return gc
-}
-
-// SetNillableSubscriptionType sets the "subscription_type" field if the given value is not nil.
-func (gc *GroupCreate) SetNillableSubscriptionType(gt *group.SubscriptionType) *GroupCreate {
-	if gt != nil {
-		gc.SetSubscriptionType(*gt)
 	}
 	return gc
 }
@@ -242,21 +227,6 @@ func (gc *GroupCreate) AddAPIKeys(a ...*APIKey) *GroupCreate {
 	return gc.AddAPIKeyIDs(ids...)
 }
 
-// AddSubscriptionIDs adds the "subscriptions" edge to the UserSubscription entity by IDs.
-func (gc *GroupCreate) AddSubscriptionIDs(ids ...int) *GroupCreate {
-	gc.mutation.AddSubscriptionIDs(ids...)
-	return gc
-}
-
-// AddSubscriptions adds the "subscriptions" edges to the UserSubscription entity.
-func (gc *GroupCreate) AddSubscriptions(u ...*UserSubscription) *GroupCreate {
-	ids := make([]int, len(u))
-	for i := range u {
-		ids[i] = u[i].ID
-	}
-	return gc.AddSubscriptionIDs(ids...)
-}
-
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
 func (gc *GroupCreate) AddUsageLogIDs(ids ...int) *GroupCreate {
 	gc.mutation.AddUsageLogIDs(ids...)
@@ -323,10 +293,6 @@ func (gc *GroupCreate) defaults() {
 		v := group.DefaultStatusVisible
 		gc.mutation.SetStatusVisible(v)
 	}
-	if _, ok := gc.mutation.SubscriptionType(); !ok {
-		v := group.DefaultSubscriptionType
-		gc.mutation.SetSubscriptionType(v)
-	}
 	if _, ok := gc.mutation.ServiceTier(); !ok {
 		v := group.DefaultServiceTier
 		gc.mutation.SetServiceTier(v)
@@ -374,14 +340,6 @@ func (gc *GroupCreate) check() error {
 	}
 	if _, ok := gc.mutation.StatusVisible(); !ok {
 		return &ValidationError{Name: "status_visible", err: errors.New(`ent: missing required field "Group.status_visible"`)}
-	}
-	if _, ok := gc.mutation.SubscriptionType(); !ok {
-		return &ValidationError{Name: "subscription_type", err: errors.New(`ent: missing required field "Group.subscription_type"`)}
-	}
-	if v, ok := gc.mutation.SubscriptionType(); ok {
-		if err := group.SubscriptionTypeValidator(v); err != nil {
-			return &ValidationError{Name: "subscription_type", err: fmt.Errorf(`ent: validator failed for field "Group.subscription_type": %w`, err)}
-		}
 	}
 	if _, ok := gc.mutation.ServiceTier(); !ok {
 		return &ValidationError{Name: "service_tier", err: errors.New(`ent: missing required field "Group.service_tier"`)}
@@ -446,10 +404,6 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := gc.mutation.StatusVisible(); ok {
 		_spec.SetField(group.FieldStatusVisible, field.TypeBool, value)
 		_node.StatusVisible = value
-	}
-	if value, ok := gc.mutation.SubscriptionType(); ok {
-		_spec.SetField(group.FieldSubscriptionType, field.TypeEnum, value)
-		_node.SubscriptionType = value
 	}
 	if value, ok := gc.mutation.Quotas(); ok {
 		_spec.SetField(group.FieldQuotas, field.TypeJSON, value)
@@ -524,22 +478,6 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := gc.mutation.SubscriptionsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   group.SubscriptionsTable,
-			Columns: []string{group.SubscriptionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

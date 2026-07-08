@@ -24,12 +24,6 @@ func TestGroupHandleErrorMapping(t *testing.T) {
 			wantMessage: appgroup.ErrGroupNotFound.Error(),
 		},
 		{
-			name:        "仍有订阅 400",
-			err:         appgroup.ErrGroupHasSubscriptions,
-			wantCode:    400,
-			wantMessage: appgroup.ErrGroupHasSubscriptions.Error(),
-		},
-		{
 			name:        "仍绑定渠道 400 且带数量提示",
 			err:         &appgroup.GroupHasChannelsError{Count: 3},
 			wantCode:    400,

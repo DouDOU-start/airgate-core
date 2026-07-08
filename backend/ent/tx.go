@@ -14,6 +14,10 @@ type Tx struct {
 	config
 	// APIKey is the client for interacting with the APIKey builders.
 	APIKey *APIKeyClient
+	// Announcement is the client for interacting with the Announcement builders.
+	Announcement *AnnouncementClient
+	// AnnouncementRead is the client for interacting with the AnnouncementRead builders.
+	AnnouncementRead *AnnouncementReadClient
 	// BalanceLog is the client for interacting with the BalanceLog builders.
 	BalanceLog *BalanceLogClient
 	// Channel is the client for interacting with the Channel builders.
@@ -22,8 +26,6 @@ type Tx struct {
 	Group *GroupClient
 	// ModelPrice is the client for interacting with the ModelPrice builders.
 	ModelPrice *ModelPriceClient
-	// Proxy is the client for interacting with the Proxy builders.
-	Proxy *ProxyClient
 	// Setting is the client for interacting with the Setting builders.
 	Setting *SettingClient
 	// Task is the client for interacting with the Task builders.
@@ -32,8 +34,6 @@ type Tx struct {
 	UsageLog *UsageLogClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
-	// UserSubscription is the client for interacting with the UserSubscription builders.
-	UserSubscription *UserSubscriptionClient
 
 	// lazily loaded.
 	client     *Client
@@ -166,16 +166,16 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.APIKey = NewAPIKeyClient(tx.config)
+	tx.Announcement = NewAnnouncementClient(tx.config)
+	tx.AnnouncementRead = NewAnnouncementReadClient(tx.config)
 	tx.BalanceLog = NewBalanceLogClient(tx.config)
 	tx.Channel = NewChannelClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
 	tx.ModelPrice = NewModelPriceClient(tx.config)
-	tx.Proxy = NewProxyClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
 	tx.Task = NewTaskClient(tx.config)
 	tx.UsageLog = NewUsageLogClient(tx.config)
 	tx.User = NewUserClient(tx.config)
-	tx.UserSubscription = NewUserSubscriptionClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

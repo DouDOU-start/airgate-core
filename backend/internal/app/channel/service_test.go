@@ -120,19 +120,19 @@ func TestTestRecoverRereadsCurrentStatus(t *testing.T) {
 
 // stubFetcher 记录收到的参数。
 type stubFetcher struct {
-	gotProxyURL string
-	gotBaseURL  string
-	models      []string
+	gotBaseURL string
+	gotAPIKey  string
+	models     []string
 }
 
-func (s *stubFetcher) FetchModels(_ context.Context, _, baseURL, _, proxyURL string) ([]string, error) {
+func (s *stubFetcher) FetchModels(_ context.Context, _, baseURL, apiKey string) ([]string, error) {
 	s.gotBaseURL = baseURL
-	s.gotProxyURL = proxyURL
+	s.gotAPIKey = apiKey
 	return s.models, nil
 }
 
-// TestFetchModelsUsesChannelProxy fetch-models 走渠道绑定的出口代理（与转发链路一致）。
-func TestFetchModelsUsesChannelProxy(t *testing.T) {
+// TestFetchModelsDelegatesToFetcher fetch-models 解密渠道首个 API Key 后委托拉取器。
+func TestFetchModelsDelegatesToFetcher(t *testing.T) {
 	// secret 须为 hex 且解码后 ≥32 字节（AES-256）。
 	const secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	encrypted, err := auth.EncryptAPIKey("sk-upstream", secret)
@@ -140,50 +140,31 @@ func TestFetchModelsUsesChannelProxy(t *testing.T) {
 		t.Fatalf("加密失败: %v", err)
 	}
 
-	cases := []struct {
-		name         string
-		proxy        *ProxyInfo
-		wantProxyURL string
-	}{
-		{
-			name:         "绑定 socks5 代理",
-			proxy:        &ProxyInfo{Protocol: "socks5", Address: "10.0.0.1", Port: 1080, Username: "u", Password: "p"},
-			wantProxyURL: "socks5://u:p@10.0.0.1:1080",
-		},
-		{
-			name:         "未绑定代理直连",
-			proxy:        nil,
-			wantProxyURL: "",
+	repo := &stubRepo{
+		findByID: func(_ context.Context, id int) (Channel, error) {
+			return Channel{
+				ID:      id,
+				Type:    "openai_compatible",
+				BaseURL: "https://api.example.com",
+				APIKeys: []string{encrypted},
+			}, nil
 		},
 	}
+	svc := NewService(repo, secret)
+	fetcher := &stubFetcher{models: []string{"gpt-4o"}}
+	svc.fetcher = fetcher
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			repo := &stubRepo{
-				findByID: func(_ context.Context, id int) (Channel, error) {
-					return Channel{
-						ID:      id,
-						Type:    "openai_compatible",
-						BaseURL: "https://api.example.com",
-						APIKeys: []string{encrypted},
-						Proxy:   tc.proxy,
-					}, nil
-				},
-			}
-			svc := NewService(repo, secret)
-			fetcher := &stubFetcher{models: []string{"gpt-4o"}}
-			svc.fetcher = fetcher
-
-			models, err := svc.FetchModels(context.Background(), 1)
-			if err != nil {
-				t.Fatalf("FetchModels err = %v", err)
-			}
-			if len(models) != 1 || models[0] != "gpt-4o" {
-				t.Errorf("models = %v", models)
-			}
-			if fetcher.gotProxyURL != tc.wantProxyURL {
-				t.Errorf("proxyURL = %q, want %q", fetcher.gotProxyURL, tc.wantProxyURL)
-			}
-		})
+	models, err := svc.FetchModels(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("FetchModels err = %v", err)
+	}
+	if len(models) != 1 || models[0] != "gpt-4o" {
+		t.Errorf("models = %v", models)
+	}
+	if fetcher.gotBaseURL != "https://api.example.com" {
+		t.Errorf("baseURL = %q, want %q", fetcher.gotBaseURL, "https://api.example.com")
+	}
+	if fetcher.gotAPIKey != "sk-upstream" {
+		t.Errorf("apiKey = %q, want 解密后的明文", fetcher.gotAPIKey)
 	}
 }

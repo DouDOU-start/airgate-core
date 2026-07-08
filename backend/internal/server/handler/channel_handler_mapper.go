@@ -34,7 +34,6 @@ func toChannelRespFromDomain(item appchannel.Channel) dto.ChannelResp {
 		TestedAt:       item.TestedAt,
 		LastUsedAt:     item.LastUsedAt,
 		GroupIDs:       emptyIfNilInts(item.GroupIDs),
-		ProxyID:        item.ProxyID,
 		TimeMixin: dto.TimeMixin{
 			CreatedAt: item.CreatedAt,
 			UpdatedAt: item.UpdatedAt,

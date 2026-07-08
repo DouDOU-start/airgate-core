@@ -36,8 +36,7 @@ export const UsersPage = lazyWithPreload(() => import('../pages/admin/UsersPage'
 export const ChannelsPage = lazyWithPreload(() => import('../pages/admin/ChannelsPage'));
 export const ModelPricesPage = lazyWithPreload(() => import('../pages/admin/ModelPricesPage'));
 export const GroupsPage = lazyWithPreload(() => import('../pages/admin/GroupsPage'));
-export const SubscriptionsPage = lazyWithPreload(() => import('../pages/admin/SubscriptionsPage'));
-export const ProxiesPage = lazyWithPreload(() => import('../pages/admin/ProxiesPage'));
+export const AnnouncementsPage = lazyWithPreload(() => import('../pages/admin/AnnouncementsPage'));
 export const UsagePage = lazyWithPreload(() => import('../pages/admin/UsagePage'));
 export const SettingsPage = lazyWithPreload(() => import('../pages/admin/SettingsPage'));
 export const ProfilePage = lazyWithPreload(() => import('../pages/user/ProfilePage'));
@@ -65,8 +64,7 @@ const ROUTE_PRELOADS = new Map<string, AnyPreloadableLazyComponent[]>([
   ['/admin/channels', [ChannelsPage]],
   ['/admin/model-prices', [ModelPricesPage]],
   ['/admin/groups', [GroupsPage]],
-  ['/admin/subscriptions', [SubscriptionsPage]],
-  ['/admin/proxies', [ProxiesPage]],
+  ['/admin/announcements', [AnnouncementsPage]],
   ['/admin/usage', [UsagePage]],
   ['/admin/settings', [SettingsPage]],
 ]);

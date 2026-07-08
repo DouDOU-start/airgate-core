@@ -9,6 +9,12 @@ import (
 // APIKey is the predicate function for apikey builders.
 type APIKey func(*sql.Selector)
 
+// Announcement is the predicate function for announcement builders.
+type Announcement func(*sql.Selector)
+
+// AnnouncementRead is the predicate function for announcementread builders.
+type AnnouncementRead func(*sql.Selector)
+
 // BalanceLog is the predicate function for balancelog builders.
 type BalanceLog func(*sql.Selector)
 
@@ -21,9 +27,6 @@ type Group func(*sql.Selector)
 // ModelPrice is the predicate function for modelprice builders.
 type ModelPrice func(*sql.Selector)
 
-// Proxy is the predicate function for proxy builders.
-type Proxy func(*sql.Selector)
-
 // Setting is the predicate function for setting builders.
 type Setting func(*sql.Selector)
 
@@ -35,6 +38,3 @@ type UsageLog func(*sql.Selector)
 
 // User is the predicate function for user builders.
 type User func(*sql.Selector)
-
-// UserSubscription is the predicate function for usersubscription builders.
-type UserSubscription func(*sql.Selector)

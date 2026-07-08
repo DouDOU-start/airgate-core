@@ -12,27 +12,23 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/pkg/upstreamclient"
 )
 
-// DefaultModelFetcher 默认上游模型列表拉取器（按渠道出口代理请求，与转发链路一致）。
+// DefaultModelFetcher 默认上游模型列表拉取器。
 //
 // 各渠道类型端点：
 //   - openai_compatible / custom：GET {base_url}/v1/models，Bearer 认证，解析 data[].id
 //   - anthropic：GET {base_url}/v1/models，x-api-key 认证，解析 data[].id
 //   - gemini：GET {base_url}/v1beta/models，x-goog-api-key 认证，解析 models[].name（去掉 "models/" 前缀）
 type DefaultModelFetcher struct {
-	// Client 可注入的 HTTP 客户端（测试用）；nil 时按 proxyURL 构建
+	// Client 可注入的 HTTP 客户端（测试用）；nil 时构建
 	// 15s 超时、不跟随重定向的出口客户端（upstreamclient）。
 	Client *http.Client
 }
 
 // FetchModels 拉取上游模型列表；拿不到（网络错误/非 2xx/解析失败/空列表）即报错。
-func (f DefaultModelFetcher) FetchModels(ctx context.Context, channelType, baseURL, apiKey, proxyURL string) ([]string, error) {
+func (f DefaultModelFetcher) FetchModels(ctx context.Context, channelType, baseURL, apiKey string) ([]string, error) {
 	client := f.Client
 	if client == nil {
-		var err error
-		client, err = upstreamclient.NewClient(proxyURL, 15*time.Second)
-		if err != nil {
-			return nil, fmt.Errorf("构建出口客户端失败: %w", err)
-		}
+		client = upstreamclient.NewClient(15 * time.Second)
 	}
 	base := strings.TrimRight(baseURL, "/")
 

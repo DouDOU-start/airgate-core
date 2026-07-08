@@ -12,16 +12,14 @@ import (
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 
 	"github.com/DouDOU-start/airgate-core/ent"
+	appannouncement "github.com/DouDOU-start/airgate-core/internal/app/announcement"
 	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
 	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
 	appchannel "github.com/DouDOU-start/airgate-core/internal/app/channel"
 	appdashboard "github.com/DouDOU-start/airgate-core/internal/app/dashboard"
 	appgroup "github.com/DouDOU-start/airgate-core/internal/app/group"
 	appmodelprice "github.com/DouDOU-start/airgate-core/internal/app/modelprice"
-	appopenclaw "github.com/DouDOU-start/airgate-core/internal/app/openclaw"
-	appproxy "github.com/DouDOU-start/airgate-core/internal/app/proxy"
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
-	appsubscription "github.com/DouDOU-start/airgate-core/internal/app/subscription"
 	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
 	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
@@ -47,25 +45,21 @@ type HTTPHandlers struct {
 	Auth         *handler.AuthHandler
 	User         *handler.UserHandler
 	Group        *handler.GroupHandler
+	Announcement *handler.AnnouncementHandler
 	APIKey       *handler.APIKeyHandler
-	Subscription *handler.SubscriptionHandler
 	Usage        *handler.UsageHandler
-	Proxy        *handler.ProxyHandler
 	Channel      *handler.ChannelHandler
 	ModelPrice   *handler.ModelPriceHandler
 	Settings     *handler.SettingsHandler
 	Dashboard    *handler.DashboardHandler
-	OpenClaw     *handler.OpenClawHandler
 	Version      *handler.VersionHandler
 	Upgrade      *handler.UpgradeHandler
 
-	// ChannelService / ProxyService / ModelPriceService / SettingsService 暴露给 server.go：
+	// ChannelService / ModelPriceService / SettingsService 暴露给 server.go：
 	// ChannelService 充当渠道注册表的 Loader/Persister 并接收 Reloader/Tester 注入，
-	// ProxyService 接收 Reloader 注入（代理写操作后重载渠道快照的 ProxyURL），
 	// ModelPriceService 充当 pricing 缓存的 Loader 并接收 Invalidator 注入，
 	// SettingsService 供 relay 管线的 gateway 设置读取器使用。
 	ChannelService    *appchannel.Service
-	ProxyService      *appproxy.Service
 	ModelPriceService *appmodelprice.Service
 	SettingsService   *appsettings.Service
 }
@@ -81,19 +75,16 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	// 设置和验证码依赖延迟到 settingsService 创建后注入
 	groupStore := store.NewGroupStore(dep.DB)
 	groupService := appgroup.NewService(groupStore, dep.Concurrency)
-	proxyStore := store.NewProxyStore(dep.DB)
-	proxyService := appproxy.NewService(proxyStore)
+	announcementStore := store.NewAnnouncementStore(dep.DB)
+	announcementService := appannouncement.NewService(announcementStore)
 	channelStore := store.NewChannelStore(dep.DB)
 	channelService := appchannel.NewService(channelStore, dep.Config.APIKeySecret())
 	modelPriceStore := store.NewModelPriceStore(dep.DB)
 	modelPriceService := appmodelprice.NewService(modelPriceStore)
-	subscriptionStore := store.NewSubscriptionStore(dep.DB)
-	subscriptionService := appsubscription.NewService(subscriptionStore)
 	dashboardStore := store.NewDashboardStore(dep.DB, dep.Redis)
 	dashboardService := appdashboard.NewService(dashboardStore, dep.Redis)
 	settingsStore := store.NewSettingsStore(dep.DB)
 	settingsService := appsettings.NewService(settingsStore, dep.Config.APIKeySecret())
-	openclawService := appopenclaw.NewService(settingsService)
 
 	// 注入 auth 服务的设置/验证码/邮件依赖
 	authService.SetSettingsLister(&settingsAdapter{settingsService})
@@ -116,20 +107,17 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Auth:         handler.NewAuthHandler(authService, dep.JWTMgr),
 		User:         handler.NewUserHandler(userService, settingsService),
 		Group:        handler.NewGroupHandler(groupService),
+		Announcement: handler.NewAnnouncementHandler(announcementService),
 		APIKey:       handler.NewAPIKeyHandler(apiKeyService),
-		Subscription: handler.NewSubscriptionHandler(subscriptionService),
 		Usage:        handler.NewUsageHandler(usageService),
-		Proxy:        handler.NewProxyHandler(proxyService),
 		Channel:      handler.NewChannelHandler(channelService),
 		ModelPrice:   handler.NewModelPriceHandler(modelPriceService),
 		Settings:     handler.NewSettingsHandler(settingsService),
 		Dashboard:    handler.NewDashboardHandler(dashboardService),
-		OpenClaw:     handler.NewOpenClawHandler(openclawService),
 		Version:      handler.NewVersionHandler(),
 		Upgrade:      handler.NewUpgradeHandler(upgradeService),
 
 		ChannelService:    channelService,
-		ProxyService:      proxyService,
 		ModelPriceService: modelPriceService,
 		SettingsService:   settingsService,
 	}

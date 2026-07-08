@@ -6,7 +6,7 @@ tmp_dir = "tmp"
 
 [build]
   cmd = "go build -o ./tmp/main ./cmd/server"
-  bin = "./tmp/main"
+  entrypoint = ["./tmp/main"]
   delay = 1000
   # WSL2 + /mnt/* (9p drvfs) 不支持 inotify，必须开 poll 才能检测文件变更
   poll = true

@@ -14,6 +14,7 @@ import { FullPageLoading, PageLoading } from '../shared/components/PageLoading';
 import { checkAdmin, withSetupCheck } from './routeGuards';
 import {
   ADMIN_IDLE_PRELOADS,
+  AnnouncementsPage,
   ChannelsPage,
   DashboardPage,
   DocsPage,
@@ -23,11 +24,9 @@ import {
   ModelPricesPage,
   preloadRoutePage,
   ProfilePage,
-  ProxiesPage,
   PublicHomePage,
   SettingsPage,
   SetupPage,
-  SubscriptionsPage,
   UsagePage,
   UserKeysPage,
   UserOverviewPage,
@@ -207,8 +206,7 @@ const adminUsersRoute = createRoute({ getParentRoute: () => adminLayout, path: '
 const adminChannelsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/channels', component: renderPage(ChannelsPage) });
 const adminModelPricesRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/model-prices', component: renderPage(ModelPricesPage) });
 const adminGroupsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/groups', component: renderPage(GroupsPage) });
-const adminSubscriptionsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/subscriptions', component: renderPage(SubscriptionsPage) });
-const adminProxiesRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/proxies', component: renderPage(ProxiesPage) });
+const adminAnnouncementsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/announcements', component: renderPage(AnnouncementsPage) });
 const adminUsageRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/usage', component: renderPage(UsagePage) });
 const adminSettingsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/settings', component: renderPage(SettingsPage) });
 
@@ -229,8 +227,7 @@ const routeTree = rootRoute.addChildren([
       adminChannelsRoute,
       adminModelPricesRoute,
       adminGroupsRoute,
-      adminSubscriptionsRoute,
-      adminProxiesRoute,
+      adminAnnouncementsRoute,
       adminUsageRoute,
       adminSettingsRoute,
     ]),

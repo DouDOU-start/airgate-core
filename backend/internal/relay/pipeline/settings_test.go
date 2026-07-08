@@ -43,16 +43,14 @@ func TestSettingsReader(t *testing.T) {
 			want:   defaultGatewaySettings(),
 		},
 		{
-			name: "三键全解析",
+			name: "两键全解析",
 			lister: &fakeLister{items: []Setting{
 				{Key: "channel_auto_ban_enabled", Value: "false"},
-				{Key: "unpriced_model_allow", Value: "true"},
 				{Key: "channel_ban_keywords", Value: `["Custom KEYWORD"," another "]`},
 			}},
 			want: GatewaySettings{
-				AutoBanEnabled:     false,
-				UnpricedModelAllow: true,
-				BanKeywords:        []string{"custom keyword", "another"}, // 统一小写 + 去首尾空白
+				AutoBanEnabled: false,
+				BanKeywords:    []string{"custom keyword", "another"}, // 统一小写 + 去首尾空白
 			},
 		},
 		{
@@ -84,12 +82,12 @@ func TestSettingsReader(t *testing.T) {
 
 // TestSettingsReaderTTLCache TTL 内不重复打后端。
 func TestSettingsReaderTTLCache(t *testing.T) {
-	lister := &fakeLister{items: []Setting{{Key: "unpriced_model_allow", Value: "true"}}}
+	lister := &fakeLister{items: []Setting{{Key: "channel_auto_ban_enabled", Value: "false"}}}
 	r := NewSettingsReader(lister)
 
 	for i := 0; i < 5; i++ {
-		if got := r.Get(context.Background()); !got.UnpricedModelAllow {
-			t.Fatal("UnpricedModelAllow 应为 true")
+		if got := r.Get(context.Background()); got.AutoBanEnabled {
+			t.Fatal("AutoBanEnabled 应为 false")
 		}
 	}
 	if lister.calls != 1 {
@@ -109,12 +107,11 @@ func (r *SettingsReader) expire() {
 func TestSettingsReaderServeStale(t *testing.T) {
 	lister := &fakeLister{items: []Setting{
 		{Key: "channel_auto_ban_enabled", Value: "false"},
-		{Key: "unpriced_model_allow", Value: "true"},
 	}}
 	r := NewSettingsReader(lister)
 
 	first := r.Get(context.Background())
-	if first.AutoBanEnabled || !first.UnpricedModelAllow {
+	if first.AutoBanEnabled {
 		t.Fatalf("首次加载异常: %+v", first)
 	}
 
@@ -124,9 +121,6 @@ func TestSettingsReaderServeStale(t *testing.T) {
 	got := r.Get(context.Background())
 	if got.AutoBanEnabled {
 		t.Error("刷新失败后 AutoBanEnabled 被默认值覆盖（缓存中毒）")
-	}
-	if !got.UnpricedModelAllow {
-		t.Error("刷新失败后 UnpricedModelAllow 被默认值覆盖（缓存中毒）")
 	}
 
 	// serve-stale 续短 TTL：随后立即 Get 不应再打后端（未到期）。
@@ -159,14 +153,14 @@ func TestSettingsReaderNeverLoadedFallsBackToDefaults(t *testing.T) {
 // TestSettingsReaderRefreshUsesBackgroundCtx 刷新不使用触发请求的 ctx：
 // 客户端断连（ctx 已取消）不得把 context.Canceled 放大为刷新失败。
 func TestSettingsReaderRefreshUsesBackgroundCtx(t *testing.T) {
-	lister := &fakeLister{items: []Setting{{Key: "unpriced_model_allow", Value: "true"}}}
+	lister := &fakeLister{items: []Setting{{Key: "channel_auto_ban_enabled", Value: "false"}}}
 	r := NewSettingsReader(lister)
 
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel() // 模拟客户端已断连的请求 ctx
 
 	got := r.Get(canceled)
-	if !got.UnpricedModelAllow {
+	if got.AutoBanEnabled {
 		t.Fatalf("断连 ctx 触发的刷新应正常加载: %+v", got)
 	}
 	if lister.calls != 1 {
@@ -182,9 +176,9 @@ func TestSettingsReaderRefreshUsesBackgroundCtx(t *testing.T) {
 
 // TestSettingsReaderSingleFlight 刷新进行中其他请求直接用现值，不排队等 DB。
 func TestSettingsReaderSingleFlight(t *testing.T) {
-	lister := &fakeLister{items: []Setting{{Key: "unpriced_model_allow", Value: "true"}}}
+	lister := &fakeLister{items: []Setting{{Key: "channel_auto_ban_enabled", Value: "false"}}}
 	r := NewSettingsReader(lister)
-	if got := r.Get(context.Background()); !got.UnpricedModelAllow {
+	if got := r.Get(context.Background()); got.AutoBanEnabled {
 		t.Fatal("首次加载失败")
 	}
 
@@ -195,7 +189,7 @@ func TestSettingsReaderSingleFlight(t *testing.T) {
 	r.mu.Unlock()
 
 	callsBefore := lister.calls
-	if got := r.Get(context.Background()); !got.UnpricedModelAllow {
+	if got := r.Get(context.Background()); got.AutoBanEnabled {
 		t.Error("刷新进行中应返回现有缓存值")
 	}
 	if lister.calls != callsBefore {

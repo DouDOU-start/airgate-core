@@ -42,11 +42,10 @@ func TestCreateClonesMutableFields(t *testing.T) {
 	routing := map[string][]int64{"gpt-*": {1, 2}}
 
 	_, err := service.Create(t.Context(), CreateInput{
-		Name:             "默认分组",
-		Platform:         "openai",
-		SubscriptionType: "standard",
-		Quotas:           quotas,
-		ModelRouting:     routing,
+		Name:         "默认分组",
+		Platform:     "openai",
+		Quotas:       quotas,
+		ModelRouting: routing,
 	})
 	if err != nil {
 		t.Fatalf("Create() returned error: %v", err)

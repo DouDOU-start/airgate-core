@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	entbalancelog "github.com/DouDOU-start/airgate-core/ent/balancelog"
@@ -20,13 +19,6 @@ func TestUserStoreDeleteKeepsUsageAndBillingHistory(t *testing.T) {
 
 	ctx := context.Background()
 	user := createTestUser(t, db, "deleted-user@example.com")
-	group, err := db.Group.Create().
-		SetName("Test Group").
-		SetPlatform("openai").
-		Save(ctx)
-	if err != nil {
-		t.Fatalf("create group: %v", err)
-	}
 	key, err := db.APIKey.Create().
 		SetName("test-key").
 		SetKeyHash("hash").
@@ -34,14 +26,6 @@ func TestUserStoreDeleteKeepsUsageAndBillingHistory(t *testing.T) {
 		Save(ctx)
 	if err != nil {
 		t.Fatalf("create api key: %v", err)
-	}
-	if _, err := db.UserSubscription.Create().
-		SetUserID(user.ID).
-		SetGroupID(group.ID).
-		SetEffectiveAt(time.Now()).
-		SetExpiresAt(time.Now().Add(24 * time.Hour)).
-		Save(ctx); err != nil {
-		t.Fatalf("create subscription: %v", err)
 	}
 	if _, err := db.UsageLog.Create().
 		SetPlatform("openai").
@@ -78,9 +62,6 @@ func TestUserStoreDeleteKeepsUsageAndBillingHistory(t *testing.T) {
 	}
 	if count, err := db.APIKey.Query().Count(ctx); err != nil || count != 0 {
 		t.Fatalf("api key count = %d, err = %v; want 0", count, err)
-	}
-	if count, err := db.UserSubscription.Query().Count(ctx); err != nil || count != 0 {
-		t.Fatalf("subscription count = %d, err = %v; want 0", count, err)
 	}
 
 	usage, err := db.UsageLog.Query().Only(ctx)

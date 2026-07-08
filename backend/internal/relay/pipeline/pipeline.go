@@ -4,7 +4,10 @@
 package pipeline
 
 import (
+	"net/http"
+
 	"github.com/DouDOU-start/airgate-core/internal/billing"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/upstreamclient"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
@@ -38,7 +41,11 @@ type Pipeline struct {
 	calculator  *billing.Calculator
 	sink        UsageSink
 	settings    *SettingsReader
-	clients     *clientPool
+	// client 出口 HTTP 客户端：不设总超时（流式无总超时），仅设连接/TLS 层超时；
+	// 非流式的总超时由调用方经 context 施加。重定向不跟随
+	//（upstreamclient.NewClient 统一设 ErrUseLastResponse），
+	// 3xx 原样进入 outcome 判定按 clientError 透传终止。
+	client *http.Client
 }
 
 // New 创建转发管线。
@@ -59,6 +66,6 @@ func New(opts Options) *Pipeline {
 		calculator:  calculator,
 		sink:        opts.Sink,
 		settings:    settings,
-		clients:     newClientPool(),
+		client:      upstreamclient.NewClient(0),
 	}
 }

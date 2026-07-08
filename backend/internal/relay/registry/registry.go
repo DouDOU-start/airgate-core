@@ -1,5 +1,5 @@
 // Package registry 提供渠道调度的内存注册表：
-// 全量渠道快照（api_keys 已解密、proxy 边已解析）常驻内存，
+// 全量渠道快照（api_keys 已解密）常驻内存，
 // 转发管线经 Pick 选渠道、NextKey 轮询密钥；状态变更（冷却/自动禁用/恢复）
 // 内存即时生效并经 Persister 异步落库。
 //
@@ -54,9 +54,7 @@ type ChannelSnapshot struct {
 	// StatusUntil 429 冷却到期时间：非 nil 且未到期时不可调度。
 	StatusUntil *time.Time
 	// GroupIDs 绑定分组集合；空集合表示公共渠道，对所有分组可用。
-	GroupIDs map[int]struct{}
-	// ProxyURL 出口代理（http:// 或 socks5://），空串表示直连。
-	ProxyURL     string
+	GroupIDs     map[int]struct{}
 	TestModel    string
 	CustomConfig map[string]any
 }
@@ -69,7 +67,7 @@ func (c *ChannelSnapshot) available(now time.Time) bool {
 	return c.StatusUntil == nil || !c.StatusUntil.After(now)
 }
 
-// Loader 全量加载渠道快照（由 channel service 实现：解密 api_keys、解析 proxy 边）。
+// Loader 全量加载渠道快照（由 channel service 实现：解密 api_keys）。
 type Loader interface {
 	LoadAllForRegistry(ctx context.Context) ([]ChannelSnapshot, error)
 }

@@ -49,7 +49,6 @@ func (t *channelTester) Test(ctx context.Context, ch appchannel.Channel, model s
 		HeaderOverride: ch.HeaderOverride,
 		CostRatio:      ch.CostRatio,
 		Status:         ch.Status,
-		ProxyURL:       appchannel.BuildProxyURL(ch.Proxy),
 		TestModel:      ch.TestModel,
 		CustomConfig:   ch.CustomConfig,
 	}

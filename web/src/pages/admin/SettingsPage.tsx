@@ -12,7 +12,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { useToast } from '../../shared/ui';
 import {
   Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound, Zap, Download, Database,
+  ShieldCheck, Copy, Trash2, KeyRound, Download, Database,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
 import { SystemUpdatePanel } from './SystemUpdatePanel';
@@ -48,44 +48,6 @@ const STORAGE_KEYS = [
   's3_presign_ttl_minutes', 's3_path_prefix', 'local_storage_dir',
   'asset_retention_generated_days',
 ] as const;
-
-// OpenClaw 一键接入相关 setting key。所有 key 统一加 "openclaw." 前缀，便于在 Setting 表中识别。
-// 默认值（DEFAULT_OPENCLAW_*）在后端 internal/app/openclaw/defaults.go 中维护了同构的一份，
-// 这里只负责前端展示 / 回填。keep in sync。
-const OPENCLAW_KEYS = [
-  'openclaw.enabled',
-  'openclaw.provider_name',
-  'openclaw.base_url',
-  'openclaw.models_preset',
-  'openclaw.memory_search_enabled',
-  'openclaw.memory_search_model',
-] as const;
-
-const DEFAULT_OPENCLAW_PROVIDER_NAME = 'airgate';
-const DEFAULT_OPENCLAW_MEMORY_MODEL = 'text-embedding-3-small';
-const DEFAULT_OPENCLAW_MODELS_PRESET = `[
-  {
-    "id": "gpt-5.4",
-    "label": "GPT-5.4 (推荐)",
-    "api": "openai-responses",
-    "reasoning": true,
-    "input": ["text", "image"]
-  },
-  {
-    "id": "claude-sonnet-4-6",
-    "label": "Claude Sonnet 4.6",
-    "api": "anthropic-messages",
-    "reasoning": true,
-    "input": ["text", "image"]
-  },
-  {
-    "id": "claude-opus-4-6",
-    "label": "Claude Opus 4.6",
-    "api": "anthropic-messages",
-    "reasoning": true,
-    "input": ["text", "image"]
-  }
-]`;
 
 const DEFAULT_EMAIL_SUBJECT = '{{site_name}} - 邮箱验证码';
 const DEFAULT_EMAIL_BODY = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 420px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e5e7eb;">
@@ -126,14 +88,13 @@ const DEFAULT_BALANCE_ALERT_BODY = `<div style="font-family: -apple-system, Blin
 
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'security' | 'smtp' | 'storage' | 'openclaw' | 'system';
+type TabKey = 'site' | 'security' | 'smtp' | 'storage' | 'system';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
   { key: 'security', labelKey: 'settings.tab_security', icon: ShieldCheck },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
   { key: 'storage', labelKey: 'settings.tab_storage', icon: Database },
-  { key: 'openclaw', labelKey: 'settings.tab_openclaw', icon: Zap },
   { key: 'system', labelKey: 'settings.tab_system', icon: Download },
 ];
 
@@ -144,14 +105,12 @@ const TAB_GROUP: Record<SaveTabKey, string> = {
   site: 'site',
   smtp: 'smtp',
   storage: 'storage',
-  openclaw: 'openclaw',
 };
 
 const TAB_KEYS: Record<SaveTabKey, readonly string[]> = {
   site: SITE_KEYS,
   smtp: SMTP_KEYS,
   storage: STORAGE_KEYS,
-  openclaw: OPENCLAW_KEYS,
 };
 
 // ==================== Component ====================
@@ -576,16 +535,6 @@ export default function SettingsPage() {
 
         {activeTab === 'storage' && (
           <StoragePanel set={set} boolVal={boolVal} val={val} footer={saveAction} />
-        )}
-
-        {activeTab === 'openclaw' && (
-          <OpenClawPanel
-            values={values}
-            set={set}
-            boolVal={boolVal}
-            val={val}
-            footer={saveAction}
-          />
         )}
 
         {activeTab === 'system' && <SystemUpdatePanel />}
@@ -1140,198 +1089,6 @@ function StoragePanel({
             />
           </Field>
         </Form>
-        {footer}
-      </Card.Content>
-    </Card>
-  );
-}
-
-// ==================== OpenClaw Panel ====================
-
-function OpenClawPanel({
-  values,
-  set,
-  boolVal,
-  val,
-  footer,
-}: {
-  values: Record<string, string>;
-  set: (key: string, value: string) => void;
-  boolVal: (key: string) => boolean;
-  val: (key: string) => string;
-  footer?: React.ReactNode;
-}) {
-  const { t } = useTranslation();
-  const copy = useClipboard();
-
-  // 未设置时按钮态显示"启用"，即默认启用。
-  const enabled = (values['openclaw.enabled'] ?? 'true') === 'true';
-
-  // 管理员可能没填 site.api_base_url，这里只做展示预览，真正的 URL 推导在后端。
-  // 都为空时回退到当前页面 origin（与 DocsPage 的处理一致），避免出现尴尬的 <站点地址> 占位符。
-  const fallbackOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-  const usingFallbackOrigin = !val('openclaw.base_url') && !val('api_base_url');
-  const previewBase = (val('openclaw.base_url') || val('api_base_url') || fallbackOrigin || '').replace(/\/$/, '');
-
-  // 两个平台对应两份命令：Unix 用 bash + curl，Windows 用 PowerShell iwr|iex。
-  // 后端 HandleInfo 同时返回 install_command_bash / install_command_powershell 两个字段，
-  // 这里也分开展示，通过 tab 切换。
-  const baseForCmd = previewBase || '<站点地址>';
-  const installCommandBash = `curl -fsSL ${baseForCmd}/openclaw/install.sh -o openclaw-install.sh && bash openclaw-install.sh`;
-  const installCommandPowerShell = `iwr -useb ${baseForCmd}/openclaw/install.ps1 | iex`;
-
-  // 模型预设 JSON 的客户端校验：不阻塞保存，只给提示，让管理员自己决定。
-  const modelsRaw = values['openclaw.models_preset'] ?? '';
-  let modelsError = '';
-  if (modelsRaw.trim() !== '') {
-    try {
-      const parsed = JSON.parse(modelsRaw);
-      if (!Array.isArray(parsed)) {
-        modelsError = t('settings.openclaw_models_not_array');
-      }
-    } catch (e) {
-      modelsError = (e as Error).message;
-    }
-  }
-
-  return (
-    <Card>
-      <Card.Header>
-        <Card.Title>{t('settings.tab_openclaw')}</Card.Title>
-      </Card.Header>
-      <Card.Content>
-        <div className="ag-settings-section-stack">
-          <SettingsSection
-            description={t('settings.openclaw_quickstart_desc')}
-            title={t('settings.openclaw_quickstart')}
-          >
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-text">
-                  {t('settings.openclaw_install_tab_unix')}
-                </div>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 min-w-0 px-3 py-2 rounded-md bg-surface border border-glass-border text-[12px] font-mono text-text break-all">
-                    {installCommandBash}
-                  </code>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => copy(installCommandBash)}
-                    isDisabled={!previewBase}
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    {t('settings.openclaw_copy_command')}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-text">
-                  {t('settings.openclaw_install_tab_windows')}
-                </div>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 min-w-0 px-3 py-2 rounded-md bg-surface border border-glass-border text-[12px] font-mono text-text break-all">
-                    {installCommandPowerShell}
-                  </code>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => copy(installCommandPowerShell)}
-                    isDisabled={!previewBase}
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    {t('settings.openclaw_copy_command')}
-                  </Button>
-                </div>
-              </div>
-            </div>
-            {usingFallbackOrigin && (
-              <p className="text-[11px] text-text-tertiary mt-2">
-                {t('settings.openclaw_base_url_missing_hint')}
-              </p>
-            )}
-          </SettingsSection>
-
-          <SettingsSection title={t('settings.openclaw_basic')}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <NativeSwitch
-                className="col-span-1 md:col-span-2"
-                isSelected={enabled}
-                label={(
-                  <>
-                    <span className="text-sm font-medium text-text">{t('settings.openclaw_enabled')}</span>
-                    <span className="block text-xs text-text-tertiary">{t('settings.openclaw_enabled_desc')}</span>
-                  </>
-                )}
-                onChange={(v) => set('openclaw.enabled', String(v))}
-              />
-              <Field label={t('settings.openclaw_provider_name')} hint={t('settings.openclaw_provider_name_hint')}>
-                <Input
-                  value={val('openclaw.provider_name')}
-                  onChange={(e) => set('openclaw.provider_name', e.target.value)}
-                  placeholder={DEFAULT_OPENCLAW_PROVIDER_NAME}
-                />
-              </Field>
-              <Field label={t('settings.openclaw_base_url')} hint={t('settings.openclaw_base_url_hint')}>
-                <Input
-                  value={val('openclaw.base_url')}
-                  onChange={(e) => set('openclaw.base_url', e.target.value)}
-                  placeholder="https://api.example.com"
-                />
-              </Field>
-            </div>
-          </SettingsSection>
-
-          <SettingsSection title={t('settings.openclaw_memory_search')}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <NativeSwitch
-                className="col-span-1 md:col-span-2"
-                isSelected={boolVal('openclaw.memory_search_enabled')}
-                label={(
-                  <>
-                    <span className="text-sm font-medium text-text">{t('settings.openclaw_memory_search_enabled')}</span>
-                    <span className="block text-xs text-text-tertiary">{t('settings.openclaw_memory_search_enabled_desc')}</span>
-                  </>
-                )}
-                onChange={(v) => set('openclaw.memory_search_enabled', String(v))}
-              />
-              <Field label={t('settings.openclaw_memory_search_model')} hint={t('settings.openclaw_memory_search_model_hint')}>
-                <Input
-                  value={val('openclaw.memory_search_model')}
-                  onChange={(e) => set('openclaw.memory_search_model', e.target.value)}
-                  placeholder={DEFAULT_OPENCLAW_MEMORY_MODEL}
-                />
-              </Field>
-            </div>
-          </SettingsSection>
-
-          <SettingsSection
-            action={(
-              <Button
-                size="sm"
-                variant="ghost"
-                onPress={() => set('openclaw.models_preset', DEFAULT_OPENCLAW_MODELS_PRESET)}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                {t('settings.template_reset')}
-              </Button>
-            )}
-            description={t('settings.openclaw_models_preset_desc')}
-            title={t('settings.openclaw_models_preset')}
-          >
-            <TextArea
-              aria-label={t('settings.openclaw_models_preset')}
-              value={modelsRaw || DEFAULT_OPENCLAW_MODELS_PRESET}
-              onChange={(e) => set('openclaw.models_preset', e.target.value)}
-              className="h-80 w-full font-mono text-xs leading-5"
-              placeholder={DEFAULT_OPENCLAW_MODELS_PRESET}
-            />
-            {modelsError && (
-              <p className="text-[11px] text-danger mt-1.5">{modelsError}</p>
-            )}
-          </SettingsSection>
-        </div>
         {footer}
       </Card.Content>
     </Card>

@@ -17,21 +17,19 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
-	"github.com/DouDOU-start/airgate-core/ent/usersubscription"
 )
 
 // GroupQuery is the builder for querying Group entities.
 type GroupQuery struct {
 	config
-	ctx               *QueryContext
-	order             []group.OrderOption
-	inters            []Interceptor
-	predicates        []predicate.Group
-	withChannels      *ChannelQuery
-	withAllowedUsers  *UserQuery
-	withAPIKeys       *APIKeyQuery
-	withSubscriptions *UserSubscriptionQuery
-	withUsageLogs     *UsageLogQuery
+	ctx              *QueryContext
+	order            []group.OrderOption
+	inters           []Interceptor
+	predicates       []predicate.Group
+	withChannels     *ChannelQuery
+	withAllowedUsers *UserQuery
+	withAPIKeys      *APIKeyQuery
+	withUsageLogs    *UsageLogQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -127,28 +125,6 @@ func (gq *GroupQuery) QueryAPIKeys() *APIKeyQuery {
 			sqlgraph.From(group.Table, group.FieldID, selector),
 			sqlgraph.To(apikey.Table, apikey.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, group.APIKeysTable, group.APIKeysColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(gq.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QuerySubscriptions chains the current query on the "subscriptions" edge.
-func (gq *GroupQuery) QuerySubscriptions() *UserSubscriptionQuery {
-	query := (&UserSubscriptionClient{config: gq.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := gq.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := gq.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(group.Table, group.FieldID, selector),
-			sqlgraph.To(usersubscription.Table, usersubscription.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, group.SubscriptionsTable, group.SubscriptionsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(gq.driver.Dialect(), step)
 		return fromU, nil
@@ -365,16 +341,15 @@ func (gq *GroupQuery) Clone() *GroupQuery {
 		return nil
 	}
 	return &GroupQuery{
-		config:            gq.config,
-		ctx:               gq.ctx.Clone(),
-		order:             append([]group.OrderOption{}, gq.order...),
-		inters:            append([]Interceptor{}, gq.inters...),
-		predicates:        append([]predicate.Group{}, gq.predicates...),
-		withChannels:      gq.withChannels.Clone(),
-		withAllowedUsers:  gq.withAllowedUsers.Clone(),
-		withAPIKeys:       gq.withAPIKeys.Clone(),
-		withSubscriptions: gq.withSubscriptions.Clone(),
-		withUsageLogs:     gq.withUsageLogs.Clone(),
+		config:           gq.config,
+		ctx:              gq.ctx.Clone(),
+		order:            append([]group.OrderOption{}, gq.order...),
+		inters:           append([]Interceptor{}, gq.inters...),
+		predicates:       append([]predicate.Group{}, gq.predicates...),
+		withChannels:     gq.withChannels.Clone(),
+		withAllowedUsers: gq.withAllowedUsers.Clone(),
+		withAPIKeys:      gq.withAPIKeys.Clone(),
+		withUsageLogs:    gq.withUsageLogs.Clone(),
 		// clone intermediate query.
 		sql:  gq.sql.Clone(),
 		path: gq.path,
@@ -411,17 +386,6 @@ func (gq *GroupQuery) WithAPIKeys(opts ...func(*APIKeyQuery)) *GroupQuery {
 		opt(query)
 	}
 	gq.withAPIKeys = query
-	return gq
-}
-
-// WithSubscriptions tells the query-builder to eager-load the nodes that are connected to
-// the "subscriptions" edge. The optional arguments are used to configure the query builder of the edge.
-func (gq *GroupQuery) WithSubscriptions(opts ...func(*UserSubscriptionQuery)) *GroupQuery {
-	query := (&UserSubscriptionClient{config: gq.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	gq.withSubscriptions = query
 	return gq
 }
 
@@ -514,11 +478,10 @@ func (gq *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 	var (
 		nodes       = []*Group{}
 		_spec       = gq.querySpec()
-		loadedTypes = [5]bool{
+		loadedTypes = [4]bool{
 			gq.withChannels != nil,
 			gq.withAllowedUsers != nil,
 			gq.withAPIKeys != nil,
-			gq.withSubscriptions != nil,
 			gq.withUsageLogs != nil,
 		}
 	)
@@ -558,13 +521,6 @@ func (gq *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 		if err := gq.loadAPIKeys(ctx, query, nodes,
 			func(n *Group) { n.Edges.APIKeys = []*APIKey{} },
 			func(n *Group, e *APIKey) { n.Edges.APIKeys = append(n.Edges.APIKeys, e) }); err != nil {
-			return nil, err
-		}
-	}
-	if query := gq.withSubscriptions; query != nil {
-		if err := gq.loadSubscriptions(ctx, query, nodes,
-			func(n *Group) { n.Edges.Subscriptions = []*UserSubscription{} },
-			func(n *Group, e *UserSubscription) { n.Edges.Subscriptions = append(n.Edges.Subscriptions, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -726,37 +682,6 @@ func (gq *GroupQuery) loadAPIKeys(ctx context.Context, query *APIKeyQuery, nodes
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "group_api_keys" returned %v for node %v`, *fk, n.ID)
-		}
-		assign(node, n)
-	}
-	return nil
-}
-func (gq *GroupQuery) loadSubscriptions(ctx context.Context, query *UserSubscriptionQuery, nodes []*Group, init func(*Group), assign func(*Group, *UserSubscription)) error {
-	fks := make([]driver.Value, 0, len(nodes))
-	nodeids := make(map[int]*Group)
-	for i := range nodes {
-		fks = append(fks, nodes[i].ID)
-		nodeids[nodes[i].ID] = nodes[i]
-		if init != nil {
-			init(nodes[i])
-		}
-	}
-	query.withFKs = true
-	query.Where(predicate.UserSubscription(func(s *sql.Selector) {
-		s.Where(sql.InValues(s.C(group.SubscriptionsColumn), fks...))
-	}))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		fk := n.group_subscriptions
-		if fk == nil {
-			return fmt.Errorf(`foreign-key "group_subscriptions" is nil for node %v`, n.ID)
-		}
-		node, ok := nodeids[*fk]
-		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "group_subscriptions" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}
