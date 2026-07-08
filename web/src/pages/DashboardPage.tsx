@@ -28,7 +28,7 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
-import { decorativePalette } from '@doudou-start/airgate-theme';
+import { decorativePalette } from '../shared/utils/theme';
 import { dashboardApi } from '../shared/api/dashboard';
 import { usersApi } from '../shared/api/users';
 import { queryKeys } from '../shared/queryKeys';

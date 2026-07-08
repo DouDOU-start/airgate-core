@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@doudou-start/airgate-theme':
-        specifier: https://github.com/DouDOU-start/airgate-sdk/releases/download/v0.2.1/airgate-theme-v0.2.1.tgz
-        version: https://github.com/DouDOU-start/airgate-sdk/releases/download/v0.2.1/airgate-theme-v0.2.1.tgz(react@19.2.5)
       '@fontsource/geist-mono':
         specifier: ^5.2.7
         version: 5.2.7
@@ -197,12 +194,6 @@ packages:
   '@babel/types@7.29.0':
     resolution: {integrity: sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A==}
     engines: {node: '>=6.9.0'}
-
-  '@doudou-start/airgate-theme@https://github.com/DouDOU-start/airgate-sdk/releases/download/v0.2.1/airgate-theme-v0.2.1.tgz':
-    resolution: {integrity: sha512-itYvgvVIcT477Bqa1izpzuQ1TP2iAYjkXQNpOtc4YD0b9NqPYIpuop4lws8bETppqlTzejglLSr2syoWCD7LKA==, tarball: https://github.com/DouDOU-start/airgate-sdk/releases/download/v0.2.1/airgate-theme-v0.2.1.tgz}
-    version: 0.2.1
-    peerDependencies:
-      react: ^19.0.0
 
   '@esbuild/aix-ppc64@0.25.12':
     resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}
@@ -2272,10 +2263,6 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
-
-  '@doudou-start/airgate-theme@https://github.com/DouDOU-start/airgate-sdk/releases/download/v0.2.1/airgate-theme-v0.2.1.tgz(react@19.2.5)':
-    dependencies:
-      react: 19.2.5
 
   '@esbuild/aix-ppc64@0.25.12':
     optional: true

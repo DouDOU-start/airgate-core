@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { injectThemeStyle, setTheme, getStoredTheme, type ThemeName } from '@doudou-start/airgate-theme';
+import { setTheme, getStoredTheme, type ThemeName } from '../../shared/utils/theme';
 
 interface ThemeContextValue {
   theme: ThemeName;
@@ -16,11 +16,7 @@ function syncHeroUIThemeClass(theme: ThemeName) {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeName>(getStoredTheme);
 
-  // 初始化：注入 AirGate CSS 变量。
-  useEffect(() => {
-    injectThemeStyle();
-  }, []);
-
+  // CSS 变量由 styles/theme-vars.css 静态提供，无需运行时注入。
   // 主题变化时同步 AirGate data-theme 与 HeroUI light/dark class。
   useEffect(() => {
     setTheme(theme);

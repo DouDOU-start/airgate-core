@@ -31,5 +31,5 @@ export const PIE_CHART_COLORS = [
   'oklch(66% 0.085 48)',
 ] as const;
 
-/** 头像颜色池（引用 SDK 装饰色） */
-export { decorativePalette as AVATAR_COLORS } from '@doudou-start/airgate-theme';
+/** 头像颜色池（内嵌装饰色板） */
+export { decorativePalette as AVATAR_COLORS } from './utils/theme';

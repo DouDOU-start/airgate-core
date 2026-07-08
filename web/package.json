@@ -12,7 +12,6 @@
     "type-check": "tsc -b --noEmit"
   },
   "dependencies": {
-    "@doudou-start/airgate-theme": "https://github.com/DouDOU-start/airgate-sdk/releases/download/v0.2.1/airgate-theme-v0.2.1.tgz",
     "@fontsource/geist-mono": "^5.2.7",
     "@fontsource/geist-sans": "^5.2.5",
     "@heroui/react": "^3.0.3",

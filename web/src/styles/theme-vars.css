@@ -1,0 +1,131 @@
+/* ==========================================================================
+   AirGate 主题 CSS 变量（静态内嵌）
+   自 airgate-sdk 的 @doudou-start/airgate-theme v0.2.1 generateThemeCSS() 物化生成。
+   standalone-gateway 分支无插件生态，不再依赖 SDK 运行时注入；
+   调整主题直接改本文件（含 :root 静态 token 与 dark/light 两套主题变量）。
+   ========================================================================== */
+
+:root {
+  --ag-radius-sm: 0.25rem;
+  --ag-radius-md: 0.25rem;
+  --ag-radius-lg: 0.25rem;
+  --ag-radius-xl: 0.25rem;
+  --ag-field-radius: 0.5rem;
+  --ag-font-sans: 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ag-font-mono: 'Geist Mono', 'SF Mono', 'Cascadia Code', monospace;
+  --ag-transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ag-transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ag-sidebar-width: 260px;
+  --ag-sidebar-collapsed: 72px;
+  --ag-topbar-height: 64px;
+}
+
+:root[data-theme="dark"] {
+  --ag-primary: oklch(0.9848 0 0);
+  --ag-primary-foreground: oklch(15% 0.0000 0.00);
+  --ag-primary-hover: color-mix(in oklab, oklch(0.9848 0 0) 88%, oklch(15% 0.0000 0.00) 12%);
+  --ag-primary-subtle: color-mix(in oklab, oklch(0.9848 0 0) 14%, transparent);
+  --ag-primary-glow: color-mix(in oklab, oklch(0.9848 0 0) 22%, transparent);
+  --ag-success: oklch(73.29% 0.1935 120.35);
+  --ag-success-foreground: oklch(21.03% 0.0059 120.35);
+  --ag-success-subtle: color-mix(in oklab, oklch(73.29% 0.1935 120.35) 15%, transparent);
+  --ag-warning: oklch(0.8803 0.1348 86.06);
+  --ag-warning-foreground: oklch(15% 0.0404 86.06);
+  --ag-warning-subtle: color-mix(in oklab, oklch(0.8803 0.1348 86.06) 15%, transparent);
+  --ag-danger: oklch(0.7044 0.1872 23.19);
+  --ag-danger-foreground: oklch(15% 0.0500 23.19);
+  --ag-danger-subtle: color-mix(in oklab, oklch(0.7044 0.1872 23.19) 15%, transparent);
+  --ag-info: oklch(0.9848 0 0);
+  --ag-info-subtle: color-mix(in oklab, oklch(0.9848 0 0) 14%, transparent);
+  --ag-default-bg: oklch(27.40% 0.0000 0.00);
+  --ag-default-foreground: oklch(99.11% 0 0);
+  --ag-field-background: oklch(21.03% 0.0000 0.00);
+  --ag-field-foreground: oklch(99.11% 0.0000 0.00);
+  --ag-field-placeholder: oklch(70.50% 0.0000 0.00);
+  --ag-muted: oklch(70.50% 0.0000 0.00);
+  --ag-overlay: oklch(21.03% 0.0000 0.00);
+  --ag-overlay-foreground: oklch(99.11% 0.0000 0.00);
+  --ag-scrollbar: oklch(70.50% 0.0000 0.00);
+  --ag-segment: oklch(39.64% 0.0000 0.00);
+  --ag-segment-foreground: oklch(99.11% 0.0000 0.00);
+  --ag-surface: oklch(21.03% 0.0000 0.00);
+  --ag-surface-foreground: oklch(99.11% 0.0000 0.00);
+  --ag-surface-secondary: oklch(25.70% 0.0000 0.00);
+  --ag-surface-secondary-foreground: oklch(99.11% 0.0000 0.00);
+  --ag-surface-tertiary: oklch(27.21% 0.0000 0.00);
+  --ag-surface-tertiary-foreground: oklch(99.11% 0.0000 0.00);
+  --ag-bg-deep: oklch(12.00% 0.0000 0.00);
+  --ag-bg: oklch(12.00% 0.0000 0.00);
+  --ag-bg-elevated: oklch(21.03% 0.0000 0.00);
+  --ag-bg-surface: oklch(21.03% 0.0000 0.00);
+  --ag-bg-hover: oklch(25.70% 0.0000 0.00);
+  --ag-bg-active: oklch(27.21% 0.0000 0.00);
+  --ag-border: oklch(28.00% 0.0000 0.00);
+  --ag-border-subtle: oklch(25.00% 0.0000 0.00);
+  --ag-border-focus: oklch(0.9848 0 0);
+  --ag-text: oklch(99.11% 0.0000 0.00);
+  --ag-text-secondary: oklch(70.50% 0.0000 0.00);
+  --ag-text-tertiary: oklch(70.50% 0.0000 0.00);
+  --ag-text-inverse: oklch(15% 0.0000 0.00);
+  --ag-glass: color-mix(in oklab, oklch(21.03% 0.0000 0.00) 92%, transparent);
+  --ag-glass-border: oklch(28.00% 0.0000 0.00);
+  --ag-shadow-sm: 0 0 0 0 transparent inset;
+  --ag-shadow-md: 0 0 0 0 transparent inset;
+  --ag-shadow-lg: 0 0 1px 0 #ffffff4d inset;
+  --ag-shadow-glow: 0 0 0 1px color-mix(in oklab, oklch(0.9848 0 0) 18%, transparent);
+}
+
+:root[data-theme="light"] {
+  --ag-primary: oklch(0 0 0);
+  --ag-primary-foreground: oklch(99.11% 0 0);
+  --ag-primary-hover: color-mix(in oklab, oklch(0 0 0) 88%, oklch(99.11% 0 0) 12%);
+  --ag-primary-subtle: color-mix(in oklab, oklch(0 0 0) 10%, transparent);
+  --ag-primary-glow: color-mix(in oklab, oklch(0 0 0) 16%, transparent);
+  --ag-success: oklch(73.29% 0.1935 120.35);
+  --ag-success-foreground: oklch(21.03% 0.0059 120.35);
+  --ag-success-subtle: color-mix(in oklab, oklch(73.29% 0.1935 120.35) 15%, transparent);
+  --ag-warning: oklch(0.8446 0.1525 80.6);
+  --ag-warning-foreground: oklch(15% 0.0457 80.60);
+  --ag-warning-subtle: color-mix(in oklab, oklch(0.8446 0.1525 80.6) 15%, transparent);
+  --ag-danger: oklch(0.573 0.2249 21.97);
+  --ag-danger-foreground: oklch(98% 0.0200 21.97);
+  --ag-danger-subtle: color-mix(in oklab, oklch(0.573 0.2249 21.97) 15%, transparent);
+  --ag-info: oklch(0 0 0);
+  --ag-info-subtle: color-mix(in oklab, oklch(0 0 0) 10%, transparent);
+  --ag-default-bg: oklch(94.00% 0.0000 0.00);
+  --ag-default-foreground: oklch(21.03% 0.0059 0.00);
+  --ag-field-background: oklch(100.00% 0.0000 0.00);
+  --ag-field-foreground: oklch(21.03% 0.0000 0.00);
+  --ag-field-placeholder: oklch(55.17% 0.0000 0.00);
+  --ag-muted: oklch(55.17% 0.0000 0.00);
+  --ag-overlay: oklch(100.00% 0.0000 0.00);
+  --ag-overlay-foreground: oklch(21.03% 0.0000 0.00);
+  --ag-scrollbar: oklch(87.10% 0.0000 0.00);
+  --ag-segment: oklch(100.00% 0.0000 0.00);
+  --ag-segment-foreground: oklch(21.03% 0.0000 0.00);
+  --ag-surface: oklch(100.00% 0.0000 0.00);
+  --ag-surface-foreground: oklch(21.03% 0.0000 0.00);
+  --ag-surface-secondary: oklch(95.24% 0.0000 0.00);
+  --ag-surface-secondary-foreground: oklch(21.03% 0.0000 0.00);
+  --ag-surface-tertiary: oklch(93.73% 0.0000 0.00);
+  --ag-surface-tertiary-foreground: oklch(21.03% 0.0000 0.00);
+  --ag-bg-deep: oklch(97.02% 0.0000 0.00);
+  --ag-bg: oklch(97.02% 0.0000 0.00);
+  --ag-bg-elevated: oklch(100.00% 0.0000 0.00);
+  --ag-bg-surface: oklch(100.00% 0.0000 0.00);
+  --ag-bg-hover: oklch(95.24% 0.0000 0.00);
+  --ag-bg-active: oklch(93.73% 0.0000 0.00);
+  --ag-border: oklch(90.00% 0.0000 0.00);
+  --ag-border-subtle: oklch(92.00% 0.0000 0.00);
+  --ag-border-focus: oklch(0 0 0);
+  --ag-text: oklch(21.03% 0.0000 0.00);
+  --ag-text-secondary: oklch(55.17% 0.0000 0.00);
+  --ag-text-tertiary: oklch(55.17% 0.0000 0.00);
+  --ag-text-inverse: oklch(99.11% 0 0);
+  --ag-glass: color-mix(in oklab, oklch(100.00% 0.0000 0.00) 92%, transparent);
+  --ag-glass-border: oklch(90.00% 0.0000 0.00);
+  --ag-shadow-sm: 0 2px 4px 0 #0000000a, 0 1px 2px 0 #0000000f, 0 0 1px 0 #0000000f;
+  --ag-shadow-md: 0 2px 4px 0 #0000000a, 0 1px 2px 0 #0000000f, 0 0 1px 0 #0000000f;
+  --ag-shadow-lg: 0 2px 8px 0 #0000000f, 0 -6px 12px 0 #00000008, 0 14px 28px 0 #00000014;
+  --ag-shadow-glow: 0 0 0 1px color-mix(in oklab, oklch(0 0 0) 12%, transparent);
+}
