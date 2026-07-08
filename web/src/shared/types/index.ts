@@ -65,7 +65,6 @@ export interface UserResp {
   max_concurrency: number;
 
   group_rates?: Record<number, number>;
-  group_plugin_settings?: Record<number, Record<string, Record<string, string>>>;
   allowed_group_ids?: number[];
   balance_alert_threshold: number;
   status: string;
@@ -75,7 +74,6 @@ export interface UserResp {
   api_key_used_quota?: number;
   api_key_expires_at?: string;
   api_key_rate?: number;
-  api_key_platform?: string;
   created_at: string;
   updated_at: string;
 }
@@ -96,7 +94,6 @@ export interface CreateUserReq {
   role: UserRole;
   max_concurrency?: number;
   group_rates?: Record<number, number>;
-  group_plugin_settings?: Record<number, Record<string, Record<string, string>>>;
 }
 
 export interface UpdateUserReq {
@@ -105,7 +102,6 @@ export interface UpdateUserReq {
   role?: UserRole;
   max_concurrency?: number;
   group_rates?: Record<number, number>;
-  group_plugin_settings?: Record<number, Record<string, Record<string, string>>>;
   allowed_group_ids?: number[];
   status?: 'active' | 'disabled';
 }
@@ -126,94 +122,9 @@ export interface BalanceLogResp {
   created_at: string;
 }
 
-// ==================== Account ====================
+// ==================== 批量操作（通用） ====================
 
-/** 账号状态枚举（与后端 scheduler 状态机对应）。 */
-export type AccountState = 'active' | 'rate_limited' | 'degraded' | 'disabled';
-
-/**
- * 家族级限流冷却（Redis 侧）。account.state 仍可能是 active，
- * 但该家族在 until 之前会被调度器跳过；其它家族不受影响。
- */
-export interface FamilyCooldownDTO {
-  family: string;
-  /** RFC3339 UTC */
-  until: string;
-  reason?: string;
-}
-
-export interface AccountResp {
-  id: number;
-  name: string;
-  platform: string;
-  type: string;
-  credentials: Record<string, string>;
-  state: AccountState;
-  /** 当前 state 的到期时间（rate_limited / degraded 有值；active / disabled 为空）。 */
-  state_until?: string;
-  priority: number;
-  max_concurrency: number;
-  current_concurrency: number;
-  proxy_id?: number;
-  rate_multiplier: number;
-  error_msg?: string;
-  upstream_is_pool: boolean;
-  extra?: Record<string, unknown>;
-  last_used_at?: string;
-  group_ids: number[];
-  /** 当前在 Redis 上仍生效的家族级限流冷却列表；后端 omitempty，没有冷却时缺省。 */
-  family_cooldowns?: FamilyCooldownDTO[];
-  /**
-   * 仅 OpenAI 平台账号在列表接口下填充：今日 / 累计生图请求数（model 名前缀 "gpt-image"）。
-   * 0 也会显式给出（`{today: 0, total: 0}`）；非 OpenAI 平台字段缺省。
-   */
-  today_image_count?: number;
-  total_image_count?: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateAccountReq {
-  name: string;
-  platform: string;
-  type?: string;
-  credentials: Record<string, string>;
-  priority?: number;
-  max_concurrency?: number;
-  proxy_id?: number;
-  rate_multiplier?: number;
-  upstream_is_pool?: boolean;
-  extra?: Record<string, unknown>;
-  group_ids?: number[];
-}
-
-export interface UpdateAccountReq {
-  name?: string;
-  type?: string;
-  credentials?: Record<string, string>;
-  /** 仅允许 "active" / "disabled"：运维手动恢复 / 禁用。 */
-  state?: 'active' | 'disabled';
-  priority?: number;
-  max_concurrency?: number;
-  proxy_id?: number | null;
-  rate_multiplier?: number;
-  upstream_is_pool?: boolean;
-  extra?: Record<string, unknown>;
-  group_ids?: number[];
-}
-
-// 批量更新账号请求（只传需要修改的字段，缺失 = 不改）
-export interface BulkUpdateAccountsReq {
-  account_ids: number[];
-  state?: 'active' | 'disabled';
-  priority?: number;
-  max_concurrency?: number;
-  rate_multiplier?: number;
-  group_ids?: number[];
-  proxy_id?: number;
-}
-
-// 批量操作单条结果
+// 批量操作单条结果（渠道等资源的批量接口通用结构）
 export interface BulkOpResultItem {
   id: number;
   success: boolean;
@@ -229,79 +140,21 @@ export interface BulkOpResp {
   results: BulkOpResultItem[];
 }
 
-// 导出文件中的单条账号（精简字段，可被 import 还原）
-export interface AccountExportItem {
-  name: string;
-  platform: string;
-  type?: string;
-  credentials: Record<string, string>;
-  priority: number;
-  max_concurrency: number;
-  rate_multiplier: number;
-  group_ids?: number[];
-  proxy_id?: number;
-  extra?: Record<string, unknown>;
-}
-
-// 导出文件结构
-export interface AccountExportFile {
-  version: number;
-  exported_at: string;
-  count: number;
-  accounts: AccountExportItem[];
-}
-
-// 导入响应
-export interface ImportAccountsResp {
-  imported: number;
-  failed: number;
-  errors?: { index: number; name: string; message: string }[];
-}
-
-export interface CredentialField {
-  key: string;
-  label: string;
-  type: 'text' | 'password' | 'textarea' | 'select';
-  required: boolean;
-  placeholder: string;
-  edit_disabled?: boolean;
-}
-
-export interface AccountTypeResp {
-  key: string;
-  label: string;
-  description: string;
-  fields: CredentialField[];
-}
-
-export interface CredentialSchemaResp {
-  fields: CredentialField[];
-  account_types?: AccountTypeResp[];
-}
-
 // ==================== Group ====================
 
 export interface GroupResp {
   id: number;
   name: string;
-  platform: string;
+  /** 历史字段：渠道化改造后为可空，新建分组不再填写。 */
+  platform?: string;
   rate_multiplier: number;
   is_exclusive: boolean;
   status_visible: boolean;
   subscription_type: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
-  model_routing?: Record<string, number[]>;
-  plugin_settings?: Record<string, Record<string, string>>;
-  service_tier?: 'fast' | 'flex';
   force_instructions?: string;
   note?: string;
   sort_weight: number;
-  account_active: number;
-  account_error: number;
-  account_disabled: number;
-  account_total: number;
-  capacity_used: number;
-  capacity_total: number;
   today_cost: number;
   total_cost: number;
   created_at: string;
@@ -310,19 +163,14 @@ export interface GroupResp {
 
 export interface CreateGroupReq {
   name: string;
-  platform: string;
   rate_multiplier?: number;
   is_exclusive?: boolean;
   status_visible?: boolean;
   subscription_type: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
-  model_routing?: Record<string, number[]>;
-  plugin_settings?: Record<string, Record<string, string>>;
-  service_tier?: 'fast' | 'flex';
   force_instructions?: string;
   note?: string;
   sort_weight?: number;
-  copy_accounts_from_group_ids?: number[];
 }
 
 export interface GroupRateOverrideResp {
@@ -330,7 +178,6 @@ export interface GroupRateOverrideResp {
   email: string;
   username: string;
   rate: number;
-  plugin_settings?: Record<string, Record<string, string>>;
 }
 
 export interface UpdateGroupReq {
@@ -340,9 +187,6 @@ export interface UpdateGroupReq {
   status_visible?: boolean;
   subscription_type?: 'standard' | 'subscription';
   quotas?: Record<string, unknown>;
-  model_routing?: Record<string, number[]>;
-  plugin_settings?: Record<string, Record<string, string>>;
-  service_tier?: 'fast' | 'flex';
   force_instructions?: string;
   note?: string;
   sort_weight?: number;
@@ -476,9 +320,8 @@ export interface UsageLogResp {
   api_key_name?: string;
   api_key_hint?: string;
   api_key_deleted: boolean;
-  account_id: number;
-  account_name?: string;
-  account_email?: string;
+  channel_id: number;
+  channel_name?: string;
   group_id: number;
   platform: string;
   model: string;
@@ -506,12 +349,12 @@ export interface UsageLogResp {
   actual_cost: number;
   /** 客户账面消耗（含 sell_rate markup）；reseller 计算 actual_cost 与之差额即利润 */
   billed_cost: number;
-  /** 账号实际成本 = total × account_rate；用于"账号计费"统计 */
+  /** 渠道成本（JSON 键沿用 account_cost）= total × channel.cost_ratio */
   account_cost: number;
   rate_multiplier: number;
   /** 快照：本次请求生效的 sell_rate；0 表示该 key 当时未启用 markup */
   sell_rate: number;
-  /** 快照：本次请求生效的 account_rate */
+  /** 快照：本次请求生效的渠道成本倍率（JSON 键沿用 account_rate_multiplier） */
   account_rate_multiplier: number;
   service_tier?: string;
   /** 图像生成实际出图尺寸（"WxH"），非图像请求不返。admin 后台显示在模型名下方做计费分档解释。 */
@@ -574,7 +417,7 @@ export interface CustomerUsageLogResp {
 export interface UsageQuery extends PageReq {
   user_id?: number;
   api_key_id?: number;
-  account_id?: number;
+  channel_id?: number;
   group_id?: number;
   platform?: string;
   model?: string;
@@ -591,7 +434,7 @@ export interface UsageStatsResp {
   total_billed_cost?: number;
   by_model?: ModelStats[];
   by_user?: UserStats[];
-  by_account?: AccountStats[];
+  by_channel?: ChannelStats[];
   by_group?: GroupStats[];
 }
 
@@ -614,8 +457,8 @@ export interface UserStats {
   billed_cost?: number;
 }
 
-export interface AccountStats {
-  account_id: number;
+export interface ChannelStats {
+  channel_id: number;
   name: string;
   requests: number;
   tokens: number;
@@ -688,53 +531,176 @@ export interface TestProxyResp {
   city?: string;
 }
 
-// ==================== Plugin ====================
+// ==================== Channel ====================
 
-export interface PluginResp {
+/** 渠道协议类型 */
+export type ChannelType = 'openai_compatible' | 'anthropic' | 'gemini' | 'custom';
+
+/** 渠道状态：enabled 启用（status_until 未过期时为冷却中）/ disabled_manual 手动禁用 / disabled_auto 自动禁用 */
+export type ChannelStatus = 'enabled' | 'disabled_manual' | 'disabled_auto';
+
+// 渠道响应 —— 与后端 dto.ChannelResp 对应。api_keys 明文永不出现在任何响应，
+// 仅回 api_keys_count 与 api_key_hints（尾 4 位提示）。
+export interface ChannelResp {
+  id: number;
   name: string;
-  display_name?: string;
-  version?: string;
-  author?: string;
-  type?: string;
-  platform: string;
-  account_types?: Array<{
-    key: string;
-    label: string;
-    description?: string;
-  }>;
-  frontend_pages?: Array<{
-    path: string;
-    title: string;
-    icon?: string;
-    description?: string;
-    /** "admin" | "user" | "all"，空字符串视为 "admin"（向后兼容） */
-    audience?: string;
-  }>;
-  config_schema?: Array<{
-    key: string;
-    label?: string;
-    type: string;
-    required?: boolean;
-    default?: string;
-    description?: string;
-    placeholder?: string;
-  }>;
-  metadata?: Record<string, string>;
-  instruction_presets?: string[];
-  has_web_assets?: boolean;
-  is_dev?: boolean;
+  type: ChannelType;
+  base_url: string;
+  api_keys_count: number;
+  api_key_hints: string[];
+  models: string[];
+  model_mapping: Record<string, string> | null;
+  param_override: Record<string, unknown> | null;
+  header_override: Record<string, string> | null;
+  status: ChannelStatus;
+  /** 冷却截止时间；缺省表示无冷却 */
+  status_until?: string;
+  error_msg: string;
+  priority: number;
+  weight: number;
+  max_concurrency: number;
+  max_rpm: number;
+  cost_ratio: number;
+  tags: string[];
+  test_model: string;
+  custom_config: Record<string, unknown> | null;
+  response_time_ms: number;
+  tested_at?: string;
+  last_used_at?: string;
+  group_ids: number[];
+  proxy_id?: number;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface MarketplacePluginResp {
+export interface CreateChannelReq {
   name: string;
-  version: string;
-  description: string;
-  author: string;
-  type: string;
-  github_repo?: string;
-  installed: boolean;
-  installed_version?: string;
-  has_update?: boolean;
+  type: ChannelType;
+  base_url: string;
+  api_keys: string[];
+  models: string[];
+  model_mapping?: Record<string, string>;
+  param_override?: Record<string, unknown>;
+  header_override?: Record<string, string>;
+  status?: 'enabled' | 'disabled_manual';
+  priority?: number;
+  weight?: number;
+  max_concurrency?: number;
+  max_rpm?: number;
+  cost_ratio?: number;
+  tags?: string[];
+  test_model?: string;
+  custom_config?: Record<string, unknown>;
+  group_ids?: number[];
+  proxy_id?: number;
+}
+
+// 更新渠道请求（partial）：字段缺省 = 不改；api_keys/models 提供非空数组 = 整组替换，
+// 留空 = 不改；映射/覆写/标签/分组提供（含空集合）= 整组替换；proxy_id 传 0 = 解绑代理。
+export interface UpdateChannelReq {
+  name?: string;
+  type?: ChannelType;
+  base_url?: string;
+  api_keys?: string[];
+  models?: string[];
+  model_mapping?: Record<string, string>;
+  param_override?: Record<string, unknown>;
+  header_override?: Record<string, string>;
+  status?: 'enabled' | 'disabled_manual';
+  priority?: number;
+  weight?: number;
+  max_concurrency?: number;
+  max_rpm?: number;
+  cost_ratio?: number;
+  tags?: string[];
+  test_model?: string;
+  custom_config?: Record<string, unknown>;
+  group_ids?: number[];
+  proxy_id?: number;
+}
+
+export interface TestChannelReq {
+  /** 缺省时后端取渠道 test_model 或首个模型 */
+  model?: string;
+}
+
+export interface TestChannelResp {
+  latency_ms: number;
+  message: string;
+}
+
+export interface FetchChannelModelsResp {
+  models: string[];
+}
+
+export type BulkChannelAction = 'enable' | 'disable' | 'delete' | 'set_priority';
+
+export interface BulkUpdateChannelsReq {
+  ids: number[];
+  action: BulkChannelAction;
+  priority?: number;
+}
+
+export interface BulkUpdateChannelsResp {
+  affected: number;
+}
+
+export interface ChannelListQuery extends PageReq {
+  type?: string;
+  status?: string;
+  tag?: string;
+  group_id?: number;
+}
+
+// ==================== ModelPrice ====================
+
+// 模型价格响应 —— 价格单位 USD / 1M tokens；per_request_price 为 USD / 次。
+export interface ModelPriceResp {
+  id: number;
+  model: string;
+  input_price: number;
+  output_price: number;
+  cached_input_price: number;
+  cache_creation_price: number;
+  per_request_price: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateModelPriceReq {
+  model: string;
+  input_price?: number;
+  output_price?: number;
+  cached_input_price?: number;
+  cache_creation_price?: number;
+  per_request_price?: number;
+}
+
+export interface UpdateModelPriceReq {
+  model?: string;
+  input_price?: number;
+  output_price?: number;
+  cached_input_price?: number;
+  cache_creation_price?: number;
+  per_request_price?: number;
+}
+
+export interface ImportModelPriceItem {
+  model: string;
+  input_price?: number;
+  output_price?: number;
+  cached_input_price?: number;
+  cache_creation_price?: number;
+  per_request_price?: number;
+}
+
+export interface ImportModelPricesReq {
+  items: ImportModelPriceItem[];
+}
+
+export interface ImportModelPricesResp {
+  created: number;
+  updated: number;
 }
 
 // ==================== Settings ====================
@@ -770,9 +736,9 @@ export interface TestSMTPReq {
 export interface DashboardStatsResp {
   total_api_keys: number;
   enabled_api_keys: number;
-  total_accounts: number;
-  enabled_accounts: number;
-  error_accounts: number;
+  total_channels: number;
+  enabled_channels: number;
+  disabled_channels: number;
   today_requests: number;
   today_image_requests: number;
   alltime_requests: number;

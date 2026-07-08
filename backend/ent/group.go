@@ -34,8 +34,6 @@ type Group struct {
 	Quotas map[string]interface{} `json:"quotas,omitempty"`
 	// ModelRouting holds the value of the "model_routing" field.
 	ModelRouting map[string][]int64 `json:"model_routing,omitempty"`
-	// PluginSettings holds the value of the "plugin_settings" field.
-	PluginSettings map[string]map[string]string `json:"plugin_settings,omitempty"`
 	// ServiceTier holds the value of the "service_tier" field.
 	ServiceTier string `json:"service_tier,omitempty"`
 	// ForceInstructions holds the value of the "force_instructions" field.
@@ -56,8 +54,8 @@ type Group struct {
 
 // GroupEdges holds the relations/edges for other nodes in the graph.
 type GroupEdges struct {
-	// Accounts holds the value of the accounts edge.
-	Accounts []*Account `json:"accounts,omitempty"`
+	// Channels holds the value of the channels edge.
+	Channels []*Channel `json:"channels,omitempty"`
 	// AllowedUsers holds the value of the allowed_users edge.
 	AllowedUsers []*User `json:"allowed_users,omitempty"`
 	// APIKeys holds the value of the api_keys edge.
@@ -71,13 +69,13 @@ type GroupEdges struct {
 	loadedTypes [5]bool
 }
 
-// AccountsOrErr returns the Accounts value or an error if the edge
+// ChannelsOrErr returns the Channels value or an error if the edge
 // was not loaded in eager-loading.
-func (e GroupEdges) AccountsOrErr() ([]*Account, error) {
+func (e GroupEdges) ChannelsOrErr() ([]*Channel, error) {
 	if e.loadedTypes[0] {
-		return e.Accounts, nil
+		return e.Channels, nil
 	}
-	return nil, &NotLoadedError{edge: "accounts"}
+	return nil, &NotLoadedError{edge: "channels"}
 }
 
 // AllowedUsersOrErr returns the AllowedUsers value or an error if the edge
@@ -121,7 +119,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case group.FieldQuotas, group.FieldModelRouting, group.FieldPluginSettings:
+		case group.FieldQuotas, group.FieldModelRouting:
 			values[i] = new([]byte)
 		case group.FieldIsExclusive, group.FieldStatusVisible:
 			values[i] = new(sql.NullBool)
@@ -206,14 +204,6 @@ func (gr *Group) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field model_routing: %w", err)
 				}
 			}
-		case group.FieldPluginSettings:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field plugin_settings", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &gr.PluginSettings); err != nil {
-					return fmt.Errorf("unmarshal field plugin_settings: %w", err)
-				}
-			}
 		case group.FieldServiceTier:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field service_tier", values[i])
@@ -263,9 +253,9 @@ func (gr *Group) Value(name string) (ent.Value, error) {
 	return gr.selectValues.Get(name)
 }
 
-// QueryAccounts queries the "accounts" edge of the Group entity.
-func (gr *Group) QueryAccounts() *AccountQuery {
-	return NewGroupClient(gr.config).QueryAccounts(gr)
+// QueryChannels queries the "channels" edge of the Group entity.
+func (gr *Group) QueryChannels() *ChannelQuery {
+	return NewGroupClient(gr.config).QueryChannels(gr)
 }
 
 // QueryAllowedUsers queries the "allowed_users" edge of the Group entity.
@@ -334,9 +324,6 @@ func (gr *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("model_routing=")
 	builder.WriteString(fmt.Sprintf("%v", gr.ModelRouting))
-	builder.WriteString(", ")
-	builder.WriteString("plugin_settings=")
-	builder.WriteString(fmt.Sprintf("%v", gr.PluginSettings))
 	builder.WriteString(", ")
 	builder.WriteString("service_tier=")
 	builder.WriteString(gr.ServiceTier)

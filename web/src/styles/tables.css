@@ -3,7 +3,6 @@
    ========================================================================== */
 
 @import "./tables/base.css";
-@import "./tables/accounts.css";
 @import "./tables/groups.css";
 @import "./tables/usage.css";
 @import "./tables/pagination.css";

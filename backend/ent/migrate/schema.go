@@ -61,47 +61,6 @@ var (
 			},
 		},
 	}
-	// AccountsColumns holds the columns for the "accounts" table.
-	AccountsColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "name", Type: field.TypeString},
-		{Name: "platform", Type: field.TypeString},
-		{Name: "type", Type: field.TypeString, Nullable: true, Default: ""},
-		{Name: "credentials", Type: field.TypeJSON},
-		{Name: "state", Type: field.TypeEnum, Enums: []string{"active", "rate_limited", "degraded", "disabled"}, Default: "active"},
-		{Name: "state_until", Type: field.TypeTime, Nullable: true},
-		{Name: "priority", Type: field.TypeInt, Default: 50},
-		{Name: "max_concurrency", Type: field.TypeInt, Default: 10},
-		{Name: "rate_multiplier", Type: field.TypeFloat64, Default: 1},
-		{Name: "error_msg", Type: field.TypeString, Default: ""},
-		{Name: "upstream_is_pool", Type: field.TypeBool, Default: false},
-		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
-		{Name: "extra", Type: field.TypeJSON, Nullable: true},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "account_proxy", Type: field.TypeInt, Nullable: true},
-	}
-	// AccountsTable holds the schema information for the "accounts" table.
-	AccountsTable = &schema.Table{
-		Name:       "accounts",
-		Columns:    AccountsColumns,
-		PrimaryKey: []*schema.Column{AccountsColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "accounts_proxies_proxy",
-				Columns:    []*schema.Column{AccountsColumns[16]},
-				RefColumns: []*schema.Column{ProxiesColumns[0]},
-				OnDelete:   schema.SetNull,
-			},
-		},
-		Indexes: []*schema.Index{
-			{
-				Name:    "account_platform_state",
-				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[2], AccountsColumns[5]},
-			},
-		},
-	}
 	// BalanceLogsColumns holds the columns for the "balance_logs" table.
 	BalanceLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -142,18 +101,67 @@ var (
 			},
 		},
 	}
+	// ChannelsColumns holds the columns for the "channels" table.
+	ChannelsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"openai_compatible", "anthropic", "gemini", "custom"}},
+		{Name: "base_url", Type: field.TypeString},
+		{Name: "api_keys", Type: field.TypeJSON},
+		{Name: "models", Type: field.TypeJSON},
+		{Name: "model_mapping", Type: field.TypeJSON, Nullable: true},
+		{Name: "param_override", Type: field.TypeJSON, Nullable: true},
+		{Name: "header_override", Type: field.TypeJSON, Nullable: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"enabled", "disabled_manual", "disabled_auto"}, Default: "enabled"},
+		{Name: "status_until", Type: field.TypeTime, Nullable: true},
+		{Name: "error_msg", Type: field.TypeString, Default: ""},
+		{Name: "priority", Type: field.TypeInt, Default: 50},
+		{Name: "weight", Type: field.TypeInt, Default: 10},
+		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
+		{Name: "max_rpm", Type: field.TypeInt, Default: 0},
+		{Name: "cost_ratio", Type: field.TypeFloat64, Default: 1},
+		{Name: "tags", Type: field.TypeJSON, Nullable: true},
+		{Name: "test_model", Type: field.TypeString, Default: ""},
+		{Name: "custom_config", Type: field.TypeJSON, Nullable: true},
+		{Name: "response_time_ms", Type: field.TypeInt, Default: 0},
+		{Name: "tested_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "channel_proxy", Type: field.TypeInt, Nullable: true},
+	}
+	// ChannelsTable holds the schema information for the "channels" table.
+	ChannelsTable = &schema.Table{
+		Name:       "channels",
+		Columns:    ChannelsColumns,
+		PrimaryKey: []*schema.Column{ChannelsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "channels_proxies_proxy",
+				Columns:    []*schema.Column{ChannelsColumns[25]},
+				RefColumns: []*schema.Column{ProxiesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "channel_type_status",
+				Unique:  false,
+				Columns: []*schema.Column{ChannelsColumns[2], ChannelsColumns[9]},
+			},
+		},
+	}
 	// GroupsColumns holds the columns for the "groups" table.
 	GroupsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "name", Type: field.TypeString},
-		{Name: "platform", Type: field.TypeString},
+		{Name: "platform", Type: field.TypeString, Default: ""},
 		{Name: "rate_multiplier", Type: field.TypeFloat64, Default: 1},
 		{Name: "is_exclusive", Type: field.TypeBool, Default: false},
 		{Name: "status_visible", Type: field.TypeBool, Default: true},
 		{Name: "subscription_type", Type: field.TypeEnum, Enums: []string{"standard", "subscription"}, Default: "standard"},
 		{Name: "quotas", Type: field.TypeJSON, Nullable: true},
 		{Name: "model_routing", Type: field.TypeJSON, Nullable: true},
-		{Name: "plugin_settings", Type: field.TypeJSON, Nullable: true},
 		{Name: "service_tier", Type: field.TypeString, Default: ""},
 		{Name: "force_instructions", Type: field.TypeString, Default: ""},
 		{Name: "note", Type: field.TypeString, Default: ""},
@@ -167,40 +175,23 @@ var (
 		Columns:    GroupsColumns,
 		PrimaryKey: []*schema.Column{GroupsColumns[0]},
 	}
-	// PluginsColumns holds the columns for the "plugins" table.
-	PluginsColumns = []*schema.Column{
+	// ModelPricesColumns holds the columns for the "model_prices" table.
+	ModelPricesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "name", Type: field.TypeString, Unique: true},
-		{Name: "platform", Type: field.TypeString, Default: ""},
-		{Name: "version", Type: field.TypeString, Default: ""},
-		{Name: "type", Type: field.TypeEnum, Enums: []string{"gateway", "payment", "extension"}, Default: "gateway"},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"installed", "enabled", "disabled"}, Default: "installed"},
-		{Name: "config", Type: field.TypeJSON, Nullable: true},
-		{Name: "binary_path", Type: field.TypeString, Default: ""},
+		{Name: "model", Type: field.TypeString, Unique: true},
+		{Name: "input_price", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "output_price", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "cached_input_price", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "cache_creation_price", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "per_request_price", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 	}
-	// PluginsTable holds the schema information for the "plugins" table.
-	PluginsTable = &schema.Table{
-		Name:       "plugins",
-		Columns:    PluginsColumns,
-		PrimaryKey: []*schema.Column{PluginsColumns[0]},
-	}
-	// PluginSourcesColumns holds the columns for the "plugin_sources" table.
-	PluginSourcesColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "name", Type: field.TypeString, Unique: true},
-		{Name: "url", Type: field.TypeString},
-		{Name: "is_official", Type: field.TypeBool, Default: false},
-		{Name: "last_sync_at", Type: field.TypeTime, Nullable: true},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-	}
-	// PluginSourcesTable holds the schema information for the "plugin_sources" table.
-	PluginSourcesTable = &schema.Table{
-		Name:       "plugin_sources",
-		Columns:    PluginSourcesColumns,
-		PrimaryKey: []*schema.Column{PluginSourcesColumns[0]},
+	// ModelPricesTable holds the schema information for the "model_prices" table.
+	ModelPricesTable = &schema.Table{
+		Name:       "model_prices",
+		Columns:    ModelPricesColumns,
+		PrimaryKey: []*schema.Column{ModelPricesColumns[0]},
 	}
 	// ProxiesColumns holds the columns for the "proxies" table.
 	ProxiesColumns = []*schema.Column{
@@ -344,7 +335,7 @@ var (
 		{Name: "user_email_snapshot", Type: field.TypeString, Default: ""},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "api_key_usage_logs", Type: field.TypeInt, Nullable: true},
-		{Name: "account_usage_logs", Type: field.TypeInt, Nullable: true},
+		{Name: "channel_usage_logs", Type: field.TypeInt, Nullable: true},
 		{Name: "group_usage_logs", Type: field.TypeInt, Nullable: true},
 		{Name: "user_usage_logs", Type: field.TypeInt, Nullable: true},
 	}
@@ -361,9 +352,9 @@ var (
 				OnDelete:   schema.SetNull,
 			},
 			{
-				Symbol:     "usage_logs_accounts_usage_logs",
+				Symbol:     "usage_logs_channels_usage_logs",
 				Columns:    []*schema.Column{UsageLogsColumns[44]},
-				RefColumns: []*schema.Column{AccountsColumns[0]},
+				RefColumns: []*schema.Column{ChannelsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
@@ -411,7 +402,7 @@ var (
 				Columns: []*schema.Column{UsageLogsColumns[43]},
 			},
 			{
-				Name:    "usage_log_account",
+				Name:    "usage_log_channel",
 				Unique:  false,
 				Columns: []*schema.Column{UsageLogsColumns[44]},
 			},
@@ -433,7 +424,6 @@ var (
 		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
 		{Name: "totp_secret", Type: field.TypeString, Nullable: true},
 		{Name: "group_rates", Type: field.TypeJSON, Nullable: true},
-		{Name: "group_plugin_settings", Type: field.TypeJSON, Nullable: true},
 		{Name: "balance_alert_threshold", Type: field.TypeFloat64, Default: 0},
 		{Name: "balance_alert_notified", Type: field.TypeBool, Default: false},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "disabled"}, Default: "active"},
@@ -485,26 +475,26 @@ var (
 			},
 		},
 	}
-	// AccountGroupsColumns holds the columns for the "account_groups" table.
-	AccountGroupsColumns = []*schema.Column{
-		{Name: "account_id", Type: field.TypeInt},
+	// ChannelGroupsColumns holds the columns for the "channel_groups" table.
+	ChannelGroupsColumns = []*schema.Column{
+		{Name: "channel_id", Type: field.TypeInt},
 		{Name: "group_id", Type: field.TypeInt},
 	}
-	// AccountGroupsTable holds the schema information for the "account_groups" table.
-	AccountGroupsTable = &schema.Table{
-		Name:       "account_groups",
-		Columns:    AccountGroupsColumns,
-		PrimaryKey: []*schema.Column{AccountGroupsColumns[0], AccountGroupsColumns[1]},
+	// ChannelGroupsTable holds the schema information for the "channel_groups" table.
+	ChannelGroupsTable = &schema.Table{
+		Name:       "channel_groups",
+		Columns:    ChannelGroupsColumns,
+		PrimaryKey: []*schema.Column{ChannelGroupsColumns[0], ChannelGroupsColumns[1]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "account_groups_account_id",
-				Columns:    []*schema.Column{AccountGroupsColumns[0]},
-				RefColumns: []*schema.Column{AccountsColumns[0]},
+				Symbol:     "channel_groups_channel_id",
+				Columns:    []*schema.Column{ChannelGroupsColumns[0]},
+				RefColumns: []*schema.Column{ChannelsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
 			{
-				Symbol:     "account_groups_group_id",
-				Columns:    []*schema.Column{AccountGroupsColumns[1]},
+				Symbol:     "channel_groups_group_id",
+				Columns:    []*schema.Column{ChannelGroupsColumns[1]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -538,18 +528,17 @@ var (
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		APIKeysTable,
-		AccountsTable,
 		BalanceLogsTable,
+		ChannelsTable,
 		GroupsTable,
-		PluginsTable,
-		PluginSourcesTable,
+		ModelPricesTable,
 		ProxiesTable,
 		SettingsTable,
 		TasksTable,
 		UsageLogsTable,
 		UsersTable,
 		UserSubscriptionsTable,
-		AccountGroupsTable,
+		ChannelGroupsTable,
 		UserAllowedGroupsTable,
 	}
 )
@@ -557,16 +546,16 @@ var (
 func init() {
 	APIKeysTable.ForeignKeys[0].RefTable = GroupsTable
 	APIKeysTable.ForeignKeys[1].RefTable = UsersTable
-	AccountsTable.ForeignKeys[0].RefTable = ProxiesTable
 	BalanceLogsTable.ForeignKeys[0].RefTable = UsersTable
+	ChannelsTable.ForeignKeys[0].RefTable = ProxiesTable
 	UsageLogsTable.ForeignKeys[0].RefTable = APIKeysTable
-	UsageLogsTable.ForeignKeys[1].RefTable = AccountsTable
+	UsageLogsTable.ForeignKeys[1].RefTable = ChannelsTable
 	UsageLogsTable.ForeignKeys[2].RefTable = GroupsTable
 	UsageLogsTable.ForeignKeys[3].RefTable = UsersTable
 	UserSubscriptionsTable.ForeignKeys[0].RefTable = GroupsTable
 	UserSubscriptionsTable.ForeignKeys[1].RefTable = UsersTable
-	AccountGroupsTable.ForeignKeys[0].RefTable = AccountsTable
-	AccountGroupsTable.ForeignKeys[1].RefTable = GroupsTable
+	ChannelGroupsTable.ForeignKeys[0].RefTable = ChannelsTable
+	ChannelGroupsTable.ForeignKeys[1].RefTable = GroupsTable
 	UserAllowedGroupsTable.ForeignKeys[0].RefTable = UsersTable
 	UserAllowedGroupsTable.ForeignKeys[1].RefTable = GroupsTable
 }

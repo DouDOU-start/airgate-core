@@ -64,7 +64,7 @@ export function AssignModal({
   })), [users]);
   const groupOptions = useMemo(() => groups.map((group) => ({
     id: String(group.id),
-    label: `${group.name} (${group.platform})`,
+    label: group.name,
   })), [groups]);
   const selectedGroupLabel = groupOptions.find((item) => item.id === String(form.group_id))?.label;
   const filteredUserOptions = useMemo(() => {

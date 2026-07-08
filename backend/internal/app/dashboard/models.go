@@ -15,9 +15,9 @@ type Repository interface {
 type StatsSnapshot struct {
 	TotalAPIKeys            int64
 	EnabledAPIKeys          int64
-	TotalAccounts           int64
-	EnabledAccounts         int64
-	ErrorAccounts           int64
+	TotalChannels           int64
+	EnabledChannels         int64
+	DisabledChannels        int64
 	TotalUsers              int64
 	NewUsersToday           int64
 	TodayRequests           int64
@@ -43,9 +43,9 @@ type StatsSnapshot struct {
 type Stats struct {
 	TotalAPIKeys        int64
 	EnabledAPIKeys      int64
-	TotalAccounts       int64
-	EnabledAccounts     int64
-	ErrorAccounts       int64
+	TotalChannels       int64
+	EnabledChannels     int64
+	DisabledChannels    int64
 	TodayRequests       int64
 	TodayImageRequests  int64
 	AllTimeRequests     int64

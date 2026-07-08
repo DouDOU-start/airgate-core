@@ -1,67 +1,50 @@
-# airgate-core — Claude 开发指南
+# airgate-core — Claude 开发指南（standalone-gateway 分支）
 
-> 叠加于根 `../CLAUDE.md`。开发前先读「生态边界」「🚫 红线」。
-> 分层落点、错误映射、鉴权、编码约定的**权威细则见 skill `core-dev`**（后端 `backend.md` / 前端 `frontend.md` / 转发·调度·计费 `forwarding.md` / 任务 `task.md` / 插件契约 `plugin-contract.md`）——本文件只保留边界与红线，不复制细则。
+> **本分支是独立单体网关架构**（new-api 式渠道管理），与 master 插件架构长期分叉、不合回。
+> 需求单一事实源：仓库根上层 `../standalone-gateway-plan.md`。
+> **根 `../CLAUDE.md` 的「插件边界」「Host.Invoke」「生态职责速查表」及 skill `core-dev` / `develop-plugin` 描述的是 master 插件线，对本分支一律不适用。**
 
-## 生态边界（动手前先归位）
+## 架构（本分支）
 
-全生态职责速查表见根 `../CLAUDE.md`「生态边界」，本节为 core 视角。
+无插件进程、无上游账号池。管理员配置**渠道**（channel = 协议类型 + base_url + api_keys + 模型列表），用户拿 sk- key 调统一 API，core 内置 adaptor 直发上游、按**模型价目表**计费。
 
-**Core 负责**：身份/用户、账号、API Key、分组与路由、账号调度、转发管线（鉴权/限流/failover）、计费、任务/资产、模型目录、插件生命周期、后台 UI 框架。
-
-**Core 不负责（出现即越界）**：
-
-| 不写什么 | 归谁 | core 的正确做法 |
-|---|---|---|
-| 外部协议格式（OpenAI/Anthropic 的请求/响应/SSE/错误体形态） | Gateway 插件 | 转发层只认 `ForwardOutcome`；对外错误格式按插件 `Metadata["error_format"]` 声明选择格式化器，未声明回退 OpenAI 兼容默认 |
-| 上游认证（OAuth/token/session/TLS 指纹） | Provider（现混于网关插件） | 凭证只加密存取、不解释；刷新经 `ForwardOutcome.UpdatedCredentials` 回写 |
-| 插件产品页面 | UI 插件 | core 仅提供挂载点（FrontendWidgets slot / FrontendPages）与资产服务 |
-
-**边界纪律（新增/改动代码必须遵守）**：
-
-1. **禁止新增 provider/模型字符串特判**。协议/平台差异一律经插件 Metadata 约定键声明，Core 只留与厂商无关的默认兜底。约定键登记于 skill `core-dev` 的 Metadata 约定表；**现存硬编码越界**（`scheduling_model.go` 的 claude/openai 翻译映射、`selector.go`/`billing/image_pricing.go`/`asset_cleanup.go` 的图像 provider 假定）已逐条登记 skill `core-dev`「技术债」，**勿加深**，越界判定标准见该节。
-2. **HostService 是插件调 core 的唯一通道**（`internal/plugin/host_service.go`，现 19 个 method），已登记"单通道过宽"债务。新增 method 前先确认属**跨插件的平台能力**，单插件业务勿入；新增后同步登记 skill `core-dev`。
-3. **core 禁止 import 插件包**，识别插件仅经 SDK 接口 + manifest；core 代码勿绑定具体插件名（`/status` 反代目标经 config `plugins.status_plugin` 指定即为此例）。
-4. 触碰技术债登记的热点时**勿加深**，治理按排期，无需顺手重构。
-5. 改动涉及转发/契约/计费/调度/任务，**同步更新 skill `core-dev`**（防漂移红线）。
-
-## 🚫 红线
-
-- **分层**：handler 不写业务逻辑；service 不碰 gin/http（不出现 `*gin.Context`/HTTP 状态码/`response.*`）；service 不直连 ent——经本包 `Repository` 接口，实现置于 `internal/infra/store/`。落点表与标准改动顺序见 skill `core-dev`「backend」。
-- **改 `ent/schema/` 后须 `make ent` 并提交生成代码**，否则 `make ci` 的 `verify-ent` 失败；生成代码（`ent/` 非 `schema/` 部分）不可手改。
-- **新接口走 dto + mapper**，handler 勿手拼 `map[string]any` 作响应（统计/SSE 等沿用同域写法除外）。
-- **上游账号失效用 422，禁止返回 401**——前端 401 全局拦截会登出当前管理员（见 `ErrReauthRequired`）。
-- **API Key 路由错误用 `abortWithOpenAIError()`**，不用 `response.*`。
-- **复用优先**：开发前先读同域现有实现（首选 `account` 全链路）。注释中文；`_test.go` 同包、表驱动。
-
-## 装配点（新增 handler/路由须两处接线）
-
-- `internal/bootstrap/http_handlers.go` — `NewHTTPHandlers` 内按 `store → service → handler` 构造，挂载至 `HTTPHandlers`。
-- `internal/server/router.go` — `registerRoutes()` 选对分组（`v1`/`userGroup`/`adminGroup`/`extGroup`）注册路由。
+```
+请求（/v1/chat/completions 等，middleware.APIKeyAuth 鉴权）
+  → internal/relay/pipeline：余额预检 → user/key 并发闸门 → failover≤3
+      { registry.Pick(分组,模型)（priority 分档 + weight+10 加权随机 + 多 key 轮询）
+        → adaptor 直发 HTTP → outcome 判定（429 冷却 / 401·关键词自动禁用 / 5xx 换渠道）}
+  → relay/pricing（token×价目表）→ billing.Calculate 三管道 → recorder → usage_log
+```
 
 ## 子系统边界
 
-- `internal/scheduler/` — 账号调度/并发/家族冷却/sticky 路由，瞬态状态在 Redis。
-- `internal/billing/` — 用量计费、费率、记账（`calculator`/`rate`/`recorder`）。
-- `internal/plugin/` — 插件生命周期、转发管线、HostService 宿主能力、任务执行、资产服务；core 调插件经此，反向仅经 `Host.Invoke`。
-- `internal/routing/` — 模型 → 账号选择。
-- 任务状态机见 skill `core-dev`「任务状态机」（`task.md`）。
+- `internal/relay/registry` — 渠道内存快照与调度（Pick/NextKey/Mark*）；禁止 import ent 与 app 包，经 Loader/Persister 接口（由 channel service 实现）取数落库。
+- `internal/relay/adaptor` — 协议适配（openai_compatible/anthropic/gemini/custom）；**只做协议翻译+发请求+解响应**，调度/重试/禁用/计费一律在 pipeline。
+- `internal/relay/pipeline` — 转发主循环、outcome 判定、SSE、错误体（OpenAI 形态，errfmt.go）、gateway settings 读取。
+- `internal/relay/pricing` — 价目表缓存 + token→cost 纯函数。
+- `internal/billing` — 三管道计费（actual=total×billing_rate 扣余额；billed=total×sell_rate 累加 key 用量；account_cost 列=total×channel.cost_ratio 渠道成本统计）与异步记账。
+- `internal/scheduler` — 仅剩 ConcurrencyManager/RPMCounter（Redis 限流原语，渠道/用户/key 维度）。
+- `internal/asset` — 运行时资产存储（自原插件包迁入）。
 
-## 前端（`web/`）
+## 🚫 红线（本分支仍然有效）
 
-React 19 + Vite + TanStack Query + Tailwind + `@doudou-start/airgate-theme`。三层落点（pages/shared/app）、数据流、路由守卫与懒加载约定见 skill `core-dev`「frontend」；新页面参照 `pages/admin` 现有页面。
+- **分层五件套**：dto（server/dto）→ handler（server/handler，不写业务）→ service（app/<domain>，不碰 gin/http、不 import ent，经本包 Repository 接口）→ store（infra/store，唯一 import ent）→ ent/schema。
+- **改 `ent/schema/` 后须 `make ent` 并提交生成代码**；生成代码不可手改。
+- **装配两处接线**：`internal/bootstrap/http_handlers.go`（store→service→handler）+ `internal/server/router.go` `registerRoutes()`。
+- **新接口走 dto + mapper**，handler 勿手拼 map 响应。
+- **/v1 转发路由错误一律走 relay 的 OpenAI 错误体**（errfmt），不用 `response.*`；管理面照旧 `response.*`。
+- **渠道 api_keys 明文永不出现在任何 API 响应**（只出 count + 尾 4 位 hint）；加解密用 `internal/auth`（AES-256-GCM），在 service 层做。
+- 复用优先（新领域参照 channel/proxy 全链路）；注释中文；`_test.go` 同包、表驱动。
+- 需求/架构变更**先改 `../standalone-gateway-plan.md` 再改代码**。
 
 ## 常用命令（`airgate-core/`）
 
 ```bash
-make dev            # 全量热重载（后端 air + 前端 vite + 插件 watch）
 make ent            # 改 ent/schema 后重新生成
-make ci             # 提交前完整自检（链路见 skill airgate-ci-check）
+make ci             # 提交前自检
+cd backend && go test ./internal/relay/... -v -count=1   # relay 子系统测试
 ```
 
-单包测试（`backend/`）：`go test ./internal/app/account/... -run TestXxx -v -count=1`
+## 前端（`web/`）
 
-## 相关 skill / 文档
-
-- core 全栈开发（后端/前端/子系统） → skill `core-dev`
-- 提交前自检 → skill `airgate-ci-check`
+React 19 + Vite + TanStack Query + Tailwind。三层落点 pages/shared/app；新页面参照 `pages/admin/ChannelsPage` 与 proxy/group 域范式；i18n 键 zh/en 同步。

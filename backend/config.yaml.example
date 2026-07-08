@@ -26,15 +26,7 @@ security:
                                  # 未配置时使用内置默认值；或设置环境变量 API_KEY_SECRET
 
 log:
-  level: "info"                  # debug / info / warn / error；core 设置会自动透传给所有插件
+  level: "info"                  # debug / info / warn / error
                                  # 或设置环境变量 LOG_LEVEL
   format: "text"                 # text（人看）/ json（对接 Loki / ELK / Datadog）
                                  # 或设置环境变量 LOG_FORMAT
-
-plugins:
-  dir: data/plugins
-  dev: []
-  # status_plugin: airgate-health   # 公开状态页 /status 反代的目标插件（默认 airgate-health）
-  # dev:
-  #   - name: airgate-openai
-  #     path: ../../airgate-openai/backend

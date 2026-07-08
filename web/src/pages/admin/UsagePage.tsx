@@ -1,12 +1,11 @@
 import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Card, ComboBox, Input, ListBox, Select, Tabs } from '@heroui/react';
+import { Card, ComboBox, Input, ListBox, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { usePagination } from '../../shared/hooks/usePagination';
-import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
 import { queryKeys } from '../../shared/queryKeys';
@@ -94,18 +93,18 @@ function StatCard({
 const groupByKeys: Record<string, string> = {
   model: 'usage.by_model',
   user: 'usage.by_user',
-  account: 'usage.by_account',
+  channel: 'usage.by_channel',
   group: 'usage.by_group',
 };
 
 const groupByHeaderKeys: Record<string, string> = {
   model: 'usage.model',
   user: 'usage.user_id',
-  account: 'usage.by_account',
+  channel: 'usage.channel',
   group: 'usage.by_group',
 };
 
-const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,account,user';
+const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,channel,user';
 const USAGE_PAGE_ACTIVATION_DELAY_MS = 180;
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.admin.usage.auto_update';
 
@@ -394,7 +393,6 @@ export default function UsagePage() {
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
   const [granularity, setGranularity] = useState<string>('hour');
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, ADMIN_AUTO_REFRESH_OPTIONS);
-  const { platforms, platformName } = usePlatforms();
   const pageActive = useDeferredActivation(USAGE_PAGE_ACTIVATION_DELAY_MS);
   const autoRefreshEnabled = autoRefresh > 0;
   const autoRefreshLabel = `${t('usage.auto_update')} `;
@@ -498,13 +496,12 @@ export default function UsagePage() {
   });
 
   const { data: stats, isFetching: isStatsFetching, refetch: refetchStats } = useQuery({
-    queryKey: queryKeys.adminUsageStats(filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id, filters.api_key_id),
+    queryKey: queryKeys.adminUsageStats(filters.start_date, filters.end_date, filters.model, filters.user_id, filters.api_key_id),
     queryFn: ({ signal }) =>
       usageApi.stats({
         group_by: ADMIN_USAGE_STATS_GROUP_BY,
         start_date: filters.start_date,
         end_date: filters.end_date,
-        platform: filters.platform,
         model: filters.model,
         user_id: filters.user_id ? Number(filters.user_id) : undefined,
         api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
@@ -518,13 +515,12 @@ export default function UsagePage() {
 
   // Token 趋势
   const { data: trendData, isFetching: isTrendFetching, refetch: refetchTrend } = useQuery({
-    queryKey: queryKeys.adminUsageTrend(granularity, filters.start_date, filters.end_date, filters.platform, filters.model, filters.user_id, filters.api_key_id),
+    queryKey: queryKeys.adminUsageTrend(granularity, filters.start_date, filters.end_date, filters.model, filters.user_id, filters.api_key_id),
     queryFn: ({ signal }) =>
       usageApi.trend({
         granularity,
         start_date: filters.start_date,
         end_date: filters.end_date,
-        platform: filters.platform,
         model: filters.model,
         user_id: filters.user_id ? Number(filters.user_id) : undefined,
         api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
@@ -587,7 +583,7 @@ export default function UsagePage() {
   const groupStatsRows: GroupStatsRow[] = useMemo(() => {
     if (!activeStats) return [];
     const dataMap: Record<string, GroupStatsRow[]> = {
-      account: activeStats.by_account?.map((s) => ({ key: s.account_id, name: s.name, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      channel: activeStats.by_channel?.map((s) => ({ key: s.channel_id, name: s.name, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
       group: activeStats.by_group?.map((s) => ({ key: s.group_id, name: s.name || `#${s.group_id}`, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
       model: activeStats.by_model?.map((s) => ({ key: s.model, name: s.model, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
       user: activeStats.by_user?.map((s) => ({ key: s.user_id, name: s.email, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
@@ -596,12 +592,6 @@ export default function UsagePage() {
   }, [activeStats, statsGroupBy]);
 
   const sharedColumns = useUsageColumns();
-
-  const platformOptions = [
-    { id: '', label: t('common.all') },
-    ...platforms.map((p) => ({ id: p, label: platformName(p) })),
-  ];
-  const selectedPlatformLabel = platformOptions.find((item) => item.id === (filters.platform || ''))?.label ?? t('common.all');
 
   const columns = useMemo(() => {
     const adminColumns: UsageColumnConfig<UsageLogResp>[] = [
@@ -656,21 +646,16 @@ export default function UsagePage() {
         );
       },
     };
-    const accountColumn: UsageColumnConfig<UsageLogResp> = {
-      key: 'account_name',
-      title: t('usage.upstream_credential', '上游凭证'),
+    const channelColumn: UsageColumnConfig<UsageLogResp> = {
+      key: 'channel_name',
+      title: t('usage.channel', '渠道'),
       width: '172px',
       hideOnMobile: true,
       render: (row) => {
-        const name = row.account_name || '-';
-        const email = row.account_email?.trim();
-        const title = email && name !== '-' ? `${name}\n${email}` : name;
+        const name = row.channel_name || '-';
         return (
-          <div className="flex w-full min-w-0 flex-col items-center text-center" title={title}>
+          <div className="flex w-full min-w-0 flex-col items-center text-center" title={name}>
             <span className="block max-w-full truncate text-xs font-medium text-text-secondary">{name}</span>
-            {email && name !== '-' ? (
-              <span className="block max-w-full truncate text-[11px] leading-tight text-text-tertiary">{email}</span>
-            ) : null}
           </div>
         );
       },
@@ -683,7 +668,7 @@ export default function UsagePage() {
       ...sharedColumnsAfterModel,
       endpointColumn,
       apiKeyColumn,
-      accountColumn,
+      channelColumn,
     ] as UsageColumnConfig<UsageLogResp>[];
   }, [sharedColumns, t]);
   const total = data?.total ?? 0;
@@ -763,32 +748,6 @@ export default function UsagePage() {
               setFilters((prev) => ({ ...prev, start_date: startDate, end_date: endDate }));
             }}
           />
-        </div>
-        <div className="w-full sm:w-48">
-          <Select
-            aria-label={t('usage.platform')}
-            fullWidth
-            selectedKey={filters.platform || ''}
-            onSelectionChange={(key) => updateFilter('platform', key == null ? '' : String(key))}
-          >
-            <Select.Trigger>
-              <Select.Value>
-                {filters.platform ? selectedPlatformLabel : (
-                  <span className="text-text-tertiary">{t('usage.platform')}</span>
-                )}
-              </Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={platformOptions}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
         </div>
         <div className="w-full sm:w-48">
           <UsageModelFilterInput

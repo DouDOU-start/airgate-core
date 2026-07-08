@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -27,7 +27,7 @@ type GroupQuery struct {
 	order             []group.OrderOption
 	inters            []Interceptor
 	predicates        []predicate.Group
-	withAccounts      *AccountQuery
+	withChannels      *ChannelQuery
 	withAllowedUsers  *UserQuery
 	withAPIKeys       *APIKeyQuery
 	withSubscriptions *UserSubscriptionQuery
@@ -68,9 +68,9 @@ func (gq *GroupQuery) Order(o ...group.OrderOption) *GroupQuery {
 	return gq
 }
 
-// QueryAccounts chains the current query on the "accounts" edge.
-func (gq *GroupQuery) QueryAccounts() *AccountQuery {
-	query := (&AccountClient{config: gq.config}).Query()
+// QueryChannels chains the current query on the "channels" edge.
+func (gq *GroupQuery) QueryChannels() *ChannelQuery {
+	query := (&ChannelClient{config: gq.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := gq.prepareQuery(ctx); err != nil {
 			return nil, err
@@ -81,8 +81,8 @@ func (gq *GroupQuery) QueryAccounts() *AccountQuery {
 		}
 		step := sqlgraph.NewStep(
 			sqlgraph.From(group.Table, group.FieldID, selector),
-			sqlgraph.To(account.Table, account.FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, true, group.AccountsTable, group.AccountsPrimaryKey...),
+			sqlgraph.To(channel.Table, channel.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, group.ChannelsTable, group.ChannelsPrimaryKey...),
 		)
 		fromU = sqlgraph.SetNeighbors(gq.driver.Dialect(), step)
 		return fromU, nil
@@ -370,7 +370,7 @@ func (gq *GroupQuery) Clone() *GroupQuery {
 		order:             append([]group.OrderOption{}, gq.order...),
 		inters:            append([]Interceptor{}, gq.inters...),
 		predicates:        append([]predicate.Group{}, gq.predicates...),
-		withAccounts:      gq.withAccounts.Clone(),
+		withChannels:      gq.withChannels.Clone(),
 		withAllowedUsers:  gq.withAllowedUsers.Clone(),
 		withAPIKeys:       gq.withAPIKeys.Clone(),
 		withSubscriptions: gq.withSubscriptions.Clone(),
@@ -381,14 +381,14 @@ func (gq *GroupQuery) Clone() *GroupQuery {
 	}
 }
 
-// WithAccounts tells the query-builder to eager-load the nodes that are connected to
-// the "accounts" edge. The optional arguments are used to configure the query builder of the edge.
-func (gq *GroupQuery) WithAccounts(opts ...func(*AccountQuery)) *GroupQuery {
-	query := (&AccountClient{config: gq.config}).Query()
+// WithChannels tells the query-builder to eager-load the nodes that are connected to
+// the "channels" edge. The optional arguments are used to configure the query builder of the edge.
+func (gq *GroupQuery) WithChannels(opts ...func(*ChannelQuery)) *GroupQuery {
+	query := (&ChannelClient{config: gq.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	gq.withAccounts = query
+	gq.withChannels = query
 	return gq
 }
 
@@ -515,7 +515,7 @@ func (gq *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 		nodes       = []*Group{}
 		_spec       = gq.querySpec()
 		loadedTypes = [5]bool{
-			gq.withAccounts != nil,
+			gq.withChannels != nil,
 			gq.withAllowedUsers != nil,
 			gq.withAPIKeys != nil,
 			gq.withSubscriptions != nil,
@@ -540,10 +540,10 @@ func (gq *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
-	if query := gq.withAccounts; query != nil {
-		if err := gq.loadAccounts(ctx, query, nodes,
-			func(n *Group) { n.Edges.Accounts = []*Account{} },
-			func(n *Group, e *Account) { n.Edges.Accounts = append(n.Edges.Accounts, e) }); err != nil {
+	if query := gq.withChannels; query != nil {
+		if err := gq.loadChannels(ctx, query, nodes,
+			func(n *Group) { n.Edges.Channels = []*Channel{} },
+			func(n *Group, e *Channel) { n.Edges.Channels = append(n.Edges.Channels, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -578,7 +578,7 @@ func (gq *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 	return nodes, nil
 }
 
-func (gq *GroupQuery) loadAccounts(ctx context.Context, query *AccountQuery, nodes []*Group, init func(*Group), assign func(*Group, *Account)) error {
+func (gq *GroupQuery) loadChannels(ctx context.Context, query *ChannelQuery, nodes []*Group, init func(*Group), assign func(*Group, *Channel)) error {
 	edgeIDs := make([]driver.Value, len(nodes))
 	byID := make(map[int]*Group)
 	nids := make(map[int]map[*Group]struct{})
@@ -590,11 +590,11 @@ func (gq *GroupQuery) loadAccounts(ctx context.Context, query *AccountQuery, nod
 		}
 	}
 	query.Where(func(s *sql.Selector) {
-		joinT := sql.Table(group.AccountsTable)
-		s.Join(joinT).On(s.C(account.FieldID), joinT.C(group.AccountsPrimaryKey[0]))
-		s.Where(sql.InValues(joinT.C(group.AccountsPrimaryKey[1]), edgeIDs...))
+		joinT := sql.Table(group.ChannelsTable)
+		s.Join(joinT).On(s.C(channel.FieldID), joinT.C(group.ChannelsPrimaryKey[0]))
+		s.Where(sql.InValues(joinT.C(group.ChannelsPrimaryKey[1]), edgeIDs...))
 		columns := s.SelectedColumns()
-		s.Select(joinT.C(group.AccountsPrimaryKey[1]))
+		s.Select(joinT.C(group.ChannelsPrimaryKey[1]))
 		s.AppendSelect(columns...)
 		s.SetDistinct(false)
 	})
@@ -624,14 +624,14 @@ func (gq *GroupQuery) loadAccounts(ctx context.Context, query *AccountQuery, nod
 			}
 		})
 	})
-	neighbors, err := withInterceptors[[]*Account](ctx, query, qr, query.inters)
+	neighbors, err := withInterceptors[[]*Channel](ctx, query, qr, query.inters)
 	if err != nil {
 		return err
 	}
 	for _, n := range neighbors {
 		nodes, ok := nids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected "accounts" node returned %v`, n.ID)
+			return fmt.Errorf(`unexpected "channels" node returned %v`, n.ID)
 		}
 		for kn := range nodes {
 			assign(kn, n)

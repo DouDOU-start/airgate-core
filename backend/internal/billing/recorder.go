@@ -26,7 +26,7 @@ type UsageRecord struct {
 	UserID                       int
 	UserEmail                    string
 	APIKeyID                     int
-	AccountID                    int
+	ChannelID                    int
 	GroupID                      int
 	Platform                     string
 	Model                        string
@@ -80,6 +80,12 @@ type Recorder struct {
 	stopCh  chan struct{}
 	stopped chan struct{}
 	once    sync.Once
+
+	// insertBatch / insertOne 落库函数，可注入以便测试降级逻辑（默认真实实现）。
+	insertBatch func(ctx context.Context, batch []UsageRecord) error
+	insertOne   func(ctx context.Context, rec UsageRecord, withChannel bool) error
+	// sleep 重试间隔等待，可注入以便测试（默认 time.Sleep）。
+	sleep func(d time.Duration)
 }
 
 // NewRecorder 创建使用量记录器
@@ -87,12 +93,16 @@ func NewRecorder(db *ent.Client, bufferSize int) *Recorder {
 	if bufferSize <= 0 {
 		bufferSize = defaultBufferSize
 	}
-	return &Recorder{
+	r := &Recorder{
 		db:      db,
 		ch:      make(chan UsageRecord, bufferSize),
 		stopCh:  make(chan struct{}),
 		stopped: make(chan struct{}),
+		sleep:   time.Sleep,
 	}
+	r.insertBatch = r.batchInsert
+	r.insertOne = r.insertSingle
+	return r
 }
 
 // Record 提交使用记录（非阻塞）
@@ -118,7 +128,7 @@ func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, err
 		_ = tx.Rollback()
 	}()
 
-	log, err := usageLogCreate(tx, record).Save(ctx)
+	log, err := usageLogCreate(tx, record, true).Save(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("插入 UsageLog 失败: %w", err)
 	}
@@ -183,25 +193,82 @@ func (r *Recorder) run() {
 	}
 }
 
-// flush 批量写入数据库，失败时重试
+// flush 批量写入数据库：整批失败重试 maxRetries 次后降级为逐条写入，
+// 单条坏记录（如渠道已删除触发 FK 违约）不再放大为整批计费丢失。
 func (r *Recorder) flush(ctx context.Context, batch []UsageRecord) {
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		if err := r.batchInsert(ctx, batch); err != nil {
+		if err := r.insertBatch(ctx, batch); err != nil {
 			slog.Error("billing_batch_flush_failed",
 				"attempt", attempt+1,
 				"count", len(batch),
 				"error", err,
 			)
 			if attempt < maxRetries-1 {
-				time.Sleep(time.Duration(attempt+1) * time.Second)
-				continue
+				r.sleep(time.Duration(attempt+1) * time.Second)
 			}
-			slog.Error("billing_batch_flush_dropped", "count", len(batch))
-			return
+			continue
 		}
 		slog.Debug("billing_batch_flush_succeeded", "count", len(batch))
 		return
 	}
+	r.flushOneByOne(ctx, batch)
+}
+
+// flushOneByOne 整批重试耗尽后的降级路径：逐条插入；单条因约束冲突失败
+// （渠道硬删除后新插入引用悬空 id 触发 FK 违约）再降级为去掉 channel 边重插，
+// 保证计费金额与余额扣款绝不因单条坏记录整批丢失。
+func (r *Recorder) flushOneByOne(ctx context.Context, batch []UsageRecord) {
+	dropped := 0
+	for _, rec := range batch {
+		err := r.insertOne(ctx, rec, true)
+		if err == nil {
+			continue
+		}
+		if ent.IsConstraintError(err) {
+			retryErr := r.insertOne(ctx, rec, false)
+			if retryErr == nil {
+				slog.Warn("billing_record_channel_edge_cleared",
+					"user_id", rec.UserID,
+					"channel_id", rec.ChannelID,
+					"model", rec.Model,
+				)
+				continue
+			}
+			err = retryErr
+		}
+		dropped++
+		slog.Error("billing_record_dropped",
+			"user_id", rec.UserID,
+			"channel_id", rec.ChannelID,
+			"model", rec.Model,
+			"error", err,
+		)
+	}
+	if dropped > 0 {
+		slog.Error("billing_batch_flush_dropped", "count", dropped)
+	}
+}
+
+// insertSingle 单条写入（UsageLog + 扣费同事务）；withChannel=false 时不设 channel 边。
+func (r *Recorder) insertSingle(ctx context.Context, rec UsageRecord, withChannel bool) error {
+	tx, err := r.db.Tx(ctx)
+	if err != nil {
+		return fmt.Errorf("开启事务失败: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	if _, err := usageLogCreate(tx, rec, withChannel).Save(ctx); err != nil {
+		return fmt.Errorf("插入 UsageLog 失败: %w", err)
+	}
+	if err := applyUsageCharges(ctx, tx, []UsageRecord{rec}); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("提交事务失败: %w", err)
+	}
+	return nil
 }
 
 // batchInsert 在同一事务中批量写入使用记录并扣费
@@ -219,7 +286,7 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 	// 1. 批量写入 UsageLog（同时记录 actual_cost 和 billed_cost 双轨数据）
 	builders := make([]*ent.UsageLogCreate, 0, len(batch))
 	for _, rec := range batch {
-		builders = append(builders, usageLogCreate(tx, rec))
+		builders = append(builders, usageLogCreate(tx, rec, true))
 	}
 
 	if _, err := tx.UsageLog.CreateBulk(builders...).Save(ctx); err != nil {
@@ -237,7 +304,9 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 	return nil
 }
 
-func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
+// usageLogCreate 构建 UsageLog 插入语句；withChannel=false 时跳过 channel 边
+// （渠道已删除时 FK 违约的降级重插路径）。
+func usageLogCreate(tx *ent.Tx, rec UsageRecord, withChannel bool) *ent.UsageLogCreate {
 	b := tx.UsageLog.Create().
 		SetPlatform(rec.Platform).
 		SetModel(rec.Model).
@@ -281,8 +350,10 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord) *ent.UsageLogCreate {
 		SetUserIDSnapshot(rec.UserID).
 		SetUserEmailSnapshot(rec.UserEmail).
 		SetUserID(rec.UserID).
-		SetAccountID(rec.AccountID).
 		SetGroupID(rec.GroupID)
+	if withChannel && rec.ChannelID > 0 {
+		b.SetChannelID(rec.ChannelID)
+	}
 	if rec.APIKeyID > 0 {
 		b.SetAPIKeyID(rec.APIKeyID)
 	}

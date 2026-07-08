@@ -2046,21 +2046,21 @@ func HasAPIKeyWith(preds ...predicate.APIKey) predicate.UsageLog {
 	})
 }
 
-// HasAccount applies the HasEdge predicate on the "account" edge.
-func HasAccount() predicate.UsageLog {
+// HasChannel applies the HasEdge predicate on the "channel" edge.
+func HasChannel() predicate.UsageLog {
 	return predicate.UsageLog(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, AccountTable, AccountColumn),
+			sqlgraph.Edge(sqlgraph.M2O, true, ChannelTable, ChannelColumn),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
 }
 
-// HasAccountWith applies the HasEdge predicate on the "account" edge with a given conditions (other predicates).
-func HasAccountWith(preds ...predicate.Account) predicate.UsageLog {
+// HasChannelWith applies the HasEdge predicate on the "channel" edge with a given conditions (other predicates).
+func HasChannelWith(preds ...predicate.Channel) predicate.UsageLog {
 	return predicate.UsageLog(func(s *sql.Selector) {
-		step := newAccountStep()
+		step := newChannelStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

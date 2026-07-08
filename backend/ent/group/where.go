@@ -340,16 +340,6 @@ func ModelRoutingNotNil() predicate.Group {
 	return predicate.Group(sql.FieldNotNull(FieldModelRouting))
 }
 
-// PluginSettingsIsNil applies the IsNil predicate on the "plugin_settings" field.
-func PluginSettingsIsNil() predicate.Group {
-	return predicate.Group(sql.FieldIsNull(FieldPluginSettings))
-}
-
-// PluginSettingsNotNil applies the NotNil predicate on the "plugin_settings" field.
-func PluginSettingsNotNil() predicate.Group {
-	return predicate.Group(sql.FieldNotNull(FieldPluginSettings))
-}
-
 // ServiceTierEQ applies the EQ predicate on the "service_tier" field.
 func ServiceTierEQ(v string) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldServiceTier, v))
@@ -665,21 +655,21 @@ func UpdatedAtLTE(v time.Time) predicate.Group {
 	return predicate.Group(sql.FieldLTE(FieldUpdatedAt, v))
 }
 
-// HasAccounts applies the HasEdge predicate on the "accounts" edge.
-func HasAccounts() predicate.Group {
+// HasChannels applies the HasEdge predicate on the "channels" edge.
+func HasChannels() predicate.Group {
 	return predicate.Group(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, true, AccountsTable, AccountsPrimaryKey...),
+			sqlgraph.Edge(sqlgraph.M2M, true, ChannelsTable, ChannelsPrimaryKey...),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
 }
 
-// HasAccountsWith applies the HasEdge predicate on the "accounts" edge with a given conditions (other predicates).
-func HasAccountsWith(preds ...predicate.Account) predicate.Group {
+// HasChannelsWith applies the HasEdge predicate on the "channels" edge with a given conditions (other predicates).
+func HasChannelsWith(preds ...predicate.Channel) predicate.Group {
 	return predicate.Group(func(s *sql.Selector) {
-		step := newAccountsStep()
+		step := newChannelsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

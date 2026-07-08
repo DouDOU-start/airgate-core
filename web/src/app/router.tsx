@@ -7,22 +7,20 @@ import {
 } from '@tanstack/react-router';
 import { Suspense, useEffect } from 'react';
 import type { ElementType, ReactNode } from 'react';
-import type { PluginBreadcrumbItem } from '../shared/components/PluginBreadcrumbs';
 import { useAuth } from './providers/AuthProvider';
 import { ErrorBoundary } from './providers/ErrorBoundary';
 import { getToken, getTokenRole } from '../shared/api/client';
-import { ChatPageLoading, FullPageLoading, PageLoading } from '../shared/components/PageLoading';
+import { FullPageLoading, PageLoading } from '../shared/components/PageLoading';
 import { checkAdmin, withSetupCheck } from './routeGuards';
 import {
-  AccountsPage,
   ADMIN_IDLE_PRELOADS,
+  ChannelsPage,
   DashboardPage,
   DocsPage,
   GroupsPage,
   lazyWithPreload,
   LoginPage,
-  PluginPage,
-  PluginsPage,
+  ModelPricesPage,
   preloadRoutePage,
   ProfilePage,
   ProxiesPage,
@@ -55,15 +53,6 @@ function requestIdle(work: () => void) {
 
 const AppShell = lazyWithPreload<{ children: ReactNode }>(() =>
   import('./layout/AppShell').then((m) => ({ default: m.AppShell })),
-);
-const PluginShell = lazyWithPreload<{
-  children: ReactNode;
-  pluginName?: string;
-  titleKey?: string;
-  titleFallback?: string;
-  breadcrumbs?: PluginBreadcrumbItem[];
-}>(() =>
-  import('./layout/PluginShell').then((m) => ({ default: m.PluginShell })),
 );
 
 function RoutePreloader() {
@@ -138,10 +127,6 @@ const homeRoute = createRoute({
     </Suspense>
   ),
 });
-
-// 注意：/status 不再注册客户端路由，整个公开状态页交给 airgate-health 插件维护。
-// 后端 GET /status 直接反代到插件的 handlePublicIndex，前端用普通 href 跳转。
-// 这样避免 core 与插件出现两份重复的状态页实现。
 
 // 内置默认文档页 —— 当管理员未在 系统设置 → 站点品牌 → 文档链接 中填写外部 URL 时，
 // 所有"文档"按钮 fallback 到这里。公开可访问，独立布局（不挂 AppShell）。
@@ -219,80 +204,17 @@ function renderPage(Page: ElementType) {
 }
 
 const adminUsersRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/users', component: renderPage(UsersPage) });
-const adminAccountsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/accounts', component: renderPage(AccountsPage) });
+const adminChannelsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/channels', component: renderPage(ChannelsPage) });
+const adminModelPricesRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/model-prices', component: renderPage(ModelPricesPage) });
 const adminGroupsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/groups', component: renderPage(GroupsPage) });
 const adminSubscriptionsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/subscriptions', component: renderPage(SubscriptionsPage) });
 const adminProxiesRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/proxies', component: renderPage(ProxiesPage) });
 const adminUsageRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/usage', component: renderPage(UsagePage) });
-const adminPluginsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/plugins', component: renderPage(PluginsPage) });
 const adminSettingsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/settings', component: renderPage(SettingsPage) });
 
 const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/profile', component: renderPage(ProfilePage) });
 const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/keys', component: renderPage(UserKeysPage) });
 const userUsageRoute = createRoute({ getParentRoute: () => authLayout, path: '/usage', component: renderPage(UserUsagePage) });
-
-// /chat: 全屏沉浸式 AI 对话页（airgate-playground 插件），独立布局不挂 AppShell。
-// 仍要求登录 + 安装完成；走 PluginShell 通用插件顶栏。
-const chatBeforeLoad = () => withSetupCheck((needs) => {
-  if (needs) throw redirect({ to: '/setup' });
-  if (!getToken()) throw redirect({ to: '/home' });
-  if (getTokenRole() === 'api_key') throw redirect({ to: '/' });
-});
-const chatRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/chat',
-  beforeLoad: chatBeforeLoad,
-  component: () => (
-    <Suspense fallback={<ChatPageLoading />}>
-      <PluginShell
-        pluginName="airgate-playground"
-        titleKey="plugin_shell.playground_title"
-        titleFallback="AI 对话"
-        breadcrumbs={[
-          { to: '/', labelKey: 'plugin_shell.console', labelFallback: '控制台' },
-          { labelKey: 'plugin_shell.playground_title', labelFallback: 'AI 对话' },
-        ]}
-      >
-        <PluginPage pluginNameOverride="airgate-playground" subPathOverride="/chat" />
-      </PluginShell>
-    </Suspense>
-  ),
-});
-// /studio: 创作中心（airgate-studio 插件），独立全屏布局。
-const studioRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/studio',
-  beforeLoad: chatBeforeLoad,
-  component: () => (
-    <Suspense fallback={<ChatPageLoading />}>
-      <PluginPage pluginNameOverride="airgate-studio" subPathOverride="/studio" />
-    </Suspense>
-  ),
-});
-
-// 旧路径 /plugins/playground 重定向到 /chat，避免历史书签 / 链接失效。
-const playgroundLegacyRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/plugins/playground',
-  beforeLoad: () => {
-    throw redirect({ to: '/chat' });
-  },
-  component: () => null,
-});
-
-// 插件页面路由（catch-all）
-const pluginRoute = createRoute({
-  getParentRoute: () => authLayout,
-  path: '/plugins/$pluginName/$',
-  beforeLoad: () => {
-    if (getTokenRole() === 'api_key') throw redirect({ to: '/' });
-  },
-  component: () => (
-    <Suspense fallback={<PageLoading />}>
-      <PluginPage />
-    </Suspense>
-  ),
-});
 
 // 路由树
 const routeTree = rootRoute.addChildren([
@@ -300,25 +222,21 @@ const routeTree = rootRoute.addChildren([
   homeRoute,
   loginRoute,
   docsRoute,
-  studioRoute,
-  chatRoute,
-  playgroundLegacyRoute,
   authLayout.addChildren([
     dashboardRoute,
     adminLayout.addChildren([
       adminUsersRoute,
-      adminAccountsRoute,
+      adminChannelsRoute,
+      adminModelPricesRoute,
       adminGroupsRoute,
       adminSubscriptionsRoute,
       adminProxiesRoute,
       adminUsageRoute,
-      adminPluginsRoute,
       adminSettingsRoute,
     ]),
     profileRoute,
     userKeysRoute,
     userUsageRoute,
-    pluginRoute,
   ]),
 ]);
 

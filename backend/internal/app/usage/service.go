@@ -173,8 +173,8 @@ func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy st
 				result.ByModel, err = s.repo.StatsByModel(loadCtx, filter)
 			case "user":
 				result.ByUser, err = s.repo.StatsByUser(loadCtx, filter)
-			case "account":
-				result.ByAccount, err = s.repo.StatsByAccount(loadCtx, filter)
+			case "channel":
+				result.ByChannel, err = s.repo.StatsByChannel(loadCtx, filter)
 			case "group":
 				result.ByGroup, err = s.repo.StatsByGroup(loadCtx, filter)
 			default:
@@ -224,7 +224,7 @@ func normalizeStatsGroupBy(groupBy string) string {
 	allowed := map[string]struct{}{
 		"model":   {},
 		"user":    {},
-		"account": {},
+		"channel": {},
 		"group":   {},
 	}
 	seen := make(map[string]struct{})

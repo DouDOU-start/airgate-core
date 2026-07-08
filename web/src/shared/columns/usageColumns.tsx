@@ -1,19 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Tooltip } from '@heroui/react';
 import { ArrowDown, ArrowUp, BookOpen, Sparkles } from 'lucide-react';
-import {
-  getPluginUsageCostDetail,
-  getPluginUsageMetricDetail,
-  getPluginUsageModelMeta,
-  getUsageCostDetailVersion,
-  getUsageMetricDetailVersion,
-  getUsageModelMetaVersion,
-  subscribeUsageCostDetailChange,
-  subscribeUsageMetricDetailChange,
-  subscribeUsageModelMetaChange,
-} from '../../app/plugin-frontend-registry';
 import type { UsageLogResp, CustomerUsageLogResp, UsageAttribute, UsageMetric } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
 import { CostValue } from '../components/CostValue';
@@ -383,12 +372,6 @@ function buildUsageRecordContext(row: UsageRow, customerScope: boolean) {
   return ctx;
 }
 
-function buildCostDetailContext(row: UsageLogResp, adminView: boolean) {
-  const ctx = buildUsageRecordContext(row, false);
-  ctx.adminView = adminView;
-  return ctx;
-}
-
 function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
   const allMetrics = rowMetrics(row);
   const hasSDKMetrics = (row.usage_metrics?.length ?? 0) > 0;
@@ -429,18 +412,11 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
     width: '140px',
     render: (raw) => {
       const row = raw as UsageLogResp;
-      const PluginUsageCostDetail = getPluginUsageCostDetail(row.platform);
       return (
         <RichTooltip
           placement="right"
           content={() => (
-            PluginUsageCostDetail ? (
-              <PluginUsageCostDetail
-                recordId={row.id}
-                context={buildCostDetailContext(row, adminView)}
-              />
-            ) : (
-              <TooltipPanel title={t('usage.cost_detail')} subtitle={row.model}>
+            <TooltipPanel title={t('usage.cost_detail')} subtitle={row.model}>
                 <TooltipRow label={t('usage.input_cost')} value={`$${row.input_cost.toFixed(6)}`} />
                 <TooltipRow label={t('usage.output_cost')} value={`$${row.output_cost.toFixed(6)}`} />
                 {row.input_price > 0 && (
@@ -458,7 +434,7 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 )}
                 <TooltipRow label={t('usage.rate_multiplier')} value={`${row.rate_multiplier.toFixed(2)}x`} />
                 {adminView && row.account_rate_multiplier > 0 && (
-                  <TooltipRow label={t('usage.account_rate', '账号倍率')} value={`${row.account_rate_multiplier.toFixed(2)}x`} />
+                  <TooltipRow label={t('usage.account_rate', '渠道倍率')} value={`${row.account_rate_multiplier.toFixed(2)}x`} />
                 )}
                 {row.sell_rate > 0 && (
                   <TooltipRow label={t('usage.sell_rate', '销售倍率')} value={`${row.sell_rate.toFixed(2)}x`} />
@@ -466,7 +442,7 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 <TooltipDivider />
                 <TooltipRow label={t('usage.original_cost')} value={<CostValue value={row.total_cost} decimals={6} tone="standard" />} />
                 {adminView && (
-                  <TooltipRow label={t('usage.account_cost', '账号计费')} value={<CostValue value={row.account_cost} decimals={6} />} />
+                  <TooltipRow label={t('usage.account_cost', '渠道成本')} value={<CostValue value={row.account_cost} decimals={6} />} />
                 )}
                 <TooltipRow label={t('usage.user_charged', '用户扣费')} value={<CostValue value={row.actual_cost} decimals={6} tone="actual" />} />
                 {row.sell_rate > 0 && row.billed_cost !== row.actual_cost && (
@@ -476,7 +452,6 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                   </>
                 )}
               </TooltipPanel>
-            )
           )}
         >
           <div className="flex w-full flex-col items-center font-mono text-center text-xs">
@@ -526,7 +501,7 @@ function buildCustomerCostColumn(t: TFunction): UsageColumnConfig<UsageRow> {
 
 /**
  * 使用记录表格的共享列定义。
- * 管理端和用户端共用，管理端额外在前面插入 user / api_key / account 列。
+ * 管理端和用户端共用，管理端额外在前面插入 user / api_key / channel 列。
  *
  * customerScope=true 时切换为 end customer 视角的成本列，避免读取后端剥离过的字段。
  */
@@ -534,9 +509,6 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
   const { t } = useTranslation();
   const customerScope = opts?.customerScope ?? false;
   const adminView = opts?.adminView ?? true;
-  const metricDetailVersion = useSyncExternalStore(subscribeUsageMetricDetailChange, getUsageMetricDetailVersion);
-  const costDetailVersion = useSyncExternalStore(subscribeUsageCostDetailChange, getUsageCostDetailVersion);
-  const modelMetaVersion = useSyncExternalStore(subscribeUsageModelMetaChange, getUsageModelMetaVersion);
 
   return useMemo(() => {
     const costColumn = customerScope ? buildCustomerCostColumn(t) : buildResellerCostColumn(t, adminView);
@@ -569,10 +541,8 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       title: t('usage.model'),
       width: '220px',
       render: (row) => {
-        const PluginUsageModelMeta = getPluginUsageModelMeta(row.platform);
         const metaContext = buildUsageRecordContext(row, customerScope);
         const fallbackMeta = (() => {
-          if (PluginUsageModelMeta) return null;
           const imageSize = typeof metaContext.image_size === 'string' ? metaContext.image_size : '';
           if (imageSize) {
             return (
@@ -607,12 +577,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         return (
           <div className="grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2 text-left">
             <div className={`ag-usage-model-meta-slot ${MODEL_META_SLOT_WIDTH_CLASS} flex h-4 shrink-0 items-center justify-center overflow-hidden`}>
-              {PluginUsageModelMeta ? (
-                <PluginUsageModelMeta
-                  recordId={row.id}
-                  context={metaContext}
-                />
-              ) : fallbackMeta}
+              {fallbackMeta}
             </div>
             <span className="min-w-0 truncate text-sm font-medium leading-none text-text" title={row.model}>
               {row.model}
@@ -627,7 +592,6 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       width: '220px',
       render: (row) => {
         const metrics = rowMetrics(row);
-        const PluginUsageMetricDetail = getPluginUsageMetricDetail(row.platform);
         const inputTokens = metricValue(metrics, ['input_tokens', 'input_token', 'prompt_tokens', 'prompt_token']) ?? row.input_tokens;
         const outputTokens = metricValue(metrics, ['output_tokens', 'output_token', 'completion_tokens', 'completion_token']) ?? row.output_tokens;
         const cacheReadTokens = metricValue(metrics, ['cached_input_tokens', 'cached_input_token', 'cache_read_tokens', 'cache_read_token']) ?? row.cached_input_tokens;
@@ -643,14 +607,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
           <RichTooltip
             placement="left"
             content={() => (
-              PluginUsageMetricDetail ? (
-                <PluginUsageMetricDetail
-                  recordId={row.id}
-                  context={buildUsageRecordContext(row, customerScope)}
-                />
-              ) : (
-                <GenericMetricDetail row={row} t={t} />
-              )
+              <GenericMetricDetail row={row} t={t} />
             )}
           >
             {tokenSummaryVisible ? (
@@ -741,5 +698,5 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       ),
     },
     ];
-  }, [adminView, costDetailVersion, customerScope, metricDetailVersion, modelMetaVersion, t]);
+  }, [adminView, customerScope, t]);
 }

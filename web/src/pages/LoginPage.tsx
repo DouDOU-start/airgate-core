@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Card, FieldError, Form, Input, Label, Link as HeroLink, Tabs, TextField as HeroTextField } from '@heroui/react';
+import { Alert, Button, Card, FieldError, Form, Input, Label, Tabs, TextField as HeroTextField } from '@heroui/react';
 import { useAuth } from '../app/providers/AuthProvider';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
 import { authApi } from '../shared/api/auth';
 import { useTheme } from '../app/providers/ThemeProvider';
-import { useStatusPageEnabled } from '../shared/hooks/useStatusPageEnabled';
 import { ApiError, setSessionAPIKey } from '../shared/api/client';
-import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key, Activity } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key } from 'lucide-react';
 
 type TabKey = 'login' | 'register' | 'apikey';
 
@@ -458,7 +457,6 @@ export default function LoginPage() {
   const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const site = useSiteSettings();
-  const showStatusEntry = useStatusPageEnabled();
   const [activeTab, setActiveTab] = useState<TabKey>('login');
   const [registerSuccess, setRegisterSuccess] = useState(false);
 
@@ -580,15 +578,6 @@ export default function LoginPage() {
 
           {/* 底部 */}
           <div className="mt-6 flex flex-col items-center gap-2">
-            {showStatusEntry && (
-              <HeroLink
-                href="/status"
-                className="inline-flex items-center gap-1.5 text-[11px] text-text-tertiary hover:text-primary transition-colors"
-              >
-                <Activity className="w-3 h-3" />
-                {t('nav.status')}
-              </HeroLink>
-            )}
             <p className="text-center text-[10px] text-text-tertiary font-mono uppercase">
               Powered by {site.site_name || 'AirGate'}
             </p>

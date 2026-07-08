@@ -21,12 +21,14 @@ func NewGroupHandler(service *appgroup.Service) *GroupHandler {
 var parseGroupID = ParseID
 
 func (h *GroupHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
+	var hasChannels *appgroup.GroupHasChannelsError
 	switch {
 	case errors.Is(err, appgroup.ErrGroupNotFound):
 		return 404, err.Error()
 	case errors.Is(err, appgroup.ErrGroupHasSubscriptions):
 		return 400, err.Error()
-	case errors.Is(err, appgroup.ErrSourceGroupPlatformMismatch):
+	case errors.As(err, &hasChannels):
+		// 分组仍绑定渠道：拒绝删除，提示先解绑（防专属渠道静默变公共）。
 		return 400, err.Error()
 	default:
 		slog.Error(logMessage, "error", err)

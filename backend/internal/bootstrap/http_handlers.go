@@ -12,13 +12,13 @@ import (
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 
 	"github.com/DouDOU-start/airgate-core/ent"
-	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"
 	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
 	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
+	appchannel "github.com/DouDOU-start/airgate-core/internal/app/channel"
 	appdashboard "github.com/DouDOU-start/airgate-core/internal/app/dashboard"
 	appgroup "github.com/DouDOU-start/airgate-core/internal/app/group"
+	appmodelprice "github.com/DouDOU-start/airgate-core/internal/app/modelprice"
 	appopenclaw "github.com/DouDOU-start/airgate-core/internal/app/openclaw"
-	apppluginadmin "github.com/DouDOU-start/airgate-core/internal/app/pluginadmin"
 	appproxy "github.com/DouDOU-start/airgate-core/internal/app/proxy"
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
 	appsubscription "github.com/DouDOU-start/airgate-core/internal/app/subscription"
@@ -28,7 +28,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
-	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/handler"
 	"github.com/DouDOU-start/airgate-core/internal/upgrade"
@@ -40,30 +39,35 @@ type HTTPDependencies struct {
 	DB          *ent.Client
 	Redis       *redis.Client
 	JWTMgr      *auth.JWTManager
-	PluginMgr   *plugin.Manager
-	Marketplace *plugin.Marketplace
 	Concurrency *scheduler.ConcurrencyManager
-	Scheduler   *scheduler.Scheduler
 }
 
 // HTTPHandlers 聚合所有 HTTP 处理器。
 type HTTPHandlers struct {
 	Auth         *handler.AuthHandler
 	User         *handler.UserHandler
-	Account      *handler.AccountHandler
 	Group        *handler.GroupHandler
 	APIKey       *handler.APIKeyHandler
 	Subscription *handler.SubscriptionHandler
 	Usage        *handler.UsageHandler
 	Proxy        *handler.ProxyHandler
+	Channel      *handler.ChannelHandler
+	ModelPrice   *handler.ModelPriceHandler
 	Settings     *handler.SettingsHandler
 	Dashboard    *handler.DashboardHandler
-	Plugin       *handler.PluginHandler
 	OpenClaw     *handler.OpenClawHandler
 	Version      *handler.VersionHandler
 	Upgrade      *handler.UpgradeHandler
 
-	AccountService *appaccount.Service
+	// ChannelService / ProxyService / ModelPriceService / SettingsService 暴露给 server.go：
+	// ChannelService 充当渠道注册表的 Loader/Persister 并接收 Reloader/Tester 注入，
+	// ProxyService 接收 Reloader 注入（代理写操作后重载渠道快照的 ProxyURL），
+	// ModelPriceService 充当 pricing 缓存的 Loader 并接收 Invalidator 注入，
+	// SettingsService 供 relay 管线的 gateway 设置读取器使用。
+	ChannelService    *appchannel.Service
+	ProxyService      *appproxy.Service
+	ModelPriceService *appmodelprice.Service
+	SettingsService   *appsettings.Service
 }
 
 // NewHTTPHandlers 统一构造 HTTP 处理器。
@@ -75,18 +79,18 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	authService := appauth.NewService(authStore, dep.JWTMgr)
 	verifyCodeStore := mailer.NewVerifyCodeStore()
 	// 设置和验证码依赖延迟到 settingsService 创建后注入
-	accountStore := store.NewAccountStore(dep.DB)
-	accountService := appaccount.NewService(accountStore, dep.PluginMgr, dep.Concurrency, dep.Scheduler)
-	accountService.SetUsageCacheRedis(dep.Redis)
 	groupStore := store.NewGroupStore(dep.DB)
 	groupService := appgroup.NewService(groupStore, dep.Concurrency)
 	proxyStore := store.NewProxyStore(dep.DB)
 	proxyService := appproxy.NewService(proxyStore)
+	channelStore := store.NewChannelStore(dep.DB)
+	channelService := appchannel.NewService(channelStore, dep.Config.APIKeySecret())
+	modelPriceStore := store.NewModelPriceStore(dep.DB)
+	modelPriceService := appmodelprice.NewService(modelPriceStore)
 	subscriptionStore := store.NewSubscriptionStore(dep.DB)
 	subscriptionService := appsubscription.NewService(subscriptionStore)
 	dashboardStore := store.NewDashboardStore(dep.DB, dep.Redis)
 	dashboardService := appdashboard.NewService(dashboardStore, dep.Redis)
-	pluginAdminService := apppluginadmin.NewService(dep.PluginMgr, dep.Marketplace)
 	settingsStore := store.NewSettingsStore(dep.DB)
 	settingsService := appsettings.NewService(settingsStore, dep.Config.APIKeySecret())
 	openclawService := appopenclaw.NewService(settingsService)
@@ -109,21 +113,25 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	upgradeService := upgrade.NewService(upgrade.DetectMode(), dep.Redis)
 
 	return &HTTPHandlers{
-		Auth:           handler.NewAuthHandler(authService, dep.JWTMgr),
-		User:           handler.NewUserHandler(userService, settingsService),
-		Account:        handler.NewAccountHandler(accountService, dep.Scheduler),
-		Group:          handler.NewGroupHandler(groupService),
-		APIKey:         handler.NewAPIKeyHandler(apiKeyService),
-		Subscription:   handler.NewSubscriptionHandler(subscriptionService),
-		Usage:          handler.NewUsageHandler(usageService),
-		Proxy:          handler.NewProxyHandler(proxyService),
-		Settings:       handler.NewSettingsHandler(settingsService),
-		Dashboard:      handler.NewDashboardHandler(dashboardService),
-		Plugin:         handler.NewPluginHandler(pluginAdminService),
-		OpenClaw:       handler.NewOpenClawHandler(openclawService),
-		Version:        handler.NewVersionHandler(),
-		Upgrade:        handler.NewUpgradeHandler(upgradeService),
-		AccountService: accountService,
+		Auth:         handler.NewAuthHandler(authService, dep.JWTMgr),
+		User:         handler.NewUserHandler(userService, settingsService),
+		Group:        handler.NewGroupHandler(groupService),
+		APIKey:       handler.NewAPIKeyHandler(apiKeyService),
+		Subscription: handler.NewSubscriptionHandler(subscriptionService),
+		Usage:        handler.NewUsageHandler(usageService),
+		Proxy:        handler.NewProxyHandler(proxyService),
+		Channel:      handler.NewChannelHandler(channelService),
+		ModelPrice:   handler.NewModelPriceHandler(modelPriceService),
+		Settings:     handler.NewSettingsHandler(settingsService),
+		Dashboard:    handler.NewDashboardHandler(dashboardService),
+		OpenClaw:     handler.NewOpenClawHandler(openclawService),
+		Version:      handler.NewVersionHandler(),
+		Upgrade:      handler.NewUpgradeHandler(upgradeService),
+
+		ChannelService:    channelService,
+		ProxyService:      proxyService,
+		ModelPriceService: modelPriceService,
+		SettingsService:   settingsService,
 	}
 }
 

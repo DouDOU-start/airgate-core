@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -148,18 +148,6 @@ func (gu *GroupUpdate) ClearModelRouting() *GroupUpdate {
 	return gu
 }
 
-// SetPluginSettings sets the "plugin_settings" field.
-func (gu *GroupUpdate) SetPluginSettings(m map[string]map[string]string) *GroupUpdate {
-	gu.mutation.SetPluginSettings(m)
-	return gu
-}
-
-// ClearPluginSettings clears the value of the "plugin_settings" field.
-func (gu *GroupUpdate) ClearPluginSettings() *GroupUpdate {
-	gu.mutation.ClearPluginSettings()
-	return gu
-}
-
 // SetServiceTier sets the "service_tier" field.
 func (gu *GroupUpdate) SetServiceTier(s string) *GroupUpdate {
 	gu.mutation.SetServiceTier(s)
@@ -229,19 +217,19 @@ func (gu *GroupUpdate) SetUpdatedAt(t time.Time) *GroupUpdate {
 	return gu
 }
 
-// AddAccountIDs adds the "accounts" edge to the Account entity by IDs.
-func (gu *GroupUpdate) AddAccountIDs(ids ...int) *GroupUpdate {
-	gu.mutation.AddAccountIDs(ids...)
+// AddChannelIDs adds the "channels" edge to the Channel entity by IDs.
+func (gu *GroupUpdate) AddChannelIDs(ids ...int) *GroupUpdate {
+	gu.mutation.AddChannelIDs(ids...)
 	return gu
 }
 
-// AddAccounts adds the "accounts" edges to the Account entity.
-func (gu *GroupUpdate) AddAccounts(a ...*Account) *GroupUpdate {
-	ids := make([]int, len(a))
-	for i := range a {
-		ids[i] = a[i].ID
+// AddChannels adds the "channels" edges to the Channel entity.
+func (gu *GroupUpdate) AddChannels(c ...*Channel) *GroupUpdate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return gu.AddAccountIDs(ids...)
+	return gu.AddChannelIDs(ids...)
 }
 
 // AddAllowedUserIDs adds the "allowed_users" edge to the User entity by IDs.
@@ -309,25 +297,25 @@ func (gu *GroupUpdate) Mutation() *GroupMutation {
 	return gu.mutation
 }
 
-// ClearAccounts clears all "accounts" edges to the Account entity.
-func (gu *GroupUpdate) ClearAccounts() *GroupUpdate {
-	gu.mutation.ClearAccounts()
+// ClearChannels clears all "channels" edges to the Channel entity.
+func (gu *GroupUpdate) ClearChannels() *GroupUpdate {
+	gu.mutation.ClearChannels()
 	return gu
 }
 
-// RemoveAccountIDs removes the "accounts" edge to Account entities by IDs.
-func (gu *GroupUpdate) RemoveAccountIDs(ids ...int) *GroupUpdate {
-	gu.mutation.RemoveAccountIDs(ids...)
+// RemoveChannelIDs removes the "channels" edge to Channel entities by IDs.
+func (gu *GroupUpdate) RemoveChannelIDs(ids ...int) *GroupUpdate {
+	gu.mutation.RemoveChannelIDs(ids...)
 	return gu
 }
 
-// RemoveAccounts removes "accounts" edges to Account entities.
-func (gu *GroupUpdate) RemoveAccounts(a ...*Account) *GroupUpdate {
-	ids := make([]int, len(a))
-	for i := range a {
-		ids[i] = a[i].ID
+// RemoveChannels removes "channels" edges to Channel entities.
+func (gu *GroupUpdate) RemoveChannels(c ...*Channel) *GroupUpdate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return gu.RemoveAccountIDs(ids...)
+	return gu.RemoveChannelIDs(ids...)
 }
 
 // ClearAllowedUsers clears all "allowed_users" edges to the User entity.
@@ -457,11 +445,6 @@ func (gu *GroupUpdate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Group.name": %w`, err)}
 		}
 	}
-	if v, ok := gu.mutation.Platform(); ok {
-		if err := group.PlatformValidator(v); err != nil {
-			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "Group.platform": %w`, err)}
-		}
-	}
 	if v, ok := gu.mutation.SubscriptionType(); ok {
 		if err := group.SubscriptionTypeValidator(v); err != nil {
 			return &ValidationError{Name: "subscription_type", err: fmt.Errorf(`ent: validator failed for field "Group.subscription_type": %w`, err)}
@@ -515,12 +498,6 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if gu.mutation.ModelRoutingCleared() {
 		_spec.ClearField(group.FieldModelRouting, field.TypeJSON)
 	}
-	if value, ok := gu.mutation.PluginSettings(); ok {
-		_spec.SetField(group.FieldPluginSettings, field.TypeJSON, value)
-	}
-	if gu.mutation.PluginSettingsCleared() {
-		_spec.ClearField(group.FieldPluginSettings, field.TypeJSON)
-	}
 	if value, ok := gu.mutation.ServiceTier(); ok {
 		_spec.SetField(group.FieldServiceTier, field.TypeString, value)
 	}
@@ -539,28 +516,28 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := gu.mutation.UpdatedAt(); ok {
 		_spec.SetField(group.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if gu.mutation.AccountsCleared() {
+	if gu.mutation.ChannelsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.AccountsTable,
-			Columns: group.AccountsPrimaryKey,
+			Table:   group.ChannelsTable,
+			Columns: group.ChannelsPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := gu.mutation.RemovedAccountsIDs(); len(nodes) > 0 && !gu.mutation.AccountsCleared() {
+	if nodes := gu.mutation.RemovedChannelsIDs(); len(nodes) > 0 && !gu.mutation.ChannelsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.AccountsTable,
-			Columns: group.AccountsPrimaryKey,
+			Table:   group.ChannelsTable,
+			Columns: group.ChannelsPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -568,15 +545,15 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := gu.mutation.AccountsIDs(); len(nodes) > 0 {
+	if nodes := gu.mutation.ChannelsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.AccountsTable,
-			Columns: group.AccountsPrimaryKey,
+			Table:   group.ChannelsTable,
+			Columns: group.ChannelsPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -899,18 +876,6 @@ func (guo *GroupUpdateOne) ClearModelRouting() *GroupUpdateOne {
 	return guo
 }
 
-// SetPluginSettings sets the "plugin_settings" field.
-func (guo *GroupUpdateOne) SetPluginSettings(m map[string]map[string]string) *GroupUpdateOne {
-	guo.mutation.SetPluginSettings(m)
-	return guo
-}
-
-// ClearPluginSettings clears the value of the "plugin_settings" field.
-func (guo *GroupUpdateOne) ClearPluginSettings() *GroupUpdateOne {
-	guo.mutation.ClearPluginSettings()
-	return guo
-}
-
 // SetServiceTier sets the "service_tier" field.
 func (guo *GroupUpdateOne) SetServiceTier(s string) *GroupUpdateOne {
 	guo.mutation.SetServiceTier(s)
@@ -980,19 +945,19 @@ func (guo *GroupUpdateOne) SetUpdatedAt(t time.Time) *GroupUpdateOne {
 	return guo
 }
 
-// AddAccountIDs adds the "accounts" edge to the Account entity by IDs.
-func (guo *GroupUpdateOne) AddAccountIDs(ids ...int) *GroupUpdateOne {
-	guo.mutation.AddAccountIDs(ids...)
+// AddChannelIDs adds the "channels" edge to the Channel entity by IDs.
+func (guo *GroupUpdateOne) AddChannelIDs(ids ...int) *GroupUpdateOne {
+	guo.mutation.AddChannelIDs(ids...)
 	return guo
 }
 
-// AddAccounts adds the "accounts" edges to the Account entity.
-func (guo *GroupUpdateOne) AddAccounts(a ...*Account) *GroupUpdateOne {
-	ids := make([]int, len(a))
-	for i := range a {
-		ids[i] = a[i].ID
+// AddChannels adds the "channels" edges to the Channel entity.
+func (guo *GroupUpdateOne) AddChannels(c ...*Channel) *GroupUpdateOne {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return guo.AddAccountIDs(ids...)
+	return guo.AddChannelIDs(ids...)
 }
 
 // AddAllowedUserIDs adds the "allowed_users" edge to the User entity by IDs.
@@ -1060,25 +1025,25 @@ func (guo *GroupUpdateOne) Mutation() *GroupMutation {
 	return guo.mutation
 }
 
-// ClearAccounts clears all "accounts" edges to the Account entity.
-func (guo *GroupUpdateOne) ClearAccounts() *GroupUpdateOne {
-	guo.mutation.ClearAccounts()
+// ClearChannels clears all "channels" edges to the Channel entity.
+func (guo *GroupUpdateOne) ClearChannels() *GroupUpdateOne {
+	guo.mutation.ClearChannels()
 	return guo
 }
 
-// RemoveAccountIDs removes the "accounts" edge to Account entities by IDs.
-func (guo *GroupUpdateOne) RemoveAccountIDs(ids ...int) *GroupUpdateOne {
-	guo.mutation.RemoveAccountIDs(ids...)
+// RemoveChannelIDs removes the "channels" edge to Channel entities by IDs.
+func (guo *GroupUpdateOne) RemoveChannelIDs(ids ...int) *GroupUpdateOne {
+	guo.mutation.RemoveChannelIDs(ids...)
 	return guo
 }
 
-// RemoveAccounts removes "accounts" edges to Account entities.
-func (guo *GroupUpdateOne) RemoveAccounts(a ...*Account) *GroupUpdateOne {
-	ids := make([]int, len(a))
-	for i := range a {
-		ids[i] = a[i].ID
+// RemoveChannels removes "channels" edges to Channel entities.
+func (guo *GroupUpdateOne) RemoveChannels(c ...*Channel) *GroupUpdateOne {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return guo.RemoveAccountIDs(ids...)
+	return guo.RemoveChannelIDs(ids...)
 }
 
 // ClearAllowedUsers clears all "allowed_users" edges to the User entity.
@@ -1221,11 +1186,6 @@ func (guo *GroupUpdateOne) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Group.name": %w`, err)}
 		}
 	}
-	if v, ok := guo.mutation.Platform(); ok {
-		if err := group.PlatformValidator(v); err != nil {
-			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "Group.platform": %w`, err)}
-		}
-	}
 	if v, ok := guo.mutation.SubscriptionType(); ok {
 		if err := group.SubscriptionTypeValidator(v); err != nil {
 			return &ValidationError{Name: "subscription_type", err: fmt.Errorf(`ent: validator failed for field "Group.subscription_type": %w`, err)}
@@ -1296,12 +1256,6 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 	if guo.mutation.ModelRoutingCleared() {
 		_spec.ClearField(group.FieldModelRouting, field.TypeJSON)
 	}
-	if value, ok := guo.mutation.PluginSettings(); ok {
-		_spec.SetField(group.FieldPluginSettings, field.TypeJSON, value)
-	}
-	if guo.mutation.PluginSettingsCleared() {
-		_spec.ClearField(group.FieldPluginSettings, field.TypeJSON)
-	}
 	if value, ok := guo.mutation.ServiceTier(); ok {
 		_spec.SetField(group.FieldServiceTier, field.TypeString, value)
 	}
@@ -1320,28 +1274,28 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 	if value, ok := guo.mutation.UpdatedAt(); ok {
 		_spec.SetField(group.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if guo.mutation.AccountsCleared() {
+	if guo.mutation.ChannelsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.AccountsTable,
-			Columns: group.AccountsPrimaryKey,
+			Table:   group.ChannelsTable,
+			Columns: group.ChannelsPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := guo.mutation.RemovedAccountsIDs(); len(nodes) > 0 && !guo.mutation.AccountsCleared() {
+	if nodes := guo.mutation.RemovedChannelsIDs(); len(nodes) > 0 && !guo.mutation.ChannelsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.AccountsTable,
-			Columns: group.AccountsPrimaryKey,
+			Table:   group.ChannelsTable,
+			Columns: group.ChannelsPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1349,15 +1303,15 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := guo.mutation.AccountsIDs(); len(nodes) > 0 {
+	if nodes := guo.mutation.ChannelsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.AccountsTable,
-			Columns: group.AccountsPrimaryKey,
+			Table:   group.ChannelsTable,
+			Columns: group.ChannelsPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

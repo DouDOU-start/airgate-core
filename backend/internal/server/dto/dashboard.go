@@ -6,10 +6,10 @@ type DashboardStatsResp struct {
 	TotalAPIKeys   int64 `json:"total_api_keys"`
 	EnabledAPIKeys int64 `json:"enabled_api_keys"`
 
-	// 账号
-	TotalAccounts   int64 `json:"total_accounts"`
-	EnabledAccounts int64 `json:"enabled_accounts"`
-	ErrorAccounts   int64 `json:"error_accounts"`
+	// 渠道
+	TotalChannels    int64 `json:"total_channels"`
+	EnabledChannels  int64 `json:"enabled_channels"`
+	DisabledChannels int64 `json:"disabled_channels"`
 
 	// 请求
 	TodayRequests      int64 `json:"today_requests"`

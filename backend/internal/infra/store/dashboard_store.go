@@ -12,8 +12,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DouDOU-start/airgate-core/ent"
-	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
+	entchannel "github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
@@ -347,20 +347,20 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 		return appdashboard.StatsSnapshot{}, err
 	}
 
-	totalAccounts, err := s.db.Account.Query().Count(ctx)
+	totalChannels, err := s.db.Channel.Query().Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
-	// "enabled" = 任何非 disabled 状态（active / rate_limited / degraded 都能被调度）。
-	enabledAccounts, err := s.db.Account.Query().
-		Where(entaccount.StateNEQ(entaccount.StateDisabled)).
+	// "enabled" = 状态为 enabled 的渠道。
+	enabledChannels, err := s.db.Channel.Query().
+		Where(entchannel.StatusEQ(entchannel.StatusEnabled)).
 		Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
-	// "error" = disabled + 有错误信息（区分人工禁用和状态机自动禁用）。
-	errorAccounts, err := s.db.Account.Query().
-		Where(entaccount.StateEQ(entaccount.StateDisabled), entaccount.ErrorMsgNEQ("")).
+	// "disabled" = 手动禁用 + 自动禁用的合计。
+	disabledChannels, err := s.db.Channel.Query().
+		Where(entchannel.StatusIn(entchannel.StatusDisabledManual, entchannel.StatusDisabledAuto)).
 		Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
@@ -394,9 +394,9 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 	return appdashboard.StatsSnapshot{
 		TotalAPIKeys:            int64(totalAPIKeys),
 		EnabledAPIKeys:          int64(enabledAPIKeys),
-		TotalAccounts:           int64(totalAccounts),
-		EnabledAccounts:         int64(enabledAccounts),
-		ErrorAccounts:           int64(errorAccounts),
+		TotalChannels:           int64(totalChannels),
+		EnabledChannels:         int64(enabledChannels),
+		DisabledChannels:        int64(disabledChannels),
 		TotalUsers:              int64(totalUsers),
 		NewUsersToday:           int64(newUsersToday),
 		TodayRequests:           todayUsage.Requests,

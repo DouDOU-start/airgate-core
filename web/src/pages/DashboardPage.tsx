@@ -222,9 +222,9 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
       <MetricCard
         icon={<Monitor className="h-5 w-5" />}
         tone="violet"
-        title={t('dashboard.accounts')}
-        value={stats.total_accounts}
-        meta={t('dashboard.accounts_status', { enabled: stats.enabled_accounts, errors: stats.error_accounts })}
+        title={t('dashboard.channels')}
+        value={stats.total_channels}
+        meta={t('dashboard.channels_status', { enabled: stats.enabled_channels, disabled: stats.disabled_channels })}
       />
       <MetricCard
         icon={<Activity className="h-5 w-5" />}

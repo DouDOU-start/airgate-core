@@ -510,21 +510,21 @@ func UpdatedAtLTE(v time.Time) predicate.Proxy {
 	return predicate.Proxy(sql.FieldLTE(FieldUpdatedAt, v))
 }
 
-// HasAccounts applies the HasEdge predicate on the "accounts" edge.
-func HasAccounts() predicate.Proxy {
+// HasChannels applies the HasEdge predicate on the "channels" edge.
+func HasChannels() predicate.Proxy {
 	return predicate.Proxy(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, true, AccountsTable, AccountsColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, ChannelsTable, ChannelsColumn),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
 }
 
-// HasAccountsWith applies the HasEdge predicate on the "accounts" edge with a given conditions (other predicates).
-func HasAccountsWith(preds ...predicate.Account) predicate.Proxy {
+// HasChannelsWith applies the HasEdge predicate on the "channels" edge with a given conditions (other predicates).
+func HasChannelsWith(preds ...predicate.Channel) predicate.Proxy {
 	return predicate.Proxy(func(s *sql.Selector) {
-		step := newAccountsStep()
+		step := newChannelsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

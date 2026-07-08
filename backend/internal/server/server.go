@@ -6,18 +6,20 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DouDOU-start/airgate-core/ent"
-	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
+	"github.com/DouDOU-start/airgate-core/internal/asset"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
 	"github.com/DouDOU-start/airgate-core/internal/config"
-	"github.com/DouDOU-start/airgate-core/internal/infra/store"
-	"github.com/DouDOU-start/airgate-core/internal/plugin"
+	"github.com/DouDOU-start/airgate-core/internal/relay/pipeline"
+	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
+	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 )
@@ -31,24 +33,18 @@ type Server struct {
 	engine *gin.Engine
 	srv    *http.Server
 
-	// 插件系统组件
-	pluginMgr      *plugin.Manager
-	forwarder      *plugin.Forwarder
-	marketplace    *plugin.Marketplace
-	dynamicRouter  *DynamicRouter
-	extensionProxy *plugin.ExtensionProxy
-
 	// 核心服务组件
-	scheduler   *scheduler.Scheduler
-	concurrency *scheduler.ConcurrencyManager
-	calculator  *billing.Calculator
-	recorder    *billing.Recorder
-	handlers    *bootstrap.HTTPHandlers
+	concurrency     *scheduler.ConcurrencyManager
+	recorder        *billing.Recorder
+	handlers        *bootstrap.HTTPHandlers
+	channelRegistry *registry.Registry
+	pricingCache    *pricing.Cache
+	relay           *pipeline.Pipeline
 
 	// 中间件组件（需 Shutdown 时释放）
 	ipRateLimiter *middleware.IPRateLimiter
 
-	pluginStartCancel context.CancelFunc
+	backgroundCancel context.CancelFunc
 }
 
 // NewServer 创建 HTTP 服务器
@@ -60,38 +56,8 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	jwtMgr := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.ExpireHour)
 
 	// 核心服务组件
-	sched := scheduler.NewScheduler(db, rdb)
 	concurrency := scheduler.NewConcurrencyManager(rdb)
-	calculator := billing.NewCalculator()
 	recorder := billing.NewRecorder(db, 0)
-
-	// 插件系统组件
-	pluginDir := cfg.Plugins.Dir
-	if pluginDir == "" {
-		pluginDir = "data/plugins"
-	}
-	pluginMgr := plugin.NewManager(pluginDir, cfg.Log.Level, cfg.Database.DSN(), db)
-	// 注入插件目录的模型家族查询：调度器据此优先从插件声明的 Metadata["family"]
-	// 获取家族键，替代 scheduler.ModelFamily 中的硬编码 gpt-image 前缀判定。
-	sched.SetModelFamilyFunc(pluginMgr.ModelFamily)
-	// HostService 通过 hashicorp/go-plugin GRPCBroker 暴露给所有插件子进程，
-	// 替代旧的 admin HTTP API + admin_api_key 模式。必须在加载任何插件之前注入。
-	// users.update_balance 复用 app/user 服务（独立实例，不挂余额预警邮件回调——
-	// 入账只会抬高余额，预警重置逻辑无需回调即可生效）。
-	hostUserSvc := appuser.NewService(store.NewUserStore(db))
-	pluginMgr.SetHostService(plugin.NewHostService(db, pluginMgr, sched, concurrency, calculator, recorder, hostUserSvc))
-	forwarder := plugin.NewForwarder(db, pluginMgr, sched, concurrency, calculator, recorder)
-
-	marketOpts := []plugin.MarketplaceOption{
-		plugin.WithGithubToken(cfg.Plugins.Marketplace.GithubToken),
-		plugin.WithRefreshInterval(cfg.Plugins.Marketplace.RefreshInterval),
-	}
-	if entries := convertMarketEntries(cfg.Plugins.Marketplace.Plugins); len(entries) > 0 {
-		marketOpts = append(marketOpts, plugin.WithEntries(entries))
-	}
-	marketplace := plugin.NewMarketplace(pluginDir, marketOpts...)
-	dynamicRouter := NewDynamicRouter(forwarder)
-	extensionProxy := plugin.NewExtensionProxy(pluginMgr)
 
 	s := &Server{
 		cfg:    cfg,
@@ -99,16 +65,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		rdb:    rdb,
 		jwtMgr: jwtMgr,
 		// gin.New 不挂默认 Logger/Recovery，由我们的中间件接管以便接入结构化日志
-		engine:         gin.New(),
-		pluginMgr:      pluginMgr,
-		forwarder:      forwarder,
-		marketplace:    marketplace,
-		dynamicRouter:  dynamicRouter,
-		extensionProxy: extensionProxy,
-		scheduler:      sched,
-		concurrency:    concurrency,
-		calculator:     calculator,
-		recorder:       recorder,
+		engine:      gin.New(),
+		concurrency: concurrency,
+		recorder:    recorder,
 	}
 
 	s.handlers = bootstrap.NewHTTPHandlers(bootstrap.HTTPDependencies{
@@ -116,11 +75,32 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		DB:          db,
 		Redis:       rdb,
 		JWTMgr:      jwtMgr,
-		PluginMgr:   pluginMgr,
-		Marketplace: marketplace,
 		Concurrency: concurrency,
-		Scheduler:   sched,
 	})
+
+	// 渠道注册表与价目表缓存：
+	// channel service 充当注册表的 Loader/Persister（解密 api_keys、解析 proxy 边、状态落库），
+	// 注册表反向作为 channel service 的 Reloader（写操作成功后全量重载）；
+	// modelprice service 同理充当 pricing 缓存的 Loader，缓存作为其写后失效器。
+	s.channelRegistry = registry.New(s.handlers.ChannelService, s.handlers.ChannelService)
+	s.handlers.ChannelService.SetReloader(s.channelRegistry)
+	// 代理写操作（更新/删除）影响渠道快照的 ProxyURL，同样触发注册表重载。
+	s.handlers.ProxyService.SetReloader(s.channelRegistry)
+	s.pricingCache = pricing.NewCache(s.handlers.ModelPriceService)
+	s.handlers.ModelPriceService.SetInvalidator(s.pricingCache)
+
+	// relay 转发管线：注册表调度 + 渠道 RPM/并发闸门 + 计费落账；
+	// 渠道测试器走同一 adaptor 链路（server 层适配器负责解密与快照构造）。
+	s.relay = pipeline.New(pipeline.Options{
+		Registry:    s.channelRegistry,
+		Pricing:     s.pricingCache,
+		Concurrency: concurrency,
+		RPM:         scheduler.NewRPMCounter(rdb),
+		Calculator:  billing.NewCalculator(),
+		Sink:        recorder,
+		Settings:    pipeline.NewSettingsReader(gatewaySettingsSource{s.handlers.SettingsService}),
+	})
+	s.handlers.ChannelService.SetTester(&channelTester{pipe: s.relay, secret: cfg.APIKeySecret()})
 
 	// 注册路由
 	s.registerRoutes()
@@ -133,24 +113,6 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	return s
 }
 
-// convertMarketEntries 把 config 层 MarketEntry 转换为 plugin 层 MarketplacePlugin
-func convertMarketEntries(entries []config.MarketEntry) []plugin.MarketplacePlugin {
-	if len(entries) == 0 {
-		return nil
-	}
-	out := make([]plugin.MarketplacePlugin, 0, len(entries))
-	for _, e := range entries {
-		out = append(out, plugin.MarketplacePlugin{
-			Name:        e.Name,
-			Description: e.Description,
-			Author:      e.Author,
-			Type:        e.Type,
-			GithubRepo:  e.GithubRepo,
-		})
-	}
-	return out
-}
-
 // Start 启动 HTTP 服务器（阻塞）
 func (s *Server) Start() error {
 	slog.Info("server_listening", "host", s.cfg.Server.Host, "port", s.cfg.Server.Port, "addr", s.srv.Addr)
@@ -161,58 +123,62 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// StartPlugins 启动异步记录器和插件系统
-func (s *Server) StartPlugins(ctx context.Context) {
+// StartBackground 启动后台组件：使用量异步记录器与资产迁移/清理循环。
+func (s *Server) StartBackground(ctx context.Context) {
 	// 启动使用量异步记录器
 	s.recorder.Start()
 
-	pluginCtx, cancel := context.WithCancel(ctx)
-	s.pluginStartCancel = cancel
+	backgroundCtx, cancel := context.WithCancel(ctx)
+	s.backgroundCancel = cancel
 
-	go plugin.StartAssetMigrationLoop(pluginCtx, s.db)
-	go plugin.StartAssetCleanupLoop(pluginCtx, s.db)
+	// 渠道注册表初次加载与价目表预热；失败不阻塞启动：
+	// 注册表起后台指数退避重试（成功即停，Pick 另有惰性兜底），
+	// 价目表由 Get 惰性重载兜底。
+	if err := s.channelRegistry.Reload(ctx); err != nil {
+		slog.Warn("channel_registry_initial_load_failed", "error", err)
+		go retryReload(backgroundCtx, s.channelRegistry, "channel_registry", time.Second)
+	}
+	if err := s.pricingCache.Reload(ctx); err != nil {
+		slog.Warn("model_price_cache_warmup_failed", "error", err)
+	}
 
-	go func() {
-		// 加载已编译的插件。后台执行，避免坏插件阻塞 core 监听端口。
-		if err := s.pluginMgr.LoadAll(pluginCtx); err != nil {
-			slog.Error("加载插件失败（不影响核心服务）", "error", err)
-		}
-		if pluginCtx.Err() != nil {
+	go asset.StartAssetMigrationLoop(backgroundCtx, s.db)
+	go asset.StartAssetCleanupLoop(backgroundCtx, s.db)
+}
+
+// reloadable 后台重试所需的窄接口（registry.Registry 实现；便于测试注入）。
+type reloadable interface {
+	Reload(ctx context.Context) error
+}
+
+// retryReloadMaxDelay 后台重载重试的退避上限。
+const retryReloadMaxDelay = 30 * time.Second
+
+// retryReload 指数退避重试 Reload（initialDelay 起、30s 封顶），成功或 ctx 取消即停。
+func retryReload(ctx context.Context, target reloadable, name string, initialDelay time.Duration) {
+	delay := initialDelay
+	for {
+		select {
+		case <-ctx.Done():
 			return
+		case <-time.After(delay):
 		}
-
-		// 加载开发模式插件（go run 源码）
-		for _, dev := range s.cfg.Plugins.Dev {
-			if pluginCtx.Err() != nil {
-				return
-			}
-			if err := s.pluginMgr.LoadDev(pluginCtx, dev.Name, dev.Path); err != nil {
-				slog.Error("加载开发插件失败", "name", dev.Name, "path", dev.Path, "error", err)
-			}
+		if err := target.Reload(ctx); err != nil {
+			slog.Warn("background_reload_retry_failed", "target", name, "delay", delay.String(), "error", err)
+			delay = min(delay*2, retryReloadMaxDelay)
+			continue
 		}
-
-		// 启动统一任务分发器
-		if pluginCtx.Err() == nil {
-			s.pluginMgr.StartTaskDispatcher(pluginCtx)
-		}
-
-		if s.handlers != nil && s.handlers.AccountService != nil && pluginCtx.Err() == nil {
-			s.handlers.AccountService.StartQuotaRefreshLoop(pluginCtx)
-		}
-
-		// 启动插件市场后台同步（默认开启，配置 plugins.marketplace.disabled=true 可关闭）
-		if !s.cfg.Plugins.Marketplace.Disabled && pluginCtx.Err() == nil {
-			s.marketplace.Start(context.Background())
-		}
-	}()
+		slog.Info("background_reload_retry_succeeded", "target", name)
+		return
+	}
 }
 
 // Shutdown 优雅关闭服务器
 func (s *Server) Shutdown(ctx context.Context) error {
 	slog.Info("正在关闭服务器...")
 
-	if s.pluginStartCancel != nil {
-		s.pluginStartCancel()
+	if s.backgroundCancel != nil {
+		s.backgroundCancel()
 	}
 
 	// 停止 IP 限流器后台清理
@@ -222,14 +188,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 	// 停止使用量记录器
 	s.recorder.Stop()
-
-	// 停止插件市场后台同步
-	if !s.cfg.Plugins.Marketplace.Disabled {
-		s.marketplace.Stop()
-	}
-
-	// 停止所有插件
-	s.pluginMgr.StopAll(ctx)
 
 	return s.srv.Shutdown(ctx)
 }

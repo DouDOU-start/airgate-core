@@ -28,19 +28,20 @@ func TestRecordSyncPersistsUserEmailSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create group: %v", err)
 	}
-	account, err := db.Account.Create().
-		SetName("acc").
-		SetPlatform("openai").
+	channel, err := db.Channel.Create().
+		SetName("chan").
+		SetType("openai_compatible").
+		SetBaseURL("https://api.openai.com").
 		Save(ctx)
 	if err != nil {
-		t.Fatalf("create account: %v", err)
+		t.Fatalf("create channel: %v", err)
 	}
 
 	recorder := NewRecorder(db, 0)
 	usageID, err := recorder.RecordSync(ctx, UsageRecord{
 		UserID:    user.ID,
 		UserEmail: user.Email,
-		AccountID: account.ID,
+		ChannelID: channel.ID,
 		GroupID:   group.ID,
 		Platform:  "openai",
 		Model:     "gpt-5",

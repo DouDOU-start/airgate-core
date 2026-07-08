@@ -41,12 +41,6 @@ func (h *GroupHandler) ListGroups(c *gin.Context) {
 	for _, item := range result.List {
 		resp := toGroupRespFromDomain(item)
 		if stats, ok := statsMap[item.ID]; ok {
-			resp.AccountActive = stats.AccountActive
-			resp.AccountError = stats.AccountError
-			resp.AccountDisabled = stats.AccountDisabled
-			resp.AccountTotal = stats.AccountTotal
-			resp.CapacityUsed = stats.CapacityUsed
-			resp.CapacityTotal = stats.CapacityTotal
 			resp.TodayCost = stats.TodayCost
 			resp.TotalCost = stats.TotalCost
 		}
@@ -124,20 +118,18 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 	}
 
 	item, err := h.service.Create(c.Request.Context(), appgroup.CreateInput{
-		Name:                     req.Name,
-		Platform:                 req.Platform,
-		RateMultiplier:           req.RateMultiplier,
-		IsExclusive:              req.IsExclusive,
-		StatusVisible:            statusVisible,
-		SubscriptionType:         req.SubscriptionType,
-		Quotas:                   req.Quotas,
-		ModelRouting:             req.ModelRouting,
-		PluginSettings:           req.PluginSettings,
-		ServiceTier:              req.ServiceTier,
-		ForceInstructions:        req.ForceInstructions,
-		Note:                     req.Note,
-		SortWeight:               req.SortWeight,
-		CopyAccountsFromGroupIDs: req.CopyAccountsFromGroupIDs,
+		Name:              req.Name,
+		Platform:          req.Platform,
+		RateMultiplier:    req.RateMultiplier,
+		IsExclusive:       req.IsExclusive,
+		StatusVisible:     statusVisible,
+		SubscriptionType:  req.SubscriptionType,
+		Quotas:            req.Quotas,
+		ModelRouting:      req.ModelRouting,
+		ServiceTier:       req.ServiceTier,
+		ForceInstructions: req.ForceInstructions,
+		Note:              req.Note,
+		SortWeight:        req.SortWeight,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("创建分组失败", "创建失败", err)
@@ -170,7 +162,6 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 		SubscriptionType:  req.SubscriptionType,
 		Quotas:            req.Quotas,
 		ModelRouting:      req.ModelRouting,
-		PluginSettings:    req.PluginSettings,
 		ServiceTier:       req.ServiceTier,
 		ForceInstructions: req.ForceInstructions,
 		Note:              req.Note,

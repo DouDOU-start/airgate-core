@@ -11,7 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/account"
+	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/proxy"
 )
@@ -140,19 +140,19 @@ func (pu *ProxyUpdate) SetUpdatedAt(t time.Time) *ProxyUpdate {
 	return pu
 }
 
-// AddAccountIDs adds the "accounts" edge to the Account entity by IDs.
-func (pu *ProxyUpdate) AddAccountIDs(ids ...int) *ProxyUpdate {
-	pu.mutation.AddAccountIDs(ids...)
+// AddChannelIDs adds the "channels" edge to the Channel entity by IDs.
+func (pu *ProxyUpdate) AddChannelIDs(ids ...int) *ProxyUpdate {
+	pu.mutation.AddChannelIDs(ids...)
 	return pu
 }
 
-// AddAccounts adds the "accounts" edges to the Account entity.
-func (pu *ProxyUpdate) AddAccounts(a ...*Account) *ProxyUpdate {
-	ids := make([]int, len(a))
-	for i := range a {
-		ids[i] = a[i].ID
+// AddChannels adds the "channels" edges to the Channel entity.
+func (pu *ProxyUpdate) AddChannels(c ...*Channel) *ProxyUpdate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return pu.AddAccountIDs(ids...)
+	return pu.AddChannelIDs(ids...)
 }
 
 // Mutation returns the ProxyMutation object of the builder.
@@ -160,25 +160,25 @@ func (pu *ProxyUpdate) Mutation() *ProxyMutation {
 	return pu.mutation
 }
 
-// ClearAccounts clears all "accounts" edges to the Account entity.
-func (pu *ProxyUpdate) ClearAccounts() *ProxyUpdate {
-	pu.mutation.ClearAccounts()
+// ClearChannels clears all "channels" edges to the Channel entity.
+func (pu *ProxyUpdate) ClearChannels() *ProxyUpdate {
+	pu.mutation.ClearChannels()
 	return pu
 }
 
-// RemoveAccountIDs removes the "accounts" edge to Account entities by IDs.
-func (pu *ProxyUpdate) RemoveAccountIDs(ids ...int) *ProxyUpdate {
-	pu.mutation.RemoveAccountIDs(ids...)
+// RemoveChannelIDs removes the "channels" edge to Channel entities by IDs.
+func (pu *ProxyUpdate) RemoveChannelIDs(ids ...int) *ProxyUpdate {
+	pu.mutation.RemoveChannelIDs(ids...)
 	return pu
 }
 
-// RemoveAccounts removes "accounts" edges to Account entities.
-func (pu *ProxyUpdate) RemoveAccounts(a ...*Account) *ProxyUpdate {
-	ids := make([]int, len(a))
-	for i := range a {
-		ids[i] = a[i].ID
+// RemoveChannels removes "channels" edges to Channel entities.
+func (pu *ProxyUpdate) RemoveChannels(c ...*Channel) *ProxyUpdate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return pu.RemoveAccountIDs(ids...)
+	return pu.RemoveChannelIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -281,28 +281,28 @@ func (pu *ProxyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := pu.mutation.UpdatedAt(); ok {
 		_spec.SetField(proxy.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if pu.mutation.AccountsCleared() {
+	if pu.mutation.ChannelsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: true,
-			Table:   proxy.AccountsTable,
-			Columns: []string{proxy.AccountsColumn},
+			Table:   proxy.ChannelsTable,
+			Columns: []string{proxy.ChannelsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := pu.mutation.RemovedAccountsIDs(); len(nodes) > 0 && !pu.mutation.AccountsCleared() {
+	if nodes := pu.mutation.RemovedChannelsIDs(); len(nodes) > 0 && !pu.mutation.ChannelsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: true,
-			Table:   proxy.AccountsTable,
-			Columns: []string{proxy.AccountsColumn},
+			Table:   proxy.ChannelsTable,
+			Columns: []string{proxy.ChannelsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -310,15 +310,15 @@ func (pu *ProxyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := pu.mutation.AccountsIDs(); len(nodes) > 0 {
+	if nodes := pu.mutation.ChannelsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: true,
-			Table:   proxy.AccountsTable,
-			Columns: []string{proxy.AccountsColumn},
+			Table:   proxy.ChannelsTable,
+			Columns: []string{proxy.ChannelsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -457,19 +457,19 @@ func (puo *ProxyUpdateOne) SetUpdatedAt(t time.Time) *ProxyUpdateOne {
 	return puo
 }
 
-// AddAccountIDs adds the "accounts" edge to the Account entity by IDs.
-func (puo *ProxyUpdateOne) AddAccountIDs(ids ...int) *ProxyUpdateOne {
-	puo.mutation.AddAccountIDs(ids...)
+// AddChannelIDs adds the "channels" edge to the Channel entity by IDs.
+func (puo *ProxyUpdateOne) AddChannelIDs(ids ...int) *ProxyUpdateOne {
+	puo.mutation.AddChannelIDs(ids...)
 	return puo
 }
 
-// AddAccounts adds the "accounts" edges to the Account entity.
-func (puo *ProxyUpdateOne) AddAccounts(a ...*Account) *ProxyUpdateOne {
-	ids := make([]int, len(a))
-	for i := range a {
-		ids[i] = a[i].ID
+// AddChannels adds the "channels" edges to the Channel entity.
+func (puo *ProxyUpdateOne) AddChannels(c ...*Channel) *ProxyUpdateOne {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return puo.AddAccountIDs(ids...)
+	return puo.AddChannelIDs(ids...)
 }
 
 // Mutation returns the ProxyMutation object of the builder.
@@ -477,25 +477,25 @@ func (puo *ProxyUpdateOne) Mutation() *ProxyMutation {
 	return puo.mutation
 }
 
-// ClearAccounts clears all "accounts" edges to the Account entity.
-func (puo *ProxyUpdateOne) ClearAccounts() *ProxyUpdateOne {
-	puo.mutation.ClearAccounts()
+// ClearChannels clears all "channels" edges to the Channel entity.
+func (puo *ProxyUpdateOne) ClearChannels() *ProxyUpdateOne {
+	puo.mutation.ClearChannels()
 	return puo
 }
 
-// RemoveAccountIDs removes the "accounts" edge to Account entities by IDs.
-func (puo *ProxyUpdateOne) RemoveAccountIDs(ids ...int) *ProxyUpdateOne {
-	puo.mutation.RemoveAccountIDs(ids...)
+// RemoveChannelIDs removes the "channels" edge to Channel entities by IDs.
+func (puo *ProxyUpdateOne) RemoveChannelIDs(ids ...int) *ProxyUpdateOne {
+	puo.mutation.RemoveChannelIDs(ids...)
 	return puo
 }
 
-// RemoveAccounts removes "accounts" edges to Account entities.
-func (puo *ProxyUpdateOne) RemoveAccounts(a ...*Account) *ProxyUpdateOne {
-	ids := make([]int, len(a))
-	for i := range a {
-		ids[i] = a[i].ID
+// RemoveChannels removes "channels" edges to Channel entities.
+func (puo *ProxyUpdateOne) RemoveChannels(c ...*Channel) *ProxyUpdateOne {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return puo.RemoveAccountIDs(ids...)
+	return puo.RemoveChannelIDs(ids...)
 }
 
 // Where appends a list predicates to the ProxyUpdate builder.
@@ -628,28 +628,28 @@ func (puo *ProxyUpdateOne) sqlSave(ctx context.Context) (_node *Proxy, err error
 	if value, ok := puo.mutation.UpdatedAt(); ok {
 		_spec.SetField(proxy.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if puo.mutation.AccountsCleared() {
+	if puo.mutation.ChannelsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: true,
-			Table:   proxy.AccountsTable,
-			Columns: []string{proxy.AccountsColumn},
+			Table:   proxy.ChannelsTable,
+			Columns: []string{proxy.ChannelsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := puo.mutation.RemovedAccountsIDs(); len(nodes) > 0 && !puo.mutation.AccountsCleared() {
+	if nodes := puo.mutation.RemovedChannelsIDs(); len(nodes) > 0 && !puo.mutation.ChannelsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: true,
-			Table:   proxy.AccountsTable,
-			Columns: []string{proxy.AccountsColumn},
+			Table:   proxy.ChannelsTable,
+			Columns: []string{proxy.ChannelsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -657,15 +657,15 @@ func (puo *ProxyUpdateOne) sqlSave(ctx context.Context) (_node *Proxy, err error
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := puo.mutation.AccountsIDs(); len(nodes) > 0 {
+	if nodes := puo.mutation.ChannelsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: true,
-			Table:   proxy.AccountsTable,
-			Columns: []string{proxy.AccountsColumn},
+			Table:   proxy.ChannelsTable,
+			Columns: []string{proxy.ChannelsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

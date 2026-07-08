@@ -6,7 +6,6 @@ import { usageApi } from '../../shared/api/usage';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
-import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useToast } from '../../shared/ui';
 import { Activity, Hash, DollarSign, Coins, Clock, Gauge, Percent, Upload } from 'lucide-react';
@@ -74,7 +73,6 @@ function APIKeyInfoBar() {
   // 原文 Key 仅在 API Key 登录当次会话内通过 sessionStorage 暂存；刷新页面后丢失，
   // 此时按钮会提示用户重新登录。
   const sessionKey = getSessionAPIKey();
-  const platform = user.api_key_platform || '';
   const canImportCcs = !!sessionKey;
 
   function handleImportCcs() {
@@ -173,7 +171,6 @@ function APIKeyInfoBar() {
         <CcsImportModal
           open={ccsOpen}
           ccsKeyValue={sessionKey}
-          ccsPlatform={platform}
           onClose={() => setCcsOpen(false)}
         />
       </Card.Content>
@@ -203,13 +200,6 @@ export default function UserUsageContent() {
     page_size: pageSize,
     ...filters,
   }), [filters, page, pageSize]);
-
-  const { platforms, platformName } = usePlatforms();
-  const platformOptions = [
-    { id: '', label: t('common.all') },
-    ...platforms.map((p) => ({ id: p, label: platformName(p) })),
-  ];
-  const selectedPlatformLabel = platformOptions.find((item) => item.id === (filters.platform || ''))?.label ?? t('common.all');
 
   const { data: apiKeysData } = useQuery({
     queryKey: queryKeys.userKeys('usage-filter'),
@@ -373,32 +363,6 @@ export default function UserUsageContent() {
               setFilters((prev) => ({ ...prev, start_date: startDate, end_date: endDate }));
             }}
           />
-        </div>
-        <div className="w-full sm:w-48">
-          <Select
-            aria-label={t('usage.platform')}
-            fullWidth
-            selectedKey={filters.platform || ''}
-            onSelectionChange={(key) => updateFilter('platform', key == null ? '' : String(key))}
-          >
-            <Select.Trigger>
-              <Select.Value>
-                {filters.platform ? selectedPlatformLabel : (
-                  <span className="text-text-tertiary">{t('usage.platform')}</span>
-                )}
-              </Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={platformOptions}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
         </div>
         {!customerScope && (
           <div className="w-full sm:w-48">

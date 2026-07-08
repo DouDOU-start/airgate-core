@@ -10,8 +10,8 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -34,6 +34,14 @@ func (gc *GroupCreate) SetName(s string) *GroupCreate {
 // SetPlatform sets the "platform" field.
 func (gc *GroupCreate) SetPlatform(s string) *GroupCreate {
 	gc.mutation.SetPlatform(s)
+	return gc
+}
+
+// SetNillablePlatform sets the "platform" field if the given value is not nil.
+func (gc *GroupCreate) SetNillablePlatform(s *string) *GroupCreate {
+	if s != nil {
+		gc.SetPlatform(*s)
+	}
 	return gc
 }
 
@@ -102,12 +110,6 @@ func (gc *GroupCreate) SetQuotas(m map[string]interface{}) *GroupCreate {
 // SetModelRouting sets the "model_routing" field.
 func (gc *GroupCreate) SetModelRouting(m map[string][]int64) *GroupCreate {
 	gc.mutation.SetModelRouting(m)
-	return gc
-}
-
-// SetPluginSettings sets the "plugin_settings" field.
-func (gc *GroupCreate) SetPluginSettings(m map[string]map[string]string) *GroupCreate {
-	gc.mutation.SetPluginSettings(m)
 	return gc
 }
 
@@ -195,19 +197,19 @@ func (gc *GroupCreate) SetNillableUpdatedAt(t *time.Time) *GroupCreate {
 	return gc
 }
 
-// AddAccountIDs adds the "accounts" edge to the Account entity by IDs.
-func (gc *GroupCreate) AddAccountIDs(ids ...int) *GroupCreate {
-	gc.mutation.AddAccountIDs(ids...)
+// AddChannelIDs adds the "channels" edge to the Channel entity by IDs.
+func (gc *GroupCreate) AddChannelIDs(ids ...int) *GroupCreate {
+	gc.mutation.AddChannelIDs(ids...)
 	return gc
 }
 
-// AddAccounts adds the "accounts" edges to the Account entity.
-func (gc *GroupCreate) AddAccounts(a ...*Account) *GroupCreate {
-	ids := make([]int, len(a))
-	for i := range a {
-		ids[i] = a[i].ID
+// AddChannels adds the "channels" edges to the Channel entity.
+func (gc *GroupCreate) AddChannels(c ...*Channel) *GroupCreate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return gc.AddAccountIDs(ids...)
+	return gc.AddChannelIDs(ids...)
 }
 
 // AddAllowedUserIDs adds the "allowed_users" edge to the User entity by IDs.
@@ -305,6 +307,10 @@ func (gc *GroupCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (gc *GroupCreate) defaults() {
+	if _, ok := gc.mutation.Platform(); !ok {
+		v := group.DefaultPlatform
+		gc.mutation.SetPlatform(v)
+	}
 	if _, ok := gc.mutation.RateMultiplier(); !ok {
 		v := group.DefaultRateMultiplier
 		gc.mutation.SetRateMultiplier(v)
@@ -359,11 +365,6 @@ func (gc *GroupCreate) check() error {
 	}
 	if _, ok := gc.mutation.Platform(); !ok {
 		return &ValidationError{Name: "platform", err: errors.New(`ent: missing required field "Group.platform"`)}
-	}
-	if v, ok := gc.mutation.Platform(); ok {
-		if err := group.PlatformValidator(v); err != nil {
-			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "Group.platform": %w`, err)}
-		}
 	}
 	if _, ok := gc.mutation.RateMultiplier(); !ok {
 		return &ValidationError{Name: "rate_multiplier", err: errors.New(`ent: missing required field "Group.rate_multiplier"`)}
@@ -458,10 +459,6 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		_spec.SetField(group.FieldModelRouting, field.TypeJSON, value)
 		_node.ModelRouting = value
 	}
-	if value, ok := gc.mutation.PluginSettings(); ok {
-		_spec.SetField(group.FieldPluginSettings, field.TypeJSON, value)
-		_node.PluginSettings = value
-	}
 	if value, ok := gc.mutation.ServiceTier(); ok {
 		_spec.SetField(group.FieldServiceTier, field.TypeString, value)
 		_node.ServiceTier = value
@@ -486,15 +483,15 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		_spec.SetField(group.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
 	}
-	if nodes := gc.mutation.AccountsIDs(); len(nodes) > 0 {
+	if nodes := gc.mutation.ChannelsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.AccountsTable,
-			Columns: group.AccountsPrimaryKey,
+			Table:   group.ChannelsTable,
+			Columns: group.ChannelsPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

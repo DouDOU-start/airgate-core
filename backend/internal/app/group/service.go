@@ -42,35 +42,12 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 	}, nil
 }
 
-// StatsForGroups 批量查询分组统计信息（含实时容量）。
+// StatsForGroups 批量查询分组统计信息（今日/累计用量）。
 // tz 决定"今日"起点；为空时回退到服务器本地时区。
 func (s *Service) StatsForGroups(ctx context.Context, groupIDs []int, tz string) (map[int]GroupStats, error) {
 	loc := timezone.Resolve(tz)
 	todayStart := timezone.StartOfDay(time.Now().In(loc))
-	stats, activeAccounts, err := s.repo.StatsForGroups(ctx, groupIDs, todayStart)
-	if err != nil {
-		return nil, err
-	}
-
-	// 收集所有活跃账号 ID，批量查询当前并发数
-	var allAccountIDs []int
-	for _, accs := range activeAccounts {
-		for _, a := range accs {
-			allAccountIDs = append(allAccountIDs, a.AccountID)
-		}
-	}
-	counts := s.concurrency.GetCurrentCounts(ctx, allAccountIDs)
-
-	// 按分组聚合已用容量
-	for groupID, accs := range activeAccounts {
-		st := stats[groupID]
-		for _, a := range accs {
-			st.CapacityUsed += counts[a.AccountID]
-		}
-		stats[groupID] = st
-	}
-
-	return stats, nil
+	return s.repo.StatsForGroups(ctx, groupIDs, todayStart)
 }
 
 // ListAvailable 查询用户可用分组列表。
@@ -108,7 +85,6 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Group, error) 
 	logger := sdk.LoggerFromContext(ctx)
 	input.Quotas = cloneQuotas(input.Quotas)
 	input.ModelRouting = cloneModelRouting(input.ModelRouting)
-	input.PluginSettings = clonePluginSettings(input.PluginSettings)
 	g, err := s.repo.Create(ctx, input)
 	if err != nil {
 		logger.Error("group_persist_failed",
@@ -130,7 +106,6 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Group,
 	logger := sdk.LoggerFromContext(ctx)
 	input.Quotas = cloneQuotas(input.Quotas)
 	input.ModelRouting = cloneModelRouting(input.ModelRouting)
-	input.PluginSettings = clonePluginSettings(input.PluginSettings)
 	g, err := s.repo.Update(ctx, id, input)
 	if err != nil {
 		logger.Error("group_persist_failed",

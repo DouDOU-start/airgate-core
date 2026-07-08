@@ -5,9 +5,8 @@ import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsPr
 import { useTheme } from '../app/providers/ThemeProvider';
 import { getToken } from '../shared/api/client';
 import { effectiveDocUrl } from '../shared/utils/docUrl';
-import { useStatusPageEnabled } from '../shared/hooks/useStatusPageEnabled';
 import {
-  Zap, Shield, Globe, ArrowRight, Sun, Moon, Code, BarChart3, KeyRound, Layers, Activity,
+  Zap, Shield, Globe, ArrowRight, Sun, Moon, Code, BarChart3, KeyRound, Layers,
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -15,8 +14,6 @@ export default function HomePage() {
   const navigate = useNavigate();
   const site = useSiteSettings();
   const { theme, toggleTheme } = useTheme();
-  const showStatusEntry = useStatusPageEnabled();
-
   const isLoggedIn = !!getToken();
   // 文档链接 fallback：管理员未填外部 doc_url 时回退到内置 /docs（详见 docUrl.ts）
   const docs = effectiveDocUrl(site.doc_url);
@@ -24,7 +21,7 @@ export default function HomePage() {
   const features = [
     { icon: <Zap className="w-6 h-6" />, titleKey: 'home.feature_gateway', descKey: 'home.feature_gateway_desc' },
     { icon: <Shield className="w-6 h-6" />, titleKey: 'home.feature_security', descKey: 'home.feature_security_desc' },
-    { icon: <Layers className="w-6 h-6" />, titleKey: 'home.feature_plugins', descKey: 'home.feature_plugins_desc' },
+    { icon: <Layers className="w-6 h-6" />, titleKey: 'home.feature_channels', descKey: 'home.feature_channels_desc' },
     { icon: <BarChart3 className="w-6 h-6" />, titleKey: 'home.feature_analytics', descKey: 'home.feature_analytics_desc' },
     { icon: <KeyRound className="w-6 h-6" />, titleKey: 'home.feature_keys', descKey: 'home.feature_keys_desc' },
     { icon: <Globe className="w-6 h-6" />, titleKey: 'home.feature_multi_platform', descKey: 'home.feature_multi_platform_desc' },
@@ -39,15 +36,6 @@ export default function HomePage() {
           <span className="text-base font-bold">{site.site_name || 'AirGate'}</span>
         </div>
         <div className="flex items-center gap-2">
-          {showStatusEntry && (
-            <HeroLink
-              href="/status"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text transition-colors"
-            >
-              <Activity className="w-3.5 h-3.5" />
-              {t('nav.status')}
-            </HeroLink>
-          )}
           <HeroLink
             href={docs.href}
             {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}

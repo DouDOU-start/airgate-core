@@ -1,11 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
-import { queryKeys } from '../../../shared/queryKeys';
-import { Button, Chip, Description, Input, Label, ListBox, Modal, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { Button, Description, Input, Label, ListBox, Modal, Select, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
-import { ArrowUpDown, Layers, X } from 'lucide-react';
-import { groupsApi } from '../../../shared/api/groups';
+import { ArrowUpDown, Layers } from 'lucide-react';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../../shared/types';
 
@@ -25,56 +22,6 @@ function buildQuotas(q: { daily: string; weekly: string; monthly: string }): Rec
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-type ImagePrices = {
-  oneK: string;
-  twoK: string;
-  fourK: string;
-};
-
-const IMAGE_PRICE_FIELDS: Array<{ key: keyof ImagePrices; setting: string; label: string }> = [
-  { key: 'oneK', setting: 'image_price_1k', label: '1K' },
-  { key: 'twoK', setting: 'image_price_2k', label: '2K' },
-  { key: 'fourK', setting: 'image_price_4k', label: '4K' },
-];
-
-function parseImagePrices(settings?: Record<string, Record<string, string>>): ImagePrices {
-  const openai = settings?.openai ?? {};
-  return {
-    oneK: openai.image_price_1k ?? '',
-    twoK: openai.image_price_2k ?? '',
-    fourK: openai.image_price_4k ?? '',
-  };
-}
-
-function clonePluginSettings(
-  settings?: Record<string, Record<string, string>>,
-): Record<string, Record<string, string>> {
-  const result: Record<string, Record<string, string>> = {};
-  for (const [plugin, values] of Object.entries(settings ?? {})) {
-    result[plugin] = { ...values };
-  }
-  return result;
-}
-
-function buildOpenAISettings(
-  current: Record<string, string> | undefined,
-  imageEnabled: boolean,
-  prices: ImagePrices,
-): Record<string, string> {
-  const settings: Record<string, string> = { ...(current ?? {}), image_enabled: imageEnabled ? 'true' : 'false' };
-
-  for (const field of IMAGE_PRICE_FIELDS) {
-    delete settings[field.setting];
-    const raw = prices[field.key].trim();
-    if (raw === '') continue;
-    const value = Number(raw);
-    if (Number.isFinite(value) && value >= 0) {
-      settings[field.setting] = raw;
-    }
-  }
-  return settings;
-}
-
 export function GroupFormModal({
   open,
   title,
@@ -82,8 +29,6 @@ export function GroupFormModal({
   onClose,
   onSubmit,
   loading,
-  platforms,
-  instructionPresets,
 }: {
   open: boolean;
   title: string;
@@ -91,8 +36,6 @@ export function GroupFormModal({
   onClose: () => void;
   onSubmit: (data: CreateGroupReq | UpdateGroupReq) => void;
   loading: boolean;
-  platforms: string[];
-  instructionPresets: (platform: string) => string[];
 }) {
   const { t } = useTranslation();
   const isEdit = !!group;
@@ -102,45 +45,13 @@ export function GroupFormModal({
     is_exclusive: group?.is_exclusive ?? false,
     name: group?.name ?? '',
     note: group?.note ?? '',
-    platform: group?.platform ?? '',
     rate_multiplier: group?.rate_multiplier ?? 1,
     sort_weight: group?.sort_weight ?? 0,
     status_visible: group?.status_visible ?? true,
     subscription_type: group?.subscription_type ?? 'standard' as const,
   });
   const [quotas, setQuotas] = useState(parseQuotas(group?.quotas as Record<string, unknown> | undefined));
-  const [claudeCodeOnly, setClaudeCodeOnly] = useState(group?.plugin_settings?.claude?.claude_code_only === 'true');
-  const [imageEnabled, setImageEnabled] = useState(group?.plugin_settings?.openai?.image_enabled === 'true');
-  const [imagePrices, setImagePrices] = useState<ImagePrices>(() => parseImagePrices(group?.plugin_settings));
-  const [copyFromGroupIds, setCopyFromGroupIds] = useState<number[]>([]);
 
-  const { data: copySourceData } = useQuery({
-    queryKey: queryKeys.groupsForCopy(form.platform),
-    queryFn: () => groupsApi.list({ page: 1, page_size: 100, platform: form.platform }),
-    enabled: !isEdit && !!form.platform && open,
-  });
-  const copySourceGroups: GroupResp[] = copySourceData?.list ?? [];
-  const platformOptions = [
-    { id: '', label: t('groups.select_platform') },
-    ...platforms.map((platform) => ({ id: platform, label: platform })),
-  ];
-  const selectedPlatformLabel = platformOptions.find((item) => item.id === form.platform)?.label ?? t('groups.select_platform');
-  const copyAccountOptions = [
-    {
-      id: '',
-      label: !form.platform
-        ? t('groups.copy_accounts_select_platform_first')
-        : copySourceGroups.length === 0
-          ? t('groups.copy_accounts_empty')
-          : t('groups.copy_accounts_placeholder'),
-    },
-    ...copySourceGroups
-      .filter((copyGroup) => !copyFromGroupIds.includes(copyGroup.id))
-      .map((copyGroup) => ({
-        id: String(copyGroup.id),
-        label: `${copyGroup.name} (${t('groups.copy_accounts_count', { count: copyGroup.account_total })})`,
-      })),
-  ];
   const subscriptionTypeOptions = [
     { id: 'standard', label: t('groups.type_standard') },
     { id: 'subscription', label: t('groups.type_subscription') },
@@ -149,33 +60,17 @@ export function GroupFormModal({
     subscriptionTypeOptions.find((item) => item.id === form.subscription_type)?.label ?? t('groups.type_standard');
 
   const handleSubmit = () => {
-    if (!isEdit && (!form.name || !form.platform)) return;
-
-    const pluginSettings = clonePluginSettings(group?.plugin_settings);
-    if (form.platform === 'claude') {
-      pluginSettings.claude = {
-        ...(pluginSettings.claude ?? {}),
-        claude_code_only: claudeCodeOnly ? 'true' : 'false',
-      };
-    }
-    if (form.platform === 'openai') {
-      pluginSettings.openai = buildOpenAISettings(pluginSettings.openai, imageEnabled, imagePrices);
-    }
+    if (!isEdit && !form.name) return;
 
     onSubmit({
       ...form,
       force_instructions: form.force_instructions ?? '',
       note: form.note,
-      plugin_settings: Object.keys(pluginSettings).length > 0 ? pluginSettings : undefined,
       quotas: form.subscription_type === 'subscription' ? buildQuotas(quotas) : undefined,
       subscription_type: form.subscription_type as 'standard' | 'subscription',
-      ...(!isEdit && copyFromGroupIds.length > 0
-        ? { copy_accounts_from_group_ids: copyFromGroupIds }
-        : {}),
     });
   };
 
-  const presets = instructionPresets(form.platform);
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -210,93 +105,6 @@ export function GroupFormModal({
             />
           </div>
         </HeroTextField>
-
-        {isEdit ? (
-          <HeroTextField fullWidth isDisabled>
-            <Label>{t('groups.platform')}</Label>
-            <Input value={form.platform} disabled />
-          </HeroTextField>
-        ) : (
-          <Select
-            fullWidth
-            isRequired
-            selectedKey={form.platform}
-            onSelectionChange={(key) => {
-              setForm({ ...form, platform: key == null ? '' : String(key) });
-              setCopyFromGroupIds([]);
-            }}
-          >
-            <Label>{t('groups.platform')}</Label>
-            <Select.Trigger>
-              <Select.Value>{selectedPlatformLabel}</Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={platformOptions}>
-                {(item) => (
-                  <ListBox.Item id={item.id} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        )}
-
-        {!isEdit ? (
-          <div>
-            <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
-              {t('groups.copy_accounts_title')}
-            </p>
-            {copyFromGroupIds.length > 0 ? (
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {copyFromGroupIds.map((groupId) => {
-                  const sourceGroup = copySourceGroups.find((item) => item.id === groupId);
-                  return (
-                    <Chip key={groupId} color="accent" size="sm" variant="soft">
-                      {sourceGroup ? sourceGroup.name : `#${groupId}`}
-                      <Button
-                        isIconOnly
-                        aria-label="remove"
-                        size="sm"
-                        variant="ghost"
-                        onPress={() => setCopyFromGroupIds(copyFromGroupIds.filter((id) => id !== groupId))}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </Chip>
-                  );
-                })}
-              </div>
-            ) : null}
-            <Select
-              fullWidth
-              isDisabled={!form.platform}
-              selectedKey=""
-              onSelectionChange={(key) => {
-                const value = Number(key);
-                if (value && !copyFromGroupIds.includes(value)) {
-                  setCopyFromGroupIds([...copyFromGroupIds, value]);
-                }
-              }}
-            >
-              <Select.Trigger>
-                <Select.Value>{copyAccountOptions[0]?.label}</Select.Value>
-                <Select.Indicator />
-              </Select.Trigger>
-              <Select.Popover>
-                <ListBox items={copyAccountOptions}>
-                  {(item) => (
-                    <ListBox.Item id={item.id} textValue={item.label}>
-                      {item.label}
-                    </ListBox.Item>
-                  )}
-                </ListBox>
-              </Select.Popover>
-            </Select>
-            <p className="mt-1 text-[11px] text-text-tertiary">{t('groups.copy_accounts_hint')}</p>
-          </div>
-        ) : null}
 
         <HeroTextField fullWidth>
           <Label>{t('groups.rate_multiplier')}</Label>
@@ -368,88 +176,6 @@ export function GroupFormModal({
           />
           <Description>{t('groups.note_hint')}</Description>
         </HeroTextField>
-
-        {presets.length > 0 ? (
-          <div>
-            <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
-              {t('groups.force_instructions')}
-            </p>
-            <p className="mb-2 text-[11px] text-text-tertiary">{t('groups.force_instructions_hint')}</p>
-            <div className="mb-2 flex flex-wrap gap-2">
-              {['', ...presets].map((preset) => (
-                <Button
-                  key={preset}
-                  size="sm"
-                  variant={form.force_instructions === preset ? 'primary' : 'secondary'}
-                  onPress={() => setForm({ ...form, force_instructions: preset })}
-                >
-                  {preset || t('groups.instructions_none')}
-                </Button>
-              ))}
-            </div>
-            {form.force_instructions && !presets.includes(form.force_instructions) ? (
-              <HeroTextField fullWidth>
-                <TextArea
-                  rows={4}
-                  value={form.force_instructions}
-                  onChange={(e) => setForm({ ...form, force_instructions: e.target.value })}
-                  placeholder={t('groups.instructions_custom_placeholder')}
-                />
-              </HeroTextField>
-            ) : null}
-          </div>
-        ) : null}
-
-        {form.platform === 'claude' ? (
-          <NativeSwitch
-            isSelected={claudeCodeOnly}
-            label={(
-              <span>
-                <span className="block text-sm">仅 Claude Code 客户端</span>
-                <span className="mt-1 block text-[11px] text-text-tertiary">
-                  开启后，本分组的账号只接受官方 Claude CLI 发起的流量；非 CLI 请求返回 403。
-                </span>
-              </span>
-            )}
-            onChange={setClaudeCodeOnly}
-          />
-        ) : null}
-
-        {form.platform === 'openai' ? (
-          <div className="space-y-3">
-            <NativeSwitch
-              isSelected={imageEnabled}
-              label={<span className="text-sm text-text">{t('groups.image_generation')}</span>}
-              onChange={setImageEnabled}
-            />
-
-            {imageEnabled ? (
-              <div>
-                <p className="mb-1.5 text-xs font-medium uppercaser text-text-secondary">
-                  {t('groups.image_pricing')}
-                </p>
-                <p className="mb-2 text-[11px] text-text-tertiary">{t('groups.image_pricing_hint')}</p>
-                <div className="grid grid-cols-3 gap-3">
-                  {IMAGE_PRICE_FIELDS.map((field) => (
-                    <HeroTextField key={field.key} fullWidth>
-                      <Label>{field.label}</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.000001"
-                        value={imagePrices[field.key]}
-                        onChange={(e) =>
-                          setImagePrices((current) => ({ ...current, [field.key]: e.target.value }))
-                        }
-                        placeholder={t('groups.image_price_fallback')}
-                      />
-                    </HeroTextField>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
 
         {form.subscription_type === 'subscription' ? (
           <div>

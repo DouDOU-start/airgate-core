@@ -33,17 +33,17 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
-	// EdgeAccounts holds the string denoting the accounts edge name in mutations.
-	EdgeAccounts = "accounts"
+	// EdgeChannels holds the string denoting the channels edge name in mutations.
+	EdgeChannels = "channels"
 	// Table holds the table name of the proxy in the database.
 	Table = "proxies"
-	// AccountsTable is the table that holds the accounts relation/edge.
-	AccountsTable = "accounts"
-	// AccountsInverseTable is the table name for the Account entity.
-	// It exists in this package in order to avoid circular dependency with the "account" package.
-	AccountsInverseTable = "accounts"
-	// AccountsColumn is the table column denoting the accounts relation/edge.
-	AccountsColumn = "account_proxy"
+	// ChannelsTable is the table that holds the channels relation/edge.
+	ChannelsTable = "channels"
+	// ChannelsInverseTable is the table name for the Channel entity.
+	// It exists in this package in order to avoid circular dependency with the "channel" package.
+	ChannelsInverseTable = "channels"
+	// ChannelsColumn is the table column denoting the channels relation/edge.
+	ChannelsColumn = "channel_proxy"
 )
 
 // Columns holds all SQL columns for proxy fields.
@@ -192,23 +192,23 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
-// ByAccountsCount orders the results by accounts count.
-func ByAccountsCount(opts ...sql.OrderTermOption) OrderOption {
+// ByChannelsCount orders the results by channels count.
+func ByChannelsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newAccountsStep(), opts...)
+		sqlgraph.OrderByNeighborsCount(s, newChannelsStep(), opts...)
 	}
 }
 
-// ByAccounts orders the results by accounts terms.
-func ByAccounts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+// ByChannels orders the results by channels terms.
+func ByChannels(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newAccountsStep(), append([]sql.OrderTerm{term}, terms...)...)
+		sqlgraph.OrderByNeighborTerms(s, newChannelsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
-func newAccountsStep() *sqlgraph.Step {
+func newChannelsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(AccountsInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.O2M, true, AccountsTable, AccountsColumn),
+		sqlgraph.To(ChannelsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, true, ChannelsTable, ChannelsColumn),
 	)
 }

@@ -12,9 +12,8 @@ type UsageLogResp struct {
 	APIKeyName            string                `json:"api_key_name,omitempty"`
 	APIKeyHint            string                `json:"api_key_hint,omitempty"`
 	APIKeyDeleted         bool                  `json:"api_key_deleted"`
-	AccountID             int64                 `json:"account_id"`
-	AccountName           string                `json:"account_name,omitempty"`
-	AccountEmail          string                `json:"account_email,omitempty"`
+	ChannelID             int64                 `json:"channel_id"`
+	ChannelName           string                `json:"channel_name,omitempty"`
 	GroupID               int64                 `json:"group_id"`
 	Platform              string                `json:"platform"`
 	Model                 string                `json:"model"`
@@ -93,7 +92,7 @@ type UsageQuery struct {
 	PageReq
 	UserID    *int64 `form:"user_id"`
 	APIKeyID  *int64 `form:"api_key_id"`
-	AccountID *int64 `form:"account_id"`
+	ChannelID *int64 `form:"channel_id"`
 	GroupID   *int64 `form:"group_id"`
 	Platform  string `form:"platform"`
 	Model     string `form:"model"`
@@ -119,7 +118,7 @@ type UsageStatsResp struct {
 	TotalBilledCost float64        `json:"total_billed_cost,omitempty"` // 客户视角 / reseller scope 的账面费用；admin scope omit
 	ByModel         []ModelStats   `json:"by_model,omitempty"`
 	ByUser          []UserStats    `json:"by_user,omitempty"`
-	ByAccount       []AccountStats `json:"by_account,omitempty"`
+	ByChannel       []ChannelStats `json:"by_channel,omitempty"`
 	ByGroup         []GroupStats   `json:"by_group,omitempty"`
 }
 
@@ -144,9 +143,9 @@ type UserStats struct {
 	BilledCost float64 `json:"billed_cost,omitempty"`
 }
 
-// AccountStats 按账号统计
-type AccountStats struct {
-	AccountID  int64   `json:"account_id"`
+// ChannelStats 按渠道统计
+type ChannelStats struct {
+	ChannelID  int64   `json:"channel_id"`
 	Name       string  `json:"name"`
 	Requests   int64   `json:"requests"`
 	Tokens     int64   `json:"tokens"`

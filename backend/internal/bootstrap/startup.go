@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"context"
 	"log/slog"
-	"strings"
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
@@ -20,7 +19,6 @@ func RunStartupTasks(db *ent.Client, drv *entsql.Driver, apiKeySecret string) {
 	slog.Info("bootstrap_startup_tasks_start")
 	backfillKeyHints(db, apiKeySecret)
 	backfillResellerMarkupColumns(drv)
-	migrateAccountState(drv)
 	migrateUserHistoryRefs(drv)
 	slog.Info("bootstrap_startup_tasks_done")
 }
@@ -171,90 +169,6 @@ func userHistoryForeignKeyIsSetNull(ctx context.Context, drv *entsql.Driver, con
 		return false
 	}
 	return ok
-}
-
-// migrateAccountState 把老的 status / rate_limit_reset_at 字段一次性迁移到新的
-// state / state_until，然后 DROP 旧列。幂等：首次启动或升级时有效，之后旧列已不存在时跳过。
-//
-// 映射规则：
-//
-//	status='error'    → state='disabled'
-//	status='disabled' → state='disabled'
-//	rate_limit_reset_at > now() → state='rate_limited', state_until = rate_limit_reset_at
-//	其它               → state='active'（ent 默认值，不需要改）
-func migrateAccountState(drv *entsql.Driver) {
-	if drv == nil {
-		return
-	}
-	ctx := context.Background()
-
-	hasStatus, ok := accountColumnExists(ctx, drv, "status")
-	if !ok {
-		return
-	}
-	hasRateLimitResetAt, ok := accountColumnExists(ctx, drv, "rate_limit_reset_at")
-	if !ok {
-		return
-	}
-	if !hasStatus && !hasRateLimitResetAt {
-		return
-	}
-
-	slog.Info("bootstrap_account_state_migration_start")
-
-	updates := make([]string, 0, 2)
-	if hasStatus || hasRateLimitResetAt {
-		stateCase := []string{"state = CASE"}
-		if hasStatus {
-			stateCase = append(stateCase, "WHEN status IN ('error', 'disabled') THEN 'disabled'")
-		}
-		if hasRateLimitResetAt {
-			stateCase = append(stateCase, "WHEN rate_limit_reset_at IS NOT NULL AND rate_limit_reset_at > NOW() THEN 'rate_limited'")
-		}
-		stateCase = append(stateCase, "ELSE 'active' END")
-		updates = append(updates, strings.Join(stateCase, " "))
-	}
-	if hasRateLimitResetAt {
-		updates = append(updates, `state_until = CASE
-			WHEN rate_limit_reset_at IS NOT NULL AND rate_limit_reset_at > NOW() THEN rate_limit_reset_at
-			ELSE NULL
-		END`)
-	}
-
-	var res entsql.Result
-	updateSQL := "UPDATE accounts SET " + strings.Join(updates, ", ")
-	if err := drv.Exec(ctx, updateSQL, []any{}, &res); err != nil {
-		slog.Error("bootstrap_account_state_migration_failed", sdk.LogFieldError, err)
-		return
-	}
-	if affected, err := res.RowsAffected(); err == nil {
-		slog.Info("bootstrap_account_state_migration_done", "rows", affected)
-	}
-
-	// 然后删旧列。WithDropColumn(false) 让 ent 不自动删，所以手工 DROP。
-	drops := []string{
-		`ALTER TABLE accounts DROP COLUMN IF EXISTS status`,
-		`ALTER TABLE accounts DROP COLUMN IF EXISTS rate_limit_reset_at`,
-	}
-	for _, sql := range drops {
-		var r entsql.Result
-		if err := drv.Exec(ctx, sql, []any{}, &r); err != nil {
-			slog.Warn("bootstrap_drop_legacy_column_failed", "sql", sql, sdk.LogFieldError, err)
-		}
-	}
-	slog.Info("bootstrap_account_legacy_columns_dropped")
-}
-
-func accountColumnExists(ctx context.Context, drv *entsql.Driver, column string) (bool, bool) {
-	var exists entsql.Rows
-	const checkSQL = `SELECT 1 FROM information_schema.columns
-		WHERE table_name='accounts' AND column_name=$1 LIMIT 1`
-	if err := drv.Query(ctx, checkSQL, []any{column}, &exists); err != nil {
-		slog.Warn("bootstrap_account_state_check_failed", "column", column, sdk.LogFieldError, err)
-		return false, false
-	}
-	defer func() { _ = exists.Close() }()
-	return exists.Next(), true
 }
 
 // backfillResellerMarkupColumns 一次性回填 reseller markup 改造引入的两个新列：

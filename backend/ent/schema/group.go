@@ -14,7 +14,9 @@ type Group struct {
 func (Group) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").NotEmpty(),
-		field.String("platform").NotEmpty(),
+		// platform 旧插件世界观遗留：分组绑定单一平台。渠道化后分组与渠道多对多，
+		// 此字段仅为兼容保留（可空），P1 调度改造时废弃。
+		field.String("platform").Default(""),
 		field.Float("rate_multiplier").Default(1.0),
 		field.Bool("is_exclusive").Default(false),
 		// status_visible 控制此分组是否在公开「服务状态」页展示。
@@ -25,11 +27,6 @@ func (Group) Fields() []ent.Field {
 		field.Enum("subscription_type").Values("standard", "subscription").Default("standard"),
 		field.JSON("quotas", map[string]interface{}{}).Optional(),
 		field.JSON("model_routing", map[string][]int64{}).Optional(),
-		// plugin_settings 按插件命名空间存放细粒度开关，形如
-		//   {"claude": {"claude_code_only": "true"}}
-		// Core 在 buildForwardHeaders 时按约定映射成 X-Airgate-* 头下发给网关插件。
-		// 保持 string→string 嵌套是为了不侵入 SDK（零 SDK bump）。
-		field.JSON("plugin_settings", map[string]map[string]string{}).Optional(),
 		field.String("service_tier").Default(""),
 		field.String("force_instructions").Default(""),
 		field.String("note").Default(""),
@@ -41,8 +38,8 @@ func (Group) Fields() []ent.Field {
 
 func (Group) Edges() []ent.Edge {
 	return []ent.Edge{
-		// 分组关联的账号（多对多反向）
-		edge.From("accounts", Account.Type).Ref("groups"),
+		// 分组关联的渠道（多对多反向）
+		edge.From("channels", Channel.Type).Ref("groups"),
 		// 允许访问此专属分组的用户（多对多反向）
 		edge.From("allowed_users", User.Type).Ref("allowed_groups"),
 		edge.To("api_keys", APIKey.Type),

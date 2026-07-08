@@ -6,9 +6,7 @@ import { Button, Link as HeroLink, Tooltip } from '@heroui/react';
 import { useAuth } from '../providers/AuthProvider';
 import { getTokenRole } from '../../shared/api/client';
 import { setStoredLanguage } from '../../i18n';
-import { pluginsApi } from '../../shared/api/plugins';
 import { settingsApi } from '../../shared/api/settings';
-import { queryKeys } from '../../shared/queryKeys';
 import { useTheme } from '../providers/ThemeProvider';
 import { useSiteSettings, defaultLogoUrl } from '../providers/SiteSettingsProvider';
 import { effectiveDocUrl } from '../../shared/utils/docUrl';
@@ -18,14 +16,14 @@ import { TopLoadingLine } from '../../shared/components/PageLoading';
 import {
   LayoutDashboard,
   Users,
-  IdCard,
+  Network,
+  CircleDollarSign,
   FolderTree,
   KeyRound,
   CreditCard,
   Globe,
   ChartNoAxesCombined,
   ReceiptText,
-  Puzzle,
   Settings,
   UserRoundCog,
   LogOut,
@@ -37,7 +35,6 @@ import {
   BookOpen,
   MessageCircle,
   Github,
-  Activity,
   HelpCircle,
   ChevronLeft,
   ChevronRight,
@@ -57,13 +54,13 @@ interface MenuItem {
 const adminMenuItems: MenuItem[] = [
   { path: '/', labelKey: 'nav.dashboard', icon: <LayoutDashboard className="h-5 w-5" />, sectionKey: 'nav.overview' },
   { path: '/admin/users', labelKey: 'nav.users', icon: <Users className="h-5 w-5" />, sectionKey: 'nav.management' },
-  { path: '/admin/accounts', labelKey: 'nav.accounts', icon: <IdCard className="h-5 w-5" /> },
+  { path: '/admin/channels', labelKey: 'nav.channels', icon: <Network className="h-5 w-5" /> },
+  { path: '/admin/model-prices', labelKey: 'nav.model_prices', icon: <CircleDollarSign className="h-5 w-5" /> },
   { path: '/admin/groups', labelKey: 'nav.groups', icon: <FolderTree className="h-5 w-5" /> },
   { path: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: <CreditCard className="h-5 w-5" /> },
   { path: '/admin/proxies', labelKey: 'nav.proxies', icon: <Globe className="h-5 w-5" /> },
   { path: '/admin/usage', labelKey: 'nav.usage', icon: <ChartNoAxesCombined className="h-5 w-5" /> },
-  { path: '/admin/plugins', labelKey: 'nav.plugins', icon: <Puzzle className="h-5 w-5" />, sectionKey: 'nav.system' },
-  { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="h-5 w-5" /> },
+  { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="h-5 w-5" />, sectionKey: 'nav.system' },
 ];
 
 const userMenuItems: MenuItem[] = [
@@ -79,77 +76,6 @@ const apiKeyMenuItems: MenuItem[] = [
 ];
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'airgate:sidebar:collapsed';
-
-/**
- * 拉取插件菜单：所有登录用户均可调用 /plugins/menu，再按 page.audience 过滤显示。
- *   audience = "admin"（或空，向后兼容）— 仅管理员可见，挂在「插件」分组
- *   audience = "user"                    — 仅普通用户可见（管理员不显示），挂在「个人中心」分组
- *   audience = "all"                     — 所有登录用户可见，按当前角色挂分组
- */
-function pluginPagePath(pluginName: string, pagePath: string) {
-  if (pluginName === 'airgate-playground' && pagePath === '/playground') return '/chat';
-  if (pluginName === 'airgate-studio' && pagePath === '/studio') return '/studio';
-  return `/plugins/${pluginName}${pagePath}`;
-}
-
-function usePluginMenuItems(isAdmin: boolean, isAPIKeySession: boolean): {
-  adminItems: MenuItem[];
-  userItems: MenuItem[];
-  healthInstalled: boolean;
-} {
-  const { data } = useQuery({
-    queryKey: queryKeys.pluginsMenu(),
-    queryFn: () => pluginsApi.menu(),
-    enabled: !isAPIKeySession,
-    staleTime: 60_000,
-  });
-
-  return useMemo(() => {
-    if (!data?.list) return { adminItems: [], userItems: [], healthInstalled: false };
-
-    // 服务状态页由 airgate-health 插件提供（core 反代 /status/* → 插件）；
-    // 未装该插件时顶栏不显示状态入口，避免点进去看到 404 / "状态页未启用" 错误。
-    const healthInstalled = data.list.some((p) => p.name === 'airgate-health');
-
-    const adminItems: MenuItem[] = [];
-    const userItems: MenuItem[] = [];
-    let firstAdmin = true;
-    let firstUser = true;
-
-    for (const p of data.list) {
-      if (!p.frontend_pages?.length) continue;
-      for (const page of p.frontend_pages) {
-        const audience = page.audience || 'admin';
-        const showInUser =
-          audience === 'user' || (audience === 'all' && !isAdmin);
-        const showInAdmin =
-          isAdmin && (audience === 'admin' || audience === 'all');
-
-        const item: MenuItem = {
-          path: pluginPagePath(p.name, page.path),
-          labelKey: page.title,
-          icon: <Puzzle className="h-5 w-5" />,
-        };
-
-        if (showInAdmin) {
-          adminItems.push({
-            ...item,
-            ...(firstAdmin ? { sectionKey: 'nav.plugins' } : {}),
-          });
-          firstAdmin = false;
-        }
-        if (showInUser) {
-          userItems.push({
-            ...item,
-            ...(firstUser ? { sectionKey: 'nav.personal' } : {}),
-          });
-          firstUser = false;
-        }
-      }
-    }
-    return { adminItems, userItems, healthInstalled };
-  }, [data?.list, isAdmin]);
-}
 
 export function AppShell({ children }: AppShellProps) {
   const { user, logout } = useAuth();
@@ -194,23 +120,15 @@ export function AppShell({ children }: AppShellProps) {
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
-  const { adminItems: pluginAdminItems, userItems: pluginUserItems, healthInstalled } = usePluginMenuItems(isAdmin, isAPIKeySession);
-  const showStatusEntry = healthInstalled;
   const sections = useMemo(() => {
     const adminUserItems = userMenuItems
       .filter((item) => item.path !== '/')
       .map((item, i) => (i === 0 ? { ...item, sectionKey: 'nav.personal' } : item));
-    // 不论 admin 还是普通用户视图，pluginUserItems 都会紧跟一个已有的「个人中心」section
-    // （admin 视图：adminUserItems；普通用户视图：userMenuItems），所以必须剥掉首项的
-    // sectionKey 避免 sections 数组里出现两个同名 section header → 渲染成两个「我的账户」。
-    const pluginUserItemsMerged = pluginUserItems.map((item, i) =>
-      i === 0 ? { path: item.path, labelKey: item.labelKey, icon: item.icon } : item,
-    );
     const menuItems = isAPIKeySession
       ? apiKeyMenuItems
       : isAdmin
-        ? [...adminMenuItems, ...pluginAdminItems, ...adminUserItems, ...pluginUserItemsMerged]
-        : [...userMenuItems, ...pluginUserItemsMerged];
+        ? [...adminMenuItems, ...adminUserItems]
+        : [...userMenuItems];
 
     const nextSections: Array<{ titleKey?: string; items: MenuItem[] }> = [];
     let currentSection: { titleKey?: string; items: MenuItem[] } | null = null;
@@ -228,7 +146,7 @@ export function AppShell({ children }: AppShellProps) {
     });
 
     return nextSections;
-  }, [isAPIKeySession, isAdmin, pluginAdminItems, pluginUserItems]);
+  }, [isAPIKeySession, isAdmin]);
 
   const toggleLanguage = () => {
     const nextLang = i18n.language === 'zh' ? 'en' : 'zh';
@@ -426,18 +344,6 @@ export function AppShell({ children }: AppShellProps) {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {/* Service status — 仅当 airgate-health 插件已安装时显示
-                注意：用普通 href 而非 SPA Link，因为 /status 由后端反代到 health 插件
-                的 standalone 页面，不在 SPA 路由树里 */}
-            {showStatusEntry && (
-              <HeroLink
-                href="/status"
-                aria-label={t('nav.status')}
-                className="flex h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text"
-              >
-                <Activity className="h-5 w-5" />
-              </HeroLink>
-            )}
             {/* GitHub */}
             <HeroLink
               href="https://github.com/DouDOU-start/airgate-core"

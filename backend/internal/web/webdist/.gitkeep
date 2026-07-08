@@ -1,3 +1,0 @@
-go:embed 要求目标目录非空。Makefile / Dockerfile / release workflow 在
-执行 go build 前会用真正的 web/dist 内容刷新这个目录；本占位符仅用于
-保证空仓库 clone 后 go build ./... 不会因 embed 路径不存在而失败。

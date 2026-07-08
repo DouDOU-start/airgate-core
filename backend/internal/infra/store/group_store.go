@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
-	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
+	entchannel "github.com/DouDOU-start/airgate-core/ent/channel"
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
@@ -89,82 +89,7 @@ func (s *GroupStore) FindByID(ctx context.Context, id int) (appgroup.Group, erro
 
 // Create 创建分组。
 func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (appgroup.Group, error) {
-	// 若无需复制账号，走快路径。
-	if len(input.CopyAccountsFromGroupIDs) == 0 {
-		builder := s.db.Group.Create().
-			SetName(input.Name).
-			SetPlatform(input.Platform).
-			SetRateMultiplier(input.RateMultiplier).
-			SetIsExclusive(input.IsExclusive).
-			SetStatusVisible(input.StatusVisible).
-			SetSubscriptionType(entgroup.SubscriptionType(input.SubscriptionType)).
-			SetServiceTier(input.ServiceTier).
-			SetForceInstructions(input.ForceInstructions).
-			SetNote(input.Note).
-			SetSortWeight(input.SortWeight)
-
-		if input.Quotas != nil {
-			builder = builder.SetQuotas(appgroupCloneQuotas(input.Quotas))
-		}
-		if input.ModelRouting != nil {
-			builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
-		}
-		if input.PluginSettings != nil {
-			builder = builder.SetPluginSettings(appgroupClonePluginSettings(input.PluginSettings))
-		}
-
-		item, err := builder.Save(ctx)
-		if err != nil {
-			return appgroup.Group{}, err
-		}
-		return mapGroup(item), nil
-	}
-
-	// 需要复制账号：在事务内校验源分组平台、收集去重的账号 ID，随后一次性绑定。
-	tx, err := s.db.Tx(ctx)
-	if err != nil {
-		return appgroup.Group{}, err
-	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
-
-	// 去重源分组 ID。
-	seenGroup := make(map[int]struct{}, len(input.CopyAccountsFromGroupIDs))
-	uniqueSourceGroupIDs := make([]int, 0, len(input.CopyAccountsFromGroupIDs))
-	for _, gid := range input.CopyAccountsFromGroupIDs {
-		if _, ok := seenGroup[gid]; ok {
-			continue
-		}
-		seenGroup[gid] = struct{}{}
-		uniqueSourceGroupIDs = append(uniqueSourceGroupIDs, gid)
-	}
-
-	// 校验源分组存在且平台一致。
-	srcGroups, err := tx.Group.Query().
-		Where(entgroup.IDIn(uniqueSourceGroupIDs...)).
-		All(ctx)
-	if err != nil {
-		return appgroup.Group{}, err
-	}
-	if len(srcGroups) != len(uniqueSourceGroupIDs) {
-		return appgroup.Group{}, appgroup.ErrGroupNotFound
-	}
-	for _, g := range srcGroups {
-		if g.Platform != input.Platform {
-			return appgroup.Group{}, appgroup.ErrSourceGroupPlatformMismatch
-		}
-	}
-
-	// 从源分组收集去重后的账号 ID。
-	accountIDs, err := tx.Account.Query().
-		Where(entaccount.HasGroupsWith(entgroup.IDIn(uniqueSourceGroupIDs...))).
-		IDs(ctx)
-	if err != nil {
-		return appgroup.Group{}, err
-	}
-
-	builder := tx.Group.Create().
+	builder := s.db.Group.Create().
 		SetName(input.Name).
 		SetPlatform(input.Platform).
 		SetRateMultiplier(input.RateMultiplier).
@@ -182,22 +107,11 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 	if input.ModelRouting != nil {
 		builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
 	}
-	if input.PluginSettings != nil {
-		builder = builder.SetPluginSettings(appgroupClonePluginSettings(input.PluginSettings))
-	}
-	if len(accountIDs) > 0 {
-		builder = builder.AddAccountIDs(accountIDs...)
-	}
 
 	item, err := builder.Save(ctx)
 	if err != nil {
 		return appgroup.Group{}, err
 	}
-
-	if err := tx.Commit(); err != nil {
-		return appgroup.Group{}, err
-	}
-
 	return mapGroup(item), nil
 }
 
@@ -225,9 +139,6 @@ func (s *GroupStore) Update(ctx context.Context, id int, input appgroup.UpdateIn
 	}
 	if input.ModelRouting != nil {
 		builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
-	}
-	if input.PluginSettings != nil {
-		builder = builder.SetPluginSettings(appgroupClonePluginSettings(input.PluginSettings))
 	}
 	if input.ServiceTier != nil {
 		builder = builder.SetServiceTier(*input.ServiceTier)
@@ -280,6 +191,18 @@ func (s *GroupStore) Delete(ctx context.Context, id int) error {
 		return appgroup.ErrGroupHasSubscriptions
 	}
 
+	// 渠道绑定守卫：channel_groups 对 group_id 是 ON DELETE CASCADE，
+	// 直接删除会静默解绑，使专属渠道变成公共渠道（对所有分组可调度）。
+	channelCount, err := tx.Channel.Query().
+		Where(entchannel.HasGroupsWith(entgroup.IDEQ(id))).
+		Count(ctx)
+	if err != nil {
+		return err
+	}
+	if channelCount > 0 {
+		return &appgroup.GroupHasChannelsError{Count: channelCount}
+	}
+
 	if _, err = tx.APIKey.Update().
 		Where(entapikey.HasGroupWith(entgroup.IDEQ(id))).
 		ClearGroup().
@@ -311,61 +234,27 @@ func (s *GroupStore) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
-// StatsForGroups 批量查询分组统计信息（账号数、容量、用量）。
+// StatsForGroups 批量查询分组统计信息（今日/累计用量）。
 // todayStart 必须由调用方按用户时区计算好；store 层不再自己读 time.Now。
-func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todayStart time.Time) (map[int]appgroup.GroupStats, map[int][]appgroup.AccountCapacity, error) {
+func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todayStart time.Time) (map[int]appgroup.GroupStats, error) {
 	if len(groupIDs) == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
 
 	result := make(map[int]appgroup.GroupStats, len(groupIDs))
-	activeAccounts := make(map[int][]appgroup.AccountCapacity, len(groupIDs))
 
-	// 1. 查询每个分组的账号按状态统计，同时收集活跃账号的容量
-	groups, err := s.db.Group.Query().
-		Where(entgroup.IDIn(groupIDs...)).
-		WithAccounts(func(q *ent.AccountQuery) {
-			q.Select(entaccount.FieldState, entaccount.FieldMaxConcurrency, entaccount.FieldErrorMsg)
-		}).
-		All(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, g := range groups {
-		stats := appgroup.GroupStats{}
-		for _, a := range g.Edges.Accounts {
-			switch a.State {
-			case entaccount.StateActive, entaccount.StateRateLimited, entaccount.StateDegraded:
-				stats.AccountActive++
-				stats.CapacityTotal += a.MaxConcurrency
-				activeAccounts[g.ID] = append(activeAccounts[g.ID], appgroup.AccountCapacity{
-					AccountID:      a.ID,
-					MaxConcurrency: a.MaxConcurrency,
-				})
-			case entaccount.StateDisabled:
-				if a.ErrorMsg != "" {
-					stats.AccountError++
-				} else {
-					stats.AccountDisabled++
-				}
-			}
-			stats.AccountTotal++
-		}
-		result[g.ID] = stats
-	}
-
-	// 2. 查询每个分组的总用量
+	// 1. 查询每个分组的总用量
 	var totalRows []struct {
 		GroupID   int     `json:"group_usage_logs"`
 		TotalCost float64 `json:"total_cost"`
 	}
-	err = s.db.UsageLog.Query().
+	err := s.db.UsageLog.Query().
 		Where(entusagelog.HasGroupWith(entgroup.IDIn(groupIDs...))).
 		GroupBy("group_usage_logs").
 		Aggregate(ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost")).
 		Scan(ctx, &totalRows)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	for _, row := range totalRows {
 		stats := result[row.GroupID]
@@ -373,7 +262,7 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 		result[row.GroupID] = stats
 	}
 
-	// 3. 查询每个分组的今日用量
+	// 2. 查询每个分组的今日用量
 	var todayRows []struct {
 		GroupID   int     `json:"group_usage_logs"`
 		TotalCost float64 `json:"total_cost"`
@@ -387,7 +276,7 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 		Aggregate(ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost")).
 		Scan(ctx, &todayRows)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	for _, row := range todayRows {
 		stats := result[row.GroupID]
@@ -395,7 +284,7 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 		result[row.GroupID] = stats
 	}
 
-	return result, activeAccounts, nil
+	return result, nil
 }
 
 func applyGroupListFilters(query *ent.GroupQuery, keyword, platform, serviceTier string) *ent.GroupQuery {
@@ -430,7 +319,6 @@ func mapGroup(item *ent.Group) appgroup.Group {
 		SubscriptionType:  string(item.SubscriptionType),
 		Quotas:            appgroupCloneQuotas(item.Quotas),
 		ModelRouting:      appgroupCloneModelRouting(item.ModelRouting),
-		PluginSettings:    appgroupClonePluginSettings(item.PluginSettings),
 		ServiceTier:       item.ServiceTier,
 		ForceInstructions: item.ForceInstructions,
 		Note:              item.Note,
@@ -458,21 +346,6 @@ func appgroupCloneModelRouting(input map[string][]int64) map[string][]int64 {
 	cloned := make(map[string][]int64, len(input))
 	for key, value := range input {
 		cloned[key] = append([]int64(nil), value...)
-	}
-	return cloned
-}
-
-func appgroupClonePluginSettings(input map[string]map[string]string) map[string]map[string]string {
-	if input == nil {
-		return nil
-	}
-	cloned := make(map[string]map[string]string, len(input))
-	for plugin, kv := range input {
-		inner := make(map[string]string, len(kv))
-		for k, v := range kv {
-			inner[k] = v
-		}
-		cloned[plugin] = inner
 	}
 	return cloned
 }

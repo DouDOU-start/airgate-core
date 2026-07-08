@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
-	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
+	entchannel "github.com/DouDOU-start/airgate-core/ent/channel"
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -189,8 +189,8 @@ func (s *UsageStore) StatsByUser(ctx context.Context, filter appusage.StatsFilte
 	return result, nil
 }
 
-// StatsByAccount 按账号分组统计。
-func (s *UsageStore) StatsByAccount(ctx context.Context, filter appusage.StatsFilter) ([]appusage.AccountStats, error) {
+// StatsByChannel 按渠道分组统计。
+func (s *UsageStore) StatsByChannel(ctx context.Context, filter appusage.StatsFilter) ([]appusage.ChannelStats, error) {
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
 		query = query.Where(usageUserPredicate(*filter.UserID))
@@ -198,7 +198,7 @@ func (s *UsageStore) StatsByAccount(ctx context.Context, filter appusage.StatsFi
 	query = applyUsageStatsFilter(query, filter)
 
 	var rows []struct {
-		AccountID    int     `json:"account_usage_logs"`
+		ChannelID    int     `json:"channel_usage_logs"`
 		Count        int     `json:"count"`
 		InputTokens  int64   `json:"input_tokens"`
 		OutputTokens int64   `json:"output_tokens"`
@@ -206,7 +206,7 @@ func (s *UsageStore) StatsByAccount(ctx context.Context, filter appusage.StatsFi
 		ActualCost   float64 `json:"actual_cost"`
 		BilledCost   float64 `json:"billed_cost"`
 	}
-	err := query.GroupBy("account_usage_logs").
+	err := query.GroupBy("channel_usage_logs").
 		Aggregate(
 			ent.Count(),
 			ent.As(ent.Sum(entusagelog.FieldInputTokens), "input_tokens"),
@@ -220,28 +220,28 @@ func (s *UsageStore) StatsByAccount(ctx context.Context, filter appusage.StatsFi
 		return nil, err
 	}
 
-	accountIDs := make([]int, 0, len(rows))
+	channelIDs := make([]int, 0, len(rows))
 	for _, row := range rows {
-		if row.AccountID > 0 {
-			accountIDs = append(accountIDs, row.AccountID)
+		if row.ChannelID > 0 {
+			channelIDs = append(channelIDs, row.ChannelID)
 		}
 	}
 	nameMap := make(map[int]string)
-	if len(accountIDs) > 0 {
-		accounts, err := s.db.Account.Query().Where(entaccount.IDIn(accountIDs...)).All(ctx)
+	if len(channelIDs) > 0 {
+		channels, err := s.db.Channel.Query().Where(entchannel.IDIn(channelIDs...)).All(ctx)
 		if err != nil {
 			return nil, err
 		}
-		for _, item := range accounts {
+		for _, item := range channels {
 			nameMap[item.ID] = item.Name
 		}
 	}
 
-	result := make([]appusage.AccountStats, 0, len(rows))
+	result := make([]appusage.ChannelStats, 0, len(rows))
 	for _, row := range rows {
-		result = append(result, appusage.AccountStats{
-			AccountID:  int64(row.AccountID),
-			Name:       nameMap[row.AccountID],
+		result = append(result, appusage.ChannelStats{
+			ChannelID:  int64(row.ChannelID),
+			Name:       nameMap[row.ChannelID],
 			Requests:   int64(row.Count),
 			Tokens:     row.InputTokens + row.OutputTokens,
 			TotalCost:  row.TotalCost,
@@ -251,7 +251,7 @@ func (s *UsageStore) StatsByAccount(ctx context.Context, filter appusage.StatsFi
 	}
 	sort.Slice(result, func(i, j int) bool {
 		if result[i].Requests == result[j].Requests {
-			return result[i].AccountID < result[j].AccountID
+			return result[i].ChannelID < result[j].ChannelID
 		}
 		return result[i].Requests > result[j].Requests
 	})
@@ -401,7 +401,7 @@ func (s *UsageStore) paginateUsageLogs(ctx context.Context, query *ent.UsageLogQ
 		Where(entusagelog.IDIn(ids...)).
 		WithUser().
 		WithAPIKey().
-		WithAccount().
+		WithChannel().
 		WithGroup().
 		Order(ent.Desc(entusagelog.FieldCreatedAt), ent.Desc(entusagelog.FieldID)).
 		All(ctx)
@@ -440,8 +440,8 @@ func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) 
 	if filter.APIKeyID != nil {
 		query = query.Where(entusagelog.HasAPIKeyWith(entapikey.IDEQ(int(*filter.APIKeyID))))
 	}
-	if filter.AccountID != nil {
-		query = query.Where(entusagelog.HasAccountWith(entaccount.IDEQ(int(*filter.AccountID))))
+	if filter.ChannelID != nil {
+		query = query.Where(entusagelog.HasChannelWith(entchannel.IDEQ(int(*filter.ChannelID))))
 	}
 	if filter.GroupID != nil {
 		query = query.Where(entusagelog.HasGroupWith(entgroup.IDEQ(int(*filter.GroupID))))
@@ -579,14 +579,11 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		record.APIKeyName = item.Edges.APIKey.Name
 		record.APIKeyHint = item.Edges.APIKey.KeyHint
 	}
-	if item.Edges.Account != nil {
-		record.AccountID = int64(item.Edges.Account.ID)
-		if email, ok := item.Edges.Account.Credentials["email"]; ok && email != "" {
-			record.AccountEmail = email
-		}
-		record.AccountName = item.Edges.Account.Name
+	if item.Edges.Channel != nil {
+		record.ChannelID = int64(item.Edges.Channel.ID)
+		record.ChannelName = item.Edges.Channel.Name
 	} else {
-		record.AccountName = "-"
+		record.ChannelName = "-"
 	}
 	if item.Edges.Group != nil {
 		record.GroupID = int64(item.Edges.Group.ID)

@@ -28,11 +28,10 @@ func (h *UserHandler) ListGroupRateOverrides(c *gin.Context) {
 	resp := make([]dto.GroupRateOverrideResp, 0, len(items))
 	for _, it := range items {
 		resp = append(resp, dto.GroupRateOverrideResp{
-			UserID:         int64(it.UserID),
-			Email:          it.Email,
-			Username:       it.Username,
-			Rate:           it.Rate,
-			PluginSettings: it.PluginSettings,
+			UserID:   int64(it.UserID),
+			Email:    it.Email,
+			Username: it.Username,
+			Rate:     it.Rate,
 		})
 	}
 	response.Success(c, resp)
@@ -58,18 +57,17 @@ func (h *UserHandler) SetGroupRateOverride(c *gin.Context) {
 		return
 	}
 
-	item, err := h.service.SetGroupRate(c.Request.Context(), userID, groupID, req.Rate, req.PluginSettings)
+	item, err := h.service.SetGroupRate(c.Request.Context(), userID, groupID, req.Rate)
 	if err != nil {
 		httpCode, message := h.handleError("设置分组专属倍率失败", "设置失败", err)
 		response.Error(c, httpCode, httpCode, message)
 		return
 	}
 	response.Success(c, dto.GroupRateOverrideResp{
-		UserID:         int64(item.UserID),
-		Email:          item.Email,
-		Username:       item.Username,
-		Rate:           item.Rate,
-		PluginSettings: item.PluginSettings,
+		UserID:   int64(item.UserID),
+		Email:    item.Email,
+		Username: item.Username,
+		Rate:     item.Rate,
 	})
 }
 

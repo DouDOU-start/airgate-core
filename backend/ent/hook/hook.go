@@ -21,18 +21,6 @@ func (f APIKeyFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, erro
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.APIKeyMutation", m)
 }
 
-// The AccountFunc type is an adapter to allow the use of ordinary
-// function as Account mutator.
-type AccountFunc func(context.Context, *ent.AccountMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f AccountFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.AccountMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AccountMutation", m)
-}
-
 // The BalanceLogFunc type is an adapter to allow the use of ordinary
 // function as BalanceLog mutator.
 type BalanceLogFunc func(context.Context, *ent.BalanceLogMutation) (ent.Value, error)
@@ -43,6 +31,18 @@ func (f BalanceLogFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, 
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BalanceLogMutation", m)
+}
+
+// The ChannelFunc type is an adapter to allow the use of ordinary
+// function as Channel mutator.
+type ChannelFunc func(context.Context, *ent.ChannelMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ChannelFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ChannelMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ChannelMutation", m)
 }
 
 // The GroupFunc type is an adapter to allow the use of ordinary
@@ -57,28 +57,16 @@ func (f GroupFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.GroupMutation", m)
 }
 
-// The PluginFunc type is an adapter to allow the use of ordinary
-// function as Plugin mutator.
-type PluginFunc func(context.Context, *ent.PluginMutation) (ent.Value, error)
+// The ModelPriceFunc type is an adapter to allow the use of ordinary
+// function as ModelPrice mutator.
+type ModelPriceFunc func(context.Context, *ent.ModelPriceMutation) (ent.Value, error)
 
 // Mutate calls f(ctx, m).
-func (f PluginFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.PluginMutation); ok {
+func (f ModelPriceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ModelPriceMutation); ok {
 		return f(ctx, mv)
 	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PluginMutation", m)
-}
-
-// The PluginSourceFunc type is an adapter to allow the use of ordinary
-// function as PluginSource mutator.
-type PluginSourceFunc func(context.Context, *ent.PluginSourceMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f PluginSourceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.PluginSourceMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PluginSourceMutation", m)
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ModelPriceMutation", m)
 }
 
 // The ProxyFunc type is an adapter to allow the use of ordinary

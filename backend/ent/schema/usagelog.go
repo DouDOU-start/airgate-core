@@ -94,7 +94,9 @@ func (UsageLog) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("user", User.Type).Ref("usage_logs").Unique(),
 		edge.From("api_key", APIKey.Type).Ref("usage_logs").Unique(),
-		edge.From("account", Account.Type).Ref("usage_logs").Unique(),
+		// channel FK 的 ON DELETE SET NULL 声明在 Channel 侧 assoc 边
+		//（ent 生成 FK 时只读 edge.To 的注解）；见 schema/channel.go。
+		edge.From("channel", Channel.Type).Ref("usage_logs").Unique(),
 		edge.From("group", Group.Type).Ref("usage_logs").Unique(),
 	}
 }
@@ -113,8 +115,8 @@ func (UsageLog) Indexes() []ent.Index {
 			StorageKey("usage_log_user"),
 		index.Edges("api_key").
 			StorageKey("usage_log_api_key"),
-		index.Edges("account").
-			StorageKey("usage_log_account"),
+		index.Edges("channel").
+			StorageKey("usage_log_channel"),
 		index.Edges("group").
 			StorageKey("usage_log_group"),
 	}

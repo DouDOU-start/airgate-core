@@ -44,8 +44,8 @@ func TestUserStatsWithModelsCombinesSummaryAndModelStats(t *testing.T) {
 }
 
 func TestNormalizeStatsGroupByDropsUnknownAndDuplicates(t *testing.T) {
-	got := normalizeStatsGroupBy("user, model,foo,group,user,account,model")
-	want := "account,group,model,user"
+	got := normalizeStatsGroupBy("user, model,foo,group,user,channel,model")
+	want := "channel,group,model,user"
 	if got != want {
 		t.Fatalf("normalizeStatsGroupBy() = %q, want %q", got, want)
 	}
@@ -63,7 +63,7 @@ type stubUsageRepository struct {
 	summaryAdminFn   func(context.Context, StatsFilter) (Summary, error)
 	statsByModelFn   func(context.Context, StatsFilter) ([]ModelStats, error)
 	statsByUserFn    func(context.Context, StatsFilter) ([]UserStats, error)
-	statsByAccountFn func(context.Context, StatsFilter) ([]AccountStats, error)
+	statsByChannelFn func(context.Context, StatsFilter) ([]ChannelStats, error)
 	statsByGroupFn   func(context.Context, StatsFilter) ([]GroupStats, error)
 	trendEntriesFn   func(context.Context, TrendFilter) ([]TrendEntry, error)
 }
@@ -104,9 +104,9 @@ func (s *stubUsageRepository) StatsByUser(ctx context.Context, filter StatsFilte
 	return nil, nil
 }
 
-func (s *stubUsageRepository) StatsByAccount(ctx context.Context, filter StatsFilter) ([]AccountStats, error) {
-	if s.statsByAccountFn != nil {
-		return s.statsByAccountFn(ctx, filter)
+func (s *stubUsageRepository) StatsByChannel(ctx context.Context, filter StatsFilter) ([]ChannelStats, error) {
+	if s.statsByChannelFn != nil {
+		return s.statsByChannelFn(ctx, filter)
 	}
 	return nil, nil
 }

@@ -13,30 +13,19 @@ type Repository interface {
 	Create(context.Context, CreateInput) (Group, error)
 	Update(context.Context, int, UpdateInput) (Group, error)
 	Delete(context.Context, int) error
-	StatsForGroups(ctx context.Context, groupIDs []int, todayStart time.Time) (stats map[int]GroupStats, activeAccounts map[int][]AccountCapacity, err error)
+	StatsForGroups(ctx context.Context, groupIDs []int, todayStart time.Time) (map[int]GroupStats, error)
 }
 
 // ConcurrencyReader 并发读接口。
+// P0 阶段账号容量统计已下线，暂无调用方；保留注入以便 P1 渠道容量统计复用。
 type ConcurrencyReader interface {
 	GetCurrentCounts(context.Context, []int) map[int]int
 }
 
 // GroupStats 描述分组统计信息。
 type GroupStats struct {
-	AccountActive   int
-	AccountError    int
-	AccountDisabled int
-	AccountTotal    int
-	CapacityUsed    int
-	CapacityTotal   int
-	TodayCost       float64
-	TotalCost       float64
-}
-
-// AccountCapacity 描述每个分组中活跃账号的容量信息。
-type AccountCapacity struct {
-	AccountID      int
-	MaxConcurrency int
+	TodayCost float64
+	TotalCost float64
 }
 
 // Group 描述分组领域对象。
@@ -50,7 +39,6 @@ type Group struct {
 	SubscriptionType  string
 	Quotas            map[string]any
 	ModelRouting      map[string][]int64
-	PluginSettings    map[string]map[string]string
 	ServiceTier       string
 	ForceInstructions string
 	Note              string
@@ -95,13 +83,10 @@ type CreateInput struct {
 	SubscriptionType  string
 	Quotas            map[string]any
 	ModelRouting      map[string][]int64
-	PluginSettings    map[string]map[string]string
 	ServiceTier       string
 	ForceInstructions string
 	Note              string
 	SortWeight        int
-	// CopyAccountsFromGroupIDs 指定在新分组创建后从这些分组复制账号绑定（同平台，自动去重）。
-	CopyAccountsFromGroupIDs []int
 }
 
 // UpdateInput 描述更新分组输入。
@@ -113,7 +98,6 @@ type UpdateInput struct {
 	SubscriptionType  *string
 	Quotas            map[string]any
 	ModelRouting      map[string][]int64
-	PluginSettings    map[string]map[string]string
 	ServiceTier       *string
 	ForceInstructions *string
 	Note              *string
@@ -138,21 +122,6 @@ func cloneModelRouting(input map[string][]int64) map[string][]int64 {
 	cloned := make(map[string][]int64, len(input))
 	for key, value := range input {
 		cloned[key] = append([]int64(nil), value...)
-	}
-	return cloned
-}
-
-func clonePluginSettings(input map[string]map[string]string) map[string]map[string]string {
-	if input == nil {
-		return nil
-	}
-	cloned := make(map[string]map[string]string, len(input))
-	for plugin, kv := range input {
-		inner := make(map[string]string, len(kv))
-		for k, v := range kv {
-			inner[k] = v
-		}
-		cloned[plugin] = inner
 	}
 	return cloned
 }

@@ -1,9 +1,8 @@
 # 开发环境编排 — 源码挂载 + 实时编译
 # 使用方式: docker compose -f deploy/docker-compose.dev.yml up
 #
-# 仅拉起 core + pg + redis + 前端构建。插件（gateway-openai / payment-epay /
-# airgate-health 等）启动后通过管理后台「插件市场」自行安装即可，
-# data/plugins 是持久 volume，装一次后续重启不会丢。
+# 仅拉起 core + pg + redis + 前端构建。
+# 
 services:
   postgres:
     image: postgres:16
@@ -61,14 +60,12 @@ services:
         condition: service_completed_successfully
     environment:
       CONFIG_PATH: /workspace/airgate-core/backend/config.docker.yaml
-      PLUGINS_DIR: /workspace/airgate-core/backend/data/plugins
       ASSETS_DIR: /workspace/airgate-core/backend/data/assets
       REDIS_PASSWORD: airgate-dev
     volumes:
       - ../..:/workspace
       - ../data/go_pkg_mod:/go/pkg/mod
       - ../data/go_build_cache:/root/.cache/go-build
-      - ../data/plugins:/workspace/airgate-core/backend/data/plugins
       - ../data/assets:/workspace/airgate-core/backend/data/assets
     ports:
       - "9517:9517"

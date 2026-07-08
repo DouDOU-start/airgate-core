@@ -21,8 +21,9 @@ import (
 
 // Service 提供代理域用例编排。
 type Service struct {
-	repo   Repository
-	prober Prober
+	repo     Repository
+	prober   Prober
+	reloader Reloader
 }
 
 // Prober 定义代理探测能力。
@@ -30,11 +31,33 @@ type Prober interface {
 	Probe(context.Context, Proxy) TestResult
 }
 
+// Reloader 渠道注册表重载窄接口（由 relay/registry.Registry 实现，可为 nil——测试时不接）。
+// 渠道快照的 ProxyURL 在 Reload 时由 proxy 边解析固化，代理写操作后须重载，
+// 否则转发持续使用旧出口代理。
+type Reloader interface {
+	Reload(ctx context.Context) error
+}
+
 // NewService 创建代理服务。
 func NewService(repo Repository) *Service {
 	return &Service{
 		repo:   repo,
 		prober: DefaultProber{},
+	}
+}
+
+// SetReloader 注入渠道注册表重载器（server 装配阶段调用；nil 安全）。
+func (s *Service) SetReloader(reloader Reloader) {
+	s.reloader = reloader
+}
+
+// reloadRegistry 写操作成功后触发渠道注册表重载；失败仅记日志，不影响主流程。
+func (s *Service) reloadRegistry(ctx context.Context) {
+	if s.reloader == nil {
+		return
+	}
+	if err := s.reloader.Reload(ctx); err != nil {
+		sdk.LoggerFromContext(ctx).Error("channel_registry_reload_failed", sdk.LogFieldError, err)
 	}
 }
 
@@ -89,6 +112,7 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Proxy,
 			sdk.LogFieldError, err)
 		return p, err
 	}
+	s.reloadRegistry(ctx)
 	return p, nil
 }
 
@@ -103,6 +127,7 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 		return err
 	}
 	logger.Info("proxy_config_deleted", "proxy_id", id)
+	s.reloadRegistry(ctx)
 	return nil
 }
 

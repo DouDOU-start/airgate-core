@@ -57,7 +57,7 @@ export function BulkAssignModal({
   };
   const groupOptions = groups.map((group) => ({
     id: String(group.id),
-    label: `${group.name} (${group.platform})`,
+    label: group.name,
   }));
   const selectedGroupLabel = groupOptions.find((item) => item.id === String(groupId))?.label;
   const selectedUserIdSet = useMemo(() => new Set(selectedUserIds), [selectedUserIds]);

@@ -7,12 +7,12 @@ import { useToast } from '../../../shared/ui';
 import { useClipboard } from '../../../shared/hooks/useClipboard';
 import { useSiteSettings } from '../../../app/providers/SiteSettingsProvider';
 import { apikeysApi } from '../../../shared/api/apikeys';
-import type { APIKeyResp, GroupResp } from '../../../shared/types';
+import type { APIKeyResp } from '../../../shared/types';
 
+// 渠道化后任意入口协议均可用，配置内容只取决于客户端类型（tab），与分组无关。
 function getUseKeyConfig(
   baseUrl: string,
-  platform: string,
-  tab: 'claude' | 'codex' | 'desktop' | 'desktop',
+  tab: 'claude' | 'codex' | 'desktop',
   shell: 'unix' | 'cmd' | 'powershell',
   apiKey: string,
   siteName: string,
@@ -40,45 +40,13 @@ function getUseKeyConfig(
     };
   }
 
-  // OpenAI 平台同时支持 Claude Code（通过 /v1/messages 适配）和 Codex CLI
-  if (platform === 'openai') {
-    if (tab === 'claude') {
-      // Claude Code 配置 — 通过 OpenAI 插件的 Anthropic 协议适配
-      if (shell === 'unix') {
-        return {
-          files: [
-            {
-              path: '~/.bashrc 或 ~/.zshrc',
-              content: `export ANTHROPIC_BASE_URL="${baseUrl}"\nexport ANTHROPIC_API_KEY="${apiKey}"`,
-            },
-          ],
-        };
-      } else if (shell === 'cmd') {
-        return {
-          files: [
-            {
-              path: 'CMD',
-              content: `set ANTHROPIC_BASE_URL=${baseUrl}\nset ANTHROPIC_API_KEY=${apiKey}`,
-            },
-          ],
-        };
-      } else {
-        return {
-          files: [
-            {
-              path: 'PowerShell',
-              content: `$env:ANTHROPIC_BASE_URL="${baseUrl}"\n$env:ANTHROPIC_API_KEY="${apiKey}"`,
-            },
-          ],
-        };
-      }
-    } else {
-      // Codex CLI 配置 — 写入 config.toml + auth.json，与 CCS 导入格式一致
-      const configDir = shell === 'unix' ? '~/.codex' : '%USERPROFILE%\\.codex';
-      const configPath = shell === 'unix' ? `${configDir}/config.toml` : `${configDir}\\config.toml`;
-      const authPath = shell === 'unix' ? `${configDir}/auth.json` : `${configDir}\\auth.json`;
-      const providerName = siteName || 'AirGate';
-      const configToml = `model_provider = "${providerName}"
+  if (tab === 'codex') {
+    // Codex CLI 配置 — 写入 config.toml + auth.json，与 CCS 导入格式一致
+    const configDir = shell === 'unix' ? '~/.codex' : '%USERPROFILE%\\.codex';
+    const configPath = shell === 'unix' ? `${configDir}/config.toml` : `${configDir}\\config.toml`;
+    const authPath = shell === 'unix' ? `${configDir}/auth.json` : `${configDir}\\auth.json`;
+    const providerName = siteName || 'AirGate';
+    const configToml = `model_provider = "${providerName}"
 model = "gpt-5.5"
 review_model = "gpt-5.5"
 model_reasoning_effort = "xhigh"
@@ -93,24 +61,23 @@ requires_openai_auth = true
 
 [features]
 goals = true`;
-      const authJson = JSON.stringify({ OPENAI_API_KEY: apiKey }, null, 2);
-      return {
-        files: [
-          {
-            path: configPath,
-            content: configToml,
-            hint: t('user_keys.codex_config_toml_hint'),
-          },
-          {
-            path: authPath,
-            content: authJson,
-          },
-        ],
-      };
-    }
+    const authJson = JSON.stringify({ OPENAI_API_KEY: apiKey }, null, 2);
+    return {
+      files: [
+        {
+          path: configPath,
+          content: configToml,
+          hint: t('user_keys.codex_config_toml_hint'),
+        },
+        {
+          path: authPath,
+          content: authJson,
+        },
+      ],
+    };
   }
 
-  // 默认/其他平台 — 使用 Claude 标准配置
+  // Claude Code — Anthropic 环境变量配置
   if (shell === 'unix') {
     return {
       files: [
@@ -141,7 +108,7 @@ goals = true`;
   }
 }
 
-export function useUseKeyModal(groupMap: Map<number, GroupResp>) {
+export function useUseKeyModal() {
   const { toast } = useToast();
   const { t } = useTranslation();
 
@@ -171,12 +138,6 @@ export function useUseKeyModal(groupMap: Map<number, GroupResp>) {
     setUseKeyValue(null);
   }, []);
 
-  const getGroupPlatform = (groupId: number | null) =>
-    groupId == null ? '' : groupMap.get(groupId)?.platform || '';
-
-  const useKeyPlatform = useKeyTarget ? getGroupPlatform(useKeyTarget.group_id) : '';
-  const showClientTabs = useKeyPlatform === 'openai';
-
   return {
     useKeyTarget,
     useKeyValue,
@@ -184,8 +145,6 @@ export function useUseKeyModal(groupMap: Map<number, GroupResp>) {
     setUseKeyTab,
     useKeyShell,
     setUseKeyShell,
-    useKeyPlatform,
-    showClientTabs,
     openUseKeyModal,
     closeUseKeyModal,
   };
@@ -194,8 +153,6 @@ export function useUseKeyModal(groupMap: Map<number, GroupResp>) {
 export function UseKeyModal({
   useKeyTarget,
   useKeyValue,
-  useKeyPlatform,
-  showClientTabs,
   useKeyTab,
   setUseKeyTab,
   useKeyShell,
@@ -204,8 +161,6 @@ export function UseKeyModal({
 }: {
   useKeyTarget: APIKeyResp | null;
   useKeyValue: string | null;
-  useKeyPlatform: string;
-  showClientTabs: boolean;
   useKeyTab: 'claude' | 'codex' | 'desktop';
   setUseKeyTab: (tab: 'claude' | 'codex' | 'desktop') => void;
   useKeyShell: 'unix' | 'cmd' | 'powershell';
@@ -238,7 +193,7 @@ export function UseKeyModal({
             </Modal.Header>
             <Modal.Body>
       {useKeyValue ? (
-        useKeyPlatform ? (
+        useKeyTarget?.group_id != null ? (
           <div className="space-y-4">
             <p className="text-sm text-text-secondary">
               {t('user_keys.use_key_desc')}
@@ -262,16 +217,14 @@ export function UseKeyModal({
               >
                 Claude Desktop
               </Button>
-              {showClientTabs && (
-                <Button
-                  fullWidth
-                  size="sm"
-                  variant={useKeyTab === 'codex' ? 'primary' : 'secondary'}
-                  onPress={() => setUseKeyTab('codex')}
-                >
-                  Codex CLI
-                </Button>
-              )}
+              <Button
+                fullWidth
+                size="sm"
+                variant={useKeyTab === 'codex' ? 'primary' : 'secondary'}
+                onPress={() => setUseKeyTab('codex')}
+              >
+                Codex CLI
+              </Button>
             </div>
 
             {/* OS/Shell Tab（Claude Desktop 不需要） */}
@@ -316,7 +269,7 @@ export function UseKeyModal({
             </div>}
 
             {/* 配置代码块 */}
-            {getUseKeyConfig(baseUrl, useKeyPlatform, useKeyTab, useKeyShell, useKeyValue, site.site_name || document.title || 'AirGate', t).files.map(
+            {getUseKeyConfig(baseUrl, useKeyTab, useKeyShell, useKeyValue, site.site_name || document.title || 'AirGate', t).files.map(
               (file, idx) => (
                 <div key={idx}>
                   {file.hint && (

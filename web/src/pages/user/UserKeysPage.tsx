@@ -237,20 +237,17 @@ export default function UserKeysPage() {
     setUseKeyTab,
     useKeyShell,
     setUseKeyShell,
-    useKeyPlatform,
-    showClientTabs,
     openUseKeyModal,
     closeUseKeyModal,
-  } = useUseKeyModal(groupMap);
+  } = useUseKeyModal();
 
   // CCS 导入弹窗
   const {
     ccsTarget,
     ccsKeyValue,
-    ccsPlatform,
     openCcsModal,
     closeCcsModal,
-  } = useCcsImportModal(groupMap);
+  } = useCcsImportModal();
 
   const saving = createMutation.isPending || updateMutation.isPending;
   const rows = data?.list ?? [];
@@ -638,8 +635,6 @@ export default function UserKeysPage() {
       <UseKeyModal
         useKeyTarget={useKeyTarget}
         useKeyValue={useKeyValue}
-        useKeyPlatform={useKeyPlatform}
-        showClientTabs={showClientTabs}
         useKeyTab={useKeyTab}
         setUseKeyTab={setUseKeyTab}
         useKeyShell={useKeyShell}
@@ -651,7 +646,6 @@ export default function UserKeysPage() {
       <CcsImportModal
         open={!!ccsTarget}
         ccsKeyValue={ccsKeyValue}
-        ccsPlatform={ccsPlatform}
         onClose={closeCcsModal}
       />
 

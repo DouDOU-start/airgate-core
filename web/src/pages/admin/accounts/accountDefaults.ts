@@ -1,1 +1,0 @@
-export const DEFAULT_ACCOUNT_MAX_CONCURRENCY = 10;

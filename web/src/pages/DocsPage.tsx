@@ -7,9 +7,8 @@ import remarkGfm from 'remark-gfm';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
 import { useTheme } from '../app/providers/ThemeProvider';
 import { useClipboard } from '../shared/hooks/useClipboard';
-import { useStatusPageEnabled } from '../shared/hooks/useStatusPageEnabled';
 import { getToken } from '../shared/api/client';
-import { Sun, Moon, Activity, Copy, Check, ArrowRight, BookOpen } from 'lucide-react';
+import { Sun, Moon, Copy, Check, ArrowRight, BookOpen } from 'lucide-react';
 
 // 顶栏高度（含 sticky nav 的 padding）。所有"滚到指定 H2"的位置都需要在
 // 视口顶部下方留出这么多空间，否则 H2 会被顶栏遮住。
@@ -34,7 +33,6 @@ export default function DocsPage() {
   const navigate = useNavigate();
   const site = useSiteSettings();
   const { theme, toggleTheme } = useTheme();
-  const showStatusEntry = useStatusPageEnabled();
   const isLoggedIn = !!getToken();
 
   const siteName = site.site_name || 'AirGate';
@@ -168,15 +166,6 @@ export default function DocsPage() {
             <span className="text-base font-bold">{siteName}</span>
           </Link>
           <div className="flex items-center gap-2">
-            {showStatusEntry && (
-              <HeroLink
-                href="/status"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text transition-colors"
-              >
-                <Activity className="w-3.5 h-3.5" />
-                {t('nav.status')}
-              </HeroLink>
-            )}
             <Button
               aria-label={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
               isIconOnly

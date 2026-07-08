@@ -72,9 +72,9 @@ func (s *Service) Stats(ctx context.Context, userID int, tz string) (Stats, erro
 	result := Stats{
 		TotalAPIKeys:        snapshot.TotalAPIKeys,
 		EnabledAPIKeys:      snapshot.EnabledAPIKeys,
-		TotalAccounts:       snapshot.TotalAccounts,
-		EnabledAccounts:     snapshot.EnabledAccounts,
-		ErrorAccounts:       snapshot.ErrorAccounts,
+		TotalChannels:       snapshot.TotalChannels,
+		EnabledChannels:     snapshot.EnabledChannels,
+		DisabledChannels:    snapshot.DisabledChannels,
 		TodayRequests:       snapshot.TodayRequests,
 		TodayImageRequests:  snapshot.TodayImageRequests,
 		AllTimeRequests:     snapshot.AllTimeRequests,

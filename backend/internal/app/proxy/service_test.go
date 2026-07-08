@@ -187,3 +187,61 @@ func (s proxyStubRepository) Delete(ctx context.Context, id int) error {
 	}
 	return s.delete(ctx, id)
 }
+
+// stubReloader 统计渠道注册表重载调用。
+type stubReloader struct{ calls int }
+
+func (s *stubReloader) Reload(context.Context) error {
+	s.calls++
+	return nil
+}
+
+// TestUpdateDeleteTriggerRegistryReload 代理更新/删除成功后触发渠道注册表重载
+// （渠道快照的 ProxyURL 在 Reload 时固化，不重载则转发持续用旧出口代理）。
+func TestUpdateDeleteTriggerRegistryReload(t *testing.T) {
+	service := NewService(proxyStubRepository{})
+	reloader := &stubReloader{}
+	service.SetReloader(reloader)
+
+	name := "p2"
+	if _, err := service.Update(t.Context(), 1, UpdateInput{Name: &name}); err != nil {
+		t.Fatalf("Update err = %v", err)
+	}
+	if reloader.calls != 1 {
+		t.Errorf("Update 后重载次数 = %d, want 1", reloader.calls)
+	}
+
+	if err := service.Delete(t.Context(), 1); err != nil {
+		t.Fatalf("Delete err = %v", err)
+	}
+	if reloader.calls != 2 {
+		t.Errorf("Delete 后重载次数 = %d, want 2", reloader.calls)
+	}
+
+	// Create 不触发（新代理尚未被任何渠道引用）。
+	if _, err := service.Create(t.Context(), CreateInput{Name: "p1"}); err != nil {
+		t.Fatalf("Create err = %v", err)
+	}
+	if reloader.calls != 2 {
+		t.Errorf("Create 不应触发重载: 次数 = %d", reloader.calls)
+	}
+}
+
+// TestUpdateFailureSkipsReload 写失败不触发重载。
+func TestUpdateFailureSkipsReload(t *testing.T) {
+	service := NewService(proxyStubRepository{
+		update: func(context.Context, int, UpdateInput) (Proxy, error) {
+			return Proxy{}, errors.New("db down")
+		},
+	})
+	reloader := &stubReloader{}
+	service.SetReloader(reloader)
+
+	name := "p2"
+	if _, err := service.Update(t.Context(), 1, UpdateInput{Name: &name}); err == nil {
+		t.Fatal("Update 应失败")
+	}
+	if reloader.calls != 0 {
+		t.Errorf("写失败不应触发重载: 次数 = %d", reloader.calls)
+	}
+}

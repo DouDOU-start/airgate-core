@@ -59,7 +59,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
       id: String(group.id),
       label: (
         <div className="flex min-w-0 items-center justify-between gap-2">
-          <span className="truncate">{group.name} ({group.platform})</span>
+          <span className="truncate">{group.name}</span>
           <span className="shrink-0 text-xs text-text-tertiary">
             {hasOverride ? (
               <>
@@ -72,7 +72,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
           </span>
         </div>
       ),
-      textValue: `${group.name} ${group.platform}`,
+      textValue: group.name,
     };
   });
   const selectedGroupLabel =

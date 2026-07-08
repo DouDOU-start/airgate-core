@@ -140,7 +140,7 @@ fi
 
 mkdir -p "$AIRGATE_DIR"
 cd "$AIRGATE_DIR"
-mkdir -p data/postgres data/redis data/plugins data/uploads data/assets
+mkdir -p data/postgres data/redis data/uploads data/assets
 
 ok "目录就绪：$(pwd)"
 
@@ -176,7 +176,6 @@ REDIS_PASSWORD=${REDIS_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
 
 API_KEY_SECRET=
-PLUGINS_MARKETPLACE_GITHUB_TOKEN=
 EOF
   chmod 600 .env
   ok "已生成 .env（所有密钥随机，权限 600）"

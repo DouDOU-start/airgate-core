@@ -63,7 +63,7 @@ export function EditUserModal({ open, user, onClose, onSubmit, loading }: EditUs
                       className="pr-10"
                       name="new-password"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder={t('accounts.leave_empty_to_keep')}
+                      placeholder={t('users.leave_empty_to_keep')}
                       value={form.password ?? ''}
                       onChange={(e) => setForm({ ...form, password: e.target.value || undefined })}
                       autoComplete="new-password"

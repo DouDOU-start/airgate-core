@@ -31,8 +31,6 @@ const (
 	FieldQuotas = "quotas"
 	// FieldModelRouting holds the string denoting the model_routing field in the database.
 	FieldModelRouting = "model_routing"
-	// FieldPluginSettings holds the string denoting the plugin_settings field in the database.
-	FieldPluginSettings = "plugin_settings"
 	// FieldServiceTier holds the string denoting the service_tier field in the database.
 	FieldServiceTier = "service_tier"
 	// FieldForceInstructions holds the string denoting the force_instructions field in the database.
@@ -45,8 +43,8 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
-	// EdgeAccounts holds the string denoting the accounts edge name in mutations.
-	EdgeAccounts = "accounts"
+	// EdgeChannels holds the string denoting the channels edge name in mutations.
+	EdgeChannels = "channels"
 	// EdgeAllowedUsers holds the string denoting the allowed_users edge name in mutations.
 	EdgeAllowedUsers = "allowed_users"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
@@ -57,11 +55,11 @@ const (
 	EdgeUsageLogs = "usage_logs"
 	// Table holds the table name of the group in the database.
 	Table = "groups"
-	// AccountsTable is the table that holds the accounts relation/edge. The primary key declared below.
-	AccountsTable = "account_groups"
-	// AccountsInverseTable is the table name for the Account entity.
-	// It exists in this package in order to avoid circular dependency with the "account" package.
-	AccountsInverseTable = "accounts"
+	// ChannelsTable is the table that holds the channels relation/edge. The primary key declared below.
+	ChannelsTable = "channel_groups"
+	// ChannelsInverseTable is the table name for the Channel entity.
+	// It exists in this package in order to avoid circular dependency with the "channel" package.
+	ChannelsInverseTable = "channels"
 	// AllowedUsersTable is the table that holds the allowed_users relation/edge. The primary key declared below.
 	AllowedUsersTable = "user_allowed_groups"
 	// AllowedUsersInverseTable is the table name for the User entity.
@@ -101,7 +99,6 @@ var Columns = []string{
 	FieldSubscriptionType,
 	FieldQuotas,
 	FieldModelRouting,
-	FieldPluginSettings,
 	FieldServiceTier,
 	FieldForceInstructions,
 	FieldNote,
@@ -111,9 +108,9 @@ var Columns = []string{
 }
 
 var (
-	// AccountsPrimaryKey and AccountsColumn2 are the table columns denoting the
-	// primary key for the accounts relation (M2M).
-	AccountsPrimaryKey = []string{"account_id", "group_id"}
+	// ChannelsPrimaryKey and ChannelsColumn2 are the table columns denoting the
+	// primary key for the channels relation (M2M).
+	ChannelsPrimaryKey = []string{"channel_id", "group_id"}
 	// AllowedUsersPrimaryKey and AllowedUsersColumn2 are the table columns denoting the
 	// primary key for the allowed_users relation (M2M).
 	AllowedUsersPrimaryKey = []string{"user_id", "group_id"}
@@ -132,8 +129,8 @@ func ValidColumn(column string) bool {
 var (
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
-	// PlatformValidator is a validator for the "platform" field. It is called by the builders before save.
-	PlatformValidator func(string) error
+	// DefaultPlatform holds the default value on creation for the "platform" field.
+	DefaultPlatform string
 	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
 	DefaultRateMultiplier float64
 	// DefaultIsExclusive holds the default value on creation for the "is_exclusive" field.
@@ -250,17 +247,17 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
-// ByAccountsCount orders the results by accounts count.
-func ByAccountsCount(opts ...sql.OrderTermOption) OrderOption {
+// ByChannelsCount orders the results by channels count.
+func ByChannelsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newAccountsStep(), opts...)
+		sqlgraph.OrderByNeighborsCount(s, newChannelsStep(), opts...)
 	}
 }
 
-// ByAccounts orders the results by accounts terms.
-func ByAccounts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+// ByChannels orders the results by channels terms.
+func ByChannels(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newAccountsStep(), append([]sql.OrderTerm{term}, terms...)...)
+		sqlgraph.OrderByNeighborTerms(s, newChannelsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
 
@@ -319,11 +316,11 @@ func ByUsageLogs(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newUsageLogsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
-func newAccountsStep() *sqlgraph.Step {
+func newChannelsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(AccountsInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2M, true, AccountsTable, AccountsPrimaryKey...),
+		sqlgraph.To(ChannelsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2M, true, ChannelsTable, ChannelsPrimaryKey...),
 	)
 }
 func newAllowedUsersStep() *sqlgraph.Step {

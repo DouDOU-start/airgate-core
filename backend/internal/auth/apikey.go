@@ -85,14 +85,12 @@ type APIKeyInfo struct {
 	// 加起来同时在途的请求数不能超过这个值。与 KeyMaxConcurrency 是 AND 关系。
 	UserMaxConcurrency int
 
-	// 预加载字段，避免 forwarder 重复查询
-	UserBalance             float64                                // 用户余额
-	UserGroupRates          map[int64]float64                      // 用户级专属倍率（按 group_id），用于 ResolveBillingRate 优先级链
-	UserGroupPluginSettings map[int64]map[string]map[string]string // 用户级分组插件配置覆盖（按 group_id）
-	GroupRateMultiplier     float64                                // 分组倍率
-	GroupServiceTier        string                                 // 分组 service tier
-	GroupForceInstructions  string                                 // 分组强制 instructions
-	GroupPluginSettings     map[string]map[string]string           // 分组插件级开关（claude_code_only 等）
+	// 预加载字段，避免转发管线重复查询
+	UserBalance            float64           // 用户余额
+	UserGroupRates         map[int64]float64 // 用户级专属倍率（按 group_id），用于 ResolveBillingRate 优先级链
+	GroupRateMultiplier    float64           // 分组倍率
+	GroupServiceTier       string            // 分组 service tier
+	GroupForceInstructions string            // 分组强制 instructions
 }
 
 // UserGroupRate 返回当前 key 所属分组在 user.group_rates 中的倍率（若存在）。
@@ -272,13 +270,11 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 		KeyMaxConcurrency:  ak.MaxConcurrency,
 		UserMaxConcurrency: u.MaxConcurrency,
 
-		UserBalance:             u.Balance,
-		UserGroupRates:          u.GroupRates,
-		UserGroupPluginSettings: u.GroupPluginSettings,
-		GroupRateMultiplier:     g.RateMultiplier,
-		GroupServiceTier:        g.ServiceTier,
-		GroupForceInstructions:  g.ForceInstructions,
-		GroupPluginSettings:     g.PluginSettings,
+		UserBalance:            u.Balance,
+		UserGroupRates:         u.GroupRates,
+		GroupRateMultiplier:    g.RateMultiplier,
+		GroupServiceTier:       g.ServiceTier,
+		GroupForceInstructions: g.ForceInstructions,
 	}
 	cacheAPIKeyResult(hash, info, nil)
 	return info, nil

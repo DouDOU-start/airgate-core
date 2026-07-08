@@ -12,12 +12,11 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
-	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
+	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/plugin"
-	"github.com/DouDOU-start/airgate-core/ent/pluginsource"
+	"github.com/DouDOU-start/airgate-core/ent/modelprice"
 	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/ent/task"
@@ -85,11 +84,10 @@ func checkColumn(table, column string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			apikey.Table:           apikey.ValidColumn,
-			account.Table:          account.ValidColumn,
 			balancelog.Table:       balancelog.ValidColumn,
+			channel.Table:          channel.ValidColumn,
 			group.Table:            group.ValidColumn,
-			plugin.Table:           plugin.ValidColumn,
-			pluginsource.Table:     pluginsource.ValidColumn,
+			modelprice.Table:       modelprice.ValidColumn,
 			proxy.Table:            proxy.ValidColumn,
 			setting.Table:          setting.ValidColumn,
 			task.Table:             task.ValidColumn,

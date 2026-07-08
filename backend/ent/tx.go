@@ -14,16 +14,14 @@ type Tx struct {
 	config
 	// APIKey is the client for interacting with the APIKey builders.
 	APIKey *APIKeyClient
-	// Account is the client for interacting with the Account builders.
-	Account *AccountClient
 	// BalanceLog is the client for interacting with the BalanceLog builders.
 	BalanceLog *BalanceLogClient
+	// Channel is the client for interacting with the Channel builders.
+	Channel *ChannelClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
-	// Plugin is the client for interacting with the Plugin builders.
-	Plugin *PluginClient
-	// PluginSource is the client for interacting with the PluginSource builders.
-	PluginSource *PluginSourceClient
+	// ModelPrice is the client for interacting with the ModelPrice builders.
+	ModelPrice *ModelPriceClient
 	// Proxy is the client for interacting with the Proxy builders.
 	Proxy *ProxyClient
 	// Setting is the client for interacting with the Setting builders.
@@ -168,11 +166,10 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.APIKey = NewAPIKeyClient(tx.config)
-	tx.Account = NewAccountClient(tx.config)
 	tx.BalanceLog = NewBalanceLogClient(tx.config)
+	tx.Channel = NewChannelClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
-	tx.Plugin = NewPluginClient(tx.config)
-	tx.PluginSource = NewPluginSourceClient(tx.config)
+	tx.ModelPrice = NewModelPriceClient(tx.config)
 	tx.Proxy = NewProxyClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
 	tx.Task = NewTaskClient(tx.config)

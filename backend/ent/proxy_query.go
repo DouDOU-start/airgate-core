@@ -11,7 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/account"
+	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/proxy"
 )
@@ -23,7 +23,7 @@ type ProxyQuery struct {
 	order        []proxy.OrderOption
 	inters       []Interceptor
 	predicates   []predicate.Proxy
-	withAccounts *AccountQuery
+	withChannels *ChannelQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -60,9 +60,9 @@ func (pq *ProxyQuery) Order(o ...proxy.OrderOption) *ProxyQuery {
 	return pq
 }
 
-// QueryAccounts chains the current query on the "accounts" edge.
-func (pq *ProxyQuery) QueryAccounts() *AccountQuery {
-	query := (&AccountClient{config: pq.config}).Query()
+// QueryChannels chains the current query on the "channels" edge.
+func (pq *ProxyQuery) QueryChannels() *ChannelQuery {
+	query := (&ChannelClient{config: pq.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := pq.prepareQuery(ctx); err != nil {
 			return nil, err
@@ -73,8 +73,8 @@ func (pq *ProxyQuery) QueryAccounts() *AccountQuery {
 		}
 		step := sqlgraph.NewStep(
 			sqlgraph.From(proxy.Table, proxy.FieldID, selector),
-			sqlgraph.To(account.Table, account.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, true, proxy.AccountsTable, proxy.AccountsColumn),
+			sqlgraph.To(channel.Table, channel.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, proxy.ChannelsTable, proxy.ChannelsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(pq.driver.Dialect(), step)
 		return fromU, nil
@@ -274,21 +274,21 @@ func (pq *ProxyQuery) Clone() *ProxyQuery {
 		order:        append([]proxy.OrderOption{}, pq.order...),
 		inters:       append([]Interceptor{}, pq.inters...),
 		predicates:   append([]predicate.Proxy{}, pq.predicates...),
-		withAccounts: pq.withAccounts.Clone(),
+		withChannels: pq.withChannels.Clone(),
 		// clone intermediate query.
 		sql:  pq.sql.Clone(),
 		path: pq.path,
 	}
 }
 
-// WithAccounts tells the query-builder to eager-load the nodes that are connected to
-// the "accounts" edge. The optional arguments are used to configure the query builder of the edge.
-func (pq *ProxyQuery) WithAccounts(opts ...func(*AccountQuery)) *ProxyQuery {
-	query := (&AccountClient{config: pq.config}).Query()
+// WithChannels tells the query-builder to eager-load the nodes that are connected to
+// the "channels" edge. The optional arguments are used to configure the query builder of the edge.
+func (pq *ProxyQuery) WithChannels(opts ...func(*ChannelQuery)) *ProxyQuery {
+	query := (&ChannelClient{config: pq.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	pq.withAccounts = query
+	pq.withChannels = query
 	return pq
 }
 
@@ -371,7 +371,7 @@ func (pq *ProxyQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Proxy,
 		nodes       = []*Proxy{}
 		_spec       = pq.querySpec()
 		loadedTypes = [1]bool{
-			pq.withAccounts != nil,
+			pq.withChannels != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -392,17 +392,17 @@ func (pq *ProxyQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Proxy,
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
-	if query := pq.withAccounts; query != nil {
-		if err := pq.loadAccounts(ctx, query, nodes,
-			func(n *Proxy) { n.Edges.Accounts = []*Account{} },
-			func(n *Proxy, e *Account) { n.Edges.Accounts = append(n.Edges.Accounts, e) }); err != nil {
+	if query := pq.withChannels; query != nil {
+		if err := pq.loadChannels(ctx, query, nodes,
+			func(n *Proxy) { n.Edges.Channels = []*Channel{} },
+			func(n *Proxy, e *Channel) { n.Edges.Channels = append(n.Edges.Channels, e) }); err != nil {
 			return nil, err
 		}
 	}
 	return nodes, nil
 }
 
-func (pq *ProxyQuery) loadAccounts(ctx context.Context, query *AccountQuery, nodes []*Proxy, init func(*Proxy), assign func(*Proxy, *Account)) error {
+func (pq *ProxyQuery) loadChannels(ctx context.Context, query *ChannelQuery, nodes []*Proxy, init func(*Proxy), assign func(*Proxy, *Channel)) error {
 	fks := make([]driver.Value, 0, len(nodes))
 	nodeids := make(map[int]*Proxy)
 	for i := range nodes {
@@ -413,21 +413,21 @@ func (pq *ProxyQuery) loadAccounts(ctx context.Context, query *AccountQuery, nod
 		}
 	}
 	query.withFKs = true
-	query.Where(predicate.Account(func(s *sql.Selector) {
-		s.Where(sql.InValues(s.C(proxy.AccountsColumn), fks...))
+	query.Where(predicate.Channel(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(proxy.ChannelsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {
 		return err
 	}
 	for _, n := range neighbors {
-		fk := n.account_proxy
+		fk := n.channel_proxy
 		if fk == nil {
-			return fmt.Errorf(`foreign-key "account_proxy" is nil for node %v`, n.ID)
+			return fmt.Errorf(`foreign-key "channel_proxy" is nil for node %v`, n.ID)
 		}
 		node, ok := nodeids[*fk]
 		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "account_proxy" returned %v for node %v`, *fk, n.ID)
+			return fmt.Errorf(`unexpected referenced foreign-key "channel_proxy" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

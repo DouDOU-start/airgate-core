@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/account"
+	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/proxy"
 )
 
@@ -123,19 +123,19 @@ func (pc *ProxyCreate) SetNillableUpdatedAt(t *time.Time) *ProxyCreate {
 	return pc
 }
 
-// AddAccountIDs adds the "accounts" edge to the Account entity by IDs.
-func (pc *ProxyCreate) AddAccountIDs(ids ...int) *ProxyCreate {
-	pc.mutation.AddAccountIDs(ids...)
+// AddChannelIDs adds the "channels" edge to the Channel entity by IDs.
+func (pc *ProxyCreate) AddChannelIDs(ids ...int) *ProxyCreate {
+	pc.mutation.AddChannelIDs(ids...)
 	return pc
 }
 
-// AddAccounts adds the "accounts" edges to the Account entity.
-func (pc *ProxyCreate) AddAccounts(a ...*Account) *ProxyCreate {
-	ids := make([]int, len(a))
-	for i := range a {
-		ids[i] = a[i].ID
+// AddChannels adds the "channels" edges to the Channel entity.
+func (pc *ProxyCreate) AddChannels(c ...*Channel) *ProxyCreate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return pc.AddAccountIDs(ids...)
+	return pc.AddChannelIDs(ids...)
 }
 
 // Mutation returns the ProxyMutation object of the builder.
@@ -310,15 +310,15 @@ func (pc *ProxyCreate) createSpec() (*Proxy, *sqlgraph.CreateSpec) {
 		_spec.SetField(proxy.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
 	}
-	if nodes := pc.mutation.AccountsIDs(); len(nodes) > 0 {
+	if nodes := pc.mutation.ChannelsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: true,
-			Table:   proxy.AccountsTable,
-			Columns: []string{proxy.AccountsColumn},
+			Table:   proxy.ChannelsTable,
+			Columns: []string{proxy.ChannelsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

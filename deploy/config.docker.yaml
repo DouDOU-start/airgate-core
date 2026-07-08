@@ -28,6 +28,3 @@ security:
 log:
   level: info
   format: text
-
-plugins:
-  dir: data/plugins

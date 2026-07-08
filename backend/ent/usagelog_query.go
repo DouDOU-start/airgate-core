@@ -10,8 +10,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -27,7 +27,7 @@ type UsageLogQuery struct {
 	predicates  []predicate.UsageLog
 	withUser    *UserQuery
 	withAPIKey  *APIKeyQuery
-	withAccount *AccountQuery
+	withChannel *ChannelQuery
 	withGroup   *GroupQuery
 	withFKs     bool
 	// intermediate query (i.e. traversal path).
@@ -110,9 +110,9 @@ func (ulq *UsageLogQuery) QueryAPIKey() *APIKeyQuery {
 	return query
 }
 
-// QueryAccount chains the current query on the "account" edge.
-func (ulq *UsageLogQuery) QueryAccount() *AccountQuery {
-	query := (&AccountClient{config: ulq.config}).Query()
+// QueryChannel chains the current query on the "channel" edge.
+func (ulq *UsageLogQuery) QueryChannel() *ChannelQuery {
+	query := (&ChannelClient{config: ulq.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := ulq.prepareQuery(ctx); err != nil {
 			return nil, err
@@ -123,8 +123,8 @@ func (ulq *UsageLogQuery) QueryAccount() *AccountQuery {
 		}
 		step := sqlgraph.NewStep(
 			sqlgraph.From(usagelog.Table, usagelog.FieldID, selector),
-			sqlgraph.To(account.Table, account.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, usagelog.AccountTable, usagelog.AccountColumn),
+			sqlgraph.To(channel.Table, channel.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, usagelog.ChannelTable, usagelog.ChannelColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(ulq.driver.Dialect(), step)
 		return fromU, nil
@@ -348,7 +348,7 @@ func (ulq *UsageLogQuery) Clone() *UsageLogQuery {
 		predicates:  append([]predicate.UsageLog{}, ulq.predicates...),
 		withUser:    ulq.withUser.Clone(),
 		withAPIKey:  ulq.withAPIKey.Clone(),
-		withAccount: ulq.withAccount.Clone(),
+		withChannel: ulq.withChannel.Clone(),
 		withGroup:   ulq.withGroup.Clone(),
 		// clone intermediate query.
 		sql:  ulq.sql.Clone(),
@@ -378,14 +378,14 @@ func (ulq *UsageLogQuery) WithAPIKey(opts ...func(*APIKeyQuery)) *UsageLogQuery 
 	return ulq
 }
 
-// WithAccount tells the query-builder to eager-load the nodes that are connected to
-// the "account" edge. The optional arguments are used to configure the query builder of the edge.
-func (ulq *UsageLogQuery) WithAccount(opts ...func(*AccountQuery)) *UsageLogQuery {
-	query := (&AccountClient{config: ulq.config}).Query()
+// WithChannel tells the query-builder to eager-load the nodes that are connected to
+// the "channel" edge. The optional arguments are used to configure the query builder of the edge.
+func (ulq *UsageLogQuery) WithChannel(opts ...func(*ChannelQuery)) *UsageLogQuery {
+	query := (&ChannelClient{config: ulq.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	ulq.withAccount = query
+	ulq.withChannel = query
 	return ulq
 }
 
@@ -482,11 +482,11 @@ func (ulq *UsageLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Us
 		loadedTypes = [4]bool{
 			ulq.withUser != nil,
 			ulq.withAPIKey != nil,
-			ulq.withAccount != nil,
+			ulq.withChannel != nil,
 			ulq.withGroup != nil,
 		}
 	)
-	if ulq.withUser != nil || ulq.withAPIKey != nil || ulq.withAccount != nil || ulq.withGroup != nil {
+	if ulq.withUser != nil || ulq.withAPIKey != nil || ulq.withChannel != nil || ulq.withGroup != nil {
 		withFKs = true
 	}
 	if withFKs {
@@ -522,9 +522,9 @@ func (ulq *UsageLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Us
 			return nil, err
 		}
 	}
-	if query := ulq.withAccount; query != nil {
-		if err := ulq.loadAccount(ctx, query, nodes, nil,
-			func(n *UsageLog, e *Account) { n.Edges.Account = e }); err != nil {
+	if query := ulq.withChannel; query != nil {
+		if err := ulq.loadChannel(ctx, query, nodes, nil,
+			func(n *UsageLog, e *Channel) { n.Edges.Channel = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -601,14 +601,14 @@ func (ulq *UsageLogQuery) loadAPIKey(ctx context.Context, query *APIKeyQuery, no
 	}
 	return nil
 }
-func (ulq *UsageLogQuery) loadAccount(ctx context.Context, query *AccountQuery, nodes []*UsageLog, init func(*UsageLog), assign func(*UsageLog, *Account)) error {
+func (ulq *UsageLogQuery) loadChannel(ctx context.Context, query *ChannelQuery, nodes []*UsageLog, init func(*UsageLog), assign func(*UsageLog, *Channel)) error {
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*UsageLog)
 	for i := range nodes {
-		if nodes[i].account_usage_logs == nil {
+		if nodes[i].channel_usage_logs == nil {
 			continue
 		}
-		fk := *nodes[i].account_usage_logs
+		fk := *nodes[i].channel_usage_logs
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -617,7 +617,7 @@ func (ulq *UsageLogQuery) loadAccount(ctx context.Context, query *AccountQuery, 
 	if len(ids) == 0 {
 		return nil
 	}
-	query.Where(account.IDIn(ids...))
+	query.Where(channel.IDIn(ids...))
 	neighbors, err := query.All(ctx)
 	if err != nil {
 		return err
@@ -625,7 +625,7 @@ func (ulq *UsageLogQuery) loadAccount(ctx context.Context, query *AccountQuery, 
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "account_usage_logs" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "channel_usage_logs" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)

@@ -24,6 +24,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/migrate"
 	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
+	"github.com/DouDOU-start/airgate-core/internal/bootstrap/priceseed"
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/i18n"
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
@@ -214,6 +215,9 @@ func startMainServer(cfg *config.Config) {
 	// 回填历史 API Key 的 key_hint 以及 reseller markup 新列等启动整理任务
 	bootstrap.RunStartupTasks(db, drv, cfg.APIKeySecret())
 
+	// 导入默认模型价目表种子（insert-if-absent，不覆盖已有条目；失败只 Warn 不阻塞）
+	priceseed.Load(context.Background(), store.NewModelPriceStore(db), config.ConfigPath())
+
 	// 初始化 Redis
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port),
@@ -259,8 +263,8 @@ func startMainServer(cfg *config.Config) {
 	// 创建并启动 HTTP 服务器
 	srv := server.NewServer(cfg, db, rdb)
 
-	// 启动插件系统（非阻塞，失败不影响核心服务）
-	srv.StartPlugins(context.Background())
+	// 启动后台组件（记录器 + 资产循环，非阻塞）
+	srv.StartBackground(context.Background())
 
 	// 优雅关闭
 	quit := make(chan os.Signal, 1)

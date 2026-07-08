@@ -76,7 +76,7 @@ type groupStubRepository struct {
 	create         func(context.Context, CreateInput) (Group, error)
 	update         func(context.Context, int, UpdateInput) (Group, error)
 	delete         func(context.Context, int) error
-	statsForGroups func(context.Context, []int) (map[int]GroupStats, map[int][]AccountCapacity, error)
+	statsForGroups func(context.Context, []int) (map[int]GroupStats, error)
 }
 
 func (s groupStubRepository) List(ctx context.Context, filter ListFilter) ([]Group, int64, error) {
@@ -121,9 +121,9 @@ func (s groupStubRepository) Delete(ctx context.Context, id int) error {
 	return s.delete(ctx, id)
 }
 
-func (s groupStubRepository) StatsForGroups(ctx context.Context, groupIDs []int, _ time.Time) (map[int]GroupStats, map[int][]AccountCapacity, error) {
+func (s groupStubRepository) StatsForGroups(ctx context.Context, groupIDs []int, _ time.Time) (map[int]GroupStats, error) {
 	if s.statsForGroups == nil {
-		return nil, nil, nil
+		return nil, nil
 	}
 	return s.statsForGroups(ctx, groupIDs)
 }

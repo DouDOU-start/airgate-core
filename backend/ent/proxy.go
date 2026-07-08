@@ -43,20 +43,20 @@ type Proxy struct {
 
 // ProxyEdges holds the relations/edges for other nodes in the graph.
 type ProxyEdges struct {
-	// Accounts holds the value of the accounts edge.
-	Accounts []*Account `json:"accounts,omitempty"`
+	// Channels holds the value of the channels edge.
+	Channels []*Channel `json:"channels,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
 	loadedTypes [1]bool
 }
 
-// AccountsOrErr returns the Accounts value or an error if the edge
+// ChannelsOrErr returns the Channels value or an error if the edge
 // was not loaded in eager-loading.
-func (e ProxyEdges) AccountsOrErr() ([]*Account, error) {
+func (e ProxyEdges) ChannelsOrErr() ([]*Channel, error) {
 	if e.loadedTypes[0] {
-		return e.Accounts, nil
+		return e.Channels, nil
 	}
-	return nil, &NotLoadedError{edge: "accounts"}
+	return nil, &NotLoadedError{edge: "channels"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -158,9 +158,9 @@ func (pr *Proxy) Value(name string) (ent.Value, error) {
 	return pr.selectValues.Get(name)
 }
 
-// QueryAccounts queries the "accounts" edge of the Proxy entity.
-func (pr *Proxy) QueryAccounts() *AccountQuery {
-	return NewProxyClient(pr.config).QueryAccounts(pr)
+// QueryChannels queries the "channels" edge of the Proxy entity.
+func (pr *Proxy) QueryChannels() *ChannelQuery {
+	return NewProxyClient(pr.config).QueryChannels(pr)
 }
 
 // Update returns a builder for updating this Proxy.

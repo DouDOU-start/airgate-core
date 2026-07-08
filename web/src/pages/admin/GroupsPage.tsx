@@ -8,14 +8,10 @@ import {
   Trash2,
   RefreshCw,
   Percent,
-  Image,
-  Text,
 } from 'lucide-react';
-import { AlertDialog, Button, Chip, EmptyState, Label, ListBox, Select, Spinner } from '@heroui/react';
+import { AlertDialog, Button, Chip, EmptyState, Spinner } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
-import { PlatformIcon } from '../../shared/ui';
 import { groupsApi } from '../../shared/api/groups';
-import { usePlatforms } from '../../shared/hooks/usePlatforms';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../shared/queryKeys';
@@ -31,15 +27,9 @@ import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/typ
 
 export default function GroupsPage() {
   const { t } = useTranslation();
-  const { platforms, platformName, instructionPresets } = usePlatforms();
 
-  const PLATFORM_OPTIONS = [
-    { value: '', label: t('groups.all_platforms') },
-    ...platforms.map((p) => ({ value: p, label: platformName(p) })),
-  ];
   // 筛选状态
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.groups');
-  const [platformFilter, setPlatformFilter] = useState('');
 
   // 弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -49,12 +39,11 @@ export default function GroupsPage() {
 
   // 查询分组列表
   const { data, isLoading, refetch } = useQuery({
-    queryKey: queryKeys.groups(page, pageSize, platformFilter),
+    queryKey: queryKeys.groups(page, pageSize),
     queryFn: () =>
       groupsApi.list({
         page,
         page_size: pageSize,
-        platform: platformFilter || undefined,
       }),
     placeholderData: keepPreviousData,
   });
@@ -91,38 +80,11 @@ export default function GroupsPage() {
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
-  const selectedPlatformLabel = PLATFORM_OPTIONS.find((option) => option.value === platformFilter)?.label ?? t('groups.all_platforms');
-  const isImageGroup = (group: GroupResp) => group.plugin_settings?.openai?.image_enabled === 'true';
 
   return (
     <div>
-      {/* 筛选 */}
+      {/* 工具栏 */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
-        <div className="w-full sm:w-48">
-          <Select
-            fullWidth
-            selectedKey={platformFilter}
-            onSelectionChange={(key) => {
-              setPlatformFilter(key == null ? '' : String(key));
-              setPage(1);
-            }}
-          >
-            <Label className="sr-only">{t('groups.platform')}</Label>
-            <Select.Trigger>
-              <Select.Value>{selectedPlatformLabel}</Select.Value>
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox items={PLATFORM_OPTIONS}>
-                {(item) => (
-                  <ListBox.Item id={item.value} textValue={item.label}>
-                    {item.label}
-                  </ListBox.Item>
-                )}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        </div>
         <div className="flex items-center gap-2 sm:ml-auto">
           <Button
             isIconOnly
@@ -155,28 +117,21 @@ export default function GroupsPage() {
             totalPages={totalPages}
           />
         )}
-        minWidth={1120}
+        minWidth={880}
       >
             <CommonTable.Header>
-              <CommonTable.Column id="name" style={{ width: 160 }}>{t('common.name')}</CommonTable.Column>
-              <CommonTable.Column id="platform" style={{ width: 112 }}>{t('groups.platform')}</CommonTable.Column>
-              <CommonTable.Column id="subscription_type" style={{ width: 88 }}>{t('groups.subscription_type')}</CommonTable.Column>
-              <CommonTable.Column id="rate_multiplier" style={{ width: 80 }}>
+              <CommonTable.Column id="name" style={{ width: 200 }}>{t('common.name')}</CommonTable.Column>
+              <CommonTable.Column id="subscription_type" style={{ width: 96 }}>{t('groups.subscription_type')}</CommonTable.Column>
+              <CommonTable.Column id="rate_multiplier" style={{ width: 88 }}>
                 {t('groups.rate_multiplier')}
               </CommonTable.Column>
-              <CommonTable.Column id="is_exclusive" style={{ width: 76 }}>
+              <CommonTable.Column id="is_exclusive" style={{ width: 84 }}>
                 {t('groups.group_type')}
-              </CommonTable.Column>
-              <CommonTable.Column id="account_stats" style={{ width: '10.75rem' }}>
-                {t('groups.account_stats')}
               </CommonTable.Column>
               <CommonTable.Column id="usage" style={{ width: '10.75rem' }}>
                 {t('groups.usage')}
               </CommonTable.Column>
-              <CommonTable.Column id="capacity" style={{ minWidth: 112, width: 112 }}>
-                {t('groups.capacity')}
-              </CommonTable.Column>
-              <CommonTable.Column id="sort_weight" style={{ width: 72 }}>
+              <CommonTable.Column id="sort_weight" style={{ width: 80 }}>
                 {t('groups.sort_weight')}
               </CommonTable.Column>
               <CommonTable.Column id="actions" style={{ width: 132 }}>
@@ -185,10 +140,10 @@ export default function GroupsPage() {
             </CommonTable.Header>
             <CommonTable.Body>
               {isLoading ? (
-                <TableLoadingRow colSpan={10} />
+                <TableLoadingRow colSpan={7} />
               ) : rows.length === 0 ? (
                 <CommonTable.Row id="empty">
-                  <CommonTable.Cell colSpan={10}>
+                  <CommonTable.Cell colSpan={7}>
                     <EmptyState>
                       <div className="text-sm text-default-500">{t('common.no_data')}</div>
                     </EmptyState>
@@ -198,21 +153,10 @@ export default function GroupsPage() {
                 rows.map((row) => (
                     <CommonTable.Row id={String(row.id)} key={row.id}>
                     <CommonTable.Cell>
-                      <span className="inline-flex max-w-[9.5rem] items-center gap-1.5">
-                        {isImageGroup(row) ? (
-                          <Image className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--ag-primary)' }} />
-                        ) : (
-                          <Text className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--ag-text-tertiary)' }} />
-                        )}
+                      <span className="inline-flex max-w-[11.5rem] items-center gap-1.5">
                         <span style={{ color: 'var(--ag-text)' }} className="truncate font-medium">
                           {row.name}
                         </span>
-                      </span>
-                    </CommonTable.Cell>
-                    <CommonTable.Cell>
-                      <span className="inline-flex max-w-[6.5rem] items-center gap-1.5">
-                        <PlatformIcon platform={row.platform} className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{platformName(row.platform)}</span>
                       </span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
@@ -236,23 +180,6 @@ export default function GroupsPage() {
                     </CommonTable.Cell>
                     <CommonTable.Cell className="ag-groups-metric-cell">
                       <MetricChips
-                        className="ag-metric-chips--stack ag-metric-chips--markup ag-metric-chips--account-stats ag-metric-chips--compact-y"
-                        items={[
-                          {
-                            color: 'default' as const,
-                            label: `${t('groups.account_available')}/${t('groups.account_total')}`,
-                            value: `${row.account_active}/${row.account_total}`,
-                          },
-                          {
-                            color: row.account_error > 0 ? 'danger' as const : 'default' as const,
-                            label: t('groups.account_error'),
-                            value: String(row.account_error),
-                          },
-                        ]}
-                      />
-                    </CommonTable.Cell>
-                    <CommonTable.Cell className="ag-groups-metric-cell">
-                      <MetricChips
                         className="ag-metric-chips--stack ag-metric-chips--markup ag-metric-chips--compact-y"
                         items={[
                           {
@@ -271,15 +198,6 @@ export default function GroupsPage() {
                           },
                         ]}
                       />
-                    </CommonTable.Cell>
-                    <CommonTable.Cell>
-                      <div className="inline-flex min-w-[6.75rem] items-center justify-end whitespace-nowrap font-mono tabular-nums">
-                        <span className="font-mono" style={{ color: row.capacity_used > 0 ? 'var(--ag-primary)' : undefined }}>
-                          {row.capacity_used}
-                        </span>
-                        <span className="mx-0.5" style={{ color: 'var(--ag-text-tertiary)' }}>/</span>
-                        <span className="font-mono">{row.capacity_total}</span>
-                      </div>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <span className="inline-flex items-center gap-1 font-mono">
@@ -332,8 +250,6 @@ export default function GroupsPage() {
         onClose={() => setShowCreateModal(false)}
         onSubmit={(data) => createMutation.mutate(data as CreateGroupReq)}
         loading={createMutation.isPending}
-        platforms={platforms}
-        instructionPresets={instructionPresets}
       />
 
       {/* 编辑弹窗 */}
@@ -347,8 +263,6 @@ export default function GroupsPage() {
             updateMutation.mutate({ id: editingGroup.id, data })
           }
           loading={updateMutation.isPending}
-          platforms={platforms}
-          instructionPresets={instructionPresets}
         />
       )}
 

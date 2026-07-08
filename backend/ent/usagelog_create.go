@@ -10,8 +10,8 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -603,23 +603,23 @@ func (ulc *UsageLogCreate) SetAPIKey(a *APIKey) *UsageLogCreate {
 	return ulc.SetAPIKeyID(a.ID)
 }
 
-// SetAccountID sets the "account" edge to the Account entity by ID.
-func (ulc *UsageLogCreate) SetAccountID(id int) *UsageLogCreate {
-	ulc.mutation.SetAccountID(id)
+// SetChannelID sets the "channel" edge to the Channel entity by ID.
+func (ulc *UsageLogCreate) SetChannelID(id int) *UsageLogCreate {
+	ulc.mutation.SetChannelID(id)
 	return ulc
 }
 
-// SetNillableAccountID sets the "account" edge to the Account entity by ID if the given value is not nil.
-func (ulc *UsageLogCreate) SetNillableAccountID(id *int) *UsageLogCreate {
+// SetNillableChannelID sets the "channel" edge to the Channel entity by ID if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableChannelID(id *int) *UsageLogCreate {
 	if id != nil {
-		ulc = ulc.SetAccountID(*id)
+		ulc = ulc.SetChannelID(*id)
 	}
 	return ulc
 }
 
-// SetAccount sets the "account" edge to the Account entity.
-func (ulc *UsageLogCreate) SetAccount(a *Account) *UsageLogCreate {
-	return ulc.SetAccountID(a.ID)
+// SetChannel sets the "channel" edge to the Channel entity.
+func (ulc *UsageLogCreate) SetChannel(c *Channel) *UsageLogCreate {
+	return ulc.SetChannelID(c.ID)
 }
 
 // SetGroupID sets the "group" edge to the Group entity by ID.
@@ -1176,21 +1176,21 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_node.api_key_usage_logs = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	if nodes := ulc.mutation.AccountIDs(); len(nodes) > 0 {
+	if nodes := ulc.mutation.ChannelIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
-			Table:   usagelog.AccountTable,
-			Columns: []string{usagelog.AccountColumn},
+			Table:   usagelog.ChannelTable,
+			Columns: []string{usagelog.ChannelColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.account_usage_logs = &nodes[0]
+		_node.channel_usage_logs = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := ulc.mutation.GroupIDs(); len(nodes) > 0 {

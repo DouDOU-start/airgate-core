@@ -10,11 +10,11 @@ import type {
 
 export const groupsApi = {
   // 用户接口
-  listAvailable: (params: PageReq & { platform?: string }) =>
+  listAvailable: (params: PageReq) =>
     get<PagedData<GroupResp>>('/api/v1/groups', params),
 
   // 管理员接口
-  list: (params: PageReq & { platform?: string }) =>
+  list: (params: PageReq) =>
     get<PagedData<GroupResp>>('/api/v1/admin/groups', params),
   get: (id: number) => get<GroupResp>(`/api/v1/admin/groups/${id}`),
   create: (data: CreateGroupReq) => post<GroupResp>('/api/v1/admin/groups', data),
@@ -27,7 +27,7 @@ export const groupsApi = {
   setRateOverride: (
     groupId: number,
     userId: number,
-    payload: { rate: number; plugin_settings?: Record<string, Record<string, string>> },
+    payload: { rate: number },
   ) =>
     put<GroupRateOverrideResp>(`/api/v1/admin/groups/${groupId}/rate-overrides/${userId}`, payload),
   deleteRateOverride: (groupId: number, userId: number) =>

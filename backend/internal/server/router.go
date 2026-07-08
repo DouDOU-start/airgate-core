@@ -6,20 +6,15 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/internal/plugin"
+	"github.com/DouDOU-start/airgate-core/internal/asset"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 	"github.com/DouDOU-start/airgate-core/internal/setup"
 	webfs "github.com/DouDOU-start/airgate-core/internal/web"
 )
-
-// defaultStatusPluginName 公开状态页反代目标插件的默认值；
-// 可经 config `plugins.status_plugin` 覆盖，core 不绑定具体插件实现。
-const defaultStatusPluginName = "airgate-health"
 
 // registerRoutes 注册所有 API 路由
 func (s *Server) registerRoutes() {
@@ -101,10 +96,6 @@ func (s *Server) registerRoutes() {
 		userGroup.GET("/usage", handlers.Usage.UserUsage)
 		userGroup.GET("/usage/stats", handlers.Usage.UserUsageStats)
 		userGroup.GET("/usage/trend", handlers.Usage.UserUsageTrend)
-
-		// 插件菜单（精简元信息：仅返回 name + frontend_pages，普通账号会话可访问，
-		// 用于前端 AppShell 渲染插件提供的页面菜单项）
-		accountGroup.GET("/plugins/menu", handlers.Plugin.ListPluginMenu)
 	}
 
 	// === 管理员路由（需要管理员 JWT + AdminOnly，支持 admin- 管理员 API Key） ===
@@ -120,27 +111,6 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/users/:id/balance", handlers.User.AdjustBalance)
 		adminGroup.GET("/users/:id/balance-history", handlers.User.GetUserBalanceHistory)
 		adminGroup.GET("/users/:id/api-keys", handlers.User.AdminListUserKeys)
-
-		// 账号管理
-		adminGroup.GET("/accounts", handlers.Account.ListAccounts)
-		adminGroup.GET("/accounts/usage", handlers.Account.GetAccountUsage)
-		adminGroup.GET("/accounts/export", handlers.Account.ExportAccounts)
-		adminGroup.POST("/accounts/import", handlers.Account.ImportAccounts)
-		adminGroup.POST("/accounts/bulk-update", handlers.Account.BulkUpdateAccounts)
-		adminGroup.POST("/accounts/bulk-delete", handlers.Account.BulkDeleteAccounts)
-		adminGroup.POST("/accounts/bulk-clear-family-cooldowns", handlers.Account.BulkClearFamilyCooldowns)
-		adminGroup.POST("/accounts/bulk-refresh-quota", handlers.Account.BulkRefreshQuota)
-		adminGroup.POST("/accounts", handlers.Account.CreateAccount)
-		adminGroup.PUT("/accounts/:id", handlers.Account.UpdateAccount)
-		adminGroup.DELETE("/accounts/:id", handlers.Account.DeleteAccount)
-		adminGroup.POST("/accounts/:id/test", handlers.Account.TestAccount)
-		adminGroup.PATCH("/accounts/:id/toggle", handlers.Account.ToggleScheduling)
-		adminGroup.DELETE("/accounts/:id/family-cooldowns", handlers.Account.ClearFamilyCooldowns)
-		adminGroup.GET("/accounts/:id/models", handlers.Account.GetAccountModels)
-		adminGroup.GET("/accounts/:id/usage", handlers.Account.GetSingleAccountUsage)
-		adminGroup.GET("/accounts/credentials-schema/:platform", handlers.Account.GetCredentialsSchema)
-		adminGroup.POST("/accounts/:id/refresh-quota", handlers.Account.RefreshQuota)
-		adminGroup.GET("/accounts/:id/stats", handlers.Account.GetAccountStats)
 
 		// 分组管理
 		adminGroup.GET("/groups", handlers.Group.ListGroups)
@@ -171,24 +141,26 @@ func (s *Server) registerRoutes() {
 		adminGroup.DELETE("/proxies/:id", handlers.Proxy.DeleteProxy)
 		adminGroup.POST("/proxies/:id/test", handlers.Proxy.TestProxy)
 
+		// 渠道管理
+		adminGroup.GET("/channels", handlers.Channel.ListChannels)
+		adminGroup.POST("/channels", handlers.Channel.CreateChannel)
+		adminGroup.PUT("/channels/:id", handlers.Channel.UpdateChannel)
+		adminGroup.DELETE("/channels/:id", handlers.Channel.DeleteChannel)
+		adminGroup.POST("/channels/:id/test", handlers.Channel.TestChannel)
+		adminGroup.POST("/channels/:id/fetch-models", handlers.Channel.FetchChannelModels)
+		adminGroup.POST("/channels/bulk-update", handlers.Channel.BulkUpdateChannels)
+
+		// 模型价格
+		adminGroup.GET("/model-prices", handlers.ModelPrice.ListModelPrices)
+		adminGroup.POST("/model-prices", handlers.ModelPrice.CreateModelPrice)
+		adminGroup.PUT("/model-prices/:id", handlers.ModelPrice.UpdateModelPrice)
+		adminGroup.DELETE("/model-prices/:id", handlers.ModelPrice.DeleteModelPrice)
+		adminGroup.POST("/model-prices/import", handlers.ModelPrice.ImportModelPrices)
+
 		// 使用记录（管理员）
 		adminGroup.GET("/usage", handlers.Usage.AdminUsage)
 		adminGroup.GET("/usage/stats", handlers.Usage.AdminUsageStats)
 		adminGroup.GET("/usage/trend", handlers.Usage.AdminUsageTrend)
-
-		// 插件管理
-		adminGroup.GET("/plugins", handlers.Plugin.ListPlugins)
-		adminGroup.GET("/plugins/:name/config", handlers.Plugin.GetPluginConfig)
-		adminGroup.PUT("/plugins/:name/config", handlers.Plugin.UpdatePluginConfig)
-		adminGroup.POST("/plugins/upload", handlers.Plugin.UploadPlugin)
-		adminGroup.POST("/plugins/install-github", handlers.Plugin.InstallFromGithub)
-		adminGroup.POST("/plugins/:name/uninstall", handlers.Plugin.UninstallPlugin)
-		adminGroup.POST("/plugins/:name/reload", handlers.Plugin.ReloadPlugin)
-		adminGroup.Any("/plugins/:name/rpc/*action", handlers.Plugin.ProxyRequest)
-
-		// 插件市场
-		adminGroup.GET("/marketplace/plugins", handlers.Plugin.ListMarketplace)
-		adminGroup.POST("/marketplace/refresh", handlers.Plugin.RefreshMarketplace)
 
 		// 系统设置
 		adminGroup.GET("/settings", handlers.Settings.GetSettings)
@@ -214,43 +186,6 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/upgrade/run", handlers.Upgrade.Run)
 	}
 
-	// === Extension 插件 API 路由（JWT 认证 + 管理员权限，支持 admin- 管理员 API Key） ===
-	extGroup := r.Group("/api/v1/ext")
-	extGroup.Use(middleware.JWTAuth(s.jwtMgr, s.db), middleware.AdminOnly())
-	{
-		extGroup.Any("/:pluginName/*path", s.extensionProxy.Handle)
-	}
-
-	// === Extension 插件用户级 API 路由（仅 JWT，普通用户可访问） ===
-	// 用于支付插件等面向用户的扩展，让普通用户能调用插件接口（创建充值订单、查询自己订单等）。
-	// 插件需自行根据 X-Airgate-User-ID 头识别用户，并校验数据归属。
-	extUserGroup := r.Group("/api/v1/ext-user")
-	extUserGroup.Use(middleware.JWTAuth(s.jwtMgr), middleware.RequireRoles("admin", "user"))
-	{
-		extUserGroup.Any("/:pluginName/*path", s.extensionProxy.Handle)
-	}
-
-	// === 支付回调路由（无需认证，由插件自行验签） ===
-	// 第三方支付平台异步通知（epay/支付宝/微信等）通过此路径转发到对应插件。
-	r.Any("/api/v1/payment-callback/:pluginName/*path", s.extensionProxy.Handle)
-
-	// === 公开状态页路由 ===
-	// 设计：core 完全不维护一份状态页前端，所有 /status* 请求一律反代到
-	// 状态页插件（config `plugins.status_plugin`，默认 airgate-health），由插件内部
-	// standalone 打包的 status.html + status-XXX.js 渲染。这样状态页的 UI / 数据 /
-	// 粒度都由健康监控插件单点维护，避免 core 与插件出现两份重复实现（之前 core
-	// 自己有个 React StatusPage 组件并维护 90 天日级方格图，与 health 插件的
-	// standalone 页严重重复，移除）。
-	//
-	// 反代规则：
-	//   - GET /status            → 插件看到 /        → handlePublicIndex 返回 status.html
-	//   - GET /status/*path      → 插件看到 /<path> → API + 静态资源
-	statusPluginName := s.cfg.Plugins.StatusPlugin
-	if statusPluginName == "" {
-		statusPluginName = defaultStatusPluginName
-	}
-	statusProxy := s.extensionProxy.HandleNamed(statusPluginName, "public")
-
 	// 加载嵌入的前端 SPA：所有静态资源通过 //go:embed 打进二进制
 	distFS, err := webfs.FS()
 	if err != nil {
@@ -264,22 +199,24 @@ func (s *Server) registerRoutes() {
 		os.Exit(1)
 	}
 
-	// /status 与 /status/*path 都走 statusProxy 反代到状态页插件
-	r.GET("/status", statusProxy)
-	r.GET("/status/*path", statusProxy)
+	// === 对外网关路由（sk- API Key 鉴权，OpenAI 兼容） ===
+	// 显式静态注册（先于 NoRoute），错误体统一走 relay 的 OpenAI 形态 errfmt。
+	relayGroup := r.Group("/v1", middleware.APIKeyAuth(s.db))
+	{
+		relayGroup.POST("/chat/completions", s.relay.HandleChatCompletions)
+		relayGroup.POST("/responses", s.relay.HandleResponses)
+		relayGroup.GET("/models", s.relay.HandleModels)
+	}
 
 	// === cc-switch 通用模板兼容端点（使用 sk-xxx API Key 自鉴权） ===
 	// AirGate 安装脚本和 cc-switch 通用脚本可使用 /v1/usage 做 Key 校验和
 	// 余额查询。该路径由 Core 直接处理，返回真实可用余额。
-	// 必须注册在 NoRoute 之前，否则会被插件动态路由吃掉。
 	// 实现见 cc_compat.go。
 	r.GET("/v1/usage", s.handleCCCompatUserBalance)
 
 	// === OpenClaw 一键接入（公共路由，无需认证） ===
 	// 设计：install.sh 通过 `curl | bash` 分发，因此必须公开；models/info
 	// 也无需鉴权，内容均为管理员已标记为 "可公开" 的元信息。
-	// 注意：这些路由必须在 NoRoute 之前注册，否则带 Bearer 的请求会被 NoRoute
-	// 的 API Key 转发逻辑吃掉。
 	openclawGroup := r.Group("/openclaw")
 	{
 		openclawGroup.GET("/install.sh", handlers.OpenClaw.HandleInstallScript)
@@ -298,48 +235,17 @@ func (s *Server) registerRoutes() {
 	r.Static("/uploads", "data/uploads")
 	r.GET("/assets-runtime/*path", s.handleRuntimeAsset)
 
-	// 插件前端静态资源（/plugins/{pluginName}/assets/*）
-	//
-	// 与 r.Static 不同：这是一个 dev-aware handler，对每个请求按以下顺序查找：
-	//   1. 如果该插件是 dev 模式 → 从 <plugin_src>/web/dist/ 读 vite watch 实时产物
-	//   2. fallback 到 data/plugins/<id>/assets/ —— 生产模式或 vite 还没构建好
-	//
-	// 这样所有插件的 vite watch 都可以统一输出到自己的 web/dist，不需要再让
-	// vite watch --outDir 写到 core 的 plugin assets dir。
-	pluginDir := s.cfg.Plugins.Dir
-	if pluginDir == "" {
-		pluginDir = "data/plugins"
-	}
-	r.GET("/plugins/:name/assets/*path", servePluginAsset(s.pluginMgr, pluginDir))
-
 	// 静态文件服务（前端 SPA）
 	r.StaticFS("/assets", http.FS(assetsFS))
 
-	// NoRoute: 携带 API Key 的请求转发到插件系统，其余返回前端 index.html
-	// 支持 Authorization: Bearer 和 x-api-key 两种认证方式（兼容 Anthropic 标准格式）
-	apiKeyAuth := middleware.APIKeyAuth(s.db)
+	// NoRoute: 纯 SPA fallback，未匹配的路径一律返回前端 index.html。
+	// P1 起对外网关路由（/v1/chat/completions 等）走显式注册，不再经 NoRoute 分发。
 	r.NoRoute(func(c *gin.Context) {
-		if middleware.HasAPIKey(c) {
-			apiKeyAuth(c)
-			if c.IsAborted() {
-				return
-			}
-			c.Params = append(c.Params, gin.Param{Key: "path", Value: c.Request.URL.Path})
-			s.dynamicRouter.Handle(c)
-			return
-		}
 		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
 	})
 }
 
-// servePluginAsset 处理 /plugins/<name>/assets/* 请求。
-//
-// 双模式：
-//   - dev 模式：从 <plugin_src>/web/dist/<rel> 读 vite watch 实时构建产物。
-//     这样 openai/epay/health 都可以让 vite watch 输出到自己的 web/dist，
-//     core 透明地从那里读，不再需要让 vite watch --outDir 写到 core 内部目录。
-//   - production 模式：fallback 到 data/plugins/<name>/assets/<rel>，
-//     由 core 启动时通过 GetWebAssets() 把插件 binary embed 的 webdist 提取出来。
+// handleRuntimeAsset 处理 /assets-runtime/* 运行时资产请求。
 //
 // 路径穿越防御：clean 后检查不允许 ".."。
 func (s *Server) handleRuntimeAsset(c *gin.Context) {
@@ -348,7 +254,7 @@ func (s *Server) handleRuntimeAsset(c *gin.Context) {
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	storage, err := plugin.NewAssetStorage(c.Request.Context(), s.db)
+	storage, err := asset.NewAssetStorage(c.Request.Context(), s.db)
 	if err != nil {
 		slog.Warn("runtime_asset_storage_init_failed", "error", err)
 		c.Status(http.StatusInternalServerError)
@@ -395,47 +301,7 @@ func (s *Server) handleRuntimeAsset(c *gin.Context) {
 	c.Data(http.StatusOK, contentType, data)
 }
 
-func servePluginAsset(mgr *plugin.Manager, baseDir string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		name := c.Param("name")
-		rel := strings.TrimPrefix(c.Param("path"), "/")
-
-		// 路径穿越防御
-		clean := filepath.Clean("/" + rel)
-		if strings.Contains(clean, "..") {
-			c.Status(http.StatusBadRequest)
-			return
-		}
-		rel = strings.TrimPrefix(clean, "/")
-
-		// 优先尝试 dev 路径
-		if devDir, ok := mgr.DevWebDistPath(name); ok {
-			full := filepath.Join(devDir, rel)
-			if data, err := os.ReadFile(full); err == nil {
-				c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
-				c.Data(http.StatusOK, contentTypeFromExt(rel), data)
-				return
-			}
-		}
-
-		// fallback 到 production 路径
-		full := filepath.Join(baseDir, name, "assets", rel)
-		data, err := os.ReadFile(full)
-		if err != nil {
-			// 插件可选 CSS：若 index.css 不存在，返回空 CSS 而非 404。
-			// 否则浏览器会在 network 面板打印 404，污染开发者控制台。
-			if rel == "index.css" {
-				c.Data(http.StatusOK, "text/css; charset=utf-8", nil)
-				return
-			}
-			c.Status(http.StatusNotFound)
-			return
-		}
-		c.Data(http.StatusOK, contentTypeFromExt(rel), data)
-	}
-}
-
-// contentTypeFromExt 按扩展名返回 Content-Type。覆盖插件资源里常见的几种文件，
+// contentTypeFromExt 按扩展名返回 Content-Type。覆盖运行时资产里常见的几种文件，
 // 未知扩展名退回 application/octet-stream。
 func contentTypeFromExt(name string) string {
 	switch {

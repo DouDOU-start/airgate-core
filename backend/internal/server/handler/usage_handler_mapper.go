@@ -16,9 +16,8 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 		APIKeyName:            record.APIKeyName,
 		APIKeyHint:            record.APIKeyHint,
 		APIKeyDeleted:         record.APIKeyDeleted,
-		AccountID:             record.AccountID,
-		AccountName:           record.AccountName,
-		AccountEmail:          record.AccountEmail,
+		ChannelID:             record.ChannelID,
+		ChannelName:           record.ChannelName,
 		GroupID:               record.GroupID,
 		Platform:              record.Platform,
 		Model:                 record.Model,
@@ -123,9 +122,9 @@ func toUsageStatsResp(result appusage.StatsResult) dto.UsageStatsResp {
 			BilledCost: item.BilledCost,
 		})
 	}
-	for _, item := range result.ByAccount {
-		resp.ByAccount = append(resp.ByAccount, dto.AccountStats{
-			AccountID:  item.AccountID,
+	for _, item := range result.ByChannel {
+		resp.ByChannel = append(resp.ByChannel, dto.ChannelStats{
+			ChannelID:  item.ChannelID,
 			Name:       item.Name,
 			Requests:   item.Requests,
 			Tokens:     item.Tokens,

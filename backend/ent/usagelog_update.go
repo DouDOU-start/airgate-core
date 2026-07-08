@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
-	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -844,23 +844,23 @@ func (ulu *UsageLogUpdate) SetAPIKey(a *APIKey) *UsageLogUpdate {
 	return ulu.SetAPIKeyID(a.ID)
 }
 
-// SetAccountID sets the "account" edge to the Account entity by ID.
-func (ulu *UsageLogUpdate) SetAccountID(id int) *UsageLogUpdate {
-	ulu.mutation.SetAccountID(id)
+// SetChannelID sets the "channel" edge to the Channel entity by ID.
+func (ulu *UsageLogUpdate) SetChannelID(id int) *UsageLogUpdate {
+	ulu.mutation.SetChannelID(id)
 	return ulu
 }
 
-// SetNillableAccountID sets the "account" edge to the Account entity by ID if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillableAccountID(id *int) *UsageLogUpdate {
+// SetNillableChannelID sets the "channel" edge to the Channel entity by ID if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableChannelID(id *int) *UsageLogUpdate {
 	if id != nil {
-		ulu = ulu.SetAccountID(*id)
+		ulu = ulu.SetChannelID(*id)
 	}
 	return ulu
 }
 
-// SetAccount sets the "account" edge to the Account entity.
-func (ulu *UsageLogUpdate) SetAccount(a *Account) *UsageLogUpdate {
-	return ulu.SetAccountID(a.ID)
+// SetChannel sets the "channel" edge to the Channel entity.
+func (ulu *UsageLogUpdate) SetChannel(c *Channel) *UsageLogUpdate {
+	return ulu.SetChannelID(c.ID)
 }
 
 // SetGroupID sets the "group" edge to the Group entity by ID.
@@ -899,9 +899,9 @@ func (ulu *UsageLogUpdate) ClearAPIKey() *UsageLogUpdate {
 	return ulu
 }
 
-// ClearAccount clears the "account" edge to the Account entity.
-func (ulu *UsageLogUpdate) ClearAccount() *UsageLogUpdate {
-	ulu.mutation.ClearAccount()
+// ClearChannel clears the "channel" edge to the Channel entity.
+func (ulu *UsageLogUpdate) ClearChannel() *UsageLogUpdate {
+	ulu.mutation.ClearChannel()
 	return ulu
 }
 
@@ -1254,28 +1254,28 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if ulu.mutation.AccountCleared() {
+	if ulu.mutation.ChannelCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
-			Table:   usagelog.AccountTable,
-			Columns: []string{usagelog.AccountColumn},
+			Table:   usagelog.ChannelTable,
+			Columns: []string{usagelog.ChannelColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := ulu.mutation.AccountIDs(); len(nodes) > 0 {
+	if nodes := ulu.mutation.ChannelIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
-			Table:   usagelog.AccountTable,
-			Columns: []string{usagelog.AccountColumn},
+			Table:   usagelog.ChannelTable,
+			Columns: []string{usagelog.ChannelColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -2143,23 +2143,23 @@ func (uluo *UsageLogUpdateOne) SetAPIKey(a *APIKey) *UsageLogUpdateOne {
 	return uluo.SetAPIKeyID(a.ID)
 }
 
-// SetAccountID sets the "account" edge to the Account entity by ID.
-func (uluo *UsageLogUpdateOne) SetAccountID(id int) *UsageLogUpdateOne {
-	uluo.mutation.SetAccountID(id)
+// SetChannelID sets the "channel" edge to the Channel entity by ID.
+func (uluo *UsageLogUpdateOne) SetChannelID(id int) *UsageLogUpdateOne {
+	uluo.mutation.SetChannelID(id)
 	return uluo
 }
 
-// SetNillableAccountID sets the "account" edge to the Account entity by ID if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillableAccountID(id *int) *UsageLogUpdateOne {
+// SetNillableChannelID sets the "channel" edge to the Channel entity by ID if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableChannelID(id *int) *UsageLogUpdateOne {
 	if id != nil {
-		uluo = uluo.SetAccountID(*id)
+		uluo = uluo.SetChannelID(*id)
 	}
 	return uluo
 }
 
-// SetAccount sets the "account" edge to the Account entity.
-func (uluo *UsageLogUpdateOne) SetAccount(a *Account) *UsageLogUpdateOne {
-	return uluo.SetAccountID(a.ID)
+// SetChannel sets the "channel" edge to the Channel entity.
+func (uluo *UsageLogUpdateOne) SetChannel(c *Channel) *UsageLogUpdateOne {
+	return uluo.SetChannelID(c.ID)
 }
 
 // SetGroupID sets the "group" edge to the Group entity by ID.
@@ -2198,9 +2198,9 @@ func (uluo *UsageLogUpdateOne) ClearAPIKey() *UsageLogUpdateOne {
 	return uluo
 }
 
-// ClearAccount clears the "account" edge to the Account entity.
-func (uluo *UsageLogUpdateOne) ClearAccount() *UsageLogUpdateOne {
-	uluo.mutation.ClearAccount()
+// ClearChannel clears the "channel" edge to the Channel entity.
+func (uluo *UsageLogUpdateOne) ClearChannel() *UsageLogUpdateOne {
+	uluo.mutation.ClearChannel()
 	return uluo
 }
 
@@ -2583,28 +2583,28 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if uluo.mutation.AccountCleared() {
+	if uluo.mutation.ChannelCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
-			Table:   usagelog.AccountTable,
-			Columns: []string{usagelog.AccountColumn},
+			Table:   usagelog.ChannelTable,
+			Columns: []string{usagelog.ChannelColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := uluo.mutation.AccountIDs(); len(nodes) > 0 {
+	if nodes := uluo.mutation.ChannelIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
-			Table:   usagelog.AccountTable,
-			Columns: []string{usagelog.AccountColumn},
+			Table:   usagelog.ChannelTable,
+			Columns: []string{usagelog.ChannelColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

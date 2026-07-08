@@ -1,0 +1,377 @@
+package pipeline
+
+import (
+	"bufio"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
+)
+
+// chunkedReader 按固定 chunk 大小切割数据，模拟跨 read 边界的半行场景。
+type chunkedReader struct {
+	data      []byte
+	chunkSize int
+	offset    int
+}
+
+func (r *chunkedReader) Read(p []byte) (int, error) {
+	if r.offset >= len(r.data) {
+		return 0, io.EOF
+	}
+	end := r.offset + r.chunkSize
+	if end > len(r.data) {
+		end = len(r.data)
+	}
+	n := copy(p, r.data[r.offset:end])
+	r.offset += n
+	return n, nil
+}
+
+// newSSEResponse 构造带指定 body reader 的上游响应。
+func newSSEResponse(body io.Reader) *http.Response {
+	return &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(body),
+	}
+}
+
+func TestRelaySSE(t *testing.T) {
+	usageChunk := `data: {"id":"c1","choices":[],"usage":{"prompt_tokens":100,"completion_tokens":42,"prompt_tokens_details":{"cached_tokens":10}}}`
+	stream := strings.Join([]string{
+		`data: {"id":"c1","choices":[{"delta":{"content":"He"}}]}`,
+		``,
+		`data: {"id":"c1","choices":[{"delta":{"content":"llo"}}]}`,
+		``,
+		usageChunk,
+		``,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+
+	// forwardUsageChunk=false 时 usage-only chunk 被吞掉（其余行照常透传）。
+	streamWithoutUsageChunk := strings.Join([]string{
+		`data: {"id":"c1","choices":[{"delta":{"content":"He"}}]}`,
+		``,
+		`data: {"id":"c1","choices":[{"delta":{"content":"llo"}}]}`,
+		``,
+		``,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+
+	cases := []struct {
+		name              string
+		body              string
+		chunkSize         int
+		forwardUsageChunk bool
+		wantUsage         *dto.Usage
+		wantDone          bool
+		// wantBody 非空时精确断言透传体；空则期望与输入逐行一致。
+		wantBody string
+	}{
+		{
+			name:              "include_usage 末 chunk 捕获（客户端请求了 usage 则透传）",
+			body:              stream,
+			chunkSize:         1 << 20, // 一次读完
+			forwardUsageChunk: true,
+			wantUsage:         &dto.Usage{PromptTokens: 100, CompletionTokens: 42, CachedTokens: 10},
+			wantDone:          true,
+		},
+		{
+			name:              "跨 read 边界半行拼接",
+			body:              stream,
+			chunkSize:         7, // 每 7 字节一读，行必然被截断
+			forwardUsageChunk: true,
+			wantUsage:         &dto.Usage{PromptTokens: 100, CompletionTokens: 42, CachedTokens: 10},
+			wantDone:          true,
+		},
+		{
+			name:      "客户端未请求 include_usage：usage 捕获但 chunk 不下发",
+			body:      stream,
+			chunkSize: 1 << 20,
+			wantUsage: &dto.Usage{PromptTokens: 100, CompletionTokens: 42, CachedTokens: 10},
+			wantDone:  true,
+			wantBody:  streamWithoutUsageChunk,
+		},
+		{
+			name: "无 usage 流记 0",
+			body: strings.Join([]string{
+				`data: {"id":"c1","choices":[{"delta":{"content":"hi"}}]}`,
+				``,
+				`data: [DONE]`,
+				``,
+			}, "\n"),
+			chunkSize:         1 << 20,
+			forwardUsageChunk: true,
+			wantUsage:         nil,
+			wantDone:          true,
+		},
+		{
+			name: "无 DONE 标志",
+			body: strings.Join([]string{
+				`data: {"id":"c1","choices":[{"delta":{"content":"hi"}}]}`,
+				``,
+			}, "\n"),
+			chunkSize:         1 << 20,
+			forwardUsageChunk: true,
+			wantUsage:         nil,
+			wantDone:          false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			upstream := newSSEResponse(&chunkedReader{data: []byte(tc.body), chunkSize: tc.chunkSize})
+			result := relaySSE(w, upstream, time.Now(), dto.ExtractUsage, tc.forwardUsageChunk, chatFirstContentLine, sseMaxLineBytes)
+
+			if result.err != nil {
+				t.Fatalf("relaySSE err = %v", result.err)
+			}
+			if !result.written {
+				t.Error("written 应为 true")
+			}
+			if result.done != tc.wantDone {
+				t.Errorf("done = %v, want %v", result.done, tc.wantDone)
+			}
+			if tc.wantUsage == nil {
+				if result.usage != nil {
+					t.Errorf("usage = %+v, want nil", result.usage)
+				}
+			} else if result.usage == nil || *result.usage != *tc.wantUsage {
+				t.Errorf("usage = %+v, want %+v", result.usage, tc.wantUsage)
+			}
+
+			// 逐行透传：输出与输入逐行一致（尾部统一补 \n）；吞 usage chunk 场景单独断言。
+			wantBody := tc.wantBody
+			if wantBody == "" {
+				wantBody = tc.body
+			}
+			if !strings.HasSuffix(wantBody, "\n") {
+				wantBody += "\n"
+			}
+			if got := w.Body.String(); got != wantBody {
+				t.Errorf("透传体不一致:\ngot  %q\nwant %q", got, wantBody)
+			}
+			if ct := w.Header().Get("Content-Type"); ct != "text/event-stream" {
+				t.Errorf("Content-Type = %q", ct)
+			}
+			if result.firstTokenMs < 0 {
+				t.Errorf("firstTokenMs = %d", result.firstTokenMs)
+			}
+		})
+	}
+}
+
+// TestRelaySSEFirstTokenOnlyOnDataLines first_token_ms 只在真实 data 载荷行触发：
+// 注释行 / event: 行 / [DONE] 不算首 token。
+func TestRelaySSEFirstTokenOnlyOnDataLines(t *testing.T) {
+	// start 前移 50ms：任何记录必然 >= 50，与"未记录"（0）可区分。
+	backdated := func() time.Time { return time.Now().Add(-50 * time.Millisecond) }
+
+	t.Run("仅注释与 event 行不记录", func(t *testing.T) {
+		body := strings.Join([]string{
+			`: OPENROUTER PROCESSING`,
+			`event: message`,
+			``,
+			`data: [DONE]`,
+			``,
+		}, "\n")
+		w := httptest.NewRecorder()
+		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(), dto.ExtractUsage, true, chatFirstContentLine, sseMaxLineBytes)
+		if result.firstTokenMs != 0 {
+			t.Errorf("firstTokenMs = %d, want 0（无真实 data 载荷）", result.firstTokenMs)
+		}
+	})
+
+	t.Run("注释心跳后的首个 data 行才记录", func(t *testing.T) {
+		body := strings.Join([]string{
+			`: keepalive`,
+			``,
+			`data: {"id":"c1","choices":[{"delta":{"content":"hi"}}]}`,
+			``,
+			`data: [DONE]`,
+			``,
+		}, "\n")
+		w := httptest.NewRecorder()
+		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(), dto.ExtractUsage, true, chatFirstContentLine, sseMaxLineBytes)
+		if result.firstTokenMs < 50 {
+			t.Errorf("firstTokenMs = %d, want >= 50（应由 data 行触发）", result.firstTokenMs)
+		}
+	})
+}
+
+// TestResponsesFirstContentLine Responses 首内容行谓词：仅内容增量事件（type 以 .delta
+// 结尾）算首 token；response.created / in_progress / output_item.added / content_part.added /
+// completed 等 preamble/生命周期事件跳过；非 JSON / 无 type 不算。
+func TestResponsesFirstContentLine(t *testing.T) {
+	cases := []struct {
+		name string
+		data string
+		want bool
+	}{
+		{"output_text.delta", `{"type":"response.output_text.delta","delta":"hi"}`, true},
+		{"output_audio.delta", `{"type":"response.output_audio.delta","delta":"aGk="}`, true},
+		{"function_call_arguments.delta", `{"type":"response.function_call_arguments.delta","delta":"{"}`, true},
+		{"response.created", `{"type":"response.created","response":{}}`, false},
+		{"response.in_progress", `{"type":"response.in_progress"}`, false},
+		{"output_item.added", `{"type":"response.output_item.added"}`, false},
+		{"content_part.added", `{"type":"response.content_part.added"}`, false},
+		{"response.completed", `{"type":"response.completed","response":{}}`, false},
+		{"非 JSON", `not-json`, false},
+		{"无 type 字段", `{"delta":"hi"}`, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := responsesFirstContentLine([]byte(tc.data)); got != tc.want {
+				t.Errorf("responsesFirstContentLine(%q) = %v, want %v", tc.data, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestRelaySSEFirstTokenResponses 修1 回归：Responses 流 first_token 只在内容增量事件记录，
+// 跳过 response.created 等 preamble 生命周期事件（避免记成 ack 延迟）；chat 维持首个 data
+// 载荷行即记。
+func TestRelaySSEFirstTokenResponses(t *testing.T) {
+	// start 前移 50ms：任何记录必然 >= 50，与"未记录"（0）可区分。
+	backdated := func() time.Time { return time.Now().Add(-50 * time.Millisecond) }
+
+	t.Run("responses: created 打头不记，随后 delta 才记", func(t *testing.T) {
+		body := strings.Join([]string{
+			`event: response.created`,
+			`data: {"type":"response.created","response":{"id":"resp_1"}}`,
+			``,
+			`event: response.output_text.delta`,
+			`data: {"type":"response.output_text.delta","delta":"Hi"}`,
+			``,
+		}, "\n")
+		w := httptest.NewRecorder()
+		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(),
+			dto.ExtractResponsesUsage, true, responsesFirstContentLine, sseMaxLineBytesResponses)
+		if result.firstTokenMs < 50 {
+			t.Errorf("firstTokenMs = %d, want >= 50（应由 delta 行触发，非 created 行）", result.firstTokenMs)
+		}
+	})
+
+	t.Run("responses: 仅 created + completed 无 delta 则不记", func(t *testing.T) {
+		body := strings.Join([]string{
+			`event: response.created`,
+			`data: {"type":"response.created","response":{"id":"resp_1"}}`,
+			``,
+			`event: response.completed`,
+			`data: {"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":5}}}`,
+			``,
+		}, "\n")
+		w := httptest.NewRecorder()
+		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(),
+			dto.ExtractResponsesUsage, true, responsesFirstContentLine, sseMaxLineBytesResponses)
+		if result.firstTokenMs != 0 {
+			t.Errorf("firstTokenMs = %d, want 0（无 delta 内容增量事件）", result.firstTokenMs)
+		}
+		if result.usage == nil {
+			t.Error("completed 事件 usage 应被捕获")
+		}
+	})
+
+	t.Run("chat: 首个 data 载荷行即记（回归）", func(t *testing.T) {
+		body := strings.Join([]string{
+			`data: {"id":"c1","choices":[{"delta":{"content":"hi"}}]}`,
+			``,
+			`data: [DONE]`,
+			``,
+		}, "\n")
+		w := httptest.NewRecorder()
+		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(),
+			dto.ExtractUsage, true, chatFirstContentLine, sseMaxLineBytes)
+		if result.firstTokenMs < 50 {
+			t.Errorf("firstTokenMs = %d, want >= 50（chat 首个 data 行即记）", result.firstTokenMs)
+		}
+	})
+}
+
+// TestRelaySSEResponsesLargeCompletedEvent 修2 回归：Responses 端点单个 completed 事件略超
+// 8MB 时不报 ErrTooLong（用 64MB 上限），usage 仍被捕获；chat 维持 8MB 上限（超限报错）。
+func TestRelaySSEResponsesLargeCompletedEvent(t *testing.T) {
+	// 构造略超 8MB 的 completed 事件：内嵌大 output 文本，usage 在同一事件内。
+	big := strings.Repeat("x", (8<<20)+(1<<10))
+	body := strings.Join([]string{
+		`event: response.completed`,
+		`data: {"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"` + big + `"}]}],"usage":{"input_tokens":1000,"output_tokens":500}}}`,
+		``,
+	}, "\n")
+
+	t.Run("responses 64MB 上限：completed 事件不截断，usage 捕获", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), time.Now(),
+			dto.ExtractResponsesUsage, true, responsesFirstContentLine, sseMaxLineBytesResponses)
+		if result.err != nil {
+			t.Fatalf("relaySSE err = %v（64MB 上限不应报 ErrTooLong）", result.err)
+		}
+		if result.usage == nil || result.usage.PromptTokens != 1000 || result.usage.CompletionTokens != 500 {
+			t.Errorf("usage = %+v, want input=1000 output=500", result.usage)
+		}
+	})
+
+	t.Run("chat 8MB 上限：超限报 ErrTooLong", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), time.Now(),
+			dto.ExtractUsage, true, chatFirstContentLine, sseMaxLineBytes)
+		if !errors.Is(result.err, bufio.ErrTooLong) {
+			t.Errorf("err = %v, want bufio.ErrTooLong（chat 维持 8MB 上限）", result.err)
+		}
+	})
+}
+
+func TestIsUsageOnlyChunk(t *testing.T) {
+	cases := []struct {
+		name string
+		data string
+		want bool
+	}{
+		{"choices 空数组带 usage", `{"id":"c1","choices":[],"usage":{"prompt_tokens":1}}`, true},
+		{"无 choices 字段带 usage", `{"id":"c1","usage":{"prompt_tokens":1}}`, true},
+		{"choices 非空带 usage", `{"choices":[{"delta":{}}],"usage":{"prompt_tokens":1}}`, false},
+		{"usage 为 null", `{"choices":[],"usage":null}`, false},
+		{"无 usage", `{"choices":[]}`, false},
+		{"非 JSON", `not-json`, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isUsageOnlyChunk([]byte(tc.data)); got != tc.want {
+				t.Errorf("isUsageOnlyChunk(%q) = %v, want %v", tc.data, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestExtractSSEData(t *testing.T) {
+	cases := []struct {
+		name   string
+		line   string
+		want   string
+		wantOK bool
+	}{
+		{"带空格", `data: {"a":1}`, `{"a":1}`, true},
+		{"不带空格", `data:{"a":1}`, `{"a":1}`, true},
+		{"DONE", `data: [DONE]`, `[DONE]`, true},
+		{"event 行", `event: message`, ``, false},
+		{"注释行", `: keepalive`, ``, false},
+		{"空行", ``, ``, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := extractSSEData(tc.line)
+			if ok != tc.wantOK || got != tc.want {
+				t.Errorf("extractSSEData(%q) = (%q,%v), want (%q,%v)", tc.line, got, ok, tc.want, tc.wantOK)
+			}
+		})
+	}
+}

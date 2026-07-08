@@ -27,7 +27,7 @@ func (Proxy) Fields() []ent.Field {
 
 func (Proxy) Edges() []ent.Edge {
 	return []ent.Edge{
-		// 反向关联：哪些账号使用了此代理
-		edge.From("accounts", Account.Type).Ref("proxy"),
+		// 反向关联：哪些渠道使用了此代理
+		edge.From("channels", Channel.Type).Ref("proxy"),
 	}
 }

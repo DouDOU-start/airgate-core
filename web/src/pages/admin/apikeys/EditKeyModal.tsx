@@ -43,7 +43,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
     { id: '0', label: t('api_keys.group_unbound') },
     ...groups.map((group) => ({
       id: String(group.id),
-      label: `${group.name} (${group.platform}) · ${group.rate_multiplier}x`,
+      label: `${group.name} · ${group.rate_multiplier}x`,
     })),
   ];
   const selectedGroupLabel = groupOptions.find((item) => item.id === String(groupId))?.label ?? t('api_keys.group_unbound');

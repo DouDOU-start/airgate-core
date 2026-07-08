@@ -31,8 +31,6 @@ const (
 	FieldTotpSecret = "totp_secret"
 	// FieldGroupRates holds the string denoting the group_rates field in the database.
 	FieldGroupRates = "group_rates"
-	// FieldGroupPluginSettings holds the string denoting the group_plugin_settings field in the database.
-	FieldGroupPluginSettings = "group_plugin_settings"
 	// FieldBalanceAlertThreshold holds the string denoting the balance_alert_threshold field in the database.
 	FieldBalanceAlertThreshold = "balance_alert_threshold"
 	// FieldBalanceAlertNotified holds the string denoting the balance_alert_notified field in the database.
@@ -101,7 +99,6 @@ var Columns = []string{
 	FieldMaxConcurrency,
 	FieldTotpSecret,
 	FieldGroupRates,
-	FieldGroupPluginSettings,
 	FieldBalanceAlertThreshold,
 	FieldBalanceAlertNotified,
 	FieldStatus,

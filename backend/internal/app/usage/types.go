@@ -12,7 +12,7 @@ type ListFilter struct {
 	PageSize  int
 	UserID    *int64
 	APIKeyID  *int64
-	AccountID *int64
+	ChannelID *int64
 	GroupID   *int64
 	Platform  string
 	Model     string
@@ -54,9 +54,8 @@ type LogRecord struct {
 	APIKeyName            string
 	APIKeyHint            string
 	APIKeyDeleted         bool
-	AccountID             int64
-	AccountName           string
-	AccountEmail          string
+	ChannelID             int64
+	ChannelName           string
 	GroupID               int64
 	Platform              string
 	Model                 string
@@ -140,9 +139,9 @@ type UserStats struct {
 	BilledCost float64
 }
 
-// AccountStats 按账号统计。
-type AccountStats struct {
-	AccountID  int64  `json:"account_id"`
+// ChannelStats 按渠道统计。
+type ChannelStats struct {
+	ChannelID  int64  `json:"channel_id"`
 	Name       string `json:"name"`
 	Requests   int64  `json:"requests"`
 	Tokens     int64  `json:"tokens"`
@@ -167,7 +166,7 @@ type StatsResult struct {
 	Summary
 	ByModel   []ModelStats
 	ByUser    []UserStats
-	ByAccount []AccountStats
+	ByChannel []ChannelStats
 	ByGroup   []GroupStats
 }
 
@@ -209,7 +208,7 @@ type Repository interface {
 	SummaryAdmin(context.Context, StatsFilter) (Summary, error)
 	StatsByModel(context.Context, StatsFilter) ([]ModelStats, error)
 	StatsByUser(context.Context, StatsFilter) ([]UserStats, error)
-	StatsByAccount(context.Context, StatsFilter) ([]AccountStats, error)
+	StatsByChannel(context.Context, StatsFilter) ([]ChannelStats, error)
 	StatsByGroup(context.Context, StatsFilter) ([]GroupStats, error)
 	TrendEntries(context.Context, TrendFilter) ([]TrendEntry, error)
 }

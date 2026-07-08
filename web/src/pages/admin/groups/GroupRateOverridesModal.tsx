@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Button, ComboBox, Input, ListBox, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { Check, Plus, Search, Trash2, X } from 'lucide-react';
-import { PlatformIcon } from '../../../shared/ui';
 import { groupsApi } from '../../../shared/api/groups';
 import { usersApi } from '../../../shared/api/users';
 import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
@@ -18,57 +17,13 @@ interface GroupRateOverridesModalProps {
   onClose: () => void;
 }
 
-type ImagePrices = {
-  oneK: string;
-  twoK: string;
-  fourK: string;
-};
-
-const IMAGE_PRICE_FIELDS: Array<{ key: keyof ImagePrices; setting: string; label: string }> = [
-  { key: 'oneK', setting: 'image_price_1k', label: '1K' },
-  { key: 'twoK', setting: 'image_price_2k', label: '2K' },
-  { key: 'fourK', setting: 'image_price_4k', label: '4K' },
-];
-
-const emptyImagePrices = (): ImagePrices => ({ oneK: '', twoK: '', fourK: '' });
-
-function isOpenAIImageEnabled(group: GroupResp): boolean {
-  return group.platform === 'openai' && group.plugin_settings?.openai?.image_enabled === 'true';
-}
-
-function parseImagePrices(settings?: Record<string, Record<string, string>>): ImagePrices {
-  const openai = settings?.openai ?? {};
-  return {
-    oneK: openai.image_price_1k ?? '',
-    twoK: openai.image_price_2k ?? '',
-    fourK: openai.image_price_4k ?? '',
-  };
-}
-
-function buildPluginSettings(prices: ImagePrices, enabled: boolean): Record<string, Record<string, string>> | undefined {
-  if (!enabled) return undefined;
-  const openai: Record<string, string> = {};
-  for (const field of IMAGE_PRICE_FIELDS) {
-    const raw = prices[field.key].trim();
-    if (!raw) continue;
-    const value = Number(raw);
-    if (Number.isFinite(value) && value >= 0) {
-      openai[field.setting] = raw;
-    }
-  }
-  return Object.keys(openai).length > 0 ? { openai } : undefined;
-}
-
 export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverridesModalProps) {
   const { t } = useTranslation();
-  const showImagePricing = isOpenAIImageEnabled(group);
   const [emailQuery, setEmailQuery] = useState('');
   const [pickedUser, setPickedUser] = useState<UserResp | null>(null);
   const [newRate, setNewRate] = useState('1');
-  const [newImagePrices, setNewImagePrices] = useState<ImagePrices>(() => emptyImagePrices());
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editingRate, setEditingRate] = useState('');
-  const [editingImagePrices, setEditingImagePrices] = useState<ImagePrices>(() => emptyImagePrices());
   const debouncedEmailQuery = useDebouncedValue(emailQuery.trim(), 250);
 
   const overridesKey = ['group-rate-overrides', group.id] as const;
@@ -89,10 +44,9 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
   });
 
   const setMutation = useCrudMutation({
-    mutationFn: (payload: { userId: number; rate: number; plugin_settings?: Record<string, Record<string, string>> }) =>
+    mutationFn: (payload: { userId: number; rate: number }) =>
       groupsApi.setRateOverride(group.id, payload.userId, {
         rate: payload.rate,
-        plugin_settings: payload.plugin_settings,
       }),
     successMessage: t('groups.rate_override_set_success'),
     queryKey: overridesKey,
@@ -100,7 +54,6 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
       setEmailQuery('');
       setPickedUser(null);
       setNewRate('1');
-      setNewImagePrices(emptyImagePrices());
       setEditingUserId(null);
     },
   });
@@ -150,14 +103,13 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
     setMutation.mutate({
       userId: pickedUser.id,
       rate: newRateNum,
-      plugin_settings: buildPluginSettings(newImagePrices, showImagePricing),
     });
   };
 
   const commitEdit = (userId: number) => {
     const value = Number(editingRate);
     if (!Number.isFinite(value) || value <= 0) return;
-    setMutation.mutate({ userId, rate: value, plugin_settings: buildPluginSettings(editingImagePrices, showImagePricing) });
+    setMutation.mutate({ userId, rate: value });
   };
   const modalState = useOverlayState({
     isOpen: open,
@@ -181,10 +133,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
             </Modal.Header>
             <Modal.Body>
       <div className="mb-4 flex items-center gap-3 rounded-lg border border-glass-border px-3 py-2.5 text-sm">
-        <PlatformIcon platform={group.platform} className="h-4 w-4" />
         <span className="font-medium text-text">{group.name}</span>
-        <span className="text-text-tertiary">|</span>
-        <span className="text-text-tertiary">{group.platform}</span>
         <span className="text-text-tertiary">|</span>
         <span className="text-text-tertiary">
           {t('groups.default_rate')}: <span className="font-mono text-primary">{group.rate_multiplier}x</span>
@@ -272,35 +221,6 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
             {t('common.add')}
           </Button>
         </div>
-        {showImagePricing ? (
-          <div className="mt-3">
-            <div className="mb-1 flex items-center justify-between text-[11px] text-text-tertiary">
-              <span>{t('groups.image_pricing')}</span>
-              <span>{t('groups.image_price_fallback')}</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {IMAGE_PRICE_FIELDS.map((field) => (
-                <HeroTextField key={field.key} fullWidth>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-2 top-1/2 z-10 -translate-y-1/2 text-[10px] text-text-tertiary">
-                      {field.label}
-                    </span>
-                    <Input
-                      aria-label={`${field.label} ${t('groups.image_pricing')}`}
-                      className="pl-7"
-                      type="number"
-                      min="0"
-                      step="0.000001"
-                      value={newImagePrices[field.key]}
-                      placeholder={group.plugin_settings?.openai?.[field.setting] ?? ''}
-                      onChange={(e) => setNewImagePrices((current) => ({ ...current, [field.key]: e.target.value }))}
-                    />
-                  </div>
-                </HeroTextField>
-              ))}
-            </div>
-          </div>
-        ) : null}
       </div>
 
       <div>
@@ -337,31 +257,6 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
                           onChange={(e) => setEditingRate(e.target.value)}
                         />
                       </HeroTextField>
-                      {showImagePricing ? (
-                        <div className="grid w-56 grid-cols-3 gap-1">
-                          {IMAGE_PRICE_FIELDS.map((field) => (
-                            <HeroTextField key={field.key} fullWidth>
-                              <div className="relative">
-                                <span className="pointer-events-none absolute left-2 top-1/2 z-10 -translate-y-1/2 text-[10px] text-text-tertiary">
-                                  {field.label}
-                                </span>
-                                <Input
-                                  aria-label={`${field.label} ${t('groups.image_pricing')}`}
-                                  className="pl-7"
-                                  type="number"
-                                  min="0"
-                                  step="0.000001"
-                                  value={editingImagePrices[field.key]}
-                                  placeholder={group.plugin_settings?.openai?.[field.setting] ?? ''}
-                                  onChange={(e) =>
-                                    setEditingImagePrices((current) => ({ ...current, [field.key]: e.target.value }))
-                                  }
-                                />
-                              </div>
-                            </HeroTextField>
-                          ))}
-                        </div>
-                      ) : null}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -384,20 +279,10 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
                         onPress={() => {
                           setEditingUserId(row.user_id);
                           setEditingRate(String(row.rate));
-                          setEditingImagePrices(parseImagePrices(row.plugin_settings));
                         }}
                       >
                         <span className="font-mono text-primary">{row.rate}x</span>
                       </Button>
-                      {showImagePricing && row.plugin_settings?.openai ? (
-                        <span className="font-mono text-[11px] text-text-tertiary">
-                          {[
-                            row.plugin_settings.openai.image_price_1k,
-                            row.plugin_settings.openai.image_price_2k,
-                            row.plugin_settings.openai.image_price_4k,
-                          ].filter(Boolean).join(' / ')}
-                        </span>
-                      ) : null}
                       <Button
                         isIconOnly
                         size="sm"

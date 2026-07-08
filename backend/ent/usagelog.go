@@ -10,8 +10,8 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
+	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -111,7 +111,7 @@ type UsageLog struct {
 	// The values are being populated by the UsageLogQuery when eager-loading is set.
 	Edges              UsageLogEdges `json:"edges"`
 	api_key_usage_logs *int
-	account_usage_logs *int
+	channel_usage_logs *int
 	group_usage_logs   *int
 	user_usage_logs    *int
 	selectValues       sql.SelectValues
@@ -123,8 +123,8 @@ type UsageLogEdges struct {
 	User *User `json:"user,omitempty"`
 	// APIKey holds the value of the api_key edge.
 	APIKey *APIKey `json:"api_key,omitempty"`
-	// Account holds the value of the account edge.
-	Account *Account `json:"account,omitempty"`
+	// Channel holds the value of the channel edge.
+	Channel *Channel `json:"channel,omitempty"`
 	// Group holds the value of the group edge.
 	Group *Group `json:"group,omitempty"`
 	// loadedTypes holds the information for reporting if a
@@ -154,15 +154,15 @@ func (e UsageLogEdges) APIKeyOrErr() (*APIKey, error) {
 	return nil, &NotLoadedError{edge: "api_key"}
 }
 
-// AccountOrErr returns the Account value or an error if the edge
+// ChannelOrErr returns the Channel value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
-func (e UsageLogEdges) AccountOrErr() (*Account, error) {
-	if e.Account != nil {
-		return e.Account, nil
+func (e UsageLogEdges) ChannelOrErr() (*Channel, error) {
+	if e.Channel != nil {
+		return e.Channel, nil
 	} else if e.loadedTypes[2] {
-		return nil, &NotFoundError{label: account.Label}
+		return nil, &NotFoundError{label: channel.Label}
 	}
-	return nil, &NotLoadedError{edge: "account"}
+	return nil, &NotLoadedError{edge: "channel"}
 }
 
 // GroupOrErr returns the Group value or an error if the edge
@@ -195,7 +195,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullTime)
 		case usagelog.ForeignKeys[0]: // api_key_usage_logs
 			values[i] = new(sql.NullInt64)
-		case usagelog.ForeignKeys[1]: // account_usage_logs
+		case usagelog.ForeignKeys[1]: // channel_usage_logs
 			values[i] = new(sql.NullInt64)
 		case usagelog.ForeignKeys[2]: // group_usage_logs
 			values[i] = new(sql.NullInt64)
@@ -491,10 +491,10 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			}
 		case usagelog.ForeignKeys[1]:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for edge-field account_usage_logs", value)
+				return fmt.Errorf("unexpected type %T for edge-field channel_usage_logs", value)
 			} else if value.Valid {
-				ul.account_usage_logs = new(int)
-				*ul.account_usage_logs = int(value.Int64)
+				ul.channel_usage_logs = new(int)
+				*ul.channel_usage_logs = int(value.Int64)
 			}
 		case usagelog.ForeignKeys[2]:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -533,9 +533,9 @@ func (ul *UsageLog) QueryAPIKey() *APIKeyQuery {
 	return NewUsageLogClient(ul.config).QueryAPIKey(ul)
 }
 
-// QueryAccount queries the "account" edge of the UsageLog entity.
-func (ul *UsageLog) QueryAccount() *AccountQuery {
-	return NewUsageLogClient(ul.config).QueryAccount(ul)
+// QueryChannel queries the "channel" edge of the UsageLog entity.
+func (ul *UsageLog) QueryChannel() *ChannelQuery {
+	return NewUsageLogClient(ul.config).QueryChannel(ul)
 }
 
 // QueryGroup queries the "group" edge of the UsageLog entity.

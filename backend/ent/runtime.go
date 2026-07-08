@@ -5,12 +5,11 @@ package ent
 import (
 	"time"
 
-	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
+	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
-	"github.com/DouDOU-start/airgate-core/ent/plugin"
-	"github.com/DouDOU-start/airgate-core/ent/pluginsource"
+	"github.com/DouDOU-start/airgate-core/ent/modelprice"
 	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/schema"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
@@ -72,74 +71,6 @@ func init() {
 	apikey.DefaultUpdatedAt = apikeyDescUpdatedAt.Default.(func() time.Time)
 	// apikey.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	apikey.UpdateDefaultUpdatedAt = apikeyDescUpdatedAt.UpdateDefault.(func() time.Time)
-	accountFields := schema.Account{}.Fields()
-	_ = accountFields
-	// accountDescName is the schema descriptor for name field.
-	accountDescName := accountFields[0].Descriptor()
-	// account.NameValidator is a validator for the "name" field. It is called by the builders before save.
-	account.NameValidator = accountDescName.Validators[0].(func(string) error)
-	// accountDescPlatform is the schema descriptor for platform field.
-	accountDescPlatform := accountFields[1].Descriptor()
-	// account.PlatformValidator is a validator for the "platform" field. It is called by the builders before save.
-	account.PlatformValidator = accountDescPlatform.Validators[0].(func(string) error)
-	// accountDescType is the schema descriptor for type field.
-	accountDescType := accountFields[2].Descriptor()
-	// account.DefaultType holds the default value on creation for the type field.
-	account.DefaultType = accountDescType.Default.(string)
-	// accountDescCredentials is the schema descriptor for credentials field.
-	accountDescCredentials := accountFields[3].Descriptor()
-	// account.DefaultCredentials holds the default value on creation for the credentials field.
-	account.DefaultCredentials = accountDescCredentials.Default.(map[string]string)
-	// accountDescPriority is the schema descriptor for priority field.
-	accountDescPriority := accountFields[6].Descriptor()
-	// account.DefaultPriority holds the default value on creation for the priority field.
-	account.DefaultPriority = accountDescPriority.Default.(int)
-	// account.PriorityValidator is a validator for the "priority" field. It is called by the builders before save.
-	account.PriorityValidator = func() func(int) error {
-		validators := accountDescPriority.Validators
-		fns := [...]func(int) error{
-			validators[0].(func(int) error),
-			validators[1].(func(int) error),
-		}
-		return func(priority int) error {
-			for _, fn := range fns {
-				if err := fn(priority); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// accountDescMaxConcurrency is the schema descriptor for max_concurrency field.
-	accountDescMaxConcurrency := accountFields[7].Descriptor()
-	// account.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
-	account.DefaultMaxConcurrency = accountDescMaxConcurrency.Default.(int)
-	// accountDescRateMultiplier is the schema descriptor for rate_multiplier field.
-	accountDescRateMultiplier := accountFields[8].Descriptor()
-	// account.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
-	account.DefaultRateMultiplier = accountDescRateMultiplier.Default.(float64)
-	// accountDescErrorMsg is the schema descriptor for error_msg field.
-	accountDescErrorMsg := accountFields[9].Descriptor()
-	// account.DefaultErrorMsg holds the default value on creation for the error_msg field.
-	account.DefaultErrorMsg = accountDescErrorMsg.Default.(string)
-	// accountDescUpstreamIsPool is the schema descriptor for upstream_is_pool field.
-	accountDescUpstreamIsPool := accountFields[10].Descriptor()
-	// account.DefaultUpstreamIsPool holds the default value on creation for the upstream_is_pool field.
-	account.DefaultUpstreamIsPool = accountDescUpstreamIsPool.Default.(bool)
-	// accountDescExtra is the schema descriptor for extra field.
-	accountDescExtra := accountFields[12].Descriptor()
-	// account.DefaultExtra holds the default value on creation for the extra field.
-	account.DefaultExtra = accountDescExtra.Default.(map[string]interface{})
-	// accountDescCreatedAt is the schema descriptor for created_at field.
-	accountDescCreatedAt := accountFields[13].Descriptor()
-	// account.DefaultCreatedAt holds the default value on creation for the created_at field.
-	account.DefaultCreatedAt = accountDescCreatedAt.Default.(func() time.Time)
-	// accountDescUpdatedAt is the schema descriptor for updated_at field.
-	accountDescUpdatedAt := accountFields[14].Descriptor()
-	// account.DefaultUpdatedAt holds the default value on creation for the updated_at field.
-	account.DefaultUpdatedAt = accountDescUpdatedAt.Default.(func() time.Time)
-	// account.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
-	account.UpdateDefaultUpdatedAt = accountDescUpdatedAt.UpdateDefault.(func() time.Time)
 	balancelogFields := schema.BalanceLog{}.Fields()
 	_ = balancelogFields
 	// balancelogDescRemark is the schema descriptor for remark field.
@@ -158,6 +89,84 @@ func init() {
 	balancelogDescCreatedAt := balancelogFields[8].Descriptor()
 	// balancelog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	balancelog.DefaultCreatedAt = balancelogDescCreatedAt.Default.(func() time.Time)
+	channelFields := schema.Channel{}.Fields()
+	_ = channelFields
+	// channelDescName is the schema descriptor for name field.
+	channelDescName := channelFields[0].Descriptor()
+	// channel.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	channel.NameValidator = channelDescName.Validators[0].(func(string) error)
+	// channelDescBaseURL is the schema descriptor for base_url field.
+	channelDescBaseURL := channelFields[2].Descriptor()
+	// channel.BaseURLValidator is a validator for the "base_url" field. It is called by the builders before save.
+	channel.BaseURLValidator = channelDescBaseURL.Validators[0].(func(string) error)
+	// channelDescAPIKeys is the schema descriptor for api_keys field.
+	channelDescAPIKeys := channelFields[3].Descriptor()
+	// channel.DefaultAPIKeys holds the default value on creation for the api_keys field.
+	channel.DefaultAPIKeys = channelDescAPIKeys.Default.([]string)
+	// channelDescModels is the schema descriptor for models field.
+	channelDescModels := channelFields[4].Descriptor()
+	// channel.DefaultModels holds the default value on creation for the models field.
+	channel.DefaultModels = channelDescModels.Default.([]string)
+	// channelDescErrorMsg is the schema descriptor for error_msg field.
+	channelDescErrorMsg := channelFields[10].Descriptor()
+	// channel.DefaultErrorMsg holds the default value on creation for the error_msg field.
+	channel.DefaultErrorMsg = channelDescErrorMsg.Default.(string)
+	// channelDescPriority is the schema descriptor for priority field.
+	channelDescPriority := channelFields[11].Descriptor()
+	// channel.DefaultPriority holds the default value on creation for the priority field.
+	channel.DefaultPriority = channelDescPriority.Default.(int)
+	// channel.PriorityValidator is a validator for the "priority" field. It is called by the builders before save.
+	channel.PriorityValidator = func() func(int) error {
+		validators := channelDescPriority.Validators
+		fns := [...]func(int) error{
+			validators[0].(func(int) error),
+			validators[1].(func(int) error),
+		}
+		return func(priority int) error {
+			for _, fn := range fns {
+				if err := fn(priority); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// channelDescWeight is the schema descriptor for weight field.
+	channelDescWeight := channelFields[12].Descriptor()
+	// channel.DefaultWeight holds the default value on creation for the weight field.
+	channel.DefaultWeight = channelDescWeight.Default.(int)
+	// channel.WeightValidator is a validator for the "weight" field. It is called by the builders before save.
+	channel.WeightValidator = channelDescWeight.Validators[0].(func(int) error)
+	// channelDescMaxConcurrency is the schema descriptor for max_concurrency field.
+	channelDescMaxConcurrency := channelFields[13].Descriptor()
+	// channel.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
+	channel.DefaultMaxConcurrency = channelDescMaxConcurrency.Default.(int)
+	// channelDescMaxRpm is the schema descriptor for max_rpm field.
+	channelDescMaxRpm := channelFields[14].Descriptor()
+	// channel.DefaultMaxRpm holds the default value on creation for the max_rpm field.
+	channel.DefaultMaxRpm = channelDescMaxRpm.Default.(int)
+	// channelDescCostRatio is the schema descriptor for cost_ratio field.
+	channelDescCostRatio := channelFields[15].Descriptor()
+	// channel.DefaultCostRatio holds the default value on creation for the cost_ratio field.
+	channel.DefaultCostRatio = channelDescCostRatio.Default.(float64)
+	// channelDescTestModel is the schema descriptor for test_model field.
+	channelDescTestModel := channelFields[17].Descriptor()
+	// channel.DefaultTestModel holds the default value on creation for the test_model field.
+	channel.DefaultTestModel = channelDescTestModel.Default.(string)
+	// channelDescResponseTimeMs is the schema descriptor for response_time_ms field.
+	channelDescResponseTimeMs := channelFields[19].Descriptor()
+	// channel.DefaultResponseTimeMs holds the default value on creation for the response_time_ms field.
+	channel.DefaultResponseTimeMs = channelDescResponseTimeMs.Default.(int)
+	// channelDescCreatedAt is the schema descriptor for created_at field.
+	channelDescCreatedAt := channelFields[22].Descriptor()
+	// channel.DefaultCreatedAt holds the default value on creation for the created_at field.
+	channel.DefaultCreatedAt = channelDescCreatedAt.Default.(func() time.Time)
+	// channelDescUpdatedAt is the schema descriptor for updated_at field.
+	channelDescUpdatedAt := channelFields[23].Descriptor()
+	// channel.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	channel.DefaultUpdatedAt = channelDescUpdatedAt.Default.(func() time.Time)
+	// channel.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	channel.UpdateDefaultUpdatedAt = channelDescUpdatedAt.UpdateDefault.(func() time.Time)
 	groupFields := schema.Group{}.Fields()
 	_ = groupFields
 	// groupDescName is the schema descriptor for name field.
@@ -166,8 +175,8 @@ func init() {
 	group.NameValidator = groupDescName.Validators[0].(func(string) error)
 	// groupDescPlatform is the schema descriptor for platform field.
 	groupDescPlatform := groupFields[1].Descriptor()
-	// group.PlatformValidator is a validator for the "platform" field. It is called by the builders before save.
-	group.PlatformValidator = groupDescPlatform.Validators[0].(func(string) error)
+	// group.DefaultPlatform holds the default value on creation for the platform field.
+	group.DefaultPlatform = groupDescPlatform.Default.(string)
 	// groupDescRateMultiplier is the schema descriptor for rate_multiplier field.
 	groupDescRateMultiplier := groupFields[2].Descriptor()
 	// group.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
@@ -181,83 +190,67 @@ func init() {
 	// group.DefaultStatusVisible holds the default value on creation for the status_visible field.
 	group.DefaultStatusVisible = groupDescStatusVisible.Default.(bool)
 	// groupDescServiceTier is the schema descriptor for service_tier field.
-	groupDescServiceTier := groupFields[9].Descriptor()
+	groupDescServiceTier := groupFields[8].Descriptor()
 	// group.DefaultServiceTier holds the default value on creation for the service_tier field.
 	group.DefaultServiceTier = groupDescServiceTier.Default.(string)
 	// groupDescForceInstructions is the schema descriptor for force_instructions field.
-	groupDescForceInstructions := groupFields[10].Descriptor()
+	groupDescForceInstructions := groupFields[9].Descriptor()
 	// group.DefaultForceInstructions holds the default value on creation for the force_instructions field.
 	group.DefaultForceInstructions = groupDescForceInstructions.Default.(string)
 	// groupDescNote is the schema descriptor for note field.
-	groupDescNote := groupFields[11].Descriptor()
+	groupDescNote := groupFields[10].Descriptor()
 	// group.DefaultNote holds the default value on creation for the note field.
 	group.DefaultNote = groupDescNote.Default.(string)
 	// groupDescSortWeight is the schema descriptor for sort_weight field.
-	groupDescSortWeight := groupFields[12].Descriptor()
+	groupDescSortWeight := groupFields[11].Descriptor()
 	// group.DefaultSortWeight holds the default value on creation for the sort_weight field.
 	group.DefaultSortWeight = groupDescSortWeight.Default.(int)
 	// groupDescCreatedAt is the schema descriptor for created_at field.
-	groupDescCreatedAt := groupFields[13].Descriptor()
+	groupDescCreatedAt := groupFields[12].Descriptor()
 	// group.DefaultCreatedAt holds the default value on creation for the created_at field.
 	group.DefaultCreatedAt = groupDescCreatedAt.Default.(func() time.Time)
 	// groupDescUpdatedAt is the schema descriptor for updated_at field.
-	groupDescUpdatedAt := groupFields[14].Descriptor()
+	groupDescUpdatedAt := groupFields[13].Descriptor()
 	// group.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	group.DefaultUpdatedAt = groupDescUpdatedAt.Default.(func() time.Time)
 	// group.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	group.UpdateDefaultUpdatedAt = groupDescUpdatedAt.UpdateDefault.(func() time.Time)
-	pluginFields := schema.Plugin{}.Fields()
-	_ = pluginFields
-	// pluginDescName is the schema descriptor for name field.
-	pluginDescName := pluginFields[0].Descriptor()
-	// plugin.NameValidator is a validator for the "name" field. It is called by the builders before save.
-	plugin.NameValidator = pluginDescName.Validators[0].(func(string) error)
-	// pluginDescPlatform is the schema descriptor for platform field.
-	pluginDescPlatform := pluginFields[1].Descriptor()
-	// plugin.DefaultPlatform holds the default value on creation for the platform field.
-	plugin.DefaultPlatform = pluginDescPlatform.Default.(string)
-	// pluginDescVersion is the schema descriptor for version field.
-	pluginDescVersion := pluginFields[2].Descriptor()
-	// plugin.DefaultVersion holds the default value on creation for the version field.
-	plugin.DefaultVersion = pluginDescVersion.Default.(string)
-	// pluginDescBinaryPath is the schema descriptor for binary_path field.
-	pluginDescBinaryPath := pluginFields[6].Descriptor()
-	// plugin.DefaultBinaryPath holds the default value on creation for the binary_path field.
-	plugin.DefaultBinaryPath = pluginDescBinaryPath.Default.(string)
-	// pluginDescCreatedAt is the schema descriptor for created_at field.
-	pluginDescCreatedAt := pluginFields[7].Descriptor()
-	// plugin.DefaultCreatedAt holds the default value on creation for the created_at field.
-	plugin.DefaultCreatedAt = pluginDescCreatedAt.Default.(func() time.Time)
-	// pluginDescUpdatedAt is the schema descriptor for updated_at field.
-	pluginDescUpdatedAt := pluginFields[8].Descriptor()
-	// plugin.DefaultUpdatedAt holds the default value on creation for the updated_at field.
-	plugin.DefaultUpdatedAt = pluginDescUpdatedAt.Default.(func() time.Time)
-	// plugin.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
-	plugin.UpdateDefaultUpdatedAt = pluginDescUpdatedAt.UpdateDefault.(func() time.Time)
-	pluginsourceFields := schema.PluginSource{}.Fields()
-	_ = pluginsourceFields
-	// pluginsourceDescName is the schema descriptor for name field.
-	pluginsourceDescName := pluginsourceFields[0].Descriptor()
-	// pluginsource.NameValidator is a validator for the "name" field. It is called by the builders before save.
-	pluginsource.NameValidator = pluginsourceDescName.Validators[0].(func(string) error)
-	// pluginsourceDescURL is the schema descriptor for url field.
-	pluginsourceDescURL := pluginsourceFields[1].Descriptor()
-	// pluginsource.URLValidator is a validator for the "url" field. It is called by the builders before save.
-	pluginsource.URLValidator = pluginsourceDescURL.Validators[0].(func(string) error)
-	// pluginsourceDescIsOfficial is the schema descriptor for is_official field.
-	pluginsourceDescIsOfficial := pluginsourceFields[2].Descriptor()
-	// pluginsource.DefaultIsOfficial holds the default value on creation for the is_official field.
-	pluginsource.DefaultIsOfficial = pluginsourceDescIsOfficial.Default.(bool)
-	// pluginsourceDescCreatedAt is the schema descriptor for created_at field.
-	pluginsourceDescCreatedAt := pluginsourceFields[4].Descriptor()
-	// pluginsource.DefaultCreatedAt holds the default value on creation for the created_at field.
-	pluginsource.DefaultCreatedAt = pluginsourceDescCreatedAt.Default.(func() time.Time)
-	// pluginsourceDescUpdatedAt is the schema descriptor for updated_at field.
-	pluginsourceDescUpdatedAt := pluginsourceFields[5].Descriptor()
-	// pluginsource.DefaultUpdatedAt holds the default value on creation for the updated_at field.
-	pluginsource.DefaultUpdatedAt = pluginsourceDescUpdatedAt.Default.(func() time.Time)
-	// pluginsource.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
-	pluginsource.UpdateDefaultUpdatedAt = pluginsourceDescUpdatedAt.UpdateDefault.(func() time.Time)
+	modelpriceFields := schema.ModelPrice{}.Fields()
+	_ = modelpriceFields
+	// modelpriceDescModel is the schema descriptor for model field.
+	modelpriceDescModel := modelpriceFields[0].Descriptor()
+	// modelprice.ModelValidator is a validator for the "model" field. It is called by the builders before save.
+	modelprice.ModelValidator = modelpriceDescModel.Validators[0].(func(string) error)
+	// modelpriceDescInputPrice is the schema descriptor for input_price field.
+	modelpriceDescInputPrice := modelpriceFields[1].Descriptor()
+	// modelprice.DefaultInputPrice holds the default value on creation for the input_price field.
+	modelprice.DefaultInputPrice = modelpriceDescInputPrice.Default.(float64)
+	// modelpriceDescOutputPrice is the schema descriptor for output_price field.
+	modelpriceDescOutputPrice := modelpriceFields[2].Descriptor()
+	// modelprice.DefaultOutputPrice holds the default value on creation for the output_price field.
+	modelprice.DefaultOutputPrice = modelpriceDescOutputPrice.Default.(float64)
+	// modelpriceDescCachedInputPrice is the schema descriptor for cached_input_price field.
+	modelpriceDescCachedInputPrice := modelpriceFields[3].Descriptor()
+	// modelprice.DefaultCachedInputPrice holds the default value on creation for the cached_input_price field.
+	modelprice.DefaultCachedInputPrice = modelpriceDescCachedInputPrice.Default.(float64)
+	// modelpriceDescCacheCreationPrice is the schema descriptor for cache_creation_price field.
+	modelpriceDescCacheCreationPrice := modelpriceFields[4].Descriptor()
+	// modelprice.DefaultCacheCreationPrice holds the default value on creation for the cache_creation_price field.
+	modelprice.DefaultCacheCreationPrice = modelpriceDescCacheCreationPrice.Default.(float64)
+	// modelpriceDescPerRequestPrice is the schema descriptor for per_request_price field.
+	modelpriceDescPerRequestPrice := modelpriceFields[5].Descriptor()
+	// modelprice.DefaultPerRequestPrice holds the default value on creation for the per_request_price field.
+	modelprice.DefaultPerRequestPrice = modelpriceDescPerRequestPrice.Default.(float64)
+	// modelpriceDescCreatedAt is the schema descriptor for created_at field.
+	modelpriceDescCreatedAt := modelpriceFields[6].Descriptor()
+	// modelprice.DefaultCreatedAt holds the default value on creation for the created_at field.
+	modelprice.DefaultCreatedAt = modelpriceDescCreatedAt.Default.(func() time.Time)
+	// modelpriceDescUpdatedAt is the schema descriptor for updated_at field.
+	modelpriceDescUpdatedAt := modelpriceFields[7].Descriptor()
+	// modelprice.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	modelprice.DefaultUpdatedAt = modelpriceDescUpdatedAt.Default.(func() time.Time)
+	// modelprice.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	modelprice.UpdateDefaultUpdatedAt = modelpriceDescUpdatedAt.UpdateDefault.(func() time.Time)
 	proxyFields := schema.Proxy{}.Fields()
 	_ = proxyFields
 	// proxyDescName is the schema descriptor for name field.
@@ -577,19 +570,19 @@ func init() {
 	// user.MaxConcurrencyValidator is a validator for the "max_concurrency" field. It is called by the builders before save.
 	user.MaxConcurrencyValidator = userDescMaxConcurrency.Validators[0].(func(int) error)
 	// userDescBalanceAlertThreshold is the schema descriptor for balance_alert_threshold field.
-	userDescBalanceAlertThreshold := userFields[9].Descriptor()
+	userDescBalanceAlertThreshold := userFields[8].Descriptor()
 	// user.DefaultBalanceAlertThreshold holds the default value on creation for the balance_alert_threshold field.
 	user.DefaultBalanceAlertThreshold = userDescBalanceAlertThreshold.Default.(float64)
 	// userDescBalanceAlertNotified is the schema descriptor for balance_alert_notified field.
-	userDescBalanceAlertNotified := userFields[10].Descriptor()
+	userDescBalanceAlertNotified := userFields[9].Descriptor()
 	// user.DefaultBalanceAlertNotified holds the default value on creation for the balance_alert_notified field.
 	user.DefaultBalanceAlertNotified = userDescBalanceAlertNotified.Default.(bool)
 	// userDescCreatedAt is the schema descriptor for created_at field.
-	userDescCreatedAt := userFields[12].Descriptor()
+	userDescCreatedAt := userFields[11].Descriptor()
 	// user.DefaultCreatedAt holds the default value on creation for the created_at field.
 	user.DefaultCreatedAt = userDescCreatedAt.Default.(func() time.Time)
 	// userDescUpdatedAt is the schema descriptor for updated_at field.
-	userDescUpdatedAt := userFields[13].Descriptor()
+	userDescUpdatedAt := userFields[12].Descriptor()
 	// user.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	user.DefaultUpdatedAt = userDescUpdatedAt.Default.(func() time.Time)
 	// user.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

@@ -53,8 +53,6 @@ jwt:
   expire_hour: 12
 log:
   level: info
-plugins:
-  dir: data/plugins
 `)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatalf("写入临时配置失败: %v", err)
@@ -64,7 +62,6 @@ plugins:
 	t.Setenv("DB_HOST", "db.env")
 	t.Setenv("DB_PORT", "15432")
 	t.Setenv("LOG_LEVEL", "debug")
-	t.Setenv("PLUGINS_DIR", "env/plugins")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -77,8 +74,8 @@ plugins:
 	if cfg.Database.Host != "db.env" || cfg.Database.Port != 15432 {
 		t.Fatalf("数据库配置未被环境变量覆盖: %+v", cfg.Database)
 	}
-	if cfg.Log.Level != "debug" || cfg.Plugins.Dir != "env/plugins" {
-		t.Fatalf("日志或插件配置未被环境变量覆盖: log=%+v plugins=%+v", cfg.Log, cfg.Plugins)
+	if cfg.Log.Level != "debug" {
+		t.Fatalf("日志配置未被环境变量覆盖: log=%+v", cfg.Log)
 	}
 }
 
@@ -125,7 +122,7 @@ func clearConfigEnv(t *testing.T) {
 		"REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD", "REDIS_DB",
 		"JWT_SECRET", "JWT_EXPIRE_HOUR",
 		"LOG_LEVEL", "LOG_FORMAT",
-		"API_KEY_SECRET", "PLUGINS_DIR", "PLUGINS_MARKETPLACE_GITHUB_TOKEN",
+		"API_KEY_SECRET",
 	}
 	for _, key := range keys {
 		t.Setenv(key, "")

@@ -9,20 +9,17 @@ import (
 // APIKey is the predicate function for apikey builders.
 type APIKey func(*sql.Selector)
 
-// Account is the predicate function for account builders.
-type Account func(*sql.Selector)
-
 // BalanceLog is the predicate function for balancelog builders.
 type BalanceLog func(*sql.Selector)
+
+// Channel is the predicate function for channel builders.
+type Channel func(*sql.Selector)
 
 // Group is the predicate function for group builders.
 type Group func(*sql.Selector)
 
-// Plugin is the predicate function for plugin builders.
-type Plugin func(*sql.Selector)
-
-// PluginSource is the predicate function for pluginsource builders.
-type PluginSource func(*sql.Selector)
+// ModelPrice is the predicate function for modelprice builders.
+type ModelPrice func(*sql.Selector)
 
 // Proxy is the predicate function for proxy builders.
 type Proxy func(*sql.Selector)

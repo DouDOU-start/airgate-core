@@ -9,9 +9,9 @@ func toDashboardStatsResp(item appdashboard.Stats) dto.DashboardStatsResp {
 	return dto.DashboardStatsResp{
 		TotalAPIKeys:        item.TotalAPIKeys,
 		EnabledAPIKeys:      item.EnabledAPIKeys,
-		TotalAccounts:       item.TotalAccounts,
-		EnabledAccounts:     item.EnabledAccounts,
-		ErrorAccounts:       item.ErrorAccounts,
+		TotalChannels:       item.TotalChannels,
+		EnabledChannels:     item.EnabledChannels,
+		DisabledChannels:    item.DisabledChannels,
 		TodayRequests:       item.TodayRequests,
 		TodayImageRequests:  item.TodayImageRequests,
 		AllTimeRequests:     item.AllTimeRequests,
