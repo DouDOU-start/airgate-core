@@ -13,13 +13,12 @@ import (
 )
 
 // publicGroups 允许公开访问的设置分组。
-var publicGroups = []string{"site", "registration", "storage"}
+var publicGroups = []string{"site", "registration"}
 
 // publicSafeKeys 允许公开的 key（不暴露敏感项）。
 var publicSafeKeys = map[string]bool{
-	"registration_enabled":           true,
-	"email_verify_enabled":           true,
-	"asset_retention_generated_days": true,
+	"registration_enabled": true,
+	"email_verify_enabled": true,
 }
 
 // settings key 常量（管理员 API Key）。

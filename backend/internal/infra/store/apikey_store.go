@@ -196,6 +196,40 @@ func (s *APIKeyStore) DeleteOwned(ctx context.Context, userID, id int) error {
 	return tx.Commit()
 }
 
+// FindProvisioned 查找某用户名下由指定应用 provision 的 key。
+func (s *APIKeyStore) FindProvisioned(ctx context.Context, userID int, clientID string) (appapikey.Key, bool, error) {
+	item, err := s.db.APIKey.Query().
+		Where(
+			entapikey.HasUserWith(entuser.IDEQ(userID)),
+			entapikey.ProvisionedByEQ(clientID),
+		).
+		WithUser().
+		WithGroup().
+		First(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return appapikey.Key{}, false, nil
+		}
+		return appapikey.Key{}, false, err
+	}
+	return mapAPIKey(item), true, nil
+}
+
+// DefaultGroupID 返回默认分组：非专属分组中 sort_weight 最高者（与分组列表排序一致）。
+func (s *APIKeyStore) DefaultGroupID(ctx context.Context) (int, bool, error) {
+	item, err := s.db.Group.Query().
+		Where(entgroup.IsExclusiveEQ(false)).
+		Order(ent.Desc(entgroup.FieldSortWeight), ent.Desc(entgroup.FieldCreatedAt)).
+		First(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+	return item.ID, true, nil
+}
+
 // FindOwned 查询当前用户的 API Key。
 func (s *APIKeyStore) FindOwned(ctx context.Context, userID, id int) (appapikey.Key, error) {
 	item, err := s.db.APIKey.Query().
@@ -279,6 +313,9 @@ func applyAPIKeyMutationCreate(builder *ent.APIKeyCreate, mutation appapikey.Mut
 	if mutation.Status != nil {
 		builder.SetStatus(entapikey.Status(*mutation.Status))
 	}
+	if mutation.ProvisionedBy != nil {
+		builder.SetProvisionedBy(*mutation.ProvisionedBy)
+	}
 }
 
 func applyAPIKeyMutationUpdate(builder *ent.APIKeyUpdateOne, mutation appapikey.Mutation) {
@@ -330,6 +367,7 @@ func mapAPIKey(item *ent.APIKey) appapikey.Key {
 		SellRate:        item.SellRate,
 		MaxConcurrency:  item.MaxConcurrency,
 		Status:          item.Status.String(),
+		ProvisionedBy:   item.ProvisionedBy,
 		CreatedAt:       item.CreatedAt,
 		UpdatedAt:       item.UpdatedAt,
 	}

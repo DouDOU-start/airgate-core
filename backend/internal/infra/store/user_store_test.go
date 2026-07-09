@@ -28,7 +28,6 @@ func TestUserStoreDeleteKeepsUsageAndBillingHistory(t *testing.T) {
 		t.Fatalf("create api key: %v", err)
 	}
 	if _, err := db.UsageLog.Create().
-		SetPlatform("openai").
 		SetModel("gpt-test").
 		SetUserID(user.ID).
 		SetUserIDSnapshot(user.ID).

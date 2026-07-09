@@ -12,6 +12,11 @@ import (
 // CtxKeyRequestID 在 gin.Context 中存放 request_id 的键名。
 const CtxKeyRequestID = "request_id"
 
+// maxRequestIDLen 客户端自报 X-Request-ID 的落库/回显长度上限（字节）。
+// 自生成 UUID 为 36 字符；截断按字节即可——合法 request id 应为 ASCII，
+// 超长本身已属异常输入。
+const maxRequestIDLen = 64
+
 // 业务层往 gin.Context 写入的"访问日志富化字段"。RequestLogger 在收尾时读取这些键
 // 把它们合并进 http_request 那一行，避免再单独打 forward_request_completed 重复信息。
 const (
@@ -33,8 +38,13 @@ func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 
-		// 抽取或生成 request_id，写入响应头供客户端排错
+		// 抽取或生成 request_id，写入响应头供客户端排错。
+		// X-Request-ID 为攻击者可控头且无上限：usage_logs.request_id 带 btree 索引，
+		// 超长值会令索引写入报错、整批计费 INSERT 失败（变相免费用量），此处统一截断。
 		rid := sdk.ExtractOrGenerateRequestID(c.Request.Header)
+		if len(rid) > maxRequestIDLen {
+			rid = rid[:maxRequestIDLen]
+		}
 		c.Header(sdk.HeaderRequestID, rid)
 		c.Set(CtxKeyRequestID, rid)
 

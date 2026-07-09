@@ -269,15 +269,17 @@ func TestUpdateAdminDoesNotCheckGroupAccess(t *testing.T) {
 }
 
 type apiKeyStubRepository struct {
-	listByUser  func(context.Context, int, ListFilter) ([]Key, int64, error)
-	listAdmin   func(context.Context, ListFilter) ([]Key, int64, error)
-	keyUsage    func(context.Context, []int, time.Time) (map[int]float64, map[int]float64, error)
-	groupAccess func(context.Context, int, int) (GroupAccess, error)
-	create      func(context.Context, Mutation) (Key, error)
-	updateOwned func(context.Context, int, int, Mutation) (Key, error)
-	updateAdmin func(context.Context, int, Mutation) (Key, error)
-	deleteOwned func(context.Context, int, int) error
-	findOwned   func(context.Context, int, int) (Key, error)
+	listByUser      func(context.Context, int, ListFilter) ([]Key, int64, error)
+	listAdmin       func(context.Context, ListFilter) ([]Key, int64, error)
+	keyUsage        func(context.Context, []int, time.Time) (map[int]float64, map[int]float64, error)
+	groupAccess     func(context.Context, int, int) (GroupAccess, error)
+	create          func(context.Context, Mutation) (Key, error)
+	updateOwned     func(context.Context, int, int, Mutation) (Key, error)
+	updateAdmin     func(context.Context, int, Mutation) (Key, error)
+	deleteOwned     func(context.Context, int, int) error
+	findOwned       func(context.Context, int, int) (Key, error)
+	findProvisioned func(context.Context, int, string) (Key, bool, error)
+	defaultGroupID  func(context.Context) (int, bool, error)
 }
 
 func (s apiKeyStubRepository) ListByUser(ctx context.Context, userID int, filter ListFilter) ([]Key, int64, error) {
@@ -343,6 +345,20 @@ func (s apiKeyStubRepository) FindOwned(ctx context.Context, userID, id int) (Ke
 	return s.findOwned(ctx, userID, id)
 }
 
+func (s apiKeyStubRepository) FindProvisioned(ctx context.Context, userID int, clientID string) (Key, bool, error) {
+	if s.findProvisioned == nil {
+		return Key{}, false, nil
+	}
+	return s.findProvisioned(ctx, userID, clientID)
+}
+
+func (s apiKeyStubRepository) DefaultGroupID(ctx context.Context) (int, bool, error) {
+	if s.defaultGroupID == nil {
+		return 1, true, nil
+	}
+	return s.defaultGroupID(ctx)
+}
+
 func derefString(value *string) string {
 	if value == nil {
 		return ""
@@ -355,4 +371,108 @@ func derefInt(value *int) int {
 		return 0
 	}
 	return *value
+}
+
+// testAESSecret 64 位 hex，供 ProvisionForClient 测试做真实加解密。
+const testAESSecret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+func TestProvisionForClientCreates(t *testing.T) {
+	var created Mutation
+	service := NewService(apiKeyStubRepository{
+		create: func(_ context.Context, mutation Mutation) (Key, error) {
+			created = mutation
+			return Key{ID: 1}, nil
+		},
+	}, testAESSecret)
+
+	plainKey, hint, isNew, err := service.ProvisionForClient(context.Background(), 7, "ac_chat", "对话", 0)
+	if err != nil {
+		t.Fatalf("ProvisionForClient 失败: %v", err)
+	}
+	if !isNew || plainKey == "" || hint == "" {
+		t.Fatalf("新建结果异常: key=%q hint=%q created=%v", plainKey, hint, isNew)
+	}
+	if created.ProvisionedBy == nil || *created.ProvisionedBy != "ac_chat" {
+		t.Fatalf("Mutation 未带 ProvisionedBy: %+v", created.ProvisionedBy)
+	}
+	if created.GroupID == nil || *created.GroupID != 1 {
+		t.Fatalf("未回填默认分组: %+v", created.GroupID)
+	}
+	if created.Name == nil || *created.Name != "对话" {
+		t.Fatalf("key 名称异常: %+v", created.Name)
+	}
+	// 落库的密文能解回明文
+	decrypted, err := corauth.DecryptAPIKey(*created.KeyEncrypted, testAESSecret)
+	if err != nil || decrypted != plainKey {
+		t.Fatalf("密文解密不一致: %v", err)
+	}
+}
+
+func TestProvisionForClientReturnsExisting(t *testing.T) {
+	encrypted, err := corauth.EncryptAPIKey("sk-existing", testAESSecret)
+	if err != nil {
+		t.Fatalf("加密失败: %v", err)
+	}
+	service := NewService(apiKeyStubRepository{
+		findProvisioned: func(_ context.Context, userID int, clientID string) (Key, bool, error) {
+			if userID != 7 || clientID != "ac_chat" {
+				t.Fatalf("查询参数异常: %d %s", userID, clientID)
+			}
+			return Key{ID: 1, Status: "active", KeyEncrypted: encrypted, KeyHint: "sk-exis...ting"}, true, nil
+		},
+		create: func(context.Context, Mutation) (Key, error) {
+			t.Fatal("已有 key 时不应再创建")
+			return Key{}, nil
+		},
+	}, testAESSecret)
+
+	plainKey, hint, isNew, err := service.ProvisionForClient(context.Background(), 7, "ac_chat", "对话", 0)
+	if err != nil {
+		t.Fatalf("ProvisionForClient 失败: %v", err)
+	}
+	if isNew || plainKey != "sk-existing" || hint == "" {
+		t.Fatalf("应返回既有 key: key=%q created=%v", plainKey, isNew)
+	}
+}
+
+func TestProvisionForClientRejections(t *testing.T) {
+	tests := []struct {
+		name    string
+		repo    apiKeyStubRepository
+		wantErr error
+	}{
+		{
+			name: "既有 key 被禁用",
+			repo: apiKeyStubRepository{
+				findProvisioned: func(context.Context, int, string) (Key, bool, error) {
+					return Key{ID: 1, Status: "disabled"}, true, nil
+				},
+			},
+			wantErr: ErrProvisionedKeyDisabled,
+		},
+		{
+			name: "无默认分组",
+			repo: apiKeyStubRepository{
+				defaultGroupID: func(context.Context) (int, bool, error) { return 0, false, nil },
+			},
+			wantErr: ErrNoDefaultGroup,
+		},
+		{
+			name: "默认分组无权使用",
+			repo: apiKeyStubRepository{
+				groupAccess: func(context.Context, int, int) (GroupAccess, error) {
+					return GroupAccess{Exists: true, Allowed: false}, nil
+				},
+			},
+			wantErr: ErrGroupForbidden,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := NewService(tt.repo, testAESSecret)
+			if _, _, _, err := service.ProvisionForClient(context.Background(), 7, "ac_chat", "对话", 0); !errors.Is(err, tt.wantErr) {
+				t.Fatalf("err = %v, 期望 %v", err, tt.wantErr)
+			}
+		})
+	}
 }

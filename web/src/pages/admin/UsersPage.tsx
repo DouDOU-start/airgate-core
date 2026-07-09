@@ -14,6 +14,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { MetricChips } from '../../shared/components/MetricChips';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { getAvatarColor } from '../../shared/utils/avatar';
 import { formatDateTime } from '../../shared/utils/format';
@@ -183,6 +184,7 @@ export default function UsersPage() {
 
       <CommonTable
         ariaLabel={t('users.title', 'Users')}
+        className="ag-users-table"
         footer={(
           <TablePaginationFooter
             page={page}
@@ -203,16 +205,19 @@ export default function UsersPage() {
               <CommonTable.Column id="username">{t('users.username')}</CommonTable.Column>
               <CommonTable.Column id="role">{t('users.role')}</CommonTable.Column>
               <CommonTable.Column id="balance">{t('users.balance')}</CommonTable.Column>
+              <CommonTable.Column id="runtime" style={{ width: '9.75rem' }}>
+                <span title={t('users.concurrency_rpm_hint')}>{t('users.concurrency_rpm')}</span>
+              </CommonTable.Column>
               <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
               <CommonTable.Column id="created_at">{t('users.created_at')}</CommonTable.Column>
               <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
             </CommonTable.Header>
             <CommonTable.Body>
               {isLoading ? (
-                <TableLoadingRow colSpan={8} />
+                <TableLoadingRow colSpan={9} />
               ) : rows.length === 0 ? (
                 <CommonTable.Row id="empty">
-                  <CommonTable.Cell colSpan={8}>
+                  <CommonTable.Cell colSpan={9}>
                     <EmptyState>
                       <div className="text-sm text-default-500">{t('common.no_data')}</div>
                     </EmptyState>
@@ -245,6 +250,25 @@ export default function UsersPage() {
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <span className="font-mono">${row.balance.toFixed(2)}</span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell className="ag-users-metric-cell">
+                      <MetricChips
+                        className="ag-metric-chips--stack ag-metric-chips--compact-y"
+                        items={[
+                          {
+                            color: 'accent' as const,
+                            label: t('users.concurrency_label'),
+                            muted: (row.current_concurrency ?? 0) === 0,
+                            value: `${row.current_concurrency ?? 0}/${row.max_concurrency > 0 ? row.max_concurrency : '∞'}`,
+                          },
+                          {
+                            color: 'success' as const,
+                            label: 'RPM',
+                            muted: (row.current_rpm ?? 0) === 0,
+                            value: String(row.current_rpm ?? 0),
+                          },
+                        ]}
+                      />
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <NativeSwitch

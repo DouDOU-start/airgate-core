@@ -19,6 +19,8 @@ type BalanceAlertFunc func(email string, balance float64, threshold float64)
 type Service struct {
 	repo           Repository
 	onBalanceAlert BalanceAlertFunc
+	concurrency    ConcurrencyReader
+	rpm            RPMReader
 }
 
 // NewService 创建用户服务。
@@ -29,6 +31,13 @@ func NewService(repo Repository) *Service {
 // SetBalanceAlertCallback 设置余额预警回调。
 func (s *Service) SetBalanceAlertCallback(fn BalanceAlertFunc) {
 	s.onBalanceAlert = fn
+}
+
+// SetRuntimeStatsReaders 注入运行时指标读取器（server 装配阶段调用；nil 安全，
+// 未注入时列表的并发/RPM 恒为 0）。
+func (s *Service) SetRuntimeStatsReaders(concurrency ConcurrencyReader, rpm RPMReader) {
+	s.concurrency = concurrency
+	s.rpm = rpm
 }
 
 // Get 获取用户。
@@ -107,7 +116,31 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 		)
 		return ListResult{}, err
 	}
+	s.attachRuntimeStats(ctx, list)
 	return ListResult{List: list, Total: total, Page: page, PageSize: pageSize}, nil
+}
+
+// attachRuntimeStats 为列表页用户批量填充运行时观测指标（在途并发 / 当前分钟 RPM）。
+// 读取器未注入或 Redis 不可用时保持 0 值，不影响列表主流程。
+func (s *Service) attachRuntimeStats(ctx context.Context, list []User) {
+	if len(list) == 0 {
+		return
+	}
+	ids := make([]int, len(list))
+	for i, u := range list {
+		ids[i] = u.ID
+	}
+	var counts, rpms map[int]int
+	if s.concurrency != nil {
+		counts = s.concurrency.GetUserCurrentCounts(ctx, ids)
+	}
+	if s.rpm != nil {
+		rpms = s.rpm.GetUserRPMs(ctx, ids)
+	}
+	for i := range list {
+		list[i].CurrentConcurrency = counts[list[i].ID]
+		list[i].CurrentRPM = rpms[list[i].ID]
+	}
 }
 
 // Create 创建用户。

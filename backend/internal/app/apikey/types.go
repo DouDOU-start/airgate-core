@@ -27,6 +27,7 @@ type Key struct {
 	TodayCost       float64
 	ThirtyDayCost   float64
 	Status          string
+	ProvisionedBy   string // 经 OAuth provision-key 创建时的来源应用 client_id；空 = 手动创建
 	ExpiresAt       *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
@@ -99,6 +100,7 @@ type Mutation struct {
 	ExpiresAt      *time.Time
 	HasExpiresAt   bool
 	Status         *string
+	ProvisionedBy  *string
 }
 
 // Repository API Key 持久化接口。
@@ -114,4 +116,8 @@ type Repository interface {
 	UpdateAdmin(context.Context, int, Mutation) (Key, error)
 	DeleteOwned(context.Context, int, int) error
 	FindOwned(context.Context, int, int) (Key, error)
+	// FindProvisioned 查找某用户名下由指定应用 provision 的 key（不含用量聚合）。
+	FindProvisioned(ctx context.Context, userID int, clientID string) (Key, bool, error)
+	// DefaultGroupID 返回默认分组（非专属分组中 sort_weight 最高者）；无可用分组时 ok=false。
+	DefaultGroupID(ctx context.Context) (groupID int, ok bool, err error)
 }

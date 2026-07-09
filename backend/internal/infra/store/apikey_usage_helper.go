@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
-	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 )
 
@@ -28,10 +27,10 @@ func queryAPIKeyUsage(ctx context.Context, db *ent.Client, keyIDs []int, todaySt
 	var todayRows []costRow
 	if err := db.UsageLog.Query().
 		Where(
-			entusagelog.HasAPIKeyWith(entapikey.IDIn(keyIDs...)),
+			entusagelog.APIKeyIDIn(keyIDs...),
 			entusagelog.CreatedAtGTE(todayStart),
 		).
-		GroupBy(entusagelog.ForeignKeys[0]).
+		GroupBy(entusagelog.FieldAPIKeyID).
 		Aggregate(ent.As(ent.Sum(entusagelog.FieldActualCost), "cost")).
 		Scan(ctx, &todayRows); err != nil {
 		return nil, nil, err
@@ -43,10 +42,10 @@ func queryAPIKeyUsage(ctx context.Context, db *ent.Client, keyIDs []int, todaySt
 	var thirtyDayRows []costRow
 	if err := db.UsageLog.Query().
 		Where(
-			entusagelog.HasAPIKeyWith(entapikey.IDIn(keyIDs...)),
+			entusagelog.APIKeyIDIn(keyIDs...),
 			entusagelog.CreatedAtGTE(thirtyDaysAgo),
 		).
-		GroupBy(entusagelog.ForeignKeys[0]).
+		GroupBy(entusagelog.FieldAPIKeyID).
 		Aggregate(ent.As(ent.Sum(entusagelog.FieldActualCost), "cost")).
 		Scan(ctx, &thirtyDayRows); err != nil {
 		return nil, nil, err

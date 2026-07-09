@@ -130,6 +130,9 @@ export default function GroupsPage() {
               <CommonTable.Column id="usage" style={{ width: '10.75rem' }}>
                 {t('groups.usage')}
               </CommonTable.Column>
+              <CommonTable.Column id="runtime" style={{ width: '9.75rem' }}>
+                <span title={t('groups.concurrency_rpm_hint')}>{t('groups.concurrency_rpm')}</span>
+              </CommonTable.Column>
               <CommonTable.Column id="sort_weight" style={{ width: 80 }}>
                 {t('groups.sort_weight')}
               </CommonTable.Column>
@@ -139,10 +142,10 @@ export default function GroupsPage() {
             </CommonTable.Header>
             <CommonTable.Body>
               {isLoading ? (
-                <TableLoadingRow colSpan={6} />
+                <TableLoadingRow colSpan={7} />
               ) : rows.length === 0 ? (
                 <CommonTable.Row id="empty">
-                  <CommonTable.Cell colSpan={6}>
+                  <CommonTable.Cell colSpan={7}>
                     <EmptyState>
                       <div className="text-sm text-default-500">{t('common.no_data')}</div>
                     </EmptyState>
@@ -189,6 +192,25 @@ export default function GroupsPage() {
                             dollarTone: 'warning',
                             label: t('groups.total_cost'),
                             mutedWhenZero: true,
+                          },
+                        ]}
+                      />
+                    </CommonTable.Cell>
+                    <CommonTable.Cell className="ag-groups-metric-cell">
+                      <MetricChips
+                        className="ag-metric-chips--stack ag-metric-chips--compact-y ag-metric-chips--runtime"
+                        items={[
+                          {
+                            color: 'accent' as const,
+                            label: t('groups.concurrency_label'),
+                            muted: (row.current_concurrency ?? 0) === 0,
+                            value: String(row.current_concurrency ?? 0),
+                          },
+                          {
+                            color: 'success' as const,
+                            label: 'RPM',
+                            muted: (row.current_rpm ?? 0) === 0,
+                            value: String(row.current_rpm ?? 0),
                           },
                         ]}
                       />

@@ -269,6 +269,94 @@ func (s *Service) RevealOwned(ctx context.Context, userID, id int) (Key, error) 
 	return item, nil
 }
 
+// ProvisionForClient 为用户按应用 get-or-create 一把 sk- key（OAuth provision-key 用）。
+//
+// 幂等依据 (user, provisioned_by=clientID)：已存在且启用 → 解密返回既有明文；
+// 已禁用 → 报错（视为用户暂时封禁该应用，可在密钥管理中重新启用）；
+// 用户删除该 key 则下次 provision 自动重建。groupID=0 时选默认分组。
+func (s *Service) ProvisionForClient(ctx context.Context, userID int, clientID, keyName string, groupID int) (string, string, bool, error) {
+	logger := sdk.LoggerFromContext(ctx)
+
+	plainKey, hint, found, err := s.revealProvisioned(ctx, userID, clientID)
+	if err != nil || found {
+		return plainKey, hint, false, err
+	}
+
+	if groupID == 0 {
+		gid, ok, err := s.repo.DefaultGroupID(ctx)
+		if err != nil {
+			return "", "", false, err
+		}
+		if !ok {
+			return "", "", false, ErrNoDefaultGroup
+		}
+		groupID = gid
+	}
+	if err := s.ensureUserCanUseGroup(ctx, userID, groupID); err != nil {
+		return "", "", false, err
+	}
+
+	rawKey, keyHash, err := auth.GenerateAPIKey()
+	if err != nil {
+		return "", "", false, err
+	}
+	encrypted, err := auth.EncryptAPIKey(rawKey, s.secret)
+	if err != nil {
+		return "", "", false, err
+	}
+	name := keyName
+	if name == "" {
+		name = clientID
+	}
+	keyHint := buildKeyHint(rawKey)
+	_, err = s.repo.Create(ctx, Mutation{
+		Name:          &name,
+		KeyHint:       &keyHint,
+		KeyHash:       &keyHash,
+		KeyEncrypted:  &encrypted,
+		UserID:        &userID,
+		GroupID:       &groupID,
+		ProvisionedBy: &clientID,
+	})
+	if err != nil {
+		// 并发 provision 撞 (user, provisioned_by) 部分唯一索引：重查一次自愈。
+		plainKey, hint, found, retryErr := s.revealProvisioned(ctx, userID, clientID)
+		if retryErr == nil && found {
+			return plainKey, hint, false, nil
+		}
+		logger.Error("api_key_provision_failed",
+			sdk.LogFieldUserID, userID,
+			sdk.LogFieldReason, "create",
+			sdk.LogFieldError, err,
+		)
+		return "", "", false, err
+	}
+	logger.Info("api_key_provisioned", sdk.LogFieldUserID, userID, "client_id", clientID)
+	return rawKey, keyHint, true, nil
+}
+
+// revealProvisioned 查找既有 provisioned key 并解回明文；不存在时 found=false 且无错误。
+func (s *Service) revealProvisioned(ctx context.Context, userID int, clientID string) (string, string, bool, error) {
+	existing, found, err := s.repo.FindProvisioned(ctx, userID, clientID)
+	if err != nil {
+		return "", "", false, err
+	}
+	if !found {
+		return "", "", false, nil
+	}
+	if existing.Status != "active" {
+		return "", "", true, ErrProvisionedKeyDisabled
+	}
+	if existing.KeyEncrypted == "" {
+		return "", "", true, ErrKeyDecryptFailed
+	}
+	plainKey, err := auth.DecryptAPIKey(existing.KeyEncrypted, s.secret)
+	if err != nil {
+		return "", "", true, ErrKeyDecryptFailed
+	}
+	return plainKey, existing.KeyHint, true, nil
+}
+
 // logApiKeyMutationOutcome 根据本次更新涉及的字段，输出对应的成功事件。
 // 不打印 key 明文/hash，仅打印 ID 与变更类型。
 func logApiKeyMutationOutcome(logger *slog.Logger, userID, keyID int, mutation Mutation) {

@@ -21,15 +21,18 @@ func TestExtractBearerTokenAndHasAPIKey(t *testing.T) {
 		name          string
 		authorization string
 		apiKey        string
+		googAPIKey    string
 		wantToken     string
 		wantHasKey    bool
 	}{
-		{"authorization_bearer", "Bearer sk-test", "", "sk-test", true},
-		{"authorization_case_insensitive", "bearer token-123", "", "token-123", true},
-		{"authorization_trim_space", "Bearer   token-123  ", "", "token-123", true},
-		{"x_api_key_fallback", "", "sk-from-header", "sk-from-header", true},
-		{"x_api_key_when_auth_not_bearer", "Basic abc", "sk-from-header", "sk-from-header", true},
-		{"missing", "", "", "", false},
+		{"authorization_bearer", "Bearer sk-test", "", "", "sk-test", true},
+		{"authorization_case_insensitive", "bearer token-123", "", "", "token-123", true},
+		{"authorization_trim_space", "Bearer   token-123  ", "", "", "token-123", true},
+		{"x_api_key_fallback", "", "sk-from-header", "", "sk-from-header", true},
+		{"x_api_key_when_auth_not_bearer", "Basic abc", "sk-from-header", "", "sk-from-header", true},
+		{"x_goog_api_key_fallback", "", "", "sk-goog", "sk-goog", true},
+		{"x_api_key_priority_over_goog", "", "sk-from-header", "sk-goog", "sk-from-header", true},
+		{"missing", "", "", "", "", false},
 	}
 
 	for _, tt := range tests {
@@ -40,6 +43,9 @@ func TestExtractBearerTokenAndHasAPIKey(t *testing.T) {
 			}
 			if tt.apiKey != "" {
 				c.Request.Header.Set("x-api-key", tt.apiKey)
+			}
+			if tt.googAPIKey != "" {
+				c.Request.Header.Set("x-goog-api-key", tt.googAPIKey)
 			}
 
 			if got := extractBearerToken(c); got != tt.wantToken {
@@ -138,23 +144,72 @@ func TestAdminOnlyAllowsAdminRole(t *testing.T) {
 	}
 }
 
-func TestAbortWithOpenAIError(t *testing.T) {
-	c, w := newAuthContext(http.MethodGet, "/v1/models")
+// TestAbortWithRelayError 鉴权错误体按请求路径的入口协议出原生形态。
+func TestAbortWithRelayError(t *testing.T) {
+	t.Run("openai 路径出 OpenAI 形态", func(t *testing.T) {
+		c, w := newAuthContext(http.MethodGet, "/v1/models")
 
-	abortWithOpenAIError(c, http.StatusPaymentRequired, "insufficient_quota", "额度不足")
+		abortWithRelayError(c, http.StatusPaymentRequired, "insufficient_quota", "额度不足")
 
-	if w.Code != http.StatusPaymentRequired {
-		t.Fatalf("状态码 = %d，期望 %d", w.Code, http.StatusPaymentRequired)
-	}
-	var got map[string]map[string]string
-	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
-		t.Fatalf("响应 JSON 解析失败: %v", err)
-	}
-	errBody := got["error"]
-	if errBody["message"] != "额度不足" || errBody["type"] != "authentication_error" || errBody["code"] != "insufficient_quota" {
-		t.Fatalf("错误响应异常: %#v", errBody)
-	}
-	if !c.IsAborted() {
-		t.Fatal("请求应该被终止")
-	}
+		if w.Code != http.StatusPaymentRequired {
+			t.Fatalf("状态码 = %d，期望 %d", w.Code, http.StatusPaymentRequired)
+		}
+		var got map[string]map[string]string
+		if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+			t.Fatalf("响应 JSON 解析失败: %v", err)
+		}
+		errBody := got["error"]
+		if errBody["message"] != "额度不足" || errBody["type"] != "authentication_error" || errBody["code"] != "insufficient_quota" {
+			t.Fatalf("错误响应异常: %#v", errBody)
+		}
+		if !c.IsAborted() {
+			t.Fatal("请求应该被终止")
+		}
+	})
+
+	t.Run("messages 路径出 Anthropic 形态", func(t *testing.T) {
+		c, w := newAuthContext(http.MethodPost, "/v1/messages")
+
+		abortWithRelayError(c, http.StatusUnauthorized, "invalid_api_key", "无效的 API Key")
+
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("状态码 = %d，期望 401", w.Code)
+		}
+		var got struct {
+			Type  string `json:"type"`
+			Error struct {
+				Type    string `json:"type"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+			t.Fatalf("响应 JSON 解析失败: %v", err)
+		}
+		if got.Type != "error" || got.Error.Type != "authentication_error" || got.Error.Message != "无效的 API Key" {
+			t.Fatalf("错误响应异常: %s", w.Body.String())
+		}
+	})
+
+	t.Run("v1beta 路径出 Gemini 形态", func(t *testing.T) {
+		c, w := newAuthContext(http.MethodPost, "/v1beta/models/gemini-2.0:generateContent")
+
+		abortWithRelayError(c, http.StatusUnauthorized, "invalid_api_key", "无效的 API Key")
+
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("状态码 = %d，期望 401", w.Code)
+		}
+		var got struct {
+			Error struct {
+				Code    int    `json:"code"`
+				Message string `json:"message"`
+				Status  string `json:"status"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+			t.Fatalf("响应 JSON 解析失败: %v", err)
+		}
+		if got.Error.Code != 401 || got.Error.Status != "UNAUTHENTICATED" {
+			t.Fatalf("错误响应异常: %s", w.Body.String())
+		}
+	})
 }

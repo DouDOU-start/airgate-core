@@ -12,6 +12,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
+	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
 )
 
@@ -82,21 +83,22 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 }
 
 // APIKeyAuth API Key 认证中间件
-// 从 Authorization: Bearer sk-xxx 头解析 API Key
-// 返回 OpenAI 兼容错误格式，确保 Claude Code 等客户端能正确识别
+// 从 Authorization: Bearer sk-xxx / x-api-key / x-goog-api-key 头解析 API Key。
+// 错误体按请求路径的入口协议出原生形态（errfmt），确保 OpenAI SDK / Claude Code /
+// Gemini 客户端都能正确识别。
 func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := extractBearerToken(c)
 		if key == "" {
 			slog.Warn("api_key_validation_failed", sdk.LogFieldReason, "missing_api_key", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
-			abortWithOpenAIError(c, http.StatusUnauthorized, "missing_api_key", "缺少 API Key")
+			abortWithRelayError(c, http.StatusUnauthorized, "missing_api_key", "缺少 API Key")
 			return
 		}
 
 		// 验证 API Key 格式
 		if !strings.HasPrefix(key, "sk-") {
 			slog.Warn("api_key_validation_failed", sdk.LogFieldReason, "invalid_format", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
-			abortWithOpenAIError(c, http.StatusUnauthorized, "invalid_api_key", "无效的 API Key 格式")
+			abortWithRelayError(c, http.StatusUnauthorized, "invalid_api_key", "无效的 API Key 格式")
 			return
 		}
 
@@ -127,7 +129,7 @@ func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 				reason = "service_unavailable"
 			}
 			slog.Warn("api_key_validation_failed", sdk.LogFieldReason, reason, sdk.LogFieldError, err, sdk.LogFieldStatus, status, sdk.LogFieldRequestID, RequestIDFromGinContext(c))
-			abortWithOpenAIError(c, status, code, err.Error())
+			abortWithRelayError(c, status, code, err.Error())
 			return
 		}
 
@@ -145,15 +147,11 @@ func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 	}
 }
 
-// abortWithOpenAIError 返回 OpenAI 兼容的错误格式并终止请求
-func abortWithOpenAIError(c *gin.Context, status int, code, message string) {
-	c.AbortWithStatusJSON(status, gin.H{
-		"error": gin.H{
-			"message": message,
-			"type":    "authentication_error",
-			"code":    code,
-		},
-	})
+// abortWithRelayError 按请求路径的入口协议返回原生形态错误体并终止请求
+// （/v1/messages → Anthropic，/v1beta/* → Gemini，其余 → OpenAI）。
+func abortWithRelayError(c *gin.Context, status int, code, message string) {
+	protocol := errfmt.ProtocolForPath(c.Request.URL.Path)
+	c.AbortWithStatusJSON(status, errfmt.Render(protocol, status, "authentication_error", code, message, RequestIDFromGinContext(c)))
 }
 
 // AdminOnly 管理员权限中间件（需要在 JWTAuth 之后使用）
@@ -196,8 +194,9 @@ func RequireRoles(roles ...string) gin.HandlerFunc {
 	}
 }
 
-// extractBearerToken 从 Authorization 头或 x-api-key 头提取 API Key
-// 优先使用 Authorization: Bearer <token>，回退到 x-api-key（Anthropic 标准格式）
+// extractBearerToken 从 Authorization / x-api-key / x-goog-api-key 头提取 API Key
+// 优先使用 Authorization: Bearer <token>，回退到 x-api-key（Anthropic 标准格式）、
+// x-goog-api-key（Gemini 标准格式，Google GenAI SDK 默认走此头）
 func extractBearerToken(c *gin.Context) string {
 	header := c.GetHeader("Authorization")
 	if header != "" {
@@ -211,14 +210,18 @@ func extractBearerToken(c *gin.Context) string {
 	if key := c.GetHeader("x-api-key"); key != "" {
 		return key
 	}
+	// 回退：Gemini 标准 x-goog-api-key 头
+	if key := c.GetHeader("x-goog-api-key"); key != "" {
+		return key
+	}
 	return ""
 }
 
-// HasAPIKey 检查请求是否携带 API Key（Authorization: Bearer 或 x-api-key）
+// HasAPIKey 检查请求是否携带 API Key（Authorization: Bearer / x-api-key / x-goog-api-key）
 func HasAPIKey(c *gin.Context) bool {
 	auth := c.GetHeader("Authorization")
 	if len(auth) > 7 && strings.EqualFold(auth[:7], "Bearer ") {
 		return true
 	}
-	return c.GetHeader("x-api-key") != ""
+	return c.GetHeader("x-api-key") != "" || c.GetHeader("x-goog-api-key") != ""
 }

@@ -21,6 +21,21 @@ type User struct {
 	Status                string
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
+
+	// CurrentConcurrency / CurrentRPM 运行时观测指标（当前在途请求数 / 当前分钟请求数），
+	// 仅管理员列表查询时由 RuntimeStatsReader 填充，不落库。
+	CurrentConcurrency int
+	CurrentRPM         int
+}
+
+// ConcurrencyReader 用户在途并发数批量读取（由 scheduler.ConcurrencyManager 实现）。
+type ConcurrencyReader interface {
+	GetUserCurrentCounts(ctx context.Context, userIDs []int) map[int]int
+}
+
+// RPMReader 用户当前分钟 RPM 批量读取（由 scheduler.RPMCounter 实现）。
+type RPMReader interface {
+	GetUserRPMs(ctx context.Context, userIDs []int) map[int]int
 }
 
 // ListFilter 用户列表筛选。

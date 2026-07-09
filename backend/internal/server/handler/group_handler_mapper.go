@@ -19,6 +19,9 @@ func toGroupRespFromDomain(item appgroup.Group) dto.GroupResp {
 		ForceInstructions: item.ForceInstructions,
 		Note:              item.Note,
 		SortWeight:        item.SortWeight,
+
+		CurrentConcurrency: item.CurrentConcurrency,
+		CurrentRPM:         item.CurrentRPM,
 		TimeMixin: dto.TimeMixin{
 			CreatedAt: item.CreatedAt,
 			UpdatedAt: item.UpdatedAt,

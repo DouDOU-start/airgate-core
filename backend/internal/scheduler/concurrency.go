@@ -33,7 +33,7 @@ const (
 //
 //	KEYS[1] = 槽位 key
 //	ARGV[1] = 当前 unix 秒
-//	ARGV[2] = max_concurrency
+//	ARGV[2] = max_concurrency（<= 0 表示不限制，但仍记录 slot——观测口径）
 //	ARGV[3] = requestID
 //	ARGV[4] = slotTTL 秒（单个 slot 的存活上限；整 key 的兜底 TTL 取历次 acquire 的最大值）
 //
@@ -51,7 +51,7 @@ var acquireSlotScript = redis.NewScript(`
 	redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', now)
 
 	local current = redis.call('ZCARD', KEYS[1])
-	if current < max then
+	if max <= 0 or current < max then
 		redis.call('ZADD', KEYS[1], now + ttl, requestID)
 		-- 整 key TTL 只增不减：短 TTL 的 acquire 不得缩短长流 slot 的存活窗口
 		if redis.call('TTL', KEYS[1]) < ttl then
@@ -96,14 +96,25 @@ func channelConcurrencyKey(channelID int) string {
 	return fmt.Sprintf("concurrency:v2:channel:%d", channelID)
 }
 
+// groupConcurrencyKey 生成分组级 Redis Key（纯管理端观测，无限流语义）。
+func groupConcurrencyKey(groupID int) string {
+	return fmt.Sprintf("concurrency:v2:group:%d", groupID)
+}
+
 // acquireSlotByKey 通用并发槽获取：给定 Redis key 和上限，原子性的
 // 清理僵尸 slot + 检查上限 + ZADD 加入新 slot（score = 当前时间）。
-// maxConcurrency <= 0 时视为不限制，直接放行。
+// maxConcurrency <= 0 时视为不限制，直接放行（不记录，热路径零 Redis 开销）。
 // Redis 不可用时也直接放行，避免影响主链路可用性。
 func (cm *ConcurrencyManager) acquireSlotByKey(ctx context.Context, key, requestID string, maxConcurrency int, slotTTL time.Duration) error {
 	if cm.rdb == nil || maxConcurrency <= 0 {
 		return nil
 	}
+	return cm.runAcquireSlot(ctx, key, requestID, maxConcurrency, slotTTL)
+}
+
+// runAcquireSlot 执行原子获取脚本。maxConcurrency <= 0 时脚本仍记录 slot 但不设
+// 上限（观测口径，供管理端读取实时并发）；> 0 时超限返回 ErrConcurrencyLimit。
+func (cm *ConcurrencyManager) runAcquireSlot(ctx context.Context, key, requestID string, maxConcurrency int, slotTTL time.Duration) error {
 	if slotTTL <= 0 {
 		slotTTL = defaultSlotTTL
 	}
@@ -160,9 +171,13 @@ func (cm *ConcurrencyManager) ReleaseAPIKeySlot(ctx context.Context, keyID int, 
 }
 
 // AcquireChannelSlot 获取渠道级并发槽位。
-// maxConcurrency <= 0 时直接放行（表示该渠道不限制并发）。
+// maxConcurrency <= 0 时不限制但仍记录 slot（管理端实时并发观测口径）；
+// 释放侧 ReleaseChannelSlot 由 pipeline 无条件 defer 执行，两侧恒配对。
 func (cm *ConcurrencyManager) AcquireChannelSlot(ctx context.Context, channelID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
-	return cm.acquireSlotByKey(ctx, channelConcurrencyKey(channelID), requestID, maxConcurrency, slotTTL)
+	if cm.rdb == nil {
+		return nil
+	}
+	return cm.runAcquireSlot(ctx, channelConcurrencyKey(channelID), requestID, maxConcurrency, slotTTL)
 }
 
 // ReleaseChannelSlot 释放渠道级并发槽位
@@ -171,6 +186,23 @@ func (cm *ConcurrencyManager) ReleaseChannelSlot(ctx context.Context, channelID 
 		return
 	}
 	cm.rdb.ZRem(ctx, channelConcurrencyKey(channelID), requestID)
+}
+
+// TrackGroupSlot 记录分组级在途请求槽位（纯观测口径：不限流、不拒绝，
+// 供管理端展示分组实时并发）。与 ReleaseGroupSlot 配对。
+func (cm *ConcurrencyManager) TrackGroupSlot(ctx context.Context, groupID int, requestID string, slotTTL time.Duration) {
+	if cm.rdb == nil {
+		return
+	}
+	_ = cm.runAcquireSlot(ctx, groupConcurrencyKey(groupID), requestID, 0, slotTTL)
+}
+
+// ReleaseGroupSlot 释放分组级槽位。
+func (cm *ConcurrencyManager) ReleaseGroupSlot(ctx context.Context, groupID int, requestID string) {
+	if cm.rdb == nil {
+		return
+	}
+	cm.rdb.ZRem(ctx, groupConcurrencyKey(groupID), requestID)
 }
 
 // AcquireUserSlot 获取用户级并发槽位。
@@ -214,6 +246,72 @@ func (cm *ConcurrencyManager) GetCurrentCounts(ctx context.Context, accountIDs [
 	cmds := make(map[int]*redis.IntCmd, len(accountIDs))
 	for _, id := range accountIDs {
 		cmds[id] = pipe.ZCount(ctx, concurrencyKey(id), min, "+inf")
+	}
+	_, _ = pipe.Exec(ctx)
+	for id, cmd := range cmds {
+		if n, err := cmd.Result(); err == nil {
+			result[id] = int(n)
+		}
+	}
+	return result
+}
+
+// GetUserCurrentCounts 批量获取多个用户的当前在途并发数（管理端观测用）。
+// 与 GetCurrentCounts 同口径：只统计未过期的 slot，僵尸 slot 不计入。
+func (cm *ConcurrencyManager) GetUserCurrentCounts(ctx context.Context, userIDs []int) map[int]int {
+	result := make(map[int]int, len(userIDs))
+	if cm.rdb == nil {
+		return result
+	}
+	min := "(" + strconv.FormatInt(time.Now().Unix(), 10)
+	pipe := cm.rdb.Pipeline()
+	cmds := make(map[int]*redis.IntCmd, len(userIDs))
+	for _, id := range userIDs {
+		cmds[id] = pipe.ZCount(ctx, userConcurrencyKey(id), min, "+inf")
+	}
+	_, _ = pipe.Exec(ctx)
+	for id, cmd := range cmds {
+		if n, err := cmd.Result(); err == nil {
+			result[id] = int(n)
+		}
+	}
+	return result
+}
+
+// GetChannelCurrentCounts 批量获取多个渠道的当前在途并发数（管理端观测用）。
+// 与 GetCurrentCounts 同口径：只统计未过期的 slot，僵尸 slot 不计入。
+func (cm *ConcurrencyManager) GetChannelCurrentCounts(ctx context.Context, channelIDs []int) map[int]int {
+	result := make(map[int]int, len(channelIDs))
+	if cm.rdb == nil {
+		return result
+	}
+	min := "(" + strconv.FormatInt(time.Now().Unix(), 10)
+	pipe := cm.rdb.Pipeline()
+	cmds := make(map[int]*redis.IntCmd, len(channelIDs))
+	for _, id := range channelIDs {
+		cmds[id] = pipe.ZCount(ctx, channelConcurrencyKey(id), min, "+inf")
+	}
+	_, _ = pipe.Exec(ctx)
+	for id, cmd := range cmds {
+		if n, err := cmd.Result(); err == nil {
+			result[id] = int(n)
+		}
+	}
+	return result
+}
+
+// GetGroupCurrentCounts 批量获取多个分组的当前在途并发数（管理端观测用）。
+// 与 GetCurrentCounts 同口径：只统计未过期的 slot，僵尸 slot 不计入。
+func (cm *ConcurrencyManager) GetGroupCurrentCounts(ctx context.Context, groupIDs []int) map[int]int {
+	result := make(map[int]int, len(groupIDs))
+	if cm.rdb == nil {
+		return result
+	}
+	min := "(" + strconv.FormatInt(time.Now().Unix(), 10)
+	pipe := cm.rdb.Pipeline()
+	cmds := make(map[int]*redis.IntCmd, len(groupIDs))
+	for _, id := range groupIDs {
+		cmds[id] = pipe.ZCount(ctx, groupConcurrencyKey(id), min, "+inf")
 	}
 	_, _ = pipe.Exec(ctx)
 	for id, cmd := range cmds {

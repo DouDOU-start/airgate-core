@@ -64,7 +64,7 @@ func TestCreateClonesMutableFields(t *testing.T) {
 
 type stubConcurrencyReader struct{}
 
-func (stubConcurrencyReader) GetCurrentCounts(_ context.Context, _ []int) map[int]int {
+func (stubConcurrencyReader) GetGroupCurrentCounts(_ context.Context, _ []int) map[int]int {
 	return nil
 }
 

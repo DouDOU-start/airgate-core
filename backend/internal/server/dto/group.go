@@ -15,9 +15,13 @@ type GroupResp struct {
 	Note              string                 `json:"note,omitempty"`
 	SortWeight        int                    `json:"sort_weight"`
 
-	// 统计字段（仅管理员列表返回）
+	// 统计字段（仅管理员列表返回），实扣口径（actual_cost 汇总）
 	TodayCost float64 `json:"today_cost"`
 	TotalCost float64 `json:"total_cost"`
+
+	// CurrentConcurrency / CurrentRPM 运行时观测指标（在途请求数 / 当前分钟请求数），列表实时展示。
+	CurrentConcurrency int `json:"current_concurrency"`
+	CurrentRPM         int `json:"current_rpm"`
 
 	TimeMixin
 }

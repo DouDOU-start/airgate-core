@@ -16,13 +16,17 @@ type Repository interface {
 	StatsForGroups(ctx context.Context, groupIDs []int, todayStart time.Time) (map[int]GroupStats, error)
 }
 
-// ConcurrencyReader 并发读接口。
-// P0 阶段账号容量统计已下线，暂无调用方；保留注入以便 P1 渠道容量统计复用。
+// ConcurrencyReader 分组在途并发数批量读取（由 scheduler.ConcurrencyManager 实现）。
 type ConcurrencyReader interface {
-	GetCurrentCounts(context.Context, []int) map[int]int
+	GetGroupCurrentCounts(context.Context, []int) map[int]int
 }
 
-// GroupStats 描述分组统计信息。
+// RPMReader 分组当前分钟 RPM 批量读取（由 scheduler.RPMCounter 实现）。
+type RPMReader interface {
+	GetGroupRPMs(context.Context, []int) map[int]int
+}
+
+// GroupStats 描述分组统计信息。金额为实扣口径（usage_log.actual_cost 汇总），非价目表原价。
 type GroupStats struct {
 	TodayCost float64
 	TotalCost float64
@@ -44,6 +48,11 @@ type Group struct {
 	SortWeight        int
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+
+	// CurrentConcurrency / CurrentRPM 运行时观测指标（在途请求数 / 当前分钟请求数），
+	// 仅管理员列表查询时由读取器填充，不落库。
+	CurrentConcurrency int
+	CurrentRPM         int
 }
 
 // ListFilter 描述管理员分组列表查询条件。

@@ -13,11 +13,18 @@ import (
 type Service struct {
 	repo        Repository
 	concurrency ConcurrencyReader
+	rpm         RPMReader
 }
 
 // NewService 创建分组服务。
 func NewService(repo Repository, concurrency ConcurrencyReader) *Service {
 	return &Service{repo: repo, concurrency: concurrency}
+}
+
+// SetRPMReader 注入分组 RPM 读取器（server 装配阶段调用；nil 安全，
+// 未注入时列表 RPM 保持 0 值）。
+func (s *Service) SetRPMReader(rpm RPMReader) {
+	s.rpm = rpm
 }
 
 // List 查询管理员分组列表。
@@ -33,6 +40,7 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 			sdk.LogFieldError, err)
 		return ListResult{}, err
 	}
+	s.attachRuntimeStats(ctx, list)
 
 	return ListResult{
 		List:     list,
@@ -40,6 +48,29 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 		Page:     page,
 		PageSize: pageSize,
 	}, nil
+}
+
+// attachRuntimeStats 为列表页分组批量填充运行时观测指标（在途并发 / 当前分钟 RPM）。
+// 读取器未注入或 Redis 不可用时保持 0 值，不影响列表主流程。
+func (s *Service) attachRuntimeStats(ctx context.Context, list []Group) {
+	if len(list) == 0 {
+		return
+	}
+	ids := make([]int, len(list))
+	for i, g := range list {
+		ids[i] = g.ID
+	}
+	var counts, rpms map[int]int
+	if s.concurrency != nil {
+		counts = s.concurrency.GetGroupCurrentCounts(ctx, ids)
+	}
+	if s.rpm != nil {
+		rpms = s.rpm.GetGroupRPMs(ctx, ids)
+	}
+	for i := range list {
+		list[i].CurrentConcurrency = counts[list[i].ID]
+		list[i].CurrentRPM = rpms[list[i].ID]
+	}
 }
 
 // StatsForGroups 批量查询分组统计信息（今日/累计用量）。

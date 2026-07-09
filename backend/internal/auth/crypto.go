@@ -8,9 +8,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log/slog"
-
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // deriveAESKey 从 hex 编码的 secret 中取前 32 字节作为 AES-256 密钥
@@ -82,7 +79,8 @@ func DecryptAPIKey(encrypted, secret string) (string, error) {
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		slog.Error("api_key_decrypt_failed", sdk.LogFieldError, err)
+		// 不在此记日志：失败是否异常由调用方判断（各调用方均有带上下文的日志），
+		// 库级 ERROR 会在「探测性解密」场景产生误导性噪音。
 		return "", fmt.Errorf("解密失败: %w", err)
 	}
 

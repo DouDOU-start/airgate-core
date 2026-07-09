@@ -12,7 +12,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { useToast } from '../../shared/ui';
 import {
   Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound, Download, Database,
+  ShieldCheck, Copy, Trash2, KeyRound, Download,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
 import { SystemUpdatePanel } from './SystemUpdatePanel';
@@ -40,13 +40,6 @@ const SMTP_KEYS = [
   'smtp_from_email', 'smtp_from_name', 'smtp_use_tls',
   'email_template_subject', 'email_template_body',
   'balance_alert_email_subject', 'balance_alert_email_body',
-] as const;
-
-const STORAGE_KEYS = [
-  's3_endpoint', 's3_bucket', 's3_access_key', 's3_secret_key',
-  's3_region', 's3_use_ssl', 's3_public_base_url',
-  's3_presign_ttl_minutes', 's3_path_prefix', 'local_storage_dir',
-  'asset_retention_generated_days',
 ] as const;
 
 const DEFAULT_EMAIL_SUBJECT = '{{site_name}} - 邮箱验证码';
@@ -88,13 +81,12 @@ const DEFAULT_BALANCE_ALERT_BODY = `<div style="font-family: -apple-system, Blin
 
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'security' | 'smtp' | 'storage' | 'system';
+type TabKey = 'site' | 'security' | 'smtp' | 'system';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
   { key: 'security', labelKey: 'settings.tab_security', icon: ShieldCheck },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
-  { key: 'storage', labelKey: 'settings.tab_storage', icon: Database },
   { key: 'system', labelKey: 'settings.tab_system', icon: Download },
 ];
 
@@ -104,13 +96,11 @@ type SaveTabKey = Exclude<TabKey, 'security' | 'system'>;
 const TAB_GROUP: Record<SaveTabKey, string> = {
   site: 'site',
   smtp: 'smtp',
-  storage: 'storage',
 };
 
 const TAB_KEYS: Record<SaveTabKey, readonly string[]> = {
   site: SITE_KEYS,
   smtp: SMTP_KEYS,
-  storage: STORAGE_KEYS,
 };
 
 // ==================== Component ====================
@@ -531,10 +521,6 @@ export default function SettingsPage() {
               {smtpSaveAction}
             </Card.Content>
           </Card>
-        )}
-
-        {activeTab === 'storage' && (
-          <StoragePanel set={set} boolVal={boolVal} val={val} footer={saveAction} />
         )}
 
         {activeTab === 'system' && <SystemUpdatePanel />}
@@ -974,124 +960,6 @@ function EmailTemplateEditor({
         </Modal>
       ) : null}
     </>
-  );
-}
-
-// ==================== Storage Panel ====================
-
-function StoragePanel({
-  set,
-  boolVal,
-  val,
-  footer,
-}: {
-  set: (key: string, value: string) => void;
-  boolVal: (key: string) => boolean;
-  val: (key: string) => string;
-  footer?: React.ReactNode;
-}) {
-  const { t } = useTranslation();
-
-  return (
-      <Card>
-        <Card.Header>
-          <Card.Title>{t('settings.storage_config')}</Card.Title>
-        </Card.Header>
-        <Card.Content>
-          <Form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={(e) => e.preventDefault()}>
-          <Field label={t('settings.s3_endpoint')} hint={t('settings.s3_endpoint_hint')}>
-            <Input
-              value={val('s3_endpoint')}
-              onChange={(e) => set('s3_endpoint', e.target.value)}
-              placeholder="http://minio:9000"
-            />
-          </Field>
-          <Field label={t('settings.s3_bucket')} hint={t('settings.s3_bucket_hint')}>
-            <Input
-              value={val('s3_bucket')}
-              onChange={(e) => set('s3_bucket', e.target.value)}
-              placeholder="airgate"
-            />
-          </Field>
-          <Field label={t('settings.s3_access_key')}>
-            <Input
-              value={val('s3_access_key')}
-              onChange={(e) => set('s3_access_key', e.target.value)}
-              autoComplete="off"
-            />
-          </Field>
-          <Field label={t('settings.s3_secret_key')}>
-            <Input
-              name="s3_secret_key"
-              type="password"
-              value={val('s3_secret_key')}
-              onChange={(e) => set('s3_secret_key', e.target.value)}
-              autoComplete="off"
-            />
-          </Field>
-          <Field label={t('settings.s3_region')} hint={t('settings.s3_region_hint')}>
-            <Input
-              value={val('s3_region')}
-              onChange={(e) => set('s3_region', e.target.value)}
-              placeholder="us-east-1"
-            />
-          </Field>
-          <Field label={t('settings.s3_presign_ttl_minutes')} hint={t('settings.s3_presign_ttl_minutes_hint')}>
-            <Input
-              type="number"
-              value={val('s3_presign_ttl_minutes')}
-              onChange={(e) => set('s3_presign_ttl_minutes', e.target.value)}
-              placeholder="360"
-            />
-          </Field>
-          <Field className="col-span-1 md:col-span-2" label={t('settings.s3_public_base_url')} hint={t('settings.s3_public_base_url_hint')}>
-            <Input
-              value={val('s3_public_base_url')}
-              onChange={(e) => set('s3_public_base_url', e.target.value)}
-              placeholder="https://cdn.example.com/airgate"
-            />
-          </Field>
-          <Field label={t('settings.s3_path_prefix')} hint={t('settings.s3_path_prefix_hint')}>
-            <Input
-              value={val('s3_path_prefix')}
-              onChange={(e) => set('s3_path_prefix', e.target.value)}
-              placeholder="airgate"
-            />
-          </Field>
-          <Field label={t('settings.local_storage_dir')} hint={t('settings.local_storage_dir_hint')}>
-            <Input
-              value={val('local_storage_dir')}
-              onChange={(e) => set('local_storage_dir', e.target.value)}
-              placeholder="data/assets"
-            />
-          </Field>
-          <NativeSwitch
-            className="col-span-1 md:col-span-2"
-            isSelected={boolVal('s3_use_ssl')}
-            label={(
-              <>
-                <span className="text-sm font-medium text-text">{t('settings.s3_use_ssl')}</span>
-                <span className="block text-xs text-text-tertiary">{t('settings.s3_use_ssl_desc')}</span>
-              </>
-            )}
-            onChange={(v) => set('s3_use_ssl', String(v))}
-          />
-          <div className="col-span-1 md:col-span-2 pt-2 border-t border-border">
-            <div className="text-sm font-medium text-text">{t('settings.asset_retention_section')}</div>
-            <div className="mt-1 text-xs text-text-tertiary">{t('settings.asset_retention_section_hint')}</div>
-          </div>
-          <Field label={t('settings.asset_retention_generated_days')} hint={t('settings.asset_retention_generated_days_hint')}>
-            <Input
-              type="number"
-              value={val('asset_retention_generated_days')}
-              onChange={(e) => set('asset_retention_generated_days', e.target.value)}
-              placeholder="7"
-            />
-          </Field>
-        </Form>
-        {footer}
-      </Card.Content>
-    </Card>
   );
 }
 

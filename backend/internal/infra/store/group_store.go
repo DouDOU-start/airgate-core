@@ -216,7 +216,7 @@ func (s *GroupStore) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
-// StatsForGroups 批量查询分组统计信息（今日/累计用量）。
+// StatsForGroups 批量查询分组统计信息（今日/累计实扣金额，聚合 actual_cost 而非价目表原价）。
 // todayStart 必须由调用方按用户时区计算好；store 层不再自己读 time.Now。
 func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todayStart time.Time) (map[int]appgroup.GroupStats, error) {
 	if len(groupIDs) == 0 {
@@ -225,29 +225,29 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 
 	result := make(map[int]appgroup.GroupStats, len(groupIDs))
 
-	// 1. 查询每个分组的总用量
+	// 1. 查询每个分组的累计实扣
 	var totalRows []struct {
-		GroupID   int     `json:"group_usage_logs"`
-		TotalCost float64 `json:"total_cost"`
+		GroupID    int     `json:"group_usage_logs"`
+		ActualCost float64 `json:"actual_cost"`
 	}
 	err := s.db.UsageLog.Query().
 		Where(entusagelog.HasGroupWith(entgroup.IDIn(groupIDs...))).
 		GroupBy("group_usage_logs").
-		Aggregate(ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost")).
+		Aggregate(ent.As(ent.Sum(entusagelog.FieldActualCost), "actual_cost")).
 		Scan(ctx, &totalRows)
 	if err != nil {
 		return nil, err
 	}
 	for _, row := range totalRows {
 		stats := result[row.GroupID]
-		stats.TotalCost = row.TotalCost
+		stats.TotalCost = row.ActualCost
 		result[row.GroupID] = stats
 	}
 
-	// 2. 查询每个分组的今日用量
+	// 2. 查询每个分组的今日实扣
 	var todayRows []struct {
-		GroupID   int     `json:"group_usage_logs"`
-		TotalCost float64 `json:"total_cost"`
+		GroupID    int     `json:"group_usage_logs"`
+		ActualCost float64 `json:"actual_cost"`
 	}
 	err = s.db.UsageLog.Query().
 		Where(
@@ -255,14 +255,14 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 			entusagelog.CreatedAtGTE(todayStart),
 		).
 		GroupBy("group_usage_logs").
-		Aggregate(ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost")).
+		Aggregate(ent.As(ent.Sum(entusagelog.FieldActualCost), "actual_cost")).
 		Scan(ctx, &todayRows)
 	if err != nil {
 		return nil, err
 	}
 	for _, row := range todayRows {
 		stats := result[row.GroupID]
-		stats.TodayCost = row.TotalCost
+		stats.TodayCost = row.ActualCost
 		result[row.GroupID] = stats
 	}
 

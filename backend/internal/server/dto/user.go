@@ -8,6 +8,8 @@ type UserResp struct {
 	Balance               float64           `json:"balance"`
 	Role                  string            `json:"role"` // admin / user / api_key
 	MaxConcurrency        int               `json:"max_concurrency"`
+	CurrentConcurrency    int               `json:"current_concurrency"`         // 当前在途请求数（管理员列表）
+	CurrentRPM            int               `json:"current_rpm"`                 // 当前分钟请求数（管理员列表）
 	GroupRates            map[int64]float64 `json:"group_rates,omitempty"`       // 用户专属分组倍率
 	AllowedGroupIDs       []int64           `json:"allowed_group_ids,omitempty"` // 已分配的专属分组 ID
 	BalanceAlertThreshold float64           `json:"balance_alert_threshold"`

@@ -57,6 +57,17 @@ func channelMinuteKey(channelID int, minute int64) string {
 	return fmt.Sprintf("rpm:channel:%d:%d", channelID, minute)
 }
 
+// userMinuteKey 生成用户维度指定分钟窗口的 Redis key。
+// 前缀带 user: 段，与账号级 / 渠道级 key 的 ID 空间隔离。
+func userMinuteKey(userID int, minute int64) string {
+	return fmt.Sprintf("rpm:user:%d:%d", userID, minute)
+}
+
+// groupMinuteKey 生成分组维度指定分钟窗口的 Redis key。
+func groupMinuteKey(groupID int, minute int64) string {
+	return fmt.Sprintf("rpm:group:%d:%d", groupID, minute)
+}
+
 // incrementByKey 原子递增指定 key 的计数并续期，返回递增后的值。
 func (r *RPMCounter) incrementByKey(ctx context.Context, key string) (int, error) {
 	pipe := r.rdb.TxPipeline()
@@ -74,6 +85,87 @@ func (r *RPMCounter) IncrementRPM(ctx context.Context, accountID int) (int, erro
 		return 0, nil
 	}
 	return r.incrementByKey(ctx, r.getMinuteKey(ctx, accountID))
+}
+
+// IncrementUserRPM 递增用户当前分钟的请求计数（管理端观测口径，不做限流；
+// 计入所有已通过鉴权进入转发链路的请求，失败请求不回退）。
+func (r *RPMCounter) IncrementUserRPM(ctx context.Context, userID int) {
+	if r.rdb == nil {
+		return
+	}
+	_, _ = r.incrementByKey(ctx, userMinuteKey(userID, currentMinute()))
+}
+
+// IncrementGroupRPM 递增分组当前分钟的请求计数（管理端观测口径，不做限流；
+// 口径与 IncrementUserRPM 一致：已鉴权进入转发链路即计入，失败请求不回退）。
+func (r *RPMCounter) IncrementGroupRPM(ctx context.Context, groupID int) {
+	if r.rdb == nil {
+		return
+	}
+	_, _ = r.incrementByKey(ctx, groupMinuteKey(groupID, currentMinute()))
+}
+
+// GetGroupRPMs 批量获取多个分组当前分钟的请求计数（管理端观测用）。
+func (r *RPMCounter) GetGroupRPMs(ctx context.Context, groupIDs []int) map[int]int {
+	result := make(map[int]int, len(groupIDs))
+	if r.rdb == nil {
+		return result
+	}
+	minute := currentMinute()
+	pipe := r.rdb.Pipeline()
+	cmds := make(map[int]*redis.StringCmd, len(groupIDs))
+	for _, id := range groupIDs {
+		cmds[id] = pipe.Get(ctx, groupMinuteKey(id, minute))
+	}
+	_, _ = pipe.Exec(ctx)
+	for id, cmd := range cmds {
+		if n, err := cmd.Int(); err == nil {
+			result[id] = n
+		}
+	}
+	return result
+}
+
+// GetUserRPMs 批量获取多个用户当前分钟的请求计数（管理端观测用）。
+func (r *RPMCounter) GetUserRPMs(ctx context.Context, userIDs []int) map[int]int {
+	result := make(map[int]int, len(userIDs))
+	if r.rdb == nil {
+		return result
+	}
+	minute := currentMinute()
+	pipe := r.rdb.Pipeline()
+	cmds := make(map[int]*redis.StringCmd, len(userIDs))
+	for _, id := range userIDs {
+		cmds[id] = pipe.Get(ctx, userMinuteKey(id, minute))
+	}
+	_, _ = pipe.Exec(ctx)
+	for id, cmd := range cmds {
+		if n, err := cmd.Int(); err == nil {
+			result[id] = n
+		}
+	}
+	return result
+}
+
+// GetChannelRPMs 批量获取多个渠道当前分钟的请求计数（管理端观测用）。
+func (r *RPMCounter) GetChannelRPMs(ctx context.Context, channelIDs []int) map[int]int {
+	result := make(map[int]int, len(channelIDs))
+	if r.rdb == nil {
+		return result
+	}
+	minute := currentMinute()
+	pipe := r.rdb.Pipeline()
+	cmds := make(map[int]*redis.StringCmd, len(channelIDs))
+	for _, id := range channelIDs {
+		cmds[id] = pipe.Get(ctx, channelMinuteKey(id, minute))
+	}
+	_, _ = pipe.Exec(ctx)
+	for id, cmd := range cmds {
+		if n, err := cmd.Int(); err == nil {
+			result[id] = n
+		}
+	}
+	return result
 }
 
 // GetRPM 获取当前分钟的请求计数
