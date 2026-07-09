@@ -146,7 +146,7 @@ func TestParseUsage(t *testing.T) {
 			name: "Responses 结构（input/output_tokens_details）",
 			raw: `{"input_tokens":36,"input_tokens_details":{"cached_tokens":6},` +
 				`"output_tokens":87,"output_tokens_details":{"reasoning_tokens":12},"total_tokens":123}`,
-			want:  Usage{PromptTokens: 36, CompletionTokens: 87, CachedTokens: 6, ReasoningTokens: 12},
+			want:  Usage{PromptTokens: 36, CompletionTokens: 87, CachedTokens: 6},
 			found: true,
 		},
 		{
@@ -164,7 +164,7 @@ func TestParseUsage(t *testing.T) {
 		{
 			name:  "Responses reasoning 负值钳 0",
 			raw:   `{"input_tokens":10,"output_tokens":5,"output_tokens_details":{"reasoning_tokens":-3}}`,
-			want:  Usage{PromptTokens: 10, CompletionTokens: 5, ReasoningTokens: 0},
+			want:  Usage{PromptTokens: 10, CompletionTokens: 5},
 			found: true,
 		},
 		{
@@ -242,7 +242,7 @@ func TestExtractResponsesUsage(t *testing.T) {
 			data: `{"type":"response.completed","response":{"id":"resp_1","model":"gpt-4.1",` +
 				`"usage":{"input_tokens":36,"input_tokens_details":{"cached_tokens":6},` +
 				`"output_tokens":87,"output_tokens_details":{"reasoning_tokens":12},"total_tokens":123}}}`,
-			want:  Usage{PromptTokens: 36, CompletionTokens: 87, CachedTokens: 6, ReasoningTokens: 12},
+			want:  Usage{PromptTokens: 36, CompletionTokens: 87, CachedTokens: 6},
 			found: true,
 		},
 		{

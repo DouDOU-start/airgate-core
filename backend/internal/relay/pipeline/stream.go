@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 )
 
@@ -30,31 +31,38 @@ type streamResult struct {
 	firstTokenMs int64
 	// written 是否已向客户端写出过字节（含响应头）——写出后不可 failover。
 	written bool
-	// err 中途失败（上游读错误或客户端写错误）；已写出字节时只能终止。
+	// err 中途失败（上游读错误、客户端写错误或流内错误事件）；已写出字节时只能终止。
 	err error
-	// done 是否收到 data: [DONE] 完成标志。
+	// done 是否收到协议级完成信号：OpenAI 路径为 data: [DONE]；
+	// 观察器路径（anthropic/gemini 原生流）取 observer.Done()。
 	done bool
 }
 
-// relaySSE 把上游 SSE 流逐行透传给客户端，同时旁路捕获 usage chunk 与 first_token_ms。
+// relaySSE 把上游 SSE 流逐行透传给客户端，同时旁路捕获 usage 与 first_token_ms。
 //
 //   - 响应头：透传上游 Content-Type（缺省 text/event-stream），补 SSE 标准头；
-//   - 逐行写出并 Flush；
-//   - data: [DONE] → 完成标志；其余 data 行经 extractUsage 探测 usage（最后一个非空生效）——
-//     chat 用 dto.ExtractUsage（顶层 usage），responses 用 dto.ExtractResponsesUsage
-//     （completed 事件的 data.response.usage）；
-//   - forwardUsageChunk=false（客户端未显式请求 include_usage，注入系网关计费所需）
-//     时吞掉 usage-only chunk（choices 为空数组且带 usage），[DONE] 照常下发；
-//     responses 传 true——completed 事件是正常内容事件，全透传不吞；
+//   - 逐行写出并 Flush；bufio.Scanner 天然处理跨 read 边界的半行拼接；
 //   - first_token_ms 只在 isFirstContentLine 判为「首内容行」的 data 载荷行触发
 //     （注释行/event: 行/[DONE] 恒不算）——chat 传 chatFirstContentLine（任意 data 载荷
-//     即算，维持现状），responses 传 responsesFirstContentLine（仅 type 含 .delta 的内容
-//     增量事件才算，跳过 response.created 等 preamble 生命周期事件，避免 first_token 记成
-//     上游 ack 延迟）；
+//     即算），responses 传 responsesFirstContentLine（仅 .delta 内容增量事件），
+//     messages 传 anthropicFirstContentLine（仅 content_block_delta 事件）；
 //   - maxLineBytes 为 scanner 单行上限：chat 用 sseMaxLineBytes（8MB），responses 用
-//     sseMaxLineBytesResponses（64MB，容纳内嵌完整 response 的 completed 事件）；
-//   - bufio.Scanner 天然处理跨 read 边界的半行拼接。
-func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, extractUsage func([]byte) (dto.Usage, bool), forwardUsageChunk bool, isFirstContentLine func([]byte) bool, maxLineBytes int) streamResult {
+//     sseMaxLineBytesResponses（64MB，容纳内嵌完整 response 的 completed 事件）。
+//
+// 两种旁路捕获模式（纯透传架构下不存在任何翻译路径）：
+//
+//   - observer == nil（OpenAI 协议流）：data: [DONE] → 完成标志；其余 data 行经
+//     extractUsage 探测 usage（最后一个非空生效）——chat 用 dto.ExtractUsage（顶层
+//     usage），responses 用 dto.ExtractResponsesUsage（completed 事件的
+//     data.response.usage）；forwardUsageChunk=false（客户端未显式请求 include_usage，
+//     注入系网关计费所需）时吞掉 usage-only chunk（choices 空数组且带 usage），
+//     [DONE] 照常下发。
+//   - observer != nil（anthropic/gemini 原生协议流）：每行原样写出、无一被吞，
+//     观察器旁路解析 usage/完成信号/流内错误事件；extractUsage 与
+//     forwardUsageChunk 不参与。EOF 后 usage/done 取自观察器；观察器报错
+//     （流内 error 事件）时 result.err 置位——管线按流中断处理，
+//     不把截断响应伪装成完整。
+func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, extractUsage func([]byte) (dto.Usage, bool), forwardUsageChunk bool, isFirstContentLine func([]byte) bool, maxLineBytes int, observer adaptor.StreamObserver) streamResult {
 	result := streamResult{}
 
 	contentType := upstream.Header.Get("Content-Type")
@@ -72,11 +80,38 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 
 	flusher, _ := w.(http.Flusher)
 
+	// writeLine 写出一行（补行尾换行）并 Flush；返回 false 表示客户端写失败。
+	writeLine := func(line string) bool {
+		if _, err := io.WriteString(w, line+"\n"); err != nil {
+			result.err = err
+			return false
+		}
+		if flusher != nil {
+			flusher.Flush()
+		}
+		return true
+	}
+
 	scanner := bufio.NewScanner(upstream.Body)
 	scanner.Buffer(make([]byte, sseInitialBufSize), maxLineBytes)
 	for scanner.Scan() {
 		line := scanner.Text()
 
+		if observer != nil {
+			// 原生协议流：观察器旁路解析，行内容原样下发。
+			observer.ObserveLine(line)
+			if data, ok := extractSSEData(line); ok {
+				if result.firstTokenMs == 0 && isFirstContentLine([]byte(data)) {
+					result.firstTokenMs = time.Since(start).Milliseconds()
+				}
+			}
+			if !writeLine(line) {
+				break
+			}
+			continue
+		}
+
+		// OpenAI 协议流：内联捕获 usage 与 [DONE]。
 		if data, ok := extractSSEData(line); ok {
 			if data == "[DONE]" {
 				result.done = true
@@ -93,17 +128,23 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 				}
 			}
 		}
-
-		if _, err := io.WriteString(w, line+"\n"); err != nil {
-			result.err = err
-			return result
-		}
-		if flusher != nil {
-			flusher.Flush()
+		if !writeLine(line) {
+			break
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		result.err = err
+
+	if scanErr := scanner.Err(); scanErr != nil && result.err == nil {
+		result.err = scanErr
+	}
+	if observer != nil {
+		// 观察器结果回收：usage（中途断连时的计费兜底）、完成信号、流内错误事件。
+		if u, ok := observer.Usage(); ok {
+			result.usage = &u
+		}
+		result.done = observer.Done()
+		if oerr := observer.Err(); oerr != nil && result.err == nil {
+			result.err = oerr
+		}
 	}
 	return result
 }
@@ -125,7 +166,8 @@ func isUsageOnlyChunk(data []byte) bool {
 }
 
 // chatFirstContentLine chat 端点首内容行谓词：任意 data 载荷行即算首 token，
-// 维持既有口径（chat 流首个 chunk 即首个内容增量）。
+// 维持既有口径（chat 流首个 chunk 即首个内容增量）。gemini 流同用此谓词——
+// 每个 data 分片都是完整 JSON chunk（即内容增量），无 preamble 生命周期事件。
 func chatFirstContentLine([]byte) bool { return true }
 
 // responsesFirstContentLine Responses 端点首内容行谓词：仅内容增量事件算首 token。
@@ -142,6 +184,19 @@ func responsesFirstContentLine(data []byte) bool {
 		return false
 	}
 	return strings.HasSuffix(probe.Type, ".delta")
+}
+
+// anthropicFirstContentLine Anthropic Messages 流首内容行谓词：仅 content_block_delta
+// 内容增量事件算首 token——message_start 是上游 ack（早于生成），
+// content_block_start / ping 等生命周期事件同样跳过，避免 first_token 记成 ack 延迟。
+func anthropicFirstContentLine(data []byte) bool {
+	var probe struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return false
+	}
+	return probe.Type == "content_block_delta"
 }
 
 // extractSSEData 剥离 "data:" 前缀（容忍前缀后可选空格）；非 data 行返回 false。

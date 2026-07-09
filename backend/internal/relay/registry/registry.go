@@ -25,6 +25,41 @@ const (
 	StatusDisabledAuto   = "disabled_auto"
 )
 
+// 入口协议常量：纯透传网关不做跨协议翻译，Pick 只在与入口协议同构的渠道类型集合内调度。
+const (
+	ProtocolOpenAI    = "openai"
+	ProtocolAnthropic = "anthropic"
+	ProtocolGemini    = "gemini"
+)
+
+// protocolChannelTypes 入口协议 → 可路由渠道 Type 集合。
+// custom 语义为「OpenAI 兼容自定义渠道」，归 openai 协议组。
+var protocolChannelTypes = map[string]map[string]struct{}{
+	ProtocolOpenAI:    {"openai_compatible": {}, "custom": {}},
+	ProtocolAnthropic: {"anthropic": {}},
+	ProtocolGemini:    {"gemini": {}},
+}
+
+// channelTypesForProtocol 返回协议可路由的渠道类型集合；
+// 空串按 openai 兼容（历史调用方未显式传协议时的缺省）。
+func channelTypesForProtocol(protocol string) map[string]struct{} {
+	if protocol == "" {
+		protocol = ProtocolOpenAI
+	}
+	return protocolChannelTypes[protocol]
+}
+
+// protocolForChannelType 渠道 Type → 入口协议（protocolChannelTypes 的反向映射）；
+// 未知类型返回空串（不进模型目录）。
+func protocolForChannelType(chType string) string {
+	for proto, types := range protocolChannelTypes {
+		if _, ok := types[chType]; ok {
+			return proto
+		}
+	}
+	return ""
+}
+
 // ErrNoAvailableChannel 表示当前分组/模型下无可调度渠道。
 var ErrNoAvailableChannel = errors.New("无可用渠道")
 
@@ -54,9 +89,8 @@ type ChannelSnapshot struct {
 	// StatusUntil 429 冷却到期时间：非 nil 且未到期时不可调度。
 	StatusUntil *time.Time
 	// GroupIDs 绑定分组集合；空集合表示公共渠道，对所有分组可用。
-	GroupIDs     map[int]struct{}
-	TestModel    string
-	CustomConfig map[string]any
+	GroupIDs  map[int]struct{}
+	TestModel string
 }
 
 // available 判断快照当前是否可被调度。
@@ -176,20 +210,23 @@ func (r *Registry) ensureLoaded() {
 	}
 }
 
-// Pick 为指定分组与模型选择一个渠道：
+// Pick 为指定分组、模型与入口协议选择一个渠道：
 //
 //	候选 = status==enabled 且 (StatusUntil==nil || 已过期) 且模型命中
+//	       且渠道 Type 属于入口协议的同构类型集合（纯透传：不做跨协议翻译，
+//	       同一模型可同时存在于多协议渠道，Pick 只在协议匹配的集合内调度）
 //	       且分组命中（渠道 GroupIDs 为空 = 公共渠道）且不在 exclude 中
 //	→ 取最高 priority 档 → 档内按 weight+10 加权随机。
 //
-// 无候选返回 ErrNoAvailableChannel。
-func (r *Registry) Pick(groupID int, model string, exclude []int) (*ChannelSnapshot, error) {
+// protocol 为空串时按 openai 兼容。无候选返回 ErrNoAvailableChannel。
+func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*ChannelSnapshot, error) {
 	r.ensureLoaded()
 
 	excluded := make(map[int]struct{}, len(exclude))
 	for _, id := range exclude {
 		excluded[id] = struct{}{}
 	}
+	allowedTypes := channelTypesForProtocol(protocol)
 	now := time.Now()
 
 	r.mu.RLock()
@@ -200,6 +237,9 @@ func (r *Registry) Pick(groupID int, model string, exclude []int) (*ChannelSnaps
 	best := -1
 	for _, ch := range r.channels {
 		if _, skip := excluded[ch.ID]; skip {
+			continue
+		}
+		if _, ok := allowedTypes[ch.Type]; !ok {
 			continue
 		}
 		if !ch.available(now) {
@@ -242,11 +282,19 @@ func (r *Registry) Pick(groupID int, model string, exclude []int) (*ChannelSnaps
 	return tier[len(tier)-1], nil
 }
 
-// ModelsForGroup 返回指定分组可用渠道（status==enabled，含冷却中）的模型并集，按字典序。
-// 冷却是瞬态状态，不影响"该分组能用哪些模型"的目录语义。
-func (r *Registry) ModelsForGroup(groupID int) []string {
+// ModelEntry 模型目录条目：对外模型名 + 可经哪些入口协议调用（升序）。
+// 同一模型可能同时由多协议渠道供给（如 claude 系模型既有 anthropic 原生渠道
+// 又有 openai 兼容聚合渠道），第一方应用据 Protocols 选端点。
+type ModelEntry struct {
+	Name      string
+	Protocols []string
+}
+
+// ModelEntriesForGroup 返回指定分组可用渠道（status==enabled，含冷却中）的
+// 模型目录（含协议集合），按模型名字典序。冷却是瞬态状态，不影响目录语义。
+func (r *Registry) ModelEntriesForGroup(groupID int) []ModelEntry {
 	r.mu.RLock()
-	set := map[string]struct{}{}
+	set := map[string]map[string]struct{}{}
 	for _, ch := range r.channels {
 		if ch.Status != StatusEnabled {
 			continue
@@ -256,17 +304,39 @@ func (r *Registry) ModelsForGroup(groupID int) []string {
 				continue
 			}
 		}
+		proto := protocolForChannelType(ch.Type)
+		if proto == "" {
+			continue
+		}
 		for m := range ch.Models {
-			set[m] = struct{}{}
+			if set[m] == nil {
+				set[m] = map[string]struct{}{}
+			}
+			set[m][proto] = struct{}{}
 		}
 	}
 	r.mu.RUnlock()
 
-	models := make([]string, 0, len(set))
-	for m := range set {
-		models = append(models, m)
+	entries := make([]ModelEntry, 0, len(set))
+	for m, protos := range set {
+		ps := make([]string, 0, len(protos))
+		for p := range protos {
+			ps = append(ps, p)
+		}
+		sort.Strings(ps)
+		entries = append(entries, ModelEntry{Name: m, Protocols: ps})
 	}
-	sort.Strings(models)
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
+	return entries
+}
+
+// ModelsForGroup 返回指定分组可用模型名并集（不含协议维度），按字典序。
+func (r *Registry) ModelsForGroup(groupID int) []string {
+	entries := r.ModelEntriesForGroup(groupID)
+	models := make([]string, 0, len(entries))
+	for _, e := range entries {
+		models = append(models, e.Name)
+	}
 	return models
 }
 

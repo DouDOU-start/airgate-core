@@ -130,7 +130,7 @@ func TestRelaySSE(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			upstream := newSSEResponse(&chunkedReader{data: []byte(tc.body), chunkSize: tc.chunkSize})
-			result := relaySSE(w, upstream, time.Now(), dto.ExtractUsage, tc.forwardUsageChunk, chatFirstContentLine, sseMaxLineBytes)
+			result := relaySSE(w, upstream, time.Now(), dto.ExtractUsage, tc.forwardUsageChunk, chatFirstContentLine, sseMaxLineBytes, nil)
 
 			if result.err != nil {
 				t.Fatalf("relaySSE err = %v", result.err)
@@ -185,7 +185,7 @@ func TestRelaySSEFirstTokenOnlyOnDataLines(t *testing.T) {
 			``,
 		}, "\n")
 		w := httptest.NewRecorder()
-		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(), dto.ExtractUsage, true, chatFirstContentLine, sseMaxLineBytes)
+		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(), dto.ExtractUsage, true, chatFirstContentLine, sseMaxLineBytes, nil)
 		if result.firstTokenMs != 0 {
 			t.Errorf("firstTokenMs = %d, want 0（无真实 data 载荷）", result.firstTokenMs)
 		}
@@ -201,7 +201,7 @@ func TestRelaySSEFirstTokenOnlyOnDataLines(t *testing.T) {
 			``,
 		}, "\n")
 		w := httptest.NewRecorder()
-		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(), dto.ExtractUsage, true, chatFirstContentLine, sseMaxLineBytes)
+		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(), dto.ExtractUsage, true, chatFirstContentLine, sseMaxLineBytes, nil)
 		if result.firstTokenMs < 50 {
 			t.Errorf("firstTokenMs = %d, want >= 50（应由 data 行触发）", result.firstTokenMs)
 		}
@@ -255,7 +255,7 @@ func TestRelaySSEFirstTokenResponses(t *testing.T) {
 		}, "\n")
 		w := httptest.NewRecorder()
 		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(),
-			dto.ExtractResponsesUsage, true, responsesFirstContentLine, sseMaxLineBytesResponses)
+			dto.ExtractResponsesUsage, true, responsesFirstContentLine, sseMaxLineBytesResponses, nil)
 		if result.firstTokenMs < 50 {
 			t.Errorf("firstTokenMs = %d, want >= 50（应由 delta 行触发，非 created 行）", result.firstTokenMs)
 		}
@@ -272,7 +272,7 @@ func TestRelaySSEFirstTokenResponses(t *testing.T) {
 		}, "\n")
 		w := httptest.NewRecorder()
 		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(),
-			dto.ExtractResponsesUsage, true, responsesFirstContentLine, sseMaxLineBytesResponses)
+			dto.ExtractResponsesUsage, true, responsesFirstContentLine, sseMaxLineBytesResponses, nil)
 		if result.firstTokenMs != 0 {
 			t.Errorf("firstTokenMs = %d, want 0（无 delta 内容增量事件）", result.firstTokenMs)
 		}
@@ -290,7 +290,7 @@ func TestRelaySSEFirstTokenResponses(t *testing.T) {
 		}, "\n")
 		w := httptest.NewRecorder()
 		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(),
-			dto.ExtractUsage, true, chatFirstContentLine, sseMaxLineBytes)
+			dto.ExtractUsage, true, chatFirstContentLine, sseMaxLineBytes, nil)
 		if result.firstTokenMs < 50 {
 			t.Errorf("firstTokenMs = %d, want >= 50（chat 首个 data 行即记）", result.firstTokenMs)
 		}
@@ -311,7 +311,7 @@ func TestRelaySSEResponsesLargeCompletedEvent(t *testing.T) {
 	t.Run("responses 64MB 上限：completed 事件不截断，usage 捕获", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), time.Now(),
-			dto.ExtractResponsesUsage, true, responsesFirstContentLine, sseMaxLineBytesResponses)
+			dto.ExtractResponsesUsage, true, responsesFirstContentLine, sseMaxLineBytesResponses, nil)
 		if result.err != nil {
 			t.Fatalf("relaySSE err = %v（64MB 上限不应报 ErrTooLong）", result.err)
 		}
@@ -323,7 +323,7 @@ func TestRelaySSEResponsesLargeCompletedEvent(t *testing.T) {
 	t.Run("chat 8MB 上限：超限报 ErrTooLong", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), time.Now(),
-			dto.ExtractUsage, true, chatFirstContentLine, sseMaxLineBytes)
+			dto.ExtractUsage, true, chatFirstContentLine, sseMaxLineBytes, nil)
 		if !errors.Is(result.err, bufio.ErrTooLong) {
 			t.Errorf("err = %v, want bufio.ErrTooLong（chat 维持 8MB 上限）", result.err)
 		}
@@ -374,4 +374,139 @@ func TestExtractSSEData(t *testing.T) {
 			}
 		})
 	}
+}
+
+// fakeObserver 供 relaySSE 观察器路径（原生协议流透传）测试：记录观察到的行，
+// 可注入 usage/err/done。
+type fakeObserver struct {
+	seen  []string
+	usage *dto.Usage
+	err   error
+	done  bool
+}
+
+func (f *fakeObserver) ObserveLine(line string) { f.seen = append(f.seen, line) }
+func (f *fakeObserver) Usage() (dto.Usage, bool) {
+	if f.usage == nil {
+		return dto.Usage{}, false
+	}
+	return *f.usage, true
+}
+func (f *fakeObserver) Err() error { return f.err }
+func (f *fakeObserver) Done() bool { return f.done }
+
+// 观察器路径为纯透传：上游字节逐行原样下发（无一被吞、不注入任何行），
+// 观察器旁路看到每一行；usage/done 取自观察器。
+func TestRelaySSEObserverPassthrough(t *testing.T) {
+	upstream := strings.Join([]string{
+		`event: message_start`,
+		`data: {"type":"message_start","message":{"usage":{"input_tokens":10}}}`,
+		``,
+		`data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}`,
+		``,
+		`data: {"type":"message_stop"}`,
+		``,
+	}, "\n")
+	obs := &fakeObserver{usage: &dto.Usage{PromptTokens: 10, CompletionTokens: 5}, done: true}
+
+	w := httptest.NewRecorder()
+	sr := relaySSE(w, newSSEResponse(strings.NewReader(upstream)), time.Now(),
+		dto.ExtractUsage, false, anthropicFirstContentLine, sseMaxLineBytes, obs)
+
+	if sr.err != nil {
+		t.Fatalf("err = %v", sr.err)
+	}
+	// 输入以换行结尾，scanner 产出 6 行，逐行补 \n 后与输入逐字节一致。
+	if got := w.Body.String(); got != upstream {
+		t.Errorf("透传体不一致:\ngot  %q\nwant %q", got, upstream)
+	}
+	if len(obs.seen) != 6 {
+		t.Errorf("观察行数 = %d, want 6（含 event/空行）", len(obs.seen))
+	}
+	if sr.usage == nil || sr.usage.PromptTokens != 10 || sr.usage.CompletionTokens != 5 {
+		t.Errorf("usage = %+v, want 取自观察器", sr.usage)
+	}
+	if !sr.done {
+		t.Error("done 应取自观察器 Done()")
+	}
+}
+
+// 上游中途断连（scanner 未 EOF 干净）：观察器已累积 usage 须兜底取回，不记 0。
+func TestRelaySSEObserverInterruptUsesAccumulatedUsage(t *testing.T) {
+	obs := &fakeObserver{usage: &dto.Usage{PromptTokens: 100, CompletionTokens: 5}}
+	body := &errAfterReader{data: []byte("data: {\"type\":\"content_block_delta\"}\n")}
+	w := httptest.NewRecorder()
+	sr := relaySSE(w, newSSEResponse(body), time.Now(),
+		dto.ExtractUsage, false, anthropicFirstContentLine, sseMaxLineBytes, obs)
+
+	if sr.err == nil {
+		t.Fatal("expected scanner error")
+	}
+	if sr.usage == nil || sr.usage.PromptTokens != 100 {
+		t.Errorf("usage = %+v, want accumulated prompt=100 (interrupt fallback)", sr.usage)
+	}
+	if sr.done {
+		t.Error("中断流不得标记完成")
+	}
+}
+
+// 流内 error 事件：观察器 Err() 非 nil → relaySSE 置 result.err、done=false
+// （截断响应不伪装成完整），错误事件本身已原样透传给客户端。
+func TestRelaySSEObserverErrorEventAborts(t *testing.T) {
+	upstream := `data: {"type":"error","error":{"type":"overloaded_error","message":"overloaded"}}` + "\n"
+	obs := &fakeObserver{err: errors.New("overloaded"), usage: &dto.Usage{PromptTokens: 10}}
+	w := httptest.NewRecorder()
+	sr := relaySSE(w, newSSEResponse(strings.NewReader(upstream)), time.Now(),
+		dto.ExtractUsage, false, anthropicFirstContentLine, sseMaxLineBytes, obs)
+
+	if sr.err == nil {
+		t.Fatal("expected result.err from observer.Err()")
+	}
+	if sr.done {
+		t.Error("done should be false (error event)")
+	}
+	if !strings.Contains(w.Body.String(), "overloaded_error") {
+		t.Errorf("错误事件应原样透传给客户端: %q", w.Body.String())
+	}
+	if sr.usage == nil || sr.usage.PromptTokens != 10 {
+		t.Errorf("usage fallback = %+v, want prompt=10", sr.usage)
+	}
+}
+
+// TestAnthropicFirstContentLine Anthropic 流首内容行谓词：仅 content_block_delta 算首 token。
+func TestAnthropicFirstContentLine(t *testing.T) {
+	cases := []struct {
+		name string
+		data string
+		want bool
+	}{
+		{"content_block_delta", `{"type":"content_block_delta","delta":{"type":"text_delta","text":"hi"}}`, true},
+		{"message_start", `{"type":"message_start","message":{}}`, false},
+		{"content_block_start", `{"type":"content_block_start"}`, false},
+		{"ping", `{"type":"ping"}`, false},
+		{"message_stop", `{"type":"message_stop"}`, false},
+		{"非 JSON", `not-json`, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := anthropicFirstContentLine([]byte(tc.data)); got != tc.want {
+				t.Errorf("anthropicFirstContentLine(%q) = %v, want %v", tc.data, got, tc.want)
+			}
+		})
+	}
+}
+
+// errAfterReader 读完 data 后返回错误（模拟传输中断，非干净 EOF）。
+type errAfterReader struct {
+	data []byte
+	off  int
+}
+
+func (r *errAfterReader) Read(p []byte) (int, error) {
+	if r.off >= len(r.data) {
+		return 0, errors.New("connection reset")
+	}
+	n := copy(p, r.data[r.off:])
+	r.off += n
+	return n, nil
 }

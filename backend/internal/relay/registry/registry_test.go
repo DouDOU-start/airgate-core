@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -94,10 +95,12 @@ func TestRegistryPick(t *testing.T) {
 		snaps   []ChannelSnapshot
 		groupID int
 		model   string
-		exclude []int
-		randN   int // randFn 固定返回值
-		wantID  int
-		wantErr error
+		// protocol 入口协议；空串按 openai 兼容（Pick 缺省语义）。
+		protocol string
+		exclude  []int
+		randN    int // randFn 固定返回值
+		wantID   int
+		wantErr  error
 	}{
 		{
 			name:    "无任何渠道",
@@ -203,6 +206,65 @@ func TestRegistryPick(t *testing.T) {
 			randN:  10,
 			wantID: 2,
 		},
+		// ===== 协议维度过滤（纯透传：同模型跨协议渠道不串台） =====
+		{
+			name: "openai 协议只命中 openai_compatible 渠道（同模型 anthropic 渠道被过滤）",
+			snaps: []ChannelSnapshot{
+				snap(1, func(s *ChannelSnapshot) { s.Type = "anthropic"; s.Priority = 99 }),
+				snap(2), // openai_compatible
+			},
+			model:    "gpt-4o",
+			protocol: ProtocolOpenAI,
+			wantID:   2,
+		},
+		{
+			name: "anthropic 协议只命中 anthropic 渠道（同模型 openai 渠道被过滤）",
+			snaps: []ChannelSnapshot{
+				snap(1, func(s *ChannelSnapshot) { s.Priority = 99 }), // openai_compatible
+				snap(2, func(s *ChannelSnapshot) { s.Type = "anthropic" }),
+			},
+			model:    "gpt-4o",
+			protocol: ProtocolAnthropic,
+			wantID:   2,
+		},
+		{
+			name: "gemini 协议只命中 gemini 渠道",
+			snaps: []ChannelSnapshot{
+				snap(1, func(s *ChannelSnapshot) { s.Type = "anthropic" }),
+				snap(2, func(s *ChannelSnapshot) { s.Type = "gemini" }),
+				snap(3), // openai_compatible
+			},
+			model:    "gpt-4o",
+			protocol: ProtocolGemini,
+			wantID:   2,
+		},
+		{
+			name: "custom 渠道归 openai 协议组",
+			snaps: []ChannelSnapshot{
+				snap(1, func(s *ChannelSnapshot) { s.Type = "custom" }),
+			},
+			model:    "gpt-4o",
+			protocol: ProtocolOpenAI,
+			wantID:   1,
+		},
+		{
+			name: "协议无匹配渠道类型时无可用渠道",
+			snaps: []ChannelSnapshot{
+				snap(1), // openai_compatible
+			},
+			model:    "gpt-4o",
+			protocol: ProtocolAnthropic,
+			wantErr:  ErrNoAvailableChannel,
+		},
+		{
+			name: "空协议按 openai 兼容",
+			snaps: []ChannelSnapshot{
+				snap(1, func(s *ChannelSnapshot) { s.Type = "anthropic" }),
+				snap(2),
+			},
+			model:  "gpt-4o",
+			wantID: 2,
+		},
 	}
 
 	for _, tc := range cases {
@@ -211,7 +273,7 @@ func TestRegistryPick(t *testing.T) {
 			// 固定随机源；Pick 档内按 ID 排序，随机值区间可精确断言。
 			r.randFn = func(int) int { return tc.randN }
 
-			got, err := r.Pick(tc.groupID, tc.model, tc.exclude)
+			got, err := r.Pick(tc.groupID, tc.model, tc.protocol, tc.exclude)
 			if tc.wantErr != nil {
 				if !errors.Is(err, tc.wantErr) {
 					t.Fatalf("期望错误 %v，实际 %v", tc.wantErr, err)
@@ -239,7 +301,7 @@ func TestRegistryPickWeighted(t *testing.T) {
 	counts := map[int]int{}
 	for n := 0; n < 110; n++ {
 		r.randFn = func(int) int { return n }
-		got, err := r.Pick(0, "gpt-4o", nil)
+		got, err := r.Pick(0, "gpt-4o", ProtocolOpenAI, nil)
 		if err != nil {
 			t.Fatalf("Pick 失败: %v", err)
 		}
@@ -280,7 +342,7 @@ func TestRegistryMarkCooldown(t *testing.T) {
 	r.MarkCooldown(1, until)
 
 	// 内存即时生效：冷却期间不可被 Pick。
-	if _, err := r.Pick(0, "gpt-4o", nil); !errors.Is(err, ErrNoAvailableChannel) {
+	if _, err := r.Pick(0, "gpt-4o", ProtocolOpenAI, nil); !errors.Is(err, ErrNoAvailableChannel) {
 		t.Fatalf("冷却中渠道仍被选中，err=%v", err)
 	}
 
@@ -295,7 +357,7 @@ func TestRegistryMarkAutoDisabledAndRecovered(t *testing.T) {
 	r := newTestRegistry(t, persister, snap(1))
 
 	r.MarkAutoDisabled(1, "invalid_api_key")
-	if _, err := r.Pick(0, "gpt-4o", nil); !errors.Is(err, ErrNoAvailableChannel) {
+	if _, err := r.Pick(0, "gpt-4o", ProtocolOpenAI, nil); !errors.Is(err, ErrNoAvailableChannel) {
 		t.Fatalf("自动禁用后渠道仍被选中，err=%v", err)
 	}
 	call := persister.waitOne(t)
@@ -304,7 +366,7 @@ func TestRegistryMarkAutoDisabledAndRecovered(t *testing.T) {
 	}
 
 	r.MarkRecovered(1)
-	if got, err := r.Pick(0, "gpt-4o", nil); err != nil || got.ID != 1 {
+	if got, err := r.Pick(0, "gpt-4o", ProtocolOpenAI, nil); err != nil || got.ID != 1 {
 		t.Fatalf("恢复后应可选中渠道 1，got=%v err=%v", got, err)
 	}
 	call = persister.waitOne(t)
@@ -321,7 +383,7 @@ func TestRegistryMarkRecoveredSkipsManualDisabled(t *testing.T) {
 
 	// 手动禁用渠道不被 MarkRecovered 恢复，也不应触发落库。
 	r.MarkRecovered(1)
-	if _, err := r.Pick(0, "gpt-4o", nil); !errors.Is(err, ErrNoAvailableChannel) {
+	if _, err := r.Pick(0, "gpt-4o", ProtocolOpenAI, nil); !errors.Is(err, ErrNoAvailableChannel) {
 		t.Fatalf("手动禁用渠道被错误恢复，err=%v", err)
 	}
 	select {
@@ -460,7 +522,7 @@ func TestRegistryPickLazyReload(t *testing.T) {
 	}
 
 	// DB 仍不可用：Pick 惰性尝试一次后仍无可用渠道。
-	if _, err := r.Pick(0, "gpt-4o", nil); !errors.Is(err, ErrNoAvailableChannel) {
+	if _, err := r.Pick(0, "gpt-4o", ProtocolOpenAI, nil); !errors.Is(err, ErrNoAvailableChannel) {
 		t.Fatalf("Pick err = %v, want ErrNoAvailableChannel", err)
 	}
 	if loader.loadCount() != 2 { // 启动一次 + 惰性一次
@@ -468,7 +530,7 @@ func TestRegistryPickLazyReload(t *testing.T) {
 	}
 
 	// 节流窗口内不重复打 DB。
-	if _, err := r.Pick(0, "gpt-4o", nil); !errors.Is(err, ErrNoAvailableChannel) {
+	if _, err := r.Pick(0, "gpt-4o", ProtocolOpenAI, nil); !errors.Is(err, ErrNoAvailableChannel) {
 		t.Fatalf("Pick err = %v", err)
 	}
 	if loader.loadCount() != 2 {
@@ -478,17 +540,59 @@ func TestRegistryPickLazyReload(t *testing.T) {
 	// DB 恢复：Pick 惰性重载成功，无需任何管理员写操作。
 	loader.set([]ChannelSnapshot{snap(1)}, nil)
 	r.resetLazyThrottle()
-	ch, err := r.Pick(0, "gpt-4o", nil)
+	ch, err := r.Pick(0, "gpt-4o", ProtocolOpenAI, nil)
 	if err != nil || ch.ID != 1 {
 		t.Fatalf("Pick = (%+v, %v), want 渠道 1", ch, err)
 	}
 
 	// 已加载成功：后续 Pick 不再触发惰性重载。
 	r.resetLazyThrottle()
-	if _, err := r.Pick(0, "gpt-4o", nil); err != nil {
+	if _, err := r.Pick(0, "gpt-4o", ProtocolOpenAI, nil); err != nil {
 		t.Fatalf("Pick err = %v", err)
 	}
 	if loader.loadCount() != 3 {
 		t.Errorf("加载成功后仍触发惰性重载: 次数 = %d, want 3", loader.loadCount())
+	}
+}
+
+func TestModelEntriesForGroupAggregatesProtocols(t *testing.T) {
+	r := newTestRegistry(t, nil,
+		// claude-sonnet 同时由 anthropic 原生渠道与 openai 兼容聚合渠道供给
+		snap(1, func(s *ChannelSnapshot) {
+			s.Type = "anthropic"
+			s.Models = map[string]struct{}{"claude-sonnet": {}}
+		}),
+		snap(2, func(s *ChannelSnapshot) {
+			s.Models = map[string]struct{}{"claude-sonnet": {}, "gpt-4o": {}}
+		}),
+		snap(3, func(s *ChannelSnapshot) {
+			s.Type = "gemini"
+			s.Models = map[string]struct{}{"gemini-2.5-pro": {}}
+		}),
+		// 停用渠道不进目录
+		snap(4, func(s *ChannelSnapshot) {
+			s.Status = StatusDisabledManual
+			s.Models = map[string]struct{}{"disabled-model": {}}
+		}),
+	)
+
+	entries := r.ModelEntriesForGroup(0)
+	got := map[string][]string{}
+	for _, e := range entries {
+		got[e.Name] = e.Protocols
+	}
+
+	want := map[string][]string{
+		"claude-sonnet":  {"anthropic", "openai"},
+		"gpt-4o":         {"openai"},
+		"gemini-2.5-pro": {"gemini"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("模型目录条数 = %d, 期望 %d（%v）", len(got), len(want), got)
+	}
+	for name, protos := range want {
+		if !slices.Equal(got[name], protos) {
+			t.Fatalf("模型 %s 协议 = %v, 期望 %v", name, got[name], protos)
+		}
 	}
 }

@@ -116,9 +116,9 @@ type Usage struct {
 	// （Anthropic usage.cache_creation.ephemeral_5m/1h_input_tokens）；OpenAI 上游恒 0。
 	CacheCreation5mTokens int
 	CacheCreation1hTokens int
-	// ReasoningTokens 推理 token 数（Responses output_tokens_details.reasoning_tokens）。
-	// 不单独计费（已含于 CompletionTokens），仅落账用于展示/统计。
-	ReasoningTokens int
+	// Calls 按次计费的计次数：图像端点由 adaptor 从响应 data/predictions 数组长度提取
+	//（产出张数）；其余端点恒 0，计费侧（pricing.ComputeCosts）把 0 视为 1 次。
+	Calls int
 }
 
 // usageWire usage 字段的双协议命名兼容解析载体。
@@ -132,14 +132,10 @@ type usageWire struct {
 
 	// OpenAI Responses 风格（input_tokens/output_tokens + details 子对象）。
 	// 计数字段 input_tokens/output_tokens 与 Anthropic 同名，复用下方回退候选，
-	// 仅 details 子对象命名不同（cached_tokens 在 input_tokens_details、
-	// reasoning_tokens 在 output_tokens_details）。
+	// 仅 details 子对象命名不同（cached_tokens 在 input_tokens_details）。
 	InputTokensDetails *struct {
 		CachedTokens *int `json:"cached_tokens"`
 	} `json:"input_tokens_details"`
-	OutputTokensDetails *struct {
-		ReasoningTokens *int `json:"reasoning_tokens"`
-	} `json:"output_tokens_details"`
 
 	// Anthropic 风格（缺省回退）
 	InputTokens              *int `json:"input_tokens"`
@@ -192,13 +188,6 @@ func ParseUsage(raw []byte) (Usage, bool) {
 	if w.CacheCreation != nil {
 		u.CacheCreation5mTokens = pick(w.CacheCreation.Ephemeral5mInputTokens)
 		u.CacheCreation1hTokens = pick(w.CacheCreation.Ephemeral1hInputTokens)
-	}
-
-	// reasoning 已含于 output/completion，不叠加计费也不影响 found 判定；负值钳 0。
-	if w.OutputTokensDetails != nil && w.OutputTokensDetails.ReasoningTokens != nil {
-		if r := *w.OutputTokensDetails.ReasoningTokens; r > 0 {
-			u.ReasoningTokens = r
-		}
 	}
 
 	if !found {
