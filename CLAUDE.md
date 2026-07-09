@@ -6,25 +6,29 @@
 
 ## 架构（本分支）
 
-无插件进程、无上游账号池。管理员配置**渠道**（channel = 协议类型 + base_url + api_keys + 模型列表），用户拿 sk- key 调统一 API，core 内置 adaptor 直发上游、按**模型价目表**计费。
+无插件进程、无上游账号池。管理员配置**渠道**（channel = 协议类型 + base_url + api_keys + 模型列表），用户拿 sk- key 按协议调对应端点，core 内置 adaptor **纯透传直发**上游（零翻译）、按**模型价目表**计费。入站端点按协议分树，只路由到同协议渠道：
 
 ```
-请求（/v1/chat/completions 等，middleware.APIKeyAuth 鉴权）
+请求（middleware.APIKeyAuth 鉴权，入站按协议分树：
+      openai    → POST /v1/chat/completions、/v1/responses、/v1/images/{generations|edits}（openai_compatible/custom 渠道）
+      anthropic → POST /v1/messages、/v1/messages/count_tokens※（anthropic 渠道）
+      gemini    → POST /v1beta/models/{model}:generateContent|:streamGenerateContent|:predict|:countTokens※（gemini 渠道）
+      ※ countTokens 两端点零计费；images/predict 在 per_request_price>0 时按次×产出张数计费）
   → internal/relay/pipeline：余额预检 → user/key 并发闸门 → failover≤3
-      { registry.Pick(分组,模型)（priority 分档 + weight+10 加权随机 + 多 key 轮询）
-        → adaptor 直发 HTTP → outcome 判定（429 冷却 / 401·关键词自动禁用 / 5xx 换渠道）}
+      { registry.Pick(分组,模型,协议)（协议过滤 + priority 分档 + weight+10 加权随机 + 多 key 轮询）
+        → adaptor 透传直发 HTTP → outcome 判定（429 冷却 / 401·关键词自动禁用 / 5xx 换渠道）}
   → relay/pricing（token×价目表）→ billing.Calculate 三管道 → recorder → usage_log
 ```
 
 ## 子系统边界
 
-- `internal/relay/registry` — 渠道内存快照与调度（Pick/NextKey/Mark*）；禁止 import ent 与 app 包，经 Loader/Persister 接口（由 channel service 实现）取数落库。
-- `internal/relay/adaptor` — 协议适配（openai_compatible/anthropic/gemini/custom）；**只做协议翻译+发请求+解响应**，调度/重试/禁用/计费一律在 pipeline。
-- `internal/relay/pipeline` — 转发主循环、outcome 判定、SSE、错误体（OpenAI 形态，errfmt.go）、gateway settings 读取。
+- `internal/relay/registry` — 渠道内存快照与调度（Pick/NextKey/Mark*，Pick 按入口协议过滤渠道 Type）；禁止 import ent 与 app 包，经 Loader/Persister 接口（由 channel service 实现）取数落库。
+- `internal/relay/adaptor` — 协议适配（openai_compatible/anthropic/gemini/custom），**零翻译纯透传**：只做上游 URL 拼接、认证头、渠道模型名重写、param_override、各协议响应的 usage 提取归一化（计量不是翻译，须精确保留）；请求/响应体原样透传，不做任何跨协议翻译；调度/重试/禁用/计费一律在 pipeline。
+- `internal/relay/pipeline` — 转发主循环、outcome 判定、SSE 透传（原生协议流经透传型 usage 观察器旁路计量）、错误体（按入口协议原生形态，errfmt 分发）、gateway settings 读取。
+- `internal/relay/errfmt` — 网关自产错误的协议形态渲染（openai/anthropic/gemini），pipeline 与鉴权中间件共用；上游错误一律原样透传不经此包。
 - `internal/relay/pricing` — 价目表缓存 + token→cost 纯函数。
 - `internal/billing` — 三管道计费（actual=total×billing_rate 扣余额；billed=total×sell_rate 累加 key 用量；account_cost 列=total×channel.cost_ratio 渠道成本统计）与异步记账。
 - `internal/scheduler` — 仅剩 ConcurrencyManager/RPMCounter（Redis 限流原语，渠道/用户/key 维度）。
-- `internal/asset` — 运行时资产存储（自原插件包迁入）。
 
 ## 🚫 红线（本分支仍然有效）
 
@@ -32,7 +36,7 @@
 - **改 `ent/schema/` 后须 `make ent` 并提交生成代码**；生成代码不可手改。
 - **装配两处接线**：`internal/bootstrap/http_handlers.go`（store→service→handler）+ `internal/server/router.go` `registerRoutes()`。
 - **新接口走 dto + mapper**，handler 勿手拼 map 响应。
-- **/v1 转发路由错误一律走 relay 的 OpenAI 错误体**（errfmt），不用 `response.*`；管理面照旧 `response.*`。
+- **转发路由（/v1、/v1beta）错误一律按入口协议的原生错误形态**（`internal/relay/errfmt` 按 EntryProtocol 分发：openai/anthropic/gemini），不用 `response.*`；上游错误原样透传；管理面照旧 `response.*`。
 - **渠道 api_keys 明文永不出现在任何 API 响应**（只出 count + 尾 4 位 hint）；加解密用 `internal/auth`（AES-256-GCM），在 service 层做。
 - 复用优先（新领域参照 channel/proxy 全链路）；注释中文；`_test.go` 同包、表驱动。
 - 需求/架构变更**先改 `../standalone-gateway-plan.md` 再改代码**。
