@@ -1,7 +1,7 @@
 import { get, post, put, del } from './client';
 import type {
   ChannelResp, CreateChannelReq, UpdateChannelReq,
-  TestChannelReq, TestChannelResp, FetchChannelModelsResp,
+  TestChannelReq, TestChannelResp, FetchChannelModelsResp, RefreshChannelBalanceResp,
   FetchChannelModelsPreviewReq,
   BulkUpdateChannelsReq, BulkUpdateChannelsResp,
   ChannelListQuery, PagedData,
@@ -13,7 +13,10 @@ export const channelsApi = {
   create: (data: CreateChannelReq) => post<ChannelResp>('/api/v1/admin/channels', data),
   update: (id: number, data: UpdateChannelReq) => put<ChannelResp>(`/api/v1/admin/channels/${id}`, data),
   delete: (id: number) => del<void>(`/api/v1/admin/channels/${id}`),
-  test: (id: number, data?: TestChannelReq) => post<TestChannelResp>(`/api/v1/admin/channels/${id}/test`, data ?? {}),
+  test: (id: number, data?: TestChannelReq, options?: { signal?: AbortSignal }) =>
+    post<TestChannelResp>(`/api/v1/admin/channels/${id}/test`, data ?? {}, options),
+  refreshBalance: (id: number, options?: { signal?: AbortSignal }) =>
+    post<RefreshChannelBalanceResp>(`/api/v1/admin/channels/${id}/balance`, {}, options),
   fetchModels: (id: number) => post<FetchChannelModelsResp>(`/api/v1/admin/channels/${id}/fetch-models`),
   // 预览拉取：渠道未保存时按表单连接参数试拉模型
   fetchModelsPreview: (data: FetchChannelModelsPreviewReq) =>

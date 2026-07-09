@@ -17,4 +17,6 @@ var (
 	ErrTestFailed = errors.New("渠道测试失败")
 	// ErrModelFetchFailed 表示拉取上游模型列表失败。
 	ErrModelFetchFailed = errors.New("拉取模型列表失败")
+	// ErrBalanceFetchFailed 表示查询上游余额失败（所有 key 均失败）。
+	ErrBalanceFetchFailed = errors.New("查询余额失败")
 )

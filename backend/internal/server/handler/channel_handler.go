@@ -26,12 +26,14 @@ func (h *ChannelHandler) handleError(logMessage, publicMessage string, err error
 		return 404, err.Error()
 	case errors.Is(err, appchannel.ErrInvalidReference),
 		errors.Is(err, appchannel.ErrInvalidBulkAction),
-		errors.Is(err, appchannel.ErrNoAPIKey):
+		errors.Is(err, appchannel.ErrNoAPIKey),
+		errors.Is(err, appchannel.ErrBalanceUnsupported):
 		return 400, err.Error()
 	case errors.Is(err, appchannel.ErrTesterNotReady):
 		return 503, err.Error()
 	case errors.Is(err, appchannel.ErrTestFailed),
-		errors.Is(err, appchannel.ErrModelFetchFailed):
+		errors.Is(err, appchannel.ErrModelFetchFailed),
+		errors.Is(err, appchannel.ErrBalanceFetchFailed):
 		return 502, err.Error()
 	default:
 		slog.Error(logMessage, "error", err)

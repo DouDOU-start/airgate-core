@@ -11,6 +11,7 @@ import (
 	entchannel "github.com/DouDOU-start/airgate-core/ent/channel"
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
+	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	appchannel "github.com/DouDOU-start/airgate-core/internal/app/channel"
 )
 
@@ -92,12 +93,17 @@ func (s *ChannelStore) FindByID(ctx context.Context, id int) (appchannel.Channel
 
 // Create 创建渠道。
 func (s *ChannelStore) Create(ctx context.Context, input appchannel.CreateInput) (appchannel.Channel, error) {
+	// models 可空（创建时允许不配模型），归一为空切片避免 JSON 列落 null。
+	models := input.Models
+	if models == nil {
+		models = []string{}
+	}
 	builder := s.db.Channel.Create().
 		SetName(input.Name).
 		SetType(entchannel.Type(input.Type)).
 		SetBaseURL(input.BaseURL).
 		SetAPIKeys(input.APIKeys).
-		SetModels(input.Models).
+		SetModels(models).
 		SetNillablePriority(input.Priority).
 		SetNillableWeight(input.Weight).
 		SetNillableMaxConcurrency(input.MaxConcurrency).
@@ -121,9 +127,6 @@ func (s *ChannelStore) Create(ctx context.Context, input appchannel.CreateInput)
 	}
 	if input.TestModel != "" {
 		builder = builder.SetTestModel(input.TestModel)
-	}
-	if input.CustomConfig != nil {
-		builder = builder.SetCustomConfig(input.CustomConfig)
 	}
 	if len(input.GroupIDs) > 0 {
 		builder = builder.AddGroupIDs(input.GroupIDs...)
@@ -179,9 +182,6 @@ func (s *ChannelStore) Update(ctx context.Context, id int, input appchannel.Upda
 	}
 	if input.Tags != nil {
 		builder = builder.SetTags(input.Tags)
-	}
-	if input.CustomConfig != nil {
-		builder = builder.SetCustomConfig(input.CustomConfig)
 	}
 	if input.GroupIDs != nil {
 		builder = builder.ClearGroups().AddGroupIDs(input.GroupIDs...)
@@ -278,6 +278,55 @@ func (s *ChannelStore) UpdateTestResult(ctx context.Context, id int, responseTim
 	return nil
 }
 
+// UpdateBalance 记录渠道余额刷新结果。
+func (s *ChannelStore) UpdateBalance(ctx context.Context, id int, balance float64, updatedAt time.Time) error {
+	err := s.db.Channel.UpdateOneID(id).
+		SetBalance(balance).
+		SetBalanceUpdatedAt(updatedAt).
+		Exec(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return appchannel.ErrChannelNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+// GetChannelMoneyStats 按渠道聚合累计金额（实现 appchannel.StatsReader）：
+// 成本 = Σ(total_cost × account_rate_multiplier)（渠道成本查询期现算，见 usagelog schema），
+// 收益 = Σ(actual_cost)（平台对用户的真实扣费）。
+func (s *ChannelStore) GetChannelMoneyStats(ctx context.Context, channelIDs []int) (map[int]appchannel.MoneyStats, error) {
+	result := make(map[int]appchannel.MoneyStats, len(channelIDs))
+	if len(channelIDs) == 0 {
+		return result, nil
+	}
+	var rows []struct {
+		ChannelID int     `json:"channel_usage_logs"`
+		Cost      float64 `json:"cost"`
+		Revenue   float64 `json:"revenue"`
+	}
+	err := s.db.UsageLog.Query().
+		Where(entusagelog.ChannelIDIn(channelIDs...)).
+		GroupBy(entusagelog.ChannelColumn).
+		Aggregate(
+			ent.As(func(sel *sql.Selector) string {
+				return "COALESCE(SUM(" + sel.C(entusagelog.FieldTotalCost) + " * " + sel.C(entusagelog.FieldAccountRateMultiplier) + "), 0)"
+			}, "cost"),
+			ent.As(func(sel *sql.Selector) string {
+				return "COALESCE(SUM(" + sel.C(entusagelog.FieldActualCost) + "), 0)"
+			}, "revenue"),
+		).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.ChannelID] = appchannel.MoneyStats{Cost: row.Cost, Revenue: row.Revenue}
+	}
+	return result, nil
+}
+
 func mapChannelList(items []*ent.Channel) []appchannel.Channel {
 	result := make([]appchannel.Channel, 0, len(items))
 	for _, item := range items {
@@ -288,31 +337,32 @@ func mapChannelList(items []*ent.Channel) []appchannel.Channel {
 
 func mapChannel(item *ent.Channel) appchannel.Channel {
 	ch := appchannel.Channel{
-		ID:             item.ID,
-		Name:           item.Name,
-		Type:           item.Type.String(),
-		BaseURL:        item.BaseURL,
-		APIKeys:        item.APIKeys,
-		Models:         item.Models,
-		ModelMapping:   item.ModelMapping,
-		ParamOverride:  item.ParamOverride,
-		HeaderOverride: item.HeaderOverride,
-		Status:         item.Status.String(),
-		StatusUntil:    item.StatusUntil,
-		ErrorMsg:       item.ErrorMsg,
-		Priority:       item.Priority,
-		Weight:         item.Weight,
-		MaxConcurrency: item.MaxConcurrency,
-		MaxRPM:         item.MaxRpm,
-		CostRatio:      item.CostRatio,
-		Tags:           item.Tags,
-		TestModel:      item.TestModel,
-		CustomConfig:   item.CustomConfig,
-		ResponseTimeMs: item.ResponseTimeMs,
-		TestedAt:       item.TestedAt,
-		LastUsedAt:     item.LastUsedAt,
-		CreatedAt:      item.CreatedAt,
-		UpdatedAt:      item.UpdatedAt,
+		ID:               item.ID,
+		Name:             item.Name,
+		Type:             item.Type.String(),
+		BaseURL:          item.BaseURL,
+		APIKeys:          item.APIKeys,
+		Models:           item.Models,
+		ModelMapping:     item.ModelMapping,
+		ParamOverride:    item.ParamOverride,
+		HeaderOverride:   item.HeaderOverride,
+		Status:           item.Status.String(),
+		StatusUntil:      item.StatusUntil,
+		ErrorMsg:         item.ErrorMsg,
+		Priority:         item.Priority,
+		Weight:           item.Weight,
+		MaxConcurrency:   item.MaxConcurrency,
+		MaxRPM:           item.MaxRpm,
+		CostRatio:        item.CostRatio,
+		Tags:             item.Tags,
+		TestModel:        item.TestModel,
+		ResponseTimeMs:   item.ResponseTimeMs,
+		TestedAt:         item.TestedAt,
+		Balance:          item.Balance,
+		BalanceUpdatedAt: item.BalanceUpdatedAt,
+		LastUsedAt:       item.LastUsedAt,
+		CreatedAt:        item.CreatedAt,
+		UpdatedAt:        item.UpdatedAt,
 	}
 	if groups, err := item.Edges.GroupsOrErr(); err == nil {
 		ch.GroupIDs = make([]int, 0, len(groups))

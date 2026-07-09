@@ -2,6 +2,7 @@ package channel
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ type stubRepo struct {
 	findByID         func(ctx context.Context, id int) (Channel, error)
 	updateState      func(ctx context.Context, id int, status string, until *time.Time, errMsg string) error
 	updateTestResult func(ctx context.Context, id int, responseTimeMs int, testedAt time.Time) error
+	updateBalance    func(ctx context.Context, id int, balance float64, updatedAt time.Time) error
 }
 
 func (s *stubRepo) List(context.Context, ListFilter) ([]Channel, int64, error) { return nil, 0, nil }
@@ -39,11 +41,19 @@ func (s *stubRepo) UpdateTestResult(ctx context.Context, id int, responseTimeMs 
 	}
 	return s.updateTestResult(ctx, id, responseTimeMs, testedAt)
 }
+func (s *stubRepo) UpdateBalance(ctx context.Context, id int, balance float64, updatedAt time.Time) error {
+	if s.updateBalance == nil {
+		return nil
+	}
+	return s.updateBalance(ctx, id, balance, updatedAt)
+}
 
 // stubTester 恒成功的渠道测试器。
 type stubTester struct{ latency int }
 
-func (s stubTester) Test(context.Context, Channel, string) (int, error) { return s.latency, nil }
+func (s stubTester) Test(context.Context, Channel, string, string) (int, error) {
+	return s.latency, nil
+}
 
 // TestTestRecoverRereadsCurrentStatus 测试成功恢复前重读当前状态：
 // 30s 测试窗口内管理员改为手动禁用时，不得凭测前快照恢复覆盖手动操作。
@@ -104,7 +114,7 @@ func TestTestRecoverRereadsCurrentStatus(t *testing.T) {
 			svc := NewService(repo, "test-secret-test-secret-test-32b")
 			svc.SetTester(stubTester{latency: 12})
 
-			latency, err := svc.Test(context.Background(), 1, "gpt-4o")
+			latency, err := svc.Test(context.Background(), 1, "gpt-4o", "")
 			if err != nil {
 				t.Fatalf("Test err = %v", err)
 			}
@@ -120,15 +130,26 @@ func TestTestRecoverRereadsCurrentStatus(t *testing.T) {
 
 // stubFetcher 记录收到的参数。
 type stubFetcher struct {
-	gotBaseURL string
-	gotAPIKey  string
-	models     []string
+	gotBaseURL  string
+	gotAPIKey   string
+	models      []string
+	balance     float64
+	balanceErr  error
+	balanceKeys []string // 每次 FetchBalance 收到的 key（验证多 key 求和）
 }
 
 func (s *stubFetcher) FetchModels(_ context.Context, _, baseURL, apiKey string) ([]string, error) {
 	s.gotBaseURL = baseURL
 	s.gotAPIKey = apiKey
 	return s.models, nil
+}
+
+func (s *stubFetcher) FetchBalance(_ context.Context, _, _, apiKey string) (float64, error) {
+	s.balanceKeys = append(s.balanceKeys, apiKey)
+	if s.balanceErr != nil {
+		return 0, s.balanceErr
+	}
+	return s.balance, nil
 }
 
 // TestFetchModelsDelegatesToFetcher fetch-models 解密渠道首个 API Key 后委托拉取器。
@@ -166,5 +187,60 @@ func TestFetchModelsDelegatesToFetcher(t *testing.T) {
 	}
 	if fetcher.gotAPIKey != "sk-upstream" {
 		t.Errorf("apiKey = %q, want 解密后的明文", fetcher.gotAPIKey)
+	}
+}
+
+// TestRefreshBalanceSumsAcrossKeys 多 key 渠道余额求和并落库。
+func TestRefreshBalanceSumsAcrossKeys(t *testing.T) {
+	const secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	k1, _ := auth.EncryptAPIKey("sk-1", secret)
+	k2, _ := auth.EncryptAPIKey("sk-2", secret)
+
+	var persisted float64
+	repo := &stubRepo{
+		findByID: func(_ context.Context, id int) (Channel, error) {
+			return Channel{ID: id, Type: "openai_compatible", BaseURL: "https://x", APIKeys: []string{k1, k2}}, nil
+		},
+		updateBalance: func(_ context.Context, _ int, balance float64, _ time.Time) error {
+			persisted = balance
+			return nil
+		},
+	}
+	svc := NewService(repo, secret)
+	fetcher := &stubFetcher{balance: 30} // 每 key $30
+	svc.fetcher = fetcher
+
+	bal, updatedAt, err := svc.RefreshBalance(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("RefreshBalance err = %v", err)
+	}
+	if bal != 60 {
+		t.Errorf("balance = %v, want 60 (2 keys × 30)", bal)
+	}
+	if len(fetcher.balanceKeys) != 2 {
+		t.Errorf("queried %d keys, want 2", len(fetcher.balanceKeys))
+	}
+	if persisted != 60 {
+		t.Errorf("persisted = %v, want 60", persisted)
+	}
+	if updatedAt == nil {
+		t.Error("updatedAt nil")
+	}
+}
+
+// TestRefreshBalanceUnsupportedShortCircuits 不支持类型直接透传 ErrBalanceUnsupported。
+func TestRefreshBalanceUnsupportedShortCircuits(t *testing.T) {
+	const secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	k1, _ := auth.EncryptAPIKey("sk-1", secret)
+	repo := &stubRepo{
+		findByID: func(_ context.Context, id int) (Channel, error) {
+			return Channel{ID: id, Type: "anthropic", BaseURL: "https://x", APIKeys: []string{k1}}, nil
+		},
+	}
+	svc := NewService(repo, secret)
+	svc.fetcher = &stubFetcher{balanceErr: ErrBalanceUnsupported}
+
+	if _, _, err := svc.RefreshBalance(context.Background(), 1); !errors.Is(err, ErrBalanceUnsupported) {
+		t.Errorf("err = %v, want ErrBalanceUnsupported", err)
 	}
 }

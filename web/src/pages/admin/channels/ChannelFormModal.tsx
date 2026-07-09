@@ -1,11 +1,10 @@
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   Button, Checkbox, Input, Label, ListBox, Modal, Select, Spinner,
   TextArea, TextField as HeroTextField, useOverlayState,
 } from '@heroui/react';
-import { DownloadCloud, Plus, X } from 'lucide-react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { channelsApi } from '../../../shared/api/channels';
 import { groupsApi } from '../../../shared/api/groups';
@@ -13,6 +12,7 @@ import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
 import { queryKeys } from '../../../shared/queryKeys';
 import { useToast } from '../../../shared/ui';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
+import { TagInput, KeyValueEditor, kvRowsToRecord, recordToKVRows, type KVRow } from './editors';
 import type {
   ChannelResp, ChannelType, CreateChannelReq, UpdateChannelReq,
 } from '../../../shared/types';
@@ -22,103 +22,7 @@ export const CHANNEL_TYPE_OPTIONS: Array<{ id: ChannelType; label: string }> = [
   { id: 'openai_compatible', label: 'OpenAI Compatible' },
   { id: 'anthropic', label: 'Anthropic' },
   { id: 'gemini', label: 'Gemini' },
-  { id: 'custom', label: 'Custom' },
 ];
-
-// ==================== 标签输入（models / tags 共用） ====================
-
-function TagInput({
-  ariaLabel,
-  placeholder,
-  value,
-  onChange,
-}: {
-  ariaLabel: string;
-  placeholder?: string;
-  value: string[];
-  onChange: (next: string[]) => void;
-}) {
-  const [draft, setDraft] = useState('');
-
-  function commit(raw: string) {
-    // 支持一次粘贴多个（逗号/换行/空白分隔），去重后追加
-    const parts = raw.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
-    if (parts.length === 0) return;
-    const next = [...value];
-    for (const part of parts) {
-      if (!next.includes(part)) next.push(part);
-    }
-    onChange(next);
-    setDraft('');
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault();
-      commit(draft);
-      return;
-    }
-    if (event.key === 'Backspace' && draft === '' && value.length > 0) {
-      onChange(value.slice(0, -1));
-    }
-  }
-
-  return (
-    <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-[var(--field-radius)] border border-border bg-transparent px-2.5 py-1.5">
-      {value.map((tag) => (
-        <span
-          key={tag}
-          className="inline-flex items-center gap-1 rounded-md bg-accent-soft px-1.5 py-0.5 font-mono text-xs text-accent-soft-foreground"
-        >
-          <span className="max-w-[240px] truncate" title={tag}>{tag}</span>
-          <button
-            aria-label={`remove ${tag}`}
-            className="shrink-0 opacity-70 hover:opacity-100"
-            type="button"
-            onClick={() => onChange(value.filter((item) => item !== tag))}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </span>
-      ))}
-      <input
-        aria-label={ariaLabel}
-        className="min-w-[160px] flex-1 bg-transparent py-0.5 text-sm text-text outline-none placeholder:text-text-tertiary"
-        placeholder={placeholder}
-        value={draft}
-        onBlur={() => commit(draft)}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-    </div>
-  );
-}
-
-// ==================== 键值对行编辑器（模型映射 / 参数覆写 / Header 覆写共用） ====================
-
-interface KVRow {
-  key: string;
-  value: string;
-}
-
-// kvRowsToRecord 行 → 对象：键去首尾空白，空键行忽略；重复键后者覆盖前者。
-function kvRowsToRecord(rows: KVRow[], mapValue: (raw: string) => unknown = (raw) => raw): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const row of rows) {
-    const key = row.key.trim();
-    if (!key) continue;
-    result[key] = mapValue(row.value);
-  }
-  return result;
-}
-
-// recordToKVRows 对象 → 行：非字符串值序列化为 JSON 文本回显。
-function recordToKVRows(record: Record<string, unknown> | null | undefined): KVRow[] {
-  return Object.entries(record ?? {}).map(([key, value]) => ({
-    key,
-    value: typeof value === 'string' ? value : JSON.stringify(value),
-  }));
-}
 
 // parseParamValue 参数覆写值智能解析：能按 JSON 解析的（数字/布尔/对象/带引号字符串）
 // 用解析结果，否则按原样字符串——管理员填 0.7 得到数字，填 gpt-4o 得到字符串。
@@ -132,114 +36,24 @@ function parseParamValue(raw: string): unknown {
   }
 }
 
-function KeyValueEditor({
-  ariaLabel,
-  keyPlaceholder,
-  valuePlaceholder,
-  rows,
-  onChange,
-}: {
-  ariaLabel: string;
-  keyPlaceholder: string;
-  valuePlaceholder: string;
-  rows: KVRow[];
-  onChange: (next: KVRow[]) => void;
-}) {
-  const { t } = useTranslation();
-
-  function updateRow(index: number, patch: Partial<KVRow>) {
-    onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  }
-
-  return (
-    <div className="space-y-1.5">
-      {rows.map((row, index) => (
-        // 行无稳定业务主键，索引即身份（增删只在尾部/原位），用 index 作 key 可接受
-        <div key={index} className="flex items-center gap-2">
-          <Input
-            aria-label={`${ariaLabel} key`}
-            className="flex-1 font-mono text-xs"
-            placeholder={keyPlaceholder}
-            value={row.key}
-            onChange={(event) => updateRow(index, { key: event.target.value })}
-          />
-          <Input
-            aria-label={`${ariaLabel} value`}
-            className="flex-1 font-mono text-xs"
-            placeholder={valuePlaceholder}
-            value={row.value}
-            onChange={(event) => updateRow(index, { value: event.target.value })}
-          />
-          <Button
-            isIconOnly
-            aria-label={t('common.delete')}
-            size="sm"
-            variant="ghost"
-            onPress={() => onChange(rows.filter((_, i) => i !== index))}
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      ))}
-      <Button size="sm" variant="secondary" onPress={() => onChange([...rows, { key: '', value: '' }])}>
-        <Plus className="h-3.5 w-3.5" />
-        {t('channels.add_row')}
-      </Button>
-    </div>
-  );
-}
-
-// ==================== JSON 文本域（提交前 JSON.parse 校验，报错标红） ====================
-
-function JsonField({
-  error,
-  label,
-  placeholder,
-  value,
-  onChange,
-}: {
-  error?: string;
-  label: string;
-  placeholder?: string;
-  value: string;
-  onChange: (next: string) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <Label>{label}</Label>
-      <TextArea
-        aria-label={label}
-        className={`w-full font-mono text-xs leading-5${error ? ' border-danger' : ''}`}
-        placeholder={placeholder}
-        rows={3}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {error ? <p className="text-xs text-danger">{error}</p> : null}
-    </div>
-  );
-}
-
 // ==================== 表单状态 ====================
 
+// 模型清单 / 模型映射在「模型」弹窗（ChannelTestModal）管理，表单不承载：
+// 创建时模型可空（渠道不会被调度命中），建后再配。
 interface ChannelForm {
   name: string;
   type: ChannelType;
   base_url: string;
   apiKeysText: string;
-  models: string[];
-  mappingRows: KVRow[];
   paramSetRows: KVRow[];
   paramRemoveKeys: string[];
   headerRows: KVRow[];
-  customConfigText: string;
   groupIds: number[];
   priority: string;
   weight: string;
   maxConcurrency: string;
   maxRpm: string;
   costRatio: string;
-  testModel: string;
   tags: string[];
 }
 
@@ -249,26 +63,17 @@ const emptyForm: ChannelForm = {
   type: 'openai_compatible',
   base_url: '',
   apiKeysText: '',
-  models: [],
-  mappingRows: [],
   paramSetRows: [],
   paramRemoveKeys: [],
   headerRows: [],
-  customConfigText: '',
   groupIds: [],
   priority: '50',
   weight: '10',
   maxConcurrency: '0',
   maxRpm: '0',
   costRatio: '1',
-  testModel: '',
   tags: [],
 };
-
-function stringifyJson(value: Record<string, unknown> | Record<string, string> | null | undefined): string {
-  if (!value || Object.keys(value).length === 0) return '';
-  return JSON.stringify(value, null, 2);
-}
 
 function formFromChannel(channel: ChannelResp): ChannelForm {
   // param_override 语义：值为 null 表示转发时删除该参数，其余为覆盖写入。
@@ -278,37 +83,17 @@ function formFromChannel(channel: ChannelResp): ChannelForm {
     type: channel.type,
     base_url: channel.base_url,
     apiKeysText: '',
-    models: channel.models ?? [],
-    mappingRows: recordToKVRows(channel.model_mapping),
     paramSetRows: recordToKVRows(Object.fromEntries(paramEntries.filter(([, v]) => v !== null))),
     paramRemoveKeys: paramEntries.filter(([, v]) => v === null).map(([k]) => k),
     headerRows: recordToKVRows(channel.header_override),
-    customConfigText: stringifyJson(channel.custom_config),
     groupIds: channel.group_ids ?? [],
     priority: String(channel.priority),
     weight: String(channel.weight),
     maxConcurrency: String(channel.max_concurrency),
     maxRpm: String(channel.max_rpm),
     costRatio: String(channel.cost_ratio),
-    testModel: channel.test_model,
     tags: channel.tags ?? [],
   };
-}
-
-// 解析 JSON 对象字段；空串返回 {}（更新语义：提供空集合 = 整组替换清空）
-function parseJsonObject(text: string, stringValues: boolean): Record<string, unknown> {
-  const trimmed = text.trim();
-  if (!trimmed) return {};
-  const parsed: unknown = JSON.parse(trimmed);
-  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('not an object');
-  }
-  if (stringValues) {
-    for (const value of Object.values(parsed as Record<string, unknown>)) {
-      if (typeof value !== 'string') throw new Error('values must be strings');
-    }
-  }
-  return parsed as Record<string, unknown>;
 }
 
 interface ChannelFormModalProps {
@@ -321,14 +106,12 @@ export function ChannelFormModal({ channel, open, onClose }: ChannelFormModalPro
   const { t } = useTranslation();
   const { toast } = useToast();
   const [form, setForm] = useState<ChannelForm>(emptyForm);
-  const [jsonErrors, setJsonErrors] = useState<Record<string, string>>({});
   const isEdit = !!channel;
 
   // 打开时按 创建/编辑 初始化表单
   useEffect(() => {
     if (!open) return;
     setForm(channel ? formFromChannel(channel) : emptyForm);
-    setJsonErrors({});
   }, [open, channel]);
 
   const { data: groupsData } = useQuery({
@@ -351,25 +134,6 @@ export function ChannelFormModal({ channel, open, onClose }: ChannelFormModalPro
     onSuccess: () => onClose(),
   });
 
-  // 拉取上游模型列表回填。表单里填了新 key（或创建态）时按表单连接参数预览拉取，
-  // 无需先保存渠道；编辑态未填新 key 则按渠道 ID 用库里已存密钥拉取。
-  const firstTypedKey = form.apiKeysText.split('\n').map((line) => line.trim()).find(Boolean) ?? '';
-  const canFetchModels = form.base_url.trim() !== '' && (isEdit || firstTypedKey !== '');
-  const fetchModelsMutation = useMutation({
-    mutationFn: () => (firstTypedKey
-      ? channelsApi.fetchModelsPreview({
-          type: form.type,
-          base_url: form.base_url.trim(),
-          api_key: firstTypedKey,
-        })
-      : channelsApi.fetchModels(channel!.id)),
-    onSuccess: (resp) => {
-      setForm((prev) => ({ ...prev, models: resp.models }));
-      toast('success', t('channels.fetch_models_success', { count: resp.models.length }));
-    },
-    onError: (err: Error) => toast('error', err.message),
-  });
-
   function set<K extends keyof ChannelForm>(key: K, value: ChannelForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -384,19 +148,7 @@ export function ChannelFormModal({ channel, open, onClose }: ChannelFormModalPro
   }
 
   function handleSubmit() {
-    // 仅剩 custom_config 是 JSON 域（custom 类型的声明式接入，面向高级用户）。
-    const nextErrors: Record<string, string> = {};
-    let customConfig: Record<string, unknown> = {};
-    try {
-      customConfig = parseJsonObject(form.customConfigText, false);
-    } catch {
-      nextErrors.custom_config = t('channels.json_invalid');
-    }
-    setJsonErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
-
     // 行编辑器 → 后端对象：删除参数按 value=null 语义合并进 param_override。
-    const modelMapping = kvRowsToRecord(form.mappingRows) as Record<string, string>;
     const paramOverride: Record<string, unknown> = kvRowsToRecord(form.paramSetRows, parseParamValue);
     for (const key of form.paramRemoveKeys) {
       const trimmed = key.trim();
@@ -407,10 +159,6 @@ export function ChannelFormModal({ channel, open, onClose }: ChannelFormModalPro
     const apiKeys = form.apiKeysText.split('\n').map((line) => line.trim()).filter(Boolean);
     if (!form.name.trim() || !form.base_url.trim()) {
       toast('error', t('common.fill_required'));
-      return;
-    }
-    if (form.models.length === 0) {
-      toast('error', t('channels.models_required'));
       return;
     }
     if (!isEdit && apiKeys.length === 0) {
@@ -426,17 +174,15 @@ export function ChannelFormModal({ channel, open, onClose }: ChannelFormModalPro
       cost_ratio: Number(form.costRatio) || 0,
     };
 
+    // models / model_mapping 由「模型与测试」弹窗维护，
+    // 编辑载荷不携带（后端 partial 语义：缺省 = 不改），避免互相覆盖。
     const shared = {
       name: form.name.trim(),
       type: form.type,
       base_url: form.base_url.trim(),
-      models: form.models,
-      model_mapping: modelMapping,
       param_override: paramOverride,
       header_override: headerOverride,
-      custom_config: customConfig,
       tags: form.tags,
-      test_model: form.testModel.trim(),
       group_ids: form.groupIds,
       ...numbers,
     };
@@ -544,41 +290,8 @@ export function ChannelFormModal({ channel, open, onClose }: ChannelFormModalPro
                   <p className="text-xs text-text-tertiary">{t('channels.api_keys_hint')}</p>
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label>{t('channels.models')}</Label>
-                    <Button
-                      isDisabled={!canFetchModels || fetchModelsMutation.isPending}
-                      size="sm"
-                      variant="secondary"
-                      onPress={() => fetchModelsMutation.mutate()}
-                    >
-                      {fetchModelsMutation.isPending ? <Spinner size="sm" /> : <DownloadCloud className="h-3.5 w-3.5" />}
-                      {t('channels.fetch_models')}
-                    </Button>
-                  </div>
-                  <TagInput
-                    ariaLabel={t('channels.models')}
-                    placeholder={t('channels.models_placeholder')}
-                    value={form.models}
-                    onChange={(models) => set('models', models)}
-                  />
-                  {!isEdit && !canFetchModels ? (
-                    <p className="text-xs text-text-tertiary">{t('channels.fetch_models_create_hint')}</p>
-                  ) : null}
-                </div>
-
-                <div className="space-y-1">
-                  <Label>{t('channels.model_mapping')}</Label>
-                  <p className="text-xs text-text-tertiary">{t('channels.model_mapping_hint')}</p>
-                  <KeyValueEditor
-                    ariaLabel={t('channels.model_mapping')}
-                    keyPlaceholder={t('channels.mapping_from_placeholder')}
-                    valuePlaceholder={t('channels.mapping_to_placeholder')}
-                    rows={form.mappingRows}
-                    onChange={(rows) => set('mappingRows', rows)}
-                  />
-                </div>
+                {/* 模型清单/映射不在表单承载（创建可空），指引到渠道列表「模型」弹窗 */}
+                <p className="text-xs text-text-tertiary">{t('channels.models_in_test_modal_hint')}</p>
 
                 <div className="space-y-1">
                   <Label>{t('channels.param_override')}</Label>
@@ -615,16 +328,6 @@ export function ChannelFormModal({ channel, open, onClose }: ChannelFormModalPro
                   />
                 </div>
 
-                {form.type === 'custom' ? (
-                  <JsonField
-                    error={jsonErrors.custom_config}
-                    label={t('channels.custom_config')}
-                    placeholder={'{ }'}
-                    value={form.customConfigText}
-                    onChange={(text) => set('customConfigText', text)}
-                  />
-                ) : null}
-
                 <div className="space-y-1">
                   <Label>{t('channels.groups')}</Label>
                   <p className="text-xs text-text-tertiary">{t('channels.groups_hint')}</p>
@@ -646,18 +349,6 @@ export function ChannelFormModal({ channel, open, onClose }: ChannelFormModalPro
                       ))}
                     </div>
                   )}
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <HeroTextField fullWidth>
-                    <Label>{t('channels.test_model')}</Label>
-                    <Input
-                      autoComplete="off"
-                      placeholder={t('channels.test_model_placeholder')}
-                      value={form.testModel}
-                      onChange={(event) => set('testModel', event.target.value)}
-                    />
-                  </HeroTextField>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-5">

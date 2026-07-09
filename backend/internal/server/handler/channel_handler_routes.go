@@ -66,7 +66,6 @@ func (h *ChannelHandler) CreateChannel(c *gin.Context) {
 		CostRatio:      req.CostRatio,
 		Tags:           req.Tags,
 		TestModel:      req.TestModel,
-		CustomConfig:   req.CustomConfig,
 		GroupIDs:       req.GroupIDs,
 	})
 	if err != nil {
@@ -109,7 +108,6 @@ func (h *ChannelHandler) UpdateChannel(c *gin.Context) {
 		CostRatio:      req.CostRatio,
 		Tags:           req.Tags,
 		TestModel:      req.TestModel,
-		CustomConfig:   req.CustomConfig,
 		GroupIDs:       req.GroupIDs,
 	})
 	if err != nil {
@@ -152,7 +150,7 @@ func (h *ChannelHandler) TestChannel(c *gin.Context) {
 		return
 	}
 
-	latencyMs, err := h.service.Test(c.Request.Context(), id, req.Model)
+	latencyMs, err := h.service.Test(c.Request.Context(), id, req.Model, req.Endpoint)
 	if err != nil {
 		httpCode, message := h.handleError("测试渠道失败", "测试失败", err)
 		response.Error(c, httpCode, httpCode, message)
@@ -181,6 +179,27 @@ func (h *ChannelHandler) FetchChannelModels(c *gin.Context) {
 	}
 
 	response.Success(c, dto.FetchChannelModelsResp{Models: models})
+}
+
+// RefreshChannelBalance 经渠道 key 查询上游余额并落库（仅 openai_compatible 中转站可查）。
+func (h *ChannelHandler) RefreshChannelBalance(c *gin.Context) {
+	id, err := parseChannelID(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "无效的渠道 ID")
+		return
+	}
+
+	balance, updatedAt, err := h.service.RefreshBalance(c.Request.Context(), id)
+	if err != nil {
+		httpCode, message := h.handleError("刷新渠道余额失败", "刷新失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	response.Success(c, dto.RefreshChannelBalanceResp{
+		Balance:          balance,
+		BalanceUpdatedAt: updatedAt,
+	})
 }
 
 // FetchChannelModelsPreview 按表单连接参数预览拉取模型列表（渠道未保存时使用）。

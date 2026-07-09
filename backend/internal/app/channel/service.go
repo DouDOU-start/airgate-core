@@ -2,6 +2,7 @@ package channel
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -20,21 +21,37 @@ type Reloader interface {
 // Tester 渠道连通性测试接口：走完整 relay adaptor 链路发起一次真实请求。
 // 本棒（P1 第一棒）不提供实现，由 relay 管线落地后注入。
 type Tester interface {
-	Test(ctx context.Context, ch Channel, model string) (latencyMs int, err error)
+	// endpoint 仅对 openai 协议渠道生效（chat_completions / responses，空值默认前者）。
+	Test(ctx context.Context, ch Channel, model, endpoint string) (latencyMs int, err error)
 }
 
-// ModelFetcher 上游模型列表拉取接口。
+// ModelFetcher 上游拉取接口：模型列表与账户余额。
 type ModelFetcher interface {
 	FetchModels(ctx context.Context, channelType, baseURL, apiKey string) ([]string, error)
+	// FetchBalance 经 key 查上游余额（USD）；不支持的渠道类型返回 ErrBalanceUnsupported。
+	FetchBalance(ctx context.Context, channelType, baseURL, apiKey string) (float64, error)
+}
+
+// ConcurrencyReader 渠道在途并发数批量读取（由 scheduler.ConcurrencyManager 实现）。
+type ConcurrencyReader interface {
+	GetChannelCurrentCounts(ctx context.Context, channelIDs []int) map[int]int
+}
+
+// RPMReader 渠道当前分钟 RPM 批量读取（由 scheduler.RPMCounter 实现）。
+type RPMReader interface {
+	GetChannelRPMs(ctx context.Context, channelIDs []int) map[int]int
 }
 
 // Service 提供渠道域用例编排。
 type Service struct {
-	repo     Repository
-	secret   string
-	reloader Reloader
-	tester   Tester
-	fetcher  ModelFetcher
+	repo        Repository
+	secret      string
+	reloader    Reloader
+	tester      Tester
+	fetcher     ModelFetcher
+	concurrency ConcurrencyReader
+	rpm         RPMReader
+	stats       StatsReader
 }
 
 // NewService 创建渠道服务。secret 为 API Key 加密密钥（注入仿 apikey service）。
@@ -56,6 +73,19 @@ func (s *Service) SetTester(tester Tester) {
 	s.tester = tester
 }
 
+// SetRuntimeStatsReaders 注入运行时指标读取器（server 装配阶段调用；nil 安全，
+// 未注入时列表指标保持 0 值）。
+func (s *Service) SetRuntimeStatsReaders(concurrency ConcurrencyReader, rpm RPMReader) {
+	s.concurrency = concurrency
+	s.rpm = rpm
+}
+
+// SetStatsReader 注入渠道金额聚合读取器（server 装配阶段调用；nil 安全，
+// 未注入时列表成本/收益保持 0 值）。
+func (s *Service) SetStatsReader(stats StatsReader) {
+	s.stats = stats
+}
+
 // List 查询渠道列表。
 func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, error) {
 	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
@@ -69,12 +99,58 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 	for i := range list {
 		s.decorate(&list[i])
 	}
+	s.attachRuntimeStats(ctx, list)
+	s.attachMoneyStats(ctx, list)
 	return ListResult{
 		List:     list,
 		Total:    total,
 		Page:     page,
 		PageSize: pageSize,
 	}, nil
+}
+
+// attachMoneyStats 为列表页渠道批量填充累计成本/收益（基于 usage_logs 聚合）。
+// 读取器未注入或查询失败时保持 0 值，不影响列表主流程。
+func (s *Service) attachMoneyStats(ctx context.Context, list []Channel) {
+	if s.stats == nil || len(list) == 0 {
+		return
+	}
+	ids := make([]int, len(list))
+	for i, ch := range list {
+		ids[i] = ch.ID
+	}
+	stats, err := s.stats.GetChannelMoneyStats(ctx, ids)
+	if err != nil {
+		sdk.LoggerFromContext(ctx).Warn("channel_money_stats_failed", sdk.LogFieldError, err)
+		return
+	}
+	for i := range list {
+		list[i].TotalCost = stats[list[i].ID].Cost
+		list[i].TotalRevenue = stats[list[i].ID].Revenue
+	}
+}
+
+// attachRuntimeStats 为列表页渠道批量填充运行时观测指标（在途并发 / 当前分钟 RPM）。
+// 读取器未注入或 Redis 不可用时保持 0 值，不影响列表主流程。
+func (s *Service) attachRuntimeStats(ctx context.Context, list []Channel) {
+	if len(list) == 0 {
+		return
+	}
+	ids := make([]int, len(list))
+	for i, ch := range list {
+		ids[i] = ch.ID
+	}
+	var counts, rpms map[int]int
+	if s.concurrency != nil {
+		counts = s.concurrency.GetChannelCurrentCounts(ctx, ids)
+	}
+	if s.rpm != nil {
+		rpms = s.rpm.GetChannelRPMs(ctx, ids)
+	}
+	for i := range list {
+		list[i].CurrentConcurrency = counts[list[i].ID]
+		list[i].CurrentRPM = rpms[list[i].ID]
+	}
 }
 
 // Create 创建渠道：api_keys 在本层逐元素加密后落库。
@@ -170,7 +246,7 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) (int, e
 
 // Test 测试渠道连通性：走 relay adaptor 链路发一次真实请求。
 // 成功后记录响应耗时；若渠道处于 disabled_auto 则恢复 enabled 并清 error_msg。
-func (s *Service) Test(ctx context.Context, id int, model string) (int, error) {
+func (s *Service) Test(ctx context.Context, id int, model, endpoint string) (int, error) {
 	logger := sdk.LoggerFromContext(ctx)
 
 	ch, err := s.repo.FindByID(ctx, id)
@@ -188,7 +264,7 @@ func (s *Service) Test(ctx context.Context, id int, model string) (int, error) {
 		model = ch.Models[0]
 	}
 
-	latency, err := s.tester.Test(ctx, ch, model)
+	latency, err := s.tester.Test(ctx, ch, model, endpoint)
 	if err != nil {
 		logger.Warn("channel_test_failed", "channel_id", id, "model", model, sdk.LogFieldError, err)
 		return 0, fmt.Errorf("%w: %v", ErrTestFailed, err)
@@ -217,7 +293,7 @@ func (s *Service) Test(ctx context.Context, id int, model string) (int, error) {
 	return latency, nil
 }
 
-// FetchModels 从上游拉取模型列表（用渠道第一个 API Key）。
+// FetchModels 从上游拉取模型列表（用渠道第一个 API Key）。成败均写上游请求日志。
 func (s *Service) FetchModels(ctx context.Context, id int) ([]string, error) {
 	logger := sdk.LoggerFromContext(ctx)
 
@@ -234,13 +310,73 @@ func (s *Service) FetchModels(ctx context.Context, id int) ([]string, error) {
 		return nil, fmt.Errorf("%w: API Key 解密失败", ErrModelFetchFailed)
 	}
 
-	return s.FetchModelsWithKey(ctx, ch.Type, ch.BaseURL, apiKey)
+	return s.fetchModels(ctx, ch.Type, ch.BaseURL, apiKey)
 }
 
 // FetchModelsWithKey 按给定连接参数（明文 key）拉取上游模型列表。
 // 供渠道尚未保存时的预览拉取使用：表单填好 type/base_url/api_key 即可试拉，
 // 不要求渠道已落库，解开「保存要先有模型、拉模型要先保存」的死锁。
+// 结果当场返回给管理员，不留痕（留痕判据：事后排障需要且当场看不到）。
 func (s *Service) FetchModelsWithKey(ctx context.Context, channelType, baseURL, apiKey string) ([]string, error) {
+	return s.fetchModels(ctx, channelType, baseURL, apiKey)
+}
+
+// RefreshBalance 经渠道全部 key 查询上游余额并求和，落库后返回。
+// 多 key 求和 = 该渠道背后总可用额度；单个 key 查询失败跳过并计入告警，
+// 全部失败才整体报错。仅 openai_compatible 中转站可查（其余返回 ErrBalanceUnsupported）。
+func (s *Service) RefreshBalance(ctx context.Context, id int) (float64, *time.Time, error) {
+	logger := sdk.LoggerFromContext(ctx)
+
+	ch, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return 0, nil, err
+	}
+	if len(ch.APIKeys) == 0 {
+		return 0, nil, ErrNoAPIKey
+	}
+
+	var total float64
+	var okCount, failCount int
+	var lastErr error
+	for _, encrypted := range ch.APIKeys {
+		apiKey, derr := auth.DecryptAPIKey(encrypted, s.secret)
+		if derr != nil {
+			logger.Warn("channel_api_key_decrypt_failed", "channel_id", id, sdk.LogFieldError, derr)
+			failCount++
+			lastErr = derr
+			continue
+		}
+		bal, berr := s.fetcher.FetchBalance(ctx, ch.Type, ch.BaseURL, apiKey)
+		if berr != nil {
+			// 类型不支持是确定性结果，无需逐 key 重试——直接透传。
+			if errors.Is(berr, ErrBalanceUnsupported) {
+				return 0, nil, ErrBalanceUnsupported
+			}
+			logger.Warn("channel_fetch_balance_failed", "channel_id", id, sdk.LogFieldError, berr)
+			failCount++
+			lastErr = berr
+			continue
+		}
+		total += bal
+		okCount++
+	}
+	if okCount == 0 {
+		return 0, nil, fmt.Errorf("%w: %v", ErrBalanceFetchFailed, lastErr)
+	}
+
+	now := time.Now()
+	if err := s.repo.UpdateBalance(ctx, id, total, now); err != nil {
+		logger.Warn("channel_persist_failed", "op", "balance", "channel_id", id, sdk.LogFieldError, err)
+		return 0, nil, err
+	}
+	if failCount > 0 {
+		logger.Warn("channel_balance_partial", "channel_id", id, "ok", okCount, "fail", failCount)
+	}
+	return total, &now, nil
+}
+
+// fetchModels 拉取主体（无留痕）。
+func (s *Service) fetchModels(ctx context.Context, channelType, baseURL, apiKey string) ([]string, error) {
 	models, err := s.fetcher.FetchModels(ctx, channelType, baseURL, apiKey)
 	if err != nil {
 		sdk.LoggerFromContext(ctx).Warn("channel_fetch_models_failed", "type", channelType, sdk.LogFieldError, err)
@@ -299,7 +435,6 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelSna
 			StatusUntil:    ch.StatusUntil,
 			GroupIDs:       groups,
 			TestModel:      ch.TestModel,
-			CustomConfig:   ch.CustomConfig,
 		})
 	}
 	return snaps, nil

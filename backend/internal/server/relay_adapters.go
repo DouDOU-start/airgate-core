@@ -19,8 +19,8 @@ type channelTester struct {
 	secret string
 }
 
-// Test 实现 appchannel.Tester。
-func (t *channelTester) Test(ctx context.Context, ch appchannel.Channel, model string) (int, error) {
+// Test 实现 appchannel.Tester。endpoint 仅对 openai 协议渠道生效（空值默认 chat completions）。
+func (t *channelTester) Test(ctx context.Context, ch appchannel.Channel, model, endpoint string) (int, error) {
 	keys := make([]string, 0, len(ch.APIKeys))
 	for _, encrypted := range ch.APIKeys {
 		plain, err := auth.DecryptAPIKey(encrypted, t.secret)
@@ -50,9 +50,8 @@ func (t *channelTester) Test(ctx context.Context, ch appchannel.Channel, model s
 		CostRatio:      ch.CostRatio,
 		Status:         ch.Status,
 		TestModel:      ch.TestModel,
-		CustomConfig:   ch.CustomConfig,
 	}
-	return t.pipe.TestChannel(ctx, snap, model)
+	return t.pipe.TestChannel(ctx, snap, model, endpoint)
 }
 
 // gatewaySettingsSource 把 appsettings.Service 适配为 pipeline.SettingsLister。

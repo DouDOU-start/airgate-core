@@ -35,38 +35,63 @@ type Repository interface {
 	UpdateState(ctx context.Context, id int, status string, until *time.Time, errMsg string) error
 	// UpdateTestResult 记录渠道测试结果。
 	UpdateTestResult(ctx context.Context, id int, responseTimeMs int, testedAt time.Time) error
+	// UpdateBalance 记录渠道余额刷新结果。
+	UpdateBalance(ctx context.Context, id int, balance float64, updatedAt time.Time) error
+}
+
+// MoneyStats 渠道金额统计（累计）：
+// Cost = Σ(total_cost × account_rate_multiplier) 渠道成本；Revenue = Σ(actual_cost) 平台真实收入。
+type MoneyStats struct {
+	Cost    float64
+	Revenue float64
+}
+
+// StatsReader 渠道金额聚合读取器（由 store 基于 usage_logs 实现），列表页展示成本/收益用。
+type StatsReader interface {
+	GetChannelMoneyStats(ctx context.Context, channelIDs []int) (map[int]MoneyStats, error)
 }
 
 // Channel 渠道领域对象。APIKeys 存密文（AES-GCM base64），
 // APIKeyHints 由 service 解密生成（尾 4 位提示），不落库。
 type Channel struct {
-	ID             int
-	Name           string
-	Type           string
-	BaseURL        string
-	APIKeys        []string
-	APIKeyHints    []string
-	Models         []string
-	ModelMapping   map[string]string
-	ParamOverride  map[string]any
-	HeaderOverride map[string]string
-	Status         string
-	StatusUntil    *time.Time
-	ErrorMsg       string
-	Priority       int
-	Weight         int
-	MaxConcurrency int
-	MaxRPM         int
-	CostRatio      float64
-	Tags           []string
-	TestModel      string
-	CustomConfig   map[string]any
-	ResponseTimeMs int
-	TestedAt       *time.Time
-	LastUsedAt     *time.Time
-	GroupIDs       []int
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID               int
+	Name             string
+	Type             string
+	BaseURL          string
+	APIKeys          []string
+	APIKeyHints      []string
+	Models           []string
+	ModelMapping     map[string]string
+	ParamOverride    map[string]any
+	HeaderOverride   map[string]string
+	Status           string
+	StatusUntil      *time.Time
+	ErrorMsg         string
+	Priority         int
+	Weight           int
+	MaxConcurrency   int
+	MaxRPM           int
+	CostRatio        float64
+	Tags             []string
+	TestModel        string
+	ResponseTimeMs   int
+	TestedAt         *time.Time
+	Balance          float64
+	BalanceUpdatedAt *time.Time
+	LastUsedAt       *time.Time
+	GroupIDs         []int
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+
+	// CurrentConcurrency / CurrentRPM 运行时观测指标（在途请求数 / 当前分钟请求数），
+	// 仅列表查询时由 SetRuntimeStatsReaders 注入的读取器填充，不落库。
+	CurrentConcurrency int
+	CurrentRPM         int
+
+	// TotalCost / TotalRevenue 累计金额统计（渠道成本 / 平台真实收入），
+	// 仅列表查询时由 SetStatsReader 注入的读取器填充，不落库。
+	TotalCost    float64
+	TotalRevenue float64
 }
 
 // ListFilter 渠道列表查询参数。
@@ -107,14 +132,13 @@ type CreateInput struct {
 	CostRatio      *float64
 	Tags           []string
 	TestModel      string
-	CustomConfig   map[string]any
 	GroupIDs       []int
 }
 
 // UpdateInput 更新渠道输入（partial）：
 //   - 指针字段 nil = 不改；
 //   - APIKeys/Models 非空 = 整组替换（空 = 不改）；
-//   - ModelMapping/ParamOverride/HeaderOverride/Tags/CustomConfig/GroupIDs
+//   - ModelMapping/ParamOverride/HeaderOverride/Tags/GroupIDs
 //     非 nil = 整组替换（可传空集合清空）。
 type UpdateInput struct {
 	Name           *string
@@ -137,7 +161,6 @@ type UpdateInput struct {
 	CostRatio        *float64
 	Tags             []string
 	TestModel        *string
-	CustomConfig     map[string]any
 	GroupIDs         []int
 }
 

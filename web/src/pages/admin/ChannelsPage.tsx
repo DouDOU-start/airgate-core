@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -6,9 +6,10 @@ import {
   Select, Spinner, TextField as HeroTextField, Tooltip, useOverlayState,
 } from '@heroui/react';
 import {
-  ArrowUpDown, CircleCheck, CircleOff, Pencil, Plus, RefreshCw, Search, Trash2, Zap,
+  ArrowUpDown, Boxes, CircleCheck, CircleOff, Pencil, Plus, RefreshCw, Search, Trash2,
 } from 'lucide-react';
 import { channelsApi } from '../../shared/api/channels';
+import { upstreamLogsApi } from '../../shared/api/upstreamLogs';
 import { queryKeys } from '../../shared/queryKeys';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { usePagination } from '../../shared/hooks/usePagination';
@@ -16,20 +17,35 @@ import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useToast } from '../../shared/ui';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { MetricChips } from '../../shared/components/MetricChips';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { ChannelFormModal, CHANNEL_TYPE_OPTIONS } from './channels/ChannelFormModal';
-import type { BulkChannelAction, ChannelResp, ChannelType } from '../../shared/types';
+import { ChannelTestModal } from './channels/ChannelTestModal';
+import type { BulkChannelAction, ChannelFailureCounts, ChannelResp, ChannelType } from '../../shared/types';
 
-const COLUMN_COUNT = 11;
+const COLUMN_COUNT = 14;
+
+// 仅 openai_compatible 中转站支持经 key 查余额；官方直连渠道无此接口。
+const BALANCE_SUPPORTED_TYPES = new Set(['openai_compatible']);
+
+// 余额自动刷新的陈旧阈值：更新时间早于此则视为陈旧、进入页面时后台刷新。
+// 取 60s：主要用于「打开/切回渠道页时看到较新余额」，同时把 React 双挂载/快速
+// 连续刷新去重掉，不至于每次渲染都打上游。
+const BALANCE_STALE_MS = 60_000;
+
+// isBalanceStale 从未刷新过、或超过阈值 → 陈旧。
+function isBalanceStale(updatedAt: string | undefined): boolean {
+  if (!updatedAt) return true;
+  return Date.now() - new Date(updatedAt).getTime() > BALANCE_STALE_MS;
+}
 
 // 渠道类型 → 徽章配色
 const TYPE_CHIP_COLORS: Record<ChannelType, 'accent' | 'warning' | 'success' | 'default'> = {
   openai_compatible: 'accent',
   anthropic: 'warning',
   gemini: 'success',
-  custom: 'default',
 };
 
 function typeLabel(type: string): string {
@@ -91,6 +107,55 @@ function ChannelStatusChip({ channel }: { channel: ChannelResp }) {
   );
 }
 
+// 余额单元格：openai_compatible 显示 $X.XX + 刷新时间 + 刷新按钮；其余类型显示"不支持"。
+function BalanceCell({
+  row,
+  isRefreshing,
+  onRefresh,
+}: {
+  row: ChannelResp;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const { t } = useTranslation();
+
+  if (!BALANCE_SUPPORTED_TYPES.has(row.type)) {
+    return (
+      <span className="text-xs text-text-tertiary" title={t('channels.balance_unsupported_hint')}>
+        {t('channels.balance_unsupported')}
+      </span>
+    );
+  }
+
+  const updated = row.balance_updated_at ? new Date(row.balance_updated_at) : null;
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="flex min-w-0 flex-col">
+        {updated ? (
+          <span className="font-mono text-[13px] font-medium text-text">${row.balance.toFixed(2)}</span>
+        ) : (
+          <span className="text-xs text-text-tertiary">{t('channels.balance_never')}</span>
+        )}
+        {updated ? (
+          <span className="text-[11px] text-text-tertiary" title={updated.toLocaleString()}>
+            {updated.toLocaleDateString('zh-CN')}
+          </span>
+        ) : null}
+      </div>
+      <Button
+        isIconOnly
+        aria-label={t('channels.refresh_balance')}
+        isDisabled={isRefreshing}
+        size="sm"
+        variant="ghost"
+        onPress={onRefresh}
+      >
+        {isRefreshing ? <Spinner size="sm" /> : <RefreshCw className="h-3.5 w-3.5" />}
+      </Button>
+    </div>
+  );
+}
+
 export default function ChannelsPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -109,7 +174,7 @@ export default function ChannelsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [priorityModalOpen, setPriorityModalOpen] = useState(false);
   const [bulkPriority, setBulkPriority] = useState('50');
-  const [testingId, setTestingId] = useState<number | null>(null);
+  const [testTarget, setTestTarget] = useState<ChannelResp | null>(null);
 
   const listQuery = useMemo(() => ({
     page,
@@ -128,6 +193,21 @@ export default function ChannelsPage() {
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
+
+  // 渠道近 30 分钟失败计数（errlog Redis 分钟桶），30s 轮询；Redis 缺失时后端返回全 0。
+  const channelIds = rows.map((row) => row.id);
+  const { data: failureStats } = useQuery({
+    queryKey: queryKeys.channelFailureStats(channelIds),
+    queryFn: () => upstreamLogsApi.channelFailureStats(channelIds),
+    enabled: channelIds.length > 0,
+    refetchInterval: 30_000,
+    placeholderData: keepPreviousData,
+  });
+  const failureByChannel = useMemo(() => {
+    const map = new Map<number, ChannelFailureCounts>();
+    for (const item of failureStats?.channels ?? []) map.set(item.channel_id, item);
+    return map;
+  }, [failureStats]);
 
   // 删除单个渠道
   const deleteMutation = useCrudMutation({
@@ -154,19 +234,68 @@ export default function ChannelsPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  // 测试渠道连通性
-  const testMutation = useMutation({
-    mutationFn: (id: number) => channelsApi.test(id),
+  // 刷新单个渠道余额（经 key 查上游）。variables 记录目标 id，用于给对应行按钮显示 loading。
+  const balanceMutation = useMutation({
+    mutationFn: (id: number) => channelsApi.refreshBalance(id),
     onSuccess: (resp) => {
-      toast('success', t('channels.test_success', { latency: resp.latency_ms }));
+      toast('success', t('channels.balance_refreshed', { amount: resp.balance.toFixed(2) }));
       queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
-      setTestingId(null);
     },
-    onError: (err: Error) => {
-      toast('error', t('channels.test_failed', { error: err.message }));
-      setTestingId(null);
-    },
+    onError: (err: Error) => toast('error', err.message),
   });
+
+  // 进入渠道页 / 翻页时自动刷新可见渠道的余额（后台、串行、只刷陈旧的）。
+  // autoRefreshedRef 记录本次挂载已发起过的渠道，防 React 重渲染/双挂载重复打上游；
+  // 刷新后 balance_updated_at 变新 → isBalanceStale 返回 false → 不再重刷（天然收敛）。
+  const autoRefreshedRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    const stale = rows.filter(
+      (row) =>
+        BALANCE_SUPPORTED_TYPES.has(row.type) &&
+        !autoRefreshedRef.current.has(row.id) &&
+        isBalanceStale(row.balance_updated_at),
+    );
+    if (stale.length === 0) return;
+    stale.forEach((row) => autoRefreshedRef.current.add(row.id));
+
+    let cancelled = false;
+    void (async () => {
+      let updated = false;
+      for (const row of stale) {
+        if (cancelled) break;
+        try {
+          await channelsApi.refreshBalance(row.id);
+          updated = true;
+        } catch {
+          // 不支持/失败静默跳过：自动刷新不打扰用户，手动刷新才提示错误。
+        }
+      }
+      if (!cancelled && updated) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [rows, queryClient]);
+
+  // 批量刷新余额：串行逐个刷（避免并发打爆中转站），支持的渠道成功、不支持的跳过。
+  const [batchBalanceRunning, setBatchBalanceRunning] = useState(false);
+  async function handleBatchRefreshBalance() {
+    setBatchBalanceRunning(true);
+    let ok = 0;
+    for (const id of selectedIds) {
+      try {
+        await channelsApi.refreshBalance(id);
+        ok += 1;
+      } catch {
+        // 不支持/失败的渠道跳过，不中断整批。
+      }
+    }
+    setBatchBalanceRunning(false);
+    queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+    toast('success', t('channels.balance_batch_done', { ok, total: selectedIds.length }));
+  }
 
   function openCreate() {
     setEditingChannel(null);
@@ -176,11 +305,6 @@ export default function ChannelsPage() {
   function openEdit(channel: ChannelResp) {
     setEditingChannel(channel);
     setFormOpen(true);
-  }
-
-  function handleTest(id: number) {
-    setTestingId(id);
-    testMutation.mutate(id);
   }
 
   function toggleSelected(id: number, selected: boolean) {
@@ -329,6 +453,15 @@ export default function ChannelsPage() {
             {t('common.disable')}
           </Button>
           <Button
+            isDisabled={bulkPending || batchBalanceRunning}
+            size="sm"
+            variant="secondary"
+            onPress={handleBatchRefreshBalance}
+          >
+            {batchBalanceRunning ? <Spinner size="sm" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            {t('channels.refresh_balance')}
+          </Button>
+          <Button
             isDisabled={bulkPending}
             size="sm"
             variant="secondary"
@@ -360,6 +493,7 @@ export default function ChannelsPage() {
 
       <CommonTable
         ariaLabel={t('channels.title')}
+        className="ag-channels-table"
         footer={(
           <TablePaginationFooter
             page={page}
@@ -370,7 +504,7 @@ export default function ChannelsPage() {
             totalPages={totalPages}
           />
         )}
-        minWidth={1080}
+        minWidth={1220}
       >
         <CommonTable.Header>
           <CommonTable.Column id="select" style={{ width: 44 }}>
@@ -393,7 +527,16 @@ export default function ChannelsPage() {
           <CommonTable.Column id="priority">{t('channels.priority')}</CommonTable.Column>
           <CommonTable.Column id="weight">{t('channels.weight')}</CommonTable.Column>
           <CommonTable.Column id="models">{t('channels.models')}</CommonTable.Column>
+          <CommonTable.Column id="runtime" style={{ width: '9.75rem' }}>
+            <span title={t('channels.concurrency_rpm_hint')}>{t('channels.concurrency_rpm')}</span>
+          </CommonTable.Column>
+          <CommonTable.Column id="money" style={{ width: '9.75rem' }}>
+            <span title={t('channels.stats_hint')}>{t('channels.stats_header')}</span>
+          </CommonTable.Column>
           <CommonTable.Column id="response_time">{t('channels.response_time')}</CommonTable.Column>
+          <CommonTable.Column id="balance" style={{ width: '9rem' }}>
+            <span title={t('channels.balance_hint')}>{t('channels.balance')}</span>
+          </CommonTable.Column>
           <CommonTable.Column id="tags">{t('channels.tags')}</CommonTable.Column>
           <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
         </CommonTable.Header>
@@ -467,10 +610,65 @@ export default function ChannelsPage() {
                     <span className="text-text-tertiary">-</span>
                   )}
                 </CommonTable.Cell>
+                <CommonTable.Cell className="ag-channels-metric-cell">
+                  <MetricChips
+                    className="ag-metric-chips--stack ag-metric-chips--compact-y"
+                    items={[
+                      {
+                        color: 'accent' as const,
+                        label: t('channels.concurrency_label'),
+                        muted: (row.current_concurrency ?? 0) === 0,
+                        value: `${row.current_concurrency ?? 0}/${row.max_concurrency > 0 ? row.max_concurrency : '∞'}`,
+                      },
+                      {
+                        color: 'success' as const,
+                        label: 'RPM',
+                        muted: (row.current_rpm ?? 0) === 0,
+                        value: String(row.current_rpm ?? 0),
+                      },
+                      {
+                        color: 'danger' as const,
+                        label: t('channels.failures_label'),
+                        muted: (failureByChannel.get(row.id)?.total ?? 0) === 0,
+                        value: String(failureByChannel.get(row.id)?.total ?? 0),
+                      },
+                    ]}
+                  />
+                </CommonTable.Cell>
+                <CommonTable.Cell className="ag-channels-metric-cell">
+                  <MetricChips
+                    className="ag-metric-chips--stack ag-metric-chips--compact-y"
+                    items={[
+                      {
+                        amount: row.total_cost ?? 0,
+                        color: 'warning' as const,
+                        decimals: 2,
+                        dollarTone: 'warning' as const,
+                        label: t('channels.stats_cost'),
+                        mutedWhenZero: true,
+                      },
+                      {
+                        amount: row.total_revenue ?? 0,
+                        color: 'success' as const,
+                        decimals: 2,
+                        dollarTone: 'success' as const,
+                        label: t('channels.stats_revenue'),
+                        mutedWhenZero: true,
+                      },
+                    ]}
+                  />
+                </CommonTable.Cell>
                 <CommonTable.Cell>
                   <span className="font-mono text-text-secondary">
                     {row.response_time_ms > 0 ? `${row.response_time_ms}ms` : '-'}
                   </span>
+                </CommonTable.Cell>
+                <CommonTable.Cell>
+                  <BalanceCell
+                    row={row}
+                    isRefreshing={balanceMutation.isPending && balanceMutation.variables === row.id}
+                    onRefresh={() => balanceMutation.mutate(row.id)}
+                  />
                 </CommonTable.Cell>
                 <CommonTable.Cell>
                   {row.tags.length > 0 ? (
@@ -492,13 +690,12 @@ export default function ChannelsPage() {
                       {t('common.edit')}
                     </Button>
                     <Button
-                      isDisabled={testingId === row.id}
                       size="sm"
                       variant="secondary"
-                      onPress={() => handleTest(row.id)}
+                      onPress={() => setTestTarget(row)}
                     >
-                      {testingId === row.id ? <Spinner size="sm" /> : <Zap className="h-3.5 w-3.5" />}
-                      {t('common.test')}
+                      <Boxes className="h-3.5 w-3.5" />
+                      {t('channels.models')}
                     </Button>
                     <Button
                       className="text-danger"
@@ -525,6 +722,12 @@ export default function ChannelsPage() {
           setFormOpen(false);
           setEditingChannel(null);
         }}
+      />
+
+      {/* 模型与测试弹窗（模型清单/映射/测试模型管理 + 逐个或全部测试） */}
+      <ChannelTestModal
+        channel={testTarget}
+        onClose={() => setTestTarget(null)}
       />
 
       {/* 批量改优先级 */}
