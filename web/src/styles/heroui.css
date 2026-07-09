@@ -473,6 +473,13 @@
   box-shadow: var(--overlay-shadow) !important;
 }
 
+/* Dropdown.Trigger 套 .button 样式时恢复 flex：heroui.min.css 里 .dropdown__trigger
+   的 display:inline-block 源码序晚于 .button 的 inline-flex 而胜出，svg 子元素被
+   preflight 置为 block 后换行溢出到按钮外 */
+.dropdown__trigger.button {
+  display: inline-flex;
+}
+
 .dropdown__popover {
   min-width: min(15rem, calc(100vw - 2rem)) !important;
   max-width: min(24rem, calc(100vw - 2rem)) !important;

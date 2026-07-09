@@ -14,30 +14,30 @@
   margin-inline: auto;
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chips {
   display: inline-grid;
   align-items: center;
   gap: 0.375rem;
   font-family: var(--ag-font-mono);
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--quota {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chips--quota {
   width: min(100%, 17.5rem);
   min-width: 17.5rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--stack {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chips--stack {
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--usage {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chips--usage {
   width: min(100%, 10.25rem);
   min-width: 10.25rem;
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--markup {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chips--markup {
   width: min(100%, 10.25rem);
   min-width: 10.25rem;
 }
@@ -56,7 +56,7 @@
   min-width: 0;
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--compact-y {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chips--compact-y {
   gap: 0.25rem;
 }
 
@@ -64,7 +64,15 @@
   padding-block: 0.625rem !important;
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip {
+.ag-users-table .ag-users-metric-cell {
+  padding-block: 0.625rem !important;
+}
+
+.ag-channels-table .ag-channels-metric-cell {
+  padding-block: 0.625rem !important;
+}
+
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chip {
   display: inline-grid !important;
   width: 100%;
   min-width: 0;
@@ -74,16 +82,16 @@
   gap: 0.375rem;
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--markup .ag-metric-chip {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chips--markup .ag-metric-chip {
   grid-template-columns: 3.25rem minmax(5.25rem, 1fr);
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chips--usage .ag-metric-chip {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chips--usage .ag-metric-chip {
   grid-template-columns: 3.25rem minmax(5.25rem, 1fr);
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip-label,
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip-value {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chip-label,
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chip-value {
   min-width: 0;
   color: var(--ag-text) !important;
   overflow: hidden;
@@ -91,7 +99,7 @@
   white-space: nowrap;
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip-label {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chip-label {
   color: var(--ag-text-secondary) !important;
   font-weight: 600;
   letter-spacing: 0;
@@ -99,7 +107,7 @@
   text-align: left;
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip-value {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chip-value {
   display: inline-flex;
   min-width: 5.25rem;
   align-items: center;
@@ -111,23 +119,49 @@
   text-overflow: ellipsis;
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-chip--zero {
+/* 用户/渠道表并发/RPM 列：定宽小指标，不需要占满 minmax 下限（须置于上方通用规则之后以覆盖生效） */
+:is(.ag-users-table, .ag-channels-table) .ag-metric-chips--stack {
+  width: min(100%, 8.5rem);
+}
+
+:is(.ag-users-table, .ag-channels-table) .ag-metric-chip {
+  grid-template-columns: 2.25rem minmax(3.5rem, 1fr);
+}
+
+:is(.ag-users-table, .ag-channels-table) .ag-metric-chip-value {
+  min-width: 3.5rem;
+}
+
+/* 分组表并发/RPM 列：同款定宽小指标；用 --runtime 限定，避免影响同表消费列（--markup）的宽度 */
+.ag-groups-table .ag-metric-chips--runtime {
+  width: min(100%, 8.5rem);
+}
+
+.ag-groups-table .ag-metric-chips--runtime .ag-metric-chip {
+  grid-template-columns: 2.25rem minmax(3.5rem, 1fr);
+}
+
+.ag-groups-table .ag-metric-chips--runtime .ag-metric-chip-value {
+  min-width: 3.5rem;
+}
+
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-chip--zero {
   background: var(--ag-default-bg) !important;
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-dollar--warning {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-dollar--warning {
   color: var(--ag-warning);
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-dollar--success {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-dollar--success {
   color: var(--ag-success);
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-dollar--accent {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-dollar--accent {
   color: var(--ag-primary);
 }
 
-:is(.ag-api-keys-table, .ag-groups-table) .ag-metric-infinity {
+:is(.ag-api-keys-table, .ag-groups-table, .ag-users-table, .ag-channels-table) .ag-metric-infinity {
   font-weight: 800;
 }
 
