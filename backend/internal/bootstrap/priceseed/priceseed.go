@@ -38,6 +38,8 @@ const envSeedPath = "MODEL_PRICES_SEED"
 type PriceStore interface {
 	ListAll(ctx context.Context) ([]appmodelprice.ModelPrice, error)
 	Create(ctx context.Context, input appmodelprice.CreateInput) (appmodelprice.ModelPrice, error)
+	// EnsureTag 按名称 find-or-create 标签，返回标签 ID。
+	EnsureTag(ctx context.Context, name string) (int, error)
 }
 
 // Load 解析种子文件并对每个 model 执行 insert-if-absent 导入。
@@ -90,8 +92,9 @@ func resolveSource(configPath string) ([]byte, string) {
 }
 
 // insertMissing 只对价目表中尚不存在的 model 调用 Create，绝不更新已存在条目。
-// 返回新建条数与跳过（已存在）条数。ListAll 失败返回 error；单条 Create 失败降级为 Warn+continue。
-func insertMissing(ctx context.Context, store PriceStore, items []appmodelprice.CreateInput) (inserted, skipped int, err error) {
+// 返回新建条数与跳过（已存在）条数。ListAll 失败返回 error；单条 Create 失败降级为 Warn+continue；
+// 标签 EnsureTag 失败降级为「无标签插入」（不因标签阻塞价格种子）。
+func insertMissing(ctx context.Context, store PriceStore, items []SeedItem) (inserted, skipped int, err error) {
 	existing, err := store.ListAll(ctx)
 	if err != nil {
 		return 0, 0, err
@@ -102,12 +105,29 @@ func insertMissing(ctx context.Context, store PriceStore, items []appmodelprice.
 		present[e.Model] = struct{}{}
 	}
 
+	tagIDs := map[string]int{} // 标签名 → ID 缓存（同名只 EnsureTag 一次）
 	for _, item := range items {
 		if _, ok := present[item.Model]; ok {
 			skipped++
 			continue
 		}
-		if _, cerr := store.Create(ctx, item); cerr != nil {
+		input := item.CreateInput
+		if item.TagName != "" {
+			id, ok := tagIDs[item.TagName]
+			if !ok {
+				var terr error
+				if id, terr = store.EnsureTag(ctx, item.TagName); terr != nil {
+					slog.Warn("price_seed_tag_failed", "model", item.Model, "tag", item.TagName, sdk.LogFieldError, terr)
+					id = 0
+				}
+				tagIDs[item.TagName] = id
+			}
+			if id > 0 {
+				tagID := id
+				input.TagID = &tagID
+			}
+		}
+		if _, cerr := store.Create(ctx, input); cerr != nil {
 			slog.Warn("price_seed_insert_failed", "model", item.Model, sdk.LogFieldError, cerr)
 			continue
 		}

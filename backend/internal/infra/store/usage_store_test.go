@@ -22,7 +22,6 @@ func TestUsageStoreListPaginationIsStableForIdenticalCreatedAt(t *testing.T) {
 
 	for range 3 {
 		if _, err := db.UsageLog.Create().
-			SetPlatform("openai").
 			SetModel("gpt-5").
 			SetUserID(user.ID).
 			SetUserIDSnapshot(user.ID).
@@ -36,41 +35,45 @@ func TestUsageStoreListPaginationIsStableForIdenticalCreatedAt(t *testing.T) {
 	store := NewUsageStore(db)
 
 	t.Run("admin list", func(t *testing.T) {
-		page1, total, err := store.ListAdmin(ctx, appusage.ListFilter{Page: 1, PageSize: 2})
+		total, err := store.CountAdmin(ctx, appusage.ListFilter{})
+		if err != nil {
+			t.Fatalf("CountAdmin returned error: %v", err)
+		}
+		if total != 3 {
+			t.Fatalf("CountAdmin = %d, want 3", total)
+		}
+
+		page1, err := store.ListAdmin(ctx, appusage.ListFilter{Page: 1, PageSize: 2})
 		if err != nil {
 			t.Fatalf("ListAdmin page 1 returned error: %v", err)
 		}
-		if total != 3 {
-			t.Fatalf("ListAdmin page 1 total = %d, want 3", total)
-		}
 		assertLogIDs(t, page1, 3, 2)
 
-		page2, total, err := store.ListAdmin(ctx, appusage.ListFilter{Page: 2, PageSize: 2})
+		page2, err := store.ListAdmin(ctx, appusage.ListFilter{Page: 2, PageSize: 2})
 		if err != nil {
 			t.Fatalf("ListAdmin page 2 returned error: %v", err)
-		}
-		if total != 3 {
-			t.Fatalf("ListAdmin page 2 total = %d, want 3", total)
 		}
 		assertLogIDs(t, page2, 1)
 	})
 
 	t.Run("user list", func(t *testing.T) {
-		page1, total, err := store.ListUser(ctx, int64(user.ID), appusage.ListFilter{Page: 1, PageSize: 2})
+		total, err := store.CountUser(ctx, int64(user.ID), appusage.ListFilter{})
+		if err != nil {
+			t.Fatalf("CountUser returned error: %v", err)
+		}
+		if total != 3 {
+			t.Fatalf("CountUser = %d, want 3", total)
+		}
+
+		page1, err := store.ListUser(ctx, int64(user.ID), appusage.ListFilter{Page: 1, PageSize: 2})
 		if err != nil {
 			t.Fatalf("ListUser page 1 returned error: %v", err)
 		}
-		if total != 3 {
-			t.Fatalf("ListUser page 1 total = %d, want 3", total)
-		}
 		assertLogIDs(t, page1, 3, 2)
 
-		page2, total, err := store.ListUser(ctx, int64(user.ID), appusage.ListFilter{Page: 2, PageSize: 2})
+		page2, err := store.ListUser(ctx, int64(user.ID), appusage.ListFilter{Page: 2, PageSize: 2})
 		if err != nil {
 			t.Fatalf("ListUser page 2 returned error: %v", err)
-		}
-		if total != 3 {
-			t.Fatalf("ListUser page 2 total = %d, want 3", total)
 		}
 		assertLogIDs(t, page2, 1)
 	})

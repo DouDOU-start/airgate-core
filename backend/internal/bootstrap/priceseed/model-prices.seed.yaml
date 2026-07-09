@@ -1,6 +1,7 @@
 # AirGate 默认模型价目表种子。
 # 单位：USD / 1,000,000 tokens。per_request 为 USD/次（按次计费模型用，token 计费模型填 0）。
-# 来源：airgate-openai registry.go + airgate-claude models.go（standalone-gateway 分支提取）。
+# 来源：claude/openai 取自 airgate-openai registry.go + airgate-claude models.go（standalone-gateway 分支提取）；
+#   gemini/grok 取自 Google AI / xAI 官方价目（2026-01 快照，调价后可直接改本文件或用后台价目表页）。
 # 字段映射：input←InputPrice，output←OutputPrice，cached_input←CachedPrice/CachedInputPrice，
 #   cache_creation←claude 的 CacheCreationPrice(5m 缓存写入档，openai 无此档填 0)，
 #   cache_creation_1h←claude 的 CacheCreation1hPrice(1h 缓存写入档)，per_request←0。
@@ -17,6 +18,7 @@
 models:
   # ── claude（airgate-claude / models.go，含别名）──
   - model: claude-fable-5
+    tag: claude
     input: 10.0
     output: 50.0
     cached_input: 1.0
@@ -24,6 +26,7 @@ models:
     cache_creation_1h: 20.0
     per_request: 0
   - model: claude-haiku-4-5           # 别名 → claude-haiku-4-5-20251001
+    tag: claude
     input: 1.0
     output: 5.0
     cached_input: 0.1
@@ -31,6 +34,7 @@ models:
     cache_creation_1h: 2.0
     per_request: 0
   - model: claude-haiku-4-5-20251001
+    tag: claude
     input: 1.0
     output: 5.0
     cached_input: 0.1
@@ -38,6 +42,7 @@ models:
     cache_creation_1h: 2.0
     per_request: 0
   - model: claude-opus-4-1            # 别名 → claude-opus-4-1-20250805
+    tag: claude
     input: 15.0
     output: 75.0
     cached_input: 1.5
@@ -45,6 +50,7 @@ models:
     cache_creation_1h: 30.0
     per_request: 0
   - model: claude-opus-4-1-20250805
+    tag: claude
     input: 15.0
     output: 75.0
     cached_input: 1.5
@@ -52,6 +58,7 @@ models:
     cache_creation_1h: 30.0
     per_request: 0
   - model: claude-opus-4-5            # 别名 → claude-opus-4-5-20251101
+    tag: claude
     input: 5.0
     output: 25.0
     cached_input: 0.5
@@ -59,6 +66,7 @@ models:
     cache_creation_1h: 10.0
     per_request: 0
   - model: claude-opus-4-5-20251101
+    tag: claude
     input: 5.0
     output: 25.0
     cached_input: 0.5
@@ -66,6 +74,7 @@ models:
     cache_creation_1h: 10.0
     per_request: 0
   - model: claude-opus-4-6
+    tag: claude
     input: 5.0
     output: 25.0
     cached_input: 0.5
@@ -73,6 +82,7 @@ models:
     cache_creation_1h: 10.0
     per_request: 0
   - model: claude-opus-4-7
+    tag: claude
     input: 5.0
     output: 25.0
     cached_input: 0.5
@@ -80,6 +90,7 @@ models:
     cache_creation_1h: 10.0
     per_request: 0
   - model: claude-opus-4-8
+    tag: claude
     input: 5.0
     output: 25.0
     cached_input: 0.5
@@ -87,6 +98,7 @@ models:
     cache_creation_1h: 10.0
     per_request: 0
   - model: claude-sonnet-4-0          # 别名 → claude-sonnet-4-20250514
+    tag: claude
     input: 3.0
     output: 15.0
     cached_input: 0.3
@@ -94,6 +106,7 @@ models:
     cache_creation_1h: 6.0
     per_request: 0
   - model: claude-sonnet-4-20250514
+    tag: claude
     input: 3.0
     output: 15.0
     cached_input: 0.3
@@ -101,6 +114,7 @@ models:
     cache_creation_1h: 6.0
     per_request: 0
   - model: claude-sonnet-4-5          # 别名 → claude-sonnet-4-5-20250929
+    tag: claude
     input: 3.0
     output: 15.0
     cached_input: 0.3
@@ -108,6 +122,7 @@ models:
     cache_creation_1h: 6.0
     per_request: 0
   - model: claude-sonnet-4-5-20250929
+    tag: claude
     input: 3.0
     output: 15.0
     cached_input: 0.3
@@ -115,6 +130,7 @@ models:
     cache_creation_1h: 6.0
     per_request: 0
   - model: claude-sonnet-4-6
+    tag: claude
     input: 3.0
     output: 15.0
     cached_input: 0.3
@@ -123,6 +139,7 @@ models:
     per_request: 0
   # ── openai（airgate-openai / registry.go，标准档；纯图像模型跳过）──
   - model: gpt-5.3-codex-spark
+    tag: openai
     input: 1.75
     output: 14.0
     cached_input: 0.175
@@ -133,6 +150,7 @@ models:
         priority: 2.0
         flex: 0.5
   - model: gpt-5.4
+    tag: openai
     input: 2.5
     output: 15.0
     cached_input: 0.25
@@ -148,6 +166,7 @@ models:
         output_multiplier: 1.5
         cached_multiplier: 2.0
   - model: gpt-5.4-mini
+    tag: openai
     input: 0.75
     output: 4.5
     cached_input: 0.075
@@ -158,6 +177,7 @@ models:
         priority: 2.0
         flex: 0.5
   - model: gpt-5.5
+    tag: openai
     input: 5.0
     output: 30.0
     cached_input: 0.5
@@ -167,3 +187,112 @@ models:
       service_tiers:
         priority: 2.5
         flex: 0.5
+  # ── gemini（ai.google.dev 官方价 2026-07 核实；Pro 系列长上下文阶梯阈值 200K；
+  #    2.0 系列已于 2026-06-01 停服不收录。3.1-flash-lite / 3-flash-preview 官方未列
+  #    缓存读价，按「缓存读 = 输入价 10%」的现行折扣规则推算。──
+  - model: gemini-3.5-flash
+    tag: gemini
+    input: 1.5
+    output: 9.0
+    cached_input: 0.15
+    cache_creation: 0
+    per_request: 0
+  - model: gemini-3.1-pro-preview
+    tag: gemini
+    input: 2.0
+    output: 12.0
+    cached_input: 0.2
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      long_context:
+        threshold_tokens: 200000
+        input_multiplier: 2.0
+        output_multiplier: 1.5
+        cached_multiplier: 2.0
+  - model: gemini-3.1-flash-lite
+    tag: gemini
+    input: 0.25
+    output: 1.5
+    cached_input: 0.025
+    cache_creation: 0
+    per_request: 0
+  - model: gemini-3-flash-preview
+    tag: gemini
+    input: 0.5
+    output: 3.0
+    cached_input: 0.05
+    cache_creation: 0
+    per_request: 0
+  - model: gemini-2.5-pro
+    tag: gemini
+    input: 1.25
+    output: 10.0
+    cached_input: 0.31
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      long_context:
+        threshold_tokens: 200000
+        input_multiplier: 2.0
+        output_multiplier: 1.5
+        cached_multiplier: 2.0
+  - model: gemini-2.5-flash
+    tag: gemini
+    input: 0.3
+    output: 2.5
+    cached_input: 0.075
+    cache_creation: 0
+    per_request: 0
+  - model: gemini-2.5-flash-lite
+    tag: gemini
+    input: 0.1
+    output: 0.4
+    cached_input: 0.025
+    cache_creation: 0
+    per_request: 0
+  # ── grok（docs.x.ai 官方价 2026-07 核实；grok-4/4-fast/4.1/4.1-fast/code-fast-1/3
+  #    已于 2026-05-15 退役不收录。官方缓存无折扣（缓存 token 按标准输入价计），
+  #    故 cached_input = input，避免缓存段少计费。──
+  - model: grok-4.3
+    tag: grok
+    input: 1.25
+    output: 2.5
+    cached_input: 1.25
+    cache_creation: 0
+    per_request: 0
+  - model: grok-4.20-0309-reasoning
+    tag: grok
+    input: 1.25
+    output: 2.5
+    cached_input: 1.25
+    cache_creation: 0
+    per_request: 0
+  - model: grok-4.20-0309-non-reasoning
+    tag: grok
+    input: 1.25
+    output: 2.5
+    cached_input: 1.25
+    cache_creation: 0
+    per_request: 0
+  - model: grok-4.20-multi-agent-0309
+    tag: grok
+    input: 1.25
+    output: 2.5
+    cached_input: 1.25
+    cache_creation: 0
+    per_request: 0
+  - model: grok-4.5
+    tag: grok
+    input: 2.0
+    output: 6.0
+    cached_input: 2.0
+    cache_creation: 0
+    per_request: 0
+  - model: grok-build-0.1
+    tag: grok
+    input: 1.0
+    output: 2.0
+    cached_input: 1.0
+    cache_creation: 0
+    per_request: 0

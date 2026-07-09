@@ -35,6 +35,11 @@ func (s *fakeStore) ListAll(_ context.Context) ([]appmodelprice.ModelPrice, erro
 	return out, nil
 }
 
+func (s *fakeStore) EnsureTag(_ context.Context, name string) (int, error) {
+	// 简单稳定映射：按名称长度+首字符构造正 ID，测试无需真实表。
+	return len(name) + int(name[0]), nil
+}
+
 func (s *fakeStore) Create(_ context.Context, input appmodelprice.CreateInput) (appmodelprice.ModelPrice, error) {
 	if err := s.createErr[input.Model]; err != nil {
 		return appmodelprice.ModelPrice{}, err
@@ -62,10 +67,10 @@ func TestInsertIfAbsent(t *testing.T) {
 		ID: 1, Model: "claude-opus-4-8", InputPrice: 999, OutputPrice: 888,
 	}
 
-	items := []appmodelprice.CreateInput{
-		{Model: "claude-opus-4-8", InputPrice: 5, OutputPrice: 25},   // 已存在 → 跳过
-		{Model: "gpt-5.4", InputPrice: 2.5, OutputPrice: 15},         // 缺失 → 插入
-		{Model: "claude-sonnet-4-6", InputPrice: 3, OutputPrice: 15}, // 缺失 → 插入
+	items := []SeedItem{
+		{CreateInput: appmodelprice.CreateInput{Model: "claude-opus-4-8", InputPrice: 5, OutputPrice: 25}},   // 已存在 → 跳过
+		{CreateInput: appmodelprice.CreateInput{Model: "gpt-5.4", InputPrice: 2.5, OutputPrice: 15}},         // 缺失 → 插入
+		{CreateInput: appmodelprice.CreateInput{Model: "claude-sonnet-4-6", InputPrice: 3, OutputPrice: 15}}, // 缺失 → 插入
 	}
 
 	inserted, skipped, err := insertMissing(context.Background(), store, items)
@@ -101,9 +106,9 @@ func TestInsertIfAbsent(t *testing.T) {
 // TestInsertMissingIdempotent 证明重复运行只补缺失，第二次全部跳过。
 func TestInsertMissingIdempotent(t *testing.T) {
 	store := newFakeStore()
-	items := []appmodelprice.CreateInput{
-		{Model: "gpt-5.4", InputPrice: 2.5},
-		{Model: "claude-opus-4-8", InputPrice: 5},
+	items := []SeedItem{
+		{CreateInput: appmodelprice.CreateInput{Model: "gpt-5.4", InputPrice: 2.5}},
+		{CreateInput: appmodelprice.CreateInput{Model: "claude-opus-4-8", InputPrice: 5}},
 	}
 
 	ins1, skip1, _ := insertMissing(context.Background(), store, items)
@@ -120,9 +125,9 @@ func TestInsertMissingIdempotent(t *testing.T) {
 func TestInsertMissingSingleFailureDegrades(t *testing.T) {
 	store := newFakeStore()
 	store.createErr["boom"] = os.ErrPermission
-	items := []appmodelprice.CreateInput{
-		{Model: "boom"},
-		{Model: "gpt-5.4"},
+	items := []SeedItem{
+		{CreateInput: appmodelprice.CreateInput{Model: "boom"}},
+		{CreateInput: appmodelprice.CreateInput{Model: "gpt-5.4"}},
 	}
 	inserted, _, err := insertMissing(context.Background(), store, items)
 	if err != nil {
@@ -143,17 +148,18 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		t.Fatalf("Parse(embeddedSeed) err = %v", err)
 	}
 
-	byModel := map[string]appmodelprice.CreateInput{}
+	byModel := map[string]SeedItem{}
 	for _, it := range items {
 		byModel[it.Model] = it
 	}
 
-	// 覆盖总数：15 claude（含 5 别名）+ 4 openai = 19。
-	if len(items) != 19 {
-		t.Errorf("seed model count = %d, want 19", len(items))
+	// 覆盖总数：15 claude（含 5 别名）+ 4 openai + 7 gemini + 6 grok = 32。
+	if len(items) != 32 {
+		t.Errorf("seed model count = %d, want 32", len(items))
 	}
 
-	// 抽样核对（值来自 airgate-claude/models.go 与 airgate-openai/registry.go）。
+	// 抽样核对（claude/openai 值来自 airgate-claude/models.go 与 airgate-openai/registry.go，
+	// gemini/grok 值来自官方价目 2026-07 核实快照）。
 	cases := []struct {
 		model                          string
 		input, output, cached, cacheCr float64
@@ -163,6 +169,11 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		{"claude-opus-4-1-20250805", 15.0, 75.0, 1.5, 18.75},
 		{"claude-fable-5", 10.0, 50.0, 1.0, 12.5},
 		{"gpt-5.5", 5.0, 30.0, 0.5, 0},
+		{"gemini-2.5-pro", 1.25, 10.0, 0.31, 0},
+		{"gemini-3.1-pro-preview", 2.0, 12.0, 0.2, 0},
+		{"gemini-3.5-flash", 1.5, 9.0, 0.15, 0},
+		{"grok-4.3", 1.25, 2.5, 1.25, 0},
+		{"grok-build-0.1", 1.0, 2.0, 1.0, 0},
 	}
 	for _, c := range cases {
 		got, ok := byModel[c.model]
@@ -175,6 +186,19 @@ func TestParseEmbeddedSeed(t *testing.T) {
 			t.Errorf("model %q = in%.4g/out%.4g/cache%.4g/cc%.4g, want %.4g/%.4g/%.4g/%.4g",
 				c.model, got.InputPrice, got.OutputPrice, got.CachedInputPrice, got.CacheCreationPrice,
 				c.input, c.output, c.cached, c.cacheCr)
+		}
+	}
+
+	// 标签归类抽样：四个家族各取一个。
+	tagCases := map[string]string{
+		"claude-fable-5":   "claude",
+		"gpt-5.5":          "openai",
+		"gemini-2.5-flash": "gemini",
+		"grok-4.3":         "grok",
+	}
+	for m, want := range tagCases {
+		if got := byModel[m].TagName; got != want {
+			t.Errorf("model %q tag = %q, want %q", m, got, want)
 		}
 	}
 
@@ -232,7 +256,7 @@ func TestSeedPricingExtra(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse(embeddedSeed) err = %v", err)
 	}
-	byModel := map[string]appmodelprice.CreateInput{}
+	byModel := map[string]SeedItem{}
 	for _, it := range items {
 		byModel[it.Model] = it
 	}

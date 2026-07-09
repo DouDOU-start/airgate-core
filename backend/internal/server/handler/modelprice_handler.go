@@ -26,6 +26,10 @@ func (h *ModelPriceHandler) handleError(logMessage, publicMessage string, err er
 		return 404, err.Error()
 	case errors.Is(err, appmodelprice.ErrModelPriceExists):
 		return 400, err.Error()
+	case errors.Is(err, appmodelprice.ErrTagNotFound):
+		return 404, err.Error()
+	case errors.Is(err, appmodelprice.ErrTagExists):
+		return 400, err.Error()
 	default:
 		slog.Error(logMessage, "error", err)
 		return 500, publicMessage

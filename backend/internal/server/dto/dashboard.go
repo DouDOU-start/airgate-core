@@ -20,15 +20,17 @@ type DashboardStatsResp struct {
 	TotalUsers    int64 `json:"total_users"`
 	NewUsersToday int64 `json:"new_users_today"`
 
-	// 今日 Token
+	// 今日 Token（cost=实际扣费；standard=1 倍率标准价；channel=渠道成本）
 	TodayTokens       int64   `json:"today_tokens"`
 	TodayCost         float64 `json:"today_cost"`
 	TodayStandardCost float64 `json:"today_standard_cost"`
+	TodayChannelCost  float64 `json:"today_channel_cost"`
 
 	// 总 Token
 	AllTimeTokens       int64   `json:"alltime_tokens"`        //nolint:misspell
 	AllTimeCost         float64 `json:"alltime_cost"`          //nolint:misspell
 	AllTimeStandardCost float64 `json:"alltime_standard_cost"` //nolint:misspell
+	AllTimeChannelCost  float64 `json:"alltime_channel_cost"`  //nolint:misspell
 
 	// 性能指标
 	RPM float64 `json:"rpm"`

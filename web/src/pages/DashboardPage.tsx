@@ -247,7 +247,14 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         metaTone="warning"
         title={t('dashboard.today_tokens')}
         value={fmtNum(stats.today_tokens)}
-        meta={<CostPair actual={stats.today_cost} standard={stats.today_standard_cost} />}
+        meta={(
+          <CostPair
+            actual={stats.today_cost}
+            channelCost={stats.today_channel_cost}
+            standard={stats.today_standard_cost}
+            title={t('dashboard.cost_triple_hint')}
+          />
+        )}
       />
       <MetricCard
         icon={<Database className="h-5 w-5" />}
@@ -255,7 +262,14 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
         metaTone="success"
         title={t('dashboard.total_tokens')}
         value={fmtNum(stats.alltime_tokens)}
-        meta={<CostPair actual={stats.alltime_cost} standard={stats.alltime_standard_cost} />}
+        meta={(
+          <CostPair
+            actual={stats.alltime_cost}
+            channelCost={stats.alltime_channel_cost}
+            standard={stats.alltime_standard_cost}
+            title={t('dashboard.cost_triple_hint')}
+          />
+        )}
       />
       <MetricCard
         icon={<Zap className="h-5 w-5" />}

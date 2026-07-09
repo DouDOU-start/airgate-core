@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Tooltip } from '@heroui/react';
 import { ArrowDown, ArrowUp, BookOpen, Sparkles } from 'lucide-react';
-import type { UsageLogResp, CustomerUsageLogResp, UsageAttribute, UsageMetric } from '../types';
+import type { UsageLogResp, CustomerUsageLogResp } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
 import { CostValue } from '../components/CostValue';
 
@@ -111,34 +111,20 @@ function TooltipDivider() {
   return <div className="my-0.5 border-t border-border" />;
 }
 
-const MODEL_META_IMAGE_COLOR = 'rgb(148,163,184)';
-const META_CHIP_LOW_COLOR = 'rgb(34,197,94)';
-const META_CHIP_MEDIUM_COLOR = 'rgb(59,130,246)';
-const META_CHIP_HIGH_COLOR = 'rgb(249,115,22)';
-const META_CHIP_XHIGH_COLOR = 'rgb(239,68,68)';
 const META_CHIP_SERVICE_TIER_COLOR = 'rgb(168,85,247)';
-
-const META_CHIP_EFFORT_COLORS: Record<string, string> = {
-  low: META_CHIP_LOW_COLOR,
-  medium: META_CHIP_MEDIUM_COLOR,
-  high: META_CHIP_HIGH_COLOR,
-  xhigh: META_CHIP_XHIGH_COLOR,
-};
 
 const MODEL_META_SLOT_WIDTH_CLASS = 'w-[5.5rem]';
 
 function MetaChip({
   color,
-  dotColor,
   label,
 }: {
   color: string;
-  dotColor?: string;
   label: string;
 }) {
   return (
     <span
-      className={`${MODEL_META_SLOT_WIDTH_CLASS} ${dotColor ? 'ag-usage-image-size-chip' : ''} inline-flex h-4 shrink-0 items-center justify-center truncate rounded px-1.5 text-[12px] font-semibold leading-none whitespace-nowrap`}
+      className={`${MODEL_META_SLOT_WIDTH_CLASS} inline-flex h-4 shrink-0 items-center justify-center truncate rounded px-1.5 text-[12px] font-semibold leading-none whitespace-nowrap`}
       style={{
         background: `color-mix(in srgb, ${color} 18%, transparent)`,
         boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 34%, transparent)`,
@@ -146,29 +132,9 @@ function MetaChip({
       }}
       title={label}
     >
-      {dotColor ? (
-        <span
-          className="ag-usage-image-size-dot"
-          aria-hidden="true"
-          style={{ backgroundColor: dotColor }}
-        />
-      ) : null}
       {label}
     </span>
   );
-}
-
-function getImageSizeDotColor(imageSize: string): string {
-  const normalized = imageSize.trim().toLowerCase();
-  if (normalized.includes('4k')) return META_CHIP_HIGH_COLOR;
-  if (normalized.includes('2k')) return META_CHIP_MEDIUM_COLOR;
-  if (normalized.includes('1k')) return META_CHIP_LOW_COLOR;
-
-  const dimensions = normalized.match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) ?? [];
-  const maxDimension = Math.max(0, ...dimensions);
-  if (maxDimension > 2048) return META_CHIP_HIGH_COLOR;
-  if (maxDimension > 1536) return META_CHIP_MEDIUM_COLOR;
-  return META_CHIP_LOW_COLOR;
 }
 
 function serviceTierMetaLabel(serviceTier: string): string {
@@ -230,176 +196,62 @@ export function fmtCost(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
-function normalizeUsageKey(value?: string): string {
-  return (value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
-}
+// TokenMetric 计量明细行（直接由 usage_log 的 token 列构造）。
+type TokenMetric = {
+  key: string;
+  label: string;
+  value: number;
+  color: string;
+};
 
-function normalizeMetricKey(metric: Pick<UsageMetric, 'key' | 'kind' | 'label'>): string {
-  return normalizeUsageKey(metric.key || metric.kind || metric.label);
-}
-
-function metricNumber(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
-}
-
-function metricMatches(metric: UsageMetric, keys: string[]) {
-  const key = normalizeMetricKey(metric);
-  return keys.includes(key);
-}
-
-function metricValue(metrics: UsageMetric[], keys: string[]): number | undefined {
-  const item = metrics.find((metric) => metricMatches(metric, keys));
-  return item ? metricNumber(item.value) : undefined;
-}
-
-function firstText(...values: unknown[]): string | undefined {
-  for (const value of values) {
-    if (typeof value !== 'string') continue;
-    const text = value.trim();
-    if (text) return text;
+// tokenMetrics 计量明细：输入/输出恒显示，缓存读/写仅在非零时显示；
+// Claude 双档缓存写有明细时展开 5m/1h 两行。
+function tokenMetrics(row: UsageRow): TokenMetric[] {
+  const cacheCreation = row.cache_creation_tokens ?? 0;
+  const cache5m = row.cache_creation_5m_tokens ?? 0;
+  const cache1h = row.cache_creation_1h_tokens ?? 0;
+  const metrics: TokenMetric[] = [
+    { key: 'input_tokens', label: '输入 Token', value: row.input_tokens, color: USAGE_TOKEN_COLORS.input },
+    { key: 'output_tokens', label: '输出 Token', value: row.output_tokens, color: USAGE_TOKEN_COLORS.output },
+  ];
+  if (row.cached_input_tokens > 0) {
+    metrics.push({ key: 'cached_input_tokens', label: '缓存读取 Token', value: row.cached_input_tokens, color: USAGE_TOKEN_COLORS.cacheRead });
   }
-  return undefined;
-}
-
-function usageAttributeValue(attributes: UsageAttribute[], keys: string[]): string | undefined {
-  const normalizedKeys = new Set(keys.map(normalizeUsageKey));
-  const item = attributes.find((attr) => (
-    normalizedKeys.has(normalizeUsageKey(attr.key || attr.kind || attr.label))
-  ));
-  return firstText(item?.value);
-}
-
-function usageMetadataValue(metadata: Record<string, string>, keys: string[]): string | undefined {
-  const normalizedKeys = new Set(keys.map(normalizeUsageKey));
-  for (const [key, value] of Object.entries(metadata)) {
-    if (!normalizedKeys.has(normalizeUsageKey(key))) continue;
-    const text = firstText(value);
-    if (text) return text;
+  if (cache5m > 0 || cache1h > 0) {
+    if (cache5m > 0) {
+      metrics.push({ key: 'cache_creation_5m_tokens', label: '缓存写入 5m Token', value: cache5m, color: USAGE_TOKEN_COLORS.cacheCreation });
+    }
+    if (cache1h > 0) {
+      metrics.push({ key: 'cache_creation_1h_tokens', label: '缓存写入 1h Token', value: cache1h, color: USAGE_TOKEN_COLORS.cacheCreation });
+    }
+  } else if (cacheCreation > 0) {
+    metrics.push({ key: 'cache_creation_tokens', label: '缓存写入 Token', value: cacheCreation, color: USAGE_TOKEN_COLORS.cacheCreation });
   }
-  return undefined;
-}
-
-function isTotalMetric(metric: UsageMetric) {
-  return metricMatches(metric, ['total_tokens', 'total_token', 'total']);
-}
-
-function formatMetricValue(metric: UsageMetric): string {
-  const value = metricNumber(metric.value);
-  const formatted = Number.isInteger(value)
-    ? value.toLocaleString()
-    : value.toLocaleString(undefined, { maximumFractionDigits: 4 });
-  return metric.unit ? `${formatted} ${metric.unit}` : formatted;
-}
-
-function metricColor(metric: UsageMetric, index: number): string | undefined {
-  const key = normalizeMetricKey(metric);
-  if (key.includes('input') && !key.includes('cached')) return USAGE_TOKEN_COLORS.input;
-  if (key.includes('output')) return USAGE_TOKEN_COLORS.output;
-  if (key.includes('cache_read') || key.includes('cached_input')) return USAGE_TOKEN_COLORS.cacheRead;
-  if (key.includes('cache_creation')) return USAGE_TOKEN_COLORS.cacheCreation;
-  if (metric.kind === 'image') return 'var(--ag-success)';
-  return [USAGE_TOKEN_COLORS.input, USAGE_TOKEN_COLORS.output, USAGE_TOKEN_COLORS.cacheRead, USAGE_TOKEN_COLORS.cacheCreation][index % 4];
-}
-
-function legacyMetrics(row: UsageRow): UsageMetric[] {
-  const cacheCreation = (row as UsageLogResp).cache_creation_tokens ?? 0;
-  return [
-    { key: 'input_tokens', label: '输入 Token', kind: 'token', unit: 'token', value: row.input_tokens },
-    { key: 'output_tokens', label: '输出 Token', kind: 'token', unit: 'token', value: row.output_tokens },
-    { key: 'cached_input_tokens', label: '缓存读取 Token', kind: 'token', unit: 'token', value: row.cached_input_tokens },
-    { key: 'cache_creation_tokens', label: '缓存写入 Token', kind: 'token', unit: 'token', value: cacheCreation },
-  ].filter((metric) => metric.value > 0 || metric.key === 'input_tokens' || metric.key === 'output_tokens');
-}
-
-function rowMetrics(row: UsageRow): UsageMetric[] {
-  const metrics = row.usage_metrics ?? [];
-  if (metrics.length > 0) return metrics;
-  return legacyMetrics(row);
-}
-
-function buildUsageRecordContext(row: UsageRow, customerScope: boolean) {
-  const usageCostDetails = !customerScope && 'usage_cost_details' in row
-    ? (row.usage_cost_details ?? [])
-    : [];
-  const usageAttributes = row.usage_attributes ?? [];
-  const usageMetrics = row.usage_metrics ?? [];
-  const usageMetadata = row.usage_metadata ?? {};
-  const imageSize = firstText(
-    row.image_size,
-    usageAttributeValue(usageAttributes, ['image_size', 'resolution', 'size']),
-    usageMetadataValue(usageMetadata, ['image_size', 'resolution', 'size']),
-  );
-  const serviceTier = firstText(
-    row.service_tier,
-    usageAttributeValue(usageAttributes, ['service_tier', 'tier']),
-    usageMetadataValue(usageMetadata, ['service_tier', 'tier']),
-  );
-  const reasoningEffort = firstText(
-    (row as Partial<UsageLogResp>).reasoning_effort,
-    usageAttributeValue(usageAttributes, ['reasoning_effort', 'reasoning']),
-    usageMetadataValue(usageMetadata, ['reasoning_effort', 'reasoning']),
-  );
-  const reasoningTokens =
-    (row as Partial<UsageLogResp>).reasoning_output_tokens
-    ?? metricValue(usageMetrics, ['reasoning_output_tokens', 'reasoning_tokens', 'reasoning_token']);
-
-  const ctx: Record<string, unknown> = {
-    record: row,
-    customerScope,
-    usageAttributes,
-    usageMetrics,
-    usageCostDetails,
-    usageMetadata,
-    usage_attributes: usageAttributes,
-    usage_metrics: usageMetrics,
-    usage_cost_details: usageCostDetails,
-    usage_metadata: usageMetadata,
-    // 常用的行级别字段做扁平化，方便插件扩展渲染器直接取值。
-    model: row.model,
-    platform: row.platform,
-    service_tier: serviceTier,
-    image_size: imageSize,
-    endpoint: row.endpoint,
-    stream: row.stream,
-    created_at: row.created_at,
-  };
-
-  if (reasoningEffort) ctx.reasoning_effort = reasoningEffort;
-  if (typeof reasoningTokens === 'number' && reasoningTokens > 0) {
-    ctx.reasoning_output_tokens = reasoningTokens;
-  }
-
-  return ctx;
+  return metrics;
 }
 
 function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
-  const allMetrics = rowMetrics(row);
-  const hasSDKMetrics = (row.usage_metrics?.length ?? 0) > 0;
-  const metrics = allMetrics.filter((metric) => (
-    !isTotalMetric(metric) && (metricNumber(metric.value) > 0 || !hasSDKMetrics)
-  ));
-  const totalMetric = allMetrics.find(isTotalMetric);
+  const metrics = tokenMetrics(row);
   const tokenTotal =
-    totalMetric?.value
-    ?? row.input_tokens + row.output_tokens + row.cached_input_tokens + ((row as UsageLogResp).cache_creation_tokens ?? 0);
-  const shouldShowTokenTotal = !!totalMetric || tokenTotal > 0 || metrics.some((metric) => metric.kind === 'token');
+    row.input_tokens + row.output_tokens + row.cached_input_tokens + (row.cache_creation_tokens ?? 0);
+  const calls = row.calls ?? 0;
 
   return (
     <TooltipPanel title={t('usage.metric_detail', '计量明细')} subtitle={row.model}>
-      {metrics.map((metric, index) => (
+      {metrics.map((metric) => (
         <TooltipRow
-          key={metric.key || `${metric.label}:${index}`}
-          label={metric.label || metric.key || t('usage.metric', '计量')}
-          value={formatMetricValue(metric)}
-          color={metricColor(metric, index)}
+          key={metric.key}
+          label={metric.label}
+          value={metric.value.toLocaleString()}
+          color={metric.color}
         />
       ))}
-      {shouldShowTokenTotal && (
-        <>
-          <TooltipDivider />
-          <TooltipRow label={t('usage.total_tokens')} value={Number(tokenTotal).toLocaleString()} tone="strong" />
-        </>
+      {calls > 0 && (
+        // 图像端点的产出张数（按次计费的计次数）；token 端点恒 0 不显示。
+        <TooltipRow label={t('usage.calls', '产出张数')} value={`×${calls}`} tone="accent" />
       )}
+      <TooltipDivider />
+      <TooltipRow label={t('usage.total_tokens')} value={tokenTotal.toLocaleString()} tone="strong" />
     </TooltipPanel>
   );
 }
@@ -428,6 +280,10 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 {row.cached_input_cost > 0 && (
                   <TooltipRow label={t('usage.cached_input_cost')} value={`$${row.cached_input_cost.toFixed(6)}`} />
                 )}
+                {(row.calls ?? 0) > 0 && (
+                  // 图像端点产出张数；按次计费时成本 = input_price × 张数。
+                  <TooltipRow label={t('usage.calls', '产出张数')} value={`×${row.calls}`} />
+                )}
                 <TooltipDivider />
                 {row.service_tier && (
                   <TooltipRow label={t('usage.service_tier')} value={<span className="capitalize">{row.service_tier}</span>} />
@@ -441,8 +297,9 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 )}
                 <TooltipDivider />
                 <TooltipRow label={t('usage.original_cost')} value={<CostValue value={row.total_cost} decimals={6} tone="standard" />} />
-                {adminView && (
-                  <TooltipRow label={t('usage.account_cost', '渠道成本')} value={<CostValue value={row.account_cost} decimals={6} />} />
+                {adminView && row.account_rate_multiplier > 0 && (
+                  // 渠道成本不落列，按快照现算：total × 渠道成本倍率（与原落库值精确一致）
+                  <TooltipRow label={t('usage.account_cost', '渠道成本')} value={<CostValue value={row.total_cost * row.account_rate_multiplier} decimals={6} />} />
                 )}
                 <TooltipRow label={t('usage.user_charged', '用户扣费')} value={<CostValue value={row.actual_cost} decimals={6} tone="actual" />} />
                 {row.sell_rate > 0 && row.billed_cost !== row.actual_cost && (
@@ -455,7 +312,12 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
           )}
         >
           <div className="flex w-full flex-col items-center font-mono text-center text-xs">
-            {row.sell_rate > 0 && row.billed_cost !== row.actual_cost ? (
+            {adminView && row.source === 'channel_test' ? (
+              // 渠道测试不计用户扣费（恒为 0），费用列直接展示渠道成本（红 $ 区分口径）
+              <div className="text-[15px] font-semibold leading-none text-text">
+                <CostValue value={row.total_cost * row.account_rate_multiplier} decimals={6} tone="channel" />
+              </div>
+            ) : row.sell_rate > 0 && row.billed_cost !== row.actual_cost ? (
               <div className="text-[15px] font-semibold leading-none text-text">
                 <CostValue value={row.billed_cost} decimals={6} tone="warning" />
               </div>
@@ -522,7 +384,10 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         const date = new Date(row.created_at);
         const timeLabel = date.toLocaleTimeString('zh-CN', { hour12: false });
         const dateLabel = date.toLocaleDateString('zh-CN');
-        const fullLabel = `${dateLabel} ${timeLabel}`;
+        // request_id 附在 title：与失败请求 Tab 的留痕互查（两侧都露同一 ID）。
+        const fullLabel = row.request_id
+          ? `${dateLabel} ${timeLabel}\nrequest_id: ${row.request_id}`
+          : `${dateLabel} ${timeLabel}`;
 
         return (
           <div className="flex min-w-0 items-center gap-1.5 font-mono text-xs" title={fullLabel}>
@@ -541,38 +406,13 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       title: t('usage.model'),
       width: '220px',
       render: (row) => {
-        const metaContext = buildUsageRecordContext(row, customerScope);
-        const fallbackMeta = (() => {
-          const imageSize = typeof metaContext.image_size === 'string' ? metaContext.image_size : '';
-          if (imageSize) {
-            return (
-              <MetaChip
-                color={MODEL_META_IMAGE_COLOR}
-                dotColor={getImageSizeDotColor(imageSize)}
-                label={imageSize}
-              />
-            );
-          }
-
-          const reasoningEffort = typeof metaContext.reasoning_effort === 'string' ? metaContext.reasoning_effort : '';
-          if (reasoningEffort) {
-            return (
-              <MetaChip
-                color={META_CHIP_EFFORT_COLORS[reasoningEffort.toLowerCase()] ?? 'rgb(148,163,184)'}
-                label={reasoningEffort}
-              />
-            );
-          }
-
-          const serviceTier = typeof metaContext.service_tier === 'string' ? metaContext.service_tier : '';
-          if (!serviceTier) return null;
-          return (
-            <MetaChip
-              color={META_CHIP_SERVICE_TIER_COLOR}
-              label={serviceTierMetaLabel(serviceTier)}
-            />
-          );
-        })();
+        const serviceTier = (row.service_tier ?? '').trim();
+        const fallbackMeta = serviceTier ? (
+          <MetaChip
+            color={META_CHIP_SERVICE_TIER_COLOR}
+            label={serviceTierMetaLabel(serviceTier)}
+          />
+        ) : null;
 
         return (
           <div className="grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2 text-left">
@@ -591,18 +431,15 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       title: t('usage.metrics', '计量'),
       width: '220px',
       render: (row) => {
-        const metrics = rowMetrics(row);
-        const inputTokens = metricValue(metrics, ['input_tokens', 'input_token', 'prompt_tokens', 'prompt_token']) ?? row.input_tokens;
-        const outputTokens = metricValue(metrics, ['output_tokens', 'output_token', 'completion_tokens', 'completion_token']) ?? row.output_tokens;
-        const cacheReadTokens = metricValue(metrics, ['cached_input_tokens', 'cached_input_token', 'cache_read_tokens', 'cache_read_token']) ?? row.cached_input_tokens;
-        const cacheCreationTokens = metricValue(metrics, ['cache_creation_tokens', 'cache_creation_token']) ?? ((row as UsageLogResp).cache_creation_tokens ?? 0);
-        const total =
-          metricValue(metrics, ['total_tokens', 'total_token'])
-          ?? inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
+        const inputTokens = row.input_tokens;
+        const outputTokens = row.output_tokens;
+        const cacheReadTokens = row.cached_input_tokens;
+        const cacheCreationTokens = row.cache_creation_tokens ?? 0;
+        const calls = row.calls ?? 0;
+        const total = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
         const hasCacheRead = cacheReadTokens > 0;
         const hasCacheWrite = cacheCreationTokens > 0;
-        const tokenSummaryVisible = inputTokens > 0 || outputTokens > 0 || hasCacheRead || hasCacheWrite || total > 0;
-        const primaryMetric = metrics.find((metric) => metricNumber(metric.value) > 0 && !isTotalMetric(metric));
+        const tokenSummaryVisible = total > 0;
         return (
           <RichTooltip
             placement="left"
@@ -646,14 +483,16 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
                   {fmtNum(total)}
                 </div>
               </div>
+            ) : calls > 0 ? (
+              // 纯按次计费的图像请求（无 token 计量）：以产出张数代替 "-"。
+              <div className="flex h-full min-w-0 items-center justify-center px-2 text-center">
+                <span className="font-mono text-base font-semibold tabular-nums leading-none text-text">
+                  ×{calls}
+                </span>
+              </div>
             ) : (
-              <div className="flex h-full min-w-0 flex-col items-center justify-center px-2 text-center">
-                <span className="max-w-full truncate text-[11px] leading-none text-text-tertiary" title={primaryMetric?.label || primaryMetric?.key}>
-                  {primaryMetric?.label || primaryMetric?.key || '-'}
-                </span>
-                <span className="mt-1 max-w-full truncate font-mono text-sm font-semibold leading-none text-text">
-                  {primaryMetric ? formatMetricValue(primaryMetric) : '-'}
-                </span>
+              <div className="flex h-full min-w-0 items-center justify-center px-2 text-center">
+                <span className="font-mono text-sm font-semibold leading-none text-text-tertiary">-</span>
               </div>
             )}
           </RichTooltip>
@@ -697,6 +536,47 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         </span>
       ),
     },
+    // customer scope 的响应剥离了 user_agent / ip_address，不渲染客户端列
+    ...(customerScope ? [] : [buildClientColumn(t)]),
     ];
   }, [adminView, customerScope, t]);
+}
+
+/** 客户端列：IP 主行 + UA 次行，悬浮展示完整 IP / User-Agent */
+function buildClientColumn(t: TFunction): UsageColumnConfig<UsageRow> {
+  return {
+    key: 'client',
+    title: t('usage.client', '客户端'),
+    width: '150px',
+    hideOnMobile: true,
+    render: (raw) => {
+      const row = raw as UsageLogResp;
+      const ip = row.ip_address || '';
+      const ua = row.user_agent || '';
+      if (!ip && !ua) {
+        return <span className="block text-center font-mono text-[13px] text-text-secondary">-</span>;
+      }
+      return (
+        <RichTooltip
+          placement="left"
+          content={() => (
+            <TooltipPanel title={t('usage.client', '客户端')}>
+              <TooltipRow label={t('usage.client_ip', 'IP 地址')} value={ip || '-'} />
+              <div className="rounded-[var(--radius)] bg-surface px-2 py-1 text-xs">
+                <div className="text-text-tertiary">User-Agent</div>
+                <div className="mt-0.5 break-all text-left font-mono font-medium text-text-secondary">{ua || '-'}</div>
+              </div>
+            </TooltipPanel>
+          )}
+        >
+          <div className="flex w-full min-w-0 flex-col items-center text-center">
+            <span className="max-w-full truncate font-mono text-xs text-text-secondary">{ip || '-'}</span>
+            {ua ? (
+              <span className="max-w-full truncate text-[11px] leading-tight text-text-tertiary">{ua}</span>
+            ) : null}
+          </div>
+        </RichTooltip>
+      );
+    },
+  };
 }

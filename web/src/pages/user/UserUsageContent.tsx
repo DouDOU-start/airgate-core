@@ -1,19 +1,20 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Button, Card, ListBox, Meter, Select } from '@heroui/react';
+import { Button, Card, ListBox, Meter, Select, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useToast } from '../../shared/ui';
-import { Activity, Hash, DollarSign, Coins, Clock, Gauge, Percent, Upload } from 'lucide-react';
+import { Activity, Hash, Coins, Clock, Gauge, Percent, Upload } from 'lucide-react';
 import type { UsageQuery } from '../../shared/types';
 import { useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '../../shared/columns/usageColumns';
 import { getSessionAPIKey } from '../../shared/api/client';
 import { CcsImportModal } from './userkeys/CcsImportModal';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
+import { UserUpstreamLogsTable } from './UserUpstreamLogsTable';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { CostValue } from '../../shared/components/CostValue';
@@ -184,6 +185,8 @@ export default function UserUsageContent() {
   const customerScope = !!user?.api_key_id;
   const { page, setPage, pageSize, setPageSize } = usePagination(20, 'user.usage');
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
+  // 记录区 Tab：消费记录 | 失败请求（共享筛选；失败请求由后端脱敏）。
+  const [recordsTab, setRecordsTab] = useState<'usage' | 'upstream'>('usage');
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(USER_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, USER_AUTO_REFRESH_OPTIONS);
   const autoRefreshEnabled = autoRefresh > 0;
   const autoRefreshLabel = `${t('usage.auto_update')} `;
@@ -321,7 +324,7 @@ export default function UserUsageContent() {
       <APIKeyInfoBar />
 
       {/* 概览统计 */}
-      <div className={`mb-6 grid grid-cols-1 gap-3 ${customerScope ? 'md:grid-cols-3 xl:grid-cols-3' : 'md:grid-cols-2 xl:grid-cols-4'} 2xl:gap-4`}>
+      <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-3 2xl:gap-4">
         <StatCard
           title={t('usage.total_requests')}
           value={(stats?.total_requests ?? 0).toLocaleString()}
@@ -335,19 +338,25 @@ export default function UserUsageContent() {
           accentColor="var(--ag-info)"
         />
         <StatCard
-          title={t('usage.actual_cost')}
-          value={<CostValue value={visibleActualCost} decimals={4} tone="actual" />}
+          title={t('usage.cost')}
+          value={customerScope ? (
+            // end customer 只能看到自己的账面消费，不暴露标准价
+            <CostValue value={visibleActualCost} decimals={4} tone="actual" />
+          ) : (
+            <span
+              className="inline-flex min-w-0 items-baseline gap-1.5"
+              title={`${t('usage.actual_cost')} / ${t('usage.standard_cost')}`}
+            >
+              <CostValue value={visibleActualCost} decimals={4} tone="actual" />
+              <span className="text-sm text-text-tertiary">/</span>
+              <span className="text-sm opacity-70">
+                <CostValue value={stats?.total_cost ?? 0} decimals={4} tone="standard" />
+              </span>
+            </span>
+          )}
           icon={<Coins className="w-5 h-5" />}
           accentColor="var(--ag-warning)"
         />
-        {!customerScope && (
-          <StatCard
-            title={t('usage.total_cost')}
-            value={<CostValue value={stats?.total_cost ?? 0} decimals={4} tone="standard" />}
-            icon={<DollarSign className="w-5 h-5" />}
-            accentColor="var(--ag-success)"
-          />
-        )}
       </div>
 
       {/* 筛选栏 */}
@@ -415,12 +424,55 @@ export default function UserUsageContent() {
         />
       </div>
 
-      {/* 使用记录表格 */}
+      {/* 记录区：消费记录 | 失败请求 */}
+      <Tabs
+        className="ag-segmented-tabs ag-segmented-tabs-compact mb-3"
+        selectedKey={recordsTab}
+        onSelectionChange={(key) => setRecordsTab(key as 'usage' | 'upstream')}
+      >
+        <Tabs.List>
+          <Tabs.Tab id="usage">
+            <Tabs.Indicator />
+            {t('usage.records_tab_usage')}
+          </Tabs.Tab>
+          <Tabs.Tab id="upstream">
+            <Tabs.Indicator />
+            {t('usage.records_tab_upstream')}
+          </Tabs.Tab>
+        </Tabs.List>
+      </Tabs>
+
+      {recordsTab === 'upstream' && (
+        <UserUpstreamLogsTable
+          filters={{
+            start_date: filters.start_date,
+            end_date: filters.end_date,
+            model: filters.model,
+            api_key_id: filters.api_key_id,
+          }}
+        />
+      )}
+
+      {recordsTab === 'usage' && (
       <UsageRecordsTable
         ariaLabel={t('usage.title', 'Usage')}
         columns={columns}
         dataVersion={dataUpdatedAt}
-        emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
+        emptyAction={filters.start_date || filters.end_date ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            onPress={() => {
+              setPage(1);
+              setFilters((prev) => ({ ...prev, start_date: undefined, end_date: undefined }));
+            }}
+          >
+            {t('usage.view_all_time')}
+          </Button>
+        ) : undefined}
+        emptyDescription={filters.start_date || filters.end_date
+          ? t('usage.empty_in_range')
+          : t('usage.empty_description', '调整筛选条件后重试')}
         emptyTitle={t('common.no_data')}
         highlightNewRows={autoRefreshEnabled && page === 1}
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
@@ -433,6 +485,7 @@ export default function UserUsageContent() {
         suppressHighlight={isPlaceholderData}
         total={total}
       />
+      )}
     </div>
   );
 }

@@ -161,6 +161,14 @@ type usageTotals struct {
 	Tokens       int64
 	Cost         float64
 	StandardCost float64
+	ChannelCost  float64
+}
+
+// usageLogChannelCostSum 渠道成本聚合：Σ(total_cost × account_rate_multiplier)（查询期现算，见 usagelog schema）。
+func usageLogChannelCostSum() ent.AggregateFunc {
+	return func(s *entsql.Selector) string {
+		return "COALESCE(SUM(" + s.C(entusagelog.FieldTotalCost) + " * " + s.C(entusagelog.FieldAccountRateMultiplier) + "), 0)"
+	}
 }
 
 type usageTodaySnapshot struct {
@@ -170,6 +178,7 @@ type usageTodaySnapshot struct {
 	Tokens             int64
 	Cost               float64
 	StandardCost       float64
+	ChannelCost        float64
 	NonImageDurationMs int64
 	FirstTokenRequests int64
 	FirstTokenMs       int64
@@ -186,6 +195,7 @@ func queryUsageTotals(ctx context.Context, query *ent.UsageLogQuery) (usageTotal
 		CacheCreationSum int64   `json:"cache_creation_sum"`
 		CostSum          float64 `json:"cost_sum"`
 		StandardCostSum  float64 `json:"standard_cost_sum"`
+		ChannelCostSum   float64 `json:"channel_cost_sum"`
 	}
 	if err := query.Clone().Aggregate(
 		ent.Count(),
@@ -195,6 +205,7 @@ func queryUsageTotals(ctx context.Context, query *ent.UsageLogQuery) (usageTotal
 		ent.As(ent.Sum(entusagelog.FieldCacheCreationTokens), "cache_creation_sum"),
 		ent.As(ent.Sum(entusagelog.FieldActualCost), "cost_sum"),
 		ent.As(ent.Sum(entusagelog.FieldTotalCost), "standard_cost_sum"),
+		ent.As(usageLogChannelCostSum(), "channel_cost_sum"),
 	).Scan(ctx, &rows); err != nil {
 		return usageTotals{}, err
 	}
@@ -206,6 +217,7 @@ func queryUsageTotals(ctx context.Context, query *ent.UsageLogQuery) (usageTotal
 		Tokens:       rows[0].InputSum + rows[0].OutputSum + rows[0].CacheSum + rows[0].CacheCreationSum,
 		Cost:         rows[0].CostSum,
 		StandardCost: rows[0].StandardCostSum,
+		ChannelCost:  rows[0].ChannelCostSum,
 	}, nil
 }
 
@@ -218,6 +230,7 @@ func queryTodayUsageSnapshot(ctx context.Context, query *ent.UsageLogQuery, toda
 		CacheCreationSum   int64   `json:"cache_creation_sum"`
 		CostSum            float64 `json:"cost_sum"`
 		StandardCostSum    float64 `json:"standard_cost_sum"`
+		ChannelCostSum     float64 `json:"channel_cost_sum"`
 		ImageRequests      int64   `json:"image_requests"`
 		NonImageRequests   int64   `json:"non_image_requests"`
 		NonImageDurationMs int64   `json:"non_image_duration_ms"`
@@ -236,6 +249,7 @@ func queryTodayUsageSnapshot(ctx context.Context, query *ent.UsageLogQuery, toda
 			ent.As(ent.Sum(entusagelog.FieldCacheCreationTokens), "cache_creation_sum"),
 			ent.As(ent.Sum(entusagelog.FieldActualCost), "cost_sum"),
 			ent.As(ent.Sum(entusagelog.FieldTotalCost), "standard_cost_sum"),
+			ent.As(usageLogChannelCostSum(), "channel_cost_sum"),
 			ent.As(usageLogCountIf(usageLogImageCondition), "image_requests"),
 			ent.As(usageLogCountIf(usageLogNonImageCondition), "non_image_requests"),
 			ent.As(usageLogSumIf(usageLogNonImageCondition, entusagelog.FieldDurationMs), "non_image_duration_ms"),
@@ -257,6 +271,7 @@ func queryTodayUsageSnapshot(ctx context.Context, query *ent.UsageLogQuery, toda
 		Tokens:             rows[0].InputSum + rows[0].OutputSum + rows[0].CacheSum + rows[0].CacheCreationSum,
 		Cost:               rows[0].CostSum,
 		StandardCost:       rows[0].StandardCostSum,
+		ChannelCost:        rows[0].ChannelCostSum,
 		NonImageDurationMs: rows[0].NonImageDurationMs,
 		FirstTokenRequests: rows[0].FirstTokenRequests,
 		FirstTokenMs:       rows[0].FirstTokenMs,
@@ -406,6 +421,7 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 		TodayTokens:             todayUsage.Tokens,
 		TodayCost:               todayUsage.Cost,
 		TodayStandardCost:       todayUsage.StandardCost,
+		TodayChannelCost:        todayUsage.ChannelCost,
 		TodayNonImageDurationMs: todayUsage.NonImageDurationMs,
 		TodayFirstTokenRequests: todayUsage.FirstTokenRequests,
 		TodayFirstTokenMs:       todayUsage.FirstTokenMs,
@@ -414,6 +430,7 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 		AllTimeTokens:           allTimeTotals.Tokens,
 		AllTimeCost:             allTimeTotals.Cost,
 		AllTimeStandardCost:     allTimeTotals.StandardCost,
+		AllTimeChannelCost:      allTimeTotals.ChannelCost,
 		RecentRequests:          recentTotals.Requests,
 		RecentTokens:            recentTotals.Tokens,
 	}, nil

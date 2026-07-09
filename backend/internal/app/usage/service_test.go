@@ -11,8 +11,8 @@ func TestUserStatsWithModelsCombinesSummaryAndModelStats(t *testing.T) {
 			if userID != 42 {
 				t.Fatalf("SummaryUser userID = %d, want 42", userID)
 			}
-			if filter.Platform != "openai" || filter.Model != "gpt-5.5" {
-				t.Fatalf("SummaryUser filter = %+v, want openai/gpt-5.5", filter)
+			if filter.Model != "gpt-5.5" {
+				t.Fatalf("SummaryUser filter = %+v, want gpt-5.5", filter)
 			}
 			return Summary{TotalRequests: 7, TotalTokens: 99, TotalBilledCost: 3.14}, nil
 		},
@@ -26,8 +26,7 @@ func TestUserStatsWithModelsCombinesSummaryAndModelStats(t *testing.T) {
 
 	svc := NewService(repo)
 	result, err := svc.UserStatsWithModels(context.Background(), 42, StatsFilter{
-		Platform: "openai",
-		Model:    "gpt-5.5",
+		Model: "gpt-5.5",
 	})
 	if err != nil {
 		t.Fatalf("UserStatsWithModels returned error: %v", err)
@@ -68,12 +67,20 @@ type stubUsageRepository struct {
 	trendEntriesFn   func(context.Context, TrendFilter) ([]TrendEntry, error)
 }
 
-func (s *stubUsageRepository) ListUser(context.Context, int64, ListFilter) ([]LogRecord, int64, error) {
-	return nil, 0, nil
+func (s *stubUsageRepository) ListUser(context.Context, int64, ListFilter) ([]LogRecord, error) {
+	return nil, nil
 }
 
-func (s *stubUsageRepository) ListAdmin(context.Context, ListFilter) ([]LogRecord, int64, error) {
-	return nil, 0, nil
+func (s *stubUsageRepository) ListAdmin(context.Context, ListFilter) ([]LogRecord, error) {
+	return nil, nil
+}
+
+func (s *stubUsageRepository) CountUser(context.Context, int64, ListFilter) (int64, error) {
+	return 0, nil
+}
+
+func (s *stubUsageRepository) CountAdmin(context.Context, ListFilter) (int64, error) {
+	return 0, nil
 }
 
 func (s *stubUsageRepository) SummaryUser(ctx context.Context, userID int64, filter StatsFilter) (Summary, error) {

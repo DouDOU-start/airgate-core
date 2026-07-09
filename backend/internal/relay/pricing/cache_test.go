@@ -90,6 +90,30 @@ func TestComputeCosts(t *testing.T) {
 			want:  Costs{Input: 0.02},
 		},
 		{
+			name:  "per_request × 张数（图像端点 Calls=产出张数）",
+			price: Price{PerRequest: 0.04},
+			usage: Usage{Calls: 3},
+			want:  Costs{Input: 0.12},
+		},
+		{
+			name:  "per_request Calls=0 视为 1（chat 等既有路径回归）",
+			price: Price{PerRequest: 0.02},
+			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 500_000},
+			want:  Costs{Input: 0.02},
+		},
+		{
+			name:  "per_request 负 Calls 钳为 1（上游不可信）",
+			price: Price{PerRequest: 0.02},
+			usage: Usage{Calls: -5},
+			want:  Costs{Input: 0.02},
+		},
+		{
+			name:  "token 计费不受 Calls 影响（PerRequest==0 时张数不参与）",
+			price: Price{Input: 3, Output: 15},
+			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000, Calls: 7},
+			want:  Costs{Input: 3, Output: 15},
+		},
+		{
 			name:  "长上下文：prompt 未超阈值用 base 单价",
 			price: Price{Input: 2.5, Output: 15, CachedInput: 0.25, LongContext: longCtxRule},
 			usage: Usage{PromptTokens: 272_000, CompletionTokens: 0},

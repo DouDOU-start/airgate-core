@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
-	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
 	entchannel "github.com/DouDOU-start/airgate-core/ent/channel"
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
@@ -26,22 +25,42 @@ func NewUsageStore(db *ent.Client) *UsageStore {
 	return &UsageStore{db: db}
 }
 
-// ListUser 查询用户使用记录。
-func (s *UsageStore) ListUser(ctx context.Context, userID int64, filter appusage.ListFilter) ([]appusage.LogRecord, int64, error) {
+// ListUser 查询用户使用记录（仅当前页行，计数走 CountUser）。
+func (s *UsageStore) ListUser(ctx context.Context, userID int64, filter appusage.ListFilter) ([]appusage.LogRecord, error) {
 	query := s.db.UsageLog.Query().
 		Where(usageUserPredicate(userID))
 	query = applyUsageListFilter(query, filter)
-	return s.paginateUsageLogs(ctx, query, filter.Page, filter.PageSize)
+	return s.pageUsageLogs(ctx, query, filter.Page, filter.PageSize)
 }
 
-// ListAdmin 查询管理员使用记录。
-func (s *UsageStore) ListAdmin(ctx context.Context, filter appusage.ListFilter) ([]appusage.LogRecord, int64, error) {
+// ListAdmin 查询管理员使用记录（仅当前页行，计数走 CountAdmin）。
+func (s *UsageStore) ListAdmin(ctx context.Context, filter appusage.ListFilter) ([]appusage.LogRecord, error) {
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
 		query = query.Where(usageUserPredicate(*filter.UserID))
 	}
 	query = applyUsageListFilter(query, filter)
-	return s.paginateUsageLogs(ctx, query, filter.Page, filter.PageSize)
+	return s.pageUsageLogs(ctx, query, filter.Page, filter.PageSize)
+}
+
+// CountUser 统计用户使用记录总数。
+func (s *UsageStore) CountUser(ctx context.Context, userID int64, filter appusage.ListFilter) (int64, error) {
+	query := s.db.UsageLog.Query().
+		Where(usageUserPredicate(userID))
+	query = applyUsageListFilter(query, filter)
+	total, err := query.Count(ctx)
+	return int64(total), err
+}
+
+// CountAdmin 统计管理员使用记录总数。
+func (s *UsageStore) CountAdmin(ctx context.Context, filter appusage.ListFilter) (int64, error) {
+	query := s.db.UsageLog.Query()
+	if filter.UserID != nil {
+		query = query.Where(usageUserPredicate(*filter.UserID))
+	}
+	query = applyUsageListFilter(query, filter)
+	total, err := query.Count(ctx)
+	return int64(total), err
 }
 
 // SummaryUser 查询用户汇总统计。
@@ -373,28 +392,20 @@ func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilt
 	return result, nil
 }
 
-// paginateUsageLogs 延迟 JOIN 分页：先查 ID（索引扫描），再按 ID 加载完整行，
+// pageUsageLogs 延迟 JOIN 分页：先查 ID（索引扫描），再按 ID 加载完整行，
 // 避免 OFFSET 丢弃行与 4 表 JOIN 叠加导致的深页性能劣化。
-func (s *UsageStore) paginateUsageLogs(ctx context.Context, query *ent.UsageLogQuery, page, pageSize int) ([]appusage.LogRecord, int64, error) {
-	total, err := query.Clone().Count(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	if total == 0 {
-		return nil, 0, nil
-	}
-
-	ids, err := query.Clone().
+func (s *UsageStore) pageUsageLogs(ctx context.Context, query *ent.UsageLogQuery, page, pageSize int) ([]appusage.LogRecord, error) {
+	ids, err := query.
 		Offset((page-1)*pageSize).
 		Limit(pageSize).
 		Order(ent.Desc(entusagelog.FieldCreatedAt), ent.Desc(entusagelog.FieldID)).
 		Select(entusagelog.FieldID).
 		Ints(ctx)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	if len(ids) == 0 {
-		return nil, int64(total), nil
+		return nil, nil
 	}
 
 	logs, err := s.db.UsageLog.Query().
@@ -406,14 +417,14 @@ func (s *UsageStore) paginateUsageLogs(ctx context.Context, query *ent.UsageLogQ
 		Order(ent.Desc(entusagelog.FieldCreatedAt), ent.Desc(entusagelog.FieldID)).
 		All(ctx)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	result := make([]appusage.LogRecord, 0, len(logs))
 	for _, item := range logs {
 		result = append(result, mapUsageLog(item))
 	}
-	return result, int64(total), nil
+	return result, nil
 }
 
 func usageUserPredicate(userID int64) predicate.UsageLog {
@@ -437,17 +448,21 @@ func coalesceString(primary, fallback string) string {
 }
 
 func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) *ent.UsageLogQuery {
+	// 直连 FK 列谓词（边已绑定显式字段）：命中 (fk, created_at) 组合索引，
+	// 避免 EXISTS 子查询干扰规划器。
 	if filter.APIKeyID != nil {
-		query = query.Where(entusagelog.HasAPIKeyWith(entapikey.IDEQ(int(*filter.APIKeyID))))
+		query = query.Where(entusagelog.APIKeyIDEQ(int(*filter.APIKeyID)))
 	}
 	if filter.ChannelID != nil {
-		query = query.Where(entusagelog.HasChannelWith(entchannel.IDEQ(int(*filter.ChannelID))))
+		query = query.Where(entusagelog.ChannelIDEQ(int(*filter.ChannelID)))
 	}
 	if filter.GroupID != nil {
-		query = query.Where(entusagelog.HasGroupWith(entgroup.IDEQ(int(*filter.GroupID))))
+		query = query.Where(entusagelog.GroupIDEQ(int(*filter.GroupID)))
+	}
+	if filter.RequestID != "" {
+		query = query.Where(entusagelog.RequestIDEQ(filter.RequestID))
 	}
 	return applyUsageStatsFilter(query, appusage.StatsFilter{
-		Platform:    filter.Platform,
 		Model:       filter.Model,
 		StartDate:   filter.StartDate,
 		EndDate:     filter.EndDate,
@@ -458,10 +473,7 @@ func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) 
 
 func applyUsageStatsFilter(query *ent.UsageLogQuery, filter appusage.StatsFilter) *ent.UsageLogQuery {
 	if filter.APIKeyID != nil {
-		query = query.Where(entusagelog.HasAPIKeyWith(entapikey.IDEQ(int(*filter.APIKeyID))))
-	}
-	if filter.Platform != "" {
-		query = query.Where(entusagelog.PlatformEQ(filter.Platform))
+		query = query.Where(entusagelog.APIKeyIDEQ(int(*filter.APIKeyID)))
 	}
 	if filter.Model != "" {
 		query = query.Where(entusagelog.ModelContains(filter.Model))
@@ -481,12 +493,9 @@ func applyUsageStatsFilter(query *ent.UsageLogQuery, filter appusage.StatsFilter
 }
 
 func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summary, error) {
-	totalRequests, err := query.Clone().Count(ctx)
-	if err != nil {
-		return appusage.Summary{}, err
-	}
-
+	// COUNT 并入同一次聚合：一趟扫描出全部汇总，替代原先 Count + Sum 两趟。
 	var rows []struct {
+		Count               int     `json:"count"`
 		InputTokens         int64   `json:"input_tokens"`
 		OutputTokens        int64   `json:"output_tokens"`
 		CachedInputTokens   int64   `json:"cached_input_tokens"`
@@ -495,8 +504,9 @@ func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summar
 		ActualCost          float64 `json:"actual_cost"`
 		BilledCost          float64 `json:"billed_cost"`
 	}
-	err = query.Clone().
+	err := query.
 		Aggregate(
+			ent.Count(),
 			ent.As(ent.Sum(entusagelog.FieldInputTokens), "input_tokens"),
 			ent.As(ent.Sum(entusagelog.FieldOutputTokens), "output_tokens"),
 			ent.As(ent.Sum(entusagelog.FieldCachedInputTokens), "cached_input_tokens"),
@@ -510,8 +520,9 @@ func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summar
 		return appusage.Summary{}, err
 	}
 
-	summary := appusage.Summary{TotalRequests: int64(totalRequests)}
+	summary := appusage.Summary{}
 	if len(rows) > 0 {
+		summary.TotalRequests = int64(rows[0].Count)
 		summary.TotalTokens = rows[0].InputTokens + rows[0].OutputTokens + rows[0].CachedInputTokens + rows[0].CacheCreationTokens
 		summary.TotalCost = rows[0].TotalCost
 		summary.TotalActualCost = rows[0].ActualCost
@@ -523,7 +534,6 @@ func scanSummary(ctx context.Context, query *ent.UsageLogQuery) (appusage.Summar
 func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 	record := appusage.LogRecord{
 		ID:                    int64(item.ID),
-		Platform:              item.Platform,
 		Model:                 item.Model,
 		InputTokens:           item.InputTokens,
 		OutputTokens:          item.OutputTokens,
@@ -531,7 +541,7 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		CacheCreationTokens:   item.CacheCreationTokens,
 		CacheCreation5mTokens: item.CacheCreation5mTokens,
 		CacheCreation1hTokens: item.CacheCreation1hTokens,
-		ReasoningOutputTokens: item.ReasoningOutputTokens,
+		Calls:                 item.Calls,
 		InputPrice:            item.InputPrice,
 		OutputPrice:           item.OutputPrice,
 		CachedInputPrice:      item.CachedInputPrice,
@@ -541,27 +551,21 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		OutputCost:            item.OutputCost,
 		CachedInputCost:       item.CachedInputCost,
 		CacheCreationCost:     item.CacheCreationCost,
-		ImageCost:             item.ImageCost,
 		TotalCost:             item.TotalCost,
 		ActualCost:            item.ActualCost,
 		BilledCost:            item.BilledCost,
-		AccountCost:           item.AccountCost,
 		RateMultiplier:        item.RateMultiplier,
 		SellRate:              item.SellRate,
 		AccountRateMultiplier: item.AccountRateMultiplier,
 		ServiceTier:           item.ServiceTier,
-		ImageSize:             item.ImageSize,
 		Stream:                item.Stream,
 		DurationMs:            item.DurationMs,
 		FirstTokenMs:          item.FirstTokenMs,
 		UserAgent:             item.UserAgent,
 		IPAddress:             item.IPAddress,
 		Endpoint:              item.Endpoint,
-		ReasoningEffort:       item.ReasoningEffort,
-		UsageAttributes:       item.UsageAttributes,
-		UsageMetrics:          item.UsageMetrics,
-		UsageCostDetails:      item.UsageCostDetails,
-		UsageMetadata:         item.UsageMetadata,
+		Source:                item.Source,
+		RequestID:             item.RequestID,
 		CreatedAt:             item.CreatedAt.Format(time.RFC3339),
 	}
 

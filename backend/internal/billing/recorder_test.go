@@ -43,7 +43,6 @@ func TestRecordSyncPersistsUserEmailSnapshot(t *testing.T) {
 		UserEmail: user.Email,
 		ChannelID: channel.ID,
 		GroupID:   group.ID,
-		Platform:  "openai",
 		Model:     "gpt-5",
 	})
 	if err != nil {

@@ -30,7 +30,6 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 	}
 
 	if _, err := db.UsageLog.Create().
-		SetPlatform("openai").
 		SetModel("gpt-4.1").
 		SetInputTokens(10).
 		SetOutputTokens(20).
@@ -47,7 +46,6 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 	}
 
 	if _, err := db.UsageLog.Create().
-		SetPlatform("openai").
 		SetModel("gpt-image-1").
 		SetInputTokens(1).
 		SetOutputTokens(2).
@@ -115,7 +113,6 @@ func TestDashboardStoreListTrendLogsIncludesSnapshotOnlyRows(t *testing.T) {
 	}
 
 	if _, err := db.UsageLog.Create().
-		SetPlatform("openai").
 		SetModel("gpt-4.1").
 		SetInputTokens(10).
 		SetOutputTokens(20).
@@ -128,7 +125,6 @@ func TestDashboardStoreListTrendLogsIncludesSnapshotOnlyRows(t *testing.T) {
 	}
 
 	if _, err := db.UsageLog.Create().
-		SetPlatform("openai").
 		SetModel("gpt-image-1").
 		SetInputTokens(1).
 		SetOutputTokens(2).

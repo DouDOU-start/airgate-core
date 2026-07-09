@@ -200,3 +200,44 @@ func (s *Service) invalidate() {
 		s.invalidator.Invalidate()
 	}
 }
+
+// —— 模型标签用例（家族归类，归属模型管理）——
+
+// ListTags 列出全部标签（含模型计数）。
+func (s *Service) ListTags(ctx context.Context) ([]Tag, error) {
+	return s.repo.ListTags(ctx)
+}
+
+// CreateTag 新建标签。
+func (s *Service) CreateTag(ctx context.Context, name string) (Tag, error) {
+	logger := sdk.LoggerFromContext(ctx)
+	tag, err := s.repo.CreateTag(ctx, name)
+	if err != nil {
+		logger.Error("model_tag_persist_failed", "op", "create", "name", name, sdk.LogFieldError, err)
+		return Tag{}, err
+	}
+	logger.Info("model_tag_created", "model_tag_id", tag.ID, "name", tag.Name)
+	return tag, nil
+}
+
+// RenameTag 重命名标签（引用侧经外键自动跟随）。
+func (s *Service) RenameTag(ctx context.Context, id int, name string) (Tag, error) {
+	logger := sdk.LoggerFromContext(ctx)
+	tag, err := s.repo.RenameTag(ctx, id, name)
+	if err != nil {
+		logger.Error("model_tag_persist_failed", "op", "rename", "model_tag_id", id, sdk.LogFieldError, err)
+		return Tag{}, err
+	}
+	return tag, nil
+}
+
+// DeleteTag 删除标签；引用该标签的模型 tag_id 置空（store 事务内完成）。
+func (s *Service) DeleteTag(ctx context.Context, id int) error {
+	logger := sdk.LoggerFromContext(ctx)
+	if err := s.repo.DeleteTag(ctx, id); err != nil {
+		logger.Error("model_tag_persist_failed", "op", "delete", "model_tag_id", id, sdk.LogFieldError, err)
+		return err
+	}
+	logger.Info("model_tag_deleted", "model_tag_id", id)
+	return nil
+}

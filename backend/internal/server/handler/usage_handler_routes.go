@@ -37,8 +37,8 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		APIKeyID:    apiKeyFilter,
 		ChannelID:   query.ChannelID,
 		GroupID:     query.GroupID,
-		Platform:    query.Platform,
 		Model:       query.Model,
+		RequestID:   query.RequestID,
 		StartDate:   query.StartDate,
 		EndDate:     query.EndDate,
 		TZ:          c.Query("tz"),
@@ -60,12 +60,10 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		return
 	}
 
-	// 用户视角：剥离账号级别字段（account_cost / account_rate_multiplier），
-	// 仅管理端 AdminUsage 才返回。
+	// 用户视角：剥离渠道成本倍率快照（渠道成本 = total × 该快照，仅管理端可见）。
 	list := make([]dto.UsageLogResp, 0, len(result.List))
 	for _, item := range result.List {
 		resp := toUsageLogResp(item)
-		resp.AccountCost = 0
 		resp.AccountRateMultiplier = 0
 		list = append(list, resp)
 	}
@@ -96,7 +94,6 @@ func (h *UsageHandler) UserUsageStats(c *gin.Context) {
 	tz := c.Query("tz")
 	result, err := h.service.UserStatsWithModels(c.Request.Context(), int64(userID), appusage.StatsFilter{
 		APIKeyID:    apiKeyFilter,
-		Platform:    query.Platform,
 		Model:       query.Model,
 		StartDate:   query.StartDate,
 		EndDate:     query.EndDate,
@@ -178,7 +175,6 @@ func (h *UsageHandler) UserUsageTrend(c *gin.Context) {
 		StatsFilter: appusage.StatsFilter{
 			UserID:      &uid64,
 			APIKeyID:    scopedKeyTrend,
-			Platform:    query.Platform,
 			Model:       query.Model,
 			StartDate:   query.StartDate,
 			EndDate:     query.EndDate,
@@ -229,8 +225,8 @@ func (h *UsageHandler) AdminUsage(c *gin.Context) {
 		APIKeyID:  query.APIKeyID,
 		ChannelID: query.ChannelID,
 		GroupID:   query.GroupID,
-		Platform:  query.Platform,
 		Model:     query.Model,
+		RequestID: query.RequestID,
 		StartDate: query.StartDate,
 		EndDate:   query.EndDate,
 		TZ:        c.Query("tz"),
@@ -259,7 +255,6 @@ func (h *UsageHandler) AdminUsageStats(c *gin.Context) {
 	result, err := h.service.AdminStats(c.Request.Context(), appusage.StatsFilter{
 		UserID:    query.UserID,
 		APIKeyID:  query.APIKeyID,
-		Platform:  query.Platform,
 		Model:     query.Model,
 		StartDate: query.StartDate,
 		EndDate:   query.EndDate,
@@ -286,7 +281,6 @@ func (h *UsageHandler) AdminUsageTrend(c *gin.Context) {
 		StatsFilter: appusage.StatsFilter{
 			UserID:    query.UserID,
 			APIKeyID:  query.APIKeyID,
-			Platform:  query.Platform,
 			Model:     query.Model,
 			StartDate: query.StartDate,
 			EndDate:   query.EndDate,

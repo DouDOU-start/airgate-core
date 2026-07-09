@@ -2,8 +2,6 @@ package usage
 
 import (
 	"context"
-
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // ListFilter 使用记录列表筛选。
@@ -14,8 +12,8 @@ type ListFilter struct {
 	APIKeyID  *int64
 	ChannelID *int64
 	GroupID   *int64
-	Platform  string
 	Model     string
+	RequestID string // 精确互查：从失败留痕跳查同一请求的计费行
 	StartDate string
 	EndDate   string
 	TZ        string // IANA 时区名，用于解析 StartDate/EndDate
@@ -29,7 +27,6 @@ type ListFilter struct {
 type StatsFilter struct {
 	UserID      *int64
 	APIKeyID    *int64
-	Platform    string
 	Model       string
 	StartDate   string
 	EndDate     string
@@ -57,7 +54,6 @@ type LogRecord struct {
 	ChannelID             int64
 	ChannelName           string
 	GroupID               int64
-	Platform              string
 	Model                 string
 	InputTokens           int
 	OutputTokens          int
@@ -65,7 +61,7 @@ type LogRecord struct {
 	CacheCreationTokens   int
 	CacheCreation5mTokens int
 	CacheCreation1hTokens int
-	ReasoningOutputTokens int
+	Calls                 int // 按次计费计次数（图像端点=产出张数）；token 计费恒 0
 	InputPrice            float64
 	OutputPrice           float64
 	CachedInputPrice      float64
@@ -75,27 +71,21 @@ type LogRecord struct {
 	OutputCost            float64
 	CachedInputCost       float64
 	CacheCreationCost     float64
-	ImageCost             float64
 	TotalCost             float64
 	ActualCost            float64 // 平台真实成本（用户扣费）
 	BilledCost            float64 // 客户账面消耗（reseller 销售管道）
-	AccountCost           float64 // 账号实际成本（账号管理统计专用）
 	RateMultiplier        float64 // 快照：本次生效的平台计费倍率
 	SellRate              float64 // 快照：本次生效的销售倍率（0 表示未启用 markup）
-	AccountRateMultiplier float64 // 快照：本次生效的 account_rate
+	AccountRateMultiplier float64 // 快照：本次生效的渠道成本倍率；渠道成本 = TotalCost × 本值，查询期现算
 	ServiceTier           string
-	ImageSize             string // 图像生成请求的实际出图尺寸（"WxH"），非图像请求留空
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64
 	UserAgent             string
 	IPAddress             string
 	Endpoint              string
-	ReasoningEffort       string
-	UsageAttributes       []sdk.UsageAttribute
-	UsageMetrics          []sdk.UsageMetric
-	UsageCostDetails      []sdk.UsageCostDetail
-	UsageMetadata         map[string]string
+	Source                string // 记账来源：relay 用户转发 / channel_test 渠道测试
+	RequestID             string
 	CreatedAt             string
 }
 
@@ -201,9 +191,13 @@ type TrendBucket struct {
 }
 
 // Repository 使用记录仓储接口。
+// List* 只取当前页行；Count* 单独计数，由 service 层做短 TTL 缓存
+// （大表每次翻页都精确 COUNT 是列表接口超时的主因）。
 type Repository interface {
-	ListUser(context.Context, int64, ListFilter) ([]LogRecord, int64, error)
-	ListAdmin(context.Context, ListFilter) ([]LogRecord, int64, error)
+	ListUser(context.Context, int64, ListFilter) ([]LogRecord, error)
+	ListAdmin(context.Context, ListFilter) ([]LogRecord, error)
+	CountUser(context.Context, int64, ListFilter) (int64, error)
+	CountAdmin(context.Context, ListFilter) (int64, error)
 	SummaryUser(context.Context, int64, StatsFilter) (Summary, error)
 	SummaryAdmin(context.Context, StatsFilter) (Summary, error)
 	StatsByModel(context.Context, StatsFilter) ([]ModelStats, error)

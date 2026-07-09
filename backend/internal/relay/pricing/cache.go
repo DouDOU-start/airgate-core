@@ -50,6 +50,9 @@ type Usage struct {
 	// CacheCreation5mTokens / CacheCreation1hTokens Claude 双档缓存写入明细；openai 入口恒 0。
 	CacheCreation5mTokens int
 	CacheCreation1hTokens int
+	// Calls 按次计费的计次数（图像端点=响应产出张数）；仅 PerRequest>0 时参与计算，
+	// 0 或负数视为 1（chat 等 token 端点不设该字段，行为与历史一致）。
+	Calls int
 }
 
 // Costs ComputeCosts 的分段成本结果（缓存写入拆 5m/1h 两档，供分列落账）。
@@ -169,7 +172,9 @@ func (c *Cache) Invalidate() {
 //
 // 计算顺序（严格）：
 //  1. 全部 token 计数统一钳 0（上游为不可信第三方，负数会虚增 input 费用或写入负成本）。
-//  2. PerRequest > 0：整单按次计费，Input=PerRequest，其余为 0（忽略服务档/长上下文）。
+//  2. PerRequest > 0：整单按次计费，Input = PerRequest × max(Calls, 1)
+//     （图像端点 Calls=响应产出张数；chat 等未设 Calls 恒按 1 次），
+//     其余为 0（忽略全部 token 单价 / 服务档 / 长上下文）。
 //  3. 取 base 单价 inR/outR/cachedR；若 LongContext!=nil 且 PromptTokens 超阈值，
 //     各单价乘对应倍率（长上下文阶梯，阈值比较对象是含 cached 的完整 prompt）。
 //  4. 缓存写入分档：cc5mTokens = CacheCreation5mTokens>0 ? 它 : CacheCreationTokens（泛化回退当 5m）；
@@ -186,7 +191,11 @@ func ComputeCosts(p Price, u Usage, serviceTier string) Costs {
 	u.CacheCreation1hTokens = clampNonNegative(u.CacheCreation1hTokens)
 
 	if p.PerRequest > 0 {
-		return Costs{Input: p.PerRequest}
+		calls := u.Calls
+		if calls < 1 {
+			calls = 1
+		}
+		return Costs{Input: p.PerRequest * float64(calls)}
 	}
 
 	inR, outR, cachedR := p.Input, p.Output, p.CachedInput

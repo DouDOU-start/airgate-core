@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
@@ -35,6 +36,9 @@ func NewService(repo Repository, rdb ...*redis.Client) *Service {
 const (
 	usageStatsCacheTTL = 10 * time.Second
 	usageTrendCacheTTL = 15 * time.Second
+	// usageCountCacheTTL 列表总数缓存：大表精确 COUNT 昂贵，翻页时总数
+	// 容忍 30s 陈旧（当前页行始终实时查询，只有分页器的总数可能短暂滞后）。
+	usageCountCacheTTL = 30 * time.Second
 	usageCacheLockTTL  = 5 * time.Second
 	usageCacheLockWait = 1 * time.Second
 	usageCacheV1Key    = "airgate:usage:v1"
@@ -55,10 +59,20 @@ func (s *Service) ListUser(ctx context.Context, userID int64, filter ListFilter)
 	filter.Page = page
 	filter.PageSize = pageSize
 
-	list, total, err := s.repo.ListUser(ctx, userID, filter)
+	list, err := s.repo.ListUser(ctx, userID, filter)
 	if err != nil {
 		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
 			"scope", "user_list",
+			sdk.LogFieldUserID, userID,
+			sdk.LogFieldError, err)
+		return ListResult{}, err
+	}
+	total, err := s.cachedListTotal(ctx, "user-count", userID, filter, func(loadCtx context.Context) (int64, error) {
+		return s.repo.CountUser(loadCtx, userID, filter)
+	})
+	if err != nil {
+		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
+			"scope", "user_count",
 			sdk.LogFieldUserID, userID,
 			sdk.LogFieldError, err)
 		return ListResult{}, err
@@ -70,6 +84,19 @@ func (s *Service) ListUser(ctx context.Context, userID int64, filter ListFilter)
 		Page:     page,
 		PageSize: pageSize,
 	}, nil
+}
+
+// cachedListTotal 按「筛选条件（剔除分页参数）」缓存列表总数，
+// 翻页只换 Offset 时不再对大表重复精确 COUNT。
+func (s *Service) cachedListTotal(ctx context.Context, kind string, userID int64, filter ListFilter, loader func(context.Context) (int64, error)) (int64, error) {
+	countFilter := filter
+	countFilter.Page = 0
+	countFilter.PageSize = 0
+	key := usageCacheKey(kind, struct {
+		UserID int64
+		Filter ListFilter
+	}{UserID: userID, Filter: countFilter})
+	return usageCachedResult(ctx, s.rdb, key, usageCountCacheTTL, loader)
 }
 
 // UserStats 查询当前用户汇总统计。
@@ -121,10 +148,19 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult,
 	filter.Page = page
 	filter.PageSize = pageSize
 
-	list, total, err := s.repo.ListAdmin(ctx, filter)
+	list, err := s.repo.ListAdmin(ctx, filter)
 	if err != nil {
 		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
 			"scope", "admin_list",
+			sdk.LogFieldError, err)
+		return ListResult{}, err
+	}
+	total, err := s.cachedListTotal(ctx, "admin-count", 0, filter, func(loadCtx context.Context) (int64, error) {
+		return s.repo.CountAdmin(loadCtx, filter)
+	})
+	if err != nil {
+		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
+			"scope", "admin_count",
 			sdk.LogFieldError, err)
 		return ListResult{}, err
 	}
@@ -158,37 +194,55 @@ func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy st
 	}{Filter: filter, GroupBy: groupBy})
 
 	return usageCachedResult(ctx, s.rdb, key, usageStatsCacheTTL, func(loadCtx context.Context) (StatsResult, error) {
-		summary, err := s.repo.SummaryAdmin(loadCtx, filter)
-		if err != nil {
-			logger.Error("usage_query_failed",
-				"scope", "admin_summary",
-				sdk.LogFieldError, err)
-			return StatsResult{}, err
-		}
-
-		result := StatsResult{Summary: summary}
+		// 汇总与各分组维度均为独立的全量聚合扫描，串行执行时耗时线性叠加；
+		// 并行化后墙钟时间≈最慢一趟。写入互不重叠（各自独立字段），无需加锁。
+		var result StatsResult
+		g, gctx := errgroup.WithContext(loadCtx)
+		g.Go(func() error {
+			summary, err := s.repo.SummaryAdmin(gctx, filter)
+			if err != nil {
+				logger.Error("usage_query_failed",
+					"scope", "admin_summary",
+					sdk.LogFieldError, err)
+				return err
+			}
+			result.Summary = summary
+			return nil
+		})
 		for _, dimension := range strings.Split(groupBy, ",") {
 			switch dimension {
 			case "model":
-				result.ByModel, err = s.repo.StatsByModel(loadCtx, filter)
+				g.Go(func() error {
+					stats, err := s.repo.StatsByModel(gctx, filter)
+					result.ByModel = stats
+					return err
+				})
 			case "user":
-				result.ByUser, err = s.repo.StatsByUser(loadCtx, filter)
+				g.Go(func() error {
+					stats, err := s.repo.StatsByUser(gctx, filter)
+					result.ByUser = stats
+					return err
+				})
 			case "channel":
-				result.ByChannel, err = s.repo.StatsByChannel(loadCtx, filter)
+				g.Go(func() error {
+					stats, err := s.repo.StatsByChannel(gctx, filter)
+					result.ByChannel = stats
+					return err
+				})
 			case "group":
-				result.ByGroup, err = s.repo.StatsByGroup(loadCtx, filter)
-			default:
-				continue
-			}
-			if err != nil {
-				logger.Error("usage_query_failed",
-					"scope", "admin_stats",
-					"group_by", dimension,
-					sdk.LogFieldError, err)
-				return StatsResult{}, err
+				g.Go(func() error {
+					stats, err := s.repo.StatsByGroup(gctx, filter)
+					result.ByGroup = stats
+					return err
+				})
 			}
 		}
-
+		if err := g.Wait(); err != nil {
+			logger.Error("usage_query_failed",
+				"scope", "admin_stats",
+				sdk.LogFieldError, err)
+			return StatsResult{}, err
+		}
 		return result, nil
 	})
 }

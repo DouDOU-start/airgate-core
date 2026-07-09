@@ -20,6 +20,7 @@ func RunStartupTasks(db *ent.Client, drv *entsql.Driver, apiKeySecret string) {
 	backfillKeyHints(db, apiKeySecret)
 	backfillResellerMarkupColumns(drv)
 	migrateUserHistoryRefs(drv)
+	backfillLegacyPaymentData(drv)
 	slog.Info("bootstrap_startup_tasks_done")
 }
 
@@ -171,12 +172,11 @@ func userHistoryForeignKeyIsSetNull(ctx context.Context, drv *entsql.Driver, con
 	return ok
 }
 
-// backfillResellerMarkupColumns 一次性回填 reseller markup 改造引入的两个新列：
+// backfillResellerMarkupColumns 一次性回填历史结构改造引入的新列（幂等 SQL，
+// 多次启动重复执行也不会污染已经被新代码正确写入的数据）：
 //   - usage_logs.billed_cost：历史行未启用 markup，账面 = 真实成本
 //   - api_keys.used_quota_actual：历史 key 未启用 markup，actual 累加值 = used_quota
-//
-// SQL 使用 idempotent 条件 WHERE billed_cost = 0 / used_quota_actual = 0，
-// 多次启动重复执行也不会污染已经被新代码正确写入的数据。
+//   - usage_logs.source：source 列引入前渠道测试行以 endpoint 哨兵值标识，迁移到正规来源列
 func backfillResellerMarkupColumns(drv *entsql.Driver) {
 	if drv == nil {
 		return
@@ -188,9 +188,10 @@ func backfillResellerMarkupColumns(drv *entsql.Driver) {
 		sql   string
 	}{
 		{"usage_logs.billed_cost", "UPDATE usage_logs SET billed_cost = actual_cost WHERE billed_cost = 0 AND actual_cost > 0"},
-		// 历史 account_rate 全是 1.0，account_cost 等价 total_cost
-		{"usage_logs.account_cost", "UPDATE usage_logs SET account_cost = total_cost WHERE account_cost = 0 AND total_cost > 0"},
+		// 渠道成本已改为查询期现算（total_cost × account_rate_multiplier，列默认 1.0），
+		// 历史 account_cost 落列与回填一并移除。
 		{"api_keys.used_quota_actual", "UPDATE api_keys SET used_quota_actual = used_quota WHERE used_quota_actual = 0 AND used_quota > 0"},
+		{"usage_logs.source", "UPDATE usage_logs SET source = 'channel_test' WHERE endpoint = 'channel_test' AND source <> 'channel_test'"},
 	}
 
 	for _, stmt := range statements {

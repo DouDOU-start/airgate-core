@@ -16,6 +16,22 @@ type Repository interface {
 	Delete(context.Context, int) error
 	// Upsert 按 model 名 upsert，返回新建与更新条数。
 	Upsert(context.Context, []ImportItem) (created int, updated int, err error)
+
+	// —— 模型标签（家族归类，归属模型管理）——
+	ListTags(context.Context) ([]Tag, error)
+	CreateTag(ctx context.Context, name string) (Tag, error)
+	RenameTag(ctx context.Context, id int, name string) (Tag, error)
+	// DeleteTag 删除标签并清空引用该标签的模型 tag_id（事务内）。
+	DeleteTag(ctx context.Context, id int) error
+	// EnsureTag 按名称 find-or-create，返回标签 ID（种子/批量导入用）。
+	EnsureTag(ctx context.Context, name string) (int, error)
+}
+
+// Tag 模型标签领域对象；ModelCount 为引用该标签的模型数（列表查询时填充）。
+type Tag struct {
+	ID         int
+	Name       string
+	ModelCount int64
 }
 
 // ModelPrice 模型价格领域对象。价格单位 USD / 1M tokens；PerRequestPrice 为 USD / 次。
@@ -30,8 +46,11 @@ type ModelPrice struct {
 	PerRequestPrice      float64
 	// PricingExtra 服务档倍率 + 长上下文阶梯等长尾维度（多数模型为空）。
 	PricingExtra map[string]interface{}
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	// TagID / TagName 模型标签（家族归类，可空；TagName 由 store 联查填充）。
+	TagID     *int
+	TagName   string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // ListFilter 价目表列表查询参数。
@@ -39,6 +58,8 @@ type ListFilter struct {
 	Page     int
 	PageSize int
 	Keyword  string
+	// TagID 按标签过滤（nil = 不过滤）。
+	TagID *int
 }
 
 // ListResult 价目表分页结果。
@@ -59,10 +80,13 @@ type CreateInput struct {
 	CacheCreation1hPrice float64
 	PerRequestPrice      float64
 	PricingExtra         map[string]interface{}
+	// TagID 模型标签（nil = 不挂标签）。
+	TagID *int
 }
 
 // UpdateInput 更新价格输入（partial，指针字段）。
 // PricingExtra 为整体替换语义：非 nil 时整块写入（空 map 清空扩展）。
+// TagID 三态：nil = 不改；指向 0 = 清空标签；指向正数 = 设为该标签。
 type UpdateInput struct {
 	Model                *string
 	InputPrice           *float64
@@ -72,9 +96,11 @@ type UpdateInput struct {
 	CacheCreation1hPrice *float64
 	PerRequestPrice      *float64
 	PricingExtra         map[string]interface{}
+	TagID                *int
 }
 
 // ImportItem 批量导入条目（按 model 名 upsert）。
+// TagName 非空时按名称 find-or-create 并挂到模型上；空串不改动已有标签。
 type ImportItem struct {
 	Model                string
 	InputPrice           float64
@@ -84,6 +110,7 @@ type ImportItem struct {
 	CacheCreation1hPrice float64
 	PerRequestPrice      float64
 	PricingExtra         map[string]interface{}
+	TagName              string
 }
 
 // ImportResult 批量导入结果。

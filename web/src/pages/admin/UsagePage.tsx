@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Card, ComboBox, Input, ListBox, Tabs } from '@heroui/react';
+import { Button, Card, Chip, ComboBox, Input, ListBox, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { apikeysApi } from '../../shared/api/apikeys';
@@ -9,7 +9,8 @@ import { usePagination } from '../../shared/hooks/usePagination';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
 import { queryKeys } from '../../shared/queryKeys';
-import { Activity, Coins, Hash, DollarSign, Search } from 'lucide-react';
+import { UpstreamLogsTable } from './usage/UpstreamLogsTable';
+import { Activity, Coins, Hash, Search } from 'lucide-react';
 import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
@@ -203,17 +204,19 @@ function DistributionCard({
               },
               {
                 align: 'end',
-                key: 'actualCost',
-                title: t('usage.actual_cost'),
-                width: '18%',
-                render: (item) => <CostValue className="truncate font-mono" value={item.actualCost} tone="actual" />,
-              },
-              {
-                align: 'end',
-                key: 'totalCost',
-                title: t('usage.standard_cost'),
-                width: '18%',
-                render: (item) => <CostValue className="truncate font-mono" value={item.totalCost} tone="standard" />,
+                key: 'cost',
+                title: t('usage.cost'),
+                width: '30%',
+                render: (item) => (
+                  <span
+                    className="inline-flex min-w-0 items-baseline gap-1 truncate font-mono"
+                    title={`${t('usage.actual_cost')} / ${t('usage.standard_cost')}`}
+                  >
+                    <CostValue value={item.actualCost} tone="actual" />
+                    <span className="text-text-tertiary">/</span>
+                    <span className="opacity-70"><CostValue value={item.totalCost} tone="standard" /></span>
+                  </span>
+                ),
               },
             ]}
           />
@@ -306,17 +309,19 @@ function GroupStatsCard({
             },
             {
               align: 'end',
-              key: 'actualCost',
-              title: t('usage.actual_cost'),
-              width: '18%',
-              render: (row) => <CostValue className="truncate font-mono" value={row.actual_cost} tone="actual" />,
-            },
-            {
-              align: 'end',
-              key: 'totalCost',
-              title: t('usage.standard_cost'),
-              width: '18%',
-              render: (row) => <CostValue className="truncate font-mono" value={row.total_cost} tone="standard" />,
+              key: 'cost',
+              title: t('usage.cost'),
+              width: '30%',
+              render: (row) => (
+                <span
+                  className="inline-flex min-w-0 items-baseline gap-1 truncate font-mono"
+                  title={`${t('usage.actual_cost')} / ${t('usage.standard_cost')}`}
+                >
+                  <CostValue value={row.actual_cost} tone="actual" />
+                  <span className="text-text-tertiary">/</span>
+                  <span className="opacity-70"><CostValue value={row.total_cost} tone="standard" /></span>
+                </span>
+              ),
             },
           ]}
         />
@@ -390,6 +395,8 @@ export default function UsagePage() {
   const { t } = useTranslation();
   const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.usage');
   const [filters, setFilters] = useState<Partial<UsageQuery>>({});
+  // 记录区 Tab：消费记录（usage_logs）| 失败请求（上游请求日志），共享筛选。
+  const [recordsTab, setRecordsTab] = useState<'usage' | 'upstream'>('usage');
   const [statsGroupBy, setStatsGroupBy] = useState<string>('model');
   const [granularity, setGranularity] = useState<string>('hour');
   const [autoRefresh, setAutoRefresh] = usePersistentAutoRefresh(ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY, 0, ADMIN_AUTO_REFRESH_OPTIONS);
@@ -600,6 +607,14 @@ export default function UsagePage() {
         title: t('common.user'),
         width: '160px',
         render: (row) => {
+          // 渠道测试落账行：无用户归属，发起方标为「渠道测试」。
+          if (row.source === 'channel_test') {
+            return (
+              <Chip color="accent" size="sm" variant="soft">
+                {t('upstream_logs.source_channel_test')}
+              </Chip>
+            );
+          }
           const fallbackLabel = row.user_deleted ? t('usage.user_deleted') : `#${row.user_id}`;
           const label = row.user_email || fallbackLabel;
 
@@ -678,7 +693,7 @@ export default function UsagePage() {
       {/* 聚合统计 */}
       {activeStats && (
         <div className="mb-6 space-y-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-3 2xl:gap-4">
             <StatCard
               title={t('usage.total_requests')}
               value={activeStats.total_requests.toLocaleString()}
@@ -692,16 +707,21 @@ export default function UsagePage() {
               accentColor="var(--ag-info)"
             />
             <StatCard
-              title={t('usage.actual_cost')}
-              value={<CostValue value={activeStats.total_actual_cost} decimals={4} tone="actual" />}
+              title={t('usage.cost')}
+              value={(
+                <span
+                  className="inline-flex min-w-0 items-baseline gap-1.5"
+                  title={`${t('usage.actual_cost')} / ${t('usage.standard_cost')}`}
+                >
+                  <CostValue value={activeStats.total_actual_cost} decimals={4} tone="actual" />
+                  <span className="text-sm text-text-tertiary">/</span>
+                  <span className="text-sm opacity-70">
+                    <CostValue value={activeStats.total_cost} decimals={4} tone="standard" />
+                  </span>
+                </span>
+              )}
               icon={<Coins className="w-5 h-5" />}
               accentColor="var(--ag-warning)"
-            />
-            <StatCard
-              title={t('usage.total_cost')}
-              value={<CostValue value={activeStats.total_cost} decimals={4} tone="standard" />}
-              icon={<DollarSign className="w-5 h-5" />}
-              accentColor="var(--ag-success)"
             />
           </div>
 
@@ -887,12 +907,56 @@ export default function UsagePage() {
         />
       </div>
 
-      {/* 使用记录表格 */}
+      {/* 记录区：消费记录 | 失败请求（切换共享筛选） */}
+      <Tabs
+        className="ag-segmented-tabs ag-segmented-tabs-compact mb-3"
+        selectedKey={recordsTab}
+        onSelectionChange={(key) => setRecordsTab(key as 'usage' | 'upstream')}
+      >
+        <Tabs.List>
+          <Tabs.Tab id="usage">
+            <Tabs.Indicator />
+            {t('usage.records_tab_usage')}
+          </Tabs.Tab>
+          <Tabs.Tab id="upstream">
+            <Tabs.Indicator />
+            {t('usage.records_tab_upstream')}
+          </Tabs.Tab>
+        </Tabs.List>
+      </Tabs>
+
+      {recordsTab === 'upstream' && (
+        <UpstreamLogsTable
+          filters={{
+            start_date: filters.start_date,
+            end_date: filters.end_date,
+            model: filters.model,
+            user_id: filters.user_id,
+            api_key_id: filters.api_key_id,
+          }}
+        />
+      )}
+
+      {recordsTab === 'usage' && (
       <UsageRecordsTable
         ariaLabel={t('usage.title', 'Usage')}
         columns={columns}
         dataVersion={pageActive ? dataUpdatedAt : undefined}
-        emptyDescription={t('usage.empty_description', '调整筛选条件后重试')}
+        emptyAction={filters.start_date || filters.end_date ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            onPress={() => {
+              setPage(1);
+              setFilters((prev) => ({ ...prev, start_date: undefined, end_date: undefined }));
+            }}
+          >
+            {t('usage.view_all_time')}
+          </Button>
+        ) : undefined}
+        emptyDescription={filters.start_date || filters.end_date
+          ? t('usage.empty_in_range')
+          : t('usage.empty_description', '调整筛选条件后重试')}
         emptyTitle={t('common.no_data')}
         highlightNewRows={pageActive && autoRefreshEnabled && page === 1}
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}
@@ -905,6 +969,7 @@ export default function UsagePage() {
         suppressHighlight={!pageActive || isPlaceholderData}
         total={pageActive ? total : 0}
       />
+      )}
     </div>
   );
 }
