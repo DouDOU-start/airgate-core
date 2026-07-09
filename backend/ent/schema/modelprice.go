@@ -3,6 +3,7 @@ package schema
 import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
+	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 )
 
@@ -32,7 +33,18 @@ func (ModelPrice) Fields() []ent.Field {
 		// pricing_extra 承载服务档倍率（priority/flex）与长上下文阶梯等长尾维度，
 		// 多数模型为空。结构见 relay/pricing 与 modelprice service Loader。
 		field.JSON("pricing_extra", map[string]interface{}{}).Optional(),
+		// tag_id 模型标签外键（家族归类，可空）；删除标签时由 store 层先清引用。
+		field.Int("tag_id").Optional().Nillable(),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
+	}
+}
+
+func (ModelPrice) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.From("tag", ModelTag.Type).
+			Ref("prices").
+			Field("tag_id").
+			Unique(),
 	}
 }

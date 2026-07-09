@@ -269,6 +269,20 @@ func (aku *APIKeyUpdate) SetNillableStatus(a *apikey.Status) *APIKeyUpdate {
 	return aku
 }
 
+// SetProvisionedBy sets the "provisioned_by" field.
+func (aku *APIKeyUpdate) SetProvisionedBy(s string) *APIKeyUpdate {
+	aku.mutation.SetProvisionedBy(s)
+	return aku
+}
+
+// SetNillableProvisionedBy sets the "provisioned_by" field if the given value is not nil.
+func (aku *APIKeyUpdate) SetNillableProvisionedBy(s *string) *APIKeyUpdate {
+	if s != nil {
+		aku.SetProvisionedBy(*s)
+	}
+	return aku
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (aku *APIKeyUpdate) SetUpdatedAt(t time.Time) *APIKeyUpdate {
 	aku.mutation.SetUpdatedAt(t)
@@ -514,6 +528,9 @@ func (aku *APIKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := aku.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeEnum, value)
+	}
+	if value, ok := aku.mutation.ProvisionedBy(); ok {
+		_spec.SetField(apikey.FieldProvisionedBy, field.TypeString, value)
 	}
 	if value, ok := aku.mutation.UpdatedAt(); ok {
 		_spec.SetField(apikey.FieldUpdatedAt, field.TypeTime, value)
@@ -878,6 +895,20 @@ func (akuo *APIKeyUpdateOne) SetNillableStatus(a *apikey.Status) *APIKeyUpdateOn
 	return akuo
 }
 
+// SetProvisionedBy sets the "provisioned_by" field.
+func (akuo *APIKeyUpdateOne) SetProvisionedBy(s string) *APIKeyUpdateOne {
+	akuo.mutation.SetProvisionedBy(s)
+	return akuo
+}
+
+// SetNillableProvisionedBy sets the "provisioned_by" field if the given value is not nil.
+func (akuo *APIKeyUpdateOne) SetNillableProvisionedBy(s *string) *APIKeyUpdateOne {
+	if s != nil {
+		akuo.SetProvisionedBy(*s)
+	}
+	return akuo
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (akuo *APIKeyUpdateOne) SetUpdatedAt(t time.Time) *APIKeyUpdateOne {
 	akuo.mutation.SetUpdatedAt(t)
@@ -1153,6 +1184,9 @@ func (akuo *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err er
 	}
 	if value, ok := akuo.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeEnum, value)
+	}
+	if value, ok := akuo.mutation.ProvisionedBy(); ok {
+		_spec.SetField(apikey.FieldProvisionedBy, field.TypeString, value)
 	}
 	if value, ok := akuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(apikey.FieldUpdatedAt, field.TypeTime, value)

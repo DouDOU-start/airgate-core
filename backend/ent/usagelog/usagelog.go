@@ -14,8 +14,6 @@ const (
 	Label = "usage_log"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
-	// FieldPlatform holds the string denoting the platform field in the database.
-	FieldPlatform = "platform"
 	// FieldModel holds the string denoting the model field in the database.
 	FieldModel = "model"
 	// FieldInputTokens holds the string denoting the input_tokens field in the database.
@@ -30,8 +28,8 @@ const (
 	FieldCacheCreation5mTokens = "cache_creation_5m_tokens"
 	// FieldCacheCreation1hTokens holds the string denoting the cache_creation_1h_tokens field in the database.
 	FieldCacheCreation1hTokens = "cache_creation_1h_tokens"
-	// FieldReasoningOutputTokens holds the string denoting the reasoning_output_tokens field in the database.
-	FieldReasoningOutputTokens = "reasoning_output_tokens"
+	// FieldCalls holds the string denoting the calls field in the database.
+	FieldCalls = "calls"
 	// FieldInputPrice holds the string denoting the input_price field in the database.
 	FieldInputPrice = "input_price"
 	// FieldOutputPrice holds the string denoting the output_price field in the database.
@@ -50,16 +48,12 @@ const (
 	FieldCachedInputCost = "cached_input_cost"
 	// FieldCacheCreationCost holds the string denoting the cache_creation_cost field in the database.
 	FieldCacheCreationCost = "cache_creation_cost"
-	// FieldImageCost holds the string denoting the image_cost field in the database.
-	FieldImageCost = "image_cost"
 	// FieldTotalCost holds the string denoting the total_cost field in the database.
 	FieldTotalCost = "total_cost"
 	// FieldActualCost holds the string denoting the actual_cost field in the database.
 	FieldActualCost = "actual_cost"
 	// FieldBilledCost holds the string denoting the billed_cost field in the database.
 	FieldBilledCost = "billed_cost"
-	// FieldAccountCost holds the string denoting the account_cost field in the database.
-	FieldAccountCost = "account_cost"
 	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
 	FieldRateMultiplier = "rate_multiplier"
 	// FieldSellRate holds the string denoting the sell_rate field in the database.
@@ -68,8 +62,6 @@ const (
 	FieldAccountRateMultiplier = "account_rate_multiplier"
 	// FieldServiceTier holds the string denoting the service_tier field in the database.
 	FieldServiceTier = "service_tier"
-	// FieldImageSize holds the string denoting the image_size field in the database.
-	FieldImageSize = "image_size"
 	// FieldStream holds the string denoting the stream field in the database.
 	FieldStream = "stream"
 	// FieldDurationMs holds the string denoting the duration_ms field in the database.
@@ -82,22 +74,24 @@ const (
 	FieldIPAddress = "ip_address"
 	// FieldEndpoint holds the string denoting the endpoint field in the database.
 	FieldEndpoint = "endpoint"
-	// FieldReasoningEffort holds the string denoting the reasoning_effort field in the database.
-	FieldReasoningEffort = "reasoning_effort"
-	// FieldUsageAttributes holds the string denoting the usage_attributes field in the database.
-	FieldUsageAttributes = "usage_attributes"
-	// FieldUsageMetrics holds the string denoting the usage_metrics field in the database.
-	FieldUsageMetrics = "usage_metrics"
-	// FieldUsageCostDetails holds the string denoting the usage_cost_details field in the database.
-	FieldUsageCostDetails = "usage_cost_details"
-	// FieldUsageMetadata holds the string denoting the usage_metadata field in the database.
-	FieldUsageMetadata = "usage_metadata"
+	// FieldSource holds the string denoting the source field in the database.
+	FieldSource = "source"
+	// FieldRequestID holds the string denoting the request_id field in the database.
+	FieldRequestID = "request_id"
 	// FieldUserIDSnapshot holds the string denoting the user_id_snapshot field in the database.
 	FieldUserIDSnapshot = "user_id_snapshot"
 	// FieldUserEmailSnapshot holds the string denoting the user_email_snapshot field in the database.
 	FieldUserEmailSnapshot = "user_email_snapshot"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
+	// FieldUserID holds the string denoting the user_id field in the database.
+	FieldUserID = "user_usage_logs"
+	// FieldAPIKeyID holds the string denoting the api_key_id field in the database.
+	FieldAPIKeyID = "api_key_usage_logs"
+	// FieldChannelID holds the string denoting the channel_id field in the database.
+	FieldChannelID = "channel_usage_logs"
+	// FieldGroupID holds the string denoting the group_id field in the database.
+	FieldGroupID = "group_usage_logs"
 	// EdgeUser holds the string denoting the user edge name in mutations.
 	EdgeUser = "user"
 	// EdgeAPIKey holds the string denoting the api_key edge name in mutations.
@@ -141,7 +135,6 @@ const (
 // Columns holds all SQL columns for usagelog fields.
 var Columns = []string{
 	FieldID,
-	FieldPlatform,
 	FieldModel,
 	FieldInputTokens,
 	FieldOutputTokens,
@@ -149,7 +142,7 @@ var Columns = []string{
 	FieldCacheCreationTokens,
 	FieldCacheCreation5mTokens,
 	FieldCacheCreation1hTokens,
-	FieldReasoningOutputTokens,
+	FieldCalls,
 	FieldInputPrice,
 	FieldOutputPrice,
 	FieldCachedInputPrice,
@@ -159,39 +152,28 @@ var Columns = []string{
 	FieldOutputCost,
 	FieldCachedInputCost,
 	FieldCacheCreationCost,
-	FieldImageCost,
 	FieldTotalCost,
 	FieldActualCost,
 	FieldBilledCost,
-	FieldAccountCost,
 	FieldRateMultiplier,
 	FieldSellRate,
 	FieldAccountRateMultiplier,
 	FieldServiceTier,
-	FieldImageSize,
 	FieldStream,
 	FieldDurationMs,
 	FieldFirstTokenMs,
 	FieldUserAgent,
 	FieldIPAddress,
 	FieldEndpoint,
-	FieldReasoningEffort,
-	FieldUsageAttributes,
-	FieldUsageMetrics,
-	FieldUsageCostDetails,
-	FieldUsageMetadata,
+	FieldSource,
+	FieldRequestID,
 	FieldUserIDSnapshot,
 	FieldUserEmailSnapshot,
 	FieldCreatedAt,
-}
-
-// ForeignKeys holds the SQL foreign-keys that are owned by the "usage_logs"
-// table and are not defined as standalone fields in the schema.
-var ForeignKeys = []string{
-	"api_key_usage_logs",
-	"channel_usage_logs",
-	"group_usage_logs",
-	"user_usage_logs",
+	FieldUserID,
+	FieldAPIKeyID,
+	FieldChannelID,
+	FieldGroupID,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -201,17 +183,10 @@ func ValidColumn(column string) bool {
 			return true
 		}
 	}
-	for i := range ForeignKeys {
-		if column == ForeignKeys[i] {
-			return true
-		}
-	}
 	return false
 }
 
 var (
-	// PlatformValidator is a validator for the "platform" field. It is called by the builders before save.
-	PlatformValidator func(string) error
 	// ModelValidator is a validator for the "model" field. It is called by the builders before save.
 	ModelValidator func(string) error
 	// DefaultInputTokens holds the default value on creation for the "input_tokens" field.
@@ -226,8 +201,8 @@ var (
 	DefaultCacheCreation5mTokens int
 	// DefaultCacheCreation1hTokens holds the default value on creation for the "cache_creation_1h_tokens" field.
 	DefaultCacheCreation1hTokens int
-	// DefaultReasoningOutputTokens holds the default value on creation for the "reasoning_output_tokens" field.
-	DefaultReasoningOutputTokens int
+	// DefaultCalls holds the default value on creation for the "calls" field.
+	DefaultCalls int
 	// DefaultInputPrice holds the default value on creation for the "input_price" field.
 	DefaultInputPrice float64
 	// DefaultOutputPrice holds the default value on creation for the "output_price" field.
@@ -246,16 +221,12 @@ var (
 	DefaultCachedInputCost float64
 	// DefaultCacheCreationCost holds the default value on creation for the "cache_creation_cost" field.
 	DefaultCacheCreationCost float64
-	// DefaultImageCost holds the default value on creation for the "image_cost" field.
-	DefaultImageCost float64
 	// DefaultTotalCost holds the default value on creation for the "total_cost" field.
 	DefaultTotalCost float64
 	// DefaultActualCost holds the default value on creation for the "actual_cost" field.
 	DefaultActualCost float64
 	// DefaultBilledCost holds the default value on creation for the "billed_cost" field.
 	DefaultBilledCost float64
-	// DefaultAccountCost holds the default value on creation for the "account_cost" field.
-	DefaultAccountCost float64
 	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
 	DefaultRateMultiplier float64
 	// DefaultSellRate holds the default value on creation for the "sell_rate" field.
@@ -264,8 +235,6 @@ var (
 	DefaultAccountRateMultiplier float64
 	// DefaultServiceTier holds the default value on creation for the "service_tier" field.
 	DefaultServiceTier string
-	// DefaultImageSize holds the default value on creation for the "image_size" field.
-	DefaultImageSize string
 	// DefaultStream holds the default value on creation for the "stream" field.
 	DefaultStream bool
 	// DefaultDurationMs holds the default value on creation for the "duration_ms" field.
@@ -278,8 +247,10 @@ var (
 	DefaultIPAddress string
 	// DefaultEndpoint holds the default value on creation for the "endpoint" field.
 	DefaultEndpoint string
-	// DefaultReasoningEffort holds the default value on creation for the "reasoning_effort" field.
-	DefaultReasoningEffort string
+	// DefaultSource holds the default value on creation for the "source" field.
+	DefaultSource string
+	// DefaultRequestID holds the default value on creation for the "request_id" field.
+	DefaultRequestID string
 	// DefaultUserIDSnapshot holds the default value on creation for the "user_id_snapshot" field.
 	DefaultUserIDSnapshot int
 	// DefaultUserEmailSnapshot holds the default value on creation for the "user_email_snapshot" field.
@@ -294,11 +265,6 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
-}
-
-// ByPlatform orders the results by the platform field.
-func ByPlatform(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldPlatform, opts...).ToFunc()
 }
 
 // ByModel orders the results by the model field.
@@ -336,9 +302,9 @@ func ByCacheCreation1hTokens(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCacheCreation1hTokens, opts...).ToFunc()
 }
 
-// ByReasoningOutputTokens orders the results by the reasoning_output_tokens field.
-func ByReasoningOutputTokens(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldReasoningOutputTokens, opts...).ToFunc()
+// ByCalls orders the results by the calls field.
+func ByCalls(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCalls, opts...).ToFunc()
 }
 
 // ByInputPrice orders the results by the input_price field.
@@ -386,11 +352,6 @@ func ByCacheCreationCost(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCacheCreationCost, opts...).ToFunc()
 }
 
-// ByImageCost orders the results by the image_cost field.
-func ByImageCost(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldImageCost, opts...).ToFunc()
-}
-
 // ByTotalCost orders the results by the total_cost field.
 func ByTotalCost(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTotalCost, opts...).ToFunc()
@@ -404,11 +365,6 @@ func ByActualCost(opts ...sql.OrderTermOption) OrderOption {
 // ByBilledCost orders the results by the billed_cost field.
 func ByBilledCost(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldBilledCost, opts...).ToFunc()
-}
-
-// ByAccountCost orders the results by the account_cost field.
-func ByAccountCost(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldAccountCost, opts...).ToFunc()
 }
 
 // ByRateMultiplier orders the results by the rate_multiplier field.
@@ -429,11 +385,6 @@ func ByAccountRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 // ByServiceTier orders the results by the service_tier field.
 func ByServiceTier(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldServiceTier, opts...).ToFunc()
-}
-
-// ByImageSize orders the results by the image_size field.
-func ByImageSize(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldImageSize, opts...).ToFunc()
 }
 
 // ByStream orders the results by the stream field.
@@ -466,9 +417,14 @@ func ByEndpoint(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldEndpoint, opts...).ToFunc()
 }
 
-// ByReasoningEffort orders the results by the reasoning_effort field.
-func ByReasoningEffort(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldReasoningEffort, opts...).ToFunc()
+// BySource orders the results by the source field.
+func BySource(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSource, opts...).ToFunc()
+}
+
+// ByRequestID orders the results by the request_id field.
+func ByRequestID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequestID, opts...).ToFunc()
 }
 
 // ByUserIDSnapshot orders the results by the user_id_snapshot field.
@@ -484,6 +440,26 @@ func ByUserEmailSnapshot(opts ...sql.OrderTermOption) OrderOption {
 // ByCreatedAt orders the results by the created_at field.
 func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedAt, opts...).ToFunc()
+}
+
+// ByUserID orders the results by the user_id field.
+func ByUserID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUserID, opts...).ToFunc()
+}
+
+// ByAPIKeyID orders the results by the api_key_id field.
+func ByAPIKeyID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAPIKeyID, opts...).ToFunc()
+}
+
+// ByChannelID orders the results by the channel_id field.
+func ByChannelID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldChannelID, opts...).ToFunc()
+}
+
+// ByGroupID orders the results by the group_id field.
+func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
 }
 
 // ByUserField orders the results by user field.

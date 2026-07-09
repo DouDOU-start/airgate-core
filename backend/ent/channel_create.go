@@ -202,12 +202,6 @@ func (cc *ChannelCreate) SetNillableTestModel(s *string) *ChannelCreate {
 	return cc
 }
 
-// SetCustomConfig sets the "custom_config" field.
-func (cc *ChannelCreate) SetCustomConfig(m map[string]interface{}) *ChannelCreate {
-	cc.mutation.SetCustomConfig(m)
-	return cc
-}
-
 // SetResponseTimeMs sets the "response_time_ms" field.
 func (cc *ChannelCreate) SetResponseTimeMs(i int) *ChannelCreate {
 	cc.mutation.SetResponseTimeMs(i)
@@ -232,6 +226,34 @@ func (cc *ChannelCreate) SetTestedAt(t time.Time) *ChannelCreate {
 func (cc *ChannelCreate) SetNillableTestedAt(t *time.Time) *ChannelCreate {
 	if t != nil {
 		cc.SetTestedAt(*t)
+	}
+	return cc
+}
+
+// SetBalance sets the "balance" field.
+func (cc *ChannelCreate) SetBalance(f float64) *ChannelCreate {
+	cc.mutation.SetBalance(f)
+	return cc
+}
+
+// SetNillableBalance sets the "balance" field if the given value is not nil.
+func (cc *ChannelCreate) SetNillableBalance(f *float64) *ChannelCreate {
+	if f != nil {
+		cc.SetBalance(*f)
+	}
+	return cc
+}
+
+// SetBalanceUpdatedAt sets the "balance_updated_at" field.
+func (cc *ChannelCreate) SetBalanceUpdatedAt(t time.Time) *ChannelCreate {
+	cc.mutation.SetBalanceUpdatedAt(t)
+	return cc
+}
+
+// SetNillableBalanceUpdatedAt sets the "balance_updated_at" field if the given value is not nil.
+func (cc *ChannelCreate) SetNillableBalanceUpdatedAt(t *time.Time) *ChannelCreate {
+	if t != nil {
+		cc.SetBalanceUpdatedAt(*t)
 	}
 	return cc
 }
@@ -387,6 +409,10 @@ func (cc *ChannelCreate) defaults() {
 		v := channel.DefaultResponseTimeMs
 		cc.mutation.SetResponseTimeMs(v)
 	}
+	if _, ok := cc.mutation.Balance(); !ok {
+		v := channel.DefaultBalance
+		cc.mutation.SetBalance(v)
+	}
 	if _, ok := cc.mutation.CreatedAt(); !ok {
 		v := channel.DefaultCreatedAt()
 		cc.mutation.SetCreatedAt(v)
@@ -470,6 +496,9 @@ func (cc *ChannelCreate) check() error {
 	}
 	if _, ok := cc.mutation.ResponseTimeMs(); !ok {
 		return &ValidationError{Name: "response_time_ms", err: errors.New(`ent: missing required field "Channel.response_time_ms"`)}
+	}
+	if _, ok := cc.mutation.Balance(); !ok {
+		return &ValidationError{Name: "balance", err: errors.New(`ent: missing required field "Channel.balance"`)}
 	}
 	if _, ok := cc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Channel.created_at"`)}
@@ -575,10 +604,6 @@ func (cc *ChannelCreate) createSpec() (*Channel, *sqlgraph.CreateSpec) {
 		_spec.SetField(channel.FieldTestModel, field.TypeString, value)
 		_node.TestModel = value
 	}
-	if value, ok := cc.mutation.CustomConfig(); ok {
-		_spec.SetField(channel.FieldCustomConfig, field.TypeJSON, value)
-		_node.CustomConfig = value
-	}
 	if value, ok := cc.mutation.ResponseTimeMs(); ok {
 		_spec.SetField(channel.FieldResponseTimeMs, field.TypeInt, value)
 		_node.ResponseTimeMs = value
@@ -586,6 +611,14 @@ func (cc *ChannelCreate) createSpec() (*Channel, *sqlgraph.CreateSpec) {
 	if value, ok := cc.mutation.TestedAt(); ok {
 		_spec.SetField(channel.FieldTestedAt, field.TypeTime, value)
 		_node.TestedAt = &value
+	}
+	if value, ok := cc.mutation.Balance(); ok {
+		_spec.SetField(channel.FieldBalance, field.TypeFloat64, value)
+		_node.Balance = value
+	}
+	if value, ok := cc.mutation.BalanceUpdatedAt(); ok {
+		_spec.SetField(channel.FieldBalanceUpdatedAt, field.TypeTime, value)
+		_node.BalanceUpdatedAt = &value
 	}
 	if value, ok := cc.mutation.LastUsedAt(); ok {
 		_spec.SetField(channel.FieldLastUsedAt, field.TypeTime, value)

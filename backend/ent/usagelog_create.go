@@ -15,7 +15,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // UsageLogCreate is the builder for creating a UsageLog entity.
@@ -23,12 +22,6 @@ type UsageLogCreate struct {
 	config
 	mutation *UsageLogMutation
 	hooks    []Hook
-}
-
-// SetPlatform sets the "platform" field.
-func (ulc *UsageLogCreate) SetPlatform(s string) *UsageLogCreate {
-	ulc.mutation.SetPlatform(s)
-	return ulc
 }
 
 // SetModel sets the "model" field.
@@ -121,16 +114,16 @@ func (ulc *UsageLogCreate) SetNillableCacheCreation1hTokens(i *int) *UsageLogCre
 	return ulc
 }
 
-// SetReasoningOutputTokens sets the "reasoning_output_tokens" field.
-func (ulc *UsageLogCreate) SetReasoningOutputTokens(i int) *UsageLogCreate {
-	ulc.mutation.SetReasoningOutputTokens(i)
+// SetCalls sets the "calls" field.
+func (ulc *UsageLogCreate) SetCalls(i int) *UsageLogCreate {
+	ulc.mutation.SetCalls(i)
 	return ulc
 }
 
-// SetNillableReasoningOutputTokens sets the "reasoning_output_tokens" field if the given value is not nil.
-func (ulc *UsageLogCreate) SetNillableReasoningOutputTokens(i *int) *UsageLogCreate {
+// SetNillableCalls sets the "calls" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableCalls(i *int) *UsageLogCreate {
 	if i != nil {
-		ulc.SetReasoningOutputTokens(*i)
+		ulc.SetCalls(*i)
 	}
 	return ulc
 }
@@ -261,20 +254,6 @@ func (ulc *UsageLogCreate) SetNillableCacheCreationCost(f *float64) *UsageLogCre
 	return ulc
 }
 
-// SetImageCost sets the "image_cost" field.
-func (ulc *UsageLogCreate) SetImageCost(f float64) *UsageLogCreate {
-	ulc.mutation.SetImageCost(f)
-	return ulc
-}
-
-// SetNillableImageCost sets the "image_cost" field if the given value is not nil.
-func (ulc *UsageLogCreate) SetNillableImageCost(f *float64) *UsageLogCreate {
-	if f != nil {
-		ulc.SetImageCost(*f)
-	}
-	return ulc
-}
-
 // SetTotalCost sets the "total_cost" field.
 func (ulc *UsageLogCreate) SetTotalCost(f float64) *UsageLogCreate {
 	ulc.mutation.SetTotalCost(f)
@@ -313,20 +292,6 @@ func (ulc *UsageLogCreate) SetBilledCost(f float64) *UsageLogCreate {
 func (ulc *UsageLogCreate) SetNillableBilledCost(f *float64) *UsageLogCreate {
 	if f != nil {
 		ulc.SetBilledCost(*f)
-	}
-	return ulc
-}
-
-// SetAccountCost sets the "account_cost" field.
-func (ulc *UsageLogCreate) SetAccountCost(f float64) *UsageLogCreate {
-	ulc.mutation.SetAccountCost(f)
-	return ulc
-}
-
-// SetNillableAccountCost sets the "account_cost" field if the given value is not nil.
-func (ulc *UsageLogCreate) SetNillableAccountCost(f *float64) *UsageLogCreate {
-	if f != nil {
-		ulc.SetAccountCost(*f)
 	}
 	return ulc
 }
@@ -383,20 +348,6 @@ func (ulc *UsageLogCreate) SetServiceTier(s string) *UsageLogCreate {
 func (ulc *UsageLogCreate) SetNillableServiceTier(s *string) *UsageLogCreate {
 	if s != nil {
 		ulc.SetServiceTier(*s)
-	}
-	return ulc
-}
-
-// SetImageSize sets the "image_size" field.
-func (ulc *UsageLogCreate) SetImageSize(s string) *UsageLogCreate {
-	ulc.mutation.SetImageSize(s)
-	return ulc
-}
-
-// SetNillableImageSize sets the "image_size" field if the given value is not nil.
-func (ulc *UsageLogCreate) SetNillableImageSize(s *string) *UsageLogCreate {
-	if s != nil {
-		ulc.SetImageSize(*s)
 	}
 	return ulc
 }
@@ -485,41 +436,31 @@ func (ulc *UsageLogCreate) SetNillableEndpoint(s *string) *UsageLogCreate {
 	return ulc
 }
 
-// SetReasoningEffort sets the "reasoning_effort" field.
-func (ulc *UsageLogCreate) SetReasoningEffort(s string) *UsageLogCreate {
-	ulc.mutation.SetReasoningEffort(s)
+// SetSource sets the "source" field.
+func (ulc *UsageLogCreate) SetSource(s string) *UsageLogCreate {
+	ulc.mutation.SetSource(s)
 	return ulc
 }
 
-// SetNillableReasoningEffort sets the "reasoning_effort" field if the given value is not nil.
-func (ulc *UsageLogCreate) SetNillableReasoningEffort(s *string) *UsageLogCreate {
+// SetNillableSource sets the "source" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableSource(s *string) *UsageLogCreate {
 	if s != nil {
-		ulc.SetReasoningEffort(*s)
+		ulc.SetSource(*s)
 	}
 	return ulc
 }
 
-// SetUsageAttributes sets the "usage_attributes" field.
-func (ulc *UsageLogCreate) SetUsageAttributes(sa []sdk.UsageAttribute) *UsageLogCreate {
-	ulc.mutation.SetUsageAttributes(sa)
+// SetRequestID sets the "request_id" field.
+func (ulc *UsageLogCreate) SetRequestID(s string) *UsageLogCreate {
+	ulc.mutation.SetRequestID(s)
 	return ulc
 }
 
-// SetUsageMetrics sets the "usage_metrics" field.
-func (ulc *UsageLogCreate) SetUsageMetrics(sm []sdk.UsageMetric) *UsageLogCreate {
-	ulc.mutation.SetUsageMetrics(sm)
-	return ulc
-}
-
-// SetUsageCostDetails sets the "usage_cost_details" field.
-func (ulc *UsageLogCreate) SetUsageCostDetails(scd []sdk.UsageCostDetail) *UsageLogCreate {
-	ulc.mutation.SetUsageCostDetails(scd)
-	return ulc
-}
-
-// SetUsageMetadata sets the "usage_metadata" field.
-func (ulc *UsageLogCreate) SetUsageMetadata(m map[string]string) *UsageLogCreate {
-	ulc.mutation.SetUsageMetadata(m)
+// SetNillableRequestID sets the "request_id" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableRequestID(s *string) *UsageLogCreate {
+	if s != nil {
+		ulc.SetRequestID(*s)
+	}
 	return ulc
 }
 
@@ -565,16 +506,58 @@ func (ulc *UsageLogCreate) SetNillableCreatedAt(t *time.Time) *UsageLogCreate {
 	return ulc
 }
 
-// SetUserID sets the "user" edge to the User entity by ID.
-func (ulc *UsageLogCreate) SetUserID(id int) *UsageLogCreate {
-	ulc.mutation.SetUserID(id)
+// SetUserID sets the "user_id" field.
+func (ulc *UsageLogCreate) SetUserID(i int) *UsageLogCreate {
+	ulc.mutation.SetUserID(i)
 	return ulc
 }
 
-// SetNillableUserID sets the "user" edge to the User entity by ID if the given value is not nil.
-func (ulc *UsageLogCreate) SetNillableUserID(id *int) *UsageLogCreate {
-	if id != nil {
-		ulc = ulc.SetUserID(*id)
+// SetNillableUserID sets the "user_id" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableUserID(i *int) *UsageLogCreate {
+	if i != nil {
+		ulc.SetUserID(*i)
+	}
+	return ulc
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (ulc *UsageLogCreate) SetAPIKeyID(i int) *UsageLogCreate {
+	ulc.mutation.SetAPIKeyID(i)
+	return ulc
+}
+
+// SetNillableAPIKeyID sets the "api_key_id" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableAPIKeyID(i *int) *UsageLogCreate {
+	if i != nil {
+		ulc.SetAPIKeyID(*i)
+	}
+	return ulc
+}
+
+// SetChannelID sets the "channel_id" field.
+func (ulc *UsageLogCreate) SetChannelID(i int) *UsageLogCreate {
+	ulc.mutation.SetChannelID(i)
+	return ulc
+}
+
+// SetNillableChannelID sets the "channel_id" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableChannelID(i *int) *UsageLogCreate {
+	if i != nil {
+		ulc.SetChannelID(*i)
+	}
+	return ulc
+}
+
+// SetGroupID sets the "group_id" field.
+func (ulc *UsageLogCreate) SetGroupID(i int) *UsageLogCreate {
+	ulc.mutation.SetGroupID(i)
+	return ulc
+}
+
+// SetNillableGroupID sets the "group_id" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableGroupID(i *int) *UsageLogCreate {
+	if i != nil {
+		ulc.SetGroupID(*i)
 	}
 	return ulc
 }
@@ -584,56 +567,14 @@ func (ulc *UsageLogCreate) SetUser(u *User) *UsageLogCreate {
 	return ulc.SetUserID(u.ID)
 }
 
-// SetAPIKeyID sets the "api_key" edge to the APIKey entity by ID.
-func (ulc *UsageLogCreate) SetAPIKeyID(id int) *UsageLogCreate {
-	ulc.mutation.SetAPIKeyID(id)
-	return ulc
-}
-
-// SetNillableAPIKeyID sets the "api_key" edge to the APIKey entity by ID if the given value is not nil.
-func (ulc *UsageLogCreate) SetNillableAPIKeyID(id *int) *UsageLogCreate {
-	if id != nil {
-		ulc = ulc.SetAPIKeyID(*id)
-	}
-	return ulc
-}
-
 // SetAPIKey sets the "api_key" edge to the APIKey entity.
 func (ulc *UsageLogCreate) SetAPIKey(a *APIKey) *UsageLogCreate {
 	return ulc.SetAPIKeyID(a.ID)
 }
 
-// SetChannelID sets the "channel" edge to the Channel entity by ID.
-func (ulc *UsageLogCreate) SetChannelID(id int) *UsageLogCreate {
-	ulc.mutation.SetChannelID(id)
-	return ulc
-}
-
-// SetNillableChannelID sets the "channel" edge to the Channel entity by ID if the given value is not nil.
-func (ulc *UsageLogCreate) SetNillableChannelID(id *int) *UsageLogCreate {
-	if id != nil {
-		ulc = ulc.SetChannelID(*id)
-	}
-	return ulc
-}
-
 // SetChannel sets the "channel" edge to the Channel entity.
 func (ulc *UsageLogCreate) SetChannel(c *Channel) *UsageLogCreate {
 	return ulc.SetChannelID(c.ID)
-}
-
-// SetGroupID sets the "group" edge to the Group entity by ID.
-func (ulc *UsageLogCreate) SetGroupID(id int) *UsageLogCreate {
-	ulc.mutation.SetGroupID(id)
-	return ulc
-}
-
-// SetNillableGroupID sets the "group" edge to the Group entity by ID if the given value is not nil.
-func (ulc *UsageLogCreate) SetNillableGroupID(id *int) *UsageLogCreate {
-	if id != nil {
-		ulc = ulc.SetGroupID(*id)
-	}
-	return ulc
 }
 
 // SetGroup sets the "group" edge to the Group entity.
@@ -700,9 +641,9 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultCacheCreation1hTokens
 		ulc.mutation.SetCacheCreation1hTokens(v)
 	}
-	if _, ok := ulc.mutation.ReasoningOutputTokens(); !ok {
-		v := usagelog.DefaultReasoningOutputTokens
-		ulc.mutation.SetReasoningOutputTokens(v)
+	if _, ok := ulc.mutation.Calls(); !ok {
+		v := usagelog.DefaultCalls
+		ulc.mutation.SetCalls(v)
 	}
 	if _, ok := ulc.mutation.InputPrice(); !ok {
 		v := usagelog.DefaultInputPrice
@@ -740,10 +681,6 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultCacheCreationCost
 		ulc.mutation.SetCacheCreationCost(v)
 	}
-	if _, ok := ulc.mutation.ImageCost(); !ok {
-		v := usagelog.DefaultImageCost
-		ulc.mutation.SetImageCost(v)
-	}
 	if _, ok := ulc.mutation.TotalCost(); !ok {
 		v := usagelog.DefaultTotalCost
 		ulc.mutation.SetTotalCost(v)
@@ -755,10 +692,6 @@ func (ulc *UsageLogCreate) defaults() {
 	if _, ok := ulc.mutation.BilledCost(); !ok {
 		v := usagelog.DefaultBilledCost
 		ulc.mutation.SetBilledCost(v)
-	}
-	if _, ok := ulc.mutation.AccountCost(); !ok {
-		v := usagelog.DefaultAccountCost
-		ulc.mutation.SetAccountCost(v)
 	}
 	if _, ok := ulc.mutation.RateMultiplier(); !ok {
 		v := usagelog.DefaultRateMultiplier
@@ -775,10 +708,6 @@ func (ulc *UsageLogCreate) defaults() {
 	if _, ok := ulc.mutation.ServiceTier(); !ok {
 		v := usagelog.DefaultServiceTier
 		ulc.mutation.SetServiceTier(v)
-	}
-	if _, ok := ulc.mutation.ImageSize(); !ok {
-		v := usagelog.DefaultImageSize
-		ulc.mutation.SetImageSize(v)
 	}
 	if _, ok := ulc.mutation.Stream(); !ok {
 		v := usagelog.DefaultStream
@@ -804,9 +733,13 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultEndpoint
 		ulc.mutation.SetEndpoint(v)
 	}
-	if _, ok := ulc.mutation.ReasoningEffort(); !ok {
-		v := usagelog.DefaultReasoningEffort
-		ulc.mutation.SetReasoningEffort(v)
+	if _, ok := ulc.mutation.Source(); !ok {
+		v := usagelog.DefaultSource
+		ulc.mutation.SetSource(v)
+	}
+	if _, ok := ulc.mutation.RequestID(); !ok {
+		v := usagelog.DefaultRequestID
+		ulc.mutation.SetRequestID(v)
 	}
 	if _, ok := ulc.mutation.UserIDSnapshot(); !ok {
 		v := usagelog.DefaultUserIDSnapshot
@@ -824,14 +757,6 @@ func (ulc *UsageLogCreate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (ulc *UsageLogCreate) check() error {
-	if _, ok := ulc.mutation.Platform(); !ok {
-		return &ValidationError{Name: "platform", err: errors.New(`ent: missing required field "UsageLog.platform"`)}
-	}
-	if v, ok := ulc.mutation.Platform(); ok {
-		if err := usagelog.PlatformValidator(v); err != nil {
-			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "UsageLog.platform": %w`, err)}
-		}
-	}
 	if _, ok := ulc.mutation.Model(); !ok {
 		return &ValidationError{Name: "model", err: errors.New(`ent: missing required field "UsageLog.model"`)}
 	}
@@ -858,8 +783,8 @@ func (ulc *UsageLogCreate) check() error {
 	if _, ok := ulc.mutation.CacheCreation1hTokens(); !ok {
 		return &ValidationError{Name: "cache_creation_1h_tokens", err: errors.New(`ent: missing required field "UsageLog.cache_creation_1h_tokens"`)}
 	}
-	if _, ok := ulc.mutation.ReasoningOutputTokens(); !ok {
-		return &ValidationError{Name: "reasoning_output_tokens", err: errors.New(`ent: missing required field "UsageLog.reasoning_output_tokens"`)}
+	if _, ok := ulc.mutation.Calls(); !ok {
+		return &ValidationError{Name: "calls", err: errors.New(`ent: missing required field "UsageLog.calls"`)}
 	}
 	if _, ok := ulc.mutation.InputPrice(); !ok {
 		return &ValidationError{Name: "input_price", err: errors.New(`ent: missing required field "UsageLog.input_price"`)}
@@ -888,9 +813,6 @@ func (ulc *UsageLogCreate) check() error {
 	if _, ok := ulc.mutation.CacheCreationCost(); !ok {
 		return &ValidationError{Name: "cache_creation_cost", err: errors.New(`ent: missing required field "UsageLog.cache_creation_cost"`)}
 	}
-	if _, ok := ulc.mutation.ImageCost(); !ok {
-		return &ValidationError{Name: "image_cost", err: errors.New(`ent: missing required field "UsageLog.image_cost"`)}
-	}
 	if _, ok := ulc.mutation.TotalCost(); !ok {
 		return &ValidationError{Name: "total_cost", err: errors.New(`ent: missing required field "UsageLog.total_cost"`)}
 	}
@@ -899,9 +821,6 @@ func (ulc *UsageLogCreate) check() error {
 	}
 	if _, ok := ulc.mutation.BilledCost(); !ok {
 		return &ValidationError{Name: "billed_cost", err: errors.New(`ent: missing required field "UsageLog.billed_cost"`)}
-	}
-	if _, ok := ulc.mutation.AccountCost(); !ok {
-		return &ValidationError{Name: "account_cost", err: errors.New(`ent: missing required field "UsageLog.account_cost"`)}
 	}
 	if _, ok := ulc.mutation.RateMultiplier(); !ok {
 		return &ValidationError{Name: "rate_multiplier", err: errors.New(`ent: missing required field "UsageLog.rate_multiplier"`)}
@@ -914,9 +833,6 @@ func (ulc *UsageLogCreate) check() error {
 	}
 	if _, ok := ulc.mutation.ServiceTier(); !ok {
 		return &ValidationError{Name: "service_tier", err: errors.New(`ent: missing required field "UsageLog.service_tier"`)}
-	}
-	if _, ok := ulc.mutation.ImageSize(); !ok {
-		return &ValidationError{Name: "image_size", err: errors.New(`ent: missing required field "UsageLog.image_size"`)}
 	}
 	if _, ok := ulc.mutation.Stream(); !ok {
 		return &ValidationError{Name: "stream", err: errors.New(`ent: missing required field "UsageLog.stream"`)}
@@ -936,8 +852,11 @@ func (ulc *UsageLogCreate) check() error {
 	if _, ok := ulc.mutation.Endpoint(); !ok {
 		return &ValidationError{Name: "endpoint", err: errors.New(`ent: missing required field "UsageLog.endpoint"`)}
 	}
-	if _, ok := ulc.mutation.ReasoningEffort(); !ok {
-		return &ValidationError{Name: "reasoning_effort", err: errors.New(`ent: missing required field "UsageLog.reasoning_effort"`)}
+	if _, ok := ulc.mutation.Source(); !ok {
+		return &ValidationError{Name: "source", err: errors.New(`ent: missing required field "UsageLog.source"`)}
+	}
+	if _, ok := ulc.mutation.RequestID(); !ok {
+		return &ValidationError{Name: "request_id", err: errors.New(`ent: missing required field "UsageLog.request_id"`)}
 	}
 	if _, ok := ulc.mutation.UserIDSnapshot(); !ok {
 		return &ValidationError{Name: "user_id_snapshot", err: errors.New(`ent: missing required field "UsageLog.user_id_snapshot"`)}
@@ -974,10 +893,6 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_node = &UsageLog{config: ulc.config}
 		_spec = sqlgraph.NewCreateSpec(usagelog.Table, sqlgraph.NewFieldSpec(usagelog.FieldID, field.TypeInt))
 	)
-	if value, ok := ulc.mutation.Platform(); ok {
-		_spec.SetField(usagelog.FieldPlatform, field.TypeString, value)
-		_node.Platform = value
-	}
 	if value, ok := ulc.mutation.Model(); ok {
 		_spec.SetField(usagelog.FieldModel, field.TypeString, value)
 		_node.Model = value
@@ -1006,9 +921,9 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_spec.SetField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
 		_node.CacheCreation1hTokens = value
 	}
-	if value, ok := ulc.mutation.ReasoningOutputTokens(); ok {
-		_spec.SetField(usagelog.FieldReasoningOutputTokens, field.TypeInt, value)
-		_node.ReasoningOutputTokens = value
+	if value, ok := ulc.mutation.Calls(); ok {
+		_spec.SetField(usagelog.FieldCalls, field.TypeInt, value)
+		_node.Calls = value
 	}
 	if value, ok := ulc.mutation.InputPrice(); ok {
 		_spec.SetField(usagelog.FieldInputPrice, field.TypeFloat64, value)
@@ -1046,10 +961,6 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_spec.SetField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
 		_node.CacheCreationCost = value
 	}
-	if value, ok := ulc.mutation.ImageCost(); ok {
-		_spec.SetField(usagelog.FieldImageCost, field.TypeFloat64, value)
-		_node.ImageCost = value
-	}
 	if value, ok := ulc.mutation.TotalCost(); ok {
 		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)
 		_node.TotalCost = value
@@ -1061,10 +972,6 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := ulc.mutation.BilledCost(); ok {
 		_spec.SetField(usagelog.FieldBilledCost, field.TypeFloat64, value)
 		_node.BilledCost = value
-	}
-	if value, ok := ulc.mutation.AccountCost(); ok {
-		_spec.SetField(usagelog.FieldAccountCost, field.TypeFloat64, value)
-		_node.AccountCost = value
 	}
 	if value, ok := ulc.mutation.RateMultiplier(); ok {
 		_spec.SetField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
@@ -1081,10 +988,6 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := ulc.mutation.ServiceTier(); ok {
 		_spec.SetField(usagelog.FieldServiceTier, field.TypeString, value)
 		_node.ServiceTier = value
-	}
-	if value, ok := ulc.mutation.ImageSize(); ok {
-		_spec.SetField(usagelog.FieldImageSize, field.TypeString, value)
-		_node.ImageSize = value
 	}
 	if value, ok := ulc.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
@@ -1110,25 +1013,13 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_spec.SetField(usagelog.FieldEndpoint, field.TypeString, value)
 		_node.Endpoint = value
 	}
-	if value, ok := ulc.mutation.ReasoningEffort(); ok {
-		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
-		_node.ReasoningEffort = value
+	if value, ok := ulc.mutation.Source(); ok {
+		_spec.SetField(usagelog.FieldSource, field.TypeString, value)
+		_node.Source = value
 	}
-	if value, ok := ulc.mutation.UsageAttributes(); ok {
-		_spec.SetField(usagelog.FieldUsageAttributes, field.TypeJSON, value)
-		_node.UsageAttributes = value
-	}
-	if value, ok := ulc.mutation.UsageMetrics(); ok {
-		_spec.SetField(usagelog.FieldUsageMetrics, field.TypeJSON, value)
-		_node.UsageMetrics = value
-	}
-	if value, ok := ulc.mutation.UsageCostDetails(); ok {
-		_spec.SetField(usagelog.FieldUsageCostDetails, field.TypeJSON, value)
-		_node.UsageCostDetails = value
-	}
-	if value, ok := ulc.mutation.UsageMetadata(); ok {
-		_spec.SetField(usagelog.FieldUsageMetadata, field.TypeJSON, value)
-		_node.UsageMetadata = value
+	if value, ok := ulc.mutation.RequestID(); ok {
+		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
+		_node.RequestID = value
 	}
 	if value, ok := ulc.mutation.UserIDSnapshot(); ok {
 		_spec.SetField(usagelog.FieldUserIDSnapshot, field.TypeInt, value)
@@ -1156,7 +1047,7 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.user_usage_logs = &nodes[0]
+		_node.UserID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := ulc.mutation.APIKeyIDs(); len(nodes) > 0 {
@@ -1173,7 +1064,7 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.api_key_usage_logs = &nodes[0]
+		_node.APIKeyID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := ulc.mutation.ChannelIDs(); len(nodes) > 0 {
@@ -1190,7 +1081,7 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.channel_usage_logs = &nodes[0]
+		_node.ChannelID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := ulc.mutation.GroupIDs(); len(nodes) > 0 {
@@ -1207,7 +1098,7 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.group_usage_logs = &nodes[0]
+		_node.GroupID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

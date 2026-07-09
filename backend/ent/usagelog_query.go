@@ -29,7 +29,6 @@ type UsageLogQuery struct {
 	withAPIKey  *APIKeyQuery
 	withChannel *ChannelQuery
 	withGroup   *GroupQuery
-	withFKs     bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -406,12 +405,12 @@ func (ulq *UsageLogQuery) WithGroup(opts ...func(*GroupQuery)) *UsageLogQuery {
 // Example:
 //
 //	var v []struct {
-//		Platform string `json:"platform,omitempty"`
+//		Model string `json:"model,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.UsageLog.Query().
-//		GroupBy(usagelog.FieldPlatform).
+//		GroupBy(usagelog.FieldModel).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (ulq *UsageLogQuery) GroupBy(field string, fields ...string) *UsageLogGroupBy {
@@ -429,11 +428,11 @@ func (ulq *UsageLogQuery) GroupBy(field string, fields ...string) *UsageLogGroup
 // Example:
 //
 //	var v []struct {
-//		Platform string `json:"platform,omitempty"`
+//		Model string `json:"model,omitempty"`
 //	}
 //
 //	client.UsageLog.Query().
-//		Select(usagelog.FieldPlatform).
+//		Select(usagelog.FieldModel).
 //		Scan(ctx, &v)
 func (ulq *UsageLogQuery) Select(fields ...string) *UsageLogSelect {
 	ulq.ctx.Fields = append(ulq.ctx.Fields, fields...)
@@ -477,7 +476,6 @@ func (ulq *UsageLogQuery) prepareQuery(ctx context.Context) error {
 func (ulq *UsageLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*UsageLog, error) {
 	var (
 		nodes       = []*UsageLog{}
-		withFKs     = ulq.withFKs
 		_spec       = ulq.querySpec()
 		loadedTypes = [4]bool{
 			ulq.withUser != nil,
@@ -486,12 +484,6 @@ func (ulq *UsageLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Us
 			ulq.withGroup != nil,
 		}
 	)
-	if ulq.withUser != nil || ulq.withAPIKey != nil || ulq.withChannel != nil || ulq.withGroup != nil {
-		withFKs = true
-	}
-	if withFKs {
-		_spec.Node.Columns = append(_spec.Node.Columns, usagelog.ForeignKeys...)
-	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*UsageLog).scanValues(nil, columns)
 	}
@@ -541,10 +533,7 @@ func (ulq *UsageLogQuery) loadUser(ctx context.Context, query *UserQuery, nodes 
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*UsageLog)
 	for i := range nodes {
-		if nodes[i].user_usage_logs == nil {
-			continue
-		}
-		fk := *nodes[i].user_usage_logs
+		fk := nodes[i].UserID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -561,7 +550,7 @@ func (ulq *UsageLogQuery) loadUser(ctx context.Context, query *UserQuery, nodes 
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "user_usage_logs" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "user_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -573,10 +562,7 @@ func (ulq *UsageLogQuery) loadAPIKey(ctx context.Context, query *APIKeyQuery, no
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*UsageLog)
 	for i := range nodes {
-		if nodes[i].api_key_usage_logs == nil {
-			continue
-		}
-		fk := *nodes[i].api_key_usage_logs
+		fk := nodes[i].APIKeyID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -593,7 +579,7 @@ func (ulq *UsageLogQuery) loadAPIKey(ctx context.Context, query *APIKeyQuery, no
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "api_key_usage_logs" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "api_key_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -605,10 +591,7 @@ func (ulq *UsageLogQuery) loadChannel(ctx context.Context, query *ChannelQuery, 
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*UsageLog)
 	for i := range nodes {
-		if nodes[i].channel_usage_logs == nil {
-			continue
-		}
-		fk := *nodes[i].channel_usage_logs
+		fk := nodes[i].ChannelID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -625,7 +608,7 @@ func (ulq *UsageLogQuery) loadChannel(ctx context.Context, query *ChannelQuery, 
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "channel_usage_logs" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "channel_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -637,10 +620,7 @@ func (ulq *UsageLogQuery) loadGroup(ctx context.Context, query *GroupQuery, node
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*UsageLog)
 	for i := range nodes {
-		if nodes[i].group_usage_logs == nil {
-			continue
-		}
-		fk := *nodes[i].group_usage_logs
+		fk := nodes[i].GroupID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -657,7 +637,7 @@ func (ulq *UsageLogQuery) loadGroup(ctx context.Context, query *GroupQuery, node
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "group_usage_logs" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "group_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -690,6 +670,18 @@ func (ulq *UsageLogQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != usagelog.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if ulq.withUser != nil {
+			_spec.Node.AddColumnOnce(usagelog.FieldUserID)
+		}
+		if ulq.withAPIKey != nil {
+			_spec.Node.AddColumnOnce(usagelog.FieldAPIKeyID)
+		}
+		if ulq.withChannel != nil {
+			_spec.Node.AddColumnOnce(usagelog.FieldChannelID)
+		}
+		if ulq.withGroup != nil {
+			_spec.Node.AddColumnOnce(usagelog.FieldGroupID)
 		}
 	}
 	if ps := ulq.predicates; len(ps) > 0 {

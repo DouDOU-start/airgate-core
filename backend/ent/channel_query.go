@@ -517,7 +517,9 @@ func (cq *ChannelQuery) loadUsageLogs(ctx context.Context, query *UsageLogQuery,
 			init(nodes[i])
 		}
 	}
-	query.withFKs = true
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(usagelog.FieldChannelID)
+	}
 	query.Where(predicate.UsageLog(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(channel.UsageLogsColumn), fks...))
 	}))
@@ -526,13 +528,10 @@ func (cq *ChannelQuery) loadUsageLogs(ctx context.Context, query *UsageLogQuery,
 		return err
 	}
 	for _, n := range neighbors {
-		fk := n.channel_usage_logs
-		if fk == nil {
-			return fmt.Errorf(`foreign-key "channel_usage_logs" is nil for node %v`, n.ID)
-		}
-		node, ok := nodeids[*fk]
+		fk := n.ChannelID
+		node, ok := nodeids[fk]
 		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "channel_usage_logs" returned %v for node %v`, *fk, n.ID)
+			return fmt.Errorf(`unexpected referenced foreign-key "channel_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

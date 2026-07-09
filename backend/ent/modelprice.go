@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
+	"github.com/DouDOU-start/airgate-core/ent/modeltag"
 )
 
 // ModelPrice is the model entity for the ModelPrice schema.
@@ -34,11 +35,36 @@ type ModelPrice struct {
 	PerRequestPrice float64 `json:"per_request_price,omitempty"`
 	// PricingExtra holds the value of the "pricing_extra" field.
 	PricingExtra map[string]interface{} `json:"pricing_extra,omitempty"`
+	// TagID holds the value of the "tag_id" field.
+	TagID *int `json:"tag_id,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
-	UpdatedAt    time.Time `json:"updated_at,omitempty"`
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the ModelPriceQuery when eager-loading is set.
+	Edges        ModelPriceEdges `json:"edges"`
 	selectValues sql.SelectValues
+}
+
+// ModelPriceEdges holds the relations/edges for other nodes in the graph.
+type ModelPriceEdges struct {
+	// Tag holds the value of the tag edge.
+	Tag *ModelTag `json:"tag,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// TagOrErr returns the Tag value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e ModelPriceEdges) TagOrErr() (*ModelTag, error) {
+	if e.Tag != nil {
+		return e.Tag, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: modeltag.Label}
+	}
+	return nil, &NotLoadedError{edge: "tag"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -50,7 +76,7 @@ func (*ModelPrice) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case modelprice.FieldInputPrice, modelprice.FieldOutputPrice, modelprice.FieldCachedInputPrice, modelprice.FieldCacheCreationPrice, modelprice.FieldCacheCreation1hPrice, modelprice.FieldPerRequestPrice:
 			values[i] = new(sql.NullFloat64)
-		case modelprice.FieldID:
+		case modelprice.FieldID, modelprice.FieldTagID:
 			values[i] = new(sql.NullInt64)
 		case modelprice.FieldModel:
 			values[i] = new(sql.NullString)
@@ -127,6 +153,13 @@ func (mp *ModelPrice) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field pricing_extra: %w", err)
 				}
 			}
+		case modelprice.FieldTagID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field tag_id", values[i])
+			} else if value.Valid {
+				mp.TagID = new(int)
+				*mp.TagID = int(value.Int64)
+			}
 		case modelprice.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -150,6 +183,11 @@ func (mp *ModelPrice) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (mp *ModelPrice) Value(name string) (ent.Value, error) {
 	return mp.selectValues.Get(name)
+}
+
+// QueryTag queries the "tag" edge of the ModelPrice entity.
+func (mp *ModelPrice) QueryTag() *ModelTagQuery {
+	return NewModelPriceClient(mp.config).QueryTag(mp)
 }
 
 // Update returns a builder for updating this ModelPrice.
@@ -198,6 +236,11 @@ func (mp *ModelPrice) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("pricing_extra=")
 	builder.WriteString(fmt.Sprintf("%v", mp.PricingExtra))
+	builder.WriteString(", ")
+	if v := mp.TagID; v != nil {
+		builder.WriteString("tag_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(mp.CreatedAt.Format(time.ANSIC))

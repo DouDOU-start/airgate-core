@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 const (
@@ -29,12 +30,23 @@ const (
 	FieldPerRequestPrice = "per_request_price"
 	// FieldPricingExtra holds the string denoting the pricing_extra field in the database.
 	FieldPricingExtra = "pricing_extra"
+	// FieldTagID holds the string denoting the tag_id field in the database.
+	FieldTagID = "tag_id"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgeTag holds the string denoting the tag edge name in mutations.
+	EdgeTag = "tag"
 	// Table holds the table name of the modelprice in the database.
 	Table = "model_prices"
+	// TagTable is the table that holds the tag relation/edge.
+	TagTable = "model_prices"
+	// TagInverseTable is the table name for the ModelTag entity.
+	// It exists in this package in order to avoid circular dependency with the "modeltag" package.
+	TagInverseTable = "model_tags"
+	// TagColumn is the table column denoting the tag relation/edge.
+	TagColumn = "tag_id"
 )
 
 // Columns holds all SQL columns for modelprice fields.
@@ -48,6 +60,7 @@ var Columns = []string{
 	FieldCacheCreation1hPrice,
 	FieldPerRequestPrice,
 	FieldPricingExtra,
+	FieldTagID,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -128,6 +141,11 @@ func ByPerRequestPrice(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPerRequestPrice, opts...).ToFunc()
 }
 
+// ByTagID orders the results by the tag_id field.
+func ByTagID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTagID, opts...).ToFunc()
+}
+
 // ByCreatedAt orders the results by the created_at field.
 func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedAt, opts...).ToFunc()
@@ -136,4 +154,18 @@ func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdatedAt orders the results by the updated_at field.
 func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
+}
+
+// ByTagField orders the results by tag field.
+func ByTagField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTagStep(), sql.OrderByField(field, opts...))
+	}
+}
+func newTagStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TagInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, TagTable, TagColumn),
+	)
 }

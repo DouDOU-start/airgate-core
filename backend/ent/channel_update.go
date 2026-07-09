@@ -318,18 +318,6 @@ func (cu *ChannelUpdate) SetNillableTestModel(s *string) *ChannelUpdate {
 	return cu
 }
 
-// SetCustomConfig sets the "custom_config" field.
-func (cu *ChannelUpdate) SetCustomConfig(m map[string]interface{}) *ChannelUpdate {
-	cu.mutation.SetCustomConfig(m)
-	return cu
-}
-
-// ClearCustomConfig clears the value of the "custom_config" field.
-func (cu *ChannelUpdate) ClearCustomConfig() *ChannelUpdate {
-	cu.mutation.ClearCustomConfig()
-	return cu
-}
-
 // SetResponseTimeMs sets the "response_time_ms" field.
 func (cu *ChannelUpdate) SetResponseTimeMs(i int) *ChannelUpdate {
 	cu.mutation.ResetResponseTimeMs()
@@ -368,6 +356,47 @@ func (cu *ChannelUpdate) SetNillableTestedAt(t *time.Time) *ChannelUpdate {
 // ClearTestedAt clears the value of the "tested_at" field.
 func (cu *ChannelUpdate) ClearTestedAt() *ChannelUpdate {
 	cu.mutation.ClearTestedAt()
+	return cu
+}
+
+// SetBalance sets the "balance" field.
+func (cu *ChannelUpdate) SetBalance(f float64) *ChannelUpdate {
+	cu.mutation.ResetBalance()
+	cu.mutation.SetBalance(f)
+	return cu
+}
+
+// SetNillableBalance sets the "balance" field if the given value is not nil.
+func (cu *ChannelUpdate) SetNillableBalance(f *float64) *ChannelUpdate {
+	if f != nil {
+		cu.SetBalance(*f)
+	}
+	return cu
+}
+
+// AddBalance adds f to the "balance" field.
+func (cu *ChannelUpdate) AddBalance(f float64) *ChannelUpdate {
+	cu.mutation.AddBalance(f)
+	return cu
+}
+
+// SetBalanceUpdatedAt sets the "balance_updated_at" field.
+func (cu *ChannelUpdate) SetBalanceUpdatedAt(t time.Time) *ChannelUpdate {
+	cu.mutation.SetBalanceUpdatedAt(t)
+	return cu
+}
+
+// SetNillableBalanceUpdatedAt sets the "balance_updated_at" field if the given value is not nil.
+func (cu *ChannelUpdate) SetNillableBalanceUpdatedAt(t *time.Time) *ChannelUpdate {
+	if t != nil {
+		cu.SetBalanceUpdatedAt(*t)
+	}
+	return cu
+}
+
+// ClearBalanceUpdatedAt clears the value of the "balance_updated_at" field.
+func (cu *ChannelUpdate) ClearBalanceUpdatedAt() *ChannelUpdate {
+	cu.mutation.ClearBalanceUpdatedAt()
 	return cu
 }
 
@@ -656,12 +685,6 @@ func (cu *ChannelUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := cu.mutation.TestModel(); ok {
 		_spec.SetField(channel.FieldTestModel, field.TypeString, value)
 	}
-	if value, ok := cu.mutation.CustomConfig(); ok {
-		_spec.SetField(channel.FieldCustomConfig, field.TypeJSON, value)
-	}
-	if cu.mutation.CustomConfigCleared() {
-		_spec.ClearField(channel.FieldCustomConfig, field.TypeJSON)
-	}
 	if value, ok := cu.mutation.ResponseTimeMs(); ok {
 		_spec.SetField(channel.FieldResponseTimeMs, field.TypeInt, value)
 	}
@@ -673,6 +696,18 @@ func (cu *ChannelUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if cu.mutation.TestedAtCleared() {
 		_spec.ClearField(channel.FieldTestedAt, field.TypeTime)
+	}
+	if value, ok := cu.mutation.Balance(); ok {
+		_spec.SetField(channel.FieldBalance, field.TypeFloat64, value)
+	}
+	if value, ok := cu.mutation.AddedBalance(); ok {
+		_spec.AddField(channel.FieldBalance, field.TypeFloat64, value)
+	}
+	if value, ok := cu.mutation.BalanceUpdatedAt(); ok {
+		_spec.SetField(channel.FieldBalanceUpdatedAt, field.TypeTime, value)
+	}
+	if cu.mutation.BalanceUpdatedAtCleared() {
+		_spec.ClearField(channel.FieldBalanceUpdatedAt, field.TypeTime)
 	}
 	if value, ok := cu.mutation.LastUsedAt(); ok {
 		_spec.SetField(channel.FieldLastUsedAt, field.TypeTime, value)
@@ -1080,18 +1115,6 @@ func (cuo *ChannelUpdateOne) SetNillableTestModel(s *string) *ChannelUpdateOne {
 	return cuo
 }
 
-// SetCustomConfig sets the "custom_config" field.
-func (cuo *ChannelUpdateOne) SetCustomConfig(m map[string]interface{}) *ChannelUpdateOne {
-	cuo.mutation.SetCustomConfig(m)
-	return cuo
-}
-
-// ClearCustomConfig clears the value of the "custom_config" field.
-func (cuo *ChannelUpdateOne) ClearCustomConfig() *ChannelUpdateOne {
-	cuo.mutation.ClearCustomConfig()
-	return cuo
-}
-
 // SetResponseTimeMs sets the "response_time_ms" field.
 func (cuo *ChannelUpdateOne) SetResponseTimeMs(i int) *ChannelUpdateOne {
 	cuo.mutation.ResetResponseTimeMs()
@@ -1130,6 +1153,47 @@ func (cuo *ChannelUpdateOne) SetNillableTestedAt(t *time.Time) *ChannelUpdateOne
 // ClearTestedAt clears the value of the "tested_at" field.
 func (cuo *ChannelUpdateOne) ClearTestedAt() *ChannelUpdateOne {
 	cuo.mutation.ClearTestedAt()
+	return cuo
+}
+
+// SetBalance sets the "balance" field.
+func (cuo *ChannelUpdateOne) SetBalance(f float64) *ChannelUpdateOne {
+	cuo.mutation.ResetBalance()
+	cuo.mutation.SetBalance(f)
+	return cuo
+}
+
+// SetNillableBalance sets the "balance" field if the given value is not nil.
+func (cuo *ChannelUpdateOne) SetNillableBalance(f *float64) *ChannelUpdateOne {
+	if f != nil {
+		cuo.SetBalance(*f)
+	}
+	return cuo
+}
+
+// AddBalance adds f to the "balance" field.
+func (cuo *ChannelUpdateOne) AddBalance(f float64) *ChannelUpdateOne {
+	cuo.mutation.AddBalance(f)
+	return cuo
+}
+
+// SetBalanceUpdatedAt sets the "balance_updated_at" field.
+func (cuo *ChannelUpdateOne) SetBalanceUpdatedAt(t time.Time) *ChannelUpdateOne {
+	cuo.mutation.SetBalanceUpdatedAt(t)
+	return cuo
+}
+
+// SetNillableBalanceUpdatedAt sets the "balance_updated_at" field if the given value is not nil.
+func (cuo *ChannelUpdateOne) SetNillableBalanceUpdatedAt(t *time.Time) *ChannelUpdateOne {
+	if t != nil {
+		cuo.SetBalanceUpdatedAt(*t)
+	}
+	return cuo
+}
+
+// ClearBalanceUpdatedAt clears the value of the "balance_updated_at" field.
+func (cuo *ChannelUpdateOne) ClearBalanceUpdatedAt() *ChannelUpdateOne {
+	cuo.mutation.ClearBalanceUpdatedAt()
 	return cuo
 }
 
@@ -1448,12 +1512,6 @@ func (cuo *ChannelUpdateOne) sqlSave(ctx context.Context) (_node *Channel, err e
 	if value, ok := cuo.mutation.TestModel(); ok {
 		_spec.SetField(channel.FieldTestModel, field.TypeString, value)
 	}
-	if value, ok := cuo.mutation.CustomConfig(); ok {
-		_spec.SetField(channel.FieldCustomConfig, field.TypeJSON, value)
-	}
-	if cuo.mutation.CustomConfigCleared() {
-		_spec.ClearField(channel.FieldCustomConfig, field.TypeJSON)
-	}
 	if value, ok := cuo.mutation.ResponseTimeMs(); ok {
 		_spec.SetField(channel.FieldResponseTimeMs, field.TypeInt, value)
 	}
@@ -1465,6 +1523,18 @@ func (cuo *ChannelUpdateOne) sqlSave(ctx context.Context) (_node *Channel, err e
 	}
 	if cuo.mutation.TestedAtCleared() {
 		_spec.ClearField(channel.FieldTestedAt, field.TypeTime)
+	}
+	if value, ok := cuo.mutation.Balance(); ok {
+		_spec.SetField(channel.FieldBalance, field.TypeFloat64, value)
+	}
+	if value, ok := cuo.mutation.AddedBalance(); ok {
+		_spec.AddField(channel.FieldBalance, field.TypeFloat64, value)
+	}
+	if value, ok := cuo.mutation.BalanceUpdatedAt(); ok {
+		_spec.SetField(channel.FieldBalanceUpdatedAt, field.TypeTime, value)
+	}
+	if cuo.mutation.BalanceUpdatedAtCleared() {
+		_spec.ClearField(channel.FieldBalanceUpdatedAt, field.TypeTime)
 	}
 	if value, ok := cuo.mutation.LastUsedAt(); ok {
 		_spec.SetField(channel.FieldLastUsedAt, field.TypeTime, value)

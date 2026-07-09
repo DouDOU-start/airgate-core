@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
+	"github.com/DouDOU-start/airgate-core/ent/modeltag"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 )
 
@@ -180,15 +181,46 @@ func (mpu *ModelPriceUpdate) ClearPricingExtra() *ModelPriceUpdate {
 	return mpu
 }
 
+// SetTagID sets the "tag_id" field.
+func (mpu *ModelPriceUpdate) SetTagID(i int) *ModelPriceUpdate {
+	mpu.mutation.SetTagID(i)
+	return mpu
+}
+
+// SetNillableTagID sets the "tag_id" field if the given value is not nil.
+func (mpu *ModelPriceUpdate) SetNillableTagID(i *int) *ModelPriceUpdate {
+	if i != nil {
+		mpu.SetTagID(*i)
+	}
+	return mpu
+}
+
+// ClearTagID clears the value of the "tag_id" field.
+func (mpu *ModelPriceUpdate) ClearTagID() *ModelPriceUpdate {
+	mpu.mutation.ClearTagID()
+	return mpu
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (mpu *ModelPriceUpdate) SetUpdatedAt(t time.Time) *ModelPriceUpdate {
 	mpu.mutation.SetUpdatedAt(t)
 	return mpu
 }
 
+// SetTag sets the "tag" edge to the ModelTag entity.
+func (mpu *ModelPriceUpdate) SetTag(m *ModelTag) *ModelPriceUpdate {
+	return mpu.SetTagID(m.ID)
+}
+
 // Mutation returns the ModelPriceMutation object of the builder.
 func (mpu *ModelPriceUpdate) Mutation() *ModelPriceMutation {
 	return mpu.mutation
+}
+
+// ClearTag clears the "tag" edge to the ModelTag entity.
+func (mpu *ModelPriceUpdate) ClearTag() *ModelPriceUpdate {
+	mpu.mutation.ClearTag()
+	return mpu
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -296,6 +328,35 @@ func (mpu *ModelPriceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := mpu.mutation.UpdatedAt(); ok {
 		_spec.SetField(modelprice.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if mpu.mutation.TagCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   modelprice.TagTable,
+			Columns: []string{modelprice.TagColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(modeltag.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := mpu.mutation.TagIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   modelprice.TagTable,
+			Columns: []string{modelprice.TagColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(modeltag.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, mpu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -469,15 +530,46 @@ func (mpuo *ModelPriceUpdateOne) ClearPricingExtra() *ModelPriceUpdateOne {
 	return mpuo
 }
 
+// SetTagID sets the "tag_id" field.
+func (mpuo *ModelPriceUpdateOne) SetTagID(i int) *ModelPriceUpdateOne {
+	mpuo.mutation.SetTagID(i)
+	return mpuo
+}
+
+// SetNillableTagID sets the "tag_id" field if the given value is not nil.
+func (mpuo *ModelPriceUpdateOne) SetNillableTagID(i *int) *ModelPriceUpdateOne {
+	if i != nil {
+		mpuo.SetTagID(*i)
+	}
+	return mpuo
+}
+
+// ClearTagID clears the value of the "tag_id" field.
+func (mpuo *ModelPriceUpdateOne) ClearTagID() *ModelPriceUpdateOne {
+	mpuo.mutation.ClearTagID()
+	return mpuo
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (mpuo *ModelPriceUpdateOne) SetUpdatedAt(t time.Time) *ModelPriceUpdateOne {
 	mpuo.mutation.SetUpdatedAt(t)
 	return mpuo
 }
 
+// SetTag sets the "tag" edge to the ModelTag entity.
+func (mpuo *ModelPriceUpdateOne) SetTag(m *ModelTag) *ModelPriceUpdateOne {
+	return mpuo.SetTagID(m.ID)
+}
+
 // Mutation returns the ModelPriceMutation object of the builder.
 func (mpuo *ModelPriceUpdateOne) Mutation() *ModelPriceMutation {
 	return mpuo.mutation
+}
+
+// ClearTag clears the "tag" edge to the ModelTag entity.
+func (mpuo *ModelPriceUpdateOne) ClearTag() *ModelPriceUpdateOne {
+	mpuo.mutation.ClearTag()
+	return mpuo
 }
 
 // Where appends a list predicates to the ModelPriceUpdate builder.
@@ -615,6 +707,35 @@ func (mpuo *ModelPriceUpdateOne) sqlSave(ctx context.Context) (_node *ModelPrice
 	}
 	if value, ok := mpuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(modelprice.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if mpuo.mutation.TagCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   modelprice.TagTable,
+			Columns: []string{modelprice.TagColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(modeltag.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := mpuo.mutation.TagIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   modelprice.TagTable,
+			Columns: []string{modelprice.TagColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(modeltag.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &ModelPrice{config: mpuo.config}
 	_spec.Assign = _node.assignValues

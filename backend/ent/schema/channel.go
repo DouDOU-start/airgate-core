@@ -22,7 +22,7 @@ type Channel struct {
 func (Channel) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").NotEmpty(),
-		field.Enum("type").Values("openai_compatible", "anthropic", "gemini", "custom"),
+		field.Enum("type").Values("openai_compatible", "anthropic", "gemini"),
 		field.String("base_url").NotEmpty(),
 		// api_keys 存元素级 AES-GCM 密文（base64），加解密由 service 层负责，schema 不管加密。
 		field.JSON("api_keys", []string{}).Default([]string{}).Sensitive(),
@@ -47,10 +47,14 @@ func (Channel) Fields() []ent.Field {
 			Comment("采购折扣率：官方 1.0、三折中转 0.3，用于渠道成本统计"),
 		field.JSON("tags", []string{}).Optional(),
 		field.String("test_model").Default(""),
-		// custom_config custom 类型的声明式接入 JSON（endpoints/headers/query/格式等）。
-		field.JSON("custom_config", map[string]interface{}{}).Optional(),
 		field.Int("response_time_ms").Default(0),
 		field.Time("tested_at").Optional().Nillable(),
+		// balance 上游账户余额（美元），经 key 查询 /dashboard/billing 拉取；
+		// 仅 openai_compatible 中转站支持，官方直连渠道恒 0（不支持查询）。
+		field.Float("balance").Default(0).
+			Comment("上游账户余额（USD）；多 key 求和；仅 openai_compatible 中转站可查"),
+		field.Time("balance_updated_at").Optional().Nillable().
+			Comment("余额最近刷新时间；nil 表示从未刷新过"),
 		field.Time("last_used_at").Optional().Nillable(),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),

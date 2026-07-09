@@ -19,8 +19,13 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
+	"github.com/DouDOU-start/airgate-core/ent/modeltag"
+	"github.com/DouDOU-start/airgate-core/ent/oauthclient"
+	"github.com/DouDOU-start/airgate-core/ent/paymentorder"
+	"github.com/DouDOU-start/airgate-core/ent/paymentproviderconfig"
+	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
-	"github.com/DouDOU-start/airgate-core/ent/task"
+	"github.com/DouDOU-start/airgate-core/ent/upstreamrequestlog"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 )
@@ -83,17 +88,22 @@ var (
 func checkColumn(table, column string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			apikey.Table:           apikey.ValidColumn,
-			announcement.Table:     announcement.ValidColumn,
-			announcementread.Table: announcementread.ValidColumn,
-			balancelog.Table:       balancelog.ValidColumn,
-			channel.Table:          channel.ValidColumn,
-			group.Table:            group.ValidColumn,
-			modelprice.Table:       modelprice.ValidColumn,
-			setting.Table:          setting.ValidColumn,
-			task.Table:             task.ValidColumn,
-			usagelog.Table:         usagelog.ValidColumn,
-			user.Table:             user.ValidColumn,
+			apikey.Table:                apikey.ValidColumn,
+			announcement.Table:          announcement.ValidColumn,
+			announcementread.Table:      announcementread.ValidColumn,
+			balancelog.Table:            balancelog.ValidColumn,
+			channel.Table:               channel.ValidColumn,
+			group.Table:                 group.ValidColumn,
+			modelprice.Table:            modelprice.ValidColumn,
+			modeltag.Table:              modeltag.ValidColumn,
+			oauthclient.Table:           oauthclient.ValidColumn,
+			paymentorder.Table:          paymentorder.ValidColumn,
+			paymentproviderconfig.Table: paymentproviderconfig.ValidColumn,
+			redemptioncode.Table:        redemptioncode.ValidColumn,
+			setting.Table:               setting.ValidColumn,
+			upstreamrequestlog.Table:    upstreamrequestlog.ValidColumn,
+			usagelog.Table:              usagelog.ValidColumn,
+			user.Table:                  user.ValidColumn,
 		})
 	})
 	return columnCheck(table, column)

@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
+	"github.com/DouDOU-start/airgate-core/ent/modeltag"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 )
 
@@ -21,6 +22,7 @@ type ModelPriceQuery struct {
 	order      []modelprice.OrderOption
 	inters     []Interceptor
 	predicates []predicate.ModelPrice
+	withTag    *ModelTagQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -55,6 +57,28 @@ func (mpq *ModelPriceQuery) Unique(unique bool) *ModelPriceQuery {
 func (mpq *ModelPriceQuery) Order(o ...modelprice.OrderOption) *ModelPriceQuery {
 	mpq.order = append(mpq.order, o...)
 	return mpq
+}
+
+// QueryTag chains the current query on the "tag" edge.
+func (mpq *ModelPriceQuery) QueryTag() *ModelTagQuery {
+	query := (&ModelTagClient{config: mpq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := mpq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := mpq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(modelprice.Table, modelprice.FieldID, selector),
+			sqlgraph.To(modeltag.Table, modeltag.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, modelprice.TagTable, modelprice.TagColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(mpq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first ModelPrice entity from the query.
@@ -249,10 +273,22 @@ func (mpq *ModelPriceQuery) Clone() *ModelPriceQuery {
 		order:      append([]modelprice.OrderOption{}, mpq.order...),
 		inters:     append([]Interceptor{}, mpq.inters...),
 		predicates: append([]predicate.ModelPrice{}, mpq.predicates...),
+		withTag:    mpq.withTag.Clone(),
 		// clone intermediate query.
 		sql:  mpq.sql.Clone(),
 		path: mpq.path,
 	}
+}
+
+// WithTag tells the query-builder to eager-load the nodes that are connected to
+// the "tag" edge. The optional arguments are used to configure the query builder of the edge.
+func (mpq *ModelPriceQuery) WithTag(opts ...func(*ModelTagQuery)) *ModelPriceQuery {
+	query := (&ModelTagClient{config: mpq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	mpq.withTag = query
+	return mpq
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -331,8 +367,11 @@ func (mpq *ModelPriceQuery) prepareQuery(ctx context.Context) error {
 
 func (mpq *ModelPriceQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*ModelPrice, error) {
 	var (
-		nodes = []*ModelPrice{}
-		_spec = mpq.querySpec()
+		nodes       = []*ModelPrice{}
+		_spec       = mpq.querySpec()
+		loadedTypes = [1]bool{
+			mpq.withTag != nil,
+		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*ModelPrice).scanValues(nil, columns)
@@ -340,6 +379,7 @@ func (mpq *ModelPriceQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &ModelPrice{config: mpq.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -351,7 +391,46 @@ func (mpq *ModelPriceQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := mpq.withTag; query != nil {
+		if err := mpq.loadTag(ctx, query, nodes, nil,
+			func(n *ModelPrice, e *ModelTag) { n.Edges.Tag = e }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (mpq *ModelPriceQuery) loadTag(ctx context.Context, query *ModelTagQuery, nodes []*ModelPrice, init func(*ModelPrice), assign func(*ModelPrice, *ModelTag)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*ModelPrice)
+	for i := range nodes {
+		if nodes[i].TagID == nil {
+			continue
+		}
+		fk := *nodes[i].TagID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(modeltag.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "tag_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
 }
 
 func (mpq *ModelPriceQuery) sqlCount(ctx context.Context) (int, error) {
@@ -378,6 +457,9 @@ func (mpq *ModelPriceQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != modelprice.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if mpq.withTag != nil {
+			_spec.Node.AddColumnOnce(modelprice.FieldTagID)
 		}
 	}
 	if ps := mpq.predicates; len(ps) > 0 {

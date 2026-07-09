@@ -26,10 +26,20 @@ type Tx struct {
 	Group *GroupClient
 	// ModelPrice is the client for interacting with the ModelPrice builders.
 	ModelPrice *ModelPriceClient
+	// ModelTag is the client for interacting with the ModelTag builders.
+	ModelTag *ModelTagClient
+	// OAuthClient is the client for interacting with the OAuthClient builders.
+	OAuthClient *OAuthClientClient
+	// PaymentOrder is the client for interacting with the PaymentOrder builders.
+	PaymentOrder *PaymentOrderClient
+	// PaymentProviderConfig is the client for interacting with the PaymentProviderConfig builders.
+	PaymentProviderConfig *PaymentProviderConfigClient
+	// RedemptionCode is the client for interacting with the RedemptionCode builders.
+	RedemptionCode *RedemptionCodeClient
 	// Setting is the client for interacting with the Setting builders.
 	Setting *SettingClient
-	// Task is the client for interacting with the Task builders.
-	Task *TaskClient
+	// UpstreamRequestLog is the client for interacting with the UpstreamRequestLog builders.
+	UpstreamRequestLog *UpstreamRequestLogClient
 	// UsageLog is the client for interacting with the UsageLog builders.
 	UsageLog *UsageLogClient
 	// User is the client for interacting with the User builders.
@@ -172,8 +182,13 @@ func (tx *Tx) init() {
 	tx.Channel = NewChannelClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
 	tx.ModelPrice = NewModelPriceClient(tx.config)
+	tx.ModelTag = NewModelTagClient(tx.config)
+	tx.OAuthClient = NewOAuthClientClient(tx.config)
+	tx.PaymentOrder = NewPaymentOrderClient(tx.config)
+	tx.PaymentProviderConfig = NewPaymentProviderConfigClient(tx.config)
+	tx.RedemptionCode = NewRedemptionCodeClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
-	tx.Task = NewTaskClient(tx.config)
+	tx.UpstreamRequestLog = NewUpstreamRequestLogClient(tx.config)
 	tx.UsageLog = NewUsageLogClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 }

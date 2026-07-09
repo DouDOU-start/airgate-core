@@ -105,6 +105,11 @@ func ExpiresAt(v time.Time) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldExpiresAt, v))
 }
 
+// ProvisionedBy applies equality check predicate on the "provisioned_by" field. It's identical to ProvisionedByEQ.
+func ProvisionedBy(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldProvisionedBy, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldCreatedAt, v))
@@ -673,6 +678,71 @@ func StatusIn(vs ...Status) predicate.APIKey {
 // StatusNotIn applies the NotIn predicate on the "status" field.
 func StatusNotIn(vs ...Status) predicate.APIKey {
 	return predicate.APIKey(sql.FieldNotIn(FieldStatus, vs...))
+}
+
+// ProvisionedByEQ applies the EQ predicate on the "provisioned_by" field.
+func ProvisionedByEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldProvisionedBy, v))
+}
+
+// ProvisionedByNEQ applies the NEQ predicate on the "provisioned_by" field.
+func ProvisionedByNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldProvisionedBy, v))
+}
+
+// ProvisionedByIn applies the In predicate on the "provisioned_by" field.
+func ProvisionedByIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldProvisionedBy, vs...))
+}
+
+// ProvisionedByNotIn applies the NotIn predicate on the "provisioned_by" field.
+func ProvisionedByNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldProvisionedBy, vs...))
+}
+
+// ProvisionedByGT applies the GT predicate on the "provisioned_by" field.
+func ProvisionedByGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldProvisionedBy, v))
+}
+
+// ProvisionedByGTE applies the GTE predicate on the "provisioned_by" field.
+func ProvisionedByGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldProvisionedBy, v))
+}
+
+// ProvisionedByLT applies the LT predicate on the "provisioned_by" field.
+func ProvisionedByLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldProvisionedBy, v))
+}
+
+// ProvisionedByLTE applies the LTE predicate on the "provisioned_by" field.
+func ProvisionedByLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldProvisionedBy, v))
+}
+
+// ProvisionedByContains applies the Contains predicate on the "provisioned_by" field.
+func ProvisionedByContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldProvisionedBy, v))
+}
+
+// ProvisionedByHasPrefix applies the HasPrefix predicate on the "provisioned_by" field.
+func ProvisionedByHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldProvisionedBy, v))
+}
+
+// ProvisionedByHasSuffix applies the HasSuffix predicate on the "provisioned_by" field.
+func ProvisionedByHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldProvisionedBy, v))
+}
+
+// ProvisionedByEqualFold applies the EqualFold predicate on the "provisioned_by" field.
+func ProvisionedByEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldProvisionedBy, v))
+}
+
+// ProvisionedByContainsFold applies the ContainsFold predicate on the "provisioned_by" field.
+func ProvisionedByContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldProvisionedBy, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

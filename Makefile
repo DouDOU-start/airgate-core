@@ -1,5 +1,9 @@
 # AirGate Core Makefile
 
+# 子 make 均在本目录运行，关闭 Entering/Leaving directory 提示（dev 并行拉起
+# dev-backend / dev-frontend 两个子 make 时会连打两行，纯噪音）
+MAKEFLAGS += --no-print-directory
+
 # 变量
 BACKEND_DIR := backend
 WEB_DIR := web

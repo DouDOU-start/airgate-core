@@ -54,12 +54,14 @@ type Channel struct {
 	Tags []string `json:"tags,omitempty"`
 	// TestModel holds the value of the "test_model" field.
 	TestModel string `json:"test_model,omitempty"`
-	// CustomConfig holds the value of the "custom_config" field.
-	CustomConfig map[string]interface{} `json:"custom_config,omitempty"`
 	// ResponseTimeMs holds the value of the "response_time_ms" field.
 	ResponseTimeMs int `json:"response_time_ms,omitempty"`
 	// TestedAt holds the value of the "tested_at" field.
 	TestedAt *time.Time `json:"tested_at,omitempty"`
+	// 上游账户余额（USD）；多 key 求和；仅 openai_compatible 中转站可查
+	Balance float64 `json:"balance,omitempty"`
+	// 余额最近刷新时间；nil 表示从未刷新过
+	BalanceUpdatedAt *time.Time `json:"balance_updated_at,omitempty"`
 	// LastUsedAt holds the value of the "last_used_at" field.
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -106,15 +108,15 @@ func (*Channel) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case channel.FieldAPIKeys, channel.FieldModels, channel.FieldModelMapping, channel.FieldParamOverride, channel.FieldHeaderOverride, channel.FieldTags, channel.FieldCustomConfig:
+		case channel.FieldAPIKeys, channel.FieldModels, channel.FieldModelMapping, channel.FieldParamOverride, channel.FieldHeaderOverride, channel.FieldTags:
 			values[i] = new([]byte)
-		case channel.FieldCostRatio:
+		case channel.FieldCostRatio, channel.FieldBalance:
 			values[i] = new(sql.NullFloat64)
 		case channel.FieldID, channel.FieldPriority, channel.FieldWeight, channel.FieldMaxConcurrency, channel.FieldMaxRpm, channel.FieldResponseTimeMs:
 			values[i] = new(sql.NullInt64)
 		case channel.FieldName, channel.FieldType, channel.FieldBaseURL, channel.FieldStatus, channel.FieldErrorMsg, channel.FieldTestModel:
 			values[i] = new(sql.NullString)
-		case channel.FieldStatusUntil, channel.FieldTestedAt, channel.FieldLastUsedAt, channel.FieldCreatedAt, channel.FieldUpdatedAt:
+		case channel.FieldStatusUntil, channel.FieldTestedAt, channel.FieldBalanceUpdatedAt, channel.FieldLastUsedAt, channel.FieldCreatedAt, channel.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -258,14 +260,6 @@ func (c *Channel) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				c.TestModel = value.String
 			}
-		case channel.FieldCustomConfig:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field custom_config", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &c.CustomConfig); err != nil {
-					return fmt.Errorf("unmarshal field custom_config: %w", err)
-				}
-			}
 		case channel.FieldResponseTimeMs:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field response_time_ms", values[i])
@@ -278,6 +272,19 @@ func (c *Channel) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				c.TestedAt = new(time.Time)
 				*c.TestedAt = value.Time
+			}
+		case channel.FieldBalance:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field balance", values[i])
+			} else if value.Valid {
+				c.Balance = value.Float64
+			}
+		case channel.FieldBalanceUpdatedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field balance_updated_at", values[i])
+			} else if value.Valid {
+				c.BalanceUpdatedAt = new(time.Time)
+				*c.BalanceUpdatedAt = value.Time
 			}
 		case channel.FieldLastUsedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -399,14 +406,19 @@ func (c *Channel) String() string {
 	builder.WriteString("test_model=")
 	builder.WriteString(c.TestModel)
 	builder.WriteString(", ")
-	builder.WriteString("custom_config=")
-	builder.WriteString(fmt.Sprintf("%v", c.CustomConfig))
-	builder.WriteString(", ")
 	builder.WriteString("response_time_ms=")
 	builder.WriteString(fmt.Sprintf("%v", c.ResponseTimeMs))
 	builder.WriteString(", ")
 	if v := c.TestedAt; v != nil {
 		builder.WriteString("tested_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("balance=")
+	builder.WriteString(fmt.Sprintf("%v", c.Balance))
+	builder.WriteString(", ")
+	if v := c.BalanceUpdatedAt; v != nil {
+		builder.WriteString("balance_updated_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")

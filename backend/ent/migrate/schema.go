@@ -3,6 +3,7 @@
 package migrate
 
 import (
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/dialect/sql/schema"
 	"entgo.io/ent/schema/field"
 )
@@ -24,6 +25,7 @@ var (
 		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "disabled"}, Default: "active"},
+		{Name: "provisioned_by", Type: field.TypeString, Default: ""},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "group_api_keys", Type: field.TypeInt, Nullable: true},
@@ -37,13 +39,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "api_keys_groups_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[16]},
+				Columns:    []*schema.Column{APIKeysColumns[17]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "api_keys_users_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[17]},
+				Columns:    []*schema.Column{APIKeysColumns[18]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -57,7 +59,15 @@ var (
 			{
 				Name:    "apikey_status_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[13], APIKeysColumns[14]},
+				Columns: []*schema.Column{APIKeysColumns[13], APIKeysColumns[15]},
+			},
+			{
+				Name:    "apikey_provisioned_by_user_api_keys",
+				Unique:  true,
+				Columns: []*schema.Column{APIKeysColumns[14], APIKeysColumns[18]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "provisioned_by <> ''",
+				},
 			},
 		},
 	}
@@ -156,7 +166,7 @@ var (
 	ChannelsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "name", Type: field.TypeString},
-		{Name: "type", Type: field.TypeEnum, Enums: []string{"openai_compatible", "anthropic", "gemini", "custom"}},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"openai_compatible", "anthropic", "gemini"}},
 		{Name: "base_url", Type: field.TypeString},
 		{Name: "api_keys", Type: field.TypeJSON},
 		{Name: "models", Type: field.TypeJSON},
@@ -173,9 +183,10 @@ var (
 		{Name: "cost_ratio", Type: field.TypeFloat64, Default: 1},
 		{Name: "tags", Type: field.TypeJSON, Nullable: true},
 		{Name: "test_model", Type: field.TypeString, Default: ""},
-		{Name: "custom_config", Type: field.TypeJSON, Nullable: true},
 		{Name: "response_time_ms", Type: field.TypeInt, Default: 0},
 		{Name: "tested_at", Type: field.TypeTime, Nullable: true},
+		{Name: "balance", Type: field.TypeFloat64, Default: 0},
+		{Name: "balance_updated_at", Type: field.TypeTime, Nullable: true},
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -229,12 +240,155 @@ var (
 		{Name: "pricing_extra", Type: field.TypeJSON, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tag_id", Type: field.TypeInt, Nullable: true},
 	}
 	// ModelPricesTable holds the schema information for the "model_prices" table.
 	ModelPricesTable = &schema.Table{
 		Name:       "model_prices",
 		Columns:    ModelPricesColumns,
 		PrimaryKey: []*schema.Column{ModelPricesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "model_prices_model_tags_prices",
+				Columns:    []*schema.Column{ModelPricesColumns[11]},
+				RefColumns: []*schema.Column{ModelTagsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+	}
+	// ModelTagsColumns holds the columns for the "model_tags" table.
+	ModelTagsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "name", Type: field.TypeString, Unique: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// ModelTagsTable holds the schema information for the "model_tags" table.
+	ModelTagsTable = &schema.Table{
+		Name:       "model_tags",
+		Columns:    ModelTagsColumns,
+		PrimaryKey: []*schema.Column{ModelTagsColumns[0]},
+	}
+	// OauthClientsColumns holds the columns for the "oauth_clients" table.
+	OauthClientsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "client_id", Type: field.TypeString, Unique: true},
+		{Name: "secret_hash", Type: field.TypeString},
+		{Name: "secret_hint", Type: field.TypeString, Default: ""},
+		{Name: "name", Type: field.TypeString},
+		{Name: "description", Type: field.TypeString, Default: ""},
+		{Name: "redirect_uris", Type: field.TypeJSON},
+		{Name: "first_party", Type: field.TypeBool, Default: false},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "show_in_nav", Type: field.TypeBool, Default: false},
+		{Name: "launch_url", Type: field.TypeString, Default: ""},
+		{Name: "icon", Type: field.TypeString, Default: ""},
+		{Name: "sort_order", Type: field.TypeInt, Default: 0},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// OauthClientsTable holds the schema information for the "oauth_clients" table.
+	OauthClientsTable = &schema.Table{
+		Name:       "oauth_clients",
+		Columns:    OauthClientsColumns,
+		PrimaryKey: []*schema.Column{OauthClientsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "oauthclient_enabled_show_in_nav_sort_order",
+				Unique:  false,
+				Columns: []*schema.Column{OauthClientsColumns[8], OauthClientsColumns[9], OauthClientsColumns[12]},
+			},
+		},
+	}
+	// PaymentOrdersColumns holds the columns for the "payment_orders" table.
+	PaymentOrdersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "out_trade_no", Type: field.TypeString, Unique: true},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "method", Type: field.TypeString},
+		{Name: "provider_id", Type: field.TypeString},
+		{Name: "amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "status", Type: field.TypeString, Default: "pending"},
+		{Name: "subject", Type: field.TypeString, Default: ""},
+		{Name: "client_ip", Type: field.TypeString, Default: ""},
+		{Name: "payment_url", Type: field.TypeString, Default: ""},
+		{Name: "qr_code_content", Type: field.TypeString, Default: ""},
+		{Name: "notify_payload", Type: field.TypeString, Default: ""},
+		{Name: "paid_at", Type: field.TypeTime, Nullable: true},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// PaymentOrdersTable holds the schema information for the "payment_orders" table.
+	PaymentOrdersTable = &schema.Table{
+		Name:       "payment_orders",
+		Columns:    PaymentOrdersColumns,
+		PrimaryKey: []*schema.Column{PaymentOrdersColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "payment_order_user_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentOrdersColumns[2], PaymentOrdersColumns[14]},
+			},
+			{
+				Name:    "payment_order_status_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentOrdersColumns[6], PaymentOrdersColumns[13]},
+			},
+			{
+				Name:    "payment_order_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentOrdersColumns[14]},
+			},
+		},
+	}
+	// PaymentProviderConfigsColumns holds the columns for the "payment_provider_configs" table.
+	PaymentProviderConfigsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "provider_key", Type: field.TypeString, Unique: true},
+		{Name: "kind", Type: field.TypeString},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "config", Type: field.TypeJSON},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// PaymentProviderConfigsTable holds the schema information for the "payment_provider_configs" table.
+	PaymentProviderConfigsTable = &schema.Table{
+		Name:       "payment_provider_configs",
+		Columns:    PaymentProviderConfigsColumns,
+		PrimaryKey: []*schema.Column{PaymentProviderConfigsColumns[0]},
+	}
+	// RedemptionCodesColumns holds the columns for the "redemption_codes" table.
+	RedemptionCodesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "code", Type: field.TypeString, Unique: true, Size: 64},
+		{Name: "value", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "status", Type: field.TypeString, Default: "unused"},
+		{Name: "remark", Type: field.TypeString, Default: ""},
+		{Name: "used_by_id", Type: field.TypeInt, Default: 0},
+		{Name: "used_by_email", Type: field.TypeString, Default: ""},
+		{Name: "used_at", Type: field.TypeTime, Nullable: true},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// RedemptionCodesTable holds the schema information for the "redemption_codes" table.
+	RedemptionCodesTable = &schema.Table{
+		Name:       "redemption_codes",
+		Columns:    RedemptionCodesColumns,
+		PrimaryKey: []*schema.Column{RedemptionCodesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "redemption_code_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RedemptionCodesColumns[3], RedemptionCodesColumns[9]},
+			},
+			{
+				Name:    "redemption_code_used_by_used_at",
+				Unique:  false,
+				Columns: []*schema.Column{RedemptionCodesColumns[5], RedemptionCodesColumns[7]},
+			},
+		},
 	}
 	// SettingsColumns holds the columns for the "settings" table.
 	SettingsColumns = []*schema.Column{
@@ -251,72 +405,75 @@ var (
 		Columns:    SettingsColumns,
 		PrimaryKey: []*schema.Column{SettingsColumns[0]},
 	}
-	// TasksColumns holds the columns for the "tasks" table.
-	TasksColumns = []*schema.Column{
+	// UpstreamRequestLogsColumns holds the columns for the "upstream_request_logs" table.
+	UpstreamRequestLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "plugin_id", Type: field.TypeString},
-		{Name: "task_type", Type: field.TypeString},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "processing", "retrying", "completed", "failed", "cancelling", "cancelled"}, Default: "pending"},
-		{Name: "stage", Type: field.TypeString, Default: ""},
-		{Name: "user_id", Type: field.TypeInt},
-		{Name: "input", Type: field.TypeJSON},
-		{Name: "output", Type: field.TypeJSON, Nullable: true},
-		{Name: "attributes", Type: field.TypeJSON, Nullable: true},
-		{Name: "execution", Type: field.TypeJSON, Nullable: true},
+		{Name: "request_id", Type: field.TypeString},
+		{Name: "source", Type: field.TypeEnum, Enums: []string{"relay", "channel_test"}},
+		{Name: "phase", Type: field.TypeString, Default: ""},
+		{Name: "status_code", Type: field.TypeInt, Default: 0},
 		{Name: "error_type", Type: field.TypeString, Default: ""},
 		{Name: "error_code", Type: field.TypeString, Default: ""},
-		{Name: "error_message", Type: field.TypeString, Default: ""},
-		{Name: "usage_id", Type: field.TypeInt, Nullable: true},
-		{Name: "progress", Type: field.TypeInt, Default: 0},
-		{Name: "priority", Type: field.TypeInt, Default: 0},
+		{Name: "message", Type: field.TypeString, Default: ""},
 		{Name: "attempts", Type: field.TypeInt, Default: 0},
-		{Name: "max_attempts", Type: field.TypeInt, Default: 3},
-		{Name: "public_task_id", Type: field.TypeString, Nullable: true},
-		{Name: "idempotency_key", Type: field.TypeString, Nullable: true},
+		{Name: "attempt_chain", Type: field.TypeJSON, Nullable: true},
+		{Name: "billed", Type: field.TypeBool, Default: false},
+		{Name: "model", Type: field.TypeString, Default: ""},
+		{Name: "endpoint", Type: field.TypeString, Default: ""},
+		{Name: "stream", Type: field.TypeBool, Default: false},
+		{Name: "user_id", Type: field.TypeInt, Default: 0},
+		{Name: "user_email_snapshot", Type: field.TypeString, Default: ""},
+		{Name: "api_key_id", Type: field.TypeInt, Default: 0},
+		{Name: "group_id", Type: field.TypeInt, Default: 0},
+		{Name: "channel_id", Type: field.TypeInt, Default: 0},
+		{Name: "channel_name", Type: field.TypeString, Default: ""},
+		{Name: "ip_address", Type: field.TypeString, Default: ""},
+		{Name: "user_agent", Type: field.TypeString, Default: ""},
+		{Name: "duration_ms", Type: field.TypeInt64, Default: 0},
+		{Name: "repeat_count", Type: field.TypeInt, Default: 1},
 		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "started_at", Type: field.TypeTime, Nullable: true},
-		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
-		{Name: "cancel_requested_at", Type: field.TypeTime, Nullable: true},
-		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
 	}
-	// TasksTable holds the schema information for the "tasks" table.
-	TasksTable = &schema.Table{
-		Name:       "tasks",
-		Columns:    TasksColumns,
-		PrimaryKey: []*schema.Column{TasksColumns[0]},
+	// UpstreamRequestLogsTable holds the schema information for the "upstream_request_logs" table.
+	UpstreamRequestLogsTable = &schema.Table{
+		Name:       "upstream_request_logs",
+		Columns:    UpstreamRequestLogsColumns,
+		PrimaryKey: []*schema.Column{UpstreamRequestLogsColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "task_plugin_id_status_created_at",
+				Name:    "upstream_req_log_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[1], TasksColumns[3], TasksColumns[20]},
+				Columns: []*schema.Column{UpstreamRequestLogsColumns[24]},
 			},
 			{
-				Name:    "task_user_id_created_at",
+				Name:    "upstream_req_log_user_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[5], TasksColumns[20]},
+				Columns: []*schema.Column{UpstreamRequestLogsColumns[14], UpstreamRequestLogsColumns[24]},
 			},
 			{
-				Name:    "task_status_created_at",
+				Name:    "upstream_req_log_api_key_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[3], TasksColumns[20]},
+				Columns: []*schema.Column{UpstreamRequestLogsColumns[16], UpstreamRequestLogsColumns[24]},
 			},
 			{
-				Name:    "task_public_task_id",
-				Unique:  true,
-				Columns: []*schema.Column{TasksColumns[18]},
+				Name:    "upstream_req_log_channel_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UpstreamRequestLogsColumns[18], UpstreamRequestLogsColumns[24]},
 			},
 			{
-				Name:    "task_plugin_id_user_id_task_type_idempotency_key",
-				Unique:  true,
-				Columns: []*schema.Column{TasksColumns[1], TasksColumns[5], TasksColumns[2], TasksColumns[19]},
+				Name:    "upstream_req_log_phase_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UpstreamRequestLogsColumns[3], UpstreamRequestLogsColumns[24]},
+			},
+			{
+				Name:    "upstream_req_log_request_id",
+				Unique:  false,
+				Columns: []*schema.Column{UpstreamRequestLogsColumns[1]},
 			},
 		},
 	}
 	// UsageLogsColumns holds the columns for the "usage_logs" table.
 	UsageLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "platform", Type: field.TypeString},
 		{Name: "model", Type: field.TypeString},
 		{Name: "input_tokens", Type: field.TypeInt, Default: 0},
 		{Name: "output_tokens", Type: field.TypeInt, Default: 0},
@@ -324,7 +481,7 @@ var (
 		{Name: "cache_creation_tokens", Type: field.TypeInt, Default: 0},
 		{Name: "cache_creation_5m_tokens", Type: field.TypeInt, Default: 0},
 		{Name: "cache_creation_1h_tokens", Type: field.TypeInt, Default: 0},
-		{Name: "reasoning_output_tokens", Type: field.TypeInt, Default: 0},
+		{Name: "calls", Type: field.TypeInt, Default: 0},
 		{Name: "input_price", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "output_price", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "cached_input_price", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
@@ -334,27 +491,21 @@ var (
 		{Name: "output_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "cached_input_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "cache_creation_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
-		{Name: "image_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "total_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "actual_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "billed_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
-		{Name: "account_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "rate_multiplier", Type: field.TypeFloat64, Default: 1},
 		{Name: "sell_rate", Type: field.TypeFloat64, Default: 0},
 		{Name: "account_rate_multiplier", Type: field.TypeFloat64, Default: 1},
 		{Name: "service_tier", Type: field.TypeString, Default: ""},
-		{Name: "image_size", Type: field.TypeString, Default: ""},
 		{Name: "stream", Type: field.TypeBool, Default: false},
 		{Name: "duration_ms", Type: field.TypeInt64, Default: 0},
 		{Name: "first_token_ms", Type: field.TypeInt64, Default: 0},
 		{Name: "user_agent", Type: field.TypeString, Default: ""},
 		{Name: "ip_address", Type: field.TypeString, Default: ""},
 		{Name: "endpoint", Type: field.TypeString, Default: ""},
-		{Name: "reasoning_effort", Type: field.TypeString, Default: ""},
-		{Name: "usage_attributes", Type: field.TypeJSON, Nullable: true},
-		{Name: "usage_metrics", Type: field.TypeJSON, Nullable: true},
-		{Name: "usage_cost_details", Type: field.TypeJSON, Nullable: true},
-		{Name: "usage_metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "source", Type: field.TypeString, Default: "relay"},
+		{Name: "request_id", Type: field.TypeString, Default: ""},
 		{Name: "user_id_snapshot", Type: field.TypeInt, Default: 0},
 		{Name: "user_email_snapshot", Type: field.TypeString, Default: ""},
 		{Name: "created_at", Type: field.TypeTime},
@@ -371,25 +522,25 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "usage_logs_api_keys_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[43]},
+				Columns:    []*schema.Column{UsageLogsColumns[36]},
 				RefColumns: []*schema.Column{APIKeysColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_channels_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[44]},
+				Columns:    []*schema.Column{UsageLogsColumns[37]},
 				RefColumns: []*schema.Column{ChannelsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_groups_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[45]},
+				Columns:    []*schema.Column{UsageLogsColumns[38]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_users_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[46]},
+				Columns:    []*schema.Column{UsageLogsColumns[39]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -398,42 +549,57 @@ var (
 			{
 				Name:    "usage_log_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[42]},
-			},
-			{
-				Name:    "usage_log_platform_created_at",
-				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[1], UsageLogsColumns[42]},
+				Columns: []*schema.Column{UsageLogsColumns[35]},
 			},
 			{
 				Name:    "usage_log_user_snapshot_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[40], UsageLogsColumns[42]},
+				Columns: []*schema.Column{UsageLogsColumns[33], UsageLogsColumns[35]},
 			},
 			{
 				Name:    "usage_log_model_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[2], UsageLogsColumns[42]},
+				Columns: []*schema.Column{UsageLogsColumns[1], UsageLogsColumns[35]},
 			},
 			{
 				Name:    "usage_log_user",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[46]},
+				Columns: []*schema.Column{UsageLogsColumns[39]},
 			},
 			{
 				Name:    "usage_log_api_key",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[43]},
+				Columns: []*schema.Column{UsageLogsColumns[36]},
 			},
 			{
 				Name:    "usage_log_channel",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[44]},
+				Columns: []*schema.Column{UsageLogsColumns[37]},
 			},
 			{
 				Name:    "usage_log_group",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[45]},
+				Columns: []*schema.Column{UsageLogsColumns[38]},
+			},
+			{
+				Name:    "usage_log_api_key_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[36], UsageLogsColumns[35]},
+			},
+			{
+				Name:    "usage_log_channel_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[37], UsageLogsColumns[35]},
+			},
+			{
+				Name:    "usage_log_group_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[38], UsageLogsColumns[35]},
+			},
+			{
+				Name:    "usage_log_request_id",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[32]},
 			},
 		},
 	}
@@ -519,8 +685,13 @@ var (
 		ChannelsTable,
 		GroupsTable,
 		ModelPricesTable,
+		ModelTagsTable,
+		OauthClientsTable,
+		PaymentOrdersTable,
+		PaymentProviderConfigsTable,
+		RedemptionCodesTable,
 		SettingsTable,
-		TasksTable,
+		UpstreamRequestLogsTable,
 		UsageLogsTable,
 		UsersTable,
 		ChannelGroupsTable,
@@ -532,6 +703,7 @@ func init() {
 	APIKeysTable.ForeignKeys[0].RefTable = GroupsTable
 	APIKeysTable.ForeignKeys[1].RefTable = UsersTable
 	BalanceLogsTable.ForeignKeys[0].RefTable = UsersTable
+	ModelPricesTable.ForeignKeys[0].RefTable = ModelTagsTable
 	UsageLogsTable.ForeignKeys[0].RefTable = APIKeysTable
 	UsageLogsTable.ForeignKeys[1].RefTable = ChannelsTable
 	UsageLogsTable.ForeignKeys[2].RefTable = GroupsTable

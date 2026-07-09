@@ -51,12 +51,14 @@ const (
 	FieldTags = "tags"
 	// FieldTestModel holds the string denoting the test_model field in the database.
 	FieldTestModel = "test_model"
-	// FieldCustomConfig holds the string denoting the custom_config field in the database.
-	FieldCustomConfig = "custom_config"
 	// FieldResponseTimeMs holds the string denoting the response_time_ms field in the database.
 	FieldResponseTimeMs = "response_time_ms"
 	// FieldTestedAt holds the string denoting the tested_at field in the database.
 	FieldTestedAt = "tested_at"
+	// FieldBalance holds the string denoting the balance field in the database.
+	FieldBalance = "balance"
+	// FieldBalanceUpdatedAt holds the string denoting the balance_updated_at field in the database.
+	FieldBalanceUpdatedAt = "balance_updated_at"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
 	FieldLastUsedAt = "last_used_at"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -104,9 +106,10 @@ var Columns = []string{
 	FieldCostRatio,
 	FieldTags,
 	FieldTestModel,
-	FieldCustomConfig,
 	FieldResponseTimeMs,
 	FieldTestedAt,
+	FieldBalance,
+	FieldBalanceUpdatedAt,
 	FieldLastUsedAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -157,6 +160,8 @@ var (
 	DefaultTestModel string
 	// DefaultResponseTimeMs holds the default value on creation for the "response_time_ms" field.
 	DefaultResponseTimeMs int
+	// DefaultBalance holds the default value on creation for the "balance" field.
+	DefaultBalance float64
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -173,7 +178,6 @@ const (
 	TypeOpenaiCompatible Type = "openai_compatible"
 	TypeAnthropic        Type = "anthropic"
 	TypeGemini           Type = "gemini"
-	TypeCustom           Type = "custom"
 )
 
 func (_type Type) String() string {
@@ -183,7 +187,7 @@ func (_type Type) String() string {
 // TypeValidator is a validator for the "type" field enum values. It is called by the builders before save.
 func TypeValidator(_type Type) error {
 	switch _type {
-	case TypeOpenaiCompatible, TypeAnthropic, TypeGemini, TypeCustom:
+	case TypeOpenaiCompatible, TypeAnthropic, TypeGemini:
 		return nil
 	default:
 		return fmt.Errorf("channel: invalid enum value for type field: %q", _type)
@@ -293,6 +297,16 @@ func ByResponseTimeMs(opts ...sql.OrderTermOption) OrderOption {
 // ByTestedAt orders the results by the tested_at field.
 func ByTestedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTestedAt, opts...).ToFunc()
+}
+
+// ByBalance orders the results by the balance field.
+func ByBalance(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBalance, opts...).ToFunc()
+}
+
+// ByBalanceUpdatedAt orders the results by the balance_updated_at field.
+func ByBalanceUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBalanceUpdatedAt, opts...).ToFunc()
 }
 
 // ByLastUsedAt orders the results by the last_used_at field.

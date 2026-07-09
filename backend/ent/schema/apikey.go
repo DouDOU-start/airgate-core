@@ -2,6 +2,7 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -31,6 +32,8 @@ func (APIKey) Fields() []ent.Field {
 			Comment("API Key 级并发上限：同一把 key 同时在途的请求数。0 表示不限制（默认）。达到上限时返回 429 + apikey_concurrency_limit，保护单个客户端不因并发过高被自己打死或耗光上游账号的并发预算。"),
 		field.Time("expires_at").Optional().Nillable(),
 		field.Enum("status").Values("active", "disabled").Default("active"),
+		field.String("provisioned_by").Default("").
+			Comment("经 OAuth provision-key 自动创建时记录来源应用的 client_id；空 = 用户手动创建。同一用户同一应用只保留一把 provisioned key（get-or-create 幂等依据）。"),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
 	}
@@ -40,6 +43,10 @@ func (APIKey) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("key_hash").Unique(),
 		index.Fields("status", "created_at"),
+		// 同一用户同一应用只允许一把 provisioned key（部分唯一索引，
+		// 空串 = 手动创建不受约束）；并发 provision 时第二个事务撞唯一约束后重查。
+		index.Fields("provisioned_by").Edges("user").Unique().
+			Annotations(entsql.IndexWhere("provisioned_by <> ''")),
 	}
 }
 

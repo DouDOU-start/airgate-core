@@ -41,6 +41,8 @@ const (
 	FieldExpiresAt = "expires_at"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldProvisionedBy holds the string denoting the provisioned_by field in the database.
+	FieldProvisionedBy = "provisioned_by"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -92,6 +94,7 @@ var Columns = []string{
 	FieldMaxConcurrency,
 	FieldExpiresAt,
 	FieldStatus,
+	FieldProvisionedBy,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -139,6 +142,8 @@ var (
 	DefaultMaxConcurrency int
 	// MaxConcurrencyValidator is a validator for the "max_concurrency" field. It is called by the builders before save.
 	MaxConcurrencyValidator func(int) error
+	// DefaultProvisionedBy holds the default value on creation for the "provisioned_by" field.
+	DefaultProvisionedBy string
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -234,6 +239,11 @@ func ByExpiresAt(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByProvisionedBy orders the results by the provisioned_by field.
+func ByProvisionedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProvisionedBy, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

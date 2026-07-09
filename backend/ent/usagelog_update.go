@@ -9,7 +9,6 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
-	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
@@ -17,7 +16,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // UsageLogUpdate is the builder for updating UsageLog entities.
@@ -30,20 +28,6 @@ type UsageLogUpdate struct {
 // Where appends a list predicates to the UsageLogUpdate builder.
 func (ulu *UsageLogUpdate) Where(ps ...predicate.UsageLog) *UsageLogUpdate {
 	ulu.mutation.Where(ps...)
-	return ulu
-}
-
-// SetPlatform sets the "platform" field.
-func (ulu *UsageLogUpdate) SetPlatform(s string) *UsageLogUpdate {
-	ulu.mutation.SetPlatform(s)
-	return ulu
-}
-
-// SetNillablePlatform sets the "platform" field if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillablePlatform(s *string) *UsageLogUpdate {
-	if s != nil {
-		ulu.SetPlatform(*s)
-	}
 	return ulu
 }
 
@@ -187,24 +171,24 @@ func (ulu *UsageLogUpdate) AddCacheCreation1hTokens(i int) *UsageLogUpdate {
 	return ulu
 }
 
-// SetReasoningOutputTokens sets the "reasoning_output_tokens" field.
-func (ulu *UsageLogUpdate) SetReasoningOutputTokens(i int) *UsageLogUpdate {
-	ulu.mutation.ResetReasoningOutputTokens()
-	ulu.mutation.SetReasoningOutputTokens(i)
+// SetCalls sets the "calls" field.
+func (ulu *UsageLogUpdate) SetCalls(i int) *UsageLogUpdate {
+	ulu.mutation.ResetCalls()
+	ulu.mutation.SetCalls(i)
 	return ulu
 }
 
-// SetNillableReasoningOutputTokens sets the "reasoning_output_tokens" field if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillableReasoningOutputTokens(i *int) *UsageLogUpdate {
+// SetNillableCalls sets the "calls" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableCalls(i *int) *UsageLogUpdate {
 	if i != nil {
-		ulu.SetReasoningOutputTokens(*i)
+		ulu.SetCalls(*i)
 	}
 	return ulu
 }
 
-// AddReasoningOutputTokens adds i to the "reasoning_output_tokens" field.
-func (ulu *UsageLogUpdate) AddReasoningOutputTokens(i int) *UsageLogUpdate {
-	ulu.mutation.AddReasoningOutputTokens(i)
+// AddCalls adds i to the "calls" field.
+func (ulu *UsageLogUpdate) AddCalls(i int) *UsageLogUpdate {
+	ulu.mutation.AddCalls(i)
 	return ulu
 }
 
@@ -397,27 +381,6 @@ func (ulu *UsageLogUpdate) AddCacheCreationCost(f float64) *UsageLogUpdate {
 	return ulu
 }
 
-// SetImageCost sets the "image_cost" field.
-func (ulu *UsageLogUpdate) SetImageCost(f float64) *UsageLogUpdate {
-	ulu.mutation.ResetImageCost()
-	ulu.mutation.SetImageCost(f)
-	return ulu
-}
-
-// SetNillableImageCost sets the "image_cost" field if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillableImageCost(f *float64) *UsageLogUpdate {
-	if f != nil {
-		ulu.SetImageCost(*f)
-	}
-	return ulu
-}
-
-// AddImageCost adds f to the "image_cost" field.
-func (ulu *UsageLogUpdate) AddImageCost(f float64) *UsageLogUpdate {
-	ulu.mutation.AddImageCost(f)
-	return ulu
-}
-
 // SetTotalCost sets the "total_cost" field.
 func (ulu *UsageLogUpdate) SetTotalCost(f float64) *UsageLogUpdate {
 	ulu.mutation.ResetTotalCost()
@@ -478,27 +441,6 @@ func (ulu *UsageLogUpdate) SetNillableBilledCost(f *float64) *UsageLogUpdate {
 // AddBilledCost adds f to the "billed_cost" field.
 func (ulu *UsageLogUpdate) AddBilledCost(f float64) *UsageLogUpdate {
 	ulu.mutation.AddBilledCost(f)
-	return ulu
-}
-
-// SetAccountCost sets the "account_cost" field.
-func (ulu *UsageLogUpdate) SetAccountCost(f float64) *UsageLogUpdate {
-	ulu.mutation.ResetAccountCost()
-	ulu.mutation.SetAccountCost(f)
-	return ulu
-}
-
-// SetNillableAccountCost sets the "account_cost" field if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillableAccountCost(f *float64) *UsageLogUpdate {
-	if f != nil {
-		ulu.SetAccountCost(*f)
-	}
-	return ulu
-}
-
-// AddAccountCost adds f to the "account_cost" field.
-func (ulu *UsageLogUpdate) AddAccountCost(f float64) *UsageLogUpdate {
-	ulu.mutation.AddAccountCost(f)
 	return ulu
 }
 
@@ -575,20 +517,6 @@ func (ulu *UsageLogUpdate) SetServiceTier(s string) *UsageLogUpdate {
 func (ulu *UsageLogUpdate) SetNillableServiceTier(s *string) *UsageLogUpdate {
 	if s != nil {
 		ulu.SetServiceTier(*s)
-	}
-	return ulu
-}
-
-// SetImageSize sets the "image_size" field.
-func (ulu *UsageLogUpdate) SetImageSize(s string) *UsageLogUpdate {
-	ulu.mutation.SetImageSize(s)
-	return ulu
-}
-
-// SetNillableImageSize sets the "image_size" field if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillableImageSize(s *string) *UsageLogUpdate {
-	if s != nil {
-		ulu.SetImageSize(*s)
 	}
 	return ulu
 }
@@ -691,83 +619,31 @@ func (ulu *UsageLogUpdate) SetNillableEndpoint(s *string) *UsageLogUpdate {
 	return ulu
 }
 
-// SetReasoningEffort sets the "reasoning_effort" field.
-func (ulu *UsageLogUpdate) SetReasoningEffort(s string) *UsageLogUpdate {
-	ulu.mutation.SetReasoningEffort(s)
+// SetSource sets the "source" field.
+func (ulu *UsageLogUpdate) SetSource(s string) *UsageLogUpdate {
+	ulu.mutation.SetSource(s)
 	return ulu
 }
 
-// SetNillableReasoningEffort sets the "reasoning_effort" field if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillableReasoningEffort(s *string) *UsageLogUpdate {
+// SetNillableSource sets the "source" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableSource(s *string) *UsageLogUpdate {
 	if s != nil {
-		ulu.SetReasoningEffort(*s)
+		ulu.SetSource(*s)
 	}
 	return ulu
 }
 
-// SetUsageAttributes sets the "usage_attributes" field.
-func (ulu *UsageLogUpdate) SetUsageAttributes(sa []sdk.UsageAttribute) *UsageLogUpdate {
-	ulu.mutation.SetUsageAttributes(sa)
+// SetRequestID sets the "request_id" field.
+func (ulu *UsageLogUpdate) SetRequestID(s string) *UsageLogUpdate {
+	ulu.mutation.SetRequestID(s)
 	return ulu
 }
 
-// AppendUsageAttributes appends sa to the "usage_attributes" field.
-func (ulu *UsageLogUpdate) AppendUsageAttributes(sa []sdk.UsageAttribute) *UsageLogUpdate {
-	ulu.mutation.AppendUsageAttributes(sa)
-	return ulu
-}
-
-// ClearUsageAttributes clears the value of the "usage_attributes" field.
-func (ulu *UsageLogUpdate) ClearUsageAttributes() *UsageLogUpdate {
-	ulu.mutation.ClearUsageAttributes()
-	return ulu
-}
-
-// SetUsageMetrics sets the "usage_metrics" field.
-func (ulu *UsageLogUpdate) SetUsageMetrics(sm []sdk.UsageMetric) *UsageLogUpdate {
-	ulu.mutation.SetUsageMetrics(sm)
-	return ulu
-}
-
-// AppendUsageMetrics appends sm to the "usage_metrics" field.
-func (ulu *UsageLogUpdate) AppendUsageMetrics(sm []sdk.UsageMetric) *UsageLogUpdate {
-	ulu.mutation.AppendUsageMetrics(sm)
-	return ulu
-}
-
-// ClearUsageMetrics clears the value of the "usage_metrics" field.
-func (ulu *UsageLogUpdate) ClearUsageMetrics() *UsageLogUpdate {
-	ulu.mutation.ClearUsageMetrics()
-	return ulu
-}
-
-// SetUsageCostDetails sets the "usage_cost_details" field.
-func (ulu *UsageLogUpdate) SetUsageCostDetails(scd []sdk.UsageCostDetail) *UsageLogUpdate {
-	ulu.mutation.SetUsageCostDetails(scd)
-	return ulu
-}
-
-// AppendUsageCostDetails appends scd to the "usage_cost_details" field.
-func (ulu *UsageLogUpdate) AppendUsageCostDetails(scd []sdk.UsageCostDetail) *UsageLogUpdate {
-	ulu.mutation.AppendUsageCostDetails(scd)
-	return ulu
-}
-
-// ClearUsageCostDetails clears the value of the "usage_cost_details" field.
-func (ulu *UsageLogUpdate) ClearUsageCostDetails() *UsageLogUpdate {
-	ulu.mutation.ClearUsageCostDetails()
-	return ulu
-}
-
-// SetUsageMetadata sets the "usage_metadata" field.
-func (ulu *UsageLogUpdate) SetUsageMetadata(m map[string]string) *UsageLogUpdate {
-	ulu.mutation.SetUsageMetadata(m)
-	return ulu
-}
-
-// ClearUsageMetadata clears the value of the "usage_metadata" field.
-func (ulu *UsageLogUpdate) ClearUsageMetadata() *UsageLogUpdate {
-	ulu.mutation.ClearUsageMetadata()
+// SetNillableRequestID sets the "request_id" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableRequestID(s *string) *UsageLogUpdate {
+	if s != nil {
+		ulu.SetRequestID(*s)
+	}
 	return ulu
 }
 
@@ -806,17 +682,83 @@ func (ulu *UsageLogUpdate) SetNillableUserEmailSnapshot(s *string) *UsageLogUpda
 	return ulu
 }
 
-// SetUserID sets the "user" edge to the User entity by ID.
-func (ulu *UsageLogUpdate) SetUserID(id int) *UsageLogUpdate {
-	ulu.mutation.SetUserID(id)
+// SetUserID sets the "user_id" field.
+func (ulu *UsageLogUpdate) SetUserID(i int) *UsageLogUpdate {
+	ulu.mutation.SetUserID(i)
 	return ulu
 }
 
-// SetNillableUserID sets the "user" edge to the User entity by ID if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillableUserID(id *int) *UsageLogUpdate {
-	if id != nil {
-		ulu = ulu.SetUserID(*id)
+// SetNillableUserID sets the "user_id" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableUserID(i *int) *UsageLogUpdate {
+	if i != nil {
+		ulu.SetUserID(*i)
 	}
+	return ulu
+}
+
+// ClearUserID clears the value of the "user_id" field.
+func (ulu *UsageLogUpdate) ClearUserID() *UsageLogUpdate {
+	ulu.mutation.ClearUserID()
+	return ulu
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (ulu *UsageLogUpdate) SetAPIKeyID(i int) *UsageLogUpdate {
+	ulu.mutation.SetAPIKeyID(i)
+	return ulu
+}
+
+// SetNillableAPIKeyID sets the "api_key_id" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableAPIKeyID(i *int) *UsageLogUpdate {
+	if i != nil {
+		ulu.SetAPIKeyID(*i)
+	}
+	return ulu
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (ulu *UsageLogUpdate) ClearAPIKeyID() *UsageLogUpdate {
+	ulu.mutation.ClearAPIKeyID()
+	return ulu
+}
+
+// SetChannelID sets the "channel_id" field.
+func (ulu *UsageLogUpdate) SetChannelID(i int) *UsageLogUpdate {
+	ulu.mutation.SetChannelID(i)
+	return ulu
+}
+
+// SetNillableChannelID sets the "channel_id" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableChannelID(i *int) *UsageLogUpdate {
+	if i != nil {
+		ulu.SetChannelID(*i)
+	}
+	return ulu
+}
+
+// ClearChannelID clears the value of the "channel_id" field.
+func (ulu *UsageLogUpdate) ClearChannelID() *UsageLogUpdate {
+	ulu.mutation.ClearChannelID()
+	return ulu
+}
+
+// SetGroupID sets the "group_id" field.
+func (ulu *UsageLogUpdate) SetGroupID(i int) *UsageLogUpdate {
+	ulu.mutation.SetGroupID(i)
+	return ulu
+}
+
+// SetNillableGroupID sets the "group_id" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableGroupID(i *int) *UsageLogUpdate {
+	if i != nil {
+		ulu.SetGroupID(*i)
+	}
+	return ulu
+}
+
+// ClearGroupID clears the value of the "group_id" field.
+func (ulu *UsageLogUpdate) ClearGroupID() *UsageLogUpdate {
+	ulu.mutation.ClearGroupID()
 	return ulu
 }
 
@@ -825,56 +767,14 @@ func (ulu *UsageLogUpdate) SetUser(u *User) *UsageLogUpdate {
 	return ulu.SetUserID(u.ID)
 }
 
-// SetAPIKeyID sets the "api_key" edge to the APIKey entity by ID.
-func (ulu *UsageLogUpdate) SetAPIKeyID(id int) *UsageLogUpdate {
-	ulu.mutation.SetAPIKeyID(id)
-	return ulu
-}
-
-// SetNillableAPIKeyID sets the "api_key" edge to the APIKey entity by ID if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillableAPIKeyID(id *int) *UsageLogUpdate {
-	if id != nil {
-		ulu = ulu.SetAPIKeyID(*id)
-	}
-	return ulu
-}
-
 // SetAPIKey sets the "api_key" edge to the APIKey entity.
 func (ulu *UsageLogUpdate) SetAPIKey(a *APIKey) *UsageLogUpdate {
 	return ulu.SetAPIKeyID(a.ID)
 }
 
-// SetChannelID sets the "channel" edge to the Channel entity by ID.
-func (ulu *UsageLogUpdate) SetChannelID(id int) *UsageLogUpdate {
-	ulu.mutation.SetChannelID(id)
-	return ulu
-}
-
-// SetNillableChannelID sets the "channel" edge to the Channel entity by ID if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillableChannelID(id *int) *UsageLogUpdate {
-	if id != nil {
-		ulu = ulu.SetChannelID(*id)
-	}
-	return ulu
-}
-
 // SetChannel sets the "channel" edge to the Channel entity.
 func (ulu *UsageLogUpdate) SetChannel(c *Channel) *UsageLogUpdate {
 	return ulu.SetChannelID(c.ID)
-}
-
-// SetGroupID sets the "group" edge to the Group entity by ID.
-func (ulu *UsageLogUpdate) SetGroupID(id int) *UsageLogUpdate {
-	ulu.mutation.SetGroupID(id)
-	return ulu
-}
-
-// SetNillableGroupID sets the "group" edge to the Group entity by ID if the given value is not nil.
-func (ulu *UsageLogUpdate) SetNillableGroupID(id *int) *UsageLogUpdate {
-	if id != nil {
-		ulu = ulu.SetGroupID(*id)
-	}
-	return ulu
 }
 
 // SetGroup sets the "group" edge to the Group entity.
@@ -940,11 +840,6 @@ func (ulu *UsageLogUpdate) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (ulu *UsageLogUpdate) check() error {
-	if v, ok := ulu.mutation.Platform(); ok {
-		if err := usagelog.PlatformValidator(v); err != nil {
-			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "UsageLog.platform": %w`, err)}
-		}
-	}
 	if v, ok := ulu.mutation.Model(); ok {
 		if err := usagelog.ModelValidator(v); err != nil {
 			return &ValidationError{Name: "model", err: fmt.Errorf(`ent: validator failed for field "UsageLog.model": %w`, err)}
@@ -964,9 +859,6 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 				ps[i](selector)
 			}
 		}
-	}
-	if value, ok := ulu.mutation.Platform(); ok {
-		_spec.SetField(usagelog.FieldPlatform, field.TypeString, value)
 	}
 	if value, ok := ulu.mutation.Model(); ok {
 		_spec.SetField(usagelog.FieldModel, field.TypeString, value)
@@ -1007,11 +899,11 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ulu.mutation.AddedCacheCreation1hTokens(); ok {
 		_spec.AddField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
 	}
-	if value, ok := ulu.mutation.ReasoningOutputTokens(); ok {
-		_spec.SetField(usagelog.FieldReasoningOutputTokens, field.TypeInt, value)
+	if value, ok := ulu.mutation.Calls(); ok {
+		_spec.SetField(usagelog.FieldCalls, field.TypeInt, value)
 	}
-	if value, ok := ulu.mutation.AddedReasoningOutputTokens(); ok {
-		_spec.AddField(usagelog.FieldReasoningOutputTokens, field.TypeInt, value)
+	if value, ok := ulu.mutation.AddedCalls(); ok {
+		_spec.AddField(usagelog.FieldCalls, field.TypeInt, value)
 	}
 	if value, ok := ulu.mutation.InputPrice(); ok {
 		_spec.SetField(usagelog.FieldInputPrice, field.TypeFloat64, value)
@@ -1067,12 +959,6 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ulu.mutation.AddedCacheCreationCost(); ok {
 		_spec.AddField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
 	}
-	if value, ok := ulu.mutation.ImageCost(); ok {
-		_spec.SetField(usagelog.FieldImageCost, field.TypeFloat64, value)
-	}
-	if value, ok := ulu.mutation.AddedImageCost(); ok {
-		_spec.AddField(usagelog.FieldImageCost, field.TypeFloat64, value)
-	}
 	if value, ok := ulu.mutation.TotalCost(); ok {
 		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)
 	}
@@ -1090,12 +976,6 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := ulu.mutation.AddedBilledCost(); ok {
 		_spec.AddField(usagelog.FieldBilledCost, field.TypeFloat64, value)
-	}
-	if value, ok := ulu.mutation.AccountCost(); ok {
-		_spec.SetField(usagelog.FieldAccountCost, field.TypeFloat64, value)
-	}
-	if value, ok := ulu.mutation.AddedAccountCost(); ok {
-		_spec.AddField(usagelog.FieldAccountCost, field.TypeFloat64, value)
 	}
 	if value, ok := ulu.mutation.RateMultiplier(); ok {
 		_spec.SetField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
@@ -1117,9 +997,6 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := ulu.mutation.ServiceTier(); ok {
 		_spec.SetField(usagelog.FieldServiceTier, field.TypeString, value)
-	}
-	if value, ok := ulu.mutation.ImageSize(); ok {
-		_spec.SetField(usagelog.FieldImageSize, field.TypeString, value)
 	}
 	if value, ok := ulu.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
@@ -1145,47 +1022,11 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ulu.mutation.Endpoint(); ok {
 		_spec.SetField(usagelog.FieldEndpoint, field.TypeString, value)
 	}
-	if value, ok := ulu.mutation.ReasoningEffort(); ok {
-		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
+	if value, ok := ulu.mutation.Source(); ok {
+		_spec.SetField(usagelog.FieldSource, field.TypeString, value)
 	}
-	if value, ok := ulu.mutation.UsageAttributes(); ok {
-		_spec.SetField(usagelog.FieldUsageAttributes, field.TypeJSON, value)
-	}
-	if value, ok := ulu.mutation.AppendedUsageAttributes(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, usagelog.FieldUsageAttributes, value)
-		})
-	}
-	if ulu.mutation.UsageAttributesCleared() {
-		_spec.ClearField(usagelog.FieldUsageAttributes, field.TypeJSON)
-	}
-	if value, ok := ulu.mutation.UsageMetrics(); ok {
-		_spec.SetField(usagelog.FieldUsageMetrics, field.TypeJSON, value)
-	}
-	if value, ok := ulu.mutation.AppendedUsageMetrics(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, usagelog.FieldUsageMetrics, value)
-		})
-	}
-	if ulu.mutation.UsageMetricsCleared() {
-		_spec.ClearField(usagelog.FieldUsageMetrics, field.TypeJSON)
-	}
-	if value, ok := ulu.mutation.UsageCostDetails(); ok {
-		_spec.SetField(usagelog.FieldUsageCostDetails, field.TypeJSON, value)
-	}
-	if value, ok := ulu.mutation.AppendedUsageCostDetails(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, usagelog.FieldUsageCostDetails, value)
-		})
-	}
-	if ulu.mutation.UsageCostDetailsCleared() {
-		_spec.ClearField(usagelog.FieldUsageCostDetails, field.TypeJSON)
-	}
-	if value, ok := ulu.mutation.UsageMetadata(); ok {
-		_spec.SetField(usagelog.FieldUsageMetadata, field.TypeJSON, value)
-	}
-	if ulu.mutation.UsageMetadataCleared() {
-		_spec.ClearField(usagelog.FieldUsageMetadata, field.TypeJSON)
+	if value, ok := ulu.mutation.RequestID(); ok {
+		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
 	}
 	if value, ok := ulu.mutation.UserIDSnapshot(); ok {
 		_spec.SetField(usagelog.FieldUserIDSnapshot, field.TypeInt, value)
@@ -1332,20 +1173,6 @@ type UsageLogUpdateOne struct {
 	mutation *UsageLogMutation
 }
 
-// SetPlatform sets the "platform" field.
-func (uluo *UsageLogUpdateOne) SetPlatform(s string) *UsageLogUpdateOne {
-	uluo.mutation.SetPlatform(s)
-	return uluo
-}
-
-// SetNillablePlatform sets the "platform" field if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillablePlatform(s *string) *UsageLogUpdateOne {
-	if s != nil {
-		uluo.SetPlatform(*s)
-	}
-	return uluo
-}
-
 // SetModel sets the "model" field.
 func (uluo *UsageLogUpdateOne) SetModel(s string) *UsageLogUpdateOne {
 	uluo.mutation.SetModel(s)
@@ -1486,24 +1313,24 @@ func (uluo *UsageLogUpdateOne) AddCacheCreation1hTokens(i int) *UsageLogUpdateOn
 	return uluo
 }
 
-// SetReasoningOutputTokens sets the "reasoning_output_tokens" field.
-func (uluo *UsageLogUpdateOne) SetReasoningOutputTokens(i int) *UsageLogUpdateOne {
-	uluo.mutation.ResetReasoningOutputTokens()
-	uluo.mutation.SetReasoningOutputTokens(i)
+// SetCalls sets the "calls" field.
+func (uluo *UsageLogUpdateOne) SetCalls(i int) *UsageLogUpdateOne {
+	uluo.mutation.ResetCalls()
+	uluo.mutation.SetCalls(i)
 	return uluo
 }
 
-// SetNillableReasoningOutputTokens sets the "reasoning_output_tokens" field if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillableReasoningOutputTokens(i *int) *UsageLogUpdateOne {
+// SetNillableCalls sets the "calls" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableCalls(i *int) *UsageLogUpdateOne {
 	if i != nil {
-		uluo.SetReasoningOutputTokens(*i)
+		uluo.SetCalls(*i)
 	}
 	return uluo
 }
 
-// AddReasoningOutputTokens adds i to the "reasoning_output_tokens" field.
-func (uluo *UsageLogUpdateOne) AddReasoningOutputTokens(i int) *UsageLogUpdateOne {
-	uluo.mutation.AddReasoningOutputTokens(i)
+// AddCalls adds i to the "calls" field.
+func (uluo *UsageLogUpdateOne) AddCalls(i int) *UsageLogUpdateOne {
+	uluo.mutation.AddCalls(i)
 	return uluo
 }
 
@@ -1696,27 +1523,6 @@ func (uluo *UsageLogUpdateOne) AddCacheCreationCost(f float64) *UsageLogUpdateOn
 	return uluo
 }
 
-// SetImageCost sets the "image_cost" field.
-func (uluo *UsageLogUpdateOne) SetImageCost(f float64) *UsageLogUpdateOne {
-	uluo.mutation.ResetImageCost()
-	uluo.mutation.SetImageCost(f)
-	return uluo
-}
-
-// SetNillableImageCost sets the "image_cost" field if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillableImageCost(f *float64) *UsageLogUpdateOne {
-	if f != nil {
-		uluo.SetImageCost(*f)
-	}
-	return uluo
-}
-
-// AddImageCost adds f to the "image_cost" field.
-func (uluo *UsageLogUpdateOne) AddImageCost(f float64) *UsageLogUpdateOne {
-	uluo.mutation.AddImageCost(f)
-	return uluo
-}
-
 // SetTotalCost sets the "total_cost" field.
 func (uluo *UsageLogUpdateOne) SetTotalCost(f float64) *UsageLogUpdateOne {
 	uluo.mutation.ResetTotalCost()
@@ -1777,27 +1583,6 @@ func (uluo *UsageLogUpdateOne) SetNillableBilledCost(f *float64) *UsageLogUpdate
 // AddBilledCost adds f to the "billed_cost" field.
 func (uluo *UsageLogUpdateOne) AddBilledCost(f float64) *UsageLogUpdateOne {
 	uluo.mutation.AddBilledCost(f)
-	return uluo
-}
-
-// SetAccountCost sets the "account_cost" field.
-func (uluo *UsageLogUpdateOne) SetAccountCost(f float64) *UsageLogUpdateOne {
-	uluo.mutation.ResetAccountCost()
-	uluo.mutation.SetAccountCost(f)
-	return uluo
-}
-
-// SetNillableAccountCost sets the "account_cost" field if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillableAccountCost(f *float64) *UsageLogUpdateOne {
-	if f != nil {
-		uluo.SetAccountCost(*f)
-	}
-	return uluo
-}
-
-// AddAccountCost adds f to the "account_cost" field.
-func (uluo *UsageLogUpdateOne) AddAccountCost(f float64) *UsageLogUpdateOne {
-	uluo.mutation.AddAccountCost(f)
 	return uluo
 }
 
@@ -1874,20 +1659,6 @@ func (uluo *UsageLogUpdateOne) SetServiceTier(s string) *UsageLogUpdateOne {
 func (uluo *UsageLogUpdateOne) SetNillableServiceTier(s *string) *UsageLogUpdateOne {
 	if s != nil {
 		uluo.SetServiceTier(*s)
-	}
-	return uluo
-}
-
-// SetImageSize sets the "image_size" field.
-func (uluo *UsageLogUpdateOne) SetImageSize(s string) *UsageLogUpdateOne {
-	uluo.mutation.SetImageSize(s)
-	return uluo
-}
-
-// SetNillableImageSize sets the "image_size" field if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillableImageSize(s *string) *UsageLogUpdateOne {
-	if s != nil {
-		uluo.SetImageSize(*s)
 	}
 	return uluo
 }
@@ -1990,83 +1761,31 @@ func (uluo *UsageLogUpdateOne) SetNillableEndpoint(s *string) *UsageLogUpdateOne
 	return uluo
 }
 
-// SetReasoningEffort sets the "reasoning_effort" field.
-func (uluo *UsageLogUpdateOne) SetReasoningEffort(s string) *UsageLogUpdateOne {
-	uluo.mutation.SetReasoningEffort(s)
+// SetSource sets the "source" field.
+func (uluo *UsageLogUpdateOne) SetSource(s string) *UsageLogUpdateOne {
+	uluo.mutation.SetSource(s)
 	return uluo
 }
 
-// SetNillableReasoningEffort sets the "reasoning_effort" field if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillableReasoningEffort(s *string) *UsageLogUpdateOne {
+// SetNillableSource sets the "source" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableSource(s *string) *UsageLogUpdateOne {
 	if s != nil {
-		uluo.SetReasoningEffort(*s)
+		uluo.SetSource(*s)
 	}
 	return uluo
 }
 
-// SetUsageAttributes sets the "usage_attributes" field.
-func (uluo *UsageLogUpdateOne) SetUsageAttributes(sa []sdk.UsageAttribute) *UsageLogUpdateOne {
-	uluo.mutation.SetUsageAttributes(sa)
+// SetRequestID sets the "request_id" field.
+func (uluo *UsageLogUpdateOne) SetRequestID(s string) *UsageLogUpdateOne {
+	uluo.mutation.SetRequestID(s)
 	return uluo
 }
 
-// AppendUsageAttributes appends sa to the "usage_attributes" field.
-func (uluo *UsageLogUpdateOne) AppendUsageAttributes(sa []sdk.UsageAttribute) *UsageLogUpdateOne {
-	uluo.mutation.AppendUsageAttributes(sa)
-	return uluo
-}
-
-// ClearUsageAttributes clears the value of the "usage_attributes" field.
-func (uluo *UsageLogUpdateOne) ClearUsageAttributes() *UsageLogUpdateOne {
-	uluo.mutation.ClearUsageAttributes()
-	return uluo
-}
-
-// SetUsageMetrics sets the "usage_metrics" field.
-func (uluo *UsageLogUpdateOne) SetUsageMetrics(sm []sdk.UsageMetric) *UsageLogUpdateOne {
-	uluo.mutation.SetUsageMetrics(sm)
-	return uluo
-}
-
-// AppendUsageMetrics appends sm to the "usage_metrics" field.
-func (uluo *UsageLogUpdateOne) AppendUsageMetrics(sm []sdk.UsageMetric) *UsageLogUpdateOne {
-	uluo.mutation.AppendUsageMetrics(sm)
-	return uluo
-}
-
-// ClearUsageMetrics clears the value of the "usage_metrics" field.
-func (uluo *UsageLogUpdateOne) ClearUsageMetrics() *UsageLogUpdateOne {
-	uluo.mutation.ClearUsageMetrics()
-	return uluo
-}
-
-// SetUsageCostDetails sets the "usage_cost_details" field.
-func (uluo *UsageLogUpdateOne) SetUsageCostDetails(scd []sdk.UsageCostDetail) *UsageLogUpdateOne {
-	uluo.mutation.SetUsageCostDetails(scd)
-	return uluo
-}
-
-// AppendUsageCostDetails appends scd to the "usage_cost_details" field.
-func (uluo *UsageLogUpdateOne) AppendUsageCostDetails(scd []sdk.UsageCostDetail) *UsageLogUpdateOne {
-	uluo.mutation.AppendUsageCostDetails(scd)
-	return uluo
-}
-
-// ClearUsageCostDetails clears the value of the "usage_cost_details" field.
-func (uluo *UsageLogUpdateOne) ClearUsageCostDetails() *UsageLogUpdateOne {
-	uluo.mutation.ClearUsageCostDetails()
-	return uluo
-}
-
-// SetUsageMetadata sets the "usage_metadata" field.
-func (uluo *UsageLogUpdateOne) SetUsageMetadata(m map[string]string) *UsageLogUpdateOne {
-	uluo.mutation.SetUsageMetadata(m)
-	return uluo
-}
-
-// ClearUsageMetadata clears the value of the "usage_metadata" field.
-func (uluo *UsageLogUpdateOne) ClearUsageMetadata() *UsageLogUpdateOne {
-	uluo.mutation.ClearUsageMetadata()
+// SetNillableRequestID sets the "request_id" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableRequestID(s *string) *UsageLogUpdateOne {
+	if s != nil {
+		uluo.SetRequestID(*s)
+	}
 	return uluo
 }
 
@@ -2105,17 +1824,83 @@ func (uluo *UsageLogUpdateOne) SetNillableUserEmailSnapshot(s *string) *UsageLog
 	return uluo
 }
 
-// SetUserID sets the "user" edge to the User entity by ID.
-func (uluo *UsageLogUpdateOne) SetUserID(id int) *UsageLogUpdateOne {
-	uluo.mutation.SetUserID(id)
+// SetUserID sets the "user_id" field.
+func (uluo *UsageLogUpdateOne) SetUserID(i int) *UsageLogUpdateOne {
+	uluo.mutation.SetUserID(i)
 	return uluo
 }
 
-// SetNillableUserID sets the "user" edge to the User entity by ID if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillableUserID(id *int) *UsageLogUpdateOne {
-	if id != nil {
-		uluo = uluo.SetUserID(*id)
+// SetNillableUserID sets the "user_id" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableUserID(i *int) *UsageLogUpdateOne {
+	if i != nil {
+		uluo.SetUserID(*i)
 	}
+	return uluo
+}
+
+// ClearUserID clears the value of the "user_id" field.
+func (uluo *UsageLogUpdateOne) ClearUserID() *UsageLogUpdateOne {
+	uluo.mutation.ClearUserID()
+	return uluo
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (uluo *UsageLogUpdateOne) SetAPIKeyID(i int) *UsageLogUpdateOne {
+	uluo.mutation.SetAPIKeyID(i)
+	return uluo
+}
+
+// SetNillableAPIKeyID sets the "api_key_id" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableAPIKeyID(i *int) *UsageLogUpdateOne {
+	if i != nil {
+		uluo.SetAPIKeyID(*i)
+	}
+	return uluo
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (uluo *UsageLogUpdateOne) ClearAPIKeyID() *UsageLogUpdateOne {
+	uluo.mutation.ClearAPIKeyID()
+	return uluo
+}
+
+// SetChannelID sets the "channel_id" field.
+func (uluo *UsageLogUpdateOne) SetChannelID(i int) *UsageLogUpdateOne {
+	uluo.mutation.SetChannelID(i)
+	return uluo
+}
+
+// SetNillableChannelID sets the "channel_id" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableChannelID(i *int) *UsageLogUpdateOne {
+	if i != nil {
+		uluo.SetChannelID(*i)
+	}
+	return uluo
+}
+
+// ClearChannelID clears the value of the "channel_id" field.
+func (uluo *UsageLogUpdateOne) ClearChannelID() *UsageLogUpdateOne {
+	uluo.mutation.ClearChannelID()
+	return uluo
+}
+
+// SetGroupID sets the "group_id" field.
+func (uluo *UsageLogUpdateOne) SetGroupID(i int) *UsageLogUpdateOne {
+	uluo.mutation.SetGroupID(i)
+	return uluo
+}
+
+// SetNillableGroupID sets the "group_id" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableGroupID(i *int) *UsageLogUpdateOne {
+	if i != nil {
+		uluo.SetGroupID(*i)
+	}
+	return uluo
+}
+
+// ClearGroupID clears the value of the "group_id" field.
+func (uluo *UsageLogUpdateOne) ClearGroupID() *UsageLogUpdateOne {
+	uluo.mutation.ClearGroupID()
 	return uluo
 }
 
@@ -2124,56 +1909,14 @@ func (uluo *UsageLogUpdateOne) SetUser(u *User) *UsageLogUpdateOne {
 	return uluo.SetUserID(u.ID)
 }
 
-// SetAPIKeyID sets the "api_key" edge to the APIKey entity by ID.
-func (uluo *UsageLogUpdateOne) SetAPIKeyID(id int) *UsageLogUpdateOne {
-	uluo.mutation.SetAPIKeyID(id)
-	return uluo
-}
-
-// SetNillableAPIKeyID sets the "api_key" edge to the APIKey entity by ID if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillableAPIKeyID(id *int) *UsageLogUpdateOne {
-	if id != nil {
-		uluo = uluo.SetAPIKeyID(*id)
-	}
-	return uluo
-}
-
 // SetAPIKey sets the "api_key" edge to the APIKey entity.
 func (uluo *UsageLogUpdateOne) SetAPIKey(a *APIKey) *UsageLogUpdateOne {
 	return uluo.SetAPIKeyID(a.ID)
 }
 
-// SetChannelID sets the "channel" edge to the Channel entity by ID.
-func (uluo *UsageLogUpdateOne) SetChannelID(id int) *UsageLogUpdateOne {
-	uluo.mutation.SetChannelID(id)
-	return uluo
-}
-
-// SetNillableChannelID sets the "channel" edge to the Channel entity by ID if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillableChannelID(id *int) *UsageLogUpdateOne {
-	if id != nil {
-		uluo = uluo.SetChannelID(*id)
-	}
-	return uluo
-}
-
 // SetChannel sets the "channel" edge to the Channel entity.
 func (uluo *UsageLogUpdateOne) SetChannel(c *Channel) *UsageLogUpdateOne {
 	return uluo.SetChannelID(c.ID)
-}
-
-// SetGroupID sets the "group" edge to the Group entity by ID.
-func (uluo *UsageLogUpdateOne) SetGroupID(id int) *UsageLogUpdateOne {
-	uluo.mutation.SetGroupID(id)
-	return uluo
-}
-
-// SetNillableGroupID sets the "group" edge to the Group entity by ID if the given value is not nil.
-func (uluo *UsageLogUpdateOne) SetNillableGroupID(id *int) *UsageLogUpdateOne {
-	if id != nil {
-		uluo = uluo.SetGroupID(*id)
-	}
-	return uluo
 }
 
 // SetGroup sets the "group" edge to the Group entity.
@@ -2252,11 +1995,6 @@ func (uluo *UsageLogUpdateOne) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (uluo *UsageLogUpdateOne) check() error {
-	if v, ok := uluo.mutation.Platform(); ok {
-		if err := usagelog.PlatformValidator(v); err != nil {
-			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "UsageLog.platform": %w`, err)}
-		}
-	}
 	if v, ok := uluo.mutation.Model(); ok {
 		if err := usagelog.ModelValidator(v); err != nil {
 			return &ValidationError{Name: "model", err: fmt.Errorf(`ent: validator failed for field "UsageLog.model": %w`, err)}
@@ -2293,9 +2031,6 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 				ps[i](selector)
 			}
 		}
-	}
-	if value, ok := uluo.mutation.Platform(); ok {
-		_spec.SetField(usagelog.FieldPlatform, field.TypeString, value)
 	}
 	if value, ok := uluo.mutation.Model(); ok {
 		_spec.SetField(usagelog.FieldModel, field.TypeString, value)
@@ -2336,11 +2071,11 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	if value, ok := uluo.mutation.AddedCacheCreation1hTokens(); ok {
 		_spec.AddField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
 	}
-	if value, ok := uluo.mutation.ReasoningOutputTokens(); ok {
-		_spec.SetField(usagelog.FieldReasoningOutputTokens, field.TypeInt, value)
+	if value, ok := uluo.mutation.Calls(); ok {
+		_spec.SetField(usagelog.FieldCalls, field.TypeInt, value)
 	}
-	if value, ok := uluo.mutation.AddedReasoningOutputTokens(); ok {
-		_spec.AddField(usagelog.FieldReasoningOutputTokens, field.TypeInt, value)
+	if value, ok := uluo.mutation.AddedCalls(); ok {
+		_spec.AddField(usagelog.FieldCalls, field.TypeInt, value)
 	}
 	if value, ok := uluo.mutation.InputPrice(); ok {
 		_spec.SetField(usagelog.FieldInputPrice, field.TypeFloat64, value)
@@ -2396,12 +2131,6 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	if value, ok := uluo.mutation.AddedCacheCreationCost(); ok {
 		_spec.AddField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
 	}
-	if value, ok := uluo.mutation.ImageCost(); ok {
-		_spec.SetField(usagelog.FieldImageCost, field.TypeFloat64, value)
-	}
-	if value, ok := uluo.mutation.AddedImageCost(); ok {
-		_spec.AddField(usagelog.FieldImageCost, field.TypeFloat64, value)
-	}
 	if value, ok := uluo.mutation.TotalCost(); ok {
 		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)
 	}
@@ -2419,12 +2148,6 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if value, ok := uluo.mutation.AddedBilledCost(); ok {
 		_spec.AddField(usagelog.FieldBilledCost, field.TypeFloat64, value)
-	}
-	if value, ok := uluo.mutation.AccountCost(); ok {
-		_spec.SetField(usagelog.FieldAccountCost, field.TypeFloat64, value)
-	}
-	if value, ok := uluo.mutation.AddedAccountCost(); ok {
-		_spec.AddField(usagelog.FieldAccountCost, field.TypeFloat64, value)
 	}
 	if value, ok := uluo.mutation.RateMultiplier(); ok {
 		_spec.SetField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
@@ -2446,9 +2169,6 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if value, ok := uluo.mutation.ServiceTier(); ok {
 		_spec.SetField(usagelog.FieldServiceTier, field.TypeString, value)
-	}
-	if value, ok := uluo.mutation.ImageSize(); ok {
-		_spec.SetField(usagelog.FieldImageSize, field.TypeString, value)
 	}
 	if value, ok := uluo.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
@@ -2474,47 +2194,11 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	if value, ok := uluo.mutation.Endpoint(); ok {
 		_spec.SetField(usagelog.FieldEndpoint, field.TypeString, value)
 	}
-	if value, ok := uluo.mutation.ReasoningEffort(); ok {
-		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
+	if value, ok := uluo.mutation.Source(); ok {
+		_spec.SetField(usagelog.FieldSource, field.TypeString, value)
 	}
-	if value, ok := uluo.mutation.UsageAttributes(); ok {
-		_spec.SetField(usagelog.FieldUsageAttributes, field.TypeJSON, value)
-	}
-	if value, ok := uluo.mutation.AppendedUsageAttributes(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, usagelog.FieldUsageAttributes, value)
-		})
-	}
-	if uluo.mutation.UsageAttributesCleared() {
-		_spec.ClearField(usagelog.FieldUsageAttributes, field.TypeJSON)
-	}
-	if value, ok := uluo.mutation.UsageMetrics(); ok {
-		_spec.SetField(usagelog.FieldUsageMetrics, field.TypeJSON, value)
-	}
-	if value, ok := uluo.mutation.AppendedUsageMetrics(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, usagelog.FieldUsageMetrics, value)
-		})
-	}
-	if uluo.mutation.UsageMetricsCleared() {
-		_spec.ClearField(usagelog.FieldUsageMetrics, field.TypeJSON)
-	}
-	if value, ok := uluo.mutation.UsageCostDetails(); ok {
-		_spec.SetField(usagelog.FieldUsageCostDetails, field.TypeJSON, value)
-	}
-	if value, ok := uluo.mutation.AppendedUsageCostDetails(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, usagelog.FieldUsageCostDetails, value)
-		})
-	}
-	if uluo.mutation.UsageCostDetailsCleared() {
-		_spec.ClearField(usagelog.FieldUsageCostDetails, field.TypeJSON)
-	}
-	if value, ok := uluo.mutation.UsageMetadata(); ok {
-		_spec.SetField(usagelog.FieldUsageMetadata, field.TypeJSON, value)
-	}
-	if uluo.mutation.UsageMetadataCleared() {
-		_spec.ClearField(usagelog.FieldUsageMetadata, field.TypeJSON)
+	if value, ok := uluo.mutation.RequestID(); ok {
+		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
 	}
 	if value, ok := uluo.mutation.UserIDSnapshot(); ok {
 		_spec.SetField(usagelog.FieldUserIDSnapshot, field.TypeInt, value)

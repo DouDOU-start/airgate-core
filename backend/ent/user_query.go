@@ -575,7 +575,9 @@ func (uq *UserQuery) loadUsageLogs(ctx context.Context, query *UsageLogQuery, no
 			init(nodes[i])
 		}
 	}
-	query.withFKs = true
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(usagelog.FieldUserID)
+	}
 	query.Where(predicate.UsageLog(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(user.UsageLogsColumn), fks...))
 	}))
@@ -584,13 +586,10 @@ func (uq *UserQuery) loadUsageLogs(ctx context.Context, query *UsageLogQuery, no
 		return err
 	}
 	for _, n := range neighbors {
-		fk := n.user_usage_logs
-		if fk == nil {
-			return fmt.Errorf(`foreign-key "user_usage_logs" is nil for node %v`, n.ID)
-		}
-		node, ok := nodeids[*fk]
+		fk := n.UserID
+		node, ok := nodeids[fk]
 		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "user_usage_logs" returned %v for node %v`, *fk, n.ID)
+			return fmt.Errorf(`unexpected referenced foreign-key "user_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

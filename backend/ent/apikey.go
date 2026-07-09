@@ -46,6 +46,8 @@ type APIKey struct {
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// Status holds the value of the "status" field.
 	Status apikey.Status `json:"status,omitempty"`
+	// 经 OAuth provision-key 自动创建时记录来源应用的 client_id；空 = 用户手动创建。同一用户同一应用只保留一把 provisioned key（get-or-create 幂等依据）。
+	ProvisionedBy string `json:"provisioned_by,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -113,7 +115,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case apikey.FieldID, apikey.FieldMaxConcurrency:
 			values[i] = new(sql.NullInt64)
-		case apikey.FieldName, apikey.FieldKeyHint, apikey.FieldKeyHash, apikey.FieldKeyEncrypted, apikey.FieldStatus:
+		case apikey.FieldName, apikey.FieldKeyHint, apikey.FieldKeyHash, apikey.FieldKeyEncrypted, apikey.FieldStatus, apikey.FieldProvisionedBy:
 			values[i] = new(sql.NullString)
 		case apikey.FieldExpiresAt, apikey.FieldCreatedAt, apikey.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -224,6 +226,12 @@ func (ak *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				ak.Status = apikey.Status(value.String)
+			}
+		case apikey.FieldProvisionedBy:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field provisioned_by", values[i])
+			} else if value.Valid {
+				ak.ProvisionedBy = value.String
 			}
 		case apikey.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -340,6 +348,9 @@ func (ak *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", ak.Status))
+	builder.WriteString(", ")
+	builder.WriteString("provisioned_by=")
+	builder.WriteString(ak.ProvisionedBy)
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(ak.CreatedAt.Format(time.ANSIC))

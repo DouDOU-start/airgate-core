@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 )
 
@@ -87,6 +88,11 @@ func CacheCreation1hPrice(v float64) predicate.ModelPrice {
 // PerRequestPrice applies equality check predicate on the "per_request_price" field. It's identical to PerRequestPriceEQ.
 func PerRequestPrice(v float64) predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldEQ(FieldPerRequestPrice, v))
+}
+
+// TagID applies equality check predicate on the "tag_id" field. It's identical to TagIDEQ.
+func TagID(v int) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldEQ(FieldTagID, v))
 }
 
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
@@ -414,6 +420,36 @@ func PricingExtraNotNil() predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldNotNull(FieldPricingExtra))
 }
 
+// TagIDEQ applies the EQ predicate on the "tag_id" field.
+func TagIDEQ(v int) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldEQ(FieldTagID, v))
+}
+
+// TagIDNEQ applies the NEQ predicate on the "tag_id" field.
+func TagIDNEQ(v int) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldNEQ(FieldTagID, v))
+}
+
+// TagIDIn applies the In predicate on the "tag_id" field.
+func TagIDIn(vs ...int) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldIn(FieldTagID, vs...))
+}
+
+// TagIDNotIn applies the NotIn predicate on the "tag_id" field.
+func TagIDNotIn(vs ...int) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldNotIn(FieldTagID, vs...))
+}
+
+// TagIDIsNil applies the IsNil predicate on the "tag_id" field.
+func TagIDIsNil() predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldIsNull(FieldTagID))
+}
+
+// TagIDNotNil applies the NotNil predicate on the "tag_id" field.
+func TagIDNotNil() predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldNotNull(FieldTagID))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldEQ(FieldCreatedAt, v))
@@ -492,6 +528,29 @@ func UpdatedAtLT(v time.Time) predicate.ModelPrice {
 // UpdatedAtLTE applies the LTE predicate on the "updated_at" field.
 func UpdatedAtLTE(v time.Time) predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldLTE(FieldUpdatedAt, v))
+}
+
+// HasTag applies the HasEdge predicate on the "tag" edge.
+func HasTag() predicate.ModelPrice {
+	return predicate.ModelPrice(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, TagTable, TagColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasTagWith applies the HasEdge predicate on the "tag" edge with a given conditions (other predicates).
+func HasTagWith(preds ...predicate.ModelTag) predicate.ModelPrice {
+	return predicate.ModelPrice(func(s *sql.Selector) {
+		step := newTagStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

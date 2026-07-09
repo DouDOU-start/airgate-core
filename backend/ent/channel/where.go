@@ -115,6 +115,16 @@ func TestedAt(v time.Time) predicate.Channel {
 	return predicate.Channel(sql.FieldEQ(FieldTestedAt, v))
 }
 
+// Balance applies equality check predicate on the "balance" field. It's identical to BalanceEQ.
+func Balance(v float64) predicate.Channel {
+	return predicate.Channel(sql.FieldEQ(FieldBalance, v))
+}
+
+// BalanceUpdatedAt applies equality check predicate on the "balance_updated_at" field. It's identical to BalanceUpdatedAtEQ.
+func BalanceUpdatedAt(v time.Time) predicate.Channel {
+	return predicate.Channel(sql.FieldEQ(FieldBalanceUpdatedAt, v))
+}
+
 // LastUsedAt applies equality check predicate on the "last_used_at" field. It's identical to LastUsedAtEQ.
 func LastUsedAt(v time.Time) predicate.Channel {
 	return predicate.Channel(sql.FieldEQ(FieldLastUsedAt, v))
@@ -720,16 +730,6 @@ func TestModelContainsFold(v string) predicate.Channel {
 	return predicate.Channel(sql.FieldContainsFold(FieldTestModel, v))
 }
 
-// CustomConfigIsNil applies the IsNil predicate on the "custom_config" field.
-func CustomConfigIsNil() predicate.Channel {
-	return predicate.Channel(sql.FieldIsNull(FieldCustomConfig))
-}
-
-// CustomConfigNotNil applies the NotNil predicate on the "custom_config" field.
-func CustomConfigNotNil() predicate.Channel {
-	return predicate.Channel(sql.FieldNotNull(FieldCustomConfig))
-}
-
 // ResponseTimeMsEQ applies the EQ predicate on the "response_time_ms" field.
 func ResponseTimeMsEQ(v int) predicate.Channel {
 	return predicate.Channel(sql.FieldEQ(FieldResponseTimeMs, v))
@@ -818,6 +818,96 @@ func TestedAtIsNil() predicate.Channel {
 // TestedAtNotNil applies the NotNil predicate on the "tested_at" field.
 func TestedAtNotNil() predicate.Channel {
 	return predicate.Channel(sql.FieldNotNull(FieldTestedAt))
+}
+
+// BalanceEQ applies the EQ predicate on the "balance" field.
+func BalanceEQ(v float64) predicate.Channel {
+	return predicate.Channel(sql.FieldEQ(FieldBalance, v))
+}
+
+// BalanceNEQ applies the NEQ predicate on the "balance" field.
+func BalanceNEQ(v float64) predicate.Channel {
+	return predicate.Channel(sql.FieldNEQ(FieldBalance, v))
+}
+
+// BalanceIn applies the In predicate on the "balance" field.
+func BalanceIn(vs ...float64) predicate.Channel {
+	return predicate.Channel(sql.FieldIn(FieldBalance, vs...))
+}
+
+// BalanceNotIn applies the NotIn predicate on the "balance" field.
+func BalanceNotIn(vs ...float64) predicate.Channel {
+	return predicate.Channel(sql.FieldNotIn(FieldBalance, vs...))
+}
+
+// BalanceGT applies the GT predicate on the "balance" field.
+func BalanceGT(v float64) predicate.Channel {
+	return predicate.Channel(sql.FieldGT(FieldBalance, v))
+}
+
+// BalanceGTE applies the GTE predicate on the "balance" field.
+func BalanceGTE(v float64) predicate.Channel {
+	return predicate.Channel(sql.FieldGTE(FieldBalance, v))
+}
+
+// BalanceLT applies the LT predicate on the "balance" field.
+func BalanceLT(v float64) predicate.Channel {
+	return predicate.Channel(sql.FieldLT(FieldBalance, v))
+}
+
+// BalanceLTE applies the LTE predicate on the "balance" field.
+func BalanceLTE(v float64) predicate.Channel {
+	return predicate.Channel(sql.FieldLTE(FieldBalance, v))
+}
+
+// BalanceUpdatedAtEQ applies the EQ predicate on the "balance_updated_at" field.
+func BalanceUpdatedAtEQ(v time.Time) predicate.Channel {
+	return predicate.Channel(sql.FieldEQ(FieldBalanceUpdatedAt, v))
+}
+
+// BalanceUpdatedAtNEQ applies the NEQ predicate on the "balance_updated_at" field.
+func BalanceUpdatedAtNEQ(v time.Time) predicate.Channel {
+	return predicate.Channel(sql.FieldNEQ(FieldBalanceUpdatedAt, v))
+}
+
+// BalanceUpdatedAtIn applies the In predicate on the "balance_updated_at" field.
+func BalanceUpdatedAtIn(vs ...time.Time) predicate.Channel {
+	return predicate.Channel(sql.FieldIn(FieldBalanceUpdatedAt, vs...))
+}
+
+// BalanceUpdatedAtNotIn applies the NotIn predicate on the "balance_updated_at" field.
+func BalanceUpdatedAtNotIn(vs ...time.Time) predicate.Channel {
+	return predicate.Channel(sql.FieldNotIn(FieldBalanceUpdatedAt, vs...))
+}
+
+// BalanceUpdatedAtGT applies the GT predicate on the "balance_updated_at" field.
+func BalanceUpdatedAtGT(v time.Time) predicate.Channel {
+	return predicate.Channel(sql.FieldGT(FieldBalanceUpdatedAt, v))
+}
+
+// BalanceUpdatedAtGTE applies the GTE predicate on the "balance_updated_at" field.
+func BalanceUpdatedAtGTE(v time.Time) predicate.Channel {
+	return predicate.Channel(sql.FieldGTE(FieldBalanceUpdatedAt, v))
+}
+
+// BalanceUpdatedAtLT applies the LT predicate on the "balance_updated_at" field.
+func BalanceUpdatedAtLT(v time.Time) predicate.Channel {
+	return predicate.Channel(sql.FieldLT(FieldBalanceUpdatedAt, v))
+}
+
+// BalanceUpdatedAtLTE applies the LTE predicate on the "balance_updated_at" field.
+func BalanceUpdatedAtLTE(v time.Time) predicate.Channel {
+	return predicate.Channel(sql.FieldLTE(FieldBalanceUpdatedAt, v))
+}
+
+// BalanceUpdatedAtIsNil applies the IsNil predicate on the "balance_updated_at" field.
+func BalanceUpdatedAtIsNil() predicate.Channel {
+	return predicate.Channel(sql.FieldIsNull(FieldBalanceUpdatedAt))
+}
+
+// BalanceUpdatedAtNotNil applies the NotNil predicate on the "balance_updated_at" field.
+func BalanceUpdatedAtNotNil() predicate.Channel {
+	return predicate.Channel(sql.FieldNotNull(FieldBalanceUpdatedAt))
 }
 
 // LastUsedAtEQ applies the EQ predicate on the "last_used_at" field.

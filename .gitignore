@@ -48,3 +48,13 @@ web/tmp/
 .env
 backend/data/
 data/
+
+# design-sync（claude.ai/design 同步）：暂存脚本、构建产物、机器状态不提交；
+# .design-sync/ 其余（config/NOTES/conventions/previews/overrides）为 durable set，提交
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+web/types/
+web/.ds-css/

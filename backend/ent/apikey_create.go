@@ -173,6 +173,20 @@ func (akc *APIKeyCreate) SetNillableStatus(a *apikey.Status) *APIKeyCreate {
 	return akc
 }
 
+// SetProvisionedBy sets the "provisioned_by" field.
+func (akc *APIKeyCreate) SetProvisionedBy(s string) *APIKeyCreate {
+	akc.mutation.SetProvisionedBy(s)
+	return akc
+}
+
+// SetNillableProvisionedBy sets the "provisioned_by" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableProvisionedBy(s *string) *APIKeyCreate {
+	if s != nil {
+		akc.SetProvisionedBy(*s)
+	}
+	return akc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (akc *APIKeyCreate) SetCreatedAt(t time.Time) *APIKeyCreate {
 	akc.mutation.SetCreatedAt(t)
@@ -309,6 +323,10 @@ func (akc *APIKeyCreate) defaults() {
 		v := apikey.DefaultStatus
 		akc.mutation.SetStatus(v)
 	}
+	if _, ok := akc.mutation.ProvisionedBy(); !ok {
+		v := apikey.DefaultProvisionedBy
+		akc.mutation.SetProvisionedBy(v)
+	}
 	if _, ok := akc.mutation.CreatedAt(); !ok {
 		v := apikey.DefaultCreatedAt()
 		akc.mutation.SetCreatedAt(v)
@@ -372,6 +390,9 @@ func (akc *APIKeyCreate) check() error {
 		if err := apikey.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "APIKey.status": %w`, err)}
 		}
+	}
+	if _, ok := akc.mutation.ProvisionedBy(); !ok {
+		return &ValidationError{Name: "provisioned_by", err: errors.New(`ent: missing required field "APIKey.provisioned_by"`)}
 	}
 	if _, ok := akc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "APIKey.created_at"`)}
@@ -459,6 +480,10 @@ func (akc *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := akc.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
+	}
+	if value, ok := akc.mutation.ProvisionedBy(); ok {
+		_spec.SetField(apikey.FieldProvisionedBy, field.TypeString, value)
+		_node.ProvisionedBy = value
 	}
 	if value, ok := akc.mutation.CreatedAt(); ok {
 		_spec.SetField(apikey.FieldCreatedAt, field.TypeTime, value)

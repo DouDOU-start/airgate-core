@@ -3,7 +3,6 @@
 package ent
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -15,7 +14,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // UsageLog is the model entity for the UsageLog schema.
@@ -23,8 +21,6 @@ type UsageLog struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
-	// Platform holds the value of the "platform" field.
-	Platform string `json:"platform,omitempty"`
 	// Model holds the value of the "model" field.
 	Model string `json:"model,omitempty"`
 	// InputTokens holds the value of the "input_tokens" field.
@@ -39,8 +35,8 @@ type UsageLog struct {
 	CacheCreation5mTokens int `json:"cache_creation_5m_tokens,omitempty"`
 	// CacheCreation1hTokens holds the value of the "cache_creation_1h_tokens" field.
 	CacheCreation1hTokens int `json:"cache_creation_1h_tokens,omitempty"`
-	// ReasoningOutputTokens holds the value of the "reasoning_output_tokens" field.
-	ReasoningOutputTokens int `json:"reasoning_output_tokens,omitempty"`
+	// 按次计费计次数（图像端点=响应产出张数）；token 计费端点恒 0。按次成本 = input_price × max(calls,1)。
+	Calls int `json:"calls,omitempty"`
 	// InputPrice holds the value of the "input_price" field.
 	InputPrice float64 `json:"input_price,omitempty"`
 	// OutputPrice holds the value of the "output_price" field.
@@ -59,26 +55,20 @@ type UsageLog struct {
 	CachedInputCost float64 `json:"cached_input_cost,omitempty"`
 	// CacheCreationCost holds the value of the "cache_creation_cost" field.
 	CacheCreationCost float64 `json:"cache_creation_cost,omitempty"`
-	// 图片输出基础成本。未配置固定价时按官方 image token 计费；配置固定价时记录原始 token 成本供审计。
-	ImageCost float64 `json:"image_cost,omitempty"`
 	// TotalCost holds the value of the "total_cost" field.
 	TotalCost float64 `json:"total_cost,omitempty"`
 	// 平台对 reseller 的真实扣费 = total × billing_rate（group/user）
 	ActualCost float64 `json:"actual_cost,omitempty"`
 	// 账面消耗：reseller 对最终客户的计费金额。sell_rate=0 时等于 actual_cost。永远不参与平台账户/统计。
 	BilledCost float64 `json:"billed_cost,omitempty"`
-	// 账号实际成本 = total × account_rate。用于账号管理后台的'账号计费'统计；与用户计费完全独立。
-	AccountCost float64 `json:"account_cost,omitempty"`
 	// 快照：本次请求生效的平台计费倍率（ResolveBillingRate 结果）
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
 	// 快照：本次请求生效的 sell_rate；0 表示该 key 当时未启用 markup
 	SellRate float64 `json:"sell_rate,omitempty"`
-	// 快照：本次请求生效的 account_rate
+	// 快照：本次请求生效的渠道成本倍率（channel.cost_ratio）。渠道成本 = total_cost × 本列，查询期现算不落列。
 	AccountRateMultiplier float64 `json:"account_rate_multiplier,omitempty"`
 	// ServiceTier holds the value of the "service_tier" field.
 	ServiceTier string `json:"service_tier,omitempty"`
-	// ImageSize holds the value of the "image_size" field.
-	ImageSize string `json:"image_size,omitempty"`
 	// Stream holds the value of the "stream" field.
 	Stream bool `json:"stream,omitempty"`
 	// DurationMs holds the value of the "duration_ms" field.
@@ -91,30 +81,28 @@ type UsageLog struct {
 	IPAddress string `json:"ip_address,omitempty"`
 	// Endpoint holds the value of the "endpoint" field.
 	Endpoint string `json:"endpoint,omitempty"`
-	// ReasoningEffort holds the value of the "reasoning_effort" field.
-	ReasoningEffort string `json:"reasoning_effort,omitempty"`
-	// UsageAttributes holds the value of the "usage_attributes" field.
-	UsageAttributes []sdk.UsageAttribute `json:"usage_attributes,omitempty"`
-	// UsageMetrics holds the value of the "usage_metrics" field.
-	UsageMetrics []sdk.UsageMetric `json:"usage_metrics,omitempty"`
-	// UsageCostDetails holds the value of the "usage_cost_details" field.
-	UsageCostDetails []sdk.UsageCostDetail `json:"usage_cost_details,omitempty"`
-	// UsageMetadata holds the value of the "usage_metadata" field.
-	UsageMetadata map[string]string `json:"usage_metadata,omitempty"`
+	// Source holds the value of the "source" field.
+	Source string `json:"source,omitempty"`
+	// RequestID holds the value of the "request_id" field.
+	RequestID string `json:"request_id,omitempty"`
 	// 用户 ID 快照。用户硬删除后保留历史使用记录与计费归属。
 	UserIDSnapshot int `json:"user_id_snapshot,omitempty"`
 	// 用户邮箱快照。用户硬删除后后台使用记录仍能展示历史归属。
 	UserEmailSnapshot string `json:"user_email_snapshot,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
+	// UserID holds the value of the "user_id" field.
+	UserID int `json:"user_id,omitempty"`
+	// APIKeyID holds the value of the "api_key_id" field.
+	APIKeyID int `json:"api_key_id,omitempty"`
+	// ChannelID holds the value of the "channel_id" field.
+	ChannelID int `json:"channel_id,omitempty"`
+	// GroupID holds the value of the "group_id" field.
+	GroupID int `json:"group_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UsageLogQuery when eager-loading is set.
-	Edges              UsageLogEdges `json:"edges"`
-	api_key_usage_logs *int
-	channel_usage_logs *int
-	group_usage_logs   *int
-	user_usage_logs    *int
-	selectValues       sql.SelectValues
+	Edges        UsageLogEdges `json:"edges"`
+	selectValues sql.SelectValues
 }
 
 // UsageLogEdges holds the relations/edges for other nodes in the graph.
@@ -181,26 +169,16 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case usagelog.FieldUsageAttributes, usagelog.FieldUsageMetrics, usagelog.FieldUsageCostDetails, usagelog.FieldUsageMetadata:
-			values[i] = new([]byte)
 		case usagelog.FieldStream:
 			values[i] = new(sql.NullBool)
-		case usagelog.FieldInputPrice, usagelog.FieldOutputPrice, usagelog.FieldCachedInputPrice, usagelog.FieldCacheCreationPrice, usagelog.FieldCacheCreation1hPrice, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldCacheCreationCost, usagelog.FieldImageCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldBilledCost, usagelog.FieldAccountCost, usagelog.FieldRateMultiplier, usagelog.FieldSellRate, usagelog.FieldAccountRateMultiplier:
+		case usagelog.FieldInputPrice, usagelog.FieldOutputPrice, usagelog.FieldCachedInputPrice, usagelog.FieldCacheCreationPrice, usagelog.FieldCacheCreation1hPrice, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldCacheCreationCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldBilledCost, usagelog.FieldRateMultiplier, usagelog.FieldSellRate, usagelog.FieldAccountRateMultiplier:
 			values[i] = new(sql.NullFloat64)
-		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldReasoningOutputTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldUserIDSnapshot:
+		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldCalls, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldUserIDSnapshot, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldChannelID, usagelog.FieldGroupID:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldPlatform, usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldImageSize, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldReasoningEffort, usagelog.FieldUserEmailSnapshot:
+		case usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldSource, usagelog.FieldRequestID, usagelog.FieldUserEmailSnapshot:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
-		case usagelog.ForeignKeys[0]: // api_key_usage_logs
-			values[i] = new(sql.NullInt64)
-		case usagelog.ForeignKeys[1]: // channel_usage_logs
-			values[i] = new(sql.NullInt64)
-		case usagelog.ForeignKeys[2]: // group_usage_logs
-			values[i] = new(sql.NullInt64)
-		case usagelog.ForeignKeys[3]: // user_usage_logs
-			values[i] = new(sql.NullInt64)
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -222,12 +200,6 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			ul.ID = int(value.Int64)
-		case usagelog.FieldPlatform:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field platform", values[i])
-			} else if value.Valid {
-				ul.Platform = value.String
-			}
 		case usagelog.FieldModel:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field model", values[i])
@@ -270,11 +242,11 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.CacheCreation1hTokens = int(value.Int64)
 			}
-		case usagelog.FieldReasoningOutputTokens:
+		case usagelog.FieldCalls:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field reasoning_output_tokens", values[i])
+				return fmt.Errorf("unexpected type %T for field calls", values[i])
 			} else if value.Valid {
-				ul.ReasoningOutputTokens = int(value.Int64)
+				ul.Calls = int(value.Int64)
 			}
 		case usagelog.FieldInputPrice:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
@@ -330,12 +302,6 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.CacheCreationCost = value.Float64
 			}
-		case usagelog.FieldImageCost:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field image_cost", values[i])
-			} else if value.Valid {
-				ul.ImageCost = value.Float64
-			}
 		case usagelog.FieldTotalCost:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
 				return fmt.Errorf("unexpected type %T for field total_cost", values[i])
@@ -353,12 +319,6 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field billed_cost", values[i])
 			} else if value.Valid {
 				ul.BilledCost = value.Float64
-			}
-		case usagelog.FieldAccountCost:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field account_cost", values[i])
-			} else if value.Valid {
-				ul.AccountCost = value.Float64
 			}
 		case usagelog.FieldRateMultiplier:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
@@ -383,12 +343,6 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field service_tier", values[i])
 			} else if value.Valid {
 				ul.ServiceTier = value.String
-			}
-		case usagelog.FieldImageSize:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field image_size", values[i])
-			} else if value.Valid {
-				ul.ImageSize = value.String
 			}
 		case usagelog.FieldStream:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -426,43 +380,17 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.Endpoint = value.String
 			}
-		case usagelog.FieldReasoningEffort:
+		case usagelog.FieldSource:
 			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field reasoning_effort", values[i])
+				return fmt.Errorf("unexpected type %T for field source", values[i])
 			} else if value.Valid {
-				ul.ReasoningEffort = value.String
+				ul.Source = value.String
 			}
-		case usagelog.FieldUsageAttributes:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field usage_attributes", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &ul.UsageAttributes); err != nil {
-					return fmt.Errorf("unmarshal field usage_attributes: %w", err)
-				}
-			}
-		case usagelog.FieldUsageMetrics:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field usage_metrics", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &ul.UsageMetrics); err != nil {
-					return fmt.Errorf("unmarshal field usage_metrics: %w", err)
-				}
-			}
-		case usagelog.FieldUsageCostDetails:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field usage_cost_details", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &ul.UsageCostDetails); err != nil {
-					return fmt.Errorf("unmarshal field usage_cost_details: %w", err)
-				}
-			}
-		case usagelog.FieldUsageMetadata:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field usage_metadata", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &ul.UsageMetadata); err != nil {
-					return fmt.Errorf("unmarshal field usage_metadata: %w", err)
-				}
+		case usagelog.FieldRequestID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field request_id", values[i])
+			} else if value.Valid {
+				ul.RequestID = value.String
 			}
 		case usagelog.FieldUserIDSnapshot:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -482,33 +410,29 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.CreatedAt = value.Time
 			}
-		case usagelog.ForeignKeys[0]:
+		case usagelog.FieldUserID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for edge-field api_key_usage_logs", value)
+				return fmt.Errorf("unexpected type %T for field user_id", values[i])
 			} else if value.Valid {
-				ul.api_key_usage_logs = new(int)
-				*ul.api_key_usage_logs = int(value.Int64)
+				ul.UserID = int(value.Int64)
 			}
-		case usagelog.ForeignKeys[1]:
+		case usagelog.FieldAPIKeyID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for edge-field channel_usage_logs", value)
+				return fmt.Errorf("unexpected type %T for field api_key_id", values[i])
 			} else if value.Valid {
-				ul.channel_usage_logs = new(int)
-				*ul.channel_usage_logs = int(value.Int64)
+				ul.APIKeyID = int(value.Int64)
 			}
-		case usagelog.ForeignKeys[2]:
+		case usagelog.FieldChannelID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for edge-field group_usage_logs", value)
+				return fmt.Errorf("unexpected type %T for field channel_id", values[i])
 			} else if value.Valid {
-				ul.group_usage_logs = new(int)
-				*ul.group_usage_logs = int(value.Int64)
+				ul.ChannelID = int(value.Int64)
 			}
-		case usagelog.ForeignKeys[3]:
+		case usagelog.FieldGroupID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for edge-field user_usage_logs", value)
+				return fmt.Errorf("unexpected type %T for field group_id", values[i])
 			} else if value.Valid {
-				ul.user_usage_logs = new(int)
-				*ul.user_usage_logs = int(value.Int64)
+				ul.GroupID = int(value.Int64)
 			}
 		default:
 			ul.selectValues.Set(columns[i], values[i])
@@ -566,9 +490,6 @@ func (ul *UsageLog) String() string {
 	var builder strings.Builder
 	builder.WriteString("UsageLog(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", ul.ID))
-	builder.WriteString("platform=")
-	builder.WriteString(ul.Platform)
-	builder.WriteString(", ")
 	builder.WriteString("model=")
 	builder.WriteString(ul.Model)
 	builder.WriteString(", ")
@@ -590,8 +511,8 @@ func (ul *UsageLog) String() string {
 	builder.WriteString("cache_creation_1h_tokens=")
 	builder.WriteString(fmt.Sprintf("%v", ul.CacheCreation1hTokens))
 	builder.WriteString(", ")
-	builder.WriteString("reasoning_output_tokens=")
-	builder.WriteString(fmt.Sprintf("%v", ul.ReasoningOutputTokens))
+	builder.WriteString("calls=")
+	builder.WriteString(fmt.Sprintf("%v", ul.Calls))
 	builder.WriteString(", ")
 	builder.WriteString("input_price=")
 	builder.WriteString(fmt.Sprintf("%v", ul.InputPrice))
@@ -620,9 +541,6 @@ func (ul *UsageLog) String() string {
 	builder.WriteString("cache_creation_cost=")
 	builder.WriteString(fmt.Sprintf("%v", ul.CacheCreationCost))
 	builder.WriteString(", ")
-	builder.WriteString("image_cost=")
-	builder.WriteString(fmt.Sprintf("%v", ul.ImageCost))
-	builder.WriteString(", ")
 	builder.WriteString("total_cost=")
 	builder.WriteString(fmt.Sprintf("%v", ul.TotalCost))
 	builder.WriteString(", ")
@@ -631,9 +549,6 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("billed_cost=")
 	builder.WriteString(fmt.Sprintf("%v", ul.BilledCost))
-	builder.WriteString(", ")
-	builder.WriteString("account_cost=")
-	builder.WriteString(fmt.Sprintf("%v", ul.AccountCost))
 	builder.WriteString(", ")
 	builder.WriteString("rate_multiplier=")
 	builder.WriteString(fmt.Sprintf("%v", ul.RateMultiplier))
@@ -646,9 +561,6 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("service_tier=")
 	builder.WriteString(ul.ServiceTier)
-	builder.WriteString(", ")
-	builder.WriteString("image_size=")
-	builder.WriteString(ul.ImageSize)
 	builder.WriteString(", ")
 	builder.WriteString("stream=")
 	builder.WriteString(fmt.Sprintf("%v", ul.Stream))
@@ -668,20 +580,11 @@ func (ul *UsageLog) String() string {
 	builder.WriteString("endpoint=")
 	builder.WriteString(ul.Endpoint)
 	builder.WriteString(", ")
-	builder.WriteString("reasoning_effort=")
-	builder.WriteString(ul.ReasoningEffort)
+	builder.WriteString("source=")
+	builder.WriteString(ul.Source)
 	builder.WriteString(", ")
-	builder.WriteString("usage_attributes=")
-	builder.WriteString(fmt.Sprintf("%v", ul.UsageAttributes))
-	builder.WriteString(", ")
-	builder.WriteString("usage_metrics=")
-	builder.WriteString(fmt.Sprintf("%v", ul.UsageMetrics))
-	builder.WriteString(", ")
-	builder.WriteString("usage_cost_details=")
-	builder.WriteString(fmt.Sprintf("%v", ul.UsageCostDetails))
-	builder.WriteString(", ")
-	builder.WriteString("usage_metadata=")
-	builder.WriteString(fmt.Sprintf("%v", ul.UsageMetadata))
+	builder.WriteString("request_id=")
+	builder.WriteString(ul.RequestID)
 	builder.WriteString(", ")
 	builder.WriteString("user_id_snapshot=")
 	builder.WriteString(fmt.Sprintf("%v", ul.UserIDSnapshot))
@@ -691,6 +594,18 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(ul.CreatedAt.Format(time.ANSIC))
+	builder.WriteString(", ")
+	builder.WriteString("user_id=")
+	builder.WriteString(fmt.Sprintf("%v", ul.UserID))
+	builder.WriteString(", ")
+	builder.WriteString("api_key_id=")
+	builder.WriteString(fmt.Sprintf("%v", ul.APIKeyID))
+	builder.WriteString(", ")
+	builder.WriteString("channel_id=")
+	builder.WriteString(fmt.Sprintf("%v", ul.ChannelID))
+	builder.WriteString(", ")
+	builder.WriteString("group_id=")
+	builder.WriteString(fmt.Sprintf("%v", ul.GroupID))
 	builder.WriteByte(')')
 	return builder.String()
 }

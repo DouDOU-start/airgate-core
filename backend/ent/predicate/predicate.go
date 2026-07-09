@@ -27,11 +27,26 @@ type Group func(*sql.Selector)
 // ModelPrice is the predicate function for modelprice builders.
 type ModelPrice func(*sql.Selector)
 
+// ModelTag is the predicate function for modeltag builders.
+type ModelTag func(*sql.Selector)
+
+// OAuthClient is the predicate function for oauthclient builders.
+type OAuthClient func(*sql.Selector)
+
+// PaymentOrder is the predicate function for paymentorder builders.
+type PaymentOrder func(*sql.Selector)
+
+// PaymentProviderConfig is the predicate function for paymentproviderconfig builders.
+type PaymentProviderConfig func(*sql.Selector)
+
+// RedemptionCode is the predicate function for redemptioncode builders.
+type RedemptionCode func(*sql.Selector)
+
 // Setting is the predicate function for setting builders.
 type Setting func(*sql.Selector)
 
-// Task is the predicate function for task builders.
-type Task func(*sql.Selector)
+// UpstreamRequestLog is the predicate function for upstreamrequestlog builders.
+type UpstreamRequestLog func(*sql.Selector)
 
 // UsageLog is the predicate function for usagelog builders.
 type UsageLog func(*sql.Selector)

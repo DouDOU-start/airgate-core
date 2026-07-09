@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
+	"github.com/DouDOU-start/airgate-core/ent/modeltag"
 )
 
 // ModelPriceCreate is the builder for creating a ModelPrice entity.
@@ -116,6 +117,20 @@ func (mpc *ModelPriceCreate) SetPricingExtra(m map[string]interface{}) *ModelPri
 	return mpc
 }
 
+// SetTagID sets the "tag_id" field.
+func (mpc *ModelPriceCreate) SetTagID(i int) *ModelPriceCreate {
+	mpc.mutation.SetTagID(i)
+	return mpc
+}
+
+// SetNillableTagID sets the "tag_id" field if the given value is not nil.
+func (mpc *ModelPriceCreate) SetNillableTagID(i *int) *ModelPriceCreate {
+	if i != nil {
+		mpc.SetTagID(*i)
+	}
+	return mpc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (mpc *ModelPriceCreate) SetCreatedAt(t time.Time) *ModelPriceCreate {
 	mpc.mutation.SetCreatedAt(t)
@@ -142,6 +157,11 @@ func (mpc *ModelPriceCreate) SetNillableUpdatedAt(t *time.Time) *ModelPriceCreat
 		mpc.SetUpdatedAt(*t)
 	}
 	return mpc
+}
+
+// SetTag sets the "tag" edge to the ModelTag entity.
+func (mpc *ModelPriceCreate) SetTag(m *ModelTag) *ModelPriceCreate {
+	return mpc.SetTagID(m.ID)
 }
 
 // Mutation returns the ModelPriceMutation object of the builder.
@@ -312,6 +332,23 @@ func (mpc *ModelPriceCreate) createSpec() (*ModelPrice, *sqlgraph.CreateSpec) {
 	if value, ok := mpc.mutation.UpdatedAt(); ok {
 		_spec.SetField(modelprice.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
+	}
+	if nodes := mpc.mutation.TagIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   modelprice.TagTable,
+			Columns: []string{modelprice.TagColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(modeltag.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.TagID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }

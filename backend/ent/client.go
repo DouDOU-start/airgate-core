@@ -22,8 +22,13 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
+	"github.com/DouDOU-start/airgate-core/ent/modeltag"
+	"github.com/DouDOU-start/airgate-core/ent/oauthclient"
+	"github.com/DouDOU-start/airgate-core/ent/paymentorder"
+	"github.com/DouDOU-start/airgate-core/ent/paymentproviderconfig"
+	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
-	"github.com/DouDOU-start/airgate-core/ent/task"
+	"github.com/DouDOU-start/airgate-core/ent/upstreamrequestlog"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 )
@@ -47,10 +52,20 @@ type Client struct {
 	Group *GroupClient
 	// ModelPrice is the client for interacting with the ModelPrice builders.
 	ModelPrice *ModelPriceClient
+	// ModelTag is the client for interacting with the ModelTag builders.
+	ModelTag *ModelTagClient
+	// OAuthClient is the client for interacting with the OAuthClient builders.
+	OAuthClient *OAuthClientClient
+	// PaymentOrder is the client for interacting with the PaymentOrder builders.
+	PaymentOrder *PaymentOrderClient
+	// PaymentProviderConfig is the client for interacting with the PaymentProviderConfig builders.
+	PaymentProviderConfig *PaymentProviderConfigClient
+	// RedemptionCode is the client for interacting with the RedemptionCode builders.
+	RedemptionCode *RedemptionCodeClient
 	// Setting is the client for interacting with the Setting builders.
 	Setting *SettingClient
-	// Task is the client for interacting with the Task builders.
-	Task *TaskClient
+	// UpstreamRequestLog is the client for interacting with the UpstreamRequestLog builders.
+	UpstreamRequestLog *UpstreamRequestLogClient
 	// UsageLog is the client for interacting with the UsageLog builders.
 	UsageLog *UsageLogClient
 	// User is the client for interacting with the User builders.
@@ -73,8 +88,13 @@ func (c *Client) init() {
 	c.Channel = NewChannelClient(c.config)
 	c.Group = NewGroupClient(c.config)
 	c.ModelPrice = NewModelPriceClient(c.config)
+	c.ModelTag = NewModelTagClient(c.config)
+	c.OAuthClient = NewOAuthClientClient(c.config)
+	c.PaymentOrder = NewPaymentOrderClient(c.config)
+	c.PaymentProviderConfig = NewPaymentProviderConfigClient(c.config)
+	c.RedemptionCode = NewRedemptionCodeClient(c.config)
 	c.Setting = NewSettingClient(c.config)
-	c.Task = NewTaskClient(c.config)
+	c.UpstreamRequestLog = NewUpstreamRequestLogClient(c.config)
 	c.UsageLog = NewUsageLogClient(c.config)
 	c.User = NewUserClient(c.config)
 }
@@ -167,19 +187,24 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:              ctx,
-		config:           cfg,
-		APIKey:           NewAPIKeyClient(cfg),
-		Announcement:     NewAnnouncementClient(cfg),
-		AnnouncementRead: NewAnnouncementReadClient(cfg),
-		BalanceLog:       NewBalanceLogClient(cfg),
-		Channel:          NewChannelClient(cfg),
-		Group:            NewGroupClient(cfg),
-		ModelPrice:       NewModelPriceClient(cfg),
-		Setting:          NewSettingClient(cfg),
-		Task:             NewTaskClient(cfg),
-		UsageLog:         NewUsageLogClient(cfg),
-		User:             NewUserClient(cfg),
+		ctx:                   ctx,
+		config:                cfg,
+		APIKey:                NewAPIKeyClient(cfg),
+		Announcement:          NewAnnouncementClient(cfg),
+		AnnouncementRead:      NewAnnouncementReadClient(cfg),
+		BalanceLog:            NewBalanceLogClient(cfg),
+		Channel:               NewChannelClient(cfg),
+		Group:                 NewGroupClient(cfg),
+		ModelPrice:            NewModelPriceClient(cfg),
+		ModelTag:              NewModelTagClient(cfg),
+		OAuthClient:           NewOAuthClientClient(cfg),
+		PaymentOrder:          NewPaymentOrderClient(cfg),
+		PaymentProviderConfig: NewPaymentProviderConfigClient(cfg),
+		RedemptionCode:        NewRedemptionCodeClient(cfg),
+		Setting:               NewSettingClient(cfg),
+		UpstreamRequestLog:    NewUpstreamRequestLogClient(cfg),
+		UsageLog:              NewUsageLogClient(cfg),
+		User:                  NewUserClient(cfg),
 	}, nil
 }
 
@@ -197,19 +222,24 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:              ctx,
-		config:           cfg,
-		APIKey:           NewAPIKeyClient(cfg),
-		Announcement:     NewAnnouncementClient(cfg),
-		AnnouncementRead: NewAnnouncementReadClient(cfg),
-		BalanceLog:       NewBalanceLogClient(cfg),
-		Channel:          NewChannelClient(cfg),
-		Group:            NewGroupClient(cfg),
-		ModelPrice:       NewModelPriceClient(cfg),
-		Setting:          NewSettingClient(cfg),
-		Task:             NewTaskClient(cfg),
-		UsageLog:         NewUsageLogClient(cfg),
-		User:             NewUserClient(cfg),
+		ctx:                   ctx,
+		config:                cfg,
+		APIKey:                NewAPIKeyClient(cfg),
+		Announcement:          NewAnnouncementClient(cfg),
+		AnnouncementRead:      NewAnnouncementReadClient(cfg),
+		BalanceLog:            NewBalanceLogClient(cfg),
+		Channel:               NewChannelClient(cfg),
+		Group:                 NewGroupClient(cfg),
+		ModelPrice:            NewModelPriceClient(cfg),
+		ModelTag:              NewModelTagClient(cfg),
+		OAuthClient:           NewOAuthClientClient(cfg),
+		PaymentOrder:          NewPaymentOrderClient(cfg),
+		PaymentProviderConfig: NewPaymentProviderConfigClient(cfg),
+		RedemptionCode:        NewRedemptionCodeClient(cfg),
+		Setting:               NewSettingClient(cfg),
+		UpstreamRequestLog:    NewUpstreamRequestLogClient(cfg),
+		UsageLog:              NewUsageLogClient(cfg),
+		User:                  NewUserClient(cfg),
 	}, nil
 }
 
@@ -240,7 +270,9 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel, c.Group,
-		c.ModelPrice, c.Setting, c.Task, c.UsageLog, c.User,
+		c.ModelPrice, c.ModelTag, c.OAuthClient, c.PaymentOrder,
+		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.UpstreamRequestLog,
+		c.UsageLog, c.User,
 	} {
 		n.Use(hooks...)
 	}
@@ -251,7 +283,9 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel, c.Group,
-		c.ModelPrice, c.Setting, c.Task, c.UsageLog, c.User,
+		c.ModelPrice, c.ModelTag, c.OAuthClient, c.PaymentOrder,
+		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.UpstreamRequestLog,
+		c.UsageLog, c.User,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -274,10 +308,20 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Group.mutate(ctx, m)
 	case *ModelPriceMutation:
 		return c.ModelPrice.mutate(ctx, m)
+	case *ModelTagMutation:
+		return c.ModelTag.mutate(ctx, m)
+	case *OAuthClientMutation:
+		return c.OAuthClient.mutate(ctx, m)
+	case *PaymentOrderMutation:
+		return c.PaymentOrder.mutate(ctx, m)
+	case *PaymentProviderConfigMutation:
+		return c.PaymentProviderConfig.mutate(ctx, m)
+	case *RedemptionCodeMutation:
+		return c.RedemptionCode.mutate(ctx, m)
 	case *SettingMutation:
 		return c.Setting.mutate(ctx, m)
-	case *TaskMutation:
-		return c.Task.mutate(ctx, m)
+	case *UpstreamRequestLogMutation:
+		return c.UpstreamRequestLog.mutate(ctx, m)
 	case *UsageLogMutation:
 		return c.UsageLog.mutate(ctx, m)
 	case *UserMutation:
@@ -1353,6 +1397,22 @@ func (c *ModelPriceClient) GetX(ctx context.Context, id int) *ModelPrice {
 	return obj
 }
 
+// QueryTag queries the tag edge of a ModelPrice.
+func (c *ModelPriceClient) QueryTag(mp *ModelPrice) *ModelTagQuery {
+	query := (&ModelTagClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := mp.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(modelprice.Table, modelprice.FieldID, id),
+			sqlgraph.To(modeltag.Table, modeltag.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, modelprice.TagTable, modelprice.TagColumn),
+		)
+		fromV = sqlgraph.Neighbors(mp.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *ModelPriceClient) Hooks() []Hook {
 	return c.hooks.ModelPrice
@@ -1375,6 +1435,687 @@ func (c *ModelPriceClient) mutate(ctx context.Context, m *ModelPriceMutation) (V
 		return (&ModelPriceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ModelPrice mutation op: %q", m.Op())
+	}
+}
+
+// ModelTagClient is a client for the ModelTag schema.
+type ModelTagClient struct {
+	config
+}
+
+// NewModelTagClient returns a client for the ModelTag from the given config.
+func NewModelTagClient(c config) *ModelTagClient {
+	return &ModelTagClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `modeltag.Hooks(f(g(h())))`.
+func (c *ModelTagClient) Use(hooks ...Hook) {
+	c.hooks.ModelTag = append(c.hooks.ModelTag, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `modeltag.Intercept(f(g(h())))`.
+func (c *ModelTagClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ModelTag = append(c.inters.ModelTag, interceptors...)
+}
+
+// Create returns a builder for creating a ModelTag entity.
+func (c *ModelTagClient) Create() *ModelTagCreate {
+	mutation := newModelTagMutation(c.config, OpCreate)
+	return &ModelTagCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ModelTag entities.
+func (c *ModelTagClient) CreateBulk(builders ...*ModelTagCreate) *ModelTagCreateBulk {
+	return &ModelTagCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ModelTagClient) MapCreateBulk(slice any, setFunc func(*ModelTagCreate, int)) *ModelTagCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ModelTagCreateBulk{err: fmt.Errorf("calling to ModelTagClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ModelTagCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ModelTagCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ModelTag.
+func (c *ModelTagClient) Update() *ModelTagUpdate {
+	mutation := newModelTagMutation(c.config, OpUpdate)
+	return &ModelTagUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ModelTagClient) UpdateOne(mt *ModelTag) *ModelTagUpdateOne {
+	mutation := newModelTagMutation(c.config, OpUpdateOne, withModelTag(mt))
+	return &ModelTagUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ModelTagClient) UpdateOneID(id int) *ModelTagUpdateOne {
+	mutation := newModelTagMutation(c.config, OpUpdateOne, withModelTagID(id))
+	return &ModelTagUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ModelTag.
+func (c *ModelTagClient) Delete() *ModelTagDelete {
+	mutation := newModelTagMutation(c.config, OpDelete)
+	return &ModelTagDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ModelTagClient) DeleteOne(mt *ModelTag) *ModelTagDeleteOne {
+	return c.DeleteOneID(mt.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ModelTagClient) DeleteOneID(id int) *ModelTagDeleteOne {
+	builder := c.Delete().Where(modeltag.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ModelTagDeleteOne{builder}
+}
+
+// Query returns a query builder for ModelTag.
+func (c *ModelTagClient) Query() *ModelTagQuery {
+	return &ModelTagQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeModelTag},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ModelTag entity by its id.
+func (c *ModelTagClient) Get(ctx context.Context, id int) (*ModelTag, error) {
+	return c.Query().Where(modeltag.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ModelTagClient) GetX(ctx context.Context, id int) *ModelTag {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPrices queries the prices edge of a ModelTag.
+func (c *ModelTagClient) QueryPrices(mt *ModelTag) *ModelPriceQuery {
+	query := (&ModelPriceClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := mt.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(modeltag.Table, modeltag.FieldID, id),
+			sqlgraph.To(modelprice.Table, modelprice.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, modeltag.PricesTable, modeltag.PricesColumn),
+		)
+		fromV = sqlgraph.Neighbors(mt.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ModelTagClient) Hooks() []Hook {
+	return c.hooks.ModelTag
+}
+
+// Interceptors returns the client interceptors.
+func (c *ModelTagClient) Interceptors() []Interceptor {
+	return c.inters.ModelTag
+}
+
+func (c *ModelTagClient) mutate(ctx context.Context, m *ModelTagMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ModelTagCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ModelTagUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ModelTagUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ModelTagDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ModelTag mutation op: %q", m.Op())
+	}
+}
+
+// OAuthClientClient is a client for the OAuthClient schema.
+type OAuthClientClient struct {
+	config
+}
+
+// NewOAuthClientClient returns a client for the OAuthClient from the given config.
+func NewOAuthClientClient(c config) *OAuthClientClient {
+	return &OAuthClientClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `oauthclient.Hooks(f(g(h())))`.
+func (c *OAuthClientClient) Use(hooks ...Hook) {
+	c.hooks.OAuthClient = append(c.hooks.OAuthClient, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `oauthclient.Intercept(f(g(h())))`.
+func (c *OAuthClientClient) Intercept(interceptors ...Interceptor) {
+	c.inters.OAuthClient = append(c.inters.OAuthClient, interceptors...)
+}
+
+// Create returns a builder for creating a OAuthClient entity.
+func (c *OAuthClientClient) Create() *OAuthClientCreate {
+	mutation := newOAuthClientMutation(c.config, OpCreate)
+	return &OAuthClientCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of OAuthClient entities.
+func (c *OAuthClientClient) CreateBulk(builders ...*OAuthClientCreate) *OAuthClientCreateBulk {
+	return &OAuthClientCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *OAuthClientClient) MapCreateBulk(slice any, setFunc func(*OAuthClientCreate, int)) *OAuthClientCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &OAuthClientCreateBulk{err: fmt.Errorf("calling to OAuthClientClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*OAuthClientCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &OAuthClientCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for OAuthClient.
+func (c *OAuthClientClient) Update() *OAuthClientUpdate {
+	mutation := newOAuthClientMutation(c.config, OpUpdate)
+	return &OAuthClientUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *OAuthClientClient) UpdateOne(oc *OAuthClient) *OAuthClientUpdateOne {
+	mutation := newOAuthClientMutation(c.config, OpUpdateOne, withOAuthClient(oc))
+	return &OAuthClientUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *OAuthClientClient) UpdateOneID(id int) *OAuthClientUpdateOne {
+	mutation := newOAuthClientMutation(c.config, OpUpdateOne, withOAuthClientID(id))
+	return &OAuthClientUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for OAuthClient.
+func (c *OAuthClientClient) Delete() *OAuthClientDelete {
+	mutation := newOAuthClientMutation(c.config, OpDelete)
+	return &OAuthClientDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *OAuthClientClient) DeleteOne(oc *OAuthClient) *OAuthClientDeleteOne {
+	return c.DeleteOneID(oc.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *OAuthClientClient) DeleteOneID(id int) *OAuthClientDeleteOne {
+	builder := c.Delete().Where(oauthclient.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &OAuthClientDeleteOne{builder}
+}
+
+// Query returns a query builder for OAuthClient.
+func (c *OAuthClientClient) Query() *OAuthClientQuery {
+	return &OAuthClientQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeOAuthClient},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a OAuthClient entity by its id.
+func (c *OAuthClientClient) Get(ctx context.Context, id int) (*OAuthClient, error) {
+	return c.Query().Where(oauthclient.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *OAuthClientClient) GetX(ctx context.Context, id int) *OAuthClient {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *OAuthClientClient) Hooks() []Hook {
+	return c.hooks.OAuthClient
+}
+
+// Interceptors returns the client interceptors.
+func (c *OAuthClientClient) Interceptors() []Interceptor {
+	return c.inters.OAuthClient
+}
+
+func (c *OAuthClientClient) mutate(ctx context.Context, m *OAuthClientMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&OAuthClientCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&OAuthClientUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&OAuthClientUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&OAuthClientDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown OAuthClient mutation op: %q", m.Op())
+	}
+}
+
+// PaymentOrderClient is a client for the PaymentOrder schema.
+type PaymentOrderClient struct {
+	config
+}
+
+// NewPaymentOrderClient returns a client for the PaymentOrder from the given config.
+func NewPaymentOrderClient(c config) *PaymentOrderClient {
+	return &PaymentOrderClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `paymentorder.Hooks(f(g(h())))`.
+func (c *PaymentOrderClient) Use(hooks ...Hook) {
+	c.hooks.PaymentOrder = append(c.hooks.PaymentOrder, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `paymentorder.Intercept(f(g(h())))`.
+func (c *PaymentOrderClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PaymentOrder = append(c.inters.PaymentOrder, interceptors...)
+}
+
+// Create returns a builder for creating a PaymentOrder entity.
+func (c *PaymentOrderClient) Create() *PaymentOrderCreate {
+	mutation := newPaymentOrderMutation(c.config, OpCreate)
+	return &PaymentOrderCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PaymentOrder entities.
+func (c *PaymentOrderClient) CreateBulk(builders ...*PaymentOrderCreate) *PaymentOrderCreateBulk {
+	return &PaymentOrderCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PaymentOrderClient) MapCreateBulk(slice any, setFunc func(*PaymentOrderCreate, int)) *PaymentOrderCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PaymentOrderCreateBulk{err: fmt.Errorf("calling to PaymentOrderClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PaymentOrderCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PaymentOrderCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PaymentOrder.
+func (c *PaymentOrderClient) Update() *PaymentOrderUpdate {
+	mutation := newPaymentOrderMutation(c.config, OpUpdate)
+	return &PaymentOrderUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PaymentOrderClient) UpdateOne(po *PaymentOrder) *PaymentOrderUpdateOne {
+	mutation := newPaymentOrderMutation(c.config, OpUpdateOne, withPaymentOrder(po))
+	return &PaymentOrderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PaymentOrderClient) UpdateOneID(id int) *PaymentOrderUpdateOne {
+	mutation := newPaymentOrderMutation(c.config, OpUpdateOne, withPaymentOrderID(id))
+	return &PaymentOrderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PaymentOrder.
+func (c *PaymentOrderClient) Delete() *PaymentOrderDelete {
+	mutation := newPaymentOrderMutation(c.config, OpDelete)
+	return &PaymentOrderDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PaymentOrderClient) DeleteOne(po *PaymentOrder) *PaymentOrderDeleteOne {
+	return c.DeleteOneID(po.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PaymentOrderClient) DeleteOneID(id int) *PaymentOrderDeleteOne {
+	builder := c.Delete().Where(paymentorder.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PaymentOrderDeleteOne{builder}
+}
+
+// Query returns a query builder for PaymentOrder.
+func (c *PaymentOrderClient) Query() *PaymentOrderQuery {
+	return &PaymentOrderQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePaymentOrder},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PaymentOrder entity by its id.
+func (c *PaymentOrderClient) Get(ctx context.Context, id int) (*PaymentOrder, error) {
+	return c.Query().Where(paymentorder.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PaymentOrderClient) GetX(ctx context.Context, id int) *PaymentOrder {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PaymentOrderClient) Hooks() []Hook {
+	return c.hooks.PaymentOrder
+}
+
+// Interceptors returns the client interceptors.
+func (c *PaymentOrderClient) Interceptors() []Interceptor {
+	return c.inters.PaymentOrder
+}
+
+func (c *PaymentOrderClient) mutate(ctx context.Context, m *PaymentOrderMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PaymentOrderCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PaymentOrderUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PaymentOrderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PaymentOrderDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PaymentOrder mutation op: %q", m.Op())
+	}
+}
+
+// PaymentProviderConfigClient is a client for the PaymentProviderConfig schema.
+type PaymentProviderConfigClient struct {
+	config
+}
+
+// NewPaymentProviderConfigClient returns a client for the PaymentProviderConfig from the given config.
+func NewPaymentProviderConfigClient(c config) *PaymentProviderConfigClient {
+	return &PaymentProviderConfigClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `paymentproviderconfig.Hooks(f(g(h())))`.
+func (c *PaymentProviderConfigClient) Use(hooks ...Hook) {
+	c.hooks.PaymentProviderConfig = append(c.hooks.PaymentProviderConfig, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `paymentproviderconfig.Intercept(f(g(h())))`.
+func (c *PaymentProviderConfigClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PaymentProviderConfig = append(c.inters.PaymentProviderConfig, interceptors...)
+}
+
+// Create returns a builder for creating a PaymentProviderConfig entity.
+func (c *PaymentProviderConfigClient) Create() *PaymentProviderConfigCreate {
+	mutation := newPaymentProviderConfigMutation(c.config, OpCreate)
+	return &PaymentProviderConfigCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PaymentProviderConfig entities.
+func (c *PaymentProviderConfigClient) CreateBulk(builders ...*PaymentProviderConfigCreate) *PaymentProviderConfigCreateBulk {
+	return &PaymentProviderConfigCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PaymentProviderConfigClient) MapCreateBulk(slice any, setFunc func(*PaymentProviderConfigCreate, int)) *PaymentProviderConfigCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PaymentProviderConfigCreateBulk{err: fmt.Errorf("calling to PaymentProviderConfigClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PaymentProviderConfigCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PaymentProviderConfigCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PaymentProviderConfig.
+func (c *PaymentProviderConfigClient) Update() *PaymentProviderConfigUpdate {
+	mutation := newPaymentProviderConfigMutation(c.config, OpUpdate)
+	return &PaymentProviderConfigUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PaymentProviderConfigClient) UpdateOne(ppc *PaymentProviderConfig) *PaymentProviderConfigUpdateOne {
+	mutation := newPaymentProviderConfigMutation(c.config, OpUpdateOne, withPaymentProviderConfig(ppc))
+	return &PaymentProviderConfigUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PaymentProviderConfigClient) UpdateOneID(id int) *PaymentProviderConfigUpdateOne {
+	mutation := newPaymentProviderConfigMutation(c.config, OpUpdateOne, withPaymentProviderConfigID(id))
+	return &PaymentProviderConfigUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PaymentProviderConfig.
+func (c *PaymentProviderConfigClient) Delete() *PaymentProviderConfigDelete {
+	mutation := newPaymentProviderConfigMutation(c.config, OpDelete)
+	return &PaymentProviderConfigDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PaymentProviderConfigClient) DeleteOne(ppc *PaymentProviderConfig) *PaymentProviderConfigDeleteOne {
+	return c.DeleteOneID(ppc.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PaymentProviderConfigClient) DeleteOneID(id int) *PaymentProviderConfigDeleteOne {
+	builder := c.Delete().Where(paymentproviderconfig.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PaymentProviderConfigDeleteOne{builder}
+}
+
+// Query returns a query builder for PaymentProviderConfig.
+func (c *PaymentProviderConfigClient) Query() *PaymentProviderConfigQuery {
+	return &PaymentProviderConfigQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePaymentProviderConfig},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PaymentProviderConfig entity by its id.
+func (c *PaymentProviderConfigClient) Get(ctx context.Context, id int) (*PaymentProviderConfig, error) {
+	return c.Query().Where(paymentproviderconfig.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PaymentProviderConfigClient) GetX(ctx context.Context, id int) *PaymentProviderConfig {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PaymentProviderConfigClient) Hooks() []Hook {
+	return c.hooks.PaymentProviderConfig
+}
+
+// Interceptors returns the client interceptors.
+func (c *PaymentProviderConfigClient) Interceptors() []Interceptor {
+	return c.inters.PaymentProviderConfig
+}
+
+func (c *PaymentProviderConfigClient) mutate(ctx context.Context, m *PaymentProviderConfigMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PaymentProviderConfigCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PaymentProviderConfigUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PaymentProviderConfigUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PaymentProviderConfigDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PaymentProviderConfig mutation op: %q", m.Op())
+	}
+}
+
+// RedemptionCodeClient is a client for the RedemptionCode schema.
+type RedemptionCodeClient struct {
+	config
+}
+
+// NewRedemptionCodeClient returns a client for the RedemptionCode from the given config.
+func NewRedemptionCodeClient(c config) *RedemptionCodeClient {
+	return &RedemptionCodeClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `redemptioncode.Hooks(f(g(h())))`.
+func (c *RedemptionCodeClient) Use(hooks ...Hook) {
+	c.hooks.RedemptionCode = append(c.hooks.RedemptionCode, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `redemptioncode.Intercept(f(g(h())))`.
+func (c *RedemptionCodeClient) Intercept(interceptors ...Interceptor) {
+	c.inters.RedemptionCode = append(c.inters.RedemptionCode, interceptors...)
+}
+
+// Create returns a builder for creating a RedemptionCode entity.
+func (c *RedemptionCodeClient) Create() *RedemptionCodeCreate {
+	mutation := newRedemptionCodeMutation(c.config, OpCreate)
+	return &RedemptionCodeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of RedemptionCode entities.
+func (c *RedemptionCodeClient) CreateBulk(builders ...*RedemptionCodeCreate) *RedemptionCodeCreateBulk {
+	return &RedemptionCodeCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *RedemptionCodeClient) MapCreateBulk(slice any, setFunc func(*RedemptionCodeCreate, int)) *RedemptionCodeCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &RedemptionCodeCreateBulk{err: fmt.Errorf("calling to RedemptionCodeClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*RedemptionCodeCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &RedemptionCodeCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for RedemptionCode.
+func (c *RedemptionCodeClient) Update() *RedemptionCodeUpdate {
+	mutation := newRedemptionCodeMutation(c.config, OpUpdate)
+	return &RedemptionCodeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *RedemptionCodeClient) UpdateOne(rc *RedemptionCode) *RedemptionCodeUpdateOne {
+	mutation := newRedemptionCodeMutation(c.config, OpUpdateOne, withRedemptionCode(rc))
+	return &RedemptionCodeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *RedemptionCodeClient) UpdateOneID(id int) *RedemptionCodeUpdateOne {
+	mutation := newRedemptionCodeMutation(c.config, OpUpdateOne, withRedemptionCodeID(id))
+	return &RedemptionCodeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for RedemptionCode.
+func (c *RedemptionCodeClient) Delete() *RedemptionCodeDelete {
+	mutation := newRedemptionCodeMutation(c.config, OpDelete)
+	return &RedemptionCodeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *RedemptionCodeClient) DeleteOne(rc *RedemptionCode) *RedemptionCodeDeleteOne {
+	return c.DeleteOneID(rc.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *RedemptionCodeClient) DeleteOneID(id int) *RedemptionCodeDeleteOne {
+	builder := c.Delete().Where(redemptioncode.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &RedemptionCodeDeleteOne{builder}
+}
+
+// Query returns a query builder for RedemptionCode.
+func (c *RedemptionCodeClient) Query() *RedemptionCodeQuery {
+	return &RedemptionCodeQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeRedemptionCode},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a RedemptionCode entity by its id.
+func (c *RedemptionCodeClient) Get(ctx context.Context, id int) (*RedemptionCode, error) {
+	return c.Query().Where(redemptioncode.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *RedemptionCodeClient) GetX(ctx context.Context, id int) *RedemptionCode {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *RedemptionCodeClient) Hooks() []Hook {
+	return c.hooks.RedemptionCode
+}
+
+// Interceptors returns the client interceptors.
+func (c *RedemptionCodeClient) Interceptors() []Interceptor {
+	return c.inters.RedemptionCode
+}
+
+func (c *RedemptionCodeClient) mutate(ctx context.Context, m *RedemptionCodeMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&RedemptionCodeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&RedemptionCodeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&RedemptionCodeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&RedemptionCodeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown RedemptionCode mutation op: %q", m.Op())
 	}
 }
 
@@ -1511,107 +2252,107 @@ func (c *SettingClient) mutate(ctx context.Context, m *SettingMutation) (Value, 
 	}
 }
 
-// TaskClient is a client for the Task schema.
-type TaskClient struct {
+// UpstreamRequestLogClient is a client for the UpstreamRequestLog schema.
+type UpstreamRequestLogClient struct {
 	config
 }
 
-// NewTaskClient returns a client for the Task from the given config.
-func NewTaskClient(c config) *TaskClient {
-	return &TaskClient{config: c}
+// NewUpstreamRequestLogClient returns a client for the UpstreamRequestLog from the given config.
+func NewUpstreamRequestLogClient(c config) *UpstreamRequestLogClient {
+	return &UpstreamRequestLogClient{config: c}
 }
 
 // Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `task.Hooks(f(g(h())))`.
-func (c *TaskClient) Use(hooks ...Hook) {
-	c.hooks.Task = append(c.hooks.Task, hooks...)
+// A call to `Use(f, g, h)` equals to `upstreamrequestlog.Hooks(f(g(h())))`.
+func (c *UpstreamRequestLogClient) Use(hooks ...Hook) {
+	c.hooks.UpstreamRequestLog = append(c.hooks.UpstreamRequestLog, hooks...)
 }
 
 // Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `task.Intercept(f(g(h())))`.
-func (c *TaskClient) Intercept(interceptors ...Interceptor) {
-	c.inters.Task = append(c.inters.Task, interceptors...)
+// A call to `Intercept(f, g, h)` equals to `upstreamrequestlog.Intercept(f(g(h())))`.
+func (c *UpstreamRequestLogClient) Intercept(interceptors ...Interceptor) {
+	c.inters.UpstreamRequestLog = append(c.inters.UpstreamRequestLog, interceptors...)
 }
 
-// Create returns a builder for creating a Task entity.
-func (c *TaskClient) Create() *TaskCreate {
-	mutation := newTaskMutation(c.config, OpCreate)
-	return &TaskCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+// Create returns a builder for creating a UpstreamRequestLog entity.
+func (c *UpstreamRequestLogClient) Create() *UpstreamRequestLogCreate {
+	mutation := newUpstreamRequestLogMutation(c.config, OpCreate)
+	return &UpstreamRequestLogCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
-// CreateBulk returns a builder for creating a bulk of Task entities.
-func (c *TaskClient) CreateBulk(builders ...*TaskCreate) *TaskCreateBulk {
-	return &TaskCreateBulk{config: c.config, builders: builders}
+// CreateBulk returns a builder for creating a bulk of UpstreamRequestLog entities.
+func (c *UpstreamRequestLogClient) CreateBulk(builders ...*UpstreamRequestLogCreate) *UpstreamRequestLogCreateBulk {
+	return &UpstreamRequestLogCreateBulk{config: c.config, builders: builders}
 }
 
 // MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
 // a builder and applies setFunc on it.
-func (c *TaskClient) MapCreateBulk(slice any, setFunc func(*TaskCreate, int)) *TaskCreateBulk {
+func (c *UpstreamRequestLogClient) MapCreateBulk(slice any, setFunc func(*UpstreamRequestLogCreate, int)) *UpstreamRequestLogCreateBulk {
 	rv := reflect.ValueOf(slice)
 	if rv.Kind() != reflect.Slice {
-		return &TaskCreateBulk{err: fmt.Errorf("calling to TaskClient.MapCreateBulk with wrong type %T, need slice", slice)}
+		return &UpstreamRequestLogCreateBulk{err: fmt.Errorf("calling to UpstreamRequestLogClient.MapCreateBulk with wrong type %T, need slice", slice)}
 	}
-	builders := make([]*TaskCreate, rv.Len())
+	builders := make([]*UpstreamRequestLogCreate, rv.Len())
 	for i := 0; i < rv.Len(); i++ {
 		builders[i] = c.Create()
 		setFunc(builders[i], i)
 	}
-	return &TaskCreateBulk{config: c.config, builders: builders}
+	return &UpstreamRequestLogCreateBulk{config: c.config, builders: builders}
 }
 
-// Update returns an update builder for Task.
-func (c *TaskClient) Update() *TaskUpdate {
-	mutation := newTaskMutation(c.config, OpUpdate)
-	return &TaskUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+// Update returns an update builder for UpstreamRequestLog.
+func (c *UpstreamRequestLogClient) Update() *UpstreamRequestLogUpdate {
+	mutation := newUpstreamRequestLogMutation(c.config, OpUpdate)
+	return &UpstreamRequestLogUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
 // UpdateOne returns an update builder for the given entity.
-func (c *TaskClient) UpdateOne(t *Task) *TaskUpdateOne {
-	mutation := newTaskMutation(c.config, OpUpdateOne, withTask(t))
-	return &TaskUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+func (c *UpstreamRequestLogClient) UpdateOne(url *UpstreamRequestLog) *UpstreamRequestLogUpdateOne {
+	mutation := newUpstreamRequestLogMutation(c.config, OpUpdateOne, withUpstreamRequestLog(url))
+	return &UpstreamRequestLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
 // UpdateOneID returns an update builder for the given id.
-func (c *TaskClient) UpdateOneID(id int) *TaskUpdateOne {
-	mutation := newTaskMutation(c.config, OpUpdateOne, withTaskID(id))
-	return &TaskUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+func (c *UpstreamRequestLogClient) UpdateOneID(id int) *UpstreamRequestLogUpdateOne {
+	mutation := newUpstreamRequestLogMutation(c.config, OpUpdateOne, withUpstreamRequestLogID(id))
+	return &UpstreamRequestLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
-// Delete returns a delete builder for Task.
-func (c *TaskClient) Delete() *TaskDelete {
-	mutation := newTaskMutation(c.config, OpDelete)
-	return &TaskDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+// Delete returns a delete builder for UpstreamRequestLog.
+func (c *UpstreamRequestLogClient) Delete() *UpstreamRequestLogDelete {
+	mutation := newUpstreamRequestLogMutation(c.config, OpDelete)
+	return &UpstreamRequestLogDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
 // DeleteOne returns a builder for deleting the given entity.
-func (c *TaskClient) DeleteOne(t *Task) *TaskDeleteOne {
-	return c.DeleteOneID(t.ID)
+func (c *UpstreamRequestLogClient) DeleteOne(url *UpstreamRequestLog) *UpstreamRequestLogDeleteOne {
+	return c.DeleteOneID(url.ID)
 }
 
 // DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *TaskClient) DeleteOneID(id int) *TaskDeleteOne {
-	builder := c.Delete().Where(task.ID(id))
+func (c *UpstreamRequestLogClient) DeleteOneID(id int) *UpstreamRequestLogDeleteOne {
+	builder := c.Delete().Where(upstreamrequestlog.ID(id))
 	builder.mutation.id = &id
 	builder.mutation.op = OpDeleteOne
-	return &TaskDeleteOne{builder}
+	return &UpstreamRequestLogDeleteOne{builder}
 }
 
-// Query returns a query builder for Task.
-func (c *TaskClient) Query() *TaskQuery {
-	return &TaskQuery{
+// Query returns a query builder for UpstreamRequestLog.
+func (c *UpstreamRequestLogClient) Query() *UpstreamRequestLogQuery {
+	return &UpstreamRequestLogQuery{
 		config: c.config,
-		ctx:    &QueryContext{Type: TypeTask},
+		ctx:    &QueryContext{Type: TypeUpstreamRequestLog},
 		inters: c.Interceptors(),
 	}
 }
 
-// Get returns a Task entity by its id.
-func (c *TaskClient) Get(ctx context.Context, id int) (*Task, error) {
-	return c.Query().Where(task.ID(id)).Only(ctx)
+// Get returns a UpstreamRequestLog entity by its id.
+func (c *UpstreamRequestLogClient) Get(ctx context.Context, id int) (*UpstreamRequestLog, error) {
+	return c.Query().Where(upstreamrequestlog.ID(id)).Only(ctx)
 }
 
 // GetX is like Get, but panics if an error occurs.
-func (c *TaskClient) GetX(ctx context.Context, id int) *Task {
+func (c *UpstreamRequestLogClient) GetX(ctx context.Context, id int) *UpstreamRequestLog {
 	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
@@ -1620,27 +2361,27 @@ func (c *TaskClient) GetX(ctx context.Context, id int) *Task {
 }
 
 // Hooks returns the client hooks.
-func (c *TaskClient) Hooks() []Hook {
-	return c.hooks.Task
+func (c *UpstreamRequestLogClient) Hooks() []Hook {
+	return c.hooks.UpstreamRequestLog
 }
 
 // Interceptors returns the client interceptors.
-func (c *TaskClient) Interceptors() []Interceptor {
-	return c.inters.Task
+func (c *UpstreamRequestLogClient) Interceptors() []Interceptor {
+	return c.inters.UpstreamRequestLog
 }
 
-func (c *TaskClient) mutate(ctx context.Context, m *TaskMutation) (Value, error) {
+func (c *UpstreamRequestLogClient) mutate(ctx context.Context, m *UpstreamRequestLogMutation) (Value, error) {
 	switch m.Op() {
 	case OpCreate:
-		return (&TaskCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+		return (&UpstreamRequestLogCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
 	case OpUpdate:
-		return (&TaskUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+		return (&UpstreamRequestLogUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
 	case OpUpdateOne:
-		return (&TaskUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+		return (&UpstreamRequestLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
 	case OpDelete, OpDeleteOne:
-		return (&TaskDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+		return (&UpstreamRequestLogDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
-		return nil, fmt.Errorf("ent: unknown Task mutation op: %q", m.Op())
+		return nil, fmt.Errorf("ent: unknown UpstreamRequestLog mutation op: %q", m.Op())
 	}
 }
 
@@ -2042,10 +2783,12 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 type (
 	hooks struct {
 		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, Group, ModelPrice,
-		Setting, Task, UsageLog, User []ent.Hook
+		ModelTag, OAuthClient, PaymentOrder, PaymentProviderConfig, RedemptionCode,
+		Setting, UpstreamRequestLog, UsageLog, User []ent.Hook
 	}
 	inters struct {
 		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, Group, ModelPrice,
-		Setting, Task, UsageLog, User []ent.Interceptor
+		ModelTag, OAuthClient, PaymentOrder, PaymentProviderConfig, RedemptionCode,
+		Setting, UpstreamRequestLog, UsageLog, User []ent.Interceptor
 	}
 )
