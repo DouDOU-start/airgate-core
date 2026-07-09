@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Description, Input, Label, ListBox, Select, Spinner, TextArea, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { Key } from 'lucide-react';
 import { parseIpList } from '../../../shared/utils/ip';
+import { endOfDayLocalISO } from '../../../shared/utils/format';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { CommonModal } from '../../../shared/components/CommonModal';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
@@ -31,6 +32,16 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
   const [form, setForm] = useState<CreateAPIKeyReq>(defaultForm);
   const [ipWhitelist, setIpWhitelist] = useState('');
   const [ipBlacklist, setIpBlacklist] = useState('');
+
+  // 弹窗常驻挂载：创建成功后父组件直接把 open 置 false（不经 handleClose），
+  // 这里统一在关闭时重置表单，避免下次打开残留上次输入
+  useEffect(() => {
+    if (!open) {
+      setForm(defaultForm);
+      setIpWhitelist('');
+      setIpBlacklist('');
+    }
+  }, [open]);
 
   const handleClose = () => {
     setForm(defaultForm);
@@ -67,7 +78,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
                 <span className="font-medium text-primary">{override}x</span>
               </>
             ) : (
-              <>{group.rate_multiplier}x 倍率</>
+              <>{group.rate_multiplier}x {t('api_keys.rate_suffix')}</>
             )}
           </span>
         </div>
@@ -154,7 +165,7 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
             </HeroTextField>
 
             <HeroTextField fullWidth>
-              <Label>{t('api_keys.sell_rate_label', '销售倍率')}</Label>
+              <Label>{t('api_keys.sell_rate_label')}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -162,13 +173,13 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
                 value={String(form.sell_rate ?? 0)}
                 onChange={(e) => setForm({ ...form, sell_rate: Number(e.target.value) })}
               />
-              <Description>{t('api_keys.sell_rate_hint', '留空或 0 表示按平台原价计费')}</Description>
+              <Description>{t('api_keys.sell_rate_hint')}</Description>
             </HeroTextField>
           </div>
 
           <div className="space-y-5">
             <HeroTextField fullWidth>
-              <Label>{t('api_keys.max_concurrency_label', '最大并发数')}</Label>
+              <Label>{t('api_keys.max_concurrency_label')}</Label>
               <Input
                 type="number"
                 step="1"
@@ -176,14 +187,14 @@ export function CreateKeyModal({ open, groups, onClose, onSubmit, loading }: Cre
                 value={String(form.max_concurrency ?? 0)}
                 onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
               />
-              <Description>{t('api_keys.max_concurrency_hint', '留空或 0 表示不限制')}</Description>
+              <Description>{t('api_keys.max_concurrency_hint')}</Description>
             </HeroTextField>
 
             <CommonDatePicker
               description={t('api_keys.expire_hint')}
               label={t('api_keys.expire_time')}
               value={form.expires_at ? form.expires_at.split('T')[0] : ''}
-              onChange={(value) => setForm({ ...form, expires_at: value ? `${value}T23:59:59Z` : '' })}
+              onChange={(value) => setForm({ ...form, expires_at: value ? endOfDayLocalISO(value) : '' })}
             />
 
             <HeroTextField fullWidth>

@@ -4,6 +4,7 @@ import { Button, Description, Input, Label, ListBox, Modal, Select, Spinner, Tex
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { Key } from 'lucide-react';
 import { parseIpList, formatIpList } from '../../../shared/utils/ip';
+import { endOfDayLocalISO, localDateStr } from '../../../shared/utils/format';
 import { CommonDatePicker } from '../../../shared/components/CommonDatePicker';
 import type { APIKeyResp, UpdateAPIKeyReq, GroupResp } from '../../../shared/types';
 
@@ -18,7 +19,10 @@ interface EditKeyModalProps {
 
 export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading }: EditKeyModalProps) {
   const { t } = useTranslation();
-  const [groupId, setGroupId] = useState<number>(apiKey.group_id ?? 0);
+  // 未绑定分组（null）在表单里统一归一化为 0；提交时也用同一基准比较，
+  // 避免 0 !== null 恒真而误发 group_id: 0 触发解绑。
+  const baselineGroupId = apiKey.group_id ?? 0;
+  const [groupId, setGroupId] = useState<number>(baselineGroupId);
   const [form, setForm] = useState<UpdateAPIKeyReq>({
     expires_at: apiKey.expires_at,
     max_concurrency: apiKey.max_concurrency,
@@ -33,7 +37,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
   const handleSubmit = () => {
     onSubmit({
       ...form,
-      group_id: groupId !== apiKey.group_id ? groupId : undefined,
+      group_id: groupId !== baselineGroupId ? groupId : undefined,
       ip_blacklist: parseIpList(ipBlacklist),
       ip_whitelist: parseIpList(ipWhitelist),
     });
@@ -120,7 +124,7 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
         </HeroTextField>
 
         <HeroTextField fullWidth>
-          <Label>{t('api_keys.sell_rate_label', '销售倍率')}</Label>
+          <Label>{t('api_keys.sell_rate_label')}</Label>
           <Input
             type="number"
             step="0.01"
@@ -128,11 +132,11 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
             value={String(form.sell_rate ?? 0)}
             onChange={(e) => setForm({ ...form, sell_rate: Number(e.target.value) })}
           />
-          <Description>{t('api_keys.sell_rate_hint', '留空或 0 表示按平台原价计费')}</Description>
+          <Description>{t('api_keys.sell_rate_hint')}</Description>
         </HeroTextField>
 
         <HeroTextField fullWidth>
-          <Label>{t('api_keys.max_concurrency_label', '最大并发数')}</Label>
+          <Label>{t('api_keys.max_concurrency_label')}</Label>
           <Input
             type="number"
             step="1"
@@ -140,14 +144,15 @@ export function EditKeyModal({ open, apiKey, groups, onClose, onSubmit, loading 
             value={String(form.max_concurrency ?? 0)}
             onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
           />
-          <Description>{t('api_keys.max_concurrency_hint', '留空或 0 表示不限制')}</Description>
+          <Description>{t('api_keys.max_concurrency_hint')}</Description>
         </HeroTextField>
 
         <CommonDatePicker
           description={t('api_keys.expire_hint')}
           label={t('api_keys.expire_time')}
-          value={form.expires_at ? form.expires_at.split('T')[0] : ''}
-          onChange={(value) => setForm({ ...form, expires_at: value ? `${value}T23:59:59Z` : '' })}
+          // 按本地时区回显日期，与提交侧 endOfDayLocalISO 对称，避免跨时区偏差
+          value={form.expires_at ? localDateStr(form.expires_at) : ''}
+          onChange={(value) => setForm({ ...form, expires_at: value ? endOfDayLocalISO(value) : '' })}
         />
 
         <Select

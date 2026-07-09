@@ -150,7 +150,7 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
                 <div className="max-h-[26rem] space-y-4 overflow-y-auto">
                   {normalGroups.length > 0 ? (
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercaser text-text-tertiary">
+                      <p className="mb-2 text-xs font-medium uppercase text-text-tertiary">
                         {t('users.normal_groups')}
                       </p>
                       <div className="space-y-0.5">
@@ -161,7 +161,7 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
 
                   {exclusiveGroups.length > 0 ? (
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercaser text-text-tertiary">
+                      <p className="mb-2 text-xs font-medium uppercase text-text-tertiary">
                         {t('users.exclusive_groups')}
                       </p>
                       <div className="space-y-0.5">

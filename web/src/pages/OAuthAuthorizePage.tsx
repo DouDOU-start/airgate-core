@@ -97,14 +97,17 @@ export default function OAuthAuthorizePage() {
     },
   });
 
-  // 第一方应用：拿到授权信息后静默签发授权码
+  // 第一方应用：拿到授权信息后静默签发授权码。
+  // deps 用 mutate（useMutation 返回的 mutate 引用稳定）而非 mutation 对象，
+  // 避免 mutation 状态每次变化都重跑 effect。
   const info = infoQuery.data;
+  const { mutate: fireAuthorize } = authorizeMutation;
   useEffect(() => {
     if (info?.first_party && !autoFired.current) {
       autoFired.current = true;
-      authorizeMutation.mutate();
+      fireAuthorize();
     }
-  }, [info, authorizeMutation]);
+  }, [info, fireAuthorize]);
 
   const handleDeny = () => {
     setDenied(true);

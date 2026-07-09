@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Check, Copy, Plus, Pencil, Trash2, Key, Layers, Eye, RefreshCw } from 'lucide-react';
-import { Alert, AlertDialog, Button, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
+import { Alert, Button, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
   StatusChip,
@@ -21,12 +21,15 @@ import { CommonTable } from '../../shared/components/CommonTable';
 import { MetricChips } from '../../shared/components/MetricChips';
 import { useClipboard } from '../../shared/hooks/useClipboard';
 import { useCopyFeedback } from '../../shared/hooks/useCopyFeedback';
+import { useToast } from '../../shared/ui';
 import { CreateKeyModal } from './apikeys/CreateKeyModal';
 import { EditKeyModal } from './apikeys/EditKeyModal';
 import type { APIKeyResp, GroupResp } from '../../shared/types';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
 export default function APIKeysPage() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const copy = useClipboard();
 
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.api-keys');
@@ -198,8 +201,13 @@ export default function APIKeysPage() {
                       }}
                       title={t('common.copy')}
                       onClick={async () => {
-                        const resp = await apikeysApi.reveal(row.id);
-                        if (resp.key) await copy(resp.key);
+                        // 行内 async 需自行兜错：reveal 失败时 toast 提示而不是静默吞掉
+                        try {
+                          const resp = await apikeysApi.reveal(row.id);
+                          if (resp.key) await copy(resp.key);
+                        } catch (err) {
+                          toast('error', err instanceof Error ? err.message : t('common.copy_failed'));
+                        }
                       }}
                     >
                       {row.key_prefix}...
@@ -398,39 +406,16 @@ export default function APIKeysPage() {
         />
       )}
 
-      <AlertDialog
-        isOpen={!!deletingKey}
+      <ConfirmDialog
+        open={!!deletingKey}
         onOpenChange={(open) => {
           if (!open) setDeletingKey(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('api_keys.delete_key')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('api_keys.delete_key_confirm', { name: deletingKey?.name })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDeletingKey(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteMutation.isPending}
-                  isDisabled={deleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => deletingKey && deleteMutation.mutate(deletingKey.id)}
-                >
-                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('api_keys.delete_key')}
+        description={t('api_keys.delete_key_confirm', { name: deletingKey?.name })}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deletingKey && deleteMutation.mutate(deletingKey.id)}
+      />
     </div>
   );
 }

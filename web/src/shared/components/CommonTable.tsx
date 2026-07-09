@@ -6,6 +6,7 @@ import type {
   TdHTMLAttributes,
   ThHTMLAttributes,
 } from 'react';
+import { cx } from '../utils/cx';
 
 type NativeTableProps = ComponentPropsWithoutRef<'table'>;
 
@@ -31,10 +32,6 @@ type CommonTableColumnProps = Omit<ThHTMLAttributes<HTMLTableCellElement>, 'id'>
 type CommonTableRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'id'> & {
   id?: string | number;
 };
-
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(' ');
-}
 
 function CommonTableRoot({
   ariaLabel,

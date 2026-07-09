@@ -1,7 +1,7 @@
 import { type FormEvent, useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Alert, AlertDialog, Button, Card, Form, Input, Label, Modal, Spinner, Tabs, TextArea, useOverlayState } from '@heroui/react';
+import { Alert, Button, Card, Form, Input, Label, Modal, Spinner, Tabs, TextArea, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { settingsApi } from '../../shared/api/settings';
 import { adminApiKeyApi, type AdminAPIKeyResp } from '../../shared/api/adminApiKey';
@@ -18,6 +18,7 @@ import type { SettingItem, TestSMTPReq } from '../../shared/types';
 import { SystemUpdatePanel } from './SystemUpdatePanel';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { CommonModal } from '../../shared/components/CommonModal';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
 // ==================== 设置 key 定义 ====================
 
@@ -34,6 +35,11 @@ const REG_KEYS = [
 const DEFAULT_KEYS = [
   'default_balance', 'default_concurrency',
 ] as const;
+
+// SMTP 密码哨兵值（与后端约定）：GET 返回 "********" 表示已配置；
+// 提交 "********" = 保持不变；提交空串 = 清空密码。
+// 测试邮件接口对哨兵值会回退存量密码，因此表单值一律原样提交，无需特判。
+const SMTP_PASSWORD_SENTINEL = '********';
 
 const SMTP_KEYS = [
   'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password',
@@ -122,6 +128,13 @@ export default function SettingsPage() {
     queryKey: queryKeys.settings(),
     queryFn: () => settingsApi.list(),
   });
+
+  // 服务端是否已配置 SMTP 密码（GET 返回哨兵值即视为已配置）。
+  // 用服务端快照而非表单当前值判断，保证用户清空输入框后提示仍在，
+  // 提醒「清空保存 = 删除密码」。
+  const smtpPasswordConfigured = settings?.some(
+    (s) => s.key === 'smtp_password' && s.value === SMTP_PASSWORD_SENTINEL,
+  ) ?? false;
 
   // 初始化
   useEffect(() => {
@@ -298,7 +311,7 @@ export default function SettingsPage() {
         </Tabs>
       </div>
 
-      {/* Content */}
+      {/* 内容区 */}
       <div className="flex-1 w-full flex flex-col gap-6">
         {activeTab === 'site' && (
           <Card>
@@ -438,7 +451,10 @@ export default function SettingsPage() {
                       <Field label={t('settings.smtp_username')}>
                         <Input value={val('smtp_username')} onChange={(e) => set('smtp_username', e.target.value)} />
                       </Field>
-                      <Field label={t('settings.smtp_password')}>
+                      <Field
+                        label={t('settings.smtp_password')}
+                        hint={smtpPasswordConfigured ? t('settings.smtp_password_configured') : undefined}
+                      >
                         <Input name="smtp_password" type="password" value={val('smtp_password')} onChange={(e) => set('smtp_password', e.target.value)} autoComplete="off" />
                       </Field>
                     </div>
@@ -797,63 +813,23 @@ function SecurityPanel() {
         </Modal.Backdrop>
       </Modal>
 
-      <AlertDialog isOpen={confirmRegen} onOpenChange={setConfirmRegen}>
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('settings.security_admin_key_regenerate_confirm_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('settings.security_admin_key_regenerate_confirm_msg')}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setConfirmRegen(false)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={generateMutation.isPending}
-                  isDisabled={generateMutation.isPending}
-                  variant="danger"
-                  onPress={() => generateMutation.mutate()}
-                >
-                  {generateMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+      <ConfirmDialog
+        open={confirmRegen}
+        onOpenChange={setConfirmRegen}
+        title={t('settings.security_admin_key_regenerate_confirm_title')}
+        description={t('settings.security_admin_key_regenerate_confirm_msg')}
+        loading={generateMutation.isPending}
+        onConfirm={() => generateMutation.mutate()}
+      />
 
-      <AlertDialog isOpen={confirmDelete} onOpenChange={setConfirmDelete}>
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('settings.security_admin_key_delete_confirm_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('settings.security_admin_key_delete_confirm_msg')}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setConfirmDelete(false)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteMutation.isPending}
-                  isDisabled={deleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => deleteMutation.mutate()}
-                >
-                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title={t('settings.security_admin_key_delete_confirm_title')}
+        description={t('settings.security_admin_key_delete_confirm_msg')}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate()}
+      />
     </>
   );
 }
@@ -946,9 +922,14 @@ function EmailTemplateEditor({
                         <span className="font-medium text-text">{replaceVars(subject)}</span>
                       </div>
                     </div>
-                    <div className="max-h-[60vh] overflow-y-auto bg-[#f8f9fa] p-5">
-                      <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
-                    </div>
+                    {/* 用无任何权限的 sandbox iframe 隔离渲染模板 HTML，防脚本执行；
+                        srcDoc 内联浅色底与内边距，保持原预览样式 */}
+                    <iframe
+                      sandbox=""
+                      title={t('settings.template_preview')}
+                      className="block h-[60vh] w-full border-0 bg-[#f8f9fa]"
+                      srcDoc={`<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;padding:20px;background:#f8f9fa;font-family:system-ui,-apple-system,sans-serif;}</style></head><body>${previewHtml}</body></html>`}
+                    />
                   </div>
                 </Modal.Body>
                 <Modal.Footer>
@@ -1033,7 +1014,7 @@ function LogoUpload({ value, onChange }: { value: string; onChange: (url: string
   );
 }
 
-// ==================== Field wrapper ====================
+// ==================== 表单字段包装 ====================
 
 function SettingsSection({
   action,

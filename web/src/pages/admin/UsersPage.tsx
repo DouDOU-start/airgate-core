@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, Spinner, TextField as HeroTextField } from '@heroui/react';
-import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
+import { Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, TextField as HeroTextField } from '@heroui/react';
 import { usersApi } from '../../shared/api/users';
 import { settingsApi } from '../../shared/api/settings';
 import { usePagination } from '../../shared/hooks/usePagination';
@@ -25,6 +24,7 @@ import { UserApiKeysModal } from './users/UserApiKeysModal';
 import { BalanceHistoryModal } from './users/BalanceHistoryModal';
 import { UserGroupsModal } from './users/UserGroupsModal';
 import type { UserResp } from '../../shared/types';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import {
   Plus, Search, Pencil, MoreHorizontal, RefreshCw,
   Key, Users, PlusCircle, MinusCircle, Clock, Trash2,
@@ -412,73 +412,27 @@ export default function UsersPage() {
         />
       )}
 
-      <AlertDialog
-        isOpen={!!disablingUser}
+      <ConfirmDialog
+        open={!!disablingUser}
         onOpenChange={(open) => {
           if (!open) setDisablingUser(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('users.disable_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('users.disable_confirm', { email: disablingUser?.email })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDisablingUser(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={toggleMutation.isPending}
-                  isDisabled={toggleMutation.isPending}
-                  variant="danger"
-                  onPress={() => disablingUser && toggleMutation.mutate(disablingUser.id)}
-                >
-                  {toggleMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('users.disable_title')}
+        description={t('users.disable_confirm', { email: disablingUser?.email })}
+        loading={toggleMutation.isPending}
+        onConfirm={() => disablingUser && toggleMutation.mutate(disablingUser.id)}
+      />
 
-      <AlertDialog
-        isOpen={!!deletingUser}
+      <ConfirmDialog
+        open={!!deletingUser}
         onOpenChange={(open) => {
           if (!open) setDeletingUser(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('users.delete_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('users.delete_confirm', { email: deletingUser?.email })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDeletingUser(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteMutation.isPending}
-                  isDisabled={deleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => deletingUser && deleteMutation.mutate(deletingUser.id)}
-                >
-                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('users.delete_title')}
+        description={t('users.delete_confirm', { email: deletingUser?.email })}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deletingUser && deleteMutation.mutate(deletingUser.id)}
+      />
 
       {apiKeysUser && (
         <UserApiKeysModal open user={apiKeysUser} onClose={() => setApiKeysUser(null)} />

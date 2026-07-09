@@ -5,14 +5,11 @@ import type { UsageColumnConfig, UsageRow } from '../columns/usageColumns';
 import { getTotalPages } from '../utils/pagination';
 import { TableLoadingRow } from './TableLoadingRow';
 import { TablePaginationFooter } from './TablePaginationFooter';
+import { cx } from '../utils/cx';
 
 const FULL_CELL_CONTENT_COLUMNS = new Set(['cost', 'tokens']);
 const LEFT_ALIGNED_CONTENT_COLUMNS = new Set<string>(['model']);
 const NEW_ROW_ANIMATION_NAME = 'ag-usage-row-new-enter';
-
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(' ');
-}
 
 function parseColumnWidth(width?: string): number {
   const match = width?.match(/^(\d+(?:\.\d+)?)px$/);

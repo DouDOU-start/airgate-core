@@ -11,7 +11,6 @@ const statusMap: Record<string, { color: ChipColor; label: string }> = {
   error: { color: 'danger', label: 'status.error' },
   expired: { color: 'warning', label: 'status.expired' },
   failed: { color: 'danger', label: 'status.failed' },
-  installed: { color: 'accent', label: 'status.installed' },
   paid: { color: 'success', label: 'status.paid' },
   pending: { color: 'accent', label: 'status.pending' },
   suspended: { color: 'warning', label: 'status.suspended' },

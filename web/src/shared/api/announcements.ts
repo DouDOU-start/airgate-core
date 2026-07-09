@@ -20,7 +20,6 @@ export const announcementsApi = {
   // 管理员接口
   list: (params: { page: number; page_size: number; keyword?: string; status?: string }) =>
     get<PagedData<AnnouncementResp>>('/api/v1/admin/announcements', params),
-  get: (id: number) => get<AnnouncementResp>(`/api/v1/admin/announcements/${id}`),
   create: (data: CreateAnnouncementReq) =>
     post<AnnouncementResp>('/api/v1/admin/announcements', data),
   update: (id: number, data: UpdateAnnouncementReq) =>

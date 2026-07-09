@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Description, Input, Label, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
@@ -24,8 +24,7 @@ export function GroupFormModal({
   const { t } = useTranslation();
   const isEdit = !!group;
 
-  const [form, setForm] = useState({
-    force_instructions: group?.force_instructions ?? '',
+  const buildForm = () => ({
     is_exclusive: group?.is_exclusive ?? false,
     name: group?.name ?? '',
     note: group?.note ?? '',
@@ -34,14 +33,18 @@ export function GroupFormModal({
     status_visible: group?.status_visible ?? true,
   });
 
+  const [form, setForm] = useState(buildForm);
+
+  // 弹窗常驻挂载：关闭时把表单重置回初始值，避免下次打开残留上次输入
+  useEffect(() => {
+    if (!open) {
+      setForm(buildForm());
+    }
+  }, [open, group]);
+
   const handleSubmit = () => {
     if (!isEdit && !form.name) return;
-
-    onSubmit({
-      ...form,
-      force_instructions: form.force_instructions ?? '',
-      note: form.note,
-    });
+    onSubmit(form);
   };
 
   const modalState = useOverlayState({

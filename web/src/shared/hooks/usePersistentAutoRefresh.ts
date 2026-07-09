@@ -51,7 +51,7 @@ export function usePersistentAutoRefresh(key: string, defaultValue = 0, options:
     try {
       window.localStorage.setItem(key, String(value));
     } catch {
-      // localStorage can be unavailable in restricted browser modes.
+      // 受限浏览器模式下 localStorage 可能不可用，静默忽略。
     }
   }, [key, value]);
 

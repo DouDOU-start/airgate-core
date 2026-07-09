@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
-  AlertDialog, Button, Card, Checkbox, Chip, EmptyState, Input, Label, ListBox,
+  Button, Card, Checkbox, Chip, EmptyState, Input, Label, ListBox,
   Modal, Select, Spinner, TextArea, TextField as HeroTextField, Tabs, useOverlayState,
 } from '@heroui/react';
 import {
@@ -18,11 +18,13 @@ import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useToast } from '../../shared/ui';
 import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
 import { getTotalPages } from '../../shared/utils/pagination';
+import { formatDateTime } from '../../shared/utils/format';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import type {
   PaymentOrderStatus, PaymentProviderItem, PaymentProviderKindMeta,
   SettingItem, UpsertPaymentProviderReq,
@@ -259,7 +261,7 @@ function OrdersTab() {
           ) : (
             rows.map((row) => (
               <CommonTable.Row id={row.out_trade_no} key={row.out_trade_no}>
-                <CommonTable.Cell>{new Date(row.created_at).toLocaleString()}</CommonTable.Cell>
+                <CommonTable.Cell>{formatDateTime(row.created_at)}</CommonTable.Cell>
                 <CommonTable.Cell>
                   <span className="font-mono text-xs text-text-secondary">{row.out_trade_no}</span>
                 </CommonTable.Cell>
@@ -742,41 +744,16 @@ function ConfigTab() {
       )}
 
       {/* 删除确认 */}
-      <AlertDialog
-        isOpen={!!deleteTarget}
+      <ConfirmDialog
+        open={!!deleteTarget}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('payment.provider_delete_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>
-                {t('payment.provider_delete_confirm', { name: deleteTarget?.name || deleteTarget?.id })}
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDeleteTarget(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteMutation.isPending}
-                  isDisabled={deleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-                >
-                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('payment.provider_delete_title')}
+        description={t('payment.provider_delete_confirm', { name: deleteTarget?.name || deleteTarget?.id })}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

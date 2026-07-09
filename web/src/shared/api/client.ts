@@ -3,27 +3,38 @@ import i18n from '../../i18n';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
-// Token 管理
-function readBrowserStorage(kind: 'localStorage' | 'sessionStorage', key: string): string | null {
+// 旧版本曾把 API Key 登录的明文 Key 写入 sessionStorage（key: apikey_session_secret），
+// 现已改为仅存内存变量；模块加载时清理历史残留，避免明文密钥继续留在浏览器存储中。
+try {
+  if (typeof window !== 'undefined') {
+    window.sessionStorage.removeItem('apikey_session_secret');
+  }
+} catch {
+  // 隐私模式或受限浏览器下 Storage 可能不可用，静默忽略。
+}
+
+// Token 管理：特化为 localStorage 专用函数（不接受 storage 种类参数），
+// 防止后人顺手把敏感值写回 sessionStorage。
+function readLocalStorage(key: string): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    return window[kind].getItem(key);
+    return window.localStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
-function writeBrowserStorage(kind: 'localStorage' | 'sessionStorage', key: string, value: string | null) {
+function writeLocalStorage(key: string, value: string | null) {
   if (typeof window === 'undefined') return;
   try {
-    if (value == null) window[kind].removeItem(key);
-    else window[kind].setItem(key, value);
+    if (value == null) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, value);
   } catch {
-    // Storage can be unavailable in private mode or locked-down browsers.
+    // 隐私模式或受限浏览器下 Storage 可能不可用，静默忽略。
   }
 }
 
-let accessToken: string | null = readBrowserStorage('localStorage', 'token');
+let accessToken: string | null = readLocalStorage('token');
 
 interface TokenClaims {
   role?: string;
@@ -33,7 +44,7 @@ interface TokenClaims {
 
 export function setToken(token: string | null) {
   accessToken = token;
-  writeBrowserStorage('localStorage', 'token', token);
+  writeLocalStorage('token', token);
 }
 
 export function getToken(): string | null {
@@ -68,16 +79,17 @@ export function getTokenAPIKeyID(token = accessToken): number | null {
   return typeof id === 'number' && id > 0 ? id : null;
 }
 
-// API Key 登录场景下用户输入的原文 Key，仅保留在 sessionStorage 内，
-// 退出登录或关闭浏览器即清除。供 CCS 导入等需要原文 Key 的客户端功能使用。
-const API_KEY_SECRET_STORAGE = 'apikey_session_secret';
+// API Key 登录场景下用户输入的原文 Key，仅保留在模块级内存变量中（不落任何
+// Web Storage，避免明文密钥被持久化）。页面刷新后丢失，属可接受降级；
+// 供 CCS 导入等需要原文 Key 的客户端功能使用。
+let sessionAPIKeySecret: string | null = null;
 
 export function setSessionAPIKey(key: string | null) {
-  writeBrowserStorage('sessionStorage', API_KEY_SECRET_STORAGE, key);
+  sessionAPIKeySecret = key;
 }
 
 export function getSessionAPIKey(): string | null {
-  return readBrowserStorage('sessionStorage', API_KEY_SECRET_STORAGE);
+  return sessionAPIKeySecret;
 }
 
 // 查询参数类型

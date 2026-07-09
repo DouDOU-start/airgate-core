@@ -56,47 +56,7 @@ export const USER_IDLE_PRELOADS = [
   UserOverviewPage,
 ];
 
-const ROUTE_PRELOADS = new Map<string, AnyPreloadableLazyComponent[]>([
-  ['/', [DashboardPage, UserOverviewPage]],
-  ['/home', [PublicHomePage]],
-  ['/login', [LoginPage]],
-  ['/setup', [SetupPage]],
-  ['/docs', [DocsPage]],
-  ['/profile', [ProfilePage]],
-  ['/keys', [UserKeysPage]],
-  ['/usage', [UserUsagePage]],
-  ['/recharge', [RechargePage]],
-  ['/admin/users', [UsersPage]],
-  ['/admin/channels', [ChannelsPage]],
-  ['/admin/model-prices', [ModelPricesPage]],
-  ['/admin/groups', [GroupsPage]],
-  ['/admin/announcements', [AnnouncementsPage]],
-  ['/admin/usage', [UsagePage]],
-  ['/admin/payment', [PaymentPage]],
-  ['/admin/redemption', [RedemptionCodesPage]],
-  ['/admin/settings', [SettingsPage]],
-  ['/admin/oauth-clients', [OAuthClientsPage]],
-  ['/oauth/authorize', [OAuthAuthorizePage]],
-]);
-
-function normalizePreloadPath(path: string) {
-  const [pathname = '/'] = path.split(/[?#]/, 1);
-  return pathname || '/';
-}
-
-export function preloadRoutePage(
-  page: AnyPreloadableLazyComponent,
-  options: { deep?: boolean } = {},
-) {
-  return page.preload().then((module) => (
-    options.deep === false ? undefined : module.preloadUserUsageContent?.()
-  ));
-}
-
-export function preloadRoutePath(path: string, options: { deep?: boolean } = {}) {
-  const pathname = normalizePreloadPath(path);
-  const pages = ROUTE_PRELOADS.get(pathname);
-
-  if (!pages?.length) return Promise.resolve();
-  return Promise.all(pages.map((page) => preloadRoutePage(page, options))).then(() => undefined);
+// 预加载路由 chunk，并顺带深预载页面导出的子内容模块（如 UserUsagePage 的用量内容）
+export function preloadRoutePage(page: AnyPreloadableLazyComponent) {
+  return page.preload().then((module) => module.preloadUserUsageContent?.());
 }

@@ -29,7 +29,6 @@ const UsageTokenTrendChart = lazy(() =>
   import('./usage/UsageCharts').then((m) => ({ default: m.UsageTokenTrendChart })),
 );
 
-const PIE_COLORS = PIE_CHART_COLORS;
 
 function SectionCard({
   children,
@@ -183,7 +182,7 @@ function DistributionCard({
                 render: (item, index) => (
                   <>
                     <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_CHART_COLORS[index % PIE_CHART_COLORS.length] }} />
                     <span className="min-w-0 truncate font-medium text-text" title={item.name}>{item.name}</span>
                   </>
                 ),
@@ -288,7 +287,7 @@ function GroupStatsCard({
               render: (row, index) => (
                 <>
                   <span className="shrink-0 font-mono text-[11px] font-semibold text-text-tertiary">#{index + 1}</span>
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_CHART_COLORS[index % PIE_CHART_COLORS.length] }} />
                   <span className="min-w-0 truncate font-medium text-text" title={row.name}>{row.name}</span>
                 </>
               ),
@@ -956,7 +955,7 @@ export default function UsagePage() {
         ) : undefined}
         emptyDescription={filters.start_date || filters.end_date
           ? t('usage.empty_in_range')
-          : t('usage.empty_description', '调整筛选条件后重试')}
+          : t('usage.empty_description')}
         emptyTitle={t('common.no_data')}
         highlightNewRows={pageActive && autoRefreshEnabled && page === 1}
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}

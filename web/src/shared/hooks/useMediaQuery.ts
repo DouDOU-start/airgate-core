@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-/** SSR-safe media query hook */
+/** SSR 安全的媒体查询 hook */
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -18,7 +18,7 @@ export function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-/** Convenience: true when viewport < 768px */
+/** 便捷封装：视口宽度 < 768px 时为 true */
 export function useIsMobile(): boolean {
   return useMediaQuery('(max-width: 767px)');
 }

@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { cx } from '../utils/cx';
 
 interface NativeSwitchProps {
   ariaLabel?: string;
@@ -26,8 +27,8 @@ export function NativeSwitch({
   onChange,
 }: NativeSwitchProps) {
   const content = label ?? children;
-  const rootClassName = ['ag-native-switch', className].filter(Boolean).join(' ');
-  const labelClassName = ['ag-native-switch-content', contentClassName].filter(Boolean).join(' ');
+  const rootClassName = cx('ag-native-switch', className);
+  const labelClassName = cx('ag-native-switch-content', contentClassName);
 
   return (
     <label className={rootClassName} data-disabled={isDisabled ? 'true' : 'false'}>

@@ -142,7 +142,7 @@ export function SystemUpdatePanel() {
       );
     }
 
-    // noop
+    // 无可用更新（noop）
     return (
       <div className="text-xs text-text-tertiary">
         {t('settings.system_noop_hint')}
@@ -171,7 +171,7 @@ export function SystemUpdatePanel() {
           {/* 版本对照 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-xl border border-border bg-bg-subtle px-4 py-3">
-              <div className="text-[10px] uppercaser text-text-tertiary mb-1">
+              <div className="text-[10px] uppercase text-text-tertiary mb-1">
                 {t('settings.system_current_version')}
               </div>
               <div className="text-lg font-mono font-semibold text-text">
@@ -185,7 +185,7 @@ export function SystemUpdatePanel() {
             </div>
             <div className="rounded-xl border border-border bg-bg-subtle px-4 py-3">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] uppercaser text-text-tertiary">
+                <span className="text-[10px] uppercase text-text-tertiary">
                   {t('settings.system_latest_version')}
                 </span>
                 {renderStateBadge()}
@@ -215,7 +215,7 @@ export function SystemUpdatePanel() {
             )}
           </div>
 
-        {/* Release notes */}
+        {/* 版本说明 */}
         {info?.release_notes && (
           <details className="rounded-xl border border-border bg-bg-subtle">
             <summary className="px-4 py-3 cursor-pointer text-xs font-medium text-text-secondary select-none">

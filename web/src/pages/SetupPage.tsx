@@ -14,6 +14,7 @@ import StepDatabase from './setup/StepDatabase';
 import StepRedis from './setup/StepRedis';
 import StepAdmin from './setup/StepAdmin';
 import StepFinish from './setup/StepFinish';
+import { cx } from '../shared/utils/cx';
 
 // ==================== 步骤配置 ====================
 //
@@ -47,13 +48,12 @@ function Stepper({ current, steps }: { current: number; steps: StepKey[] }) {
           <div key={key} className="flex items-center">
             <div className="flex flex-col items-center">
               <div
-                className={[
+                className={cx(
                   'relative flex items-center justify-center w-9 h-9 rounded-[var(--radius)] border transition-colors duration-150',
                   isCompleted || isCurrent
                     ? 'border-primary bg-primary text-text-inverse'
                     : 'border-glass-border bg-surface text-text-tertiary',
-                  '',
-                ].filter(Boolean).join(' ')}
+                )}
               >
                 {isCompleted ? (
                   <CheckCircle2 className="w-4 h-4 text-text-inverse" />
@@ -62,20 +62,20 @@ function Stepper({ current, steps }: { current: number; steps: StepKey[] }) {
                 )}
               </div>
               <span
-                className={[
+                className={cx(
                   'text-[10px] mt-1.5 whitespace-nowrap font-medium font-mono uppercase transition-colors',
                   isCompleted || isCurrent ? 'text-primary' : 'text-text-tertiary',
-                ].join(' ')}
+                )}
               >
                 {t(step.labelKey)}
               </span>
             </div>
             {index < steps.length - 1 && (
               <div
-                className={[
+                className={cx(
                   'w-12 h-px mx-2.5 mb-5 rounded-[var(--radius)] transition-colors duration-150',
                   isCompleted ? 'bg-primary' : 'bg-glass-border',
-                ].join(' ')}
+                )}
               />
             )}
           </div>

@@ -21,7 +21,7 @@ function writeSetupCompleteCache(value: boolean) {
     if (value) window.localStorage.setItem(SETUP_COMPLETE_STORAGE_KEY, 'true');
     else window.localStorage.removeItem(SETUP_COMPLETE_STORAGE_KEY);
   } catch {
-    // Storage can be unavailable; the in-memory cache still covers this session.
+    // Storage 可能不可用（隐私模式等）；本次会话仍有内存缓存兜底。
   }
 }
 
@@ -55,14 +55,6 @@ export function withSetupCheck(handler: (needs: boolean) => void): void | Promis
   const result = checkSetup();
   if (result instanceof Promise) return result.then(handler);
   return handler(result);
-}
-
-// 需要强制重新检查安装状态时调用。
-export function resetSetupCache() {
-  setupChecked = false;
-  needsSetup = false;
-  setupCheckPromise = null;
-  writeSetupCompleteCache(false);
 }
 
 // 安装完成后调用，直接标记 setup 已完成，避免跳转登录页前再次阻塞 /setup/status。

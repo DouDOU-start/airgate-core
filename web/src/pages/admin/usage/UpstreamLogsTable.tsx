@@ -7,6 +7,7 @@ import { upstreamLogsApi } from '../../../shared/api/upstreamLogs';
 import { queryKeys } from '../../../shared/queryKeys';
 import { usePagination } from '../../../shared/hooks/usePagination';
 import { getTotalPages } from '../../../shared/utils/pagination';
+import { formatDate, formatTime } from '../../../shared/utils/format';
 import { TablePaginationFooter } from '../../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../../shared/components/CommonTable';
@@ -108,8 +109,8 @@ function LogRow({ row }: { row: UpstreamLogResp }) {
     <CommonTable.Row id={String(row.id)}>
       <CommonTable.Cell>
         <div className="font-mono text-xs leading-tight" title={row.request_id ? `request_id: ${row.request_id}` : undefined}>
-          <div className="text-text">{date.toLocaleTimeString('zh-CN', { hour12: false })}</div>
-          <div className="text-text-tertiary">{date.toLocaleDateString('zh-CN')}</div>
+          <div className="text-text">{formatTime(date)}</div>
+          <div className="text-text-tertiary">{formatDate(date)}</div>
         </div>
       </CommonTable.Cell>
       <CommonTable.Cell>
@@ -240,17 +241,18 @@ function ChannelCell({ row }: { row: UpstreamLogResp }) {
 }
 
 function HopLine({ hop }: { hop: UpstreamAttemptHop }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-[var(--radius)] bg-bg-hover px-2 py-1 font-mono text-[11px] leading-relaxed">
       <span className="text-text">
-        #{hop.seq} {hop.channel_name || `渠道${hop.channel_id}`}
+        #{hop.seq} {hop.channel_name || t('upstream_logs.channel_fallback', { id: hop.channel_id })}
         {hop.key_hint ? ` (${hop.key_hint})` : ''}
       </span>
       <span className="text-text-tertiary">
         {' '}· {hop.verdict}
         {hop.upstream_status ? ` · HTTP ${hop.upstream_status}` : ''}
         {typeof hop.latency_ms === 'number' && hop.latency_ms > 0 ? ` · ${hop.latency_ms}ms` : ''}
-        {hop.auto_disabled ? ' · 触发自动禁用' : ''}
+        {hop.auto_disabled ? ` · ${t('upstream_logs.auto_disabled')}` : ''}
       </span>
       {hop.reason && <div className="break-all text-text-secondary">{hop.reason}</div>}
     </div>

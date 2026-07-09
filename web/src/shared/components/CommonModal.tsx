@@ -1,6 +1,7 @@
 import type { ComponentProps, CSSProperties, ReactNode } from 'react';
 import { Modal, Surface } from '@heroui/react';
 import { DialogTriggerShim } from './DialogTriggerShim';
+import { cx } from '../utils/cx';
 
 type ModalContainerProps = ComponentProps<typeof Modal.Container>;
 type ModalRootProps = ComponentProps<typeof Modal>;
@@ -22,10 +23,6 @@ interface CommonModalProps {
   surface?: boolean;
   surfaceClassName?: string;
   title: ReactNode;
-}
-
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(' ');
 }
 
 export function CommonModal({

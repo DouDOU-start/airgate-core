@@ -5,7 +5,7 @@ import { apikeysApi } from '../../shared/api/apikeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { groupsApi } from '../../shared/api/groups';
 import { useToast } from '../../shared/ui';
-import { Alert, AlertDialog, Button, Dropdown, EmptyState, Modal, Spinner, useOverlayState } from '@heroui/react';
+import { Alert, Button, Dropdown, EmptyState, Modal, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import {
   StatusChip,
@@ -44,6 +44,8 @@ import { CreateKeyModal } from './userkeys/CreateKeyModal';
 import { UseKeyModal, useUseKeyModal } from './userkeys/UseKeyModal';
 import { CcsImportModal, useCcsImportModal } from './userkeys/CcsImportModal';
 import { type KeyForm, emptyForm } from './userkeys/types';
+import { endOfDayLocalISO, formatDate, localDateStr } from '../../shared/utils/format';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
 export default function UserKeysPage() {
   const { t } = useTranslation();
@@ -155,7 +157,8 @@ export default function UserKeysPage() {
       quota_usd: key.quota_usd ? String(key.quota_usd) : '',
       sell_rate: key.sell_rate ? String(key.sell_rate) : '',
       max_concurrency: key.max_concurrency ? String(key.max_concurrency) : '',
-      expires_at: key.expires_at ? key.expires_at.slice(0, 10) : '',
+      // 按本地时区回填日期，与提交侧 endOfDayLocalISO 对称，避免跨时区漂移
+      expires_at: key.expires_at ? localDateStr(key.expires_at) : '',
     });
     setModalOpen(true);
   }
@@ -176,8 +179,16 @@ export default function UserKeysPage() {
       return;
     }
 
-    // 后端要求 RFC3339 格式；空字符串表示显式清除过期时间
-    const expiresAt = form.expires_at ? `${form.expires_at}T23:59:59Z` : '';
+    // 后端要求 RFC3339 格式；空字符串表示显式清除过期时间。
+    // 编辑态下若日期未改动，原样传回原 RFC3339 值，避免「回填→重编码」在
+    // 重复保存时把过期时刻反复重算而产生漂移。
+    let expiresAt = '';
+    if (form.expires_at) {
+      const original = editingKey?.expires_at;
+      expiresAt = original && localDateStr(original) === form.expires_at
+        ? original
+        : endOfDayLocalISO(form.expires_at);
+    }
 
     if (editingKey) {
       const payload: UpdateAPIKeyReq = {
@@ -224,7 +235,7 @@ export default function UserKeysPage() {
           <span className="text-primary font-medium">{override}x</span>
         </span>
       ) : (
-        <span className="text-text-tertiary">{g.rate_multiplier}x {t('user_keys.rate_suffix', '倍率')}</span>
+        <span className="text-text-tertiary">{g.rate_multiplier}x {t('user_keys.rate_suffix')}</span>
       ),
     };
   }), [groupList, t, userGroupRates]);
@@ -362,8 +373,13 @@ export default function UserKeysPage() {
                       className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-sm border border-glass-border bg-surface text-text-secondary font-mono cursor-pointer transition-colors hover:border-accent hover:text-accent"
                       title={t('common.copy')}
                       onClick={async () => {
-                        const resp = await apikeysApi.reveal(row.id);
-                        if (resp.key) await copy(resp.key);
+                        // 行内 async 需自行兜错：reveal 失败时 toast 提示而不是静默吞掉
+                        try {
+                          const resp = await apikeysApi.reveal(row.id);
+                          if (resp.key) await copy(resp.key);
+                        } catch (err) {
+                          toast('error', err instanceof Error ? err.message : t('common.copy_failed'));
+                        }
                       }}
                     >
                       <Key className="w-3 h-3 text-text-tertiary" />
@@ -473,7 +489,7 @@ export default function UserKeysPage() {
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     {row.expires_at
-                      ? new Date(row.expires_at).toLocaleDateString('zh-CN')
+                      ? formatDate(row.expires_at)
                       : t('user_keys.never_expire')}
                   </CommonTable.Cell>
                   <CommonTable.Cell>
@@ -650,39 +666,16 @@ export default function UserKeysPage() {
       />
 
       {/* 删除确认 */}
-      <AlertDialog
-        isOpen={!!deleteTarget}
+      <ConfirmDialog
+        open={!!deleteTarget}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('user_keys.delete_key')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('user_keys.delete_confirm', { name: deleteTarget?.name })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDeleteTarget(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteMutation.isPending}
-                  isDisabled={deleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-                >
-                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('user_keys.delete_key')}
+        description={t('user_keys.delete_confirm', { name: deleteTarget?.name })}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

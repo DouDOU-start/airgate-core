@@ -57,7 +57,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', '@tanstack/react-router', '@tanstack/react-query', 'i18next', 'react-i18next'],
-          ui: ['@heroui/react', '@heroui/styles', 'lucide-react', 'motion'],
+          ui: ['@heroui/react', '@heroui/styles', 'lucide-react'],
           charts: ['recharts'],
           markdown: ['react-markdown', 'remark-gfm'],
         },
@@ -97,10 +97,9 @@ export default defineConfig({
       // OpenAI 兼容接口（含 WebSocket）
       '/v1': { target: BACKEND, ws: true },
       '/responses': { target: BACKEND, ws: true },
-      // /chat 既是 SPA 全屏对话页（GET /chat），也是 OpenAI 兼容裸路径（POST
-      // /chat/completions）的兜底代理。bypass：纯 /chat 与 /chat/ 让 vite 走
-      // SPA fallback；其余 /chat/<sub> 才转给后端，避免刷新页面时被代理到 core
-      // 拿不到 SPA 而白屏。
+      // /chat 是 OpenAI 兼容裸路径（POST /chat/completions）的兜底代理。
+      // 前端已无 /chat 页面，但保留 bypass：纯 /chat 与 /chat/ 仍走 vite 的
+      // SPA fallback（渲染 404 路由），仅 /chat/<sub> 转给后端。
       '/chat': {
         target: BACKEND,
         ws: true,

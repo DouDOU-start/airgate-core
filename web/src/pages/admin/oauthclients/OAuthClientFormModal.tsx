@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -41,7 +41,7 @@ export function OAuthClientFormModal({
 }) {
   const { t } = useTranslation();
 
-  const [form, setForm] = useState({
+  const buildForm = () => ({
     name: client?.name ?? '',
     description: client?.description ?? '',
     redirect_uris: (client?.redirect_uris ?? []).join('\n'),
@@ -52,6 +52,15 @@ export function OAuthClientFormModal({
     enabled: client?.enabled ?? true,
     show_in_nav: client?.show_in_nav ?? true,
   });
+
+  const [form, setForm] = useState(buildForm);
+
+  // 弹窗常驻挂载：关闭（含提交成功后父组件收起）时重置表单，避免下次打开残留上次输入
+  useEffect(() => {
+    if (!open) {
+      setForm(buildForm());
+    }
+  }, [open, client]);
 
   const handleSubmit = () => {
     onSubmit({

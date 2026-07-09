@@ -16,7 +16,6 @@ import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { CostValue } from '../../shared/components/CostValue';
 import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../../shared/constants';
 
-const PIE_COLORS = PIE_CHART_COLORS;
 const TOKEN_TREND_LINE_ORDER = ['input', 'output', 'cacheRead'] as const;
 
 type PieTooltipPayload = Array<{
@@ -273,7 +272,7 @@ export default function UserOverviewPage() {
               {models.length > 0 ? (
                 <PieChart width={176} height={176}>
                   <Pie data={models.map((m) => ({ name: m.model, value: m.tokens }))} cx="50%" cy="50%" innerRadius={42} outerRadius={68} dataKey="value" isAnimationActive={false} minAngle={3} stroke="var(--ag-surface)" strokeWidth={2}>
-                    {models.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    {models.map((_, i) => <Cell key={i} fill={PIE_CHART_COLORS[i % PIE_CHART_COLORS.length]} />)}
                   </Pie>
                   <RechartsTooltip
                     animationDuration={0}
@@ -302,7 +301,7 @@ export default function UserOverviewPage() {
                     render: (row, index) => (
                       <>
                         <span className="shrink-0 font-mono text-[11px] font-semibold text-text">#{index + 1}</span>
-                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_CHART_COLORS[index % PIE_CHART_COLORS.length] }} />
                         <span className="min-w-0 truncate font-medium text-text" title={row.model}>{row.model}</span>
                       </>
                     ),

@@ -163,7 +163,7 @@ export default function DocsPage() {
           </Link>
           <div className="flex items-center gap-2">
             <Button
-              aria-label={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+              aria-label={theme === 'dark' ? t('common.toggle_theme_light') : t('common.toggle_theme_dark')}
               isIconOnly
               size="sm"
               variant="ghost"
@@ -190,7 +190,7 @@ export default function DocsPage() {
           <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-2">
             <div className="flex items-center gap-2 mb-3 text-text-secondary">
               <BookOpen className="w-4 h-4" />
-              <span className="text-xs font-semibold uppercaser">{t('docs.toc')}</span>
+              <span className="text-xs font-semibold uppercase">{t('docs.toc')}</span>
             </div>
             <nav className="space-y-0.5">
               {toc.map((item, idx) => (
@@ -391,6 +391,7 @@ function extractH2(md: string): TocItem[] {
 // ==================== Code block ====================
 
 function CodeBlock({ code, language }: { code: string; language: string }): ReactNode {
+  const { t } = useTranslation();
   const copy = useClipboard();
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
@@ -401,14 +402,14 @@ function CodeBlock({ code, language }: { code: string; language: string }): Reac
   return (
     <div className="my-4 rounded-xl border border-glass-border bg-bg-elevated overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-surface">
-        <span className="text-[11px] uppercaser text-text-tertiary">{language}</span>
+        <span className="text-[11px] uppercase text-text-tertiary">{language}</span>
         <Button
           size="sm"
           variant="ghost"
           onPress={handleCopy}
         >
           {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t('docs.copied') : t('docs.copy')}
         </Button>
       </div>
       <pre className="px-4 py-3 overflow-x-auto text-[12px] font-mono text-text leading-relaxed">

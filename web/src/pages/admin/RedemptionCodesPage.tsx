@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertDialog, Button, Chip, EmptyState, Input, Label, ListBox, Modal, Select,
+  Button, Chip, EmptyState, Input, Label, ListBox, Modal, Select,
   Spinner, TextField as HeroTextField, useOverlayState,
 } from '@heroui/react';
 import {
@@ -22,6 +22,7 @@ import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { formatDateTime } from '../../shared/utils/format';
 import type { GenerateRedemptionCodesReq, RedemptionCode, RedemptionCodeStatus } from '../../shared/types';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
 // 状态徽章配色
 const STATUS_CHIP_COLORS: Record<RedemptionCodeStatus, 'success' | 'default' | 'warning' | 'danger'> = {
@@ -503,39 +504,16 @@ export default function RedemptionCodesPage() {
       )}
 
       {/* 删除确认 */}
-      <AlertDialog
-        isOpen={!!deletingCode}
+      <ConfirmDialog
+        open={!!deletingCode}
         onOpenChange={(open) => {
           if (!open) setDeletingCode(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('redemption.delete_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('redemption.delete_confirm', { code: deletingCode?.code })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDeletingCode(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteMutation.isPending}
-                  isDisabled={deleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => deletingCode && deleteMutation.mutate(deletingCode.id)}
-                >
-                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('redemption.delete_title')}
+        description={t('redemption.delete_confirm', { code: deletingCode?.code })}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deletingCode && deleteMutation.mutate(deletingCode.id)}
+      />
     </div>
   );
 }

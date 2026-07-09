@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import DOMPurify from 'dompurify';
 import { Button, Card, Link as HeroLink } from '@heroui/react';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
 import { useTheme } from '../app/providers/ThemeProvider';
@@ -17,6 +19,11 @@ export default function HomePage() {
   const isLoggedIn = !!getToken();
   // 文档链接 fallback：管理员未填外部 doc_url 时回退到内置 /docs（详见 docUrl.ts）
   const docs = effectiveDocUrl(site.doc_url);
+  // 自定义首页内容为管理员可编辑的富文本，注入前统一经 DOMPurify 白名单消毒，防存储型 XSS
+  const safeHomeContent = useMemo(
+    () => (site.home_content ? DOMPurify.sanitize(site.home_content, { USE_PROFILES: { html: true } }) : ''),
+    [site.home_content],
+  );
 
   const features = [
     { icon: <Zap className="w-6 h-6" />, titleKey: 'home.feature_gateway', descKey: 'home.feature_gateway_desc' },
@@ -44,7 +51,7 @@ export default function HomePage() {
             {t('home.docs')}
           </HeroLink>
           <Button
-            aria-label={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+            aria-label={theme === 'dark' ? t('common.toggle_theme_light') : t('common.toggle_theme_dark')}
             isIconOnly
             size="sm"
             variant="ghost"
@@ -120,11 +127,11 @@ export default function HomePage() {
       </section>
 
       {/* 自定义 HTML 内容 */}
-      {site.home_content && (
+      {safeHomeContent && (
         <section className="relative z-10 px-6 pb-16 max-w-4xl mx-auto">
           <div
             className="prose prose-sm dark:prose-invert max-w-none text-text-secondary"
-            dangerouslySetInnerHTML={{ __html: site.home_content }}
+            dangerouslySetInnerHTML={{ __html: safeHomeContent }}
           />
         </section>
       )}

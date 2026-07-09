@@ -14,6 +14,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useToast } from '../../shared/ui';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { formatDateTime } from '../../shared/utils/format';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import type { CreatePaymentOrderReq, PaymentOrder, PaymentOrderStatus, RedeemResp } from '../../shared/types';
@@ -356,7 +357,7 @@ export default function RechargePage() {
                 const canContinue = row.status === 'pending' && !!(row.payment_url || row.qr_code_content);
                 return (
                   <CommonTable.Row id={row.out_trade_no} key={row.out_trade_no}>
-                    <CommonTable.Cell>{new Date(row.created_at).toLocaleString()}</CommonTable.Cell>
+                    <CommonTable.Cell>{formatDateTime(row.created_at)}</CommonTable.Cell>
                     <CommonTable.Cell>
                       <span className="font-mono text-xs text-text-secondary">{row.out_trade_no}</span>
                     </CommonTable.Cell>
@@ -445,7 +446,7 @@ export default function RechargePage() {
                     ) : null}
                     {displayOrder?.expires_at ? (
                       <p className="text-xs text-text-tertiary">
-                        {t('payment.expires_at_hint', { time: new Date(displayOrder.expires_at).toLocaleString() })}
+                        {t('payment.expires_at_hint', { time: formatDateTime(displayOrder.expires_at) })}
                       </p>
                     ) : null}
                     <div className="flex items-center gap-1.5 text-xs text-text-tertiary">

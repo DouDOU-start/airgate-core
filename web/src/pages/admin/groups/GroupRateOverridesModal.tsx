@@ -141,7 +141,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
       </div>
 
       <div className="mb-4">
-        <p className="mb-2 text-xs font-medium uppercaser text-text-secondary">
+        <p className="mb-2 text-xs font-medium uppercase text-text-secondary">
           {t('groups.rate_override_add')}
         </p>
         <div className="flex items-start gap-2">
@@ -224,7 +224,7 @@ export function GroupRateOverridesModal({ open, group, onClose }: GroupRateOverr
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-medium uppercaser text-text-secondary">
+        <p className="mb-2 text-xs font-medium uppercase text-text-secondary">
           {t('groups.rate_override_list', { count: overrides.length })}
         </p>
         {isLoading ? (

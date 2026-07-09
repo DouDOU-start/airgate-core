@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '../../../shared/queryKeys';
 import { usersApi } from '../../../shared/api/users';
 import { getTotalPages } from '../../../shared/utils/pagination';
+import { formatDateTime } from '../../../shared/utils/format';
 import { CommonTable } from '../../../shared/components/CommonTable';
 import { TablePaginationFooter } from '../../../shared/components/TablePaginationFooter';
 import type { UserResp, BalanceLogResp } from '../../../shared/types';
@@ -68,7 +69,7 @@ export function BalanceHistoryModal({ open, user, onClose }: BalanceHistoryModal
             </Modal.Header>
             <Modal.Body>
               <div className="mb-4 rounded-md border border-glass-border bg-surface px-4 py-3">
-                <p className="text-xs uppercaser text-text-tertiary">{t('users.current_balance')}</p>
+                <p className="text-xs uppercase text-text-tertiary">{t('users.current_balance')}</p>
                 <p className="mt-1 font-mono text-lg font-bold">${user.balance.toFixed(2)}</p>
               </div>
 
@@ -136,12 +137,7 @@ export function BalanceHistoryModal({ open, user, onClose }: BalanceHistoryModal
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <span className="text-xs text-text-secondary">
-                        {new Date(row.created_at).toLocaleString('zh-CN', {
-                          day: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          month: '2-digit',
-                        })}
+                        {formatDateTime(row.created_at)}
                       </span>
                     </CommonTable.Cell>
                   </CommonTable.Row>

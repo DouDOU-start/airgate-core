@@ -106,12 +106,12 @@ export function AppShell({ children }: AppShellProps) {
   });
   const topLoadingActive = routerStatus === 'pending' || blockingFetches > 0;
 
-  // Close mobile drawer on route change
+  // 路由切换时收起移动端抽屉
   useEffect(() => {
     setMobileOpen(false);
   }, [routerPath]);
 
-  // Prevent body scroll when mobile drawer is open
+  // 移动端抽屉打开时禁止 body 滚动
   useEffect(() => {
     if (mobileOpen) {
       document.body.style.overflow = 'hidden';
@@ -183,7 +183,7 @@ export function AppShell({ children }: AppShellProps) {
     document.title = site.site_name || 'AirGate';
   }, [site.site_name]);
 
-  // On mobile, sidebar is always expanded inside the drawer
+  // 移动端抽屉内侧边栏恒为展开态
   const sidebarCollapsed = isMobile ? false : collapsed;
 
   const sidebarContent = (
@@ -362,7 +362,7 @@ export function AppShell({ children }: AppShellProps) {
     <div className="fixed inset-0 flex overflow-hidden bg-bg text-text">
       <TopLoadingLine active={topLoadingActive} />
 
-      {/* Mobile backdrop */}
+      {/* 移动端遮罩 */}
       {isMobile && mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40"
@@ -370,7 +370,7 @@ export function AppShell({ children }: AppShellProps) {
         />
       )}
 
-      {/* Sidebar */}
+      {/* 侧边栏 */}
       {isMobile ? (
         <aside
           className="fixed inset-y-0 left-0 z-50 flex flex-col bg-surface border-r border-border transition-transform duration-150 ease-out"
@@ -387,7 +387,7 @@ export function AppShell({ children }: AppShellProps) {
         </aside>
       )}
 
-      {/* Main content */}
+      {/* 主内容区 */}
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="ag-topbar pointer-events-auto absolute inset-x-0 top-0 z-20 flex h-12 items-center justify-between gap-3 px-4 md:px-5">
           <div className="flex shrink-0 items-center gap-3">
@@ -431,14 +431,14 @@ export function AppShell({ children }: AppShellProps) {
                 </HeroLink>
               );
             })()}
-            {/* Contact */}
+            {/* 联系方式 */}
             {site.contact_info && (
               <div className="hidden items-center gap-2 text-text-tertiary lg:flex">
                 <MessageCircle className="h-5 w-5 shrink-0" />
                 <span className="text-sm">{site.contact_info}</span>
               </div>
             )}
-            {/* Language toggle */}
+            {/* 语言切换 */}
             <Button
               aria-label={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
               className="h-10 px-3"
@@ -449,9 +449,9 @@ export function AppShell({ children }: AppShellProps) {
               <Languages className="h-5 w-5" />
               <span className="hidden w-8 text-center font-mono text-xs uppercase sm:inline-block">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
             </Button>
-            {/* Theme toggle */}
+            {/* 主题切换 */}
             <Button
-              aria-label={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+              aria-label={theme === 'dark' ? t('common.toggle_theme_light') : t('common.toggle_theme_dark')}
               className="h-10 w-10"
               isIconOnly
               size="sm"
@@ -487,7 +487,7 @@ export function AppShell({ children }: AppShellProps) {
               )}
             </div>
 
-            {/* Logout button */}
+            {/* 退出登录 */}
             <div className="mx-1 hidden h-6 w-px bg-border sm:block" />
             <Button
               aria-label={t('common.logout')}

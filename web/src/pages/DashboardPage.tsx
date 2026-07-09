@@ -38,7 +38,6 @@ import { useDebouncedValue } from '../shared/hooks/useDebouncedValue';
 import { CostPair, CostValue } from '../shared/components/CostValue';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
-const PIE_COLORS = PIE_CHART_COLORS;
 const USER_COLORS = [...decorativePalette];
 const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio', 'cacheCumulativeRatio'];
 const TOKEN_TREND_RATIO_KEYS = new Set<keyof typeof USAGE_TOKEN_COLORS>(['cacheRatio', 'cacheCumulativeRatio']);
@@ -443,7 +442,7 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
             <PieChart width={176} height={176}>
               <Pie data={activePieData} cx="50%" cy="50%" dataKey="value" innerRadius={42} isAnimationActive={false} minAngle={3} outerRadius={68} stroke="var(--ag-surface)" strokeWidth={2}>
                 {activePieData.map((_, index) => (
-                  <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                  <Cell key={index} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
                 ))}
               </Pie>
               <RechartsTooltip
@@ -474,7 +473,7 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
                 render: (row, index) => (
                   <>
                     <span className="shrink-0 font-mono text-[11px] font-semibold text-text">#{index + 1}</span>
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_CHART_COLORS[index % PIE_CHART_COLORS.length] }} />
                     <span className="min-w-0 truncate font-medium text-text" title={row.name}>{row.name}</span>
                   </>
                 ),

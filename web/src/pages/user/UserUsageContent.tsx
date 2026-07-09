@@ -13,6 +13,7 @@ import type { UsageQuery } from '../../shared/types';
 import { useUsageColumns, fmtNum, type UsageColumnConfig, type UsageRow } from '../../shared/columns/usageColumns';
 import { getSessionAPIKey } from '../../shared/api/client';
 import { CcsImportModal } from './userkeys/CcsImportModal';
+import { formatDate } from '../../shared/utils/format';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
 import { UserUpstreamLogsTable } from './UserUpstreamLogsTable';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
@@ -71,7 +72,7 @@ function APIKeyInfoBar() {
   const expiresAt = user.api_key_expires_at;
   const pct = quota > 0 ? Math.min((used / quota) * 100, 100) : 0;
 
-  // 原文 Key 仅在 API Key 登录当次会话内通过 sessionStorage 暂存；刷新页面后丢失，
+  // 原文 Key 仅在 API Key 登录当次会话内保存在内存变量中；刷新页面后丢失，
   // 此时按钮会提示用户重新登录。
   const sessionKey = getSessionAPIKey();
   const canImportCcs = !!sessionKey;
@@ -95,7 +96,7 @@ function APIKeyInfoBar() {
     const d = new Date(expiresAt);
     const now = new Date();
     const diffDays = Math.ceil((d.getTime() - now.getTime()) / 86400000);
-    expiresLabel = d.toLocaleDateString();
+    expiresLabel = formatDate(d);
     expiresWarning = diffDays <= 7;
   }
 
@@ -157,17 +158,22 @@ function APIKeyInfoBar() {
           </div>
         )}
 
-        <Button
-          type="button"
-          onPress={handleImportCcs}
-          isDisabled={!canImportCcs}
-          className="ml-auto"
-          size="sm"
-          variant="outline"
-        >
-          <Upload className="w-3.5 h-3.5" />
-          <span>{t('user_keys.import_ccs')}</span>
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          {/* 原文 Key 只存内存，页面刷新后丢失；禁用时给出可见解释而不是只变灰 */}
+          {!canImportCcs && (
+            <span className="text-xs text-text-tertiary">{t('user_keys.ccs_relogin_hint')}</span>
+          )}
+          <Button
+            type="button"
+            onPress={handleImportCcs}
+            isDisabled={!canImportCcs}
+            size="sm"
+            variant="outline"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>{t('user_keys.import_ccs')}</span>
+          </Button>
+        </div>
 
         <CcsImportModal
           open={ccsOpen}
@@ -472,7 +478,7 @@ export default function UserUsageContent() {
         ) : undefined}
         emptyDescription={filters.start_date || filters.end_date
           ? t('usage.empty_in_range')
-          : t('usage.empty_description', '调整筛选条件后重试')}
+          : t('usage.empty_description')}
         emptyTitle={t('common.no_data')}
         highlightNewRows={autoRefreshEnabled && page === 1}
         highlightResetKey={JSON.stringify({ ...filters, page, pageSize })}

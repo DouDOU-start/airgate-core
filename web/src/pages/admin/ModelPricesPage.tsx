@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertDialog, Button, Chip, EmptyState, Input, Label, ListBox, Modal, Select,
+  Button, Chip, EmptyState, Input, Label, ListBox, Modal, Select,
   Spinner, TextArea, TextField as HeroTextField, ToggleButton, ToggleButtonGroup,
   useOverlayState,
 } from '@heroui/react';
@@ -18,6 +18,7 @@ import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import type { CreateModelPriceReq, ImportModelPriceItem, ModelPriceResp, ModelTagResp } from '../../shared/types';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
 type Translate = (key: string) => string;
 
@@ -1025,74 +1026,29 @@ export default function ModelPricesPage() {
       </Modal>
 
       {/* 删除标签确认 */}
-      <AlertDialog
-        isOpen={!!deleteTagTarget}
+      <ConfirmDialog
+        open={!!deleteTagTarget}
         onOpenChange={(open) => {
           if (!open) setDeleteTagTarget(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="warning" />
-                <AlertDialog.Heading>{t('model_prices.tag_delete_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('model_prices.tag_delete_confirm', { name: deleteTagTarget?.name })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDeleteTagTarget(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteTagMutation.isPending}
-                  isDisabled={deleteTagMutation.isPending}
-                  variant="danger"
-                  onPress={() => deleteTagTarget && deleteTagMutation.mutate(deleteTagTarget.id)}
-                >
-                  {deleteTagMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('model_prices.tag_delete_title')}
+        description={t('model_prices.tag_delete_confirm', { name: deleteTagTarget?.name })}
+        status="warning"
+        loading={deleteTagMutation.isPending}
+        onConfirm={() => deleteTagTarget && deleteTagMutation.mutate(deleteTagTarget.id)}
+      />
 
       {/* 删除确认 */}
-      <AlertDialog
-        isOpen={!!deleteTarget}
+      <ConfirmDialog
+        open={!!deleteTarget}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('model_prices.delete_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('model_prices.delete_confirm', { model: deleteTarget?.model })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDeleteTarget(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteMutation.isPending}
-                  isDisabled={deleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-                >
-                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('model_prices.delete_title')}
+        description={t('model_prices.delete_confirm', { model: deleteTarget?.model })}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

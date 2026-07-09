@@ -1,4 +1,5 @@
 import { type CSSProperties, type ReactNode } from 'react';
+import { cx } from '../utils/cx';
 
 type RowKey = string | number;
 
@@ -18,10 +19,6 @@ interface CompactDataTableProps<T> {
   minWidth?: CSSProperties['minWidth'];
   rowKey: (row: T, index: number) => RowKey;
   rows: T[];
-}
-
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(' ');
 }
 
 export function CompactDataTable<T>({

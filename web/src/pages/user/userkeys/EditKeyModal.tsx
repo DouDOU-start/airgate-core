@@ -113,24 +113,24 @@ export function EditKeyModal({
           <Description>{t('user_keys.quota_hint')}</Description>
         </HeroTextField>
         <HeroTextField fullWidth>
-          <Label>{t('user_keys.sell_rate_label', '销售倍率（对外售价）')}</Label>
+          <Label>{t('user_keys.sell_rate_label')}</Label>
           <Input
             type="number"
             value={form.sell_rate}
             onChange={(e) => setForm({ ...form, sell_rate: e.target.value })}
             placeholder="0"
           />
-          <Description>{t('user_keys.sell_rate_hint', '留空或 0 表示按平台原价计费')}</Description>
+          <Description>{t('user_keys.sell_rate_hint')}</Description>
         </HeroTextField>
         <HeroTextField fullWidth>
-          <Label>{t('user_keys.max_concurrency_label', '最大并发数')}</Label>
+          <Label>{t('user_keys.max_concurrency_label')}</Label>
           <Input
             type="number"
             value={form.max_concurrency}
             onChange={(e) => setForm({ ...form, max_concurrency: e.target.value })}
             placeholder="0"
           />
-          <Description>{t('user_keys.max_concurrency_hint', '留空或 0 表示不限制')}</Description>
+          <Description>{t('user_keys.max_concurrency_hint')}</Description>
         </HeroTextField>
         <CommonDatePicker
           description={t('user_keys.expire_hint')}

@@ -10,6 +10,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
+import { formatDate, formatTime } from '../../shared/utils/format';
 import type { UserUpstreamLogResp } from '../../shared/types';
 
 // 有操作建议（CTA 文案）的失败阶段；缺失时只显示错误原因。
@@ -104,8 +105,8 @@ function LogRow({ row }: { row: UserUpstreamLogResp }) {
     <CommonTable.Row id={String(row.id)}>
       <CommonTable.Cell>
         <div className="font-mono text-xs leading-tight" title={row.request_id ? `request_id: ${row.request_id}` : undefined}>
-          <div className="text-text">{date.toLocaleTimeString('zh-CN', { hour12: false })}</div>
-          <div className="text-text-tertiary">{date.toLocaleDateString('zh-CN')}</div>
+          <div className="text-text">{formatTime(date)}</div>
+          <div className="text-text-tertiary">{formatDate(date)}</div>
         </div>
       </CommonTable.Cell>
       <CommonTable.Cell>

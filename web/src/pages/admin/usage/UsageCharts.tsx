@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   PieChart,
   Pie,
@@ -93,6 +94,7 @@ export function UsageTokenTrendChart({
   data: UsageTrendBucket[];
   lineLabels: Record<string, string>;
 }) {
+  const { t } = useTranslation();
   const chartData = useMemo(() => {
     let cumulativeCache = 0;
     let cumulativeTotal = 0;
@@ -152,24 +154,6 @@ export function UsageTokenTrendChart({
           width={32}
         />
         <RechartsTooltip
-          contentStyle={{
-            background: 'var(--ag-bg-elevated)',
-            border: '1px solid var(--ag-border)',
-            borderRadius: 8,
-            fontSize: 12,
-            padding: '8px 12px',
-          }}
-          labelStyle={{ color: 'var(--ag-text)', fontWeight: 600, marginBottom: 4 }}
-          labelFormatter={(_label, payload) => {
-            if (payload?.[0]?.payload?.rawTime) {
-              return payload[0].payload.rawTime;
-            }
-            return _label;
-          }}
-          formatter={(value, name) => [
-            TOKEN_TREND_RATIO_KEYS.has(String(name) as keyof typeof USAGE_TOKEN_COLORS) ? `${Number(value).toFixed(1)}%` : fmtNum(Number(value)),
-            lineLabels[String(name)] || String(name),
-          ]}
           content={({ active, payload, label }) => {
             if (!active || !payload?.length) return null;
             const d = payload[0]?.payload;
@@ -191,9 +175,9 @@ export function UsageTokenTrendChart({
                   </div>
                 ))}
                 <div className="border-t border-border-subtle mt-2 pt-2 text-text-secondary">
-                  Actual: <CostValue className="font-mono" value={d?.actualCost ?? 0} tone="actual" />
+                  {t('usage.cost_actual')}: <CostValue className="font-mono" value={d?.actualCost ?? 0} tone="actual" />
                   {' | '}
-                  Standard: <CostValue className="font-mono" value={d?.standardCost ?? 0} tone="standard" />
+                  {t('usage.cost_standard')}: <CostValue className="font-mono" value={d?.standardCost ?? 0} tone="standard" />
                 </div>
               </div>
             );

@@ -13,6 +13,7 @@ import { CommonTable } from '../../shared/components/CommonTable';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import type { BalanceLogResp } from '../../shared/types';
+import { formatDateTime } from '../../shared/utils/format';
 import {
   User,
   Mail,
@@ -388,12 +389,7 @@ function MyBalanceHistoryModal({ open, balance, onClose }: { open: boolean; bala
                             </CommonTable.Cell>
                             <CommonTable.Cell>
                               <span className="text-xs text-text-secondary">
-                                {new Date(row.created_at).toLocaleString('zh-CN', {
-                                  day: '2-digit',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  month: '2-digit',
-                                })}
+                                {formatDateTime(row.created_at)}
                               </span>
                             </CommonTable.Cell>
                           </CommonTable.Row>

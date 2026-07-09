@@ -16,7 +16,6 @@ export const groupsApi = {
   // 管理员接口
   list: (params: PageReq) =>
     get<PagedData<GroupResp>>('/api/v1/admin/groups', params),
-  get: (id: number) => get<GroupResp>(`/api/v1/admin/groups/${id}`),
   create: (data: CreateGroupReq) => post<GroupResp>('/api/v1/admin/groups', data),
   update: (id: number, data: UpdateGroupReq) => put<void>(`/api/v1/admin/groups/${id}`, data),
   delete: (id: number) => del<void>(`/api/v1/admin/groups/${id}`),

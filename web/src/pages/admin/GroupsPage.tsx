@@ -9,8 +9,7 @@ import {
   RefreshCw,
   Percent,
 } from 'lucide-react';
-import { AlertDialog, Button, Chip, EmptyState, Spinner } from '@heroui/react';
-import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
+import { Button, Chip, EmptyState } from '@heroui/react';
 import { groupsApi } from '../../shared/api/groups';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -24,11 +23,11 @@ import { MetricChips } from '../../shared/components/MetricChips';
 import { GroupFormModal } from './groups/EditGroupModal';
 import { GroupRateOverridesModal } from './groups/GroupRateOverridesModal';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/types';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
 export default function GroupsPage() {
   const { t } = useTranslation();
 
-  // 筛选状态
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.groups');
 
   // 弹窗状态
@@ -292,39 +291,16 @@ export default function GroupsPage() {
       )}
 
       {/* 删除确认 */}
-      <AlertDialog
-        isOpen={!!deletingGroup}
+      <ConfirmDialog
+        open={!!deletingGroup}
         onOpenChange={(open) => {
           if (!open) setDeletingGroup(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('groups.delete_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('groups.delete_confirm', { name: deletingGroup?.name })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDeletingGroup(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteMutation.isPending}
-                  isDisabled={deleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => deletingGroup && deleteMutation.mutate(deletingGroup.id)}
-                >
-                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('groups.delete_title')}
+        description={t('groups.delete_confirm', { name: deletingGroup?.name })}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deletingGroup && deleteMutation.mutate(deletingGroup.id)}
+      />
     </div>
   );
 }

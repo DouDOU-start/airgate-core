@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, RefreshCw, KeyRound } from 'lucide-react';
-import { AlertDialog, Button, Chip, EmptyState, Spinner } from '@heroui/react';
-import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
+import { Button, Chip, EmptyState } from '@heroui/react';
 import { oauthApi } from '../../shared/api/oauth';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useClipboard } from '../../shared/hooks/useClipboard';
@@ -12,6 +11,7 @@ import { CommonTable } from '../../shared/components/CommonTable';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { OAuthClientFormModal } from './oauthclients/OAuthClientFormModal';
 import { OAuthClientSecretModal } from './oauthclients/OAuthClientSecretModal';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import type {
   OAuthClientResp,
   OAuthClientSecretResp,
@@ -226,78 +226,30 @@ export default function OAuthClientsPage() {
       <OAuthClientSecretModal credential={credential} onClose={() => setCredential(null)} />
 
       {/* 重置 secret 确认 */}
-      <AlertDialog
-        isOpen={!!resettingItem}
+      <ConfirmDialog
+        open={!!resettingItem}
         onOpenChange={(open) => {
           if (!open) setResettingItem(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="warning" />
-                <AlertDialog.Heading>{t('oauth_clients.reset_secret')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>
-                {t('oauth_clients.reset_secret_confirm', { name: resettingItem?.name })}
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setResettingItem(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={resetSecretMutation.isPending}
-                  isDisabled={resetSecretMutation.isPending}
-                  variant="primary"
-                  onPress={() => resettingItem && resetSecretMutation.mutate(resettingItem.id)}
-                >
-                  {resetSecretMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('oauth_clients.reset_secret')}
+        description={t('oauth_clients.reset_secret_confirm', { name: resettingItem?.name })}
+        status="warning"
+        confirmVariant="primary"
+        loading={resetSecretMutation.isPending}
+        onConfirm={() => resettingItem && resetSecretMutation.mutate(resettingItem.id)}
+      />
 
       {/* 删除确认 */}
-      <AlertDialog
-        isOpen={!!deletingItem}
+      <ConfirmDialog
+        open={!!deletingItem}
         onOpenChange={(open) => {
           if (!open) setDeletingItem(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('oauth_clients.delete_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>
-                {t('oauth_clients.delete_confirm', { name: deletingItem?.name })}
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDeletingItem(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteMutation.isPending}
-                  isDisabled={deleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => deletingItem && deleteMutation.mutate(deletingItem.id)}
-                >
-                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('oauth_clients.delete_title')}
+        description={t('oauth_clients.delete_confirm', { name: deletingItem?.name })}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deletingItem && deleteMutation.mutate(deletingItem.id)}
+      />
     </div>
   );
 }

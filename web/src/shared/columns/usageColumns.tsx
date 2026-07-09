@@ -5,6 +5,7 @@ import { Tooltip } from '@heroui/react';
 import { ArrowDown, ArrowUp, BookOpen, Sparkles } from 'lucide-react';
 import type { UsageLogResp, CustomerUsageLogResp } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
+import { formatDate, formatTime } from '../utils/format';
 import { CostValue } from '../components/CostValue';
 
 /**
@@ -190,11 +191,6 @@ export function fmtNum(n: number): string {
   return n.toLocaleString();
 }
 
-/** 格式化费用 */
-export function fmtCost(n: number): string {
-  if (n >= 1000) return `$${(n / 1000).toFixed(2)}K`;
-  return `$${n.toFixed(2)}`;
-}
 
 // TokenMetric 计量明细行（直接由 usage_log 的 token 列构造）。
 type TokenMetric = {
@@ -206,32 +202,32 @@ type TokenMetric = {
 
 // tokenMetrics 计量明细：输入/输出恒显示，缓存读/写仅在非零时显示；
 // Claude 双档缓存写有明细时展开 5m/1h 两行。
-function tokenMetrics(row: UsageRow): TokenMetric[] {
+function tokenMetrics(row: UsageRow, t: TFunction): TokenMetric[] {
   const cacheCreation = row.cache_creation_tokens ?? 0;
   const cache5m = row.cache_creation_5m_tokens ?? 0;
   const cache1h = row.cache_creation_1h_tokens ?? 0;
   const metrics: TokenMetric[] = [
-    { key: 'input_tokens', label: '输入 Token', value: row.input_tokens, color: USAGE_TOKEN_COLORS.input },
-    { key: 'output_tokens', label: '输出 Token', value: row.output_tokens, color: USAGE_TOKEN_COLORS.output },
+    { key: 'input_tokens', label: t('usage.input_tokens'), value: row.input_tokens, color: USAGE_TOKEN_COLORS.input },
+    { key: 'output_tokens', label: t('usage.output_tokens'), value: row.output_tokens, color: USAGE_TOKEN_COLORS.output },
   ];
   if (row.cached_input_tokens > 0) {
-    metrics.push({ key: 'cached_input_tokens', label: '缓存读取 Token', value: row.cached_input_tokens, color: USAGE_TOKEN_COLORS.cacheRead });
+    metrics.push({ key: 'cached_input_tokens', label: t('usage.cache_read'), value: row.cached_input_tokens, color: USAGE_TOKEN_COLORS.cacheRead });
   }
   if (cache5m > 0 || cache1h > 0) {
     if (cache5m > 0) {
-      metrics.push({ key: 'cache_creation_5m_tokens', label: '缓存写入 5m Token', value: cache5m, color: USAGE_TOKEN_COLORS.cacheCreation });
+      metrics.push({ key: 'cache_creation_5m_tokens', label: t('usage.cache_creation_5m'), value: cache5m, color: USAGE_TOKEN_COLORS.cacheCreation });
     }
     if (cache1h > 0) {
-      metrics.push({ key: 'cache_creation_1h_tokens', label: '缓存写入 1h Token', value: cache1h, color: USAGE_TOKEN_COLORS.cacheCreation });
+      metrics.push({ key: 'cache_creation_1h_tokens', label: t('usage.cache_creation_1h'), value: cache1h, color: USAGE_TOKEN_COLORS.cacheCreation });
     }
   } else if (cacheCreation > 0) {
-    metrics.push({ key: 'cache_creation_tokens', label: '缓存写入 Token', value: cacheCreation, color: USAGE_TOKEN_COLORS.cacheCreation });
+    metrics.push({ key: 'cache_creation_tokens', label: t('usage.cache_creation'), value: cacheCreation, color: USAGE_TOKEN_COLORS.cacheCreation });
   }
   return metrics;
 }
 
 function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
-  const metrics = tokenMetrics(row);
+  const metrics = tokenMetrics(row, t);
   const tokenTotal =
     row.input_tokens + row.output_tokens + row.cached_input_tokens + (row.cache_creation_tokens ?? 0);
   const calls = row.calls ?? 0;
@@ -382,8 +378,8 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       width: '142px',
       render: (row) => {
         const date = new Date(row.created_at);
-        const timeLabel = date.toLocaleTimeString('zh-CN', { hour12: false });
-        const dateLabel = date.toLocaleDateString('zh-CN');
+        const timeLabel = formatTime(date);
+        const dateLabel = formatDate(date);
         // request_id 附在 title：与失败请求 Tab 的留痕互查（两侧都露同一 ID）。
         const fullLabel = row.request_id
           ? `${dateLabel} ${timeLabel}\nrequest_id: ${row.request_id}`

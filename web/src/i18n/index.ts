@@ -17,7 +17,7 @@ export function setStoredLanguage(lang: string) {
   try {
     window.localStorage.setItem('lang', lang);
   } catch {
-    // Language switching should keep working when storage is unavailable.
+    // Storage 不可用时语言切换仍需正常工作，静默忽略。
   }
 }
 

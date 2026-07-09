@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertDialog, Button, Checkbox, Chip, EmptyState, Input, Label, ListBox, Modal,
+  Button, Checkbox, Chip, EmptyState, Input, Label, ListBox, Modal,
   Select, Spinner, TextField as HeroTextField, Tooltip, useOverlayState,
 } from '@heroui/react';
 import {
@@ -23,7 +23,9 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { ChannelFormModal, CHANNEL_TYPE_OPTIONS } from './channels/ChannelFormModal';
 import { ChannelTestModal } from './channels/ChannelTestModal';
+import { formatDate, formatDateTime } from '../../shared/utils/format';
 import type { BulkChannelAction, ChannelFailureCounts, ChannelResp, ChannelType } from '../../shared/types';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
 const COLUMN_COUNT = 14;
 
@@ -87,7 +89,7 @@ function ChannelStatusChip({ channel }: { channel: ChannelResp }) {
   }
 
   if (isCoolingDown(channel)) {
-    const until = new Date(channel.status_until!).toLocaleString();
+    const until = formatDateTime(channel.status_until!);
     return (
       <Tooltip>
         <Tooltip.Trigger className="inline-flex">
@@ -137,8 +139,8 @@ function BalanceCell({
           <span className="text-xs text-text-tertiary">{t('channels.balance_never')}</span>
         )}
         {updated ? (
-          <span className="text-[11px] text-text-tertiary" title={updated.toLocaleString()}>
-            {updated.toLocaleDateString('zh-CN')}
+          <span className="text-[11px] text-text-tertiary" title={formatDateTime(updated)}>
+            {formatDate(updated)}
           </span>
         ) : null}
       </div>
@@ -775,74 +777,28 @@ export default function ChannelsPage() {
       </Modal>
 
       {/* 删除单个确认 */}
-      <AlertDialog
-        isOpen={!!deleteTarget}
+      <ConfirmDialog
+        open={!!deleteTarget}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('channels.delete_channel')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('channels.delete_confirm', { name: deleteTarget?.name })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDeleteTarget(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteMutation.isPending}
-                  isDisabled={deleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-                >
-                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('channels.delete_channel')}
+        description={t('channels.delete_confirm', { name: deleteTarget?.name })}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
 
       {/* 批量删除确认 */}
-      <AlertDialog
-        isOpen={bulkDeleteOpen}
+      <ConfirmDialog
+        open={bulkDeleteOpen}
         onOpenChange={(open) => {
           if (!open) setBulkDeleteOpen(false);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('channels.delete_channel')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('channels.bulk_delete_confirm', { count: selectedIds.length })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setBulkDeleteOpen(false)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={bulkPending}
-                  isDisabled={bulkPending}
-                  variant="danger"
-                  onPress={() => bulkMutation.mutate({ ids: selectedIds, action: 'delete' })}
-                >
-                  {bulkPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('channels.delete_channel')}
+        description={t('channels.bulk_delete_confirm', { count: selectedIds.length })}
+        loading={bulkPending}
+        onConfirm={() => bulkMutation.mutate({ ids: selectedIds, action: 'delete' })}
+      />
     </div>
   );
 }

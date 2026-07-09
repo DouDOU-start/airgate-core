@@ -227,7 +227,10 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
-        // 验证码错误则回到第一步
+        // 验证码错误则回到第一步。
+        // 脆弱性说明：后端注册接口对验证码无效/缺失只回 HTTP 400 + 中文 message，
+        // 没有可区分的业务 code（见 backend handleRegisterError），前端只能按文案
+        // 关键字匹配；后端若增设错误码或改文案，此分支需同步调整。
         if (err.message.includes('验证码')) {
           setStep(1);
           setVerifyCode('');
@@ -414,7 +417,7 @@ function APIKeyLoginForm() {
 
     try {
       const resp = await authApi.loginByAPIKey({ key: apiKey });
-      // 把用户输入的原文 Key 暂存到 sessionStorage，供 CCS 导入等需要原文的功能使用。
+      // 把用户输入的原文 Key 暂存到内存变量（不落存储），供 CCS 导入等需要原文的功能使用。
       setSessionAPIKey(apiKey);
       login(resp.token, { ...resp.user, api_key_id: resp.api_key_id, api_key_name: resp.api_key_name });
       const redirect = consumeLoginRedirect();
@@ -536,7 +539,7 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6 sm:p-8 bg-bg-deep relative">
         {/* 主题切换按钮 */}
         <Button
-          aria-label={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          aria-label={theme === 'dark' ? t('common.toggle_theme_light') : t('common.toggle_theme_dark')}
           className="absolute top-4 right-4 z-10"
           isIconOnly
           size="sm"

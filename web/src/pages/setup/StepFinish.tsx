@@ -138,7 +138,7 @@ export default function StepFinish({ dbConfig, redisConfig, adminConfig, envDBPr
                   <Icon className="w-4 h-4 text-primary" />
                   <h4 className="text-sm font-semibold text-text">{item.title}</h4>
                   {item.fromEnv && (
-                    <Chip className="ml-auto font-mono uppercaser" color="accent" size="sm" variant="soft">
+                    <Chip className="ml-auto font-mono uppercase" color="accent" size="sm" variant="soft">
                       {t('setup.from_env')}
                     </Chip>
                   )}

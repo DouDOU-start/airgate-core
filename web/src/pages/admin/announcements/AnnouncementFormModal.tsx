@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -58,7 +58,7 @@ export function AnnouncementFormModal({
   const { t } = useTranslation();
   const isEdit = !!announcement;
 
-  const [form, setForm] = useState({
+  const buildForm = () => ({
     content: announcement?.content ?? '',
     ends_at: toDatetimeLocal(announcement?.ends_at),
     notify_mode: announcement?.notify_mode ?? ('silent' as AnnouncementNotifyMode),
@@ -66,6 +66,15 @@ export function AnnouncementFormModal({
     status: announcement?.status ?? ('draft' as AnnouncementStatus),
     title: announcement?.title ?? '',
   });
+
+  const [form, setForm] = useState(buildForm);
+
+  // 弹窗常驻挂载：关闭（含提交成功后父组件收起）时重置表单，避免下次打开残留上次输入
+  useEffect(() => {
+    if (!open) {
+      setForm(buildForm());
+    }
+  }, [open, announcement]);
 
   const statusOptions = [
     { id: 'draft', label: t('announcements.status_draft') },

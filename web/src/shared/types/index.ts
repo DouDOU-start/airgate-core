@@ -18,8 +18,6 @@ export interface PageReq {
   page: number;
   page_size: number;
   keyword?: string;
-  platform?: string;
-  service_tier?: 'fast' | 'flex';
 }
 
 // ==================== Auth ====================
@@ -48,10 +46,6 @@ export interface RegisterReq {
   password: string;
   username?: string;
   verify_code?: string;
-}
-
-export interface RefreshResp {
-  token: string;
 }
 
 // ==================== User ====================
@@ -126,24 +120,6 @@ export interface BalanceLogResp {
   created_at: string;
 }
 
-// ==================== 批量操作（通用） ====================
-
-// 批量操作单条结果（渠道等资源的批量接口通用结构）
-export interface BulkOpResultItem {
-  id: number;
-  success: boolean;
-  error?: string;
-}
-
-// 批量操作汇总响应
-export interface BulkOpResp {
-  success: number;
-  failed: number;
-  success_ids: number[];
-  failed_ids: number[];
-  results: BulkOpResultItem[];
-}
-
 // ==================== Group ====================
 
 export interface GroupResp {
@@ -154,8 +130,6 @@ export interface GroupResp {
   rate_multiplier: number;
   is_exclusive: boolean;
   status_visible: boolean;
-  quotas?: Record<string, unknown>;
-  force_instructions?: string;
   note?: string;
   sort_weight: number;
   today_cost: number;
@@ -173,8 +147,6 @@ export interface CreateGroupReq {
   rate_multiplier?: number;
   is_exclusive?: boolean;
   status_visible?: boolean;
-  quotas?: Record<string, unknown>;
-  force_instructions?: string;
   note?: string;
   sort_weight?: number;
 }
@@ -191,8 +163,6 @@ export interface UpdateGroupReq {
   rate_multiplier?: number;
   is_exclusive?: boolean;
   status_visible?: boolean;
-  quotas?: Record<string, unknown>;
-  force_instructions?: string;
   note?: string;
   sort_weight?: number;
 }
@@ -628,13 +598,6 @@ export interface RefreshChannelBalanceResp {
   balance_updated_at?: string;
 }
 
-// 预览拉取模型请求（渠道未保存，直接给连接参数）
-export interface FetchChannelModelsPreviewReq {
-  type: ChannelType;
-  base_url: string;
-  api_key: string;
-}
-
 export type BulkChannelAction = 'enable' | 'disable' | 'delete' | 'set_priority';
 
 export interface BulkUpdateChannelsReq {
@@ -892,11 +855,6 @@ export interface AdminSetup {
 export interface TestConnectionResp {
   success: boolean;
   error_msg?: string;
-}
-
-export interface ModelInfo {
-  id: string;
-  name: string;
 }
 
 // ==================== Announcement ====================

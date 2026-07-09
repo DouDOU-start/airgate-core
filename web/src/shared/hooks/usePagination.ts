@@ -21,7 +21,7 @@ function writeStoredPageSize(storageKey: string | undefined, pageSize: number) {
   try {
     window.localStorage.setItem(`${PAGE_SIZE_STORAGE_PREFIX}${storageKey}`, String(pageSize));
   } catch {
-    // localStorage may be unavailable in private mode; pagination should still work.
+    // 隐私模式下 localStorage 可能不可用；分页功能本身不受影响。
   }
 }
 

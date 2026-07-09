@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, RefreshCw, BellRing, Bell } from 'lucide-react';
-import { AlertDialog, Button, Chip, EmptyState, Spinner } from '@heroui/react';
-import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
+import { Button, Chip, EmptyState } from '@heroui/react';
 import { announcementsApi } from '../../shared/api/announcements';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -15,6 +14,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { AnnouncementFormModal } from './announcements/AnnouncementFormModal';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import type {
   AnnouncementResp,
   AnnouncementStatus,
@@ -232,39 +232,16 @@ export default function AnnouncementsPage() {
       )}
 
       {/* 删除确认 */}
-      <AlertDialog
-        isOpen={!!deletingItem}
+      <ConfirmDialog
+        open={!!deletingItem}
         onOpenChange={(open) => {
           if (!open) setDeletingItem(null);
         }}
-      >
-        <DialogTriggerShim />
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container placement="center" size="sm">
-            <AlertDialog.Dialog className="ag-elevation-modal">
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>{t('announcements.delete_title')}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{t('announcements.delete_confirm', { title: deletingItem?.title })}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={() => setDeletingItem(null)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  aria-busy={deleteMutation.isPending}
-                  isDisabled={deleteMutation.isPending}
-                  variant="danger"
-                  onPress={() => deletingItem && deleteMutation.mutate(deletingItem.id)}
-                >
-                  {deleteMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('common.confirm')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        title={t('announcements.delete_title')}
+        description={t('announcements.delete_confirm', { title: deletingItem?.title })}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deletingItem && deleteMutation.mutate(deletingItem.id)}
+      />
     </div>
   );
 }
