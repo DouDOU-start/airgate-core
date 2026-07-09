@@ -1,12 +1,12 @@
 # airgate-core — Claude 开发指南（standalone-gateway 分支）
 
-> **本分支是独立单体网关架构**（new-api 式渠道管理），与 master 插件架构长期分叉、不合回。
-> 需求单一事实源：仓库根上层 `../standalone-gateway-plan.md`。
-> **根 `../CLAUDE.md` 的「插件边界」「Host.Invoke」「生态职责速查表」及 skill `core-dev` / `develop-plugin` 描述的是 master 插件线，对本分支一律不适用。**
+> **本分支是独立单体网关架构**（渠道管理式），与 master 插件架构长期分叉、不合回。
+> **本文件自包含**：仓库外的任何文档（monorepo 根 CLAUDE.md、skill `core-dev` / `develop-plugin` 等）描述的都是 master 插件线，对本分支一律不适用。
+> 无插件进程、无 SDK 依赖、无上游账号池；架构与需求以本文件 + `README.md` 为准。
 
 ## 架构（本分支）
 
-无插件进程、无上游账号池。管理员配置**渠道**（channel = 协议类型 + base_url + api_keys + 模型列表），用户拿 sk- key 按协议调对应端点，core 内置 adaptor **纯透传直发**上游（零翻译）、按**模型价目表**计费。入站端点按协议分树，只路由到同协议渠道：
+管理员配置**渠道**（channel = 协议类型 + base_url + api_keys + 模型列表），用户拿 sk- key 按协议调对应端点，core 内置 adaptor **纯透传直发**上游（零翻译）、按**模型价目表**计费。入站端点按协议分树，只路由到同协议渠道：
 
 ```
 请求（middleware.APIKeyAuth 鉴权，入站按协议分树：
@@ -27,7 +27,7 @@
 - `internal/relay/pipeline` — 转发主循环、outcome 判定、SSE 透传（原生协议流经透传型 usage 观察器旁路计量）、错误体（按入口协议原生形态，errfmt 分发）、gateway settings 读取。
 - `internal/relay/errfmt` — 网关自产错误的协议形态渲染（openai/anthropic/gemini），pipeline 与鉴权中间件共用；上游错误一律原样透传不经此包。
 - `internal/relay/pricing` — 价目表缓存 + token→cost 纯函数。
-- `internal/billing` — 三管道计费（actual=total×billing_rate 扣余额；billed=total×sell_rate 累加 key 用量；account_cost 列=total×channel.cost_ratio 渠道成本统计）与异步记账。
+- `internal/billing` — 三管道计费（actual=total×billing_rate 扣余额；billed=total×sell_rate 累加 key 用量；渠道成本=total×account_rate_multiplier 快照列查询期现算、不落列）与异步记账。
 - `internal/scheduler` — 仅剩 ConcurrencyManager/RPMCounter（Redis 限流原语，渠道/用户/key 维度）。
 
 ## 🚫 红线（本分支仍然有效）
@@ -38,8 +38,8 @@
 - **新接口走 dto + mapper**，handler 勿手拼 map 响应。
 - **转发路由（/v1、/v1beta）错误一律按入口协议的原生错误形态**（`internal/relay/errfmt` 按 EntryProtocol 分发：openai/anthropic/gemini），不用 `response.*`；上游错误原样透传；管理面照旧 `response.*`。
 - **渠道 api_keys 明文永不出现在任何 API 响应**（只出 count + 尾 4 位 hint）；加解密用 `internal/auth`（AES-256-GCM），在 service 层做。
-- 复用优先（新领域参照 channel/proxy 全链路）；注释中文；`_test.go` 同包、表驱动。
-- 需求/架构变更**先改 `../standalone-gateway-plan.md` 再改代码**。
+- 复用优先（新领域参照 channel 域全链路）；注释中文、不写复述代码的冗余注释；`_test.go` 同包、表驱动。
+- 需求/架构变更**同步更新本文件与 `README.md`**，防止文档漂移。
 
 ## 常用命令（`airgate-core/`）
 
