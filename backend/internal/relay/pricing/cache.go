@@ -196,11 +196,14 @@ func ComputeCosts(p Price, u Usage, serviceTier string) Costs {
 		cachedR *= p.LongContext.CachedMul
 	}
 
+	// 计费忠实于上游 usage：给了 5m/1h 明细就按明细分档；仅当双档明细
+	// 完全缺失时，泛化总量才按 5m 档兜底（Anthropic 旧形态 cache_creation_input_tokens
+	// 语义即 5m 写入）。只看 5m 是否为零会把「纯 1h 缓存写」的总量误按 5m 再计一次（双计）。
 	cc5mTokens := u.CacheCreation5mTokens
-	if cc5mTokens == 0 {
+	cc1hTokens := u.CacheCreation1hTokens
+	if cc5mTokens == 0 && cc1hTokens == 0 {
 		cc5mTokens = u.CacheCreationTokens
 	}
-	cc1hTokens := u.CacheCreation1hTokens
 
 	promptTokens := u.PromptTokens - u.CachedTokens
 	if promptTokens < 0 {

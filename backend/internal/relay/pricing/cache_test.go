@@ -69,6 +69,14 @@ func TestComputeCosts(t *testing.T) {
 			want: Costs{CacheCreation5m: 0.375, CacheCreation1h: 1.2},
 		},
 		{
+			name:  "纯 1h 缓存写：总量不得按 5m 回退双计",
+			price: Price{CacheCreation5m: 3.75, CacheCreation1h: 6.0},
+			usage: Usage{CacheCreationTokens: 200_000, CacheCreation1hTokens: 200_000},
+			// Anthropic 只用 1h 缓存时总量=1h 明细、5m 明细为 0；
+			// 总量不得再按 5m 档兜底：只计 1h 0.2M*6=1.2
+			want: Costs{CacheCreation1h: 1.2},
+		},
+		{
 			name:  "cached 超过 prompt 时 input 钳制为 0",
 			price: Price{Input: 3, CachedInput: 0.3},
 			usage: Usage{PromptTokens: 100_000, CachedTokens: 200_000},
