@@ -3,7 +3,7 @@
 # AirGate Core - 裸金属安装脚本（systemd）
 #
 # 用法：
-#   curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/install.sh | sudo bash
+#   curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/standalone-gateway/deploy/install.sh | sudo bash
 #
 # 或带子命令：
 #   sudo bash install.sh install    # 安装最新版本（默认动作）
@@ -37,7 +37,7 @@
 
 set -e
 
-# ---- Constants ----
+# ---- 常量 ----
 GITHUB_REPO="DouDOU-start/airgate-core"
 INSTALL_DIR="/opt/airgate-core"
 CONFIG_DIR="/etc/airgate-core"
@@ -45,7 +45,7 @@ DATA_DIR="/var/lib/airgate-core"
 SERVICE_NAME="airgate-core"
 SERVICE_USER="airgate"
 
-# Colors
+# 颜色
 #
 # 使用 bash ANSI-C quoting `$'...'` 让变量直接保存真正的 ESC 字符（0x1B），
 # 这样无论是 echo / printf / heredoc 都能正确显示颜色。
@@ -66,25 +66,25 @@ else
     NC=''
 fi
 
-# ---- Logging ----
+# ---- 日志输出 ----
 print_info()    { echo "${BLUE}[信息]${NC} $1"; }
 print_success() { echo "${GREEN}[成功]${NC} $1"; }
 print_warning() { echo "${YELLOW}[警告]${NC} $1"; }
 print_error()   { echo "${RED}[错误]${NC} $1" >&2; }
 
-# ---- Banner ----
+# ---- 横幅 ----
 print_banner() {
     cat <<'BANNER'
 
     ╔═══════════════════════════════════════════════╗
     ║          AirGate Core Installer               ║
-    ║       Pluggable AI Gateway · Bare Metal       ║
+    ║           AI Gateway · Bare Metal             ║
     ╚═══════════════════════════════════════════════╝
 
 BANNER
 }
 
-# ---- Check root ----
+# ---- root 校验 ----
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
         print_error "请使用 root 权限运行（sudo bash install.sh）"
@@ -92,7 +92,7 @@ check_root() {
     fi
 }
 
-# ---- Detect OS / arch ----
+# ---- 平台探测 ----
 detect_platform() {
     OS=$(uname -s | tr '[:upper:]' '[:lower:]')
     ARCH=$(uname -m)
@@ -121,7 +121,7 @@ detect_platform() {
     print_info "检测到平台: ${OS}/${ARCH}"
 }
 
-# ---- Check dependencies ----
+# ---- 依赖检查 ----
 check_dependencies() {
     local missing=()
     command -v curl >/dev/null 2>&1 || missing+=("curl")
@@ -135,7 +135,7 @@ check_dependencies() {
     fi
 }
 
-# ---- Get latest version ----
+# ---- 获取最新版本 ----
 get_latest_version() {
     print_info "获取最新版本..."
     LATEST_VERSION=$(curl -fsSL --connect-timeout 10 --max-time 30 \
@@ -150,7 +150,7 @@ get_latest_version() {
     print_info "最新版本: $LATEST_VERSION"
 }
 
-# ---- Validate explicit version ----
+# ---- 校验指定版本 ----
 validate_version() {
     local v="$1"
     [[ "$v" =~ ^v ]] || v="v$v"
@@ -166,7 +166,7 @@ validate_version() {
     print_info "已选择版本: $LATEST_VERSION"
 }
 
-# ---- Get currently installed version ----
+# ---- 获取已安装版本 ----
 get_current_version() {
     if [ -f "$INSTALL_DIR/airgate-core" ]; then
         "$INSTALL_DIR/airgate-core" --version 2>/dev/null \
@@ -176,7 +176,7 @@ get_current_version() {
     fi
 }
 
-# ---- Download and install binary ----
+# ---- 下载并安装二进制 ----
 download_and_install_binary() {
     local asset="airgate-core-${OS}-${ARCH}"
     local url="https://github.com/${GITHUB_REPO}/releases/download/${LATEST_VERSION}/${asset}"
@@ -212,7 +212,7 @@ download_and_install_binary() {
     print_success "二进制已安装到 $INSTALL_DIR/airgate-core"
 }
 
-# ---- Create system user ----
+# ---- 创建系统用户 ----
 create_user() {
     if id "$SERVICE_USER" &>/dev/null; then
         print_info "系统用户 $SERVICE_USER 已存在"
@@ -225,19 +225,19 @@ create_user() {
     fi
 }
 
-# ---- Setup directories ----
+# ---- 创建目录 ----
 setup_directories() {
     print_info "创建目录与权限 ..."
-    mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR/plugins" "$DATA_DIR/uploads" "$DATA_DIR/assets"
+    mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR"
     chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR" "$DATA_DIR"
     chown -R "$SERVICE_USER:$SERVICE_USER" "$CONFIG_DIR"
     chmod 750 "$CONFIG_DIR"
     print_success "目录就绪"
 }
 
-# ---- Install systemd unit ----
+# ---- 安装 systemd unit ----
 install_service() {
-    local unit_url="https://raw.githubusercontent.com/${GITHUB_REPO}/master/deploy/airgate-core.service"
+    local unit_url="https://raw.githubusercontent.com/${GITHUB_REPO}/standalone-gateway/deploy/airgate-core.service"
     print_info "下载并安装 systemd unit ..."
     if ! curl -fsSL "$unit_url" -o "/etc/systemd/system/${SERVICE_NAME}.service"; then
         print_error "下载 systemd unit 失败"
@@ -247,13 +247,13 @@ install_service() {
     print_success "systemd 服务已安装到 /etc/systemd/system/${SERVICE_NAME}.service"
 }
 
-# ---- Detect public IP for completion message ----
+# ---- 探测公网 IP（用于完成提示） ----
 detect_public_ip() {
     PUBLIC_IP=$(curl -fsSL --connect-timeout 5 --max-time 10 https://ipinfo.io/ip 2>/dev/null || true)
     [ -n "$PUBLIC_IP" ] || PUBLIC_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "<your-host>")
 }
 
-# ---- Print install completion ----
+# ---- 打印安装完成提示 ----
 print_install_complete() {
     detect_public_ip
     cat <<DONE
@@ -294,12 +294,12 @@ ${BLUE}常用命令${NC}
 
 ${BLUE}卸载${NC}
 
-  curl -sSL https://raw.githubusercontent.com/${GITHUB_REPO}/master/deploy/install.sh | sudo bash -s -- uninstall
+  curl -sSL https://raw.githubusercontent.com/${GITHUB_REPO}/standalone-gateway/deploy/install.sh | sudo bash -s -- uninstall
 
 DONE
 }
 
-# ---- Upgrade ----
+# ---- 升级 ----
 upgrade() {
     if [ ! -f "$INSTALL_DIR/airgate-core" ]; then
         print_error "尚未安装，请先运行 install"
@@ -338,7 +338,7 @@ upgrade() {
     print_success "升级完成: $(get_current_version)"
 }
 
-# ---- Uninstall ----
+# ---- 卸载 ----
 uninstall() {
     print_warning "即将卸载 AirGate Core："
     echo "  - 停止并禁用 systemd 服务"
@@ -346,7 +346,7 @@ uninstall() {
     echo "  - 删除 systemd unit 文件"
     echo ""
     echo "  ${YELLOW}保留${NC} ${CONFIG_DIR}（配置）"
-    echo "  ${YELLOW}保留${NC} ${DATA_DIR}（数据 / 已安装的插件）"
+    echo "  ${YELLOW}保留${NC} ${DATA_DIR}（数据）"
     echo "  ${YELLOW}保留${NC} 系统用户 ${SERVICE_USER}"
     echo ""
 
@@ -375,7 +375,7 @@ uninstall() {
     print_info "如需彻底清理：sudo rm -rf ${CONFIG_DIR} ${DATA_DIR} && sudo userdel ${SERVICE_USER}"
 }
 
-# ---- Install (default) ----
+# ---- 安装（默认动作） ----
 do_install() {
     if [ -f "$INSTALL_DIR/airgate-core" ]; then
         print_warning "检测到已安装：$(get_current_version)"
@@ -396,7 +396,7 @@ do_install() {
     print_install_complete
 }
 
-# ---- CLI parsing ----
+# ---- 命令行解析 ----
 main() {
     print_banner
     check_root

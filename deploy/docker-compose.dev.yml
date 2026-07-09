@@ -2,10 +2,9 @@
 # 使用方式: docker compose -f deploy/docker-compose.dev.yml up
 #
 # 仅拉起 core + pg + redis + 前端构建。
-# 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: airgate
@@ -20,7 +19,7 @@ services:
       retries: 20
 
   redis:
-    image: redis:7
+    image: redis:8-alpine
     restart: unless-stopped
     command: ["redis-server", "--requirepass", "airgate-dev"]
     volumes:
@@ -35,7 +34,7 @@ services:
     image: node:22-bookworm
     working_dir: /workspace
     volumes:
-      - ../..:/workspace
+      - ..:/workspace
       - ../data/pnpm_store:/root/.local/share/pnpm/store
     command:
       - bash
@@ -44,12 +43,12 @@ services:
         set -e;
         corepack enable;
         corepack prepare pnpm@11.1.1 --activate;
-        cd /workspace/airgate-core/web && pnpm install --frozen-lockfile && pnpm build
+        cd /workspace/web && pnpm install --frozen-lockfile && pnpm build
     restart: "no"
 
   core:
     image: golang:1.25-bookworm
-    working_dir: /workspace/airgate-core/backend
+    working_dir: /workspace/backend
     restart: unless-stopped
     depends_on:
       postgres:
@@ -59,14 +58,13 @@ services:
       frontend-builder:
         condition: service_completed_successfully
     environment:
-      CONFIG_PATH: /workspace/airgate-core/backend/config.docker.yaml
-      ASSETS_DIR: /workspace/airgate-core/backend/data/assets
+      # 开发配置由容器内首次启动的安装向导写出（不入库，见根 .gitignore）
+      CONFIG_PATH: /workspace/backend/config.dev.yaml
       REDIS_PASSWORD: airgate-dev
     volumes:
-      - ../..:/workspace
+      - ..:/workspace
       - ../data/go_pkg_mod:/go/pkg/mod
       - ../data/go_build_cache:/root/.cache/go-build
-      - ../data/assets:/workspace/airgate-core/backend/data/assets
     ports:
       - "9517:9517"
     command:

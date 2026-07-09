@@ -40,7 +40,7 @@ Thumbs.db
 # Runtime
 .dev/
 backend/config.yaml
-backend/config.docker.yaml
+backend/config.dev.yaml
 web/tmp/
 
 # Config

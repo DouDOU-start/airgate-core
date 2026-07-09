@@ -5,7 +5,7 @@
 # 这个脚本只负责"准备文件"：
 #   - 在指定目录里创建 ./data 子目录
 #   - 下载 docker-compose.yml
-#   - 用 openssl 生成三个随机密钥并写入 .env
+#   - 用 openssl 生成四个随机密钥并写入 .env
 #
 # 它故意不替你跑 docker compose up -d。检查完文件后用户自己执行：
 #
@@ -16,7 +16,7 @@
 #
 # 用法：
 #   mkdir airgate && cd airgate
-#   curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/docker-deploy.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/standalone-gateway/deploy/docker-deploy.sh | bash
 #
 # 或带参数：
 #   curl -sSL .../docker-deploy.sh -o docker-deploy.sh
@@ -25,7 +25,7 @@
 # 环境变量覆盖（可选）：
 #   AIRGATE_DIR     安装目录            默认: 当前目录
 #   AIRGATE_PORT    HTTP 端口           默认: 9517
-#   AIRGATE_BRANCH  从 GitHub 拉哪个分支 默认: master
+#   AIRGATE_BRANCH  从 GitHub 拉哪个分支 默认: standalone-gateway
 #   AIRGATE_TAG     固定镜像版本         默认: latest
 #   NON_INTERACTIVE 跳过所有交互（CI 用） 默认: 0
 #
@@ -65,7 +65,7 @@ BANNER
 # ---- 默认参数 ----
 AIRGATE_DIR="${AIRGATE_DIR:-.}"
 AIRGATE_PORT="${AIRGATE_PORT:-9517}"
-AIRGATE_BRANCH="${AIRGATE_BRANCH:-master}"
+AIRGATE_BRANCH="${AIRGATE_BRANCH:-standalone-gateway}"
 AIRGATE_TAG="${AIRGATE_TAG:-latest}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
 
@@ -140,7 +140,7 @@ fi
 
 mkdir -p "$AIRGATE_DIR"
 cd "$AIRGATE_DIR"
-mkdir -p data/postgres data/redis data/uploads data/assets
+mkdir -p data/postgres data/redis data/uploads
 
 ok "目录就绪：$(pwd)"
 
@@ -158,11 +158,12 @@ else
   DB_PASSWORD="$(openssl rand -hex 24)"
   REDIS_PASSWORD="$(openssl rand -hex 24)"
   JWT_SECRET="$(openssl rand -hex 32)"
+  API_KEY_SECRET="$(openssl rand -hex 32)"
 
   cat > .env <<EOF
-# AirGate Core 部署配置（由 install.sh 自动生成于 $(date '+%Y-%m-%d %H:%M:%S')）
+# AirGate Core 部署配置（由 docker-deploy.sh 自动生成于 $(date '+%Y-%m-%d %H:%M:%S')）
 # 任何修改需要 docker compose up -d 重启生效
-# 数据库 / Redis 密码相关说明见 README.md
+# 各变量说明见 .env.example / README.md
 
 AIRGATE_IMAGE=ghcr.io/doudou-start/airgate-core
 AIRGATE_IMAGE_TAG=${AIRGATE_TAG}
@@ -174,8 +175,7 @@ TZ=Asia/Shanghai
 DB_PASSWORD=${DB_PASSWORD}
 REDIS_PASSWORD=${REDIS_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
-
-API_KEY_SECRET=
+API_KEY_SECRET=${API_KEY_SECRET}
 EOF
   chmod 600 .env
   ok "已生成 .env（所有密钥随机，权限 600）"
@@ -197,7 +197,7 @@ ${C_BOLD}下一步：手动启动容器${C_RESET}
 启动后访问 ${C_CYAN}http://<your-host>:${AIRGATE_PORT}${C_RESET}：
   - 安装向导会检测到 .env 已配置好 DB / Redis，自动跳过这两步
   - 只需要建立管理员账号
-  - 进入管理后台 → 插件管理 → 插件市场 → 按需安装插件
+  - 进入管理后台 → 配置渠道与模型价目表，即可开始转发
 
 ${C_BOLD}常用命令${C_RESET}
   $COMPOSE logs -f core              # 查看日志

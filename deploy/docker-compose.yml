@@ -2,14 +2,14 @@
 # AirGate Core 生产部署
 #
 # 推荐用法（一行安装）：
-#   curl -fsSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/master/deploy/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/standalone-gateway/deploy/docker-deploy.sh | bash
 #
 # 手动用法：
 #   1. 在本目录（或任意空目录）准备 docker-compose.yml + .env：
 #        cp .env.example .env && vim .env
 #        # 必填：DB_PASSWORD / REDIS_PASSWORD / JWT_SECRET
 #   2. 启动前先建好 ./data 子目录（避免 docker 以 root 创建后续读写不便）：
-#        mkdir -p data/postgres data/redis data/uploads data/assets
+#        mkdir -p data/postgres data/redis data/uploads
 #   3. 启动：
 #        docker compose up -d
 #   4. 查看日志：
@@ -112,15 +112,10 @@ services:
       GIN_MODE: release
       LOG_LEVEL: info
       LOG_FORMAT: text
-      WEB_DIR: frontend
-      ASSETS_DIR: /app/data/assets
       TZ: ${TZ:-Asia/Shanghai}
     volumes:
-      # 插件目录持久化（重建容器不丢已安装插件）
       # 上传文件持久化
       - ./data/uploads:/app/data/uploads
-      # 运行时图片资产持久化
-      - ./data/assets:/app/data/assets
     ports:
       - "${BIND_HOST:-0.0.0.0}:${PORT:-9517}:9517"
     healthcheck:

@@ -1,7 +1,8 @@
+# 镜像内置的兜底配置：连接信息与密钥通常由环境变量提供
+# （compose 的 DB_*/REDIS_*/JWT_SECRET/API_KEY_SECRET 在加载期覆盖本文件）。
 server:
   port: 9517
   mode: release
-  web_dir: frontend
 
 database:
   host: postgres

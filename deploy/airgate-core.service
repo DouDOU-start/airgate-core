@@ -1,5 +1,5 @@
 [Unit]
-Description=AirGate Core - Pluggable AI Gateway Runtime
+Description=AirGate Core - AI 网关
 Documentation=https://github.com/DouDOU-start/airgate-core
 After=network.target postgresql.service redis.service redis-server.service
 Wants=postgresql.service redis.service
@@ -8,7 +8,9 @@ Wants=postgresql.service redis.service
 Type=simple
 User=airgate
 Group=airgate
-WorkingDirectory=/opt/airgate-core
+# 工作目录指向数据目录：代码里的相对路径 data/uploads 会落到这里，
+# 卸载删除 /opt/airgate-core 时不会连带删掉用户数据。
+WorkingDirectory=/var/lib/airgate-core
 ExecStart=/opt/airgate-core/airgate-core --config /etc/airgate-core/config.yaml
 Restart=always
 RestartSec=5
@@ -16,7 +18,7 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=airgate-core
 
-# Security hardening
+# 安全加固
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
@@ -26,13 +28,7 @@ ReadWritePaths=/opt/airgate-core /etc/airgate-core /var/lib/airgate-core
 # 进程级文件描述符限制（与 docker compose 部署对齐）
 LimitNOFILE=65536
 
-# 默认环境变量；首次启动后用户应当通过 install.sh 或手工编辑配置：
-#  - CONFIG_PATH 可以由 --config 覆盖
-#  - PLUGINS_DIR 默认 /var/lib/airgate-core/plugins
-#  - ASSETS_DIR 默认 /var/lib/airgate-core/assets
 Environment=GIN_MODE=release
-Environment=PLUGINS_DIR=/var/lib/airgate-core/plugins
-Environment=ASSETS_DIR=/var/lib/airgate-core/assets
 
 [Install]
 WantedBy=multi-user.target
