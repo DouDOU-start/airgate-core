@@ -206,6 +206,10 @@ func startMainServer(cfg *config.Config) {
 		}
 	}()
 
+	// 旧 epay 插件遗留支付表先改名保留（BIGSERIAL 与 ent IDENTITY 不兼容会打挂迁移），
+	// 数据在 RunStartupTasks 里幂等回填进新表。
+	bootstrap.RenameLegacyPaymentTables(context.Background(), drv)
+
 	// 启动时执行非破坏性迁移，补齐缺失表和字段，避免升级后因 schema 落后导致接口报错。
 	if err := db.Schema.Create(context.Background(), migrate.WithDropIndex(false), migrate.WithDropColumn(false)); err != nil {
 		slog.Error("db_migration_failed", sdk.LogFieldError, err)
