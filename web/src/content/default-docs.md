@@ -1,30 +1,35 @@
 # 使用 AirGate
 
-AirGate 是一个统一的 AI API 网关：把 OpenAI API Key 与 ChatGPT OAuth 等上游账号统一调度、计费、限流，并对外暴露 OpenAI 兼容协议（Chat Completions / Responses）以及 Anthropic Messages 协议翻译。
+AirGate 是一个统一的 AI API 网关：把多家上游渠道统一调度、计费、限流，对外提供 OpenAI / Anthropic / Gemini **三种原生协议直连**——网关不做任何协议翻译，请求与响应原样透传，各家官方 SDK 的全部字段（工具调用、多模态、缓存等）都完整可用。
 
-你可以把现有的 OpenAI SDK、Anthropic SDK、Codex CLI、Claude Code 等客户端工具直接指向 AirGate，无需改代码。
+你可以把现有的 OpenAI SDK、Anthropic SDK、Google GenAI SDK、Codex CLI、Claude Code 等客户端工具直接指向 AirGate，无需改代码。
 
 ## 快速开始
 
 1. **创建 API Key**：进入 **API 密钥** 页，点击「创建」即可。复制返回的 `sk-...`；如果之后忘了，在该页面随时点「查看」也能再次取出。
-2. **API 基础地址**：`https://your-airgate.example.com/v1`
-3. **发请求**：把客户端的 `base_url` 指向上面的地址，`Authorization` 头设为 `Bearer sk-你的key`。
+2. **API 基础地址**：`https://your-airgate.example.com`（OpenAI 客户端加 `/v1` 后缀）
+3. **发请求**：把客户端的 `base_url` 指向上面的地址，密钥填 AirGate 的 `sk-` key（`Authorization: Bearer`、`x-api-key`、`x-goog-api-key` 三种头都支持）。
 
 ## API 概览
 
-AirGate 对外暴露 OpenAI 兼容协议，并通过协议翻译同时兼容 Anthropic Messages，常用路由：
+三种协议各走各的原生端点，客户端按自己的协议选端点即可：
 
-| 方法 | 路径 | 用途 |
+| 方法 | 路径 | 协议 / 用途 |
 | --- | --- | --- |
 | `POST` | `/v1/chat/completions` | OpenAI Chat Completions（最广泛使用的协议，绝大多数 OpenAI SDK / 第三方客户端走这条） |
 | `POST` | `/v1/responses` | OpenAI Responses API（OpenAI 较新协议） |
-| `POST` | `/v1/images/generations` | OpenAI Images API（文生图，支持 `gpt-image-1.5` / `gpt-image-2`） |
-| `POST` | `/v1/images/edits` | OpenAI Images API（图生图，支持 `gpt-image-1.5` / `gpt-image-2`） |
-| `GET`  | `/v1/images/tasks` | 查询异步生图任务状态（配合请求头 `Prefer: respond-async` 使用，详见下文「异步任务模式」） |
-| `POST` | `/v1/messages` | Anthropic Messages（Claude Code 等 Anthropic 客户端走这条；当前为协议翻译，未来对接原生 Claude 上游后将自动切换） |
-| `GET`  | `/v1/models` | 列出当前可用模型 |
+| `POST` | `/v1/images/generations` | OpenAI 生图（gpt-image / DALL·E 系，JSON，详见下方「生图」） |
+| `POST` | `/v1/images/edits` | OpenAI 图像编辑（multipart/form-data 原样透传） |
+| `POST` | `/v1/messages` | Anthropic Messages（Claude Code 等 Anthropic 客户端走这条，原生直连） |
+| `POST` | `/v1/messages/count_tokens` | Anthropic token 计数（免费端点，不计费） |
+| `POST` | `/v1beta/models/{model}:generateContent` | Gemini 非流式（Google GenAI SDK / Gemini 客户端走这条，原生直连） |
+| `POST` | `/v1beta/models/{model}:streamGenerateContent?alt=sse` | Gemini 流式（SSE） |
+| `POST` | `/v1beta/models/{model}:predict` | Gemini Imagen 生图（按次计费，详见下方「生图」） |
+| `POST` | `/v1beta/models/{model}:countTokens` | Gemini token 计数（免费端点，不计费） |
+| `GET`  | `/v1/models` | 列出当前可用模型（全协议全量列出，OpenAI 格式） |
+| `GET`  | `/v1beta/models` | 列出当前可用模型（Gemini 原生格式） |
 
-> 不带 `/v1` 前缀的别名路由也都可用，方便有些工具习惯把 base URL 直接写到根域名。
+> 端点只路由到**同协议**的上游渠道：某个模型能在哪个端点用，取决于管理员为它配置的渠道协议类型（OpenAI 兼容 / Anthropic / Gemini）。同一个模型名若配了多协议渠道，各端点各走各的，互不串台。
 
 ### curl 示例
 
@@ -59,151 +64,6 @@ resp = client.chat.completions.create(
 print(resp.choices[0].message.content)
 ```
 
-### OpenAI Images SDK（文生图）
-
-```python
-import base64
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://your-airgate.example.com/v1",
-    api_key="sk-你的key",
-)
-
-resp = client.images.generate(
-    model="gpt-image-2",            # gpt-image-1.5 | gpt-image-2
-    prompt="一只可爱的柴犬坐在樱花树下，日系水彩风格",
-    size="2048x2048",               # gpt-image-2 支持任意合规 WIDTHxHEIGHT，或 auto
-    quality="medium",               # low | medium | high | auto
-    background="opaque",            # opaque | transparent
-    output_format="png",            # png | jpeg | webp
-    n=1,
-    extra_body={"stream": True},    # 可选：上游耗时较长时，AirGate 会在等待期间通过 SSE 发送 keepalive ping 防止客户端/网关超时；响应体仍是标准 ImagesResponse
-)
-
-img = resp.data[0]
-with open("out.png", "wb") as f:
-    f.write(base64.b64decode(img.b64_json))
-```
-
-### OpenAI Images SDK（图生图）
-
-```python
-with open("in.png", "rb") as f:
-    resp = client.images.edit(
-        model="gpt-image-2",        # gpt-image-1.5 | gpt-image-2
-        image=f,                    # 也可传 [f1, f2] 列表传多张参考图
-        prompt="把这张图变成梵高星空风格的油画",
-        size="1536x1024",
-        quality="medium",
-        background="opaque",
-        output_format="png",
-        n=1,
-        extra_body={"stream": True},  # 可选：等同上面，SSE keepalive ping 防超时，响应体仍是 ImagesResponse
-    )
-
-img = resp.data[0]
-with open("out.png", "wb") as f:
-    f.write(base64.b64decode(img.b64_json))
-```
-
-### 生图：异步任务模式（`Prefer: respond-async`）
-
-上面的 `stream: True` 只是在同步等待时发心跳防超时，**响应仍是阻塞等到图片生成完才返回**。如果你想立即拿到一个 `task_id` 后台轮询、不占用一个长连接（适合移动端、Serverless、批量任务场景），给请求加 `Prefer: respond-async` HTTP header 即可。
-
-服务端行为：
-
-- 立即返回 `202 Accepted`，响应体包含 `task_id` 和 `status_url`
-- 响应头 `Preference-Applied: respond-async` 表示已切到异步模式
-- 响应头 `Location` 指向任务查询地址
-
-> 注意：异步模式的响应体不是标准 `ImagesResponse`，OpenAI 官方 SDK 的类型化解析（`client.images.generate(...)`）无法直接套用。推荐用 `httpx` / `requests` 等通用 HTTP 客户端，或调用 SDK 的 raw response 接口拿原始 JSON。
-
-Python（用 `httpx` 直发）：
-
-```python
-import time
-import httpx
-
-BASE = "https://your-airgate.example.com/v1"
-AUTH = {"Authorization": "Bearer sk-你的key"}
-
-# 1. 提交任务，立即拿到 task_id
-resp = httpx.post(
-    f"{BASE}/images/generations",
-    headers={**AUTH, "Prefer": "respond-async"},
-    json={
-        "model": "gpt-image-2",
-        "prompt": "一只可爱的柴犬坐在樱花树下",
-        "size": "2048x2048",
-    },
-    timeout=30,
-)
-resp.raise_for_status()                          # 期望 202 Accepted
-task_id = resp.json()["task_id"]                 # AirGate task id
-
-# 2. 轮询任务状态
-while True:
-    status = httpx.get(
-        f"{BASE}/images/tasks",
-        params={"task_id": task_id},
-        headers=AUTH,
-        timeout=10,
-    ).json()
-    if status["status"] in ("completed", "failed"):
-        break
-    time.sleep(2)
-
-# 3. 任务完成后：
-#    - status["result_content"] 是 Markdown 形式的图片引用，URL 为相对路径
-#      如 "![image](/assets-runtime/...)"，需拼上 base URL 才能直接访问
-#    - status["model"] / "input_tokens" / "output_tokens" / "cost" 提供计费摘要
-#    - 失败时 status["error"] 带原因
-print(status)
-```
-
-curl 等价示例：
-
-```bash
-# 提交任务
-curl -i https://your-airgate.example.com/v1/images/generations \
-  -H "Authorization: Bearer sk-你的key" \
-  -H "Content-Type: application/json" \
-  -H "Prefer: respond-async" \
-  -d '{
-    "model": "gpt-image-2",
-    "prompt": "一只可爱的柴犬坐在樱花树下",
-    "size": "2048x2048"
-  }'
-# → HTTP/1.1 202 Accepted
-#   Preference-Applied: respond-async
-#   Location: /v1/images/tasks?task_id=01933e4f-89a0-7c1e-8b3f-d4a92a1f00aa
-#   {
-#     "object": "image.task",
-#     "task_id": "01933e4f-89a0-7c1e-8b3f-d4a92a1f00aa",
-#     "status": "pending",
-#     "status_url": "/v1/images/tasks?task_id=01933e4f-89a0-7c1e-8b3f-d4a92a1f00aa"
-#   }
-
-# 轮询任务
-curl "https://your-airgate.example.com/v1/images/tasks?task_id=01933e4f-89a0-7c1e-8b3f-d4a92a1f00aa" \
-  -H "Authorization: Bearer sk-你的key"
-# → {
-#     "task_id": "01933e4f-89a0-7c1e-8b3f-d4a92a1f00aa",
-#     "status": "completed",
-#     "progress": 100,
-#     "result_content": "![image](/assets-runtime/...)",
-#     "model": "gpt-image-2",
-#     "input_tokens": 12,
-#     "output_tokens": 0,
-#     "cost": 0.012
-#   }
-```
-
-任务状态字段：`pending` / `processing` / `completed` / `failed`。失败时 `error` 字段带上原因。
-
-`/v1/images/edits` 完全相同，只是请求体多 `image` / `mask` 字段。
-
 ### Anthropic Python SDK
 
 ```python
@@ -222,6 +82,23 @@ resp = client.messages.create(
 print(resp.content[0].text)
 ```
 
+### Google GenAI Python SDK
+
+```python
+from google import genai
+
+client = genai.Client(
+    api_key="sk-你的key",
+    http_options={"base_url": "https://your-airgate.example.com"},
+)
+
+resp = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents="你好",
+)
+print(resp.text)
+```
+
 ## 常见问题
 
 ### Q: 调用接口提示 401 / 余额不足？
@@ -236,22 +113,44 @@ print(resp.content[0].text)
 
 直接在请求体的 `model` 字段里写 AirGate 当前支持的模型 ID。可调用 `GET /v1/models` 拿到完整清单。
 
-### Q: 生图接口支持哪些模型和参数？
+## 应用接入（OAuth 单点登录）
 
-支持 `gpt-image-1.5` / `gpt-image-2`。
+独立部署的应用（如对话、创作中心）可注册为 AirGate 的 OAuth 客户端，让用户用 AirGate 账号单点登录，并自动领取该用户的 API Key 调用 `/v1` 网关（消费直接计入用户余额）。
 
-| 模型 | 文生图 | 图生图 |
-| --- | --- | --- |
-| `gpt-image-1.5` | ✅ | ✅ |
-| `gpt-image-2` | ✅ | ✅ |
+管理员在 **应用接入** 页注册应用（配置回调地址白名单、是否第一方免确认、导航入口），获得 `client_id` / `client_secret`（secret 仅创建时展示一次）。
 
-参数：
+接入流程（授权码 + PKCE，PKCE 强制 S256）：
 
-- `size`：`auto` 或 `WIDTHxHEIGHT`。`gpt-image-2` 要求宽高均为 16 的倍数、单边不超过 3840、长短边比例不超过 3:1、总像素在 `655360` 到 `8294400` 之间；常用值如 `1024x1024`、`1536x1024`、`1024x1536`、`2048x2048`、`3840x2160`。
-- `quality`：`low`、`medium`、`high`、`auto`
-- `n`：OAuth 模式目前仅支持 `1`；API Key 直通模式按上游能力处理。
-- `background`：`opaque` / `transparent`
-- `output_format`：`png` / `jpeg` / `webp`
-- `input_fidelity`：仅图生图可用，`gpt-image-1` / `gpt-image-1.5` 可传 `low` / `high`；`gpt-image-2` 默认高保真处理参考图，无需传。
+```
+1. 浏览器跳转   GET  {AirGate}/oauth/authorize?client_id&redirect_uri&state
+                     &code_challenge=<base64url(sha256(verifier))>&code_challenge_method=S256
+   → 授权通过后 302 回 {redirect_uri}?code=...&state=...
 
-响应使用标准 OpenAI Images API schema（`data[].b64_json` + `usage`），官方 SDK 能直接解析。
+2. 应用后端     POST {AirGate}/oauth/token        (application/x-www-form-urlencoded)
+                     grant_type=authorization_code&code&redirect_uri
+                     &client_id&client_secret&code_verifier
+   → {"access_token","token_type":"Bearer","expires_in":7200}
+
+3. 应用后端     GET  {AirGate}/oauth/userinfo      (Authorization: Bearer <access_token>)
+   → {"sub":"<用户ID>","name","email"}
+
+4. 应用后端     POST {AirGate}/oauth/provision-key (Authorization: Bearer <access_token>)
+   → {"api_key":"sk-...","key_hint","created"}
+```
+
+说明：
+
+- `provision-key` 幂等：同一用户同一应用只有一把 key，重复调用返回同一把的完整明文；用户在密钥管理里删除后会自动重建，禁用则返回 403。
+- 领到的 `sk-` key 与用户手动创建的 key 完全等价：调 `/v1/chat/completions` 等接口、按价目表计费扣用户余额、可在使用记录中按 key 查看消耗。
+- key 只应保存在应用后端，切勿下发到浏览器。
+- 令牌有效期 2 小时，过期后重走一次静默授权即可（已登录用户无感知）。
+
+## 生图
+
+与文本一样零翻译透传，按模型所在渠道的协议选端点：
+
+- **OpenAI 协议渠道**：`POST /v1/images/generations`（JSON）与 `POST /v1/images/edits`（multipart/form-data，原样透传上游），适用 gpt-image / DALL·E 系模型。当前生图端点不支持 `stream: true`（会返回 400），后续版本放开。
+- **Gemini 原生生图**：Gemini 系生图模型（如 gemini-2.5-flash-image）走 `generateContent` / `streamGenerateContent` 端点，与文本调用完全一致。
+- **Imagen**：Imagen 系模型走 `POST /v1beta/models/{model}:predict`。
+
+计费口径：模型价目表配置了按次价（`per_request_price` > 0）时，按 **按次单价 × 产出张数** 计费（张数以响应中实际返回的图片数为准，最少按 1 次计）；未配按次价时按上游返回的 token 用量计费（gpt-image 系上游会返回 token usage）。

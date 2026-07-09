@@ -11,6 +11,14 @@ import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key } from 'lucid
 
 type TabKey = 'login' | 'register' | 'apikey';
 
+// consumeLoginRedirect 读取 ?redirect= 回跳地址（OAuth 授权页等场景）。
+// 仅允许站内相对路径，防开放重定向；带查询串所以用 location 跳转而非 router navigate。
+function consumeLoginRedirect(): string | null {
+  const raw = new URLSearchParams(window.location.search).get('redirect');
+  if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw;
+  return null;
+}
+
 /* ==================== 登录表单 ==================== */
 
 function LoginForm() {
@@ -31,7 +39,12 @@ function LoginForm() {
     try {
       const resp = await authApi.login({ email, password });
       login(resp.token, resp.user);
-      navigate({ to: '/' });
+      const redirect = consumeLoginRedirect();
+      if (redirect) {
+        window.location.assign(redirect);
+      } else {
+        navigate({ to: '/' });
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -404,7 +417,12 @@ function APIKeyLoginForm() {
       // 把用户输入的原文 Key 暂存到 sessionStorage，供 CCS 导入等需要原文的功能使用。
       setSessionAPIKey(apiKey);
       login(resp.token, { ...resp.user, api_key_id: resp.api_key_id, api_key_name: resp.api_key_name });
-      navigate({ to: '/' });
+      const redirect = consumeLoginRedirect();
+      if (redirect) {
+        window.location.assign(redirect);
+      } else {
+        navigate({ to: '/' });
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

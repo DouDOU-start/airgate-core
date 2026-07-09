@@ -22,9 +22,14 @@ import {
   lazyWithPreload,
   LoginPage,
   ModelPricesPage,
+  OAuthAuthorizePage,
+  OAuthClientsPage,
+  PaymentPage,
   preloadRoutePage,
+  RedemptionCodesPage,
   ProfilePage,
   PublicHomePage,
+  RechargePage,
   SettingsPage,
   SetupPage,
   UsagePage,
@@ -153,6 +158,17 @@ const loginRoute = createRoute({
   ),
 });
 
+// OAuth 授权页（公开路由，页面内部自行校验登录态并带回跳去登录页）
+const oauthAuthorizeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/oauth/authorize',
+  component: () => (
+    <Suspense fallback={<FullPageLoading />}>
+      <OAuthAuthorizePage />
+    </Suspense>
+  ),
+});
+
 // 认证布局（需要登录）
 const authLayout = createRoute({
   getParentRoute: () => rootRoute,
@@ -208,11 +224,15 @@ const adminModelPricesRoute = createRoute({ getParentRoute: () => adminLayout, p
 const adminGroupsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/groups', component: renderPage(GroupsPage) });
 const adminAnnouncementsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/announcements', component: renderPage(AnnouncementsPage) });
 const adminUsageRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/usage', component: renderPage(UsagePage) });
+const adminPaymentRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/payment', component: renderPage(PaymentPage) });
+const adminRedemptionRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/redemption', component: renderPage(RedemptionCodesPage) });
 const adminSettingsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/settings', component: renderPage(SettingsPage) });
+const adminOAuthClientsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/oauth-clients', component: renderPage(OAuthClientsPage) });
 
 const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/profile', component: renderPage(ProfilePage) });
 const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/keys', component: renderPage(UserKeysPage) });
 const userUsageRoute = createRoute({ getParentRoute: () => authLayout, path: '/usage', component: renderPage(UserUsagePage) });
+const rechargeRoute = createRoute({ getParentRoute: () => authLayout, path: '/recharge', component: renderPage(RechargePage) });
 
 // 路由树
 const routeTree = rootRoute.addChildren([
@@ -220,6 +240,7 @@ const routeTree = rootRoute.addChildren([
   homeRoute,
   loginRoute,
   docsRoute,
+  oauthAuthorizeRoute,
   authLayout.addChildren([
     dashboardRoute,
     adminLayout.addChildren([
@@ -229,11 +250,15 @@ const routeTree = rootRoute.addChildren([
       adminGroupsRoute,
       adminAnnouncementsRoute,
       adminUsageRoute,
+      adminPaymentRoute,
+      adminRedemptionRoute,
       adminSettingsRoute,
+      adminOAuthClientsRoute,
     ]),
     profileRoute,
     userKeysRoute,
     userUsageRoute,
+    rechargeRoute,
   ]),
 ]);
 

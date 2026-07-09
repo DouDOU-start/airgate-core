@@ -19,7 +19,11 @@ import (
 	appdashboard "github.com/DouDOU-start/airgate-core/internal/app/dashboard"
 	appgroup "github.com/DouDOU-start/airgate-core/internal/app/group"
 	appmodelprice "github.com/DouDOU-start/airgate-core/internal/app/modelprice"
+	appoauth "github.com/DouDOU-start/airgate-core/internal/app/oauth"
+	apppayment "github.com/DouDOU-start/airgate-core/internal/app/payment"
+	appredemption "github.com/DouDOU-start/airgate-core/internal/app/redemption"
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
+	appupstreamlog "github.com/DouDOU-start/airgate-core/internal/app/upstreamlog"
 	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
 	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
@@ -48,20 +52,28 @@ type HTTPHandlers struct {
 	Announcement *handler.AnnouncementHandler
 	APIKey       *handler.APIKeyHandler
 	Usage        *handler.UsageHandler
+	UpstreamLog  *handler.UpstreamLogHandler
 	Channel      *handler.ChannelHandler
 	ModelPrice   *handler.ModelPriceHandler
 	Settings     *handler.SettingsHandler
 	Dashboard    *handler.DashboardHandler
+	Payment      *handler.PaymentHandler
+	Redemption   *handler.RedemptionHandler
 	Version      *handler.VersionHandler
 	Upgrade      *handler.UpgradeHandler
+	OAuth        *handler.OAuthHandler
 
 	// ChannelService / ModelPriceService / SettingsService 暴露给 server.go：
 	// ChannelService 充当渠道注册表的 Loader/Persister 并接收 Reloader/Tester 注入，
 	// ModelPriceService 充当 pricing 缓存的 Loader 并接收 Invalidator 注入，
-	// SettingsService 供 relay 管线的 gateway 设置读取器使用。
-	ChannelService    *appchannel.Service
-	ModelPriceService *appmodelprice.Service
-	SettingsService   *appsettings.Service
+	// SettingsService 供 relay 管线的 gateway 设置读取器使用，
+	// UpstreamLogService 接收 errlog 失败计数读取器注入（渠道页监控列）。
+	ChannelService     *appchannel.Service
+	ModelPriceService  *appmodelprice.Service
+	SettingsService    *appsettings.Service
+	UpstreamLogService *appupstreamlog.Service
+	// PaymentService 暴露给 server.go：启动时装载支付服务商 + 拉起订单过期清理循环。
+	PaymentService *apppayment.Service
 }
 
 // NewHTTPHandlers 统一构造 HTTP 处理器。
@@ -73,12 +85,17 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	authService := appauth.NewService(authStore, dep.JWTMgr)
 	verifyCodeStore := mailer.NewVerifyCodeStore()
 	// 设置和验证码依赖延迟到 settingsService 创建后注入
+	// RPM 计数器为无状态 Redis 包装，user / group / channel 三个域共享一个实例。
+	rpmCounter := scheduler.NewRPMCounter(dep.Redis)
 	groupStore := store.NewGroupStore(dep.DB)
 	groupService := appgroup.NewService(groupStore, dep.Concurrency)
+	groupService.SetRPMReader(rpmCounter)
 	announcementStore := store.NewAnnouncementStore(dep.DB)
 	announcementService := appannouncement.NewService(announcementStore)
 	channelStore := store.NewChannelStore(dep.DB)
 	channelService := appchannel.NewService(channelStore, dep.Config.APIKeySecret())
+	channelService.SetRuntimeStatsReaders(dep.Concurrency, rpmCounter)
+	channelService.SetStatsReader(channelStore)
 	modelPriceStore := store.NewModelPriceStore(dep.DB)
 	modelPriceService := appmodelprice.NewService(modelPriceStore)
 	dashboardStore := store.NewDashboardStore(dep.DB, dep.Redis)
@@ -93,6 +110,9 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 
 	userStore := store.NewUserStore(dep.DB)
 	userService := appuser.NewService(userStore)
+	// 用户列表的并发/RPM 观测：并发读用户槽（dep.Concurrency），RPM 读取器
+	// 与 relay 管线共用同一套 Redis key（rpm:user:*），实例无状态可各建各的。
+	userService.SetRuntimeStatsReaders(dep.Concurrency, rpmCounter)
 
 	// 余额预警回调：从设置读取 SMTP 配置发送邮件
 	userService.SetBalanceAlertCallback(func(email string, balance float64, threshold float64) {
@@ -100,8 +120,22 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	})
 	usageStore := store.NewUsageStore(dep.DB)
 	usageService := appusage.NewService(usageStore, dep.Redis)
+	upstreamLogStore := store.NewUpstreamLogStore(dep.DB)
+	upstreamLogService := appupstreamlog.NewService(upstreamLogStore)
+
+	paymentStore := store.NewPaymentStore(dep.DB)
+	paymentService := apppayment.NewService(paymentStore, paymentSettingsAdapter{settingsService}, dep.Config.APIKeySecret())
+
+	redemptionStore := store.NewRedemptionStore(dep.DB)
+	redemptionService := appredemption.NewService(redemptionStore)
 
 	upgradeService := upgrade.NewService(upgrade.DetectMode(), dep.Redis)
+
+	// OAuth 应用接入：客户端仓储兼任 UserReader，授权码/令牌走 Redis，
+	// provision-key 复用 apikey 服务的 get-or-create。
+	oauthClientStore := store.NewOAuthClientStore(dep.DB)
+	oauthGrantStore := store.NewOAuthGrantStore(dep.Redis)
+	oauthService := appoauth.NewService(oauthClientStore, oauthGrantStore, oauthClientStore, apiKeyService)
 
 	return &HTTPHandlers{
 		Auth:         handler.NewAuthHandler(authService, dep.JWTMgr),
@@ -110,17 +144,40 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Announcement: handler.NewAnnouncementHandler(announcementService),
 		APIKey:       handler.NewAPIKeyHandler(apiKeyService),
 		Usage:        handler.NewUsageHandler(usageService),
+		UpstreamLog:  handler.NewUpstreamLogHandler(upstreamLogService),
 		Channel:      handler.NewChannelHandler(channelService),
 		ModelPrice:   handler.NewModelPriceHandler(modelPriceService),
 		Settings:     handler.NewSettingsHandler(settingsService),
 		Dashboard:    handler.NewDashboardHandler(dashboardService),
+		Payment:      handler.NewPaymentHandler(paymentService),
+		Redemption:   handler.NewRedemptionHandler(redemptionService),
 		Version:      handler.NewVersionHandler(),
 		Upgrade:      handler.NewUpgradeHandler(upgradeService),
+		OAuth:        handler.NewOAuthHandler(oauthService),
 
-		ChannelService:    channelService,
-		ModelPriceService: modelPriceService,
-		SettingsService:   settingsService,
+		ChannelService:     channelService,
+		ModelPriceService:  modelPriceService,
+		SettingsService:    settingsService,
+		UpstreamLogService: upstreamLogService,
+		PaymentService:     paymentService,
 	}
+}
+
+// paymentSettingsAdapter 将 appsettings.Service 适配为 apppayment.SettingsLister 接口。
+type paymentSettingsAdapter struct {
+	svc *appsettings.Service
+}
+
+func (a paymentSettingsAdapter) List(ctx context.Context, group string) ([]apppayment.SettingItem, error) {
+	items, err := a.svc.List(ctx, group)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]apppayment.SettingItem, len(items))
+	for i, item := range items {
+		out[i] = apppayment.SettingItem{Key: item.Key, Value: item.Value}
+	}
+	return out, nil
 }
 
 // settingsAdapter 将 appsettings.Service 适配为 appauth.SettingsLister 接口。

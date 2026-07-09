@@ -5,12 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/DouDOU-start/airgate-core/internal/asset"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 	"github.com/DouDOU-start/airgate-core/internal/setup"
 	webfs "github.com/DouDOU-start/airgate-core/internal/web"
@@ -96,6 +93,22 @@ func (s *Server) registerRoutes() {
 		userGroup.GET("/usage", handlers.Usage.UserUsage)
 		userGroup.GET("/usage/stats", handlers.Usage.UserUsageStats)
 		userGroup.GET("/usage/trend", handlers.Usage.UserUsageTrend)
+		// 用户视角失败请求（脱敏：不含渠道/重试链/IP/UA）
+		userGroup.GET("/usage/upstream-logs", handlers.UpstreamLog.UserList)
+
+		// 在线充值（仅真实用户会话；API Key 登录的 end customer 不可充值）
+		accountGroup.GET("/payment/methods", handlers.Payment.ListMethods)
+		accountGroup.POST("/payment/orders", handlers.Payment.CreateOrder)
+		accountGroup.GET("/payment/orders", handlers.Payment.ListUserOrders)
+		accountGroup.GET("/payment/orders/:out_trade_no", handlers.Payment.GetUserOrder)
+
+		// 兑换码充值（同充值：仅真实用户会话）
+		accountGroup.POST("/redeem", handlers.Redemption.Redeem)
+
+		// OAuth 应用授权（仅真实用户会话；SPA 授权页转发）+ 应用导航入口
+		accountGroup.GET("/oauth/authorize-info", handlers.OAuth.GetAuthorizeInfo)
+		accountGroup.POST("/oauth/authorize", handlers.OAuth.Authorize)
+		accountGroup.GET("/apps", handlers.OAuth.ListApps)
 	}
 
 	// === 管理员路由（需要管理员 JWT + AdminOnly，支持 admin- 管理员 API Key） ===
@@ -141,10 +154,13 @@ func (s *Server) registerRoutes() {
 		adminGroup.PUT("/channels/:id", handlers.Channel.UpdateChannel)
 		adminGroup.DELETE("/channels/:id", handlers.Channel.DeleteChannel)
 		adminGroup.POST("/channels/:id/test", handlers.Channel.TestChannel)
+		adminGroup.POST("/channels/:id/balance", handlers.Channel.RefreshChannelBalance)
 		adminGroup.POST("/channels/:id/fetch-models", handlers.Channel.FetchChannelModels)
 		// 预览拉取：渠道未保存时按表单连接参数试拉模型（静态段，先于 :id 匹配）
 		adminGroup.POST("/channels/fetch-models", handlers.Channel.FetchChannelModelsPreview)
 		adminGroup.POST("/channels/bulk-update", handlers.Channel.BulkUpdateChannels)
+		// 渠道近 N 分钟失败计数（errlog Redis 分钟桶，渠道页监控列）
+		adminGroup.GET("/channels/failure-stats", handlers.UpstreamLog.ChannelFailureStats)
 
 		// 模型价格
 		adminGroup.GET("/model-prices", handlers.ModelPrice.ListModelPrices)
@@ -153,10 +169,19 @@ func (s *Server) registerRoutes() {
 		adminGroup.DELETE("/model-prices/:id", handlers.ModelPrice.DeleteModelPrice)
 		adminGroup.POST("/model-prices/import", handlers.ModelPrice.ImportModelPrices)
 
+		// 模型标签（家族归类，归属模型管理）
+		adminGroup.GET("/model-tags", handlers.ModelPrice.ListModelTags)
+		adminGroup.POST("/model-tags", handlers.ModelPrice.CreateModelTag)
+		adminGroup.PUT("/model-tags/:id", handlers.ModelPrice.UpdateModelTag)
+		adminGroup.DELETE("/model-tags/:id", handlers.ModelPrice.DeleteModelTag)
+
 		// 使用记录（管理员）
 		adminGroup.GET("/usage", handlers.Usage.AdminUsage)
 		adminGroup.GET("/usage/stats", handlers.Usage.AdminUsageStats)
 		adminGroup.GET("/usage/trend", handlers.Usage.AdminUsageTrend)
+
+		// 上游请求日志（失败留痕/渠道测试/拉模型，仅管理员）
+		adminGroup.GET("/upstream-logs", handlers.UpstreamLog.AdminList)
 
 		// 系统设置
 		adminGroup.GET("/settings", handlers.Settings.GetSettings)
@@ -169,6 +194,13 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/settings/admin-api-key", handlers.Settings.GenerateAdminAPIKey)
 		adminGroup.DELETE("/settings/admin-api-key", handlers.Settings.DeleteAdminAPIKey)
 
+		// OAuth 应用接入管理
+		adminGroup.GET("/oauth-clients", handlers.OAuth.ListOAuthClients)
+		adminGroup.POST("/oauth-clients", handlers.OAuth.CreateOAuthClient)
+		adminGroup.PUT("/oauth-clients/:id", handlers.OAuth.UpdateOAuthClient)
+		adminGroup.DELETE("/oauth-clients/:id", handlers.OAuth.DeleteOAuthClient)
+		adminGroup.POST("/oauth-clients/:id/reset-secret", handlers.OAuth.ResetOAuthClientSecret)
+
 		// 仪表盘（管理员）
 		adminGroup.GET("/dashboard/stats", handlers.Dashboard.Stats)
 		adminGroup.GET("/dashboard/trend", handlers.Dashboard.Trend)
@@ -180,6 +212,19 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/upgrade/info", handlers.Upgrade.GetInfo)
 		adminGroup.GET("/upgrade/status", handlers.Upgrade.GetStatus)
 		adminGroup.POST("/upgrade/run", handlers.Upgrade.Run)
+
+		// 支付管理：订单总览 + 服务商实例配置（保存即热加载）
+		adminGroup.GET("/payment/orders", handlers.Payment.AdminListOrders)
+		adminGroup.GET("/payment/providers", handlers.Payment.AdminListProviders)
+		adminGroup.POST("/payment/providers", handlers.Payment.AdminUpsertProvider)
+		adminGroup.DELETE("/payment/providers/:id", handlers.Payment.AdminDeleteProvider)
+
+		// 兑换码管理
+		adminGroup.GET("/redemption-codes", handlers.Redemption.AdminListCodes)
+		adminGroup.GET("/redemption-codes/stats", handlers.Redemption.AdminStats)
+		adminGroup.POST("/redemption-codes", handlers.Redemption.AdminGenerateCodes)
+		adminGroup.PATCH("/redemption-codes/:id/status", handlers.Redemption.AdminUpdateStatus)
+		adminGroup.DELETE("/redemption-codes/:id", handlers.Redemption.AdminDeleteCode)
 	}
 
 	// 加载嵌入的前端 SPA：所有静态资源通过 //go:embed 打进二进制
@@ -195,13 +240,29 @@ func (s *Server) registerRoutes() {
 		os.Exit(1)
 	}
 
-	// === 对外网关路由（sk- API Key 鉴权，OpenAI 兼容） ===
-	// 显式静态注册（先于 NoRoute），错误体统一走 relay 的 OpenAI 形态 errfmt。
+	// === 对外网关路由（sk- API Key 鉴权，纯透传：入站端点按协议分树） ===
+	// 显式静态注册（先于 NoRoute），错误体按入口协议出原生形态（errfmt 按 EntryProtocol 分发）。
 	relayGroup := r.Group("/v1", middleware.APIKeyAuth(s.db))
 	{
+		// OpenAI 协议（openai_compatible / custom 渠道）
 		relayGroup.POST("/chat/completions", s.relay.HandleChatCompletions)
 		relayGroup.POST("/responses", s.relay.HandleResponses)
+		relayGroup.POST("/images/generations", s.relay.HandleImagesGenerations)
+		relayGroup.POST("/images/edits", s.relay.HandleImagesEdits)
 		relayGroup.GET("/models", s.relay.HandleModels)
+		// Anthropic 协议（anthropic 渠道）
+		relayGroup.POST("/messages", s.relay.HandleMessages)
+		relayGroup.POST("/messages/count_tokens", s.relay.HandleMessagesCountTokens)
+	}
+	// Gemini 协议（gemini 渠道）：路径形如 /v1beta/models/{model}:generateContent，
+	// ':' 在 gin 路由里只有段首才是参数语法、段中不是分隔符——用单参数段承载
+	// "model:action"，handler 内自行解析（见 pipeline.HandleGenerateContent，
+	// 动词含 generateContent / streamGenerateContent / predict / countTokens）。
+	geminiGroup := r.Group("/v1beta", middleware.APIKeyAuth(s.db))
+	{
+		geminiGroup.POST("/models/:modelAction", s.relay.HandleGenerateContent)
+		// Gemini 原生形态模型列表（{"models":[{"name":"models/<id>",...}]}）。
+		geminiGroup.GET("/models", s.relay.HandleGeminiModels)
 	}
 
 	// === cc-switch 通用模板兼容端点（使用 sk-xxx API Key 自鉴权） ===
@@ -210,13 +271,26 @@ func (s *Server) registerRoutes() {
 	// 实现见 cc_compat.go。
 	r.GET("/v1/usage", s.handleCCCompatUserBalance)
 
+	// === 支付平台异步回调（公开路由，验签在 provider 实现内完成） ===
+	// 易支付系走 form/GET，微信 V3 / easypay 走 JSON body + header 签名。
+	r.POST("/api/v1/payment/notify/:provider_id", handlers.Payment.HandleCallback)
+	r.GET("/api/v1/payment/notify/:provider_id", handlers.Payment.HandleCallback)
+
+	// OAuth 协议端点（公开，供外部应用后端调用，RFC 6749 原始响应形态）。
+	// GET /oauth/authorize 是 SPA 路由（授权页），经 NoRoute 落到前端。
+	// token 端点带 IP 限流，防 client_secret 爆破。
+	oauthRL := middleware.NewIPRateLimit(60)
+	s.oauthRateLimiter = oauthRL.Limiter
+	r.POST("/oauth/token", oauthRL.Handler, handlers.OAuth.Token)
+	r.GET("/oauth/userinfo", handlers.OAuth.UserInfo)
+	r.POST("/oauth/provision-key", handlers.OAuth.ProvisionKey)
+
 	// 上传文件静态服务（这部分仍然在磁盘上，因为是用户上传的运行时数据）
 	//
-	// ⚠️ 安全说明：此路径公开可访问，无需认证。上传的文件（如头像、聊天图片）可能
+	// ⚠️ 安全说明：此路径公开可访问，无需认证。上传的文件（如站点 logo）可能
 	// 被嵌入外部链接中分享，因此保持公开。文件名使用 UUID 生成，不可枚举。
 	// 如未来需要访问控制，应替换为带鉴权的路由组。
 	r.Static("/uploads", "data/uploads")
-	r.GET("/assets-runtime/*path", s.handleRuntimeAsset)
 
 	// 静态文件服务（前端 SPA）
 	r.StaticFS("/assets", http.FS(assetsFS))
@@ -226,93 +300,4 @@ func (s *Server) registerRoutes() {
 	r.NoRoute(func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
 	})
-}
-
-// handleRuntimeAsset 处理 /assets-runtime/* 运行时资产请求。
-//
-// 路径穿越防御：clean 后检查不允许 ".."。
-func (s *Server) handleRuntimeAsset(c *gin.Context) {
-	rel := strings.TrimPrefix(path.Clean("/"+c.Param("path")), "/")
-	if rel == "" || rel == "." || strings.HasPrefix(rel, "../") || strings.Contains(rel, "/../") {
-		c.Status(http.StatusBadRequest)
-		return
-	}
-	storage, err := asset.NewAssetStorage(c.Request.Context(), s.db)
-	if err != nil {
-		slog.Warn("runtime_asset_storage_init_failed", "error", err)
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-	localPath, err := storage.LocalPath(rel)
-	if err != nil {
-		c.Status(http.StatusBadRequest)
-		return
-	}
-	c.Header("Cache-Control", "public, max-age=31536000, immutable")
-
-	if width := resolveThumbWidth(c.Query("w")); width > 0 && thumbnailableExt(rel) {
-		cachePath := thumbCachePath(localPath, width)
-		if data, err := os.ReadFile(cachePath); err == nil {
-			c.Data(http.StatusOK, "image/jpeg", data)
-			return
-		}
-		data, contentType, err := storage.GetBytes(c.Request.Context(), rel)
-		if err != nil {
-			c.Status(http.StatusNotFound)
-			return
-		}
-		thumb, thumbErr := generateThumbnailFromBytes(data, cachePath, width)
-		if thumbErr == nil {
-			c.Data(http.StatusOK, "image/jpeg", thumb)
-			return
-		}
-		if contentType == "" || contentType == "application/octet-stream" {
-			contentType = contentTypeFromExt(rel)
-		}
-		c.Data(http.StatusOK, contentType, data)
-		return
-	}
-
-	data, contentType, err := storage.GetBytes(c.Request.Context(), rel)
-	if err != nil {
-		c.Status(http.StatusNotFound)
-		return
-	}
-	if contentType == "" || contentType == "application/octet-stream" {
-		contentType = contentTypeFromExt(rel)
-	}
-	c.Data(http.StatusOK, contentType, data)
-}
-
-// contentTypeFromExt 按扩展名返回 Content-Type。覆盖运行时资产里常见的几种文件，
-// 未知扩展名退回 application/octet-stream。
-func contentTypeFromExt(name string) string {
-	switch {
-	case strings.HasSuffix(name, ".html"):
-		return "text/html; charset=utf-8"
-	case strings.HasSuffix(name, ".css"):
-		return "text/css; charset=utf-8"
-	case strings.HasSuffix(name, ".js"), strings.HasSuffix(name, ".mjs"):
-		return "application/javascript; charset=utf-8"
-	case strings.HasSuffix(name, ".json"):
-		return "application/json"
-	case strings.HasSuffix(name, ".svg"):
-		return "image/svg+xml"
-	case strings.HasSuffix(name, ".png"):
-		return "image/png"
-	case strings.HasSuffix(name, ".jpg"), strings.HasSuffix(name, ".jpeg"):
-		return "image/jpeg"
-	case strings.HasSuffix(name, ".webp"):
-		return "image/webp"
-	case strings.HasSuffix(name, ".gif"):
-		return "image/gif"
-	case strings.HasSuffix(name, ".mp4"):
-		return "video/mp4"
-	case strings.HasSuffix(name, ".mp3"):
-		return "audio/mpeg"
-	case strings.HasSuffix(name, ".woff2"):
-		return "font/woff2"
-	default:
-		return "application/octet-stream"
-	}
 }

@@ -63,6 +63,10 @@ export interface UserResp {
   balance: number;
   role: SessionRole;
   max_concurrency: number;
+  /** 当前在途请求数（仅管理员列表返回有效值） */
+  current_concurrency?: number;
+  /** 当前分钟请求数（仅管理员列表返回有效值） */
+  current_rpm?: number;
 
   group_rates?: Record<number, number>;
   allowed_group_ids?: number[];
@@ -156,6 +160,10 @@ export interface GroupResp {
   sort_weight: number;
   today_cost: number;
   total_cost: number;
+  /** 当前在途请求数（列表实时观测） */
+  current_concurrency?: number;
+  /** 当前分钟请求数（列表实时观测） */
+  current_rpm?: number;
   created_at: string;
   updated_at: string;
 }
@@ -244,36 +252,101 @@ export interface UpdateAPIKeyReq {
   status?: 'active' | 'disabled';
 }
 
+// ==================== 上游请求日志（失败留痕/渠道测试/拉模型，仅管理员） ====================
+
+/** 重试链一跳（attempt_chain 元素） */
+export interface UpstreamAttemptHop {
+  seq: number;
+  channel_id: number;
+  channel_name: string;
+  key_hint?: string;
+  upstream_status?: number;
+  verdict: string; // rateLimited / authFailed / transient / networkError / clientError / streamAborted
+  reason?: string;
+  retry_after_ms?: number;
+  latency_ms?: number;
+  auto_disabled?: boolean;
+}
+
+export interface UpstreamLogResp {
+  id: number;
+  request_id: string;
+  /** 发起方：relay 用户转发 / channel_test 渠道测试（表内只有失败行） */
+  source: 'relay' | 'channel_test';
+  phase?: string;
+  status_code: number;
+  error_type?: string;
+  error_code?: string;
+  message: string;
+  attempts: number;
+  /** UpstreamAttemptHop 数组（后端原样透传 JSON） */
+  attempt_chain?: UpstreamAttemptHop[];
+  /** 该请求是否同时产生了消费记录（流式中断/带 usage 的 4xx） */
+  billed: boolean;
+  model?: string;
+  endpoint?: string;
+  stream: boolean;
+  user_id?: number;
+  user_email?: string;
+  api_key_id?: number;
+  group_id?: number;
+  channel_id?: number;
+  channel_name?: string;
+  ip_address?: string;
+  user_agent?: string;
+  duration_ms: number;
+  repeat_count: number;
+  created_at: string;
+}
+
+export interface UpstreamLogQuery extends PageReq {
+  source?: 'relay' | 'channel_test';
+  phase?: string;
+  user_id?: number;
+  api_key_id?: number;
+  channel_id?: number;
+  request_id?: string;
+  model?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+/**
+ * UserUpstreamLogResp 用户视角失败请求（后端已脱敏：无渠道/重试链/IP/UA）。
+ */
+export interface UserUpstreamLogResp {
+  id: number;
+  request_id: string;
+  phase?: string;
+  status_code: number;
+  error_type?: string;
+  error_code?: string;
+  message: string;
+  attempts: number;
+  billed: boolean;
+  model?: string;
+  endpoint?: string;
+  stream: boolean;
+  api_key_id?: number;
+  duration_ms: number;
+  repeat_count: number;
+  created_at: string;
+}
+
+/** 单渠道近 N 分钟失败计数（verdict → 次数；clientError 不计入） */
+export interface ChannelFailureCounts {
+  channel_id: number;
+  total: number;
+  by_verdict: Record<string, number>;
+}
+
+/** 渠道失败计数响应（errlog Redis 分钟桶汇总） */
+export interface ChannelFailureStatsResp {
+  minutes: number;
+  channels: ChannelFailureCounts[];
+}
+
 // ==================== Usage ====================
-
-export interface UsageAttribute {
-  key?: string;
-  label: string;
-  kind?: string;
-  value: string;
-  metadata?: Record<string, string>;
-}
-
-export interface UsageMetric {
-  key?: string;
-  label: string;
-  kind?: string;
-  unit?: string;
-  value: number;
-  account_cost?: number;
-  currency?: string;
-  metadata?: Record<string, string>;
-}
-
-export interface UsageCostDetail {
-  key?: string;
-  label: string;
-  account_cost: number;
-  user_cost?: number;
-  billing_multiplier?: number;
-  currency?: string;
-  metadata?: Record<string, string>;
-}
 
 export interface UsageLogResp {
   id: number;
@@ -287,7 +360,6 @@ export interface UsageLogResp {
   channel_id: number;
   channel_name?: string;
   group_id: number;
-  platform: string;
   model: string;
   input_tokens: number;
   output_tokens: number;
@@ -298,7 +370,8 @@ export interface UsageLogResp {
   cache_creation_5m_tokens: number;
   /** Anthropic 缓存创建 1h 档 */
   cache_creation_1h_tokens: number;
-  reasoning_output_tokens: number;
+  /** 按次计费计次数（图像端点=响应产出张数）；token 计费端点恒 0 */
+  calls: number;
   input_price: number;
   output_price: number;
   cached_input_price: number;
@@ -313,16 +386,12 @@ export interface UsageLogResp {
   actual_cost: number;
   /** 客户账面消耗（含 sell_rate markup）；reseller 计算 actual_cost 与之差额即利润 */
   billed_cost: number;
-  /** 渠道成本（JSON 键沿用 account_cost）= total × channel.cost_ratio */
-  account_cost: number;
   rate_multiplier: number;
   /** 快照：本次请求生效的 sell_rate；0 表示该 key 当时未启用 markup */
   sell_rate: number;
-  /** 快照：本次请求生效的渠道成本倍率（JSON 键沿用 account_rate_multiplier） */
+  /** 快照：本次请求生效的渠道成本倍率；渠道成本 = total_cost × 本值（前端现算） */
   account_rate_multiplier: number;
   service_tier?: string;
-  /** 图像生成实际出图尺寸（"WxH"），非图像请求不返。admin 后台显示在模型名下方做计费分档解释。 */
-  image_size?: string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;
@@ -330,12 +399,10 @@ export interface UsageLogResp {
   ip_address?: string;
   /** 请求端点 */
   endpoint?: string;
-  /** 推理强度档位 */
-  reasoning_effort?: string;
-  usage_attributes?: UsageAttribute[];
-  usage_metrics?: UsageMetric[];
-  usage_cost_details?: UsageCostDetail[];
-  usage_metadata?: Record<string, string>;
+  /** 记账来源：relay 用户转发 / channel_test 渠道测试 */
+  source: 'relay' | 'channel_test';
+  /** 请求 ID（X-Request-ID）：与失败请求留痕互查 */
+  request_id?: string;
   created_at: string;
 }
 
@@ -348,7 +415,6 @@ export interface UsageLogResp {
 export interface CustomerUsageLogResp {
   id: number;
   api_key_id: number;
-  platform: string;
   model: string;
   input_tokens: number;
   output_tokens: number;
@@ -359,22 +425,18 @@ export interface CustomerUsageLogResp {
   cache_creation_5m_tokens: number;
   /** Anthropic 缓存创建 1h 档 */
   cache_creation_1h_tokens: number;
-  reasoning_output_tokens: number;
+  /** 按次计费计次数（图像端点=响应产出张数）；token 计费端点恒 0 */
+  calls: number;
   /** 客户视角："本次消耗 = X 美元" */
   cost: number;
   service_tier?: string;
-  /** 图像生成实际出图尺寸（"WxH"），非图像请求不返。 */
-  image_size?: string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;
   /** 请求端点 */
   endpoint?: string;
-  /** 推理强度档位 */
-  reasoning_effort?: string;
-  usage_attributes?: UsageAttribute[];
-  usage_metrics?: UsageMetric[];
-  usage_metadata?: Record<string, string>;
+  /** 请求 ID（X-Request-ID） */
+  request_id?: string;
   created_at: string;
 }
 
@@ -383,7 +445,6 @@ export interface UsageQuery extends PageReq {
   api_key_id?: number;
   channel_id?: number;
   group_id?: number;
-  platform?: string;
   model?: string;
   start_date?: string;
   end_date?: string;
@@ -455,7 +516,7 @@ export interface UsageTrendBucket {
 // ==================== Channel ====================
 
 /** 渠道协议类型 */
-export type ChannelType = 'openai_compatible' | 'anthropic' | 'gemini' | 'custom';
+export type ChannelType = 'openai_compatible' | 'anthropic' | 'gemini';
 
 /** 渠道状态：enabled 启用（status_until 未过期时为冷却中）/ disabled_manual 手动禁用 / disabled_auto 自动禁用 */
 export type ChannelStatus = 'enabled' | 'disabled_manual' | 'disabled_auto';
@@ -484,11 +545,21 @@ export interface ChannelResp {
   cost_ratio: number;
   tags: string[];
   test_model: string;
-  custom_config: Record<string, unknown> | null;
   response_time_ms: number;
   tested_at?: string;
+  /** 上游账户余额（USD，多 key 求和）；仅 openai_compatible 中转站可查 */
+  balance: number;
+  balance_updated_at?: string;
   last_used_at?: string;
   group_ids: number[];
+  /** 当前在途请求数（列表实时观测） */
+  current_concurrency?: number;
+  /** 当前分钟请求数（列表实时观测） */
+  current_rpm?: number;
+  /** 累计渠道成本（Σ total_cost × 成本倍率快照） */
+  total_cost?: number;
+  /** 累计平台收益（Σ actual_cost 实际扣费） */
+  total_revenue?: number;
   created_at: string;
   updated_at: string;
 }
@@ -498,7 +569,8 @@ export interface CreateChannelReq {
   type: ChannelType;
   base_url: string;
   api_keys: string[];
-  models: string[];
+  /** 可空：创建时可不配模型（渠道不会被调度命中），建后在「模型」弹窗维护 */
+  models?: string[];
   model_mapping?: Record<string, string>;
   param_override?: Record<string, unknown>;
   header_override?: Record<string, string>;
@@ -510,7 +582,6 @@ export interface CreateChannelReq {
   cost_ratio?: number;
   tags?: string[];
   test_model?: string;
-  custom_config?: Record<string, unknown>;
   group_ids?: number[];
 }
 
@@ -533,13 +604,14 @@ export interface UpdateChannelReq {
   cost_ratio?: number;
   tags?: string[];
   test_model?: string;
-  custom_config?: Record<string, unknown>;
   group_ids?: number[];
 }
 
 export interface TestChannelReq {
   /** 缺省时后端取渠道 test_model 或首个模型 */
   model?: string;
+  /** 测试端点（仅 openai 协议渠道生效）：chat_completions（默认）/ responses */
+  endpoint?: 'chat_completions' | 'responses';
 }
 
 export interface TestChannelResp {
@@ -549,6 +621,11 @@ export interface TestChannelResp {
 
 export interface FetchChannelModelsResp {
   models: string[];
+}
+
+export interface RefreshChannelBalanceResp {
+  balance: number;
+  balance_updated_at?: string;
 }
 
 // 预览拉取模型请求（渠道未保存，直接给连接参数）
@@ -590,8 +667,17 @@ export interface ModelPriceResp {
   cache_creation_1h_price: number;
   per_request_price: number;
   pricing_extra?: Record<string, unknown>;
+  /** 模型标签（家族归类，可空）。 */
+  tag?: { id: number; name: string } | null;
   created_at: string;
   updated_at: string;
+}
+
+/** 模型标签；model_count 为引用该标签的模型数。 */
+export interface ModelTagResp {
+  id: number;
+  name: string;
+  model_count: number;
 }
 
 export interface CreateModelPriceReq {
@@ -603,6 +689,8 @@ export interface CreateModelPriceReq {
   cache_creation_1h_price?: number;
   per_request_price?: number;
   pricing_extra?: Record<string, unknown>;
+  /** 模型标签 ID（省略或 0 = 不挂标签）。 */
+  tag_id?: number;
 }
 
 export interface UpdateModelPriceReq {
@@ -614,6 +702,8 @@ export interface UpdateModelPriceReq {
   cache_creation_1h_price?: number;
   per_request_price?: number;
   pricing_extra?: Record<string, unknown>;
+  /** 三态：省略 = 不改；0 = 清空标签；正数 = 设为该标签。 */
+  tag_id?: number;
 }
 
 export interface ImportModelPriceItem {
@@ -680,9 +770,13 @@ export interface DashboardStatsResp {
   today_tokens: number;
   today_cost: number;
   today_standard_cost: number;
+  /** 今日渠道成本（Σ total_cost × 成本倍率快照） */
+  today_channel_cost: number;
   alltime_tokens: number;
   alltime_cost: number;
   alltime_standard_cost: number;
+  /** 累计渠道成本 */
+  alltime_channel_cost: number;
   rpm: number;
   tpm: number;
   avg_first_token_ms: number;
@@ -851,4 +945,263 @@ export interface UpdateAnnouncementReq {
   notify_mode?: AnnouncementNotifyMode;
   starts_at?: string;
   ends_at?: string;
+}
+
+// ==================== Payment ====================
+
+export type PaymentOrderStatus = 'pending' | 'paid' | 'expired';
+
+// 充值订单 —— 与后端 dto.PaymentOrderResp 对应
+export interface PaymentOrder {
+  out_trade_no: string;
+  user_id: number;
+  /** 仅管理端列表返回 */
+  user_email?: string;
+  method: string;
+  provider_id: string;
+  amount: number;
+  status: PaymentOrderStatus;
+  subject: string;
+  payment_url?: string;
+  qr_code_content?: string;
+  paid_at?: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 支付方式展示元信息（后端 provider.MethodInfo）
+export interface PaymentMethodInfo {
+  key: string;
+  label: string;
+  icon: string;
+  description: string;
+}
+
+// 用户可用支付方式响应
+export interface PaymentMethodsResp {
+  methods: PaymentMethodInfo[];
+  configured: boolean;
+}
+
+export interface CreatePaymentOrderReq {
+  amount: number;
+  method: string;
+  subject?: string;
+}
+
+// 用户充值记录响应
+export interface PaymentOrderListResp {
+  list: PaymentOrder[];
+}
+
+// 管理端订单统计
+export interface PaymentOrderStats {
+  total: number;
+  paid: number;
+  pending: number;
+  expired: number;
+  total_amount: number;
+  today_amount: number;
+}
+
+// 管理端订单列表响应
+export interface AdminPaymentOrdersResp {
+  list: PaymentOrder[];
+  total: number;
+  stats: PaymentOrderStats;
+}
+
+export interface AdminPaymentOrdersQuery {
+  page?: number;
+  page_size?: number;
+  email?: string;
+  status?: string;
+}
+
+// 服务商配置表单字段描述（驱动前端动态表单）
+export interface PaymentProviderFieldDescriptor {
+  key: string;
+  label: string;
+  /** text / password / textarea / number / bool / method-multi */
+  type: string;
+  required?: boolean;
+  placeholder?: string;
+  description?: string;
+}
+
+// 服务商协议类型元信息
+export interface PaymentProviderKindMeta {
+  kind: string;
+  name: string;
+  description: string;
+  supported_methods: string[];
+  field_descriptors: PaymentProviderFieldDescriptor[];
+}
+
+// 服务商实例（config 中敏感字段已掩码为空串，sensitive_keys 标记「已配置、留空保持不变」）
+export interface PaymentProviderItem {
+  id: string;
+  kind: string;
+  name: string;
+  enabled: boolean;
+  config: Record<string, string>;
+  supported_methods: string[];
+  is_running: boolean;
+  sensitive_keys: string[];
+}
+
+// 服务商列表 + 协议类型元信息响应
+export interface PaymentProvidersResp {
+  providers: PaymentProviderItem[];
+  kinds: PaymentProviderKindMeta[];
+}
+
+// 新增/编辑服务商实例请求（id 留空自动生成；original_id 非空且 ≠ id 表示重命名）
+export interface UpsertPaymentProviderReq {
+  id?: string;
+  original_id?: string;
+  kind: string;
+  enabled: boolean;
+  config: Record<string, string>;
+}
+
+export interface UpsertPaymentProviderResp {
+  id: string;
+}
+
+// ==================== OAuth 应用接入 ====================
+
+// OAuth 客户端（管理面），secret 只出 hint
+export interface OAuthClientResp {
+  id: number;
+  client_id: string;
+  secret_hint: string;
+  name: string;
+  description: string;
+  redirect_uris: string[];
+  first_party: boolean;
+  enabled: boolean;
+  show_in_nav: boolean;
+  launch_url: string;
+  icon: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// 创建/重置 secret 响应：client_secret 明文仅此一次
+export interface OAuthClientSecretResp extends OAuthClientResp {
+  client_secret: string;
+}
+
+export interface CreateOAuthClientReq {
+  name: string;
+  description?: string;
+  redirect_uris: string[];
+  first_party?: boolean;
+  enabled?: boolean;
+  show_in_nav?: boolean;
+  launch_url?: string;
+  icon?: string;
+  sort_order?: number;
+}
+
+export interface UpdateOAuthClientReq {
+  name: string;
+  description: string;
+  redirect_uris: string[];
+  first_party: boolean;
+  enabled: boolean;
+  show_in_nav: boolean;
+  launch_url: string;
+  icon: string;
+  sort_order: number;
+}
+
+// 授权页信息
+export interface AuthorizeInfoResp {
+  name: string;
+  description: string;
+  icon: string;
+  first_party: boolean;
+}
+
+export interface AuthorizeReq {
+  client_id: string;
+  redirect_uri: string;
+  scope?: string;
+  state?: string;
+  code_challenge: string;
+  code_challenge_method: string;
+}
+
+export interface AuthorizeResp {
+  code: string;
+  state: string;
+}
+
+// 用户端导航应用入口
+export interface AppEntryResp {
+  name: string;
+  description: string;
+  icon: string;
+  launch_url: string;
+}
+
+// ==================== 兑换码 ====================
+
+export type RedemptionCodeStatus = 'unused' | 'used' | 'disabled' | 'expired';
+
+// 兑换码（仅管理端可见；status 为后端现算，含 expired 虚拟状态）
+export interface RedemptionCode {
+  id: number;
+  code: string;
+  value: number;
+  status: RedemptionCodeStatus;
+  remark?: string;
+  used_by_id?: number;
+  used_by_email?: string;
+  used_at?: string;
+  expires_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 兑换码统计（unused 已剔除过期码）
+export interface RedemptionStats {
+  total: number;
+  unused: number;
+  used: number;
+  disabled: number;
+  expired: number;
+  used_value: number;
+  unused_value: number;
+}
+
+export interface GenerateRedemptionCodesReq {
+  count: number;
+  value: number;
+  remark?: string;
+  expires_at?: string;
+}
+
+export interface RedemptionCodeListResp {
+  list: RedemptionCode[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface RedemptionCodesQuery {
+  page?: number;
+  page_size?: number;
+  status?: string;
+  keyword?: string;
+}
+
+// 用户兑换结果
+export interface RedeemResp {
+  value: number;
+  balance: number;
 }

@@ -19,7 +19,7 @@ import {
   LayoutDashboard,
   Users,
   Network,
-  CircleDollarSign,
+  Boxes,
   FolderTree,
   KeyRound,
   ChartNoAxesCombined,
@@ -39,7 +39,13 @@ import {
   HelpCircle,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
+  Ticket,
+  Wallet,
+  AppWindow,
 } from 'lucide-react';
+import { oauthApi } from '../../shared/api/oauth';
+import { queryKeys } from '../../shared/queryKeys';
 
 interface AppShellProps {
   children: ReactNode;
@@ -56,10 +62,13 @@ const adminMenuItems: MenuItem[] = [
   { path: '/', labelKey: 'nav.dashboard', icon: <LayoutDashboard className="h-5 w-5" />, sectionKey: 'nav.overview' },
   { path: '/admin/users', labelKey: 'nav.users', icon: <Users className="h-5 w-5" />, sectionKey: 'nav.management' },
   { path: '/admin/channels', labelKey: 'nav.channels', icon: <Network className="h-5 w-5" /> },
-  { path: '/admin/model-prices', labelKey: 'nav.model_prices', icon: <CircleDollarSign className="h-5 w-5" /> },
+  { path: '/admin/model-prices', labelKey: 'nav.model_prices', icon: <Boxes className="h-5 w-5" /> },
   { path: '/admin/groups', labelKey: 'nav.groups', icon: <FolderTree className="h-5 w-5" /> },
   { path: '/admin/usage', labelKey: 'nav.usage', icon: <ChartNoAxesCombined className="h-5 w-5" /> },
+  { path: '/admin/payment', labelKey: 'nav.payment', icon: <CreditCard className="h-5 w-5" /> },
+  { path: '/admin/redemption', labelKey: 'nav.redemption', icon: <Ticket className="h-5 w-5" /> },
   { path: '/admin/announcements', labelKey: 'nav.announcements', icon: <Megaphone className="h-5 w-5" /> },
+  { path: '/admin/oauth-clients', labelKey: 'nav.oauth_clients', icon: <AppWindow className="h-5 w-5" /> },
   { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="h-5 w-5" />, sectionKey: 'nav.system' },
 ];
 
@@ -68,6 +77,7 @@ const userMenuItems: MenuItem[] = [
   { path: '/profile', labelKey: 'nav.profile', icon: <UserRoundCog className="h-5 w-5" /> },
   { path: '/keys', labelKey: 'nav.my_keys', icon: <KeyRound className="h-5 w-5" /> },
   { path: '/usage', labelKey: 'nav.my_usage', icon: <ReceiptText className="h-5 w-5" /> },
+  { path: '/recharge', labelKey: 'nav.recharge', icon: <Wallet className="h-5 w-5" /> },
 ];
 
 // API Key 登录只能看使用记录
@@ -120,6 +130,17 @@ export function AppShell({ children }: AppShellProps) {
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
+
+  // 应用入口（管理员在「应用接入」里配置 show_in_nav 的 OAuth 应用）
+  const { data: navApps } = useQuery({
+    queryKey: queryKeys.navApps(),
+    queryFn: () => oauthApi.listApps(),
+    enabled: !!user && !isAPIKeySession,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    meta: { globalLoading: false },
+  });
+  const appEntries = (navApps ?? []).filter((app) => app.launch_url);
   const sections = useMemo(() => {
     const adminUserItems = userMenuItems
       .filter((item) => item.path !== '/')
@@ -265,6 +286,48 @@ export function AppShell({ children }: AppShellProps) {
             </div>
           </div>
         ))}
+
+        {/* 应用入口：外链跳转到独立部署的 OAuth 应用（对话、创作中心等） */}
+        {appEntries.length > 0 && (
+          <div>
+            {!sidebarCollapsed && (
+              <p className="px-2.5 pb-2 text-[10px] font-medium uppercase text-text-tertiary">
+                {t('nav.apps')}
+              </p>
+            )}
+            {sidebarCollapsed && <div className="mx-3 mb-2.5 h-px bg-border" />}
+            <div className="space-y-1">
+              {appEntries.map((app) => {
+                const icon = app.icon.startsWith('http://') || app.icon.startsWith('https://')
+                  ? <img alt="" className="h-5 w-5 rounded" src={app.icon} />
+                  : app.icon
+                    ? <span className="text-base leading-none">{app.icon}</span>
+                    : <AppWindow className="h-5 w-5" />;
+                const link = (
+                  <a
+                    key={app.launch_url}
+                    className={`ag-sidebar-nav-item group relative flex items-center transition-colors duration-150 ${sidebarCollapsed ? 'mx-auto h-10 w-10 justify-center p-0' : 'px-2 py-1.5'}`}
+                    href={app.launch_url}
+                    rel="noreferrer"
+                    target="_blank"
+                    title={app.description || undefined}
+                  >
+                    <span className="flex shrink-0 items-center justify-center">{icon}</span>
+                    {!sidebarCollapsed && (
+                      <span className="ag-sidebar-nav-item-label truncate">{app.name}</span>
+                    )}
+                  </a>
+                );
+                return sidebarCollapsed ? (
+                  <Tooltip key={app.launch_url}>
+                    <Tooltip.Trigger className="block w-full">{link}</Tooltip.Trigger>
+                    <Tooltip.Content>{app.name}</Tooltip.Content>
+                  </Tooltip>
+                ) : link;
+              })}
+            </div>
+          </div>
+        )}
       </nav>
 
       <div className="space-y-1 border-t border-border p-3">

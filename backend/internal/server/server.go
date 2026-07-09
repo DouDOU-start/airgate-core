@@ -12,11 +12,11 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/internal/asset"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
 	"github.com/DouDOU-start/airgate-core/internal/config"
+	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pipeline"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
@@ -36,6 +36,7 @@ type Server struct {
 	// 核心服务组件
 	concurrency     *scheduler.ConcurrencyManager
 	recorder        *billing.Recorder
+	errRecorder     *errlog.Recorder
 	handlers        *bootstrap.HTTPHandlers
 	channelRegistry *registry.Registry
 	pricingCache    *pricing.Cache
@@ -43,6 +44,8 @@ type Server struct {
 
 	// 中间件组件（需 Shutdown 时释放）
 	ipRateLimiter *middleware.IPRateLimiter
+	// oauthRateLimiter /oauth/token 端点的 IP 限流器（防 secret 爆破）。
+	oauthRateLimiter *middleware.IPRateLimiter
 
 	backgroundCancel context.CancelFunc
 }
@@ -58,6 +61,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	// 核心服务组件
 	concurrency := scheduler.NewConcurrencyManager(rdb)
 	recorder := billing.NewRecorder(db, 0)
+	errRecorder := errlog.NewRecorder(db, rdb)
 
 	s := &Server{
 		cfg:    cfg,
@@ -68,6 +72,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		engine:      gin.New(),
 		concurrency: concurrency,
 		recorder:    recorder,
+		errRecorder: errRecorder,
 	}
 
 	s.handlers = bootstrap.NewHTTPHandlers(bootstrap.HTTPDependencies{
@@ -96,9 +101,12 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		RPM:         scheduler.NewRPMCounter(rdb),
 		Calculator:  billing.NewCalculator(),
 		Sink:        recorder,
+		ErrLog:      errRecorder,
 		Settings:    pipeline.NewSettingsReader(gatewaySettingsSource{s.handlers.SettingsService}),
 	})
 	s.handlers.ChannelService.SetTester(&channelTester{pipe: s.relay, secret: cfg.APIKeySecret()})
+	// 渠道失败计数读取（渠道页监控列，读 errlog 分钟桶）。
+	s.handlers.UpstreamLogService.SetFailureCounter(errRecorder)
 
 	// 注册路由
 	s.registerRoutes()
@@ -121,10 +129,11 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// StartBackground 启动后台组件：使用量异步记录器与资产迁移/清理循环。
+// StartBackground 启动后台组件：使用量异步记录器与各类后台装载/清理循环。
 func (s *Server) StartBackground(ctx context.Context) {
-	// 启动使用量异步记录器
+	// 启动使用量异步记录器与上游请求日志记录器（含 TTL 清理）
 	s.recorder.Start()
+	s.errRecorder.Start()
 
 	backgroundCtx, cancel := context.WithCancel(ctx)
 	s.backgroundCancel = cancel
@@ -140,8 +149,13 @@ func (s *Server) StartBackground(ctx context.Context) {
 		slog.Warn("model_price_cache_warmup_failed", "error", err)
 	}
 
-	go asset.StartAssetMigrationLoop(backgroundCtx, s.db)
-	go asset.StartAssetCleanupLoop(backgroundCtx, s.db)
+	// 支付服务商装载（失败不阻塞启动：admin 保存配置时会再次 Reload）+ 订单过期清理。
+	// 先把旧插件回填的明文敏感配置一次性加密规范化，再装载。
+	s.handlers.PaymentService.NormalizeLegacyConfigs(ctx)
+	if err := s.handlers.PaymentService.ReloadProviders(ctx); err != nil {
+		slog.Warn("payment_providers_initial_load_failed", "error", err)
+	}
+	go s.handlers.PaymentService.StartExpireLoop(backgroundCtx)
 }
 
 // reloadable 后台重试所需的窄接口（registry.Registry 实现；便于测试注入）。
@@ -183,9 +197,14 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.ipRateLimiter != nil {
 		s.ipRateLimiter.Stop()
 	}
+	if s.oauthRateLimiter != nil {
+		s.oauthRateLimiter.Stop()
+	}
 
-	// 停止使用量记录器
+	// 先排空 HTTP 在途请求，再停两个 recorder：在途请求收尾时仍会调 Record，
+	// 先停 recorder 会把关停窗口内的计费/留痕全部丢弃。
+	err := s.srv.Shutdown(ctx)
 	s.recorder.Stop()
-
-	return s.srv.Shutdown(ctx)
+	s.errRecorder.Stop()
+	return err
 }

@@ -9,6 +9,8 @@ export type MetricChipItem = {
   dollarTone?: MetricChipColor;
   highlightDollar?: boolean;
   label: string;
+  /** 显式弱化（灰底）：value 型指标空闲态使用，与 mutedWhenZero 的零值弱化同款式 */
+  muted?: boolean;
   mutedWhenZero?: boolean;
   value?: string;
 };
@@ -22,9 +24,9 @@ function formatMetricTitleValue(item: MetricChipItem) {
   return item.value ?? '';
 }
 
-function MetricChip({ amount, color, decimals, dollarTone, highlightDollar, label, mutedWhenZero, value }: MetricChipItem) {
+function MetricChip({ amount, color, decimals, dollarTone, highlightDollar, label, muted, mutedWhenZero, value }: MetricChipItem) {
   const amountText = amount == null ? null : formatMoneyAmount(amount, decimals);
-  const isMutedZero = mutedWhenZero && amount === 0;
+  const isMutedZero = muted || (mutedWhenZero && amount === 0);
   const chipClassName = [
     'ag-metric-chip',
     isMutedZero ? 'ag-metric-chip--zero' : '',

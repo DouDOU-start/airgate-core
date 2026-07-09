@@ -75,6 +75,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // 窗口回焦 / 标签页重新可见时刷新会话用户信息（余额、并发数等），
+  // 与 react-query 的 refetchOnWindowFocus 行为对齐：管理员在别处调整了
+  // 余额后，用户切回本标签页即可看到最新值，无需整页刷新。
+  // 节流 5s，避免频繁切换窗口时重复请求。
+  const lastFocusRefreshRef = useRef(0);
+  useEffect(() => {
+    const REFRESH_MIN_INTERVAL_MS = 5_000;
+    const refresh = () => {
+      if (!getToken() || document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if (now - lastFocusRefreshRef.current < REFRESH_MIN_INTERVAL_MS) return;
+      lastFocusRefreshRef.current = now;
+      const revision = authRevisionRef.current;
+      usersApi.me()
+        .then((freshUser) => {
+          const currentToken = getToken();
+          if (authRevisionRef.current === revision && currentToken) {
+            setUser(normalizeSessionUser(freshUser, currentToken));
+          }
+        })
+        // 静默失败：网络抖动不打断会话，登录态失效由请求层统一处理
+        .catch(() => {});
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
+
   const login = useCallback((token: string, userData: UserResp) => {
     authRevisionRef.current += 1;
     const revision = authRevisionRef.current;

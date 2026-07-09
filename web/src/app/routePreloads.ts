@@ -38,10 +38,15 @@ export const ModelPricesPage = lazyWithPreload(() => import('../pages/admin/Mode
 export const GroupsPage = lazyWithPreload(() => import('../pages/admin/GroupsPage'));
 export const AnnouncementsPage = lazyWithPreload(() => import('../pages/admin/AnnouncementsPage'));
 export const UsagePage = lazyWithPreload(() => import('../pages/admin/UsagePage'));
+export const PaymentPage = lazyWithPreload(() => import('../pages/admin/PaymentPage'));
+export const RedemptionCodesPage = lazyWithPreload(() => import('../pages/admin/RedemptionCodesPage'));
 export const SettingsPage = lazyWithPreload(() => import('../pages/admin/SettingsPage'));
 export const ProfilePage = lazyWithPreload(() => import('../pages/user/ProfilePage'));
 export const UserKeysPage = lazyWithPreload(() => import('../pages/user/UserKeysPage'));
 export const UserUsagePage = lazyWithPreload(() => import('../pages/user/UserUsagePage'));
+export const RechargePage = lazyWithPreload(() => import('../pages/user/RechargePage'));
+export const OAuthAuthorizePage = lazyWithPreload(() => import('../pages/OAuthAuthorizePage'));
+export const OAuthClientsPage = lazyWithPreload(() => import('../pages/admin/OAuthClientsPage'));
 
 export const ADMIN_IDLE_PRELOADS = [
   DashboardPage,
@@ -60,13 +65,18 @@ const ROUTE_PRELOADS = new Map<string, AnyPreloadableLazyComponent[]>([
   ['/profile', [ProfilePage]],
   ['/keys', [UserKeysPage]],
   ['/usage', [UserUsagePage]],
+  ['/recharge', [RechargePage]],
   ['/admin/users', [UsersPage]],
   ['/admin/channels', [ChannelsPage]],
   ['/admin/model-prices', [ModelPricesPage]],
   ['/admin/groups', [GroupsPage]],
   ['/admin/announcements', [AnnouncementsPage]],
   ['/admin/usage', [UsagePage]],
+  ['/admin/payment', [PaymentPage]],
+  ['/admin/redemption', [RedemptionCodesPage]],
   ['/admin/settings', [SettingsPage]],
+  ['/admin/oauth-clients', [OAuthClientsPage]],
+  ['/oauth/authorize', [OAuthAuthorizePage]],
 ]);
 
 function normalizePreloadPath(path: string) {

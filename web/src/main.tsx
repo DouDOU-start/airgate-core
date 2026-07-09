@@ -31,10 +31,12 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      // 短时间内切页返回直接复用缓存，避免路由切换时重复请求抢占首屏渲染。
-      staleTime: 60_000,
+      // stale-while-revalidate：切页返回 / 窗口回焦时先渲染缓存，再后台刷新。
+      // 缓存数据立即可见不阻塞首屏，但保证导航和跨标签页操作后数据不长期滞留。
+      // 个别高频或昂贵查询可在调用处用 staleTime / refetchOnWindowFocus 覆盖。
+      staleTime: 0,
       refetchOnMount: true,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
     },
   },
 });

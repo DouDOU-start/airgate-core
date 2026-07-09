@@ -160,6 +160,7 @@ export function UsageRecordsTable<T extends UsageRow>({
   ariaLabel,
   columns,
   dataVersion,
+  emptyAction,
   emptyDescription,
   emptyTitle,
   highlightNewRows = false,
@@ -176,6 +177,8 @@ export function UsageRecordsTable<T extends UsageRow>({
   ariaLabel: string;
   columns: UsageColumnConfig<T>[];
   dataVersion?: number;
+  /** 空态下方的操作位（如「查看全部时间」一键清空筛选） */
+  emptyAction?: ReactNode;
   emptyDescription?: string;
   emptyTitle: string;
   highlightNewRows?: boolean;
@@ -228,6 +231,7 @@ export function UsageRecordsTable<T extends UsageRow>({
           <div className="text-xs text-text-tertiary">{emptyDescription}</div>
         ) : null}
       </div>
+      {emptyAction}
     </EmptyState>
   );
 

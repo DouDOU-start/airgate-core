@@ -162,8 +162,8 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return json.data;
 }
 
-// 执行 fetch 请求
-function isAbortError(err: unknown): boolean {
+// 判定请求是否被 AbortController 主动取消（原样抛出，调用方据此区分用户取消与真实失败）
+export function isAbortError(err: unknown): boolean {
   return typeof err === 'object'
     && err !== null
     && 'name' in err
@@ -254,8 +254,8 @@ export function get<T>(path: string, params?: QueryParams, options?: RequestOpti
   return request<T>('GET', path, undefined, params, options);
 }
 
-export function post<T>(path: string, body?: unknown): Promise<T> {
-  return request<T>('POST', path, body);
+export function post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  return request<T>('POST', path, body, undefined, options);
 }
 
 export function put<T>(path: string, body?: unknown): Promise<T> {
