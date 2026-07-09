@@ -24,14 +24,6 @@ const (
 	FieldIsExclusive = "is_exclusive"
 	// FieldStatusVisible holds the string denoting the status_visible field in the database.
 	FieldStatusVisible = "status_visible"
-	// FieldQuotas holds the string denoting the quotas field in the database.
-	FieldQuotas = "quotas"
-	// FieldModelRouting holds the string denoting the model_routing field in the database.
-	FieldModelRouting = "model_routing"
-	// FieldServiceTier holds the string denoting the service_tier field in the database.
-	FieldServiceTier = "service_tier"
-	// FieldForceInstructions holds the string denoting the force_instructions field in the database.
-	FieldForceInstructions = "force_instructions"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldSortWeight holds the string denoting the sort_weight field in the database.
@@ -84,10 +76,6 @@ var Columns = []string{
 	FieldRateMultiplier,
 	FieldIsExclusive,
 	FieldStatusVisible,
-	FieldQuotas,
-	FieldModelRouting,
-	FieldServiceTier,
-	FieldForceInstructions,
 	FieldNote,
 	FieldSortWeight,
 	FieldCreatedAt,
@@ -124,10 +112,6 @@ var (
 	DefaultIsExclusive bool
 	// DefaultStatusVisible holds the default value on creation for the "status_visible" field.
 	DefaultStatusVisible bool
-	// DefaultServiceTier holds the default value on creation for the "service_tier" field.
-	DefaultServiceTier string
-	// DefaultForceInstructions holds the default value on creation for the "force_instructions" field.
-	DefaultForceInstructions string
 	// DefaultNote holds the default value on creation for the "note" field.
 	DefaultNote string
 	// DefaultSortWeight holds the default value on creation for the "sort_weight" field.
@@ -171,16 +155,6 @@ func ByIsExclusive(opts ...sql.OrderTermOption) OrderOption {
 // ByStatusVisible orders the results by the status_visible field.
 func ByStatusVisible(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatusVisible, opts...).ToFunc()
-}
-
-// ByServiceTier orders the results by the service_tier field.
-func ByServiceTier(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldServiceTier, opts...).ToFunc()
-}
-
-// ByForceInstructions orders the results by the force_instructions field.
-func ByForceInstructions(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldForceInstructions, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

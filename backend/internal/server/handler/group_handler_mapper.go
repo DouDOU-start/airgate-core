@@ -7,18 +7,14 @@ import (
 
 func toGroupRespFromDomain(item appgroup.Group) dto.GroupResp {
 	return dto.GroupResp{
-		ID:                int64(item.ID),
-		Name:              item.Name,
-		Platform:          item.Platform,
-		RateMultiplier:    item.RateMultiplier,
-		IsExclusive:       item.IsExclusive,
-		StatusVisible:     item.StatusVisible,
-		Quotas:            item.Quotas,
-		ModelRouting:      item.ModelRouting,
-		ServiceTier:       item.ServiceTier,
-		ForceInstructions: item.ForceInstructions,
-		Note:              item.Note,
-		SortWeight:        item.SortWeight,
+		ID:             int64(item.ID),
+		Name:           item.Name,
+		Platform:       item.Platform,
+		RateMultiplier: item.RateMultiplier,
+		IsExclusive:    item.IsExclusive,
+		StatusVisible:  item.StatusVisible,
+		Note:           item.Note,
+		SortWeight:     item.SortWeight,
 
 		CurrentConcurrency: item.CurrentConcurrency,
 		CurrentRPM:         item.CurrentRPM,

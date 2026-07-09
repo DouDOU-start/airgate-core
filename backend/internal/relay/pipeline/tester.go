@@ -22,26 +22,26 @@ import (
 // channelTestTimeout 渠道测试请求总超时。
 const channelTestTimeout = 30 * time.Second
 
-// channelTestPlan 按渠道协议返回测试请求的端点/协议/原生请求体
+// channelTestPlan 按渠道协议返回测试请求的端点/原生请求体
 // （纯透传架构：adaptor 不做翻译，测试体须是渠道协议的原生最小请求，max_tokens=1 控成本）。
 // testEndpoint 仅对 openai 协议渠道生效（chat_completions / responses 二选一，
 // 空值默认 chat_completions）；anthropic/gemini 各只有一个端点，忽略该参数。
-func channelTestPlan(channelType, model, testEndpoint string) (endpoint, protocol, body string) {
+func channelTestPlan(channelType, model, testEndpoint string) (endpoint, body string) {
 	switch channelType {
 	case "anthropic":
-		return adaptor.EndpointMessages, registry.ProtocolAnthropic,
+		return adaptor.EndpointMessages,
 			fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"hi"}],"max_tokens":1}`, model)
 	case "gemini":
 		// Gemini 请求体不携带 model（在 URL 层，由 RelayInfo.UpstreamModel 拼接）。
-		return adaptor.EndpointGenerateContent, registry.ProtocolGemini,
+		return adaptor.EndpointGenerateContent,
 			`{"contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"maxOutputTokens":1}}`
 	default:
 		if testEndpoint == adaptor.EndpointResponses {
 			// Responses API 的 max_output_tokens 下限为 16。
-			return adaptor.EndpointResponses, registry.ProtocolOpenAI,
+			return adaptor.EndpointResponses,
 				fmt.Sprintf(`{"model":%q,"input":"hi","max_output_tokens":16,"stream":false}`, model)
 		}
-		return adaptor.EndpointChatCompletions, registry.ProtocolOpenAI,
+		return adaptor.EndpointChatCompletions,
 			fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"hi"}],"max_tokens":1,"stream":false}`, model)
 	}
 }
@@ -167,7 +167,7 @@ func (p *Pipeline) testChannel(ctx context.Context, snap *registry.ChannelSnapsh
 	}
 	client := p.client
 
-	endpoint, protocol, testBody := channelTestPlan(snap.Type, model, testEndpoint)
+	endpoint, testBody := channelTestPlan(snap.Type, model, testEndpoint)
 	req, err := dto.ParseChatRequest([]byte(testBody))
 	if err != nil {
 		return 0, "", nil, err
@@ -181,7 +181,6 @@ func (p *Pipeline) testChannel(ctx context.Context, snap *registry.ChannelSnapsh
 		UpstreamModel: upstreamModel(snap, model),
 		Stream:        false,
 		Endpoint:      endpoint,
-		EntryProtocol: protocol,
 		Client:        client,
 	}
 

@@ -2,7 +2,11 @@ package store
 
 import (
 	"context"
+	"strconv"
 	"time"
+
+	entsql "entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqljson"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
@@ -87,11 +91,17 @@ func (s *UserStore) EmailExists(ctx context.Context, email string) (bool, error)
 // ListWithGroupRateOverride 返回所有在 group_rates 中
 // 为 groupID 设置了专属倍率的用户。
 //
-// 采用内存过滤：group_rates 是 JSON map 字段，ent 未生成 JSONB 包含谓词；
-// 管理员后台的用户规模较小（通常数百到数千），全表扫描 + 内存过滤成本可接受。
-// 如未来规模增长可改为原生 SQL `WHERE group_rates ? $1`。
+// 用 sqljson.HasKey 在数据库侧过滤（Postgres 走 JSONB 取键、sqlite 走
+// JSON_TYPE，跨方言一致），只回传含该键的行；rate>0 的业务过滤保留在内存
+// （行数已被谓词收敛，成本可忽略）。
 func (s *UserStore) ListWithGroupRateOverride(ctx context.Context, groupID int64) ([]appuser.GroupRateOverride, error) {
 	users, err := s.db.User.Query().
+		Where(func(sel *entsql.Selector) {
+			sel.Where(sqljson.HasKey(
+				entuser.FieldGroupRates,
+				sqljson.Path(strconv.FormatInt(groupID, 10)),
+			))
+		}).
 		Order(ent.Asc(entuser.FieldID)).
 		All(ctx)
 	if err != nil {
@@ -140,8 +150,13 @@ func (s *UserStore) Update(ctx context.Context, id int, mutation appuser.Mutatio
 	return s.FindByID(ctx, id, true)
 }
 
-// UpdateBalance 更新用户余额并写日志。
-func (s *UserStore) UpdateBalance(ctx context.Context, id int, update appuser.BalanceUpdate) (appuser.User, error) {
+// UpdateBalance 单事务内原子更新用户余额并写流水。
+//
+// 并发语义：事务内先以行锁重读当前余额（Postgres FOR UPDATE，见 forUpdateLock），
+// 保证流水 before/after 与真实变更一致；add/subtract 走增量 UPDATE
+// （balance = balance ± amount），即便锁为 no-op（sqlite）也不会覆盖并发扣费；
+// set 为绝对覆盖，依赖行锁与计费侧的原子扣减串行化。
+func (s *UserStore) UpdateBalance(ctx context.Context, id int, change appuser.BalanceChange) (appuser.User, error) {
 	tx, err := s.db.Tx(ctx)
 	if err != nil {
 		return appuser.User{}, err
@@ -152,9 +167,9 @@ func (s *UserStore) UpdateBalance(ctx context.Context, id int, update appuser.Ba
 
 	// 幂等键预检：同一键已入账则整体放弃（事务回滚），由 service 返回当前状态。
 	// 唯一索引兜底并发竞态：两个相同键同时到达时，后提交者会触发唯一冲突。
-	if update.IdempotencyKey != "" {
+	if change.IdempotencyKey != "" {
 		exists, err := tx.BalanceLog.Query().
-			Where(entbalancelog.IdempotencyKeyEQ(update.IdempotencyKey)).
+			Where(entbalancelog.IdempotencyKeyEQ(change.IdempotencyKey)).
 			Exist(ctx)
 		if err != nil {
 			return appuser.User{}, err
@@ -164,9 +179,38 @@ func (s *UserStore) UpdateBalance(ctx context.Context, id int, update appuser.Ba
 		}
 	}
 
-	item, err := tx.User.UpdateOneID(id).
-		SetBalance(update.AfterBalance).
-		Save(ctx)
+	// 行锁重读：与计费侧 AddBalance(-cost) 并发时在此串行化
+	cur, err := tx.User.Query().
+		Where(entuser.IDEQ(id)).
+		Where(forUpdateLock).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return appuser.User{}, appuser.ErrUserNotFound
+		}
+		return appuser.User{}, err
+	}
+
+	before := cur.Balance
+	var after float64
+	upd := tx.User.UpdateOneID(id)
+	switch change.Action {
+	case "set":
+		after = change.Amount
+		upd.SetBalance(after)
+	case "add":
+		after = before + change.Amount
+		upd.AddBalance(change.Amount)
+	case "subtract":
+		if before < change.Amount {
+			return appuser.User{}, appuser.ErrInsufficientBalance
+		}
+		after = before - change.Amount
+		upd.AddBalance(-change.Amount)
+	default:
+		return appuser.User{}, appuser.ErrInvalidBalanceAction
+	}
+	item, err := upd.Save(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return appuser.User{}, appuser.ErrUserNotFound
@@ -175,19 +219,19 @@ func (s *UserStore) UpdateBalance(ctx context.Context, id int, update appuser.Ba
 	}
 
 	logCreate := tx.BalanceLog.Create().
-		SetAction(entbalancelog.Action(update.Action)).
-		SetAmount(update.Amount).
-		SetBeforeBalance(update.BeforeBalance).
-		SetAfterBalance(update.AfterBalance).
-		SetRemark(update.Remark).
+		SetAction(entbalancelog.Action(change.Action)).
+		SetAmount(change.Amount).
+		SetBeforeBalance(before).
+		SetAfterBalance(after).
+		SetRemark(change.Remark).
 		SetUserIDSnapshot(id).
 		SetUserEmailSnapshot(item.Email).
 		SetUserID(id)
-	if update.IdempotencyKey != "" {
-		logCreate = logCreate.SetIdempotencyKey(update.IdempotencyKey)
+	if change.IdempotencyKey != "" {
+		logCreate = logCreate.SetIdempotencyKey(change.IdempotencyKey)
 	}
 	if _, err := logCreate.Save(ctx); err != nil {
-		if ent.IsConstraintError(err) && update.IdempotencyKey != "" {
+		if ent.IsConstraintError(err) && change.IdempotencyKey != "" {
 			return appuser.User{}, appuser.ErrDuplicateBalanceChange
 		}
 		return appuser.User{}, err
@@ -297,15 +341,6 @@ func balanceUserPredicate(userID int) predicate.BalanceLog {
 		entbalancelog.UserIDSnapshotEQ(userID),
 		entbalancelog.HasUserWith(entuser.IDEQ(userID)),
 	)
-}
-
-// GetAPIKeyName 获取 API Key 名称。
-func (s *UserStore) GetAPIKeyName(ctx context.Context, keyID int) (string, error) {
-	ak, err := s.db.APIKey.Get(ctx, keyID)
-	if err != nil {
-		return "", err
-	}
-	return ak.Name, nil
 }
 
 // GetAPIKeyInfo 获取 API Key 基本信息（名称、额度、到期时间、销售/分组倍率）。

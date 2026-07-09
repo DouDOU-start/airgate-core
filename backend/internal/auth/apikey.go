@@ -4,17 +4,19 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
@@ -30,9 +32,15 @@ import (
 // TTL 设短（默认 5s）是个折衷：key 被禁用 / 配额耗尽 / 过期等动态变化能快速传播到
 // 网关。运维手动禁用 key 后最多 5s 用户会看到 401，可接受。
 //
-// 失败结果（invalid / expired / quota / group_unbound）同样缓存——避免被拒的 key
-// 反复打 DB 制造压力。
+// 失败结果（invalid / expired / quota / group_unbound）进"有界"本地负缓存 +
+// Redis 共享缓存：Redis 故障窗口内被拒 key 的重试不至于直穿 DB；
+// 本地负缓存用 maxNegativeCacheEntries 设上限，防止攻击者用随机 sk- key
+// （每次哈希都不同）无界撑大进程内存，超限后新负条目只进带 TTL 的 Redis。
 const apiKeyCacheTTL = 5 * time.Second
+
+// maxNegativeCacheEntries 本地负缓存条目上限。达到上限后新负条目不再写入
+// 本地 map（正条目不受影响）；负条目过期删除或被正条目覆盖时释放名额。
+const maxNegativeCacheEntries = 4096
 
 type apiKeyCacheEntry struct {
 	info      *APIKeyInfo // 成功结果；失败时为 nil
@@ -41,9 +49,11 @@ type apiKeyCacheEntry struct {
 }
 
 var (
-	apiKeyCache   sync.Map // map[hash] → apiKeyCacheEntry
-	apiKeyCacheMu sync.Mutex
-	apiKeyRedis   *redis.Client
+	apiKeyCache sync.Map // map[hash] → apiKeyCacheEntry（成功结果 + 有界负结果）
+	apiKeyRedis *redis.Client
+
+	// negativeCacheCount 本地负缓存当前条目数（有界闸门，CAS 维护）。
+	negativeCacheCount atomic.Int64
 )
 
 var (
@@ -64,20 +74,16 @@ type apiKeyRedisEntry struct {
 
 // APIKeyInfo API Key 验证后的信息
 type APIKeyInfo struct {
-	KeyID         int
-	KeyName       string
-	UserID        int
-	UserEmail     string
-	GroupID       int
-	GroupPlatform string
-	QuotaUSD      float64
-	UsedQuota     float64
+	KeyID     int
+	UserID    int
+	UserEmail string
+	GroupID   int
 
 	// SellRate Reseller 设置的销售倍率（>0 时启用 markup，独立于平台计费）
 	SellRate float64
 
 	// KeyMaxConcurrency API Key 级并发上限，0 表示不限制。
-	// 在 forwarder 路径里会用 Redis 原子 SET 按 key_id 维度争抢槽位。
+	// 转发管线用 Redis ZSET 按 key_id 维度争抢槽位。
 	KeyMaxConcurrency int
 
 	// UserMaxConcurrency 用户级并发上限，0 表示不限制。
@@ -86,24 +92,9 @@ type APIKeyInfo struct {
 	UserMaxConcurrency int
 
 	// 预加载字段，避免转发管线重复查询
-	UserBalance            float64           // 用户余额
-	UserGroupRates         map[int64]float64 // 用户级专属倍率（按 group_id），用于 ResolveBillingRate 优先级链
-	GroupRateMultiplier    float64           // 分组倍率
-	GroupServiceTier       string            // 分组 service tier
-	GroupForceInstructions string            // 分组强制 instructions
-}
-
-// UserGroupRate 返回当前 key 所属分组在 user.group_rates 中的倍率（若存在）。
-// 用于 ResolveBillingRate 的优先级链：用户级专属 > 分组档位。
-func (i *APIKeyInfo) UserGroupRate() (float64, bool) {
-	if i == nil || i.UserGroupRates == nil {
-		return 0, false
-	}
-	r, ok := i.UserGroupRates[int64(i.GroupID)]
-	if !ok || r <= 0 {
-		return 0, false
-	}
-	return r, true
+	UserBalance         float64           // 用户余额
+	UserGroupRates      map[int64]float64 // 用户级专属倍率（按 group_id），用于 ResolveBillingRate 优先级链
+	GroupRateMultiplier float64           // 分组倍率
 }
 
 // GenerateAPIKey 生成 API Key 和对应的哈希值
@@ -146,39 +137,6 @@ func IsAdminAPIKey(key string) bool {
 	return len(key) > len(adminKeyPrefix) && key[:len(adminKeyPrefix)] == adminKeyPrefix
 }
 
-// ValidateAPIKeyForLogin 验证 API Key 用于 Web 登录（不要求绑定分组）。
-// 返回 KeyID、KeyName、UserID 等基本信息。
-func ValidateAPIKeyForLogin(ctx context.Context, db *ent.Client, key string) (*APIKeyInfo, error) {
-	hash := HashAPIKey(key)
-
-	ak, err := db.APIKey.Query().
-		Where(
-			apikey.KeyHash(hash),
-			apikey.StatusEQ(apikey.StatusActive),
-		).
-		WithUser().
-		Only(ctx)
-	if err != nil {
-		return nil, ErrInvalidAPIKey
-	}
-
-	if ak.ExpiresAt != nil && ak.ExpiresAt.Before(time.Now()) {
-		return nil, ErrAPIKeyExpired
-	}
-
-	u, err := ak.Edges.UserOrErr()
-	if err != nil {
-		return nil, ErrInvalidAPIKey
-	}
-
-	return &APIKeyInfo{
-		KeyID:     ak.ID,
-		KeyName:   ak.Name,
-		UserID:    u.ID,
-		UserEmail: u.Email,
-	}, nil
-}
-
 // ValidateAPIKey 验证 API Key 并返回关联信息。带 5s TTL 内存缓存，
 // 高并发下同一个 key 300 req → 1 次 DB 查询 + 299 次缓存命中。
 //
@@ -194,19 +152,19 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 	if cached, ok := apiKeyCache.Load(hash); ok {
 		if e := cached.(apiKeyCacheEntry); time.Now().Before(e.expiresAt) {
 			if e.info != nil {
-				slog.Debug("api_key_cache_hit", sdk.LogFieldAPIKeyID, e.info.KeyID)
+				slog.Debug("api_key_cache_hit", logx.LogFieldAPIKeyID, e.info.KeyID)
 			} else {
-				slog.Debug("api_key_cache_hit_negative", sdk.LogFieldError, e.err)
+				slog.Debug("api_key_cache_hit_negative", logx.LogFieldError, e.err)
 			}
 			return e.info, e.err
 		}
-		apiKeyCache.Delete(hash)
+		evictAPIKeyLocalCache(hash)
 	}
 	if info, err, ok := loadAPIKeyCacheFromRedis(ctx, hash); ok {
 		if info != nil {
-			slog.Debug("api_key_cache_hit_shared", sdk.LogFieldAPIKeyID, info.KeyID)
+			slog.Debug("api_key_cache_hit_shared", logx.LogFieldAPIKeyID, info.KeyID)
 		} else {
-			slog.Debug("api_key_cache_hit_negative_shared", sdk.LogFieldError, err)
+			slog.Debug("api_key_cache_hit_negative_shared", logx.LogFieldError, err)
 		}
 		storeAPIKeyLocalCache(hash, info, err)
 		return info, err
@@ -229,7 +187,7 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 			return nil, ErrInvalidAPIKey
 		}
 		// DB 瞬时故障：不缓存，下次请求重试
-		slog.Error("api_key_lookup_failed", sdk.LogFieldError, err)
+		slog.Error("api_key_lookup_failed", logx.LogFieldError, err)
 		return nil, fmt.Errorf("查询 API Key 失败: %w", err)
 	}
 
@@ -259,22 +217,16 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 
 	info := &APIKeyInfo{
 		KeyID:              ak.ID,
-		KeyName:            ak.Name,
 		UserID:             u.ID,
 		UserEmail:          u.Email,
 		GroupID:            g.ID,
-		GroupPlatform:      g.Platform,
-		QuotaUSD:           ak.QuotaUsd,
-		UsedQuota:          ak.UsedQuota,
 		SellRate:           ak.SellRate,
 		KeyMaxConcurrency:  ak.MaxConcurrency,
 		UserMaxConcurrency: u.MaxConcurrency,
 
-		UserBalance:            u.Balance,
-		UserGroupRates:         u.GroupRates,
-		GroupRateMultiplier:    g.RateMultiplier,
-		GroupServiceTier:       g.ServiceTier,
-		GroupForceInstructions: g.ForceInstructions,
+		UserBalance:         u.Balance,
+		UserGroupRates:      u.GroupRates,
+		GroupRateMultiplier: g.RateMultiplier,
 	}
 	cacheAPIKeyResult(hash, info, nil)
 	return info, nil
@@ -289,11 +241,54 @@ func cacheAPIKeyResult(hash string, info *APIKeyInfo, err error) {
 }
 
 func storeAPIKeyLocalCache(hash string, info *APIKeyInfo, err error) {
-	apiKeyCache.Store(hash, apiKeyCacheEntry{
+	if info == nil && err == nil {
+		return
+	}
+	// 负结果进有界本地缓存：Redis 故障窗口内被拒 key 的重试不直穿 DB；
+	// 超限后不再写入新负条目（内存有界），此时仅靠 Redis 负缓存兜底。
+	if info == nil && !tryAcquireNegativeCacheSlot() {
+		return
+	}
+	prev, loaded := apiKeyCache.Swap(hash, apiKeyCacheEntry{
 		info:      info,
 		err:       err,
 		expiresAt: time.Now().Add(apiKeyCacheTTL),
 	})
+	// 覆盖了旧负条目（负→负 / 负→正）：释放旧条目占用的名额。
+	if loaded {
+		if e, ok := prev.(apiKeyCacheEntry); ok && e.info == nil {
+			releaseNegativeCacheSlot()
+		}
+	}
+}
+
+// evictAPIKeyLocalCache 删除本地缓存条目并维护负条目计数（过期驱逐路径）。
+func evictAPIKeyLocalCache(hash string) {
+	prev, loaded := apiKeyCache.LoadAndDelete(hash)
+	if !loaded {
+		return
+	}
+	if e, ok := prev.(apiKeyCacheEntry); ok && e.info == nil {
+		releaseNegativeCacheSlot()
+	}
+}
+
+// tryAcquireNegativeCacheSlot 以 CAS 抢占一个负缓存名额；已达上限返回 false。
+func tryAcquireNegativeCacheSlot() bool {
+	for {
+		n := negativeCacheCount.Load()
+		if n >= maxNegativeCacheEntries {
+			return false
+		}
+		if negativeCacheCount.CompareAndSwap(n, n+1) {
+			return true
+		}
+	}
+}
+
+// releaseNegativeCacheSlot 释放一个负缓存名额（负条目被删除/覆盖时调用）。
+func releaseNegativeCacheSlot() {
+	negativeCacheCount.Add(-1)
 }
 
 func storeAPIKeyRedisCache(hash string, info *APIKeyInfo, err error) {
@@ -381,50 +376,6 @@ func SetAPIKeyCacheRedis(rdb *redis.Client) {
 	apiKeyRedis = rdb
 }
 
-// InvalidateAPIKeyCache 清除指定 key 的缓存（用于运维手动禁用 / 改配额等场景）。
-// 传空字符串清除所有缓存。
-func InvalidateAPIKeyCache(key string) {
-	if key == "" {
-		apiKeyCacheMu.Lock()
-		apiKeyCache.Range(func(k, _ any) bool {
-			apiKeyCache.Delete(k)
-			return true
-		})
-		apiKeyCacheMu.Unlock()
-		deleteAllAPIKeyRedisCache()
-		return
-	}
-	hash := HashAPIKey(key)
-	apiKeyCache.Delete(hash)
-	if apiKeyRedis != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-		defer cancel()
-		_, _ = apiKeyRedis.Del(ctx, apiKeyRedisCacheKey(hash)).Result()
-	}
-}
-
-func deleteAllAPIKeyRedisCache() {
-	if apiKeyRedis == nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	var cursor uint64
-	for {
-		keys, next, err := apiKeyRedis.Scan(ctx, cursor, "airgate:auth:v1:apikey:*", 100).Result()
-		if err != nil {
-			return
-		}
-		if len(keys) > 0 {
-			_, _ = apiKeyRedis.Del(ctx, keys...).Result()
-		}
-		if next == 0 {
-			return
-		}
-		cursor = next
-	}
-}
-
 // ValidateAdminAPIKey 验证管理员 API Key，返回 nil 表示验证通过。
 func ValidateAdminAPIKey(ctx context.Context, db *ent.Client, key string) error {
 	hash := HashAPIKey(key)
@@ -439,7 +390,8 @@ func ValidateAdminAPIKey(ctx context.Context, db *ent.Client, key string) error 
 	if err != nil {
 		return ErrInvalidAPIKey
 	}
-	if s.Value == "" || s.Value != hash {
+	// 常数时间比较：虽然比较对象是哈希（时序侧信道价值有限），仍统一防御口径。
+	if s.Value == "" || subtle.ConstantTimeCompare([]byte(s.Value), []byte(hash)) != 1 {
 		return ErrInvalidAPIKey
 	}
 	return nil

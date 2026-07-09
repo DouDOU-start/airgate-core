@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"time"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 )
 
 const (
@@ -62,10 +62,10 @@ func (s *Service) CreateClient(ctx context.Context, m ClientMutation) (Client, s
 	}
 	item, err := s.repo.Create(ctx, clientID, hashSecret(secret), secretHint(secret), m)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("oauth_client_create_failed", sdk.LogFieldError, err)
+		logx.LoggerFromContext(ctx).Error("oauth_client_create_failed", logx.LogFieldError, err)
 		return Client{}, "", err
 	}
-	sdk.LoggerFromContext(ctx).Info("oauth_client_created", "client_id", item.ClientID, "name", item.Name)
+	logx.LoggerFromContext(ctx).Info("oauth_client_created", "client_id", item.ClientID, "name", item.Name)
 	return item, secret, nil
 }
 
@@ -92,7 +92,7 @@ func (s *Service) ResetSecret(ctx context.Context, id int) (Client, string, erro
 	if err != nil {
 		return Client{}, "", err
 	}
-	sdk.LoggerFromContext(ctx).Info("oauth_client_secret_reset", "client_id", item.ClientID)
+	logx.LoggerFromContext(ctx).Info("oauth_client_secret_reset", "client_id", item.ClientID)
 	return item, secret, nil
 }
 
@@ -130,7 +130,7 @@ func (s *Service) Authorize(ctx context.Context, userID int, input AuthorizeInpu
 		Scope:         input.Scope,
 	}
 	if err := s.grants.SaveCode(ctx, code, grant, codeTTL); err != nil {
-		sdk.LoggerFromContext(ctx).Error("oauth_code_save_failed", sdk.LogFieldError, err)
+		logx.LoggerFromContext(ctx).Error("oauth_code_save_failed", logx.LogFieldError, err)
 		return "", err
 	}
 	return code, nil
@@ -140,7 +140,7 @@ func (s *Service) Authorize(ctx context.Context, userID int, input AuthorizeInpu
 
 // ExchangeToken 授权码换访问令牌：校验 client secret、授权码一次性取出、PKCE 校验。
 func (s *Service) ExchangeToken(ctx context.Context, input TokenInput) (TokenOutput, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	if input.GrantType != "authorization_code" {
 		return TokenOutput{}, ErrUnsupportedGrantType
 	}
@@ -152,20 +152,20 @@ func (s *Service) ExchangeToken(ctx context.Context, input TokenInput) (TokenOut
 		return TokenOutput{}, ErrClientDisabled
 	}
 	if subtle.ConstantTimeCompare([]byte(client.SecretHash), []byte(hashSecret(input.ClientSecret))) != 1 {
-		logger.Warn("oauth_token_rejected", "client_id", input.ClientID, sdk.LogFieldReason, "bad_secret")
+		logger.Warn("oauth_token_rejected", "client_id", input.ClientID, logx.LogFieldReason, "bad_secret")
 		return TokenOutput{}, ErrInvalidClientSecret
 	}
 
 	grant, ok, err := s.grants.TakeCode(ctx, input.Code)
 	if err != nil {
-		logger.Error("oauth_code_take_failed", sdk.LogFieldError, err)
+		logger.Error("oauth_code_take_failed", logx.LogFieldError, err)
 		return TokenOutput{}, err
 	}
 	if !ok || grant.ClientID != client.ClientID || grant.RedirectURI != input.RedirectURI {
 		return TokenOutput{}, ErrInvalidGrant
 	}
 	if !verifyPKCE(grant.CodeChallenge, input.CodeVerifier) {
-		logger.Warn("oauth_token_rejected", "client_id", input.ClientID, sdk.LogFieldReason, "pkce_mismatch")
+		logger.Warn("oauth_token_rejected", "client_id", input.ClientID, logx.LogFieldReason, "pkce_mismatch")
 		return TokenOutput{}, ErrInvalidGrant
 	}
 
@@ -175,10 +175,10 @@ func (s *Service) ExchangeToken(ctx context.Context, input TokenInput) (TokenOut
 	}
 	tg := TokenGrant{ClientID: client.ClientID, UserID: grant.UserID, Scope: grant.Scope}
 	if err := s.grants.SaveToken(ctx, token, tg, tokenTTL); err != nil {
-		logger.Error("oauth_token_save_failed", sdk.LogFieldError, err)
+		logger.Error("oauth_token_save_failed", logx.LogFieldError, err)
 		return TokenOutput{}, err
 	}
-	logger.Info("oauth_token_issued", "client_id", client.ClientID, sdk.LogFieldUserID, grant.UserID)
+	logger.Info("oauth_token_issued", "client_id", client.ClientID, logx.LogFieldUserID, grant.UserID)
 	return TokenOutput{
 		AccessToken: token,
 		TokenType:   "Bearer",
@@ -231,8 +231,8 @@ func (s *Service) ProvisionKey(ctx context.Context, token string, groupID int) (
 		return ProvisionResult{}, err
 	}
 	if created {
-		sdk.LoggerFromContext(ctx).Info("oauth_key_provisioned",
-			"client_id", client.ClientID, sdk.LogFieldUserID, grant.UserID)
+		logx.LoggerFromContext(ctx).Info("oauth_key_provisioned",
+			"client_id", client.ClientID, logx.LogFieldUserID, grant.UserID)
 	}
 	return ProvisionResult{APIKey: plainKey, KeyHint: hint, Created: created}, nil
 }

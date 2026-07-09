@@ -8,8 +8,9 @@ import (
 
 func TestAdjustBalanceRejectsInvalidAction(t *testing.T) {
 	service := NewService(stubRepository{
-		findByID: func() (User, error) {
-			return User{ID: 1, Balance: 10}, nil
+		updateBalance: func(BalanceChange) (User, error) {
+			t.Fatal("非法 action 不应触达仓储层")
+			return User{}, nil
 		},
 	})
 
@@ -19,10 +20,15 @@ func TestAdjustBalanceRejectsInvalidAction(t *testing.T) {
 	}
 }
 
-func TestAdjustBalanceRejectsInsufficientBalance(t *testing.T) {
+// TestAdjustBalanceSurfacesInsufficientBalance 余额不足由 store 在事务内判定，
+// service 原样透出并不再自行预读余额。
+func TestAdjustBalanceSurfacesInsufficientBalance(t *testing.T) {
 	service := NewService(stubRepository{
-		findByID: func() (User, error) {
-			return User{ID: 1, Balance: 5}, nil
+		updateBalance: func(change BalanceChange) (User, error) {
+			if change.Action != "subtract" || change.Amount != 10 {
+				t.Fatalf("unexpected change: %+v", change)
+			}
+			return User{}, ErrInsufficientBalance
 		},
 	})
 
@@ -114,9 +120,10 @@ func TestListAttachesRuntimeStats(t *testing.T) {
 }
 
 type stubRepository struct {
-	findByID    func() (User, error)
-	list        func(context.Context, ListFilter) ([]User, int64, error)
-	listAPIKeys func(context.Context, int, int, int) ([]APIKey, int64, error)
+	findByID      func() (User, error)
+	list          func(context.Context, ListFilter) ([]User, int64, error)
+	listAPIKeys   func(context.Context, int, int, int) ([]APIKey, int64, error)
+	updateBalance func(BalanceChange) (User, error)
 }
 
 func (s stubRepository) FindByID(_ context.Context, _ int, _ bool) (User, error) {
@@ -137,7 +144,10 @@ func (s stubRepository) Create(_ context.Context, _ Mutation) (User, error) { re
 func (s stubRepository) Update(_ context.Context, _ int, _ Mutation) (User, error) {
 	return User{}, nil
 }
-func (s stubRepository) UpdateBalance(_ context.Context, _ int, _ BalanceUpdate) (User, error) {
+func (s stubRepository) UpdateBalance(_ context.Context, _ int, change BalanceChange) (User, error) {
+	if s.updateBalance != nil {
+		return s.updateBalance(change)
+	}
 	return User{}, nil
 }
 func (s stubRepository) Delete(_ context.Context, _ int) error { return nil }
@@ -153,9 +163,6 @@ func (s stubRepository) ListAPIKeys(ctx context.Context, userID, page, pageSize 
 		return nil, 0, nil
 	}
 	return s.listAPIKeys(ctx, userID, page, pageSize)
-}
-func (s stubRepository) GetAPIKeyName(_ context.Context, _ int) (string, error) {
-	return "", nil
 }
 func (s stubRepository) GetAPIKeyInfo(_ context.Context, _ int) (APIKeyBrief, error) {
 	return APIKeyBrief{}, nil

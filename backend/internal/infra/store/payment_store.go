@@ -288,7 +288,12 @@ func (s *PaymentStore) CreditPaidOrder(ctx context.Context, in apppayment.Credit
 		return true, nil // 另一条并发回调已入账
 	}
 
-	usr, err := tx.User.Query().Where(entuser.IDEQ(order.UserID)).Only(ctx)
+	// 行锁重读余额（Postgres FOR UPDATE），保证流水 before/after 与真实变更一致；
+	// 入账本身走增量 UPDATE，与计费侧 AddBalance(-cost) 并发时不会丢失更新。
+	usr, err := tx.User.Query().
+		Where(entuser.IDEQ(order.UserID)).
+		Where(forUpdateLock).
+		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			// 用户已被删除：订单标记支付但无处入账，回滚保持 pending 供人工处理
@@ -298,7 +303,7 @@ func (s *PaymentStore) CreditPaidOrder(ctx context.Context, in apppayment.Credit
 	}
 	before := usr.Balance
 	after := before + order.Amount
-	if _, err := tx.User.UpdateOneID(usr.ID).SetBalance(after).Save(ctx); err != nil {
+	if _, err := tx.User.UpdateOneID(usr.ID).AddBalance(order.Amount).Save(ctx); err != nil {
 		return false, err
 	}
 

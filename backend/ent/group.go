@@ -3,7 +3,6 @@
 package ent
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -28,14 +27,6 @@ type Group struct {
 	IsExclusive bool `json:"is_exclusive,omitempty"`
 	// StatusVisible holds the value of the "status_visible" field.
 	StatusVisible bool `json:"status_visible,omitempty"`
-	// Quotas holds the value of the "quotas" field.
-	Quotas map[string]interface{} `json:"quotas,omitempty"`
-	// ModelRouting holds the value of the "model_routing" field.
-	ModelRouting map[string][]int64 `json:"model_routing,omitempty"`
-	// ServiceTier holds the value of the "service_tier" field.
-	ServiceTier string `json:"service_tier,omitempty"`
-	// ForceInstructions holds the value of the "force_instructions" field.
-	ForceInstructions string `json:"force_instructions,omitempty"`
 	// Note holds the value of the "note" field.
 	Note string `json:"note,omitempty"`
 	// SortWeight holds the value of the "sort_weight" field.
@@ -106,15 +97,13 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case group.FieldQuotas, group.FieldModelRouting:
-			values[i] = new([]byte)
 		case group.FieldIsExclusive, group.FieldStatusVisible:
 			values[i] = new(sql.NullBool)
 		case group.FieldRateMultiplier:
 			values[i] = new(sql.NullFloat64)
 		case group.FieldID, group.FieldSortWeight:
 			values[i] = new(sql.NullInt64)
-		case group.FieldName, group.FieldPlatform, group.FieldServiceTier, group.FieldForceInstructions, group.FieldNote:
+		case group.FieldName, group.FieldPlatform, group.FieldNote:
 			values[i] = new(sql.NullString)
 		case group.FieldCreatedAt, group.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -168,34 +157,6 @@ func (gr *Group) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status_visible", values[i])
 			} else if value.Valid {
 				gr.StatusVisible = value.Bool
-			}
-		case group.FieldQuotas:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field quotas", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &gr.Quotas); err != nil {
-					return fmt.Errorf("unmarshal field quotas: %w", err)
-				}
-			}
-		case group.FieldModelRouting:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field model_routing", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &gr.ModelRouting); err != nil {
-					return fmt.Errorf("unmarshal field model_routing: %w", err)
-				}
-			}
-		case group.FieldServiceTier:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field service_tier", values[i])
-			} else if value.Valid {
-				gr.ServiceTier = value.String
-			}
-		case group.FieldForceInstructions:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field force_instructions", values[i])
-			} else if value.Valid {
-				gr.ForceInstructions = value.String
 			}
 		case group.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -291,18 +252,6 @@ func (gr *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status_visible=")
 	builder.WriteString(fmt.Sprintf("%v", gr.StatusVisible))
-	builder.WriteString(", ")
-	builder.WriteString("quotas=")
-	builder.WriteString(fmt.Sprintf("%v", gr.Quotas))
-	builder.WriteString(", ")
-	builder.WriteString("model_routing=")
-	builder.WriteString(fmt.Sprintf("%v", gr.ModelRouting))
-	builder.WriteString(", ")
-	builder.WriteString("service_tier=")
-	builder.WriteString(gr.ServiceTier)
-	builder.WriteString(", ")
-	builder.WriteString("force_instructions=")
-	builder.WriteString(gr.ForceInstructions)
 	builder.WriteString(", ")
 	builder.WriteString("note=")
 	builder.WriteString(gr.Note)

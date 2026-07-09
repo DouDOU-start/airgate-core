@@ -18,7 +18,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 
 	"github.com/DouDOU-start/airgate-core/internal/version"
 )
@@ -26,6 +26,26 @@ import (
 // redisLockKey 全局升级互斥锁。
 const redisLockKey = "airgate:upgrade:lock"
 const redisLockTTL = 10 * time.Minute
+
+// 资产下载客户端取舍：
+//   - binary 下载不设总超时——慢链路上大文件的合法下载耗时无上界，任何固定总时限
+//     都会掐断它；改用 ResponseHeaderTimeout 清除"请求发出后对端永不回首包"的挂死
+//     （首包到达后，下载循环边读边写，对端断连会以读错误返回，不会永久卡死 goroutine）。
+//   - checksum 仅几十字节，保持 30s 总超时即可。
+//
+// 不用裸 http.Get（默认客户端无任何超时，对端挂起会让升级 goroutine 永久卡死）。
+var (
+	assetDownloadClient = &http.Client{Transport: newAssetDownloadTransport()}
+	checksumClient      = &http.Client{Timeout: 30 * time.Second}
+)
+
+// newAssetDownloadTransport 在默认 Transport（保留代理/连接超时等缺省行为）
+// 基础上加响应头超时，作为下载客户端唯一的挂死防护。
+func newAssetDownloadTransport() http.RoundTripper {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.ResponseHeaderTimeout = 60 * time.Second
+	return t
+}
 
 // Service 升级服务，对外暴露 Info / Status / Run 三个能力。
 type Service struct {
@@ -66,7 +86,7 @@ func (s *Service) Info(ctx context.Context) (*Info, error) {
 	rel, err := s.github.LatestRelease(ctx)
 	if err != nil {
 		// GitHub 失败不算硬错误：前端仍能展示当前版本，按钮置灰即可。
-		slog.Warn("upgrade_check_failed", sdk.LogFieldError, err)
+		slog.Warn("upgrade_check_failed", logx.LogFieldError, err)
 		return info, nil
 	}
 
@@ -249,7 +269,7 @@ func (s *Service) fail(target, msg string, err error) {
 		"from", version.Version,
 		"to", target,
 		"stage", msg,
-		sdk.LogFieldError, err)
+		logx.LogFieldError, err)
 	s.box.store(Status{
 		State:   StateFailed,
 		Target:  target,
@@ -260,7 +280,7 @@ func (s *Service) fail(target, msg string, err error) {
 
 // download 边写边算 progress。
 func (s *Service) download(asset *Asset, dst string) error {
-	resp, err := http.Get(asset.DownloadURL)
+	resp, err := assetDownloadClient.Get(asset.DownloadURL)
 	if err != nil {
 		return err
 	}
@@ -327,7 +347,7 @@ func (s *Service) verifyChecksum(asset *Asset, path string) error {
 		return errors.New("release 缺少 .sha256 校验文件")
 	}
 
-	resp, err := http.Get(checksumAsset.DownloadURL)
+	resp, err := checksumClient.Get(checksumAsset.DownloadURL)
 	if err != nil {
 		return err
 	}

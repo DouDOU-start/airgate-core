@@ -2,15 +2,14 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
@@ -29,9 +28,10 @@ func (h *SettingsHandler) GetPublicSettings(c *gin.Context) {
 	response.Success(c, result)
 }
 
-// GetSettings 获取所有设置。
+// GetSettings 获取所有设置（脱敏语义收口在 service.ListMasked：
+// security 组整组过滤、smtp_password 等敏感键掩码为哨兵值，handler 纯透传）。
 func (h *SettingsHandler) GetSettings(c *gin.Context) {
-	list, err := h.service.List(c.Request.Context(), c.Query("group"))
+	list, err := h.service.ListMasked(c.Request.Context(), c.Query("group"))
 	if err != nil {
 		slog.Error("查询设置失败", "error", err)
 		response.InternalError(c, "查询失败")
@@ -45,7 +45,7 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 	response.Success(c, resp)
 }
 
-// UpdateSettings 批量更新设置。
+// UpdateSettings 批量更新设置（掩码哨兵保持/security 组拒写语义在 service.Update）。
 func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	var req dto.UpdateSettingsReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -63,6 +63,10 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	if err := h.service.Update(c.Request.Context(), items); err != nil {
+		if errors.Is(err, appsettings.ErrSecuritySettingReadOnly) {
+			response.BadRequest(c, err.Error())
+			return
+		}
 		slog.Error("更新设置失败", "error", err)
 		response.InternalError(c, "更新设置失败")
 		return
@@ -119,11 +123,12 @@ func (h *SettingsHandler) UploadFile(c *gin.Context) {
 		return
 	}
 
-	// 只允许图片
+	// 只允许位图图片。SVG 属于可执行文档（可内嵌脚本），同源存储后可被用作
+	// 存储型 XSS 载体，明确禁止。
 	ext := strings.ToLower(filepath.Ext(header.Filename))
-	allowed := map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".svg": true, ".ico": true, ".webp": true}
+	allowed := map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".ico": true, ".webp": true}
 	if !allowed[ext] {
-		response.BadRequest(c, "只支持 PNG/JPG/GIF/SVG/ICO/WebP 格式")
+		response.BadRequest(c, "只支持 PNG/JPG/GIF/ICO/WebP 格式")
 		return
 	}
 
@@ -134,7 +139,8 @@ func (h *SettingsHandler) UploadFile(c *gin.Context) {
 		return
 	}
 
-	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
+	// 文件名用 UUID：不可枚举，也与 /uploads 路由注释的安全承诺一致
+	filename := uuid.NewString() + ext
 	dst, err := os.Create(filepath.Join(uploadDir, filename))
 	if err != nil {
 		response.InternalError(c, "保存文件失败")
@@ -193,15 +199,10 @@ func (h *SettingsHandler) GenerateAdminAPIKey(c *gin.Context) {
 	response.Success(c, dto.AdminAPIKeyResp{Hint: result.Hint, Key: result.Key})
 }
 
-// DeleteAdminAPIKey 删除管理员 API Key。
+// DeleteAdminAPIKey 删除管理员 API Key（security 组键经通用 Update 已拒写，
+// 走 service 专用通道）。
 func (h *SettingsHandler) DeleteAdminAPIKey(c *gin.Context) {
-	// 将三个 key 置空即可
-	items := []appsettings.ItemInput{
-		{Key: "admin_api_key_hint", Value: "", Group: "security"},
-		{Key: "admin_api_key_hash", Value: "", Group: "security"},
-		{Key: "admin_api_key_encrypted", Value: "", Group: "security"},
-	}
-	if err := h.service.Update(c.Request.Context(), items); err != nil {
+	if err := h.service.DeleteAdminAPIKey(c.Request.Context()); err != nil {
 		slog.Error("删除管理员 API Key 失败", "error", err)
 		response.InternalError(c, "删除密钥失败")
 		return

@@ -103,11 +103,16 @@ func CORS(cfgs ...CORSConfig) gin.HandlerFunc {
 			return
 		}
 
-		// 设置 CORS 响应头
+		// 设置 CORS 响应头。
+		// allowAll（反射任意 Origin）时不下发 Allow-Credentials：
+		// 「任意来源 + 允许凭证」组合等于放弃同源保护，浏览器也明确禁止
+		// Access-Control-Allow-Origin: * 搭配 credentials。
 		c.Header("Access-Control-Allow-Origin", origin)
 		c.Header("Access-Control-Allow-Methods", methodsStr)
 		c.Header("Access-Control-Allow-Headers", headersStr)
-		c.Header("Access-Control-Allow-Credentials", "true")
+		if !allowAll {
+			c.Header("Access-Control-Allow-Credentials", "true")
+		}
 		c.Header("Access-Control-Max-Age", maxAgeStr)
 
 		// 预检请求直接返回 204

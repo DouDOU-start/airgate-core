@@ -18,8 +18,9 @@ import (
 // AnnouncementUpdate is the builder for updating Announcement entities.
 type AnnouncementUpdate struct {
 	config
-	hooks    []Hook
-	mutation *AnnouncementMutation
+	hooks     []Hook
+	mutation  *AnnouncementMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the AnnouncementUpdate builder.
@@ -181,6 +182,12 @@ func (au *AnnouncementUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (au *AnnouncementUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *AnnouncementUpdate {
+	au.modifiers = append(au.modifiers, modifiers...)
+	return au
+}
+
 func (au *AnnouncementUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := au.check(); err != nil {
 		return n, err
@@ -220,6 +227,7 @@ func (au *AnnouncementUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := au.mutation.UpdatedAt(); ok {
 		_spec.SetField(announcement.FieldUpdatedAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(au.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, au.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{announcement.Label}
@@ -235,9 +243,10 @@ func (au *AnnouncementUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // AnnouncementUpdateOne is the builder for updating a single Announcement entity.
 type AnnouncementUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *AnnouncementMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *AnnouncementMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetTitle sets the "title" field.
@@ -406,6 +415,12 @@ func (auo *AnnouncementUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (auo *AnnouncementUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *AnnouncementUpdateOne {
+	auo.modifiers = append(auo.modifiers, modifiers...)
+	return auo
+}
+
 func (auo *AnnouncementUpdateOne) sqlSave(ctx context.Context) (_node *Announcement, err error) {
 	if err := auo.check(); err != nil {
 		return _node, err
@@ -462,6 +477,7 @@ func (auo *AnnouncementUpdateOne) sqlSave(ctx context.Context) (_node *Announcem
 	if value, ok := auo.mutation.UpdatedAt(); ok {
 		_spec.SetField(announcement.FieldUpdatedAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(auo.modifiers...)
 	_node = &Announcement{config: auo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

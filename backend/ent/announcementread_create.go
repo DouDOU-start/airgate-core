@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/announcementread"
@@ -18,6 +19,7 @@ type AnnouncementReadCreate struct {
 	config
 	mutation *AnnouncementReadMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetAnnouncementID sets the "announcement_id" field.
@@ -155,6 +157,7 @@ func (arc *AnnouncementReadCreate) createSpec() (*AnnouncementRead, *sqlgraph.Cr
 		_node = &AnnouncementRead{config: arc.config}
 		_spec = sqlgraph.NewCreateSpec(announcementread.Table, sqlgraph.NewFieldSpec(announcementread.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = arc.conflict
 	if value, ok := arc.mutation.AnnouncementID(); ok {
 		_spec.SetField(announcementread.FieldAnnouncementID, field.TypeInt, value)
 		_node.AnnouncementID = value
@@ -174,11 +177,243 @@ func (arc *AnnouncementReadCreate) createSpec() (*AnnouncementRead, *sqlgraph.Cr
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.AnnouncementRead.Create().
+//		SetAnnouncementID(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.AnnouncementReadUpsert) {
+//			SetAnnouncementID(v+v).
+//		}).
+//		Exec(ctx)
+func (arc *AnnouncementReadCreate) OnConflict(opts ...sql.ConflictOption) *AnnouncementReadUpsertOne {
+	arc.conflict = opts
+	return &AnnouncementReadUpsertOne{
+		create: arc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.AnnouncementRead.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (arc *AnnouncementReadCreate) OnConflictColumns(columns ...string) *AnnouncementReadUpsertOne {
+	arc.conflict = append(arc.conflict, sql.ConflictColumns(columns...))
+	return &AnnouncementReadUpsertOne{
+		create: arc,
+	}
+}
+
+type (
+	// AnnouncementReadUpsertOne is the builder for "upsert"-ing
+	//  one AnnouncementRead node.
+	AnnouncementReadUpsertOne struct {
+		create *AnnouncementReadCreate
+	}
+
+	// AnnouncementReadUpsert is the "OnConflict" setter.
+	AnnouncementReadUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetAnnouncementID sets the "announcement_id" field.
+func (u *AnnouncementReadUpsert) SetAnnouncementID(v int) *AnnouncementReadUpsert {
+	u.Set(announcementread.FieldAnnouncementID, v)
+	return u
+}
+
+// UpdateAnnouncementID sets the "announcement_id" field to the value that was provided on create.
+func (u *AnnouncementReadUpsert) UpdateAnnouncementID() *AnnouncementReadUpsert {
+	u.SetExcluded(announcementread.FieldAnnouncementID)
+	return u
+}
+
+// AddAnnouncementID adds v to the "announcement_id" field.
+func (u *AnnouncementReadUpsert) AddAnnouncementID(v int) *AnnouncementReadUpsert {
+	u.Add(announcementread.FieldAnnouncementID, v)
+	return u
+}
+
+// SetUserID sets the "user_id" field.
+func (u *AnnouncementReadUpsert) SetUserID(v int) *AnnouncementReadUpsert {
+	u.Set(announcementread.FieldUserID, v)
+	return u
+}
+
+// UpdateUserID sets the "user_id" field to the value that was provided on create.
+func (u *AnnouncementReadUpsert) UpdateUserID() *AnnouncementReadUpsert {
+	u.SetExcluded(announcementread.FieldUserID)
+	return u
+}
+
+// AddUserID adds v to the "user_id" field.
+func (u *AnnouncementReadUpsert) AddUserID(v int) *AnnouncementReadUpsert {
+	u.Add(announcementread.FieldUserID, v)
+	return u
+}
+
+// SetReadAt sets the "read_at" field.
+func (u *AnnouncementReadUpsert) SetReadAt(v time.Time) *AnnouncementReadUpsert {
+	u.Set(announcementread.FieldReadAt, v)
+	return u
+}
+
+// UpdateReadAt sets the "read_at" field to the value that was provided on create.
+func (u *AnnouncementReadUpsert) UpdateReadAt() *AnnouncementReadUpsert {
+	u.SetExcluded(announcementread.FieldReadAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.AnnouncementRead.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *AnnouncementReadUpsertOne) UpdateNewValues() *AnnouncementReadUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(announcementread.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.AnnouncementRead.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *AnnouncementReadUpsertOne) Ignore() *AnnouncementReadUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *AnnouncementReadUpsertOne) DoNothing() *AnnouncementReadUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the AnnouncementReadCreate.OnConflict
+// documentation for more info.
+func (u *AnnouncementReadUpsertOne) Update(set func(*AnnouncementReadUpsert)) *AnnouncementReadUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&AnnouncementReadUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetAnnouncementID sets the "announcement_id" field.
+func (u *AnnouncementReadUpsertOne) SetAnnouncementID(v int) *AnnouncementReadUpsertOne {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.SetAnnouncementID(v)
+	})
+}
+
+// AddAnnouncementID adds v to the "announcement_id" field.
+func (u *AnnouncementReadUpsertOne) AddAnnouncementID(v int) *AnnouncementReadUpsertOne {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.AddAnnouncementID(v)
+	})
+}
+
+// UpdateAnnouncementID sets the "announcement_id" field to the value that was provided on create.
+func (u *AnnouncementReadUpsertOne) UpdateAnnouncementID() *AnnouncementReadUpsertOne {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.UpdateAnnouncementID()
+	})
+}
+
+// SetUserID sets the "user_id" field.
+func (u *AnnouncementReadUpsertOne) SetUserID(v int) *AnnouncementReadUpsertOne {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.SetUserID(v)
+	})
+}
+
+// AddUserID adds v to the "user_id" field.
+func (u *AnnouncementReadUpsertOne) AddUserID(v int) *AnnouncementReadUpsertOne {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.AddUserID(v)
+	})
+}
+
+// UpdateUserID sets the "user_id" field to the value that was provided on create.
+func (u *AnnouncementReadUpsertOne) UpdateUserID() *AnnouncementReadUpsertOne {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.UpdateUserID()
+	})
+}
+
+// SetReadAt sets the "read_at" field.
+func (u *AnnouncementReadUpsertOne) SetReadAt(v time.Time) *AnnouncementReadUpsertOne {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.SetReadAt(v)
+	})
+}
+
+// UpdateReadAt sets the "read_at" field to the value that was provided on create.
+func (u *AnnouncementReadUpsertOne) UpdateReadAt() *AnnouncementReadUpsertOne {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.UpdateReadAt()
+	})
+}
+
+// Exec executes the query.
+func (u *AnnouncementReadUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for AnnouncementReadCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *AnnouncementReadUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *AnnouncementReadUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *AnnouncementReadUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // AnnouncementReadCreateBulk is the builder for creating many AnnouncementRead entities in bulk.
 type AnnouncementReadCreateBulk struct {
 	config
 	err      error
 	builders []*AnnouncementReadCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the AnnouncementRead entities in the database.
@@ -208,6 +443,7 @@ func (arcb *AnnouncementReadCreateBulk) Save(ctx context.Context) ([]*Announceme
 					_, err = mutators[i+1].Mutate(root, arcb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = arcb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, arcb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -258,6 +494,173 @@ func (arcb *AnnouncementReadCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (arcb *AnnouncementReadCreateBulk) ExecX(ctx context.Context) {
 	if err := arcb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.AnnouncementRead.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.AnnouncementReadUpsert) {
+//			SetAnnouncementID(v+v).
+//		}).
+//		Exec(ctx)
+func (arcb *AnnouncementReadCreateBulk) OnConflict(opts ...sql.ConflictOption) *AnnouncementReadUpsertBulk {
+	arcb.conflict = opts
+	return &AnnouncementReadUpsertBulk{
+		create: arcb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.AnnouncementRead.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (arcb *AnnouncementReadCreateBulk) OnConflictColumns(columns ...string) *AnnouncementReadUpsertBulk {
+	arcb.conflict = append(arcb.conflict, sql.ConflictColumns(columns...))
+	return &AnnouncementReadUpsertBulk{
+		create: arcb,
+	}
+}
+
+// AnnouncementReadUpsertBulk is the builder for "upsert"-ing
+// a bulk of AnnouncementRead nodes.
+type AnnouncementReadUpsertBulk struct {
+	create *AnnouncementReadCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.AnnouncementRead.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *AnnouncementReadUpsertBulk) UpdateNewValues() *AnnouncementReadUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(announcementread.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.AnnouncementRead.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *AnnouncementReadUpsertBulk) Ignore() *AnnouncementReadUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *AnnouncementReadUpsertBulk) DoNothing() *AnnouncementReadUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the AnnouncementReadCreateBulk.OnConflict
+// documentation for more info.
+func (u *AnnouncementReadUpsertBulk) Update(set func(*AnnouncementReadUpsert)) *AnnouncementReadUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&AnnouncementReadUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetAnnouncementID sets the "announcement_id" field.
+func (u *AnnouncementReadUpsertBulk) SetAnnouncementID(v int) *AnnouncementReadUpsertBulk {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.SetAnnouncementID(v)
+	})
+}
+
+// AddAnnouncementID adds v to the "announcement_id" field.
+func (u *AnnouncementReadUpsertBulk) AddAnnouncementID(v int) *AnnouncementReadUpsertBulk {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.AddAnnouncementID(v)
+	})
+}
+
+// UpdateAnnouncementID sets the "announcement_id" field to the value that was provided on create.
+func (u *AnnouncementReadUpsertBulk) UpdateAnnouncementID() *AnnouncementReadUpsertBulk {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.UpdateAnnouncementID()
+	})
+}
+
+// SetUserID sets the "user_id" field.
+func (u *AnnouncementReadUpsertBulk) SetUserID(v int) *AnnouncementReadUpsertBulk {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.SetUserID(v)
+	})
+}
+
+// AddUserID adds v to the "user_id" field.
+func (u *AnnouncementReadUpsertBulk) AddUserID(v int) *AnnouncementReadUpsertBulk {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.AddUserID(v)
+	})
+}
+
+// UpdateUserID sets the "user_id" field to the value that was provided on create.
+func (u *AnnouncementReadUpsertBulk) UpdateUserID() *AnnouncementReadUpsertBulk {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.UpdateUserID()
+	})
+}
+
+// SetReadAt sets the "read_at" field.
+func (u *AnnouncementReadUpsertBulk) SetReadAt(v time.Time) *AnnouncementReadUpsertBulk {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.SetReadAt(v)
+	})
+}
+
+// UpdateReadAt sets the "read_at" field to the value that was provided on create.
+func (u *AnnouncementReadUpsertBulk) UpdateReadAt() *AnnouncementReadUpsertBulk {
+	return u.Update(func(s *AnnouncementReadUpsert) {
+		s.UpdateReadAt()
+	})
+}
+
+// Exec executes the query.
+func (u *AnnouncementReadUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the AnnouncementReadCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for AnnouncementReadCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *AnnouncementReadUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

@@ -53,6 +53,11 @@ func (s *stubSettingsLister) List(_ context.Context, group string) ([]Setting, e
 	return s.data[group], nil
 }
 
+// NewUserDefaults 桩实现：返回系统默认值。
+func (s *stubSettingsLister) NewUserDefaults(context.Context) (float64, int) {
+	return 0, 5
+}
+
 func TestLoginIssuesTokenForActiveUser(t *testing.T) {
 	hash, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 	if err != nil {
@@ -212,25 +217,49 @@ func TestRefreshTokenRejectsInvalidAPIKeySession(t *testing.T) {
 	}
 }
 
-func TestFindAndEmailDelegatesToRepository(t *testing.T) {
-	service := NewService(authStubRepository{
-		emailExists: func() (bool, error) { return true, nil },
-		findByID: func() (User, error) {
-			return User{ID: 3, Email: "u@test.com"}, nil
-		},
-	}, corauth.NewJWTManager("secret", 24))
+// TestRefreshTokenChecksUserStatus 普通用户续签须按库中状态校验：
+// active 用户可续签（并采用库中最新 role/email），禁用/不存在的用户拒绝。
+func TestRefreshTokenChecksUserStatus(t *testing.T) {
+	jwtMgr := corauth.NewJWTManager("secret", 24)
 
-	exists, err := service.EmailExists(t.Context(), "u@test.com")
-	if err != nil || !exists {
-		t.Fatalf("EmailExists = %v, %v，期望 true, nil", exists, err)
-	}
-	user, err := service.FindByID(t.Context(), 3)
-	if err != nil || user.ID != 3 {
-		t.Fatalf("FindByID = %+v, %v，期望用户 3", user, err)
-	}
-	if !IsUserMissing(ErrUserNotFound) {
-		t.Fatal("ErrUserNotFound 应被识别为用户不存在")
-	}
+	t.Run("active_user_refreshes", func(t *testing.T) {
+		service := NewService(authStubRepository{
+			findByID: func() (User, error) {
+				return User{ID: 7, Email: "u@test.com", Role: "user", Status: "active"}, nil
+			},
+		}, jwtMgr)
+		token, err := service.RefreshToken(t.Context(), AuthIdentity{UserID: 7, Role: "user", Email: "u@test.com"})
+		if err != nil {
+			t.Fatalf("刷新 token 失败: %v", err)
+		}
+		claims, err := jwtMgr.ParseToken(token)
+		if err != nil {
+			t.Fatalf("解析刷新 token 失败: %v", err)
+		}
+		if claims.UserID != 7 || claims.Role != "user" {
+			t.Fatalf("刷新 claims 异常: %+v", claims)
+		}
+	})
+
+	t.Run("disabled_user_rejected", func(t *testing.T) {
+		service := NewService(authStubRepository{
+			findByID: func() (User, error) {
+				return User{ID: 7, Email: "u@test.com", Role: "user", Status: "disabled"}, nil
+			},
+		}, jwtMgr)
+		_, err := service.RefreshToken(t.Context(), AuthIdentity{UserID: 7, Role: "user", Email: "u@test.com"})
+		if !errors.Is(err, ErrUserDisabled) {
+			t.Fatalf("刷新错误 = %v，期望 %v", err, ErrUserDisabled)
+		}
+	})
+
+	t.Run("missing_user_rejected", func(t *testing.T) {
+		service := NewService(authStubRepository{}, jwtMgr) // findByID 缺省返回 ErrUserNotFound
+		_, err := service.RefreshToken(t.Context(), AuthIdentity{UserID: 404, Role: "user", Email: "u@test.com"})
+		if !IsUserMissing(err) {
+			t.Fatalf("刷新错误 = %v，期望用户不存在", err)
+		}
+	})
 }
 
 type authStubRepository struct {

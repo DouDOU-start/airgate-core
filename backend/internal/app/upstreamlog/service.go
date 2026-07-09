@@ -6,8 +6,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // ListFilter 失败请求留痕列表筛选。
@@ -92,7 +92,7 @@ func (s *Service) ChannelFailureStats(ctx context.Context, channelIDs []int, min
 	}
 	counts, err := s.counter.FailureCounts(ctx, channelIDs, minutes)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("upstream_log_query_failed", "scope", "failure_counts", sdk.LogFieldError, err)
+		logx.LoggerFromContext(ctx).Error("upstream_log_query_failed", "scope", "failure_counts", logx.LogFieldError, err)
 		return nil, err
 	}
 	if counts == nil {
@@ -114,12 +114,12 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 
 	list, err := s.repo.List(ctx, filter)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("upstream_log_query_failed", "scope", "list", sdk.LogFieldError, err)
+		logx.LoggerFromContext(ctx).Error("upstream_log_query_failed", "scope", "list", logx.LogFieldError, err)
 		return ListResult{}, err
 	}
 	total, err := s.repo.Count(ctx, filter)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("upstream_log_query_failed", "scope", "count", sdk.LogFieldError, err)
+		logx.LoggerFromContext(ctx).Error("upstream_log_query_failed", "scope", "count", logx.LogFieldError, err)
 		return ListResult{}, err
 	}
 	return ListResult{List: list, Total: total, Page: page, PageSize: pageSize}, nil

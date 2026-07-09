@@ -21,6 +21,7 @@ type UpstreamRequestLogQuery struct {
 	order      []upstreamrequestlog.OrderOption
 	inters     []Interceptor
 	predicates []predicate.UpstreamRequestLog
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -342,6 +343,9 @@ func (urlq *UpstreamRequestLogQuery) sqlAll(ctx context.Context, hooks ...queryH
 		nodes = append(nodes, node)
 		return node.assignValues(columns, values)
 	}
+	if len(urlq.modifiers) > 0 {
+		_spec.Modifiers = urlq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -356,6 +360,9 @@ func (urlq *UpstreamRequestLogQuery) sqlAll(ctx context.Context, hooks ...queryH
 
 func (urlq *UpstreamRequestLogQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := urlq.querySpec()
+	if len(urlq.modifiers) > 0 {
+		_spec.Modifiers = urlq.modifiers
+	}
 	_spec.Node.Columns = urlq.ctx.Fields
 	if len(urlq.ctx.Fields) > 0 {
 		_spec.Unique = urlq.ctx.Unique != nil && *urlq.ctx.Unique
@@ -418,6 +425,9 @@ func (urlq *UpstreamRequestLogQuery) sqlQuery(ctx context.Context) *sql.Selector
 	if urlq.ctx.Unique != nil && *urlq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range urlq.modifiers {
+		m(selector)
+	}
 	for _, p := range urlq.predicates {
 		p(selector)
 	}
@@ -433,6 +443,12 @@ func (urlq *UpstreamRequestLogQuery) sqlQuery(ctx context.Context) *sql.Selector
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (urlq *UpstreamRequestLogQuery) Modify(modifiers ...func(s *sql.Selector)) *UpstreamRequestLogSelect {
+	urlq.modifiers = append(urlq.modifiers, modifiers...)
+	return urlq.Select()
 }
 
 // UpstreamRequestLogGroupBy is the group-by builder for UpstreamRequestLog entities.
@@ -523,4 +539,10 @@ func (urls *UpstreamRequestLogSelect) sqlScan(ctx context.Context, root *Upstrea
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (urls *UpstreamRequestLogSelect) Modify(modifiers ...func(s *sql.Selector)) *UpstreamRequestLogSelect {
+	urls.modifiers = append(urls.modifiers, modifiers...)
+	return urls
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -131,6 +132,61 @@ func TestFlushBatchSuccessSkipsFallback(t *testing.T) {
 	r.flush(context.Background(), []UsageRecord{{UserID: 1, ChannelID: 42}})
 	if batchCalls != 1 {
 		t.Errorf("insertBatch 调用次数 = %d, want 1", batchCalls)
+	}
+}
+
+// TestRecordBufferFullDropsNonBlocking 缓冲满时 Record 丢弃该条且立即返回（非阻塞），
+// 已入队记录不受影响。
+func TestRecordBufferFullDropsNonBlocking(t *testing.T) {
+	r := NewRecorder(nil, 1) // 缓冲 1，不 Start：第二条必然触发满缓冲路径
+
+	r.Record(UsageRecord{UserID: 1, Model: "gpt-4o"})
+	done := make(chan struct{})
+	go func() {
+		r.Record(UsageRecord{UserID: 2, Model: "gpt-4o", TotalCost: 0.5})
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("缓冲满时 Record 应立即返回，不阻塞")
+	}
+
+	if got := len(r.ch); got != 1 {
+		t.Fatalf("缓冲内记录数 = %d, 期望 1（第二条被丢弃）", got)
+	}
+	rec := <-r.ch
+	if rec.UserID != 1 {
+		t.Fatalf("保留的应是先入队的记录，实际 user_id=%d", rec.UserID)
+	}
+}
+
+// TestStopDrainsBuffer Stop 排空缓冲：Stop 返回前所有已提交记录均已落库，
+// 且重复 Stop 幂等不 panic。
+func TestStopDrainsBuffer(t *testing.T) {
+	r := newLogicRecorder()
+	r.ch = make(chan UsageRecord, 10)
+
+	var mu sync.Mutex
+	var flushed []UsageRecord
+	r.insertBatch = func(_ context.Context, batch []UsageRecord) error {
+		mu.Lock()
+		flushed = append(flushed, batch...)
+		mu.Unlock()
+		return nil
+	}
+
+	for i := 1; i <= 3; i++ {
+		r.Record(UsageRecord{UserID: i, Model: "gpt-4o"})
+	}
+	r.Start()
+	r.Stop()
+	r.Stop() // 幂等
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(flushed) != 3 {
+		t.Fatalf("Stop 后落库记录数 = %d, 期望 3（缓冲须排空）", len(flushed))
 	}
 }
 

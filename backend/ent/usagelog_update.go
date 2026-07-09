@@ -21,8 +21,9 @@ import (
 // UsageLogUpdate is the builder for updating UsageLog entities.
 type UsageLogUpdate struct {
 	config
-	hooks    []Hook
-	mutation *UsageLogMutation
+	hooks     []Hook
+	mutation  *UsageLogMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the UsageLogUpdate builder.
@@ -848,6 +849,12 @@ func (ulu *UsageLogUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ulu *UsageLogUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *UsageLogUpdate {
+	ulu.modifiers = append(ulu.modifiers, modifiers...)
+	return ulu
+}
+
 func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := ulu.check(); err != nil {
 		return n, err
@@ -1153,6 +1160,7 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(ulu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, ulu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{usagelog.Label}
@@ -1168,9 +1176,10 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // UsageLogUpdateOne is the builder for updating a single UsageLog entity.
 type UsageLogUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *UsageLogMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *UsageLogMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetModel sets the "model" field.
@@ -2003,6 +2012,12 @@ func (uluo *UsageLogUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (uluo *UsageLogUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *UsageLogUpdateOne {
+	uluo.modifiers = append(uluo.modifiers, modifiers...)
+	return uluo
+}
+
 func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err error) {
 	if err := uluo.check(); err != nil {
 		return _node, err
@@ -2325,6 +2340,7 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(uluo.modifiers...)
 	_node = &UsageLog{config: uluo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

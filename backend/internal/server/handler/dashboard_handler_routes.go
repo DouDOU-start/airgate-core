@@ -8,13 +8,8 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
 )
 
-// Stats 返回仪表盘统计数据。
+// Stats 返回仪表盘统计数据（管理员权限由路由层 AdminOnly 中间件保证）。
 func (h *DashboardHandler) Stats(c *gin.Context) {
-	if !ensureAdminRole(c) {
-		response.Forbidden(c, "需要管理员权限")
-		return
-	}
-
 	var req dto.DashboardStatsReq
 	if err := c.ShouldBindQuery(&req); err != nil {
 		response.BindError(c, err)
@@ -31,13 +26,8 @@ func (h *DashboardHandler) Stats(c *gin.Context) {
 	response.Success(c, toDashboardStatsResp(stats))
 }
 
-// Trend 返回仪表盘趋势数据。
+// Trend 返回仪表盘趋势数据（管理员权限由路由层 AdminOnly 中间件保证）。
 func (h *DashboardHandler) Trend(c *gin.Context) {
-	if !ensureAdminRole(c) {
-		response.Forbidden(c, "需要管理员权限")
-		return
-	}
-
 	var req dto.DashboardTrendReq
 	if err := c.ShouldBindQuery(&req); err != nil {
 		response.BindError(c, err)

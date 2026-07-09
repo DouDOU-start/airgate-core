@@ -2,8 +2,12 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
+
+	"entgo.io/ent/dialect"
+	entsql "entgo.io/ent/dialect/sql"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	entchannel "github.com/DouDOU-start/airgate-core/ent/channel"
@@ -18,11 +22,19 @@ import (
 // UsageStore 使用 Ent 实现使用记录仓储。
 type UsageStore struct {
 	db *ent.Client
+	// sqlDialect 生产装配传 dialect.Postgres 以启用趋势查询的 SQL 分桶聚合下推；
+	// 空值（如 sqlite 测试环境）回退为行拉取 + 内存聚合。
+	sqlDialect string
 }
 
-// NewUsageStore 创建使用记录仓储。
-func NewUsageStore(db *ent.Client) *UsageStore {
-	return &UsageStore{db: db}
+// NewUsageStore 创建使用记录仓储。可选参数为底层 SQL 方言（entgo dialect 常量），
+// 用于按方言启用聚合下推等优化。
+func NewUsageStore(db *ent.Client, sqlDialect ...string) *UsageStore {
+	s := &UsageStore{db: db}
+	if len(sqlDialect) > 0 {
+		s.sqlDialect = sqlDialect[0]
+	}
+	return s
 }
 
 // ListUser 查询用户使用记录（仅当前页行，计数走 CountUser）。
@@ -346,7 +358,11 @@ func (s *UsageStore) StatsByGroup(ctx context.Context, filter appusage.StatsFilt
 	return result, nil
 }
 
-// TrendEntries 查询趋势原始记录。
+// TrendEntries 查询趋势聚合项。
+//
+// Postgres 下按 date_trunc 分桶在 SQL 侧聚合（每桶一行），避免把数万行原始
+// 记录拉进内存；其余方言/无法确定时区名时回退行拉取（上限 5 万行），由
+// app 层 BuildTrendBuckets 内存聚合——两条路径产出的桶结果一致。
 func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilter) ([]appusage.TrendEntry, error) {
 	query := s.db.UsageLog.Query()
 	if filter.UserID != nil {
@@ -355,6 +371,14 @@ func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilt
 	query = applyUsageStatsFilter(query, filter.StatsFilter)
 	if filter.StartDate == "" && filter.EndDate == "" && filter.DefaultRecentHours > 0 {
 		query = query.Where(entusagelog.CreatedAtGTE(time.Now().Add(-time.Duration(filter.DefaultRecentHours) * time.Hour)))
+	}
+
+	if s.sqlDialect == dialect.Postgres {
+		if entries, ok, err := s.trendEntriesAggregatedPG(ctx, query, filter); err != nil {
+			return nil, err
+		} else if ok {
+			return entries, nil
+		}
 	}
 
 	const trendEntryLimit = 50000
@@ -390,6 +414,75 @@ func (s *UsageStore) TrendEntries(ctx context.Context, filter appusage.TrendFilt
 		})
 	}
 	return result, nil
+}
+
+// trendEntriesAggregatedPG 在 Postgres 侧按 date_trunc 分桶聚合趋势数据。
+// 桶对齐时区必须与 app 层 BuildTrendBuckets 的格式化时区一致，因此仅当
+// filter.TZ 是可加载的 IANA 时区名时才下推（ok=true）；否则回退行拉取。
+func (s *UsageStore) trendEntriesAggregatedPG(ctx context.Context, query *ent.UsageLogQuery, filter appusage.TrendFilter) ([]appusage.TrendEntry, bool, error) {
+	tzName := filter.TZ
+	if tzName == "" {
+		return nil, false, nil // 空 TZ 语义为服务器本地时区，无法映射为 SQL 时区名
+	}
+	loc, err := time.LoadLocation(tzName)
+	if err != nil {
+		return nil, false, nil
+	}
+	unit := "day"
+	if filter.Granularity == "hour" {
+		unit = "hour"
+	}
+
+	var rows []struct {
+		Bucket              time.Time `json:"bucket"`
+		InputTokens         int64     `json:"input_tokens"`
+		OutputTokens        int64     `json:"output_tokens"`
+		CachedInputTokens   int64     `json:"cached_input_tokens"`
+		CacheCreationTokens int64     `json:"cache_creation_tokens"`
+		ActualCost          float64   `json:"actual_cost"`
+		TotalCost           float64   `json:"total_cost"`
+		BilledCost          float64   `json:"billed_cost"`
+	}
+	err = query.Clone().
+		Modify(func(sel *entsql.Selector) {
+			// unit 取值受限于上面的白名单，tzName 经 LoadLocation 校验并转义，无注入面
+			bucket := fmt.Sprintf("date_trunc('%s', %s AT TIME ZONE %s)",
+				unit, sel.C(entusagelog.FieldCreatedAt), sqlStringLiteral(tzName))
+			sel.Select(
+				entsql.As(bucket, "bucket"),
+				entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldInputTokens)+"), 0)", "input_tokens"),
+				entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldOutputTokens)+"), 0)", "output_tokens"),
+				entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldCachedInputTokens)+"), 0)", "cached_input_tokens"),
+				entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldCacheCreationTokens)+"), 0)", "cache_creation_tokens"),
+				entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldActualCost)+"), 0)", "actual_cost"),
+				entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldTotalCost)+"), 0)", "total_cost"),
+				entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldBilledCost)+"), 0)", "billed_cost"),
+			).GroupBy("bucket")
+		}).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, false, err
+	}
+
+	result := make([]appusage.TrendEntry, 0, len(rows))
+	for _, row := range rows {
+		// AT TIME ZONE 返回的是 tzName 时区的墙钟时间（driver 按 UTC 解读），
+		// 重建为 loc 时区的时刻后输出 RFC3339，BuildTrendBuckets 再按 loc 格式化
+		// 桶键，与行拉取路径的结果一致。
+		b := row.Bucket
+		bucketAt := time.Date(b.Year(), b.Month(), b.Day(), b.Hour(), b.Minute(), b.Second(), 0, loc)
+		result = append(result, appusage.TrendEntry{
+			CreatedAt:           bucketAt.Format(time.RFC3339),
+			InputTokens:         row.InputTokens,
+			OutputTokens:        row.OutputTokens,
+			CachedInputTokens:   row.CachedInputTokens,
+			CacheCreationTokens: row.CacheCreationTokens,
+			ActualCost:          row.ActualCost,
+			StandardCost:        row.TotalCost,
+			BilledCost:          row.BilledCost,
+		})
+	}
+	return result, true, nil
 }
 
 // pageUsageLogs 延迟 JOIN 分页：先查 ID（索引扫描），再按 ID 加载完整行，

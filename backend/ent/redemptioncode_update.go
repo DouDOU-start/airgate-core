@@ -18,8 +18,9 @@ import (
 // RedemptionCodeUpdate is the builder for updating RedemptionCode entities.
 type RedemptionCodeUpdate struct {
 	config
-	hooks    []Hook
-	mutation *RedemptionCodeMutation
+	hooks     []Hook
+	mutation  *RedemptionCodeMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the RedemptionCodeUpdate builder.
@@ -223,6 +224,12 @@ func (rcu *RedemptionCodeUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (rcu *RedemptionCodeUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *RedemptionCodeUpdate {
+	rcu.modifiers = append(rcu.modifiers, modifiers...)
+	return rcu
+}
+
 func (rcu *RedemptionCodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := rcu.check(); err != nil {
 		return n, err
@@ -274,6 +281,7 @@ func (rcu *RedemptionCodeUpdate) sqlSave(ctx context.Context) (n int, err error)
 	if value, ok := rcu.mutation.UpdatedAt(); ok {
 		_spec.SetField(redemptioncode.FieldUpdatedAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(rcu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, rcu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{redemptioncode.Label}
@@ -289,9 +297,10 @@ func (rcu *RedemptionCodeUpdate) sqlSave(ctx context.Context) (n int, err error)
 // RedemptionCodeUpdateOne is the builder for updating a single RedemptionCode entity.
 type RedemptionCodeUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *RedemptionCodeMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *RedemptionCodeMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetCode sets the "code" field.
@@ -502,6 +511,12 @@ func (rcuo *RedemptionCodeUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (rcuo *RedemptionCodeUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *RedemptionCodeUpdateOne {
+	rcuo.modifiers = append(rcuo.modifiers, modifiers...)
+	return rcuo
+}
+
 func (rcuo *RedemptionCodeUpdateOne) sqlSave(ctx context.Context) (_node *RedemptionCode, err error) {
 	if err := rcuo.check(); err != nil {
 		return _node, err
@@ -570,6 +585,7 @@ func (rcuo *RedemptionCodeUpdateOne) sqlSave(ctx context.Context) (_node *Redemp
 	if value, ok := rcuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(redemptioncode.FieldUpdatedAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(rcuo.modifiers...)
 	_node = &RedemptionCode{config: rcuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

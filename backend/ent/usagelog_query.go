@@ -29,6 +29,7 @@ type UsageLogQuery struct {
 	withAPIKey  *APIKeyQuery
 	withChannel *ChannelQuery
 	withGroup   *GroupQuery
+	modifiers   []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -493,6 +494,9 @@ func (ulq *UsageLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Us
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
+	if len(ulq.modifiers) > 0 {
+		_spec.Modifiers = ulq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -648,6 +652,9 @@ func (ulq *UsageLogQuery) loadGroup(ctx context.Context, query *GroupQuery, node
 
 func (ulq *UsageLogQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := ulq.querySpec()
+	if len(ulq.modifiers) > 0 {
+		_spec.Modifiers = ulq.modifiers
+	}
 	_spec.Node.Columns = ulq.ctx.Fields
 	if len(ulq.ctx.Fields) > 0 {
 		_spec.Unique = ulq.ctx.Unique != nil && *ulq.ctx.Unique
@@ -722,6 +729,9 @@ func (ulq *UsageLogQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if ulq.ctx.Unique != nil && *ulq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range ulq.modifiers {
+		m(selector)
+	}
 	for _, p := range ulq.predicates {
 		p(selector)
 	}
@@ -737,6 +747,12 @@ func (ulq *UsageLogQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ulq *UsageLogQuery) Modify(modifiers ...func(s *sql.Selector)) *UsageLogSelect {
+	ulq.modifiers = append(ulq.modifiers, modifiers...)
+	return ulq.Select()
 }
 
 // UsageLogGroupBy is the group-by builder for UsageLog entities.
@@ -827,4 +843,10 @@ func (uls *UsageLogSelect) sqlScan(ctx context.Context, root *UsageLogQuery, v a
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (uls *UsageLogSelect) Modify(modifiers ...func(s *sql.Selector)) *UsageLogSelect {
+	uls.modifiers = append(uls.modifiers, modifiers...)
+	return uls
 }

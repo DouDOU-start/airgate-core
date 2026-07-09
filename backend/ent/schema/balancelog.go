@@ -28,7 +28,7 @@ func (BalanceLog) Fields() []ent.Field {
 		field.String("user_email_snapshot").Default("").
 			Comment("用户邮箱快照。用户硬删除后保留余额流水归属。"),
 		field.String("idempotency_key").Optional().Nillable().
-			Comment("幂等键。插件经 user.update_balance 入账时防重复；NULL 表示无幂等要求。"),
+			Comment("幂等键。支付回调 / 兑换码等入账链路防重复；NULL 表示无幂等要求。"),
 		field.Time("created_at").Default(timeNow).Immutable(),
 	}
 }

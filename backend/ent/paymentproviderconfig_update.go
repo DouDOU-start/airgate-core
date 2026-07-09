@@ -18,8 +18,9 @@ import (
 // PaymentProviderConfigUpdate is the builder for updating PaymentProviderConfig entities.
 type PaymentProviderConfigUpdate struct {
 	config
-	hooks    []Hook
-	mutation *PaymentProviderConfigMutation
+	hooks     []Hook
+	mutation  *PaymentProviderConfigMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the PaymentProviderConfigUpdate builder.
@@ -138,6 +139,12 @@ func (ppcu *PaymentProviderConfigUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ppcu *PaymentProviderConfigUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *PaymentProviderConfigUpdate {
+	ppcu.modifiers = append(ppcu.modifiers, modifiers...)
+	return ppcu
+}
+
 func (ppcu *PaymentProviderConfigUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := ppcu.check(); err != nil {
 		return n, err
@@ -165,6 +172,7 @@ func (ppcu *PaymentProviderConfigUpdate) sqlSave(ctx context.Context) (n int, er
 	if value, ok := ppcu.mutation.UpdatedAt(); ok {
 		_spec.SetField(paymentproviderconfig.FieldUpdatedAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(ppcu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, ppcu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{paymentproviderconfig.Label}
@@ -180,9 +188,10 @@ func (ppcu *PaymentProviderConfigUpdate) sqlSave(ctx context.Context) (n int, er
 // PaymentProviderConfigUpdateOne is the builder for updating a single PaymentProviderConfig entity.
 type PaymentProviderConfigUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *PaymentProviderConfigMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *PaymentProviderConfigMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetProviderKey sets the "provider_key" field.
@@ -308,6 +317,12 @@ func (ppcuo *PaymentProviderConfigUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ppcuo *PaymentProviderConfigUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *PaymentProviderConfigUpdateOne {
+	ppcuo.modifiers = append(ppcuo.modifiers, modifiers...)
+	return ppcuo
+}
+
 func (ppcuo *PaymentProviderConfigUpdateOne) sqlSave(ctx context.Context) (_node *PaymentProviderConfig, err error) {
 	if err := ppcuo.check(); err != nil {
 		return _node, err
@@ -352,6 +367,7 @@ func (ppcuo *PaymentProviderConfigUpdateOne) sqlSave(ctx context.Context) (_node
 	if value, ok := ppcuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(paymentproviderconfig.FieldUpdatedAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(ppcuo.modifiers...)
 	_node = &PaymentProviderConfig{config: ppcuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

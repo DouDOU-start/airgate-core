@@ -19,8 +19,9 @@ import (
 // OAuthClientUpdate is the builder for updating OAuthClient entities.
 type OAuthClientUpdate struct {
 	config
-	hooks    []Hook
-	mutation *OAuthClientMutation
+	hooks     []Hook
+	mutation  *OAuthClientMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the OAuthClientUpdate builder.
@@ -250,6 +251,12 @@ func (ocu *OAuthClientUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ocu *OAuthClientUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *OAuthClientUpdate {
+	ocu.modifiers = append(ocu.modifiers, modifiers...)
+	return ocu
+}
+
 func (ocu *OAuthClientUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := ocu.check(); err != nil {
 		return n, err
@@ -306,6 +313,7 @@ func (ocu *OAuthClientUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ocu.mutation.UpdatedAt(); ok {
 		_spec.SetField(oauthclient.FieldUpdatedAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(ocu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, ocu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{oauthclient.Label}
@@ -321,9 +329,10 @@ func (ocu *OAuthClientUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // OAuthClientUpdateOne is the builder for updating a single OAuthClient entity.
 type OAuthClientUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *OAuthClientMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *OAuthClientMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetSecretHash sets the "secret_hash" field.
@@ -560,6 +569,12 @@ func (ocuo *OAuthClientUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ocuo *OAuthClientUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *OAuthClientUpdateOne {
+	ocuo.modifiers = append(ocuo.modifiers, modifiers...)
+	return ocuo
+}
+
 func (ocuo *OAuthClientUpdateOne) sqlSave(ctx context.Context) (_node *OAuthClient, err error) {
 	if err := ocuo.check(); err != nil {
 		return _node, err
@@ -633,6 +648,7 @@ func (ocuo *OAuthClientUpdateOne) sqlSave(ctx context.Context) (_node *OAuthClie
 	if value, ok := ocuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(oauthclient.FieldUpdatedAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(ocuo.modifiers...)
 	_node = &OAuthClient{config: ocuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

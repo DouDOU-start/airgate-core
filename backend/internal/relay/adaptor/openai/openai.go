@@ -71,7 +71,7 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 			body, err = rewriteMultipartModel(info.RawBody, info.RawContentType, info.UpstreamModel)
 		}
 		url = ImagesEditsURL(info.Channel.BaseURL)
-	case "", adaptor.EndpointChatCompletions:
+	case adaptor.EndpointChatCompletions:
 		body, err = rewriteChatBody(info, req)
 		url = ChatCompletionsURL(info.Channel.BaseURL)
 	default:

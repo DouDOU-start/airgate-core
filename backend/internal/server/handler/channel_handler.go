@@ -17,9 +17,6 @@ func NewChannelHandler(service *appchannel.Service) *ChannelHandler {
 	return &ChannelHandler{service: service}
 }
 
-// parseChannelID 解析渠道 ID，委托给公共 ParseID。
-var parseChannelID = ParseID
-
 func (h *ChannelHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	switch {
 	case errors.Is(err, appchannel.ErrChannelNotFound):

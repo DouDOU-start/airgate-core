@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/DouDOU-start/airgate-core/ent"
+	appchannel "github.com/DouDOU-start/airgate-core/internal/app/channel"
 )
 
 func createTestChannel(t *testing.T, db *ent.Client, name string) *ent.Channel {
@@ -87,5 +88,38 @@ func TestChannelStoreGetChannelMoneyStats(t *testing.T) {
 	}
 	if len(empty) != 0 {
 		t.Fatalf("GetChannelMoneyStats(nil) = %v, want empty", empty)
+	}
+}
+
+// TestChannelStoreCreateCustomType custom 渠道类型可正常落库
+// （此前 schema 枚举缺 "custom"，dto/registry/adaptor 支持但 ent 校验拒绝）。
+func TestChannelStoreCreateCustomType(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	store := NewChannelStore(db)
+
+	created, err := store.Create(ctx, appchannel.CreateInput{
+		Name:    "custom-upstream",
+		Type:    "custom",
+		BaseURL: "https://custom.example.com",
+		APIKeys: []string{"cipher-1"},
+		Models:  []string{"my-model"},
+	})
+	if err != nil {
+		t.Fatalf("Create(custom) returned error: %v", err)
+	}
+	if created.Type != "custom" {
+		t.Fatalf("created.Type = %q, want custom", created.Type)
+	}
+
+	got, err := store.FindByID(ctx, created.ID)
+	if err != nil || got.Type != "custom" {
+		t.Fatalf("FindByID = (%+v, %v), want type custom", got, err)
 	}
 }

@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -250,7 +251,6 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			UpstreamModel:  upstreamModel(ch, req.Model),
 			Stream:         req.Stream,
 			Endpoint:       endpoint,
-			EntryProtocol:  protocol,
 			RawBody:        opts.rawBody,
 			RawContentType: opts.rawContentType,
 			Client:         p.client,
@@ -461,9 +461,10 @@ func attemptHop(seq int, ch *registry.ChannelSnapshot, apiKey string, upstreamSt
 	}
 }
 
-// keyHint 渠道密钥尾 4 位提示（与渠道管理展示口径一致，明文永不落库）。
+// keyHint 渠道密钥尾 4 位提示（明文永不落库）。
+// 口径与 sanitize.go 的 maskAPIKey 一致：长度 >4 保留尾 4 位。
 func keyHint(key string) string {
-	if len(key) <= 8 {
+	if len(key) <= 4 {
 		return "…"
 	}
 	return "…" + key[len(key)-4:]
@@ -641,10 +642,15 @@ func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.Rel
 			"content_type", result.contentType)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodyBytes))
+	// 多读 1 字节探测超限：超过上限时按错误处理（可 failover），
+	// 绝不把截断的半截 JSON 静默透传给客户端。
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodyBytes+1))
 	if err != nil {
 		// 非流式读体失败：未向客户端写出，按网络错误处理（可 failover）。
 		return attemptResult{netErr: err}
+	}
+	if len(body) > maxResponseBodyBytes {
+		return attemptResult{netErr: fmt.Errorf("上游响应体超过 %d 字节上限", maxResponseBodyBytes)}
 	}
 	rewritten, usage := ad.ParseNonStreamResponse(info, body)
 	result.body = rewritten

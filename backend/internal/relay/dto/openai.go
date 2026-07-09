@@ -56,12 +56,6 @@ func (r *ChatRequest) Clone() *ChatRequest {
 	return &ChatRequest{fields: fields, Model: r.Model, Stream: r.Stream}
 }
 
-// Has 判断字段是否存在。
-func (r *ChatRequest) Has(key string) bool {
-	_, ok := r.fields[key]
-	return ok
-}
-
 // Get 返回字段原始 JSON 值。
 func (r *ChatRequest) Get(key string) (json.RawMessage, bool) {
 	raw, ok := r.fields[key]

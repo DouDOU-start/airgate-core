@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
@@ -18,6 +19,7 @@ type RedemptionCodeCreate struct {
 	config
 	mutation *RedemptionCodeMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetCode sets the "code" field.
@@ -262,6 +264,7 @@ func (rcc *RedemptionCodeCreate) createSpec() (*RedemptionCode, *sqlgraph.Create
 		_node = &RedemptionCode{config: rcc.config}
 		_spec = sqlgraph.NewCreateSpec(redemptioncode.Table, sqlgraph.NewFieldSpec(redemptioncode.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = rcc.conflict
 	if value, ok := rcc.mutation.Code(); ok {
 		_spec.SetField(redemptioncode.FieldCode, field.TypeString, value)
 		_node.Code = value
@@ -305,11 +308,425 @@ func (rcc *RedemptionCodeCreate) createSpec() (*RedemptionCode, *sqlgraph.Create
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.RedemptionCode.Create().
+//		SetCode(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.RedemptionCodeUpsert) {
+//			SetCode(v+v).
+//		}).
+//		Exec(ctx)
+func (rcc *RedemptionCodeCreate) OnConflict(opts ...sql.ConflictOption) *RedemptionCodeUpsertOne {
+	rcc.conflict = opts
+	return &RedemptionCodeUpsertOne{
+		create: rcc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.RedemptionCode.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (rcc *RedemptionCodeCreate) OnConflictColumns(columns ...string) *RedemptionCodeUpsertOne {
+	rcc.conflict = append(rcc.conflict, sql.ConflictColumns(columns...))
+	return &RedemptionCodeUpsertOne{
+		create: rcc,
+	}
+}
+
+type (
+	// RedemptionCodeUpsertOne is the builder for "upsert"-ing
+	//  one RedemptionCode node.
+	RedemptionCodeUpsertOne struct {
+		create *RedemptionCodeCreate
+	}
+
+	// RedemptionCodeUpsert is the "OnConflict" setter.
+	RedemptionCodeUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetCode sets the "code" field.
+func (u *RedemptionCodeUpsert) SetCode(v string) *RedemptionCodeUpsert {
+	u.Set(redemptioncode.FieldCode, v)
+	return u
+}
+
+// UpdateCode sets the "code" field to the value that was provided on create.
+func (u *RedemptionCodeUpsert) UpdateCode() *RedemptionCodeUpsert {
+	u.SetExcluded(redemptioncode.FieldCode)
+	return u
+}
+
+// SetValue sets the "value" field.
+func (u *RedemptionCodeUpsert) SetValue(v float64) *RedemptionCodeUpsert {
+	u.Set(redemptioncode.FieldValue, v)
+	return u
+}
+
+// UpdateValue sets the "value" field to the value that was provided on create.
+func (u *RedemptionCodeUpsert) UpdateValue() *RedemptionCodeUpsert {
+	u.SetExcluded(redemptioncode.FieldValue)
+	return u
+}
+
+// AddValue adds v to the "value" field.
+func (u *RedemptionCodeUpsert) AddValue(v float64) *RedemptionCodeUpsert {
+	u.Add(redemptioncode.FieldValue, v)
+	return u
+}
+
+// SetStatus sets the "status" field.
+func (u *RedemptionCodeUpsert) SetStatus(v string) *RedemptionCodeUpsert {
+	u.Set(redemptioncode.FieldStatus, v)
+	return u
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *RedemptionCodeUpsert) UpdateStatus() *RedemptionCodeUpsert {
+	u.SetExcluded(redemptioncode.FieldStatus)
+	return u
+}
+
+// SetRemark sets the "remark" field.
+func (u *RedemptionCodeUpsert) SetRemark(v string) *RedemptionCodeUpsert {
+	u.Set(redemptioncode.FieldRemark, v)
+	return u
+}
+
+// UpdateRemark sets the "remark" field to the value that was provided on create.
+func (u *RedemptionCodeUpsert) UpdateRemark() *RedemptionCodeUpsert {
+	u.SetExcluded(redemptioncode.FieldRemark)
+	return u
+}
+
+// SetUsedByID sets the "used_by_id" field.
+func (u *RedemptionCodeUpsert) SetUsedByID(v int) *RedemptionCodeUpsert {
+	u.Set(redemptioncode.FieldUsedByID, v)
+	return u
+}
+
+// UpdateUsedByID sets the "used_by_id" field to the value that was provided on create.
+func (u *RedemptionCodeUpsert) UpdateUsedByID() *RedemptionCodeUpsert {
+	u.SetExcluded(redemptioncode.FieldUsedByID)
+	return u
+}
+
+// AddUsedByID adds v to the "used_by_id" field.
+func (u *RedemptionCodeUpsert) AddUsedByID(v int) *RedemptionCodeUpsert {
+	u.Add(redemptioncode.FieldUsedByID, v)
+	return u
+}
+
+// SetUsedByEmail sets the "used_by_email" field.
+func (u *RedemptionCodeUpsert) SetUsedByEmail(v string) *RedemptionCodeUpsert {
+	u.Set(redemptioncode.FieldUsedByEmail, v)
+	return u
+}
+
+// UpdateUsedByEmail sets the "used_by_email" field to the value that was provided on create.
+func (u *RedemptionCodeUpsert) UpdateUsedByEmail() *RedemptionCodeUpsert {
+	u.SetExcluded(redemptioncode.FieldUsedByEmail)
+	return u
+}
+
+// SetUsedAt sets the "used_at" field.
+func (u *RedemptionCodeUpsert) SetUsedAt(v time.Time) *RedemptionCodeUpsert {
+	u.Set(redemptioncode.FieldUsedAt, v)
+	return u
+}
+
+// UpdateUsedAt sets the "used_at" field to the value that was provided on create.
+func (u *RedemptionCodeUpsert) UpdateUsedAt() *RedemptionCodeUpsert {
+	u.SetExcluded(redemptioncode.FieldUsedAt)
+	return u
+}
+
+// ClearUsedAt clears the value of the "used_at" field.
+func (u *RedemptionCodeUpsert) ClearUsedAt() *RedemptionCodeUpsert {
+	u.SetNull(redemptioncode.FieldUsedAt)
+	return u
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *RedemptionCodeUpsert) SetExpiresAt(v time.Time) *RedemptionCodeUpsert {
+	u.Set(redemptioncode.FieldExpiresAt, v)
+	return u
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *RedemptionCodeUpsert) UpdateExpiresAt() *RedemptionCodeUpsert {
+	u.SetExcluded(redemptioncode.FieldExpiresAt)
+	return u
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (u *RedemptionCodeUpsert) ClearExpiresAt() *RedemptionCodeUpsert {
+	u.SetNull(redemptioncode.FieldExpiresAt)
+	return u
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *RedemptionCodeUpsert) SetUpdatedAt(v time.Time) *RedemptionCodeUpsert {
+	u.Set(redemptioncode.FieldUpdatedAt, v)
+	return u
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *RedemptionCodeUpsert) UpdateUpdatedAt() *RedemptionCodeUpsert {
+	u.SetExcluded(redemptioncode.FieldUpdatedAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.RedemptionCode.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *RedemptionCodeUpsertOne) UpdateNewValues() *RedemptionCodeUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(redemptioncode.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.RedemptionCode.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *RedemptionCodeUpsertOne) Ignore() *RedemptionCodeUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *RedemptionCodeUpsertOne) DoNothing() *RedemptionCodeUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the RedemptionCodeCreate.OnConflict
+// documentation for more info.
+func (u *RedemptionCodeUpsertOne) Update(set func(*RedemptionCodeUpsert)) *RedemptionCodeUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&RedemptionCodeUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetCode sets the "code" field.
+func (u *RedemptionCodeUpsertOne) SetCode(v string) *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetCode(v)
+	})
+}
+
+// UpdateCode sets the "code" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertOne) UpdateCode() *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateCode()
+	})
+}
+
+// SetValue sets the "value" field.
+func (u *RedemptionCodeUpsertOne) SetValue(v float64) *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetValue(v)
+	})
+}
+
+// AddValue adds v to the "value" field.
+func (u *RedemptionCodeUpsertOne) AddValue(v float64) *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.AddValue(v)
+	})
+}
+
+// UpdateValue sets the "value" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertOne) UpdateValue() *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateValue()
+	})
+}
+
+// SetStatus sets the "status" field.
+func (u *RedemptionCodeUpsertOne) SetStatus(v string) *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetStatus(v)
+	})
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertOne) UpdateStatus() *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateStatus()
+	})
+}
+
+// SetRemark sets the "remark" field.
+func (u *RedemptionCodeUpsertOne) SetRemark(v string) *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetRemark(v)
+	})
+}
+
+// UpdateRemark sets the "remark" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertOne) UpdateRemark() *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateRemark()
+	})
+}
+
+// SetUsedByID sets the "used_by_id" field.
+func (u *RedemptionCodeUpsertOne) SetUsedByID(v int) *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetUsedByID(v)
+	})
+}
+
+// AddUsedByID adds v to the "used_by_id" field.
+func (u *RedemptionCodeUpsertOne) AddUsedByID(v int) *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.AddUsedByID(v)
+	})
+}
+
+// UpdateUsedByID sets the "used_by_id" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertOne) UpdateUsedByID() *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateUsedByID()
+	})
+}
+
+// SetUsedByEmail sets the "used_by_email" field.
+func (u *RedemptionCodeUpsertOne) SetUsedByEmail(v string) *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetUsedByEmail(v)
+	})
+}
+
+// UpdateUsedByEmail sets the "used_by_email" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertOne) UpdateUsedByEmail() *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateUsedByEmail()
+	})
+}
+
+// SetUsedAt sets the "used_at" field.
+func (u *RedemptionCodeUpsertOne) SetUsedAt(v time.Time) *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetUsedAt(v)
+	})
+}
+
+// UpdateUsedAt sets the "used_at" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertOne) UpdateUsedAt() *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateUsedAt()
+	})
+}
+
+// ClearUsedAt clears the value of the "used_at" field.
+func (u *RedemptionCodeUpsertOne) ClearUsedAt() *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.ClearUsedAt()
+	})
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *RedemptionCodeUpsertOne) SetExpiresAt(v time.Time) *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetExpiresAt(v)
+	})
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertOne) UpdateExpiresAt() *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateExpiresAt()
+	})
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (u *RedemptionCodeUpsertOne) ClearExpiresAt() *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.ClearExpiresAt()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *RedemptionCodeUpsertOne) SetUpdatedAt(v time.Time) *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertOne) UpdateUpdatedAt() *RedemptionCodeUpsertOne {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *RedemptionCodeUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for RedemptionCodeCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *RedemptionCodeUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *RedemptionCodeUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *RedemptionCodeUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // RedemptionCodeCreateBulk is the builder for creating many RedemptionCode entities in bulk.
 type RedemptionCodeCreateBulk struct {
 	config
 	err      error
 	builders []*RedemptionCodeCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the RedemptionCode entities in the database.
@@ -339,6 +756,7 @@ func (rccb *RedemptionCodeCreateBulk) Save(ctx context.Context) ([]*RedemptionCo
 					_, err = mutators[i+1].Mutate(root, rccb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = rccb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, rccb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -389,6 +807,271 @@ func (rccb *RedemptionCodeCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (rccb *RedemptionCodeCreateBulk) ExecX(ctx context.Context) {
 	if err := rccb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.RedemptionCode.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.RedemptionCodeUpsert) {
+//			SetCode(v+v).
+//		}).
+//		Exec(ctx)
+func (rccb *RedemptionCodeCreateBulk) OnConflict(opts ...sql.ConflictOption) *RedemptionCodeUpsertBulk {
+	rccb.conflict = opts
+	return &RedemptionCodeUpsertBulk{
+		create: rccb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.RedemptionCode.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (rccb *RedemptionCodeCreateBulk) OnConflictColumns(columns ...string) *RedemptionCodeUpsertBulk {
+	rccb.conflict = append(rccb.conflict, sql.ConflictColumns(columns...))
+	return &RedemptionCodeUpsertBulk{
+		create: rccb,
+	}
+}
+
+// RedemptionCodeUpsertBulk is the builder for "upsert"-ing
+// a bulk of RedemptionCode nodes.
+type RedemptionCodeUpsertBulk struct {
+	create *RedemptionCodeCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.RedemptionCode.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *RedemptionCodeUpsertBulk) UpdateNewValues() *RedemptionCodeUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(redemptioncode.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.RedemptionCode.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *RedemptionCodeUpsertBulk) Ignore() *RedemptionCodeUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *RedemptionCodeUpsertBulk) DoNothing() *RedemptionCodeUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the RedemptionCodeCreateBulk.OnConflict
+// documentation for more info.
+func (u *RedemptionCodeUpsertBulk) Update(set func(*RedemptionCodeUpsert)) *RedemptionCodeUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&RedemptionCodeUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetCode sets the "code" field.
+func (u *RedemptionCodeUpsertBulk) SetCode(v string) *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetCode(v)
+	})
+}
+
+// UpdateCode sets the "code" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertBulk) UpdateCode() *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateCode()
+	})
+}
+
+// SetValue sets the "value" field.
+func (u *RedemptionCodeUpsertBulk) SetValue(v float64) *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetValue(v)
+	})
+}
+
+// AddValue adds v to the "value" field.
+func (u *RedemptionCodeUpsertBulk) AddValue(v float64) *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.AddValue(v)
+	})
+}
+
+// UpdateValue sets the "value" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertBulk) UpdateValue() *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateValue()
+	})
+}
+
+// SetStatus sets the "status" field.
+func (u *RedemptionCodeUpsertBulk) SetStatus(v string) *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetStatus(v)
+	})
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertBulk) UpdateStatus() *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateStatus()
+	})
+}
+
+// SetRemark sets the "remark" field.
+func (u *RedemptionCodeUpsertBulk) SetRemark(v string) *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetRemark(v)
+	})
+}
+
+// UpdateRemark sets the "remark" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertBulk) UpdateRemark() *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateRemark()
+	})
+}
+
+// SetUsedByID sets the "used_by_id" field.
+func (u *RedemptionCodeUpsertBulk) SetUsedByID(v int) *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetUsedByID(v)
+	})
+}
+
+// AddUsedByID adds v to the "used_by_id" field.
+func (u *RedemptionCodeUpsertBulk) AddUsedByID(v int) *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.AddUsedByID(v)
+	})
+}
+
+// UpdateUsedByID sets the "used_by_id" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertBulk) UpdateUsedByID() *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateUsedByID()
+	})
+}
+
+// SetUsedByEmail sets the "used_by_email" field.
+func (u *RedemptionCodeUpsertBulk) SetUsedByEmail(v string) *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetUsedByEmail(v)
+	})
+}
+
+// UpdateUsedByEmail sets the "used_by_email" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertBulk) UpdateUsedByEmail() *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateUsedByEmail()
+	})
+}
+
+// SetUsedAt sets the "used_at" field.
+func (u *RedemptionCodeUpsertBulk) SetUsedAt(v time.Time) *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetUsedAt(v)
+	})
+}
+
+// UpdateUsedAt sets the "used_at" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertBulk) UpdateUsedAt() *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateUsedAt()
+	})
+}
+
+// ClearUsedAt clears the value of the "used_at" field.
+func (u *RedemptionCodeUpsertBulk) ClearUsedAt() *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.ClearUsedAt()
+	})
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *RedemptionCodeUpsertBulk) SetExpiresAt(v time.Time) *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetExpiresAt(v)
+	})
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertBulk) UpdateExpiresAt() *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateExpiresAt()
+	})
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (u *RedemptionCodeUpsertBulk) ClearExpiresAt() *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.ClearExpiresAt()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *RedemptionCodeUpsertBulk) SetUpdatedAt(v time.Time) *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *RedemptionCodeUpsertBulk) UpdateUpdatedAt() *RedemptionCodeUpsertBulk {
+	return u.Update(func(s *RedemptionCodeUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *RedemptionCodeUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the RedemptionCodeCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for RedemptionCodeCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *RedemptionCodeUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

@@ -18,8 +18,9 @@ import (
 // BalanceLogUpdate is the builder for updating BalanceLog entities.
 type BalanceLogUpdate struct {
 	config
-	hooks    []Hook
-	mutation *BalanceLogMutation
+	hooks     []Hook
+	mutation  *BalanceLogMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the BalanceLogUpdate builder.
@@ -241,6 +242,12 @@ func (blu *BalanceLogUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (blu *BalanceLogUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *BalanceLogUpdate {
+	blu.modifiers = append(blu.modifiers, modifiers...)
+	return blu
+}
+
 func (blu *BalanceLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := blu.check(); err != nil {
 		return n, err
@@ -321,6 +328,7 @@ func (blu *BalanceLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(blu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, blu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{balancelog.Label}
@@ -336,9 +344,10 @@ func (blu *BalanceLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // BalanceLogUpdateOne is the builder for updating a single BalanceLog entity.
 type BalanceLogUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *BalanceLogMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *BalanceLogMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetAction sets the "action" field.
@@ -567,6 +576,12 @@ func (bluo *BalanceLogUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (bluo *BalanceLogUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *BalanceLogUpdateOne {
+	bluo.modifiers = append(bluo.modifiers, modifiers...)
+	return bluo
+}
+
 func (bluo *BalanceLogUpdateOne) sqlSave(ctx context.Context) (_node *BalanceLog, err error) {
 	if err := bluo.check(); err != nil {
 		return _node, err
@@ -664,6 +679,7 @@ func (bluo *BalanceLogUpdateOne) sqlSave(ctx context.Context) (_node *BalanceLog
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(bluo.modifiers...)
 	_node = &BalanceLog{config: bluo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Service 提供分组域用例编排。
@@ -35,9 +35,9 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 
 	list, total, err := s.repo.List(ctx, filter)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("group_lookup_failed",
+		logx.LoggerFromContext(ctx).Error("group_lookup_failed",
 			"op", "list",
-			sdk.LogFieldError, err)
+			logx.LogFieldError, err)
 		return ListResult{}, err
 	}
 	s.attachRuntimeStats(ctx, list)
@@ -104,64 +104,57 @@ func (s *Service) ListAvailable(ctx context.Context, filter AvailableFilter) (Li
 func (s *Service) Get(ctx context.Context, id int) (Group, error) {
 	g, err := s.repo.FindByID(ctx, id)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("group_lookup_failed",
-			sdk.LogFieldGroupID, id,
-			sdk.LogFieldError, err)
+		logx.LoggerFromContext(ctx).Error("group_lookup_failed",
+			logx.LogFieldGroupID, id,
+			logx.LogFieldError, err)
 	}
 	return g, err
 }
 
 // Create 创建分组。
 func (s *Service) Create(ctx context.Context, input CreateInput) (Group, error) {
-	logger := sdk.LoggerFromContext(ctx)
-	input.Quotas = cloneQuotas(input.Quotas)
-	input.ModelRouting = cloneModelRouting(input.ModelRouting)
+	logger := logx.LoggerFromContext(ctx)
 	g, err := s.repo.Create(ctx, input)
 	if err != nil {
 		logger.Error("group_persist_failed",
 			"op", "create",
 			"name", input.Name,
-			sdk.LogFieldPlatform, input.Platform,
-			sdk.LogFieldError, err)
+			logx.LogFieldPlatform, input.Platform,
+			logx.LogFieldError, err)
 		return g, err
 	}
 	logger.Info("group_create_succeeded",
-		sdk.LogFieldGroupID, g.ID,
+		logx.LogFieldGroupID, g.ID,
 		"name", g.Name,
-		sdk.LogFieldPlatform, g.Platform)
+		logx.LogFieldPlatform, g.Platform)
 	return g, err
 }
 
 // Update 更新分组。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Group, error) {
-	logger := sdk.LoggerFromContext(ctx)
-	input.Quotas = cloneQuotas(input.Quotas)
-	input.ModelRouting = cloneModelRouting(input.ModelRouting)
+	logger := logx.LoggerFromContext(ctx)
 	g, err := s.repo.Update(ctx, id, input)
 	if err != nil {
 		logger.Error("group_persist_failed",
 			"op", "update",
-			sdk.LogFieldGroupID, id,
-			sdk.LogFieldError, err)
+			logx.LogFieldGroupID, id,
+			logx.LogFieldError, err)
 		return g, err
 	}
-	logger.Info("group_update_succeeded", sdk.LogFieldGroupID, id)
-	if input.ModelRouting != nil {
-		logger.Info("group_routing_updated", sdk.LogFieldGroupID, id)
-	}
+	logger.Info("group_update_succeeded", logx.LogFieldGroupID, id)
 	return g, err
 }
 
 // Delete 删除分组。
 func (s *Service) Delete(ctx context.Context, id int) error {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	if err := s.repo.Delete(ctx, id); err != nil {
 		logger.Error("group_persist_failed",
 			"op", "delete",
-			sdk.LogFieldGroupID, id,
-			sdk.LogFieldError, err)
+			logx.LogFieldGroupID, id,
+			logx.LogFieldError, err)
 		return err
 	}
-	logger.Info("group_delete_succeeded", sdk.LogFieldGroupID, id)
+	logger.Info("group_delete_succeeded", logx.LogFieldGroupID, id)
 	return nil
 }

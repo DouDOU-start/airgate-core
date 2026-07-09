@@ -24,6 +24,7 @@ type ModelTagQuery struct {
 	inters     []Interceptor
 	predicates []predicate.ModelTag
 	withPrices *ModelPriceQuery
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -383,6 +384,9 @@ func (mtq *ModelTagQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Mo
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
+	if len(mtq.modifiers) > 0 {
+		_spec.Modifiers = mtq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -438,6 +442,9 @@ func (mtq *ModelTagQuery) loadPrices(ctx context.Context, query *ModelPriceQuery
 
 func (mtq *ModelTagQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := mtq.querySpec()
+	if len(mtq.modifiers) > 0 {
+		_spec.Modifiers = mtq.modifiers
+	}
 	_spec.Node.Columns = mtq.ctx.Fields
 	if len(mtq.ctx.Fields) > 0 {
 		_spec.Unique = mtq.ctx.Unique != nil && *mtq.ctx.Unique
@@ -500,6 +507,9 @@ func (mtq *ModelTagQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if mtq.ctx.Unique != nil && *mtq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range mtq.modifiers {
+		m(selector)
+	}
 	for _, p := range mtq.predicates {
 		p(selector)
 	}
@@ -515,6 +525,12 @@ func (mtq *ModelTagQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (mtq *ModelTagQuery) Modify(modifiers ...func(s *sql.Selector)) *ModelTagSelect {
+	mtq.modifiers = append(mtq.modifiers, modifiers...)
+	return mtq.Select()
 }
 
 // ModelTagGroupBy is the group-by builder for ModelTag entities.
@@ -605,4 +621,10 @@ func (mts *ModelTagSelect) sqlScan(ctx context.Context, root *ModelTagQuery, v a
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (mts *ModelTagSelect) Modify(modifiers ...func(s *sql.Selector)) *ModelTagSelect {
+	mts.modifiers = append(mts.modifiers, modifiers...)
+	return mts
 }

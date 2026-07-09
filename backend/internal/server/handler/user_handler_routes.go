@@ -12,6 +12,9 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
 )
 
+// fallbackDefaultUserMaxConcurrency settings 服务未注入时的新用户默认并发数兜底。
+const fallbackDefaultUserMaxConcurrency = 5
+
 // GetMe 获取当前登录用户信息。
 func (h *UserHandler) GetMe(c *gin.Context) {
 	userID, ok := currentUserID(c)
@@ -93,7 +96,8 @@ func (h *UserHandler) UpdateBalanceAlert(c *gin.Context) {
 	}
 
 	if err := h.service.UpdateBalanceAlert(c.Request.Context(), userID, req.Threshold); err != nil {
-		response.InternalError(c, "更新余额预警失败")
+		httpCode, message := h.handleError("更新余额预警失败", "更新余额预警失败", err)
+		response.Error(c, httpCode, httpCode, message)
 		return
 	}
 	response.Success(c, nil)
@@ -185,7 +189,11 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	maxConcurrency := defaultUserMaxConcurrency(c.Request.Context(), h.settingsService)
+	// 未显式指定并发数时沿用系统「新用户默认值」（解析收口在 settings 服务）
+	maxConcurrency := fallbackDefaultUserMaxConcurrency
+	if h.settingsService != nil {
+		_, maxConcurrency = h.settingsService.NewUserDefaults(c.Request.Context())
+	}
 	if req.MaxConcurrency != nil {
 		maxConcurrency = *req.MaxConcurrency
 	}
@@ -208,7 +216,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 // UpdateUser 管理员更新用户。
 func (h *UserHandler) UpdateUser(c *gin.Context) {
-	id, err := parseUserID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的用户 ID")
 		return
@@ -241,7 +249,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 
 // AdjustBalance 管理员调整用户余额。
 func (h *UserHandler) AdjustBalance(c *gin.Context) {
-	id, err := parseUserID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的用户 ID")
 		return
@@ -268,7 +276,7 @@ func (h *UserHandler) AdjustBalance(c *gin.Context) {
 
 // DeleteUser 管理员删除用户。
 func (h *UserHandler) DeleteUser(c *gin.Context) {
-	id, err := parseUserID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的用户 ID")
 		return
@@ -284,7 +292,7 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 
 // ToggleUserStatus 切换用户状态。
 func (h *UserHandler) ToggleUserStatus(c *gin.Context) {
-	id, err := parseUserID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的用户 ID")
 		return
@@ -304,7 +312,7 @@ func (h *UserHandler) ToggleUserStatus(c *gin.Context) {
 
 // GetUserBalanceHistory 查询用户余额变更历史。
 func (h *UserHandler) GetUserBalanceHistory(c *gin.Context) {
-	id, err := parseUserID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的用户 ID")
 		return
@@ -332,7 +340,7 @@ func (h *UserHandler) GetUserBalanceHistory(c *gin.Context) {
 
 // AdminListUserKeys 管理员查询指定用户的 API 密钥列表。
 func (h *UserHandler) AdminListUserKeys(c *gin.Context) {
-	id, err := parseUserID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的用户 ID")
 		return

@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Service 提供仪表盘用例编排。
@@ -61,10 +61,10 @@ func (s *Service) Stats(ctx context.Context, userID int, tz string) (Stats, erro
 
 	snapshot, err := s.repo.LoadStatsSnapshot(ctx, todayStart, fiveMinAgo, userID)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("dashboard_query_failed",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldReason, "stats_snapshot",
-			sdk.LogFieldError, err,
+		logx.LoggerFromContext(ctx).Error("dashboard_query_failed",
+			logx.LogFieldUserID, userID,
+			logx.LogFieldReason, "stats_snapshot",
+			logx.LogFieldError, err,
 		)
 		return Stats{}, err
 	}
@@ -125,10 +125,10 @@ func (s *Service) Trend(ctx context.Context, query TrendQuery) (Trend, error) {
 
 		trend, err := s.loadTrendFresh(ctx, query, loc, startTime, endTime)
 		if err != nil {
-			sdk.LoggerFromContext(ctx).Error("dashboard_query_failed",
-				sdk.LogFieldUserID, query.UserID,
-				sdk.LogFieldReason, "trend_logs",
-				sdk.LogFieldError, err,
+			logx.LoggerFromContext(ctx).Error("dashboard_query_failed",
+				logx.LogFieldUserID, query.UserID,
+				logx.LogFieldReason, "trend_logs",
+				logx.LogFieldError, err,
 			)
 			return Trend{}, err
 		}
@@ -142,10 +142,10 @@ func (s *Service) Trend(ctx context.Context, query TrendQuery) (Trend, error) {
 
 	trend, err := s.loadTrendFresh(ctx, query, loc, startTime, endTime)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("dashboard_query_failed",
-			sdk.LogFieldUserID, query.UserID,
-			sdk.LogFieldReason, "trend_logs",
-			sdk.LogFieldError, err,
+		logx.LoggerFromContext(ctx).Error("dashboard_query_failed",
+			logx.LogFieldUserID, query.UserID,
+			logx.LogFieldReason, "trend_logs",
+			logx.LogFieldError, err,
 		)
 		return Trend{}, err
 	}

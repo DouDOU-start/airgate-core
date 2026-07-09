@@ -32,7 +32,7 @@ func FS() (fs.FS, error) {
 	// 探测一下 index.html 是否存在；不存在意味着构建时漏了 cp 步骤，
 	// 直接快速失败比让用户在浏览器里看 404 友好得多。
 	if _, err := fs.Stat(sub, "index.html"); err != nil {
-		return nil, errors.New("embedded web/dist is empty: rebuild backend after running `make build-frontend` (or copy web/dist → backend/internal/web/webdist before go build)")
+		return nil, errors.New("嵌入的前端资源为空：请先执行 `make build-frontend` 再重新编译后端（或在 go build 前把 web/dist 复制到 backend/internal/web/webdist）")
 	}
 	return sub, nil
 }

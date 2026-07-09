@@ -34,20 +34,16 @@ type GroupStats struct {
 
 // Group 描述分组领域对象。
 type Group struct {
-	ID                int
-	Name              string
-	Platform          string
-	RateMultiplier    float64
-	IsExclusive       bool
-	StatusVisible     bool
-	Quotas            map[string]any
-	ModelRouting      map[string][]int64
-	ServiceTier       string
-	ForceInstructions string
-	Note              string
-	SortWeight        int
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ID             int
+	Name           string
+	Platform       string
+	RateMultiplier float64
+	IsExclusive    bool
+	StatusVisible  bool
+	Note           string
+	SortWeight     int
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 
 	// CurrentConcurrency / CurrentRPM 运行时观测指标（在途请求数 / 当前分钟请求数），
 	// 仅管理员列表查询时由读取器填充，不落库。
@@ -57,11 +53,10 @@ type Group struct {
 
 // ListFilter 描述管理员分组列表查询条件。
 type ListFilter struct {
-	Page        int
-	PageSize    int
-	Keyword     string
-	Platform    string
-	ServiceTier string
+	Page     int
+	PageSize int
+	Keyword  string
+	Platform string
 }
 
 // AvailableFilter 描述用户可用分组查询条件。
@@ -83,51 +78,21 @@ type ListResult struct {
 
 // CreateInput 描述创建分组输入。
 type CreateInput struct {
-	Name              string
-	Platform          string
-	RateMultiplier    float64
-	IsExclusive       bool
-	StatusVisible     bool
-	Quotas            map[string]any
-	ModelRouting      map[string][]int64
-	ServiceTier       string
-	ForceInstructions string
-	Note              string
-	SortWeight        int
+	Name           string
+	Platform       string
+	RateMultiplier float64
+	IsExclusive    bool
+	StatusVisible  bool
+	Note           string
+	SortWeight     int
 }
 
 // UpdateInput 描述更新分组输入。
 type UpdateInput struct {
-	Name              *string
-	RateMultiplier    *float64
-	IsExclusive       *bool
-	StatusVisible     *bool
-	Quotas            map[string]any
-	ModelRouting      map[string][]int64
-	ServiceTier       *string
-	ForceInstructions *string
-	Note              *string
-	SortWeight        *int
-}
-
-func cloneQuotas(input map[string]any) map[string]any {
-	if input == nil {
-		return nil
-	}
-	cloned := make(map[string]any, len(input))
-	for key, value := range input {
-		cloned[key] = value
-	}
-	return cloned
-}
-
-func cloneModelRouting(input map[string][]int64) map[string][]int64 {
-	if input == nil {
-		return nil
-	}
-	cloned := make(map[string][]int64, len(input))
-	for key, value := range input {
-		cloned[key] = append([]int64(nil), value...)
-	}
-	return cloned
+	Name           *string
+	RateMultiplier *float64
+	IsExclusive    *bool
+	StatusVisible  *bool
+	Note           *string
+	SortWeight     *int
 }

@@ -443,7 +443,7 @@ func TestRelaySSEObserverInterruptUsesAccumulatedUsage(t *testing.T) {
 		t.Fatal("expected scanner error")
 	}
 	if sr.usage == nil || sr.usage.PromptTokens != 100 {
-		t.Errorf("usage = %+v, want accumulated prompt=100 (interrupt fallback)", sr.usage)
+		t.Errorf("usage = %+v, 期望中断回退累积值 prompt=100", sr.usage)
 	}
 	if sr.done {
 		t.Error("中断流不得标记完成")
@@ -469,7 +469,7 @@ func TestRelaySSEObserverErrorEventAborts(t *testing.T) {
 		t.Errorf("错误事件应原样透传给客户端: %q", w.Body.String())
 	}
 	if sr.usage == nil || sr.usage.PromptTokens != 10 {
-		t.Errorf("usage fallback = %+v, want prompt=10", sr.usage)
+		t.Errorf("usage 回退值 = %+v, 期望 prompt=10", sr.usage)
 	}
 }
 

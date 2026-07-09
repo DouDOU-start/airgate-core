@@ -2,14 +2,13 @@ package store
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
 	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
+	"github.com/DouDOU-start/airgate-core/internal/auth"
 )
 
 // AuthStore 使用 Ent 实现认证仓储。
@@ -108,7 +107,7 @@ func (s *AuthStore) ValidateAPIKeySession(ctx context.Context, userID, keyID int
 
 // ValidateAPIKeyForLogin 验证 API Key 用于 Web 登录（不要求绑定分组）。
 func (s *AuthStore) ValidateAPIKeyForLogin(ctx context.Context, key string) (appauth.APIKeyLoginInfo, error) {
-	hash := hashAPIKey(key)
+	hash := auth.HashAPIKey(key)
 
 	ak, err := s.db.APIKey.Query().
 		Where(
@@ -157,12 +156,6 @@ func (s *AuthStore) GetAPIKeyBrief(ctx context.Context, keyID int) (appauth.APIK
 		brief.GroupRate = g.RateMultiplier
 	}
 	return brief, nil
-}
-
-// hashAPIKey 对 API Key 进行 SHA256 哈希（与 auth 包的 HashAPIKey 逻辑一致）。
-func hashAPIKey(key string) string {
-	h := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(h[:])
 }
 
 func mapAuthUser(item *ent.User) appauth.User {

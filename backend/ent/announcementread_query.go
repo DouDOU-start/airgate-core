@@ -21,6 +21,7 @@ type AnnouncementReadQuery struct {
 	order      []announcementread.OrderOption
 	inters     []Interceptor
 	predicates []predicate.AnnouncementRead
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -342,6 +343,9 @@ func (arq *AnnouncementReadQuery) sqlAll(ctx context.Context, hooks ...queryHook
 		nodes = append(nodes, node)
 		return node.assignValues(columns, values)
 	}
+	if len(arq.modifiers) > 0 {
+		_spec.Modifiers = arq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -356,6 +360,9 @@ func (arq *AnnouncementReadQuery) sqlAll(ctx context.Context, hooks ...queryHook
 
 func (arq *AnnouncementReadQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := arq.querySpec()
+	if len(arq.modifiers) > 0 {
+		_spec.Modifiers = arq.modifiers
+	}
 	_spec.Node.Columns = arq.ctx.Fields
 	if len(arq.ctx.Fields) > 0 {
 		_spec.Unique = arq.ctx.Unique != nil && *arq.ctx.Unique
@@ -418,6 +425,9 @@ func (arq *AnnouncementReadQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if arq.ctx.Unique != nil && *arq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range arq.modifiers {
+		m(selector)
+	}
 	for _, p := range arq.predicates {
 		p(selector)
 	}
@@ -433,6 +443,12 @@ func (arq *AnnouncementReadQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (arq *AnnouncementReadQuery) Modify(modifiers ...func(s *sql.Selector)) *AnnouncementReadSelect {
+	arq.modifiers = append(arq.modifiers, modifiers...)
+	return arq.Select()
 }
 
 // AnnouncementReadGroupBy is the group-by builder for AnnouncementRead entities.
@@ -523,4 +539,10 @@ func (ars *AnnouncementReadSelect) sqlScan(ctx context.Context, root *Announceme
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ars *AnnouncementReadSelect) Modify(modifiers ...func(s *sql.Selector)) *AnnouncementReadSelect {
+	ars.modifiers = append(ars.modifiers, modifiers...)
+	return ars
 }

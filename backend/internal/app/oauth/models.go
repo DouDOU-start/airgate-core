@@ -45,7 +45,6 @@ type ClientMutation struct {
 // Repository 客户端持久化接口（由 infra/store 实现）。
 type Repository interface {
 	List(ctx context.Context) ([]Client, error)
-	FindByID(ctx context.Context, id int) (Client, error)
 	FindByClientID(ctx context.Context, clientID string) (Client, error)
 	Create(ctx context.Context, clientID, secretHash, secretHint string, m ClientMutation) (Client, error)
 	Update(ctx context.Context, id int, m ClientMutation) (Client, error)

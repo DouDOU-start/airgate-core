@@ -23,8 +23,8 @@ import (
 // 方便不同脚本模板读取。
 //
 // airgate 原生的用量接口 /api/v1/usage 需要 JWT，不接受 sk-xxx API Key，因此
-// cc-switch 无法直接查询。这里提供轻量兼容端点 /v1/usage（在 router.go 中注册，
-// 必须在 NoRoute 之前，否则会被插件动态路由吃掉），让 cc-switch 能看到余额。
+// cc-switch 无法直接查询。这里提供轻量兼容端点 /v1/usage（在 router.go 中显式
+// 注册；NoRoute 仅作为前端 SPA fallback 返回 index.html），让 cc-switch 能看到余额。
 //
 // 故意不复用 middleware.APIKeyAuth：
 //   - APIKeyAuth 在额度耗尽时返回 402，而额度耗尽恰恰是用户最需要在 cc-switch

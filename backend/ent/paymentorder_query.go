@@ -21,6 +21,7 @@ type PaymentOrderQuery struct {
 	order      []paymentorder.OrderOption
 	inters     []Interceptor
 	predicates []predicate.PaymentOrder
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -342,6 +343,9 @@ func (poq *PaymentOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([
 		nodes = append(nodes, node)
 		return node.assignValues(columns, values)
 	}
+	if len(poq.modifiers) > 0 {
+		_spec.Modifiers = poq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -356,6 +360,9 @@ func (poq *PaymentOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([
 
 func (poq *PaymentOrderQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := poq.querySpec()
+	if len(poq.modifiers) > 0 {
+		_spec.Modifiers = poq.modifiers
+	}
 	_spec.Node.Columns = poq.ctx.Fields
 	if len(poq.ctx.Fields) > 0 {
 		_spec.Unique = poq.ctx.Unique != nil && *poq.ctx.Unique
@@ -418,6 +425,9 @@ func (poq *PaymentOrderQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if poq.ctx.Unique != nil && *poq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range poq.modifiers {
+		m(selector)
+	}
 	for _, p := range poq.predicates {
 		p(selector)
 	}
@@ -433,6 +443,12 @@ func (poq *PaymentOrderQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (poq *PaymentOrderQuery) Modify(modifiers ...func(s *sql.Selector)) *PaymentOrderSelect {
+	poq.modifiers = append(poq.modifiers, modifiers...)
+	return poq.Select()
 }
 
 // PaymentOrderGroupBy is the group-by builder for PaymentOrder entities.
@@ -523,4 +539,10 @@ func (pos *PaymentOrderSelect) sqlScan(ctx context.Context, root *PaymentOrderQu
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (pos *PaymentOrderSelect) Modify(modifiers ...func(s *sql.Selector)) *PaymentOrderSelect {
+	pos.modifiers = append(pos.modifiers, modifiers...)
+	return pos
 }

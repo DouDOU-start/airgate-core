@@ -29,6 +29,7 @@ type APIKeyQuery struct {
 	withGroup     *GroupQuery
 	withUsageLogs *UsageLogQuery
 	withFKs       bool
+	modifiers     []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -465,6 +466,9 @@ func (akq *APIKeyQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*APIK
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
+	if len(akq.modifiers) > 0 {
+		_spec.Modifiers = akq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -593,6 +597,9 @@ func (akq *APIKeyQuery) loadUsageLogs(ctx context.Context, query *UsageLogQuery,
 
 func (akq *APIKeyQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := akq.querySpec()
+	if len(akq.modifiers) > 0 {
+		_spec.Modifiers = akq.modifiers
+	}
 	_spec.Node.Columns = akq.ctx.Fields
 	if len(akq.ctx.Fields) > 0 {
 		_spec.Unique = akq.ctx.Unique != nil && *akq.ctx.Unique
@@ -655,6 +662,9 @@ func (akq *APIKeyQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if akq.ctx.Unique != nil && *akq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range akq.modifiers {
+		m(selector)
+	}
 	for _, p := range akq.predicates {
 		p(selector)
 	}
@@ -670,6 +680,12 @@ func (akq *APIKeyQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (akq *APIKeyQuery) Modify(modifiers ...func(s *sql.Selector)) *APIKeySelect {
+	akq.modifiers = append(akq.modifiers, modifiers...)
+	return akq.Select()
 }
 
 // APIKeyGroupBy is the group-by builder for APIKey entities.
@@ -760,4 +776,10 @@ func (aks *APIKeySelect) sqlScan(ctx context.Context, root *APIKeyQuery, v any) 
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (aks *APIKeySelect) Modify(modifiers ...func(s *sql.Selector)) *APIKeySelect {
+	aks.modifiers = append(aks.modifiers, modifiers...)
+	return aks
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
@@ -19,6 +20,7 @@ type BalanceLogCreate struct {
 	config
 	mutation *BalanceLogMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetAction sets the "action" field.
@@ -244,6 +246,7 @@ func (blc *BalanceLogCreate) createSpec() (*BalanceLog, *sqlgraph.CreateSpec) {
 		_node = &BalanceLog{config: blc.config}
 		_spec = sqlgraph.NewCreateSpec(balancelog.Table, sqlgraph.NewFieldSpec(balancelog.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = blc.conflict
 	if value, ok := blc.mutation.Action(); ok {
 		_spec.SetField(balancelog.FieldAction, field.TypeEnum, value)
 		_node.Action = value
@@ -300,11 +303,412 @@ func (blc *BalanceLogCreate) createSpec() (*BalanceLog, *sqlgraph.CreateSpec) {
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.BalanceLog.Create().
+//		SetAction(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.BalanceLogUpsert) {
+//			SetAction(v+v).
+//		}).
+//		Exec(ctx)
+func (blc *BalanceLogCreate) OnConflict(opts ...sql.ConflictOption) *BalanceLogUpsertOne {
+	blc.conflict = opts
+	return &BalanceLogUpsertOne{
+		create: blc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.BalanceLog.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (blc *BalanceLogCreate) OnConflictColumns(columns ...string) *BalanceLogUpsertOne {
+	blc.conflict = append(blc.conflict, sql.ConflictColumns(columns...))
+	return &BalanceLogUpsertOne{
+		create: blc,
+	}
+}
+
+type (
+	// BalanceLogUpsertOne is the builder for "upsert"-ing
+	//  one BalanceLog node.
+	BalanceLogUpsertOne struct {
+		create *BalanceLogCreate
+	}
+
+	// BalanceLogUpsert is the "OnConflict" setter.
+	BalanceLogUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetAction sets the "action" field.
+func (u *BalanceLogUpsert) SetAction(v balancelog.Action) *BalanceLogUpsert {
+	u.Set(balancelog.FieldAction, v)
+	return u
+}
+
+// UpdateAction sets the "action" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateAction() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldAction)
+	return u
+}
+
+// SetAmount sets the "amount" field.
+func (u *BalanceLogUpsert) SetAmount(v float64) *BalanceLogUpsert {
+	u.Set(balancelog.FieldAmount, v)
+	return u
+}
+
+// UpdateAmount sets the "amount" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateAmount() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldAmount)
+	return u
+}
+
+// AddAmount adds v to the "amount" field.
+func (u *BalanceLogUpsert) AddAmount(v float64) *BalanceLogUpsert {
+	u.Add(balancelog.FieldAmount, v)
+	return u
+}
+
+// SetBeforeBalance sets the "before_balance" field.
+func (u *BalanceLogUpsert) SetBeforeBalance(v float64) *BalanceLogUpsert {
+	u.Set(balancelog.FieldBeforeBalance, v)
+	return u
+}
+
+// UpdateBeforeBalance sets the "before_balance" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateBeforeBalance() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldBeforeBalance)
+	return u
+}
+
+// AddBeforeBalance adds v to the "before_balance" field.
+func (u *BalanceLogUpsert) AddBeforeBalance(v float64) *BalanceLogUpsert {
+	u.Add(balancelog.FieldBeforeBalance, v)
+	return u
+}
+
+// SetAfterBalance sets the "after_balance" field.
+func (u *BalanceLogUpsert) SetAfterBalance(v float64) *BalanceLogUpsert {
+	u.Set(balancelog.FieldAfterBalance, v)
+	return u
+}
+
+// UpdateAfterBalance sets the "after_balance" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateAfterBalance() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldAfterBalance)
+	return u
+}
+
+// AddAfterBalance adds v to the "after_balance" field.
+func (u *BalanceLogUpsert) AddAfterBalance(v float64) *BalanceLogUpsert {
+	u.Add(balancelog.FieldAfterBalance, v)
+	return u
+}
+
+// SetRemark sets the "remark" field.
+func (u *BalanceLogUpsert) SetRemark(v string) *BalanceLogUpsert {
+	u.Set(balancelog.FieldRemark, v)
+	return u
+}
+
+// UpdateRemark sets the "remark" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateRemark() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldRemark)
+	return u
+}
+
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (u *BalanceLogUpsert) SetUserIDSnapshot(v int) *BalanceLogUpsert {
+	u.Set(balancelog.FieldUserIDSnapshot, v)
+	return u
+}
+
+// UpdateUserIDSnapshot sets the "user_id_snapshot" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateUserIDSnapshot() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldUserIDSnapshot)
+	return u
+}
+
+// AddUserIDSnapshot adds v to the "user_id_snapshot" field.
+func (u *BalanceLogUpsert) AddUserIDSnapshot(v int) *BalanceLogUpsert {
+	u.Add(balancelog.FieldUserIDSnapshot, v)
+	return u
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (u *BalanceLogUpsert) SetUserEmailSnapshot(v string) *BalanceLogUpsert {
+	u.Set(balancelog.FieldUserEmailSnapshot, v)
+	return u
+}
+
+// UpdateUserEmailSnapshot sets the "user_email_snapshot" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateUserEmailSnapshot() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldUserEmailSnapshot)
+	return u
+}
+
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (u *BalanceLogUpsert) SetIdempotencyKey(v string) *BalanceLogUpsert {
+	u.Set(balancelog.FieldIdempotencyKey, v)
+	return u
+}
+
+// UpdateIdempotencyKey sets the "idempotency_key" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateIdempotencyKey() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldIdempotencyKey)
+	return u
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (u *BalanceLogUpsert) ClearIdempotencyKey() *BalanceLogUpsert {
+	u.SetNull(balancelog.FieldIdempotencyKey)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.BalanceLog.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *BalanceLogUpsertOne) UpdateNewValues() *BalanceLogUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(balancelog.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.BalanceLog.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *BalanceLogUpsertOne) Ignore() *BalanceLogUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *BalanceLogUpsertOne) DoNothing() *BalanceLogUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the BalanceLogCreate.OnConflict
+// documentation for more info.
+func (u *BalanceLogUpsertOne) Update(set func(*BalanceLogUpsert)) *BalanceLogUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&BalanceLogUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetAction sets the "action" field.
+func (u *BalanceLogUpsertOne) SetAction(v balancelog.Action) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetAction(v)
+	})
+}
+
+// UpdateAction sets the "action" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateAction() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateAction()
+	})
+}
+
+// SetAmount sets the "amount" field.
+func (u *BalanceLogUpsertOne) SetAmount(v float64) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetAmount(v)
+	})
+}
+
+// AddAmount adds v to the "amount" field.
+func (u *BalanceLogUpsertOne) AddAmount(v float64) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.AddAmount(v)
+	})
+}
+
+// UpdateAmount sets the "amount" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateAmount() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateAmount()
+	})
+}
+
+// SetBeforeBalance sets the "before_balance" field.
+func (u *BalanceLogUpsertOne) SetBeforeBalance(v float64) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetBeforeBalance(v)
+	})
+}
+
+// AddBeforeBalance adds v to the "before_balance" field.
+func (u *BalanceLogUpsertOne) AddBeforeBalance(v float64) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.AddBeforeBalance(v)
+	})
+}
+
+// UpdateBeforeBalance sets the "before_balance" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateBeforeBalance() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateBeforeBalance()
+	})
+}
+
+// SetAfterBalance sets the "after_balance" field.
+func (u *BalanceLogUpsertOne) SetAfterBalance(v float64) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetAfterBalance(v)
+	})
+}
+
+// AddAfterBalance adds v to the "after_balance" field.
+func (u *BalanceLogUpsertOne) AddAfterBalance(v float64) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.AddAfterBalance(v)
+	})
+}
+
+// UpdateAfterBalance sets the "after_balance" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateAfterBalance() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateAfterBalance()
+	})
+}
+
+// SetRemark sets the "remark" field.
+func (u *BalanceLogUpsertOne) SetRemark(v string) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetRemark(v)
+	})
+}
+
+// UpdateRemark sets the "remark" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateRemark() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateRemark()
+	})
+}
+
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (u *BalanceLogUpsertOne) SetUserIDSnapshot(v int) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetUserIDSnapshot(v)
+	})
+}
+
+// AddUserIDSnapshot adds v to the "user_id_snapshot" field.
+func (u *BalanceLogUpsertOne) AddUserIDSnapshot(v int) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.AddUserIDSnapshot(v)
+	})
+}
+
+// UpdateUserIDSnapshot sets the "user_id_snapshot" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateUserIDSnapshot() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateUserIDSnapshot()
+	})
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (u *BalanceLogUpsertOne) SetUserEmailSnapshot(v string) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetUserEmailSnapshot(v)
+	})
+}
+
+// UpdateUserEmailSnapshot sets the "user_email_snapshot" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateUserEmailSnapshot() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateUserEmailSnapshot()
+	})
+}
+
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (u *BalanceLogUpsertOne) SetIdempotencyKey(v string) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetIdempotencyKey(v)
+	})
+}
+
+// UpdateIdempotencyKey sets the "idempotency_key" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateIdempotencyKey() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateIdempotencyKey()
+	})
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (u *BalanceLogUpsertOne) ClearIdempotencyKey() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.ClearIdempotencyKey()
+	})
+}
+
+// Exec executes the query.
+func (u *BalanceLogUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for BalanceLogCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *BalanceLogUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *BalanceLogUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *BalanceLogUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // BalanceLogCreateBulk is the builder for creating many BalanceLog entities in bulk.
 type BalanceLogCreateBulk struct {
 	config
 	err      error
 	builders []*BalanceLogCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the BalanceLog entities in the database.
@@ -334,6 +738,7 @@ func (blcb *BalanceLogCreateBulk) Save(ctx context.Context) ([]*BalanceLog, erro
 					_, err = mutators[i+1].Mutate(root, blcb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = blcb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, blcb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -384,6 +789,264 @@ func (blcb *BalanceLogCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (blcb *BalanceLogCreateBulk) ExecX(ctx context.Context) {
 	if err := blcb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.BalanceLog.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.BalanceLogUpsert) {
+//			SetAction(v+v).
+//		}).
+//		Exec(ctx)
+func (blcb *BalanceLogCreateBulk) OnConflict(opts ...sql.ConflictOption) *BalanceLogUpsertBulk {
+	blcb.conflict = opts
+	return &BalanceLogUpsertBulk{
+		create: blcb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.BalanceLog.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (blcb *BalanceLogCreateBulk) OnConflictColumns(columns ...string) *BalanceLogUpsertBulk {
+	blcb.conflict = append(blcb.conflict, sql.ConflictColumns(columns...))
+	return &BalanceLogUpsertBulk{
+		create: blcb,
+	}
+}
+
+// BalanceLogUpsertBulk is the builder for "upsert"-ing
+// a bulk of BalanceLog nodes.
+type BalanceLogUpsertBulk struct {
+	create *BalanceLogCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.BalanceLog.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *BalanceLogUpsertBulk) UpdateNewValues() *BalanceLogUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(balancelog.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.BalanceLog.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *BalanceLogUpsertBulk) Ignore() *BalanceLogUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *BalanceLogUpsertBulk) DoNothing() *BalanceLogUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the BalanceLogCreateBulk.OnConflict
+// documentation for more info.
+func (u *BalanceLogUpsertBulk) Update(set func(*BalanceLogUpsert)) *BalanceLogUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&BalanceLogUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetAction sets the "action" field.
+func (u *BalanceLogUpsertBulk) SetAction(v balancelog.Action) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetAction(v)
+	})
+}
+
+// UpdateAction sets the "action" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateAction() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateAction()
+	})
+}
+
+// SetAmount sets the "amount" field.
+func (u *BalanceLogUpsertBulk) SetAmount(v float64) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetAmount(v)
+	})
+}
+
+// AddAmount adds v to the "amount" field.
+func (u *BalanceLogUpsertBulk) AddAmount(v float64) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.AddAmount(v)
+	})
+}
+
+// UpdateAmount sets the "amount" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateAmount() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateAmount()
+	})
+}
+
+// SetBeforeBalance sets the "before_balance" field.
+func (u *BalanceLogUpsertBulk) SetBeforeBalance(v float64) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetBeforeBalance(v)
+	})
+}
+
+// AddBeforeBalance adds v to the "before_balance" field.
+func (u *BalanceLogUpsertBulk) AddBeforeBalance(v float64) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.AddBeforeBalance(v)
+	})
+}
+
+// UpdateBeforeBalance sets the "before_balance" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateBeforeBalance() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateBeforeBalance()
+	})
+}
+
+// SetAfterBalance sets the "after_balance" field.
+func (u *BalanceLogUpsertBulk) SetAfterBalance(v float64) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetAfterBalance(v)
+	})
+}
+
+// AddAfterBalance adds v to the "after_balance" field.
+func (u *BalanceLogUpsertBulk) AddAfterBalance(v float64) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.AddAfterBalance(v)
+	})
+}
+
+// UpdateAfterBalance sets the "after_balance" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateAfterBalance() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateAfterBalance()
+	})
+}
+
+// SetRemark sets the "remark" field.
+func (u *BalanceLogUpsertBulk) SetRemark(v string) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetRemark(v)
+	})
+}
+
+// UpdateRemark sets the "remark" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateRemark() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateRemark()
+	})
+}
+
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (u *BalanceLogUpsertBulk) SetUserIDSnapshot(v int) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetUserIDSnapshot(v)
+	})
+}
+
+// AddUserIDSnapshot adds v to the "user_id_snapshot" field.
+func (u *BalanceLogUpsertBulk) AddUserIDSnapshot(v int) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.AddUserIDSnapshot(v)
+	})
+}
+
+// UpdateUserIDSnapshot sets the "user_id_snapshot" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateUserIDSnapshot() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateUserIDSnapshot()
+	})
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (u *BalanceLogUpsertBulk) SetUserEmailSnapshot(v string) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetUserEmailSnapshot(v)
+	})
+}
+
+// UpdateUserEmailSnapshot sets the "user_email_snapshot" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateUserEmailSnapshot() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateUserEmailSnapshot()
+	})
+}
+
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (u *BalanceLogUpsertBulk) SetIdempotencyKey(v string) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetIdempotencyKey(v)
+	})
+}
+
+// UpdateIdempotencyKey sets the "idempotency_key" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateIdempotencyKey() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateIdempotencyKey()
+	})
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (u *BalanceLogUpsertBulk) ClearIdempotencyKey() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.ClearIdempotencyKey()
+	})
+}
+
+// Exec executes the query.
+func (u *BalanceLogUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the BalanceLogCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for BalanceLogCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *BalanceLogUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

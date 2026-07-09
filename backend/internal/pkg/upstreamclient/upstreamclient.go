@@ -37,8 +37,14 @@ func buildTransport() *http.Transport {
 		KeepAlive: 30 * time.Second,
 	}
 	return &http.Transport{
-		DialContext:           dialer.DialContext,
-		TLSHandshakeTimeout:   10 * time.Second,
+		DialContext:         dialer.DialContext,
+		TLSHandshakeTimeout: 10 * time.Second,
+		// 响应头超时：本超时只为清除"握手后永不回头"的挂死连接，
+		// 只约束到响应头到达为止，不影响流式 body 的长时间读取。
+		// 非流式长生成（chat / 图像生成）首包可达数分钟，取太紧会把合法慢响应
+		// 误判为网络错误触发 failover（重复打多个渠道、重复计费），故取宽松上限；
+		// 死主机由 Dial 侧超时兜底。
+		ResponseHeaderTimeout: 10 * time.Minute,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		MaxIdleConnsPerHost:   20,

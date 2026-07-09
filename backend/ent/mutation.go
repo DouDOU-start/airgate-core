@@ -6218,10 +6218,6 @@ type GroupMutation struct {
 	addrate_multiplier   *float64
 	is_exclusive         *bool
 	status_visible       *bool
-	quotas               *map[string]interface{}
-	model_routing        *map[string][]int64
-	service_tier         *string
-	force_instructions   *string
 	note                 *string
 	sort_weight          *int
 	addsort_weight       *int
@@ -6541,176 +6537,6 @@ func (m *GroupMutation) OldStatusVisible(ctx context.Context) (v bool, err error
 // ResetStatusVisible resets all changes to the "status_visible" field.
 func (m *GroupMutation) ResetStatusVisible() {
 	m.status_visible = nil
-}
-
-// SetQuotas sets the "quotas" field.
-func (m *GroupMutation) SetQuotas(value map[string]interface{}) {
-	m.quotas = &value
-}
-
-// Quotas returns the value of the "quotas" field in the mutation.
-func (m *GroupMutation) Quotas() (r map[string]interface{}, exists bool) {
-	v := m.quotas
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldQuotas returns the old "quotas" field's value of the Group entity.
-// If the Group object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *GroupMutation) OldQuotas(ctx context.Context) (v map[string]interface{}, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldQuotas is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldQuotas requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldQuotas: %w", err)
-	}
-	return oldValue.Quotas, nil
-}
-
-// ClearQuotas clears the value of the "quotas" field.
-func (m *GroupMutation) ClearQuotas() {
-	m.quotas = nil
-	m.clearedFields[group.FieldQuotas] = struct{}{}
-}
-
-// QuotasCleared returns if the "quotas" field was cleared in this mutation.
-func (m *GroupMutation) QuotasCleared() bool {
-	_, ok := m.clearedFields[group.FieldQuotas]
-	return ok
-}
-
-// ResetQuotas resets all changes to the "quotas" field.
-func (m *GroupMutation) ResetQuotas() {
-	m.quotas = nil
-	delete(m.clearedFields, group.FieldQuotas)
-}
-
-// SetModelRouting sets the "model_routing" field.
-func (m *GroupMutation) SetModelRouting(value map[string][]int64) {
-	m.model_routing = &value
-}
-
-// ModelRouting returns the value of the "model_routing" field in the mutation.
-func (m *GroupMutation) ModelRouting() (r map[string][]int64, exists bool) {
-	v := m.model_routing
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldModelRouting returns the old "model_routing" field's value of the Group entity.
-// If the Group object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *GroupMutation) OldModelRouting(ctx context.Context) (v map[string][]int64, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldModelRouting is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldModelRouting requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldModelRouting: %w", err)
-	}
-	return oldValue.ModelRouting, nil
-}
-
-// ClearModelRouting clears the value of the "model_routing" field.
-func (m *GroupMutation) ClearModelRouting() {
-	m.model_routing = nil
-	m.clearedFields[group.FieldModelRouting] = struct{}{}
-}
-
-// ModelRoutingCleared returns if the "model_routing" field was cleared in this mutation.
-func (m *GroupMutation) ModelRoutingCleared() bool {
-	_, ok := m.clearedFields[group.FieldModelRouting]
-	return ok
-}
-
-// ResetModelRouting resets all changes to the "model_routing" field.
-func (m *GroupMutation) ResetModelRouting() {
-	m.model_routing = nil
-	delete(m.clearedFields, group.FieldModelRouting)
-}
-
-// SetServiceTier sets the "service_tier" field.
-func (m *GroupMutation) SetServiceTier(s string) {
-	m.service_tier = &s
-}
-
-// ServiceTier returns the value of the "service_tier" field in the mutation.
-func (m *GroupMutation) ServiceTier() (r string, exists bool) {
-	v := m.service_tier
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldServiceTier returns the old "service_tier" field's value of the Group entity.
-// If the Group object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *GroupMutation) OldServiceTier(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldServiceTier is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldServiceTier requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldServiceTier: %w", err)
-	}
-	return oldValue.ServiceTier, nil
-}
-
-// ResetServiceTier resets all changes to the "service_tier" field.
-func (m *GroupMutation) ResetServiceTier() {
-	m.service_tier = nil
-}
-
-// SetForceInstructions sets the "force_instructions" field.
-func (m *GroupMutation) SetForceInstructions(s string) {
-	m.force_instructions = &s
-}
-
-// ForceInstructions returns the value of the "force_instructions" field in the mutation.
-func (m *GroupMutation) ForceInstructions() (r string, exists bool) {
-	v := m.force_instructions
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldForceInstructions returns the old "force_instructions" field's value of the Group entity.
-// If the Group object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *GroupMutation) OldForceInstructions(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldForceInstructions is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldForceInstructions requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldForceInstructions: %w", err)
-	}
-	return oldValue.ForceInstructions, nil
-}
-
-// ResetForceInstructions resets all changes to the "force_instructions" field.
-func (m *GroupMutation) ResetForceInstructions() {
-	m.force_instructions = nil
 }
 
 // SetNote sets the "note" field.
@@ -7127,7 +6953,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 9)
 	if m.name != nil {
 		fields = append(fields, group.FieldName)
 	}
@@ -7142,18 +6968,6 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.status_visible != nil {
 		fields = append(fields, group.FieldStatusVisible)
-	}
-	if m.quotas != nil {
-		fields = append(fields, group.FieldQuotas)
-	}
-	if m.model_routing != nil {
-		fields = append(fields, group.FieldModelRouting)
-	}
-	if m.service_tier != nil {
-		fields = append(fields, group.FieldServiceTier)
-	}
-	if m.force_instructions != nil {
-		fields = append(fields, group.FieldForceInstructions)
 	}
 	if m.note != nil {
 		fields = append(fields, group.FieldNote)
@@ -7185,14 +6999,6 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.IsExclusive()
 	case group.FieldStatusVisible:
 		return m.StatusVisible()
-	case group.FieldQuotas:
-		return m.Quotas()
-	case group.FieldModelRouting:
-		return m.ModelRouting()
-	case group.FieldServiceTier:
-		return m.ServiceTier()
-	case group.FieldForceInstructions:
-		return m.ForceInstructions()
 	case group.FieldNote:
 		return m.Note()
 	case group.FieldSortWeight:
@@ -7220,14 +7026,6 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldIsExclusive(ctx)
 	case group.FieldStatusVisible:
 		return m.OldStatusVisible(ctx)
-	case group.FieldQuotas:
-		return m.OldQuotas(ctx)
-	case group.FieldModelRouting:
-		return m.OldModelRouting(ctx)
-	case group.FieldServiceTier:
-		return m.OldServiceTier(ctx)
-	case group.FieldForceInstructions:
-		return m.OldForceInstructions(ctx)
 	case group.FieldNote:
 		return m.OldNote(ctx)
 	case group.FieldSortWeight:
@@ -7279,34 +7077,6 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatusVisible(v)
-		return nil
-	case group.FieldQuotas:
-		v, ok := value.(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetQuotas(v)
-		return nil
-	case group.FieldModelRouting:
-		v, ok := value.(map[string][]int64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetModelRouting(v)
-		return nil
-	case group.FieldServiceTier:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetServiceTier(v)
-		return nil
-	case group.FieldForceInstructions:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetForceInstructions(v)
 		return nil
 	case group.FieldNote:
 		v, ok := value.(string)
@@ -7392,14 +7162,7 @@ func (m *GroupMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *GroupMutation) ClearedFields() []string {
-	var fields []string
-	if m.FieldCleared(group.FieldQuotas) {
-		fields = append(fields, group.FieldQuotas)
-	}
-	if m.FieldCleared(group.FieldModelRouting) {
-		fields = append(fields, group.FieldModelRouting)
-	}
-	return fields
+	return nil
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -7412,14 +7175,6 @@ func (m *GroupMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *GroupMutation) ClearField(name string) error {
-	switch name {
-	case group.FieldQuotas:
-		m.ClearQuotas()
-		return nil
-	case group.FieldModelRouting:
-		m.ClearModelRouting()
-		return nil
-	}
 	return fmt.Errorf("unknown Group nullable field %s", name)
 }
 
@@ -7441,18 +7196,6 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldStatusVisible:
 		m.ResetStatusVisible()
-		return nil
-	case group.FieldQuotas:
-		m.ResetQuotas()
-		return nil
-	case group.FieldModelRouting:
-		m.ResetModelRouting()
-		return nil
-	case group.FieldServiceTier:
-		m.ResetServiceTier()
-		return nil
-	case group.FieldForceInstructions:
-		m.ResetForceInstructions()
 		return nil
 	case group.FieldNote:
 		m.ResetNote()
@@ -18999,7 +18742,6 @@ type UserMutation struct {
 	role                       *user.Role
 	max_concurrency            *int
 	addmax_concurrency         *int
-	totp_secret                *string
 	group_rates                *map[int64]float64
 	balance_alert_threshold    *float64
 	addbalance_alert_threshold *float64
@@ -19377,55 +19119,6 @@ func (m *UserMutation) AddedMaxConcurrency() (r int, exists bool) {
 func (m *UserMutation) ResetMaxConcurrency() {
 	m.max_concurrency = nil
 	m.addmax_concurrency = nil
-}
-
-// SetTotpSecret sets the "totp_secret" field.
-func (m *UserMutation) SetTotpSecret(s string) {
-	m.totp_secret = &s
-}
-
-// TotpSecret returns the value of the "totp_secret" field in the mutation.
-func (m *UserMutation) TotpSecret() (r string, exists bool) {
-	v := m.totp_secret
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldTotpSecret returns the old "totp_secret" field's value of the User entity.
-// If the User object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UserMutation) OldTotpSecret(ctx context.Context) (v *string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldTotpSecret is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldTotpSecret requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldTotpSecret: %w", err)
-	}
-	return oldValue.TotpSecret, nil
-}
-
-// ClearTotpSecret clears the value of the "totp_secret" field.
-func (m *UserMutation) ClearTotpSecret() {
-	m.totp_secret = nil
-	m.clearedFields[user.FieldTotpSecret] = struct{}{}
-}
-
-// TotpSecretCleared returns if the "totp_secret" field was cleared in this mutation.
-func (m *UserMutation) TotpSecretCleared() bool {
-	_, ok := m.clearedFields[user.FieldTotpSecret]
-	return ok
-}
-
-// ResetTotpSecret resets all changes to the "totp_secret" field.
-func (m *UserMutation) ResetTotpSecret() {
-	m.totp_secret = nil
-	delete(m.clearedFields, user.FieldTotpSecret)
 }
 
 // SetGroupRates sets the "group_rates" field.
@@ -19927,7 +19620,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 12)
 	if m.email != nil {
 		fields = append(fields, user.FieldEmail)
 	}
@@ -19945,9 +19638,6 @@ func (m *UserMutation) Fields() []string {
 	}
 	if m.max_concurrency != nil {
 		fields = append(fields, user.FieldMaxConcurrency)
-	}
-	if m.totp_secret != nil {
-		fields = append(fields, user.FieldTotpSecret)
 	}
 	if m.group_rates != nil {
 		fields = append(fields, user.FieldGroupRates)
@@ -19987,8 +19677,6 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.Role()
 	case user.FieldMaxConcurrency:
 		return m.MaxConcurrency()
-	case user.FieldTotpSecret:
-		return m.TotpSecret()
 	case user.FieldGroupRates:
 		return m.GroupRates()
 	case user.FieldBalanceAlertThreshold:
@@ -20022,8 +19710,6 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldRole(ctx)
 	case user.FieldMaxConcurrency:
 		return m.OldMaxConcurrency(ctx)
-	case user.FieldTotpSecret:
-		return m.OldTotpSecret(ctx)
 	case user.FieldGroupRates:
 		return m.OldGroupRates(ctx)
 	case user.FieldBalanceAlertThreshold:
@@ -20086,13 +19772,6 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMaxConcurrency(v)
-		return nil
-	case user.FieldTotpSecret:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetTotpSecret(v)
 		return nil
 	case user.FieldGroupRates:
 		v, ok := value.(map[int64]float64)
@@ -20205,9 +19884,6 @@ func (m *UserMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *UserMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(user.FieldTotpSecret) {
-		fields = append(fields, user.FieldTotpSecret)
-	}
 	if m.FieldCleared(user.FieldGroupRates) {
 		fields = append(fields, user.FieldGroupRates)
 	}
@@ -20225,9 +19901,6 @@ func (m *UserMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *UserMutation) ClearField(name string) error {
 	switch name {
-	case user.FieldTotpSecret:
-		m.ClearTotpSecret()
-		return nil
 	case user.FieldGroupRates:
 		m.ClearGroupRates()
 		return nil
@@ -20256,9 +19929,6 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldMaxConcurrency:
 		m.ResetMaxConcurrency()
-		return nil
-	case user.FieldTotpSecret:
-		m.ResetTotpSecret()
 		return nil
 	case user.FieldGroupRates:
 		m.ResetGroupRates()

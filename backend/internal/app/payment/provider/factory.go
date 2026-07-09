@@ -15,7 +15,7 @@ type Builder func(id string, enabled bool, config map[string]string) (Provider, 
 // builderRegistry 全局 Builder 注册表。
 //
 // 每个 Provider 实现文件在 init() 里调用 Register(kind, builder) 注册自己。
-// plugin Init 时根据 store.List() 拿到的 ConfigRecord.Kind 选对应 Builder。
+// 支付服务装载（ReloadProviders）时按库中 ConfigRecord.Kind 选对应 Builder。
 var (
 	builderMu  sync.RWMutex
 	builderMap = make(map[string]Builder)
@@ -41,18 +41,6 @@ func Build(kind, id string, enabled bool, config map[string]string) (Provider, e
 		return nil, fmt.Errorf("unknown provider kind: %s", kind)
 	}
 	return b(id, enabled, config)
-}
-
-// RegisteredKinds 返回所有已注册的 kind 列表（按字母序），用于 admin UI 展示"可添加的 Provider 类型"。
-func RegisteredKinds() []string {
-	builderMu.RLock()
-	defer builderMu.RUnlock()
-	kinds := make([]string, 0, len(builderMap))
-	for k := range builderMap {
-		kinds = append(kinds, k)
-	}
-	sort.Strings(kinds)
-	return kinds
 }
 
 // KindMeta 描述一个 Provider 类型，用于 admin UI 渲染添加 Provider 的表单。

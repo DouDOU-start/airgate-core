@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
@@ -22,6 +23,7 @@ type GroupCreate struct {
 	config
 	mutation *GroupMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetName sets the "name" field.
@@ -82,46 +84,6 @@ func (gc *GroupCreate) SetStatusVisible(b bool) *GroupCreate {
 func (gc *GroupCreate) SetNillableStatusVisible(b *bool) *GroupCreate {
 	if b != nil {
 		gc.SetStatusVisible(*b)
-	}
-	return gc
-}
-
-// SetQuotas sets the "quotas" field.
-func (gc *GroupCreate) SetQuotas(m map[string]interface{}) *GroupCreate {
-	gc.mutation.SetQuotas(m)
-	return gc
-}
-
-// SetModelRouting sets the "model_routing" field.
-func (gc *GroupCreate) SetModelRouting(m map[string][]int64) *GroupCreate {
-	gc.mutation.SetModelRouting(m)
-	return gc
-}
-
-// SetServiceTier sets the "service_tier" field.
-func (gc *GroupCreate) SetServiceTier(s string) *GroupCreate {
-	gc.mutation.SetServiceTier(s)
-	return gc
-}
-
-// SetNillableServiceTier sets the "service_tier" field if the given value is not nil.
-func (gc *GroupCreate) SetNillableServiceTier(s *string) *GroupCreate {
-	if s != nil {
-		gc.SetServiceTier(*s)
-	}
-	return gc
-}
-
-// SetForceInstructions sets the "force_instructions" field.
-func (gc *GroupCreate) SetForceInstructions(s string) *GroupCreate {
-	gc.mutation.SetForceInstructions(s)
-	return gc
-}
-
-// SetNillableForceInstructions sets the "force_instructions" field if the given value is not nil.
-func (gc *GroupCreate) SetNillableForceInstructions(s *string) *GroupCreate {
-	if s != nil {
-		gc.SetForceInstructions(*s)
 	}
 	return gc
 }
@@ -293,14 +255,6 @@ func (gc *GroupCreate) defaults() {
 		v := group.DefaultStatusVisible
 		gc.mutation.SetStatusVisible(v)
 	}
-	if _, ok := gc.mutation.ServiceTier(); !ok {
-		v := group.DefaultServiceTier
-		gc.mutation.SetServiceTier(v)
-	}
-	if _, ok := gc.mutation.ForceInstructions(); !ok {
-		v := group.DefaultForceInstructions
-		gc.mutation.SetForceInstructions(v)
-	}
 	if _, ok := gc.mutation.Note(); !ok {
 		v := group.DefaultNote
 		gc.mutation.SetNote(v)
@@ -341,12 +295,6 @@ func (gc *GroupCreate) check() error {
 	if _, ok := gc.mutation.StatusVisible(); !ok {
 		return &ValidationError{Name: "status_visible", err: errors.New(`ent: missing required field "Group.status_visible"`)}
 	}
-	if _, ok := gc.mutation.ServiceTier(); !ok {
-		return &ValidationError{Name: "service_tier", err: errors.New(`ent: missing required field "Group.service_tier"`)}
-	}
-	if _, ok := gc.mutation.ForceInstructions(); !ok {
-		return &ValidationError{Name: "force_instructions", err: errors.New(`ent: missing required field "Group.force_instructions"`)}
-	}
 	if _, ok := gc.mutation.Note(); !ok {
 		return &ValidationError{Name: "note", err: errors.New(`ent: missing required field "Group.note"`)}
 	}
@@ -385,6 +333,7 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		_node = &Group{config: gc.config}
 		_spec = sqlgraph.NewCreateSpec(group.Table, sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = gc.conflict
 	if value, ok := gc.mutation.Name(); ok {
 		_spec.SetField(group.FieldName, field.TypeString, value)
 		_node.Name = value
@@ -404,22 +353,6 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := gc.mutation.StatusVisible(); ok {
 		_spec.SetField(group.FieldStatusVisible, field.TypeBool, value)
 		_node.StatusVisible = value
-	}
-	if value, ok := gc.mutation.Quotas(); ok {
-		_spec.SetField(group.FieldQuotas, field.TypeJSON, value)
-		_node.Quotas = value
-	}
-	if value, ok := gc.mutation.ModelRouting(); ok {
-		_spec.SetField(group.FieldModelRouting, field.TypeJSON, value)
-		_node.ModelRouting = value
-	}
-	if value, ok := gc.mutation.ServiceTier(); ok {
-		_spec.SetField(group.FieldServiceTier, field.TypeString, value)
-		_node.ServiceTier = value
-	}
-	if value, ok := gc.mutation.ForceInstructions(); ok {
-		_spec.SetField(group.FieldForceInstructions, field.TypeString, value)
-		_node.ForceInstructions = value
 	}
 	if value, ok := gc.mutation.Note(); ok {
 		_spec.SetField(group.FieldNote, field.TypeString, value)
@@ -504,11 +437,373 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.Group.Create().
+//		SetName(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.GroupUpsert) {
+//			SetName(v+v).
+//		}).
+//		Exec(ctx)
+func (gc *GroupCreate) OnConflict(opts ...sql.ConflictOption) *GroupUpsertOne {
+	gc.conflict = opts
+	return &GroupUpsertOne{
+		create: gc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.Group.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (gc *GroupCreate) OnConflictColumns(columns ...string) *GroupUpsertOne {
+	gc.conflict = append(gc.conflict, sql.ConflictColumns(columns...))
+	return &GroupUpsertOne{
+		create: gc,
+	}
+}
+
+type (
+	// GroupUpsertOne is the builder for "upsert"-ing
+	//  one Group node.
+	GroupUpsertOne struct {
+		create *GroupCreate
+	}
+
+	// GroupUpsert is the "OnConflict" setter.
+	GroupUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetName sets the "name" field.
+func (u *GroupUpsert) SetName(v string) *GroupUpsert {
+	u.Set(group.FieldName, v)
+	return u
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateName() *GroupUpsert {
+	u.SetExcluded(group.FieldName)
+	return u
+}
+
+// SetPlatform sets the "platform" field.
+func (u *GroupUpsert) SetPlatform(v string) *GroupUpsert {
+	u.Set(group.FieldPlatform, v)
+	return u
+}
+
+// UpdatePlatform sets the "platform" field to the value that was provided on create.
+func (u *GroupUpsert) UpdatePlatform() *GroupUpsert {
+	u.SetExcluded(group.FieldPlatform)
+	return u
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (u *GroupUpsert) SetRateMultiplier(v float64) *GroupUpsert {
+	u.Set(group.FieldRateMultiplier, v)
+	return u
+}
+
+// UpdateRateMultiplier sets the "rate_multiplier" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateRateMultiplier() *GroupUpsert {
+	u.SetExcluded(group.FieldRateMultiplier)
+	return u
+}
+
+// AddRateMultiplier adds v to the "rate_multiplier" field.
+func (u *GroupUpsert) AddRateMultiplier(v float64) *GroupUpsert {
+	u.Add(group.FieldRateMultiplier, v)
+	return u
+}
+
+// SetIsExclusive sets the "is_exclusive" field.
+func (u *GroupUpsert) SetIsExclusive(v bool) *GroupUpsert {
+	u.Set(group.FieldIsExclusive, v)
+	return u
+}
+
+// UpdateIsExclusive sets the "is_exclusive" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateIsExclusive() *GroupUpsert {
+	u.SetExcluded(group.FieldIsExclusive)
+	return u
+}
+
+// SetStatusVisible sets the "status_visible" field.
+func (u *GroupUpsert) SetStatusVisible(v bool) *GroupUpsert {
+	u.Set(group.FieldStatusVisible, v)
+	return u
+}
+
+// UpdateStatusVisible sets the "status_visible" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateStatusVisible() *GroupUpsert {
+	u.SetExcluded(group.FieldStatusVisible)
+	return u
+}
+
+// SetNote sets the "note" field.
+func (u *GroupUpsert) SetNote(v string) *GroupUpsert {
+	u.Set(group.FieldNote, v)
+	return u
+}
+
+// UpdateNote sets the "note" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateNote() *GroupUpsert {
+	u.SetExcluded(group.FieldNote)
+	return u
+}
+
+// SetSortWeight sets the "sort_weight" field.
+func (u *GroupUpsert) SetSortWeight(v int) *GroupUpsert {
+	u.Set(group.FieldSortWeight, v)
+	return u
+}
+
+// UpdateSortWeight sets the "sort_weight" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateSortWeight() *GroupUpsert {
+	u.SetExcluded(group.FieldSortWeight)
+	return u
+}
+
+// AddSortWeight adds v to the "sort_weight" field.
+func (u *GroupUpsert) AddSortWeight(v int) *GroupUpsert {
+	u.Add(group.FieldSortWeight, v)
+	return u
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *GroupUpsert) SetUpdatedAt(v time.Time) *GroupUpsert {
+	u.Set(group.FieldUpdatedAt, v)
+	return u
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateUpdatedAt() *GroupUpsert {
+	u.SetExcluded(group.FieldUpdatedAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.Group.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *GroupUpsertOne) UpdateNewValues() *GroupUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(group.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.Group.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *GroupUpsertOne) Ignore() *GroupUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *GroupUpsertOne) DoNothing() *GroupUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the GroupCreate.OnConflict
+// documentation for more info.
+func (u *GroupUpsertOne) Update(set func(*GroupUpsert)) *GroupUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&GroupUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetName sets the "name" field.
+func (u *GroupUpsertOne) SetName(v string) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetName(v)
+	})
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateName() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateName()
+	})
+}
+
+// SetPlatform sets the "platform" field.
+func (u *GroupUpsertOne) SetPlatform(v string) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetPlatform(v)
+	})
+}
+
+// UpdatePlatform sets the "platform" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdatePlatform() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdatePlatform()
+	})
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (u *GroupUpsertOne) SetRateMultiplier(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetRateMultiplier(v)
+	})
+}
+
+// AddRateMultiplier adds v to the "rate_multiplier" field.
+func (u *GroupUpsertOne) AddRateMultiplier(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddRateMultiplier(v)
+	})
+}
+
+// UpdateRateMultiplier sets the "rate_multiplier" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateRateMultiplier() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateRateMultiplier()
+	})
+}
+
+// SetIsExclusive sets the "is_exclusive" field.
+func (u *GroupUpsertOne) SetIsExclusive(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetIsExclusive(v)
+	})
+}
+
+// UpdateIsExclusive sets the "is_exclusive" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateIsExclusive() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateIsExclusive()
+	})
+}
+
+// SetStatusVisible sets the "status_visible" field.
+func (u *GroupUpsertOne) SetStatusVisible(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetStatusVisible(v)
+	})
+}
+
+// UpdateStatusVisible sets the "status_visible" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateStatusVisible() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateStatusVisible()
+	})
+}
+
+// SetNote sets the "note" field.
+func (u *GroupUpsertOne) SetNote(v string) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetNote(v)
+	})
+}
+
+// UpdateNote sets the "note" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateNote() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateNote()
+	})
+}
+
+// SetSortWeight sets the "sort_weight" field.
+func (u *GroupUpsertOne) SetSortWeight(v int) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetSortWeight(v)
+	})
+}
+
+// AddSortWeight adds v to the "sort_weight" field.
+func (u *GroupUpsertOne) AddSortWeight(v int) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddSortWeight(v)
+	})
+}
+
+// UpdateSortWeight sets the "sort_weight" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateSortWeight() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateSortWeight()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *GroupUpsertOne) SetUpdatedAt(v time.Time) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateUpdatedAt() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *GroupUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for GroupCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *GroupUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *GroupUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *GroupUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // GroupCreateBulk is the builder for creating many Group entities in bulk.
 type GroupCreateBulk struct {
 	config
 	err      error
 	builders []*GroupCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the Group entities in the database.
@@ -538,6 +833,7 @@ func (gcb *GroupCreateBulk) Save(ctx context.Context) ([]*Group, error) {
 					_, err = mutators[i+1].Mutate(root, gcb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = gcb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, gcb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -588,6 +884,243 @@ func (gcb *GroupCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (gcb *GroupCreateBulk) ExecX(ctx context.Context) {
 	if err := gcb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.Group.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.GroupUpsert) {
+//			SetName(v+v).
+//		}).
+//		Exec(ctx)
+func (gcb *GroupCreateBulk) OnConflict(opts ...sql.ConflictOption) *GroupUpsertBulk {
+	gcb.conflict = opts
+	return &GroupUpsertBulk{
+		create: gcb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.Group.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (gcb *GroupCreateBulk) OnConflictColumns(columns ...string) *GroupUpsertBulk {
+	gcb.conflict = append(gcb.conflict, sql.ConflictColumns(columns...))
+	return &GroupUpsertBulk{
+		create: gcb,
+	}
+}
+
+// GroupUpsertBulk is the builder for "upsert"-ing
+// a bulk of Group nodes.
+type GroupUpsertBulk struct {
+	create *GroupCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.Group.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *GroupUpsertBulk) UpdateNewValues() *GroupUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(group.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.Group.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *GroupUpsertBulk) Ignore() *GroupUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *GroupUpsertBulk) DoNothing() *GroupUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the GroupCreateBulk.OnConflict
+// documentation for more info.
+func (u *GroupUpsertBulk) Update(set func(*GroupUpsert)) *GroupUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&GroupUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetName sets the "name" field.
+func (u *GroupUpsertBulk) SetName(v string) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetName(v)
+	})
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateName() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateName()
+	})
+}
+
+// SetPlatform sets the "platform" field.
+func (u *GroupUpsertBulk) SetPlatform(v string) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetPlatform(v)
+	})
+}
+
+// UpdatePlatform sets the "platform" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdatePlatform() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdatePlatform()
+	})
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (u *GroupUpsertBulk) SetRateMultiplier(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetRateMultiplier(v)
+	})
+}
+
+// AddRateMultiplier adds v to the "rate_multiplier" field.
+func (u *GroupUpsertBulk) AddRateMultiplier(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddRateMultiplier(v)
+	})
+}
+
+// UpdateRateMultiplier sets the "rate_multiplier" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateRateMultiplier() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateRateMultiplier()
+	})
+}
+
+// SetIsExclusive sets the "is_exclusive" field.
+func (u *GroupUpsertBulk) SetIsExclusive(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetIsExclusive(v)
+	})
+}
+
+// UpdateIsExclusive sets the "is_exclusive" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateIsExclusive() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateIsExclusive()
+	})
+}
+
+// SetStatusVisible sets the "status_visible" field.
+func (u *GroupUpsertBulk) SetStatusVisible(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetStatusVisible(v)
+	})
+}
+
+// UpdateStatusVisible sets the "status_visible" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateStatusVisible() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateStatusVisible()
+	})
+}
+
+// SetNote sets the "note" field.
+func (u *GroupUpsertBulk) SetNote(v string) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetNote(v)
+	})
+}
+
+// UpdateNote sets the "note" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateNote() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateNote()
+	})
+}
+
+// SetSortWeight sets the "sort_weight" field.
+func (u *GroupUpsertBulk) SetSortWeight(v int) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetSortWeight(v)
+	})
+}
+
+// AddSortWeight adds v to the "sort_weight" field.
+func (u *GroupUpsertBulk) AddSortWeight(v int) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddSortWeight(v)
+	})
+}
+
+// UpdateSortWeight sets the "sort_weight" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateSortWeight() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateSortWeight()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *GroupUpsertBulk) SetUpdatedAt(v time.Time) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateUpdatedAt() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *GroupUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the GroupCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for GroupCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *GroupUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

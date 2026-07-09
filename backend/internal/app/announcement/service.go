@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // activeListLimit 用户端单次拉取生效公告的上限，防止历史公告无限膨胀拖垮接口。
@@ -33,9 +33,9 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 
 	list, total, err := s.repo.List(ctx, filter)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("announcement_lookup_failed",
+		logx.LoggerFromContext(ctx).Error("announcement_lookup_failed",
 			"op", "list",
-			sdk.LogFieldError, err)
+			logx.LogFieldError, err)
 		return ListResult{}, err
 	}
 
@@ -51,16 +51,16 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 func (s *Service) Get(ctx context.Context, id int) (Announcement, error) {
 	item, err := s.repo.FindByID(ctx, id)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("announcement_lookup_failed",
+		logx.LoggerFromContext(ctx).Error("announcement_lookup_failed",
 			"announcement_id", id,
-			sdk.LogFieldError, err)
+			logx.LogFieldError, err)
 	}
 	return item, err
 }
 
 // Create 创建公告。
 func (s *Service) Create(ctx context.Context, input CreateInput) (Announcement, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	record := CreateRecord{
 		Title:      input.Title,
@@ -94,7 +94,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Announcement, 
 		logger.Error("announcement_persist_failed",
 			"op", "create",
 			"title", input.Title,
-			sdk.LogFieldError, err)
+			logx.LogFieldError, err)
 		return item, err
 	}
 	logger.Info("announcement_create_succeeded",
@@ -105,7 +105,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Announcement, 
 
 // Update 更新公告。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Announcement, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	if input.Status != nil && !validStatus(*input.Status) {
 		return Announcement{}, ErrInvalidStatus
@@ -155,7 +155,7 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Announ
 		logger.Error("announcement_persist_failed",
 			"op", "update",
 			"announcement_id", id,
-			sdk.LogFieldError, err)
+			logx.LogFieldError, err)
 		return item, err
 	}
 	logger.Info("announcement_update_succeeded", "announcement_id", id)
@@ -164,12 +164,12 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Announ
 
 // Delete 删除公告（连带清理已读记录）。
 func (s *Service) Delete(ctx context.Context, id int) error {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	if err := s.repo.Delete(ctx, id); err != nil {
 		logger.Error("announcement_persist_failed",
 			"op", "delete",
 			"announcement_id", id,
-			sdk.LogFieldError, err)
+			logx.LogFieldError, err)
 		return err
 	}
 	logger.Info("announcement_delete_succeeded", "announcement_id", id)

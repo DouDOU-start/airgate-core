@@ -14,8 +14,8 @@ type Group struct {
 func (Group) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").NotEmpty(),
-		// platform 旧插件世界观遗留：分组绑定单一平台。渠道化后分组与渠道多对多，
-		// 此字段仅为兼容保留（可空），P1 调度改造时废弃。
+		// platform 分组的平台标识（如 anthropic / openai）。调度不消费此字段；
+		// 仍被 API Key 平台识别链路使用（dto/user.go APIKeyPlatform → 前端 CCS 导入识别），保留。
 		field.String("platform").Default(""),
 		field.Float("rate_multiplier").Default(1.0),
 		field.Bool("is_exclusive").Default(false),
@@ -24,10 +24,6 @@ func (Group) Fields() []ent.Field {
 		// （比如仅限熟客的专属分组、调试中的分组等）。
 		// 隐藏仅影响公开状态页 (/status)，不影响 admin 视图和 API 鉴权逻辑。
 		field.Bool("status_visible").Default(true),
-		field.JSON("quotas", map[string]interface{}{}).Optional(),
-		field.JSON("model_routing", map[string][]int64{}).Optional(),
-		field.String("service_tier").Default(""),
-		field.String("force_instructions").Default(""),
 		field.String("note").Default(""),
 		field.Int("sort_weight").Default(0),
 		field.Time("created_at").Default(timeNow).Immutable(),

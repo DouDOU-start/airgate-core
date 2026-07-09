@@ -16,23 +16,22 @@ func newAuthContext(method, target string) (*gin.Context, *httptest.ResponseReco
 	return c, w
 }
 
-func TestExtractBearerTokenAndHasAPIKey(t *testing.T) {
+func TestExtractBearerToken(t *testing.T) {
 	tests := []struct {
 		name          string
 		authorization string
 		apiKey        string
 		googAPIKey    string
 		wantToken     string
-		wantHasKey    bool
 	}{
-		{"authorization_bearer", "Bearer sk-test", "", "", "sk-test", true},
-		{"authorization_case_insensitive", "bearer token-123", "", "", "token-123", true},
-		{"authorization_trim_space", "Bearer   token-123  ", "", "", "token-123", true},
-		{"x_api_key_fallback", "", "sk-from-header", "", "sk-from-header", true},
-		{"x_api_key_when_auth_not_bearer", "Basic abc", "sk-from-header", "", "sk-from-header", true},
-		{"x_goog_api_key_fallback", "", "", "sk-goog", "sk-goog", true},
-		{"x_api_key_priority_over_goog", "", "sk-from-header", "sk-goog", "sk-from-header", true},
-		{"missing", "", "", "", "", false},
+		{"authorization_bearer", "Bearer sk-test", "", "", "sk-test"},
+		{"authorization_case_insensitive", "bearer token-123", "", "", "token-123"},
+		{"authorization_trim_space", "Bearer   token-123  ", "", "", "token-123"},
+		{"x_api_key_fallback", "", "sk-from-header", "", "sk-from-header"},
+		{"x_api_key_when_auth_not_bearer", "Basic abc", "sk-from-header", "", "sk-from-header"},
+		{"x_goog_api_key_fallback", "", "", "sk-goog", "sk-goog"},
+		{"x_api_key_priority_over_goog", "", "sk-from-header", "sk-goog", "sk-from-header"},
+		{"missing", "", "", "", ""},
 	}
 
 	for _, tt := range tests {
@@ -50,9 +49,6 @@ func TestExtractBearerTokenAndHasAPIKey(t *testing.T) {
 
 			if got := extractBearerToken(c); got != tt.wantToken {
 				t.Fatalf("token = %q，期望 %q", got, tt.wantToken)
-			}
-			if got := HasAPIKey(c); got != tt.wantHasKey {
-				t.Fatalf("HasAPIKey = %v，期望 %v", got, tt.wantHasKey)
 			}
 		})
 	}

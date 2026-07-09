@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/announcement"
@@ -18,6 +19,7 @@ type AnnouncementCreate struct {
 	config
 	mutation *AnnouncementMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetTitle sets the "title" field.
@@ -220,6 +222,7 @@ func (ac *AnnouncementCreate) createSpec() (*Announcement, *sqlgraph.CreateSpec)
 		_node = &Announcement{config: ac.config}
 		_spec = sqlgraph.NewCreateSpec(announcement.Table, sqlgraph.NewFieldSpec(announcement.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = ac.conflict
 	if value, ok := ac.mutation.Title(); ok {
 		_spec.SetField(announcement.FieldTitle, field.TypeString, value)
 		_node.Title = value
@@ -255,11 +258,347 @@ func (ac *AnnouncementCreate) createSpec() (*Announcement, *sqlgraph.CreateSpec)
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.Announcement.Create().
+//		SetTitle(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.AnnouncementUpsert) {
+//			SetTitle(v+v).
+//		}).
+//		Exec(ctx)
+func (ac *AnnouncementCreate) OnConflict(opts ...sql.ConflictOption) *AnnouncementUpsertOne {
+	ac.conflict = opts
+	return &AnnouncementUpsertOne{
+		create: ac,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.Announcement.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (ac *AnnouncementCreate) OnConflictColumns(columns ...string) *AnnouncementUpsertOne {
+	ac.conflict = append(ac.conflict, sql.ConflictColumns(columns...))
+	return &AnnouncementUpsertOne{
+		create: ac,
+	}
+}
+
+type (
+	// AnnouncementUpsertOne is the builder for "upsert"-ing
+	//  one Announcement node.
+	AnnouncementUpsertOne struct {
+		create *AnnouncementCreate
+	}
+
+	// AnnouncementUpsert is the "OnConflict" setter.
+	AnnouncementUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetTitle sets the "title" field.
+func (u *AnnouncementUpsert) SetTitle(v string) *AnnouncementUpsert {
+	u.Set(announcement.FieldTitle, v)
+	return u
+}
+
+// UpdateTitle sets the "title" field to the value that was provided on create.
+func (u *AnnouncementUpsert) UpdateTitle() *AnnouncementUpsert {
+	u.SetExcluded(announcement.FieldTitle)
+	return u
+}
+
+// SetContent sets the "content" field.
+func (u *AnnouncementUpsert) SetContent(v string) *AnnouncementUpsert {
+	u.Set(announcement.FieldContent, v)
+	return u
+}
+
+// UpdateContent sets the "content" field to the value that was provided on create.
+func (u *AnnouncementUpsert) UpdateContent() *AnnouncementUpsert {
+	u.SetExcluded(announcement.FieldContent)
+	return u
+}
+
+// SetStatus sets the "status" field.
+func (u *AnnouncementUpsert) SetStatus(v string) *AnnouncementUpsert {
+	u.Set(announcement.FieldStatus, v)
+	return u
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *AnnouncementUpsert) UpdateStatus() *AnnouncementUpsert {
+	u.SetExcluded(announcement.FieldStatus)
+	return u
+}
+
+// SetNotifyMode sets the "notify_mode" field.
+func (u *AnnouncementUpsert) SetNotifyMode(v string) *AnnouncementUpsert {
+	u.Set(announcement.FieldNotifyMode, v)
+	return u
+}
+
+// UpdateNotifyMode sets the "notify_mode" field to the value that was provided on create.
+func (u *AnnouncementUpsert) UpdateNotifyMode() *AnnouncementUpsert {
+	u.SetExcluded(announcement.FieldNotifyMode)
+	return u
+}
+
+// SetStartsAt sets the "starts_at" field.
+func (u *AnnouncementUpsert) SetStartsAt(v time.Time) *AnnouncementUpsert {
+	u.Set(announcement.FieldStartsAt, v)
+	return u
+}
+
+// UpdateStartsAt sets the "starts_at" field to the value that was provided on create.
+func (u *AnnouncementUpsert) UpdateStartsAt() *AnnouncementUpsert {
+	u.SetExcluded(announcement.FieldStartsAt)
+	return u
+}
+
+// ClearStartsAt clears the value of the "starts_at" field.
+func (u *AnnouncementUpsert) ClearStartsAt() *AnnouncementUpsert {
+	u.SetNull(announcement.FieldStartsAt)
+	return u
+}
+
+// SetEndsAt sets the "ends_at" field.
+func (u *AnnouncementUpsert) SetEndsAt(v time.Time) *AnnouncementUpsert {
+	u.Set(announcement.FieldEndsAt, v)
+	return u
+}
+
+// UpdateEndsAt sets the "ends_at" field to the value that was provided on create.
+func (u *AnnouncementUpsert) UpdateEndsAt() *AnnouncementUpsert {
+	u.SetExcluded(announcement.FieldEndsAt)
+	return u
+}
+
+// ClearEndsAt clears the value of the "ends_at" field.
+func (u *AnnouncementUpsert) ClearEndsAt() *AnnouncementUpsert {
+	u.SetNull(announcement.FieldEndsAt)
+	return u
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *AnnouncementUpsert) SetUpdatedAt(v time.Time) *AnnouncementUpsert {
+	u.Set(announcement.FieldUpdatedAt, v)
+	return u
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *AnnouncementUpsert) UpdateUpdatedAt() *AnnouncementUpsert {
+	u.SetExcluded(announcement.FieldUpdatedAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.Announcement.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *AnnouncementUpsertOne) UpdateNewValues() *AnnouncementUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(announcement.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.Announcement.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *AnnouncementUpsertOne) Ignore() *AnnouncementUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *AnnouncementUpsertOne) DoNothing() *AnnouncementUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the AnnouncementCreate.OnConflict
+// documentation for more info.
+func (u *AnnouncementUpsertOne) Update(set func(*AnnouncementUpsert)) *AnnouncementUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&AnnouncementUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetTitle sets the "title" field.
+func (u *AnnouncementUpsertOne) SetTitle(v string) *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetTitle(v)
+	})
+}
+
+// UpdateTitle sets the "title" field to the value that was provided on create.
+func (u *AnnouncementUpsertOne) UpdateTitle() *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateTitle()
+	})
+}
+
+// SetContent sets the "content" field.
+func (u *AnnouncementUpsertOne) SetContent(v string) *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetContent(v)
+	})
+}
+
+// UpdateContent sets the "content" field to the value that was provided on create.
+func (u *AnnouncementUpsertOne) UpdateContent() *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateContent()
+	})
+}
+
+// SetStatus sets the "status" field.
+func (u *AnnouncementUpsertOne) SetStatus(v string) *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetStatus(v)
+	})
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *AnnouncementUpsertOne) UpdateStatus() *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateStatus()
+	})
+}
+
+// SetNotifyMode sets the "notify_mode" field.
+func (u *AnnouncementUpsertOne) SetNotifyMode(v string) *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetNotifyMode(v)
+	})
+}
+
+// UpdateNotifyMode sets the "notify_mode" field to the value that was provided on create.
+func (u *AnnouncementUpsertOne) UpdateNotifyMode() *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateNotifyMode()
+	})
+}
+
+// SetStartsAt sets the "starts_at" field.
+func (u *AnnouncementUpsertOne) SetStartsAt(v time.Time) *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetStartsAt(v)
+	})
+}
+
+// UpdateStartsAt sets the "starts_at" field to the value that was provided on create.
+func (u *AnnouncementUpsertOne) UpdateStartsAt() *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateStartsAt()
+	})
+}
+
+// ClearStartsAt clears the value of the "starts_at" field.
+func (u *AnnouncementUpsertOne) ClearStartsAt() *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.ClearStartsAt()
+	})
+}
+
+// SetEndsAt sets the "ends_at" field.
+func (u *AnnouncementUpsertOne) SetEndsAt(v time.Time) *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetEndsAt(v)
+	})
+}
+
+// UpdateEndsAt sets the "ends_at" field to the value that was provided on create.
+func (u *AnnouncementUpsertOne) UpdateEndsAt() *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateEndsAt()
+	})
+}
+
+// ClearEndsAt clears the value of the "ends_at" field.
+func (u *AnnouncementUpsertOne) ClearEndsAt() *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.ClearEndsAt()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *AnnouncementUpsertOne) SetUpdatedAt(v time.Time) *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *AnnouncementUpsertOne) UpdateUpdatedAt() *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *AnnouncementUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for AnnouncementCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *AnnouncementUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *AnnouncementUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *AnnouncementUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // AnnouncementCreateBulk is the builder for creating many Announcement entities in bulk.
 type AnnouncementCreateBulk struct {
 	config
 	err      error
 	builders []*AnnouncementCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the Announcement entities in the database.
@@ -289,6 +628,7 @@ func (acb *AnnouncementCreateBulk) Save(ctx context.Context) ([]*Announcement, e
 					_, err = mutators[i+1].Mutate(root, acb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = acb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, acb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -339,6 +679,229 @@ func (acb *AnnouncementCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (acb *AnnouncementCreateBulk) ExecX(ctx context.Context) {
 	if err := acb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.Announcement.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.AnnouncementUpsert) {
+//			SetTitle(v+v).
+//		}).
+//		Exec(ctx)
+func (acb *AnnouncementCreateBulk) OnConflict(opts ...sql.ConflictOption) *AnnouncementUpsertBulk {
+	acb.conflict = opts
+	return &AnnouncementUpsertBulk{
+		create: acb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.Announcement.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (acb *AnnouncementCreateBulk) OnConflictColumns(columns ...string) *AnnouncementUpsertBulk {
+	acb.conflict = append(acb.conflict, sql.ConflictColumns(columns...))
+	return &AnnouncementUpsertBulk{
+		create: acb,
+	}
+}
+
+// AnnouncementUpsertBulk is the builder for "upsert"-ing
+// a bulk of Announcement nodes.
+type AnnouncementUpsertBulk struct {
+	create *AnnouncementCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.Announcement.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *AnnouncementUpsertBulk) UpdateNewValues() *AnnouncementUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(announcement.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.Announcement.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *AnnouncementUpsertBulk) Ignore() *AnnouncementUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *AnnouncementUpsertBulk) DoNothing() *AnnouncementUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the AnnouncementCreateBulk.OnConflict
+// documentation for more info.
+func (u *AnnouncementUpsertBulk) Update(set func(*AnnouncementUpsert)) *AnnouncementUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&AnnouncementUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetTitle sets the "title" field.
+func (u *AnnouncementUpsertBulk) SetTitle(v string) *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetTitle(v)
+	})
+}
+
+// UpdateTitle sets the "title" field to the value that was provided on create.
+func (u *AnnouncementUpsertBulk) UpdateTitle() *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateTitle()
+	})
+}
+
+// SetContent sets the "content" field.
+func (u *AnnouncementUpsertBulk) SetContent(v string) *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetContent(v)
+	})
+}
+
+// UpdateContent sets the "content" field to the value that was provided on create.
+func (u *AnnouncementUpsertBulk) UpdateContent() *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateContent()
+	})
+}
+
+// SetStatus sets the "status" field.
+func (u *AnnouncementUpsertBulk) SetStatus(v string) *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetStatus(v)
+	})
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *AnnouncementUpsertBulk) UpdateStatus() *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateStatus()
+	})
+}
+
+// SetNotifyMode sets the "notify_mode" field.
+func (u *AnnouncementUpsertBulk) SetNotifyMode(v string) *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetNotifyMode(v)
+	})
+}
+
+// UpdateNotifyMode sets the "notify_mode" field to the value that was provided on create.
+func (u *AnnouncementUpsertBulk) UpdateNotifyMode() *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateNotifyMode()
+	})
+}
+
+// SetStartsAt sets the "starts_at" field.
+func (u *AnnouncementUpsertBulk) SetStartsAt(v time.Time) *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetStartsAt(v)
+	})
+}
+
+// UpdateStartsAt sets the "starts_at" field to the value that was provided on create.
+func (u *AnnouncementUpsertBulk) UpdateStartsAt() *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateStartsAt()
+	})
+}
+
+// ClearStartsAt clears the value of the "starts_at" field.
+func (u *AnnouncementUpsertBulk) ClearStartsAt() *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.ClearStartsAt()
+	})
+}
+
+// SetEndsAt sets the "ends_at" field.
+func (u *AnnouncementUpsertBulk) SetEndsAt(v time.Time) *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetEndsAt(v)
+	})
+}
+
+// UpdateEndsAt sets the "ends_at" field to the value that was provided on create.
+func (u *AnnouncementUpsertBulk) UpdateEndsAt() *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateEndsAt()
+	})
+}
+
+// ClearEndsAt clears the value of the "ends_at" field.
+func (u *AnnouncementUpsertBulk) ClearEndsAt() *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.ClearEndsAt()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *AnnouncementUpsertBulk) SetUpdatedAt(v time.Time) *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *AnnouncementUpsertBulk) UpdateUpdatedAt() *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *AnnouncementUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the AnnouncementCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for AnnouncementCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *AnnouncementUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

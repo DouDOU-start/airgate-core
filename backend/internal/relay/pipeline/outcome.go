@@ -125,10 +125,11 @@ func clampCooldown(d time.Duration) time.Duration {
 }
 
 // bodySnippet 截取错误体前 200 字节做日志/落库原因（避免超长 error_msg）。
+// 截断可能切在多字节字符中间，统一清洗为合法 UTF-8（非法序列直接剔除）。
 func bodySnippet(body []byte) string {
 	s := strings.TrimSpace(string(body))
 	if len(s) > 200 {
 		s = s[:200]
 	}
-	return s
+	return strings.ToValidUTF8(s, "")
 }

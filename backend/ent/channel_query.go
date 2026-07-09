@@ -26,6 +26,7 @@ type ChannelQuery struct {
 	predicates    []predicate.Channel
 	withGroups    *GroupQuery
 	withUsageLogs *UsageLogQuery
+	modifiers     []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -420,6 +421,9 @@ func (cq *ChannelQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Chan
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
+	if len(cq.modifiers) > 0 {
+		_spec.Modifiers = cq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -540,6 +544,9 @@ func (cq *ChannelQuery) loadUsageLogs(ctx context.Context, query *UsageLogQuery,
 
 func (cq *ChannelQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := cq.querySpec()
+	if len(cq.modifiers) > 0 {
+		_spec.Modifiers = cq.modifiers
+	}
 	_spec.Node.Columns = cq.ctx.Fields
 	if len(cq.ctx.Fields) > 0 {
 		_spec.Unique = cq.ctx.Unique != nil && *cq.ctx.Unique
@@ -602,6 +609,9 @@ func (cq *ChannelQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if cq.ctx.Unique != nil && *cq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range cq.modifiers {
+		m(selector)
+	}
 	for _, p := range cq.predicates {
 		p(selector)
 	}
@@ -617,6 +627,12 @@ func (cq *ChannelQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (cq *ChannelQuery) Modify(modifiers ...func(s *sql.Selector)) *ChannelSelect {
+	cq.modifiers = append(cq.modifiers, modifiers...)
+	return cq.Select()
 }
 
 // ChannelGroupBy is the group-by builder for Channel entities.
@@ -707,4 +723,10 @@ func (cs *ChannelSelect) sqlScan(ctx context.Context, root *ChannelQuery, v any)
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (cs *ChannelSelect) Modify(modifiers ...func(s *sql.Selector)) *ChannelSelect {
+	cs.modifiers = append(cs.modifiers, modifiers...)
+	return cs
 }

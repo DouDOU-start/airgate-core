@@ -95,7 +95,7 @@ func TestRegistryPick(t *testing.T) {
 		snaps   []ChannelSnapshot
 		groupID int
 		model   string
-		// protocol 入口协议；空串按 openai 兼容（Pick 缺省语义）。
+		// protocol 入口协议；用例未显式指定时按 openai 执行（见循环内缺省）。
 		protocol string
 		exclude  []int
 		randN    int // randFn 固定返回值
@@ -256,15 +256,6 @@ func TestRegistryPick(t *testing.T) {
 			protocol: ProtocolAnthropic,
 			wantErr:  ErrNoAvailableChannel,
 		},
-		{
-			name: "空协议按 openai 兼容",
-			snaps: []ChannelSnapshot{
-				snap(1, func(s *ChannelSnapshot) { s.Type = "anthropic" }),
-				snap(2),
-			},
-			model:  "gpt-4o",
-			wantID: 2,
-		},
 	}
 
 	for _, tc := range cases {
@@ -273,7 +264,11 @@ func TestRegistryPick(t *testing.T) {
 			// 固定随机源；Pick 档内按 ID 排序，随机值区间可精确断言。
 			r.randFn = func(int) int { return tc.randN }
 
-			got, err := r.Pick(tc.groupID, tc.model, tc.protocol, tc.exclude)
+			protocol := tc.protocol
+			if protocol == "" {
+				protocol = ProtocolOpenAI
+			}
+			got, err := r.Pick(tc.groupID, tc.model, protocol, tc.exclude)
 			if tc.wantErr != nil {
 				if !errors.Is(err, tc.wantErr) {
 					t.Fatalf("期望错误 %v，实际 %v", tc.wantErr, err)
@@ -287,6 +282,17 @@ func TestRegistryPick(t *testing.T) {
 				t.Fatalf("期望选中渠道 %d，实际 %d", tc.wantID, got.ID)
 			}
 		})
+	}
+}
+
+// TestRegistryPickUnknownProtocol 未知协议（含空串）不再有任何缺省兼容：
+// 无可路由渠道类型，直接返回 ErrNoAvailableChannel。
+func TestRegistryPickUnknownProtocol(t *testing.T) {
+	r := newTestRegistry(t, nil, snap(1))
+	for _, protocol := range []string{"", "unknown"} {
+		if _, err := r.Pick(0, "gpt-4o", protocol, nil); !errors.Is(err, ErrNoAvailableChannel) {
+			t.Errorf("protocol=%q 期望 ErrNoAvailableChannel，实际 %v", protocol, err)
+		}
 	}
 }
 
@@ -421,7 +427,10 @@ func TestRegistryReloadKeepsCounters(t *testing.T) {
 	}
 }
 
-func TestRegistryModelsForGroup(t *testing.T) {
+// TestRegistryModelEntriesForGroup 分组过滤与状态语义：
+// 公共渠道对所有分组可见、绑定分组渠道只对本组可见、
+// 停用渠道不进目录、冷却是瞬态状态不影响目录。
+func TestRegistryModelEntriesForGroup(t *testing.T) {
 	future := time.Now().Add(time.Minute)
 	r := newTestRegistry(t, nil,
 		snap(1, func(s *ChannelSnapshot) {
@@ -460,14 +469,17 @@ func TestRegistryModelsForGroup(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := r.ModelsForGroup(tc.groupID)
-			if len(got) != len(tc.want) {
-				t.Fatalf("ModelsForGroup = %v, want %v", got, tc.want)
-			}
-			for i := range got {
-				if got[i] != tc.want[i] {
-					t.Fatalf("ModelsForGroup = %v, want %v", got, tc.want)
+			entries := r.ModelEntriesForGroup(tc.groupID)
+			got := make([]string, 0, len(entries))
+			for _, e := range entries {
+				got = append(got, e.Name)
+				// 测试快照渠道均为 openai_compatible 类型：协议集合恒为 [openai]。
+				if !slices.Equal(e.Protocols, []string{ProtocolOpenAI}) {
+					t.Fatalf("模型 %s 协议 = %v, 期望 [openai]", e.Name, e.Protocols)
 				}
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("ModelEntriesForGroup 模型名 = %v, 期望 %v", got, tc.want)
 			}
 		})
 	}

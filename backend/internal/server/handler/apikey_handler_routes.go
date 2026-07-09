@@ -109,7 +109,7 @@ func (h *APIKeyHandler) UpdateKey(c *gin.Context) {
 		return
 	}
 
-	id, err := parseKeyID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的密钥 ID")
 		return
@@ -151,7 +151,7 @@ func (h *APIKeyHandler) DeleteKey(c *gin.Context) {
 		return
 	}
 
-	id, err := parseKeyID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的密钥 ID")
 		return
@@ -168,7 +168,7 @@ func (h *APIKeyHandler) DeleteKey(c *gin.Context) {
 
 // AdminUpdateKey 管理员更新 API Key。
 func (h *APIKeyHandler) AdminUpdateKey(c *gin.Context) {
-	id, err := parseKeyID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的密钥 ID")
 		return
@@ -210,7 +210,7 @@ func (h *APIKeyHandler) RevealKey(c *gin.Context) {
 		return
 	}
 
-	id, err := parseKeyID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的密钥 ID")
 		return

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
@@ -22,6 +23,7 @@ type UsageLogCreate struct {
 	config
 	mutation *UsageLogMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetModel sets the "model" field.
@@ -893,6 +895,7 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_node = &UsageLog{config: ulc.config}
 		_spec = sqlgraph.NewCreateSpec(usagelog.Table, sqlgraph.NewFieldSpec(usagelog.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = ulc.conflict
 	if value, ok := ulc.mutation.Model(); ok {
 		_spec.SetField(usagelog.FieldModel, field.TypeString, value)
 		_node.Model = value
@@ -1104,11 +1107,1504 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.UsageLog.Create().
+//		SetModel(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.UsageLogUpsert) {
+//			SetModel(v+v).
+//		}).
+//		Exec(ctx)
+func (ulc *UsageLogCreate) OnConflict(opts ...sql.ConflictOption) *UsageLogUpsertOne {
+	ulc.conflict = opts
+	return &UsageLogUpsertOne{
+		create: ulc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.UsageLog.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (ulc *UsageLogCreate) OnConflictColumns(columns ...string) *UsageLogUpsertOne {
+	ulc.conflict = append(ulc.conflict, sql.ConflictColumns(columns...))
+	return &UsageLogUpsertOne{
+		create: ulc,
+	}
+}
+
+type (
+	// UsageLogUpsertOne is the builder for "upsert"-ing
+	//  one UsageLog node.
+	UsageLogUpsertOne struct {
+		create *UsageLogCreate
+	}
+
+	// UsageLogUpsert is the "OnConflict" setter.
+	UsageLogUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetModel sets the "model" field.
+func (u *UsageLogUpsert) SetModel(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldModel, v)
+	return u
+}
+
+// UpdateModel sets the "model" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateModel() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldModel)
+	return u
+}
+
+// SetInputTokens sets the "input_tokens" field.
+func (u *UsageLogUpsert) SetInputTokens(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldInputTokens, v)
+	return u
+}
+
+// UpdateInputTokens sets the "input_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateInputTokens() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldInputTokens)
+	return u
+}
+
+// AddInputTokens adds v to the "input_tokens" field.
+func (u *UsageLogUpsert) AddInputTokens(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldInputTokens, v)
+	return u
+}
+
+// SetOutputTokens sets the "output_tokens" field.
+func (u *UsageLogUpsert) SetOutputTokens(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldOutputTokens, v)
+	return u
+}
+
+// UpdateOutputTokens sets the "output_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateOutputTokens() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldOutputTokens)
+	return u
+}
+
+// AddOutputTokens adds v to the "output_tokens" field.
+func (u *UsageLogUpsert) AddOutputTokens(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldOutputTokens, v)
+	return u
+}
+
+// SetCachedInputTokens sets the "cached_input_tokens" field.
+func (u *UsageLogUpsert) SetCachedInputTokens(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldCachedInputTokens, v)
+	return u
+}
+
+// UpdateCachedInputTokens sets the "cached_input_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateCachedInputTokens() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldCachedInputTokens)
+	return u
+}
+
+// AddCachedInputTokens adds v to the "cached_input_tokens" field.
+func (u *UsageLogUpsert) AddCachedInputTokens(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldCachedInputTokens, v)
+	return u
+}
+
+// SetCacheCreationTokens sets the "cache_creation_tokens" field.
+func (u *UsageLogUpsert) SetCacheCreationTokens(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldCacheCreationTokens, v)
+	return u
+}
+
+// UpdateCacheCreationTokens sets the "cache_creation_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateCacheCreationTokens() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldCacheCreationTokens)
+	return u
+}
+
+// AddCacheCreationTokens adds v to the "cache_creation_tokens" field.
+func (u *UsageLogUpsert) AddCacheCreationTokens(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldCacheCreationTokens, v)
+	return u
+}
+
+// SetCacheCreation5mTokens sets the "cache_creation_5m_tokens" field.
+func (u *UsageLogUpsert) SetCacheCreation5mTokens(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldCacheCreation5mTokens, v)
+	return u
+}
+
+// UpdateCacheCreation5mTokens sets the "cache_creation_5m_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateCacheCreation5mTokens() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldCacheCreation5mTokens)
+	return u
+}
+
+// AddCacheCreation5mTokens adds v to the "cache_creation_5m_tokens" field.
+func (u *UsageLogUpsert) AddCacheCreation5mTokens(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldCacheCreation5mTokens, v)
+	return u
+}
+
+// SetCacheCreation1hTokens sets the "cache_creation_1h_tokens" field.
+func (u *UsageLogUpsert) SetCacheCreation1hTokens(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldCacheCreation1hTokens, v)
+	return u
+}
+
+// UpdateCacheCreation1hTokens sets the "cache_creation_1h_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateCacheCreation1hTokens() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldCacheCreation1hTokens)
+	return u
+}
+
+// AddCacheCreation1hTokens adds v to the "cache_creation_1h_tokens" field.
+func (u *UsageLogUpsert) AddCacheCreation1hTokens(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldCacheCreation1hTokens, v)
+	return u
+}
+
+// SetCalls sets the "calls" field.
+func (u *UsageLogUpsert) SetCalls(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldCalls, v)
+	return u
+}
+
+// UpdateCalls sets the "calls" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateCalls() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldCalls)
+	return u
+}
+
+// AddCalls adds v to the "calls" field.
+func (u *UsageLogUpsert) AddCalls(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldCalls, v)
+	return u
+}
+
+// SetInputPrice sets the "input_price" field.
+func (u *UsageLogUpsert) SetInputPrice(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldInputPrice, v)
+	return u
+}
+
+// UpdateInputPrice sets the "input_price" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateInputPrice() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldInputPrice)
+	return u
+}
+
+// AddInputPrice adds v to the "input_price" field.
+func (u *UsageLogUpsert) AddInputPrice(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldInputPrice, v)
+	return u
+}
+
+// SetOutputPrice sets the "output_price" field.
+func (u *UsageLogUpsert) SetOutputPrice(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldOutputPrice, v)
+	return u
+}
+
+// UpdateOutputPrice sets the "output_price" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateOutputPrice() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldOutputPrice)
+	return u
+}
+
+// AddOutputPrice adds v to the "output_price" field.
+func (u *UsageLogUpsert) AddOutputPrice(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldOutputPrice, v)
+	return u
+}
+
+// SetCachedInputPrice sets the "cached_input_price" field.
+func (u *UsageLogUpsert) SetCachedInputPrice(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldCachedInputPrice, v)
+	return u
+}
+
+// UpdateCachedInputPrice sets the "cached_input_price" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateCachedInputPrice() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldCachedInputPrice)
+	return u
+}
+
+// AddCachedInputPrice adds v to the "cached_input_price" field.
+func (u *UsageLogUpsert) AddCachedInputPrice(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldCachedInputPrice, v)
+	return u
+}
+
+// SetCacheCreationPrice sets the "cache_creation_price" field.
+func (u *UsageLogUpsert) SetCacheCreationPrice(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldCacheCreationPrice, v)
+	return u
+}
+
+// UpdateCacheCreationPrice sets the "cache_creation_price" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateCacheCreationPrice() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldCacheCreationPrice)
+	return u
+}
+
+// AddCacheCreationPrice adds v to the "cache_creation_price" field.
+func (u *UsageLogUpsert) AddCacheCreationPrice(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldCacheCreationPrice, v)
+	return u
+}
+
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (u *UsageLogUpsert) SetCacheCreation1hPrice(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldCacheCreation1hPrice, v)
+	return u
+}
+
+// UpdateCacheCreation1hPrice sets the "cache_creation_1h_price" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateCacheCreation1hPrice() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldCacheCreation1hPrice)
+	return u
+}
+
+// AddCacheCreation1hPrice adds v to the "cache_creation_1h_price" field.
+func (u *UsageLogUpsert) AddCacheCreation1hPrice(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldCacheCreation1hPrice, v)
+	return u
+}
+
+// SetInputCost sets the "input_cost" field.
+func (u *UsageLogUpsert) SetInputCost(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldInputCost, v)
+	return u
+}
+
+// UpdateInputCost sets the "input_cost" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateInputCost() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldInputCost)
+	return u
+}
+
+// AddInputCost adds v to the "input_cost" field.
+func (u *UsageLogUpsert) AddInputCost(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldInputCost, v)
+	return u
+}
+
+// SetOutputCost sets the "output_cost" field.
+func (u *UsageLogUpsert) SetOutputCost(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldOutputCost, v)
+	return u
+}
+
+// UpdateOutputCost sets the "output_cost" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateOutputCost() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldOutputCost)
+	return u
+}
+
+// AddOutputCost adds v to the "output_cost" field.
+func (u *UsageLogUpsert) AddOutputCost(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldOutputCost, v)
+	return u
+}
+
+// SetCachedInputCost sets the "cached_input_cost" field.
+func (u *UsageLogUpsert) SetCachedInputCost(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldCachedInputCost, v)
+	return u
+}
+
+// UpdateCachedInputCost sets the "cached_input_cost" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateCachedInputCost() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldCachedInputCost)
+	return u
+}
+
+// AddCachedInputCost adds v to the "cached_input_cost" field.
+func (u *UsageLogUpsert) AddCachedInputCost(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldCachedInputCost, v)
+	return u
+}
+
+// SetCacheCreationCost sets the "cache_creation_cost" field.
+func (u *UsageLogUpsert) SetCacheCreationCost(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldCacheCreationCost, v)
+	return u
+}
+
+// UpdateCacheCreationCost sets the "cache_creation_cost" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateCacheCreationCost() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldCacheCreationCost)
+	return u
+}
+
+// AddCacheCreationCost adds v to the "cache_creation_cost" field.
+func (u *UsageLogUpsert) AddCacheCreationCost(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldCacheCreationCost, v)
+	return u
+}
+
+// SetTotalCost sets the "total_cost" field.
+func (u *UsageLogUpsert) SetTotalCost(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldTotalCost, v)
+	return u
+}
+
+// UpdateTotalCost sets the "total_cost" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateTotalCost() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldTotalCost)
+	return u
+}
+
+// AddTotalCost adds v to the "total_cost" field.
+func (u *UsageLogUpsert) AddTotalCost(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldTotalCost, v)
+	return u
+}
+
+// SetActualCost sets the "actual_cost" field.
+func (u *UsageLogUpsert) SetActualCost(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldActualCost, v)
+	return u
+}
+
+// UpdateActualCost sets the "actual_cost" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateActualCost() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldActualCost)
+	return u
+}
+
+// AddActualCost adds v to the "actual_cost" field.
+func (u *UsageLogUpsert) AddActualCost(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldActualCost, v)
+	return u
+}
+
+// SetBilledCost sets the "billed_cost" field.
+func (u *UsageLogUpsert) SetBilledCost(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldBilledCost, v)
+	return u
+}
+
+// UpdateBilledCost sets the "billed_cost" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateBilledCost() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldBilledCost)
+	return u
+}
+
+// AddBilledCost adds v to the "billed_cost" field.
+func (u *UsageLogUpsert) AddBilledCost(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldBilledCost, v)
+	return u
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (u *UsageLogUpsert) SetRateMultiplier(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldRateMultiplier, v)
+	return u
+}
+
+// UpdateRateMultiplier sets the "rate_multiplier" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateRateMultiplier() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldRateMultiplier)
+	return u
+}
+
+// AddRateMultiplier adds v to the "rate_multiplier" field.
+func (u *UsageLogUpsert) AddRateMultiplier(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldRateMultiplier, v)
+	return u
+}
+
+// SetSellRate sets the "sell_rate" field.
+func (u *UsageLogUpsert) SetSellRate(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldSellRate, v)
+	return u
+}
+
+// UpdateSellRate sets the "sell_rate" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateSellRate() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldSellRate)
+	return u
+}
+
+// AddSellRate adds v to the "sell_rate" field.
+func (u *UsageLogUpsert) AddSellRate(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldSellRate, v)
+	return u
+}
+
+// SetAccountRateMultiplier sets the "account_rate_multiplier" field.
+func (u *UsageLogUpsert) SetAccountRateMultiplier(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldAccountRateMultiplier, v)
+	return u
+}
+
+// UpdateAccountRateMultiplier sets the "account_rate_multiplier" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateAccountRateMultiplier() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldAccountRateMultiplier)
+	return u
+}
+
+// AddAccountRateMultiplier adds v to the "account_rate_multiplier" field.
+func (u *UsageLogUpsert) AddAccountRateMultiplier(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldAccountRateMultiplier, v)
+	return u
+}
+
+// SetServiceTier sets the "service_tier" field.
+func (u *UsageLogUpsert) SetServiceTier(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldServiceTier, v)
+	return u
+}
+
+// UpdateServiceTier sets the "service_tier" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateServiceTier() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldServiceTier)
+	return u
+}
+
+// SetStream sets the "stream" field.
+func (u *UsageLogUpsert) SetStream(v bool) *UsageLogUpsert {
+	u.Set(usagelog.FieldStream, v)
+	return u
+}
+
+// UpdateStream sets the "stream" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateStream() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldStream)
+	return u
+}
+
+// SetDurationMs sets the "duration_ms" field.
+func (u *UsageLogUpsert) SetDurationMs(v int64) *UsageLogUpsert {
+	u.Set(usagelog.FieldDurationMs, v)
+	return u
+}
+
+// UpdateDurationMs sets the "duration_ms" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateDurationMs() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldDurationMs)
+	return u
+}
+
+// AddDurationMs adds v to the "duration_ms" field.
+func (u *UsageLogUpsert) AddDurationMs(v int64) *UsageLogUpsert {
+	u.Add(usagelog.FieldDurationMs, v)
+	return u
+}
+
+// SetFirstTokenMs sets the "first_token_ms" field.
+func (u *UsageLogUpsert) SetFirstTokenMs(v int64) *UsageLogUpsert {
+	u.Set(usagelog.FieldFirstTokenMs, v)
+	return u
+}
+
+// UpdateFirstTokenMs sets the "first_token_ms" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateFirstTokenMs() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldFirstTokenMs)
+	return u
+}
+
+// AddFirstTokenMs adds v to the "first_token_ms" field.
+func (u *UsageLogUpsert) AddFirstTokenMs(v int64) *UsageLogUpsert {
+	u.Add(usagelog.FieldFirstTokenMs, v)
+	return u
+}
+
+// SetUserAgent sets the "user_agent" field.
+func (u *UsageLogUpsert) SetUserAgent(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldUserAgent, v)
+	return u
+}
+
+// UpdateUserAgent sets the "user_agent" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateUserAgent() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldUserAgent)
+	return u
+}
+
+// SetIPAddress sets the "ip_address" field.
+func (u *UsageLogUpsert) SetIPAddress(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldIPAddress, v)
+	return u
+}
+
+// UpdateIPAddress sets the "ip_address" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateIPAddress() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldIPAddress)
+	return u
+}
+
+// SetEndpoint sets the "endpoint" field.
+func (u *UsageLogUpsert) SetEndpoint(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldEndpoint, v)
+	return u
+}
+
+// UpdateEndpoint sets the "endpoint" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateEndpoint() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldEndpoint)
+	return u
+}
+
+// SetSource sets the "source" field.
+func (u *UsageLogUpsert) SetSource(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldSource, v)
+	return u
+}
+
+// UpdateSource sets the "source" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateSource() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldSource)
+	return u
+}
+
+// SetRequestID sets the "request_id" field.
+func (u *UsageLogUpsert) SetRequestID(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldRequestID, v)
+	return u
+}
+
+// UpdateRequestID sets the "request_id" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateRequestID() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldRequestID)
+	return u
+}
+
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (u *UsageLogUpsert) SetUserIDSnapshot(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldUserIDSnapshot, v)
+	return u
+}
+
+// UpdateUserIDSnapshot sets the "user_id_snapshot" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateUserIDSnapshot() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldUserIDSnapshot)
+	return u
+}
+
+// AddUserIDSnapshot adds v to the "user_id_snapshot" field.
+func (u *UsageLogUpsert) AddUserIDSnapshot(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldUserIDSnapshot, v)
+	return u
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (u *UsageLogUpsert) SetUserEmailSnapshot(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldUserEmailSnapshot, v)
+	return u
+}
+
+// UpdateUserEmailSnapshot sets the "user_email_snapshot" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateUserEmailSnapshot() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldUserEmailSnapshot)
+	return u
+}
+
+// SetUserID sets the "user_id" field.
+func (u *UsageLogUpsert) SetUserID(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldUserID, v)
+	return u
+}
+
+// UpdateUserID sets the "user_id" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateUserID() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldUserID)
+	return u
+}
+
+// ClearUserID clears the value of the "user_id" field.
+func (u *UsageLogUpsert) ClearUserID() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldUserID)
+	return u
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (u *UsageLogUpsert) SetAPIKeyID(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldAPIKeyID, v)
+	return u
+}
+
+// UpdateAPIKeyID sets the "api_key_id" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateAPIKeyID() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldAPIKeyID)
+	return u
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (u *UsageLogUpsert) ClearAPIKeyID() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldAPIKeyID)
+	return u
+}
+
+// SetChannelID sets the "channel_id" field.
+func (u *UsageLogUpsert) SetChannelID(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldChannelID, v)
+	return u
+}
+
+// UpdateChannelID sets the "channel_id" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateChannelID() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldChannelID)
+	return u
+}
+
+// ClearChannelID clears the value of the "channel_id" field.
+func (u *UsageLogUpsert) ClearChannelID() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldChannelID)
+	return u
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *UsageLogUpsert) SetGroupID(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldGroupID, v)
+	return u
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateGroupID() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldGroupID)
+	return u
+}
+
+// ClearGroupID clears the value of the "group_id" field.
+func (u *UsageLogUpsert) ClearGroupID() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldGroupID)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.UsageLog.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *UsageLogUpsertOne) UpdateNewValues() *UsageLogUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(usagelog.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.UsageLog.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *UsageLogUpsertOne) Ignore() *UsageLogUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *UsageLogUpsertOne) DoNothing() *UsageLogUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the UsageLogCreate.OnConflict
+// documentation for more info.
+func (u *UsageLogUpsertOne) Update(set func(*UsageLogUpsert)) *UsageLogUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&UsageLogUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetModel sets the "model" field.
+func (u *UsageLogUpsertOne) SetModel(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetModel(v)
+	})
+}
+
+// UpdateModel sets the "model" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateModel() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateModel()
+	})
+}
+
+// SetInputTokens sets the "input_tokens" field.
+func (u *UsageLogUpsertOne) SetInputTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetInputTokens(v)
+	})
+}
+
+// AddInputTokens adds v to the "input_tokens" field.
+func (u *UsageLogUpsertOne) AddInputTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddInputTokens(v)
+	})
+}
+
+// UpdateInputTokens sets the "input_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateInputTokens() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateInputTokens()
+	})
+}
+
+// SetOutputTokens sets the "output_tokens" field.
+func (u *UsageLogUpsertOne) SetOutputTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetOutputTokens(v)
+	})
+}
+
+// AddOutputTokens adds v to the "output_tokens" field.
+func (u *UsageLogUpsertOne) AddOutputTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddOutputTokens(v)
+	})
+}
+
+// UpdateOutputTokens sets the "output_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateOutputTokens() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateOutputTokens()
+	})
+}
+
+// SetCachedInputTokens sets the "cached_input_tokens" field.
+func (u *UsageLogUpsertOne) SetCachedInputTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCachedInputTokens(v)
+	})
+}
+
+// AddCachedInputTokens adds v to the "cached_input_tokens" field.
+func (u *UsageLogUpsertOne) AddCachedInputTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCachedInputTokens(v)
+	})
+}
+
+// UpdateCachedInputTokens sets the "cached_input_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateCachedInputTokens() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCachedInputTokens()
+	})
+}
+
+// SetCacheCreationTokens sets the "cache_creation_tokens" field.
+func (u *UsageLogUpsertOne) SetCacheCreationTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCacheCreationTokens(v)
+	})
+}
+
+// AddCacheCreationTokens adds v to the "cache_creation_tokens" field.
+func (u *UsageLogUpsertOne) AddCacheCreationTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCacheCreationTokens(v)
+	})
+}
+
+// UpdateCacheCreationTokens sets the "cache_creation_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateCacheCreationTokens() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCacheCreationTokens()
+	})
+}
+
+// SetCacheCreation5mTokens sets the "cache_creation_5m_tokens" field.
+func (u *UsageLogUpsertOne) SetCacheCreation5mTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCacheCreation5mTokens(v)
+	})
+}
+
+// AddCacheCreation5mTokens adds v to the "cache_creation_5m_tokens" field.
+func (u *UsageLogUpsertOne) AddCacheCreation5mTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCacheCreation5mTokens(v)
+	})
+}
+
+// UpdateCacheCreation5mTokens sets the "cache_creation_5m_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateCacheCreation5mTokens() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCacheCreation5mTokens()
+	})
+}
+
+// SetCacheCreation1hTokens sets the "cache_creation_1h_tokens" field.
+func (u *UsageLogUpsertOne) SetCacheCreation1hTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCacheCreation1hTokens(v)
+	})
+}
+
+// AddCacheCreation1hTokens adds v to the "cache_creation_1h_tokens" field.
+func (u *UsageLogUpsertOne) AddCacheCreation1hTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCacheCreation1hTokens(v)
+	})
+}
+
+// UpdateCacheCreation1hTokens sets the "cache_creation_1h_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateCacheCreation1hTokens() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCacheCreation1hTokens()
+	})
+}
+
+// SetCalls sets the "calls" field.
+func (u *UsageLogUpsertOne) SetCalls(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCalls(v)
+	})
+}
+
+// AddCalls adds v to the "calls" field.
+func (u *UsageLogUpsertOne) AddCalls(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCalls(v)
+	})
+}
+
+// UpdateCalls sets the "calls" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateCalls() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCalls()
+	})
+}
+
+// SetInputPrice sets the "input_price" field.
+func (u *UsageLogUpsertOne) SetInputPrice(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetInputPrice(v)
+	})
+}
+
+// AddInputPrice adds v to the "input_price" field.
+func (u *UsageLogUpsertOne) AddInputPrice(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddInputPrice(v)
+	})
+}
+
+// UpdateInputPrice sets the "input_price" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateInputPrice() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateInputPrice()
+	})
+}
+
+// SetOutputPrice sets the "output_price" field.
+func (u *UsageLogUpsertOne) SetOutputPrice(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetOutputPrice(v)
+	})
+}
+
+// AddOutputPrice adds v to the "output_price" field.
+func (u *UsageLogUpsertOne) AddOutputPrice(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddOutputPrice(v)
+	})
+}
+
+// UpdateOutputPrice sets the "output_price" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateOutputPrice() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateOutputPrice()
+	})
+}
+
+// SetCachedInputPrice sets the "cached_input_price" field.
+func (u *UsageLogUpsertOne) SetCachedInputPrice(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCachedInputPrice(v)
+	})
+}
+
+// AddCachedInputPrice adds v to the "cached_input_price" field.
+func (u *UsageLogUpsertOne) AddCachedInputPrice(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCachedInputPrice(v)
+	})
+}
+
+// UpdateCachedInputPrice sets the "cached_input_price" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateCachedInputPrice() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCachedInputPrice()
+	})
+}
+
+// SetCacheCreationPrice sets the "cache_creation_price" field.
+func (u *UsageLogUpsertOne) SetCacheCreationPrice(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCacheCreationPrice(v)
+	})
+}
+
+// AddCacheCreationPrice adds v to the "cache_creation_price" field.
+func (u *UsageLogUpsertOne) AddCacheCreationPrice(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCacheCreationPrice(v)
+	})
+}
+
+// UpdateCacheCreationPrice sets the "cache_creation_price" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateCacheCreationPrice() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCacheCreationPrice()
+	})
+}
+
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (u *UsageLogUpsertOne) SetCacheCreation1hPrice(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCacheCreation1hPrice(v)
+	})
+}
+
+// AddCacheCreation1hPrice adds v to the "cache_creation_1h_price" field.
+func (u *UsageLogUpsertOne) AddCacheCreation1hPrice(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCacheCreation1hPrice(v)
+	})
+}
+
+// UpdateCacheCreation1hPrice sets the "cache_creation_1h_price" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateCacheCreation1hPrice() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCacheCreation1hPrice()
+	})
+}
+
+// SetInputCost sets the "input_cost" field.
+func (u *UsageLogUpsertOne) SetInputCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetInputCost(v)
+	})
+}
+
+// AddInputCost adds v to the "input_cost" field.
+func (u *UsageLogUpsertOne) AddInputCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddInputCost(v)
+	})
+}
+
+// UpdateInputCost sets the "input_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateInputCost() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateInputCost()
+	})
+}
+
+// SetOutputCost sets the "output_cost" field.
+func (u *UsageLogUpsertOne) SetOutputCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetOutputCost(v)
+	})
+}
+
+// AddOutputCost adds v to the "output_cost" field.
+func (u *UsageLogUpsertOne) AddOutputCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddOutputCost(v)
+	})
+}
+
+// UpdateOutputCost sets the "output_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateOutputCost() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateOutputCost()
+	})
+}
+
+// SetCachedInputCost sets the "cached_input_cost" field.
+func (u *UsageLogUpsertOne) SetCachedInputCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCachedInputCost(v)
+	})
+}
+
+// AddCachedInputCost adds v to the "cached_input_cost" field.
+func (u *UsageLogUpsertOne) AddCachedInputCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCachedInputCost(v)
+	})
+}
+
+// UpdateCachedInputCost sets the "cached_input_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateCachedInputCost() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCachedInputCost()
+	})
+}
+
+// SetCacheCreationCost sets the "cache_creation_cost" field.
+func (u *UsageLogUpsertOne) SetCacheCreationCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCacheCreationCost(v)
+	})
+}
+
+// AddCacheCreationCost adds v to the "cache_creation_cost" field.
+func (u *UsageLogUpsertOne) AddCacheCreationCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCacheCreationCost(v)
+	})
+}
+
+// UpdateCacheCreationCost sets the "cache_creation_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateCacheCreationCost() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCacheCreationCost()
+	})
+}
+
+// SetTotalCost sets the "total_cost" field.
+func (u *UsageLogUpsertOne) SetTotalCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetTotalCost(v)
+	})
+}
+
+// AddTotalCost adds v to the "total_cost" field.
+func (u *UsageLogUpsertOne) AddTotalCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddTotalCost(v)
+	})
+}
+
+// UpdateTotalCost sets the "total_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateTotalCost() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateTotalCost()
+	})
+}
+
+// SetActualCost sets the "actual_cost" field.
+func (u *UsageLogUpsertOne) SetActualCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetActualCost(v)
+	})
+}
+
+// AddActualCost adds v to the "actual_cost" field.
+func (u *UsageLogUpsertOne) AddActualCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddActualCost(v)
+	})
+}
+
+// UpdateActualCost sets the "actual_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateActualCost() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateActualCost()
+	})
+}
+
+// SetBilledCost sets the "billed_cost" field.
+func (u *UsageLogUpsertOne) SetBilledCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetBilledCost(v)
+	})
+}
+
+// AddBilledCost adds v to the "billed_cost" field.
+func (u *UsageLogUpsertOne) AddBilledCost(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddBilledCost(v)
+	})
+}
+
+// UpdateBilledCost sets the "billed_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateBilledCost() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateBilledCost()
+	})
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (u *UsageLogUpsertOne) SetRateMultiplier(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRateMultiplier(v)
+	})
+}
+
+// AddRateMultiplier adds v to the "rate_multiplier" field.
+func (u *UsageLogUpsertOne) AddRateMultiplier(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddRateMultiplier(v)
+	})
+}
+
+// UpdateRateMultiplier sets the "rate_multiplier" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateRateMultiplier() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRateMultiplier()
+	})
+}
+
+// SetSellRate sets the "sell_rate" field.
+func (u *UsageLogUpsertOne) SetSellRate(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetSellRate(v)
+	})
+}
+
+// AddSellRate adds v to the "sell_rate" field.
+func (u *UsageLogUpsertOne) AddSellRate(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddSellRate(v)
+	})
+}
+
+// UpdateSellRate sets the "sell_rate" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateSellRate() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateSellRate()
+	})
+}
+
+// SetAccountRateMultiplier sets the "account_rate_multiplier" field.
+func (u *UsageLogUpsertOne) SetAccountRateMultiplier(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetAccountRateMultiplier(v)
+	})
+}
+
+// AddAccountRateMultiplier adds v to the "account_rate_multiplier" field.
+func (u *UsageLogUpsertOne) AddAccountRateMultiplier(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddAccountRateMultiplier(v)
+	})
+}
+
+// UpdateAccountRateMultiplier sets the "account_rate_multiplier" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateAccountRateMultiplier() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateAccountRateMultiplier()
+	})
+}
+
+// SetServiceTier sets the "service_tier" field.
+func (u *UsageLogUpsertOne) SetServiceTier(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetServiceTier(v)
+	})
+}
+
+// UpdateServiceTier sets the "service_tier" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateServiceTier() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateServiceTier()
+	})
+}
+
+// SetStream sets the "stream" field.
+func (u *UsageLogUpsertOne) SetStream(v bool) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetStream(v)
+	})
+}
+
+// UpdateStream sets the "stream" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateStream() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateStream()
+	})
+}
+
+// SetDurationMs sets the "duration_ms" field.
+func (u *UsageLogUpsertOne) SetDurationMs(v int64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetDurationMs(v)
+	})
+}
+
+// AddDurationMs adds v to the "duration_ms" field.
+func (u *UsageLogUpsertOne) AddDurationMs(v int64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddDurationMs(v)
+	})
+}
+
+// UpdateDurationMs sets the "duration_ms" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateDurationMs() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateDurationMs()
+	})
+}
+
+// SetFirstTokenMs sets the "first_token_ms" field.
+func (u *UsageLogUpsertOne) SetFirstTokenMs(v int64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetFirstTokenMs(v)
+	})
+}
+
+// AddFirstTokenMs adds v to the "first_token_ms" field.
+func (u *UsageLogUpsertOne) AddFirstTokenMs(v int64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddFirstTokenMs(v)
+	})
+}
+
+// UpdateFirstTokenMs sets the "first_token_ms" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateFirstTokenMs() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateFirstTokenMs()
+	})
+}
+
+// SetUserAgent sets the "user_agent" field.
+func (u *UsageLogUpsertOne) SetUserAgent(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetUserAgent(v)
+	})
+}
+
+// UpdateUserAgent sets the "user_agent" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateUserAgent() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateUserAgent()
+	})
+}
+
+// SetIPAddress sets the "ip_address" field.
+func (u *UsageLogUpsertOne) SetIPAddress(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetIPAddress(v)
+	})
+}
+
+// UpdateIPAddress sets the "ip_address" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateIPAddress() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateIPAddress()
+	})
+}
+
+// SetEndpoint sets the "endpoint" field.
+func (u *UsageLogUpsertOne) SetEndpoint(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetEndpoint(v)
+	})
+}
+
+// UpdateEndpoint sets the "endpoint" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateEndpoint() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateEndpoint()
+	})
+}
+
+// SetSource sets the "source" field.
+func (u *UsageLogUpsertOne) SetSource(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetSource(v)
+	})
+}
+
+// UpdateSource sets the "source" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateSource() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateSource()
+	})
+}
+
+// SetRequestID sets the "request_id" field.
+func (u *UsageLogUpsertOne) SetRequestID(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRequestID(v)
+	})
+}
+
+// UpdateRequestID sets the "request_id" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateRequestID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRequestID()
+	})
+}
+
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (u *UsageLogUpsertOne) SetUserIDSnapshot(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetUserIDSnapshot(v)
+	})
+}
+
+// AddUserIDSnapshot adds v to the "user_id_snapshot" field.
+func (u *UsageLogUpsertOne) AddUserIDSnapshot(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddUserIDSnapshot(v)
+	})
+}
+
+// UpdateUserIDSnapshot sets the "user_id_snapshot" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateUserIDSnapshot() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateUserIDSnapshot()
+	})
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (u *UsageLogUpsertOne) SetUserEmailSnapshot(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetUserEmailSnapshot(v)
+	})
+}
+
+// UpdateUserEmailSnapshot sets the "user_email_snapshot" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateUserEmailSnapshot() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateUserEmailSnapshot()
+	})
+}
+
+// SetUserID sets the "user_id" field.
+func (u *UsageLogUpsertOne) SetUserID(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetUserID(v)
+	})
+}
+
+// UpdateUserID sets the "user_id" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateUserID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateUserID()
+	})
+}
+
+// ClearUserID clears the value of the "user_id" field.
+func (u *UsageLogUpsertOne) ClearUserID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearUserID()
+	})
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (u *UsageLogUpsertOne) SetAPIKeyID(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetAPIKeyID(v)
+	})
+}
+
+// UpdateAPIKeyID sets the "api_key_id" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateAPIKeyID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateAPIKeyID()
+	})
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (u *UsageLogUpsertOne) ClearAPIKeyID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearAPIKeyID()
+	})
+}
+
+// SetChannelID sets the "channel_id" field.
+func (u *UsageLogUpsertOne) SetChannelID(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetChannelID(v)
+	})
+}
+
+// UpdateChannelID sets the "channel_id" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateChannelID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateChannelID()
+	})
+}
+
+// ClearChannelID clears the value of the "channel_id" field.
+func (u *UsageLogUpsertOne) ClearChannelID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearChannelID()
+	})
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *UsageLogUpsertOne) SetGroupID(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetGroupID(v)
+	})
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateGroupID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateGroupID()
+	})
+}
+
+// ClearGroupID clears the value of the "group_id" field.
+func (u *UsageLogUpsertOne) ClearGroupID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearGroupID()
+	})
+}
+
+// Exec executes the query.
+func (u *UsageLogUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for UsageLogCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *UsageLogUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *UsageLogUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *UsageLogUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // UsageLogCreateBulk is the builder for creating many UsageLog entities in bulk.
 type UsageLogCreateBulk struct {
 	config
 	err      error
 	builders []*UsageLogCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the UsageLog entities in the database.
@@ -1138,6 +2634,7 @@ func (ulcb *UsageLogCreateBulk) Save(ctx context.Context) ([]*UsageLog, error) {
 					_, err = mutators[i+1].Mutate(root, ulcb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = ulcb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, ulcb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -1188,6 +2685,852 @@ func (ulcb *UsageLogCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (ulcb *UsageLogCreateBulk) ExecX(ctx context.Context) {
 	if err := ulcb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.UsageLog.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.UsageLogUpsert) {
+//			SetModel(v+v).
+//		}).
+//		Exec(ctx)
+func (ulcb *UsageLogCreateBulk) OnConflict(opts ...sql.ConflictOption) *UsageLogUpsertBulk {
+	ulcb.conflict = opts
+	return &UsageLogUpsertBulk{
+		create: ulcb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.UsageLog.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (ulcb *UsageLogCreateBulk) OnConflictColumns(columns ...string) *UsageLogUpsertBulk {
+	ulcb.conflict = append(ulcb.conflict, sql.ConflictColumns(columns...))
+	return &UsageLogUpsertBulk{
+		create: ulcb,
+	}
+}
+
+// UsageLogUpsertBulk is the builder for "upsert"-ing
+// a bulk of UsageLog nodes.
+type UsageLogUpsertBulk struct {
+	create *UsageLogCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.UsageLog.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *UsageLogUpsertBulk) UpdateNewValues() *UsageLogUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(usagelog.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.UsageLog.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *UsageLogUpsertBulk) Ignore() *UsageLogUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *UsageLogUpsertBulk) DoNothing() *UsageLogUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the UsageLogCreateBulk.OnConflict
+// documentation for more info.
+func (u *UsageLogUpsertBulk) Update(set func(*UsageLogUpsert)) *UsageLogUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&UsageLogUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetModel sets the "model" field.
+func (u *UsageLogUpsertBulk) SetModel(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetModel(v)
+	})
+}
+
+// UpdateModel sets the "model" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateModel() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateModel()
+	})
+}
+
+// SetInputTokens sets the "input_tokens" field.
+func (u *UsageLogUpsertBulk) SetInputTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetInputTokens(v)
+	})
+}
+
+// AddInputTokens adds v to the "input_tokens" field.
+func (u *UsageLogUpsertBulk) AddInputTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddInputTokens(v)
+	})
+}
+
+// UpdateInputTokens sets the "input_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateInputTokens() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateInputTokens()
+	})
+}
+
+// SetOutputTokens sets the "output_tokens" field.
+func (u *UsageLogUpsertBulk) SetOutputTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetOutputTokens(v)
+	})
+}
+
+// AddOutputTokens adds v to the "output_tokens" field.
+func (u *UsageLogUpsertBulk) AddOutputTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddOutputTokens(v)
+	})
+}
+
+// UpdateOutputTokens sets the "output_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateOutputTokens() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateOutputTokens()
+	})
+}
+
+// SetCachedInputTokens sets the "cached_input_tokens" field.
+func (u *UsageLogUpsertBulk) SetCachedInputTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCachedInputTokens(v)
+	})
+}
+
+// AddCachedInputTokens adds v to the "cached_input_tokens" field.
+func (u *UsageLogUpsertBulk) AddCachedInputTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCachedInputTokens(v)
+	})
+}
+
+// UpdateCachedInputTokens sets the "cached_input_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateCachedInputTokens() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCachedInputTokens()
+	})
+}
+
+// SetCacheCreationTokens sets the "cache_creation_tokens" field.
+func (u *UsageLogUpsertBulk) SetCacheCreationTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCacheCreationTokens(v)
+	})
+}
+
+// AddCacheCreationTokens adds v to the "cache_creation_tokens" field.
+func (u *UsageLogUpsertBulk) AddCacheCreationTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCacheCreationTokens(v)
+	})
+}
+
+// UpdateCacheCreationTokens sets the "cache_creation_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateCacheCreationTokens() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCacheCreationTokens()
+	})
+}
+
+// SetCacheCreation5mTokens sets the "cache_creation_5m_tokens" field.
+func (u *UsageLogUpsertBulk) SetCacheCreation5mTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCacheCreation5mTokens(v)
+	})
+}
+
+// AddCacheCreation5mTokens adds v to the "cache_creation_5m_tokens" field.
+func (u *UsageLogUpsertBulk) AddCacheCreation5mTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCacheCreation5mTokens(v)
+	})
+}
+
+// UpdateCacheCreation5mTokens sets the "cache_creation_5m_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateCacheCreation5mTokens() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCacheCreation5mTokens()
+	})
+}
+
+// SetCacheCreation1hTokens sets the "cache_creation_1h_tokens" field.
+func (u *UsageLogUpsertBulk) SetCacheCreation1hTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCacheCreation1hTokens(v)
+	})
+}
+
+// AddCacheCreation1hTokens adds v to the "cache_creation_1h_tokens" field.
+func (u *UsageLogUpsertBulk) AddCacheCreation1hTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCacheCreation1hTokens(v)
+	})
+}
+
+// UpdateCacheCreation1hTokens sets the "cache_creation_1h_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateCacheCreation1hTokens() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCacheCreation1hTokens()
+	})
+}
+
+// SetCalls sets the "calls" field.
+func (u *UsageLogUpsertBulk) SetCalls(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCalls(v)
+	})
+}
+
+// AddCalls adds v to the "calls" field.
+func (u *UsageLogUpsertBulk) AddCalls(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCalls(v)
+	})
+}
+
+// UpdateCalls sets the "calls" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateCalls() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCalls()
+	})
+}
+
+// SetInputPrice sets the "input_price" field.
+func (u *UsageLogUpsertBulk) SetInputPrice(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetInputPrice(v)
+	})
+}
+
+// AddInputPrice adds v to the "input_price" field.
+func (u *UsageLogUpsertBulk) AddInputPrice(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddInputPrice(v)
+	})
+}
+
+// UpdateInputPrice sets the "input_price" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateInputPrice() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateInputPrice()
+	})
+}
+
+// SetOutputPrice sets the "output_price" field.
+func (u *UsageLogUpsertBulk) SetOutputPrice(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetOutputPrice(v)
+	})
+}
+
+// AddOutputPrice adds v to the "output_price" field.
+func (u *UsageLogUpsertBulk) AddOutputPrice(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddOutputPrice(v)
+	})
+}
+
+// UpdateOutputPrice sets the "output_price" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateOutputPrice() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateOutputPrice()
+	})
+}
+
+// SetCachedInputPrice sets the "cached_input_price" field.
+func (u *UsageLogUpsertBulk) SetCachedInputPrice(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCachedInputPrice(v)
+	})
+}
+
+// AddCachedInputPrice adds v to the "cached_input_price" field.
+func (u *UsageLogUpsertBulk) AddCachedInputPrice(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCachedInputPrice(v)
+	})
+}
+
+// UpdateCachedInputPrice sets the "cached_input_price" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateCachedInputPrice() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCachedInputPrice()
+	})
+}
+
+// SetCacheCreationPrice sets the "cache_creation_price" field.
+func (u *UsageLogUpsertBulk) SetCacheCreationPrice(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCacheCreationPrice(v)
+	})
+}
+
+// AddCacheCreationPrice adds v to the "cache_creation_price" field.
+func (u *UsageLogUpsertBulk) AddCacheCreationPrice(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCacheCreationPrice(v)
+	})
+}
+
+// UpdateCacheCreationPrice sets the "cache_creation_price" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateCacheCreationPrice() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCacheCreationPrice()
+	})
+}
+
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (u *UsageLogUpsertBulk) SetCacheCreation1hPrice(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCacheCreation1hPrice(v)
+	})
+}
+
+// AddCacheCreation1hPrice adds v to the "cache_creation_1h_price" field.
+func (u *UsageLogUpsertBulk) AddCacheCreation1hPrice(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCacheCreation1hPrice(v)
+	})
+}
+
+// UpdateCacheCreation1hPrice sets the "cache_creation_1h_price" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateCacheCreation1hPrice() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCacheCreation1hPrice()
+	})
+}
+
+// SetInputCost sets the "input_cost" field.
+func (u *UsageLogUpsertBulk) SetInputCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetInputCost(v)
+	})
+}
+
+// AddInputCost adds v to the "input_cost" field.
+func (u *UsageLogUpsertBulk) AddInputCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddInputCost(v)
+	})
+}
+
+// UpdateInputCost sets the "input_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateInputCost() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateInputCost()
+	})
+}
+
+// SetOutputCost sets the "output_cost" field.
+func (u *UsageLogUpsertBulk) SetOutputCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetOutputCost(v)
+	})
+}
+
+// AddOutputCost adds v to the "output_cost" field.
+func (u *UsageLogUpsertBulk) AddOutputCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddOutputCost(v)
+	})
+}
+
+// UpdateOutputCost sets the "output_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateOutputCost() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateOutputCost()
+	})
+}
+
+// SetCachedInputCost sets the "cached_input_cost" field.
+func (u *UsageLogUpsertBulk) SetCachedInputCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCachedInputCost(v)
+	})
+}
+
+// AddCachedInputCost adds v to the "cached_input_cost" field.
+func (u *UsageLogUpsertBulk) AddCachedInputCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCachedInputCost(v)
+	})
+}
+
+// UpdateCachedInputCost sets the "cached_input_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateCachedInputCost() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCachedInputCost()
+	})
+}
+
+// SetCacheCreationCost sets the "cache_creation_cost" field.
+func (u *UsageLogUpsertBulk) SetCacheCreationCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetCacheCreationCost(v)
+	})
+}
+
+// AddCacheCreationCost adds v to the "cache_creation_cost" field.
+func (u *UsageLogUpsertBulk) AddCacheCreationCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddCacheCreationCost(v)
+	})
+}
+
+// UpdateCacheCreationCost sets the "cache_creation_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateCacheCreationCost() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateCacheCreationCost()
+	})
+}
+
+// SetTotalCost sets the "total_cost" field.
+func (u *UsageLogUpsertBulk) SetTotalCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetTotalCost(v)
+	})
+}
+
+// AddTotalCost adds v to the "total_cost" field.
+func (u *UsageLogUpsertBulk) AddTotalCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddTotalCost(v)
+	})
+}
+
+// UpdateTotalCost sets the "total_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateTotalCost() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateTotalCost()
+	})
+}
+
+// SetActualCost sets the "actual_cost" field.
+func (u *UsageLogUpsertBulk) SetActualCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetActualCost(v)
+	})
+}
+
+// AddActualCost adds v to the "actual_cost" field.
+func (u *UsageLogUpsertBulk) AddActualCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddActualCost(v)
+	})
+}
+
+// UpdateActualCost sets the "actual_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateActualCost() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateActualCost()
+	})
+}
+
+// SetBilledCost sets the "billed_cost" field.
+func (u *UsageLogUpsertBulk) SetBilledCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetBilledCost(v)
+	})
+}
+
+// AddBilledCost adds v to the "billed_cost" field.
+func (u *UsageLogUpsertBulk) AddBilledCost(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddBilledCost(v)
+	})
+}
+
+// UpdateBilledCost sets the "billed_cost" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateBilledCost() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateBilledCost()
+	})
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (u *UsageLogUpsertBulk) SetRateMultiplier(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRateMultiplier(v)
+	})
+}
+
+// AddRateMultiplier adds v to the "rate_multiplier" field.
+func (u *UsageLogUpsertBulk) AddRateMultiplier(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddRateMultiplier(v)
+	})
+}
+
+// UpdateRateMultiplier sets the "rate_multiplier" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateRateMultiplier() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRateMultiplier()
+	})
+}
+
+// SetSellRate sets the "sell_rate" field.
+func (u *UsageLogUpsertBulk) SetSellRate(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetSellRate(v)
+	})
+}
+
+// AddSellRate adds v to the "sell_rate" field.
+func (u *UsageLogUpsertBulk) AddSellRate(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddSellRate(v)
+	})
+}
+
+// UpdateSellRate sets the "sell_rate" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateSellRate() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateSellRate()
+	})
+}
+
+// SetAccountRateMultiplier sets the "account_rate_multiplier" field.
+func (u *UsageLogUpsertBulk) SetAccountRateMultiplier(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetAccountRateMultiplier(v)
+	})
+}
+
+// AddAccountRateMultiplier adds v to the "account_rate_multiplier" field.
+func (u *UsageLogUpsertBulk) AddAccountRateMultiplier(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddAccountRateMultiplier(v)
+	})
+}
+
+// UpdateAccountRateMultiplier sets the "account_rate_multiplier" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateAccountRateMultiplier() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateAccountRateMultiplier()
+	})
+}
+
+// SetServiceTier sets the "service_tier" field.
+func (u *UsageLogUpsertBulk) SetServiceTier(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetServiceTier(v)
+	})
+}
+
+// UpdateServiceTier sets the "service_tier" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateServiceTier() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateServiceTier()
+	})
+}
+
+// SetStream sets the "stream" field.
+func (u *UsageLogUpsertBulk) SetStream(v bool) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetStream(v)
+	})
+}
+
+// UpdateStream sets the "stream" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateStream() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateStream()
+	})
+}
+
+// SetDurationMs sets the "duration_ms" field.
+func (u *UsageLogUpsertBulk) SetDurationMs(v int64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetDurationMs(v)
+	})
+}
+
+// AddDurationMs adds v to the "duration_ms" field.
+func (u *UsageLogUpsertBulk) AddDurationMs(v int64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddDurationMs(v)
+	})
+}
+
+// UpdateDurationMs sets the "duration_ms" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateDurationMs() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateDurationMs()
+	})
+}
+
+// SetFirstTokenMs sets the "first_token_ms" field.
+func (u *UsageLogUpsertBulk) SetFirstTokenMs(v int64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetFirstTokenMs(v)
+	})
+}
+
+// AddFirstTokenMs adds v to the "first_token_ms" field.
+func (u *UsageLogUpsertBulk) AddFirstTokenMs(v int64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddFirstTokenMs(v)
+	})
+}
+
+// UpdateFirstTokenMs sets the "first_token_ms" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateFirstTokenMs() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateFirstTokenMs()
+	})
+}
+
+// SetUserAgent sets the "user_agent" field.
+func (u *UsageLogUpsertBulk) SetUserAgent(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetUserAgent(v)
+	})
+}
+
+// UpdateUserAgent sets the "user_agent" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateUserAgent() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateUserAgent()
+	})
+}
+
+// SetIPAddress sets the "ip_address" field.
+func (u *UsageLogUpsertBulk) SetIPAddress(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetIPAddress(v)
+	})
+}
+
+// UpdateIPAddress sets the "ip_address" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateIPAddress() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateIPAddress()
+	})
+}
+
+// SetEndpoint sets the "endpoint" field.
+func (u *UsageLogUpsertBulk) SetEndpoint(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetEndpoint(v)
+	})
+}
+
+// UpdateEndpoint sets the "endpoint" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateEndpoint() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateEndpoint()
+	})
+}
+
+// SetSource sets the "source" field.
+func (u *UsageLogUpsertBulk) SetSource(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetSource(v)
+	})
+}
+
+// UpdateSource sets the "source" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateSource() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateSource()
+	})
+}
+
+// SetRequestID sets the "request_id" field.
+func (u *UsageLogUpsertBulk) SetRequestID(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRequestID(v)
+	})
+}
+
+// UpdateRequestID sets the "request_id" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateRequestID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRequestID()
+	})
+}
+
+// SetUserIDSnapshot sets the "user_id_snapshot" field.
+func (u *UsageLogUpsertBulk) SetUserIDSnapshot(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetUserIDSnapshot(v)
+	})
+}
+
+// AddUserIDSnapshot adds v to the "user_id_snapshot" field.
+func (u *UsageLogUpsertBulk) AddUserIDSnapshot(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddUserIDSnapshot(v)
+	})
+}
+
+// UpdateUserIDSnapshot sets the "user_id_snapshot" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateUserIDSnapshot() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateUserIDSnapshot()
+	})
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (u *UsageLogUpsertBulk) SetUserEmailSnapshot(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetUserEmailSnapshot(v)
+	})
+}
+
+// UpdateUserEmailSnapshot sets the "user_email_snapshot" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateUserEmailSnapshot() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateUserEmailSnapshot()
+	})
+}
+
+// SetUserID sets the "user_id" field.
+func (u *UsageLogUpsertBulk) SetUserID(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetUserID(v)
+	})
+}
+
+// UpdateUserID sets the "user_id" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateUserID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateUserID()
+	})
+}
+
+// ClearUserID clears the value of the "user_id" field.
+func (u *UsageLogUpsertBulk) ClearUserID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearUserID()
+	})
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (u *UsageLogUpsertBulk) SetAPIKeyID(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetAPIKeyID(v)
+	})
+}
+
+// UpdateAPIKeyID sets the "api_key_id" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateAPIKeyID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateAPIKeyID()
+	})
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (u *UsageLogUpsertBulk) ClearAPIKeyID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearAPIKeyID()
+	})
+}
+
+// SetChannelID sets the "channel_id" field.
+func (u *UsageLogUpsertBulk) SetChannelID(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetChannelID(v)
+	})
+}
+
+// UpdateChannelID sets the "channel_id" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateChannelID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateChannelID()
+	})
+}
+
+// ClearChannelID clears the value of the "channel_id" field.
+func (u *UsageLogUpsertBulk) ClearChannelID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearChannelID()
+	})
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *UsageLogUpsertBulk) SetGroupID(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetGroupID(v)
+	})
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateGroupID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateGroupID()
+	})
+}
+
+// ClearGroupID clears the value of the "group_id" field.
+func (u *UsageLogUpsertBulk) ClearGroupID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearGroupID()
+	})
+}
+
+// Exec executes the query.
+func (u *UsageLogUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the UsageLogCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for UsageLogCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *UsageLogUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

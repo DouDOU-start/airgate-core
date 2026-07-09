@@ -18,8 +18,9 @@ import (
 // SettingUpdate is the builder for updating Setting entities.
 type SettingUpdate struct {
 	config
-	hooks    []Hook
-	mutation *SettingMutation
+	hooks     []Hook
+	mutation  *SettingMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the SettingUpdate builder.
@@ -127,6 +128,12 @@ func (su *SettingUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (su *SettingUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *SettingUpdate {
+	su.modifiers = append(su.modifiers, modifiers...)
+	return su
+}
+
 func (su *SettingUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := su.check(); err != nil {
 		return n, err
@@ -151,6 +158,7 @@ func (su *SettingUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := su.mutation.UpdatedAt(); ok {
 		_spec.SetField(setting.FieldUpdatedAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(su.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, su.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{setting.Label}
@@ -166,9 +174,10 @@ func (su *SettingUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // SettingUpdateOne is the builder for updating a single Setting entity.
 type SettingUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *SettingMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *SettingMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetKey sets the "key" field.
@@ -283,6 +292,12 @@ func (suo *SettingUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (suo *SettingUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *SettingUpdateOne {
+	suo.modifiers = append(suo.modifiers, modifiers...)
+	return suo
+}
+
 func (suo *SettingUpdateOne) sqlSave(ctx context.Context) (_node *Setting, err error) {
 	if err := suo.check(); err != nil {
 		return _node, err
@@ -324,6 +339,7 @@ func (suo *SettingUpdateOne) sqlSave(ctx context.Context) (_node *Setting, err e
 	if value, ok := suo.mutation.UpdatedAt(); ok {
 		_spec.SetField(setting.FieldUpdatedAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(suo.modifiers...)
 	_node = &Setting{config: suo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

@@ -140,8 +140,6 @@ func geminiStatus(status int) string {
 		return "NOT_FOUND"
 	case http.StatusTooManyRequests:
 		return "RESOURCE_EXHAUSTED"
-	case 499:
-		return "CANCELLED"
 	case http.StatusInternalServerError:
 		return "INTERNAL"
 	case http.StatusNotImplemented:

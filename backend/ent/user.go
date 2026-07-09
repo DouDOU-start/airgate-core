@@ -30,8 +30,6 @@ type User struct {
 	Role user.Role `json:"role,omitempty"`
 	// 用户级并发上限：同一 user 所有 API Key 加起来同时在途的请求数。0 表示不限制（默认）。与 api_key.max_concurrency 是 AND 关系，两者都会检查。
 	MaxConcurrency int `json:"max_concurrency,omitempty"`
-	// TotpSecret holds the value of the "totp_secret" field.
-	TotpSecret *string `json:"-"`
 	// GroupRates holds the value of the "group_rates" field.
 	GroupRates map[int64]float64 `json:"group_rates,omitempty"`
 	// BalanceAlertThreshold holds the value of the "balance_alert_threshold" field.
@@ -114,7 +112,7 @@ func (*User) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case user.FieldID, user.FieldMaxConcurrency:
 			values[i] = new(sql.NullInt64)
-		case user.FieldEmail, user.FieldPasswordHash, user.FieldUsername, user.FieldRole, user.FieldTotpSecret, user.FieldStatus:
+		case user.FieldEmail, user.FieldPasswordHash, user.FieldUsername, user.FieldRole, user.FieldStatus:
 			values[i] = new(sql.NullString)
 		case user.FieldCreatedAt, user.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -174,13 +172,6 @@ func (u *User) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field max_concurrency", values[i])
 			} else if value.Valid {
 				u.MaxConcurrency = int(value.Int64)
-			}
-		case user.FieldTotpSecret:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field totp_secret", values[i])
-			} else if value.Valid {
-				u.TotpSecret = new(string)
-				*u.TotpSecret = value.String
 			}
 		case user.FieldGroupRates:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -292,8 +283,6 @@ func (u *User) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("max_concurrency=")
 	builder.WriteString(fmt.Sprintf("%v", u.MaxConcurrency))
-	builder.WriteString(", ")
-	builder.WriteString("totp_secret=<sensitive>")
 	builder.WriteString(", ")
 	builder.WriteString("group_rates=")
 	builder.WriteString(fmt.Sprintf("%v", u.GroupRates))

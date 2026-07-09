@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 )
 
 // CtxKeyRequestID 在 gin.Context 中存放 request_id 的键名。
@@ -41,16 +41,16 @@ func RequestLogger() gin.HandlerFunc {
 		// 抽取或生成 request_id，写入响应头供客户端排错。
 		// X-Request-ID 为攻击者可控头且无上限：usage_logs.request_id 带 btree 索引，
 		// 超长值会令索引写入报错、整批计费 INSERT 失败（变相免费用量），此处统一截断。
-		rid := sdk.ExtractOrGenerateRequestID(c.Request.Header)
+		rid := logx.ExtractOrGenerateRequestID(c.Request.Header)
 		if len(rid) > maxRequestIDLen {
 			rid = rid[:maxRequestIDLen]
 		}
-		c.Header(sdk.HeaderRequestID, rid)
+		c.Header(logx.HeaderRequestID, rid)
 		c.Set(CtxKeyRequestID, rid)
 
-		// 把 rid + 派生 logger 注入 std context，让下游 handler 与插件链路自动带上
-		ctx := sdk.WithRequestID(c.Request.Context(), rid)
-		ctx, _ = sdk.LoggerWithRequestID(ctx)
+		// 把 rid + 派生 logger 注入 std context，让下游 handler 与转发管线自动带上
+		ctx := logx.WithRequestID(c.Request.Context(), rid)
+		ctx, _ = logx.LoggerWithRequestID(ctx)
 		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()
@@ -81,29 +81,29 @@ func RequestLogger() gin.HandlerFunc {
 		}
 
 		attrs := []any{
-			sdk.LogFieldMethod, c.Request.Method,
-			sdk.LogFieldPath, path,
-			sdk.LogFieldStatus, status,
-			sdk.LogFieldDurationMs, duration.Milliseconds(),
-			sdk.LogFieldUserID, userID,
+			logx.LogFieldMethod, c.Request.Method,
+			logx.LogFieldPath, path,
+			logx.LogFieldStatus, status,
+			logx.LogFieldDurationMs, duration.Milliseconds(),
+			logx.LogFieldUserID, userID,
 			"ip", c.ClientIP(),
 			"bytes_out", c.Writer.Size(),
-			sdk.LogFieldRequestID, rid,
+			logx.LogFieldRequestID, rid,
 		}
 		// 业务层（如 forwarder）已写回的转发上下文，合并进 http_request 那一行
 		if v, ok := c.Get(CtxKeyAccessModel); ok {
 			if s, ok := v.(string); ok && s != "" {
-				attrs = append(attrs, sdk.LogFieldModel, s)
+				attrs = append(attrs, logx.LogFieldModel, s)
 			}
 		}
 		if v, ok := c.Get(CtxKeyAccessPlatform); ok {
 			if s, ok := v.(string); ok && s != "" {
-				attrs = append(attrs, sdk.LogFieldPlatform, s)
+				attrs = append(attrs, logx.LogFieldPlatform, s)
 			}
 		}
 		if v, ok := c.Get(CtxKeyAccessAccountID); ok {
 			if n, ok := v.(int); ok && n > 0 {
-				attrs = append(attrs, sdk.LogFieldAccountID, n)
+				attrs = append(attrs, logx.LogFieldAccountID, n)
 			}
 		}
 		if v, ok := c.Get(CtxKeyAccessAttempts); ok {
@@ -125,5 +125,5 @@ func RequestIDFromGinContext(c *gin.Context) string {
 			return s
 		}
 	}
-	return sdk.RequestIDFromContext(c.Request.Context())
+	return logx.RequestIDFromContext(c.Request.Context())
 }

@@ -18,14 +18,13 @@ func (s *Server) registerRoutes() {
 	r := s.engine
 	handlers := s.handlers
 
-	// 全局中间件：CORS → Recovery → RequestLogger → I18n → 业务
+	// 全局中间件：CORS → Recovery → RequestLogger → 业务
 	r.Use(middleware.CORS(middleware.CORSConfig{
 		// 默认不设置 AllowOrigins，仅同源可访问。
 		// 如需跨域请配置具体来源，例如：AllowOrigins: []string{"https://example.com"}
 	}))
 	r.Use(middleware.Recovery())
 	r.Use(middleware.RequestLogger())
-	r.Use(middleware.I18n())
 
 	// 健康检查（无需认证，供 docker / k8s healthcheck 使用）
 	r.GET("/healthz", func(c *gin.Context) {
@@ -268,8 +267,12 @@ func (s *Server) registerRoutes() {
 	// === cc-switch 通用模板兼容端点（使用 sk-xxx API Key 自鉴权） ===
 	// AirGate 安装脚本和 cc-switch 通用脚本可使用 /v1/usage 做 Key 校验和
 	// 余额查询。该路径由 Core 直接处理，返回真实可用余额。
-	// 实现见 cc_compat.go。
-	r.GET("/v1/usage", s.handleCCCompatUserBalance)
+	// 实现见 cc_compat.go。端点自带轻量鉴权且逐次查库，挂 IP 限流防刷。
+	// 限额取 300/min：NAT / 未透传 XFF 的反代场景下大量用户共享同一出口 IP，
+	// 60/min 会被整体误伤为 429。
+	ccUsageRL := middleware.NewIPRateLimit(300)
+	s.ccUsageRateLimiter = ccUsageRL.Limiter
+	r.GET("/v1/usage", ccUsageRL.Handler, s.handleCCCompatUserBalance)
 
 	// === 支付平台异步回调（公开路由，验签在 provider 实现内完成） ===
 	// 易支付系走 form/GET，微信 V3 / easypay 走 JSON body + header 签名。
@@ -290,7 +293,13 @@ func (s *Server) registerRoutes() {
 	// ⚠️ 安全说明：此路径公开可访问，无需认证。上传的文件（如站点 logo）可能
 	// 被嵌入外部链接中分享，因此保持公开。文件名使用 UUID 生成，不可枚举。
 	// 如未来需要访问控制，应替换为带鉴权的路由组。
-	r.Static("/uploads", "data/uploads")
+	// X-Content-Type-Options: nosniff——上传目录是用户可控内容，禁止浏览器
+	// MIME 嗅探把文件当脚本/HTML 执行（配合上传侧的扩展名白名单纵深防御）。
+	uploadsGroup := r.Group("/uploads", func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Next()
+	})
+	uploadsGroup.Static("", "data/uploads")
 
 	// 静态文件服务（前端 SPA）
 	r.StaticFS("/assets", http.FS(assetsFS))

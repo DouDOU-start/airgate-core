@@ -22,8 +22,9 @@ import (
 // UserUpdate is the builder for updating User entities.
 type UserUpdate struct {
 	config
-	hooks    []Hook
-	mutation *UserMutation
+	hooks     []Hook
+	mutation  *UserMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the UserUpdate builder.
@@ -127,26 +128,6 @@ func (uu *UserUpdate) SetNillableMaxConcurrency(i *int) *UserUpdate {
 // AddMaxConcurrency adds i to the "max_concurrency" field.
 func (uu *UserUpdate) AddMaxConcurrency(i int) *UserUpdate {
 	uu.mutation.AddMaxConcurrency(i)
-	return uu
-}
-
-// SetTotpSecret sets the "totp_secret" field.
-func (uu *UserUpdate) SetTotpSecret(s string) *UserUpdate {
-	uu.mutation.SetTotpSecret(s)
-	return uu
-}
-
-// SetNillableTotpSecret sets the "totp_secret" field if the given value is not nil.
-func (uu *UserUpdate) SetNillableTotpSecret(s *string) *UserUpdate {
-	if s != nil {
-		uu.SetTotpSecret(*s)
-	}
-	return uu
-}
-
-// ClearTotpSecret clears the value of the "totp_secret" field.
-func (uu *UserUpdate) ClearTotpSecret() *UserUpdate {
-	uu.mutation.ClearTotpSecret()
 	return uu
 }
 
@@ -432,6 +413,12 @@ func (uu *UserUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (uu *UserUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *UserUpdate {
+	uu.modifiers = append(uu.modifiers, modifiers...)
+	return uu
+}
+
 func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := uu.check(); err != nil {
 		return n, err
@@ -467,12 +454,6 @@ func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := uu.mutation.AddedMaxConcurrency(); ok {
 		_spec.AddField(user.FieldMaxConcurrency, field.TypeInt, value)
-	}
-	if value, ok := uu.mutation.TotpSecret(); ok {
-		_spec.SetField(user.FieldTotpSecret, field.TypeString, value)
-	}
-	if uu.mutation.TotpSecretCleared() {
-		_spec.ClearField(user.FieldTotpSecret, field.TypeString)
 	}
 	if value, ok := uu.mutation.GroupRates(); ok {
 		_spec.SetField(user.FieldGroupRates, field.TypeJSON, value)
@@ -675,6 +656,7 @@ func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(uu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, uu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{user.Label}
@@ -690,9 +672,10 @@ func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // UserUpdateOne is the builder for updating a single User entity.
 type UserUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *UserMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *UserMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetEmail sets the "email" field.
@@ -790,26 +773,6 @@ func (uuo *UserUpdateOne) SetNillableMaxConcurrency(i *int) *UserUpdateOne {
 // AddMaxConcurrency adds i to the "max_concurrency" field.
 func (uuo *UserUpdateOne) AddMaxConcurrency(i int) *UserUpdateOne {
 	uuo.mutation.AddMaxConcurrency(i)
-	return uuo
-}
-
-// SetTotpSecret sets the "totp_secret" field.
-func (uuo *UserUpdateOne) SetTotpSecret(s string) *UserUpdateOne {
-	uuo.mutation.SetTotpSecret(s)
-	return uuo
-}
-
-// SetNillableTotpSecret sets the "totp_secret" field if the given value is not nil.
-func (uuo *UserUpdateOne) SetNillableTotpSecret(s *string) *UserUpdateOne {
-	if s != nil {
-		uuo.SetTotpSecret(*s)
-	}
-	return uuo
-}
-
-// ClearTotpSecret clears the value of the "totp_secret" field.
-func (uuo *UserUpdateOne) ClearTotpSecret() *UserUpdateOne {
-	uuo.mutation.ClearTotpSecret()
 	return uuo
 }
 
@@ -1108,6 +1071,12 @@ func (uuo *UserUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (uuo *UserUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *UserUpdateOne {
+	uuo.modifiers = append(uuo.modifiers, modifiers...)
+	return uuo
+}
+
 func (uuo *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	if err := uuo.check(); err != nil {
 		return _node, err
@@ -1160,12 +1129,6 @@ func (uuo *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) 
 	}
 	if value, ok := uuo.mutation.AddedMaxConcurrency(); ok {
 		_spec.AddField(user.FieldMaxConcurrency, field.TypeInt, value)
-	}
-	if value, ok := uuo.mutation.TotpSecret(); ok {
-		_spec.SetField(user.FieldTotpSecret, field.TypeString, value)
-	}
-	if uuo.mutation.TotpSecretCleared() {
-		_spec.ClearField(user.FieldTotpSecret, field.TypeString)
 	}
 	if value, ok := uuo.mutation.GroupRates(); ok {
 		_spec.SetField(user.FieldGroupRates, field.TypeJSON, value)
@@ -1368,6 +1331,7 @@ func (uuo *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) 
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(uuo.modifiers...)
 	_node = &User{config: uuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

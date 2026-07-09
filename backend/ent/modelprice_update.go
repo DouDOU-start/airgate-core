@@ -19,8 +19,9 @@ import (
 // ModelPriceUpdate is the builder for updating ModelPrice entities.
 type ModelPriceUpdate struct {
 	config
-	hooks    []Hook
-	mutation *ModelPriceMutation
+	hooks     []Hook
+	mutation  *ModelPriceMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the ModelPriceUpdate builder.
@@ -269,6 +270,12 @@ func (mpu *ModelPriceUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (mpu *ModelPriceUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *ModelPriceUpdate {
+	mpu.modifiers = append(mpu.modifiers, modifiers...)
+	return mpu
+}
+
 func (mpu *ModelPriceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := mpu.check(); err != nil {
 		return n, err
@@ -358,6 +365,7 @@ func (mpu *ModelPriceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(mpu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, mpu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{modelprice.Label}
@@ -373,9 +381,10 @@ func (mpu *ModelPriceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // ModelPriceUpdateOne is the builder for updating a single ModelPrice entity.
 type ModelPriceUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *ModelPriceMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *ModelPriceMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetModel sets the "model" field.
@@ -631,6 +640,12 @@ func (mpuo *ModelPriceUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (mpuo *ModelPriceUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *ModelPriceUpdateOne {
+	mpuo.modifiers = append(mpuo.modifiers, modifiers...)
+	return mpuo
+}
+
 func (mpuo *ModelPriceUpdateOne) sqlSave(ctx context.Context) (_node *ModelPrice, err error) {
 	if err := mpuo.check(); err != nil {
 		return _node, err
@@ -737,6 +752,7 @@ func (mpuo *ModelPriceUpdateOne) sqlSave(ctx context.Context) (_node *ModelPrice
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(mpuo.modifiers...)
 	_node = &ModelPrice{config: mpuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

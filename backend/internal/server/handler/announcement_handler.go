@@ -17,9 +17,6 @@ func NewAnnouncementHandler(service *appannouncement.Service) *AnnouncementHandl
 	return &AnnouncementHandler{service: service}
 }
 
-// parseAnnouncementID 解析公告 ID，委托给公共 ParseID。
-var parseAnnouncementID = ParseID
-
 func (h *AnnouncementHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	switch {
 	case errors.Is(err, appannouncement.ErrAnnouncementNotFound):

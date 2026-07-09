@@ -24,6 +24,7 @@ type BalanceLogQuery struct {
 	predicates []predicate.BalanceLog
 	withUser   *UserQuery
 	withFKs    bool
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -390,6 +391,9 @@ func (blq *BalanceLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
+	if len(blq.modifiers) > 0 {
+		_spec.Modifiers = blq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -443,6 +447,9 @@ func (blq *BalanceLogQuery) loadUser(ctx context.Context, query *UserQuery, node
 
 func (blq *BalanceLogQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := blq.querySpec()
+	if len(blq.modifiers) > 0 {
+		_spec.Modifiers = blq.modifiers
+	}
 	_spec.Node.Columns = blq.ctx.Fields
 	if len(blq.ctx.Fields) > 0 {
 		_spec.Unique = blq.ctx.Unique != nil && *blq.ctx.Unique
@@ -505,6 +512,9 @@ func (blq *BalanceLogQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if blq.ctx.Unique != nil && *blq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range blq.modifiers {
+		m(selector)
+	}
 	for _, p := range blq.predicates {
 		p(selector)
 	}
@@ -520,6 +530,12 @@ func (blq *BalanceLogQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (blq *BalanceLogQuery) Modify(modifiers ...func(s *sql.Selector)) *BalanceLogSelect {
+	blq.modifiers = append(blq.modifiers, modifiers...)
+	return blq.Select()
 }
 
 // BalanceLogGroupBy is the group-by builder for BalanceLog entities.
@@ -610,4 +626,10 @@ func (bls *BalanceLogSelect) sqlScan(ctx context.Context, root *BalanceLogQuery,
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (bls *BalanceLogSelect) Modify(modifiers ...func(s *sql.Selector)) *BalanceLogSelect {
+	bls.modifiers = append(bls.modifiers, modifiers...)
+	return bls
 }

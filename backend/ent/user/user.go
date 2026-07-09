@@ -27,8 +27,6 @@ const (
 	FieldRole = "role"
 	// FieldMaxConcurrency holds the string denoting the max_concurrency field in the database.
 	FieldMaxConcurrency = "max_concurrency"
-	// FieldTotpSecret holds the string denoting the totp_secret field in the database.
-	FieldTotpSecret = "totp_secret"
 	// FieldGroupRates holds the string denoting the group_rates field in the database.
 	FieldGroupRates = "group_rates"
 	// FieldBalanceAlertThreshold holds the string denoting the balance_alert_threshold field in the database.
@@ -88,7 +86,6 @@ var Columns = []string{
 	FieldBalance,
 	FieldRole,
 	FieldMaxConcurrency,
-	FieldTotpSecret,
 	FieldGroupRates,
 	FieldBalanceAlertThreshold,
 	FieldBalanceAlertNotified,
@@ -226,11 +223,6 @@ func ByRole(opts ...sql.OrderTermOption) OrderOption {
 // ByMaxConcurrency orders the results by the max_concurrency field.
 func ByMaxConcurrency(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMaxConcurrency, opts...).ToFunc()
-}
-
-// ByTotpSecret orders the results by the totp_secret field.
-func ByTotpSecret(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldTotpSecret, opts...).ToFunc()
 }
 
 // ByBalanceAlertThreshold orders the results by the balance_alert_threshold field.

@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/auth"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Service API Key 应用服务。
@@ -25,7 +25,7 @@ func NewService(repo Repository, secret string) *Service {
 // ListByUser 查询当前用户的 API Key 列表。
 // tz 决定每个 key 的"今日成本"起点；为空时回退到服务器本地时区。
 func (s *Service) ListByUser(ctx context.Context, userID int, filter ListFilter, tz string) (ListResult, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
@@ -33,9 +33,9 @@ func (s *Service) ListByUser(ctx context.Context, userID int, filter ListFilter,
 	list, total, err := s.repo.ListByUser(ctx, userID, filter)
 	if err != nil {
 		logger.Error("api_key_lookup_failed",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldReason, "list",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldReason, "list",
+			logx.LogFieldError, err,
 		)
 		return ListResult{}, err
 	}
@@ -49,9 +49,9 @@ func (s *Service) ListByUser(ctx context.Context, userID int, filter ListFilter,
 	todayMap, thirtyDayMap, err := s.repo.KeyUsage(ctx, keyIDs, todayStart)
 	if err != nil {
 		logger.Error("api_key_lookup_failed",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldReason, "key_usage",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldReason, "key_usage",
+			logx.LogFieldError, err,
 		)
 		return ListResult{}, err
 	}
@@ -71,7 +71,7 @@ func (s *Service) ListByUser(ctx context.Context, userID int, filter ListFilter,
 // ListAdmin 查询全局 API Key 列表。
 // 仅用于管理员选择器等轻量查询，不附加用量聚合，避免搜索时触发额外统计查询。
 func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
@@ -79,8 +79,8 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult,
 	list, total, err := s.repo.ListAdmin(ctx, filter)
 	if err != nil {
 		logger.Error("api_key_lookup_failed",
-			sdk.LogFieldReason, "admin_list",
-			sdk.LogFieldError, err,
+			logx.LogFieldReason, "admin_list",
+			logx.LogFieldError, err,
 		)
 		return ListResult{}, err
 	}
@@ -95,15 +95,15 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult,
 
 // CreateOwned 创建当前用户的 API Key。
 func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput) (Key, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	groupID := int(input.GroupID)
 	if err := s.ensureUserCanUseGroup(ctx, userID, groupID); err != nil {
 		logger.Warn("api_key_create_rejected",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldGroupID, groupID,
-			sdk.LogFieldReason, "group_access",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldGroupID, groupID,
+			logx.LogFieldReason, "group_access",
+			logx.LogFieldError, err,
 		)
 		return Key{}, err
 	}
@@ -111,26 +111,26 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 	rawKey, keyHash, err := auth.GenerateAPIKey()
 	if err != nil {
 		logger.Error("api_key_create_failed",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldReason, "generate_key",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldReason, "generate_key",
+			logx.LogFieldError, err,
 		)
 		return Key{}, err
 	}
 	encrypted, err := auth.EncryptAPIKey(rawKey, s.secret)
 	if err != nil {
 		logger.Error("api_key_create_failed",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldReason, "encrypt_key",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldReason, "encrypt_key",
+			logx.LogFieldError, err,
 		)
 		return Key{}, err
 	}
 	expiresAt, hasExpiresAt, err := parseExpiresAt(input.ExpiresAt)
 	if err != nil {
 		logger.Warn("api_key_create_rejected",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldReason, "invalid_expires_at",
+			logx.LogFieldUserID, userID,
+			logx.LogFieldReason, "invalid_expires_at",
 		)
 		return Key{}, err
 	}
@@ -158,18 +158,18 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 	})
 	if err != nil {
 		logger.Error("api_key_create_failed",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldGroupID, groupID,
-			sdk.LogFieldReason, "persist",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldGroupID, groupID,
+			logx.LogFieldReason, "persist",
+			logx.LogFieldError, err,
 		)
 		return Key{}, err
 	}
 
 	logger.Info("api_key_created",
-		sdk.LogFieldUserID, userID,
-		sdk.LogFieldAPIKeyID, item.ID,
-		sdk.LogFieldGroupID, groupID,
+		logx.LogFieldUserID, userID,
+		logx.LogFieldAPIKeyID, item.ID,
+		logx.LogFieldGroupID, groupID,
 	)
 
 	item.PlainKey = rawKey
@@ -178,7 +178,7 @@ func (s *Service) CreateOwned(ctx context.Context, userID int, input CreateInput
 
 // UpdateOwned 更新当前用户的 API Key。
 func (s *Service) UpdateOwned(ctx context.Context, userID, id int, input UpdateInput) (Key, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	mutation, err := s.buildMutation(ctx, userID, input, true)
 	if err != nil {
 		return Key{}, err
@@ -186,9 +186,9 @@ func (s *Service) UpdateOwned(ctx context.Context, userID, id int, input UpdateI
 	updated, err := s.repo.UpdateOwned(ctx, userID, id, mutation)
 	if err != nil {
 		logger.Error("api_key_update_failed",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldAPIKeyID, id,
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldAPIKeyID, id,
+			logx.LogFieldError, err,
 		)
 		return Key{}, err
 	}
@@ -198,7 +198,7 @@ func (s *Service) UpdateOwned(ctx context.Context, userID, id int, input UpdateI
 
 // UpdateAdmin 管理员更新 API Key。
 func (s *Service) UpdateAdmin(ctx context.Context, id int, input UpdateInput) (Key, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	mutation, err := s.buildMutation(ctx, 0, input, false)
 	if err != nil {
 		return Key{}, err
@@ -206,9 +206,9 @@ func (s *Service) UpdateAdmin(ctx context.Context, id int, input UpdateInput) (K
 	updated, err := s.repo.UpdateAdmin(ctx, id, mutation)
 	if err != nil {
 		logger.Error("api_key_update_failed",
-			sdk.LogFieldAPIKeyID, id,
-			sdk.LogFieldReason, "admin",
-			sdk.LogFieldError, err,
+			logx.LogFieldAPIKeyID, id,
+			logx.LogFieldReason, "admin",
+			logx.LogFieldError, err,
 		)
 		return Key{}, err
 	}
@@ -218,50 +218,50 @@ func (s *Service) UpdateAdmin(ctx context.Context, id int, input UpdateInput) (K
 
 // DeleteOwned 删除当前用户的 API Key。
 func (s *Service) DeleteOwned(ctx context.Context, userID, id int) error {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	if err := s.repo.DeleteOwned(ctx, userID, id); err != nil {
 		logger.Error("api_key_delete_failed",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldAPIKeyID, id,
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldAPIKeyID, id,
+			logx.LogFieldError, err,
 		)
 		return err
 	}
 	logger.Info("api_key_deleted",
-		sdk.LogFieldUserID, userID,
-		sdk.LogFieldAPIKeyID, id,
+		logx.LogFieldUserID, userID,
+		logx.LogFieldAPIKeyID, id,
 	)
 	return nil
 }
 
 // RevealOwned 查看当前用户的 API Key 原文。
 func (s *Service) RevealOwned(ctx context.Context, userID, id int) (Key, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	item, err := s.repo.FindOwned(ctx, userID, id)
 	if err != nil {
 		logger.Error("api_key_lookup_failed",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldAPIKeyID, id,
-			sdk.LogFieldReason, "reveal",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldAPIKeyID, id,
+			logx.LogFieldReason, "reveal",
+			logx.LogFieldError, err,
 		)
 		return Key{}, err
 	}
 	if item.KeyEncrypted == "" {
 		logger.Warn("api_key_reveal_rejected",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldAPIKeyID, id,
-			sdk.LogFieldReason, "legacy_key",
+			logx.LogFieldUserID, userID,
+			logx.LogFieldAPIKeyID, id,
+			logx.LogFieldReason, "legacy_key",
 		)
 		return Key{}, ErrLegacyKeyNotReveal
 	}
 	plainKey, err := auth.DecryptAPIKey(item.KeyEncrypted, s.secret)
 	if err != nil {
 		logger.Error("api_key_reveal_failed",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldAPIKeyID, id,
-			sdk.LogFieldReason, "decrypt",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldAPIKeyID, id,
+			logx.LogFieldReason, "decrypt",
+			logx.LogFieldError, err,
 		)
 		return Key{}, ErrKeyDecryptFailed
 	}
@@ -275,7 +275,7 @@ func (s *Service) RevealOwned(ctx context.Context, userID, id int) (Key, error) 
 // 已禁用 → 报错（视为用户暂时封禁该应用，可在密钥管理中重新启用）；
 // 用户删除该 key 则下次 provision 自动重建。groupID=0 时选默认分组。
 func (s *Service) ProvisionForClient(ctx context.Context, userID int, clientID, keyName string, groupID int) (string, string, bool, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	plainKey, hint, found, err := s.revealProvisioned(ctx, userID, clientID)
 	if err != nil || found {
@@ -325,13 +325,13 @@ func (s *Service) ProvisionForClient(ctx context.Context, userID int, clientID, 
 			return plainKey, hint, false, nil
 		}
 		logger.Error("api_key_provision_failed",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldReason, "create",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldReason, "create",
+			logx.LogFieldError, err,
 		)
 		return "", "", false, err
 	}
-	logger.Info("api_key_provisioned", sdk.LogFieldUserID, userID, "client_id", clientID)
+	logger.Info("api_key_provisioned", logx.LogFieldUserID, userID, "client_id", clientID)
 	return rawKey, keyHint, true, nil
 }
 
@@ -362,15 +362,15 @@ func (s *Service) revealProvisioned(ctx context.Context, userID int, clientID st
 func logApiKeyMutationOutcome(logger *slog.Logger, userID, keyID int, mutation Mutation) {
 	if mutation.Status != nil {
 		logger.Info("api_key_status_changed",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldAPIKeyID, keyID,
-			sdk.LogFieldStatus, *mutation.Status,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldAPIKeyID, keyID,
+			logx.LogFieldStatus, *mutation.Status,
 		)
 	}
 	if mutation.QuotaUSD != nil {
 		logger.Info("api_key_quota_updated",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldAPIKeyID, keyID,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldAPIKeyID, keyID,
 		)
 	}
 }

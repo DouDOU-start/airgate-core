@@ -84,8 +84,11 @@ func (s *VerifyCodeStore) cleanup() {
 	}
 }
 
+// randomCode 生成 6 位数字验证码。取 4 字节随机数对 1e6 取模：
+// 2^32 对 1e6 的余数偏差约为 1/4295（此前 3 字节截断前 6 位的写法分布明显有偏）。
 func randomCode() string {
-	b := make([]byte, 3)
+	b := make([]byte, 4)
 	_, _ = rand.Read(b)
-	return fmt.Sprintf("%06d", int(b[0])<<16|int(b[1])<<8|int(b[2]))[:6]
+	n := uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
+	return fmt.Sprintf("%06d", n%1_000_000)
 }

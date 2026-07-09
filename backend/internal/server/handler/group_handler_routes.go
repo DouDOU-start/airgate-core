@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"log/slog"
+
 	"github.com/gin-gonic/gin"
 
 	appgroup "github.com/DouDOU-start/airgate-core/internal/app/group"
@@ -18,11 +20,10 @@ func (h *GroupHandler) ListGroups(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	result, err := h.service.List(ctx, appgroup.ListFilter{
-		Page:        page.Page,
-		PageSize:    page.PageSize,
-		Keyword:     page.Keyword,
-		Platform:    c.Query("platform"),
-		ServiceTier: c.Query("service_tier"),
+		Page:     page.Page,
+		PageSize: page.PageSize,
+		Keyword:  page.Keyword,
+		Platform: c.Query("platform"),
 	})
 	if err != nil {
 		httpCode, message := h.handleError("查询分组列表失败", "查询失败", err)
@@ -30,12 +31,15 @@ func (h *GroupHandler) ListGroups(c *gin.Context) {
 		return
 	}
 
-	// 批量查询分组统计
+	// 批量查询分组统计；失败不阻塞列表主流程，统计列保持 0 值
 	groupIDs := make([]int, 0, len(result.List))
 	for _, item := range result.List {
 		groupIDs = append(groupIDs, item.ID)
 	}
-	statsMap, _ := h.service.StatsForGroups(ctx, groupIDs, c.Query("tz"))
+	statsMap, err := h.service.StatsForGroups(ctx, groupIDs, c.Query("tz"))
+	if err != nil {
+		slog.Warn("查询分组统计失败", "error", err)
+	}
 
 	list := make([]dto.GroupResp, 0, len(result.List))
 	for _, item := range result.List {
@@ -87,7 +91,7 @@ func (h *GroupHandler) ListAvailableGroups(c *gin.Context) {
 
 // GetGroup 获取分组详情。
 func (h *GroupHandler) GetGroup(c *gin.Context) {
-	id, err := parseGroupID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的分组 ID")
 		return
@@ -118,17 +122,13 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 	}
 
 	item, err := h.service.Create(c.Request.Context(), appgroup.CreateInput{
-		Name:              req.Name,
-		Platform:          req.Platform,
-		RateMultiplier:    req.RateMultiplier,
-		IsExclusive:       req.IsExclusive,
-		StatusVisible:     statusVisible,
-		Quotas:            req.Quotas,
-		ModelRouting:      req.ModelRouting,
-		ServiceTier:       req.ServiceTier,
-		ForceInstructions: req.ForceInstructions,
-		Note:              req.Note,
-		SortWeight:        req.SortWeight,
+		Name:           req.Name,
+		Platform:       req.Platform,
+		RateMultiplier: req.RateMultiplier,
+		IsExclusive:    req.IsExclusive,
+		StatusVisible:  statusVisible,
+		Note:           req.Note,
+		SortWeight:     req.SortWeight,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("创建分组失败", "创建失败", err)
@@ -141,7 +141,7 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 
 // UpdateGroup 更新分组。
 func (h *GroupHandler) UpdateGroup(c *gin.Context) {
-	id, err := parseGroupID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的分组 ID")
 		return
@@ -154,16 +154,12 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 	}
 
 	item, err := h.service.Update(c.Request.Context(), id, appgroup.UpdateInput{
-		Name:              req.Name,
-		RateMultiplier:    req.RateMultiplier,
-		IsExclusive:       req.IsExclusive,
-		StatusVisible:     req.StatusVisible,
-		Quotas:            req.Quotas,
-		ModelRouting:      req.ModelRouting,
-		ServiceTier:       req.ServiceTier,
-		ForceInstructions: req.ForceInstructions,
-		Note:              req.Note,
-		SortWeight:        req.SortWeight,
+		Name:           req.Name,
+		RateMultiplier: req.RateMultiplier,
+		IsExclusive:    req.IsExclusive,
+		StatusVisible:  req.StatusVisible,
+		Note:           req.Note,
+		SortWeight:     req.SortWeight,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("更新分组失败", "更新失败", err)
@@ -176,7 +172,7 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 
 // DeleteGroup 删除分组。
 func (h *GroupHandler) DeleteGroup(c *gin.Context) {
-	id, err := parseGroupID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的分组 ID")
 		return

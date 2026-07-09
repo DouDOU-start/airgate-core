@@ -18,8 +18,9 @@ import (
 // PaymentOrderUpdate is the builder for updating PaymentOrder entities.
 type PaymentOrderUpdate struct {
 	config
-	hooks    []Hook
-	mutation *PaymentOrderMutation
+	hooks     []Hook
+	mutation  *PaymentOrderMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the PaymentOrderUpdate builder.
@@ -297,6 +298,12 @@ func (pou *PaymentOrderUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (pou *PaymentOrderUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *PaymentOrderUpdate {
+	pou.modifiers = append(pou.modifiers, modifiers...)
+	return pou
+}
+
 func (pou *PaymentOrderUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := pou.check(); err != nil {
 		return n, err
@@ -360,6 +367,7 @@ func (pou *PaymentOrderUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := pou.mutation.UpdatedAt(); ok {
 		_spec.SetField(paymentorder.FieldUpdatedAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(pou.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, pou.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{paymentorder.Label}
@@ -375,9 +383,10 @@ func (pou *PaymentOrderUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // PaymentOrderUpdateOne is the builder for updating a single PaymentOrder entity.
 type PaymentOrderUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *PaymentOrderMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *PaymentOrderMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetOutTradeNo sets the "out_trade_no" field.
@@ -662,6 +671,12 @@ func (pouo *PaymentOrderUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (pouo *PaymentOrderUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *PaymentOrderUpdateOne {
+	pouo.modifiers = append(pouo.modifiers, modifiers...)
+	return pouo
+}
+
 func (pouo *PaymentOrderUpdateOne) sqlSave(ctx context.Context) (_node *PaymentOrder, err error) {
 	if err := pouo.check(); err != nil {
 		return _node, err
@@ -742,6 +757,7 @@ func (pouo *PaymentOrderUpdateOne) sqlSave(ctx context.Context) (_node *PaymentO
 	if value, ok := pouo.mutation.UpdatedAt(); ok {
 		_spec.SetField(paymentorder.FieldUpdatedAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(pouo.modifiers...)
 	_node = &PaymentOrder{config: pouo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

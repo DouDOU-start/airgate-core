@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 )
 
 func TestRequestLoggerPropagatesRequestID(t *testing.T) {
@@ -22,14 +22,14 @@ func TestRequestLoggerPropagatesRequestID(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
-	req.Header.Set(sdk.HeaderRequestID, "req-123")
+	req.Header.Set(logx.HeaderRequestID, "req-123")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusCreated {
 		t.Fatalf("状态码 = %d，期望 %d", w.Code, http.StatusCreated)
 	}
-	if got := w.Header().Get(sdk.HeaderRequestID); got != "req-123" {
+	if got := w.Header().Get(logx.HeaderRequestID); got != "req-123" {
 		t.Fatalf("响应 request_id = %q，期望 req-123", got)
 	}
 }
@@ -48,7 +48,7 @@ func TestRecoveryReturnsJSONWithRequestID(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
-	req.Header.Set(sdk.HeaderRequestID, "panic-req")
+	req.Header.Set(logx.HeaderRequestID, "panic-req")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

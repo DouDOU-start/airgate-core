@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/auth"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Reloader 注册表重载窄接口（由 relay/registry.Registry 实现，可为 nil——测试时不接）。
@@ -121,7 +121,7 @@ func (s *Service) attachMoneyStats(ctx context.Context, list []Channel) {
 	}
 	stats, err := s.stats.GetChannelMoneyStats(ctx, ids)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Warn("channel_money_stats_failed", sdk.LogFieldError, err)
+		logx.LoggerFromContext(ctx).Warn("channel_money_stats_failed", logx.LogFieldError, err)
 		return
 	}
 	for i := range list {
@@ -155,18 +155,18 @@ func (s *Service) attachRuntimeStats(ctx context.Context, list []Channel) {
 
 // Create 创建渠道：api_keys 在本层逐元素加密后落库。
 func (s *Service) Create(ctx context.Context, input CreateInput) (Channel, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	encrypted, err := s.encryptKeys(input.APIKeys)
 	if err != nil {
-		logger.Error("channel_api_key_encrypt_failed", "name", input.Name, sdk.LogFieldError, err)
+		logger.Error("channel_api_key_encrypt_failed", "name", input.Name, logx.LogFieldError, err)
 		return Channel{}, err
 	}
 	input.APIKeys = encrypted
 
 	item, err := s.repo.Create(ctx, input)
 	if err != nil {
-		logger.Error("channel_persist_failed", "op", "create", "name", input.Name, sdk.LogFieldError, err)
+		logger.Error("channel_persist_failed", "op", "create", "name", input.Name, logx.LogFieldError, err)
 		return Channel{}, err
 	}
 	logger.Info("channel_created", "channel_id", item.ID, "name", item.Name, "type", item.Type)
@@ -178,12 +178,12 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Channel, error
 
 // Update 更新渠道（partial）：api_keys 提供即整组替换（本层加密）。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Channel, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	if len(input.APIKeys) > 0 {
 		encrypted, err := s.encryptKeys(input.APIKeys)
 		if err != nil {
-			logger.Error("channel_api_key_encrypt_failed", "channel_id", id, sdk.LogFieldError, err)
+			logger.Error("channel_api_key_encrypt_failed", "channel_id", id, logx.LogFieldError, err)
 			return Channel{}, err
 		}
 		input.APIKeys = encrypted
@@ -197,7 +197,7 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Channe
 
 	item, err := s.repo.Update(ctx, id, input)
 	if err != nil {
-		logger.Error("channel_persist_failed", "op", "update", "channel_id", id, sdk.LogFieldError, err)
+		logger.Error("channel_persist_failed", "op", "update", "channel_id", id, logx.LogFieldError, err)
 		return Channel{}, err
 	}
 
@@ -208,9 +208,9 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Channe
 
 // Delete 删除渠道。
 func (s *Service) Delete(ctx context.Context, id int) error {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	if err := s.repo.Delete(ctx, id); err != nil {
-		logger.Error("channel_persist_failed", "op", "delete", "channel_id", id, sdk.LogFieldError, err)
+		logger.Error("channel_persist_failed", "op", "delete", "channel_id", id, logx.LogFieldError, err)
 		return err
 	}
 	logger.Info("channel_deleted", "channel_id", id)
@@ -221,7 +221,7 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 
 // BulkUpdate 批量启停/删除/调优先级，返回受影响行数。
 func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) (int, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	switch input.Action {
 	case BulkActionEnable, BulkActionDisable, BulkActionDelete:
@@ -235,7 +235,7 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) (int, e
 
 	affected, err := s.repo.BulkUpdate(ctx, input)
 	if err != nil {
-		logger.Error("channel_persist_failed", "op", "bulk_"+input.Action, sdk.LogFieldError, err)
+		logger.Error("channel_persist_failed", "op", "bulk_"+input.Action, logx.LogFieldError, err)
 		return 0, err
 	}
 	logger.Info("channel_bulk_updated", "action", input.Action, "affected", affected)
@@ -247,7 +247,7 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) (int, e
 // Test 测试渠道连通性：走 relay adaptor 链路发一次真实请求。
 // 成功后记录响应耗时；若渠道处于 disabled_auto 则恢复 enabled 并清 error_msg。
 func (s *Service) Test(ctx context.Context, id int, model, endpoint string) (int, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	ch, err := s.repo.FindByID(ctx, id)
 	if err != nil {
@@ -266,12 +266,12 @@ func (s *Service) Test(ctx context.Context, id int, model, endpoint string) (int
 
 	latency, err := s.tester.Test(ctx, ch, model, endpoint)
 	if err != nil {
-		logger.Warn("channel_test_failed", "channel_id", id, "model", model, sdk.LogFieldError, err)
+		logger.Warn("channel_test_failed", "channel_id", id, "model", model, logx.LogFieldError, err)
 		return 0, fmt.Errorf("%w: %v", ErrTestFailed, err)
 	}
 
 	if err := s.repo.UpdateTestResult(ctx, id, latency, time.Now()); err != nil {
-		logger.Warn("channel_persist_failed", "op", "test_result", "channel_id", id, sdk.LogFieldError, err)
+		logger.Warn("channel_persist_failed", "op", "test_result", "channel_id", id, logx.LogFieldError, err)
 	}
 	// 测试通过 → 自动禁用渠道恢复可用（手动禁用不恢复）。
 	// 重读当前状态再判断：测试窗口（最长 30s）内管理员可能已改为手动禁用，
@@ -279,10 +279,10 @@ func (s *Service) Test(ctx context.Context, id int, model, endpoint string) (int
 	if ch.Status == StatusDisabledAuto {
 		current, err := s.repo.FindByID(ctx, id)
 		if err != nil {
-			logger.Warn("channel_persist_failed", "op", "test_recover_recheck", "channel_id", id, sdk.LogFieldError, err)
+			logger.Warn("channel_persist_failed", "op", "test_recover_recheck", "channel_id", id, logx.LogFieldError, err)
 		} else if current.Status == StatusDisabledAuto {
 			if err := s.repo.UpdateState(ctx, id, StatusEnabled, nil, ""); err != nil {
-				logger.Warn("channel_persist_failed", "op", "test_recover", "channel_id", id, sdk.LogFieldError, err)
+				logger.Warn("channel_persist_failed", "op", "test_recover", "channel_id", id, logx.LogFieldError, err)
 			} else {
 				logger.Info("channel_recovered_by_test", "channel_id", id)
 			}
@@ -295,7 +295,7 @@ func (s *Service) Test(ctx context.Context, id int, model, endpoint string) (int
 
 // FetchModels 从上游拉取模型列表（用渠道第一个 API Key）。成败均写上游请求日志。
 func (s *Service) FetchModels(ctx context.Context, id int) ([]string, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	ch, err := s.repo.FindByID(ctx, id)
 	if err != nil {
@@ -306,7 +306,7 @@ func (s *Service) FetchModels(ctx context.Context, id int) ([]string, error) {
 	}
 	apiKey, err := auth.DecryptAPIKey(ch.APIKeys[0], s.secret)
 	if err != nil {
-		logger.Error("channel_api_key_decrypt_failed", "channel_id", id, sdk.LogFieldError, err)
+		logger.Error("channel_api_key_decrypt_failed", "channel_id", id, logx.LogFieldError, err)
 		return nil, fmt.Errorf("%w: API Key 解密失败", ErrModelFetchFailed)
 	}
 
@@ -325,7 +325,7 @@ func (s *Service) FetchModelsWithKey(ctx context.Context, channelType, baseURL, 
 // 多 key 求和 = 该渠道背后总可用额度；单个 key 查询失败跳过并计入告警，
 // 全部失败才整体报错。仅 openai_compatible 中转站可查（其余返回 ErrBalanceUnsupported）。
 func (s *Service) RefreshBalance(ctx context.Context, id int) (float64, *time.Time, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	ch, err := s.repo.FindByID(ctx, id)
 	if err != nil {
@@ -341,7 +341,7 @@ func (s *Service) RefreshBalance(ctx context.Context, id int) (float64, *time.Ti
 	for _, encrypted := range ch.APIKeys {
 		apiKey, derr := auth.DecryptAPIKey(encrypted, s.secret)
 		if derr != nil {
-			logger.Warn("channel_api_key_decrypt_failed", "channel_id", id, sdk.LogFieldError, derr)
+			logger.Warn("channel_api_key_decrypt_failed", "channel_id", id, logx.LogFieldError, derr)
 			failCount++
 			lastErr = derr
 			continue
@@ -352,7 +352,7 @@ func (s *Service) RefreshBalance(ctx context.Context, id int) (float64, *time.Ti
 			if errors.Is(berr, ErrBalanceUnsupported) {
 				return 0, nil, ErrBalanceUnsupported
 			}
-			logger.Warn("channel_fetch_balance_failed", "channel_id", id, sdk.LogFieldError, berr)
+			logger.Warn("channel_fetch_balance_failed", "channel_id", id, logx.LogFieldError, berr)
 			failCount++
 			lastErr = berr
 			continue
@@ -366,7 +366,7 @@ func (s *Service) RefreshBalance(ctx context.Context, id int) (float64, *time.Ti
 
 	now := time.Now()
 	if err := s.repo.UpdateBalance(ctx, id, total, now); err != nil {
-		logger.Warn("channel_persist_failed", "op", "balance", "channel_id", id, sdk.LogFieldError, err)
+		logger.Warn("channel_persist_failed", "op", "balance", "channel_id", id, logx.LogFieldError, err)
 		return 0, nil, err
 	}
 	if failCount > 0 {
@@ -379,7 +379,7 @@ func (s *Service) RefreshBalance(ctx context.Context, id int) (float64, *time.Ti
 func (s *Service) fetchModels(ctx context.Context, channelType, baseURL, apiKey string) ([]string, error) {
 	models, err := s.fetcher.FetchModels(ctx, channelType, baseURL, apiKey)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Warn("channel_fetch_models_failed", "type", channelType, sdk.LogFieldError, err)
+		logx.LoggerFromContext(ctx).Warn("channel_fetch_models_failed", "type", channelType, logx.LogFieldError, err)
 		return nil, fmt.Errorf("%w: %v", ErrModelFetchFailed, err)
 	}
 	return models, nil
@@ -388,7 +388,7 @@ func (s *Service) fetchModels(ctx context.Context, channelType, baseURL, apiKey 
 // LoadAllForRegistry 实现 registry.Loader：全量加载渠道并
 // 解密 api_keys，产出运行时快照。
 func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelSnapshot, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	items, err := s.repo.ListAll(ctx)
 	if err != nil {
@@ -401,7 +401,7 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelSna
 		for _, encrypted := range ch.APIKeys {
 			plain, err := auth.DecryptAPIKey(encrypted, s.secret)
 			if err != nil {
-				logger.Warn("channel_api_key_decrypt_failed", "channel_id", ch.ID, sdk.LogFieldError, err)
+				logger.Warn("channel_api_key_decrypt_failed", "channel_id", ch.ID, logx.LogFieldError, err)
 				continue
 			}
 			keys = append(keys, plain)
@@ -466,6 +466,10 @@ func (s *Service) encryptKeys(keys []string) ([]string, error) {
 }
 
 // decorate 为领域对象补充解密派生字段（api_key_hints）。
+//
+// 有意保留"列表时逐 key 解密生成 hint"的实现：AES-GCM 解密为纯内存操作
+// （微秒级），渠道数量为管理面小规模数据，代价可忽略；相比 hint 落库省去
+// schema 变更与存量回填。若未来渠道/key 规模显著增长再考虑物化。
 func (s *Service) decorate(ch *Channel) {
 	hints := make([]string, 0, len(ch.APIKeys))
 	for _, encrypted := range ch.APIKeys {
@@ -493,6 +497,6 @@ func (s *Service) reloadRegistry(ctx context.Context) {
 		return
 	}
 	if err := s.reloader.Reload(ctx); err != nil {
-		sdk.LoggerFromContext(ctx).Error("channel_registry_reload_failed", sdk.LogFieldError, err)
+		logx.LoggerFromContext(ctx).Error("channel_registry_reload_failed", logx.LogFieldError, err)
 	}
 }

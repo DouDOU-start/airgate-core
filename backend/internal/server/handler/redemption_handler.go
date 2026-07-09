@@ -122,7 +122,7 @@ func (h *RedemptionHandler) AdminStats(c *gin.Context) {
 
 // AdminUpdateStatus 停用/恢复兑换码。
 func (h *RedemptionHandler) AdminUpdateStatus(c *gin.Context) {
-	id, err := parseRedemptionID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的兑换码 ID")
 		return
@@ -141,7 +141,7 @@ func (h *RedemptionHandler) AdminUpdateStatus(c *gin.Context) {
 
 // AdminDeleteCode 删除兑换码（已使用的码不可删除）。
 func (h *RedemptionHandler) AdminDeleteCode(c *gin.Context) {
-	id, err := parseRedemptionID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的兑换码 ID")
 		return
@@ -174,9 +174,6 @@ func (h *RedemptionHandler) Redeem(c *gin.Context) {
 	}
 	response.Success(c, dto.RedeemResp{Value: result.Value, Balance: result.Balance})
 }
-
-// parseRedemptionID 解析兑换码 ID，委托给公共 ParseID。
-var parseRedemptionID = ParseID
 
 // respondRedemptionError 域错误 → HTTP 响应（业务类 4xx，系统类 500 且不外泄细节）。
 func (h *RedemptionHandler) respondRedemptionError(c *gin.Context, logMessage string, err error) {

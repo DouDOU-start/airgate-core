@@ -21,6 +21,7 @@ type OAuthClientQuery struct {
 	order      []oauthclient.OrderOption
 	inters     []Interceptor
 	predicates []predicate.OAuthClient
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -342,6 +343,9 @@ func (ocq *OAuthClientQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 		nodes = append(nodes, node)
 		return node.assignValues(columns, values)
 	}
+	if len(ocq.modifiers) > 0 {
+		_spec.Modifiers = ocq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -356,6 +360,9 @@ func (ocq *OAuthClientQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 
 func (ocq *OAuthClientQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := ocq.querySpec()
+	if len(ocq.modifiers) > 0 {
+		_spec.Modifiers = ocq.modifiers
+	}
 	_spec.Node.Columns = ocq.ctx.Fields
 	if len(ocq.ctx.Fields) > 0 {
 		_spec.Unique = ocq.ctx.Unique != nil && *ocq.ctx.Unique
@@ -418,6 +425,9 @@ func (ocq *OAuthClientQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if ocq.ctx.Unique != nil && *ocq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range ocq.modifiers {
+		m(selector)
+	}
 	for _, p := range ocq.predicates {
 		p(selector)
 	}
@@ -433,6 +443,12 @@ func (ocq *OAuthClientQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ocq *OAuthClientQuery) Modify(modifiers ...func(s *sql.Selector)) *OAuthClientSelect {
+	ocq.modifiers = append(ocq.modifiers, modifiers...)
+	return ocq.Select()
 }
 
 // OAuthClientGroupBy is the group-by builder for OAuthClient entities.
@@ -523,4 +539,10 @@ func (ocs *OAuthClientSelect) sqlScan(ctx context.Context, root *OAuthClientQuer
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ocs *OAuthClientSelect) Modify(modifiers ...func(s *sql.Selector)) *OAuthClientSelect {
+	ocs.modifiers = append(ocs.modifiers, modifiers...)
+	return ocs
 }

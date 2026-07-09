@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
@@ -19,6 +20,7 @@ type ModelTagCreate struct {
 	config
 	mutation *ModelTagMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetName sets the "name" field.
@@ -157,6 +159,7 @@ func (mtc *ModelTagCreate) createSpec() (*ModelTag, *sqlgraph.CreateSpec) {
 		_node = &ModelTag{config: mtc.config}
 		_spec = sqlgraph.NewCreateSpec(modeltag.Table, sqlgraph.NewFieldSpec(modeltag.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = mtc.conflict
 	if value, ok := mtc.mutation.Name(); ok {
 		_spec.SetField(modeltag.FieldName, field.TypeString, value)
 		_node.Name = value
@@ -188,11 +191,191 @@ func (mtc *ModelTagCreate) createSpec() (*ModelTag, *sqlgraph.CreateSpec) {
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.ModelTag.Create().
+//		SetName(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.ModelTagUpsert) {
+//			SetName(v+v).
+//		}).
+//		Exec(ctx)
+func (mtc *ModelTagCreate) OnConflict(opts ...sql.ConflictOption) *ModelTagUpsertOne {
+	mtc.conflict = opts
+	return &ModelTagUpsertOne{
+		create: mtc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.ModelTag.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (mtc *ModelTagCreate) OnConflictColumns(columns ...string) *ModelTagUpsertOne {
+	mtc.conflict = append(mtc.conflict, sql.ConflictColumns(columns...))
+	return &ModelTagUpsertOne{
+		create: mtc,
+	}
+}
+
+type (
+	// ModelTagUpsertOne is the builder for "upsert"-ing
+	//  one ModelTag node.
+	ModelTagUpsertOne struct {
+		create *ModelTagCreate
+	}
+
+	// ModelTagUpsert is the "OnConflict" setter.
+	ModelTagUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetName sets the "name" field.
+func (u *ModelTagUpsert) SetName(v string) *ModelTagUpsert {
+	u.Set(modeltag.FieldName, v)
+	return u
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *ModelTagUpsert) UpdateName() *ModelTagUpsert {
+	u.SetExcluded(modeltag.FieldName)
+	return u
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *ModelTagUpsert) SetUpdatedAt(v time.Time) *ModelTagUpsert {
+	u.Set(modeltag.FieldUpdatedAt, v)
+	return u
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *ModelTagUpsert) UpdateUpdatedAt() *ModelTagUpsert {
+	u.SetExcluded(modeltag.FieldUpdatedAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.ModelTag.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *ModelTagUpsertOne) UpdateNewValues() *ModelTagUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(modeltag.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.ModelTag.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *ModelTagUpsertOne) Ignore() *ModelTagUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *ModelTagUpsertOne) DoNothing() *ModelTagUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the ModelTagCreate.OnConflict
+// documentation for more info.
+func (u *ModelTagUpsertOne) Update(set func(*ModelTagUpsert)) *ModelTagUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&ModelTagUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetName sets the "name" field.
+func (u *ModelTagUpsertOne) SetName(v string) *ModelTagUpsertOne {
+	return u.Update(func(s *ModelTagUpsert) {
+		s.SetName(v)
+	})
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *ModelTagUpsertOne) UpdateName() *ModelTagUpsertOne {
+	return u.Update(func(s *ModelTagUpsert) {
+		s.UpdateName()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *ModelTagUpsertOne) SetUpdatedAt(v time.Time) *ModelTagUpsertOne {
+	return u.Update(func(s *ModelTagUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *ModelTagUpsertOne) UpdateUpdatedAt() *ModelTagUpsertOne {
+	return u.Update(func(s *ModelTagUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *ModelTagUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for ModelTagCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *ModelTagUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *ModelTagUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *ModelTagUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // ModelTagCreateBulk is the builder for creating many ModelTag entities in bulk.
 type ModelTagCreateBulk struct {
 	config
 	err      error
 	builders []*ModelTagCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the ModelTag entities in the database.
@@ -222,6 +405,7 @@ func (mtcb *ModelTagCreateBulk) Save(ctx context.Context) ([]*ModelTag, error) {
 					_, err = mutators[i+1].Mutate(root, mtcb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = mtcb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, mtcb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -272,6 +456,145 @@ func (mtcb *ModelTagCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (mtcb *ModelTagCreateBulk) ExecX(ctx context.Context) {
 	if err := mtcb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.ModelTag.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.ModelTagUpsert) {
+//			SetName(v+v).
+//		}).
+//		Exec(ctx)
+func (mtcb *ModelTagCreateBulk) OnConflict(opts ...sql.ConflictOption) *ModelTagUpsertBulk {
+	mtcb.conflict = opts
+	return &ModelTagUpsertBulk{
+		create: mtcb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.ModelTag.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (mtcb *ModelTagCreateBulk) OnConflictColumns(columns ...string) *ModelTagUpsertBulk {
+	mtcb.conflict = append(mtcb.conflict, sql.ConflictColumns(columns...))
+	return &ModelTagUpsertBulk{
+		create: mtcb,
+	}
+}
+
+// ModelTagUpsertBulk is the builder for "upsert"-ing
+// a bulk of ModelTag nodes.
+type ModelTagUpsertBulk struct {
+	create *ModelTagCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.ModelTag.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *ModelTagUpsertBulk) UpdateNewValues() *ModelTagUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(modeltag.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.ModelTag.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *ModelTagUpsertBulk) Ignore() *ModelTagUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *ModelTagUpsertBulk) DoNothing() *ModelTagUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the ModelTagCreateBulk.OnConflict
+// documentation for more info.
+func (u *ModelTagUpsertBulk) Update(set func(*ModelTagUpsert)) *ModelTagUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&ModelTagUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetName sets the "name" field.
+func (u *ModelTagUpsertBulk) SetName(v string) *ModelTagUpsertBulk {
+	return u.Update(func(s *ModelTagUpsert) {
+		s.SetName(v)
+	})
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *ModelTagUpsertBulk) UpdateName() *ModelTagUpsertBulk {
+	return u.Update(func(s *ModelTagUpsert) {
+		s.UpdateName()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *ModelTagUpsertBulk) SetUpdatedAt(v time.Time) *ModelTagUpsertBulk {
+	return u.Update(func(s *ModelTagUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *ModelTagUpsertBulk) UpdateUpdatedAt() *ModelTagUpsertBulk {
+	return u.Update(func(s *ModelTagUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *ModelTagUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the ModelTagCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for ModelTagCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *ModelTagUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

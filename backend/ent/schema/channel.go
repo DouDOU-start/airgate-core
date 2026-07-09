@@ -22,7 +22,7 @@ type Channel struct {
 func (Channel) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").NotEmpty(),
-		field.Enum("type").Values("openai_compatible", "anthropic", "gemini"),
+		field.Enum("type").Values("openai_compatible", "anthropic", "gemini", "custom"),
 		field.String("base_url").NotEmpty(),
 		// api_keys 存元素级 AES-GCM 密文（base64），加解密由 service 层负责，schema 不管加密。
 		field.JSON("api_keys", []string{}).Default([]string{}).Sensitive(),

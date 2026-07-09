@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
@@ -19,6 +20,7 @@ type ModelPriceCreate struct {
 	config
 	mutation *ModelPriceMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetModel sets the "model" field.
@@ -293,6 +295,7 @@ func (mpc *ModelPriceCreate) createSpec() (*ModelPrice, *sqlgraph.CreateSpec) {
 		_node = &ModelPrice{config: mpc.config}
 		_spec = sqlgraph.NewCreateSpec(modelprice.Table, sqlgraph.NewFieldSpec(modelprice.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = mpc.conflict
 	if value, ok := mpc.mutation.Model(); ok {
 		_spec.SetField(modelprice.FieldModel, field.TypeString, value)
 		_node.Model = value
@@ -353,11 +356,503 @@ func (mpc *ModelPriceCreate) createSpec() (*ModelPrice, *sqlgraph.CreateSpec) {
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.ModelPrice.Create().
+//		SetModel(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.ModelPriceUpsert) {
+//			SetModel(v+v).
+//		}).
+//		Exec(ctx)
+func (mpc *ModelPriceCreate) OnConflict(opts ...sql.ConflictOption) *ModelPriceUpsertOne {
+	mpc.conflict = opts
+	return &ModelPriceUpsertOne{
+		create: mpc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.ModelPrice.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (mpc *ModelPriceCreate) OnConflictColumns(columns ...string) *ModelPriceUpsertOne {
+	mpc.conflict = append(mpc.conflict, sql.ConflictColumns(columns...))
+	return &ModelPriceUpsertOne{
+		create: mpc,
+	}
+}
+
+type (
+	// ModelPriceUpsertOne is the builder for "upsert"-ing
+	//  one ModelPrice node.
+	ModelPriceUpsertOne struct {
+		create *ModelPriceCreate
+	}
+
+	// ModelPriceUpsert is the "OnConflict" setter.
+	ModelPriceUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetModel sets the "model" field.
+func (u *ModelPriceUpsert) SetModel(v string) *ModelPriceUpsert {
+	u.Set(modelprice.FieldModel, v)
+	return u
+}
+
+// UpdateModel sets the "model" field to the value that was provided on create.
+func (u *ModelPriceUpsert) UpdateModel() *ModelPriceUpsert {
+	u.SetExcluded(modelprice.FieldModel)
+	return u
+}
+
+// SetInputPrice sets the "input_price" field.
+func (u *ModelPriceUpsert) SetInputPrice(v float64) *ModelPriceUpsert {
+	u.Set(modelprice.FieldInputPrice, v)
+	return u
+}
+
+// UpdateInputPrice sets the "input_price" field to the value that was provided on create.
+func (u *ModelPriceUpsert) UpdateInputPrice() *ModelPriceUpsert {
+	u.SetExcluded(modelprice.FieldInputPrice)
+	return u
+}
+
+// AddInputPrice adds v to the "input_price" field.
+func (u *ModelPriceUpsert) AddInputPrice(v float64) *ModelPriceUpsert {
+	u.Add(modelprice.FieldInputPrice, v)
+	return u
+}
+
+// SetOutputPrice sets the "output_price" field.
+func (u *ModelPriceUpsert) SetOutputPrice(v float64) *ModelPriceUpsert {
+	u.Set(modelprice.FieldOutputPrice, v)
+	return u
+}
+
+// UpdateOutputPrice sets the "output_price" field to the value that was provided on create.
+func (u *ModelPriceUpsert) UpdateOutputPrice() *ModelPriceUpsert {
+	u.SetExcluded(modelprice.FieldOutputPrice)
+	return u
+}
+
+// AddOutputPrice adds v to the "output_price" field.
+func (u *ModelPriceUpsert) AddOutputPrice(v float64) *ModelPriceUpsert {
+	u.Add(modelprice.FieldOutputPrice, v)
+	return u
+}
+
+// SetCachedInputPrice sets the "cached_input_price" field.
+func (u *ModelPriceUpsert) SetCachedInputPrice(v float64) *ModelPriceUpsert {
+	u.Set(modelprice.FieldCachedInputPrice, v)
+	return u
+}
+
+// UpdateCachedInputPrice sets the "cached_input_price" field to the value that was provided on create.
+func (u *ModelPriceUpsert) UpdateCachedInputPrice() *ModelPriceUpsert {
+	u.SetExcluded(modelprice.FieldCachedInputPrice)
+	return u
+}
+
+// AddCachedInputPrice adds v to the "cached_input_price" field.
+func (u *ModelPriceUpsert) AddCachedInputPrice(v float64) *ModelPriceUpsert {
+	u.Add(modelprice.FieldCachedInputPrice, v)
+	return u
+}
+
+// SetCacheCreationPrice sets the "cache_creation_price" field.
+func (u *ModelPriceUpsert) SetCacheCreationPrice(v float64) *ModelPriceUpsert {
+	u.Set(modelprice.FieldCacheCreationPrice, v)
+	return u
+}
+
+// UpdateCacheCreationPrice sets the "cache_creation_price" field to the value that was provided on create.
+func (u *ModelPriceUpsert) UpdateCacheCreationPrice() *ModelPriceUpsert {
+	u.SetExcluded(modelprice.FieldCacheCreationPrice)
+	return u
+}
+
+// AddCacheCreationPrice adds v to the "cache_creation_price" field.
+func (u *ModelPriceUpsert) AddCacheCreationPrice(v float64) *ModelPriceUpsert {
+	u.Add(modelprice.FieldCacheCreationPrice, v)
+	return u
+}
+
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (u *ModelPriceUpsert) SetCacheCreation1hPrice(v float64) *ModelPriceUpsert {
+	u.Set(modelprice.FieldCacheCreation1hPrice, v)
+	return u
+}
+
+// UpdateCacheCreation1hPrice sets the "cache_creation_1h_price" field to the value that was provided on create.
+func (u *ModelPriceUpsert) UpdateCacheCreation1hPrice() *ModelPriceUpsert {
+	u.SetExcluded(modelprice.FieldCacheCreation1hPrice)
+	return u
+}
+
+// AddCacheCreation1hPrice adds v to the "cache_creation_1h_price" field.
+func (u *ModelPriceUpsert) AddCacheCreation1hPrice(v float64) *ModelPriceUpsert {
+	u.Add(modelprice.FieldCacheCreation1hPrice, v)
+	return u
+}
+
+// SetPerRequestPrice sets the "per_request_price" field.
+func (u *ModelPriceUpsert) SetPerRequestPrice(v float64) *ModelPriceUpsert {
+	u.Set(modelprice.FieldPerRequestPrice, v)
+	return u
+}
+
+// UpdatePerRequestPrice sets the "per_request_price" field to the value that was provided on create.
+func (u *ModelPriceUpsert) UpdatePerRequestPrice() *ModelPriceUpsert {
+	u.SetExcluded(modelprice.FieldPerRequestPrice)
+	return u
+}
+
+// AddPerRequestPrice adds v to the "per_request_price" field.
+func (u *ModelPriceUpsert) AddPerRequestPrice(v float64) *ModelPriceUpsert {
+	u.Add(modelprice.FieldPerRequestPrice, v)
+	return u
+}
+
+// SetPricingExtra sets the "pricing_extra" field.
+func (u *ModelPriceUpsert) SetPricingExtra(v map[string]interface{}) *ModelPriceUpsert {
+	u.Set(modelprice.FieldPricingExtra, v)
+	return u
+}
+
+// UpdatePricingExtra sets the "pricing_extra" field to the value that was provided on create.
+func (u *ModelPriceUpsert) UpdatePricingExtra() *ModelPriceUpsert {
+	u.SetExcluded(modelprice.FieldPricingExtra)
+	return u
+}
+
+// ClearPricingExtra clears the value of the "pricing_extra" field.
+func (u *ModelPriceUpsert) ClearPricingExtra() *ModelPriceUpsert {
+	u.SetNull(modelprice.FieldPricingExtra)
+	return u
+}
+
+// SetTagID sets the "tag_id" field.
+func (u *ModelPriceUpsert) SetTagID(v int) *ModelPriceUpsert {
+	u.Set(modelprice.FieldTagID, v)
+	return u
+}
+
+// UpdateTagID sets the "tag_id" field to the value that was provided on create.
+func (u *ModelPriceUpsert) UpdateTagID() *ModelPriceUpsert {
+	u.SetExcluded(modelprice.FieldTagID)
+	return u
+}
+
+// ClearTagID clears the value of the "tag_id" field.
+func (u *ModelPriceUpsert) ClearTagID() *ModelPriceUpsert {
+	u.SetNull(modelprice.FieldTagID)
+	return u
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *ModelPriceUpsert) SetUpdatedAt(v time.Time) *ModelPriceUpsert {
+	u.Set(modelprice.FieldUpdatedAt, v)
+	return u
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *ModelPriceUpsert) UpdateUpdatedAt() *ModelPriceUpsert {
+	u.SetExcluded(modelprice.FieldUpdatedAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.ModelPrice.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *ModelPriceUpsertOne) UpdateNewValues() *ModelPriceUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(modelprice.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.ModelPrice.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *ModelPriceUpsertOne) Ignore() *ModelPriceUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *ModelPriceUpsertOne) DoNothing() *ModelPriceUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the ModelPriceCreate.OnConflict
+// documentation for more info.
+func (u *ModelPriceUpsertOne) Update(set func(*ModelPriceUpsert)) *ModelPriceUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&ModelPriceUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetModel sets the "model" field.
+func (u *ModelPriceUpsertOne) SetModel(v string) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetModel(v)
+	})
+}
+
+// UpdateModel sets the "model" field to the value that was provided on create.
+func (u *ModelPriceUpsertOne) UpdateModel() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateModel()
+	})
+}
+
+// SetInputPrice sets the "input_price" field.
+func (u *ModelPriceUpsertOne) SetInputPrice(v float64) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetInputPrice(v)
+	})
+}
+
+// AddInputPrice adds v to the "input_price" field.
+func (u *ModelPriceUpsertOne) AddInputPrice(v float64) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.AddInputPrice(v)
+	})
+}
+
+// UpdateInputPrice sets the "input_price" field to the value that was provided on create.
+func (u *ModelPriceUpsertOne) UpdateInputPrice() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateInputPrice()
+	})
+}
+
+// SetOutputPrice sets the "output_price" field.
+func (u *ModelPriceUpsertOne) SetOutputPrice(v float64) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetOutputPrice(v)
+	})
+}
+
+// AddOutputPrice adds v to the "output_price" field.
+func (u *ModelPriceUpsertOne) AddOutputPrice(v float64) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.AddOutputPrice(v)
+	})
+}
+
+// UpdateOutputPrice sets the "output_price" field to the value that was provided on create.
+func (u *ModelPriceUpsertOne) UpdateOutputPrice() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateOutputPrice()
+	})
+}
+
+// SetCachedInputPrice sets the "cached_input_price" field.
+func (u *ModelPriceUpsertOne) SetCachedInputPrice(v float64) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetCachedInputPrice(v)
+	})
+}
+
+// AddCachedInputPrice adds v to the "cached_input_price" field.
+func (u *ModelPriceUpsertOne) AddCachedInputPrice(v float64) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.AddCachedInputPrice(v)
+	})
+}
+
+// UpdateCachedInputPrice sets the "cached_input_price" field to the value that was provided on create.
+func (u *ModelPriceUpsertOne) UpdateCachedInputPrice() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateCachedInputPrice()
+	})
+}
+
+// SetCacheCreationPrice sets the "cache_creation_price" field.
+func (u *ModelPriceUpsertOne) SetCacheCreationPrice(v float64) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetCacheCreationPrice(v)
+	})
+}
+
+// AddCacheCreationPrice adds v to the "cache_creation_price" field.
+func (u *ModelPriceUpsertOne) AddCacheCreationPrice(v float64) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.AddCacheCreationPrice(v)
+	})
+}
+
+// UpdateCacheCreationPrice sets the "cache_creation_price" field to the value that was provided on create.
+func (u *ModelPriceUpsertOne) UpdateCacheCreationPrice() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateCacheCreationPrice()
+	})
+}
+
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (u *ModelPriceUpsertOne) SetCacheCreation1hPrice(v float64) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetCacheCreation1hPrice(v)
+	})
+}
+
+// AddCacheCreation1hPrice adds v to the "cache_creation_1h_price" field.
+func (u *ModelPriceUpsertOne) AddCacheCreation1hPrice(v float64) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.AddCacheCreation1hPrice(v)
+	})
+}
+
+// UpdateCacheCreation1hPrice sets the "cache_creation_1h_price" field to the value that was provided on create.
+func (u *ModelPriceUpsertOne) UpdateCacheCreation1hPrice() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateCacheCreation1hPrice()
+	})
+}
+
+// SetPerRequestPrice sets the "per_request_price" field.
+func (u *ModelPriceUpsertOne) SetPerRequestPrice(v float64) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetPerRequestPrice(v)
+	})
+}
+
+// AddPerRequestPrice adds v to the "per_request_price" field.
+func (u *ModelPriceUpsertOne) AddPerRequestPrice(v float64) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.AddPerRequestPrice(v)
+	})
+}
+
+// UpdatePerRequestPrice sets the "per_request_price" field to the value that was provided on create.
+func (u *ModelPriceUpsertOne) UpdatePerRequestPrice() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdatePerRequestPrice()
+	})
+}
+
+// SetPricingExtra sets the "pricing_extra" field.
+func (u *ModelPriceUpsertOne) SetPricingExtra(v map[string]interface{}) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetPricingExtra(v)
+	})
+}
+
+// UpdatePricingExtra sets the "pricing_extra" field to the value that was provided on create.
+func (u *ModelPriceUpsertOne) UpdatePricingExtra() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdatePricingExtra()
+	})
+}
+
+// ClearPricingExtra clears the value of the "pricing_extra" field.
+func (u *ModelPriceUpsertOne) ClearPricingExtra() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.ClearPricingExtra()
+	})
+}
+
+// SetTagID sets the "tag_id" field.
+func (u *ModelPriceUpsertOne) SetTagID(v int) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetTagID(v)
+	})
+}
+
+// UpdateTagID sets the "tag_id" field to the value that was provided on create.
+func (u *ModelPriceUpsertOne) UpdateTagID() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateTagID()
+	})
+}
+
+// ClearTagID clears the value of the "tag_id" field.
+func (u *ModelPriceUpsertOne) ClearTagID() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.ClearTagID()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *ModelPriceUpsertOne) SetUpdatedAt(v time.Time) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *ModelPriceUpsertOne) UpdateUpdatedAt() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *ModelPriceUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for ModelPriceCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *ModelPriceUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *ModelPriceUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *ModelPriceUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // ModelPriceCreateBulk is the builder for creating many ModelPrice entities in bulk.
 type ModelPriceCreateBulk struct {
 	config
 	err      error
 	builders []*ModelPriceCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the ModelPrice entities in the database.
@@ -387,6 +882,7 @@ func (mpcb *ModelPriceCreateBulk) Save(ctx context.Context) ([]*ModelPrice, erro
 					_, err = mutators[i+1].Mutate(root, mpcb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = mpcb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, mpcb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -437,6 +933,313 @@ func (mpcb *ModelPriceCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (mpcb *ModelPriceCreateBulk) ExecX(ctx context.Context) {
 	if err := mpcb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.ModelPrice.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.ModelPriceUpsert) {
+//			SetModel(v+v).
+//		}).
+//		Exec(ctx)
+func (mpcb *ModelPriceCreateBulk) OnConflict(opts ...sql.ConflictOption) *ModelPriceUpsertBulk {
+	mpcb.conflict = opts
+	return &ModelPriceUpsertBulk{
+		create: mpcb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.ModelPrice.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (mpcb *ModelPriceCreateBulk) OnConflictColumns(columns ...string) *ModelPriceUpsertBulk {
+	mpcb.conflict = append(mpcb.conflict, sql.ConflictColumns(columns...))
+	return &ModelPriceUpsertBulk{
+		create: mpcb,
+	}
+}
+
+// ModelPriceUpsertBulk is the builder for "upsert"-ing
+// a bulk of ModelPrice nodes.
+type ModelPriceUpsertBulk struct {
+	create *ModelPriceCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.ModelPrice.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *ModelPriceUpsertBulk) UpdateNewValues() *ModelPriceUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(modelprice.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.ModelPrice.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *ModelPriceUpsertBulk) Ignore() *ModelPriceUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *ModelPriceUpsertBulk) DoNothing() *ModelPriceUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the ModelPriceCreateBulk.OnConflict
+// documentation for more info.
+func (u *ModelPriceUpsertBulk) Update(set func(*ModelPriceUpsert)) *ModelPriceUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&ModelPriceUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetModel sets the "model" field.
+func (u *ModelPriceUpsertBulk) SetModel(v string) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetModel(v)
+	})
+}
+
+// UpdateModel sets the "model" field to the value that was provided on create.
+func (u *ModelPriceUpsertBulk) UpdateModel() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateModel()
+	})
+}
+
+// SetInputPrice sets the "input_price" field.
+func (u *ModelPriceUpsertBulk) SetInputPrice(v float64) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetInputPrice(v)
+	})
+}
+
+// AddInputPrice adds v to the "input_price" field.
+func (u *ModelPriceUpsertBulk) AddInputPrice(v float64) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.AddInputPrice(v)
+	})
+}
+
+// UpdateInputPrice sets the "input_price" field to the value that was provided on create.
+func (u *ModelPriceUpsertBulk) UpdateInputPrice() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateInputPrice()
+	})
+}
+
+// SetOutputPrice sets the "output_price" field.
+func (u *ModelPriceUpsertBulk) SetOutputPrice(v float64) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetOutputPrice(v)
+	})
+}
+
+// AddOutputPrice adds v to the "output_price" field.
+func (u *ModelPriceUpsertBulk) AddOutputPrice(v float64) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.AddOutputPrice(v)
+	})
+}
+
+// UpdateOutputPrice sets the "output_price" field to the value that was provided on create.
+func (u *ModelPriceUpsertBulk) UpdateOutputPrice() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateOutputPrice()
+	})
+}
+
+// SetCachedInputPrice sets the "cached_input_price" field.
+func (u *ModelPriceUpsertBulk) SetCachedInputPrice(v float64) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetCachedInputPrice(v)
+	})
+}
+
+// AddCachedInputPrice adds v to the "cached_input_price" field.
+func (u *ModelPriceUpsertBulk) AddCachedInputPrice(v float64) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.AddCachedInputPrice(v)
+	})
+}
+
+// UpdateCachedInputPrice sets the "cached_input_price" field to the value that was provided on create.
+func (u *ModelPriceUpsertBulk) UpdateCachedInputPrice() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateCachedInputPrice()
+	})
+}
+
+// SetCacheCreationPrice sets the "cache_creation_price" field.
+func (u *ModelPriceUpsertBulk) SetCacheCreationPrice(v float64) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetCacheCreationPrice(v)
+	})
+}
+
+// AddCacheCreationPrice adds v to the "cache_creation_price" field.
+func (u *ModelPriceUpsertBulk) AddCacheCreationPrice(v float64) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.AddCacheCreationPrice(v)
+	})
+}
+
+// UpdateCacheCreationPrice sets the "cache_creation_price" field to the value that was provided on create.
+func (u *ModelPriceUpsertBulk) UpdateCacheCreationPrice() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateCacheCreationPrice()
+	})
+}
+
+// SetCacheCreation1hPrice sets the "cache_creation_1h_price" field.
+func (u *ModelPriceUpsertBulk) SetCacheCreation1hPrice(v float64) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetCacheCreation1hPrice(v)
+	})
+}
+
+// AddCacheCreation1hPrice adds v to the "cache_creation_1h_price" field.
+func (u *ModelPriceUpsertBulk) AddCacheCreation1hPrice(v float64) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.AddCacheCreation1hPrice(v)
+	})
+}
+
+// UpdateCacheCreation1hPrice sets the "cache_creation_1h_price" field to the value that was provided on create.
+func (u *ModelPriceUpsertBulk) UpdateCacheCreation1hPrice() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateCacheCreation1hPrice()
+	})
+}
+
+// SetPerRequestPrice sets the "per_request_price" field.
+func (u *ModelPriceUpsertBulk) SetPerRequestPrice(v float64) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetPerRequestPrice(v)
+	})
+}
+
+// AddPerRequestPrice adds v to the "per_request_price" field.
+func (u *ModelPriceUpsertBulk) AddPerRequestPrice(v float64) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.AddPerRequestPrice(v)
+	})
+}
+
+// UpdatePerRequestPrice sets the "per_request_price" field to the value that was provided on create.
+func (u *ModelPriceUpsertBulk) UpdatePerRequestPrice() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdatePerRequestPrice()
+	})
+}
+
+// SetPricingExtra sets the "pricing_extra" field.
+func (u *ModelPriceUpsertBulk) SetPricingExtra(v map[string]interface{}) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetPricingExtra(v)
+	})
+}
+
+// UpdatePricingExtra sets the "pricing_extra" field to the value that was provided on create.
+func (u *ModelPriceUpsertBulk) UpdatePricingExtra() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdatePricingExtra()
+	})
+}
+
+// ClearPricingExtra clears the value of the "pricing_extra" field.
+func (u *ModelPriceUpsertBulk) ClearPricingExtra() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.ClearPricingExtra()
+	})
+}
+
+// SetTagID sets the "tag_id" field.
+func (u *ModelPriceUpsertBulk) SetTagID(v int) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetTagID(v)
+	})
+}
+
+// UpdateTagID sets the "tag_id" field to the value that was provided on create.
+func (u *ModelPriceUpsertBulk) UpdateTagID() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateTagID()
+	})
+}
+
+// ClearTagID clears the value of the "tag_id" field.
+func (u *ModelPriceUpsertBulk) ClearTagID() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.ClearTagID()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *ModelPriceUpsertBulk) SetUpdatedAt(v time.Time) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *ModelPriceUpsertBulk) UpdateUpdatedAt() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *ModelPriceUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the ModelPriceCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for ModelPriceCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *ModelPriceUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

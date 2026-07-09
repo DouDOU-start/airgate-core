@@ -253,7 +253,12 @@ func (s *RedemptionStore) Redeem(ctx context.Context, code string, userID int, n
 		return zero, appredemption.ErrCodeExpired
 	}
 
-	usr, err := tx.User.Query().Where(entuser.IDEQ(userID)).Only(ctx)
+	// 行锁重读余额（Postgres FOR UPDATE），保证流水 before/after 与真实变更一致；
+	// 入账本身走增量 UPDATE，与计费侧 AddBalance(-cost) 并发时不会丢失更新。
+	usr, err := tx.User.Query().
+		Where(entuser.IDEQ(userID)).
+		Where(forUpdateLock).
+		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return zero, appredemption.ErrUserNotFound
@@ -281,7 +286,7 @@ func (s *RedemptionStore) Redeem(ctx context.Context, code string, userID int, n
 
 	before := usr.Balance
 	after := before + item.Value
-	if _, err := tx.User.UpdateOneID(usr.ID).SetBalance(after).Save(ctx); err != nil {
+	if _, err := tx.User.UpdateOneID(usr.ID).AddBalance(item.Value).Save(ctx); err != nil {
 		return zero, err
 	}
 

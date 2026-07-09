@@ -8,7 +8,7 @@ import (
 	"net/smtp"
 	"strings"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
 )
@@ -77,7 +77,7 @@ func (m *Mailer) Send(to, subject, body string) error {
 			"host", m.cfg.Host,
 			"port", m.cfg.Port,
 			"use_tls", m.cfg.UseTLS,
-			sdk.LogFieldError, err)
+			logx.LogFieldError, err)
 		return err
 	}
 	slog.Info("mail_sent",
@@ -90,21 +90,21 @@ func (m *Mailer) Send(to, subject, body string) error {
 func (m *Mailer) sendTLS(addr string, auth smtp.Auth, to string, msg []byte) error {
 	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: m.cfg.Host})
 	if err != nil {
-		slog.Error("smtp_connect_failed", "host", m.cfg.Host, "port", m.cfg.Port, sdk.LogFieldError, err)
+		slog.Error("smtp_connect_failed", "host", m.cfg.Host, "port", m.cfg.Port, logx.LogFieldError, err)
 		return fmt.Errorf("TLS dial: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
 
 	client, err := smtp.NewClient(conn, m.cfg.Host)
 	if err != nil {
-		slog.Error("smtp_connect_failed", "host", m.cfg.Host, "port", m.cfg.Port, sdk.LogFieldError, err)
+		slog.Error("smtp_connect_failed", "host", m.cfg.Host, "port", m.cfg.Port, logx.LogFieldError, err)
 		return fmt.Errorf("SMTP client: %w", err)
 	}
 	defer func() { _ = client.Close() }()
 
 	if auth != nil {
 		if err := client.Auth(auth); err != nil {
-			slog.Error("smtp_auth_failed", "host", m.cfg.Host, sdk.LogFieldError, err)
+			slog.Error("smtp_auth_failed", "host", m.cfg.Host, logx.LogFieldError, err)
 			return fmt.Errorf("SMTP auth: %w", err)
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/upstreamrequestlog"
@@ -19,6 +20,7 @@ type UpstreamRequestLogCreate struct {
 	config
 	mutation *UpstreamRequestLogMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetRequestID sets the "request_id" field.
@@ -561,6 +563,7 @@ func (urlc *UpstreamRequestLogCreate) createSpec() (*UpstreamRequestLog, *sqlgra
 		_node = &UpstreamRequestLog{config: urlc.config}
 		_spec = sqlgraph.NewCreateSpec(upstreamrequestlog.Table, sqlgraph.NewFieldSpec(upstreamrequestlog.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = urlc.conflict
 	if value, ok := urlc.mutation.RequestID(); ok {
 		_spec.SetField(upstreamrequestlog.FieldRequestID, field.TypeString, value)
 		_node.RequestID = value
@@ -660,11 +663,854 @@ func (urlc *UpstreamRequestLogCreate) createSpec() (*UpstreamRequestLog, *sqlgra
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.UpstreamRequestLog.Create().
+//		SetRequestID(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.UpstreamRequestLogUpsert) {
+//			SetRequestID(v+v).
+//		}).
+//		Exec(ctx)
+func (urlc *UpstreamRequestLogCreate) OnConflict(opts ...sql.ConflictOption) *UpstreamRequestLogUpsertOne {
+	urlc.conflict = opts
+	return &UpstreamRequestLogUpsertOne{
+		create: urlc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.UpstreamRequestLog.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (urlc *UpstreamRequestLogCreate) OnConflictColumns(columns ...string) *UpstreamRequestLogUpsertOne {
+	urlc.conflict = append(urlc.conflict, sql.ConflictColumns(columns...))
+	return &UpstreamRequestLogUpsertOne{
+		create: urlc,
+	}
+}
+
+type (
+	// UpstreamRequestLogUpsertOne is the builder for "upsert"-ing
+	//  one UpstreamRequestLog node.
+	UpstreamRequestLogUpsertOne struct {
+		create *UpstreamRequestLogCreate
+	}
+
+	// UpstreamRequestLogUpsert is the "OnConflict" setter.
+	UpstreamRequestLogUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetRequestID sets the "request_id" field.
+func (u *UpstreamRequestLogUpsert) SetRequestID(v string) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldRequestID, v)
+	return u
+}
+
+// UpdateRequestID sets the "request_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateRequestID() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldRequestID)
+	return u
+}
+
+// SetSource sets the "source" field.
+func (u *UpstreamRequestLogUpsert) SetSource(v upstreamrequestlog.Source) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldSource, v)
+	return u
+}
+
+// UpdateSource sets the "source" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateSource() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldSource)
+	return u
+}
+
+// SetPhase sets the "phase" field.
+func (u *UpstreamRequestLogUpsert) SetPhase(v string) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldPhase, v)
+	return u
+}
+
+// UpdatePhase sets the "phase" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdatePhase() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldPhase)
+	return u
+}
+
+// SetStatusCode sets the "status_code" field.
+func (u *UpstreamRequestLogUpsert) SetStatusCode(v int) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldStatusCode, v)
+	return u
+}
+
+// UpdateStatusCode sets the "status_code" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateStatusCode() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldStatusCode)
+	return u
+}
+
+// AddStatusCode adds v to the "status_code" field.
+func (u *UpstreamRequestLogUpsert) AddStatusCode(v int) *UpstreamRequestLogUpsert {
+	u.Add(upstreamrequestlog.FieldStatusCode, v)
+	return u
+}
+
+// SetErrorType sets the "error_type" field.
+func (u *UpstreamRequestLogUpsert) SetErrorType(v string) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldErrorType, v)
+	return u
+}
+
+// UpdateErrorType sets the "error_type" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateErrorType() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldErrorType)
+	return u
+}
+
+// SetErrorCode sets the "error_code" field.
+func (u *UpstreamRequestLogUpsert) SetErrorCode(v string) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldErrorCode, v)
+	return u
+}
+
+// UpdateErrorCode sets the "error_code" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateErrorCode() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldErrorCode)
+	return u
+}
+
+// SetMessage sets the "message" field.
+func (u *UpstreamRequestLogUpsert) SetMessage(v string) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldMessage, v)
+	return u
+}
+
+// UpdateMessage sets the "message" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateMessage() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldMessage)
+	return u
+}
+
+// SetAttempts sets the "attempts" field.
+func (u *UpstreamRequestLogUpsert) SetAttempts(v int) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldAttempts, v)
+	return u
+}
+
+// UpdateAttempts sets the "attempts" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateAttempts() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldAttempts)
+	return u
+}
+
+// AddAttempts adds v to the "attempts" field.
+func (u *UpstreamRequestLogUpsert) AddAttempts(v int) *UpstreamRequestLogUpsert {
+	u.Add(upstreamrequestlog.FieldAttempts, v)
+	return u
+}
+
+// SetAttemptChain sets the "attempt_chain" field.
+func (u *UpstreamRequestLogUpsert) SetAttemptChain(v json.RawMessage) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldAttemptChain, v)
+	return u
+}
+
+// UpdateAttemptChain sets the "attempt_chain" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateAttemptChain() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldAttemptChain)
+	return u
+}
+
+// ClearAttemptChain clears the value of the "attempt_chain" field.
+func (u *UpstreamRequestLogUpsert) ClearAttemptChain() *UpstreamRequestLogUpsert {
+	u.SetNull(upstreamrequestlog.FieldAttemptChain)
+	return u
+}
+
+// SetBilled sets the "billed" field.
+func (u *UpstreamRequestLogUpsert) SetBilled(v bool) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldBilled, v)
+	return u
+}
+
+// UpdateBilled sets the "billed" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateBilled() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldBilled)
+	return u
+}
+
+// SetModel sets the "model" field.
+func (u *UpstreamRequestLogUpsert) SetModel(v string) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldModel, v)
+	return u
+}
+
+// UpdateModel sets the "model" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateModel() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldModel)
+	return u
+}
+
+// SetEndpoint sets the "endpoint" field.
+func (u *UpstreamRequestLogUpsert) SetEndpoint(v string) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldEndpoint, v)
+	return u
+}
+
+// UpdateEndpoint sets the "endpoint" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateEndpoint() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldEndpoint)
+	return u
+}
+
+// SetStream sets the "stream" field.
+func (u *UpstreamRequestLogUpsert) SetStream(v bool) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldStream, v)
+	return u
+}
+
+// UpdateStream sets the "stream" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateStream() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldStream)
+	return u
+}
+
+// SetUserID sets the "user_id" field.
+func (u *UpstreamRequestLogUpsert) SetUserID(v int) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldUserID, v)
+	return u
+}
+
+// UpdateUserID sets the "user_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateUserID() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldUserID)
+	return u
+}
+
+// AddUserID adds v to the "user_id" field.
+func (u *UpstreamRequestLogUpsert) AddUserID(v int) *UpstreamRequestLogUpsert {
+	u.Add(upstreamrequestlog.FieldUserID, v)
+	return u
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (u *UpstreamRequestLogUpsert) SetUserEmailSnapshot(v string) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldUserEmailSnapshot, v)
+	return u
+}
+
+// UpdateUserEmailSnapshot sets the "user_email_snapshot" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateUserEmailSnapshot() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldUserEmailSnapshot)
+	return u
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (u *UpstreamRequestLogUpsert) SetAPIKeyID(v int) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldAPIKeyID, v)
+	return u
+}
+
+// UpdateAPIKeyID sets the "api_key_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateAPIKeyID() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldAPIKeyID)
+	return u
+}
+
+// AddAPIKeyID adds v to the "api_key_id" field.
+func (u *UpstreamRequestLogUpsert) AddAPIKeyID(v int) *UpstreamRequestLogUpsert {
+	u.Add(upstreamrequestlog.FieldAPIKeyID, v)
+	return u
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *UpstreamRequestLogUpsert) SetGroupID(v int) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldGroupID, v)
+	return u
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateGroupID() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldGroupID)
+	return u
+}
+
+// AddGroupID adds v to the "group_id" field.
+func (u *UpstreamRequestLogUpsert) AddGroupID(v int) *UpstreamRequestLogUpsert {
+	u.Add(upstreamrequestlog.FieldGroupID, v)
+	return u
+}
+
+// SetChannelID sets the "channel_id" field.
+func (u *UpstreamRequestLogUpsert) SetChannelID(v int) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldChannelID, v)
+	return u
+}
+
+// UpdateChannelID sets the "channel_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateChannelID() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldChannelID)
+	return u
+}
+
+// AddChannelID adds v to the "channel_id" field.
+func (u *UpstreamRequestLogUpsert) AddChannelID(v int) *UpstreamRequestLogUpsert {
+	u.Add(upstreamrequestlog.FieldChannelID, v)
+	return u
+}
+
+// SetChannelName sets the "channel_name" field.
+func (u *UpstreamRequestLogUpsert) SetChannelName(v string) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldChannelName, v)
+	return u
+}
+
+// UpdateChannelName sets the "channel_name" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateChannelName() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldChannelName)
+	return u
+}
+
+// SetIPAddress sets the "ip_address" field.
+func (u *UpstreamRequestLogUpsert) SetIPAddress(v string) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldIPAddress, v)
+	return u
+}
+
+// UpdateIPAddress sets the "ip_address" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateIPAddress() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldIPAddress)
+	return u
+}
+
+// SetUserAgent sets the "user_agent" field.
+func (u *UpstreamRequestLogUpsert) SetUserAgent(v string) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldUserAgent, v)
+	return u
+}
+
+// UpdateUserAgent sets the "user_agent" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateUserAgent() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldUserAgent)
+	return u
+}
+
+// SetDurationMs sets the "duration_ms" field.
+func (u *UpstreamRequestLogUpsert) SetDurationMs(v int64) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldDurationMs, v)
+	return u
+}
+
+// UpdateDurationMs sets the "duration_ms" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateDurationMs() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldDurationMs)
+	return u
+}
+
+// AddDurationMs adds v to the "duration_ms" field.
+func (u *UpstreamRequestLogUpsert) AddDurationMs(v int64) *UpstreamRequestLogUpsert {
+	u.Add(upstreamrequestlog.FieldDurationMs, v)
+	return u
+}
+
+// SetRepeatCount sets the "repeat_count" field.
+func (u *UpstreamRequestLogUpsert) SetRepeatCount(v int) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldRepeatCount, v)
+	return u
+}
+
+// UpdateRepeatCount sets the "repeat_count" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateRepeatCount() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldRepeatCount)
+	return u
+}
+
+// AddRepeatCount adds v to the "repeat_count" field.
+func (u *UpstreamRequestLogUpsert) AddRepeatCount(v int) *UpstreamRequestLogUpsert {
+	u.Add(upstreamrequestlog.FieldRepeatCount, v)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.UpstreamRequestLog.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *UpstreamRequestLogUpsertOne) UpdateNewValues() *UpstreamRequestLogUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(upstreamrequestlog.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.UpstreamRequestLog.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *UpstreamRequestLogUpsertOne) Ignore() *UpstreamRequestLogUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *UpstreamRequestLogUpsertOne) DoNothing() *UpstreamRequestLogUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the UpstreamRequestLogCreate.OnConflict
+// documentation for more info.
+func (u *UpstreamRequestLogUpsertOne) Update(set func(*UpstreamRequestLogUpsert)) *UpstreamRequestLogUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&UpstreamRequestLogUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetRequestID sets the "request_id" field.
+func (u *UpstreamRequestLogUpsertOne) SetRequestID(v string) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetRequestID(v)
+	})
+}
+
+// UpdateRequestID sets the "request_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateRequestID() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateRequestID()
+	})
+}
+
+// SetSource sets the "source" field.
+func (u *UpstreamRequestLogUpsertOne) SetSource(v upstreamrequestlog.Source) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetSource(v)
+	})
+}
+
+// UpdateSource sets the "source" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateSource() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateSource()
+	})
+}
+
+// SetPhase sets the "phase" field.
+func (u *UpstreamRequestLogUpsertOne) SetPhase(v string) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetPhase(v)
+	})
+}
+
+// UpdatePhase sets the "phase" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdatePhase() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdatePhase()
+	})
+}
+
+// SetStatusCode sets the "status_code" field.
+func (u *UpstreamRequestLogUpsertOne) SetStatusCode(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetStatusCode(v)
+	})
+}
+
+// AddStatusCode adds v to the "status_code" field.
+func (u *UpstreamRequestLogUpsertOne) AddStatusCode(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddStatusCode(v)
+	})
+}
+
+// UpdateStatusCode sets the "status_code" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateStatusCode() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateStatusCode()
+	})
+}
+
+// SetErrorType sets the "error_type" field.
+func (u *UpstreamRequestLogUpsertOne) SetErrorType(v string) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetErrorType(v)
+	})
+}
+
+// UpdateErrorType sets the "error_type" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateErrorType() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateErrorType()
+	})
+}
+
+// SetErrorCode sets the "error_code" field.
+func (u *UpstreamRequestLogUpsertOne) SetErrorCode(v string) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetErrorCode(v)
+	})
+}
+
+// UpdateErrorCode sets the "error_code" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateErrorCode() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateErrorCode()
+	})
+}
+
+// SetMessage sets the "message" field.
+func (u *UpstreamRequestLogUpsertOne) SetMessage(v string) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetMessage(v)
+	})
+}
+
+// UpdateMessage sets the "message" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateMessage() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateMessage()
+	})
+}
+
+// SetAttempts sets the "attempts" field.
+func (u *UpstreamRequestLogUpsertOne) SetAttempts(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetAttempts(v)
+	})
+}
+
+// AddAttempts adds v to the "attempts" field.
+func (u *UpstreamRequestLogUpsertOne) AddAttempts(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddAttempts(v)
+	})
+}
+
+// UpdateAttempts sets the "attempts" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateAttempts() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateAttempts()
+	})
+}
+
+// SetAttemptChain sets the "attempt_chain" field.
+func (u *UpstreamRequestLogUpsertOne) SetAttemptChain(v json.RawMessage) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetAttemptChain(v)
+	})
+}
+
+// UpdateAttemptChain sets the "attempt_chain" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateAttemptChain() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateAttemptChain()
+	})
+}
+
+// ClearAttemptChain clears the value of the "attempt_chain" field.
+func (u *UpstreamRequestLogUpsertOne) ClearAttemptChain() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.ClearAttemptChain()
+	})
+}
+
+// SetBilled sets the "billed" field.
+func (u *UpstreamRequestLogUpsertOne) SetBilled(v bool) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetBilled(v)
+	})
+}
+
+// UpdateBilled sets the "billed" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateBilled() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateBilled()
+	})
+}
+
+// SetModel sets the "model" field.
+func (u *UpstreamRequestLogUpsertOne) SetModel(v string) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetModel(v)
+	})
+}
+
+// UpdateModel sets the "model" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateModel() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateModel()
+	})
+}
+
+// SetEndpoint sets the "endpoint" field.
+func (u *UpstreamRequestLogUpsertOne) SetEndpoint(v string) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetEndpoint(v)
+	})
+}
+
+// UpdateEndpoint sets the "endpoint" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateEndpoint() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateEndpoint()
+	})
+}
+
+// SetStream sets the "stream" field.
+func (u *UpstreamRequestLogUpsertOne) SetStream(v bool) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetStream(v)
+	})
+}
+
+// UpdateStream sets the "stream" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateStream() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateStream()
+	})
+}
+
+// SetUserID sets the "user_id" field.
+func (u *UpstreamRequestLogUpsertOne) SetUserID(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetUserID(v)
+	})
+}
+
+// AddUserID adds v to the "user_id" field.
+func (u *UpstreamRequestLogUpsertOne) AddUserID(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddUserID(v)
+	})
+}
+
+// UpdateUserID sets the "user_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateUserID() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateUserID()
+	})
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (u *UpstreamRequestLogUpsertOne) SetUserEmailSnapshot(v string) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetUserEmailSnapshot(v)
+	})
+}
+
+// UpdateUserEmailSnapshot sets the "user_email_snapshot" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateUserEmailSnapshot() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateUserEmailSnapshot()
+	})
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (u *UpstreamRequestLogUpsertOne) SetAPIKeyID(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetAPIKeyID(v)
+	})
+}
+
+// AddAPIKeyID adds v to the "api_key_id" field.
+func (u *UpstreamRequestLogUpsertOne) AddAPIKeyID(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddAPIKeyID(v)
+	})
+}
+
+// UpdateAPIKeyID sets the "api_key_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateAPIKeyID() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateAPIKeyID()
+	})
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *UpstreamRequestLogUpsertOne) SetGroupID(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetGroupID(v)
+	})
+}
+
+// AddGroupID adds v to the "group_id" field.
+func (u *UpstreamRequestLogUpsertOne) AddGroupID(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddGroupID(v)
+	})
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateGroupID() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateGroupID()
+	})
+}
+
+// SetChannelID sets the "channel_id" field.
+func (u *UpstreamRequestLogUpsertOne) SetChannelID(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetChannelID(v)
+	})
+}
+
+// AddChannelID adds v to the "channel_id" field.
+func (u *UpstreamRequestLogUpsertOne) AddChannelID(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddChannelID(v)
+	})
+}
+
+// UpdateChannelID sets the "channel_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateChannelID() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateChannelID()
+	})
+}
+
+// SetChannelName sets the "channel_name" field.
+func (u *UpstreamRequestLogUpsertOne) SetChannelName(v string) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetChannelName(v)
+	})
+}
+
+// UpdateChannelName sets the "channel_name" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateChannelName() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateChannelName()
+	})
+}
+
+// SetIPAddress sets the "ip_address" field.
+func (u *UpstreamRequestLogUpsertOne) SetIPAddress(v string) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetIPAddress(v)
+	})
+}
+
+// UpdateIPAddress sets the "ip_address" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateIPAddress() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateIPAddress()
+	})
+}
+
+// SetUserAgent sets the "user_agent" field.
+func (u *UpstreamRequestLogUpsertOne) SetUserAgent(v string) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetUserAgent(v)
+	})
+}
+
+// UpdateUserAgent sets the "user_agent" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateUserAgent() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateUserAgent()
+	})
+}
+
+// SetDurationMs sets the "duration_ms" field.
+func (u *UpstreamRequestLogUpsertOne) SetDurationMs(v int64) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetDurationMs(v)
+	})
+}
+
+// AddDurationMs adds v to the "duration_ms" field.
+func (u *UpstreamRequestLogUpsertOne) AddDurationMs(v int64) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddDurationMs(v)
+	})
+}
+
+// UpdateDurationMs sets the "duration_ms" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateDurationMs() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateDurationMs()
+	})
+}
+
+// SetRepeatCount sets the "repeat_count" field.
+func (u *UpstreamRequestLogUpsertOne) SetRepeatCount(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetRepeatCount(v)
+	})
+}
+
+// AddRepeatCount adds v to the "repeat_count" field.
+func (u *UpstreamRequestLogUpsertOne) AddRepeatCount(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddRepeatCount(v)
+	})
+}
+
+// UpdateRepeatCount sets the "repeat_count" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateRepeatCount() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateRepeatCount()
+	})
+}
+
+// Exec executes the query.
+func (u *UpstreamRequestLogUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for UpstreamRequestLogCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *UpstreamRequestLogUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *UpstreamRequestLogUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *UpstreamRequestLogUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // UpstreamRequestLogCreateBulk is the builder for creating many UpstreamRequestLog entities in bulk.
 type UpstreamRequestLogCreateBulk struct {
 	config
 	err      error
 	builders []*UpstreamRequestLogCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the UpstreamRequestLog entities in the database.
@@ -694,6 +1540,7 @@ func (urlcb *UpstreamRequestLogCreateBulk) Save(ctx context.Context) ([]*Upstrea
 					_, err = mutators[i+1].Mutate(root, urlcb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = urlcb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, urlcb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -744,6 +1591,502 @@ func (urlcb *UpstreamRequestLogCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (urlcb *UpstreamRequestLogCreateBulk) ExecX(ctx context.Context) {
 	if err := urlcb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.UpstreamRequestLog.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.UpstreamRequestLogUpsert) {
+//			SetRequestID(v+v).
+//		}).
+//		Exec(ctx)
+func (urlcb *UpstreamRequestLogCreateBulk) OnConflict(opts ...sql.ConflictOption) *UpstreamRequestLogUpsertBulk {
+	urlcb.conflict = opts
+	return &UpstreamRequestLogUpsertBulk{
+		create: urlcb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.UpstreamRequestLog.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (urlcb *UpstreamRequestLogCreateBulk) OnConflictColumns(columns ...string) *UpstreamRequestLogUpsertBulk {
+	urlcb.conflict = append(urlcb.conflict, sql.ConflictColumns(columns...))
+	return &UpstreamRequestLogUpsertBulk{
+		create: urlcb,
+	}
+}
+
+// UpstreamRequestLogUpsertBulk is the builder for "upsert"-ing
+// a bulk of UpstreamRequestLog nodes.
+type UpstreamRequestLogUpsertBulk struct {
+	create *UpstreamRequestLogCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.UpstreamRequestLog.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *UpstreamRequestLogUpsertBulk) UpdateNewValues() *UpstreamRequestLogUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(upstreamrequestlog.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.UpstreamRequestLog.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *UpstreamRequestLogUpsertBulk) Ignore() *UpstreamRequestLogUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *UpstreamRequestLogUpsertBulk) DoNothing() *UpstreamRequestLogUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the UpstreamRequestLogCreateBulk.OnConflict
+// documentation for more info.
+func (u *UpstreamRequestLogUpsertBulk) Update(set func(*UpstreamRequestLogUpsert)) *UpstreamRequestLogUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&UpstreamRequestLogUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetRequestID sets the "request_id" field.
+func (u *UpstreamRequestLogUpsertBulk) SetRequestID(v string) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetRequestID(v)
+	})
+}
+
+// UpdateRequestID sets the "request_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateRequestID() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateRequestID()
+	})
+}
+
+// SetSource sets the "source" field.
+func (u *UpstreamRequestLogUpsertBulk) SetSource(v upstreamrequestlog.Source) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetSource(v)
+	})
+}
+
+// UpdateSource sets the "source" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateSource() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateSource()
+	})
+}
+
+// SetPhase sets the "phase" field.
+func (u *UpstreamRequestLogUpsertBulk) SetPhase(v string) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetPhase(v)
+	})
+}
+
+// UpdatePhase sets the "phase" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdatePhase() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdatePhase()
+	})
+}
+
+// SetStatusCode sets the "status_code" field.
+func (u *UpstreamRequestLogUpsertBulk) SetStatusCode(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetStatusCode(v)
+	})
+}
+
+// AddStatusCode adds v to the "status_code" field.
+func (u *UpstreamRequestLogUpsertBulk) AddStatusCode(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddStatusCode(v)
+	})
+}
+
+// UpdateStatusCode sets the "status_code" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateStatusCode() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateStatusCode()
+	})
+}
+
+// SetErrorType sets the "error_type" field.
+func (u *UpstreamRequestLogUpsertBulk) SetErrorType(v string) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetErrorType(v)
+	})
+}
+
+// UpdateErrorType sets the "error_type" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateErrorType() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateErrorType()
+	})
+}
+
+// SetErrorCode sets the "error_code" field.
+func (u *UpstreamRequestLogUpsertBulk) SetErrorCode(v string) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetErrorCode(v)
+	})
+}
+
+// UpdateErrorCode sets the "error_code" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateErrorCode() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateErrorCode()
+	})
+}
+
+// SetMessage sets the "message" field.
+func (u *UpstreamRequestLogUpsertBulk) SetMessage(v string) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetMessage(v)
+	})
+}
+
+// UpdateMessage sets the "message" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateMessage() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateMessage()
+	})
+}
+
+// SetAttempts sets the "attempts" field.
+func (u *UpstreamRequestLogUpsertBulk) SetAttempts(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetAttempts(v)
+	})
+}
+
+// AddAttempts adds v to the "attempts" field.
+func (u *UpstreamRequestLogUpsertBulk) AddAttempts(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddAttempts(v)
+	})
+}
+
+// UpdateAttempts sets the "attempts" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateAttempts() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateAttempts()
+	})
+}
+
+// SetAttemptChain sets the "attempt_chain" field.
+func (u *UpstreamRequestLogUpsertBulk) SetAttemptChain(v json.RawMessage) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetAttemptChain(v)
+	})
+}
+
+// UpdateAttemptChain sets the "attempt_chain" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateAttemptChain() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateAttemptChain()
+	})
+}
+
+// ClearAttemptChain clears the value of the "attempt_chain" field.
+func (u *UpstreamRequestLogUpsertBulk) ClearAttemptChain() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.ClearAttemptChain()
+	})
+}
+
+// SetBilled sets the "billed" field.
+func (u *UpstreamRequestLogUpsertBulk) SetBilled(v bool) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetBilled(v)
+	})
+}
+
+// UpdateBilled sets the "billed" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateBilled() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateBilled()
+	})
+}
+
+// SetModel sets the "model" field.
+func (u *UpstreamRequestLogUpsertBulk) SetModel(v string) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetModel(v)
+	})
+}
+
+// UpdateModel sets the "model" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateModel() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateModel()
+	})
+}
+
+// SetEndpoint sets the "endpoint" field.
+func (u *UpstreamRequestLogUpsertBulk) SetEndpoint(v string) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetEndpoint(v)
+	})
+}
+
+// UpdateEndpoint sets the "endpoint" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateEndpoint() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateEndpoint()
+	})
+}
+
+// SetStream sets the "stream" field.
+func (u *UpstreamRequestLogUpsertBulk) SetStream(v bool) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetStream(v)
+	})
+}
+
+// UpdateStream sets the "stream" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateStream() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateStream()
+	})
+}
+
+// SetUserID sets the "user_id" field.
+func (u *UpstreamRequestLogUpsertBulk) SetUserID(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetUserID(v)
+	})
+}
+
+// AddUserID adds v to the "user_id" field.
+func (u *UpstreamRequestLogUpsertBulk) AddUserID(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddUserID(v)
+	})
+}
+
+// UpdateUserID sets the "user_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateUserID() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateUserID()
+	})
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (u *UpstreamRequestLogUpsertBulk) SetUserEmailSnapshot(v string) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetUserEmailSnapshot(v)
+	})
+}
+
+// UpdateUserEmailSnapshot sets the "user_email_snapshot" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateUserEmailSnapshot() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateUserEmailSnapshot()
+	})
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (u *UpstreamRequestLogUpsertBulk) SetAPIKeyID(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetAPIKeyID(v)
+	})
+}
+
+// AddAPIKeyID adds v to the "api_key_id" field.
+func (u *UpstreamRequestLogUpsertBulk) AddAPIKeyID(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddAPIKeyID(v)
+	})
+}
+
+// UpdateAPIKeyID sets the "api_key_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateAPIKeyID() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateAPIKeyID()
+	})
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *UpstreamRequestLogUpsertBulk) SetGroupID(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetGroupID(v)
+	})
+}
+
+// AddGroupID adds v to the "group_id" field.
+func (u *UpstreamRequestLogUpsertBulk) AddGroupID(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddGroupID(v)
+	})
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateGroupID() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateGroupID()
+	})
+}
+
+// SetChannelID sets the "channel_id" field.
+func (u *UpstreamRequestLogUpsertBulk) SetChannelID(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetChannelID(v)
+	})
+}
+
+// AddChannelID adds v to the "channel_id" field.
+func (u *UpstreamRequestLogUpsertBulk) AddChannelID(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddChannelID(v)
+	})
+}
+
+// UpdateChannelID sets the "channel_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateChannelID() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateChannelID()
+	})
+}
+
+// SetChannelName sets the "channel_name" field.
+func (u *UpstreamRequestLogUpsertBulk) SetChannelName(v string) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetChannelName(v)
+	})
+}
+
+// UpdateChannelName sets the "channel_name" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateChannelName() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateChannelName()
+	})
+}
+
+// SetIPAddress sets the "ip_address" field.
+func (u *UpstreamRequestLogUpsertBulk) SetIPAddress(v string) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetIPAddress(v)
+	})
+}
+
+// UpdateIPAddress sets the "ip_address" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateIPAddress() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateIPAddress()
+	})
+}
+
+// SetUserAgent sets the "user_agent" field.
+func (u *UpstreamRequestLogUpsertBulk) SetUserAgent(v string) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetUserAgent(v)
+	})
+}
+
+// UpdateUserAgent sets the "user_agent" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateUserAgent() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateUserAgent()
+	})
+}
+
+// SetDurationMs sets the "duration_ms" field.
+func (u *UpstreamRequestLogUpsertBulk) SetDurationMs(v int64) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetDurationMs(v)
+	})
+}
+
+// AddDurationMs adds v to the "duration_ms" field.
+func (u *UpstreamRequestLogUpsertBulk) AddDurationMs(v int64) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddDurationMs(v)
+	})
+}
+
+// UpdateDurationMs sets the "duration_ms" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateDurationMs() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateDurationMs()
+	})
+}
+
+// SetRepeatCount sets the "repeat_count" field.
+func (u *UpstreamRequestLogUpsertBulk) SetRepeatCount(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetRepeatCount(v)
+	})
+}
+
+// AddRepeatCount adds v to the "repeat_count" field.
+func (u *UpstreamRequestLogUpsertBulk) AddRepeatCount(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddRepeatCount(v)
+	})
+}
+
+// UpdateRepeatCount sets the "repeat_count" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateRepeatCount() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateRepeatCount()
+	})
+}
+
+// Exec executes the query.
+func (u *UpstreamRequestLogUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the UpstreamRequestLogCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for UpstreamRequestLogCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *UpstreamRequestLogUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

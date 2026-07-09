@@ -17,9 +17,6 @@ func NewGroupHandler(service *appgroup.Service) *GroupHandler {
 	return &GroupHandler{service: service}
 }
 
-// parseGroupID 解析分组 ID，委托给公共 ParseID。
-var parseGroupID = ParseID
-
 func (h *GroupHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	var hasChannels *appgroup.GroupHasChannelsError
 	switch {

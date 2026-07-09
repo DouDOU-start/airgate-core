@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
@@ -32,7 +32,7 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := extractBearerToken(c)
 		if tokenStr == "" {
-			slog.Warn("jwt_validation_failed", sdk.LogFieldReason, "missing_token", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+			slog.Warn("jwt_validation_failed", logx.LogFieldReason, "missing_token", logx.LogFieldRequestID, RequestIDFromGinContext(c))
 			response.Unauthorized(c, "缺少认证 Token")
 			c.Abort()
 			return
@@ -41,7 +41,7 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 		// 显式管理员 API Key 认证。仅调用方传入 db 的路由启用，避免 admin-xxx 在普通用户路由中生效。
 		if auth.IsAdminAPIKey(tokenStr) && len(db) > 0 && db[0] != nil {
 			if err := auth.ValidateAdminAPIKey(c.Request.Context(), db[0], tokenStr); err != nil {
-				slog.Warn("admin_api_key_validation_failed", sdk.LogFieldReason, "invalid_admin_key", sdk.LogFieldError, err, sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+				slog.Warn("admin_api_key_validation_failed", logx.LogFieldReason, "invalid_admin_key", logx.LogFieldError, err, logx.LogFieldRequestID, RequestIDFromGinContext(c))
 				response.Unauthorized(c, "管理员 API Key 无效")
 				c.Abort()
 				return
@@ -51,15 +51,15 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 			c.Set(CtxKeyEmail, "")
 
 			ctx := c.Request.Context()
-			logger := sdk.LoggerFromContext(ctx).With(sdk.LogFieldUserID, 0, "role", "admin")
-			c.Request = c.Request.WithContext(sdk.WithLogger(ctx, logger))
+			logger := logx.LoggerFromContext(ctx).With(logx.LogFieldUserID, 0, "role", "admin")
+			c.Request = c.Request.WithContext(logx.WithLogger(ctx, logger))
 			c.Next()
 			return
 		}
 
 		claims, err := jwtMgr.ParseToken(tokenStr)
 		if err != nil {
-			slog.Warn("jwt_validation_failed", sdk.LogFieldReason, "invalid_or_expired", sdk.LogFieldError, err, sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+			slog.Warn("jwt_validation_failed", logx.LogFieldReason, "invalid_or_expired", logx.LogFieldError, err, logx.LogFieldRequestID, RequestIDFromGinContext(c))
 			response.Unauthorized(c, "Token 无效或已过期")
 			c.Abort()
 			return
@@ -73,11 +73,11 @@ func JWTAuth(jwtMgr *auth.JWTManager, db ...*ent.Client) gin.HandlerFunc {
 		}
 		// 用 user_id / role / api_key_id 派生新 logger 写回 ctx
 		ctx := c.Request.Context()
-		logger := sdk.LoggerFromContext(ctx).With(sdk.LogFieldUserID, claims.UserID, "role", claims.Role)
+		logger := logx.LoggerFromContext(ctx).With(logx.LogFieldUserID, claims.UserID, "role", claims.Role)
 		if claims.APIKeyID > 0 {
-			logger = logger.With(sdk.LogFieldAPIKeyID, claims.APIKeyID)
+			logger = logger.With(logx.LogFieldAPIKeyID, claims.APIKeyID)
 		}
-		c.Request = c.Request.WithContext(sdk.WithLogger(ctx, logger))
+		c.Request = c.Request.WithContext(logx.WithLogger(ctx, logger))
 		c.Next()
 	}
 }
@@ -90,14 +90,14 @@ func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := extractBearerToken(c)
 		if key == "" {
-			slog.Warn("api_key_validation_failed", sdk.LogFieldReason, "missing_api_key", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+			slog.Warn("api_key_validation_failed", logx.LogFieldReason, "missing_api_key", logx.LogFieldRequestID, RequestIDFromGinContext(c))
 			abortWithRelayError(c, http.StatusUnauthorized, "missing_api_key", "缺少 API Key")
 			return
 		}
 
 		// 验证 API Key 格式
 		if !strings.HasPrefix(key, "sk-") {
-			slog.Warn("api_key_validation_failed", sdk.LogFieldReason, "invalid_format", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+			slog.Warn("api_key_validation_failed", logx.LogFieldReason, "invalid_format", logx.LogFieldRequestID, RequestIDFromGinContext(c))
 			abortWithRelayError(c, http.StatusUnauthorized, "invalid_api_key", "无效的 API Key 格式")
 			return
 		}
@@ -107,6 +107,7 @@ func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 			code := "invalid_api_key"
 			status := http.StatusUnauthorized
 			reason := "invalid_key"
+			message := err.Error()
 			switch err {
 			case auth.ErrInvalidAPIKey:
 				// 维持默认 401 / invalid_api_key
@@ -124,25 +125,27 @@ func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 			default:
 				// DB 超时 / 连接池满 / ctx 取消 等服务端侧问题：返 503 让客户端重试，
 				// 绝不能误判为"凭证无效"让客户端以为 key 被吊销。
+				// 错误细节（含 ent/SQL 内部信息）只进日志，绝不回给未认证客户端。
 				code = "service_unavailable"
 				status = http.StatusServiceUnavailable
 				reason = "service_unavailable"
+				message = "服务暂不可用，请稍后重试"
 			}
-			slog.Warn("api_key_validation_failed", sdk.LogFieldReason, reason, sdk.LogFieldError, err, sdk.LogFieldStatus, status, sdk.LogFieldRequestID, RequestIDFromGinContext(c))
-			abortWithRelayError(c, status, code, err.Error())
+			slog.Warn("api_key_validation_failed", logx.LogFieldReason, reason, logx.LogFieldError, err, logx.LogFieldStatus, status, logx.LogFieldRequestID, RequestIDFromGinContext(c))
+			abortWithRelayError(c, status, code, message)
 			return
 		}
 
 		c.Set(CtxKeyUserID, info.UserID)
 		c.Set(CtxKeyKeyInfo, info)
-		// 派生带 user_id/group_id/api_key_id 的 logger 写回 ctx，给后续插件链路复用
+		// 派生带 user_id/group_id/api_key_id 的 logger 写回 ctx，供后续转发管线复用
 		ctx := c.Request.Context()
-		logger := sdk.LoggerFromContext(ctx).With(
-			sdk.LogFieldUserID, info.UserID,
-			sdk.LogFieldGroupID, info.GroupID,
-			sdk.LogFieldAPIKeyID, info.KeyID,
+		logger := logx.LoggerFromContext(ctx).With(
+			logx.LogFieldUserID, info.UserID,
+			logx.LogFieldGroupID, info.GroupID,
+			logx.LogFieldAPIKeyID, info.KeyID,
 		)
-		c.Request = c.Request.WithContext(sdk.WithLogger(ctx, logger))
+		c.Request = c.Request.WithContext(logx.WithLogger(ctx, logger))
 		c.Next()
 	}
 }
@@ -160,7 +163,7 @@ func AdminOnly() gin.HandlerFunc {
 		role, exists := c.Get(CtxKeyRole)
 		roleStr, ok := role.(string)
 		if !exists || !ok || roleStr != "admin" {
-			slog.Warn("admin_access_denied", sdk.LogFieldReason, "non_admin_role", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+			slog.Warn("admin_access_denied", logx.LogFieldReason, "non_admin_role", logx.LogFieldRequestID, RequestIDFromGinContext(c))
 			response.Forbidden(c, "需要管理员权限")
 			c.Abort()
 			return
@@ -179,13 +182,13 @@ func RequireRoles(roles ...string) gin.HandlerFunc {
 		role, exists := c.Get(CtxKeyRole)
 		roleStr, ok := role.(string)
 		if !exists || !ok {
-			slog.Warn("role_access_denied", sdk.LogFieldReason, "missing_role", sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+			slog.Warn("role_access_denied", logx.LogFieldReason, "missing_role", logx.LogFieldRequestID, RequestIDFromGinContext(c))
 			response.Forbidden(c, "权限不足")
 			c.Abort()
 			return
 		}
 		if _, ok := allowed[roleStr]; !ok {
-			slog.Warn("role_access_denied", sdk.LogFieldReason, "role_not_allowed", "role", roleStr, sdk.LogFieldRequestID, RequestIDFromGinContext(c))
+			slog.Warn("role_access_denied", logx.LogFieldReason, "role_not_allowed", "role", roleStr, logx.LogFieldRequestID, RequestIDFromGinContext(c))
 			response.Forbidden(c, "权限不足")
 			c.Abort()
 			return
@@ -215,13 +218,4 @@ func extractBearerToken(c *gin.Context) string {
 		return key
 	}
 	return ""
-}
-
-// HasAPIKey 检查请求是否携带 API Key（Authorization: Bearer / x-api-key / x-goog-api-key）
-func HasAPIKey(c *gin.Context) bool {
-	auth := c.GetHeader("Authorization")
-	if len(auth) > 7 && strings.EqualFold(auth[:7], "Bearer ") {
-		return true
-	}
-	return c.GetHeader("x-api-key") != "" || c.GetHeader("x-goog-api-key") != ""
 }

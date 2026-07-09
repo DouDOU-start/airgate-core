@@ -28,40 +28,6 @@ func TestListNormalizesPagination(t *testing.T) {
 	}
 }
 
-func TestCreateClonesMutableFields(t *testing.T) {
-	var captured CreateInput
-
-	service := NewService(groupStubRepository{
-		create: func(_ context.Context, input CreateInput) (Group, error) {
-			captured = input
-			return Group{ID: 1}, nil
-		},
-	}, stubConcurrencyReader{})
-
-	quotas := map[string]any{"day": float64(100)}
-	routing := map[string][]int64{"gpt-*": {1, 2}}
-
-	_, err := service.Create(t.Context(), CreateInput{
-		Name:         "默认分组",
-		Platform:     "openai",
-		Quotas:       quotas,
-		ModelRouting: routing,
-	})
-	if err != nil {
-		t.Fatalf("Create() returned error: %v", err)
-	}
-
-	quotas["day"] = float64(200)
-	routing["gpt-*"][0] = 99
-
-	if captured.Quotas["day"] != float64(100) {
-		t.Fatalf("captured quotas mutated to %v, want 100", captured.Quotas["day"])
-	}
-	if captured.ModelRouting["gpt-*"][0] != 1 {
-		t.Fatalf("captured model routing mutated to %v, want 1", captured.ModelRouting["gpt-*"][0])
-	}
-}
-
 type stubConcurrencyReader struct{}
 
 func (stubConcurrencyReader) GetGroupCurrentCounts(_ context.Context, _ []int) map[int]int {

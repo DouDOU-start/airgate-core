@@ -78,7 +78,8 @@ type UpdateInput struct {
 	Status             *string
 }
 
-// BalanceChange 余额变更输入。
+// BalanceChange 余额变更输入。before/after 由 store 在事务内以行锁重读现算，
+// 不再由调用方传入（避免无锁读-算-写的丢失更新）。
 type BalanceChange struct {
 	Action string
 	Amount float64
@@ -169,18 +170,6 @@ type Mutation struct {
 	Status             *string
 }
 
-// BalanceUpdate 余额更新数据。
-type BalanceUpdate struct {
-	Action        string
-	Amount        float64
-	BeforeBalance float64
-	AfterBalance  float64
-	Remark        string
-	// IdempotencyKey 非空时随流水落库（balance_logs 唯一索引），重复键说明
-	// 同一笔变更已入账，store 返回 ErrDuplicateBalanceChange。
-	IdempotencyKey string
-}
-
 // GroupRateOverride 表示某个用户对某个分组的专属倍率。
 type GroupRateOverride struct {
 	UserID   int
@@ -197,13 +186,14 @@ type Repository interface {
 	ListWithGroupRateOverride(ctx context.Context, groupID int64) ([]GroupRateOverride, error)
 	Create(context.Context, Mutation) (User, error)
 	Update(context.Context, int, Mutation) (User, error)
-	UpdateBalance(context.Context, int, BalanceUpdate) (User, error)
+	// UpdateBalance 单事务原子更新余额并写流水（before/after 由 store 行锁重读现算）；
+	// subtract 余额不足返回 ErrInsufficientBalance，非法 action 返回 ErrInvalidBalanceAction。
+	UpdateBalance(context.Context, int, BalanceChange) (User, error)
 	Delete(context.Context, int) error
 	ListBalanceLogs(context.Context, int, int, int) ([]BalanceLog, int64, error)
 	// ListAPIKeys 查询用户的 API Key 列表。
 	// todayStart 必须由调用方按用户时区计算好。
 	ListAPIKeys(ctx context.Context, userID, page, pageSize int, todayStart time.Time) ([]APIKey, int64, error)
-	GetAPIKeyName(ctx context.Context, keyID int) (string, error)
 	GetAPIKeyInfo(ctx context.Context, keyID int) (APIKeyBrief, error)
 	UpdateBalanceAlert(ctx context.Context, userID int, threshold float64) error
 	SetBalanceAlertNotified(ctx context.Context, userID int, notified bool) error

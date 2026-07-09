@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/DouDOU-start/airgate-core/ent"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 )
 
 // EntSlogLogger 返回一个 ent.Option，用 slog.Debug 输出 ent 自身日志。
@@ -60,20 +61,11 @@ func RedactDSN(dsn string) string {
 }
 
 // EmailHash 输出脱敏后的邮箱字符串：保留 local part 前 3 个字符与完整域名。
+// 实现收口在 logx.MaskEmail（唯一脱敏实现），此处仅为既有调用点保留委托入口。
 //
 //	joineroz749@gmail.com → joi***@gmail.com
 //	a@b.com               → a***@b.com   （不足 3 字符也补 ***）
 //	没有 @ 的输入直接返回 ***
 func EmailHash(email string) string {
-	at := strings.LastIndex(email, "@")
-	if at <= 0 {
-		return "***"
-	}
-	local := email[:at]
-	domain := email[at:]
-	prefix := local
-	if len(local) > 3 {
-		prefix = local[:3]
-	}
-	return prefix + "***" + domain
+	return logx.MaskEmail(email)
 }

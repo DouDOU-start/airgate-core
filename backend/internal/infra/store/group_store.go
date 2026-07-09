@@ -25,7 +25,7 @@ func NewGroupStore(db *ent.Client) *GroupStore {
 
 // List 查询管理员分组列表。
 func (s *GroupStore) List(ctx context.Context, filter appgroup.ListFilter) ([]appgroup.Group, int64, error) {
-	query := applyGroupListFilters(s.db.Group.Query(), filter.Keyword, filter.Platform, filter.ServiceTier)
+	query := applyGroupListFilters(s.db.Group.Query(), filter.Keyword, filter.Platform)
 
 	total, err := query.Count(ctx)
 	if err != nil {
@@ -55,7 +55,7 @@ func (s *GroupStore) ListAvailable(ctx context.Context, filter appgroup.Availabl
 			),
 		),
 	)
-	query = applyGroupListFilters(query, filter.Keyword, filter.Platform, "")
+	query = applyGroupListFilters(query, filter.Keyword, filter.Platform)
 
 	total, err := query.Count(ctx)
 	if err != nil {
@@ -94,17 +94,8 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 		SetRateMultiplier(input.RateMultiplier).
 		SetIsExclusive(input.IsExclusive).
 		SetStatusVisible(input.StatusVisible).
-		SetServiceTier(input.ServiceTier).
-		SetForceInstructions(input.ForceInstructions).
 		SetNote(input.Note).
 		SetSortWeight(input.SortWeight)
-
-	if input.Quotas != nil {
-		builder = builder.SetQuotas(appgroupCloneQuotas(input.Quotas))
-	}
-	if input.ModelRouting != nil {
-		builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
-	}
 
 	item, err := builder.Save(ctx)
 	if err != nil {
@@ -128,18 +119,6 @@ func (s *GroupStore) Update(ctx context.Context, id int, input appgroup.UpdateIn
 	}
 	if input.StatusVisible != nil {
 		builder = builder.SetStatusVisible(*input.StatusVisible)
-	}
-	if input.Quotas != nil {
-		builder = builder.SetQuotas(appgroupCloneQuotas(input.Quotas))
-	}
-	if input.ModelRouting != nil {
-		builder = builder.SetModelRouting(appgroupCloneModelRouting(input.ModelRouting))
-	}
-	if input.ServiceTier != nil {
-		builder = builder.SetServiceTier(*input.ServiceTier)
-	}
-	if input.ForceInstructions != nil {
-		builder = builder.SetForceInstructions(*input.ForceInstructions)
 	}
 	if input.Note != nil {
 		builder = builder.SetNote(*input.Note)
@@ -269,15 +248,12 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 	return result, nil
 }
 
-func applyGroupListFilters(query *ent.GroupQuery, keyword, platform, serviceTier string) *ent.GroupQuery {
+func applyGroupListFilters(query *ent.GroupQuery, keyword, platform string) *ent.GroupQuery {
 	if keyword != "" {
 		query = query.Where(entgroup.NameContains(keyword))
 	}
 	if platform != "" {
 		query = query.Where(entgroup.PlatformEQ(platform))
-	}
-	if serviceTier != "" {
-		query = query.Where(entgroup.ServiceTierEQ(serviceTier))
 	}
 	return query
 }
@@ -292,41 +268,15 @@ func mapGroups(items []*ent.Group) []appgroup.Group {
 
 func mapGroup(item *ent.Group) appgroup.Group {
 	return appgroup.Group{
-		ID:                item.ID,
-		Name:              item.Name,
-		Platform:          item.Platform,
-		RateMultiplier:    item.RateMultiplier,
-		IsExclusive:       item.IsExclusive,
-		StatusVisible:     item.StatusVisible,
-		Quotas:            appgroupCloneQuotas(item.Quotas),
-		ModelRouting:      appgroupCloneModelRouting(item.ModelRouting),
-		ServiceTier:       item.ServiceTier,
-		ForceInstructions: item.ForceInstructions,
-		Note:              item.Note,
-		SortWeight:        item.SortWeight,
-		CreatedAt:         item.CreatedAt,
-		UpdatedAt:         item.UpdatedAt,
+		ID:             item.ID,
+		Name:           item.Name,
+		Platform:       item.Platform,
+		RateMultiplier: item.RateMultiplier,
+		IsExclusive:    item.IsExclusive,
+		StatusVisible:  item.StatusVisible,
+		Note:           item.Note,
+		SortWeight:     item.SortWeight,
+		CreatedAt:      item.CreatedAt,
+		UpdatedAt:      item.UpdatedAt,
 	}
-}
-
-func appgroupCloneQuotas(input map[string]any) map[string]any {
-	if input == nil {
-		return nil
-	}
-	cloned := make(map[string]any, len(input))
-	for key, value := range input {
-		cloned[key] = value
-	}
-	return cloned
-}
-
-func appgroupCloneModelRouting(input map[string][]int64) map[string][]int64 {
-	if input == nil {
-		return nil
-	}
-	cloned := make(map[string][]int64, len(input))
-	for key, value := range input {
-		cloned[key] = append([]int64(nil), value...)
-	}
-	return cloned
 }

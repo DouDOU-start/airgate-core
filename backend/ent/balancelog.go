@@ -32,7 +32,7 @@ type BalanceLog struct {
 	UserIDSnapshot int `json:"user_id_snapshot,omitempty"`
 	// 用户邮箱快照。用户硬删除后保留余额流水归属。
 	UserEmailSnapshot string `json:"user_email_snapshot,omitempty"`
-	// 幂等键。插件经 user.update_balance 入账时防重复；NULL 表示无幂等要求。
+	// 幂等键。支付回调 / 兑换码等入账链路防重复；NULL 表示无幂等要求。
 	IdempotencyKey *string `json:"idempotency_key,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`

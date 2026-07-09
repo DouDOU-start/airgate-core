@@ -46,6 +46,8 @@ type Server struct {
 	ipRateLimiter *middleware.IPRateLimiter
 	// oauthRateLimiter /oauth/token 端点的 IP 限流器（防 secret 爆破）。
 	oauthRateLimiter *middleware.IPRateLimiter
+	// ccUsageRateLimiter /v1/usage（cc-switch 兼容端点）的 IP 限流器（防刷）。
+	ccUsageRateLimiter *middleware.IPRateLimiter
 
 	backgroundCancel context.CancelFunc
 }
@@ -150,8 +152,6 @@ func (s *Server) StartBackground(ctx context.Context) {
 	}
 
 	// 支付服务商装载（失败不阻塞启动：admin 保存配置时会再次 Reload）+ 订单过期清理。
-	// 先把旧插件回填的明文敏感配置一次性加密规范化，再装载。
-	s.handlers.PaymentService.NormalizeLegacyConfigs(ctx)
 	if err := s.handlers.PaymentService.ReloadProviders(ctx); err != nil {
 		slog.Warn("payment_providers_initial_load_failed", "error", err)
 	}
@@ -199,6 +199,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 	if s.oauthRateLimiter != nil {
 		s.oauthRateLimiter.Stop()
+	}
+	if s.ccUsageRateLimiter != nil {
+		s.ccUsageRateLimiter.Stop()
 	}
 
 	// 先排空 HTTP 在途请求，再停两个 recorder：在途请求收尾时仍会调 Record，

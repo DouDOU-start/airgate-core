@@ -19,8 +19,9 @@ import (
 // ModelTagUpdate is the builder for updating ModelTag entities.
 type ModelTagUpdate struct {
 	config
-	hooks    []Hook
-	mutation *ModelTagMutation
+	hooks     []Hook
+	mutation  *ModelTagMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the ModelTagUpdate builder.
@@ -136,6 +137,12 @@ func (mtu *ModelTagUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (mtu *ModelTagUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *ModelTagUpdate {
+	mtu.modifiers = append(mtu.modifiers, modifiers...)
+	return mtu
+}
+
 func (mtu *ModelTagUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := mtu.check(); err != nil {
 		return n, err
@@ -199,6 +206,7 @@ func (mtu *ModelTagUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(mtu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, mtu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{modeltag.Label}
@@ -214,9 +222,10 @@ func (mtu *ModelTagUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // ModelTagUpdateOne is the builder for updating a single ModelTag entity.
 type ModelTagUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *ModelTagMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *ModelTagMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetName sets the "name" field.
@@ -339,6 +348,12 @@ func (mtuo *ModelTagUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (mtuo *ModelTagUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *ModelTagUpdateOne {
+	mtuo.modifiers = append(mtuo.modifiers, modifiers...)
+	return mtuo
+}
+
 func (mtuo *ModelTagUpdateOne) sqlSave(ctx context.Context) (_node *ModelTag, err error) {
 	if err := mtuo.check(); err != nil {
 		return _node, err
@@ -419,6 +434,7 @@ func (mtuo *ModelTagUpdateOne) sqlSave(ctx context.Context) (_node *ModelTag, er
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(mtuo.modifiers...)
 	_node = &ModelTag{config: mtuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

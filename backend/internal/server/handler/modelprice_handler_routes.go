@@ -66,7 +66,7 @@ func (h *ModelPriceHandler) CreateModelPrice(c *gin.Context) {
 
 // UpdateModelPrice 更新模型价格。
 func (h *ModelPriceHandler) UpdateModelPrice(c *gin.Context) {
-	id, err := parseModelPriceID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的价格条目 ID")
 		return
@@ -100,7 +100,7 @@ func (h *ModelPriceHandler) UpdateModelPrice(c *gin.Context) {
 
 // DeleteModelPrice 删除模型价格。
 func (h *ModelPriceHandler) DeleteModelPrice(c *gin.Context) {
-	id, err := parseModelPriceID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的价格条目 ID")
 		return
@@ -186,7 +186,7 @@ func (h *ModelPriceHandler) CreateModelTag(c *gin.Context) {
 
 // UpdateModelTag 重命名模型标签。
 func (h *ModelPriceHandler) UpdateModelTag(c *gin.Context) {
-	id, err := parseModelPriceID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的标签 ID")
 		return
@@ -207,7 +207,7 @@ func (h *ModelPriceHandler) UpdateModelTag(c *gin.Context) {
 
 // DeleteModelTag 删除模型标签（引用该标签的模型置为无标签）。
 func (h *ModelPriceHandler) DeleteModelTag(c *gin.Context) {
-	id, err := parseModelPriceID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的标签 ID")
 		return

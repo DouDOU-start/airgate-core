@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 )
 
 const (
@@ -42,7 +42,7 @@ func NewService(repo Repository) *Service {
 
 // Generate 批量生成兑换码（32 位随机 hex，同批次共享备注与过期时间）。
 func (s *Service) Generate(ctx context.Context, input GenerateInput) ([]Code, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	if input.Count < 1 || input.Count > maxBatchCount {
 		return nil, ErrInvalidGenerateInput
 	}
@@ -72,7 +72,7 @@ func (s *Service) Generate(ctx context.Context, input GenerateInput) ([]Code, er
 	}
 	created, err := s.repo.CreateBatch(ctx, codes)
 	if err != nil {
-		logger.Error("redemption_generate_failed", "count", input.Count, sdk.LogFieldError, err)
+		logger.Error("redemption_generate_failed", "count", input.Count, logx.LogFieldError, err)
 		return nil, err
 	}
 	logger.Info("redemption_codes_generated", "count", len(created), "value", input.Value)
@@ -118,13 +118,13 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 
 // Redeem 用户兑换：失败限流 → 单事务入账（并发安全由 store 条件更新保证）。
 func (s *Service) Redeem(ctx context.Context, userID int, rawCode string) (RedeemResult, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	code := strings.TrimSpace(rawCode)
 	if code == "" || len(code) > 64 {
 		return RedeemResult{}, ErrCodeNotFound
 	}
 	if !s.allowAttempt(userID) {
-		logger.Warn("redemption_rate_limited", sdk.LogFieldUserID, userID)
+		logger.Warn("redemption_rate_limited", logx.LogFieldUserID, userID)
 		return RedeemResult{}, ErrRedeemRateLimited
 	}
 
@@ -134,13 +134,13 @@ func (s *Service) Redeem(ctx context.Context, userID int, rawCode string) (Redee
 		switch err {
 		case ErrCodeNotFound, ErrCodeUsed, ErrCodeDisabled, ErrCodeExpired:
 			s.recordFail(userID)
-			logger.Info("redemption_redeem_rejected", sdk.LogFieldUserID, userID, sdk.LogFieldReason, err.Error())
+			logger.Info("redemption_redeem_rejected", logx.LogFieldUserID, userID, logx.LogFieldReason, err.Error())
 		default:
-			logger.Error("redemption_redeem_failed", sdk.LogFieldUserID, userID, sdk.LogFieldError, err)
+			logger.Error("redemption_redeem_failed", logx.LogFieldUserID, userID, logx.LogFieldError, err)
 		}
 		return RedeemResult{}, err
 	}
-	logger.Info("redemption_redeemed", sdk.LogFieldUserID, userID, "value", result.Value)
+	logger.Info("redemption_redeemed", logx.LogFieldUserID, userID, "value", result.Value)
 	return result, nil
 }
 

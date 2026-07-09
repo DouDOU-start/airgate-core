@@ -102,16 +102,15 @@ type JWTConfig struct {
 	ExpireHour int    `yaml:"expire_hour"`
 }
 
-// defaultAPIKeySecret 内置默认 API Key 加密密钥（hex 编码 32 字节）
-// 用户未配置或配置格式不合规时自动使用此值
+// defaultAPIKeySecret 内置默认 API Key 加密密钥（hex 编码 32 字节）。
+// 用户未配置或配置格式不合规时自动使用此值；生产环境建议配置随机密钥。
 const defaultAPIKeySecret = "6a8f3d2e1b9c4f7a0e5d2c8b3a1f6e9d4c7b2a5e8f1d3c6b9a2e5f8d1c4b7a0e"
 
 // APIKeySecret 返回实际使用的 API Key 加密密钥：
-// 优先使用配置值（需为合法 hex 且 ≥64 字符），否则使用内置默认值
+// 优先使用配置值（需为合法 hex 且 ≥64 字符），否则使用内置默认值。
 func (c *Config) APIKeySecret() string {
 	s := c.Security.APIKeySecret
 	if len(s) >= 64 {
-		// 简单校验：尝试 hex 解码前 64 字符
 		if b, err := hex.DecodeString(s[:64]); err == nil && len(b) == 32 {
 			return s
 		}

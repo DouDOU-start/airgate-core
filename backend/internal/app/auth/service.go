@@ -5,18 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 
 	corauth "github.com/DouDOU-start/airgate-core/internal/auth"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 )
 
 // SettingsLister 读取系统设置（由 settings 服务实现）。
 type SettingsLister interface {
 	List(ctx context.Context, group string) ([]Setting, error)
+	// NewUserDefaults 读取新用户默认余额与并发数（解析逻辑收口在 settings 服务）。
+	NewUserDefaults(ctx context.Context) (balance float64, concurrency int)
 }
 
 // VerifyCodeStore 验证码存储接口。
@@ -69,35 +70,35 @@ func (s *Service) SetMailerFactory(f MailSenderFactory) {
 
 // Login 用户登录。
 func (s *Service) Login(ctx context.Context, input LoginInput) (LoginResult, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	user, err := s.repo.FindByEmail(ctx, input.Email)
 	if err != nil {
 		if IsUserMissing(err) {
-			logger.Warn("user_login_rejected", sdk.LogFieldReason, "user_not_found")
+			logger.Warn("user_login_rejected", logx.LogFieldReason, "user_not_found")
 		} else {
-			logger.Error("user_lookup_failed", sdk.LogFieldError, err)
+			logger.Error("user_lookup_failed", logx.LogFieldError, err)
 		}
 		return LoginResult{}, ErrInvalidCredentials
 	}
 
 	if user.Status != "active" {
-		logger.Warn("user_login_rejected", sdk.LogFieldReason, "user_disabled", sdk.LogFieldUserID, user.ID)
+		logger.Warn("user_login_rejected", logx.LogFieldReason, "user_disabled", logx.LogFieldUserID, user.ID)
 		return LoginResult{}, ErrUserDisabled
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
-		logger.Warn("user_login_rejected", sdk.LogFieldReason, "password_mismatch", sdk.LogFieldUserID, user.ID)
+		logger.Warn("user_login_rejected", logx.LogFieldReason, "password_mismatch", logx.LogFieldUserID, user.ID)
 		return LoginResult{}, ErrInvalidCredentials
 	}
 
 	token, err := s.jwtMgr.GenerateToken(user.ID, user.Role, user.Email)
 	if err != nil {
-		logger.Error("jwt_issue_failed", sdk.LogFieldUserID, user.ID, sdk.LogFieldError, err)
+		logger.Error("jwt_issue_failed", logx.LogFieldUserID, user.ID, logx.LogFieldError, err)
 		return LoginResult{}, err
 	}
 
-	logger.Info("user_login_succeeded", sdk.LogFieldUserID, user.ID)
+	logger.Info("user_login_succeeded", logx.LogFieldUserID, user.ID)
 
 	return LoginResult{
 		Token: token,
@@ -107,7 +108,7 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (LoginResult, err
 
 // LoginByAPIKey 使用 API Key 登录（仅能查看该 Key 的使用记录）。
 func (s *Service) LoginByAPIKey(ctx context.Context, input LoginByAPIKeyInput) (LoginByAPIKeyResult, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	if !strings.HasPrefix(input.Key, "sk-") {
 		return LoginByAPIKeyResult{}, ErrInvalidAPIKeyFormat
@@ -115,26 +116,26 @@ func (s *Service) LoginByAPIKey(ctx context.Context, input LoginByAPIKeyInput) (
 
 	info, err := s.repo.ValidateAPIKeyForLogin(ctx, input.Key)
 	if err != nil {
-		logger.Warn("api_key_login_rejected", sdk.LogFieldError, err)
+		logger.Warn("api_key_login_rejected", logx.LogFieldError, err)
 		return LoginByAPIKeyResult{}, err
 	}
 
 	// 查询用户信息
 	user, err := s.repo.FindByID(ctx, info.UserID, true)
 	if err != nil {
-		logger.Error("user_lookup_failed", sdk.LogFieldUserID, info.UserID, sdk.LogFieldError, err)
+		logger.Error("user_lookup_failed", logx.LogFieldUserID, info.UserID, logx.LogFieldError, err)
 		return LoginByAPIKeyResult{}, err
 	}
 
 	if user.Status != "active" {
-		logger.Warn("api_key_login_rejected", sdk.LogFieldReason, "user_disabled", sdk.LogFieldUserID, user.ID)
+		logger.Warn("api_key_login_rejected", logx.LogFieldReason, "user_disabled", logx.LogFieldUserID, user.ID)
 		return LoginByAPIKeyResult{}, ErrUserDisabled
 	}
 
 	// 签发带 api_key_id 的受限 JWT。API Key 登录不继承管理员角色。
 	token, err := s.jwtMgr.GenerateAPIKeyToken(user.ID, corauth.APIKeySessionRole, user.Email, info.KeyID)
 	if err != nil {
-		logger.Error("jwt_issue_failed", sdk.LogFieldUserID, user.ID, sdk.LogFieldError, err)
+		logger.Error("jwt_issue_failed", logx.LogFieldUserID, user.ID, logx.LogFieldError, err)
 		return LoginByAPIKeyResult{}, err
 	}
 
@@ -158,13 +159,13 @@ func (s *Service) LoginByAPIKey(ctx context.Context, input LoginByAPIKeyInput) (
 		}
 	}
 
-	logger.Info("api_key_login_succeeded", sdk.LogFieldUserID, user.ID, sdk.LogFieldAPIKeyID, info.KeyID)
+	logger.Info("api_key_login_succeeded", logx.LogFieldUserID, user.ID, logx.LogFieldAPIKeyID, info.KeyID)
 	return result, nil
 }
 
 // Register 用户注册（含注册开关/验证码/默认值等业务编排）。
 func (s *Service) Register(ctx context.Context, input RegisterInput) (LoginResult, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	// 检查注册开关
 	if !s.isRegistrationEnabled(ctx) {
@@ -186,17 +187,17 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (LoginResul
 
 	exists, err := s.repo.EmailExists(ctx, input.Email)
 	if err != nil {
-		logger.Error("user_lookup_failed", sdk.LogFieldError, err)
+		logger.Error("user_lookup_failed", logx.LogFieldError, err)
 		return LoginResult{}, err
 	}
 	if exists {
-		logger.Warn("user_register_rejected", sdk.LogFieldReason, "email_already_exists")
+		logger.Warn("user_register_rejected", logx.LogFieldReason, "email_already_exists")
 		return LoginResult{}, ErrEmailAlreadyExists
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
-		logger.Error("user_register_failed", sdk.LogFieldReason, "password_hash", sdk.LogFieldError, err)
+		logger.Error("user_register_failed", logx.LogFieldReason, "password_hash", logx.LogFieldError, err)
 		return LoginResult{}, err
 	}
 
@@ -210,17 +211,17 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (LoginResul
 		MaxConcurrency: defaultConcurrency,
 	})
 	if err != nil {
-		logger.Error("user_register_failed", sdk.LogFieldReason, "create_user", sdk.LogFieldError, err)
+		logger.Error("user_register_failed", logx.LogFieldReason, "create_user", logx.LogFieldError, err)
 		return LoginResult{}, err
 	}
 
 	token, err := s.jwtMgr.GenerateToken(user.ID, user.Role, user.Email)
 	if err != nil {
-		logger.Error("jwt_issue_failed", sdk.LogFieldUserID, user.ID, sdk.LogFieldError, err)
+		logger.Error("jwt_issue_failed", logx.LogFieldUserID, user.ID, logx.LogFieldError, err)
 		return LoginResult{}, err
 	}
 
-	logger.Info("user_register_succeeded", sdk.LogFieldUserID, user.ID)
+	logger.Info("user_register_succeeded", logx.LogFieldUserID, user.ID)
 
 	return LoginResult{
 		Token: token,
@@ -230,12 +231,12 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (LoginResul
 
 // SendVerifyCode 发送邮箱验证码。
 func (s *Service) SendVerifyCode(ctx context.Context, input SendVerifyCodeInput) error {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 
 	// 检查邮箱是否已注册
 	exists, err := s.repo.EmailExists(ctx, input.Email)
 	if err != nil {
-		logger.Error("email_check_failed", sdk.LogFieldError, err)
+		logger.Error("email_check_failed", logx.LogFieldError, err)
 		return fmt.Errorf("检查邮箱失败: %w", err)
 	}
 	if exists {
@@ -255,7 +256,7 @@ func (s *Service) SendVerifyCode(ctx context.Context, input SendVerifyCodeInput)
 	}
 	m, err := s.mailerFactory(ctx)
 	if err != nil {
-		logger.Error("构建邮件发送器失败", sdk.LogFieldError, err)
+		logger.Error("构建邮件发送器失败", logx.LogFieldError, err)
 		return ErrMailerNotConfigured
 	}
 
@@ -272,21 +273,12 @@ func (s *Service) SendVerifyCode(ctx context.Context, input SendVerifyCodeInput)
 	body := replacer.Replace(bodyTpl)
 
 	if err := m.Send(input.Email, subject, body); err != nil {
-		logger.Error("发送验证码邮件失败", "email", input.Email, sdk.LogFieldError, err)
+		// 日志只留脱敏邮箱，避免完整 email 进日志
+		logger.Error("发送验证码邮件失败", "email", logx.MaskEmail(input.Email), logx.LogFieldError, err)
 		return fmt.Errorf("%w: %v", ErrSendMailFailed, err)
 	}
 
 	return nil
-}
-
-// FindByID 根据 ID 查询用户。
-func (s *Service) FindByID(ctx context.Context, id int) (User, error) {
-	return s.repo.FindByID(ctx, id, true)
-}
-
-// EmailExists 检查邮箱是否已注册。
-func (s *Service) EmailExists(ctx context.Context, email string) (bool, error) {
-	return s.repo.EmailExists(ctx, email)
 }
 
 // CheckVerifyCode 校验验证码（不消耗），供 VerifyCode 接口使用。
@@ -331,29 +323,13 @@ func (s *Service) isEmailVerifyEnabled(ctx context.Context) bool {
 	return false
 }
 
-// getNewUserDefaults 读取新用户默认余额和并发数。
+// getNewUserDefaults 读取新用户默认余额和并发数（解析逻辑收口在
+// app/settings.Service.NewUserDefaults，此处仅做未注入时的兜底）。
 func (s *Service) getNewUserDefaults(ctx context.Context) (balance float64, concurrency int) {
-	concurrency = 5 // 默认值
 	if s.settings == nil {
-		return
+		return 0, 5
 	}
-	settings, err := s.settings.List(ctx, "defaults")
-	if err != nil {
-		return
-	}
-	for _, item := range settings {
-		switch item.Key {
-		case "default_balance":
-			if v, e := strconv.ParseFloat(strings.TrimSpace(item.Value), 64); e == nil {
-				balance = v
-			}
-		case "default_concurrency":
-			if v, e := strconv.Atoi(strings.TrimSpace(item.Value)); e == nil && v > 0 {
-				concurrency = v
-			}
-		}
-	}
-	return
+	return s.settings.NewUserDefaults(ctx)
 }
 
 // defaultVerifyEmailSubject 验证码邮件默认主题模板。
@@ -408,32 +384,53 @@ func (s *Service) loadEmailTemplate(ctx context.Context) (siteName, subjectTpl, 
 }
 
 // RefreshToken 刷新 JWT。
+// 普通用户分支同样按库中状态校验：用户不存在或已禁用时拒绝续签，
+// 防止禁用用户凭旧 token 无限续命。
 func (s *Service) RefreshToken(ctx context.Context, identity AuthIdentity) (string, error) {
 	if identity.APIKeyID > 0 {
 		user, err := s.repo.ValidateAPIKeySession(ctx, identity.UserID, identity.APIKeyID)
 		if err != nil {
 			slog.Default().Warn("api_key_session_refresh_rejected",
-				sdk.LogFieldUserID, identity.UserID,
-				sdk.LogFieldAPIKeyID, identity.APIKeyID,
-				sdk.LogFieldError, err,
+				logx.LogFieldUserID, identity.UserID,
+				logx.LogFieldAPIKeyID, identity.APIKeyID,
+				logx.LogFieldError, err,
 			)
 			return "", err
 		}
 		token, err := s.jwtMgr.GenerateAPIKeyToken(user.ID, corauth.APIKeySessionRole, user.Email, identity.APIKeyID)
 		if err != nil {
 			slog.Default().Error("jwt_issue_failed",
-				sdk.LogFieldUserID, identity.UserID,
-				sdk.LogFieldAPIKeyID, identity.APIKeyID,
-				sdk.LogFieldError, err,
+				logx.LogFieldUserID, identity.UserID,
+				logx.LogFieldAPIKeyID, identity.APIKeyID,
+				logx.LogFieldError, err,
 			)
 		}
 		return token, err
 	}
-	token, err := s.jwtMgr.GenerateToken(identity.UserID, identity.Role, identity.Email)
+
+	user, err := s.repo.FindByID(ctx, identity.UserID, false)
+	if err != nil {
+		slog.Default().Warn("token_refresh_rejected",
+			logx.LogFieldUserID, identity.UserID,
+			logx.LogFieldReason, "user_lookup_failed",
+			logx.LogFieldError, err,
+		)
+		return "", err
+	}
+	if user.Status != "active" {
+		slog.Default().Warn("token_refresh_rejected",
+			logx.LogFieldUserID, identity.UserID,
+			logx.LogFieldReason, "user_disabled",
+		)
+		return "", ErrUserDisabled
+	}
+
+	// 用库中最新的 role/email 签发，避免旧 token 携带的过期身份继续传播
+	token, err := s.jwtMgr.GenerateToken(user.ID, user.Role, user.Email)
 	if err != nil {
 		slog.Default().Error("jwt_issue_failed",
-			sdk.LogFieldUserID, identity.UserID,
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, identity.UserID,
+			logx.LogFieldError, err,
 		)
 	}
 	return token, err

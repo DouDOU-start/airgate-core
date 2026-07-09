@@ -18,8 +18,9 @@ import (
 // AnnouncementReadUpdate is the builder for updating AnnouncementRead entities.
 type AnnouncementReadUpdate struct {
 	config
-	hooks    []Hook
-	mutation *AnnouncementReadMutation
+	hooks     []Hook
+	mutation  *AnnouncementReadMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the AnnouncementReadUpdate builder.
@@ -131,6 +132,12 @@ func (aru *AnnouncementReadUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (aru *AnnouncementReadUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *AnnouncementReadUpdate {
+	aru.modifiers = append(aru.modifiers, modifiers...)
+	return aru
+}
+
 func (aru *AnnouncementReadUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := aru.check(); err != nil {
 		return n, err
@@ -158,6 +165,7 @@ func (aru *AnnouncementReadUpdate) sqlSave(ctx context.Context) (n int, err erro
 	if value, ok := aru.mutation.ReadAt(); ok {
 		_spec.SetField(announcementread.FieldReadAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(aru.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, aru.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{announcementread.Label}
@@ -173,9 +181,10 @@ func (aru *AnnouncementReadUpdate) sqlSave(ctx context.Context) (n int, err erro
 // AnnouncementReadUpdateOne is the builder for updating a single AnnouncementRead entity.
 type AnnouncementReadUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *AnnouncementReadMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *AnnouncementReadMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetAnnouncementID sets the "announcement_id" field.
@@ -294,6 +303,12 @@ func (aruo *AnnouncementReadUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (aruo *AnnouncementReadUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *AnnouncementReadUpdateOne {
+	aruo.modifiers = append(aruo.modifiers, modifiers...)
+	return aruo
+}
+
 func (aruo *AnnouncementReadUpdateOne) sqlSave(ctx context.Context) (_node *AnnouncementRead, err error) {
 	if err := aruo.check(); err != nil {
 		return _node, err
@@ -338,6 +353,7 @@ func (aruo *AnnouncementReadUpdateOne) sqlSave(ctx context.Context) (_node *Anno
 	if value, ok := aruo.mutation.ReadAt(); ok {
 		_spec.SetField(announcementread.FieldReadAt, field.TypeTime, value)
 	}
+	_spec.AddModifiers(aruo.modifiers...)
 	_node = &AnnouncementRead{config: aruo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

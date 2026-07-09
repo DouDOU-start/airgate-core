@@ -34,18 +34,6 @@ func (s *OAuthClientStore) List(ctx context.Context) ([]appoauth.Client, error) 
 	return result, nil
 }
 
-// FindByID 按主键查客户端。
-func (s *OAuthClientStore) FindByID(ctx context.Context, id int) (appoauth.Client, error) {
-	item, err := s.db.OAuthClient.Get(ctx, id)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return appoauth.Client{}, appoauth.ErrClientNotFound
-		}
-		return appoauth.Client{}, err
-	}
-	return mapOAuthClient(item), nil
-}
-
 // FindByClientID 按对外 client_id 查客户端。
 func (s *OAuthClientStore) FindByClientID(ctx context.Context, clientID string) (appoauth.Client, error) {
 	item, err := s.db.OAuthClient.Query().

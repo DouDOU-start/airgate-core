@@ -19,7 +19,7 @@ import (
 	"os"
 	"path/filepath"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 
 	appmodelprice "github.com/DouDOU-start/airgate-core/internal/app/modelprice"
 )
@@ -50,7 +50,7 @@ func Load(ctx context.Context, store PriceStore, configPath string) {
 
 	items, err := Parse(data)
 	if err != nil {
-		slog.Warn("price_seed_parse_failed", "source", source, sdk.LogFieldError, err)
+		slog.Warn("price_seed_parse_failed", "source", source, logx.LogFieldError, err)
 		return
 	}
 	if len(items) == 0 {
@@ -61,7 +61,7 @@ func Load(ctx context.Context, store PriceStore, configPath string) {
 	inserted, skipped, err := insertMissing(ctx, store, items)
 	if err != nil {
 		// insertMissing 内部对单条失败已降级为 continue；此处仅 ListAll 失败会触发。
-		slog.Warn("price_seed_failed", "source", source, sdk.LogFieldError, err)
+		slog.Warn("price_seed_failed", "source", source, logx.LogFieldError, err)
 		return
 	}
 
@@ -75,7 +75,7 @@ func resolveSource(configPath string) ([]byte, string) {
 		if data, err := os.ReadFile(p); err == nil {
 			return data, p
 		} else {
-			slog.Warn("price_seed_external_read_failed", "path", p, sdk.LogFieldError, err)
+			slog.Warn("price_seed_external_read_failed", "path", p, logx.LogFieldError, err)
 		}
 	}
 
@@ -117,7 +117,7 @@ func insertMissing(ctx context.Context, store PriceStore, items []SeedItem) (ins
 			if !ok {
 				var terr error
 				if id, terr = store.EnsureTag(ctx, item.TagName); terr != nil {
-					slog.Warn("price_seed_tag_failed", "model", item.Model, "tag", item.TagName, sdk.LogFieldError, terr)
+					slog.Warn("price_seed_tag_failed", "model", item.Model, "tag", item.TagName, logx.LogFieldError, terr)
 					id = 0
 				}
 				tagIDs[item.TagName] = id
@@ -128,7 +128,7 @@ func insertMissing(ctx context.Context, store PriceStore, items []SeedItem) (ins
 			}
 		}
 		if _, cerr := store.Create(ctx, input); cerr != nil {
-			slog.Warn("price_seed_insert_failed", "model", item.Model, sdk.LogFieldError, cerr)
+			slog.Warn("price_seed_insert_failed", "model", item.Model, logx.LogFieldError, cerr)
 			continue
 		}
 		// 记入 present，防止种子内重复 model 触发二次 Create。

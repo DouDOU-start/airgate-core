@@ -92,7 +92,7 @@ func buildInfo(mutate ...func(*adaptor.RelayInfo)) *adaptor.RelayInfo {
 		APIKey:        "sk-upstream",
 		RequestModel:  "gpt-4o",
 		UpstreamModel: "gpt-4o",
-		EntryProtocol: "openai",
+		Endpoint:      adaptor.EndpointChatCompletions,
 	}
 	for _, m := range mutate {
 		m(info)
@@ -528,7 +528,7 @@ func observeImage(endpoint string, lines ...string) adaptor.StreamObserver {
 // TestNewStreamObserverOnlyImages 仅图像端点返回观察器；chat/responses 返回 nil
 // （管线维持既有 OpenAI SSE 内联捕获语义不变）。
 func TestNewStreamObserverOnlyImages(t *testing.T) {
-	for _, endpoint := range []string{"", adaptor.EndpointChatCompletions, adaptor.EndpointResponses} {
+	for _, endpoint := range []string{adaptor.EndpointChatCompletions, adaptor.EndpointResponses} {
 		info := buildInfo(func(i *adaptor.RelayInfo) { i.Endpoint = endpoint })
 		if obs := (Adaptor{}).NewStreamObserver(info); obs != nil {
 			t.Errorf("endpoint=%q 不应返回观察器", endpoint)

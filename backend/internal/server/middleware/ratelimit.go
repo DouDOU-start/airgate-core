@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/time/rate"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 )
 
 // ipLimiterEntry 存储单个 IP 的限流器及最后访问时间（用于过期清理）。
@@ -112,7 +112,7 @@ func NewIPRateLimit(reqPerMin float64) IPRateLimitResult {
 			slog.Warn("ip_rate_limited",
 				"ip", ip,
 				"path", c.Request.URL.Path,
-				sdk.LogFieldRequestID, RequestIDFromGinContext(c),
+				logx.LogFieldRequestID, RequestIDFromGinContext(c),
 			)
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error":   "too_many_requests",

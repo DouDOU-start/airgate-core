@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/paymentproviderconfig"
@@ -18,6 +19,7 @@ type PaymentProviderConfigCreate struct {
 	config
 	mutation *PaymentProviderConfigMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetProviderKey sets the "provider_key" field.
@@ -185,6 +187,7 @@ func (ppcc *PaymentProviderConfigCreate) createSpec() (*PaymentProviderConfig, *
 		_node = &PaymentProviderConfig{config: ppcc.config}
 		_spec = sqlgraph.NewCreateSpec(paymentproviderconfig.Table, sqlgraph.NewFieldSpec(paymentproviderconfig.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = ppcc.conflict
 	if value, ok := ppcc.mutation.ProviderKey(); ok {
 		_spec.SetField(paymentproviderconfig.FieldProviderKey, field.TypeString, value)
 		_node.ProviderKey = value
@@ -212,11 +215,269 @@ func (ppcc *PaymentProviderConfigCreate) createSpec() (*PaymentProviderConfig, *
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.PaymentProviderConfig.Create().
+//		SetProviderKey(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.PaymentProviderConfigUpsert) {
+//			SetProviderKey(v+v).
+//		}).
+//		Exec(ctx)
+func (ppcc *PaymentProviderConfigCreate) OnConflict(opts ...sql.ConflictOption) *PaymentProviderConfigUpsertOne {
+	ppcc.conflict = opts
+	return &PaymentProviderConfigUpsertOne{
+		create: ppcc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.PaymentProviderConfig.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (ppcc *PaymentProviderConfigCreate) OnConflictColumns(columns ...string) *PaymentProviderConfigUpsertOne {
+	ppcc.conflict = append(ppcc.conflict, sql.ConflictColumns(columns...))
+	return &PaymentProviderConfigUpsertOne{
+		create: ppcc,
+	}
+}
+
+type (
+	// PaymentProviderConfigUpsertOne is the builder for "upsert"-ing
+	//  one PaymentProviderConfig node.
+	PaymentProviderConfigUpsertOne struct {
+		create *PaymentProviderConfigCreate
+	}
+
+	// PaymentProviderConfigUpsert is the "OnConflict" setter.
+	PaymentProviderConfigUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetProviderKey sets the "provider_key" field.
+func (u *PaymentProviderConfigUpsert) SetProviderKey(v string) *PaymentProviderConfigUpsert {
+	u.Set(paymentproviderconfig.FieldProviderKey, v)
+	return u
+}
+
+// UpdateProviderKey sets the "provider_key" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsert) UpdateProviderKey() *PaymentProviderConfigUpsert {
+	u.SetExcluded(paymentproviderconfig.FieldProviderKey)
+	return u
+}
+
+// SetKind sets the "kind" field.
+func (u *PaymentProviderConfigUpsert) SetKind(v string) *PaymentProviderConfigUpsert {
+	u.Set(paymentproviderconfig.FieldKind, v)
+	return u
+}
+
+// UpdateKind sets the "kind" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsert) UpdateKind() *PaymentProviderConfigUpsert {
+	u.SetExcluded(paymentproviderconfig.FieldKind)
+	return u
+}
+
+// SetEnabled sets the "enabled" field.
+func (u *PaymentProviderConfigUpsert) SetEnabled(v bool) *PaymentProviderConfigUpsert {
+	u.Set(paymentproviderconfig.FieldEnabled, v)
+	return u
+}
+
+// UpdateEnabled sets the "enabled" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsert) UpdateEnabled() *PaymentProviderConfigUpsert {
+	u.SetExcluded(paymentproviderconfig.FieldEnabled)
+	return u
+}
+
+// SetConfig sets the "config" field.
+func (u *PaymentProviderConfigUpsert) SetConfig(v map[string]string) *PaymentProviderConfigUpsert {
+	u.Set(paymentproviderconfig.FieldConfig, v)
+	return u
+}
+
+// UpdateConfig sets the "config" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsert) UpdateConfig() *PaymentProviderConfigUpsert {
+	u.SetExcluded(paymentproviderconfig.FieldConfig)
+	return u
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *PaymentProviderConfigUpsert) SetUpdatedAt(v time.Time) *PaymentProviderConfigUpsert {
+	u.Set(paymentproviderconfig.FieldUpdatedAt, v)
+	return u
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsert) UpdateUpdatedAt() *PaymentProviderConfigUpsert {
+	u.SetExcluded(paymentproviderconfig.FieldUpdatedAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.PaymentProviderConfig.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *PaymentProviderConfigUpsertOne) UpdateNewValues() *PaymentProviderConfigUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(paymentproviderconfig.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.PaymentProviderConfig.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *PaymentProviderConfigUpsertOne) Ignore() *PaymentProviderConfigUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *PaymentProviderConfigUpsertOne) DoNothing() *PaymentProviderConfigUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the PaymentProviderConfigCreate.OnConflict
+// documentation for more info.
+func (u *PaymentProviderConfigUpsertOne) Update(set func(*PaymentProviderConfigUpsert)) *PaymentProviderConfigUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&PaymentProviderConfigUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetProviderKey sets the "provider_key" field.
+func (u *PaymentProviderConfigUpsertOne) SetProviderKey(v string) *PaymentProviderConfigUpsertOne {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.SetProviderKey(v)
+	})
+}
+
+// UpdateProviderKey sets the "provider_key" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsertOne) UpdateProviderKey() *PaymentProviderConfigUpsertOne {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.UpdateProviderKey()
+	})
+}
+
+// SetKind sets the "kind" field.
+func (u *PaymentProviderConfigUpsertOne) SetKind(v string) *PaymentProviderConfigUpsertOne {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.SetKind(v)
+	})
+}
+
+// UpdateKind sets the "kind" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsertOne) UpdateKind() *PaymentProviderConfigUpsertOne {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.UpdateKind()
+	})
+}
+
+// SetEnabled sets the "enabled" field.
+func (u *PaymentProviderConfigUpsertOne) SetEnabled(v bool) *PaymentProviderConfigUpsertOne {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.SetEnabled(v)
+	})
+}
+
+// UpdateEnabled sets the "enabled" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsertOne) UpdateEnabled() *PaymentProviderConfigUpsertOne {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.UpdateEnabled()
+	})
+}
+
+// SetConfig sets the "config" field.
+func (u *PaymentProviderConfigUpsertOne) SetConfig(v map[string]string) *PaymentProviderConfigUpsertOne {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.SetConfig(v)
+	})
+}
+
+// UpdateConfig sets the "config" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsertOne) UpdateConfig() *PaymentProviderConfigUpsertOne {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.UpdateConfig()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *PaymentProviderConfigUpsertOne) SetUpdatedAt(v time.Time) *PaymentProviderConfigUpsertOne {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsertOne) UpdateUpdatedAt() *PaymentProviderConfigUpsertOne {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *PaymentProviderConfigUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for PaymentProviderConfigCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *PaymentProviderConfigUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *PaymentProviderConfigUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *PaymentProviderConfigUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // PaymentProviderConfigCreateBulk is the builder for creating many PaymentProviderConfig entities in bulk.
 type PaymentProviderConfigCreateBulk struct {
 	config
 	err      error
 	builders []*PaymentProviderConfigCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the PaymentProviderConfig entities in the database.
@@ -246,6 +507,7 @@ func (ppccb *PaymentProviderConfigCreateBulk) Save(ctx context.Context) ([]*Paym
 					_, err = mutators[i+1].Mutate(root, ppccb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = ppccb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, ppccb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -296,6 +558,187 @@ func (ppccb *PaymentProviderConfigCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (ppccb *PaymentProviderConfigCreateBulk) ExecX(ctx context.Context) {
 	if err := ppccb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.PaymentProviderConfig.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.PaymentProviderConfigUpsert) {
+//			SetProviderKey(v+v).
+//		}).
+//		Exec(ctx)
+func (ppccb *PaymentProviderConfigCreateBulk) OnConflict(opts ...sql.ConflictOption) *PaymentProviderConfigUpsertBulk {
+	ppccb.conflict = opts
+	return &PaymentProviderConfigUpsertBulk{
+		create: ppccb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.PaymentProviderConfig.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (ppccb *PaymentProviderConfigCreateBulk) OnConflictColumns(columns ...string) *PaymentProviderConfigUpsertBulk {
+	ppccb.conflict = append(ppccb.conflict, sql.ConflictColumns(columns...))
+	return &PaymentProviderConfigUpsertBulk{
+		create: ppccb,
+	}
+}
+
+// PaymentProviderConfigUpsertBulk is the builder for "upsert"-ing
+// a bulk of PaymentProviderConfig nodes.
+type PaymentProviderConfigUpsertBulk struct {
+	create *PaymentProviderConfigCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.PaymentProviderConfig.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *PaymentProviderConfigUpsertBulk) UpdateNewValues() *PaymentProviderConfigUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(paymentproviderconfig.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.PaymentProviderConfig.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *PaymentProviderConfigUpsertBulk) Ignore() *PaymentProviderConfigUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *PaymentProviderConfigUpsertBulk) DoNothing() *PaymentProviderConfigUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the PaymentProviderConfigCreateBulk.OnConflict
+// documentation for more info.
+func (u *PaymentProviderConfigUpsertBulk) Update(set func(*PaymentProviderConfigUpsert)) *PaymentProviderConfigUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&PaymentProviderConfigUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetProviderKey sets the "provider_key" field.
+func (u *PaymentProviderConfigUpsertBulk) SetProviderKey(v string) *PaymentProviderConfigUpsertBulk {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.SetProviderKey(v)
+	})
+}
+
+// UpdateProviderKey sets the "provider_key" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsertBulk) UpdateProviderKey() *PaymentProviderConfigUpsertBulk {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.UpdateProviderKey()
+	})
+}
+
+// SetKind sets the "kind" field.
+func (u *PaymentProviderConfigUpsertBulk) SetKind(v string) *PaymentProviderConfigUpsertBulk {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.SetKind(v)
+	})
+}
+
+// UpdateKind sets the "kind" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsertBulk) UpdateKind() *PaymentProviderConfigUpsertBulk {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.UpdateKind()
+	})
+}
+
+// SetEnabled sets the "enabled" field.
+func (u *PaymentProviderConfigUpsertBulk) SetEnabled(v bool) *PaymentProviderConfigUpsertBulk {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.SetEnabled(v)
+	})
+}
+
+// UpdateEnabled sets the "enabled" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsertBulk) UpdateEnabled() *PaymentProviderConfigUpsertBulk {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.UpdateEnabled()
+	})
+}
+
+// SetConfig sets the "config" field.
+func (u *PaymentProviderConfigUpsertBulk) SetConfig(v map[string]string) *PaymentProviderConfigUpsertBulk {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.SetConfig(v)
+	})
+}
+
+// UpdateConfig sets the "config" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsertBulk) UpdateConfig() *PaymentProviderConfigUpsertBulk {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.UpdateConfig()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *PaymentProviderConfigUpsertBulk) SetUpdatedAt(v time.Time) *PaymentProviderConfigUpsertBulk {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *PaymentProviderConfigUpsertBulk) UpdateUpdatedAt() *PaymentProviderConfigUpsertBulk {
+	return u.Update(func(s *PaymentProviderConfigUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *PaymentProviderConfigUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the PaymentProviderConfigCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for PaymentProviderConfigCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *PaymentProviderConfigUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

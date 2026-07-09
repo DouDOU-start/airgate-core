@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
@@ -20,6 +21,7 @@ type ChannelCreate struct {
 	config
 	mutation *ChannelMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetName sets the "name" field.
@@ -532,6 +534,7 @@ func (cc *ChannelCreate) createSpec() (*Channel, *sqlgraph.CreateSpec) {
 		_node = &Channel{config: cc.config}
 		_spec = sqlgraph.NewCreateSpec(channel.Table, sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = cc.conflict
 	if value, ok := cc.mutation.Name(); ok {
 		_spec.SetField(channel.FieldName, field.TypeString, value)
 		_node.Name = value
@@ -667,11 +670,958 @@ func (cc *ChannelCreate) createSpec() (*Channel, *sqlgraph.CreateSpec) {
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.Channel.Create().
+//		SetName(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.ChannelUpsert) {
+//			SetName(v+v).
+//		}).
+//		Exec(ctx)
+func (cc *ChannelCreate) OnConflict(opts ...sql.ConflictOption) *ChannelUpsertOne {
+	cc.conflict = opts
+	return &ChannelUpsertOne{
+		create: cc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.Channel.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (cc *ChannelCreate) OnConflictColumns(columns ...string) *ChannelUpsertOne {
+	cc.conflict = append(cc.conflict, sql.ConflictColumns(columns...))
+	return &ChannelUpsertOne{
+		create: cc,
+	}
+}
+
+type (
+	// ChannelUpsertOne is the builder for "upsert"-ing
+	//  one Channel node.
+	ChannelUpsertOne struct {
+		create *ChannelCreate
+	}
+
+	// ChannelUpsert is the "OnConflict" setter.
+	ChannelUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetName sets the "name" field.
+func (u *ChannelUpsert) SetName(v string) *ChannelUpsert {
+	u.Set(channel.FieldName, v)
+	return u
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateName() *ChannelUpsert {
+	u.SetExcluded(channel.FieldName)
+	return u
+}
+
+// SetType sets the "type" field.
+func (u *ChannelUpsert) SetType(v channel.Type) *ChannelUpsert {
+	u.Set(channel.FieldType, v)
+	return u
+}
+
+// UpdateType sets the "type" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateType() *ChannelUpsert {
+	u.SetExcluded(channel.FieldType)
+	return u
+}
+
+// SetBaseURL sets the "base_url" field.
+func (u *ChannelUpsert) SetBaseURL(v string) *ChannelUpsert {
+	u.Set(channel.FieldBaseURL, v)
+	return u
+}
+
+// UpdateBaseURL sets the "base_url" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateBaseURL() *ChannelUpsert {
+	u.SetExcluded(channel.FieldBaseURL)
+	return u
+}
+
+// SetAPIKeys sets the "api_keys" field.
+func (u *ChannelUpsert) SetAPIKeys(v []string) *ChannelUpsert {
+	u.Set(channel.FieldAPIKeys, v)
+	return u
+}
+
+// UpdateAPIKeys sets the "api_keys" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateAPIKeys() *ChannelUpsert {
+	u.SetExcluded(channel.FieldAPIKeys)
+	return u
+}
+
+// SetModels sets the "models" field.
+func (u *ChannelUpsert) SetModels(v []string) *ChannelUpsert {
+	u.Set(channel.FieldModels, v)
+	return u
+}
+
+// UpdateModels sets the "models" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateModels() *ChannelUpsert {
+	u.SetExcluded(channel.FieldModels)
+	return u
+}
+
+// SetModelMapping sets the "model_mapping" field.
+func (u *ChannelUpsert) SetModelMapping(v map[string]string) *ChannelUpsert {
+	u.Set(channel.FieldModelMapping, v)
+	return u
+}
+
+// UpdateModelMapping sets the "model_mapping" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateModelMapping() *ChannelUpsert {
+	u.SetExcluded(channel.FieldModelMapping)
+	return u
+}
+
+// ClearModelMapping clears the value of the "model_mapping" field.
+func (u *ChannelUpsert) ClearModelMapping() *ChannelUpsert {
+	u.SetNull(channel.FieldModelMapping)
+	return u
+}
+
+// SetParamOverride sets the "param_override" field.
+func (u *ChannelUpsert) SetParamOverride(v map[string]interface{}) *ChannelUpsert {
+	u.Set(channel.FieldParamOverride, v)
+	return u
+}
+
+// UpdateParamOverride sets the "param_override" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateParamOverride() *ChannelUpsert {
+	u.SetExcluded(channel.FieldParamOverride)
+	return u
+}
+
+// ClearParamOverride clears the value of the "param_override" field.
+func (u *ChannelUpsert) ClearParamOverride() *ChannelUpsert {
+	u.SetNull(channel.FieldParamOverride)
+	return u
+}
+
+// SetHeaderOverride sets the "header_override" field.
+func (u *ChannelUpsert) SetHeaderOverride(v map[string]string) *ChannelUpsert {
+	u.Set(channel.FieldHeaderOverride, v)
+	return u
+}
+
+// UpdateHeaderOverride sets the "header_override" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateHeaderOverride() *ChannelUpsert {
+	u.SetExcluded(channel.FieldHeaderOverride)
+	return u
+}
+
+// ClearHeaderOverride clears the value of the "header_override" field.
+func (u *ChannelUpsert) ClearHeaderOverride() *ChannelUpsert {
+	u.SetNull(channel.FieldHeaderOverride)
+	return u
+}
+
+// SetStatus sets the "status" field.
+func (u *ChannelUpsert) SetStatus(v channel.Status) *ChannelUpsert {
+	u.Set(channel.FieldStatus, v)
+	return u
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateStatus() *ChannelUpsert {
+	u.SetExcluded(channel.FieldStatus)
+	return u
+}
+
+// SetStatusUntil sets the "status_until" field.
+func (u *ChannelUpsert) SetStatusUntil(v time.Time) *ChannelUpsert {
+	u.Set(channel.FieldStatusUntil, v)
+	return u
+}
+
+// UpdateStatusUntil sets the "status_until" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateStatusUntil() *ChannelUpsert {
+	u.SetExcluded(channel.FieldStatusUntil)
+	return u
+}
+
+// ClearStatusUntil clears the value of the "status_until" field.
+func (u *ChannelUpsert) ClearStatusUntil() *ChannelUpsert {
+	u.SetNull(channel.FieldStatusUntil)
+	return u
+}
+
+// SetErrorMsg sets the "error_msg" field.
+func (u *ChannelUpsert) SetErrorMsg(v string) *ChannelUpsert {
+	u.Set(channel.FieldErrorMsg, v)
+	return u
+}
+
+// UpdateErrorMsg sets the "error_msg" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateErrorMsg() *ChannelUpsert {
+	u.SetExcluded(channel.FieldErrorMsg)
+	return u
+}
+
+// SetPriority sets the "priority" field.
+func (u *ChannelUpsert) SetPriority(v int) *ChannelUpsert {
+	u.Set(channel.FieldPriority, v)
+	return u
+}
+
+// UpdatePriority sets the "priority" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdatePriority() *ChannelUpsert {
+	u.SetExcluded(channel.FieldPriority)
+	return u
+}
+
+// AddPriority adds v to the "priority" field.
+func (u *ChannelUpsert) AddPriority(v int) *ChannelUpsert {
+	u.Add(channel.FieldPriority, v)
+	return u
+}
+
+// SetWeight sets the "weight" field.
+func (u *ChannelUpsert) SetWeight(v int) *ChannelUpsert {
+	u.Set(channel.FieldWeight, v)
+	return u
+}
+
+// UpdateWeight sets the "weight" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateWeight() *ChannelUpsert {
+	u.SetExcluded(channel.FieldWeight)
+	return u
+}
+
+// AddWeight adds v to the "weight" field.
+func (u *ChannelUpsert) AddWeight(v int) *ChannelUpsert {
+	u.Add(channel.FieldWeight, v)
+	return u
+}
+
+// SetMaxConcurrency sets the "max_concurrency" field.
+func (u *ChannelUpsert) SetMaxConcurrency(v int) *ChannelUpsert {
+	u.Set(channel.FieldMaxConcurrency, v)
+	return u
+}
+
+// UpdateMaxConcurrency sets the "max_concurrency" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateMaxConcurrency() *ChannelUpsert {
+	u.SetExcluded(channel.FieldMaxConcurrency)
+	return u
+}
+
+// AddMaxConcurrency adds v to the "max_concurrency" field.
+func (u *ChannelUpsert) AddMaxConcurrency(v int) *ChannelUpsert {
+	u.Add(channel.FieldMaxConcurrency, v)
+	return u
+}
+
+// SetMaxRpm sets the "max_rpm" field.
+func (u *ChannelUpsert) SetMaxRpm(v int) *ChannelUpsert {
+	u.Set(channel.FieldMaxRpm, v)
+	return u
+}
+
+// UpdateMaxRpm sets the "max_rpm" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateMaxRpm() *ChannelUpsert {
+	u.SetExcluded(channel.FieldMaxRpm)
+	return u
+}
+
+// AddMaxRpm adds v to the "max_rpm" field.
+func (u *ChannelUpsert) AddMaxRpm(v int) *ChannelUpsert {
+	u.Add(channel.FieldMaxRpm, v)
+	return u
+}
+
+// SetCostRatio sets the "cost_ratio" field.
+func (u *ChannelUpsert) SetCostRatio(v float64) *ChannelUpsert {
+	u.Set(channel.FieldCostRatio, v)
+	return u
+}
+
+// UpdateCostRatio sets the "cost_ratio" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateCostRatio() *ChannelUpsert {
+	u.SetExcluded(channel.FieldCostRatio)
+	return u
+}
+
+// AddCostRatio adds v to the "cost_ratio" field.
+func (u *ChannelUpsert) AddCostRatio(v float64) *ChannelUpsert {
+	u.Add(channel.FieldCostRatio, v)
+	return u
+}
+
+// SetTags sets the "tags" field.
+func (u *ChannelUpsert) SetTags(v []string) *ChannelUpsert {
+	u.Set(channel.FieldTags, v)
+	return u
+}
+
+// UpdateTags sets the "tags" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateTags() *ChannelUpsert {
+	u.SetExcluded(channel.FieldTags)
+	return u
+}
+
+// ClearTags clears the value of the "tags" field.
+func (u *ChannelUpsert) ClearTags() *ChannelUpsert {
+	u.SetNull(channel.FieldTags)
+	return u
+}
+
+// SetTestModel sets the "test_model" field.
+func (u *ChannelUpsert) SetTestModel(v string) *ChannelUpsert {
+	u.Set(channel.FieldTestModel, v)
+	return u
+}
+
+// UpdateTestModel sets the "test_model" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateTestModel() *ChannelUpsert {
+	u.SetExcluded(channel.FieldTestModel)
+	return u
+}
+
+// SetResponseTimeMs sets the "response_time_ms" field.
+func (u *ChannelUpsert) SetResponseTimeMs(v int) *ChannelUpsert {
+	u.Set(channel.FieldResponseTimeMs, v)
+	return u
+}
+
+// UpdateResponseTimeMs sets the "response_time_ms" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateResponseTimeMs() *ChannelUpsert {
+	u.SetExcluded(channel.FieldResponseTimeMs)
+	return u
+}
+
+// AddResponseTimeMs adds v to the "response_time_ms" field.
+func (u *ChannelUpsert) AddResponseTimeMs(v int) *ChannelUpsert {
+	u.Add(channel.FieldResponseTimeMs, v)
+	return u
+}
+
+// SetTestedAt sets the "tested_at" field.
+func (u *ChannelUpsert) SetTestedAt(v time.Time) *ChannelUpsert {
+	u.Set(channel.FieldTestedAt, v)
+	return u
+}
+
+// UpdateTestedAt sets the "tested_at" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateTestedAt() *ChannelUpsert {
+	u.SetExcluded(channel.FieldTestedAt)
+	return u
+}
+
+// ClearTestedAt clears the value of the "tested_at" field.
+func (u *ChannelUpsert) ClearTestedAt() *ChannelUpsert {
+	u.SetNull(channel.FieldTestedAt)
+	return u
+}
+
+// SetBalance sets the "balance" field.
+func (u *ChannelUpsert) SetBalance(v float64) *ChannelUpsert {
+	u.Set(channel.FieldBalance, v)
+	return u
+}
+
+// UpdateBalance sets the "balance" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateBalance() *ChannelUpsert {
+	u.SetExcluded(channel.FieldBalance)
+	return u
+}
+
+// AddBalance adds v to the "balance" field.
+func (u *ChannelUpsert) AddBalance(v float64) *ChannelUpsert {
+	u.Add(channel.FieldBalance, v)
+	return u
+}
+
+// SetBalanceUpdatedAt sets the "balance_updated_at" field.
+func (u *ChannelUpsert) SetBalanceUpdatedAt(v time.Time) *ChannelUpsert {
+	u.Set(channel.FieldBalanceUpdatedAt, v)
+	return u
+}
+
+// UpdateBalanceUpdatedAt sets the "balance_updated_at" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateBalanceUpdatedAt() *ChannelUpsert {
+	u.SetExcluded(channel.FieldBalanceUpdatedAt)
+	return u
+}
+
+// ClearBalanceUpdatedAt clears the value of the "balance_updated_at" field.
+func (u *ChannelUpsert) ClearBalanceUpdatedAt() *ChannelUpsert {
+	u.SetNull(channel.FieldBalanceUpdatedAt)
+	return u
+}
+
+// SetLastUsedAt sets the "last_used_at" field.
+func (u *ChannelUpsert) SetLastUsedAt(v time.Time) *ChannelUpsert {
+	u.Set(channel.FieldLastUsedAt, v)
+	return u
+}
+
+// UpdateLastUsedAt sets the "last_used_at" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateLastUsedAt() *ChannelUpsert {
+	u.SetExcluded(channel.FieldLastUsedAt)
+	return u
+}
+
+// ClearLastUsedAt clears the value of the "last_used_at" field.
+func (u *ChannelUpsert) ClearLastUsedAt() *ChannelUpsert {
+	u.SetNull(channel.FieldLastUsedAt)
+	return u
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *ChannelUpsert) SetUpdatedAt(v time.Time) *ChannelUpsert {
+	u.Set(channel.FieldUpdatedAt, v)
+	return u
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *ChannelUpsert) UpdateUpdatedAt() *ChannelUpsert {
+	u.SetExcluded(channel.FieldUpdatedAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.Channel.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *ChannelUpsertOne) UpdateNewValues() *ChannelUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(channel.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.Channel.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *ChannelUpsertOne) Ignore() *ChannelUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *ChannelUpsertOne) DoNothing() *ChannelUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the ChannelCreate.OnConflict
+// documentation for more info.
+func (u *ChannelUpsertOne) Update(set func(*ChannelUpsert)) *ChannelUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&ChannelUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetName sets the "name" field.
+func (u *ChannelUpsertOne) SetName(v string) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetName(v)
+	})
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateName() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateName()
+	})
+}
+
+// SetType sets the "type" field.
+func (u *ChannelUpsertOne) SetType(v channel.Type) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetType(v)
+	})
+}
+
+// UpdateType sets the "type" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateType() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateType()
+	})
+}
+
+// SetBaseURL sets the "base_url" field.
+func (u *ChannelUpsertOne) SetBaseURL(v string) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetBaseURL(v)
+	})
+}
+
+// UpdateBaseURL sets the "base_url" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateBaseURL() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateBaseURL()
+	})
+}
+
+// SetAPIKeys sets the "api_keys" field.
+func (u *ChannelUpsertOne) SetAPIKeys(v []string) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetAPIKeys(v)
+	})
+}
+
+// UpdateAPIKeys sets the "api_keys" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateAPIKeys() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateAPIKeys()
+	})
+}
+
+// SetModels sets the "models" field.
+func (u *ChannelUpsertOne) SetModels(v []string) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetModels(v)
+	})
+}
+
+// UpdateModels sets the "models" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateModels() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateModels()
+	})
+}
+
+// SetModelMapping sets the "model_mapping" field.
+func (u *ChannelUpsertOne) SetModelMapping(v map[string]string) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetModelMapping(v)
+	})
+}
+
+// UpdateModelMapping sets the "model_mapping" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateModelMapping() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateModelMapping()
+	})
+}
+
+// ClearModelMapping clears the value of the "model_mapping" field.
+func (u *ChannelUpsertOne) ClearModelMapping() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearModelMapping()
+	})
+}
+
+// SetParamOverride sets the "param_override" field.
+func (u *ChannelUpsertOne) SetParamOverride(v map[string]interface{}) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetParamOverride(v)
+	})
+}
+
+// UpdateParamOverride sets the "param_override" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateParamOverride() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateParamOverride()
+	})
+}
+
+// ClearParamOverride clears the value of the "param_override" field.
+func (u *ChannelUpsertOne) ClearParamOverride() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearParamOverride()
+	})
+}
+
+// SetHeaderOverride sets the "header_override" field.
+func (u *ChannelUpsertOne) SetHeaderOverride(v map[string]string) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetHeaderOverride(v)
+	})
+}
+
+// UpdateHeaderOverride sets the "header_override" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateHeaderOverride() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateHeaderOverride()
+	})
+}
+
+// ClearHeaderOverride clears the value of the "header_override" field.
+func (u *ChannelUpsertOne) ClearHeaderOverride() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearHeaderOverride()
+	})
+}
+
+// SetStatus sets the "status" field.
+func (u *ChannelUpsertOne) SetStatus(v channel.Status) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetStatus(v)
+	})
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateStatus() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateStatus()
+	})
+}
+
+// SetStatusUntil sets the "status_until" field.
+func (u *ChannelUpsertOne) SetStatusUntil(v time.Time) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetStatusUntil(v)
+	})
+}
+
+// UpdateStatusUntil sets the "status_until" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateStatusUntil() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateStatusUntil()
+	})
+}
+
+// ClearStatusUntil clears the value of the "status_until" field.
+func (u *ChannelUpsertOne) ClearStatusUntil() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearStatusUntil()
+	})
+}
+
+// SetErrorMsg sets the "error_msg" field.
+func (u *ChannelUpsertOne) SetErrorMsg(v string) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetErrorMsg(v)
+	})
+}
+
+// UpdateErrorMsg sets the "error_msg" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateErrorMsg() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateErrorMsg()
+	})
+}
+
+// SetPriority sets the "priority" field.
+func (u *ChannelUpsertOne) SetPriority(v int) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetPriority(v)
+	})
+}
+
+// AddPriority adds v to the "priority" field.
+func (u *ChannelUpsertOne) AddPriority(v int) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddPriority(v)
+	})
+}
+
+// UpdatePriority sets the "priority" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdatePriority() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdatePriority()
+	})
+}
+
+// SetWeight sets the "weight" field.
+func (u *ChannelUpsertOne) SetWeight(v int) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetWeight(v)
+	})
+}
+
+// AddWeight adds v to the "weight" field.
+func (u *ChannelUpsertOne) AddWeight(v int) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddWeight(v)
+	})
+}
+
+// UpdateWeight sets the "weight" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateWeight() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateWeight()
+	})
+}
+
+// SetMaxConcurrency sets the "max_concurrency" field.
+func (u *ChannelUpsertOne) SetMaxConcurrency(v int) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetMaxConcurrency(v)
+	})
+}
+
+// AddMaxConcurrency adds v to the "max_concurrency" field.
+func (u *ChannelUpsertOne) AddMaxConcurrency(v int) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddMaxConcurrency(v)
+	})
+}
+
+// UpdateMaxConcurrency sets the "max_concurrency" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateMaxConcurrency() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateMaxConcurrency()
+	})
+}
+
+// SetMaxRpm sets the "max_rpm" field.
+func (u *ChannelUpsertOne) SetMaxRpm(v int) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetMaxRpm(v)
+	})
+}
+
+// AddMaxRpm adds v to the "max_rpm" field.
+func (u *ChannelUpsertOne) AddMaxRpm(v int) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddMaxRpm(v)
+	})
+}
+
+// UpdateMaxRpm sets the "max_rpm" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateMaxRpm() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateMaxRpm()
+	})
+}
+
+// SetCostRatio sets the "cost_ratio" field.
+func (u *ChannelUpsertOne) SetCostRatio(v float64) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetCostRatio(v)
+	})
+}
+
+// AddCostRatio adds v to the "cost_ratio" field.
+func (u *ChannelUpsertOne) AddCostRatio(v float64) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddCostRatio(v)
+	})
+}
+
+// UpdateCostRatio sets the "cost_ratio" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateCostRatio() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateCostRatio()
+	})
+}
+
+// SetTags sets the "tags" field.
+func (u *ChannelUpsertOne) SetTags(v []string) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetTags(v)
+	})
+}
+
+// UpdateTags sets the "tags" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateTags() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateTags()
+	})
+}
+
+// ClearTags clears the value of the "tags" field.
+func (u *ChannelUpsertOne) ClearTags() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearTags()
+	})
+}
+
+// SetTestModel sets the "test_model" field.
+func (u *ChannelUpsertOne) SetTestModel(v string) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetTestModel(v)
+	})
+}
+
+// UpdateTestModel sets the "test_model" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateTestModel() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateTestModel()
+	})
+}
+
+// SetResponseTimeMs sets the "response_time_ms" field.
+func (u *ChannelUpsertOne) SetResponseTimeMs(v int) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetResponseTimeMs(v)
+	})
+}
+
+// AddResponseTimeMs adds v to the "response_time_ms" field.
+func (u *ChannelUpsertOne) AddResponseTimeMs(v int) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddResponseTimeMs(v)
+	})
+}
+
+// UpdateResponseTimeMs sets the "response_time_ms" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateResponseTimeMs() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateResponseTimeMs()
+	})
+}
+
+// SetTestedAt sets the "tested_at" field.
+func (u *ChannelUpsertOne) SetTestedAt(v time.Time) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetTestedAt(v)
+	})
+}
+
+// UpdateTestedAt sets the "tested_at" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateTestedAt() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateTestedAt()
+	})
+}
+
+// ClearTestedAt clears the value of the "tested_at" field.
+func (u *ChannelUpsertOne) ClearTestedAt() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearTestedAt()
+	})
+}
+
+// SetBalance sets the "balance" field.
+func (u *ChannelUpsertOne) SetBalance(v float64) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetBalance(v)
+	})
+}
+
+// AddBalance adds v to the "balance" field.
+func (u *ChannelUpsertOne) AddBalance(v float64) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddBalance(v)
+	})
+}
+
+// UpdateBalance sets the "balance" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateBalance() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateBalance()
+	})
+}
+
+// SetBalanceUpdatedAt sets the "balance_updated_at" field.
+func (u *ChannelUpsertOne) SetBalanceUpdatedAt(v time.Time) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetBalanceUpdatedAt(v)
+	})
+}
+
+// UpdateBalanceUpdatedAt sets the "balance_updated_at" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateBalanceUpdatedAt() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateBalanceUpdatedAt()
+	})
+}
+
+// ClearBalanceUpdatedAt clears the value of the "balance_updated_at" field.
+func (u *ChannelUpsertOne) ClearBalanceUpdatedAt() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearBalanceUpdatedAt()
+	})
+}
+
+// SetLastUsedAt sets the "last_used_at" field.
+func (u *ChannelUpsertOne) SetLastUsedAt(v time.Time) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetLastUsedAt(v)
+	})
+}
+
+// UpdateLastUsedAt sets the "last_used_at" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateLastUsedAt() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateLastUsedAt()
+	})
+}
+
+// ClearLastUsedAt clears the value of the "last_used_at" field.
+func (u *ChannelUpsertOne) ClearLastUsedAt() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearLastUsedAt()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *ChannelUpsertOne) SetUpdatedAt(v time.Time) *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *ChannelUpsertOne) UpdateUpdatedAt() *ChannelUpsertOne {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *ChannelUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for ChannelCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *ChannelUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *ChannelUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *ChannelUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // ChannelCreateBulk is the builder for creating many Channel entities in bulk.
 type ChannelCreateBulk struct {
 	config
 	err      error
 	builders []*ChannelCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the Channel entities in the database.
@@ -701,6 +1651,7 @@ func (ccb *ChannelCreateBulk) Save(ctx context.Context) ([]*Channel, error) {
 					_, err = mutators[i+1].Mutate(root, ccb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = ccb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, ccb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -751,6 +1702,558 @@ func (ccb *ChannelCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (ccb *ChannelCreateBulk) ExecX(ctx context.Context) {
 	if err := ccb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.Channel.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.ChannelUpsert) {
+//			SetName(v+v).
+//		}).
+//		Exec(ctx)
+func (ccb *ChannelCreateBulk) OnConflict(opts ...sql.ConflictOption) *ChannelUpsertBulk {
+	ccb.conflict = opts
+	return &ChannelUpsertBulk{
+		create: ccb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.Channel.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (ccb *ChannelCreateBulk) OnConflictColumns(columns ...string) *ChannelUpsertBulk {
+	ccb.conflict = append(ccb.conflict, sql.ConflictColumns(columns...))
+	return &ChannelUpsertBulk{
+		create: ccb,
+	}
+}
+
+// ChannelUpsertBulk is the builder for "upsert"-ing
+// a bulk of Channel nodes.
+type ChannelUpsertBulk struct {
+	create *ChannelCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.Channel.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *ChannelUpsertBulk) UpdateNewValues() *ChannelUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(channel.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.Channel.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *ChannelUpsertBulk) Ignore() *ChannelUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *ChannelUpsertBulk) DoNothing() *ChannelUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the ChannelCreateBulk.OnConflict
+// documentation for more info.
+func (u *ChannelUpsertBulk) Update(set func(*ChannelUpsert)) *ChannelUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&ChannelUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetName sets the "name" field.
+func (u *ChannelUpsertBulk) SetName(v string) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetName(v)
+	})
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateName() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateName()
+	})
+}
+
+// SetType sets the "type" field.
+func (u *ChannelUpsertBulk) SetType(v channel.Type) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetType(v)
+	})
+}
+
+// UpdateType sets the "type" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateType() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateType()
+	})
+}
+
+// SetBaseURL sets the "base_url" field.
+func (u *ChannelUpsertBulk) SetBaseURL(v string) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetBaseURL(v)
+	})
+}
+
+// UpdateBaseURL sets the "base_url" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateBaseURL() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateBaseURL()
+	})
+}
+
+// SetAPIKeys sets the "api_keys" field.
+func (u *ChannelUpsertBulk) SetAPIKeys(v []string) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetAPIKeys(v)
+	})
+}
+
+// UpdateAPIKeys sets the "api_keys" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateAPIKeys() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateAPIKeys()
+	})
+}
+
+// SetModels sets the "models" field.
+func (u *ChannelUpsertBulk) SetModels(v []string) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetModels(v)
+	})
+}
+
+// UpdateModels sets the "models" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateModels() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateModels()
+	})
+}
+
+// SetModelMapping sets the "model_mapping" field.
+func (u *ChannelUpsertBulk) SetModelMapping(v map[string]string) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetModelMapping(v)
+	})
+}
+
+// UpdateModelMapping sets the "model_mapping" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateModelMapping() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateModelMapping()
+	})
+}
+
+// ClearModelMapping clears the value of the "model_mapping" field.
+func (u *ChannelUpsertBulk) ClearModelMapping() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearModelMapping()
+	})
+}
+
+// SetParamOverride sets the "param_override" field.
+func (u *ChannelUpsertBulk) SetParamOverride(v map[string]interface{}) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetParamOverride(v)
+	})
+}
+
+// UpdateParamOverride sets the "param_override" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateParamOverride() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateParamOverride()
+	})
+}
+
+// ClearParamOverride clears the value of the "param_override" field.
+func (u *ChannelUpsertBulk) ClearParamOverride() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearParamOverride()
+	})
+}
+
+// SetHeaderOverride sets the "header_override" field.
+func (u *ChannelUpsertBulk) SetHeaderOverride(v map[string]string) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetHeaderOverride(v)
+	})
+}
+
+// UpdateHeaderOverride sets the "header_override" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateHeaderOverride() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateHeaderOverride()
+	})
+}
+
+// ClearHeaderOverride clears the value of the "header_override" field.
+func (u *ChannelUpsertBulk) ClearHeaderOverride() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearHeaderOverride()
+	})
+}
+
+// SetStatus sets the "status" field.
+func (u *ChannelUpsertBulk) SetStatus(v channel.Status) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetStatus(v)
+	})
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateStatus() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateStatus()
+	})
+}
+
+// SetStatusUntil sets the "status_until" field.
+func (u *ChannelUpsertBulk) SetStatusUntil(v time.Time) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetStatusUntil(v)
+	})
+}
+
+// UpdateStatusUntil sets the "status_until" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateStatusUntil() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateStatusUntil()
+	})
+}
+
+// ClearStatusUntil clears the value of the "status_until" field.
+func (u *ChannelUpsertBulk) ClearStatusUntil() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearStatusUntil()
+	})
+}
+
+// SetErrorMsg sets the "error_msg" field.
+func (u *ChannelUpsertBulk) SetErrorMsg(v string) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetErrorMsg(v)
+	})
+}
+
+// UpdateErrorMsg sets the "error_msg" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateErrorMsg() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateErrorMsg()
+	})
+}
+
+// SetPriority sets the "priority" field.
+func (u *ChannelUpsertBulk) SetPriority(v int) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetPriority(v)
+	})
+}
+
+// AddPriority adds v to the "priority" field.
+func (u *ChannelUpsertBulk) AddPriority(v int) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddPriority(v)
+	})
+}
+
+// UpdatePriority sets the "priority" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdatePriority() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdatePriority()
+	})
+}
+
+// SetWeight sets the "weight" field.
+func (u *ChannelUpsertBulk) SetWeight(v int) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetWeight(v)
+	})
+}
+
+// AddWeight adds v to the "weight" field.
+func (u *ChannelUpsertBulk) AddWeight(v int) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddWeight(v)
+	})
+}
+
+// UpdateWeight sets the "weight" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateWeight() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateWeight()
+	})
+}
+
+// SetMaxConcurrency sets the "max_concurrency" field.
+func (u *ChannelUpsertBulk) SetMaxConcurrency(v int) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetMaxConcurrency(v)
+	})
+}
+
+// AddMaxConcurrency adds v to the "max_concurrency" field.
+func (u *ChannelUpsertBulk) AddMaxConcurrency(v int) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddMaxConcurrency(v)
+	})
+}
+
+// UpdateMaxConcurrency sets the "max_concurrency" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateMaxConcurrency() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateMaxConcurrency()
+	})
+}
+
+// SetMaxRpm sets the "max_rpm" field.
+func (u *ChannelUpsertBulk) SetMaxRpm(v int) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetMaxRpm(v)
+	})
+}
+
+// AddMaxRpm adds v to the "max_rpm" field.
+func (u *ChannelUpsertBulk) AddMaxRpm(v int) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddMaxRpm(v)
+	})
+}
+
+// UpdateMaxRpm sets the "max_rpm" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateMaxRpm() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateMaxRpm()
+	})
+}
+
+// SetCostRatio sets the "cost_ratio" field.
+func (u *ChannelUpsertBulk) SetCostRatio(v float64) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetCostRatio(v)
+	})
+}
+
+// AddCostRatio adds v to the "cost_ratio" field.
+func (u *ChannelUpsertBulk) AddCostRatio(v float64) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddCostRatio(v)
+	})
+}
+
+// UpdateCostRatio sets the "cost_ratio" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateCostRatio() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateCostRatio()
+	})
+}
+
+// SetTags sets the "tags" field.
+func (u *ChannelUpsertBulk) SetTags(v []string) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetTags(v)
+	})
+}
+
+// UpdateTags sets the "tags" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateTags() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateTags()
+	})
+}
+
+// ClearTags clears the value of the "tags" field.
+func (u *ChannelUpsertBulk) ClearTags() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearTags()
+	})
+}
+
+// SetTestModel sets the "test_model" field.
+func (u *ChannelUpsertBulk) SetTestModel(v string) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetTestModel(v)
+	})
+}
+
+// UpdateTestModel sets the "test_model" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateTestModel() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateTestModel()
+	})
+}
+
+// SetResponseTimeMs sets the "response_time_ms" field.
+func (u *ChannelUpsertBulk) SetResponseTimeMs(v int) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetResponseTimeMs(v)
+	})
+}
+
+// AddResponseTimeMs adds v to the "response_time_ms" field.
+func (u *ChannelUpsertBulk) AddResponseTimeMs(v int) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddResponseTimeMs(v)
+	})
+}
+
+// UpdateResponseTimeMs sets the "response_time_ms" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateResponseTimeMs() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateResponseTimeMs()
+	})
+}
+
+// SetTestedAt sets the "tested_at" field.
+func (u *ChannelUpsertBulk) SetTestedAt(v time.Time) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetTestedAt(v)
+	})
+}
+
+// UpdateTestedAt sets the "tested_at" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateTestedAt() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateTestedAt()
+	})
+}
+
+// ClearTestedAt clears the value of the "tested_at" field.
+func (u *ChannelUpsertBulk) ClearTestedAt() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearTestedAt()
+	})
+}
+
+// SetBalance sets the "balance" field.
+func (u *ChannelUpsertBulk) SetBalance(v float64) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetBalance(v)
+	})
+}
+
+// AddBalance adds v to the "balance" field.
+func (u *ChannelUpsertBulk) AddBalance(v float64) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.AddBalance(v)
+	})
+}
+
+// UpdateBalance sets the "balance" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateBalance() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateBalance()
+	})
+}
+
+// SetBalanceUpdatedAt sets the "balance_updated_at" field.
+func (u *ChannelUpsertBulk) SetBalanceUpdatedAt(v time.Time) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetBalanceUpdatedAt(v)
+	})
+}
+
+// UpdateBalanceUpdatedAt sets the "balance_updated_at" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateBalanceUpdatedAt() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateBalanceUpdatedAt()
+	})
+}
+
+// ClearBalanceUpdatedAt clears the value of the "balance_updated_at" field.
+func (u *ChannelUpsertBulk) ClearBalanceUpdatedAt() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearBalanceUpdatedAt()
+	})
+}
+
+// SetLastUsedAt sets the "last_used_at" field.
+func (u *ChannelUpsertBulk) SetLastUsedAt(v time.Time) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetLastUsedAt(v)
+	})
+}
+
+// UpdateLastUsedAt sets the "last_used_at" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateLastUsedAt() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateLastUsedAt()
+	})
+}
+
+// ClearLastUsedAt clears the value of the "last_used_at" field.
+func (u *ChannelUpsertBulk) ClearLastUsedAt() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.ClearLastUsedAt()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *ChannelUpsertBulk) SetUpdatedAt(v time.Time) *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *ChannelUpsertBulk) UpdateUpdatedAt() *ChannelUpsertBulk {
+	return u.Update(func(s *ChannelUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *ChannelUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the ChannelCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for ChannelCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *ChannelUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

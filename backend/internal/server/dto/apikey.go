@@ -34,7 +34,7 @@ type CreateAPIKeyReq struct {
 	GroupID        int64    `json:"group_id" binding:"required"`
 	IPWhitelist    []string `json:"ip_whitelist"`
 	IPBlacklist    []string `json:"ip_blacklist"`
-	QuotaUSD       float64  `json:"quota_usd"`
+	QuotaUSD       float64  `json:"quota_usd" binding:"gte=0"`       // 0 表示无限额度，负数拒绝
 	SellRate       float64  `json:"sell_rate"`                       // 可选，>0 启用 reseller markup
 	MaxConcurrency int      `json:"max_concurrency" binding:"gte=0"` // 0 表示不限制并发
 	ExpiresAt      *string  `json:"expires_at"`
@@ -46,7 +46,7 @@ type UpdateAPIKeyReq struct {
 	GroupID        *int64   `json:"group_id"`
 	IPWhitelist    []string `json:"ip_whitelist"`
 	IPBlacklist    []string `json:"ip_blacklist"`
-	QuotaUSD       *float64 `json:"quota_usd"`
+	QuotaUSD       *float64 `json:"quota_usd" binding:"omitempty,gte=0"`
 	SellRate       *float64 `json:"sell_rate"`                                 // 动态调整：随时可改，不影响历史 used_quota 累加值
 	MaxConcurrency *int     `json:"max_concurrency" binding:"omitempty,gte=0"` // 0 关闭并发限制
 	ExpiresAt      *string  `json:"expires_at"`

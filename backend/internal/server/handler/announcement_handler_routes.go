@@ -38,7 +38,7 @@ func (h *AnnouncementHandler) ListAnnouncements(c *gin.Context) {
 
 // GetAnnouncement 获取公告详情（管理员）。
 func (h *AnnouncementHandler) GetAnnouncement(c *gin.Context) {
-	id, err := parseAnnouncementID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的公告 ID")
 		return
@@ -81,7 +81,7 @@ func (h *AnnouncementHandler) CreateAnnouncement(c *gin.Context) {
 
 // UpdateAnnouncement 更新公告（管理员）。
 func (h *AnnouncementHandler) UpdateAnnouncement(c *gin.Context) {
-	id, err := parseAnnouncementID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的公告 ID")
 		return
@@ -112,7 +112,7 @@ func (h *AnnouncementHandler) UpdateAnnouncement(c *gin.Context) {
 
 // DeleteAnnouncement 删除公告（管理员）。
 func (h *AnnouncementHandler) DeleteAnnouncement(c *gin.Context) {
-	id, err := parseAnnouncementID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的公告 ID")
 		return
@@ -160,7 +160,7 @@ func (h *AnnouncementHandler) MarkAnnouncementRead(c *gin.Context) {
 		return
 	}
 
-	id, err := parseAnnouncementID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的公告 ID")
 		return

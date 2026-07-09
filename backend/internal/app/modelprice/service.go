@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Invalidator pricing 缓存失效窄接口（由 relay/pricing.Cache 实现，可为 nil——测试时不接）。
@@ -51,10 +51,10 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 
 // Create 创建价格条目。
 func (s *Service) Create(ctx context.Context, input CreateInput) (ModelPrice, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	item, err := s.repo.Create(ctx, input)
 	if err != nil {
-		logger.Error("model_price_persist_failed", "op", "create", "model", input.Model, sdk.LogFieldError, err)
+		logger.Error("model_price_persist_failed", "op", "create", "model", input.Model, logx.LogFieldError, err)
 		return ModelPrice{}, err
 	}
 	logger.Info("model_price_created", "model_price_id", item.ID, "model", item.Model)
@@ -65,10 +65,10 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (ModelPrice, er
 
 // Update 更新价格条目。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (ModelPrice, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	item, err := s.repo.Update(ctx, id, input)
 	if err != nil {
-		logger.Error("model_price_persist_failed", "op", "update", "model_price_id", id, sdk.LogFieldError, err)
+		logger.Error("model_price_persist_failed", "op", "update", "model_price_id", id, logx.LogFieldError, err)
 		return ModelPrice{}, err
 	}
 
@@ -78,9 +78,9 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (ModelP
 
 // Delete 删除价格条目。
 func (s *Service) Delete(ctx context.Context, id int) error {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	if err := s.repo.Delete(ctx, id); err != nil {
-		logger.Error("model_price_persist_failed", "op", "delete", "model_price_id", id, sdk.LogFieldError, err)
+		logger.Error("model_price_persist_failed", "op", "delete", "model_price_id", id, logx.LogFieldError, err)
 		return err
 	}
 	logger.Info("model_price_deleted", "model_price_id", id)
@@ -91,10 +91,10 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 
 // Import 批量导入（按 model 名 upsert），返回新建/更新条数。
 func (s *Service) Import(ctx context.Context, items []ImportItem) (ImportResult, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	created, updated, err := s.repo.Upsert(ctx, items)
 	if err != nil {
-		logger.Error("model_price_persist_failed", "op", "import", sdk.LogFieldError, err)
+		logger.Error("model_price_persist_failed", "op", "import", logx.LogFieldError, err)
 		return ImportResult{}, err
 	}
 	logger.Info("model_price_imported", "created", created, "updated", updated)
@@ -210,10 +210,10 @@ func (s *Service) ListTags(ctx context.Context) ([]Tag, error) {
 
 // CreateTag 新建标签。
 func (s *Service) CreateTag(ctx context.Context, name string) (Tag, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	tag, err := s.repo.CreateTag(ctx, name)
 	if err != nil {
-		logger.Error("model_tag_persist_failed", "op", "create", "name", name, sdk.LogFieldError, err)
+		logger.Error("model_tag_persist_failed", "op", "create", "name", name, logx.LogFieldError, err)
 		return Tag{}, err
 	}
 	logger.Info("model_tag_created", "model_tag_id", tag.ID, "name", tag.Name)
@@ -222,10 +222,10 @@ func (s *Service) CreateTag(ctx context.Context, name string) (Tag, error) {
 
 // RenameTag 重命名标签（引用侧经外键自动跟随）。
 func (s *Service) RenameTag(ctx context.Context, id int, name string) (Tag, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	tag, err := s.repo.RenameTag(ctx, id, name)
 	if err != nil {
-		logger.Error("model_tag_persist_failed", "op", "rename", "model_tag_id", id, sdk.LogFieldError, err)
+		logger.Error("model_tag_persist_failed", "op", "rename", "model_tag_id", id, logx.LogFieldError, err)
 		return Tag{}, err
 	}
 	return tag, nil
@@ -233,9 +233,9 @@ func (s *Service) RenameTag(ctx context.Context, id int, name string) (Tag, erro
 
 // DeleteTag 删除标签；引用该标签的模型 tag_id 置空（store 事务内完成）。
 func (s *Service) DeleteTag(ctx context.Context, id int) error {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	if err := s.repo.DeleteTag(ctx, id); err != nil {
-		logger.Error("model_tag_persist_failed", "op", "delete", "model_tag_id", id, sdk.LogFieldError, err)
+		logger.Error("model_tag_persist_failed", "op", "delete", "model_tag_id", id, logx.LogFieldError, err)
 		return err
 	}
 	logger.Info("model_tag_deleted", "model_tag_id", id)

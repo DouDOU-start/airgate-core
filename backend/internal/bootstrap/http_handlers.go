@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	"entgo.io/ent/dialect"
 	"github.com/redis/go-redis/v9"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	appannouncement "github.com/DouDOU-start/airgate-core/internal/app/announcement"
@@ -118,7 +119,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	userService.SetBalanceAlertCallback(func(email string, balance float64, threshold float64) {
 		balanceAlertSendEmail(settingsService, email, balance, threshold)
 	})
-	usageStore := store.NewUsageStore(dep.DB)
+	// 生产环境固定 Postgres（见 cmd/server/main.go），显式传入方言以启用趋势聚合下推
+	usageStore := store.NewUsageStore(dep.DB, dialect.Postgres)
 	usageService := appusage.NewService(usageStore, dep.Redis)
 	upstreamLogStore := store.NewUpstreamLogStore(dep.DB)
 	upstreamLogService := appupstreamlog.NewService(upstreamLogStore)
@@ -197,6 +199,39 @@ func (a *settingsAdapter) List(ctx context.Context, group string) ([]appauth.Set
 	return result, nil
 }
 
+// NewUserDefaults 委托给 settings 服务（新用户默认余额/并发数的唯一解析点）。
+func (a *settingsAdapter) NewUserDefaults(ctx context.Context) (float64, int) {
+	return a.svc.NewUserDefaults(ctx)
+}
+
+// smtpConfigFromSettings 把 smtp 组设置项解析为 mailer.Config（Port 缺省 587）。
+// 验证码邮件与余额预警邮件共用此解析，避免两处漂移。
+func smtpConfigFromSettings(items []appsettings.Setting) mailer.Config {
+	cfg := mailer.Config{}
+	for _, s := range items {
+		switch s.Key {
+		case "smtp_host":
+			cfg.Host = s.Value
+		case "smtp_port":
+			cfg.Port, _ = strconv.Atoi(s.Value)
+		case "smtp_username":
+			cfg.Username = s.Value
+		case "smtp_password":
+			cfg.Password = s.Value
+		case "smtp_from_email":
+			cfg.FromAddr = s.Value
+		case "smtp_from_name":
+			cfg.FromName = s.Value
+		case "smtp_use_tls":
+			cfg.UseTLS = s.Value == "true"
+		}
+	}
+	if cfg.Port == 0 {
+		cfg.Port = 587
+	}
+	return cfg
+}
+
 // buildMailerFactory 返回一个从系统设置构建邮件发送器的工厂函数。
 func buildMailerFactory(settingsService *appsettings.Service) appauth.MailSenderFactory {
 	return func(ctx context.Context) (appauth.MailSender, error) {
@@ -204,30 +239,9 @@ func buildMailerFactory(settingsService *appsettings.Service) appauth.MailSender
 		if err != nil {
 			return nil, err
 		}
-		cfg := mailer.Config{}
-		for _, s := range settings {
-			switch s.Key {
-			case "smtp_host":
-				cfg.Host = s.Value
-			case "smtp_port":
-				cfg.Port, _ = strconv.Atoi(s.Value)
-			case "smtp_username":
-				cfg.Username = s.Value
-			case "smtp_password":
-				cfg.Password = s.Value
-			case "smtp_from_email":
-				cfg.FromAddr = s.Value
-			case "smtp_from_name":
-				cfg.FromName = s.Value
-			case "smtp_use_tls":
-				cfg.UseTLS = s.Value == "true"
-			}
-		}
+		cfg := smtpConfigFromSettings(settings)
 		if cfg.Host == "" {
 			return nil, fmt.Errorf("SMTP 未配置")
-		}
-		if cfg.Port == 0 {
-			cfg.Port = 587
 		}
 		return mailer.New(cfg), nil
 	}
@@ -262,34 +276,13 @@ func balanceAlertSendEmail(settingsService *appsettings.Service, email string, b
 	// 读取 SMTP 配置
 	smtpSettings, err := settingsService.List(ctx, "smtp")
 	if err != nil {
-		slog.Error("balance_alert_smtp_load_failed", sdk.LogFieldError, err)
+		slog.Error("balance_alert_smtp_load_failed", logx.LogFieldError, err)
 		return
 	}
-	cfg := mailer.Config{}
-	for _, s := range smtpSettings {
-		switch s.Key {
-		case "smtp_host":
-			cfg.Host = s.Value
-		case "smtp_port":
-			cfg.Port, _ = strconv.Atoi(s.Value)
-		case "smtp_username":
-			cfg.Username = s.Value
-		case "smtp_password":
-			cfg.Password = s.Value
-		case "smtp_from_email":
-			cfg.FromAddr = s.Value
-		case "smtp_from_name":
-			cfg.FromName = s.Value
-		case "smtp_use_tls":
-			cfg.UseTLS = s.Value == "true"
-		}
-	}
+	cfg := smtpConfigFromSettings(smtpSettings)
 	if cfg.Host == "" {
 		slog.Warn("mail_disabled_no_config", "context", "balance_alert")
 		return
-	}
-	if cfg.Port == 0 {
-		cfg.Port = 587
 	}
 
 	// 读取站点名称及余额预警邮件模板
@@ -331,7 +324,7 @@ func balanceAlertSendEmail(settingsService *appsettings.Service, email string, b
 
 	m := mailer.New(cfg)
 	if err := m.Send(email, subject, body); err != nil {
-		slog.Error("balance_alert_email_failed", "to_hash", store.EmailHash(email), sdk.LogFieldError, err)
+		slog.Error("balance_alert_email_failed", "to_hash", store.EmailHash(email), logx.LogFieldError, err)
 	} else {
 		slog.Info("balance_alert_email_sent",
 			"to_hash", store.EmailHash(email),

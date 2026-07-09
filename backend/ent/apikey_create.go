@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
@@ -21,6 +22,7 @@ type APIKeyCreate struct {
 	config
 	mutation *APIKeyMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetName sets the "name" field.
@@ -429,6 +431,7 @@ func (akc *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 		_node = &APIKey{config: akc.config}
 		_spec = sqlgraph.NewCreateSpec(apikey.Table, sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = akc.conflict
 	if value, ok := akc.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 		_node.Name = value
@@ -546,11 +549,646 @@ func (akc *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.APIKey.Create().
+//		SetName(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.APIKeyUpsert) {
+//			SetName(v+v).
+//		}).
+//		Exec(ctx)
+func (akc *APIKeyCreate) OnConflict(opts ...sql.ConflictOption) *APIKeyUpsertOne {
+	akc.conflict = opts
+	return &APIKeyUpsertOne{
+		create: akc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.APIKey.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (akc *APIKeyCreate) OnConflictColumns(columns ...string) *APIKeyUpsertOne {
+	akc.conflict = append(akc.conflict, sql.ConflictColumns(columns...))
+	return &APIKeyUpsertOne{
+		create: akc,
+	}
+}
+
+type (
+	// APIKeyUpsertOne is the builder for "upsert"-ing
+	//  one APIKey node.
+	APIKeyUpsertOne struct {
+		create *APIKeyCreate
+	}
+
+	// APIKeyUpsert is the "OnConflict" setter.
+	APIKeyUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetName sets the "name" field.
+func (u *APIKeyUpsert) SetName(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldName, v)
+	return u
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateName() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldName)
+	return u
+}
+
+// SetKeyHint sets the "key_hint" field.
+func (u *APIKeyUpsert) SetKeyHint(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldKeyHint, v)
+	return u
+}
+
+// UpdateKeyHint sets the "key_hint" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateKeyHint() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldKeyHint)
+	return u
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (u *APIKeyUpsert) SetKeyHash(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldKeyHash, v)
+	return u
+}
+
+// UpdateKeyHash sets the "key_hash" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateKeyHash() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldKeyHash)
+	return u
+}
+
+// SetKeyEncrypted sets the "key_encrypted" field.
+func (u *APIKeyUpsert) SetKeyEncrypted(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldKeyEncrypted, v)
+	return u
+}
+
+// UpdateKeyEncrypted sets the "key_encrypted" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateKeyEncrypted() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldKeyEncrypted)
+	return u
+}
+
+// ClearKeyEncrypted clears the value of the "key_encrypted" field.
+func (u *APIKeyUpsert) ClearKeyEncrypted() *APIKeyUpsert {
+	u.SetNull(apikey.FieldKeyEncrypted)
+	return u
+}
+
+// SetIPWhitelist sets the "ip_whitelist" field.
+func (u *APIKeyUpsert) SetIPWhitelist(v []string) *APIKeyUpsert {
+	u.Set(apikey.FieldIPWhitelist, v)
+	return u
+}
+
+// UpdateIPWhitelist sets the "ip_whitelist" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateIPWhitelist() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldIPWhitelist)
+	return u
+}
+
+// ClearIPWhitelist clears the value of the "ip_whitelist" field.
+func (u *APIKeyUpsert) ClearIPWhitelist() *APIKeyUpsert {
+	u.SetNull(apikey.FieldIPWhitelist)
+	return u
+}
+
+// SetIPBlacklist sets the "ip_blacklist" field.
+func (u *APIKeyUpsert) SetIPBlacklist(v []string) *APIKeyUpsert {
+	u.Set(apikey.FieldIPBlacklist, v)
+	return u
+}
+
+// UpdateIPBlacklist sets the "ip_blacklist" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateIPBlacklist() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldIPBlacklist)
+	return u
+}
+
+// ClearIPBlacklist clears the value of the "ip_blacklist" field.
+func (u *APIKeyUpsert) ClearIPBlacklist() *APIKeyUpsert {
+	u.SetNull(apikey.FieldIPBlacklist)
+	return u
+}
+
+// SetQuotaUsd sets the "quota_usd" field.
+func (u *APIKeyUpsert) SetQuotaUsd(v float64) *APIKeyUpsert {
+	u.Set(apikey.FieldQuotaUsd, v)
+	return u
+}
+
+// UpdateQuotaUsd sets the "quota_usd" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateQuotaUsd() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldQuotaUsd)
+	return u
+}
+
+// AddQuotaUsd adds v to the "quota_usd" field.
+func (u *APIKeyUpsert) AddQuotaUsd(v float64) *APIKeyUpsert {
+	u.Add(apikey.FieldQuotaUsd, v)
+	return u
+}
+
+// SetUsedQuota sets the "used_quota" field.
+func (u *APIKeyUpsert) SetUsedQuota(v float64) *APIKeyUpsert {
+	u.Set(apikey.FieldUsedQuota, v)
+	return u
+}
+
+// UpdateUsedQuota sets the "used_quota" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateUsedQuota() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldUsedQuota)
+	return u
+}
+
+// AddUsedQuota adds v to the "used_quota" field.
+func (u *APIKeyUpsert) AddUsedQuota(v float64) *APIKeyUpsert {
+	u.Add(apikey.FieldUsedQuota, v)
+	return u
+}
+
+// SetUsedQuotaActual sets the "used_quota_actual" field.
+func (u *APIKeyUpsert) SetUsedQuotaActual(v float64) *APIKeyUpsert {
+	u.Set(apikey.FieldUsedQuotaActual, v)
+	return u
+}
+
+// UpdateUsedQuotaActual sets the "used_quota_actual" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateUsedQuotaActual() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldUsedQuotaActual)
+	return u
+}
+
+// AddUsedQuotaActual adds v to the "used_quota_actual" field.
+func (u *APIKeyUpsert) AddUsedQuotaActual(v float64) *APIKeyUpsert {
+	u.Add(apikey.FieldUsedQuotaActual, v)
+	return u
+}
+
+// SetSellRate sets the "sell_rate" field.
+func (u *APIKeyUpsert) SetSellRate(v float64) *APIKeyUpsert {
+	u.Set(apikey.FieldSellRate, v)
+	return u
+}
+
+// UpdateSellRate sets the "sell_rate" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateSellRate() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldSellRate)
+	return u
+}
+
+// AddSellRate adds v to the "sell_rate" field.
+func (u *APIKeyUpsert) AddSellRate(v float64) *APIKeyUpsert {
+	u.Add(apikey.FieldSellRate, v)
+	return u
+}
+
+// SetMaxConcurrency sets the "max_concurrency" field.
+func (u *APIKeyUpsert) SetMaxConcurrency(v int) *APIKeyUpsert {
+	u.Set(apikey.FieldMaxConcurrency, v)
+	return u
+}
+
+// UpdateMaxConcurrency sets the "max_concurrency" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateMaxConcurrency() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldMaxConcurrency)
+	return u
+}
+
+// AddMaxConcurrency adds v to the "max_concurrency" field.
+func (u *APIKeyUpsert) AddMaxConcurrency(v int) *APIKeyUpsert {
+	u.Add(apikey.FieldMaxConcurrency, v)
+	return u
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *APIKeyUpsert) SetExpiresAt(v time.Time) *APIKeyUpsert {
+	u.Set(apikey.FieldExpiresAt, v)
+	return u
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateExpiresAt() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldExpiresAt)
+	return u
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (u *APIKeyUpsert) ClearExpiresAt() *APIKeyUpsert {
+	u.SetNull(apikey.FieldExpiresAt)
+	return u
+}
+
+// SetStatus sets the "status" field.
+func (u *APIKeyUpsert) SetStatus(v apikey.Status) *APIKeyUpsert {
+	u.Set(apikey.FieldStatus, v)
+	return u
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateStatus() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldStatus)
+	return u
+}
+
+// SetProvisionedBy sets the "provisioned_by" field.
+func (u *APIKeyUpsert) SetProvisionedBy(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldProvisionedBy, v)
+	return u
+}
+
+// UpdateProvisionedBy sets the "provisioned_by" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateProvisionedBy() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldProvisionedBy)
+	return u
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *APIKeyUpsert) SetUpdatedAt(v time.Time) *APIKeyUpsert {
+	u.Set(apikey.FieldUpdatedAt, v)
+	return u
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateUpdatedAt() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldUpdatedAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.APIKey.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *APIKeyUpsertOne) UpdateNewValues() *APIKeyUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(apikey.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.APIKey.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *APIKeyUpsertOne) Ignore() *APIKeyUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *APIKeyUpsertOne) DoNothing() *APIKeyUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the APIKeyCreate.OnConflict
+// documentation for more info.
+func (u *APIKeyUpsertOne) Update(set func(*APIKeyUpsert)) *APIKeyUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&APIKeyUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetName sets the "name" field.
+func (u *APIKeyUpsertOne) SetName(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetName(v)
+	})
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateName() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateName()
+	})
+}
+
+// SetKeyHint sets the "key_hint" field.
+func (u *APIKeyUpsertOne) SetKeyHint(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyHint(v)
+	})
+}
+
+// UpdateKeyHint sets the "key_hint" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateKeyHint() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyHint()
+	})
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (u *APIKeyUpsertOne) SetKeyHash(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyHash(v)
+	})
+}
+
+// UpdateKeyHash sets the "key_hash" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateKeyHash() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyHash()
+	})
+}
+
+// SetKeyEncrypted sets the "key_encrypted" field.
+func (u *APIKeyUpsertOne) SetKeyEncrypted(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyEncrypted(v)
+	})
+}
+
+// UpdateKeyEncrypted sets the "key_encrypted" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateKeyEncrypted() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyEncrypted()
+	})
+}
+
+// ClearKeyEncrypted clears the value of the "key_encrypted" field.
+func (u *APIKeyUpsertOne) ClearKeyEncrypted() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearKeyEncrypted()
+	})
+}
+
+// SetIPWhitelist sets the "ip_whitelist" field.
+func (u *APIKeyUpsertOne) SetIPWhitelist(v []string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetIPWhitelist(v)
+	})
+}
+
+// UpdateIPWhitelist sets the "ip_whitelist" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateIPWhitelist() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateIPWhitelist()
+	})
+}
+
+// ClearIPWhitelist clears the value of the "ip_whitelist" field.
+func (u *APIKeyUpsertOne) ClearIPWhitelist() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearIPWhitelist()
+	})
+}
+
+// SetIPBlacklist sets the "ip_blacklist" field.
+func (u *APIKeyUpsertOne) SetIPBlacklist(v []string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetIPBlacklist(v)
+	})
+}
+
+// UpdateIPBlacklist sets the "ip_blacklist" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateIPBlacklist() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateIPBlacklist()
+	})
+}
+
+// ClearIPBlacklist clears the value of the "ip_blacklist" field.
+func (u *APIKeyUpsertOne) ClearIPBlacklist() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearIPBlacklist()
+	})
+}
+
+// SetQuotaUsd sets the "quota_usd" field.
+func (u *APIKeyUpsertOne) SetQuotaUsd(v float64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetQuotaUsd(v)
+	})
+}
+
+// AddQuotaUsd adds v to the "quota_usd" field.
+func (u *APIKeyUpsertOne) AddQuotaUsd(v float64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddQuotaUsd(v)
+	})
+}
+
+// UpdateQuotaUsd sets the "quota_usd" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateQuotaUsd() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateQuotaUsd()
+	})
+}
+
+// SetUsedQuota sets the "used_quota" field.
+func (u *APIKeyUpsertOne) SetUsedQuota(v float64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsedQuota(v)
+	})
+}
+
+// AddUsedQuota adds v to the "used_quota" field.
+func (u *APIKeyUpsertOne) AddUsedQuota(v float64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddUsedQuota(v)
+	})
+}
+
+// UpdateUsedQuota sets the "used_quota" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateUsedQuota() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsedQuota()
+	})
+}
+
+// SetUsedQuotaActual sets the "used_quota_actual" field.
+func (u *APIKeyUpsertOne) SetUsedQuotaActual(v float64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsedQuotaActual(v)
+	})
+}
+
+// AddUsedQuotaActual adds v to the "used_quota_actual" field.
+func (u *APIKeyUpsertOne) AddUsedQuotaActual(v float64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddUsedQuotaActual(v)
+	})
+}
+
+// UpdateUsedQuotaActual sets the "used_quota_actual" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateUsedQuotaActual() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsedQuotaActual()
+	})
+}
+
+// SetSellRate sets the "sell_rate" field.
+func (u *APIKeyUpsertOne) SetSellRate(v float64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetSellRate(v)
+	})
+}
+
+// AddSellRate adds v to the "sell_rate" field.
+func (u *APIKeyUpsertOne) AddSellRate(v float64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddSellRate(v)
+	})
+}
+
+// UpdateSellRate sets the "sell_rate" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateSellRate() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateSellRate()
+	})
+}
+
+// SetMaxConcurrency sets the "max_concurrency" field.
+func (u *APIKeyUpsertOne) SetMaxConcurrency(v int) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetMaxConcurrency(v)
+	})
+}
+
+// AddMaxConcurrency adds v to the "max_concurrency" field.
+func (u *APIKeyUpsertOne) AddMaxConcurrency(v int) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddMaxConcurrency(v)
+	})
+}
+
+// UpdateMaxConcurrency sets the "max_concurrency" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateMaxConcurrency() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateMaxConcurrency()
+	})
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *APIKeyUpsertOne) SetExpiresAt(v time.Time) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetExpiresAt(v)
+	})
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateExpiresAt() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateExpiresAt()
+	})
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (u *APIKeyUpsertOne) ClearExpiresAt() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearExpiresAt()
+	})
+}
+
+// SetStatus sets the "status" field.
+func (u *APIKeyUpsertOne) SetStatus(v apikey.Status) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetStatus(v)
+	})
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateStatus() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateStatus()
+	})
+}
+
+// SetProvisionedBy sets the "provisioned_by" field.
+func (u *APIKeyUpsertOne) SetProvisionedBy(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetProvisionedBy(v)
+	})
+}
+
+// UpdateProvisionedBy sets the "provisioned_by" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateProvisionedBy() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateProvisionedBy()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *APIKeyUpsertOne) SetUpdatedAt(v time.Time) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateUpdatedAt() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *APIKeyUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for APIKeyCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *APIKeyUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *APIKeyUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *APIKeyUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // APIKeyCreateBulk is the builder for creating many APIKey entities in bulk.
 type APIKeyCreateBulk struct {
 	config
 	err      error
 	builders []*APIKeyCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the APIKey entities in the database.
@@ -580,6 +1218,7 @@ func (akcb *APIKeyCreateBulk) Save(ctx context.Context) ([]*APIKey, error) {
 					_, err = mutators[i+1].Mutate(root, akcb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = akcb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, akcb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -630,6 +1269,390 @@ func (akcb *APIKeyCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (akcb *APIKeyCreateBulk) ExecX(ctx context.Context) {
 	if err := akcb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.APIKey.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.APIKeyUpsert) {
+//			SetName(v+v).
+//		}).
+//		Exec(ctx)
+func (akcb *APIKeyCreateBulk) OnConflict(opts ...sql.ConflictOption) *APIKeyUpsertBulk {
+	akcb.conflict = opts
+	return &APIKeyUpsertBulk{
+		create: akcb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.APIKey.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (akcb *APIKeyCreateBulk) OnConflictColumns(columns ...string) *APIKeyUpsertBulk {
+	akcb.conflict = append(akcb.conflict, sql.ConflictColumns(columns...))
+	return &APIKeyUpsertBulk{
+		create: akcb,
+	}
+}
+
+// APIKeyUpsertBulk is the builder for "upsert"-ing
+// a bulk of APIKey nodes.
+type APIKeyUpsertBulk struct {
+	create *APIKeyCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.APIKey.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *APIKeyUpsertBulk) UpdateNewValues() *APIKeyUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(apikey.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.APIKey.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *APIKeyUpsertBulk) Ignore() *APIKeyUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *APIKeyUpsertBulk) DoNothing() *APIKeyUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the APIKeyCreateBulk.OnConflict
+// documentation for more info.
+func (u *APIKeyUpsertBulk) Update(set func(*APIKeyUpsert)) *APIKeyUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&APIKeyUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetName sets the "name" field.
+func (u *APIKeyUpsertBulk) SetName(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetName(v)
+	})
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateName() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateName()
+	})
+}
+
+// SetKeyHint sets the "key_hint" field.
+func (u *APIKeyUpsertBulk) SetKeyHint(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyHint(v)
+	})
+}
+
+// UpdateKeyHint sets the "key_hint" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateKeyHint() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyHint()
+	})
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (u *APIKeyUpsertBulk) SetKeyHash(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyHash(v)
+	})
+}
+
+// UpdateKeyHash sets the "key_hash" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateKeyHash() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyHash()
+	})
+}
+
+// SetKeyEncrypted sets the "key_encrypted" field.
+func (u *APIKeyUpsertBulk) SetKeyEncrypted(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyEncrypted(v)
+	})
+}
+
+// UpdateKeyEncrypted sets the "key_encrypted" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateKeyEncrypted() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyEncrypted()
+	})
+}
+
+// ClearKeyEncrypted clears the value of the "key_encrypted" field.
+func (u *APIKeyUpsertBulk) ClearKeyEncrypted() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearKeyEncrypted()
+	})
+}
+
+// SetIPWhitelist sets the "ip_whitelist" field.
+func (u *APIKeyUpsertBulk) SetIPWhitelist(v []string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetIPWhitelist(v)
+	})
+}
+
+// UpdateIPWhitelist sets the "ip_whitelist" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateIPWhitelist() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateIPWhitelist()
+	})
+}
+
+// ClearIPWhitelist clears the value of the "ip_whitelist" field.
+func (u *APIKeyUpsertBulk) ClearIPWhitelist() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearIPWhitelist()
+	})
+}
+
+// SetIPBlacklist sets the "ip_blacklist" field.
+func (u *APIKeyUpsertBulk) SetIPBlacklist(v []string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetIPBlacklist(v)
+	})
+}
+
+// UpdateIPBlacklist sets the "ip_blacklist" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateIPBlacklist() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateIPBlacklist()
+	})
+}
+
+// ClearIPBlacklist clears the value of the "ip_blacklist" field.
+func (u *APIKeyUpsertBulk) ClearIPBlacklist() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearIPBlacklist()
+	})
+}
+
+// SetQuotaUsd sets the "quota_usd" field.
+func (u *APIKeyUpsertBulk) SetQuotaUsd(v float64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetQuotaUsd(v)
+	})
+}
+
+// AddQuotaUsd adds v to the "quota_usd" field.
+func (u *APIKeyUpsertBulk) AddQuotaUsd(v float64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddQuotaUsd(v)
+	})
+}
+
+// UpdateQuotaUsd sets the "quota_usd" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateQuotaUsd() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateQuotaUsd()
+	})
+}
+
+// SetUsedQuota sets the "used_quota" field.
+func (u *APIKeyUpsertBulk) SetUsedQuota(v float64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsedQuota(v)
+	})
+}
+
+// AddUsedQuota adds v to the "used_quota" field.
+func (u *APIKeyUpsertBulk) AddUsedQuota(v float64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddUsedQuota(v)
+	})
+}
+
+// UpdateUsedQuota sets the "used_quota" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateUsedQuota() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsedQuota()
+	})
+}
+
+// SetUsedQuotaActual sets the "used_quota_actual" field.
+func (u *APIKeyUpsertBulk) SetUsedQuotaActual(v float64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsedQuotaActual(v)
+	})
+}
+
+// AddUsedQuotaActual adds v to the "used_quota_actual" field.
+func (u *APIKeyUpsertBulk) AddUsedQuotaActual(v float64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddUsedQuotaActual(v)
+	})
+}
+
+// UpdateUsedQuotaActual sets the "used_quota_actual" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateUsedQuotaActual() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsedQuotaActual()
+	})
+}
+
+// SetSellRate sets the "sell_rate" field.
+func (u *APIKeyUpsertBulk) SetSellRate(v float64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetSellRate(v)
+	})
+}
+
+// AddSellRate adds v to the "sell_rate" field.
+func (u *APIKeyUpsertBulk) AddSellRate(v float64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddSellRate(v)
+	})
+}
+
+// UpdateSellRate sets the "sell_rate" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateSellRate() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateSellRate()
+	})
+}
+
+// SetMaxConcurrency sets the "max_concurrency" field.
+func (u *APIKeyUpsertBulk) SetMaxConcurrency(v int) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetMaxConcurrency(v)
+	})
+}
+
+// AddMaxConcurrency adds v to the "max_concurrency" field.
+func (u *APIKeyUpsertBulk) AddMaxConcurrency(v int) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddMaxConcurrency(v)
+	})
+}
+
+// UpdateMaxConcurrency sets the "max_concurrency" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateMaxConcurrency() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateMaxConcurrency()
+	})
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *APIKeyUpsertBulk) SetExpiresAt(v time.Time) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetExpiresAt(v)
+	})
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateExpiresAt() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateExpiresAt()
+	})
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (u *APIKeyUpsertBulk) ClearExpiresAt() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearExpiresAt()
+	})
+}
+
+// SetStatus sets the "status" field.
+func (u *APIKeyUpsertBulk) SetStatus(v apikey.Status) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetStatus(v)
+	})
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateStatus() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateStatus()
+	})
+}
+
+// SetProvisionedBy sets the "provisioned_by" field.
+func (u *APIKeyUpsertBulk) SetProvisionedBy(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetProvisionedBy(v)
+	})
+}
+
+// UpdateProvisionedBy sets the "provisioned_by" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateProvisionedBy() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateProvisionedBy()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *APIKeyUpsertBulk) SetUpdatedAt(v time.Time) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateUpdatedAt() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *APIKeyUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the APIKeyCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for APIKeyCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *APIKeyUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

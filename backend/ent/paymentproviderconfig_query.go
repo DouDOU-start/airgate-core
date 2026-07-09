@@ -21,6 +21,7 @@ type PaymentProviderConfigQuery struct {
 	order      []paymentproviderconfig.OrderOption
 	inters     []Interceptor
 	predicates []predicate.PaymentProviderConfig
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -342,6 +343,9 @@ func (ppcq *PaymentProviderConfigQuery) sqlAll(ctx context.Context, hooks ...que
 		nodes = append(nodes, node)
 		return node.assignValues(columns, values)
 	}
+	if len(ppcq.modifiers) > 0 {
+		_spec.Modifiers = ppcq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -356,6 +360,9 @@ func (ppcq *PaymentProviderConfigQuery) sqlAll(ctx context.Context, hooks ...que
 
 func (ppcq *PaymentProviderConfigQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := ppcq.querySpec()
+	if len(ppcq.modifiers) > 0 {
+		_spec.Modifiers = ppcq.modifiers
+	}
 	_spec.Node.Columns = ppcq.ctx.Fields
 	if len(ppcq.ctx.Fields) > 0 {
 		_spec.Unique = ppcq.ctx.Unique != nil && *ppcq.ctx.Unique
@@ -418,6 +425,9 @@ func (ppcq *PaymentProviderConfigQuery) sqlQuery(ctx context.Context) *sql.Selec
 	if ppcq.ctx.Unique != nil && *ppcq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range ppcq.modifiers {
+		m(selector)
+	}
 	for _, p := range ppcq.predicates {
 		p(selector)
 	}
@@ -433,6 +443,12 @@ func (ppcq *PaymentProviderConfigQuery) sqlQuery(ctx context.Context) *sql.Selec
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ppcq *PaymentProviderConfigQuery) Modify(modifiers ...func(s *sql.Selector)) *PaymentProviderConfigSelect {
+	ppcq.modifiers = append(ppcq.modifiers, modifiers...)
+	return ppcq.Select()
 }
 
 // PaymentProviderConfigGroupBy is the group-by builder for PaymentProviderConfig entities.
@@ -523,4 +539,10 @@ func (ppcs *PaymentProviderConfigSelect) sqlScan(ctx context.Context, root *Paym
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ppcs *PaymentProviderConfigSelect) Modify(modifiers ...func(s *sql.Selector)) *PaymentProviderConfigSelect {
+	ppcs.modifiers = append(ppcs.modifiers, modifiers...)
+	return ppcs
 }

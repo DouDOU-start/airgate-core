@@ -7,9 +7,9 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // BalanceAlertFunc 余额预警回调（异步调用，不阻塞主流程）。
@@ -47,63 +47,63 @@ func (s *Service) Get(ctx context.Context, id int) (User, error) {
 
 // UpdateProfile 更新当前用户资料。
 func (s *Service) UpdateProfile(ctx context.Context, id int, username string) (User, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	updated, err := s.repo.Update(ctx, id, Mutation{Username: &username})
 	if err != nil {
 		logger.Error("user_profile_update_failed",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, id,
+			logx.LogFieldError, err,
 		)
 		return User{}, err
 	}
-	logger.Info("user_profile_updated", sdk.LogFieldUserID, id)
+	logger.Info("user_profile_updated", logx.LogFieldUserID, id)
 	return updated, nil
 }
 
 // ChangePassword 修改当前用户密码。
 func (s *Service) ChangePassword(ctx context.Context, id int, oldPassword, newPassword string) error {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, false)
 	if err != nil {
 		logger.Error("user_lookup_failed",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldReason, "change_password",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, id,
+			logx.LogFieldReason, "change_password",
+			logx.LogFieldError, err,
 		)
 		return err
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(item.PasswordHash), []byte(oldPassword)); err != nil {
 		logger.Warn("user_password_change_rejected",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldReason, "old_password_mismatch",
+			logx.LogFieldUserID, id,
+			logx.LogFieldReason, "old_password_mismatch",
 		)
 		return ErrOldPasswordMismatch
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		logger.Error("user_password_change_failed",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldReason, "password_hash",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, id,
+			logx.LogFieldReason, "password_hash",
+			logx.LogFieldError, err,
 		)
 		return err
 	}
 	_, err = s.repo.Update(ctx, id, Mutation{PasswordHash: stringPtr(string(hash))})
 	if err != nil {
 		logger.Error("user_password_change_failed",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldReason, "persist",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, id,
+			logx.LogFieldReason, "persist",
+			logx.LogFieldError, err,
 		)
 		return err
 	}
-	logger.Info("user_password_changed", sdk.LogFieldUserID, id)
+	logger.Info("user_password_changed", logx.LogFieldUserID, id)
 	return nil
 }
 
 // List 查询用户列表。
 func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
@@ -111,8 +111,8 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 	list, total, err := s.repo.List(ctx, filter)
 	if err != nil {
 		logger.Error("user_lookup_failed",
-			sdk.LogFieldReason, "list",
-			sdk.LogFieldError, err,
+			logx.LogFieldReason, "list",
+			logx.LogFieldError, err,
 		)
 		return ListResult{}, err
 	}
@@ -145,24 +145,24 @@ func (s *Service) attachRuntimeStats(ctx context.Context, list []User) {
 
 // Create 创建用户。
 func (s *Service) Create(ctx context.Context, input CreateInput) (User, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	exists, err := s.repo.EmailExists(ctx, input.Email)
 	if err != nil {
 		logger.Error("user_lookup_failed",
-			sdk.LogFieldReason, "email_check",
-			sdk.LogFieldError, err,
+			logx.LogFieldReason, "email_check",
+			logx.LogFieldError, err,
 		)
 		return User{}, err
 	}
 	if exists {
-		logger.Warn("user_create_rejected", sdk.LogFieldReason, "email_already_exists")
+		logger.Warn("user_create_rejected", logx.LogFieldReason, "email_already_exists")
 		return User{}, ErrEmailAlreadyExists
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
 		logger.Error("user_create_failed",
-			sdk.LogFieldReason, "password_hash",
-			sdk.LogFieldError, err,
+			logx.LogFieldReason, "password_hash",
+			logx.LogFieldError, err,
 		)
 		return User{}, err
 	}
@@ -178,24 +178,24 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (User, error) {
 	})
 	if err != nil {
 		logger.Error("user_create_failed",
-			sdk.LogFieldReason, "persist",
-			sdk.LogFieldError, err,
+			logx.LogFieldReason, "persist",
+			logx.LogFieldError, err,
 		)
 		return User{}, err
 	}
-	logger.Info("user_created", sdk.LogFieldUserID, created.ID)
+	logger.Info("user_created", logx.LogFieldUserID, created.ID)
 	return created, nil
 }
 
 // Update 更新用户。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (User, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	if input.HasGroupRates {
 		for _, v := range input.GroupRates {
 			if v < 0 {
 				logger.Warn("user_update_rejected",
-					sdk.LogFieldUserID, id,
-					sdk.LogFieldReason, "invalid_rate_multiplier",
+					logx.LogFieldUserID, id,
+					logx.LogFieldReason, "invalid_rate_multiplier",
 				)
 				return User{}, ErrInvalidRateMultiplier
 			}
@@ -215,9 +215,9 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (User, 
 		hash, err := bcrypt.GenerateFromPassword([]byte(*input.Password), bcrypt.DefaultCost)
 		if err != nil {
 			logger.Error("user_password_change_failed",
-				sdk.LogFieldUserID, id,
-				sdk.LogFieldReason, "password_hash",
-				sdk.LogFieldError, err,
+				logx.LogFieldUserID, id,
+				logx.LogFieldReason, "password_hash",
+				logx.LogFieldError, err,
 			)
 			return User{}, err
 		}
@@ -226,95 +226,72 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (User, 
 	updated, err := s.repo.Update(ctx, id, mutation)
 	if err != nil {
 		logger.Error("user_update_failed",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, id,
+			logx.LogFieldError, err,
 		)
 		return User{}, err
 	}
 	if input.Password != nil {
-		logger.Info("user_password_changed", sdk.LogFieldUserID, id)
+		logger.Info("user_password_changed", logx.LogFieldUserID, id)
 	}
 	if input.Status != nil && *input.Status == "disabled" {
-		logger.Info("user_disabled", sdk.LogFieldUserID, id)
+		logger.Info("user_disabled", logx.LogFieldUserID, id)
 	}
-	logger.Info("user_profile_updated", sdk.LogFieldUserID, id)
+	logger.Info("user_profile_updated", logx.LogFieldUserID, id)
 	return updated, nil
 }
 
-// AdjustBalance 调整用户余额。
+// AdjustBalance 调整用户余额。before/after 由 store 在事务内以行锁重读现算，
+// 与计费侧的原子扣减并发安全（不再无锁读余额后覆盖写回）。
 func (s *Service) AdjustBalance(ctx context.Context, id int, change BalanceChange) (User, error) {
-	logger := sdk.LoggerFromContext(ctx)
-	item, err := s.repo.FindByID(ctx, id, false)
-	if err != nil {
-		logger.Error("user_lookup_failed",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldReason, "adjust_balance",
-			sdk.LogFieldError, err,
-		)
-		return User{}, err
-	}
-
-	beforeBalance := item.Balance
-	var afterBalance float64
+	logger := logx.LoggerFromContext(ctx)
 	switch change.Action {
-	case "set":
-		afterBalance = change.Amount
-	case "add":
-		afterBalance = beforeBalance + change.Amount
-	case "subtract":
-		if beforeBalance < change.Amount {
-			logger.Warn("user_balance_change_rejected",
-				sdk.LogFieldUserID, id,
-				sdk.LogFieldReason, "insufficient_balance",
-				"action", change.Action,
-			)
-			return User{}, ErrInsufficientBalance
-		}
-		afterBalance = beforeBalance - change.Amount
+	case "set", "add", "subtract":
 	default:
 		logger.Warn("user_balance_change_rejected",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldReason, "invalid_action",
+			logx.LogFieldUserID, id,
+			logx.LogFieldReason, "invalid_action",
 			"action", change.Action,
 		)
 		return User{}, ErrInvalidBalanceAction
 	}
 
-	updated, err := s.repo.UpdateBalance(ctx, id, BalanceUpdate{
-		Action:         change.Action,
-		Amount:         change.Amount,
-		BeforeBalance:  beforeBalance,
-		AfterBalance:   afterBalance,
-		Remark:         change.Remark,
-		IdempotencyKey: change.IdempotencyKey,
-	})
+	updated, err := s.repo.UpdateBalance(ctx, id, change)
 	if err != nil {
 		// 幂等命中：同一键的变更已入账过，返回当前状态、不重复变更
 		if errors.Is(err, ErrDuplicateBalanceChange) {
 			logger.Info("user_balance_change_idempotent_hit",
-				sdk.LogFieldUserID, id,
+				logx.LogFieldUserID, id,
 				"idempotency_key", change.IdempotencyKey,
 			)
 			return s.repo.FindByID(ctx, id, true)
 		}
+		if errors.Is(err, ErrInsufficientBalance) {
+			logger.Warn("user_balance_change_rejected",
+				logx.LogFieldUserID, id,
+				logx.LogFieldReason, "insufficient_balance",
+				"action", change.Action,
+			)
+			return User{}, err
+		}
 		logger.Error("user_balance_change_failed",
-			sdk.LogFieldUserID, id,
+			logx.LogFieldUserID, id,
 			"action", change.Action,
-			sdk.LogFieldError, err,
+			logx.LogFieldError, err,
 		)
 		return User{}, err
 	}
 
 	logger.Info("user_balance_changed",
-		sdk.LogFieldUserID, id,
+		logx.LogFieldUserID, id,
 		"action", change.Action,
-		"before", beforeBalance,
-		"after", afterBalance,
-		sdk.LogFieldReason, change.Remark,
+		"amount", change.Amount,
+		"after", updated.Balance,
+		logx.LogFieldReason, change.Remark,
 	)
 
 	// 余额预警检查
-	s.checkBalanceAlert(ctx, updated, beforeBalance)
+	s.checkBalanceAlert(ctx, updated)
 
 	return updated, nil
 }
@@ -325,7 +302,7 @@ func (s *Service) UpdateBalanceAlert(ctx context.Context, userID int, threshold 
 }
 
 // checkBalanceAlert 检查余额是否低于预警阈值，触发通知。
-func (s *Service) checkBalanceAlert(ctx context.Context, user User, beforeBalance float64) {
+func (s *Service) checkBalanceAlert(ctx context.Context, user User) {
 	threshold := user.BalanceAlertThreshold
 	if threshold <= 0 || s.onBalanceAlert == nil {
 		return
@@ -398,43 +375,43 @@ func (s *Service) DeleteGroupRate(ctx context.Context, userID int, groupID int64
 
 // Delete 删除用户。
 func (s *Service) Delete(ctx context.Context, id int) error {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, false)
 	if err != nil {
 		logger.Error("user_lookup_failed",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldReason, "delete",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, id,
+			logx.LogFieldReason, "delete",
+			logx.LogFieldError, err,
 		)
 		return err
 	}
 	if item.Role == "admin" {
 		logger.Warn("user_delete_rejected",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldReason, "delete_admin_forbidden",
+			logx.LogFieldUserID, id,
+			logx.LogFieldReason, "delete_admin_forbidden",
 		)
 		return ErrDeleteAdminForbidden
 	}
 	if err := s.repo.Delete(ctx, id); err != nil {
 		logger.Error("user_delete_failed",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, id,
+			logx.LogFieldError, err,
 		)
 		return err
 	}
-	logger.Info("user_deleted", sdk.LogFieldUserID, id)
+	logger.Info("user_deleted", logx.LogFieldUserID, id)
 	return nil
 }
 
 // ToggleStatus 切换用户状态。
 func (s *Service) ToggleStatus(ctx context.Context, id int) (ToggleResult, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	item, err := s.repo.FindByID(ctx, id, false)
 	if err != nil {
 		logger.Error("user_lookup_failed",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldReason, "toggle_status",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, id,
+			logx.LogFieldReason, "toggle_status",
+			logx.LogFieldError, err,
 		)
 		return ToggleResult{}, err
 	}
@@ -445,16 +422,16 @@ func (s *Service) ToggleStatus(ctx context.Context, id int) (ToggleResult, error
 	updated, err := s.repo.Update(ctx, id, Mutation{Status: &newStatus})
 	if err != nil {
 		logger.Error("user_update_failed",
-			sdk.LogFieldUserID, id,
-			sdk.LogFieldReason, "toggle_status",
-			sdk.LogFieldError, err,
+			logx.LogFieldUserID, id,
+			logx.LogFieldReason, "toggle_status",
+			logx.LogFieldError, err,
 		)
 		return ToggleResult{}, err
 	}
 	if newStatus == "disabled" {
-		logger.Info("user_disabled", sdk.LogFieldUserID, id)
+		logger.Info("user_disabled", logx.LogFieldUserID, id)
 	} else {
-		logger.Info("user_enabled", sdk.LogFieldUserID, id)
+		logger.Info("user_enabled", logx.LogFieldUserID, id)
 	}
 	return ToggleResult{ID: updated.ID, Status: updated.Status}, nil
 }
@@ -467,11 +444,6 @@ func (s *Service) ListBalanceLogs(ctx context.Context, userID, page, pageSize in
 		return BalanceLogList{}, err
 	}
 	return BalanceLogList{List: list, Total: total, Page: page, PageSize: pageSize}, nil
-}
-
-// GetAPIKeyName 获取 API Key 名称。
-func (s *Service) GetAPIKeyName(ctx context.Context, keyID int) (string, error) {
-	return s.repo.GetAPIKeyName(ctx, keyID)
 }
 
 // GetAPIKeyInfo 获取 API Key 概要信息。

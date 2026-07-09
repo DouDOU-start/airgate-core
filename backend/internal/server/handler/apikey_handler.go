@@ -17,9 +17,6 @@ func NewAPIKeyHandler(service *appapikey.Service) *APIKeyHandler {
 	return &APIKeyHandler{service: service}
 }
 
-// parseKeyID 解析密钥 ID，委托给公共 ParseID。
-var parseKeyID = ParseID
-
 func (h *APIKeyHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	switch {
 	case errors.Is(err, appapikey.ErrKeyNotFound):

@@ -22,8 +22,9 @@ import (
 // GroupUpdate is the builder for updating Group entities.
 type GroupUpdate struct {
 	config
-	hooks    []Hook
-	mutation *GroupMutation
+	hooks     []Hook
+	mutation  *GroupMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the GroupUpdate builder.
@@ -105,58 +106,6 @@ func (gu *GroupUpdate) SetStatusVisible(b bool) *GroupUpdate {
 func (gu *GroupUpdate) SetNillableStatusVisible(b *bool) *GroupUpdate {
 	if b != nil {
 		gu.SetStatusVisible(*b)
-	}
-	return gu
-}
-
-// SetQuotas sets the "quotas" field.
-func (gu *GroupUpdate) SetQuotas(m map[string]interface{}) *GroupUpdate {
-	gu.mutation.SetQuotas(m)
-	return gu
-}
-
-// ClearQuotas clears the value of the "quotas" field.
-func (gu *GroupUpdate) ClearQuotas() *GroupUpdate {
-	gu.mutation.ClearQuotas()
-	return gu
-}
-
-// SetModelRouting sets the "model_routing" field.
-func (gu *GroupUpdate) SetModelRouting(m map[string][]int64) *GroupUpdate {
-	gu.mutation.SetModelRouting(m)
-	return gu
-}
-
-// ClearModelRouting clears the value of the "model_routing" field.
-func (gu *GroupUpdate) ClearModelRouting() *GroupUpdate {
-	gu.mutation.ClearModelRouting()
-	return gu
-}
-
-// SetServiceTier sets the "service_tier" field.
-func (gu *GroupUpdate) SetServiceTier(s string) *GroupUpdate {
-	gu.mutation.SetServiceTier(s)
-	return gu
-}
-
-// SetNillableServiceTier sets the "service_tier" field if the given value is not nil.
-func (gu *GroupUpdate) SetNillableServiceTier(s *string) *GroupUpdate {
-	if s != nil {
-		gu.SetServiceTier(*s)
-	}
-	return gu
-}
-
-// SetForceInstructions sets the "force_instructions" field.
-func (gu *GroupUpdate) SetForceInstructions(s string) *GroupUpdate {
-	gu.mutation.SetForceInstructions(s)
-	return gu
-}
-
-// SetNillableForceInstructions sets the "force_instructions" field if the given value is not nil.
-func (gu *GroupUpdate) SetNillableForceInstructions(s *string) *GroupUpdate {
-	if s != nil {
-		gu.SetForceInstructions(*s)
 	}
 	return gu
 }
@@ -397,6 +346,12 @@ func (gu *GroupUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (gu *GroupUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *GroupUpdate {
+	gu.modifiers = append(gu.modifiers, modifiers...)
+	return gu
+}
+
 func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := gu.check(); err != nil {
 		return n, err
@@ -426,24 +381,6 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := gu.mutation.StatusVisible(); ok {
 		_spec.SetField(group.FieldStatusVisible, field.TypeBool, value)
-	}
-	if value, ok := gu.mutation.Quotas(); ok {
-		_spec.SetField(group.FieldQuotas, field.TypeJSON, value)
-	}
-	if gu.mutation.QuotasCleared() {
-		_spec.ClearField(group.FieldQuotas, field.TypeJSON)
-	}
-	if value, ok := gu.mutation.ModelRouting(); ok {
-		_spec.SetField(group.FieldModelRouting, field.TypeJSON, value)
-	}
-	if gu.mutation.ModelRoutingCleared() {
-		_spec.ClearField(group.FieldModelRouting, field.TypeJSON)
-	}
-	if value, ok := gu.mutation.ServiceTier(); ok {
-		_spec.SetField(group.FieldServiceTier, field.TypeString, value)
-	}
-	if value, ok := gu.mutation.ForceInstructions(); ok {
-		_spec.SetField(group.FieldForceInstructions, field.TypeString, value)
 	}
 	if value, ok := gu.mutation.Note(); ok {
 		_spec.SetField(group.FieldNote, field.TypeString, value)
@@ -637,6 +574,7 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(gu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, gu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{group.Label}
@@ -652,9 +590,10 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // GroupUpdateOne is the builder for updating a single Group entity.
 type GroupUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *GroupMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *GroupMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetName sets the "name" field.
@@ -730,58 +669,6 @@ func (guo *GroupUpdateOne) SetStatusVisible(b bool) *GroupUpdateOne {
 func (guo *GroupUpdateOne) SetNillableStatusVisible(b *bool) *GroupUpdateOne {
 	if b != nil {
 		guo.SetStatusVisible(*b)
-	}
-	return guo
-}
-
-// SetQuotas sets the "quotas" field.
-func (guo *GroupUpdateOne) SetQuotas(m map[string]interface{}) *GroupUpdateOne {
-	guo.mutation.SetQuotas(m)
-	return guo
-}
-
-// ClearQuotas clears the value of the "quotas" field.
-func (guo *GroupUpdateOne) ClearQuotas() *GroupUpdateOne {
-	guo.mutation.ClearQuotas()
-	return guo
-}
-
-// SetModelRouting sets the "model_routing" field.
-func (guo *GroupUpdateOne) SetModelRouting(m map[string][]int64) *GroupUpdateOne {
-	guo.mutation.SetModelRouting(m)
-	return guo
-}
-
-// ClearModelRouting clears the value of the "model_routing" field.
-func (guo *GroupUpdateOne) ClearModelRouting() *GroupUpdateOne {
-	guo.mutation.ClearModelRouting()
-	return guo
-}
-
-// SetServiceTier sets the "service_tier" field.
-func (guo *GroupUpdateOne) SetServiceTier(s string) *GroupUpdateOne {
-	guo.mutation.SetServiceTier(s)
-	return guo
-}
-
-// SetNillableServiceTier sets the "service_tier" field if the given value is not nil.
-func (guo *GroupUpdateOne) SetNillableServiceTier(s *string) *GroupUpdateOne {
-	if s != nil {
-		guo.SetServiceTier(*s)
-	}
-	return guo
-}
-
-// SetForceInstructions sets the "force_instructions" field.
-func (guo *GroupUpdateOne) SetForceInstructions(s string) *GroupUpdateOne {
-	guo.mutation.SetForceInstructions(s)
-	return guo
-}
-
-// SetNillableForceInstructions sets the "force_instructions" field if the given value is not nil.
-func (guo *GroupUpdateOne) SetNillableForceInstructions(s *string) *GroupUpdateOne {
-	if s != nil {
-		guo.SetForceInstructions(*s)
 	}
 	return guo
 }
@@ -1035,6 +922,12 @@ func (guo *GroupUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (guo *GroupUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *GroupUpdateOne {
+	guo.modifiers = append(guo.modifiers, modifiers...)
+	return guo
+}
+
 func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error) {
 	if err := guo.check(); err != nil {
 		return _node, err
@@ -1081,24 +974,6 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 	}
 	if value, ok := guo.mutation.StatusVisible(); ok {
 		_spec.SetField(group.FieldStatusVisible, field.TypeBool, value)
-	}
-	if value, ok := guo.mutation.Quotas(); ok {
-		_spec.SetField(group.FieldQuotas, field.TypeJSON, value)
-	}
-	if guo.mutation.QuotasCleared() {
-		_spec.ClearField(group.FieldQuotas, field.TypeJSON)
-	}
-	if value, ok := guo.mutation.ModelRouting(); ok {
-		_spec.SetField(group.FieldModelRouting, field.TypeJSON, value)
-	}
-	if guo.mutation.ModelRoutingCleared() {
-		_spec.ClearField(group.FieldModelRouting, field.TypeJSON)
-	}
-	if value, ok := guo.mutation.ServiceTier(); ok {
-		_spec.SetField(group.FieldServiceTier, field.TypeString, value)
-	}
-	if value, ok := guo.mutation.ForceInstructions(); ok {
-		_spec.SetField(group.FieldForceInstructions, field.TypeString, value)
 	}
 	if value, ok := guo.mutation.Note(); ok {
 		_spec.SetField(group.FieldNote, field.TypeString, value)
@@ -1292,6 +1167,7 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(guo.modifiers...)
 	_node = &Group{config: guo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

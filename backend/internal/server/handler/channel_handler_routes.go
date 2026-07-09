@@ -79,7 +79,7 @@ func (h *ChannelHandler) CreateChannel(c *gin.Context) {
 
 // UpdateChannel 更新渠道（partial；api_keys 提供即整组替换）。
 func (h *ChannelHandler) UpdateChannel(c *gin.Context) {
-	id, err := parseChannelID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的渠道 ID")
 		return
@@ -121,7 +121,7 @@ func (h *ChannelHandler) UpdateChannel(c *gin.Context) {
 
 // DeleteChannel 删除渠道。
 func (h *ChannelHandler) DeleteChannel(c *gin.Context) {
-	id, err := parseChannelID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的渠道 ID")
 		return
@@ -138,7 +138,7 @@ func (h *ChannelHandler) DeleteChannel(c *gin.Context) {
 
 // TestChannel 测试渠道连通性（body 可省略；model 缺省时取渠道 test_model 或首个模型）。
 func (h *ChannelHandler) TestChannel(c *gin.Context) {
-	id, err := parseChannelID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的渠道 ID")
 		return
@@ -165,7 +165,7 @@ func (h *ChannelHandler) TestChannel(c *gin.Context) {
 
 // FetchChannelModels 从上游拉取模型列表。
 func (h *ChannelHandler) FetchChannelModels(c *gin.Context) {
-	id, err := parseChannelID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的渠道 ID")
 		return
@@ -183,7 +183,7 @@ func (h *ChannelHandler) FetchChannelModels(c *gin.Context) {
 
 // RefreshChannelBalance 经渠道 key 查询上游余额并落库（仅 openai_compatible 中转站可查）。
 func (h *ChannelHandler) RefreshChannelBalance(c *gin.Context) {
-	id, err := parseChannelID(c.Param("id"))
+	id, err := ParseID(c.Param("id"))
 	if err != nil {
 		response.BadRequest(c, "无效的渠道 ID")
 		return

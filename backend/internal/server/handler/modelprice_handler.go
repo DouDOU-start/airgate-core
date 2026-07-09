@@ -17,9 +17,6 @@ func NewModelPriceHandler(service *appmodelprice.Service) *ModelPriceHandler {
 	return &ModelPriceHandler{service: service}
 }
 
-// parseModelPriceID 解析价格条目 ID，委托给公共 ParseID。
-var parseModelPriceID = ParseID
-
 func (h *ModelPriceHandler) handleError(logMessage, publicMessage string, err error) (int, string) {
 	switch {
 	case errors.Is(err, appmodelprice.ErrModelPriceNotFound):

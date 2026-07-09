@@ -205,24 +205,26 @@ func (s *AnnouncementStore) MarkRead(ctx context.Context, announcementID, userID
 	return nil
 }
 
-// MarkReadBulk 批量幂等写入已读记录：先查缺口再逐条写入，冲突（并发重复标记）忽略。
+// MarkReadBulk 批量幂等写入已读记录：单条 INSERT ... ON CONFLICT DO NOTHING，
+// 已读过的行（联合唯一索引冲突）直接跳过，不覆盖首次已读时间。
 func (s *AnnouncementStore) MarkReadBulk(ctx context.Context, userID int, announcementIDs []int, readAt time.Time) error {
 	if len(announcementIDs) == 0 {
 		return nil
 	}
-	existing, err := s.ReadTimes(ctx, userID, announcementIDs)
-	if err != nil {
-		return err
-	}
+	builders := make([]*ent.AnnouncementReadCreate, 0, len(announcementIDs))
 	for _, id := range announcementIDs {
-		if _, ok := existing[id]; ok {
-			continue
-		}
-		if err := s.MarkRead(ctx, id, userID, readAt); err != nil {
-			return err
-		}
+		builders = append(builders, s.db.AnnouncementRead.Create().
+			SetAnnouncementID(id).
+			SetUserID(userID).
+			SetReadAt(readAt))
 	}
-	return nil
+	return s.db.AnnouncementRead.CreateBulk(builders...).
+		OnConflictColumns(
+			entannouncementread.FieldAnnouncementID,
+			entannouncementread.FieldUserID,
+		).
+		DoNothing().
+		Exec(ctx)
 }
 
 func mapAnnouncements(items []*ent.Announcement) []appannouncement.Announcement {

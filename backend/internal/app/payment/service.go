@@ -13,8 +13,8 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/internal/app/payment/provider"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // 模块配置默认值（settings 表 payment 组缺省时生效），沿用原 epay 插件默认。
@@ -27,8 +27,8 @@ const (
 
 var providerKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 
-// encPrefix 敏感配置密文的标记前缀。带前缀 = AES-GCM 密文，无前缀 = 明文
-// （旧插件回填的过渡态，启动时由 NormalizeLegacyConfigs 一次性转换）。
+// encPrefix 敏感配置密文的标记前缀。敏感字段一律带前缀密文落库；
+// 无前缀的敏感值视为损坏配置直接报错（本分支不保留明文过渡兼容）。
 // 用确定性标记而非格式启发式：64 位 hex 商户密钥这类值与 base64 密文无法靠形态区分。
 const encPrefix = "enc:v1:"
 
@@ -102,18 +102,23 @@ func (s *Service) loadConfig(ctx context.Context) moduleConfig {
 // ReloadProviders 从库里读全部服务商配置，解密敏感字段后重建注册表。
 // admin 增删改后调用，热生效无需重启。
 func (s *Service) ReloadProviders(ctx context.Context) error {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	configs, err := s.repo.ListProviderConfigs(ctx)
 	if err != nil {
 		return err
 	}
 	providers := make([]provider.Provider, 0, len(configs))
 	for _, c := range configs {
-		plain := s.decryptSensitive(c.Kind, c.Config)
+		plain, err := s.decryptSensitive(c.Kind, c.Config)
+		if err != nil {
+			// 敏感配置未按约定加密（如手工改库）：跳过该实例，管理端重新保存即可恢复
+			logger.Warn("payment_provider_config_invalid", "provider", c.ProviderKey, "kind", c.Kind, logx.LogFieldError, err)
+			continue
+		}
 		p, err := provider.Build(c.Kind, c.ProviderKey, c.Enabled, plain)
 		if err != nil {
 			// 单个实例构建失败不阻塞其余实例（如未知 kind、配置损坏）
-			logger.Warn("payment_provider_build_failed", "provider", c.ProviderKey, "kind", c.Kind, sdk.LogFieldError, err)
+			logger.Warn("payment_provider_build_failed", "provider", c.ProviderKey, "kind", c.Kind, logx.LogFieldError, err)
 			continue
 		}
 		providers = append(providers, p)
@@ -139,27 +144,30 @@ func sensitiveFields(kind string) map[string]bool {
 	return out
 }
 
-// decryptSensitive 还原敏感字段明文：仅解密带 encPrefix 标记的密文；
-// 无前缀值视为明文原样返回（规范化前的短暂过渡态）。
-func (s *Service) decryptSensitive(kind string, config map[string]string) map[string]string {
+// decryptSensitive 还原敏感字段明文：只接受带 encPrefix 标记的密文，
+// 非空却无前缀的敏感值属于违规落库（本分支不保留明文过渡兼容），直接报错。
+func (s *Service) decryptSensitive(kind string, config map[string]string) (map[string]string, error) {
 	sensitive := sensitiveFields(kind)
 	out := make(map[string]string, len(config))
 	for k, v := range config {
-		if sensitive[k] && strings.HasPrefix(v, encPrefix) {
-			plain, err := auth.DecryptAPIKey(strings.TrimPrefix(v, encPrefix), s.secret)
-			if err != nil {
-				// 带标记却解不开（如换过 APIKeySecret）：保留原值，Provider 会因
-				// 配置无效呈 Enabled=false，管理端重新保存密钥即可恢复
-				slog.Warn("payment_config_decrypt_failed", "kind", kind, "field", k, "error", err)
-				out[k] = v
-				continue
-			}
-			out[k] = plain
+		if !sensitive[k] || v == "" {
+			out[k] = v
 			continue
 		}
-		out[k] = v
+		if !strings.HasPrefix(v, encPrefix) {
+			return nil, fmt.Errorf("敏感配置字段 %s 未加密落库（缺少 %s 标记），请在管理端重新保存", k, encPrefix)
+		}
+		plain, err := auth.DecryptAPIKey(strings.TrimPrefix(v, encPrefix), s.secret)
+		if err != nil {
+			// 带标记却解不开（如换过 APIKeySecret）：保留原值，Provider 会因
+			// 配置无效呈 Enabled=false，管理端重新保存密钥即可恢复
+			slog.Warn("payment_config_decrypt_failed", "kind", kind, "field", k, "error", err)
+			out[k] = v
+			continue
+		}
+		out[k] = plain
 	}
-	return out
+	return out, nil
 }
 
 // encryptValue 加密敏感值并打上 encPrefix 标记。
@@ -169,46 +177,6 @@ func (s *Service) encryptValue(plain string) (string, error) {
 		return "", err
 	}
 	return encPrefix + enc, nil
-}
-
-// NormalizeLegacyConfigs 一次性规范化存量敏感配置（server 启动时在
-// ReloadProviders 前调用；全部已带标记时为空操作，幂等）：
-//   - 无前缀但可解密 → 上一版无标记密文，补前缀；
-//   - 无前缀且不可解密 → 旧插件明文，加密 + 打前缀。
-func (s *Service) NormalizeLegacyConfigs(ctx context.Context) {
-	logger := sdk.LoggerFromContext(ctx)
-	configs, err := s.repo.ListProviderConfigs(ctx)
-	if err != nil {
-		return
-	}
-	for _, c := range configs {
-		sensitive := sensitiveFields(c.Kind)
-		changed := false
-		for k, v := range c.Config {
-			if !sensitive[k] || v == "" || strings.HasPrefix(v, encPrefix) {
-				continue
-			}
-			if _, err := auth.DecryptAPIKey(v, s.secret); err == nil {
-				c.Config[k] = encPrefix + v // 已是密文，仅补标记
-				changed = true
-				continue
-			}
-			enc, err := s.encryptValue(v)
-			if err != nil {
-				logger.Warn("payment_legacy_config_encrypt_failed", "provider", c.ProviderKey, "field", k, sdk.LogFieldError, err)
-				continue
-			}
-			c.Config[k] = enc
-			changed = true
-		}
-		if changed {
-			if err := s.repo.UpsertProviderConfig(ctx, c); err != nil {
-				logger.Warn("payment_persist_failed", "op", "normalize_legacy_config", "provider", c.ProviderKey, sdk.LogFieldError, err)
-				continue
-			}
-			logger.Info("payment_legacy_config_encrypted", "provider", c.ProviderKey)
-		}
-	}
 }
 
 // ===================== 用户端 =====================
@@ -231,7 +199,7 @@ func (s *Service) AvailableMethods(ctx context.Context) MethodsResult {
 
 // CreateOrder 用户下单：校验金额/日限额 → 选 Provider → 渠道下单 → 落库。
 func (s *Service) CreateOrder(ctx context.Context, in CreateOrderInput) (Order, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	cfg := s.loadConfig(ctx)
 	if cfg.CallbackBaseURL == "" {
 		return Order{}, ErrNotConfigured
@@ -273,7 +241,7 @@ func (s *Service) CreateOrder(ctx context.Context, in CreateOrderInput) (Order, 
 		ExpireSeconds: cfg.ExpireMinutes * 60,
 	})
 	if err != nil {
-		logger.Warn("payment_order_create_failed", "provider", prov.ID(), "method", in.Method, sdk.LogFieldError, err)
+		logger.Warn("payment_order_create_failed", "provider", prov.ID(), "method", in.Method, logx.LogFieldError, err)
 		return Order{}, fmt.Errorf("渠道下单失败: %w", err)
 	}
 
@@ -291,7 +259,7 @@ func (s *Service) CreateOrder(ctx context.Context, in CreateOrderInput) (Order, 
 		ExpiresAt:     expiresAt,
 	})
 	if err != nil {
-		logger.Error("payment_persist_failed", "op", "create_order", sdk.LogFieldError, err)
+		logger.Error("payment_persist_failed", "op", "create_order", logx.LogFieldError, err)
 		return Order{}, err
 	}
 	logger.Info("payment_order_created",
@@ -320,7 +288,7 @@ func (s *Service) ListUserOrders(ctx context.Context, userID, limit int) ([]Orde
 
 // HandleCallback 处理支付平台异步通知：验签 → 入账（单事务、幂等）→ 返回平台要求的应答。
 func (s *Service) HandleCallback(ctx context.Context, providerID string, req provider.CallbackRequest) (*provider.CallbackResult, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	prov := s.registry.Find(providerID)
 	if prov == nil {
 		return nil, ErrProviderNotFound
@@ -328,7 +296,7 @@ func (s *Service) HandleCallback(ctx context.Context, providerID string, req pro
 	res, err := prov.VerifyCallback(ctx, req)
 	if err != nil {
 		// 验签失败只记订单号维度信息，不回显签名/载荷
-		logger.Warn("payment_callback_verify_failed", "provider", providerID, sdk.LogFieldError, err)
+		logger.Warn("payment_callback_verify_failed", "provider", providerID, logx.LogFieldError, err)
 		return nil, err
 	}
 	if res.Status != StatusPaid {
@@ -343,7 +311,7 @@ func (s *Service) HandleCallback(ctx context.Context, providerID string, req pro
 		Remark:        "在线充值（" + provider.MethodInfoFor(methodOfCallback(ctx, s, res.OutTradeNo)).Label + "）",
 	})
 	if err != nil {
-		logger.Error("payment_credit_failed", "provider", providerID, "out_trade_no", res.OutTradeNo, sdk.LogFieldError, err)
+		logger.Error("payment_credit_failed", "provider", providerID, "out_trade_no", res.OutTradeNo, logx.LogFieldError, err)
 		return nil, err
 	}
 	if alreadyPaid {
@@ -463,7 +431,7 @@ type UpsertProviderInput struct {
 // AdminUpsertProvider 新增/编辑服务商实例并热加载。
 // 敏感字段传空串表示保持库中现值不变。返回最终实例 ID。
 func (s *Service) AdminUpsertProvider(ctx context.Context, in UpsertProviderInput) (string, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	if _, ok := provider.GetKindMeta(in.Kind); !ok {
 		return "", fmt.Errorf("未知的服务商类型: %s", in.Kind)
 	}
@@ -516,27 +484,27 @@ func (s *Service) AdminUpsertProvider(ctx context.Context, in UpsertProviderInpu
 		Enabled:     in.Enabled,
 		Config:      encrypted,
 	}); err != nil {
-		logger.Error("payment_persist_failed", "op", "upsert_provider", "provider", key, sdk.LogFieldError, err)
+		logger.Error("payment_persist_failed", "op", "upsert_provider", "provider", key, logx.LogFieldError, err)
 		return "", err
 	}
 	logger.Info("payment_provider_upserted", "provider", key, "kind", in.Kind, "enabled", in.Enabled)
 
 	if err := s.ReloadProviders(ctx); err != nil {
-		logger.Warn("payment_provider_reload_failed", sdk.LogFieldError, err)
+		logger.Warn("payment_provider_reload_failed", logx.LogFieldError, err)
 	}
 	return key, nil
 }
 
 // AdminDeleteProvider 删除服务商实例并热加载。
 func (s *Service) AdminDeleteProvider(ctx context.Context, providerKey string) error {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	if err := s.repo.DeleteProviderConfig(ctx, providerKey); err != nil {
-		logger.Error("payment_persist_failed", "op", "delete_provider", "provider", providerKey, sdk.LogFieldError, err)
+		logger.Error("payment_persist_failed", "op", "delete_provider", "provider", providerKey, logx.LogFieldError, err)
 		return err
 	}
 	logger.Info("payment_provider_deleted", "provider", providerKey)
 	if err := s.ReloadProviders(ctx); err != nil {
-		logger.Warn("payment_provider_reload_failed", sdk.LogFieldError, err)
+		logger.Warn("payment_provider_reload_failed", logx.LogFieldError, err)
 	}
 	return nil
 }
@@ -553,8 +521,13 @@ func (s *Service) StartExpireLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if n, err := s.repo.ExpirePendingOrders(ctx, time.Now()); err == nil && n > 0 {
-				sdk.LoggerFromContext(ctx).Info("payment_orders_expired", "count", n)
+			n, err := s.repo.ExpirePendingOrders(ctx, time.Now())
+			if err != nil {
+				logx.LoggerFromContext(ctx).Warn("payment_orders_expire_failed", logx.LogFieldError, err)
+				continue
+			}
+			if n > 0 {
+				logx.LoggerFromContext(ctx).Info("payment_orders_expired", "count", n)
 			}
 		}
 	}

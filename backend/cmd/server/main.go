@@ -19,14 +19,12 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/migrate"
-	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
 	"github.com/DouDOU-start/airgate-core/internal/bootstrap/priceseed"
 	"github.com/DouDOU-start/airgate-core/internal/config"
-	"github.com/DouDOU-start/airgate-core/internal/i18n"
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
 	"github.com/DouDOU-start/airgate-core/internal/server"
 	"github.com/DouDOU-start/airgate-core/internal/setup"
@@ -57,11 +55,8 @@ func main() {
 	}
 
 	// 默认初始化日志（配置加载前先用默认值）
-	sdk.InitLogger("core", "info", "text")
-	slog.Info("AirGate Core 启动中...", "version", version.Version, "sdk_version", sdk.SDKVersion)
-
-	// 加载国际化（翻译文件已 //go:embed 进二进制）
-	_ = i18n.LoadEmbedded()
+	logx.InitLogger("core", "info", "text")
+	slog.Info("AirGate Core 启动中...", "version", version.Version)
 
 	// 检查是否需要安装
 	if setup.NeedsSetup() {
@@ -80,7 +75,7 @@ func main() {
 	}
 
 	// 用配置值重新初始化日志（应用配置文件中的 level/format）
-	sdk.InitLogger("core", cfg.Log.Level, cfg.Log.Format)
+	logx.InitLogger("core", cfg.Log.Level, cfg.Log.Format)
 	slog.Info("config_loaded", "path", cfgPath, "log_level", cfg.Log.Level, "log_format", cfg.Log.Format)
 
 	// 启动正常服务
@@ -145,7 +140,7 @@ func startMainServer(cfg *config.Config) {
 	dsn := cfg.Database.DSN()
 	drv, err := sql.Open(dialect.Postgres, dsn)
 	if err != nil {
-		slog.Error("db_open_failed", "dsn", store.RedactDSN(dsn), sdk.LogFieldError, err)
+		slog.Error("db_open_failed", "dsn", store.RedactDSN(dsn), logx.LogFieldError, err)
 		os.Exit(1)
 	}
 	slog.Info("db_connected",
@@ -185,11 +180,11 @@ func startMainServer(cfg *config.Config) {
 		}
 		if attempt == dbPingMaxRetries {
 			slog.Error("db_ping_failed_after_retries",
-				"attempts", dbPingMaxRetries, sdk.LogFieldError, err)
+				"attempts", dbPingMaxRetries, logx.LogFieldError, err)
 			os.Exit(1)
 		}
 		slog.Warn("db_ping_retry",
-			"attempt", attempt, "max", dbPingMaxRetries, sdk.LogFieldError, err)
+			"attempt", attempt, "max", dbPingMaxRetries, logx.LogFieldError, err)
 		time.Sleep(dbPingRetryInterval)
 	}
 
@@ -202,22 +197,15 @@ func startMainServer(cfg *config.Config) {
 		"lifetime_min", lifeMin)
 	defer func() {
 		if err := db.Close(); err != nil {
-			slog.Warn("db_close_failed", sdk.LogFieldError, err)
+			slog.Warn("db_close_failed", logx.LogFieldError, err)
 		}
 	}()
 
-	// 旧 epay 插件遗留支付表先改名保留（BIGSERIAL 与 ent IDENTITY 不兼容会打挂迁移），
-	// 数据在 RunStartupTasks 里幂等回填进新表。
-	bootstrap.RenameLegacyPaymentTables(context.Background(), drv)
-
-	// 启动时执行非破坏性迁移，补齐缺失表和字段，避免升级后因 schema 落后导致接口报错。
+	// 按最新 schema 建齐缺失表与字段（非破坏性；存量库结构变更由生产环境手动迁移）。
 	if err := db.Schema.Create(context.Background(), migrate.WithDropIndex(false), migrate.WithDropColumn(false)); err != nil {
-		slog.Error("db_migration_failed", sdk.LogFieldError, err)
+		slog.Error("db_migration_failed", logx.LogFieldError, err)
 		os.Exit(1)
 	}
-
-	// 回填历史 API Key 的 key_hint 以及 reseller markup 新列等启动整理任务
-	bootstrap.RunStartupTasks(db, drv, cfg.APIKeySecret())
 
 	// 导入默认模型价目表种子（insert-if-absent，不覆盖已有条目；失败只 Warn 不阻塞）
 	priceseed.Load(context.Background(), store.NewModelPriceStore(db), config.ConfigPath())
@@ -242,14 +230,14 @@ func startMainServer(cfg *config.Config) {
 				"host", cfg.Redis.Host,
 				"port", cfg.Redis.Port,
 				"attempts", redisPingMaxRetries,
-				sdk.LogFieldError, err)
+				logx.LogFieldError, err)
 			os.Exit(1)
 		}
 		slog.Warn("redis_ping_retry",
 			"host", cfg.Redis.Host,
 			"port", cfg.Redis.Port,
 			"attempt", attempt, "max", redisPingMaxRetries,
-			sdk.LogFieldError, err)
+			logx.LogFieldError, err)
 		time.Sleep(redisPingRetryInterval)
 	}
 	slog.Info("redis_connected",
@@ -258,7 +246,7 @@ func startMainServer(cfg *config.Config) {
 		"db", cfg.Redis.DB)
 	defer func() {
 		if err := rdb.Close(); err != nil {
-			slog.Warn("redis_close_failed", sdk.LogFieldError, err)
+			slog.Warn("redis_close_failed", logx.LogFieldError, err)
 		}
 	}()
 
@@ -267,7 +255,7 @@ func startMainServer(cfg *config.Config) {
 	// 创建并启动 HTTP 服务器
 	srv := server.NewServer(cfg, db, rdb)
 
-	// 启动后台组件（记录器 + 资产循环，非阻塞）
+	// 启动后台组件（计费/留痕记录器 + 注册表与价目表装载 + 支付后台循环，非阻塞）
 	srv.StartBackground(context.Background())
 
 	// 优雅关闭

@@ -12,8 +12,8 @@ import "github.com/DouDOU-start/airgate-core/internal/auth"
 // 注意：
 //   - APIKey.sell_rate 不在这条链里。它是 reseller 对最终客户的"账面"售价，
 //     与平台真实计费完全独立，由 Calculator 单独处理 BilledCost。
-//   - Account.rate_multiplier 不在这条链里。它只服务于 scheduler 内部 window cost
-//     追踪，从用户计费链路完全剥离，调用方需自行计算 windowCost = base × accountRate。
+//   - Channel.cost_ratio 不在这条链里。它是渠道成本统计倍率（account_cost 列），
+//     由 Calculator 经 AccountRate 单独计算，不影响用户扣费。
 func ResolveBillingRate(keyInfo *auth.APIKeyInfo) float64 {
 	if keyInfo == nil {
 		return 1.0

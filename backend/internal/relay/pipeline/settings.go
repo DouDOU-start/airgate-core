@@ -95,13 +95,21 @@ func (r *SettingsReader) Get(_ context.Context) GatewaySettings {
 	r.mu.Unlock()
 
 	// 刷新在锁外执行：DB 慢时其余请求不在 Get 上头阻塞。
-	refreshCtx, cancel := context.WithTimeout(context.Background(), settingsRefreshTimeout)
-	items, err := r.lister.List(refreshCtx, settingsGroupGateway)
-	cancel()
+	// refreshing 复位放在 defer：List panic 时单飞标志也不会永久卡死
+	//（否则所有后续 Get 永远走"刷新进行中"分支，缓存再也不更新）。
+	items, err := func() ([]Setting, error) {
+		defer func() {
+			r.mu.Lock()
+			r.refreshing = false
+			r.mu.Unlock()
+		}()
+		refreshCtx, cancel := context.WithTimeout(context.Background(), settingsRefreshTimeout)
+		defer cancel()
+		return r.lister.List(refreshCtx, settingsGroupGateway)
+	}()
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.refreshing = false
 	if err != nil {
 		slog.Warn("gateway_settings_load_failed", "error", err)
 		r.expiresAt = time.Now().Add(settingsStaleTTL)

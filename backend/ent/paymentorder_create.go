@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/paymentorder"
@@ -18,6 +19,7 @@ type PaymentOrderCreate struct {
 	config
 	mutation *PaymentOrderMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetOutTradeNo sets the "out_trade_no" field.
@@ -336,6 +338,7 @@ func (poc *PaymentOrderCreate) createSpec() (*PaymentOrder, *sqlgraph.CreateSpec
 		_node = &PaymentOrder{config: poc.config}
 		_spec = sqlgraph.NewCreateSpec(paymentorder.Table, sqlgraph.NewFieldSpec(paymentorder.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = poc.conflict
 	if value, ok := poc.mutation.OutTradeNo(); ok {
 		_spec.SetField(paymentorder.FieldOutTradeNo, field.TypeString, value)
 		_node.OutTradeNo = value
@@ -399,11 +402,542 @@ func (poc *PaymentOrderCreate) createSpec() (*PaymentOrder, *sqlgraph.CreateSpec
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.PaymentOrder.Create().
+//		SetOutTradeNo(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.PaymentOrderUpsert) {
+//			SetOutTradeNo(v+v).
+//		}).
+//		Exec(ctx)
+func (poc *PaymentOrderCreate) OnConflict(opts ...sql.ConflictOption) *PaymentOrderUpsertOne {
+	poc.conflict = opts
+	return &PaymentOrderUpsertOne{
+		create: poc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.PaymentOrder.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (poc *PaymentOrderCreate) OnConflictColumns(columns ...string) *PaymentOrderUpsertOne {
+	poc.conflict = append(poc.conflict, sql.ConflictColumns(columns...))
+	return &PaymentOrderUpsertOne{
+		create: poc,
+	}
+}
+
+type (
+	// PaymentOrderUpsertOne is the builder for "upsert"-ing
+	//  one PaymentOrder node.
+	PaymentOrderUpsertOne struct {
+		create *PaymentOrderCreate
+	}
+
+	// PaymentOrderUpsert is the "OnConflict" setter.
+	PaymentOrderUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetOutTradeNo sets the "out_trade_no" field.
+func (u *PaymentOrderUpsert) SetOutTradeNo(v string) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldOutTradeNo, v)
+	return u
+}
+
+// UpdateOutTradeNo sets the "out_trade_no" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateOutTradeNo() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldOutTradeNo)
+	return u
+}
+
+// SetUserID sets the "user_id" field.
+func (u *PaymentOrderUpsert) SetUserID(v int) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldUserID, v)
+	return u
+}
+
+// UpdateUserID sets the "user_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateUserID() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldUserID)
+	return u
+}
+
+// AddUserID adds v to the "user_id" field.
+func (u *PaymentOrderUpsert) AddUserID(v int) *PaymentOrderUpsert {
+	u.Add(paymentorder.FieldUserID, v)
+	return u
+}
+
+// SetMethod sets the "method" field.
+func (u *PaymentOrderUpsert) SetMethod(v string) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldMethod, v)
+	return u
+}
+
+// UpdateMethod sets the "method" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateMethod() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldMethod)
+	return u
+}
+
+// SetProviderID sets the "provider_id" field.
+func (u *PaymentOrderUpsert) SetProviderID(v string) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldProviderID, v)
+	return u
+}
+
+// UpdateProviderID sets the "provider_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateProviderID() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldProviderID)
+	return u
+}
+
+// SetAmount sets the "amount" field.
+func (u *PaymentOrderUpsert) SetAmount(v float64) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldAmount, v)
+	return u
+}
+
+// UpdateAmount sets the "amount" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateAmount() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldAmount)
+	return u
+}
+
+// AddAmount adds v to the "amount" field.
+func (u *PaymentOrderUpsert) AddAmount(v float64) *PaymentOrderUpsert {
+	u.Add(paymentorder.FieldAmount, v)
+	return u
+}
+
+// SetStatus sets the "status" field.
+func (u *PaymentOrderUpsert) SetStatus(v string) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldStatus, v)
+	return u
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateStatus() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldStatus)
+	return u
+}
+
+// SetSubject sets the "subject" field.
+func (u *PaymentOrderUpsert) SetSubject(v string) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldSubject, v)
+	return u
+}
+
+// UpdateSubject sets the "subject" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateSubject() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldSubject)
+	return u
+}
+
+// SetClientIP sets the "client_ip" field.
+func (u *PaymentOrderUpsert) SetClientIP(v string) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldClientIP, v)
+	return u
+}
+
+// UpdateClientIP sets the "client_ip" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateClientIP() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldClientIP)
+	return u
+}
+
+// SetPaymentURL sets the "payment_url" field.
+func (u *PaymentOrderUpsert) SetPaymentURL(v string) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldPaymentURL, v)
+	return u
+}
+
+// UpdatePaymentURL sets the "payment_url" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdatePaymentURL() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldPaymentURL)
+	return u
+}
+
+// SetQrCodeContent sets the "qr_code_content" field.
+func (u *PaymentOrderUpsert) SetQrCodeContent(v string) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldQrCodeContent, v)
+	return u
+}
+
+// UpdateQrCodeContent sets the "qr_code_content" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateQrCodeContent() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldQrCodeContent)
+	return u
+}
+
+// SetNotifyPayload sets the "notify_payload" field.
+func (u *PaymentOrderUpsert) SetNotifyPayload(v string) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldNotifyPayload, v)
+	return u
+}
+
+// UpdateNotifyPayload sets the "notify_payload" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateNotifyPayload() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldNotifyPayload)
+	return u
+}
+
+// SetPaidAt sets the "paid_at" field.
+func (u *PaymentOrderUpsert) SetPaidAt(v time.Time) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldPaidAt, v)
+	return u
+}
+
+// UpdatePaidAt sets the "paid_at" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdatePaidAt() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldPaidAt)
+	return u
+}
+
+// ClearPaidAt clears the value of the "paid_at" field.
+func (u *PaymentOrderUpsert) ClearPaidAt() *PaymentOrderUpsert {
+	u.SetNull(paymentorder.FieldPaidAt)
+	return u
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *PaymentOrderUpsert) SetExpiresAt(v time.Time) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldExpiresAt, v)
+	return u
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateExpiresAt() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldExpiresAt)
+	return u
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *PaymentOrderUpsert) SetUpdatedAt(v time.Time) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldUpdatedAt, v)
+	return u
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateUpdatedAt() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldUpdatedAt)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.PaymentOrder.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *PaymentOrderUpsertOne) UpdateNewValues() *PaymentOrderUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreatedAt(); exists {
+			s.SetIgnore(paymentorder.FieldCreatedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.PaymentOrder.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *PaymentOrderUpsertOne) Ignore() *PaymentOrderUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *PaymentOrderUpsertOne) DoNothing() *PaymentOrderUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the PaymentOrderCreate.OnConflict
+// documentation for more info.
+func (u *PaymentOrderUpsertOne) Update(set func(*PaymentOrderUpsert)) *PaymentOrderUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&PaymentOrderUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetOutTradeNo sets the "out_trade_no" field.
+func (u *PaymentOrderUpsertOne) SetOutTradeNo(v string) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetOutTradeNo(v)
+	})
+}
+
+// UpdateOutTradeNo sets the "out_trade_no" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateOutTradeNo() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateOutTradeNo()
+	})
+}
+
+// SetUserID sets the "user_id" field.
+func (u *PaymentOrderUpsertOne) SetUserID(v int) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetUserID(v)
+	})
+}
+
+// AddUserID adds v to the "user_id" field.
+func (u *PaymentOrderUpsertOne) AddUserID(v int) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.AddUserID(v)
+	})
+}
+
+// UpdateUserID sets the "user_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateUserID() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateUserID()
+	})
+}
+
+// SetMethod sets the "method" field.
+func (u *PaymentOrderUpsertOne) SetMethod(v string) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetMethod(v)
+	})
+}
+
+// UpdateMethod sets the "method" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateMethod() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateMethod()
+	})
+}
+
+// SetProviderID sets the "provider_id" field.
+func (u *PaymentOrderUpsertOne) SetProviderID(v string) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetProviderID(v)
+	})
+}
+
+// UpdateProviderID sets the "provider_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateProviderID() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateProviderID()
+	})
+}
+
+// SetAmount sets the "amount" field.
+func (u *PaymentOrderUpsertOne) SetAmount(v float64) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetAmount(v)
+	})
+}
+
+// AddAmount adds v to the "amount" field.
+func (u *PaymentOrderUpsertOne) AddAmount(v float64) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.AddAmount(v)
+	})
+}
+
+// UpdateAmount sets the "amount" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateAmount() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateAmount()
+	})
+}
+
+// SetStatus sets the "status" field.
+func (u *PaymentOrderUpsertOne) SetStatus(v string) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetStatus(v)
+	})
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateStatus() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateStatus()
+	})
+}
+
+// SetSubject sets the "subject" field.
+func (u *PaymentOrderUpsertOne) SetSubject(v string) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetSubject(v)
+	})
+}
+
+// UpdateSubject sets the "subject" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateSubject() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateSubject()
+	})
+}
+
+// SetClientIP sets the "client_ip" field.
+func (u *PaymentOrderUpsertOne) SetClientIP(v string) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetClientIP(v)
+	})
+}
+
+// UpdateClientIP sets the "client_ip" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateClientIP() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateClientIP()
+	})
+}
+
+// SetPaymentURL sets the "payment_url" field.
+func (u *PaymentOrderUpsertOne) SetPaymentURL(v string) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetPaymentURL(v)
+	})
+}
+
+// UpdatePaymentURL sets the "payment_url" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdatePaymentURL() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdatePaymentURL()
+	})
+}
+
+// SetQrCodeContent sets the "qr_code_content" field.
+func (u *PaymentOrderUpsertOne) SetQrCodeContent(v string) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetQrCodeContent(v)
+	})
+}
+
+// UpdateQrCodeContent sets the "qr_code_content" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateQrCodeContent() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateQrCodeContent()
+	})
+}
+
+// SetNotifyPayload sets the "notify_payload" field.
+func (u *PaymentOrderUpsertOne) SetNotifyPayload(v string) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetNotifyPayload(v)
+	})
+}
+
+// UpdateNotifyPayload sets the "notify_payload" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateNotifyPayload() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateNotifyPayload()
+	})
+}
+
+// SetPaidAt sets the "paid_at" field.
+func (u *PaymentOrderUpsertOne) SetPaidAt(v time.Time) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetPaidAt(v)
+	})
+}
+
+// UpdatePaidAt sets the "paid_at" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdatePaidAt() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdatePaidAt()
+	})
+}
+
+// ClearPaidAt clears the value of the "paid_at" field.
+func (u *PaymentOrderUpsertOne) ClearPaidAt() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.ClearPaidAt()
+	})
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *PaymentOrderUpsertOne) SetExpiresAt(v time.Time) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetExpiresAt(v)
+	})
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateExpiresAt() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateExpiresAt()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *PaymentOrderUpsertOne) SetUpdatedAt(v time.Time) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateUpdatedAt() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *PaymentOrderUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for PaymentOrderCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *PaymentOrderUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *PaymentOrderUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *PaymentOrderUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // PaymentOrderCreateBulk is the builder for creating many PaymentOrder entities in bulk.
 type PaymentOrderCreateBulk struct {
 	config
 	err      error
 	builders []*PaymentOrderCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the PaymentOrder entities in the database.
@@ -433,6 +967,7 @@ func (pocb *PaymentOrderCreateBulk) Save(ctx context.Context) ([]*PaymentOrder, 
 					_, err = mutators[i+1].Mutate(root, pocb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = pocb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, pocb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -483,6 +1018,334 @@ func (pocb *PaymentOrderCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (pocb *PaymentOrderCreateBulk) ExecX(ctx context.Context) {
 	if err := pocb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.PaymentOrder.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.PaymentOrderUpsert) {
+//			SetOutTradeNo(v+v).
+//		}).
+//		Exec(ctx)
+func (pocb *PaymentOrderCreateBulk) OnConflict(opts ...sql.ConflictOption) *PaymentOrderUpsertBulk {
+	pocb.conflict = opts
+	return &PaymentOrderUpsertBulk{
+		create: pocb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.PaymentOrder.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (pocb *PaymentOrderCreateBulk) OnConflictColumns(columns ...string) *PaymentOrderUpsertBulk {
+	pocb.conflict = append(pocb.conflict, sql.ConflictColumns(columns...))
+	return &PaymentOrderUpsertBulk{
+		create: pocb,
+	}
+}
+
+// PaymentOrderUpsertBulk is the builder for "upsert"-ing
+// a bulk of PaymentOrder nodes.
+type PaymentOrderUpsertBulk struct {
+	create *PaymentOrderCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.PaymentOrder.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *PaymentOrderUpsertBulk) UpdateNewValues() *PaymentOrderUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreatedAt(); exists {
+				s.SetIgnore(paymentorder.FieldCreatedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.PaymentOrder.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *PaymentOrderUpsertBulk) Ignore() *PaymentOrderUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *PaymentOrderUpsertBulk) DoNothing() *PaymentOrderUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the PaymentOrderCreateBulk.OnConflict
+// documentation for more info.
+func (u *PaymentOrderUpsertBulk) Update(set func(*PaymentOrderUpsert)) *PaymentOrderUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&PaymentOrderUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetOutTradeNo sets the "out_trade_no" field.
+func (u *PaymentOrderUpsertBulk) SetOutTradeNo(v string) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetOutTradeNo(v)
+	})
+}
+
+// UpdateOutTradeNo sets the "out_trade_no" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateOutTradeNo() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateOutTradeNo()
+	})
+}
+
+// SetUserID sets the "user_id" field.
+func (u *PaymentOrderUpsertBulk) SetUserID(v int) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetUserID(v)
+	})
+}
+
+// AddUserID adds v to the "user_id" field.
+func (u *PaymentOrderUpsertBulk) AddUserID(v int) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.AddUserID(v)
+	})
+}
+
+// UpdateUserID sets the "user_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateUserID() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateUserID()
+	})
+}
+
+// SetMethod sets the "method" field.
+func (u *PaymentOrderUpsertBulk) SetMethod(v string) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetMethod(v)
+	})
+}
+
+// UpdateMethod sets the "method" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateMethod() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateMethod()
+	})
+}
+
+// SetProviderID sets the "provider_id" field.
+func (u *PaymentOrderUpsertBulk) SetProviderID(v string) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetProviderID(v)
+	})
+}
+
+// UpdateProviderID sets the "provider_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateProviderID() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateProviderID()
+	})
+}
+
+// SetAmount sets the "amount" field.
+func (u *PaymentOrderUpsertBulk) SetAmount(v float64) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetAmount(v)
+	})
+}
+
+// AddAmount adds v to the "amount" field.
+func (u *PaymentOrderUpsertBulk) AddAmount(v float64) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.AddAmount(v)
+	})
+}
+
+// UpdateAmount sets the "amount" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateAmount() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateAmount()
+	})
+}
+
+// SetStatus sets the "status" field.
+func (u *PaymentOrderUpsertBulk) SetStatus(v string) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetStatus(v)
+	})
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateStatus() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateStatus()
+	})
+}
+
+// SetSubject sets the "subject" field.
+func (u *PaymentOrderUpsertBulk) SetSubject(v string) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetSubject(v)
+	})
+}
+
+// UpdateSubject sets the "subject" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateSubject() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateSubject()
+	})
+}
+
+// SetClientIP sets the "client_ip" field.
+func (u *PaymentOrderUpsertBulk) SetClientIP(v string) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetClientIP(v)
+	})
+}
+
+// UpdateClientIP sets the "client_ip" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateClientIP() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateClientIP()
+	})
+}
+
+// SetPaymentURL sets the "payment_url" field.
+func (u *PaymentOrderUpsertBulk) SetPaymentURL(v string) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetPaymentURL(v)
+	})
+}
+
+// UpdatePaymentURL sets the "payment_url" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdatePaymentURL() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdatePaymentURL()
+	})
+}
+
+// SetQrCodeContent sets the "qr_code_content" field.
+func (u *PaymentOrderUpsertBulk) SetQrCodeContent(v string) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetQrCodeContent(v)
+	})
+}
+
+// UpdateQrCodeContent sets the "qr_code_content" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateQrCodeContent() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateQrCodeContent()
+	})
+}
+
+// SetNotifyPayload sets the "notify_payload" field.
+func (u *PaymentOrderUpsertBulk) SetNotifyPayload(v string) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetNotifyPayload(v)
+	})
+}
+
+// UpdateNotifyPayload sets the "notify_payload" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateNotifyPayload() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateNotifyPayload()
+	})
+}
+
+// SetPaidAt sets the "paid_at" field.
+func (u *PaymentOrderUpsertBulk) SetPaidAt(v time.Time) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetPaidAt(v)
+	})
+}
+
+// UpdatePaidAt sets the "paid_at" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdatePaidAt() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdatePaidAt()
+	})
+}
+
+// ClearPaidAt clears the value of the "paid_at" field.
+func (u *PaymentOrderUpsertBulk) ClearPaidAt() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.ClearPaidAt()
+	})
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *PaymentOrderUpsertBulk) SetExpiresAt(v time.Time) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetExpiresAt(v)
+	})
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateExpiresAt() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateExpiresAt()
+	})
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (u *PaymentOrderUpsertBulk) SetUpdatedAt(v time.Time) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetUpdatedAt(v)
+	})
+}
+
+// UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateUpdatedAt() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateUpdatedAt()
+	})
+}
+
+// Exec executes the query.
+func (u *PaymentOrderUpsertBulk) Exec(ctx context.Context) error {
+	if u.create.err != nil {
+		return u.create.err
+	}
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the PaymentOrderCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for PaymentOrderCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *PaymentOrderUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

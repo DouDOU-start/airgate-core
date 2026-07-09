@@ -64,7 +64,7 @@ const (
 	SourceChannelTest = "channel_test" // 渠道测试（管理员操作，无用户归属）
 )
 
-// normalizedSource 空来源归一为 relay（历史调用方未显式填写时的缺省语义）。
+// normalizedSource 空来源归一为 relay（防御性缺省：调用方漏填来源时不落空值）。
 func normalizedSource(source string) string {
 	if source == "" {
 		return SourceRelay
@@ -106,40 +106,22 @@ func NewRecorder(db *ent.Client, bufferSize int) *Recorder {
 	return r
 }
 
-// Record 提交使用记录（非阻塞）
+// Record 提交使用记录（非阻塞）。缓冲满时丢弃该条并记 ERROR 级日志
+// （带 user_id/model/cost 供对账补录）——保持非阻塞语义，不反压转发热路径。
 func (r *Recorder) Record(record UsageRecord) {
 	select {
 	case r.ch <- record:
 	default:
-		slog.Warn("billing_record_buffer_full",
+		slog.Error("billing_record_buffer_full_dropped",
 			"user_id", record.UserID,
+			"api_key_id", record.APIKeyID,
 			"model", record.Model,
+			"total_cost", record.TotalCost,
+			"actual_cost", record.ActualCost,
+			"billed_cost", record.BilledCost,
+			"request_id", record.RequestID,
 		)
 	}
-}
-
-// RecordSync 同步写入一条使用记录并返回 usage_log.id。
-// 需要立即把 usage_id 关联到任务时使用；普通转发仍走异步 Record。
-func (r *Recorder) RecordSync(ctx context.Context, record UsageRecord) (int, error) {
-	tx, err := r.db.Tx(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("开启事务失败: %w", err)
-	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
-
-	log, err := usageLogCreate(tx, record, true).Save(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("插入 UsageLog 失败: %w", err)
-	}
-	if err := applyUsageCharges(ctx, tx, []UsageRecord{record}); err != nil {
-		return 0, err
-	}
-	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("提交事务失败: %w", err)
-	}
-	return log.ID, nil
 }
 
 // Start 启动后台写入 goroutine
@@ -399,7 +381,7 @@ func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) err
 	}
 
 	// APIKey 双累加器：billed 和 actual 都更新（key 集合相同，合并一次 update 调用）
-	// APIKeyID == 0 表示插件经 Host 调用发起的请求（无 API Key），跳过 APIKey 累加。
+	// APIKeyID == 0 表示渠道测试等无用户归属的记录（无 API Key），跳过 APIKey 累加。
 	keyIDs := make(map[int]struct{}, len(keyBilledCosts))
 	for k := range keyBilledCosts {
 		keyIDs[k] = struct{}{}

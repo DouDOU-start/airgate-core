@@ -41,11 +41,8 @@ var protocolChannelTypes = map[string]map[string]struct{}{
 }
 
 // channelTypesForProtocol 返回协议可路由的渠道类型集合；
-// 空串按 openai 兼容（历史调用方未显式传协议时的缺省）。
+// 未知协议（含空串）返回 nil，Pick 侧表现为无可用渠道。
 func channelTypesForProtocol(protocol string) map[string]struct{} {
-	if protocol == "" {
-		protocol = ProtocolOpenAI
-	}
 	return protocolChannelTypes[protocol]
 }
 
@@ -218,7 +215,7 @@ func (r *Registry) ensureLoaded() {
 //	       且分组命中（渠道 GroupIDs 为空 = 公共渠道）且不在 exclude 中
 //	→ 取最高 priority 档 → 档内按 weight+10 加权随机。
 //
-// protocol 为空串时按 openai 兼容。无候选返回 ErrNoAvailableChannel。
+// 无候选返回 ErrNoAvailableChannel。
 func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*ChannelSnapshot, error) {
 	r.ensureLoaded()
 
@@ -328,16 +325,6 @@ func (r *Registry) ModelEntriesForGroup(groupID int) []ModelEntry {
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
 	return entries
-}
-
-// ModelsForGroup 返回指定分组可用模型名并集（不含协议维度），按字典序。
-func (r *Registry) ModelsForGroup(groupID int) []string {
-	entries := r.ModelEntriesForGroup(groupID)
-	models := make([]string, 0, len(entries))
-	for _, e := range entries {
-		models = append(models, e.Name)
-	}
-	return models
 }
 
 // NextKey 渠道内 API Key 原子轮询；渠道不存在或无密钥返回空串。

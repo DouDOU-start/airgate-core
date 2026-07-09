@@ -200,6 +200,10 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 			response.Forbidden(c, "用户已被禁用")
 			return
 		}
+		if errors.Is(err, appauth.ErrUserNotFound) {
+			response.Unauthorized(c, "用户不存在或已被删除")
+			return
+		}
 		response.InternalError(c, "刷新 Token 失败")
 		return
 	}

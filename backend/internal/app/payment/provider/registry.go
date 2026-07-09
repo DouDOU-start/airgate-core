@@ -96,15 +96,6 @@ func (r *Registry) AvailableMethods() []MethodInfo {
 	return out
 }
 
-// All 返回所有已注册的 Provider 实例（含未启用的），用于 admin 配置页展示。
-func (r *Registry) All() []Provider {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	out := make([]Provider, len(r.providers))
-	copy(out, r.providers)
-	return out
-}
-
 func containsString(s []string, target string) bool {
 	for _, v := range s {
 		if v == target {

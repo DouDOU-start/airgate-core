@@ -3,13 +3,5 @@
 // 保持同一份口径，避免 gpt-image-* 系列改名时漏改导致统计对不上。
 package usagemodel
 
-import "strings"
-
 // ImagePrefix 是生图家族模型 ID 的统一前缀（"gpt-image-*" 规则）。
 const ImagePrefix = "gpt-image"
-
-// IsImageGen 判断给定 model ID 是否属于生图家族。
-// 不直接 import scheduler 包是为了让 stats / store 层不依赖调度模块。
-func IsImageGen(model string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), ImagePrefix)
-}

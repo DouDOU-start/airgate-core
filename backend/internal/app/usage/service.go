@@ -14,8 +14,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
-	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
 // Service 使用记录用例服务。
@@ -61,20 +61,20 @@ func (s *Service) ListUser(ctx context.Context, userID int64, filter ListFilter)
 
 	list, err := s.repo.ListUser(ctx, userID, filter)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
+		logx.LoggerFromContext(ctx).Error("usage_query_failed",
 			"scope", "user_list",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldError, err)
+			logx.LogFieldUserID, userID,
+			logx.LogFieldError, err)
 		return ListResult{}, err
 	}
 	total, err := s.cachedListTotal(ctx, "user-count", userID, filter, func(loadCtx context.Context) (int64, error) {
 		return s.repo.CountUser(loadCtx, userID, filter)
 	})
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
+		logx.LoggerFromContext(ctx).Error("usage_query_failed",
 			"scope", "user_count",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldError, err)
+			logx.LogFieldUserID, userID,
+			logx.LogFieldError, err)
 		return ListResult{}, err
 	}
 
@@ -99,18 +99,6 @@ func (s *Service) cachedListTotal(ctx context.Context, kind string, userID int64
 	return usageCachedResult(ctx, s.rdb, key, usageCountCacheTTL, loader)
 }
 
-// UserStats 查询当前用户汇总统计。
-func (s *Service) UserStats(ctx context.Context, userID int64, filter StatsFilter) (Summary, error) {
-	summary, err := s.repo.SummaryUser(ctx, userID, filter)
-	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
-			"scope", "user_summary",
-			sdk.LogFieldUserID, userID,
-			sdk.LogFieldError, err)
-	}
-	return summary, err
-}
-
 // UserStatsWithModels 查询当前用户统计页的完整数据，并用 Redis 短 TTL 缓存热点筛选结果。
 func (s *Service) UserStatsWithModels(ctx context.Context, userID int64, filter StatsFilter) (UserStatsResult, error) {
 	key := usageCacheKey("user-stats", struct {
@@ -121,10 +109,10 @@ func (s *Service) UserStatsWithModels(ctx context.Context, userID int64, filter 
 	return usageCachedResult(ctx, s.rdb, key, usageStatsCacheTTL, func(loadCtx context.Context) (UserStatsResult, error) {
 		summary, err := s.repo.SummaryUser(loadCtx, userID, filter)
 		if err != nil {
-			sdk.LoggerFromContext(loadCtx).Error("usage_query_failed",
+			logx.LoggerFromContext(loadCtx).Error("usage_query_failed",
 				"scope", "user_summary",
-				sdk.LogFieldUserID, userID,
-				sdk.LogFieldError, err)
+				logx.LogFieldUserID, userID,
+				logx.LogFieldError, err)
 			return UserStatsResult{}, err
 		}
 
@@ -132,10 +120,10 @@ func (s *Service) UserStatsWithModels(ctx context.Context, userID int64, filter 
 		modelFilter.UserID = &userID
 		modelStats, err := s.repo.StatsByModel(loadCtx, modelFilter)
 		if err != nil {
-			sdk.LoggerFromContext(loadCtx).Error("usage_query_failed",
+			logx.LoggerFromContext(loadCtx).Error("usage_query_failed",
 				"scope", "user_stats_by_model",
-				sdk.LogFieldUserID, userID,
-				sdk.LogFieldError, err)
+				logx.LogFieldUserID, userID,
+				logx.LogFieldError, err)
 			return UserStatsResult{}, err
 		}
 		return UserStatsResult{Summary: summary, ByModel: modelStats}, nil
@@ -150,18 +138,18 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult,
 
 	list, err := s.repo.ListAdmin(ctx, filter)
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
+		logx.LoggerFromContext(ctx).Error("usage_query_failed",
 			"scope", "admin_list",
-			sdk.LogFieldError, err)
+			logx.LogFieldError, err)
 		return ListResult{}, err
 	}
 	total, err := s.cachedListTotal(ctx, "admin-count", 0, filter, func(loadCtx context.Context) (int64, error) {
 		return s.repo.CountAdmin(loadCtx, filter)
 	})
 	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
+		logx.LoggerFromContext(ctx).Error("usage_query_failed",
 			"scope", "admin_count",
-			sdk.LogFieldError, err)
+			logx.LogFieldError, err)
 		return ListResult{}, err
 	}
 
@@ -173,20 +161,9 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) (ListResult,
 	}, nil
 }
 
-// StatsByModel 按模型分组统计。
-func (s *Service) StatsByModel(ctx context.Context, filter StatsFilter) ([]ModelStats, error) {
-	stats, err := s.repo.StatsByModel(ctx, filter)
-	if err != nil {
-		sdk.LoggerFromContext(ctx).Error("usage_query_failed",
-			"scope", "stats_by_model",
-			sdk.LogFieldError, err)
-	}
-	return stats, err
-}
-
 // AdminStats 查询管理员聚合统计。
 func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy string) (StatsResult, error) {
-	logger := sdk.LoggerFromContext(ctx)
+	logger := logx.LoggerFromContext(ctx)
 	groupBy = normalizeStatsGroupBy(groupBy)
 	key := usageCacheKey("admin-stats", struct {
 		Filter  StatsFilter
@@ -203,7 +180,7 @@ func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy st
 			if err != nil {
 				logger.Error("usage_query_failed",
 					"scope", "admin_summary",
-					sdk.LogFieldError, err)
+					logx.LogFieldError, err)
 				return err
 			}
 			result.Summary = summary
@@ -240,7 +217,7 @@ func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy st
 		if err := g.Wait(); err != nil {
 			logger.Error("usage_query_failed",
 				"scope", "admin_stats",
-				sdk.LogFieldError, err)
+				logx.LogFieldError, err)
 			return StatsResult{}, err
 		}
 		return result, nil
@@ -255,9 +232,9 @@ func (s *Service) AdminTrend(ctx context.Context, filter TrendFilter) ([]TrendBu
 	return usageCachedResult(ctx, s.rdb, key, usageTrendCacheTTL, func(loadCtx context.Context) ([]TrendBucket, error) {
 		entries, err := s.repo.TrendEntries(loadCtx, filter)
 		if err != nil {
-			sdk.LoggerFromContext(loadCtx).Error("usage_query_failed",
+			logx.LoggerFromContext(loadCtx).Error("usage_query_failed",
 				"scope", "admin_trend",
-				sdk.LogFieldError, err)
+				logx.LogFieldError, err)
 			return nil, err
 		}
 		return BuildTrendBuckets(entries, filter.Granularity, filter.TZ), nil

@@ -18,8 +18,7 @@ import (
 )
 
 // 入口端点标识：BuildRequest 据此选上游 URL 与定点改写策略；
-// pipeline 据此选流式 usage 提取/观察策略。空值按 EndpointChatCompletions 兼容
-// （仅 openai 协议适配器；原生协议适配器要求显式端点）。
+// pipeline 据此选流式 usage 提取/观察策略。调用方须显式传端点。
 const (
 	// EndpointChatCompletions OpenAI chat completions（/v1/chat/completions）。
 	EndpointChatCompletions = "chat_completions"
@@ -54,11 +53,8 @@ type RelayInfo struct {
 	UpstreamModel string
 	// Stream 是否流式请求。
 	Stream bool
-	// Endpoint 入口端点（Endpoint* 常量；空值按 chat_completions 兼容）。
+	// Endpoint 入口端点（Endpoint* 常量，调用方恒显式传入）。
 	Endpoint string
-	// EntryProtocol 入口协议（registry.Protocol* 常量）；
-	// 纯透传架构下与渠道协议恒同构（registry.Pick 保证）。
-	EntryProtocol string
 	// RawBody 非 JSON 端点（multipart 等）的原始请求体：非 nil 时 adaptor 用
 	// 原始字节直发上游（不重组），req 字段表仅承载调度所需 model/stream。
 	RawBody []byte

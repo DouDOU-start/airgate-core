@@ -19,8 +19,9 @@ import (
 // UpstreamRequestLogUpdate is the builder for updating UpstreamRequestLog entities.
 type UpstreamRequestLogUpdate struct {
 	config
-	hooks    []Hook
-	mutation *UpstreamRequestLogMutation
+	hooks     []Hook
+	mutation  *UpstreamRequestLogMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the UpstreamRequestLogUpdate builder.
@@ -458,6 +459,12 @@ func (urlu *UpstreamRequestLogUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (urlu *UpstreamRequestLogUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *UpstreamRequestLogUpdate {
+	urlu.modifiers = append(urlu.modifiers, modifiers...)
+	return urlu
+}
+
 func (urlu *UpstreamRequestLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := urlu.check(); err != nil {
 		return n, err
@@ -571,6 +578,7 @@ func (urlu *UpstreamRequestLogUpdate) sqlSave(ctx context.Context) (n int, err e
 	if value, ok := urlu.mutation.AddedRepeatCount(); ok {
 		_spec.AddField(upstreamrequestlog.FieldRepeatCount, field.TypeInt, value)
 	}
+	_spec.AddModifiers(urlu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, urlu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{upstreamrequestlog.Label}
@@ -586,9 +594,10 @@ func (urlu *UpstreamRequestLogUpdate) sqlSave(ctx context.Context) (n int, err e
 // UpstreamRequestLogUpdateOne is the builder for updating a single UpstreamRequestLog entity.
 type UpstreamRequestLogUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *UpstreamRequestLogMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *UpstreamRequestLogMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetRequestID sets the "request_id" field.
@@ -1033,6 +1042,12 @@ func (urluo *UpstreamRequestLogUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (urluo *UpstreamRequestLogUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *UpstreamRequestLogUpdateOne {
+	urluo.modifiers = append(urluo.modifiers, modifiers...)
+	return urluo
+}
+
 func (urluo *UpstreamRequestLogUpdateOne) sqlSave(ctx context.Context) (_node *UpstreamRequestLog, err error) {
 	if err := urluo.check(); err != nil {
 		return _node, err
@@ -1163,6 +1178,7 @@ func (urluo *UpstreamRequestLogUpdateOne) sqlSave(ctx context.Context) (_node *U
 	if value, ok := urluo.mutation.AddedRepeatCount(); ok {
 		_spec.AddField(upstreamrequestlog.FieldRepeatCount, field.TypeInt, value)
 	}
+	_spec.AddModifiers(urluo.modifiers...)
 	_node = &UpstreamRequestLog{config: urluo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues
