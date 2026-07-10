@@ -86,3 +86,33 @@ func TestToCustomerUsageLogRespStripsResellerFields(t *testing.T) {
 		}
 	}
 }
+
+// TestToUserUsageLogRespStripsChannelFields 普通用户视角映射：
+// 渠道拓扑对用户不可见（只能看到分组），channel_id/channel_name 与
+// 渠道成本倍率快照一律不得进入序列化结果。
+func TestToUserUsageLogRespStripsChannelFields(t *testing.T) {
+	record := appusage.LogRecord{
+		ID:                    42,
+		UserID:                7,
+		ChannelID:             9,
+		ChannelName:           "leak-channel-name",
+		GroupID:               2,
+		Model:                 "gpt-test",
+		AccountRateMultiplier: 0.8,
+	}
+
+	data, err := json.Marshal(toUserUsageLogResp(record))
+	if err != nil {
+		t.Fatalf("序列化失败: %v", err)
+	}
+	body := string(data)
+
+	for _, forbidden := range []string{"channel_id", "channel_name", "leak-channel-name", "account_rate_multiplier"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("用户视角响应泄漏字段 %q: %s", forbidden, body)
+		}
+	}
+	if !strings.Contains(body, `"group_id":2`) {
+		t.Fatalf("用户视角应保留分组字段: %s", body)
+	}
+}

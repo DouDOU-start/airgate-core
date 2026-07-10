@@ -31,11 +31,11 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		scoped = true
 	}
 
+	// 渠道拓扑对用户不可见：忽略用户侧传入的 channel_id 筛选，防止借筛选探测渠道存在性。
 	result, err := h.service.ListUser(c.Request.Context(), int64(userID), appusage.ListFilter{
 		Page:        query.Page,
 		PageSize:    query.PageSize,
 		APIKeyID:    apiKeyFilter,
-		ChannelID:   query.ChannelID,
 		GroupID:     query.GroupID,
 		Model:       query.Model,
 		RequestID:   query.RequestID,
@@ -60,12 +60,10 @@ func (h *UsageHandler) UserUsage(c *gin.Context) {
 		return
 	}
 
-	// 用户视角：剥离渠道成本倍率快照（渠道成本 = total × 该快照，仅管理端可见）。
+	// 用户视角：剥离渠道成本倍率快照与渠道字段（用户只能看到分组）。
 	list := make([]dto.UsageLogResp, 0, len(result.List))
 	for _, item := range result.List {
-		resp := toUsageLogResp(item)
-		resp.AccountRateMultiplier = 0
-		list = append(list, resp)
+		list = append(list, toUserUsageLogResp(item))
 	}
 	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
 }

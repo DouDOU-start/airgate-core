@@ -55,6 +55,17 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 	}
 }
 
+// toUserUsageLogResp 转换为普通用户视角的响应：
+// 在完整映射基础上剥离渠道成本倍率快照与渠道字段——
+// 用户只能看到分组，渠道拓扑（ID/名称）仅管理端可见。
+func toUserUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
+	resp := toUsageLogResp(record)
+	resp.AccountRateMultiplier = 0
+	resp.ChannelID = 0
+	resp.ChannelName = ""
+	return resp
+}
+
 // toCustomerUsageLogResp 转换为 end customer 视角的精简响应（仅 billed_cost，剥离所有平台真实成本字段）。
 //
 // 当请求来自 API Key 登录拿到的 scoped JWT 时使用，避免泄漏 reseller 与平台之间的差价。

@@ -2,15 +2,16 @@ package dto
 
 // UsageLogResp 使用记录响应（reseller / admin scope，包含完整的成本字段）
 type UsageLogResp struct {
-	ID                    int64   `json:"id"`
-	UserID                int64   `json:"user_id"`
-	UserEmail             string  `json:"user_email,omitempty"`
-	UserDeleted           bool    `json:"user_deleted,omitempty"`
-	APIKeyID              int64   `json:"api_key_id"`
-	APIKeyName            string  `json:"api_key_name,omitempty"`
-	APIKeyHint            string  `json:"api_key_hint,omitempty"`
-	APIKeyDeleted         bool    `json:"api_key_deleted"`
-	ChannelID             int64   `json:"channel_id"`
+	ID            int64  `json:"id"`
+	UserID        int64  `json:"user_id"`
+	UserEmail     string `json:"user_email,omitempty"`
+	UserDeleted   bool   `json:"user_deleted,omitempty"`
+	APIKeyID      int64  `json:"api_key_id"`
+	APIKeyName    string `json:"api_key_name,omitempty"`
+	APIKeyHint    string `json:"api_key_hint,omitempty"`
+	APIKeyDeleted bool   `json:"api_key_deleted"`
+	// 渠道字段仅管理端出值；用户视角在 handler 层清零（用户只能看到分组，见 UserUsage）。
+	ChannelID             int64   `json:"channel_id,omitempty"`
 	ChannelName           string  `json:"channel_name,omitempty"`
 	GroupID               int64   `json:"group_id"`
 	Model                 string  `json:"model"`
@@ -31,11 +32,11 @@ type UsageLogResp struct {
 	CachedInputCost       float64 `json:"cached_input_cost"`
 	CacheCreationCost     float64 `json:"cache_creation_cost"`
 	TotalCost             float64 `json:"total_cost"`
-	ActualCost            float64 `json:"actual_cost"`             // 平台真实成本/用户扣费
-	BilledCost            float64 `json:"billed_cost"`             // 客户账面消耗（reseller markup 后的金额）
-	RateMultiplier        float64 `json:"rate_multiplier"`         // 平台计费倍率快照
-	SellRate              float64 `json:"sell_rate"`               // 销售倍率快照
-	AccountRateMultiplier float64 `json:"account_rate_multiplier"` // 账号倍率快照
+	ActualCost            float64 `json:"actual_cost"`                       // 平台真实成本/用户扣费
+	BilledCost            float64 `json:"billed_cost"`                       // 客户账面消耗（reseller markup 后的金额）
+	RateMultiplier        float64 `json:"rate_multiplier"`                   // 平台计费倍率快照
+	SellRate              float64 `json:"sell_rate"`                         // 销售倍率快照
+	AccountRateMultiplier float64 `json:"account_rate_multiplier,omitempty"` // 渠道成本倍率快照（仅管理端出值，用户视角清零后不序列化）
 	ServiceTier           string  `json:"service_tier,omitempty"`
 	Stream                bool    `json:"stream"`
 	DurationMs            int64   `json:"duration_ms"`
