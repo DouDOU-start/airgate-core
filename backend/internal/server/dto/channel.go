@@ -43,7 +43,7 @@ type ChannelResp struct {
 // CreateChannelReq 创建渠道请求。
 type CreateChannelReq struct {
 	Name    string   `json:"name" binding:"required"`
-	Type    string   `json:"type" binding:"required,oneof=openai_compatible anthropic gemini custom"`
+	Type    string   `json:"type" binding:"required,oneof=openai_compatible anthropic gemini custom openai_video suno"`
 	BaseURL string   `json:"base_url" binding:"required"`
 	APIKeys []string `json:"api_keys" binding:"required,min=1"`
 	// Models 可空：创建时可不配模型（渠道不会被调度命中），建后在「模型」弹窗维护。
@@ -69,7 +69,7 @@ type CreateChannelReq struct {
 //     提供（含空集合）= 整组替换。
 type UpdateChannelReq struct {
 	Name           *string           `json:"name"`
-	Type           *string           `json:"type" binding:"omitempty,oneof=openai_compatible anthropic gemini custom"`
+	Type           *string           `json:"type" binding:"omitempty,oneof=openai_compatible anthropic gemini custom openai_video suno"`
 	BaseURL        *string           `json:"base_url"`
 	APIKeys        []string          `json:"api_keys"`
 	Models         []string          `json:"models"`
@@ -113,7 +113,7 @@ type RefreshChannelBalanceResp struct {
 
 // FetchChannelModelsPreviewReq 预览拉取模型请求（渠道未保存，直接给连接参数）。
 type FetchChannelModelsPreviewReq struct {
-	Type    string `json:"type" binding:"required,oneof=openai_compatible anthropic gemini custom"`
+	Type    string `json:"type" binding:"required,oneof=openai_compatible anthropic gemini custom openai_video suno"`
 	BaseURL string `json:"base_url" binding:"required"`
 	APIKey  string `json:"api_key" binding:"required"`
 }

@@ -48,8 +48,26 @@ func TestSettingsReader(t *testing.T) {
 				{Key: "channel_auto_ban_enabled", Value: "false"},
 			}},
 			want: GatewaySettings{
-				AutoBanEnabled: false,
+				AutoBanEnabled:     false,
+				TaskTimeoutMinutes: 30,
 			},
+		},
+		{
+			name: "任务超时分钟数解析",
+			lister: &fakeLister{items: []Setting{
+				{Key: "task_timeout_minutes", Value: "60"},
+			}},
+			want: GatewaySettings{
+				AutoBanEnabled:     true,
+				TaskTimeoutMinutes: 60,
+			},
+		},
+		{
+			name: "任务超时非法值保留默认",
+			lister: &fakeLister{items: []Setting{
+				{Key: "task_timeout_minutes", Value: "-3"},
+			}},
+			want: defaultGatewaySettings(),
 		},
 		{
 			name: "未知键忽略",

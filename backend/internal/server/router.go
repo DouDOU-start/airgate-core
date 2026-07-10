@@ -252,6 +252,17 @@ func (s *Server) registerRoutes() {
 		// Anthropic 协议（anthropic 渠道）
 		relayGroup.POST("/messages", s.relay.HandleMessages)
 		relayGroup.POST("/messages/count_tokens", s.relay.HandleMessagesCountTokens)
+		// OpenAI 视频任务（openai_video 渠道，Sora 形态；异步任务子系统 relay/task）
+		relayGroup.POST("/videos", s.taskFlow.HandleVideoSubmit)
+		relayGroup.GET("/videos/:task_id", s.taskFlow.HandleVideoGet)
+		relayGroup.GET("/videos/:task_id/content", s.taskFlow.HandleVideoContent)
+	}
+	// Suno 音乐任务（suno 渠道，Suno-API 社区协议；错误体 {"code":"fail",...}）
+	sunoGroup := r.Group("/suno", middleware.APIKeyAuth(s.db))
+	{
+		sunoGroup.POST("/submit/:action", s.taskFlow.HandleSunoSubmit)
+		sunoGroup.POST("/fetch", s.taskFlow.HandleSunoFetch)
+		sunoGroup.GET("/fetch/:task_id", s.taskFlow.HandleSunoFetchByID)
 	}
 	// Gemini 协议（gemini 渠道）：路径形如 /v1beta/models/{model}:generateContent，
 	// ':' 在 gin 路由里只有段首才是参数语法、段中不是分隔符——用单参数段承载

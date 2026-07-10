@@ -166,7 +166,7 @@ var (
 	ChannelsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "name", Type: field.TypeString},
-		{Name: "type", Type: field.TypeEnum, Enums: []string{"openai_compatible", "anthropic", "gemini", "custom"}},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"openai_compatible", "anthropic", "gemini", "custom", "openai_video", "suno"}},
 		{Name: "base_url", Type: field.TypeString},
 		{Name: "api_keys", Type: field.TypeJSON},
 		{Name: "models", Type: field.TypeJSON},
@@ -399,6 +399,64 @@ var (
 		Name:       "settings",
 		Columns:    SettingsColumns,
 		PrimaryKey: []*schema.Column{SettingsColumns[0]},
+	}
+	// TasksColumns holds the columns for the "tasks" table.
+	TasksColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "task_id", Type: field.TypeString},
+		{Name: "platform", Type: field.TypeString},
+		{Name: "action", Type: field.TypeString, Default: ""},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"submitted", "queued", "in_progress", "success", "failure"}, Default: "submitted"},
+		{Name: "progress", Type: field.TypeInt, Default: 0},
+		{Name: "fail_reason", Type: field.TypeString, Default: ""},
+		{Name: "request_model", Type: field.TypeString},
+		{Name: "upstream_model", Type: field.TypeString, Default: ""},
+		{Name: "hold_amount", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "est_total", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "rate_multiplier", Type: field.TypeFloat64, Default: 1},
+		{Name: "sell_rate", Type: field.TypeFloat64, Default: 0},
+		{Name: "account_rate_multiplier", Type: field.TypeFloat64, Default: 1},
+		{Name: "settled", Type: field.TypeBool, Default: false},
+		{Name: "seconds", Type: field.TypeInt, Default: 0},
+		{Name: "data", Type: field.TypeJSON, Nullable: true},
+		{Name: "submit_time", Type: field.TypeTime},
+		{Name: "finish_time", Type: field.TypeTime, Nullable: true},
+		{Name: "request_id", Type: field.TypeString, Default: ""},
+		{Name: "user_id", Type: field.TypeInt, Default: 0},
+		{Name: "user_email_snapshot", Type: field.TypeString, Default: ""},
+		{Name: "api_key_id", Type: field.TypeInt, Default: 0},
+		{Name: "group_id", Type: field.TypeInt, Default: 0},
+		{Name: "channel_id", Type: field.TypeInt, Default: 0},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// TasksTable holds the schema information for the "tasks" table.
+	TasksTable = &schema.Table{
+		Name:       "tasks",
+		Columns:    TasksColumns,
+		PrimaryKey: []*schema.Column{TasksColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "task_platform_task_id",
+				Unique:  false,
+				Columns: []*schema.Column{TasksColumns[2], TasksColumns[1]},
+			},
+			{
+				Name:    "task_status_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{TasksColumns[4], TasksColumns[26]},
+			},
+			{
+				Name:    "task_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{TasksColumns[20], TasksColumns[25]},
+			},
+			{
+				Name:    "task_request_id",
+				Unique:  false,
+				Columns: []*schema.Column{TasksColumns[19]},
+			},
+		},
 	}
 	// UpstreamRequestLogsColumns holds the columns for the "upstream_request_logs" table.
 	UpstreamRequestLogsColumns = []*schema.Column{
@@ -685,6 +743,7 @@ var (
 		PaymentProviderConfigsTable,
 		RedemptionCodesTable,
 		SettingsTable,
+		TasksTable,
 		UpstreamRequestLogsTable,
 		UsageLogsTable,
 		UsersTable,

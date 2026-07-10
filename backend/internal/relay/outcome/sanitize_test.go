@@ -1,4 +1,4 @@
-package pipeline
+package outcome
 
 import (
 	"strings"
@@ -51,8 +51,8 @@ func TestSanitizeKeyLeak(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := sanitizeKeyLeak(tc.input, tc.apiKeys); got != tc.want {
-				t.Errorf("sanitizeKeyLeak = %q, want %q", got, tc.want)
+			if got := SanitizeKeyLeak(tc.input, tc.apiKeys); got != tc.want {
+				t.Errorf("SanitizeKeyLeak = %q, want %q", got, tc.want)
 			}
 		})
 	}
@@ -60,20 +60,20 @@ func TestSanitizeKeyLeak(t *testing.T) {
 
 func TestTruncateErrorMsg(t *testing.T) {
 	t.Run("短文本不截断", func(t *testing.T) {
-		if got := truncateErrorMsg("short"); got != "short" {
+		if got := TruncateErrorMsg("short"); got != "short" {
 			t.Errorf("got %q", got)
 		}
 	})
 	t.Run("超长截断到上限", func(t *testing.T) {
 		long := strings.Repeat("a", 500)
-		got := truncateErrorMsg(long)
+		got := TruncateErrorMsg(long)
 		if len(got) != errorMsgMaxLen {
 			t.Errorf("len = %d, want %d", len(got), errorMsgMaxLen)
 		}
 	})
 	t.Run("多字节字符不被切断", func(t *testing.T) {
 		long := strings.Repeat("错", 200) // 600 字节
-		got := truncateErrorMsg(long)
+		got := TruncateErrorMsg(long)
 		if len(got) > errorMsgMaxLen {
 			t.Errorf("len = %d, want <= %d", len(got), errorMsgMaxLen)
 		}

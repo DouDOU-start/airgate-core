@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,16 +32,20 @@ type SettingsLister interface {
 	List(ctx context.Context, group string) ([]Setting, error)
 }
 
-// GatewaySettings relay 管线运行时开关快照。
+// GatewaySettings relay 管线运行时开关快照（同步转发与异步任务子系统共用）。
 type GatewaySettings struct {
 	// AutoBanEnabled 上游 401/403 自动禁用总开关（channel_auto_ban_enabled，默认 true）。
 	AutoBanEnabled bool
+	// TaskTimeoutMinutes 异步任务超时分钟数（task_timeout_minutes，默认 30）：
+	// 提交后超过该时长仍未终态的任务由轮询器置失败并退款。
+	TaskTimeoutMinutes int
 }
 
 // defaultGatewaySettings 返回默认开关（lister 缺失或读失败时的兜底）。
 func defaultGatewaySettings() GatewaySettings {
 	return GatewaySettings{
-		AutoBanEnabled: true,
+		AutoBanEnabled:     true,
+		TaskTimeoutMinutes: 30,
 	}
 }
 
@@ -128,6 +133,10 @@ func applySettings(s *GatewaySettings, items []Setting) {
 		switch item.Key {
 		case "channel_auto_ban_enabled":
 			s.AutoBanEnabled = value != "false"
+		case "task_timeout_minutes":
+			if n, err := strconv.Atoi(value); err == nil && n > 0 {
+				s.TaskTimeoutMinutes = n
+			}
 		}
 	}
 }

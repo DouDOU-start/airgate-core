@@ -54,14 +54,19 @@ type UsageRecord struct {
 	UserAgent             string
 	IPAddress             string
 	Endpoint              string
-	Source                string // 记账来源：relay（默认）/ channel_test；空值落库归一为 relay
+	Source                string // 记账来源：relay（默认）/ channel_test / task；空值落库归一为 relay
 	RequestID             string // X-Request-ID：与 upstream_request_logs 互查
+	// SkipBalanceCharge 跳过 user.balance 扣减：异步任务的余额动账已在
+	// 预扣/结算阶段同步完成，落账只记 usage_log 与 key 用量累加，
+	// 再扣一次会双重计费。
+	SkipBalanceCharge bool
 }
 
 // 记账来源常量（usage_logs.source）。
 const (
 	SourceRelay       = "relay"        // 用户转发流量
 	SourceChannelTest = "channel_test" // 渠道测试（管理员操作，无用户归属）
+	SourceTask        = "task"         // 异步任务（视频/音乐）终态结算
 )
 
 // normalizedSource 空来源归一为 relay（防御性缺省：调用方漏填来源时不落空值）。
@@ -362,7 +367,11 @@ func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) err
 
 	for _, rec := range batch {
 		if rec.ActualCost > 0 {
-			userActualCosts[rec.UserID] += rec.ActualCost
+			// SkipBalanceCharge（异步任务）：余额已在预扣/结算同步动账，
+			// 此处只累加 key 用量，不再扣 user.balance。
+			if !rec.SkipBalanceCharge {
+				userActualCosts[rec.UserID] += rec.ActualCost
+			}
 			if rec.APIKeyID > 0 {
 				keyActualCosts[rec.APIKeyID] += rec.ActualCost
 			}

@@ -650,9 +650,9 @@ func TestRewriteMultipartModel(t *testing.T) {
 	_ = mw.Close()
 	origCT := mw.FormDataContentType()
 
-	out, err := rewriteMultipartModel(buf.Bytes(), origCT, "gpt-image-upstream")
+	out, err := RewriteMultipartModel(buf.Bytes(), origCT, "gpt-image-upstream")
 	if err != nil {
-		t.Fatalf("rewriteMultipartModel: %v", err)
+		t.Fatalf("RewriteMultipartModel: %v", err)
 	}
 
 	// boundary 沿用 → 原 Content-Type 直接可解析重写后的体。
@@ -685,7 +685,7 @@ func TestRewriteMultipartModel(t *testing.T) {
 	}
 
 	t.Run("非法 Content-Type 报错", func(t *testing.T) {
-		if _, err := rewriteMultipartModel([]byte("x"), "application/json", "m"); err == nil {
+		if _, err := RewriteMultipartModel([]byte("x"), "application/json", "m"); err == nil {
 			t.Error("非 multipart Content-Type 应报错")
 		}
 	})

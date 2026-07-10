@@ -119,11 +119,30 @@ func (s *Service) LoadAllPrices(ctx context.Context) (map[string]pricing.Price, 
 			CacheCreation5m: item.CacheCreationPrice,
 			CacheCreation1h: item.CacheCreation1hPrice,
 			PerRequest:      item.PerRequestPrice,
+			VideoPerSecond:  parseVideoPerSecond(item.Model, item.PricingExtra),
 			ServiceTiers:    tiers,
 			LongContext:     longCtx,
 		}
 	}
 	return prices, nil
+}
+
+// parseVideoPerSecond 解析 pricing_extra.video.per_second（视频按秒单价，任务子系统用）。
+// 字段缺失返回 0；形态非法记 warn 不阻断加载。
+func parseVideoPerSecond(model string, extra map[string]interface{}) float64 {
+	raw, ok := extra["video"]
+	if !ok {
+		return 0
+	}
+	m, ok := raw.(map[string]interface{})
+	if !ok {
+		slog.Warn("model_price_pricing_extra_invalid", "model", model, "field", "video")
+		return 0
+	}
+	if v, ok := toFloat(m["per_second"]); ok && v > 0 {
+		return v
+	}
+	return 0
 }
 
 // parsePricingExtra 把 pricing_extra JSON（map 形态）解析为服务档倍率与长上下文阶梯。

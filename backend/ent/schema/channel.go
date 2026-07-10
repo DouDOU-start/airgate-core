@@ -22,7 +22,9 @@ type Channel struct {
 func (Channel) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").NotEmpty(),
-		field.Enum("type").Values("openai_compatible", "anthropic", "gemini", "custom"),
+		// 任务类类型（openai_video / suno）走异步任务子系统（internal/relay/task），
+		// 枚举值与 task.platform、入口协议常量同值。
+		field.Enum("type").Values("openai_compatible", "anthropic", "gemini", "custom", "openai_video", "suno"),
 		field.String("base_url").NotEmpty(),
 		// api_keys 存元素级 AES-GCM 密文（base64），加解密由 service 层负责，schema 不管加密。
 		field.JSON("api_keys", []string{}).Default([]string{}).Sensitive(),

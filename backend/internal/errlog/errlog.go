@@ -71,6 +71,10 @@ const (
 	// PhaseBadRequest 构建上游请求即失败（非法请求体 / 不支持的端点 / 参数翻译失败）；
 	// 属客户端/配置问题，一次性 400 终止，不 failover、不计渠道健康。
 	PhaseBadRequest = "bad_request"
+	// PhaseTaskFailed 异步任务上游报失败（轮询终态，已退款）。
+	PhaseTaskFailed = "task_failed"
+	// PhaseTaskTimeout 异步任务超时清扫置失败（已退款）。
+	PhaseTaskTimeout = "task_timeout"
 )
 
 // AttemptHop 重试链中的一跳（序列化进 attempt_chain JSON）。

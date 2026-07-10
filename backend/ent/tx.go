@@ -38,6 +38,8 @@ type Tx struct {
 	RedemptionCode *RedemptionCodeClient
 	// Setting is the client for interacting with the Setting builders.
 	Setting *SettingClient
+	// Task is the client for interacting with the Task builders.
+	Task *TaskClient
 	// UpstreamRequestLog is the client for interacting with the UpstreamRequestLog builders.
 	UpstreamRequestLog *UpstreamRequestLogClient
 	// UsageLog is the client for interacting with the UsageLog builders.
@@ -188,6 +190,7 @@ func (tx *Tx) init() {
 	tx.PaymentProviderConfig = NewPaymentProviderConfigClient(tx.config)
 	tx.RedemptionCode = NewRedemptionCodeClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
+	tx.Task = NewTaskClient(tx.config)
 	tx.UpstreamRequestLog = NewUpstreamRequestLogClient(tx.config)
 	tx.UsageLog = NewUsageLogClient(tx.config)
 	tx.User = NewUserClient(tx.config)

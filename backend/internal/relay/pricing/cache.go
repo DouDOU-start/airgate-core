@@ -25,6 +25,10 @@ type Price struct {
 	CacheCreation1h float64
 	// PerRequest 按次价：>0 时整单按次计费，忽略全部 token 单价。
 	PerRequest float64
+	// VideoPerSecond 视频按秒单价（USD/秒，pricing_extra.video.per_second）：
+	// 仅异步任务子系统估价/结算使用（total = per_second × 时长），
+	// 同步转发不读该字段；PerRequest>0 时按次价优先。
+	VideoPerSecond float64
 
 	// ServiceTiers 服务档倍率表（如 priority=2.0、flex=0.5）；命中时整单各维度统一乘该倍率。
 	ServiceTiers map[string]float64

@@ -19,6 +19,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
+	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 )
@@ -265,7 +266,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		// 一次性 400 终止，不 failover、不计渠道健康信号。
 		if result.buildErr != nil {
 			p.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
-			msg := sanitizeKeyLeak(result.buildErr.Error(), ch.APIKeys)
+			msg := outcome.SanitizeKeyLeak(result.buildErr.Error(), ch.APIKeys)
 			writeError(c, http.StatusBadRequest, "invalid_request_error", "bad_request", msg)
 			p.recordFailure(c, keyInfo, req, start, errlog.Entry{
 				Phase: errlog.PhaseBadRequest, StatusCode: http.StatusBadRequest,
@@ -314,7 +315,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				// 而 Message 会透出到用户端失败视图；明细只进重试链（仅管理员可见）。
 				reason := "上游未发送完成标志即断流"
 				if result.streamErr != nil {
-					reason = sanitizeKeyLeak(result.streamErr.Error(), ch.APIKeys)
+					reason = outcome.SanitizeKeyLeak(result.streamErr.Error(), ch.APIKeys)
 				}
 				hop := attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "streamAborted", reason, 0, attemptLatency, false)
 				if p.errSink != nil {
@@ -330,22 +331,22 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			return
 		}
 
-		o := classifyOutcome(result.statusCode, result.headers, result.body, result.netErr)
+		o := outcome.Classify(result.statusCode, result.headers, result.body, result.netErr)
 		// 判定原因可能携带上游回显的渠道密钥（进日志/落库/管理端），出口前脱敏。
-		o.reason = sanitizeKeyLeak(o.reason, ch.APIKeys)
+		o.Reason = outcome.SanitizeKeyLeak(o.Reason, ch.APIKeys)
 
 		// 仅 Responses 端点：上游 404（渠道可能不支持 /v1/responses）当作可重试的软排除，
 		// 换同组其他渠道尝试；错误语义先解析脱敏并记住，failover 耗尽后按 404 原状态码
 		// 语义重建渲染（见循环末）。chat 的 404 仍归 verdictClientError（一次性终止不重试）。
-		if info.Endpoint == adaptor.EndpointResponses && result.statusCode == http.StatusNotFound && o.verdict == verdictClientError {
+		if info.Endpoint == adaptor.EndpointResponses && result.statusCode == http.StatusNotFound && o.Verdict == outcome.ClientError {
 			up := errfmt.ParseUpstream(result.statusCode, result.body)
-			up.Message = sanitizeKeyLeak(up.Message, ch.APIKeys)
+			up.Message = outcome.SanitizeKeyLeak(up.Message, ch.APIKeys)
 			responsesNotFound = &up
-			o.verdict = verdictTransient
-			o.reason = "responses 端点上游 404（渠道可能不支持），换渠道重试"
+			o.Verdict = outcome.Transient
+			o.Reason = "responses 端点上游 404（渠道可能不支持），换渠道重试"
 		}
-		switch o.verdict {
-		case verdictSuccess:
+		switch o.Verdict {
+		case outcome.Success:
 			p.registry.MarkRecovered(ch.ID)
 			// 零计费端点（countTokens 类）：usage 归零、不写 usage_log；
 			// failover/outcome/透传语义与常规端点完全一致。
@@ -355,37 +356,37 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			writeUpstreamBody(c, result)
 			return
 
-		case verdictRateLimited:
+		case outcome.RateLimited:
 			// 仅本次请求内硬排除换渠道重试；不设冷却状态，下次请求照常调度。
 			p.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
 			hardExclude = append(hardExclude, ch.ID)
 			summary.rateLimited = true
-			summary.observeRetryAfter(o.retryAfter)
-			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "rateLimited", o.reason, o.retryAfter.Milliseconds(), attemptLatency, false))
+			summary.observeRetryAfter(o.RetryAfter)
+			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "rateLimited", o.Reason, o.RetryAfter.Milliseconds(), attemptLatency, false))
 			if p.errSink != nil {
 				p.errSink.CountFailure(context.Background(), ch.ID, "rateLimited", "")
 			}
 			slog.Warn("relay_channel_rate_limited",
-				"channel_id", ch.ID, "model", req.Model, "retry_after", o.retryAfter.String())
+				"channel_id", ch.ID, "model", req.Model, "retry_after", o.RetryAfter.String())
 			continue
 
-		case verdictAuthFailed:
+		case outcome.AuthFailed:
 			p.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
 			if settings.AutoBanEnabled {
-				p.registry.MarkAutoDisabled(ch.ID, truncateErrorMsg(o.reason))
+				p.registry.MarkAutoDisabled(ch.ID, outcome.TruncateErrorMsg(o.Reason))
 			}
 			hardExclude = append(hardExclude, ch.ID)
 			summary.authFailed = true
-			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "authFailed", o.reason, 0, attemptLatency, settings.AutoBanEnabled))
+			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "authFailed", o.Reason, 0, attemptLatency, settings.AutoBanEnabled))
 			if p.errSink != nil {
 				p.errSink.CountFailure(context.Background(), ch.ID, "authFailed", "")
 			}
 			slog.Warn("relay_channel_auth_failed",
 				"channel_id", ch.ID, "model", req.Model,
-				"auto_ban", settings.AutoBanEnabled, "reason", o.reason)
+				"auto_ban", settings.AutoBanEnabled, "reason", o.Reason)
 			continue
 
-		case verdictTransient:
+		case outcome.Transient:
 			p.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
 			softExclude = append(softExclude, ch.ID)
 			summary.transient = true
@@ -393,12 +394,12 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			if result.netErr != nil {
 				verdictName = "networkError"
 			}
-			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, verdictName, o.reason, 0, attemptLatency, false))
+			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, verdictName, o.Reason, 0, attemptLatency, false))
 			if p.errSink != nil {
 				p.errSink.CountFailure(context.Background(), ch.ID, verdictName, "")
 			}
 			slog.Warn("relay_channel_transient_failure",
-				"channel_id", ch.ID, "model", req.Model, "reason", o.reason)
+				"channel_id", ch.ID, "model", req.Model, "reason", o.Reason)
 			continue
 
 		default: // verdictClientError：语义重建终止，不重试；带 usage 仍计费（零计费端点除外）。
@@ -408,15 +409,15 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			}
 			// 语义保留、载体重建：解析上游错误体提取 (message/type/code)，按入口协议
 			// 渲染（HTTP 状态码保留上游原值）；message 可能回显凭证，先做精确 key 替换。
-			// 原始响应体不透传，仅经 o.reason 片段进失败留痕。
+			// 原始响应体不透传，仅经 o.Reason 片段进失败留痕。
 			up := errfmt.ParseUpstream(result.statusCode, result.body)
-			up.Message = sanitizeKeyLeak(up.Message, ch.APIKeys)
+			up.Message = outcome.SanitizeKeyLeak(up.Message, ch.APIKeys)
 			writeUpstreamError(c, result.statusCode, up)
 			// clientError 多为调用方参数问题，不计入渠道错误率（防脏渠道健康信号）。
-			hop := attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "clientError", o.reason, 0, attemptLatency, false)
+			hop := attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "clientError", o.Reason, 0, attemptLatency, false)
 			p.recordFailure(c, keyInfo, req, start, errlog.Entry{
 				Phase: errlog.PhaseUpstreamClientError, StatusCode: result.statusCode,
-				Message: o.reason, Billed: billed,
+				Message: o.Reason, Billed: billed,
 				Attempts: attempts, Chain: append(hops, hop),
 				ChannelID: ch.ID, ChannelName: ch.Name,
 			})
@@ -455,7 +456,7 @@ func attemptHop(seq int, ch *registry.ChannelSnapshot, apiKey string, upstreamSt
 		Seq:          seq,
 		ChannelID:    ch.ID,
 		ChannelName:  ch.Name,
-		KeyHint:      keyHint(apiKey),
+		KeyHint:      outcome.KeyHint(apiKey),
 		UpstreamStat: upstreamStatus,
 		Verdict:      verdict,
 		Reason:       reason,
@@ -463,15 +464,6 @@ func attemptHop(seq int, ch *registry.ChannelSnapshot, apiKey string, upstreamSt
 		LatencyMs:    latencyMs,
 		AutoDisabled: autoDisabled,
 	}
-}
-
-// keyHint 渠道密钥尾 4 位提示（明文永不落库）。
-// 口径与 sanitize.go 的 maskAPIKey 一致：长度 >4 保留尾 4 位。
-func keyHint(key string) string {
-	if len(key) <= 4 {
-		return "…"
-	}
-	return "…" + key[len(key)-4:]
 }
 
 // recordFailure 上游请求日志失败留痕（relay 来源公共字段填充）；errSink 未注入时 no-op。

@@ -1,17 +1,17 @@
-package pipeline
+package outcome
 
 import "strings"
 
 // errorMsgMaxLen 自动禁用原因落库 error_msg 的长度上限（字节）。
 const errorMsgMaxLen = 300
 
-// sanitizeKeyLeak 把文本中出现的渠道明文 API Key 精确替换为掩码（sk-***+尾 4 位）。
+// SanitizeKeyLeak 把文本中出现的渠道明文 API Key 精确替换为掩码（sk-***+尾 4 位）。
 //
 // 上游 401 错误体可能回显 Authorization 凭证（部分 OpenAI 兼容中转整段回显），
 // 该文本会进入服务器日志、channel.error_msg 落库与管理端响应，
 // 违反「渠道 api_keys 明文永不出现在任何 API 响应」红线——出口前统一脱敏。
 // 仅做精确 key 字符串替换，不改其他内容。
-func sanitizeKeyLeak(s string, apiKeys []string) string {
+func SanitizeKeyLeak(s string, apiKeys []string) string {
 	for _, key := range apiKeys {
 		if key == "" || !strings.Contains(s, key) {
 			continue
@@ -29,8 +29,8 @@ func maskAPIKey(key string) string {
 	return "sk-***" + key[len(key)-4:]
 }
 
-// truncateErrorMsg 截断落库 error_msg（≤300 字节，按 UTF-8 字符边界回退）。
-func truncateErrorMsg(s string) string {
+// TruncateErrorMsg 截断落库 error_msg（≤300 字节，按 UTF-8 字符边界回退）。
+func TruncateErrorMsg(s string) string {
 	if len(s) <= errorMsgMaxLen {
 		return s
 	}
@@ -40,4 +40,13 @@ func truncateErrorMsg(s string) string {
 		cut--
 	}
 	return s[:cut]
+}
+
+// KeyHint 渠道密钥尾 4 位提示（明文永不落库）。
+// 口径与 maskAPIKey 一致：长度 >4 保留尾 4 位。
+func KeyHint(key string) string {
+	if len(key) <= 4 {
+		return "…"
+	}
+	return "…" + key[len(key)-4:]
 }

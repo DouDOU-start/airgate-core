@@ -1,11 +1,8 @@
 package pipeline
 
 import (
-	"bytes"
 	"errors"
 	"io"
-	"mime"
-	"mime/multipart"
 	"net/http"
 	"slices"
 	"strings"
@@ -13,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/DouDOU-start/airgate-core/internal/auth"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/multipartform"
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
@@ -134,7 +132,7 @@ func (p *Pipeline) HandleImagesEdits(c *gin.Context) {
 		return
 	}
 	contentType := c.GetHeader("Content-Type")
-	fields, err := extractMultipartFields(body, contentType, "model", "stream")
+	fields, err := multipartform.ExtractFields(body, contentType, "model", "stream")
 	if err != nil {
 		writeError(c, http.StatusBadRequest, "invalid_request_error", "invalid_multipart",
 			"multipart 请求体解析失败: "+err.Error())
@@ -157,49 +155,6 @@ func (p *Pipeline) HandleImagesEdits(c *gin.Context) {
 		rawBody:        body,
 		rawContentType: contentType,
 	})
-}
-
-// maxMultipartFieldBytes 提取的 multipart 普通字段值上限（model/stream 均为短值）。
-const maxMultipartFieldBytes = 1 << 10
-
-// extractMultipartFields 从 multipart/form-data 原始体中提取指定名字的普通表单字段值
-// （文件 part 一律跳过、不缓冲）。仅用于路由取值，原始字节不被改动——
-// 上游收到的仍是原样 multipart 体。
-func extractMultipartFields(body []byte, contentType string, names ...string) (map[string]string, error) {
-	mediaType, params, err := mime.ParseMediaType(contentType)
-	if err != nil || !strings.HasPrefix(mediaType, "multipart/") {
-		return nil, errors.New("Content-Type 必须是 multipart/form-data")
-	}
-	boundary := params["boundary"]
-	if boundary == "" {
-		return nil, errors.New("multipart 缺少 boundary")
-	}
-
-	want := make(map[string]struct{}, len(names))
-	for _, n := range names {
-		want[n] = struct{}{}
-	}
-	got := make(map[string]string, len(names))
-	mr := multipart.NewReader(bytes.NewReader(body), boundary)
-	for len(got) < len(want) {
-		part, err := mr.NextPart()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		// 非目标字段或文件 part：跳过（NextPart 会自动丢弃上一 part 的剩余内容）。
-		if _, ok := want[part.FormName()]; !ok || part.FileName() != "" {
-			continue
-		}
-		value, err := io.ReadAll(io.LimitReader(part, maxMultipartFieldBytes))
-		if err != nil {
-			return nil, err
-		}
-		got[part.FormName()] = string(value)
-	}
-	return got, nil
 }
 
 // HandleMessages POST /v1/messages 入口 handler（Anthropic Messages 协议，纯透传）。

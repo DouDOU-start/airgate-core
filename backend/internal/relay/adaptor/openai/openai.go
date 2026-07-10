@@ -39,7 +39,7 @@ type Adaptor struct{}
 //   - images edits：ImagesEditsURL；multipart 透传——渠道 model_mapping 未生效时
 //     RawBody 原始字节 + 原 Content-Type（含 boundary）直发上游、零重组；
 //     映射生效时仅定点重写 model 普通字段值（模型重写属 adaptor 职责清单），
-//     其余 part 逐字节复制、boundary 沿用（见 rewriteMultipartModel）；
+//     其余 part 逐字节复制、boundary 沿用（见 RewriteMultipartModel）；
 //     param_override 对 multipart 不生效（JSON 语义的覆盖值无法映射到表单字段）。
 //   - chat_completions（默认）：ChatCompletionsURL；公共改写 + 流式 include_usage 注入。
 //
@@ -68,7 +68,7 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 		// model_mapping 生效时定点重写 multipart 的 model 字段（沿用原 boundary，
 		// Content-Type 不变）；未生效时原样直发、零重组。
 		if info.UpstreamModel != "" && info.UpstreamModel != info.RequestModel {
-			body, err = rewriteMultipartModel(info.RawBody, info.RawContentType, info.UpstreamModel)
+			body, err = RewriteMultipartModel(info.RawBody, info.RawContentType, info.UpstreamModel)
 		}
 		url = ImagesEditsURL(info.Channel.BaseURL)
 	case adaptor.EndpointChatCompletions:
@@ -154,12 +154,12 @@ func rewritePlainBody(info *adaptor.RelayInfo, req *dto.ChatRequest) ([]byte, er
 	return r.Marshal()
 }
 
-// rewriteMultipartModel 定点重写 multipart 体中 model 普通字段的值
+// RewriteMultipartModel 定点重写 multipart 体中 model 普通字段的值
 // （仅渠道 model_mapping 生效时走此路径）。零翻译边界内的最小改写：
 //   - 沿用原 boundary（Content-Type 头无需变更）；
 //   - 各 part 头原样复制、内容经 NextRawPart 逐字节复制（不解码传输编码，
 //     文件字节零改动）；仅 model 普通字段（非文件 part）的值替换为上游模型名。
-func rewriteMultipartModel(body []byte, contentType, upstreamModel string) ([]byte, error) {
+func RewriteMultipartModel(body []byte, contentType, upstreamModel string) ([]byte, error) {
 	_, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
 		return nil, fmt.Errorf("解析 multipart Content-Type 失败: %w", err)

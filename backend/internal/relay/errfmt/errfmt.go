@@ -28,12 +28,15 @@ import (
 
 // ProtocolForPath 按请求路径判定入口协议（供 handler 之前的中间件使用；
 // handler 内部以显式设置的入口协议为准）。
+// /v1/videos（openai_video）沿用 OpenAI 错误形态，不单列。
 func ProtocolForPath(path string) string {
 	switch {
 	case strings.HasPrefix(path, "/v1/messages"):
 		return registry.ProtocolAnthropic
 	case strings.HasPrefix(path, "/v1beta/"):
 		return registry.ProtocolGemini
+	case strings.HasPrefix(path, "/suno/"):
+		return registry.ProtocolSuno
 	default:
 		return registry.ProtocolOpenAI
 	}
@@ -65,6 +68,16 @@ type AnthropicError struct {
 type AnthropicErrorDetail struct {
 	Type    string `json:"type"`
 	Message string `json:"message"`
+}
+
+// SunoError Suno-API 社区形态错误体：{"code":"fail","message":...,"data":null}。
+// code 固定 "fail"（成功路径为 "success"），语义细节留在 message；
+// request_id 顶层附带（社区客户端忽略未知字段），供报修互查。
+type SunoError struct {
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	Data      any    `json:"data"`
+	RequestID string `json:"request_id,omitempty"`
 }
 
 // GeminiError Gemini 形态错误体：{"error":{"code","message","status"}}。
@@ -99,6 +112,8 @@ func Render(protocol string, status int, errType, code, message, requestID strin
 			Message: message,
 			Status:  geminiStatus(status),
 		}}
+	case registry.ProtocolSuno:
+		return SunoError{Code: "fail", Message: message, RequestID: requestID}
 	default:
 		return OpenAIError{
 			Error:     OpenAIErrorDetail{Message: message, Type: errType, Code: code},
@@ -240,6 +255,8 @@ func RenderUpstream(protocol string, status int, up UpstreamError, requestID str
 			Message: up.Message,
 			Status:  geminiUpstreamStatus(up.Code, status),
 		}}
+	case registry.ProtocolSuno:
+		return SunoError{Code: "fail", Message: up.Message, RequestID: requestID}
 	default:
 		errType := up.Type
 		if errType == "" {

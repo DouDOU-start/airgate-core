@@ -1,0 +1,178 @@
+package task
+
+import (
+	"encoding/json"
+	"io"
+	"log/slog"
+	"net/http"
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
+	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
+	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
+)
+
+// maxBatchFetchIDs 批量查询单次 ID 数上限。
+const maxBatchFetchIDs = 100
+
+// HandleVideoGet GET /v1/videos/:task_id：读本地 task 快照重建 OpenAI video 对象。
+// 不穿透上游（轮询保鲜，最长滞后一个节拍）。
+func (f *Flow) HandleVideoGet(c *gin.Context) {
+	setEntryProtocol(c, registry.ProtocolOpenAI)
+	t, ad, ok := f.taskForRequest(c, PlatformOpenAIVideo)
+	if !ok {
+		return
+	}
+	c.Data(http.StatusOK, "application/json", ad.RenderTask(t))
+}
+
+// HandleVideoContent GET /v1/videos/:task_id/content：成片内容实时代理
+// （回任务落库的原渠道取，流式转发不落盘不缓存）。
+func (f *Flow) HandleVideoContent(c *gin.Context) {
+	setEntryProtocol(c, registry.ProtocolOpenAI)
+	t, ad, ok := f.taskForRequest(c, PlatformOpenAIVideo)
+	if !ok {
+		return
+	}
+	if t.Status != StatusSuccess {
+		writeError(c, http.StatusBadRequest, "invalid_request_error", "task_not_completed",
+			"任务尚未完成，当前状态: "+t.Status)
+		return
+	}
+	cp, ok := ad.(ContentProxy)
+	if !ok {
+		writeError(c, http.StatusNotFound, "invalid_request_error", "not_supported", "该平台不支持内容下载")
+		return
+	}
+
+	ch, ok := f.registry.Snapshot(t.ChannelID)
+	if !ok {
+		writeError(c, http.StatusBadGateway, "server_error", "channel_gone", "任务所属渠道已不存在，无法获取内容")
+		return
+	}
+	apiKey := f.registry.NextKey(ch.ID)
+	if apiKey == "" {
+		writeError(c, http.StatusBadGateway, "server_error", "channel_no_key", "任务所属渠道无可用密钥")
+		return
+	}
+	info := &Info{Channel: ch, APIKey: apiKey, RequestModel: t.RequestModel, UpstreamModel: t.UpstreamModel, Client: f.client}
+
+	httpReq, err := cp.BuildContentRequest(c.Request.Context(), info, t.TaskID)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "server_error", "internal_error", err.Error())
+		return
+	}
+	resp, err := f.client.Do(httpReq)
+	if err != nil {
+		writeError(c, http.StatusBadGateway, "server_error", "upstream_error", "上游内容获取失败")
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+		up := errfmt.ParseUpstream(resp.StatusCode, body)
+		up.Message = outcome.SanitizeKeyLeak(up.Message, ch.APIKeys)
+		writeUpstreamError(c, resp.StatusCode, up)
+		return
+	}
+
+	// 媒体内容流式转发：透传 Content-Type / Content-Length / Content-Disposition。
+	header := c.Writer.Header()
+	if ct := resp.Header.Get("Content-Type"); ct != "" {
+		header.Set("Content-Type", ct)
+	}
+	if cl := resp.Header.Get("Content-Length"); cl != "" {
+		header.Set("Content-Length", cl)
+	}
+	if cd := resp.Header.Get("Content-Disposition"); cd != "" {
+		header.Set("Content-Disposition", cd)
+	}
+	c.Status(resp.StatusCode)
+	if _, err := io.Copy(c.Writer, resp.Body); err != nil {
+		slog.Warn("task_content_proxy_aborted", "task_id", t.TaskID, "error", err)
+	}
+}
+
+// HandleSunoFetchByID GET /suno/fetch/:task_id：单任务查询（本地快照）。
+func (f *Flow) HandleSunoFetchByID(c *gin.Context) {
+	setEntryProtocol(c, registry.ProtocolSuno)
+	t, ad, ok := f.taskForRequest(c, PlatformSuno)
+	if !ok {
+		return
+	}
+	c.Data(http.StatusOK, "application/json", ad.RenderTask(t))
+}
+
+// HandleSunoFetch POST /suno/fetch：批量任务查询（body {"ids":[...]}，本地快照）。
+func (f *Flow) HandleSunoFetch(c *gin.Context) {
+	setEntryProtocol(c, registry.ProtocolSuno)
+	keyInfo, ok := requireKeyInfo(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(io.LimitReader(c.Request.Body, 1<<20)).Decode(&req); err != nil {
+		writeError(c, http.StatusBadRequest, "invalid_request_error", "invalid_body", "请求体须为 {\"ids\":[...]}")
+		return
+	}
+	if len(req.IDs) == 0 {
+		writeError(c, http.StatusBadRequest, "invalid_request_error", "missing_ids", "缺少 ids")
+		return
+	}
+	if len(req.IDs) > maxBatchFetchIDs {
+		writeError(c, http.StatusBadRequest, "invalid_request_error", "too_many_ids",
+			"单次最多查询 "+strconv.Itoa(maxBatchFetchIDs)+" 个任务")
+		return
+	}
+
+	ad, err := GetAdaptor(PlatformSuno)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "server_error", "internal_error", err.Error())
+		return
+	}
+	bq, ok := ad.(BatchQuerying)
+	if !ok {
+		writeError(c, http.StatusInternalServerError, "server_error", "internal_error", "suno 适配器缺少批量查询能力")
+		return
+	}
+	ts, err := f.store.ListForUser(c.Request.Context(), PlatformSuno, req.IDs, keyInfo.UserID)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "server_error", "internal_error", "任务查询失败")
+		return
+	}
+	c.Data(http.StatusOK, "application/json", bq.RenderTaskList(ts))
+}
+
+// taskForRequest 查询入口公共段：鉴权信息 → 按 (platform, :task_id, user) 取本地任务。
+// 失败时已写出错误体，返回 ok=false。
+func (f *Flow) taskForRequest(c *gin.Context, platform string) (*Task, Adaptor, bool) {
+	keyInfo, ok := requireKeyInfo(c)
+	if !ok {
+		return nil, nil, false
+	}
+	taskID := c.Param("task_id")
+	if taskID == "" {
+		writeError(c, http.StatusBadRequest, "invalid_request_error", "missing_task_id", "缺少任务 ID")
+		return nil, nil, false
+	}
+	ad, err := GetAdaptor(platform)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "server_error", "internal_error", err.Error())
+		return nil, nil, false
+	}
+	t, err := f.store.GetForUser(c.Request.Context(), platform, taskID, keyInfo.UserID)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "server_error", "internal_error", "任务查询失败")
+		return nil, nil, false
+	}
+	if t == nil {
+		writeError(c, http.StatusNotFound, "invalid_request_error", "task_not_found", "任务不存在")
+		return nil, nil, false
+	}
+	return t, ad, true
+}

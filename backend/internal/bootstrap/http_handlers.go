@@ -75,6 +75,10 @@ type HTTPHandlers struct {
 	UpstreamLogService *appupstreamlog.Service
 	// PaymentService 暴露给 server.go：启动时装载支付服务商 + 拉起订单过期清理循环。
 	PaymentService *apppayment.Service
+	// UserService 暴露给 server.go：任务子系统余额动账（预扣/结算/退款）适配器用。
+	UserService *appuser.Service
+	// TaskStore 暴露给 server.go：任务子系统（relay/task）的持久化实现。
+	TaskStore *store.TaskStore
 }
 
 // NewHTTPHandlers 统一构造 HTTP 处理器。
@@ -162,6 +166,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		SettingsService:    settingsService,
 		UpstreamLogService: upstreamLogService,
 		PaymentService:     paymentService,
+		UserService:        userService,
+		TaskStore:          store.NewTaskStore(dep.DB),
 	}
 }
 

@@ -1,4 +1,4 @@
-package pipeline
+package multipartform
 
 import (
 	"bytes"
@@ -41,7 +41,7 @@ func TestExtractMultipartFields(t *testing.T) {
 			map[string]string{"model": "gpt-image-1", "stream": "true", "prompt": "a cat"},
 			map[string][]byte{"image": []byte("PNGDATA")},
 		)
-		got, err := extractMultipartFields(body, ct, "model", "stream")
+		got, err := ExtractFields(body, ct, "model", "stream")
 		if err != nil {
 			t.Fatalf("extractMultipartFields: %v", err)
 		}
@@ -55,7 +55,7 @@ func TestExtractMultipartFields(t *testing.T) {
 
 	t.Run("缺 model 字段返回空值", func(t *testing.T) {
 		body, ct := buildMultipart(t, map[string]string{"prompt": "x"}, map[string][]byte{"image": []byte("D")})
-		got, err := extractMultipartFields(body, ct, "model")
+		got, err := ExtractFields(body, ct, "model")
 		if err != nil {
 			t.Fatalf("extractMultipartFields: %v", err)
 		}
@@ -66,7 +66,7 @@ func TestExtractMultipartFields(t *testing.T) {
 
 	t.Run("与目标同名的文件 part 不当作字段值", func(t *testing.T) {
 		body, ct := buildMultipart(t, nil, map[string][]byte{"model": []byte("FILEDATA")})
-		got, err := extractMultipartFields(body, ct, "model")
+		got, err := ExtractFields(body, ct, "model")
 		if err != nil {
 			t.Fatalf("extractMultipartFields: %v", err)
 		}
@@ -76,39 +76,39 @@ func TestExtractMultipartFields(t *testing.T) {
 	})
 
 	t.Run("非 multipart Content-Type 报错", func(t *testing.T) {
-		if _, err := extractMultipartFields([]byte(`{"model":"x"}`), "application/json", "model"); err == nil {
+		if _, err := ExtractFields([]byte(`{"model":"x"}`), "application/json", "model"); err == nil {
 			t.Error("application/json 应报错")
 		}
 	})
 
 	t.Run("缺 boundary 报错", func(t *testing.T) {
-		if _, err := extractMultipartFields([]byte("x"), "multipart/form-data", "model"); err == nil {
+		if _, err := ExtractFields([]byte("x"), "multipart/form-data", "model"); err == nil {
 			t.Error("缺 boundary 应报错")
 		}
 	})
 
 	t.Run("超长字段值被截断而非报错", func(t *testing.T) {
-		long := strings.Repeat("a", maxMultipartFieldBytes*2)
+		long := strings.Repeat("a", MaxFieldBytes*2)
 		body, ct := buildMultipart(t, map[string]string{"model": long}, nil)
-		got, err := extractMultipartFields(body, ct, "model")
+		got, err := ExtractFields(body, ct, "model")
 		if err != nil {
 			t.Fatalf("extractMultipartFields: %v", err)
 		}
-		if len(got["model"]) != maxMultipartFieldBytes {
-			t.Errorf("len(model) = %d, want 截断到 %d", len(got["model"]), maxMultipartFieldBytes)
+		if len(got["model"]) != MaxFieldBytes {
+			t.Errorf("len(model) = %d, want 截断到 %d", len(got["model"]), MaxFieldBytes)
 		}
 	})
 
 	t.Run("提取不消费原始体（可重复提取）", func(t *testing.T) {
 		body, ct := buildMultipart(t, map[string]string{"model": "m1"}, map[string][]byte{"image": []byte("D")})
 		before := append([]byte(nil), body...)
-		if _, err := extractMultipartFields(body, ct, "model"); err != nil {
+		if _, err := ExtractFields(body, ct, "model"); err != nil {
 			t.Fatalf("第一次提取: %v", err)
 		}
 		if !bytes.Equal(body, before) {
 			t.Fatal("原始体被改动")
 		}
-		got, err := extractMultipartFields(body, ct, "model")
+		got, err := ExtractFields(body, ct, "model")
 		if err != nil || got["model"] != "m1" {
 			t.Errorf("第二次提取 = %v, %v", got, err)
 		}

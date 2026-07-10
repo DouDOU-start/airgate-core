@@ -15,6 +15,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
+	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 )
@@ -52,6 +53,11 @@ func channelTestPlan(channelType, model, testEndpoint string) (endpoint, body st
 // 测试是真实的上游消耗：成功按 0 费用落消费记录（渠道成本口径照记），
 // 失败与转发失败同表留痕。testEndpoint 语义见 channelTestPlan。
 func (p *Pipeline) TestChannel(ctx context.Context, snap *registry.ChannelSnapshot, model, testEndpoint string) (latencyMs int, err error) {
+	// 任务类渠道（视频/音乐）测试会真实产生付费任务，不支持一键测试；
+	// 直接拒绝，不留失败痕（配置性限制而非渠道故障）。
+	if snap.Type == registry.ProtocolOpenAIVideo || snap.Type == registry.ProtocolSuno {
+		return 0, errors.New("任务类渠道（视频/音乐）暂不支持一键测试")
+	}
 	start := time.Now()
 	latencyMs, endpoint, usage, err := p.testChannel(ctx, snap, model, testEndpoint)
 	if err != nil {
@@ -203,7 +209,7 @@ func (p *Pipeline) testChannel(ctx context.Context, snap *registry.ChannelSnapsh
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		// 错误体片段会进入管理端 502 响应与日志：先对渠道全部 key 脱敏。
 		return 0, "", nil, fmt.Errorf("上游返回 HTTP %d: %s", resp.StatusCode,
-			sanitizeKeyLeak(bodySnippet(body), snap.APIKeys))
+			outcome.SanitizeKeyLeak(outcome.BodySnippet(body), snap.APIKeys))
 	}
 	// 解析上游 usage 供落账；解析失败不影响测试结果（usage 记 0）。
 	_, usage := ad.ParseNonStreamResponse(info, body)
@@ -218,7 +224,7 @@ func (p *Pipeline) testChannel(ctx context.Context, snap *registry.ChannelSnapsh
 		slog.Warn("channel_test_usage_missing",
 			"channel_id", snap.ID, "model", model, "endpoint", endpoint,
 			"content_type", resp.Header.Get("Content-Type"),
-			"body_snippet", sanitizeKeyLeak(bodySnippet(body), snap.APIKeys))
+			"body_snippet", outcome.SanitizeKeyLeak(outcome.BodySnippet(body), snap.APIKeys))
 	}
 	return latency, endpoint, usage, nil
 }

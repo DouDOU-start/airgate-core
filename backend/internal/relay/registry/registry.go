@@ -26,18 +26,24 @@ const (
 )
 
 // 入口协议常量：纯透传网关不做跨协议翻译，Pick 只在与入口协议同构的渠道类型集合内调度。
+// 任务类协议（openai_video / suno）的常量值与渠道 Type、task.platform 同值——
+// 任务子系统按平台分树路由，协议即平台。
 const (
-	ProtocolOpenAI    = "openai"
-	ProtocolAnthropic = "anthropic"
-	ProtocolGemini    = "gemini"
+	ProtocolOpenAI      = "openai"
+	ProtocolAnthropic   = "anthropic"
+	ProtocolGemini      = "gemini"
+	ProtocolOpenAIVideo = "openai_video"
+	ProtocolSuno        = "suno"
 )
 
 // protocolChannelTypes 入口协议 → 可路由渠道 Type 集合。
 // custom 语义为「OpenAI 兼容自定义渠道」，归 openai 协议组。
 var protocolChannelTypes = map[string]map[string]struct{}{
-	ProtocolOpenAI:    {"openai_compatible": {}, "custom": {}},
-	ProtocolAnthropic: {"anthropic": {}},
-	ProtocolGemini:    {"gemini": {}},
+	ProtocolOpenAI:      {"openai_compatible": {}, "custom": {}},
+	ProtocolAnthropic:   {"anthropic": {}},
+	ProtocolGemini:      {"gemini": {}},
+	ProtocolOpenAIVideo: {"openai_video": {}},
+	ProtocolSuno:        {"suno": {}},
 }
 
 // channelTypesForProtocol 返回协议可路由的渠道类型集合；
@@ -314,6 +320,16 @@ func (r *Registry) ModelEntriesForGroup(groupID int) []ModelEntry {
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
 	return entries
+}
+
+// Snapshot 按 ID 返回渠道只读快照；不存在返回 (nil, false)。
+// 任务子系统用：轮询已落库任务、代理成片内容时须回到提交时的原渠道。
+func (r *Registry) Snapshot(id int) (*ChannelSnapshot, bool) {
+	r.ensureLoaded()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	ch, ok := r.channels[id]
+	return ch, ok
 }
 
 // NextKey 渠道内 API Key 原子轮询；渠道不存在或无密钥返回空串。

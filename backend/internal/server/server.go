@@ -20,7 +20,12 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/pipeline"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
+	"github.com/DouDOU-start/airgate-core/internal/relay/task"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
+
+	// 任务平台适配器自注册（task.Register；同步协议适配器由 pipeline 包内注册）。
+	_ "github.com/DouDOU-start/airgate-core/internal/relay/task/openaivideo"
+	_ "github.com/DouDOU-start/airgate-core/internal/relay/task/suno"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 )
 
@@ -41,6 +46,8 @@ type Server struct {
 	channelRegistry *registry.Registry
 	pricingCache    *pricing.Cache
 	relay           *pipeline.Pipeline
+	taskFlow        *task.Flow
+	taskPoller      *task.Poller
 
 	// 中间件组件（需 Shutdown 时释放）
 	ipRateLimiter *middleware.IPRateLimiter
@@ -96,16 +103,34 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 
 	// relay 转发管线：注册表调度 + 渠道 RPM/并发闸门 + 计费落账；
 	// 渠道测试器走同一 adaptor 链路（server 层适配器负责解密与快照构造）。
+	settingsReader := pipeline.NewSettingsReader(gatewaySettingsSource{s.handlers.SettingsService})
+	rpmCounter := scheduler.NewRPMCounter(rdb)
 	s.relay = pipeline.New(pipeline.Options{
 		Registry:    s.channelRegistry,
 		Pricing:     s.pricingCache,
 		Concurrency: concurrency,
-		RPM:         scheduler.NewRPMCounter(rdb),
+		RPM:         rpmCounter,
 		Calculator:  billing.NewCalculator(),
 		Sink:        recorder,
 		ErrLog:      errRecorder,
-		Settings:    pipeline.NewSettingsReader(gatewaySettingsSource{s.handlers.SettingsService}),
+		Settings:    settingsReader,
 	})
+
+	// 异步任务子系统（视频/音乐）：与同步管线同源组件 + task 持久化 + 余额动账适配器。
+	taskOpts := task.Options{
+		Registry:    s.channelRegistry,
+		Pricing:     s.pricingCache,
+		Concurrency: concurrency,
+		RPM:         rpmCounter,
+		Calculator:  billing.NewCalculator(),
+		Sink:        recorder,
+		ErrLog:      errRecorder,
+		Settings:    settingsReader,
+		Store:       s.handlers.TaskStore,
+		Balance:     taskBalanceAdapter{svc: s.handlers.UserService},
+	}
+	s.taskFlow = task.NewFlow(taskOpts)
+	s.taskPoller = task.NewPoller(taskOpts)
 	s.handlers.ChannelService.SetTester(&channelTester{pipe: s.relay, secret: cfg.APIKeySecret()})
 	// 渠道失败计数读取（渠道页监控列，读 errlog 分钟桶）。
 	s.handlers.UpstreamLogService.SetFailureCounter(errRecorder)
@@ -156,6 +181,9 @@ func (s *Server) StartBackground(ctx context.Context) {
 		slog.Warn("payment_providers_initial_load_failed", "error", err)
 	}
 	go s.handlers.PaymentService.StartExpireLoop(backgroundCtx)
+
+	// 异步任务轮询器：扫未完成任务 → 查上游 → 终态结算/退款。
+	go s.taskPoller.Run(backgroundCtx)
 }
 
 // reloadable 后台重试所需的窄接口（registry.Registry 实现；便于测试注入）。

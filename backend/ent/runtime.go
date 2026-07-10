@@ -19,6 +19,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
 	"github.com/DouDOU-start/airgate-core/ent/schema"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
+	"github.com/DouDOU-start/airgate-core/ent/task"
 	"github.com/DouDOU-start/airgate-core/ent/upstreamrequestlog"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -516,6 +517,102 @@ func init() {
 	setting.DefaultUpdatedAt = settingDescUpdatedAt.Default.(func() time.Time)
 	// setting.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	setting.UpdateDefaultUpdatedAt = settingDescUpdatedAt.UpdateDefault.(func() time.Time)
+	taskFields := schema.Task{}.Fields()
+	_ = taskFields
+	// taskDescTaskID is the schema descriptor for task_id field.
+	taskDescTaskID := taskFields[0].Descriptor()
+	// task.TaskIDValidator is a validator for the "task_id" field. It is called by the builders before save.
+	task.TaskIDValidator = taskDescTaskID.Validators[0].(func(string) error)
+	// taskDescPlatform is the schema descriptor for platform field.
+	taskDescPlatform := taskFields[1].Descriptor()
+	// task.PlatformValidator is a validator for the "platform" field. It is called by the builders before save.
+	task.PlatformValidator = taskDescPlatform.Validators[0].(func(string) error)
+	// taskDescAction is the schema descriptor for action field.
+	taskDescAction := taskFields[2].Descriptor()
+	// task.DefaultAction holds the default value on creation for the action field.
+	task.DefaultAction = taskDescAction.Default.(string)
+	// taskDescProgress is the schema descriptor for progress field.
+	taskDescProgress := taskFields[4].Descriptor()
+	// task.DefaultProgress holds the default value on creation for the progress field.
+	task.DefaultProgress = taskDescProgress.Default.(int)
+	// taskDescFailReason is the schema descriptor for fail_reason field.
+	taskDescFailReason := taskFields[5].Descriptor()
+	// task.DefaultFailReason holds the default value on creation for the fail_reason field.
+	task.DefaultFailReason = taskDescFailReason.Default.(string)
+	// taskDescRequestModel is the schema descriptor for request_model field.
+	taskDescRequestModel := taskFields[6].Descriptor()
+	// task.RequestModelValidator is a validator for the "request_model" field. It is called by the builders before save.
+	task.RequestModelValidator = taskDescRequestModel.Validators[0].(func(string) error)
+	// taskDescUpstreamModel is the schema descriptor for upstream_model field.
+	taskDescUpstreamModel := taskFields[7].Descriptor()
+	// task.DefaultUpstreamModel holds the default value on creation for the upstream_model field.
+	task.DefaultUpstreamModel = taskDescUpstreamModel.Default.(string)
+	// taskDescHoldAmount is the schema descriptor for hold_amount field.
+	taskDescHoldAmount := taskFields[8].Descriptor()
+	// task.DefaultHoldAmount holds the default value on creation for the hold_amount field.
+	task.DefaultHoldAmount = taskDescHoldAmount.Default.(float64)
+	// taskDescEstTotal is the schema descriptor for est_total field.
+	taskDescEstTotal := taskFields[9].Descriptor()
+	// task.DefaultEstTotal holds the default value on creation for the est_total field.
+	task.DefaultEstTotal = taskDescEstTotal.Default.(float64)
+	// taskDescRateMultiplier is the schema descriptor for rate_multiplier field.
+	taskDescRateMultiplier := taskFields[10].Descriptor()
+	// task.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
+	task.DefaultRateMultiplier = taskDescRateMultiplier.Default.(float64)
+	// taskDescSellRate is the schema descriptor for sell_rate field.
+	taskDescSellRate := taskFields[11].Descriptor()
+	// task.DefaultSellRate holds the default value on creation for the sell_rate field.
+	task.DefaultSellRate = taskDescSellRate.Default.(float64)
+	// taskDescAccountRateMultiplier is the schema descriptor for account_rate_multiplier field.
+	taskDescAccountRateMultiplier := taskFields[12].Descriptor()
+	// task.DefaultAccountRateMultiplier holds the default value on creation for the account_rate_multiplier field.
+	task.DefaultAccountRateMultiplier = taskDescAccountRateMultiplier.Default.(float64)
+	// taskDescSettled is the schema descriptor for settled field.
+	taskDescSettled := taskFields[13].Descriptor()
+	// task.DefaultSettled holds the default value on creation for the settled field.
+	task.DefaultSettled = taskDescSettled.Default.(bool)
+	// taskDescSeconds is the schema descriptor for seconds field.
+	taskDescSeconds := taskFields[14].Descriptor()
+	// task.DefaultSeconds holds the default value on creation for the seconds field.
+	task.DefaultSeconds = taskDescSeconds.Default.(int)
+	// taskDescSubmitTime is the schema descriptor for submit_time field.
+	taskDescSubmitTime := taskFields[16].Descriptor()
+	// task.DefaultSubmitTime holds the default value on creation for the submit_time field.
+	task.DefaultSubmitTime = taskDescSubmitTime.Default.(func() time.Time)
+	// taskDescRequestID is the schema descriptor for request_id field.
+	taskDescRequestID := taskFields[18].Descriptor()
+	// task.DefaultRequestID holds the default value on creation for the request_id field.
+	task.DefaultRequestID = taskDescRequestID.Default.(string)
+	// taskDescUserID is the schema descriptor for user_id field.
+	taskDescUserID := taskFields[19].Descriptor()
+	// task.DefaultUserID holds the default value on creation for the user_id field.
+	task.DefaultUserID = taskDescUserID.Default.(int)
+	// taskDescUserEmailSnapshot is the schema descriptor for user_email_snapshot field.
+	taskDescUserEmailSnapshot := taskFields[20].Descriptor()
+	// task.DefaultUserEmailSnapshot holds the default value on creation for the user_email_snapshot field.
+	task.DefaultUserEmailSnapshot = taskDescUserEmailSnapshot.Default.(string)
+	// taskDescAPIKeyID is the schema descriptor for api_key_id field.
+	taskDescAPIKeyID := taskFields[21].Descriptor()
+	// task.DefaultAPIKeyID holds the default value on creation for the api_key_id field.
+	task.DefaultAPIKeyID = taskDescAPIKeyID.Default.(int)
+	// taskDescGroupID is the schema descriptor for group_id field.
+	taskDescGroupID := taskFields[22].Descriptor()
+	// task.DefaultGroupID holds the default value on creation for the group_id field.
+	task.DefaultGroupID = taskDescGroupID.Default.(int)
+	// taskDescChannelID is the schema descriptor for channel_id field.
+	taskDescChannelID := taskFields[23].Descriptor()
+	// task.DefaultChannelID holds the default value on creation for the channel_id field.
+	task.DefaultChannelID = taskDescChannelID.Default.(int)
+	// taskDescCreatedAt is the schema descriptor for created_at field.
+	taskDescCreatedAt := taskFields[24].Descriptor()
+	// task.DefaultCreatedAt holds the default value on creation for the created_at field.
+	task.DefaultCreatedAt = taskDescCreatedAt.Default.(func() time.Time)
+	// taskDescUpdatedAt is the schema descriptor for updated_at field.
+	taskDescUpdatedAt := taskFields[25].Descriptor()
+	// task.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	task.DefaultUpdatedAt = taskDescUpdatedAt.Default.(func() time.Time)
+	// task.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	task.UpdateDefaultUpdatedAt = taskDescUpdatedAt.UpdateDefault.(func() time.Time)
 	upstreamrequestlogFields := schema.UpstreamRequestLog{}.Fields()
 	_ = upstreamrequestlogFields
 	// upstreamrequestlogDescRequestID is the schema descriptor for request_id field.

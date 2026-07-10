@@ -45,6 +45,9 @@ type RedemptionCode func(*sql.Selector)
 // Setting is the predicate function for setting builders.
 type Setting func(*sql.Selector)
 
+// Task is the predicate function for task builders.
+type Task func(*sql.Selector)
+
 // UpstreamRequestLog is the predicate function for upstreamrequestlog builders.
 type UpstreamRequestLog func(*sql.Selector)
 
