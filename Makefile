@@ -57,15 +57,16 @@ dev-frontend: ## 启动前端开发服务器
 build: build-frontend build-backend ## 构建前后端（顺序：前端 → 嵌入 → 后端）
 
 ensure-webdist: ## 把 web/dist 同步到 backend/internal/web/webdist 供 go:embed 使用
+	@mkdir -p $(WEBDIST)
+	@# .gitkeep 是仓库跟踪的占位符（.gitignore 已用 ! 保留）：任何分支都先补齐，
+	@# 保证它始终躺在磁盘上，避免被 git add -A 当作删除误提交。
+	@touch $(WEBDIST)/.gitkeep
 	@if [ -d $(WEB_DIR)/dist ] && [ "$$(ls -A $(WEB_DIR)/dist 2>/dev/null)" ]; then \
-		mkdir -p $(WEBDIST); \
 		find $(WEBDIST) -mindepth 1 ! -name '.gitkeep' -exec rm -rf {} +; \
 		cp -r $(WEB_DIR)/dist/. $(WEBDIST)/; \
 		echo "前端产物已同步到 $(WEBDIST)"; \
 	else \
 		echo "[ensure-webdist] $(WEB_DIR)/dist 为空，将使用占位 .gitkeep（go build 仍可通过，但运行时会报缺失前端）"; \
-		mkdir -p $(WEBDIST); \
-		[ -f $(WEBDIST)/.gitkeep ] || touch $(WEBDIST)/.gitkeep; \
 	fi
 
 build-backend: ensure-webdist ## 编译后端二进制（自动嵌入最新前端）
