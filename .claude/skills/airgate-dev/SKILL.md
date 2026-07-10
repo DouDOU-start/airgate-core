@@ -8,6 +8,18 @@ description: airgate-core（standalone-gateway 分支）开发指南：架构、
 > 本分支是独立单体网关（渠道管理式），与 master 插件架构长期分叉、不合回。
 > 仓库外文档（monorepo 根 CLAUDE.md、skill `core-dev`/`develop-plugin`）描述的是 master 插件线，对本分支一律不适用。
 
+## 🚫 红线
+
+- **分层五件套**：dto → handler（不写业务）→ service（不碰 gin/http、不 import ent）→ store（唯一 import ent）→ ent/schema。
+- **改 `ent/schema/` 后须 `make ent` 并提交生成代码**；生成代码不可手改。
+- **装配两处接线**：`internal/bootstrap/http_handlers.go` + `internal/server/router.go` `registerRoutes()`。
+- **新接口走 dto + mapper**，handler 勿手拼 map 响应。
+- **转发路由（/v1、/v1beta、/suno）错误一律按入口协议原生形态**（`internal/relay/errfmt` 分发），不用 `response.*`；管理面照旧 `response.*`。
+- **渠道 api_keys 明文永不出现在任何 API 响应**（只出 count + 尾 4 位 hint）；加解密用 `internal/auth`（AES-256-GCM），在 service 层做。
+- **relay 子系统（registry/task 等）禁止 import ent 与 app 包**，经窄接口注入。
+- 复用优先（新领域参照 channel 域全链路）；注释中文、不写复述代码的冗余注释；`_test.go` 同包、表驱动。
+- 需求/架构变更**同步更新本 skill 与 `README.md`**，防止文档漂移。
+
 ## 架构
 
 管理员配置**渠道**（channel = 协议类型 + base_url + api_keys + 模型列表），用户拿 sk- key 按协议调对应端点，core 内置 adaptor **纯透传直发**上游（零翻译）、按**模型价目表**计费。入站端点按协议分树，只路由到同协议渠道：
