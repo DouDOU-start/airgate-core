@@ -269,7 +269,7 @@ export function UseKeyModal({
             </div>}
 
             {/* 配置代码块 */}
-            {getUseKeyConfig(baseUrl, useKeyTab, useKeyShell, useKeyValue, site.site_name || document.title || 'AirGate', t).files.map(
+            {getUseKeyConfig(baseUrl, useKeyTab, useKeyShell, useKeyValue, site.site_name || 'AirGate', t).files.map(
               (file, idx) => (
                 <div key={idx}>
                   {file.hint && (

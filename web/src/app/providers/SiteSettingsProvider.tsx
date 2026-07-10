@@ -53,6 +53,12 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
     settings_loaded: !isPending,
   }), [data, isPending]);
 
+  // 动态设置浏览器标签页标题（站点名 + 副标题），全站生效（含首页/登录页）
+  useEffect(() => {
+    const name = value.site_name || 'AirGate';
+    document.title = value.site_subtitle ? `${name} - ${value.site_subtitle}` : name;
+  }, [value.site_name, value.site_subtitle]);
+
   // 动态设置 favicon（优先自定义 logo，否则使用默认 logo）
   useEffect(() => {
     const logoHref = value.site_logo || defaultLogoUrl;

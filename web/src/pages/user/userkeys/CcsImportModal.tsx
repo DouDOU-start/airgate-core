@@ -4,12 +4,14 @@ import { Button, Modal, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { Terminal } from 'lucide-react';
 import { useToast } from '../../../shared/ui';
+import { useSiteSettings } from '../../../app/providers/SiteSettingsProvider';
 import { apikeysApi } from '../../../shared/api/apikeys';
 import type { APIKeyResp } from '../../../shared/types';
 
 function executeCcsImport(
   baseUrl: string,
   apiKey: string,
+  siteName: string,
   clientType: 'claude' | 'codex',
   toast: (type: 'success' | 'error', msg: string) => void,
   t: (key: string) => string,
@@ -35,7 +37,6 @@ function executeCcsImport(
     }
   })`;
 
-  const siteName = document.title || 'AirGate';
   const params = new URLSearchParams({
     resource: 'provider',
     app,
@@ -136,6 +137,8 @@ export function CcsImportModal({
 }) {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const site = useSiteSettings();
+  const siteName = site.site_name || 'AirGate';
   const baseUrl = window.location.origin;
   const modalState = useOverlayState({
     isOpen: open,
@@ -163,7 +166,7 @@ export function CcsImportModal({
                 variant="secondary"
                 className="h-auto flex-col gap-2 p-4"
                 onPress={() => {
-                  executeCcsImport(baseUrl, ccsKeyValue, 'claude', toast, t);
+                  executeCcsImport(baseUrl, ccsKeyValue, siteName, 'claude', toast, t);
                   onClose();
                 }}
               >
@@ -181,7 +184,7 @@ export function CcsImportModal({
                 variant="secondary"
                 className="h-auto flex-col gap-2 p-4"
                 onPress={() => {
-                  executeCcsImport(baseUrl, ccsKeyValue, 'codex', toast, t);
+                  executeCcsImport(baseUrl, ccsKeyValue, siteName, 'codex', toast, t);
                   onClose();
                 }}
               >

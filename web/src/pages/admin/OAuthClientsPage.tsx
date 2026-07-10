@@ -82,7 +82,6 @@ export default function OAuthClientsPage() {
     <div>
       {/* 工具栏 */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
-        <div className="text-sm text-text-tertiary">{t('oauth_clients.page_hint')}</div>
         <div className="flex items-center gap-2 sm:ml-auto">
           <Button
             isIconOnly
