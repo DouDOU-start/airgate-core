@@ -43,20 +43,18 @@ func TestSettingsReader(t *testing.T) {
 			want:   defaultGatewaySettings(),
 		},
 		{
-			name: "两键全解析",
+			name: "auto_ban 开关解析",
 			lister: &fakeLister{items: []Setting{
 				{Key: "channel_auto_ban_enabled", Value: "false"},
-				{Key: "channel_ban_keywords", Value: `["Custom KEYWORD"," another "]`},
 			}},
 			want: GatewaySettings{
 				AutoBanEnabled: false,
-				BanKeywords:    []string{"custom keyword", "another"}, // 统一小写 + 去首尾空白
 			},
 		},
 		{
-			name: "关键词 JSON 非法保留默认表",
+			name: "未知键忽略",
 			lister: &fakeLister{items: []Setting{
-				{Key: "channel_ban_keywords", Value: `not-json`},
+				{Key: "unknown_key", Value: "whatever"},
 			}},
 			want: defaultGatewaySettings(),
 		},

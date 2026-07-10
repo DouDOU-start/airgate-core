@@ -34,7 +34,8 @@ func requestIDOf(c *gin.Context) string {
 	return c.GetString(middleware.CtxKeyRequestID)
 }
 
-// writeError 按入口协议写出原生形态错误体（上游错误不经此函数，一律原样透传）。
+// writeError 按入口协议写出网关自产错误的原生形态错误体
+// （上游错误不经此函数，走 writeUpstreamError 语义重建路径）。
 func writeError(c *gin.Context, status int, errType, code, message string) {
 	c.JSON(status, errfmt.Render(entryProtocolOf(c), status, errType, code, message, requestIDOf(c)))
 }

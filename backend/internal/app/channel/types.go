@@ -32,7 +32,7 @@ type Repository interface {
 	// BulkUpdate 批量启停/删除/调优先级，返回受影响行数。
 	BulkUpdate(context.Context, BulkUpdateInput) (int, error)
 	// UpdateState 更新渠道调度状态（注册表异步落库与测试恢复共用）。
-	UpdateState(ctx context.Context, id int, status string, until *time.Time, errMsg string) error
+	UpdateState(ctx context.Context, id int, status string, errMsg string) error
 	// UpdateTestResult 记录渠道测试结果。
 	UpdateTestResult(ctx context.Context, id int, responseTimeMs int, testedAt time.Time) error
 	// UpdateBalance 记录渠道余额刷新结果。
@@ -65,7 +65,6 @@ type Channel struct {
 	ParamOverride    map[string]any
 	HeaderOverride   map[string]string
 	Status           string
-	StatusUntil      *time.Time
 	ErrorMsg         string
 	Priority         int
 	Weight           int
@@ -150,18 +149,16 @@ type UpdateInput struct {
 	ParamOverride  map[string]any
 	HeaderOverride map[string]string
 	Status         *string
-	// ErrorMsg / ClearStatusUntil 由 service 内部填充（status→enabled 时清理状态残留），
-	// 不接受外部输入。
-	ErrorMsg         *string
-	ClearStatusUntil bool
-	Priority         *int
-	Weight           *int
-	MaxConcurrency   *int
-	MaxRPM           *int
-	CostRatio        *float64
-	Tags             []string
-	TestModel        *string
-	GroupIDs         []int
+	// ErrorMsg 由 service 内部填充（status→enabled 时清理状态残留），不接受外部输入。
+	ErrorMsg       *string
+	Priority       *int
+	Weight         *int
+	MaxConcurrency *int
+	MaxRPM         *int
+	CostRatio      *float64
+	Tags           []string
+	TestModel      *string
+	GroupIDs       []int
 }
 
 // BulkUpdateInput 批量操作输入。

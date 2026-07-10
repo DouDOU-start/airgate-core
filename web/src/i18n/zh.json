@@ -276,8 +276,6 @@
     "status_enabled": "已启用",
     "status_disabled_manual": "已禁用",
     "status_disabled_auto": "自动禁用",
-    "status_cooldown": "冷却中",
-    "cooldown_until": "冷却至 {{time}}",
     "select_all": "全选本页",
     "selected_count": "已选 {{count}} 个渠道",
     "bulk_set_priority": "改优先级",

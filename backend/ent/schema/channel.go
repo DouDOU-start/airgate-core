@@ -14,7 +14,7 @@ import (
 //
 //	enabled          可调度
 //	disabled_manual  手动禁用，永不被自动恢复
-//	disabled_auto    自动禁用（401/403/禁用关键词等），渠道测试通过或 status_until 到期可恢复
+//	disabled_auto    自动禁用（上游 401/403），渠道测试通过或转发成功可恢复
 type Channel struct {
 	ent.Schema
 }
@@ -35,8 +35,6 @@ func (Channel) Fields() []ent.Field {
 		field.Enum("status").
 			Values("enabled", "disabled_manual", "disabled_auto").
 			Default("enabled"),
-		field.Time("status_until").Optional().Nillable().
-			Comment("429 冷却到期时间：到期后自动恢复可用；手动禁用不设此值"),
 		field.String("error_msg").Default("").
 			Comment("进入当前状态的原因（给运维看）"),
 		field.Int("priority").Default(50).Min(0).Max(999),

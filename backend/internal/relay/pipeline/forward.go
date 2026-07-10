@@ -18,6 +18,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
+	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 )
@@ -165,15 +166,15 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	defer releaseClient()
 
 	// 4. failover 主循环：
-	//    hardExclude 跨循环持久（429 冷却 / 认证失败 / 配置故障），
+	//    hardExclude 跨循环持久（429 限流 / 认证失败 / 配置故障，仅本次请求内生效），
 	//    softExclude 容量满（RPM/并发）——排队退避时清空重新竞争。
 	var hardExclude, softExclude []int
 	summary := failureSummary{}
-	// responsesNotFound 记住 Responses 端点上游 404 的原始响应（已脱敏）：
+	// responsesNotFound 记住 Responses 端点上游 404 的语义（已解析脱敏）：
 	// 部分 openai_compatible 上游只实现 /v1/chat/completions，对 /v1/responses 回 404，
-	// 此时软排除换渠道重试；全渠道耗尽后把原始 404（状态码 + body）透传给客户端，
+	// 此时软排除换渠道重试；全渠道耗尽后按 404 原状态码语义重建渲染给客户端，
 	// 而非误转成 all-failed 的 5xx。
-	var responsesNotFound *attemptResult
+	var responsesNotFound *errfmt.UpstreamError
 	// hops 重试链（每次真实上游尝试一跳），随失败留痕落 attempt_chain。
 	var hops []errlog.AttemptHop
 	attempts := 0
@@ -329,17 +330,17 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			return
 		}
 
-		o := classifyOutcome(result.statusCode, result.headers, result.body, result.netErr, settings.BanKeywords)
+		o := classifyOutcome(result.statusCode, result.headers, result.body, result.netErr)
 		// 判定原因可能携带上游回显的渠道密钥（进日志/落库/管理端），出口前脱敏。
 		o.reason = sanitizeKeyLeak(o.reason, ch.APIKeys)
 
 		// 仅 Responses 端点：上游 404（渠道可能不支持 /v1/responses）当作可重试的软排除，
-		// 换同组其他渠道尝试；透传体先脱敏并记住，failover 耗尽后透传原始 404（见循环末）。
-		// chat 的 404 仍归 verdictClientError（一次性透传不重试），行为不变。
+		// 换同组其他渠道尝试；错误语义先解析脱敏并记住，failover 耗尽后按 404 原状态码
+		// 语义重建渲染（见循环末）。chat 的 404 仍归 verdictClientError（一次性终止不重试）。
 		if info.Endpoint == adaptor.EndpointResponses && result.statusCode == http.StatusNotFound && o.verdict == verdictClientError {
-			result.body = []byte(sanitizeKeyLeak(string(result.body), ch.APIKeys))
-			snapshot := result
-			responsesNotFound = &snapshot
+			up := errfmt.ParseUpstream(result.statusCode, result.body)
+			up.Message = sanitizeKeyLeak(up.Message, ch.APIKeys)
+			responsesNotFound = &up
 			o.verdict = verdictTransient
 			o.reason = "responses 端点上游 404（渠道可能不支持），换渠道重试"
 		}
@@ -355,8 +356,8 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			return
 
 		case verdictRateLimited:
+			// 仅本次请求内硬排除换渠道重试；不设冷却状态，下次请求照常调度。
 			p.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
-			p.registry.MarkCooldown(ch.ID, time.Now().Add(o.retryAfter))
 			hardExclude = append(hardExclude, ch.ID)
 			summary.rateLimited = true
 			summary.observeRetryAfter(o.retryAfter)
@@ -400,14 +401,17 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				"channel_id", ch.ID, "model", req.Model, "reason", o.reason)
 			continue
 
-		default: // verdictClientError：透传终止，不重试；带 usage 仍计费（零计费端点除外）。
+		default: // verdictClientError：语义重建终止，不重试；带 usage 仍计费（零计费端点除外）。
 			billed := result.usage != nil && !opts.zeroBilling
 			if billed {
 				p.recordUsage(c, keyInfo, ch, req, result, start, price)
 			}
-			// 透传前对错误体做精确 key 替换（上游 400 可能回显凭证），其余内容不动。
-			result.body = []byte(sanitizeKeyLeak(string(result.body), ch.APIKeys))
-			writeUpstreamError(c, result)
+			// 语义保留、载体重建：解析上游错误体提取 (message/type/code)，按入口协议
+			// 渲染（HTTP 状态码保留上游原值）；message 可能回显凭证，先做精确 key 替换。
+			// 原始响应体不透传，仅经 o.reason 片段进失败留痕。
+			up := errfmt.ParseUpstream(result.statusCode, result.body)
+			up.Message = sanitizeKeyLeak(up.Message, ch.APIKeys)
+			writeUpstreamError(c, result.statusCode, up)
 			// clientError 多为调用方参数问题，不计入渠道错误率（防脏渠道健康信号）。
 			hop := attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "clientError", o.reason, 0, attemptLatency, false)
 			p.recordFailure(c, keyInfo, req, start, errlog.Entry{
@@ -420,12 +424,12 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		}
 	}
 
-	// Responses 端点全渠道 404：透传首个记住的原始 404（状态码 + body），
+	// Responses 端点全渠道 404：按首个记住的 404 语义重建渲染（保留 404 原状态码），
 	// 而非 writeAllFailed 的 5xx——渠道明确「不支持该端点」是可行动的客户端信息。
 	if responsesNotFound != nil {
-		writeUpstreamError(c, *responsesNotFound)
+		writeUpstreamError(c, http.StatusNotFound, *responsesNotFound)
 		p.recordFailure(c, keyInfo, req, start, errlog.Entry{
-			Phase: errlog.PhaseUpstreamClientError, StatusCode: responsesNotFound.statusCode,
+			Phase: errlog.PhaseUpstreamClientError, StatusCode: http.StatusNotFound,
 			Message:  "responses 端点全渠道 404（渠道均不支持该端点）",
 			Attempts: attempts, Chain: hops,
 		})
@@ -775,17 +779,11 @@ func writeUpstreamBody(c *gin.Context, result attemptResult) {
 	c.Data(result.statusCode, contentType, result.body)
 }
 
-// writeUpstreamError 不可重试 4xx：原样透传上游错误体；空体时合成 OpenAI 错误体。
-func writeUpstreamError(c *gin.Context, result attemptResult) {
-	if len(result.body) == 0 {
-		writeError(c, result.statusCode, "invalid_request_error", "upstream_error", "上游返回错误")
-		return
-	}
-	contentType := result.contentType
-	if contentType == "" {
-		contentType = "application/json"
-	}
-	c.Data(result.statusCode, contentType, result.body)
+// writeUpstreamError 不可重试 4xx：语义保留、载体重建——上游错误体解析出的语义字段
+// （已由调用方脱敏）经 errfmt 按入口协议渲染，HTTP 状态码保留上游原值；
+// 原始响应体不透传（只进失败留痕）。
+func writeUpstreamError(c *gin.Context, status int, up errfmt.UpstreamError) {
+	c.JSON(status, errfmt.RenderUpstream(entryProtocolOf(c), status, up, requestIDOf(c)))
 }
 
 // writeAllFailed 全部渠道耗尽后的响应选择

@@ -174,7 +174,6 @@ var (
 		{Name: "param_override", Type: field.TypeJSON, Nullable: true},
 		{Name: "header_override", Type: field.TypeJSON, Nullable: true},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"enabled", "disabled_manual", "disabled_auto"}, Default: "enabled"},
-		{Name: "status_until", Type: field.TypeTime, Nullable: true},
 		{Name: "error_msg", Type: field.TypeString, Default: ""},
 		{Name: "priority", Type: field.TypeInt, Default: 50},
 		{Name: "weight", Type: field.TypeInt, Default: 10},

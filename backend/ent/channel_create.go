@@ -86,20 +86,6 @@ func (cc *ChannelCreate) SetNillableStatus(c *channel.Status) *ChannelCreate {
 	return cc
 }
 
-// SetStatusUntil sets the "status_until" field.
-func (cc *ChannelCreate) SetStatusUntil(t time.Time) *ChannelCreate {
-	cc.mutation.SetStatusUntil(t)
-	return cc
-}
-
-// SetNillableStatusUntil sets the "status_until" field if the given value is not nil.
-func (cc *ChannelCreate) SetNillableStatusUntil(t *time.Time) *ChannelCreate {
-	if t != nil {
-		cc.SetStatusUntil(*t)
-	}
-	return cc
-}
-
 // SetErrorMsg sets the "error_msg" field.
 func (cc *ChannelCreate) SetErrorMsg(s string) *ChannelCreate {
 	cc.mutation.SetErrorMsg(s)
@@ -571,10 +557,6 @@ func (cc *ChannelCreate) createSpec() (*Channel, *sqlgraph.CreateSpec) {
 		_spec.SetField(channel.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
 	}
-	if value, ok := cc.mutation.StatusUntil(); ok {
-		_spec.SetField(channel.FieldStatusUntil, field.TypeTime, value)
-		_node.StatusUntil = &value
-	}
 	if value, ok := cc.mutation.ErrorMsg(); ok {
 		_spec.SetField(channel.FieldErrorMsg, field.TypeString, value)
 		_node.ErrorMsg = value
@@ -842,24 +824,6 @@ func (u *ChannelUpsert) SetStatus(v channel.Status) *ChannelUpsert {
 // UpdateStatus sets the "status" field to the value that was provided on create.
 func (u *ChannelUpsert) UpdateStatus() *ChannelUpsert {
 	u.SetExcluded(channel.FieldStatus)
-	return u
-}
-
-// SetStatusUntil sets the "status_until" field.
-func (u *ChannelUpsert) SetStatusUntil(v time.Time) *ChannelUpsert {
-	u.Set(channel.FieldStatusUntil, v)
-	return u
-}
-
-// UpdateStatusUntil sets the "status_until" field to the value that was provided on create.
-func (u *ChannelUpsert) UpdateStatusUntil() *ChannelUpsert {
-	u.SetExcluded(channel.FieldStatusUntil)
-	return u
-}
-
-// ClearStatusUntil clears the value of the "status_until" field.
-func (u *ChannelUpsert) ClearStatusUntil() *ChannelUpsert {
-	u.SetNull(channel.FieldStatusUntil)
 	return u
 }
 
@@ -1286,27 +1250,6 @@ func (u *ChannelUpsertOne) SetStatus(v channel.Status) *ChannelUpsertOne {
 func (u *ChannelUpsertOne) UpdateStatus() *ChannelUpsertOne {
 	return u.Update(func(s *ChannelUpsert) {
 		s.UpdateStatus()
-	})
-}
-
-// SetStatusUntil sets the "status_until" field.
-func (u *ChannelUpsertOne) SetStatusUntil(v time.Time) *ChannelUpsertOne {
-	return u.Update(func(s *ChannelUpsert) {
-		s.SetStatusUntil(v)
-	})
-}
-
-// UpdateStatusUntil sets the "status_until" field to the value that was provided on create.
-func (u *ChannelUpsertOne) UpdateStatusUntil() *ChannelUpsertOne {
-	return u.Update(func(s *ChannelUpsert) {
-		s.UpdateStatusUntil()
-	})
-}
-
-// ClearStatusUntil clears the value of the "status_until" field.
-func (u *ChannelUpsertOne) ClearStatusUntil() *ChannelUpsertOne {
-	return u.Update(func(s *ChannelUpsert) {
-		s.ClearStatusUntil()
 	})
 }
 
@@ -1938,27 +1881,6 @@ func (u *ChannelUpsertBulk) SetStatus(v channel.Status) *ChannelUpsertBulk {
 func (u *ChannelUpsertBulk) UpdateStatus() *ChannelUpsertBulk {
 	return u.Update(func(s *ChannelUpsert) {
 		s.UpdateStatus()
-	})
-}
-
-// SetStatusUntil sets the "status_until" field.
-func (u *ChannelUpsertBulk) SetStatusUntil(v time.Time) *ChannelUpsertBulk {
-	return u.Update(func(s *ChannelUpsert) {
-		s.SetStatusUntil(v)
-	})
-}
-
-// UpdateStatusUntil sets the "status_until" field to the value that was provided on create.
-func (u *ChannelUpsertBulk) UpdateStatusUntil() *ChannelUpsertBulk {
-	return u.Update(func(s *ChannelUpsert) {
-		s.UpdateStatusUntil()
-	})
-}
-
-// ClearStatusUntil clears the value of the "status_until" field.
-func (u *ChannelUpsertBulk) ClearStatusUntil() *ChannelUpsertBulk {
-	return u.Update(func(s *ChannelUpsert) {
-		s.ClearStatusUntil()
 	})
 }
 

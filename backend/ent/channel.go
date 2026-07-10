@@ -36,8 +36,6 @@ type Channel struct {
 	HeaderOverride map[string]string `json:"header_override,omitempty"`
 	// Status holds the value of the "status" field.
 	Status channel.Status `json:"status,omitempty"`
-	// 429 冷却到期时间：到期后自动恢复可用；手动禁用不设此值
-	StatusUntil *time.Time `json:"status_until,omitempty"`
 	// 进入当前状态的原因（给运维看）
 	ErrorMsg string `json:"error_msg,omitempty"`
 	// Priority holds the value of the "priority" field.
@@ -116,7 +114,7 @@ func (*Channel) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case channel.FieldName, channel.FieldType, channel.FieldBaseURL, channel.FieldStatus, channel.FieldErrorMsg, channel.FieldTestModel:
 			values[i] = new(sql.NullString)
-		case channel.FieldStatusUntil, channel.FieldTestedAt, channel.FieldBalanceUpdatedAt, channel.FieldLastUsedAt, channel.FieldCreatedAt, channel.FieldUpdatedAt:
+		case channel.FieldTestedAt, channel.FieldBalanceUpdatedAt, channel.FieldLastUsedAt, channel.FieldCreatedAt, channel.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -202,13 +200,6 @@ func (c *Channel) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				c.Status = channel.Status(value.String)
-			}
-		case channel.FieldStatusUntil:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field status_until", values[i])
-			} else if value.Valid {
-				c.StatusUntil = new(time.Time)
-				*c.StatusUntil = value.Time
 			}
 		case channel.FieldErrorMsg:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -376,11 +367,6 @@ func (c *Channel) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", c.Status))
-	builder.WriteString(", ")
-	if v := c.StatusUntil; v != nil {
-		builder.WriteString("status_until=")
-		builder.WriteString(v.Format(time.ANSIC))
-	}
 	builder.WriteString(", ")
 	builder.WriteString("error_msg=")
 	builder.WriteString(c.ErrorMsg)

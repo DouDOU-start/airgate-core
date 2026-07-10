@@ -13,31 +13,32 @@ type verdict int
 const (
 	// verdictSuccess 2xx：计费 + MarkRecovered（disabled_auto 渠道恢复）。
 	verdictSuccess verdict = iota
-	// verdictRateLimited 429：MarkCooldown + 硬排除重试。
+	// verdictRateLimited 429：本次请求硬排除换渠道重试；
+	// 不设冷却状态，下次请求该渠道照常参与调度。
 	verdictRateLimited
 	// verdictAuthFailed 401/403：channel_auto_ban_enabled 时 MarkAutoDisabled；恒硬排除重试。
-	// 禁用关键词只在 401/403 状态下参与判定原因，其他状态一律不触发自动禁用
-	//（上游 400 会回显用户输入，任意用户可构造关键词字符串打禁渠道）。
 	verdictAuthFailed
 	// verdictTransient 5xx / 网络错误：软排除重试。
 	verdictTransient
-	// verdictClientError 其余 4xx：透传终止，不重试（带 usage 仍计费）。
+	// verdictClientError 其余 4xx：语义重建终止，不重试（带 usage 仍计费）。
 	verdictClientError
 )
 
-// 429 冷却时长边界（契约：Retry-After 优先，缺省 60s，钳制 [1s, 30min]）。
+// Retry-After 解析边界（Retry-After 头优先，缺省 60s，钳制 [1s, 30min]）。
+// 仅用于全渠道耗尽时 429 响应的 Retry-After 头，不再驱动任何渠道冷却状态。
 const (
-	cooldownDefault = 60 * time.Second
-	cooldownMin     = 1 * time.Second
-	cooldownMax     = 30 * time.Minute
+	retryAfterDefault = 60 * time.Second
+	retryAfterMin     = 1 * time.Second
+	retryAfterMax     = 30 * time.Minute
 )
 
 // outcome 判决结果。
 type outcome struct {
 	verdict verdict
-	// retryAfter 仅 verdictRateLimited 有效：冷却时长（已钳制）。
+	// retryAfter 仅 verdictRateLimited 有效：上游建议的重试等待（已钳制），
+	// 供全渠道耗尽时 429 响应携带 Retry-After 头。
 	retryAfter time.Duration
-	// reason 判决原因（自动禁用落库 error_msg / 日志用）。
+	// reason 判决原因（自动禁用落库 error_msg / 失败留痕 / 日志用）。
 	reason string
 }
 
@@ -46,14 +47,10 @@ type outcome struct {
 //	网络错误            → transient（软排除）
 //	2xx                 → success
 //	429                 → rateLimited（Retry-After 优先，缺省 60s，钳 [1s,30min]）
-//	401/403             → authFailed（关键词命中时补充进 reason）
+//	401/403             → authFailed（仅状态码触发，不做错误体关键词匹配）
 //	5xx                 → transient
-//	其余 4xx/3xx        → clientError（透传终止）
-//
-// 禁用关键词匹配只在 401/403 状态下生效：上游参数校验类 4xx（400/404/422 等）
-// 会原样回显用户输入，若对其做关键词匹配，任意持 key 用户可构造含关键词的
-// 非法参数批量打禁渠道（渠道级 DoS）。
-func classifyOutcome(statusCode int, headers http.Header, errBody []byte, netErr error, banKeywords []string) outcome {
+//	其余 4xx/3xx        → clientError（语义重建终止）
+func classifyOutcome(statusCode int, headers http.Header, errBody []byte, netErr error) outcome {
 	if netErr != nil {
 		return outcome{verdict: verdictTransient, reason: "网络错误: " + netErr.Error()}
 	}
@@ -66,43 +63,26 @@ func classifyOutcome(statusCode int, headers http.Header, errBody []byte, netErr
 	if statusCode == http.StatusTooManyRequests {
 		return outcome{
 			verdict:    verdictRateLimited,
-			retryAfter: clampCooldown(parseRetryAfter(headers)),
+			retryAfter: clampRetryAfter(parseRetryAfter(headers)),
 			reason:     "HTTP 429: " + snippet,
 		}
 	}
 	if statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden {
-		reason := "HTTP " + strconv.Itoa(statusCode) + ": " + snippet
-		if kw := matchBanKeyword(errBody, banKeywords); kw != "" {
-			reason = "关键词命中 [" + kw + "] " + reason
-		}
-		return outcome{verdict: verdictAuthFailed, reason: reason}
+		return outcome{verdict: verdictAuthFailed, reason: "HTTP " + strconv.Itoa(statusCode) + ": " + snippet}
 	}
 	if statusCode >= 500 {
 		return outcome{verdict: verdictTransient, reason: "HTTP " + strconv.Itoa(statusCode) + ": " + snippet}
 	}
-	return outcome{verdict: verdictClientError, reason: "HTTP " + strconv.Itoa(statusCode)}
-}
-
-// matchBanKeyword 大小写不敏感地在错误体中匹配关键词表，返回命中的关键词（未命中返回空串）。
-// keywords 已在 settings 解析时统一小写。仅在 401/403 状态下调用。
-func matchBanKeyword(errBody []byte, keywords []string) string {
-	if len(errBody) == 0 || len(keywords) == 0 {
-		return ""
-	}
-	lower := strings.ToLower(string(errBody))
-	for _, kw := range keywords {
-		if kw != "" && strings.Contains(lower, kw) {
-			return kw
-		}
-	}
-	return ""
+	// clientError 的 reason 带原始体片段：响应侧只出重建后的语义字段，
+	// 原始上游响应体经此片段进失败留痕供排障。
+	return outcome{verdict: verdictClientError, reason: "HTTP " + strconv.Itoa(statusCode) + ": " + snippet}
 }
 
 // parseRetryAfter 解析 Retry-After 头：整数秒优先，HTTP 日期回退；缺失/非法返回默认 60s。
 func parseRetryAfter(headers http.Header) time.Duration {
 	value := strings.TrimSpace(headers.Get("Retry-After"))
 	if value == "" {
-		return cooldownDefault
+		return retryAfterDefault
 	}
 	if seconds, err := strconv.Atoi(value); err == nil {
 		return time.Duration(seconds) * time.Second
@@ -110,16 +90,16 @@ func parseRetryAfter(headers http.Header) time.Duration {
 	if at, err := http.ParseTime(value); err == nil {
 		return time.Until(at)
 	}
-	return cooldownDefault
+	return retryAfterDefault
 }
 
-// clampCooldown 冷却时长钳制到 [1s, 30min]。
-func clampCooldown(d time.Duration) time.Duration {
-	if d < cooldownMin {
-		return cooldownMin
+// clampRetryAfter 重试等待时长钳制到 [1s, 30min]。
+func clampRetryAfter(d time.Duration) time.Duration {
+	if d < retryAfterMin {
+		return retryAfterMin
 	}
-	if d > cooldownMax {
-		return cooldownMax
+	if d > retryAfterMax {
+		return retryAfterMax
 	}
 	return d
 }

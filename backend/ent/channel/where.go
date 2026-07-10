@@ -65,11 +65,6 @@ func BaseURL(v string) predicate.Channel {
 	return predicate.Channel(sql.FieldEQ(FieldBaseURL, v))
 }
 
-// StatusUntil applies equality check predicate on the "status_until" field. It's identical to StatusUntilEQ.
-func StatusUntil(v time.Time) predicate.Channel {
-	return predicate.Channel(sql.FieldEQ(FieldStatusUntil, v))
-}
-
 // ErrorMsg applies equality check predicate on the "error_msg" field. It's identical to ErrorMsgEQ.
 func ErrorMsg(v string) predicate.Channel {
 	return predicate.Channel(sql.FieldEQ(FieldErrorMsg, v))
@@ -338,56 +333,6 @@ func StatusIn(vs ...Status) predicate.Channel {
 // StatusNotIn applies the NotIn predicate on the "status" field.
 func StatusNotIn(vs ...Status) predicate.Channel {
 	return predicate.Channel(sql.FieldNotIn(FieldStatus, vs...))
-}
-
-// StatusUntilEQ applies the EQ predicate on the "status_until" field.
-func StatusUntilEQ(v time.Time) predicate.Channel {
-	return predicate.Channel(sql.FieldEQ(FieldStatusUntil, v))
-}
-
-// StatusUntilNEQ applies the NEQ predicate on the "status_until" field.
-func StatusUntilNEQ(v time.Time) predicate.Channel {
-	return predicate.Channel(sql.FieldNEQ(FieldStatusUntil, v))
-}
-
-// StatusUntilIn applies the In predicate on the "status_until" field.
-func StatusUntilIn(vs ...time.Time) predicate.Channel {
-	return predicate.Channel(sql.FieldIn(FieldStatusUntil, vs...))
-}
-
-// StatusUntilNotIn applies the NotIn predicate on the "status_until" field.
-func StatusUntilNotIn(vs ...time.Time) predicate.Channel {
-	return predicate.Channel(sql.FieldNotIn(FieldStatusUntil, vs...))
-}
-
-// StatusUntilGT applies the GT predicate on the "status_until" field.
-func StatusUntilGT(v time.Time) predicate.Channel {
-	return predicate.Channel(sql.FieldGT(FieldStatusUntil, v))
-}
-
-// StatusUntilGTE applies the GTE predicate on the "status_until" field.
-func StatusUntilGTE(v time.Time) predicate.Channel {
-	return predicate.Channel(sql.FieldGTE(FieldStatusUntil, v))
-}
-
-// StatusUntilLT applies the LT predicate on the "status_until" field.
-func StatusUntilLT(v time.Time) predicate.Channel {
-	return predicate.Channel(sql.FieldLT(FieldStatusUntil, v))
-}
-
-// StatusUntilLTE applies the LTE predicate on the "status_until" field.
-func StatusUntilLTE(v time.Time) predicate.Channel {
-	return predicate.Channel(sql.FieldLTE(FieldStatusUntil, v))
-}
-
-// StatusUntilIsNil applies the IsNil predicate on the "status_until" field.
-func StatusUntilIsNil() predicate.Channel {
-	return predicate.Channel(sql.FieldIsNull(FieldStatusUntil))
-}
-
-// StatusUntilNotNil applies the NotNil predicate on the "status_until" field.
-func StatusUntilNotNil() predicate.Channel {
-	return predicate.Channel(sql.FieldNotNull(FieldStatusUntil))
 }
 
 // ErrorMsgEQ applies the EQ predicate on the "error_msg" field.

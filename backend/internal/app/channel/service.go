@@ -188,11 +188,10 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Channe
 		}
 		input.APIKeys = encrypted
 	}
-	// 手动重新启用时清理上一轮状态残留（错误信息与冷却时间）。
+	// 手动重新启用时清理上一轮状态残留（错误信息）。
 	if input.Status != nil && *input.Status == StatusEnabled {
 		emptyMsg := ""
 		input.ErrorMsg = &emptyMsg
-		input.ClearStatusUntil = true
 	}
 
 	item, err := s.repo.Update(ctx, id, input)
@@ -281,7 +280,7 @@ func (s *Service) Test(ctx context.Context, id int, model, endpoint string) (int
 		if err != nil {
 			logger.Warn("channel_persist_failed", "op", "test_recover_recheck", "channel_id", id, logx.LogFieldError, err)
 		} else if current.Status == StatusDisabledAuto {
-			if err := s.repo.UpdateState(ctx, id, StatusEnabled, nil, ""); err != nil {
+			if err := s.repo.UpdateState(ctx, id, StatusEnabled, ""); err != nil {
 				logger.Warn("channel_persist_failed", "op", "test_recover", "channel_id", id, logx.LogFieldError, err)
 			} else {
 				logger.Info("channel_recovered_by_test", "channel_id", id)
@@ -432,7 +431,6 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelSna
 			MaxRPM:         ch.MaxRPM,
 			CostRatio:      ch.CostRatio,
 			Status:         ch.Status,
-			StatusUntil:    ch.StatusUntil,
 			GroupIDs:       groups,
 			TestModel:      ch.TestModel,
 		})
@@ -441,8 +439,8 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelSna
 }
 
 // PersistState 实现 registry.Persister：渠道调度状态异步落库。
-func (s *Service) PersistState(ctx context.Context, id int, status string, until *time.Time, errMsg string) error {
-	return s.repo.UpdateState(ctx, id, status, until, errMsg)
+func (s *Service) PersistState(ctx context.Context, id int, status string, errMsg string) error {
+	return s.repo.UpdateState(ctx, id, status, errMsg)
 }
 
 // encryptKeys 逐元素加密 API Key（去除首尾空白、跳过空行）。

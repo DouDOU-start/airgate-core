@@ -16,7 +16,7 @@
       ※ countTokens 两端点零计费；images/predict 在 per_request_price>0 时按次×产出张数计费）
   → internal/relay/pipeline：余额预检 → user/key 并发闸门 → failover≤3
       { registry.Pick(分组,模型,协议)（协议过滤 + priority 分档 + weight+10 加权随机 + 多 key 轮询）
-        → adaptor 透传直发 HTTP → outcome 判定（429 冷却 / 401·关键词自动禁用 / 5xx 换渠道）}
+        → adaptor 透传直发 HTTP → outcome 判定（429 换渠道 / 401·403 自动禁用 / 5xx 换渠道）}
   → relay/pricing（token×价目表）→ billing.Calculate 三管道 → recorder → usage_log
 ```
 
@@ -25,7 +25,7 @@
 - `internal/relay/registry` — 渠道内存快照与调度（Pick/NextKey/Mark*，Pick 按入口协议过滤渠道 Type）；禁止 import ent 与 app 包，经 Loader/Persister 接口（由 channel service 实现）取数落库。
 - `internal/relay/adaptor` — 协议适配（openai_compatible/anthropic/gemini/custom），**零翻译纯透传**：只做上游 URL 拼接、认证头、渠道模型名重写、param_override、各协议响应的 usage 提取归一化（计量不是翻译，须精确保留）；请求/响应体原样透传，不做任何跨协议翻译；调度/重试/禁用/计费一律在 pipeline。
 - `internal/relay/pipeline` — 转发主循环、outcome 判定、SSE 透传（原生协议流经透传型 usage 观察器旁路计量）、错误体（按入口协议原生形态，errfmt 分发）、gateway settings 读取。
-- `internal/relay/errfmt` — 网关自产错误的协议形态渲染（openai/anthropic/gemini），pipeline 与鉴权中间件共用；上游错误一律原样透传不经此包。
+- `internal/relay/errfmt` — 错误体的协议形态渲染（openai/anthropic/gemini），pipeline 与鉴权中间件共用。网关自产错误与**上游错误**都经此包渲染：上游错误解析出语义（message/type/code）后按入口协议重建（语义保留、载体重建，非字节透传），HTTP 状态码保留上游原值。
 - `internal/relay/pricing` — 价目表缓存 + token→cost 纯函数。
 - `internal/billing` — 三管道计费（actual=total×billing_rate 扣余额；billed=total×sell_rate 累加 key 用量；渠道成本=total×account_rate_multiplier 快照列查询期现算、不落列）与异步记账。
 - `internal/scheduler` — 仅剩 ConcurrencyManager/RPMCounter（Redis 限流原语，渠道/用户/key 维度）。
@@ -36,7 +36,7 @@
 - **改 `ent/schema/` 后须 `make ent` 并提交生成代码**；生成代码不可手改。
 - **装配两处接线**：`internal/bootstrap/http_handlers.go`（store→service→handler）+ `internal/server/router.go` `registerRoutes()`。
 - **新接口走 dto + mapper**，handler 勿手拼 map 响应。
-- **转发路由（/v1、/v1beta）错误一律按入口协议的原生错误形态**（`internal/relay/errfmt` 按 EntryProtocol 分发：openai/anthropic/gemini），不用 `response.*`；上游错误原样透传；管理面照旧 `response.*`。
+- **转发路由（/v1、/v1beta）错误一律按入口协议的原生错误形态**（`internal/relay/errfmt` 按 EntryProtocol 分发：openai/anthropic/gemini），不用 `response.*`；上游错误解析语义后按入口协议重建（状态码保留上游原值），不做字节透传；管理面照旧 `response.*`。
 - **渠道 api_keys 明文永不出现在任何 API 响应**（只出 count + 尾 4 位 hint）；加解密用 `internal/auth`（AES-256-GCM），在 service 层做。
 - 复用优先（新领域参照 channel 域全链路）；注释中文、不写复述代码的冗余注释；`_test.go` 同包、表驱动。
 - 需求/架构变更**同步更新本文件与 `README.md`**，防止文档漂移。

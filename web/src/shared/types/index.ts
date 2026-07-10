@@ -488,7 +488,7 @@ export interface UsageTrendBucket {
 /** 渠道协议类型 */
 export type ChannelType = 'openai_compatible' | 'anthropic' | 'gemini';
 
-/** 渠道状态：enabled 启用（status_until 未过期时为冷却中）/ disabled_manual 手动禁用 / disabled_auto 自动禁用 */
+/** 渠道状态：enabled 启用 / disabled_manual 手动禁用 / disabled_auto 自动禁用 */
 export type ChannelStatus = 'enabled' | 'disabled_manual' | 'disabled_auto';
 
 // 渠道响应 —— 与后端 dto.ChannelResp 对应。api_keys 明文永不出现在任何响应，
@@ -505,8 +505,6 @@ export interface ChannelResp {
   param_override: Record<string, unknown> | null;
   header_override: Record<string, string> | null;
   status: ChannelStatus;
-  /** 冷却截止时间；缺省表示无冷却 */
-  status_until?: string;
   error_msg: string;
   priority: number;
   weight: number;

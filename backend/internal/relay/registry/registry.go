@@ -1,6 +1,6 @@
 // Package registry 提供渠道调度的内存注册表：
 // 全量渠道快照（api_keys 已解密）常驻内存，
-// 转发管线经 Pick 选渠道、NextKey 轮询密钥；状态变更（冷却/自动禁用/恢复）
+// 转发管线经 Pick 选渠道、NextKey 轮询密钥；状态变更（自动禁用/恢复）
 // 内存即时生效并经 Persister 异步落库。
 //
 // 依赖约束：本包禁止 import ent 或 internal/app/channel（防环）；
@@ -83,19 +83,9 @@ type ChannelSnapshot struct {
 	MaxRPM         int
 	CostRatio      float64
 	Status         string
-	// StatusUntil 429 冷却到期时间：非 nil 且未到期时不可调度。
-	StatusUntil *time.Time
 	// GroupIDs 绑定分组集合；空集合表示公共渠道，对所有分组可用。
 	GroupIDs  map[int]struct{}
 	TestModel string
-}
-
-// available 判断快照当前是否可被调度。
-func (c *ChannelSnapshot) available(now time.Time) bool {
-	if c.Status != StatusEnabled {
-		return false
-	}
-	return c.StatusUntil == nil || !c.StatusUntil.After(now)
 }
 
 // Loader 全量加载渠道快照（由 channel service 实现：解密 api_keys）。
@@ -105,7 +95,7 @@ type Loader interface {
 
 // Persister 渠道状态异步落库（由 channel service 实现）。
 type Persister interface {
-	PersistState(ctx context.Context, id int, status string, until *time.Time, errMsg string) error
+	PersistState(ctx context.Context, id int, status string, errMsg string) error
 }
 
 // 惰性兜底加载参数：注册表从未成功加载过（如启动时 DB 瞬断）时，
@@ -209,7 +199,7 @@ func (r *Registry) ensureLoaded() {
 
 // Pick 为指定分组、模型与入口协议选择一个渠道：
 //
-//	候选 = status==enabled 且 (StatusUntil==nil || 已过期) 且模型命中
+//	候选 = status==enabled 且模型命中
 //	       且渠道 Type 属于入口协议的同构类型集合（纯透传：不做跨协议翻译，
 //	       同一模型可同时存在于多协议渠道，Pick 只在协议匹配的集合内调度）
 //	       且分组命中（渠道 GroupIDs 为空 = 公共渠道）且不在 exclude 中
@@ -224,7 +214,6 @@ func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*Ch
 		excluded[id] = struct{}{}
 	}
 	allowedTypes := channelTypesForProtocol(protocol)
-	now := time.Now()
 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -239,7 +228,7 @@ func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*Ch
 		if _, ok := allowedTypes[ch.Type]; !ok {
 			continue
 		}
-		if !ch.available(now) {
+		if ch.Status != StatusEnabled {
 			continue
 		}
 		if _, ok := ch.Models[model]; !ok {
@@ -287,8 +276,8 @@ type ModelEntry struct {
 	Protocols []string
 }
 
-// ModelEntriesForGroup 返回指定分组可用渠道（status==enabled，含冷却中）的
-// 模型目录（含协议集合），按模型名字典序。冷却是瞬态状态，不影响目录语义。
+// ModelEntriesForGroup 返回指定分组可用渠道（status==enabled）的
+// 模型目录（含协议集合），按模型名字典序。
 func (r *Registry) ModelEntriesForGroup(groupID int) []ModelEntry {
 	r.mu.RLock()
 	set := map[string]map[string]struct{}{}
@@ -341,27 +330,15 @@ func (r *Registry) NextKey(channelID int) string {
 	return ch.APIKeys[int(n%uint64(len(ch.APIKeys)))]
 }
 
-// MarkCooldown 标记渠道进入 429 冷却：内存即时生效，异步落库 status_until。
-func (r *Registry) MarkCooldown(id int, until time.Time) {
-	snap := r.mutate(id, func(c *ChannelSnapshot) {
-		c.StatusUntil = &until
-	})
-	if snap == nil {
-		return
-	}
-	r.persistAsync(id, snap.Status, &until, "429 限流冷却中")
-}
-
-// MarkAutoDisabled 自动禁用渠道（401/403/关键词命中）：内存即时生效 + 异步落库。
+// MarkAutoDisabled 自动禁用渠道（上游 401/403）：内存即时生效 + 异步落库。
 func (r *Registry) MarkAutoDisabled(id int, reason string) {
 	snap := r.mutate(id, func(c *ChannelSnapshot) {
 		c.Status = StatusDisabledAuto
-		c.StatusUntil = nil
 	})
 	if snap == nil {
 		return
 	}
-	r.persistAsync(id, StatusDisabledAuto, nil, reason)
+	r.persistAsync(id, StatusDisabledAuto, reason)
 }
 
 // MarkRecovered 将 disabled_auto 渠道恢复为 enabled；其余状态不动（手动禁用不自动恢复）。
@@ -372,13 +349,12 @@ func (r *Registry) MarkRecovered(id int) {
 			return
 		}
 		c.Status = StatusEnabled
-		c.StatusUntil = nil
 		recovered = true
 	})
 	if snap == nil || !recovered {
 		return
 	}
-	r.persistAsync(id, StatusEnabled, nil, "")
+	r.persistAsync(id, StatusEnabled, "")
 }
 
 // mutate 以 copy-on-write 方式更新指定渠道快照，返回更新后的快照；渠道不存在返回 nil。
@@ -398,14 +374,14 @@ func (r *Registry) mutate(id int, apply func(*ChannelSnapshot)) *ChannelSnapshot
 }
 
 // persistAsync 异步落库渠道状态；失败仅记日志，不影响内存状态。
-func (r *Registry) persistAsync(id int, status string, until *time.Time, errMsg string) {
+func (r *Registry) persistAsync(id int, status string, errMsg string) {
 	if r.persister == nil {
 		return
 	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), r.persistTimeout)
 		defer cancel()
-		if err := r.persister.PersistState(ctx, id, status, until, errMsg); err != nil {
+		if err := r.persister.PersistState(ctx, id, status, errMsg); err != nil {
 			slog.Error("channel_state_persist_failed",
 				"channel_id", id,
 				"status", status,

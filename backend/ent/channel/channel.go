@@ -33,8 +33,6 @@ const (
 	FieldHeaderOverride = "header_override"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
-	// FieldStatusUntil holds the string denoting the status_until field in the database.
-	FieldStatusUntil = "status_until"
 	// FieldErrorMsg holds the string denoting the error_msg field in the database.
 	FieldErrorMsg = "error_msg"
 	// FieldPriority holds the string denoting the priority field in the database.
@@ -97,7 +95,6 @@ var Columns = []string{
 	FieldParamOverride,
 	FieldHeaderOverride,
 	FieldStatus,
-	FieldStatusUntil,
 	FieldErrorMsg,
 	FieldPriority,
 	FieldWeight,
@@ -248,11 +245,6 @@ func ByBaseURL(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
-}
-
-// ByStatusUntil orders the results by the status_until field.
-func ByStatusUntil(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldStatusUntil, opts...).ToFunc()
 }
 
 // ByErrorMsg orders the results by the error_msg field.

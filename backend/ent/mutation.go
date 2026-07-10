@@ -3987,7 +3987,6 @@ type ChannelMutation struct {
 	param_override      *map[string]interface{}
 	header_override     *map[string]string
 	status              *channel.Status
-	status_until        *time.Time
 	error_msg           *string
 	priority            *int
 	addpriority         *int
@@ -4512,55 +4511,6 @@ func (m *ChannelMutation) OldStatus(ctx context.Context) (v channel.Status, err 
 // ResetStatus resets all changes to the "status" field.
 func (m *ChannelMutation) ResetStatus() {
 	m.status = nil
-}
-
-// SetStatusUntil sets the "status_until" field.
-func (m *ChannelMutation) SetStatusUntil(t time.Time) {
-	m.status_until = &t
-}
-
-// StatusUntil returns the value of the "status_until" field in the mutation.
-func (m *ChannelMutation) StatusUntil() (r time.Time, exists bool) {
-	v := m.status_until
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldStatusUntil returns the old "status_until" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldStatusUntil(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldStatusUntil is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldStatusUntil requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldStatusUntil: %w", err)
-	}
-	return oldValue.StatusUntil, nil
-}
-
-// ClearStatusUntil clears the value of the "status_until" field.
-func (m *ChannelMutation) ClearStatusUntil() {
-	m.status_until = nil
-	m.clearedFields[channel.FieldStatusUntil] = struct{}{}
-}
-
-// StatusUntilCleared returns if the "status_until" field was cleared in this mutation.
-func (m *ChannelMutation) StatusUntilCleared() bool {
-	_, ok := m.clearedFields[channel.FieldStatusUntil]
-	return ok
-}
-
-// ResetStatusUntil resets all changes to the "status_until" field.
-func (m *ChannelMutation) ResetStatusUntil() {
-	m.status_until = nil
-	delete(m.clearedFields, channel.FieldStatusUntil)
 }
 
 // SetErrorMsg sets the "error_msg" field.
@@ -5453,7 +5403,7 @@ func (m *ChannelMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ChannelMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 24)
 	if m.name != nil {
 		fields = append(fields, channel.FieldName)
 	}
@@ -5480,9 +5430,6 @@ func (m *ChannelMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, channel.FieldStatus)
-	}
-	if m.status_until != nil {
-		fields = append(fields, channel.FieldStatusUntil)
 	}
 	if m.error_msg != nil {
 		fields = append(fields, channel.FieldErrorMsg)
@@ -5555,8 +5502,6 @@ func (m *ChannelMutation) Field(name string) (ent.Value, bool) {
 		return m.HeaderOverride()
 	case channel.FieldStatus:
 		return m.Status()
-	case channel.FieldStatusUntil:
-		return m.StatusUntil()
 	case channel.FieldErrorMsg:
 		return m.ErrorMsg()
 	case channel.FieldPriority:
@@ -5614,8 +5559,6 @@ func (m *ChannelMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldHeaderOverride(ctx)
 	case channel.FieldStatus:
 		return m.OldStatus(ctx)
-	case channel.FieldStatusUntil:
-		return m.OldStatusUntil(ctx)
 	case channel.FieldErrorMsg:
 		return m.OldErrorMsg(ctx)
 	case channel.FieldPriority:
@@ -5717,13 +5660,6 @@ func (m *ChannelMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
-		return nil
-	case channel.FieldStatusUntil:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetStatusUntil(v)
 		return nil
 	case channel.FieldErrorMsg:
 		v, ok := value.(string)
@@ -5956,9 +5892,6 @@ func (m *ChannelMutation) ClearedFields() []string {
 	if m.FieldCleared(channel.FieldHeaderOverride) {
 		fields = append(fields, channel.FieldHeaderOverride)
 	}
-	if m.FieldCleared(channel.FieldStatusUntil) {
-		fields = append(fields, channel.FieldStatusUntil)
-	}
 	if m.FieldCleared(channel.FieldTags) {
 		fields = append(fields, channel.FieldTags)
 	}
@@ -5993,9 +5926,6 @@ func (m *ChannelMutation) ClearField(name string) error {
 		return nil
 	case channel.FieldHeaderOverride:
 		m.ClearHeaderOverride()
-		return nil
-	case channel.FieldStatusUntil:
-		m.ClearStatusUntil()
 		return nil
 	case channel.FieldTags:
 		m.ClearTags()
@@ -6043,9 +5973,6 @@ func (m *ChannelMutation) ResetField(name string) error {
 		return nil
 	case channel.FieldStatus:
 		m.ResetStatus()
-		return nil
-	case channel.FieldStatusUntil:
-		m.ResetStatusUntil()
 		return nil
 	case channel.FieldErrorMsg:
 		m.ResetErrorMsg()

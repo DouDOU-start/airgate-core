@@ -148,26 +148,6 @@ func (cu *ChannelUpdate) SetNillableStatus(c *channel.Status) *ChannelUpdate {
 	return cu
 }
 
-// SetStatusUntil sets the "status_until" field.
-func (cu *ChannelUpdate) SetStatusUntil(t time.Time) *ChannelUpdate {
-	cu.mutation.SetStatusUntil(t)
-	return cu
-}
-
-// SetNillableStatusUntil sets the "status_until" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableStatusUntil(t *time.Time) *ChannelUpdate {
-	if t != nil {
-		cu.SetStatusUntil(*t)
-	}
-	return cu
-}
-
-// ClearStatusUntil clears the value of the "status_until" field.
-func (cu *ChannelUpdate) ClearStatusUntil() *ChannelUpdate {
-	cu.mutation.ClearStatusUntil()
-	return cu
-}
-
 // SetErrorMsg sets the "error_msg" field.
 func (cu *ChannelUpdate) SetErrorMsg(s string) *ChannelUpdate {
 	cu.mutation.SetErrorMsg(s)
@@ -639,12 +619,6 @@ func (cu *ChannelUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := cu.mutation.Status(); ok {
 		_spec.SetField(channel.FieldStatus, field.TypeEnum, value)
 	}
-	if value, ok := cu.mutation.StatusUntil(); ok {
-		_spec.SetField(channel.FieldStatusUntil, field.TypeTime, value)
-	}
-	if cu.mutation.StatusUntilCleared() {
-		_spec.ClearField(channel.FieldStatusUntil, field.TypeTime)
-	}
 	if value, ok := cu.mutation.ErrorMsg(); ok {
 		_spec.SetField(channel.FieldErrorMsg, field.TypeString, value)
 	}
@@ -950,26 +924,6 @@ func (cuo *ChannelUpdateOne) SetNillableStatus(c *channel.Status) *ChannelUpdate
 	if c != nil {
 		cuo.SetStatus(*c)
 	}
-	return cuo
-}
-
-// SetStatusUntil sets the "status_until" field.
-func (cuo *ChannelUpdateOne) SetStatusUntil(t time.Time) *ChannelUpdateOne {
-	cuo.mutation.SetStatusUntil(t)
-	return cuo
-}
-
-// SetNillableStatusUntil sets the "status_until" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableStatusUntil(t *time.Time) *ChannelUpdateOne {
-	if t != nil {
-		cuo.SetStatusUntil(*t)
-	}
-	return cuo
-}
-
-// ClearStatusUntil clears the value of the "status_until" field.
-func (cuo *ChannelUpdateOne) ClearStatusUntil() *ChannelUpdateOne {
-	cuo.mutation.ClearStatusUntil()
 	return cuo
 }
 
@@ -1473,12 +1427,6 @@ func (cuo *ChannelUpdateOne) sqlSave(ctx context.Context) (_node *Channel, err e
 	}
 	if value, ok := cuo.mutation.Status(); ok {
 		_spec.SetField(channel.FieldStatus, field.TypeEnum, value)
-	}
-	if value, ok := cuo.mutation.StatusUntil(); ok {
-		_spec.SetField(channel.FieldStatusUntil, field.TypeTime, value)
-	}
-	if cuo.mutation.StatusUntilCleared() {
-		_spec.ClearField(channel.FieldStatusUntil, field.TypeTime)
 	}
 	if value, ok := cuo.mutation.ErrorMsg(); ok {
 		_spec.SetField(channel.FieldErrorMsg, field.TypeString, value)

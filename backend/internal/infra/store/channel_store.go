@@ -162,9 +162,6 @@ func (s *ChannelStore) Update(ctx context.Context, id int, input appchannel.Upda
 	if input.Status != nil {
 		builder = builder.SetStatus(entchannel.Status(*input.Status))
 	}
-	if input.ClearStatusUntil {
-		builder = builder.ClearStatusUntil()
-	}
 	if len(input.APIKeys) > 0 {
 		builder = builder.SetAPIKeys(input.APIKeys)
 	}
@@ -220,7 +217,6 @@ func (s *ChannelStore) BulkUpdate(ctx context.Context, input appchannel.BulkUpda
 			Where(entchannel.IDIn(input.IDs...)).
 			SetStatus(entchannel.StatusEnabled).
 			SetErrorMsg("").
-			ClearStatusUntil().
 			Save(ctx)
 	case appchannel.BulkActionDisable:
 		return s.db.Channel.Update().
@@ -244,16 +240,11 @@ func (s *ChannelStore) BulkUpdate(ctx context.Context, input appchannel.BulkUpda
 	}
 }
 
-// UpdateState 更新渠道调度状态（status / status_until / error_msg）。
-func (s *ChannelStore) UpdateState(ctx context.Context, id int, status string, until *time.Time, errMsg string) error {
+// UpdateState 更新渠道调度状态（status / error_msg）。
+func (s *ChannelStore) UpdateState(ctx context.Context, id int, status string, errMsg string) error {
 	builder := s.db.Channel.UpdateOneID(id).
 		SetStatus(entchannel.Status(status)).
 		SetErrorMsg(errMsg)
-	if until != nil {
-		builder = builder.SetStatusUntil(*until)
-	} else {
-		builder = builder.ClearStatusUntil()
-	}
 	if err := builder.Exec(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return appchannel.ErrChannelNotFound
@@ -347,7 +338,6 @@ func mapChannel(item *ent.Channel) appchannel.Channel {
 		ParamOverride:    item.ParamOverride,
 		HeaderOverride:   item.HeaderOverride,
 		Status:           item.Status.String(),
-		StatusUntil:      item.StatusUntil,
 		ErrorMsg:         item.ErrorMsg,
 		Priority:         item.Priority,
 		Weight:           item.Weight,

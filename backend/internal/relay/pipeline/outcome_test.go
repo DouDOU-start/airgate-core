@@ -3,13 +3,12 @@ package pipeline
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
 
 func TestClassifyOutcome(t *testing.T) {
-	keywords := defaultBanKeywords
-
 	cases := []struct {
 		name           string
 		status         int
@@ -69,27 +68,15 @@ func TestClassifyOutcome(t *testing.T) {
 			wantVerdict: verdictAuthFailed,
 		},
 		{
-			// 关键词只在 401/403 生效：上游 400 会回显用户输入，
-			// 任意用户可构造关键词字符串，不得据此自动禁用渠道。
-			name:        "400 关键词命中不再触发自动禁用（透传终止）",
+			// 自动禁用仅由 401/403 状态码触发：错误体内容不参与判定
+			//（上游 400 会回显用户输入，据内容判定会被任意用户构造打禁渠道）。
+			name:        "400 错误体含凭证类文案不触发自动禁用（语义重建终止）",
 			status:      400,
 			body:        `{"error":{"code":"INVALID_API_KEY","message":"Incorrect API Key provided"}}`,
 			wantVerdict: verdictClientError,
 		},
 		{
-			name:        "422 关键词命中不触发自动禁用",
-			status:      422,
-			body:        `{"error":{"message":"Invalid value: 'insufficient_quota'. Supported values are ..."}}`,
-			wantVerdict: verdictClientError,
-		},
-		{
-			name:        "401 关键词命中仍判认证失败",
-			status:      401,
-			body:        `{"error":{"code":"invalid_api_key"}}`,
-			wantVerdict: verdictAuthFailed,
-		},
-		{
-			name:        "500 关键词命中仍按上游故障处理",
+			name:        "500 错误体含凭证类文案仍按上游故障处理",
 			status:      500,
 			body:        `{"error":{"message":"insufficient_quota"}}`,
 			wantVerdict: verdictTransient,
@@ -106,13 +93,13 @@ func TestClassifyOutcome(t *testing.T) {
 			wantVerdict: verdictTransient,
 		},
 		{
-			name:        "普通 400 透传终止",
+			name:        "普通 400 语义重建终止",
 			status:      400,
 			body:        `{"error":{"message":"messages is required"}}`,
 			wantVerdict: verdictClientError,
 		},
 		{
-			name:        "404 透传终止",
+			name:        "404 语义重建终止",
 			status:      404,
 			body:        `{"error":{"message":"model not found"}}`,
 			wantVerdict: verdictClientError,
@@ -125,7 +112,7 @@ func TestClassifyOutcome(t *testing.T) {
 			if headers == nil {
 				headers = http.Header{}
 			}
-			got := classifyOutcome(tc.status, headers, []byte(tc.body), tc.netErr, keywords)
+			got := classifyOutcome(tc.status, headers, []byte(tc.body), tc.netErr)
 			if got.verdict != tc.wantVerdict {
 				t.Fatalf("verdict = %v, want %v (reason=%q)", got.verdict, tc.wantVerdict, got.reason)
 			}
@@ -136,25 +123,15 @@ func TestClassifyOutcome(t *testing.T) {
 	}
 }
 
-func TestMatchBanKeyword(t *testing.T) {
-	keywords := []string{"invalid_api_key", "account deactivated"}
-	cases := []struct {
-		name string
-		body string
-		want string
-	}{
-		{"命中小写", `{"code":"invalid_api_key"}`, "invalid_api_key"},
-		{"命中大写", `{"code":"INVALID_API_KEY"}`, "invalid_api_key"},
-		{"命中混合大小写短语", `Account Deactivated by admin`, "account deactivated"},
-		{"未命中", `{"message":"try later"}`, ""},
-		{"空体", ``, ""},
+// TestClassifyOutcomeClientErrorReasonHasSnippet clientError 的 reason 带原始体片段：
+// 响应侧只出重建后的语义字段，原始上游错误体经 reason 进失败留痕供排障。
+func TestClassifyOutcomeClientErrorReasonHasSnippet(t *testing.T) {
+	got := classifyOutcome(400, http.Header{}, []byte(`{"error":{"message":"bad param"}}`), nil)
+	if got.verdict != verdictClientError {
+		t.Fatalf("verdict = %v, want clientError", got.verdict)
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := matchBanKeyword([]byte(tc.body), keywords); got != tc.want {
-				t.Errorf("matchBanKeyword = %q, want %q", got, tc.want)
-			}
-		})
+	if !strings.Contains(got.reason, "HTTP 400") || !strings.Contains(got.reason, "bad param") {
+		t.Errorf("reason = %q, want 含状态码与原始体片段", got.reason)
 	}
 }
 
@@ -164,9 +141,9 @@ func TestParseRetryAfter(t *testing.T) {
 		value string
 		want  time.Duration
 	}{
-		{"缺失用默认", "", cooldownDefault},
+		{"缺失用默认", "", retryAfterDefault},
 		{"整数秒", "30", 30 * time.Second},
-		{"非法值用默认", "soon", cooldownDefault},
+		{"非法值用默认", "soon", retryAfterDefault},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

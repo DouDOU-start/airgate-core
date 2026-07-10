@@ -106,16 +106,16 @@ func (f *fakeChannelLoader) LoadAllForRegistry(context.Context) ([]registry.Chan
 // fakePersister 记录状态落库（异步，需等待）。
 type fakePersister struct {
 	mu      sync.Mutex
-	calls   []string // "id:status:hasUntil"
+	calls   []string // "id:status"
 	errMsgs []string
 	done    chan struct{}
 }
 
 func newFakePersister() *fakePersister { return &fakePersister{done: make(chan struct{}, 16)} }
 
-func (f *fakePersister) PersistState(_ context.Context, id int, status string, until *time.Time, errMsg string) error {
+func (f *fakePersister) PersistState(_ context.Context, id int, status string, errMsg string) error {
 	f.mu.Lock()
-	f.calls = append(f.calls, fmt.Sprintf("%d:%s:%v", id, status, until != nil))
+	f.calls = append(f.calls, fmt.Sprintf("%d:%s", id, status))
 	f.errMsgs = append(f.errMsgs, errMsg)
 	f.mu.Unlock()
 	f.done <- struct{}{}
@@ -447,7 +447,8 @@ func TestForwardStream(t *testing.T) {
 	}
 }
 
-// TestFailover429 坏渠道 429 → 冷却 + 硬排除 → 自动切换到好渠道成功。
+// TestFailover429 坏渠道 429 → 本次请求硬排除 → 自动切换到好渠道成功；
+// 无冷却状态：不落库任何状态变更，下次请求坏渠道仍照常参与调度。
 func TestFailover429(t *testing.T) {
 	var goodHits, badHits atomic.Int32
 	var lastBody atomic.Value
@@ -468,21 +469,22 @@ func TestFailover429(t *testing.T) {
 	if badHits.Load() != 1 || goodHits.Load() != 1 {
 		t.Errorf("hits bad=%d good=%d, want 1/1", badHits.Load(), goodHits.Load())
 	}
-	// 冷却异步落库：status 不变（enabled）、status_until 非空。
-	if call := env.persister.waitOne(t); call != "2:enabled:true" {
-		t.Errorf("冷却落库 = %q, want 2:enabled:true", call)
+	// 429 不产生任何状态落库（无冷却机制）。
+	if got := env.persister.callCount(); got != 0 {
+		t.Errorf("429 不应有状态落库, got %d 次", got)
 	}
 	if env.sink.count() != 1 {
 		t.Errorf("UsageRecord 条数 = %d, want 1（仅成功渠道计费）", env.sink.count())
 	}
 
-	// 冷却生效（hardExclude + MarkCooldown）：再次请求直接走好渠道。
+	// 429 仅本次请求内排除：下次请求高优先级坏渠道仍被选中，再次 failover 成功。
 	w2 := env.do(t, `{"model":"gpt-4o","messages":[]}`)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("第二次请求 status = %d", w2.Code)
 	}
-	if badHits.Load() != 1 {
-		t.Errorf("冷却中的渠道仍被调度: badHits = %d", badHits.Load())
+	if badHits.Load() != 2 || goodHits.Load() != 2 {
+		t.Errorf("第二次 hits bad=%d good=%d, want 2/2（429 渠道下次请求应照常调度）",
+			badHits.Load(), goodHits.Load())
 	}
 }
 
@@ -540,8 +542,9 @@ func TestUpstream500Failover(t *testing.T) {
 	}
 }
 
-// TestClientErrorPassthrough 普通 4xx 原样透传不重试。
-func TestClientErrorPassthrough(t *testing.T) {
+// TestClientErrorRebuilt 普通 4xx 语义重建终止不重试：
+// 上游 message/type 提取后按入口协议（openai）重建，HTTP 状态码保留原值。
+func TestClientErrorRebuilt(t *testing.T) {
 	var hits atomic.Int32
 	bad := newFailingUpstream(http.StatusBadRequest, "", &hits)
 	defer bad.Close()
@@ -555,8 +558,15 @@ func TestClientErrorPassthrough(t *testing.T) {
 	if hits.Load() != 1 {
 		t.Errorf("hits = %d, want 1（不重试）", hits.Load())
 	}
-	if !strings.Contains(w.Body.String(), "upstream says no") {
-		t.Errorf("未透传上游错误体: %s", w.Body.String())
+	var resp errfmt.OpenAIError
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("重建后错误体非 JSON: %v", err)
+	}
+	if resp.Error.Message != "upstream says no" {
+		t.Errorf("message = %q, want 保留上游语义", resp.Error.Message)
+	}
+	if resp.Error.Type != "rate_limit_error" {
+		t.Errorf("type = %q, want 保留上游 error.type", resp.Error.Type)
 	}
 }
 
@@ -785,8 +795,8 @@ func TestAuthFailedSanitizedAndDistinctError(t *testing.T) {
 
 	// (a) 自动禁用落库原因已脱敏。
 	call := env.persister.waitOne(t)
-	if call != "1:disabled_auto:false" {
-		t.Fatalf("落库调用 = %q, want 1:disabled_auto:false", call)
+	if call != "1:disabled_auto" {
+		t.Fatalf("落库调用 = %q, want 1:disabled_auto", call)
 	}
 	errMsg := env.persister.lastErrMsg()
 	if strings.Contains(errMsg, "sk-up-1") {
@@ -800,8 +810,8 @@ func TestAuthFailedSanitizedAndDistinctError(t *testing.T) {
 	}
 }
 
-// TestClientErrorBodySanitized 上游 400（透传路径）回显渠道 key：
-// 透传给客户端前做精确 key 替换，其余内容不动。
+// TestClientErrorBodySanitized 上游 400（语义重建路径）回显渠道 key：
+// 提取出的 message 写响应前做精确 key 替换，其余语义不动。
 func TestClientErrorBodySanitized(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -818,16 +828,17 @@ func TestClientErrorBodySanitized(t *testing.T) {
 	}
 	body := w.Body.String()
 	if strings.Contains(body, "sk-up-1") {
-		t.Errorf("4xx 透传体泄漏明文 key: %s", body)
+		t.Errorf("4xx 重建错误体泄漏明文 key: %s", body)
 	}
 	if !strings.Contains(body, "sk-***up-1") || !strings.Contains(body, "for request") {
-		t.Errorf("4xx 透传体应仅替换 key、其余内容不动: %s", body)
+		t.Errorf("4xx 重建错误体应仅替换 key、其余语义不动: %s", body)
 	}
 }
 
-// TestKeyword400DoesNotDisableChannel 上游 400 回显关键词不再自动禁用渠道
-// （防任意用户构造关键词字符串打禁渠道）。
-func TestKeyword400DoesNotDisableChannel(t *testing.T) {
+// TestClientError400DoesNotDisableChannel 上游 400（错误体含凭证类文案）不自动禁用渠道：
+// 自动禁用仅由 401/403 状态码触发，错误体内容不参与判定
+// （否则任意用户可构造回显文案打禁渠道）。
+func TestClientError400DoesNotDisableChannel(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -839,7 +850,7 @@ func TestKeyword400DoesNotDisableChannel(t *testing.T) {
 	w := env.do(t, `{"model":"gpt-4o","messages":[]}`)
 
 	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400 透传", w.Code)
+		t.Fatalf("status = %d, want 400", w.Code)
 	}
 	// 渠道不得被禁用：再次请求仍会被调度（上游再次收到请求）。
 	w2 := env.do(t, `{"model":"gpt-4o","messages":[]}`)
@@ -1142,7 +1153,7 @@ func TestForwardResponses404Failover(t *testing.T) {
 }
 
 // TestForwardResponsesAll404 修3：两 Responses 渠道全回 404 → 客户端收到 404 原状态码
-// （非 all-failed 的 5xx）+ 上游原始 body；全 404 不计费。
+// （非 all-failed 的 5xx），错误体为按 404 语义重建的入口协议形态；全 404 不计费。
 func TestForwardResponsesAll404(t *testing.T) {
 	var hits1, hits2 atomic.Int32
 	bad1 := newFailingUpstream(http.StatusNotFound, "", &hits1)
@@ -1154,19 +1165,19 @@ func TestForwardResponsesAll404(t *testing.T) {
 	w := env.doResponses(t, `{"model":"gpt-4o","input":"hi"}`)
 
 	if w.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404 原状态码透传（非 5xx）; body = %s", w.Code, w.Body.String())
+		t.Fatalf("status = %d, want 404 原状态码保留（非 5xx）; body = %s", w.Code, w.Body.String())
 	}
 	if !strings.Contains(w.Body.String(), "upstream says no") {
-		t.Errorf("未透传上游 404 原始 body: %s", w.Body.String())
+		t.Errorf("重建错误体未保留上游 404 语义: %s", w.Body.String())
 	}
 	if env.sink.count() != 0 {
 		t.Errorf("全 404 请求不应计费, got %d 条", env.sink.count())
 	}
 }
 
-// TestForwardChat404Passthrough 修3 回归：chat 端点 404 仍一次性透传不重试
+// TestForwardChat404Rebuilt 修3 回归：chat 端点 404 仍一次性语义重建终止不重试
 // （404 failover 仅限 responses 端点，chat 行为不变）。
-func TestForwardChat404Passthrough(t *testing.T) {
+func TestForwardChat404Rebuilt(t *testing.T) {
 	var hits atomic.Int32
 	bad := newFailingUpstream(http.StatusNotFound, "", &hits)
 	defer bad.Close()
@@ -1175,13 +1186,13 @@ func TestForwardChat404Passthrough(t *testing.T) {
 	w := env.do(t, `{"model":"gpt-4o","messages":[]}`)
 
 	if w.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404 一次性透传", w.Code)
+		t.Fatalf("status = %d, want 404 一次性终止", w.Code)
 	}
 	if hits.Load() != 1 {
 		t.Errorf("hits = %d, want 1（chat 404 不重试）", hits.Load())
 	}
 	if !strings.Contains(w.Body.String(), "upstream says no") {
-		t.Errorf("未透传上游 404 body: %s", w.Body.String())
+		t.Errorf("重建错误体未保留上游 404 语义: %s", w.Body.String())
 	}
 }
 
@@ -1587,7 +1598,7 @@ func TestForwardMessagesStream(t *testing.T) {
 	}
 }
 
-// TestForwardMessagesFailover anthropic 渠道 429 冷却 → 换同协议渠道成功；
+// TestForwardMessagesFailover anthropic 渠道 429 硬排除 → 换同协议渠道成功；
 // 同模型的 openai 渠道存在但绝不被 /v1/messages 调度（协议隔离）。
 func TestForwardMessagesFailover(t *testing.T) {
 	var goodHits, badHits, oaiHits atomic.Int32
@@ -1618,13 +1629,91 @@ func TestForwardMessagesFailover(t *testing.T) {
 	if oaiHits.Load() != 0 {
 		t.Errorf("openai 渠道被 anthropic 协议入口调度: hits=%d", oaiHits.Load())
 	}
-	// 429 冷却落库（status 不变 + status_until 非空）。
-	if call := env.persister.waitOne(t); call != "2:enabled:true" {
-		t.Errorf("冷却落库 = %q, want 2:enabled:true", call)
+	// 429 不产生任何状态落库（无冷却机制）。
+	if got := env.persister.callCount(); got != 0 {
+		t.Errorf("429 不应有状态落库, got %d 次", got)
 	}
 	if env.sink.count() != 1 {
 		t.Errorf("UsageRecord 条数 = %d, want 1（仅成功渠道计费）", env.sink.count())
 	}
+}
+
+// TestUpstreamClientErrorRebuiltNativeShape 上游 4xx 语义重建按入口协议出原生形态：
+// anthropic 入口重建 Anthropic 错误体（上游原生 type 保留），
+// gemini 入口重建 Gemini 错误体（上游 canonical status 保留）；HTTP 状态码保留原值。
+func TestUpstreamClientErrorRebuiltNativeShape(t *testing.T) {
+	t.Run("anthropic 入口", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"type":"error","error":{"type":"invalid_request_error","message":"max_tokens required"}}`)
+		}))
+		defer upstream.Close()
+
+		env := newTestEnv(t, anthSnap(1, upstream.URL))
+		w := env.doMessages(t, `{"model":"`+anthModel+`","max_tokens":8,"messages":[]}`)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400 原状态码保留", w.Code)
+		}
+		var resp errfmt.AnthropicError
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("错误体非 JSON: %v", err)
+		}
+		if resp.Type != "error" || resp.Error.Type != "invalid_request_error" {
+			t.Errorf("错误体非 Anthropic 原生形态: %s", w.Body.String())
+		}
+		if resp.Error.Message != "max_tokens required" {
+			t.Errorf("message = %q, want 保留上游语义", resp.Error.Message)
+		}
+	})
+
+	t.Run("gemini 入口", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"error":{"code":400,"message":"invalid contents","status":"INVALID_ARGUMENT"}}`)
+		}))
+		defer upstream.Close()
+
+		env := newTestEnv(t, gemSnap(1, upstream.URL))
+		w := env.doGemini(t, gemModel+":generateContent", `{"contents":[]}`)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400 原状态码保留", w.Code)
+		}
+		var resp errfmt.GeminiError
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("错误体非 JSON: %v", err)
+		}
+		if resp.Error.Code != 400 || resp.Error.Status != "INVALID_ARGUMENT" {
+			t.Errorf("错误体非 Gemini 原生形态: %s", w.Body.String())
+		}
+		if resp.Error.Message != "invalid contents" {
+			t.Errorf("message = %q, want 保留上游语义", resp.Error.Message)
+		}
+	})
+
+	t.Run("上游错误体不可解析回落状态码文案", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+		}))
+		defer upstream.Close()
+
+		env := newTestEnv(t, testSnap(1, upstream.URL))
+		w := env.do(t, `{"model":"gpt-4o","messages":[]}`)
+
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("status = %d, want 422", w.Code)
+		}
+		var resp errfmt.OpenAIError
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("错误体非 JSON: %v", err)
+		}
+		if resp.Error.Message != "上游返回状态码 422" {
+			t.Errorf("message = %q, want 状态码兜底文案", resp.Error.Message)
+		}
+	})
 }
 
 // TestMessagesNoChannelAnthropicErrorShape 协议隔离 + 错误形态：仅 openai 渠道

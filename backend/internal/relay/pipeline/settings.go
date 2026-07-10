@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"strings"
 	"sync"
@@ -34,26 +33,14 @@ type SettingsLister interface {
 
 // GatewaySettings relay 管线运行时开关快照。
 type GatewaySettings struct {
-	// AutoBanEnabled 401/403/关键词自动禁用总开关（channel_auto_ban_enabled，默认 true）。
+	// AutoBanEnabled 上游 401/403 自动禁用总开关（channel_auto_ban_enabled，默认 true）。
 	AutoBanEnabled bool
-	// BanKeywords 错误体关键词表（channel_ban_keywords，JSON 数组；已统一小写）。
-	BanKeywords []string
-}
-
-// defaultBanKeywords 关键词表默认种子（与契约 §5 一致，全小写）。
-var defaultBanKeywords = []string{
-	"invalid_api_key",
-	"incorrect api key",
-	"account deactivated",
-	"insufficient_quota",
-	"api key not valid",
 }
 
 // defaultGatewaySettings 返回默认开关（lister 缺失或读失败时的兜底）。
 func defaultGatewaySettings() GatewaySettings {
 	return GatewaySettings{
 		AutoBanEnabled: true,
-		BanKeywords:    defaultBanKeywords,
 	}
 }
 
@@ -141,20 +128,6 @@ func applySettings(s *GatewaySettings, items []Setting) {
 		switch item.Key {
 		case "channel_auto_ban_enabled":
 			s.AutoBanEnabled = value != "false"
-		case "channel_ban_keywords":
-			var keywords []string
-			if err := json.Unmarshal([]byte(value), &keywords); err != nil {
-				slog.Warn("gateway_settings_ban_keywords_invalid", "error", err)
-				continue
-			}
-			normalized := make([]string, 0, len(keywords))
-			for _, kw := range keywords {
-				kw = strings.ToLower(strings.TrimSpace(kw))
-				if kw != "" {
-					normalized = append(normalized, kw)
-				}
-			}
-			s.BanKeywords = normalized
 		}
 	}
 }

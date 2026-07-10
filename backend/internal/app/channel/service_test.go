@@ -12,7 +12,7 @@ import (
 // stubRepo 渠道仓储替身：按需覆盖各方法，未覆盖返回零值。
 type stubRepo struct {
 	findByID         func(ctx context.Context, id int) (Channel, error)
-	updateState      func(ctx context.Context, id int, status string, until *time.Time, errMsg string) error
+	updateState      func(ctx context.Context, id int, status string, errMsg string) error
 	updateTestResult func(ctx context.Context, id int, responseTimeMs int, testedAt time.Time) error
 	updateBalance    func(ctx context.Context, id int, balance float64, updatedAt time.Time) error
 }
@@ -29,11 +29,11 @@ func (s *stubRepo) Create(context.Context, CreateInput) (Channel, error)      { 
 func (s *stubRepo) Update(context.Context, int, UpdateInput) (Channel, error) { return Channel{}, nil }
 func (s *stubRepo) Delete(context.Context, int) error                         { return nil }
 func (s *stubRepo) BulkUpdate(context.Context, BulkUpdateInput) (int, error)  { return 0, nil }
-func (s *stubRepo) UpdateState(ctx context.Context, id int, status string, until *time.Time, errMsg string) error {
+func (s *stubRepo) UpdateState(ctx context.Context, id int, status string, errMsg string) error {
 	if s.updateState == nil {
 		return nil
 	}
-	return s.updateState(ctx, id, status, until, errMsg)
+	return s.updateState(ctx, id, status, errMsg)
 }
 func (s *stubRepo) UpdateTestResult(ctx context.Context, id int, responseTimeMs int, testedAt time.Time) error {
 	if s.updateTestResult == nil {
@@ -103,7 +103,7 @@ func TestTestRecoverRereadsCurrentStatus(t *testing.T) {
 					}
 					return Channel{ID: id, Status: status, TestModel: "gpt-4o"}, nil
 				},
-				updateState: func(_ context.Context, _ int, status string, _ *time.Time, _ string) error {
+				updateState: func(_ context.Context, _ int, status string, _ string) error {
 					if status != StatusEnabled {
 						t.Errorf("恢复状态 = %q, want enabled", status)
 					}

@@ -29,7 +29,6 @@ type fakePersister struct {
 type persistCall struct {
 	id     int
 	status string
-	until  *time.Time
 	errMsg string
 }
 
@@ -37,9 +36,9 @@ func newFakePersister() *fakePersister {
 	return &fakePersister{done: make(chan struct{}, 16)}
 }
 
-func (f *fakePersister) PersistState(_ context.Context, id int, status string, until *time.Time, errMsg string) error {
+func (f *fakePersister) PersistState(_ context.Context, id int, status string, errMsg string) error {
 	f.mu.Lock()
-	f.calls = append(f.calls, persistCall{id: id, status: status, until: until, errMsg: errMsg})
+	f.calls = append(f.calls, persistCall{id: id, status: status, errMsg: errMsg})
 	f.mu.Unlock()
 	f.done <- struct{}{}
 	return nil
@@ -87,9 +86,6 @@ func newTestRegistry(t *testing.T, persister Persister, snaps ...ChannelSnapshot
 }
 
 func TestRegistryPick(t *testing.T) {
-	past := time.Now().Add(-time.Minute)
-	future := time.Now().Add(time.Minute)
-
 	cases := []struct {
 		name    string
 		snaps   []ChannelSnapshot
@@ -122,22 +118,6 @@ func TestRegistryPick(t *testing.T) {
 			},
 			model:   "gpt-4o",
 			wantErr: ErrNoAvailableChannel,
-		},
-		{
-			name: "冷却未到期不可调度",
-			snaps: []ChannelSnapshot{
-				snap(1, func(s *ChannelSnapshot) { s.StatusUntil = &future }),
-			},
-			model:   "gpt-4o",
-			wantErr: ErrNoAvailableChannel,
-		},
-		{
-			name: "冷却已过期恢复可选",
-			snaps: []ChannelSnapshot{
-				snap(1, func(s *ChannelSnapshot) { s.StatusUntil = &past }),
-			},
-			model:  "gpt-4o",
-			wantID: 1,
 		},
 		{
 			name: "公共渠道（空分组）对任意分组可用",
@@ -340,24 +320,6 @@ func TestRegistryNextKey(t *testing.T) {
 	}
 }
 
-func TestRegistryMarkCooldown(t *testing.T) {
-	persister := newFakePersister()
-	r := newTestRegistry(t, persister, snap(1))
-
-	until := time.Now().Add(time.Minute)
-	r.MarkCooldown(1, until)
-
-	// 内存即时生效：冷却期间不可被 Pick。
-	if _, err := r.Pick(0, "gpt-4o", ProtocolOpenAI, nil); !errors.Is(err, ErrNoAvailableChannel) {
-		t.Fatalf("冷却中渠道仍被选中，err=%v", err)
-	}
-
-	call := persister.waitOne(t)
-	if call.id != 1 || call.status != StatusEnabled || call.until == nil || !call.until.Equal(until) {
-		t.Fatalf("落库参数不符: %+v", call)
-	}
-}
-
 func TestRegistryMarkAutoDisabledAndRecovered(t *testing.T) {
 	persister := newFakePersister()
 	r := newTestRegistry(t, persister, snap(1))
@@ -428,10 +390,8 @@ func TestRegistryReloadKeepsCounters(t *testing.T) {
 }
 
 // TestRegistryModelEntriesForGroup 分组过滤与状态语义：
-// 公共渠道对所有分组可见、绑定分组渠道只对本组可见、
-// 停用渠道不进目录、冷却是瞬态状态不影响目录。
+// 公共渠道对所有分组可见、绑定分组渠道只对本组可见、停用渠道不进目录。
 func TestRegistryModelEntriesForGroup(t *testing.T) {
-	future := time.Now().Add(time.Minute)
 	r := newTestRegistry(t, nil,
 		snap(1, func(s *ChannelSnapshot) {
 			s.Models = map[string]struct{}{"gpt-4o": {}, "gpt-4o-mini": {}}
@@ -444,11 +404,6 @@ func TestRegistryModelEntriesForGroup(t *testing.T) {
 			s.Models = map[string]struct{}{"disabled-model": {}}
 			s.Status = StatusDisabledManual
 		}),
-		snap(4, func(s *ChannelSnapshot) {
-			// 冷却是瞬态状态：模型目录仍然可见。
-			s.Models = map[string]struct{}{"cooldown-model": {}}
-			s.StatusUntil = &future
-		}),
 	)
 
 	cases := []struct {
@@ -459,12 +414,12 @@ func TestRegistryModelEntriesForGroup(t *testing.T) {
 		{
 			name:    "绑定分组：公共渠道 + 本组渠道并集，字典序",
 			groupID: 7,
-			want:    []string{"claude-x", "cooldown-model", "gpt-4o", "gpt-4o-mini"},
+			want:    []string{"claude-x", "gpt-4o", "gpt-4o-mini"},
 		},
 		{
 			name:    "其他分组：仅公共渠道",
 			groupID: 8,
-			want:    []string{"cooldown-model", "gpt-4o", "gpt-4o-mini"},
+			want:    []string{"gpt-4o", "gpt-4o-mini"},
 		},
 	}
 	for _, tc := range cases {

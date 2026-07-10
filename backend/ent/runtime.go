@@ -159,11 +159,11 @@ func init() {
 	// channel.DefaultModels holds the default value on creation for the models field.
 	channel.DefaultModels = channelDescModels.Default.([]string)
 	// channelDescErrorMsg is the schema descriptor for error_msg field.
-	channelDescErrorMsg := channelFields[10].Descriptor()
+	channelDescErrorMsg := channelFields[9].Descriptor()
 	// channel.DefaultErrorMsg holds the default value on creation for the error_msg field.
 	channel.DefaultErrorMsg = channelDescErrorMsg.Default.(string)
 	// channelDescPriority is the schema descriptor for priority field.
-	channelDescPriority := channelFields[11].Descriptor()
+	channelDescPriority := channelFields[10].Descriptor()
 	// channel.DefaultPriority holds the default value on creation for the priority field.
 	channel.DefaultPriority = channelDescPriority.Default.(int)
 	// channel.PriorityValidator is a validator for the "priority" field. It is called by the builders before save.
@@ -183,41 +183,41 @@ func init() {
 		}
 	}()
 	// channelDescWeight is the schema descriptor for weight field.
-	channelDescWeight := channelFields[12].Descriptor()
+	channelDescWeight := channelFields[11].Descriptor()
 	// channel.DefaultWeight holds the default value on creation for the weight field.
 	channel.DefaultWeight = channelDescWeight.Default.(int)
 	// channel.WeightValidator is a validator for the "weight" field. It is called by the builders before save.
 	channel.WeightValidator = channelDescWeight.Validators[0].(func(int) error)
 	// channelDescMaxConcurrency is the schema descriptor for max_concurrency field.
-	channelDescMaxConcurrency := channelFields[13].Descriptor()
+	channelDescMaxConcurrency := channelFields[12].Descriptor()
 	// channel.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
 	channel.DefaultMaxConcurrency = channelDescMaxConcurrency.Default.(int)
 	// channelDescMaxRpm is the schema descriptor for max_rpm field.
-	channelDescMaxRpm := channelFields[14].Descriptor()
+	channelDescMaxRpm := channelFields[13].Descriptor()
 	// channel.DefaultMaxRpm holds the default value on creation for the max_rpm field.
 	channel.DefaultMaxRpm = channelDescMaxRpm.Default.(int)
 	// channelDescCostRatio is the schema descriptor for cost_ratio field.
-	channelDescCostRatio := channelFields[15].Descriptor()
+	channelDescCostRatio := channelFields[14].Descriptor()
 	// channel.DefaultCostRatio holds the default value on creation for the cost_ratio field.
 	channel.DefaultCostRatio = channelDescCostRatio.Default.(float64)
 	// channelDescTestModel is the schema descriptor for test_model field.
-	channelDescTestModel := channelFields[17].Descriptor()
+	channelDescTestModel := channelFields[16].Descriptor()
 	// channel.DefaultTestModel holds the default value on creation for the test_model field.
 	channel.DefaultTestModel = channelDescTestModel.Default.(string)
 	// channelDescResponseTimeMs is the schema descriptor for response_time_ms field.
-	channelDescResponseTimeMs := channelFields[18].Descriptor()
+	channelDescResponseTimeMs := channelFields[17].Descriptor()
 	// channel.DefaultResponseTimeMs holds the default value on creation for the response_time_ms field.
 	channel.DefaultResponseTimeMs = channelDescResponseTimeMs.Default.(int)
 	// channelDescBalance is the schema descriptor for balance field.
-	channelDescBalance := channelFields[20].Descriptor()
+	channelDescBalance := channelFields[19].Descriptor()
 	// channel.DefaultBalance holds the default value on creation for the balance field.
 	channel.DefaultBalance = channelDescBalance.Default.(float64)
 	// channelDescCreatedAt is the schema descriptor for created_at field.
-	channelDescCreatedAt := channelFields[23].Descriptor()
+	channelDescCreatedAt := channelFields[22].Descriptor()
 	// channel.DefaultCreatedAt holds the default value on creation for the created_at field.
 	channel.DefaultCreatedAt = channelDescCreatedAt.Default.(func() time.Time)
 	// channelDescUpdatedAt is the schema descriptor for updated_at field.
-	channelDescUpdatedAt := channelFields[24].Descriptor()
+	channelDescUpdatedAt := channelFields[23].Descriptor()
 	// channel.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	channel.DefaultUpdatedAt = channelDescUpdatedAt.Default.(func() time.Time)
 	// channel.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

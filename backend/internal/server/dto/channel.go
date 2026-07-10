@@ -16,7 +16,6 @@ type ChannelResp struct {
 	ParamOverride  map[string]any    `json:"param_override"`
 	HeaderOverride map[string]string `json:"header_override"`
 	Status         string            `json:"status"` // enabled / disabled_manual / disabled_auto
-	StatusUntil    *time.Time        `json:"status_until,omitempty"`
 	ErrorMsg       string            `json:"error_msg"`
 	Priority       int               `json:"priority"`
 	Weight         int               `json:"weight"`

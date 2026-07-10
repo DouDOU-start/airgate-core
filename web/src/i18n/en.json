@@ -276,8 +276,6 @@
     "status_enabled": "Enabled",
     "status_disabled_manual": "Disabled",
     "status_disabled_auto": "Auto Disabled",
-    "status_cooldown": "Cooling Down",
-    "cooldown_until": "Cooling down until {{time}}",
     "select_all": "Select all on this page",
     "selected_count": "{{count}} channel(s) selected",
     "bulk_set_priority": "Set Priority",

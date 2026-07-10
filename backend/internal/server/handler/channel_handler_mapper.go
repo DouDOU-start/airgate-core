@@ -20,7 +20,6 @@ func toChannelRespFromDomain(item appchannel.Channel) dto.ChannelResp {
 		ParamOverride:    item.ParamOverride,
 		HeaderOverride:   item.HeaderOverride,
 		Status:           item.Status,
-		StatusUntil:      item.StatusUntil,
 		ErrorMsg:         item.ErrorMsg,
 		Priority:         item.Priority,
 		Weight:           item.Weight,

@@ -54,14 +54,7 @@ function typeLabel(type: string): string {
   return CHANNEL_TYPE_OPTIONS.find((item) => item.id === type)?.label ?? type;
 }
 
-// 冷却中 = enabled 且 status_until 未过期
-function isCoolingDown(channel: ChannelResp): boolean {
-  return channel.status === 'enabled'
-    && !!channel.status_until
-    && new Date(channel.status_until).getTime() > Date.now();
-}
-
-// 状态徽章：enabled 绿 / disabled_manual 灰 / disabled_auto 红 + error_msg tooltip / 冷却中显示 status_until
+// 状态徽章：enabled 绿 / disabled_manual 灰 / disabled_auto 红 + error_msg tooltip
 function ChannelStatusChip({ channel }: { channel: ChannelResp }) {
   const { t } = useTranslation();
 
@@ -85,20 +78,6 @@ function ChannelStatusChip({ channel }: { channel: ChannelResp }) {
       <Chip color="default" size="sm" variant="soft">
         {t('channels.status_disabled_manual')}
       </Chip>
-    );
-  }
-
-  if (isCoolingDown(channel)) {
-    const until = formatDateTime(channel.status_until!);
-    return (
-      <Tooltip>
-        <Tooltip.Trigger className="inline-flex">
-          <Chip color="warning" size="sm" variant="soft">
-            {t('channels.status_cooldown')}
-          </Chip>
-        </Tooltip.Trigger>
-        <Tooltip.Content>{t('channels.cooldown_until', { time: until })}</Tooltip.Content>
-      </Tooltip>
     );
   }
 
