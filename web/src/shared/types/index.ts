@@ -486,7 +486,7 @@ export interface UsageTrendBucket {
 // ==================== Channel ====================
 
 /** 渠道协议类型 */
-export type ChannelType = 'openai_compatible' | 'anthropic' | 'gemini';
+export type ChannelType = 'openai_compatible' | 'anthropic' | 'gemini' | 'custom' | 'openai_video' | 'suno';
 
 /** 渠道状态：enabled 启用 / disabled_manual 手动禁用 / disabled_auto 自动禁用 */
 export type ChannelStatus = 'enabled' | 'disabled_manual' | 'disabled_auto';

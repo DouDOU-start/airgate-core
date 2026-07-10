@@ -387,7 +387,12 @@
     "tag_delete_confirm": "确定删除标签「{{name}}」吗？引用该标签的模型将变为无标签。",
     "tag_create_success": "标签已创建",
     "tag_update_success": "标签已更新",
-    "tag_delete_success": "标签已删除"
+    "tag_delete_success": "标签已删除",
+    "billing_mode_video": "视频按秒计费",
+    "video_per_second": "每秒单价",
+    "unit_per_second": "USD / 秒",
+    "video_per_second_required": "视频按秒计费需填写大于 0 的每秒单价",
+    "price_short_per_second": "按秒"
   },
   "groups": {
     "title": "分组管理",

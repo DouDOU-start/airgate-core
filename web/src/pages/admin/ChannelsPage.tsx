@@ -48,6 +48,9 @@ const TYPE_CHIP_COLORS: Record<ChannelType, 'accent' | 'warning' | 'success' | '
   openai_compatible: 'accent',
   anthropic: 'warning',
   gemini: 'success',
+  custom: 'default',
+  openai_video: 'accent',
+  suno: 'warning',
 };
 
 function typeLabel(type: string): string {

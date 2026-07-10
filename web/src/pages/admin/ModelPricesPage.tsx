@@ -33,6 +33,7 @@ interface PriceForm {
   cache_creation_price: string;
   cache_creation_1h_price: string;
   per_request_price: string;
+  video_per_second: string;
   tier_priority: string;
   tier_flex: string;
   lc_threshold: string;
@@ -49,6 +50,7 @@ const emptyForm: PriceForm = {
   cache_creation_price: '',
   cache_creation_1h_price: '',
   per_request_price: '',
+  video_per_second: '',
   tier_priority: '',
   tier_flex: '',
   lc_threshold: '',
@@ -100,7 +102,7 @@ const PRICE_SECTIONS: { titleKey: string; fields: readonly PriceFieldKey[] }[] =
 
 // 计费方式：按 Token（默认）或按次一口价。后端 per_request>0 时短路 token 计价，
 // 服务档/长上下文也不参与，故按次模式下相关配置一律隐藏并清零。
-type BillingMode = 'token' | 'per_request';
+type BillingMode = 'token' | 'per_request' | 'video_per_second';
 
 function fmtPrice(value: number): string {
   if (!value) return '—';
@@ -202,6 +204,17 @@ function specialLine(row: ModelPriceResp, t: Translate): ReactNode {
         {t('model_prices.price_short_per_request')} {fmtPrice(row.per_request_price)}
       </span>,
     );
+  }
+  const video = row.pricing_extra?.video;
+  if (video && typeof video === 'object' && !Array.isArray(video)) {
+    const perSecond = Number((video as Record<string, unknown>).per_second);
+    if (Number.isFinite(perSecond) && perSecond > 0) {
+      parts.push(
+        <span className="whitespace-nowrap font-medium text-warning" key="vps">
+          {t('model_prices.price_short_per_second')} {fmtPrice(perSecond)}
+        </span>,
+      );
+    }
   }
   const tiers = row.pricing_extra?.service_tiers;
   if (tiers && typeof tiers === 'object' && !Array.isArray(tiers)) {
@@ -448,9 +461,10 @@ export default function ModelPricesPage() {
 
   function openEdit(price: ModelPriceResp) {
     const extra = asRecord(price.pricing_extra);
-    const { long_context: lcRaw, service_tiers: tiersRaw, ...restExtra } = extra;
+    const { long_context: lcRaw, service_tiers: tiersRaw, video: videoRaw, ...restExtra } = extra;
     const { flex, priority, ...restTiers } = asRecord(tiersRaw);
     const lc = asRecord(lcRaw);
+    const videoPerSecond = numToField(asRecord(videoRaw).per_second);
 
     setEditingPrice(price);
     setExtraRest(restExtra);
@@ -461,7 +475,7 @@ export default function ModelPricesPage() {
       || numToField(flex) !== '',
     );
     setLcEnabled(numToField(lc.threshold_tokens) !== '');
-    setBillingMode(price.per_request_price > 0 ? 'per_request' : 'token');
+    setBillingMode(price.per_request_price > 0 ? 'per_request' : videoPerSecond !== '' ? 'video_per_second' : 'token');
     setFormTagID(price.tag?.id ?? 0);
     setForm({
       model: price.model,
@@ -471,6 +485,7 @@ export default function ModelPricesPage() {
       cache_creation_price: String(price.cache_creation_price),
       cache_creation_1h_price: String(price.cache_creation_1h_price),
       per_request_price: String(price.per_request_price),
+      video_per_second: videoPerSecond,
       tier_priority: numToField(priority),
       tier_flex: numToField(flex),
       lc_threshold: numToField(lc.threshold_tokens),
@@ -506,6 +521,27 @@ export default function ModelPricesPage() {
       payload.per_request_price = num;
       for (const field of TOKEN_PRICE_FIELDS) payload[field] = 0;
       payload.pricing_extra = { ...extraRest };
+      payload.tag_id = formTagID;
+      if (editingPrice) {
+        updateMutation.mutate({ id: editingPrice.id, payload });
+      } else {
+        createMutation.mutate(payload);
+      }
+      return;
+    }
+
+    // 视频按秒计费（任务子系统）：只收每秒单价（必须 >0），写入
+    // pricing_extra.video.per_second；token 价格与按次价全部清零。
+    if (billingMode === 'video_per_second') {
+      const raw = form.video_per_second.trim();
+      const num = raw === '' ? 0 : Number(raw);
+      if (!Number.isFinite(num) || num <= 0) {
+        toast('error', t('model_prices.video_per_second_required'));
+        return;
+      }
+      payload.per_request_price = 0;
+      for (const field of TOKEN_PRICE_FIELDS) payload[field] = 0;
+      payload.pricing_extra = { ...extraRest, video: { per_second: num } };
       payload.tag_id = formTagID;
       if (editingPrice) {
         updateMutation.mutate({ id: editingPrice.id, payload });
@@ -901,17 +937,37 @@ export default function ModelPricesPage() {
                       selectionMode="single"
                       onSelectionChange={(keys) => {
                         const key = [...keys][0];
-                        if (key === 'token' || key === 'per_request') setBillingMode(key);
+                        if (key === 'token' || key === 'per_request' || key === 'video_per_second') setBillingMode(key);
                       }}
                     >
                       <ToggleButton id="token">{t('model_prices.billing_mode_token')}</ToggleButton>
                       <ToggleButton id="per_request">{t('model_prices.billing_mode_per_request')}</ToggleButton>
+                      <ToggleButton id="video_per_second">{t('model_prices.billing_mode_video')}</ToggleButton>
                     </ToggleButtonGroup>
                   </div>
 
                   {billingMode === 'per_request' ? (
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {renderPriceField('per_request_price')}
+                    </div>
+                  ) : billingMode === 'video_per_second' ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <HeroTextField fullWidth>
+                        <Label>
+                          {t('model_prices.video_per_second')}
+                          <span className="ml-1 text-[10px] font-normal text-text-tertiary">
+                            {t('model_prices.unit_per_second')}
+                          </span>
+                        </Label>
+                        <Input
+                          min={0}
+                          placeholder="0"
+                          step="any"
+                          type="number"
+                          value={form.video_per_second}
+                          onChange={(event) => setForm((prev) => ({ ...prev, video_per_second: event.target.value }))}
+                        />
+                      </HeroTextField>
                     </div>
                   ) : PRICE_SECTIONS.map((section) => (
                     <div className="space-y-2" key={section.titleKey}>

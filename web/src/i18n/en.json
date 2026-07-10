@@ -387,7 +387,12 @@
     "tag_delete_confirm": "Delete tag \"{{name}}\"? Models using it will become untagged.",
     "tag_create_success": "Tag created",
     "tag_update_success": "Tag updated",
-    "tag_delete_success": "Tag deleted"
+    "tag_delete_success": "Tag deleted",
+    "billing_mode_video": "Video per second",
+    "video_per_second": "Price per second",
+    "unit_per_second": "USD / second",
+    "video_per_second_required": "Per-second billing requires a price greater than 0",
+    "price_short_per_second": "Per-sec"
   },
   "groups": {
     "title": "Groups",

@@ -22,6 +22,9 @@ export const CHANNEL_TYPE_OPTIONS: Array<{ id: ChannelType; label: string }> = [
   { id: 'openai_compatible', label: 'OpenAI Compatible' },
   { id: 'anthropic', label: 'Anthropic' },
   { id: 'gemini', label: 'Gemini' },
+  // 任务类渠道（异步任务子系统）：视频（Sora 形态 /v1/videos）与 Suno 音乐
+  { id: 'openai_video', label: 'OpenAI Video' },
+  { id: 'suno', label: 'Suno Music' },
 ];
 
 // parseParamValue 参数覆写值智能解析：能按 JSON 解析的（数字/布尔/对象/带引号字符串）
