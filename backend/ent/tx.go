@@ -40,6 +40,8 @@ type Tx struct {
 	Setting *SettingClient
 	// Task is the client for interacting with the Task builders.
 	Task *TaskClient
+	// Tier is the client for interacting with the Tier builders.
+	Tier *TierClient
 	// UpstreamRequestLog is the client for interacting with the UpstreamRequestLog builders.
 	UpstreamRequestLog *UpstreamRequestLogClient
 	// UsageLog is the client for interacting with the UsageLog builders.
@@ -191,6 +193,7 @@ func (tx *Tx) init() {
 	tx.RedemptionCode = NewRedemptionCodeClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
 	tx.Task = NewTaskClient(tx.config)
+	tx.Tier = NewTierClient(tx.config)
 	tx.UpstreamRequestLog = NewUpstreamRequestLogClient(tx.config)
 	tx.UsageLog = NewUsageLogClient(tx.config)
 	tx.User = NewUserClient(tx.config)

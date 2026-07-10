@@ -41,6 +41,8 @@ func (User) Edges() []ent.Edge {
 			Annotations(entsql.OnDelete(entsql.SetNull)),
 		// 用户可访问的专属分组（多对多）
 		edge.To("allowed_groups", Group.Type),
+		// 用户等级（多对一，可空）：等级倍率参与计费优先级链，见 internal/billing/rate.go
+		edge.From("tier", Tier.Type).Ref("users").Unique(),
 		edge.To("balance_logs", BalanceLog.Type).
 			Annotations(entsql.OnDelete(entsql.SetNull)),
 	}

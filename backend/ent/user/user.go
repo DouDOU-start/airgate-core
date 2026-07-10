@@ -45,6 +45,8 @@ const (
 	EdgeUsageLogs = "usage_logs"
 	// EdgeAllowedGroups holds the string denoting the allowed_groups edge name in mutations.
 	EdgeAllowedGroups = "allowed_groups"
+	// EdgeTier holds the string denoting the tier edge name in mutations.
+	EdgeTier = "tier"
 	// EdgeBalanceLogs holds the string denoting the balance_logs edge name in mutations.
 	EdgeBalanceLogs = "balance_logs"
 	// Table holds the table name of the user in the database.
@@ -68,6 +70,13 @@ const (
 	// AllowedGroupsInverseTable is the table name for the Group entity.
 	// It exists in this package in order to avoid circular dependency with the "group" package.
 	AllowedGroupsInverseTable = "groups"
+	// TierTable is the table that holds the tier relation/edge.
+	TierTable = "users"
+	// TierInverseTable is the table name for the Tier entity.
+	// It exists in this package in order to avoid circular dependency with the "tier" package.
+	TierInverseTable = "tiers"
+	// TierColumn is the table column denoting the tier relation/edge.
+	TierColumn = "tier_users"
 	// BalanceLogsTable is the table that holds the balance_logs relation/edge.
 	BalanceLogsTable = "balance_logs"
 	// BalanceLogsInverseTable is the table name for the BalanceLog entity.
@@ -94,6 +103,12 @@ var Columns = []string{
 	FieldUpdatedAt,
 }
 
+// ForeignKeys holds the SQL foreign-keys that are owned by the "users"
+// table and are not defined as standalone fields in the schema.
+var ForeignKeys = []string{
+	"tier_users",
+}
+
 var (
 	// AllowedGroupsPrimaryKey and AllowedGroupsColumn2 are the table columns denoting the
 	// primary key for the allowed_groups relation (M2M).
@@ -104,6 +119,11 @@ var (
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
+			return true
+		}
+	}
+	for i := range ForeignKeys {
+		if column == ForeignKeys[i] {
 			return true
 		}
 	}
@@ -292,6 +312,13 @@ func ByAllowedGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByTierField orders the results by tier field.
+func ByTierField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTierStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByBalanceLogsCount orders the results by balance_logs count.
 func ByBalanceLogsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -324,6 +351,13 @@ func newAllowedGroupsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(AllowedGroupsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2M, false, AllowedGroupsTable, AllowedGroupsPrimaryKey...),
+	)
+}
+func newTierStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TierInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, TierTable, TierColumn),
 	)
 }
 func newBalanceLogsStep() *sqlgraph.Step {

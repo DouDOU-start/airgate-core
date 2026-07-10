@@ -28,5 +28,15 @@ export const PIE_CHART_COLORS = [
   'oklch(66% 0.085 48)',
 ] as const;
 
+/** 仪表盘时间范围预设，管理员仪表盘与用户概览共用 */
+export const RANGE_PRESETS = ['today', '7d', '30d', '90d'] as const;
+export type RangePreset = typeof RANGE_PRESETS[number];
+
+/** Token 趋势图折线顺序（图例与 tooltip 共用） */
+export const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio', 'cacheCumulativeRatio'];
+
+/** 趋势图中按百分比渲染的折线 key */
+export const TOKEN_TREND_RATIO_KEYS = new Set<keyof typeof USAGE_TOKEN_COLORS>(['cacheRatio', 'cacheCumulativeRatio']);
+
 /** 头像颜色池（内嵌装饰色板） */
 export { decorativePalette as AVATAR_COLORS } from './utils/theme';

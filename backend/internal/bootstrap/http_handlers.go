@@ -24,6 +24,7 @@ import (
 	apppayment "github.com/DouDOU-start/airgate-core/internal/app/payment"
 	appredemption "github.com/DouDOU-start/airgate-core/internal/app/redemption"
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
+	apptier "github.com/DouDOU-start/airgate-core/internal/app/tier"
 	appupstreamlog "github.com/DouDOU-start/airgate-core/internal/app/upstreamlog"
 	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
 	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
@@ -50,6 +51,7 @@ type HTTPHandlers struct {
 	Auth         *handler.AuthHandler
 	User         *handler.UserHandler
 	Group        *handler.GroupHandler
+	Tier         *handler.TierHandler
 	Announcement *handler.AnnouncementHandler
 	APIKey       *handler.APIKeyHandler
 	Usage        *handler.UsageHandler
@@ -95,6 +97,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	groupStore := store.NewGroupStore(dep.DB)
 	groupService := appgroup.NewService(groupStore, dep.Concurrency)
 	groupService.SetRPMReader(rpmCounter)
+	tierStore := store.NewTierStore(dep.DB)
+	tierService := apptier.NewService(tierStore)
 	announcementStore := store.NewAnnouncementStore(dep.DB)
 	announcementService := appannouncement.NewService(announcementStore)
 	channelStore := store.NewChannelStore(dep.DB)
@@ -115,6 +119,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 
 	userStore := store.NewUserStore(dep.DB)
 	userService := appuser.NewService(userStore)
+	// 用户视角的可用分组列表解析实际倍率（用户专属 > 等级 > 分组档位）
+	groupService.SetUserRatesReader(userService)
 	// 用户列表的并发/RPM 观测：并发读用户槽（dep.Concurrency），RPM 读取器
 	// 与 relay 管线共用同一套 Redis key（rpm:user:*），实例无状态可各建各的。
 	userService.SetRuntimeStatsReaders(dep.Concurrency, rpmCounter)
@@ -147,6 +153,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Auth:         handler.NewAuthHandler(authService, dep.JWTMgr),
 		User:         handler.NewUserHandler(userService, settingsService),
 		Group:        handler.NewGroupHandler(groupService),
+		Tier:         handler.NewTierHandler(tierService),
 		Announcement: handler.NewAnnouncementHandler(announcementService),
 		APIKey:       handler.NewAPIKeyHandler(apiKeyService),
 		Usage:        handler.NewUsageHandler(usageService),
@@ -183,7 +190,12 @@ func (a oauthGroupAdapter) AvailableForUser(ctx context.Context, userID int) ([]
 	}
 	out := make([]appoauth.GroupInfo, len(list))
 	for i, g := range list {
-		out[i] = appoauth.GroupInfo{ID: g.ID, Name: g.Name, RateMultiplier: g.RateMultiplier, Note: g.Note}
+		// 对外部应用展示解析后的实际倍率（用户专属 > 等级 > 分组档位），未解析时回退分组档位
+		rate := g.RateMultiplier
+		if g.EffectiveRate > 0 {
+			rate = g.EffectiveRate
+		}
+		out[i] = appoauth.GroupInfo{ID: g.ID, Name: g.Name, RateMultiplier: rate, Note: g.Note}
 	}
 	return out, nil
 }

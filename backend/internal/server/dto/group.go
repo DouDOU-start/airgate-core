@@ -6,10 +6,13 @@ type GroupResp struct {
 	Name           string  `json:"name"`
 	Platform       string  `json:"platform"`
 	RateMultiplier float64 `json:"rate_multiplier"`
-	IsExclusive    bool    `json:"is_exclusive"`
-	StatusVisible  bool    `json:"status_visible"` // 是否在公开 /status 页展示
-	Note           string  `json:"note,omitempty"`
-	SortWeight     int     `json:"sort_weight"`
+	// EffectiveRate 当前用户在此分组的实际计费倍率（用户专属 > 等级 > 分组档位），
+	// 仅用户视角接口返回；管理员列表恒为 0 并省略。
+	EffectiveRate float64 `json:"effective_rate,omitempty"`
+	IsExclusive   bool    `json:"is_exclusive"`
+	StatusVisible bool    `json:"status_visible"` // 是否在公开 /status 页展示
+	Note          string  `json:"note,omitempty"`
+	SortWeight    int     `json:"sort_weight"`
 
 	// 统计字段（仅管理员列表返回），实扣口径（actual_cost 汇总）
 	TodayCost float64 `json:"today_cost"`

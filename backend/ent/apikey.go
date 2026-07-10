@@ -40,6 +40,8 @@ type APIKey struct {
 	UsedQuotaActual float64 `json:"used_quota_actual,omitempty"`
 	// 销售倍率：>0 时启用 reseller markup, billed_cost = base_cost × sell_rate；=0 表示不加价，billed_cost = actual_cost
 	SellRate float64 `json:"sell_rate,omitempty"`
+	// 最高计费倍率：>0 时若请求时解析出的实际扣费倍率（用户专属倍率 / 分组倍率）超过该值，预检直接拒绝（403 billing_rate_exceeded），防止管理员临时调价后下游不知情超消费。0 表示不限制（默认）。
+	MaxRate float64 `json:"max_rate,omitempty"`
 	// API Key 级并发上限：同一把 key 同时在途的请求数。0 表示不限制（默认）。达到上限时返回 429 + apikey_concurrency_limit，保护单个客户端不因并发过高被自己打死或耗光上游账号的并发预算。
 	MaxConcurrency int `json:"max_concurrency,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
@@ -111,7 +113,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case apikey.FieldIPWhitelist, apikey.FieldIPBlacklist:
 			values[i] = new([]byte)
-		case apikey.FieldQuotaUsd, apikey.FieldUsedQuota, apikey.FieldUsedQuotaActual, apikey.FieldSellRate:
+		case apikey.FieldQuotaUsd, apikey.FieldUsedQuota, apikey.FieldUsedQuotaActual, apikey.FieldSellRate, apikey.FieldMaxRate:
 			values[i] = new(sql.NullFloat64)
 		case apikey.FieldID, apikey.FieldMaxConcurrency:
 			values[i] = new(sql.NullInt64)
@@ -207,6 +209,12 @@ func (ak *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field sell_rate", values[i])
 			} else if value.Valid {
 				ak.SellRate = value.Float64
+			}
+		case apikey.FieldMaxRate:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field max_rate", values[i])
+			} else if value.Valid {
+				ak.MaxRate = value.Float64
 			}
 		case apikey.FieldMaxConcurrency:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -337,6 +345,9 @@ func (ak *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("sell_rate=")
 	builder.WriteString(fmt.Sprintf("%v", ak.SellRate))
+	builder.WriteString(", ")
+	builder.WriteString("max_rate=")
+	builder.WriteString(fmt.Sprintf("%v", ak.MaxRate))
 	builder.WriteString(", ")
 	builder.WriteString("max_concurrency=")
 	builder.WriteString(fmt.Sprintf("%v", ak.MaxConcurrency))

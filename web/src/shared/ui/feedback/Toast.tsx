@@ -40,4 +40,3 @@ export function useToast(): ToastApi {
   return toastApi;
 }
 
-export { heroToast as toast };

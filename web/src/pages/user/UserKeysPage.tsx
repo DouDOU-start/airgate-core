@@ -38,7 +38,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import type { APIKeyResp, CreateAPIKeyReq, UpdateAPIKeyReq, GroupResp } from '../../shared/types';
-import { useAuth } from '../../app/providers/AuthProvider';
 import { EditKeyModal } from './userkeys/EditKeyModal';
 import { CreateKeyModal } from './userkeys/CreateKeyModal';
 import { UseKeyModal, useUseKeyModal } from './userkeys/UseKeyModal';
@@ -52,7 +51,6 @@ export default function UserKeysPage() {
   const { toast } = useToast();
   const copy = useClipboard();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'user.keys');
   const [modalOpen, setModalOpen] = useState(false);
@@ -156,6 +154,7 @@ export default function UserKeysPage() {
       group_id: key.group_id == null ? '' : String(key.group_id),
       quota_usd: key.quota_usd ? String(key.quota_usd) : '',
       sell_rate: key.sell_rate ? String(key.sell_rate) : '',
+      max_rate: key.max_rate ? String(key.max_rate) : '',
       max_concurrency: key.max_concurrency ? String(key.max_concurrency) : '',
       // 按本地时区回填日期，与提交侧 endOfDayLocalISO 对称，避免跨时区漂移
       expires_at: key.expires_at ? localDateStr(key.expires_at) : '',
@@ -197,6 +196,8 @@ export default function UserKeysPage() {
         // 空字符串显式改为 0 = 无限配额；省略字段只表示不修改旧配额
         quota_usd: form.quota_usd.trim() ? Number(form.quota_usd) : 0,
         sell_rate: form.sell_rate ? Number(form.sell_rate) : 0,
+        // 空字符串显式改为 0 = 关闭最高倍率限制
+        max_rate: form.max_rate ? Number(form.max_rate) : 0,
         // 空字符串显式改为 0 = 关闭并发限制；后端看到 0 会清除旧值
         max_concurrency: form.max_concurrency ? Number(form.max_concurrency) : 0,
         expires_at: expiresAt,
@@ -208,6 +209,7 @@ export default function UserKeysPage() {
         group_id: Number(form.group_id),
         quota_usd: form.quota_usd ? Number(form.quota_usd) : undefined,
         sell_rate: form.sell_rate ? Number(form.sell_rate) : undefined,
+        max_rate: form.max_rate ? Number(form.max_rate) : undefined,
         max_concurrency: form.max_concurrency ? Number(form.max_concurrency) : undefined,
         expires_at: expiresAt,
       };
@@ -221,24 +223,24 @@ export default function UserKeysPage() {
 
   const hasAvailableGroups = groupList.length > 0;
 
-  // 分组选项（如果用户有专属倍率，右侧显示划线原价 + 专属倍率）
-  const userGroupRates = user?.group_rates;
+  // 分组选项（后端已按"用户专属 > 等级 > 分组档位"解析 effective_rate；
+  // 与分组档位不同时右侧显示划线原价 + 实际倍率）
   const groupOptions = useMemo(() => groupList.map((g) => {
-    const override = userGroupRates?.[g.id];
-    const hasOverride = override != null && override > 0 && override !== g.rate_multiplier;
+    const effective = g.effective_rate != null && g.effective_rate > 0 ? g.effective_rate : g.rate_multiplier;
+    const hasOverride = effective !== g.rate_multiplier;
     return {
       value: String(g.id),
       label: g.name,
       suffix: hasOverride ? (
         <span className="text-text-tertiary">
           <span className="line-through opacity-60">{g.rate_multiplier}x</span>{' '}
-          <span className="text-primary font-medium">{override}x</span>
+          <span className="text-primary font-medium">{effective}x</span>
         </span>
       ) : (
         <span className="text-text-tertiary">{g.rate_multiplier}x {t('user_keys.rate_suffix')}</span>
       ),
     };
-  }), [groupList, t, userGroupRates]);
+  }), [groupList, t]);
 
   // 使用配置弹窗
   const {
@@ -351,13 +353,14 @@ export default function UserKeysPage() {
                 ? t('user_keys.group_unbound')
                 : group?.name || `#${row.group_id}`;
               const hasSellRate = row.sell_rate != null && row.sell_rate > 0;
-              const userOverride = row.group_id == null ? undefined : user?.group_rates?.[row.group_id];
-              const hasOverride =
-                typeof userOverride === 'number' &&
-                Number.isFinite(userOverride) &&
-                userOverride > 0 &&
-                group != null &&
-                userOverride !== group.rate_multiplier;
+              // 后端已按"用户专属 > 等级 > 分组档位"解析 effective_rate
+              const effectiveRate = group?.effective_rate != null && group.effective_rate > 0
+                ? group.effective_rate
+                : group?.rate_multiplier;
+              const hasOverride = group != null && effectiveRate != null && effectiveRate !== group.rate_multiplier;
+              const hasMaxRate = row.max_rate != null && row.max_rate > 0;
+              // 当前生效倍率超过密钥最高倍率时该 key 的请求会被拒绝，标红提醒
+              const maxRateExceeded = hasMaxRate && effectiveRate != null && effectiveRate > row.max_rate;
               const profit = (row.used_quota || 0) - (row.used_quota_actual || 0);
               const isExpired = row.expires_at && new Date(row.expires_at) < new Date();
               const displayStatus = isExpired ? 'expired' : row.status;
@@ -399,21 +402,28 @@ export default function UserKeysPage() {
                           <span className="min-w-0 truncate">{groupName}</span>
                         </span>
                       </div>
-                      {(group || hasSellRate) && (
+                      {(group || hasSellRate || hasMaxRate) && (
                         <MetricChips
                           className="ag-metric-chips--stack ag-metric-chips--markup"
                           items={[
                             ...(group ? [{
                               color: 'default' as const,
                               label: t('user_keys.group_rate_short', '分组倍率'),
-                              value: hasOverride && userOverride != null
-                                ? `${userOverride.toFixed(2)} ${t('user_keys.user_override_tag', '专属')}`
+                              value: hasOverride && effectiveRate != null
+                                ? `${effectiveRate.toFixed(2)} ${t('user_keys.user_override_tag', '专属')}`
                                 : group.rate_multiplier.toFixed(2),
                             }] : []),
                             ...(hasSellRate ? [{
                               color: 'default' as const,
                               label: t('user_keys.sell_rate_short', '销售倍率'),
                               value: row.sell_rate!.toFixed(2),
+                            }] : []),
+                            ...(hasMaxRate ? [{
+                              color: maxRateExceeded ? ('danger' as const) : ('default' as const),
+                              label: t('user_keys.max_rate_short', '最高倍率'),
+                              value: maxRateExceeded
+                                ? `${row.max_rate.toFixed(2)} ${t('user_keys.max_rate_exceeded_tag', '已超限')}`
+                                : row.max_rate.toFixed(2),
                             }] : []),
                           ]}
                         />

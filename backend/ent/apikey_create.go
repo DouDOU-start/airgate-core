@@ -133,6 +133,20 @@ func (akc *APIKeyCreate) SetNillableSellRate(f *float64) *APIKeyCreate {
 	return akc
 }
 
+// SetMaxRate sets the "max_rate" field.
+func (akc *APIKeyCreate) SetMaxRate(f float64) *APIKeyCreate {
+	akc.mutation.SetMaxRate(f)
+	return akc
+}
+
+// SetNillableMaxRate sets the "max_rate" field if the given value is not nil.
+func (akc *APIKeyCreate) SetNillableMaxRate(f *float64) *APIKeyCreate {
+	if f != nil {
+		akc.SetMaxRate(*f)
+	}
+	return akc
+}
+
 // SetMaxConcurrency sets the "max_concurrency" field.
 func (akc *APIKeyCreate) SetMaxConcurrency(i int) *APIKeyCreate {
 	akc.mutation.SetMaxConcurrency(i)
@@ -317,6 +331,10 @@ func (akc *APIKeyCreate) defaults() {
 		v := apikey.DefaultSellRate
 		akc.mutation.SetSellRate(v)
 	}
+	if _, ok := akc.mutation.MaxRate(); !ok {
+		v := apikey.DefaultMaxRate
+		akc.mutation.SetMaxRate(v)
+	}
 	if _, ok := akc.mutation.MaxConcurrency(); !ok {
 		v := apikey.DefaultMaxConcurrency
 		akc.mutation.SetMaxConcurrency(v)
@@ -375,6 +393,14 @@ func (akc *APIKeyCreate) check() error {
 	if v, ok := akc.mutation.SellRate(); ok {
 		if err := apikey.SellRateValidator(v); err != nil {
 			return &ValidationError{Name: "sell_rate", err: fmt.Errorf(`ent: validator failed for field "APIKey.sell_rate": %w`, err)}
+		}
+	}
+	if _, ok := akc.mutation.MaxRate(); !ok {
+		return &ValidationError{Name: "max_rate", err: errors.New(`ent: missing required field "APIKey.max_rate"`)}
+	}
+	if v, ok := akc.mutation.MaxRate(); ok {
+		if err := apikey.MaxRateValidator(v); err != nil {
+			return &ValidationError{Name: "max_rate", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_rate": %w`, err)}
 		}
 	}
 	if _, ok := akc.mutation.MaxConcurrency(); !ok {
@@ -471,6 +497,10 @@ func (akc *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := akc.mutation.SellRate(); ok {
 		_spec.SetField(apikey.FieldSellRate, field.TypeFloat64, value)
 		_node.SellRate = value
+	}
+	if value, ok := akc.mutation.MaxRate(); ok {
+		_spec.SetField(apikey.FieldMaxRate, field.TypeFloat64, value)
+		_node.MaxRate = value
 	}
 	if value, ok := akc.mutation.MaxConcurrency(); ok {
 		_spec.SetField(apikey.FieldMaxConcurrency, field.TypeInt, value)
@@ -757,6 +787,24 @@ func (u *APIKeyUpsert) UpdateSellRate() *APIKeyUpsert {
 // AddSellRate adds v to the "sell_rate" field.
 func (u *APIKeyUpsert) AddSellRate(v float64) *APIKeyUpsert {
 	u.Add(apikey.FieldSellRate, v)
+	return u
+}
+
+// SetMaxRate sets the "max_rate" field.
+func (u *APIKeyUpsert) SetMaxRate(v float64) *APIKeyUpsert {
+	u.Set(apikey.FieldMaxRate, v)
+	return u
+}
+
+// UpdateMaxRate sets the "max_rate" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateMaxRate() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldMaxRate)
+	return u
+}
+
+// AddMaxRate adds v to the "max_rate" field.
+func (u *APIKeyUpsert) AddMaxRate(v float64) *APIKeyUpsert {
+	u.Add(apikey.FieldMaxRate, v)
 	return u
 }
 
@@ -1063,6 +1111,27 @@ func (u *APIKeyUpsertOne) AddSellRate(v float64) *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) UpdateSellRate() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateSellRate()
+	})
+}
+
+// SetMaxRate sets the "max_rate" field.
+func (u *APIKeyUpsertOne) SetMaxRate(v float64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetMaxRate(v)
+	})
+}
+
+// AddMaxRate adds v to the "max_rate" field.
+func (u *APIKeyUpsertOne) AddMaxRate(v float64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddMaxRate(v)
+	})
+}
+
+// UpdateMaxRate sets the "max_rate" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateMaxRate() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateMaxRate()
 	})
 }
 
@@ -1547,6 +1616,27 @@ func (u *APIKeyUpsertBulk) AddSellRate(v float64) *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) UpdateSellRate() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateSellRate()
+	})
+}
+
+// SetMaxRate sets the "max_rate" field.
+func (u *APIKeyUpsertBulk) SetMaxRate(v float64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetMaxRate(v)
+	})
+}
+
+// AddMaxRate adds v to the "max_rate" field.
+func (u *APIKeyUpsertBulk) AddMaxRate(v float64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddMaxRate(v)
+	})
+}
+
+// UpdateMaxRate sets the "max_rate" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateMaxRate() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateMaxRate()
 	})
 }
 

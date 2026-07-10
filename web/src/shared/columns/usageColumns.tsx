@@ -5,7 +5,7 @@ import { Tooltip } from '@heroui/react';
 import { ArrowDown, ArrowUp, BookOpen, Sparkles } from 'lucide-react';
 import type { UsageLogResp, CustomerUsageLogResp } from '../types';
 import { USAGE_TOKEN_COLORS } from '../constants';
-import { formatDate, formatTime } from '../utils/format';
+import { fmtNum, fmtRate, formatDate, formatTime } from '../utils/format';
 import { CostValue } from '../components/CostValue';
 
 /**
@@ -20,6 +20,8 @@ export interface UsageColumnConfig<T extends UsageRow = UsageRow> {
   title: ReactNode;
   width?: string;
   hideOnMobile?: boolean;
+  /** 横向滚动时吸附在表格左侧（仅对最左列生效，left 固定为 0） */
+  stickyLeft?: boolean;
   render: (row: T) => ReactNode;
 }
 
@@ -183,14 +185,6 @@ function TokenRow({
   );
 }
 
-/** 大数字友好显示：33518599 -> "33.52M"，1234 -> "1,234" */
-export function fmtNum(n: number): string {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
-
 
 // TokenMetric 计量明细行（直接由 usage_log 的 token 列构造）。
 type TokenMetric = {
@@ -284,12 +278,12 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 {row.service_tier && (
                   <TooltipRow label={t('usage.service_tier')} value={<span className="capitalize">{row.service_tier}</span>} />
                 )}
-                <TooltipRow label={t('usage.rate_multiplier')} value={`${row.rate_multiplier.toFixed(2)}x`} />
+                <TooltipRow label={t('usage.rate_multiplier')} value={fmtRate(row.rate_multiplier)} />
                 {adminView && row.account_rate_multiplier > 0 && (
-                  <TooltipRow label={t('usage.account_rate', '渠道倍率')} value={`${row.account_rate_multiplier.toFixed(2)}x`} />
+                  <TooltipRow label={t('usage.account_rate', '渠道倍率')} value={fmtRate(row.account_rate_multiplier)} />
                 )}
                 {row.sell_rate > 0 && (
-                  <TooltipRow label={t('usage.sell_rate', '销售倍率')} value={`${row.sell_rate.toFixed(2)}x`} />
+                  <TooltipRow label={t('usage.sell_rate', '销售倍率')} value={fmtRate(row.sell_rate)} />
                 )}
                 <TooltipDivider />
                 <TooltipRow label={t('usage.original_cost')} value={<CostValue value={row.total_cost} decimals={6} tone="standard" />} />

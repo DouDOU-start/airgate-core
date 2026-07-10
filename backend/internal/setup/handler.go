@@ -64,7 +64,7 @@ func handleStatus(c *gin.Context) {
 		}
 	}
 	if envRedis := EnvRedisConfig(); envRedis != nil {
-		if err := TestRedisConnection(envRedis.Host, envRedis.Port, envRedis.Password, envRedis.DB); err == nil {
+		if err := TestRedisConnection(*envRedis); err == nil {
 			resp.EnvRedis = &dto.EnvRedisHint{
 				Host: envRedis.Host,
 				Port: envRedis.Port,
@@ -95,7 +95,13 @@ func handleTestRedis(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	err := TestRedisConnection(req.Host, req.Port, req.Password, req.DB)
+	err := TestRedisConnection(config.RedisConfig{
+		Host:     req.Host,
+		Port:     req.Port,
+		Password: req.Password,
+		DB:       req.DB,
+		TLS:      req.TLS,
+	})
 	if err != nil {
 		response.Success(c, dto.TestConnectionResp{Success: false, ErrorMsg: err.Error()})
 		return

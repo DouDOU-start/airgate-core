@@ -6,6 +6,7 @@ export const queryKeys = {
   usersAll: () => ['users-all'] as const,
   groups: (...args: unknown[]) => ['groups', ...args] as const,
   groupsAll: () => ['groups-all'] as const,
+  tiers: (...args: unknown[]) => ['tiers', ...args] as const,
   announcements: (...args: unknown[]) => ['announcements', ...args] as const,
   myAnnouncements: () => ['my-announcements'] as const,
   groupsForKeys: () => ['groups-for-keys'] as const,

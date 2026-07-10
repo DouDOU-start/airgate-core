@@ -6,6 +6,7 @@ package pipeline
 import (
 	"context"
 	"net/http"
+	"sync/atomic"
 
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
@@ -60,6 +61,9 @@ type Pipeline struct {
 	//（upstreamclient.NewClient 统一设 ErrUseLastResponse），
 	// 3xx 原样进入 outcome 判定按 clientError 语义重建终止。
 	client *http.Client
+	// queueWaiters 当前处于排队退避（渠道容量满等待重竞争）的请求数：
+	// 每个排队请求整段持有请求体与 user/key 并发槽，须有全局上限泄压（见 forward）。
+	queueWaiters atomic.Int64
 }
 
 // New 创建转发管线。

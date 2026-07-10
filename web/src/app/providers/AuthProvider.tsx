@@ -92,7 +92,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .then((freshUser) => {
           const currentToken = getToken();
           if (authRevisionRef.current === revision && currentToken) {
-            setUser(normalizeSessionUser(freshUser, currentToken));
+            const next = normalizeSessionUser(freshUser, currentToken);
+            // 数据没变就保住旧引用：user 引用一变，所有 useAuth() 消费者
+            //（含整个 AppShell）都会重渲染，而回焦刷新绝大多数时候数据无变化。
+            setUser((prev) => (prev && JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
           }
         })
         // 静默失败：网络抖动不打断会话，登录态失效由请求层统一处理

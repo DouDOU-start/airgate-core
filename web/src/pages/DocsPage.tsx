@@ -1,6 +1,6 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { useState, useMemo, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { memo, useState, useMemo, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { Button, Link as HeroLink } from '@heroui/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -212,9 +212,47 @@ export default function DocsPage() {
             否则末尾的 H2（如"常见问题"）滚不到视口顶部，TOC 锚点跳转看起来"没反应" */}
         <article className="min-w-0 pb-[70vh]">
           <div className="markdown-body">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
+            <DocsMarkdown markdown={markdown} toc={toc} h2Refs={h2RefsRef} />
+          </div>
+          {/* 底部 CTA */}
+          <div className="border-t border-border mt-12 pt-8 flex items-center justify-between">
+            <span className="text-sm text-text-tertiary">{t('docs.cta_hint')}</span>
+            <Button
+              variant="primary"
+              onPress={() => navigate({ to: isLoggedIn ? '/' : '/login' })}
+            >
+              {isLoggedIn ? t('home.go_dashboard') : t('home.login')}
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </article>
+
+        {/* 右侧占位列：xl 以上才有，纯粹用来视觉平衡 + 未来可放"On this page"等组件 */}
+        <div className="hidden xl:block" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 文档正文渲染。单独抽成 memo 组件：scroll-spy 每跨过一个 H2 就会 setActiveIndex
+ * 触发 DocsPage 重渲染，若 Markdown 留在页面组件内，整篇文档会随之重新解析、
+ * 重建节点树（长文档滚动可感知卡顿）。memo 后 activeIndex 变化只重渲染左侧 TOC。
+ * props 全部稳定：markdown/toc 是 useMemo 结果，h2Refs 是 ref 对象。
+ */
+const DocsMarkdown = memo(function DocsMarkdown({
+  h2Refs,
+  markdown,
+  toc,
+}: {
+  h2Refs: { current: (HTMLHeadingElement | null)[] };
+  markdown: string;
+  toc: TocItem[];
+}) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
               // 标题：保留语义化标签 + scroll-margin（用于锚点跳转留出顶栏空间）
               h1: ({ children }) => (
                 <h1 className="text-3xl font-bold mb-4 mt-2 scroll-mt-24">{children}</h1>
@@ -231,7 +269,7 @@ export default function DocsPage() {
                     id={id}
                     ref={(el) => {
                       // 把 DOM 元素塞进 ref 数组，scrollToIndex / scroll-spy 直接用它
-                      if (idx >= 0) h2RefsRef.current[idx] = el;
+                      if (idx >= 0) h2Refs.current[idx] = el;
                     }}
                     className="text-xl font-bold mt-10 mb-3 pb-2 border-b border-border scroll-mt-24"
                   >
@@ -311,31 +349,12 @@ export default function DocsPage() {
               },
               // 关键：让 pre 直接透传 children，避免在 CodeBlock 外面再包一层 pre 破坏样式
               pre: ({ children }) => <>{children}</>,
-            }}
-          >
-              {markdown}
-          </ReactMarkdown>
-          </div>
-
-          {/* 底部 CTA */}
-          <div className="border-t border-border mt-12 pt-8 flex items-center justify-between">
-            <span className="text-sm text-text-tertiary">{t('docs.cta_hint')}</span>
-            <Button
-              variant="primary"
-              onPress={() => navigate({ to: isLoggedIn ? '/' : '/login' })}
-            >
-              {isLoggedIn ? t('home.go_dashboard') : t('home.login')}
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </article>
-
-        {/* 右侧占位列：xl 以上才有，纯粹用来视觉平衡 + 未来可放"On this page"等组件 */}
-        <div className="hidden xl:block" />
-      </div>
-    </div>
+      }}
+    >
+      {markdown}
+    </ReactMarkdown>
   );
-}
+});
 
 // ==================== TOC 抽取 ====================
 

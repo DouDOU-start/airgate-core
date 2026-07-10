@@ -25,6 +25,7 @@ import {
   KeyRound,
   Bell,
   ChevronRight,
+  Crown,
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -112,6 +113,17 @@ export default function ProfilePage() {
                 {user.role === 'admin' ? t('nav.admin') : t('nav.user')}
               </Chip>
             </div>
+            {user.tier_name ? (
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 w-28 shrink-0">
+                  <Crown className="w-4 h-4 text-text-tertiary" />
+                  <span className="text-xs font-medium text-text-secondary">{t('users.tier')}</span>
+                </div>
+                <Chip color="warning" size="sm" variant="soft">
+                  {user.tier_name}
+                </Chip>
+              </div>
+            ) : null}
             <button
               type="button"
               className="flex items-center gap-4 w-full rounded-md px-1 -mx-1 py-1 transition-colors hover:bg-surface-hover cursor-pointer text-left"

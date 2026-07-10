@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
@@ -14,6 +15,7 @@ type Service struct {
 	repo        Repository
 	concurrency ConcurrencyReader
 	rpm         RPMReader
+	userRates   UserRatesReader
 }
 
 // NewService 创建分组服务。
@@ -25,6 +27,12 @@ func NewService(repo Repository, concurrency ConcurrencyReader) *Service {
 // 未注入时列表 RPM 保持 0 值）。
 func (s *Service) SetRPMReader(rpm RPMReader) {
 	s.rpm = rpm
+}
+
+// SetUserRatesReader 注入用户倍率读取器（server 装配阶段调用；nil 安全，
+// 未注入时用户视角列表的 EffectiveRate 保持 0 值）。
+func (s *Service) SetUserRatesReader(reader UserRatesReader) {
+	s.userRates = reader
 }
 
 // List 查询管理员分组列表。
@@ -87,7 +95,11 @@ const availableForUserMax = 500
 // AvailableForUser 返回用户全部可用分组（不分页；OAuth userinfo 场景）。
 func (s *Service) AvailableForUser(ctx context.Context, userID int) ([]Group, error) {
 	list, _, err := s.repo.ListAvailable(ctx, AvailableFilter{UserID: userID, Page: 1, PageSize: availableForUserMax})
-	return list, err
+	if err != nil {
+		return nil, err
+	}
+	s.attachEffectiveRates(ctx, userID, list)
+	return list, nil
 }
 
 // ListAvailable 查询用户可用分组列表。
@@ -100,6 +112,7 @@ func (s *Service) ListAvailable(ctx context.Context, filter AvailableFilter) (Li
 	if err != nil {
 		return ListResult{}, err
 	}
+	s.attachEffectiveRates(ctx, filter.UserID, list)
 
 	return ListResult{
 		List:     list,
@@ -107,6 +120,25 @@ func (s *Service) ListAvailable(ctx context.Context, filter AvailableFilter) (Li
 		Page:     page,
 		PageSize: pageSize,
 	}, nil
+}
+
+// attachEffectiveRates 为用户视角的分组列表解析实际计费倍率
+// （复用计费侧优先级链：用户专属 > 等级 > 分组档位，见 billing.ResolveBillingRateForGroup）。
+// 读取器未注入或读取失败时保持 0 值，不影响列表主流程。
+func (s *Service) attachEffectiveRates(ctx context.Context, userID int, list []Group) {
+	if s.userRates == nil || userID <= 0 || len(list) == 0 {
+		return
+	}
+	groupRates, tierRates, err := s.userRates.BillingRates(ctx, userID)
+	if err != nil {
+		logx.LoggerFromContext(ctx).Warn("group_effective_rate_skipped",
+			logx.LogFieldUserID, userID,
+			logx.LogFieldError, err)
+		return
+	}
+	for i := range list {
+		list[i].EffectiveRate = billing.ResolveBillingRateForGroup(groupRates, tierRates, list[i].ID, list[i].RateMultiplier)
+	}
 }
 
 // Get 获取分组详情。

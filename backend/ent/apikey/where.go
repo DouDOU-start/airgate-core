@@ -95,6 +95,11 @@ func SellRate(v float64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldSellRate, v))
 }
 
+// MaxRate applies equality check predicate on the "max_rate" field. It's identical to MaxRateEQ.
+func MaxRate(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldMaxRate, v))
+}
+
 // MaxConcurrency applies equality check predicate on the "max_concurrency" field. It's identical to MaxConcurrencyEQ.
 func MaxConcurrency(v int) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldMaxConcurrency, v))
@@ -568,6 +573,46 @@ func SellRateLT(v float64) predicate.APIKey {
 // SellRateLTE applies the LTE predicate on the "sell_rate" field.
 func SellRateLTE(v float64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldLTE(FieldSellRate, v))
+}
+
+// MaxRateEQ applies the EQ predicate on the "max_rate" field.
+func MaxRateEQ(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldMaxRate, v))
+}
+
+// MaxRateNEQ applies the NEQ predicate on the "max_rate" field.
+func MaxRateNEQ(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldMaxRate, v))
+}
+
+// MaxRateIn applies the In predicate on the "max_rate" field.
+func MaxRateIn(vs ...float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldMaxRate, vs...))
+}
+
+// MaxRateNotIn applies the NotIn predicate on the "max_rate" field.
+func MaxRateNotIn(vs ...float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldMaxRate, vs...))
+}
+
+// MaxRateGT applies the GT predicate on the "max_rate" field.
+func MaxRateGT(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldMaxRate, v))
+}
+
+// MaxRateGTE applies the GTE predicate on the "max_rate" field.
+func MaxRateGTE(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldMaxRate, v))
+}
+
+// MaxRateLT applies the LT predicate on the "max_rate" field.
+func MaxRateLT(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldMaxRate, v))
+}
+
+// MaxRateLTE applies the LTE predicate on the "max_rate" field.
+func MaxRateLTE(v float64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldMaxRate, v))
 }
 
 // MaxConcurrencyEQ applies the EQ predicate on the "max_concurrency" field.

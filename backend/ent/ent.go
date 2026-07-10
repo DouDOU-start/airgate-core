@@ -26,6 +26,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/ent/task"
+	"github.com/DouDOU-start/airgate-core/ent/tier"
 	"github.com/DouDOU-start/airgate-core/ent/upstreamrequestlog"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -103,6 +104,7 @@ func checkColumn(table, column string) error {
 			redemptioncode.Table:        redemptioncode.ValidColumn,
 			setting.Table:               setting.ValidColumn,
 			task.Table:                  task.ValidColumn,
+			tier.Table:                  tier.ValidColumn,
 			upstreamrequestlog.Table:    upstreamrequestlog.ValidColumn,
 			usagelog.Table:              usagelog.ValidColumn,
 			user.Table:                  user.ValidColumn,

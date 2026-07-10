@@ -215,6 +215,27 @@ func (aku *APIKeyUpdate) AddSellRate(f float64) *APIKeyUpdate {
 	return aku
 }
 
+// SetMaxRate sets the "max_rate" field.
+func (aku *APIKeyUpdate) SetMaxRate(f float64) *APIKeyUpdate {
+	aku.mutation.ResetMaxRate()
+	aku.mutation.SetMaxRate(f)
+	return aku
+}
+
+// SetNillableMaxRate sets the "max_rate" field if the given value is not nil.
+func (aku *APIKeyUpdate) SetNillableMaxRate(f *float64) *APIKeyUpdate {
+	if f != nil {
+		aku.SetMaxRate(*f)
+	}
+	return aku
+}
+
+// AddMaxRate adds f to the "max_rate" field.
+func (aku *APIKeyUpdate) AddMaxRate(f float64) *APIKeyUpdate {
+	aku.mutation.AddMaxRate(f)
+	return aku
+}
+
 // SetMaxConcurrency sets the "max_concurrency" field.
 func (aku *APIKeyUpdate) SetMaxConcurrency(i int) *APIKeyUpdate {
 	aku.mutation.ResetMaxConcurrency()
@@ -426,6 +447,11 @@ func (aku *APIKeyUpdate) check() error {
 			return &ValidationError{Name: "sell_rate", err: fmt.Errorf(`ent: validator failed for field "APIKey.sell_rate": %w`, err)}
 		}
 	}
+	if v, ok := aku.mutation.MaxRate(); ok {
+		if err := apikey.MaxRateValidator(v); err != nil {
+			return &ValidationError{Name: "max_rate", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_rate": %w`, err)}
+		}
+	}
 	if v, ok := aku.mutation.MaxConcurrency(); ok {
 		if err := apikey.MaxConcurrencyValidator(v); err != nil {
 			return &ValidationError{Name: "max_concurrency", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_concurrency": %w`, err)}
@@ -520,6 +546,12 @@ func (aku *APIKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := aku.mutation.AddedSellRate(); ok {
 		_spec.AddField(apikey.FieldSellRate, field.TypeFloat64, value)
+	}
+	if value, ok := aku.mutation.MaxRate(); ok {
+		_spec.SetField(apikey.FieldMaxRate, field.TypeFloat64, value)
+	}
+	if value, ok := aku.mutation.AddedMaxRate(); ok {
+		_spec.AddField(apikey.FieldMaxRate, field.TypeFloat64, value)
 	}
 	if value, ok := aku.mutation.MaxConcurrency(); ok {
 		_spec.SetField(apikey.FieldMaxConcurrency, field.TypeInt, value)
@@ -849,6 +881,27 @@ func (akuo *APIKeyUpdateOne) AddSellRate(f float64) *APIKeyUpdateOne {
 	return akuo
 }
 
+// SetMaxRate sets the "max_rate" field.
+func (akuo *APIKeyUpdateOne) SetMaxRate(f float64) *APIKeyUpdateOne {
+	akuo.mutation.ResetMaxRate()
+	akuo.mutation.SetMaxRate(f)
+	return akuo
+}
+
+// SetNillableMaxRate sets the "max_rate" field if the given value is not nil.
+func (akuo *APIKeyUpdateOne) SetNillableMaxRate(f *float64) *APIKeyUpdateOne {
+	if f != nil {
+		akuo.SetMaxRate(*f)
+	}
+	return akuo
+}
+
+// AddMaxRate adds f to the "max_rate" field.
+func (akuo *APIKeyUpdateOne) AddMaxRate(f float64) *APIKeyUpdateOne {
+	akuo.mutation.AddMaxRate(f)
+	return akuo
+}
+
 // SetMaxConcurrency sets the "max_concurrency" field.
 func (akuo *APIKeyUpdateOne) SetMaxConcurrency(i int) *APIKeyUpdateOne {
 	akuo.mutation.ResetMaxConcurrency()
@@ -1073,6 +1126,11 @@ func (akuo *APIKeyUpdateOne) check() error {
 			return &ValidationError{Name: "sell_rate", err: fmt.Errorf(`ent: validator failed for field "APIKey.sell_rate": %w`, err)}
 		}
 	}
+	if v, ok := akuo.mutation.MaxRate(); ok {
+		if err := apikey.MaxRateValidator(v); err != nil {
+			return &ValidationError{Name: "max_rate", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_rate": %w`, err)}
+		}
+	}
 	if v, ok := akuo.mutation.MaxConcurrency(); ok {
 		if err := apikey.MaxConcurrencyValidator(v); err != nil {
 			return &ValidationError{Name: "max_concurrency", err: fmt.Errorf(`ent: validator failed for field "APIKey.max_concurrency": %w`, err)}
@@ -1184,6 +1242,12 @@ func (akuo *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err er
 	}
 	if value, ok := akuo.mutation.AddedSellRate(); ok {
 		_spec.AddField(apikey.FieldSellRate, field.TypeFloat64, value)
+	}
+	if value, ok := akuo.mutation.MaxRate(); ok {
+		_spec.SetField(apikey.FieldMaxRate, field.TypeFloat64, value)
+	}
+	if value, ok := akuo.mutation.AddedMaxRate(); ok {
+		_spec.AddField(apikey.FieldMaxRate, field.TypeFloat64, value)
 	}
 	if value, ok := akuo.mutation.MaxConcurrency(); ok {
 		_spec.SetField(apikey.FieldMaxConcurrency, field.TypeInt, value)

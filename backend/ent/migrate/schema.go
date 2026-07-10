@@ -22,6 +22,7 @@ var (
 		{Name: "used_quota", Type: field.TypeFloat64, Default: 0},
 		{Name: "used_quota_actual", Type: field.TypeFloat64, Default: 0},
 		{Name: "sell_rate", Type: field.TypeFloat64, Default: 0},
+		{Name: "max_rate", Type: field.TypeFloat64, Default: 0},
 		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "disabled"}, Default: "active"},
@@ -39,13 +40,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "api_keys_groups_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[17]},
+				Columns:    []*schema.Column{APIKeysColumns[18]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "api_keys_users_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[18]},
+				Columns:    []*schema.Column{APIKeysColumns[19]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -59,12 +60,12 @@ var (
 			{
 				Name:    "apikey_status_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[13], APIKeysColumns[15]},
+				Columns: []*schema.Column{APIKeysColumns[14], APIKeysColumns[16]},
 			},
 			{
 				Name:    "apikey_provisioned_by_user_api_keys_group_api_keys",
 				Unique:  true,
-				Columns: []*schema.Column{APIKeysColumns[14], APIKeysColumns[18], APIKeysColumns[17]},
+				Columns: []*schema.Column{APIKeysColumns[15], APIKeysColumns[19], APIKeysColumns[18]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "provisioned_by <> ''",
 				},
@@ -458,6 +459,22 @@ var (
 			},
 		},
 	}
+	// TiersColumns holds the columns for the "tiers" table.
+	TiersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "name", Type: field.TypeString, Unique: true},
+		{Name: "rates", Type: field.TypeJSON, Nullable: true},
+		{Name: "note", Type: field.TypeString, Default: ""},
+		{Name: "sort_weight", Type: field.TypeInt, Default: 0},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// TiersTable holds the schema information for the "tiers" table.
+	TiersTable = &schema.Table{
+		Name:       "tiers",
+		Columns:    TiersColumns,
+		PrimaryKey: []*schema.Column{TiersColumns[0]},
+	}
 	// UpstreamRequestLogsColumns holds the columns for the "upstream_request_logs" table.
 	UpstreamRequestLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -671,12 +688,21 @@ var (
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "disabled"}, Default: "active"},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tier_users", Type: field.TypeInt, Nullable: true},
 	}
 	// UsersTable holds the schema information for the "users" table.
 	UsersTable = &schema.Table{
 		Name:       "users",
 		Columns:    UsersColumns,
 		PrimaryKey: []*schema.Column{UsersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "users_tiers_users",
+				Columns:    []*schema.Column{UsersColumns[13]},
+				RefColumns: []*schema.Column{TiersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
 	}
 	// ChannelGroupsColumns holds the columns for the "channel_groups" table.
 	ChannelGroupsColumns = []*schema.Column{
@@ -744,6 +770,7 @@ var (
 		RedemptionCodesTable,
 		SettingsTable,
 		TasksTable,
+		TiersTable,
 		UpstreamRequestLogsTable,
 		UsageLogsTable,
 		UsersTable,
@@ -761,6 +788,7 @@ func init() {
 	UsageLogsTable.ForeignKeys[1].RefTable = ChannelsTable
 	UsageLogsTable.ForeignKeys[2].RefTable = GroupsTable
 	UsageLogsTable.ForeignKeys[3].RefTable = UsersTable
+	UsersTable.ForeignKeys[0].RefTable = TiersTable
 	ChannelGroupsTable.ForeignKeys[0].RefTable = ChannelsTable
 	ChannelGroupsTable.ForeignKeys[1].RefTable = GroupsTable
 	UserAllowedGroupsTable.ForeignKeys[0].RefTable = UsersTable

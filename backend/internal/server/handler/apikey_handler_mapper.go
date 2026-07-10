@@ -18,6 +18,7 @@ func toAPIKeyResp(item appapikey.Key) dto.APIKeyResp {
 		UsedQuota:       item.UsedQuota,
 		UsedQuotaActual: item.UsedQuotaActual,
 		SellRate:        item.SellRate,
+		MaxRate:         item.MaxRate,
 		MaxConcurrency:  item.MaxConcurrency,
 		TodayCost:       item.TodayCost,
 		ThirtyDayCost:   item.ThirtyDayCost,

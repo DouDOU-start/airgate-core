@@ -46,8 +46,11 @@ func buildTransport() *http.Transport {
 		// 死主机由 Dial 侧超时兜底。
 		ResponseHeaderTimeout: 10 * time.Minute,
 		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
-		MaxIdleConnsPerHost:   20,
+		// 空闲连接上限按高并发网关口径取值：流量高度集中在少数上游 host，
+		// PerHost 低于峰值并发时超出的连接用完即弃，每请求重付 TCP+TLS 握手
+		// （延迟暴涨 + TIME_WAIT/临时端口堆积）。空闲连接只占少量内存，放大无代价。
+		MaxIdleConns:          2048,
+		MaxIdleConnsPerHost:   512,
 		IdleConnTimeout:       90 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}

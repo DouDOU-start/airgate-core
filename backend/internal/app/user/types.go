@@ -16,6 +16,9 @@ type User struct {
 	MaxConcurrency        int
 	GroupRates            map[int64]float64
 	AllowedGroupIDs       []int64
+	TierID                *int64
+	TierName              string
+	TierRates             map[int64]float64
 	BalanceAlertThreshold float64
 	BalanceAlertNotified  bool
 	Status                string
@@ -45,6 +48,8 @@ type ListFilter struct {
 	Keyword  string
 	Status   string
 	Role     string
+	// TierID 按用户等级筛选，0 表示不筛选。
+	TierID int64
 }
 
 // ListResult 用户列表结果。
@@ -63,6 +68,7 @@ type CreateInput struct {
 	Role           string
 	MaxConcurrency int
 	GroupRates     map[int64]float64
+	TierID         *int64
 }
 
 // UpdateInput 更新用户输入。
@@ -75,7 +81,10 @@ type UpdateInput struct {
 	HasGroupRates      bool
 	AllowedGroupIDs    []int64
 	HasAllowedGroupIDs bool
-	Status             *string
+	// TierID 用户等级归属；HasTier 区分"未提交"与"变更"，TierID 为 nil 时清除归属。
+	TierID  *int64
+	HasTier bool
+	Status  *string
 }
 
 // BalanceChange 余额变更输入。before/after 由 store 在事务内以行锁重读现算，
@@ -167,6 +176,8 @@ type Mutation struct {
 	HasGroupRates      bool
 	AllowedGroupIDs    []int64
 	HasAllowedGroupIDs bool
+	TierID             *int64
+	HasTier            bool
 	Status             *string
 }
 

@@ -58,3 +58,6 @@ ds-bundle/
 .design-sync/node_modules
 web/types/
 web/.ds-css/
+
+# Playwright MCP 浏览器会话产物
+.playwright-mcp/

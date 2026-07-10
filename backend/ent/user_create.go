@@ -14,6 +14,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/group"
+	"github.com/DouDOU-start/airgate-core/ent/tier"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 )
@@ -213,6 +214,25 @@ func (uc *UserCreate) AddAllowedGroups(g ...*Group) *UserCreate {
 		ids[i] = g[i].ID
 	}
 	return uc.AddAllowedGroupIDs(ids...)
+}
+
+// SetTierID sets the "tier" edge to the Tier entity by ID.
+func (uc *UserCreate) SetTierID(id int) *UserCreate {
+	uc.mutation.SetTierID(id)
+	return uc
+}
+
+// SetNillableTierID sets the "tier" edge to the Tier entity by ID if the given value is not nil.
+func (uc *UserCreate) SetNillableTierID(id *int) *UserCreate {
+	if id != nil {
+		uc = uc.SetTierID(*id)
+	}
+	return uc
+}
+
+// SetTier sets the "tier" edge to the Tier entity.
+func (uc *UserCreate) SetTier(t *Tier) *UserCreate {
+	return uc.SetTierID(t.ID)
 }
 
 // AddBalanceLogIDs adds the "balance_logs" edge to the BalanceLog entity by IDs.
@@ -484,6 +504,23 @@ func (uc *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := uc.mutation.TierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   user.TierTable,
+			Columns: []string{user.TierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.tier_users = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := uc.mutation.BalanceLogsIDs(); len(nodes) > 0 {

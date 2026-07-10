@@ -4,12 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Button, Card, ComboBox, Input, ListBox, Skeleton, Tabs } from '@heroui/react';
 import {
   CartesianGrid,
-  Cell,
   Legend,
   Line,
   LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
@@ -33,56 +30,27 @@ import { decorativePalette } from '../shared/utils/theme';
 import { dashboardApi } from '../shared/api/dashboard';
 import { usersApi } from '../shared/api/users';
 import { queryKeys } from '../shared/queryKeys';
-import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../shared/constants';
+import {
+  PIE_CHART_COLORS,
+  RANGE_PRESETS,
+  TOKEN_TREND_LINE_ORDER,
+  TOKEN_TREND_RATIO_KEYS,
+  USAGE_TOKEN_COLORS,
+  type RangePreset,
+} from '../shared/constants';
+import { ChartEmptyState } from '../shared/components/ChartEmptyState';
+import { ChartLineTooltip, UsagePieChart } from '../shared/components/charts';
 import { CompactDataTable } from '../shared/components/CompactDataTable';
+import { DashboardCard } from '../shared/components/DashboardCard';
+import { METRIC_TONE_CLASSES, type MetricTone } from '../shared/components/StatCard';
 import { useDebouncedValue } from '../shared/hooks/useDebouncedValue';
 import { CostPair, CostValue } from '../shared/components/CostValue';
+import { fmtNum, fmtTrendTime } from '../shared/utils/format';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
 const USER_COLORS = [...decorativePalette];
-const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio', 'cacheCumulativeRatio'];
-const TOKEN_TREND_RATIO_KEYS = new Set<keyof typeof USAGE_TOKEN_COLORS>(['cacheRatio', 'cacheCumulativeRatio']);
 
-type PieTooltipPayload = Array<{
-  name?: unknown;
-  payload?: {
-    name?: unknown;
-  };
-}>;
-
-function PieNameTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: PieTooltipPayload;
-}) {
-  const name = payload?.[0]?.payload?.name ?? payload?.[0]?.name;
-  if (!active || name == null || name === '') return null;
-
-  return (
-    <div className="max-w-56 truncate rounded-[var(--radius)] border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text shadow-lg">
-      {String(name)}
-    </div>
-  );
-}
-
-type RangePreset = 'today' | '7d' | '30d' | '90d';
-
-const RANGE_PRESETS = ['today', '7d', '30d', '90d'] as const;
-type MetricTone = 'blue' | 'violet' | 'emerald' | 'teal' | 'amber' | 'indigo' | 'purple' | 'rose';
 type MetaTone = 'default' | 'success' | 'warning' | 'danger' | 'accent';
-
-const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
-  amber: 'bg-amber-100 text-amber-600 ring-amber-200 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25',
-  blue: 'bg-blue-100 text-blue-600 ring-blue-200 dark:bg-blue-400/15 dark:text-blue-300 dark:ring-blue-400/25',
-  emerald: 'bg-success-subtle text-success ring-success/25',
-  indigo: 'bg-indigo-100 text-indigo-600 ring-indigo-200 dark:bg-indigo-400/15 dark:text-indigo-300 dark:ring-indigo-400/25',
-  purple: 'bg-purple-100 text-purple-600 ring-purple-200 dark:bg-purple-400/15 dark:text-purple-300 dark:ring-purple-400/25',
-  rose: 'bg-rose-100 text-rose-600 ring-rose-200 dark:bg-rose-400/15 dark:text-rose-300 dark:ring-rose-400/25',
-  teal: 'bg-teal-100 text-teal-600 ring-teal-200 dark:bg-teal-400/15 dark:text-teal-300 dark:ring-teal-400/25',
-  violet: 'bg-violet-100 text-violet-600 ring-violet-200 dark:bg-violet-400/15 dark:text-violet-300 dark:ring-violet-400/25',
-};
 
 const META_TONE_CLASSES: Record<MetaTone, string> = {
   accent: 'text-primary',
@@ -92,71 +60,12 @@ const META_TONE_CLASSES: Record<MetaTone, string> = {
   warning: 'text-amber-600 dark:text-amber-400',
 };
 
-function fmtNum(n: number | undefined | null): string {
-  if (n == null) return '0';
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(2)}K`;
-  return n.toLocaleString();
-}
-
 function fmtDurationMs(ms: number | undefined | null): string {
   if (ms == null || ms <= 0) return '0s';
   if (ms < 1000) return `${Math.round(ms)}ms`;
   const seconds = ms / 1000;
   if (seconds >= 100) return `${Math.round(seconds)}s`;
   return `${seconds.toFixed(seconds >= 10 ? 1 : 2)}s`;
-}
-
-function fmtTime(timeStr: string): string {
-  if (timeStr.includes(' ')) {
-    const time = timeStr.split(' ')[1] ?? '';
-    return time.slice(0, 5) || timeStr;
-  }
-  const parts = timeStr.split('-');
-  if (parts.length === 3) return `${parts[1]}/${parts[2]}`;
-  return timeStr;
-}
-
-function DashboardCard({
-  children,
-  extra,
-  title,
-}: {
-  children: ReactNode;
-  extra?: ReactNode;
-  title?: string;
-}) {
-  const hasHeader = Boolean(title || extra);
-
-  return (
-    <Card className="ag-dashboard-panel">
-      {hasHeader ? (
-        <div
-          className={`flex items-center gap-3 p-3 pb-2 2xl:p-4 2xl:pb-2 ${title ? 'justify-between' : 'justify-end'}`}
-        >
-          {title ? <h3 className="text-base font-semibold leading-none text-text">{title}</h3> : null}
-          {extra ? (
-            <div className="shrink-0">{extra}</div>
-          ) : null}
-        </div>
-      ) : null}
-      <Card.Content className={hasHeader ? 'px-3 pb-3 2xl:px-4 2xl:pb-4' : 'p-3 2xl:p-4'}>{children}</Card.Content>
-    </Card>
-  );
-}
-
-function ChartEmptyState({ className = '', icon }: { className?: string; icon: ReactNode }) {
-  const { t } = useTranslation();
-
-  return (
-    <div className={`flex w-full flex-col items-center justify-center ${className}`}>
-      <span className="flex h-11 w-11 items-center justify-center rounded-full border border-dashed border-border text-text-tertiary">
-        {icon}
-      </span>
-      <div className="mt-3 text-sm font-medium text-text-secondary">{t('common.no_data')}</div>
-    </div>
-  );
 }
 
 function MetricCard({
@@ -307,32 +216,6 @@ function StatsCards({ stats }: { stats: DashboardStatsResp }) {
   );
 }
 
-function ChartTooltip({
-  active,
-  label,
-  payload,
-}: {
-  active?: boolean;
-  label?: string;
-  payload?: Array<{ color?: string; dataKey?: string; name?: string; payload?: Record<string, unknown>; value?: number }>;
-}) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-[var(--radius)] border border-border bg-surface px-3 py-2 text-xs text-text shadow-lg">
-      <div className="mb-1 font-medium">{label}</div>
-      <div className="space-y-1">
-        {payload.map((item) => (
-          <div key={`${item.dataKey}-${item.name}`} className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
-            <span className="text-text">{item.name ?? item.dataKey}</span>
-            <span className="font-mono">{fmtNum(Number(item.value ?? 0))}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function TokenTrendTooltip({
   active,
   label,
@@ -454,19 +337,7 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
       ) : (
         <div className="ag-distribution-card-body grid items-start gap-3 2xl:grid-cols-[176px_minmax(0,1fr)]">
           <div className="ag-distribution-chart-frame">
-            <PieChart width={176} height={176}>
-              <Pie data={activePieData} cx="50%" cy="50%" dataKey="value" innerRadius={42} isAnimationActive={false} minAngle={3} outerRadius={68} stroke="var(--ag-surface)" strokeWidth={2}>
-                {activePieData.map((_, index) => (
-                  <Cell key={index} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
-                ))}
-              </Pie>
-              <RechartsTooltip
-                animationDuration={0}
-                content={<PieNameTooltip />}
-                cursor={false}
-                isAnimationActive={false}
-              />
-            </PieChart>
+            <UsagePieChart data={activePieData} />
           </div>
 
           <div className="ag-distribution-table-scroll">
@@ -564,7 +435,7 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
         input: item.input_tokens,
         output: item.output_tokens,
         standardCost: item.standard_cost,
-        time: fmtTime(item.time),
+        time: fmtTrendTime(item.time),
       };
     });
   }, [trend]);
@@ -630,7 +501,7 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
     const timeSet = new Set<string>();
     topUsers.forEach((user) => user.trend.forEach((point) => timeSet.add(point.time)));
     return Array.from(timeSet).sort().map((time) => {
-      const row: Record<string, number | string> = { time: fmtTime(time) };
+      const row: Record<string, number | string> = { time: fmtTrendTime(time) };
       topUsers.forEach((user) => {
         row[user.email] = user.trend.find((point) => point.time === time)?.tokens ?? 0;
       });
@@ -647,7 +518,7 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
               <CartesianGrid stroke="var(--ag-border-subtle)" vertical={false} />
               <XAxis axisLine={false} dataKey="time" tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickLine={false} />
               <YAxis axisLine={false} tick={{ fill: 'var(--ag-text)', fontSize: 11 }} tickFormatter={fmtNum} tickLine={false} />
-              <RechartsTooltip content={<ChartTooltip />} />
+              <RechartsTooltip content={<ChartLineTooltip />} />
               <Legend iconSize={8} iconType="circle" wrapperStyle={{ color: 'var(--ag-text)', fontSize: 11 }} />
               {topUsers.map((user, index) => (
                 <Line key={user.user_id} dataKey={user.email} dot={false} isAnimationActive={false} stroke={USER_COLORS[index % USER_COLORS.length]} strokeWidth={2.5} type="monotone" />

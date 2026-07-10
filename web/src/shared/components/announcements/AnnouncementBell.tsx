@@ -10,7 +10,7 @@ import { formatDateTime } from '../../utils/format';
 import { AnnouncementMarkdown } from './AnnouncementMarkdown';
 
 // 公告拉取节奏：与 sub2api 同款 20 分钟兜底轮询；后台刷新不触发全局加载条。
-export const ANNOUNCEMENTS_REFETCH_INTERVAL = 20 * 60 * 1000;
+const ANNOUNCEMENTS_REFETCH_INTERVAL = 20 * 60 * 1000;
 
 export function useMyAnnouncements() {
   return useQuery({

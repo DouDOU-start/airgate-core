@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { Button, Chip, Dropdown, EmptyState, Input, Label, ListBox, Select, TextField as HeroTextField } from '@heroui/react';
 import { usersApi } from '../../shared/api/users';
 import { settingsApi } from '../../shared/api/settings';
+import { tiersApi } from '../../shared/api/tiers';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
@@ -23,11 +24,12 @@ import { BalanceModal } from './users/BalanceModal';
 import { UserApiKeysModal } from './users/UserApiKeysModal';
 import { BalanceHistoryModal } from './users/BalanceHistoryModal';
 import { UserGroupsModal } from './users/UserGroupsModal';
+import { TiersModal } from './users/TiersModal';
 import type { UserResp } from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import {
   Plus, Search, Pencil, MoreHorizontal, RefreshCw,
-  Key, Users, PlusCircle, MinusCircle, Clock, Trash2,
+  Key, Users, PlusCircle, MinusCircle, Clock, Trash2, Crown,
 } from 'lucide-react';
 
 const FALLBACK_DEFAULT_USER_MAX_CONCURRENCY = 5;
@@ -46,6 +48,7 @@ export default function UsersPage() {
   const [keyword, setKeyword] = useState('');
   const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
   const [statusFilter, setStatusFilter] = useState('');
+  const [tierFilter, setTierFilter] = useState('');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserResp | null>(null);
@@ -55,17 +58,24 @@ export default function UsersPage() {
   const [apiKeysUser, setApiKeysUser] = useState<UserResp | null>(null);
   const [balanceHistoryUser, setBalanceHistoryUser] = useState<UserResp | null>(null);
   const [groupsUser, setGroupsUser] = useState<UserResp | null>(null);
+  const [showTiersModal, setShowTiersModal] = useState(false);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: queryKeys.users(page, pageSize, debouncedKeyword, statusFilter),
+    queryKey: queryKeys.users(page, pageSize, debouncedKeyword, statusFilter, tierFilter),
     queryFn: () =>
       usersApi.list({
         page,
         page_size: pageSize,
         keyword: debouncedKeyword || undefined,
         status: statusFilter || undefined,
+        tier_id: tierFilter ? Number(tierFilter) : undefined,
       }),
     placeholderData: keepPreviousData,
+  });
+
+  const { data: tiersData } = useQuery({
+    queryKey: queryKeys.tiers(),
+    queryFn: () => tiersApi.list({ page: 1, page_size: 100 }),
   });
 
   const { data: settings } = useQuery({
@@ -119,6 +129,11 @@ export default function UsersPage() {
     { id: 'disabled', label: t('status.disabled') },
   ];
   const selectedStatusLabel = statusOptions.find((item) => item.id === statusFilter)?.label ?? t('users.all_status');
+  const tierOptions = [
+    { id: '', label: t('tiers.all') },
+    ...(tiersData?.list ?? []).map((tier) => ({ id: String(tier.id), label: tier.name })),
+  ];
+  const selectedTierLabel = tierOptions.find((item) => item.id === tierFilter)?.label ?? t('tiers.all');
 
   return (
     <div>
@@ -161,6 +176,33 @@ export default function UsersPage() {
             </Select.Popover>
           </Select>
         </div>
+        {tierOptions.length > 1 ? (
+          <div className="w-full sm:w-48">
+            <Select
+              fullWidth
+              selectedKey={tierFilter}
+              onSelectionChange={(key) => {
+                setTierFilter(key == null ? '' : String(key));
+                setPage(1);
+              }}
+            >
+              <Label className="sr-only">{t('users.tier')}</Label>
+              <Select.Trigger>
+                <Select.Value>{selectedTierLabel}</Select.Value>
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox items={tierOptions}>
+                  {(item) => (
+                    <ListBox.Item id={item.id} textValue={item.label}>
+                      {item.label}
+                    </ListBox.Item>
+                  )}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+          </div>
+        ) : null}
         <div className="flex items-center gap-2 sm:ml-auto">
           {isFetching ? (
             <RefreshCw className="w-4 h-4 text-text-tertiary animate-spin" />
@@ -175,6 +217,10 @@ export default function UsersPage() {
               <RefreshCw className="w-4 h-4" />
             </Button>
           )}
+          <Button variant="secondary" onPress={() => setShowTiersModal(true)}>
+            <Crown className="w-4 h-4" />
+            {t('tiers.title')}
+          </Button>
           <Button variant="primary" onPress={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4" />
             {t('users.create')}
@@ -244,9 +290,16 @@ export default function UsersPage() {
                       <span className="text-text-secondary">{row.username || '-'}</span>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      <Chip color={row.role === 'admin' ? 'accent' : 'default'} size="sm" variant="soft">
-                        {row.role === 'admin' ? t('users.role_admin') : t('users.role_user')}
-                      </Chip>
+                      <div className="flex items-center gap-1.5">
+                        <Chip color={row.role === 'admin' ? 'accent' : 'default'} size="sm" variant="soft">
+                          {row.role === 'admin' ? t('users.role_admin') : t('users.role_user')}
+                        </Chip>
+                        {row.tier_name ? (
+                          <Chip color="warning" size="sm" variant="soft">
+                            {row.tier_name}
+                          </Chip>
+                        ) : null}
+                      </div>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
                       <span className="font-mono">${row.balance.toFixed(2)}</span>
@@ -440,6 +493,10 @@ export default function UsersPage() {
 
       {balanceHistoryUser && (
         <BalanceHistoryModal open user={balanceHistoryUser} onClose={() => setBalanceHistoryUser(null)} />
+      )}
+
+      {showTiersModal && (
+        <TiersModal open onClose={() => setShowTiersModal(false)} />
       )}
 
       {groupsUser && (

@@ -20,6 +20,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/schema"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/ent/task"
+	"github.com/DouDOU-start/airgate-core/ent/tier"
 	"github.com/DouDOU-start/airgate-core/ent/upstreamrequestlog"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -61,22 +62,28 @@ func init() {
 	apikey.DefaultSellRate = apikeyDescSellRate.Default.(float64)
 	// apikey.SellRateValidator is a validator for the "sell_rate" field. It is called by the builders before save.
 	apikey.SellRateValidator = apikeyDescSellRate.Validators[0].(func(float64) error)
+	// apikeyDescMaxRate is the schema descriptor for max_rate field.
+	apikeyDescMaxRate := apikeyFields[10].Descriptor()
+	// apikey.DefaultMaxRate holds the default value on creation for the max_rate field.
+	apikey.DefaultMaxRate = apikeyDescMaxRate.Default.(float64)
+	// apikey.MaxRateValidator is a validator for the "max_rate" field. It is called by the builders before save.
+	apikey.MaxRateValidator = apikeyDescMaxRate.Validators[0].(func(float64) error)
 	// apikeyDescMaxConcurrency is the schema descriptor for max_concurrency field.
-	apikeyDescMaxConcurrency := apikeyFields[10].Descriptor()
+	apikeyDescMaxConcurrency := apikeyFields[11].Descriptor()
 	// apikey.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
 	apikey.DefaultMaxConcurrency = apikeyDescMaxConcurrency.Default.(int)
 	// apikey.MaxConcurrencyValidator is a validator for the "max_concurrency" field. It is called by the builders before save.
 	apikey.MaxConcurrencyValidator = apikeyDescMaxConcurrency.Validators[0].(func(int) error)
 	// apikeyDescProvisionedBy is the schema descriptor for provisioned_by field.
-	apikeyDescProvisionedBy := apikeyFields[13].Descriptor()
+	apikeyDescProvisionedBy := apikeyFields[14].Descriptor()
 	// apikey.DefaultProvisionedBy holds the default value on creation for the provisioned_by field.
 	apikey.DefaultProvisionedBy = apikeyDescProvisionedBy.Default.(string)
 	// apikeyDescCreatedAt is the schema descriptor for created_at field.
-	apikeyDescCreatedAt := apikeyFields[14].Descriptor()
+	apikeyDescCreatedAt := apikeyFields[15].Descriptor()
 	// apikey.DefaultCreatedAt holds the default value on creation for the created_at field.
 	apikey.DefaultCreatedAt = apikeyDescCreatedAt.Default.(func() time.Time)
 	// apikeyDescUpdatedAt is the schema descriptor for updated_at field.
-	apikeyDescUpdatedAt := apikeyFields[15].Descriptor()
+	apikeyDescUpdatedAt := apikeyFields[16].Descriptor()
 	// apikey.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	apikey.DefaultUpdatedAt = apikeyDescUpdatedAt.Default.(func() time.Time)
 	// apikey.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -613,6 +620,30 @@ func init() {
 	task.DefaultUpdatedAt = taskDescUpdatedAt.Default.(func() time.Time)
 	// task.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	task.UpdateDefaultUpdatedAt = taskDescUpdatedAt.UpdateDefault.(func() time.Time)
+	tierFields := schema.Tier{}.Fields()
+	_ = tierFields
+	// tierDescName is the schema descriptor for name field.
+	tierDescName := tierFields[0].Descriptor()
+	// tier.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	tier.NameValidator = tierDescName.Validators[0].(func(string) error)
+	// tierDescNote is the schema descriptor for note field.
+	tierDescNote := tierFields[2].Descriptor()
+	// tier.DefaultNote holds the default value on creation for the note field.
+	tier.DefaultNote = tierDescNote.Default.(string)
+	// tierDescSortWeight is the schema descriptor for sort_weight field.
+	tierDescSortWeight := tierFields[3].Descriptor()
+	// tier.DefaultSortWeight holds the default value on creation for the sort_weight field.
+	tier.DefaultSortWeight = tierDescSortWeight.Default.(int)
+	// tierDescCreatedAt is the schema descriptor for created_at field.
+	tierDescCreatedAt := tierFields[4].Descriptor()
+	// tier.DefaultCreatedAt holds the default value on creation for the created_at field.
+	tier.DefaultCreatedAt = tierDescCreatedAt.Default.(func() time.Time)
+	// tierDescUpdatedAt is the schema descriptor for updated_at field.
+	tierDescUpdatedAt := tierFields[5].Descriptor()
+	// tier.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	tier.DefaultUpdatedAt = tierDescUpdatedAt.Default.(func() time.Time)
+	// tier.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	tier.UpdateDefaultUpdatedAt = tierDescUpdatedAt.UpdateDefault.(func() time.Time)
 	upstreamrequestlogFields := schema.UpstreamRequestLog{}.Fields()
 	_ = upstreamrequestlogFields
 	// upstreamrequestlogDescRequestID is the schema descriptor for request_id field.

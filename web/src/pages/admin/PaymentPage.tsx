@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
@@ -25,6 +25,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
+import { StatCard } from '../../shared/components/StatCard';
 import type {
   PaymentOrderStatus, PaymentProviderItem, PaymentProviderKindMeta,
   SettingItem, UpsertPaymentProviderReq,
@@ -51,41 +52,6 @@ const STATUS_CHIP_COLORS: Record<PaymentOrderStatus, 'warning' | 'success' | 'de
 };
 
 // ==================== 小组件 ====================
-
-function StatCard({
-  accentColor,
-  icon,
-  title,
-  value,
-}: {
-  accentColor: string;
-  icon: ReactNode;
-  title: string;
-  value: ReactNode;
-}) {
-  return (
-    <Card className="ag-dashboard-metric min-h-[72px]">
-      <Card.Content className="ag-dashboard-metric-content p-3">
-        <div className="ag-dashboard-metric-copy">
-          <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
-          <div className="mt-1 flex min-w-0 items-baseline gap-2">
-            <div className="min-w-0 truncate font-mono text-[22px] font-semibold leading-none text-text">{value}</div>
-          </div>
-        </div>
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm"
-          style={{
-            background: `color-mix(in srgb, ${accentColor} 14%, transparent)`,
-            color: accentColor,
-            borderColor: `color-mix(in srgb, ${accentColor} 24%, transparent)`,
-          }}
-        >
-          {icon}
-        </div>
-      </Card.Content>
-    </Card>
-  );
-}
 
 function OrderStatusChip({ status }: { status: PaymentOrderStatus }) {
   const { t } = useTranslation();

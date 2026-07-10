@@ -48,6 +48,9 @@ type Setting func(*sql.Selector)
 // Task is the predicate function for task builders.
 type Task func(*sql.Selector)
 
+// Tier is the predicate function for tier builders.
+type Tier func(*sql.Selector)
+
 // UpstreamRequestLog is the predicate function for upstreamrequestlog builders.
 type UpstreamRequestLog func(*sql.Selector)
 

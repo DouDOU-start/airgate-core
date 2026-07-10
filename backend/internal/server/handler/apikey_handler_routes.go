@@ -89,6 +89,7 @@ func (h *APIKeyHandler) CreateKey(c *gin.Context) {
 		IPBlacklist:    req.IPBlacklist,
 		QuotaUSD:       req.QuotaUSD,
 		SellRate:       req.SellRate,
+		MaxRate:        req.MaxRate,
 		MaxConcurrency: req.MaxConcurrency,
 		ExpiresAt:      req.ExpiresAt,
 	})
@@ -130,6 +131,7 @@ func (h *APIKeyHandler) UpdateKey(c *gin.Context) {
 		HasIPBlacklist: req.IPBlacklist != nil,
 		QuotaUSD:       req.QuotaUSD,
 		SellRate:       req.SellRate,
+		MaxRate:        req.MaxRate,
 		MaxConcurrency: req.MaxConcurrency,
 		ExpiresAt:      req.ExpiresAt,
 		Status:         req.Status,
@@ -189,6 +191,7 @@ func (h *APIKeyHandler) AdminUpdateKey(c *gin.Context) {
 		HasIPBlacklist: req.IPBlacklist != nil,
 		QuotaUSD:       req.QuotaUSD,
 		SellRate:       req.SellRate,
+		MaxRate:        req.MaxRate,
 		MaxConcurrency: req.MaxConcurrency,
 		ExpiresAt:      req.ExpiresAt,
 		Status:         req.Status,

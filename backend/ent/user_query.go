@@ -15,6 +15,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
+	"github.com/DouDOU-start/airgate-core/ent/tier"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 )
@@ -29,7 +30,9 @@ type UserQuery struct {
 	withAPIKeys       *APIKeyQuery
 	withUsageLogs     *UsageLogQuery
 	withAllowedGroups *GroupQuery
+	withTier          *TierQuery
 	withBalanceLogs   *BalanceLogQuery
+	withFKs           bool
 	modifiers         []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -126,6 +129,28 @@ func (uq *UserQuery) QueryAllowedGroups() *GroupQuery {
 			sqlgraph.From(user.Table, user.FieldID, selector),
 			sqlgraph.To(group.Table, group.FieldID),
 			sqlgraph.Edge(sqlgraph.M2M, false, user.AllowedGroupsTable, user.AllowedGroupsPrimaryKey...),
+		)
+		fromU = sqlgraph.SetNeighbors(uq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryTier chains the current query on the "tier" edge.
+func (uq *UserQuery) QueryTier() *TierQuery {
+	query := (&TierClient{config: uq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := uq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := uq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(tier.Table, tier.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, user.TierTable, user.TierColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(uq.driver.Dialect(), step)
 		return fromU, nil
@@ -350,6 +375,7 @@ func (uq *UserQuery) Clone() *UserQuery {
 		withAPIKeys:       uq.withAPIKeys.Clone(),
 		withUsageLogs:     uq.withUsageLogs.Clone(),
 		withAllowedGroups: uq.withAllowedGroups.Clone(),
+		withTier:          uq.withTier.Clone(),
 		withBalanceLogs:   uq.withBalanceLogs.Clone(),
 		// clone intermediate query.
 		sql:  uq.sql.Clone(),
@@ -387,6 +413,17 @@ func (uq *UserQuery) WithAllowedGroups(opts ...func(*GroupQuery)) *UserQuery {
 		opt(query)
 	}
 	uq.withAllowedGroups = query
+	return uq
+}
+
+// WithTier tells the query-builder to eager-load the nodes that are connected to
+// the "tier" edge. The optional arguments are used to configure the query builder of the edge.
+func (uq *UserQuery) WithTier(opts ...func(*TierQuery)) *UserQuery {
+	query := (&TierClient{config: uq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	uq.withTier = query
 	return uq
 }
 
@@ -478,14 +515,22 @@ func (uq *UserQuery) prepareQuery(ctx context.Context) error {
 func (uq *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, error) {
 	var (
 		nodes       = []*User{}
+		withFKs     = uq.withFKs
 		_spec       = uq.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [5]bool{
 			uq.withAPIKeys != nil,
 			uq.withUsageLogs != nil,
 			uq.withAllowedGroups != nil,
+			uq.withTier != nil,
 			uq.withBalanceLogs != nil,
 		}
 	)
+	if uq.withTier != nil {
+		withFKs = true
+	}
+	if withFKs {
+		_spec.Node.Columns = append(_spec.Node.Columns, user.ForeignKeys...)
+	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*User).scanValues(nil, columns)
 	}
@@ -525,6 +570,12 @@ func (uq *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		if err := uq.loadAllowedGroups(ctx, query, nodes,
 			func(n *User) { n.Edges.AllowedGroups = []*Group{} },
 			func(n *User, e *Group) { n.Edges.AllowedGroups = append(n.Edges.AllowedGroups, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := uq.withTier; query != nil {
+		if err := uq.loadTier(ctx, query, nodes, nil,
+			func(n *User, e *Tier) { n.Edges.Tier = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -656,6 +707,38 @@ func (uq *UserQuery) loadAllowedGroups(ctx context.Context, query *GroupQuery, n
 		}
 		for kn := range nodes {
 			assign(kn, n)
+		}
+	}
+	return nil
+}
+func (uq *UserQuery) loadTier(ctx context.Context, query *TierQuery, nodes []*User, init func(*User), assign func(*User, *Tier)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*User)
+	for i := range nodes {
+		if nodes[i].tier_users == nil {
+			continue
+		}
+		fk := *nodes[i].tier_users
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(tier.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "tier_users" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
 		}
 	}
 	return nil

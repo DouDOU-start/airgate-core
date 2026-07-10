@@ -64,6 +64,8 @@ export interface UserResp {
 
   group_rates?: Record<number, number>;
   allowed_group_ids?: number[];
+  tier_id?: number;
+  tier_name?: string;
   balance_alert_threshold: number;
   status: string;
   api_key_id?: number;
@@ -92,6 +94,7 @@ export interface CreateUserReq {
   role: UserRole;
   max_concurrency?: number;
   group_rates?: Record<number, number>;
+  tier_id?: number;
 }
 
 export interface UpdateUserReq {
@@ -101,6 +104,8 @@ export interface UpdateUserReq {
   max_concurrency?: number;
   group_rates?: Record<number, number>;
   allowed_group_ids?: number[];
+  /** 用户等级：不传=不修改，0=清除，>0=设置 */
+  tier_id?: number;
   status?: 'active' | 'disabled';
 }
 
@@ -128,6 +133,8 @@ export interface GroupResp {
   /** 历史字段：渠道化改造后为可空，新建分组不再填写。 */
   platform?: string;
   rate_multiplier: number;
+  /** 当前用户在此分组的实际计费倍率（用户专属 > 等级 > 分组档位），仅用户视角接口返回 */
+  effective_rate?: number;
   is_exclusive: boolean;
   status_visible: boolean;
   note?: string;
@@ -167,6 +174,36 @@ export interface UpdateGroupReq {
   sort_weight?: number;
 }
 
+// ==================== Tier（用户等级） ====================
+
+export interface TierResp {
+  id: number;
+  name: string;
+  /** 等级在各分组的计费倍率（按 group_id 键） */
+  rates: Record<number, number>;
+  note?: string;
+  sort_weight: number;
+  /** 归属此等级的用户数（列表返回） */
+  user_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateTierReq {
+  name: string;
+  rates?: Record<number, number>;
+  note?: string;
+  sort_weight?: number;
+}
+
+export interface UpdateTierReq {
+  name?: string;
+  /** 提交即整体替换 */
+  rates?: Record<number, number>;
+  note?: string;
+  sort_weight?: number;
+}
+
 // ==================== API Key ====================
 
 export interface APIKeyResp {
@@ -185,6 +222,8 @@ export interface APIKeyResp {
   used_quota_actual: number;
   /** 销售倍率：>0 启用 reseller markup，0 表示按平台原价计费 */
   sell_rate: number;
+  /** 最高计费倍率：>0 时实际扣费倍率超过该值直接拒绝请求，0 表示不限制 */
+  max_rate: number;
   /** API Key 级并发上限：同一把 key 同时在途请求数。0 表示不限制 */
   max_concurrency: number;
   today_cost: number;
@@ -203,6 +242,8 @@ export interface CreateAPIKeyReq {
   quota_usd?: number;
   /** 销售倍率：>0 启用 reseller markup（对客户的售价倍率）。可空，默认 0 */
   sell_rate?: number;
+  /** 最高计费倍率：>0 时实际扣费倍率超过该值拒绝请求。可空，默认 0 不限制 */
+  max_rate?: number;
   /** API Key 并发上限，0 或不传表示不限制 */
   max_concurrency?: number;
   expires_at?: string;
@@ -216,6 +257,8 @@ export interface UpdateAPIKeyReq {
   quota_usd?: number;
   /** 销售倍率可随时动态调整，不影响历史 used_quota 累加值 */
   sell_rate?: number;
+  /** 最高计费倍率，0 表示关闭限制；不传则不改动 */
+  max_rate?: number;
   /** API Key 并发上限，0 表示关闭限制；不传则不改动 */
   max_concurrency?: number;
   expires_at?: string;
@@ -665,26 +708,6 @@ export interface UpdateModelPriceReq {
   pricing_extra?: Record<string, unknown>;
   /** 三态：省略 = 不改；0 = 清空标签；正数 = 设为该标签。 */
   tag_id?: number;
-}
-
-export interface ImportModelPriceItem {
-  model: string;
-  input_price?: number;
-  output_price?: number;
-  cached_input_price?: number;
-  cache_creation_price?: number;
-  cache_creation_1h_price?: number;
-  per_request_price?: number;
-  pricing_extra?: Record<string, unknown>;
-}
-
-export interface ImportModelPricesReq {
-  items: ImportModelPriceItem[];
-}
-
-export interface ImportModelPricesResp {
-  created: number;
-  updated: number;
 }
 
 // ==================== Settings ====================

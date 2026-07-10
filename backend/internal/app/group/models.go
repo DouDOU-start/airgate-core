@@ -26,6 +26,12 @@ type RPMReader interface {
 	GetGroupRPMs(context.Context, []int) map[int]int
 }
 
+// UserRatesReader 用户计费倍率读取（由 user 服务适配实现）：
+// 返回用户专属倍率与等级倍率（均按 group_id 键），用于解析可用分组的实际倍率。
+type UserRatesReader interface {
+	BillingRates(ctx context.Context, userID int) (groupRates, tierRates map[int64]float64, err error)
+}
+
 // GroupStats 描述分组统计信息。金额为实扣口径（usage_log.actual_cost 汇总），非价目表原价。
 type GroupStats struct {
 	TodayCost float64
@@ -49,6 +55,10 @@ type Group struct {
 	// 仅管理员列表查询时由读取器填充，不落库。
 	CurrentConcurrency int
 	CurrentRPM         int
+
+	// EffectiveRate 当前用户在此分组的实际计费倍率（用户专属 > 等级 > 分组档位），
+	// 仅用户视角查询（ListAvailable / AvailableForUser）且倍率读取器已注入时填充，0 表示未解析。
+	EffectiveRate float64
 }
 
 // ListFilter 描述管理员分组列表查询条件。

@@ -10,6 +10,7 @@ func TestResolveBillingRateForGroup_PriorityChain(t *testing.T) {
 	tests := []struct {
 		name           string
 		userGroupRates map[int64]float64
+		tierGroupRates map[int64]float64
 		groupID        int
 		groupRate      float64
 		want           float64
@@ -18,13 +19,40 @@ func TestResolveBillingRateForGroup_PriorityChain(t *testing.T) {
 		{name: "group rate fallback", userGroupRates: map[int64]float64{6: 0.2}, groupID: 5, groupRate: 0.5, want: 0.5},
 		{name: "default fallback", groupID: 5, want: 1.0},
 		{name: "non-positive override falls through", userGroupRates: map[int64]float64{5: 0}, groupID: 5, groupRate: 0.4, want: 0.4},
+		{name: "user override wins over tier", userGroupRates: map[int64]float64{5: 0.2}, tierGroupRates: map[int64]float64{5: 0.8}, groupID: 5, groupRate: 0.5, want: 0.2},
+		{name: "tier rate wins over group rate", tierGroupRates: map[int64]float64{5: 0.8}, groupID: 5, groupRate: 0.5, want: 0.8},
+		{name: "tier rate miss falls back to group rate", tierGroupRates: map[int64]float64{6: 0.8}, groupID: 5, groupRate: 0.5, want: 0.5},
+		{name: "non-positive tier rate falls through", tierGroupRates: map[int64]float64{5: 0}, groupID: 5, groupRate: 0.4, want: 0.4},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ResolveBillingRateForGroup(tt.userGroupRates, tt.groupID, tt.groupRate)
+			got := ResolveBillingRateForGroup(tt.userGroupRates, tt.tierGroupRates, tt.groupID, tt.groupRate)
 			if got != tt.want {
 				t.Errorf("ResolveBillingRateForGroup() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExceedsKeyMaxRate(t *testing.T) {
+	tests := []struct {
+		name string
+		info *auth.APIKeyInfo
+		rate float64
+		want bool
+	}{
+		{name: "nil keyInfo 不拦", info: nil, rate: 2.0, want: false},
+		{name: "max_rate=0 不限制", info: &auth.APIKeyInfo{MaxRate: 0}, rate: 3.0, want: false},
+		{name: "倍率超上限拦截", info: &auth.APIKeyInfo{MaxRate: 0.2}, rate: 0.3, want: true},
+		{name: "倍率等于上限放行", info: &auth.APIKeyInfo{MaxRate: 0.3}, rate: 0.3, want: false},
+		{name: "倍率低于上限放行", info: &auth.APIKeyInfo{MaxRate: 0.5}, rate: 0.2, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ExceedsKeyMaxRate(tt.info, tt.rate); got != tt.want {
+				t.Errorf("ExceedsKeyMaxRate(%v, %v) = %v, want %v", tt.info, tt.rate, got, tt.want)
 			}
 		})
 	}
@@ -92,6 +120,15 @@ func TestResolveBillingRate_PriorityChain(t *testing.T) {
 				UserGroupRates:      map[int64]float64{5: 0}, // 显式 0 视为未设置
 			},
 			want: 0.4,
+		},
+		{
+			name: "tier.rates sits between user override and group multiplier",
+			info: &auth.APIKeyInfo{
+				GroupID:             5,
+				GroupRateMultiplier: 0.5,
+				TierGroupRates:      map[int64]float64{5: 0.8},
+			},
+			want: 0.8,
 		},
 	}
 

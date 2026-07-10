@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 /** SSR 安全的媒体查询 hook */
-export function useMediaQuery(query: string): boolean {
+function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia(query).matches;

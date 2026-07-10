@@ -14,8 +14,6 @@ type Repository interface {
 	Create(context.Context, CreateInput) (ModelPrice, error)
 	Update(context.Context, int, UpdateInput) (ModelPrice, error)
 	Delete(context.Context, int) error
-	// Upsert 按 model 名 upsert，返回新建与更新条数。
-	Upsert(context.Context, []ImportItem) (created int, updated int, err error)
 
 	// —— 模型标签（家族归类，归属模型管理）——
 	ListTags(context.Context) ([]Tag, error)
@@ -23,8 +21,6 @@ type Repository interface {
 	RenameTag(ctx context.Context, id int, name string) (Tag, error)
 	// DeleteTag 删除标签并清空引用该标签的模型 tag_id（事务内）。
 	DeleteTag(ctx context.Context, id int) error
-	// EnsureTag 按名称 find-or-create，返回标签 ID（种子/批量导入用）。
-	EnsureTag(ctx context.Context, name string) (int, error)
 }
 
 // Tag 模型标签领域对象；ModelCount 为引用该标签的模型数（列表查询时填充）。
@@ -97,24 +93,4 @@ type UpdateInput struct {
 	PerRequestPrice      *float64
 	PricingExtra         map[string]interface{}
 	TagID                *int
-}
-
-// ImportItem 批量导入条目（按 model 名 upsert）。
-// TagName 非空时按名称 find-or-create 并挂到模型上；空串不改动已有标签。
-type ImportItem struct {
-	Model                string
-	InputPrice           float64
-	OutputPrice          float64
-	CachedInputPrice     float64
-	CacheCreationPrice   float64
-	CacheCreation1hPrice float64
-	PerRequestPrice      float64
-	PricingExtra         map[string]interface{}
-	TagName              string
-}
-
-// ImportResult 批量导入结果。
-type ImportResult struct {
-	Created int
-	Updated int
 }

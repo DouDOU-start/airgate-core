@@ -123,6 +123,16 @@ export function EditKeyModal({
           <Description>{t('user_keys.sell_rate_hint')}</Description>
         </HeroTextField>
         <HeroTextField fullWidth>
+          <Label>{t('user_keys.max_rate_label')}</Label>
+          <Input
+            type="number"
+            value={form.max_rate}
+            onChange={(e) => setForm({ ...form, max_rate: e.target.value })}
+            placeholder="0"
+          />
+          <Description>{t('user_keys.max_rate_hint')}</Description>
+        </HeroTextField>
+        <HeroTextField fullWidth>
           <Label>{t('user_keys.max_concurrency_label')}</Label>
           <Input
             type="number"

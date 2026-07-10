@@ -115,42 +115,6 @@ func (h *ModelPriceHandler) DeleteModelPrice(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// ImportModelPrices 批量导入模型价格（按 model 名 upsert）。
-func (h *ModelPriceHandler) ImportModelPrices(c *gin.Context) {
-	var req dto.ImportModelPricesReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BindError(c, err)
-		return
-	}
-
-	items := make([]appmodelprice.ImportItem, 0, len(req.Items))
-	for _, item := range req.Items {
-		items = append(items, appmodelprice.ImportItem{
-			Model:                item.Model,
-			InputPrice:           item.InputPrice,
-			OutputPrice:          item.OutputPrice,
-			CachedInputPrice:     item.CachedInputPrice,
-			CacheCreationPrice:   item.CacheCreationPrice,
-			CacheCreation1hPrice: item.CacheCreation1hPrice,
-			PerRequestPrice:      item.PerRequestPrice,
-			PricingExtra:         item.PricingExtra,
-			TagName:              item.Tag,
-		})
-	}
-
-	result, err := h.service.Import(c.Request.Context(), items)
-	if err != nil {
-		httpCode, message := h.handleError("导入模型价格失败", "导入失败", err)
-		response.Error(c, httpCode, httpCode, message)
-		return
-	}
-
-	response.Success(c, dto.ImportModelPricesResp{
-		Created: result.Created,
-		Updated: result.Updated,
-	})
-}
-
 // —— 模型标签端点（家族归类，归属模型管理）——
 
 // ListModelTags 列出全部模型标签（含模型计数）。

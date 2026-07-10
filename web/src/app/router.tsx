@@ -2,6 +2,7 @@ import {
   createRouter,
   createRootRoute,
   createRoute,
+  Navigate,
   Outlet,
   redirect,
 } from '@tanstack/react-router';
@@ -187,20 +188,38 @@ const authLayout = createRoute({
   ),
 });
 
+// 根路径纯分流：管理员渲染全局仪表盘；普通用户跳个人概览；API Key 会话跳使用记录。
+// 用重定向而不是原地渲染，保证 URL 与页面一致、侧边栏高亮不失联。
 function HomePage() {
   const { user, loading, isAPIKeySession } = useAuth();
   if (loading) return <PageLoading />;
   if (!user) return null;
 
-  const isAdmin = !isAPIKeySession && (getTokenRole() === 'admin' || user.role === 'admin');
-  const Page = isAPIKeySession ? UserUsagePage : isAdmin ? DashboardPage : UserOverviewPage;
+  if (isAPIKeySession) return <Navigate replace to="/usage" />;
+  const isAdmin = getTokenRole() === 'admin' || user.role === 'admin';
+  if (!isAdmin) return <Navigate replace to="/overview" />;
   return (
     <Suspense fallback={<PageLoading />}>
-      <Page />
+      <DashboardPage />
     </Suspense>
   );
 }
 const dashboardRoute = createRoute({ getParentRoute: () => authLayout, path: '/', component: HomePage });
+
+// 个人概览：管理员与普通用户统一入口；API Key 会话只有使用记录视角，跳走。
+function OverviewPage() {
+  const { user, loading, isAPIKeySession } = useAuth();
+  if (loading) return <PageLoading />;
+  if (!user) return null;
+
+  if (isAPIKeySession) return <Navigate replace to="/usage" />;
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <UserOverviewPage />
+    </Suspense>
+  );
+}
+const overviewRoute = createRoute({ getParentRoute: () => authLayout, path: '/overview', component: OverviewPage });
 
 // 管理员布局（需要 admin 角色）
 const adminLayout = createRoute({
@@ -243,6 +262,7 @@ const routeTree = rootRoute.addChildren([
   oauthAuthorizeRoute,
   authLayout.addChildren([
     dashboardRoute,
+    overviewRoute,
     adminLayout.addChildren([
       adminUsersRoute,
       adminChannelsRoute,

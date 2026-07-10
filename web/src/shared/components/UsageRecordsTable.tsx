@@ -135,7 +135,11 @@ const UsageTableRow = memo(function UsageTableRow({
           <td
             data-slot="td"
             key={column.key}
-            className={cx(getColumnClassName(column.key), leftAlignedContent ? 'text-left' : 'text-center')}
+            className={cx(
+              getColumnClassName(column.key),
+              leftAlignedContent ? 'text-left' : 'text-center',
+              column.stickyLeft && 'ag-usage-col--sticky-left',
+            )}
           >
             <div
               className={cx(
@@ -253,6 +257,7 @@ export function UsageRecordsTable<T extends UsageRow>({
                   className={cx(
                     getColumnClassName(column.key),
                     index === 0 && 'after:hidden',
+                    column.stickyLeft && 'ag-usage-col--sticky-left',
                   )}
                   style={column.width ? { width: column.width } : undefined}
                 >

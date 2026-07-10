@@ -23,6 +23,7 @@ type Key struct {
 	UsedQuota       float64 // 账面已用（含 sell_rate markup）
 	UsedQuotaActual float64 // 真实成本已用（聚合 sum(usage_log.actual_cost)，仅在 fetch 时填充）
 	SellRate        float64 // 销售倍率，0 表示未启用
+	MaxRate         float64 // 最高计费倍率，0 表示不限制；实际扣费倍率超过时预检拒绝请求
 	MaxConcurrency  int     // API Key 级并发上限，0 表示不限制
 	TodayCost       float64
 	ThirtyDayCost   float64
@@ -57,6 +58,7 @@ type CreateInput struct {
 	IPBlacklist    []string
 	QuotaUSD       float64
 	SellRate       float64
+	MaxRate        float64
 	MaxConcurrency int // 0 表示不限制
 	ExpiresAt      *string
 }
@@ -71,6 +73,7 @@ type UpdateInput struct {
 	HasIPBlacklist bool
 	QuotaUSD       *float64
 	SellRate       *float64
+	MaxRate        *float64
 	MaxConcurrency *int // nil 表示不改动；指向 0 表示关闭并发限制
 	ExpiresAt      *string
 	Status         *string
@@ -96,6 +99,7 @@ type Mutation struct {
 	HasIPBlacklist bool
 	QuotaUSD       *float64
 	SellRate       *float64
+	MaxRate        *float64
 	MaxConcurrency *int
 	ExpiresAt      *time.Time
 	HasExpiresAt   bool

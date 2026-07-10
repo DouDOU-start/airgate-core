@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Input, Label, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
+import { useQuery } from '@tanstack/react-query';
+import { Button, Input, Label, ListBox, Modal, Select, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { Eye, EyeOff } from 'lucide-react';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
+import { tiersApi } from '../../../shared/api/tiers';
+import { queryKeys } from '../../../shared/queryKeys';
 import type { UserResp, UpdateUserReq } from '../../../shared/types';
 
 interface EditUserModalProps {
@@ -21,9 +24,22 @@ export function EditUserModal({ open, user, onClose, onSubmit, loading }: EditUs
     max_concurrency: user.max_concurrency,
     role: editableRole,
     status: user.status as 'active' | 'disabled',
+    tier_id: user.tier_id ?? 0,
     username: user.username,
   });
   const [showPassword, setShowPassword] = useState(false);
+
+  const { data: tiersData } = useQuery({
+    queryKey: queryKeys.tiers(),
+    queryFn: () => tiersApi.list({ page: 1, page_size: 100 }),
+    enabled: open,
+  });
+  const tierOptions = [
+    { id: '0', label: t('tiers.none') },
+    ...(tiersData?.list ?? []).map((tier) => ({ id: String(tier.id), label: tier.name })),
+  ];
+  const selectedTierLabel =
+    tierOptions.find((option) => option.id === String(form.tier_id ?? 0))?.label ?? t('tiers.none');
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
@@ -90,6 +106,28 @@ export function EditUserModal({ open, user, onClose, onSubmit, loading }: EditUs
                     onChange={(e) => setForm({ ...form, max_concurrency: Number(e.target.value) })}
                   />
                 </HeroTextField>
+                <Select
+                  fullWidth
+                  selectedKey={String(form.tier_id ?? 0)}
+                  onSelectionChange={(key) =>
+                    setForm({ ...form, tier_id: key == null ? 0 : Number(key) })
+                  }
+                >
+                  <Label>{t('users.tier')}</Label>
+                  <Select.Trigger>
+                    <Select.Value>{selectedTierLabel}</Select.Value>
+                    <Select.Indicator />
+                  </Select.Trigger>
+                  <Select.Popover>
+                    <ListBox items={tierOptions}>
+                      {(item) => (
+                        <ListBox.Item id={item.id} textValue={item.label}>
+                          {item.label}
+                        </ListBox.Item>
+                      )}
+                    </ListBox>
+                  </Select.Popover>
+                </Select>
                 <NativeSwitch
                   isSelected={form.status === 'active'}
                   contentClassName="text-xs"

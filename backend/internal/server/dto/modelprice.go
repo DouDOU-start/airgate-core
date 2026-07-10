@@ -57,31 +57,6 @@ type UpdateModelPriceReq struct {
 	TagID *int64 `json:"tag_id" binding:"omitempty,gte=0"`
 }
 
-// ImportModelPriceItem 批量导入条目。
-type ImportModelPriceItem struct {
-	Model                string                 `json:"model" binding:"required"`
-	InputPrice           float64                `json:"input_price" binding:"omitempty,gte=0"`
-	OutputPrice          float64                `json:"output_price" binding:"omitempty,gte=0"`
-	CachedInputPrice     float64                `json:"cached_input_price" binding:"omitempty,gte=0"`
-	CacheCreationPrice   float64                `json:"cache_creation_price" binding:"omitempty,gte=0"`
-	CacheCreation1hPrice float64                `json:"cache_creation_1h_price" binding:"omitempty,gte=0"`
-	PerRequestPrice      float64                `json:"per_request_price" binding:"omitempty,gte=0"`
-	PricingExtra         map[string]interface{} `json:"pricing_extra"`
-	// Tag 标签名称（可空；非空时 find-or-create 并挂到模型上）。
-	Tag string `json:"tag" binding:"omitempty,max=64"`
-}
-
-// ImportModelPricesReq 批量导入请求（按 model 名 upsert）。
-type ImportModelPricesReq struct {
-	Items []ImportModelPriceItem `json:"items" binding:"required,min=1,dive"`
-}
-
-// ImportModelPricesResp 批量导入结果。
-type ImportModelPricesResp struct {
-	Created int `json:"created"`
-	Updated int `json:"updated"`
-}
-
 // ModelTagResp 模型标签响应；model_count 为引用该标签的模型数。
 type ModelTagResp struct {
 	ID         int64  `json:"id"`

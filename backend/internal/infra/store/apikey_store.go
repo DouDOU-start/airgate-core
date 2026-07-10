@@ -305,6 +305,9 @@ func applyAPIKeyMutationCreate(builder *ent.APIKeyCreate, mutation appapikey.Mut
 	if mutation.SellRate != nil {
 		builder.SetSellRate(*mutation.SellRate)
 	}
+	if mutation.MaxRate != nil {
+		builder.SetMaxRate(*mutation.MaxRate)
+	}
 	if mutation.MaxConcurrency != nil {
 		builder.SetMaxConcurrency(*mutation.MaxConcurrency)
 	}
@@ -338,6 +341,9 @@ func applyAPIKeyMutationUpdate(builder *ent.APIKeyUpdateOne, mutation appapikey.
 	if mutation.SellRate != nil {
 		builder.SetSellRate(*mutation.SellRate)
 	}
+	if mutation.MaxRate != nil {
+		builder.SetMaxRate(*mutation.MaxRate)
+	}
 	if mutation.MaxConcurrency != nil {
 		builder.SetMaxConcurrency(*mutation.MaxConcurrency)
 	}
@@ -366,6 +372,7 @@ func mapAPIKey(item *ent.APIKey) appapikey.Key {
 		UsedQuota:       item.UsedQuota,
 		UsedQuotaActual: item.UsedQuotaActual,
 		SellRate:        item.SellRate,
+		MaxRate:         item.MaxRate,
 		MaxConcurrency:  item.MaxConcurrency,
 		Status:          item.Status.String(),
 		ProvisionedBy:   item.ProvisionedBy,

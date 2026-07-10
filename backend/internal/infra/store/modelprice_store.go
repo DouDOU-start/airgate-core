@@ -139,81 +139,6 @@ func (s *ModelPriceStore) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
-// Upsert 按 model 名批量 upsert（单事务：全部成功或全部回滚），返回新建与更新条数。
-func (s *ModelPriceStore) Upsert(ctx context.Context, items []appmodelprice.ImportItem) (int, int, error) {
-	tx, err := s.db.Tx(ctx)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	created, updated := 0, 0
-	for _, item := range items {
-		// 标签按名称 find-or-create（事务内）；空名不动已有标签。
-		tagID := 0
-		if item.TagName != "" {
-			tagID, err = ensureTagTx(ctx, tx, item.TagName)
-			if err != nil {
-				return 0, 0, rollbackUpsert(tx, item.Model, err)
-			}
-		}
-		existing, err := tx.ModelPrice.Query().
-			Where(entmodelprice.ModelEQ(item.Model)).
-			Only(ctx)
-		switch {
-		case err == nil:
-			builder := existing.Update().
-				SetInputPrice(item.InputPrice).
-				SetOutputPrice(item.OutputPrice).
-				SetCachedInputPrice(item.CachedInputPrice).
-				SetCacheCreationPrice(item.CacheCreationPrice).
-				SetCacheCreation1hPrice(item.CacheCreation1hPrice).
-				SetPricingExtra(item.PricingExtra).
-				SetPerRequestPrice(item.PerRequestPrice)
-			if tagID > 0 {
-				builder = builder.SetTagID(tagID)
-			}
-			_, err = builder.Save(ctx)
-			if err != nil {
-				return 0, 0, rollbackUpsert(tx, item.Model, err)
-			}
-			updated++
-		case ent.IsNotFound(err):
-			builder := tx.ModelPrice.Create().
-				SetModel(item.Model).
-				SetInputPrice(item.InputPrice).
-				SetOutputPrice(item.OutputPrice).
-				SetCachedInputPrice(item.CachedInputPrice).
-				SetCacheCreationPrice(item.CacheCreationPrice).
-				SetCacheCreation1hPrice(item.CacheCreation1hPrice).
-				SetPricingExtra(item.PricingExtra).
-				SetPerRequestPrice(item.PerRequestPrice)
-			if tagID > 0 {
-				builder = builder.SetTagID(tagID)
-			}
-			_, err = builder.Save(ctx)
-			if err != nil {
-				return 0, 0, rollbackUpsert(tx, item.Model, err)
-			}
-			created++
-		default:
-			return 0, 0, rollbackUpsert(tx, item.Model, err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return 0, 0, err
-	}
-	return created, updated, nil
-}
-
-// rollbackUpsert 回滚导入事务并携带出错模型名。
-func rollbackUpsert(tx *ent.Tx, model string, err error) error {
-	if rerr := tx.Rollback(); rerr != nil {
-		return fmt.Errorf("导入 %q 失败: %w（回滚失败: %v）", model, err, rerr)
-	}
-	return fmt.Errorf("导入 %q 失败: %w", model, err)
-}
-
 func mapModelPriceList(items []*ent.ModelPrice) []appmodelprice.ModelPrice {
 	result := make([]appmodelprice.ModelPrice, 0, len(items))
 	for _, item := range items {
@@ -350,22 +275,6 @@ func (s *ModelPriceStore) EnsureTag(ctx context.Context, name string) (int, erro
 				return tag.ID, nil
 			}
 		}
-		return 0, err
-	}
-	return created.ID, nil
-}
-
-// ensureTagTx 事务内按名称 find-or-create 标签（批量导入用）。
-func ensureTagTx(ctx context.Context, tx *ent.Tx, name string) (int, error) {
-	tag, err := tx.ModelTag.Query().Where(entmodeltag.NameEQ(name)).Only(ctx)
-	if err == nil {
-		return tag.ID, nil
-	}
-	if !ent.IsNotFound(err) {
-		return 0, err
-	}
-	created, err := tx.ModelTag.Create().SetName(name).Save(ctx)
-	if err != nil {
 		return 0, err
 	}
 	return created.ID, nil

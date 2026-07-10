@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -161,12 +162,14 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 		return
 	}
 
+	tierID, _ := strconv.ParseInt(c.Query("tier_id"), 10, 64)
 	result, err := h.service.List(c.Request.Context(), appuser.ListFilter{
 		Page:     page.Page,
 		PageSize: page.PageSize,
 		Keyword:  page.Keyword,
 		Status:   c.Query("status"),
 		Role:     c.Query("role"),
+		TierID:   tierID,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("查询用户列表失败", "查询失败", err)
@@ -205,6 +208,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		Role:           req.Role,
 		MaxConcurrency: maxConcurrency,
 		GroupRates:     req.GroupRates,
+		TierID:         req.TierID,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("创建用户失败", "创建失败", err)
@@ -237,6 +241,8 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		HasGroupRates:      req.GroupRates != nil,
 		AllowedGroupIDs:    derefInt64Slice(req.AllowedGroupIDs),
 		HasAllowedGroupIDs: req.AllowedGroupIDs != nil,
+		TierID:             tierIDFromReq(req.TierID),
+		HasTier:            req.TierID != nil,
 		Status:             req.Status,
 	})
 	if err != nil {
@@ -371,4 +377,12 @@ func derefInt64Slice(input *[]int64) []int64 {
 		return nil
 	}
 	return append([]int64(nil), (*input)...)
+}
+
+// tierIDFromReq 把请求里的 tier_id 转成领域语义：0（或负数）表示清除归属，返回 nil。
+func tierIDFromReq(id *int64) *int64 {
+	if id == nil || *id <= 0 {
+		return nil
+	}
+	return id
 }

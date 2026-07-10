@@ -1,12 +1,12 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button, Chip, EmptyState, Input, Label, ListBox, Modal, Select,
-  Spinner, TextArea, TextField as HeroTextField, ToggleButton, ToggleButtonGroup,
+  Spinner, TextField as HeroTextField, ToggleButton, ToggleButtonGroup,
   useOverlayState,
 } from '@heroui/react';
-import { Check, FileUp, Inbox, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { Check, Inbox, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { modelPricesApi, modelTagsApi } from '../../shared/api/modelPrices';
 import { queryKeys } from '../../shared/queryKeys';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -17,7 +17,7 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
-import type { CreateModelPriceReq, ImportModelPriceItem, ModelPriceResp, ModelTagResp } from '../../shared/types';
+import type { CreateModelPriceReq, ModelPriceResp, ModelTagResp } from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
 type Translate = (key: string) => string;
@@ -75,15 +75,6 @@ function asRecord(v: unknown): Record<string, unknown> {
 type PriceFieldKey =
   | 'input_price' | 'output_price' | 'cached_input_price'
   | 'cache_creation_price' | 'cache_creation_1h_price' | 'per_request_price';
-
-const PRICE_FIELDS: readonly PriceFieldKey[] = [
-  'input_price',
-  'output_price',
-  'cached_input_price',
-  'cache_creation_price',
-  'cache_creation_1h_price',
-  'per_request_price',
-];
 
 // token 计费模式下的价格字段（按次计费时这些字段清零且不显示）。
 const TOKEN_PRICE_FIELDS: readonly PriceFieldKey[] = [
@@ -279,37 +270,6 @@ export function PriceCard({ onDelete, onEdit, row, t }: {
   );
 }
 
-// 归一导入 JSON：支持 {items:[...]} 或直接数组两种形态
-function normalizeImportItems(raw: string): ImportModelPriceItem[] {
-  const parsed: unknown = JSON.parse(raw);
-  const list = Array.isArray(parsed)
-    ? parsed
-    : (parsed !== null && typeof parsed === 'object' && Array.isArray((parsed as { items?: unknown }).items))
-      ? (parsed as { items: unknown[] }).items
-      : null;
-  if (!list) throw new Error('not a list');
-
-  return list.map((entry) => {
-    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) throw new Error('bad item');
-    const record = entry as Record<string, unknown>;
-    if (typeof record.model !== 'string' || !record.model.trim()) throw new Error('missing model');
-    const item: ImportModelPriceItem = { model: record.model.trim() };
-    for (const field of PRICE_FIELDS) {
-      const value = record[field];
-      if (value === undefined || value === null) continue;
-      const num = Number(value);
-      if (!Number.isFinite(num) || num < 0) throw new Error(`bad ${field}`);
-      item[field] = num;
-    }
-    const extra = record.pricing_extra;
-    if (extra !== undefined && extra !== null) {
-      if (typeof extra !== 'object' || Array.isArray(extra)) throw new Error('bad pricing_extra');
-      item.pricing_extra = extra as Record<string, unknown>;
-    }
-    return item;
-  });
-}
-
 export default function ModelPricesPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -341,9 +301,6 @@ export default function ModelPricesPage() {
   const [editingTag, setEditingTag] = useState<{ id: number; name: string } | null>(null);
   const [deleteTagTarget, setDeleteTagTarget] = useState<ModelTagResp | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ModelPriceResp | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
-  const [importText, setImportText] = useState('');
-  const [importError, setImportError] = useState('');
 
   const listQuery = useMemo(() => ({
     page,
@@ -434,18 +391,6 @@ export default function ModelPricesPage() {
     if (!name) return;
     renameTagMutation.mutate({ id: editingTag.id, name });
   }
-
-  const importMutation = useMutation({
-    mutationFn: (items: ImportModelPriceItem[]) => modelPricesApi.import({ items }),
-    onSuccess: (resp) => {
-      toast('success', t('model_prices.import_success', { created: resp.created, updated: resp.updated }));
-      queryClient.invalidateQueries({ queryKey: queryKeys.modelPrices() });
-      setImportOpen(false);
-      setImportText('');
-      setImportError('');
-    },
-    onError: (err: Error) => toast('error', err.message),
-  });
 
   function openCreate() {
     setEditingPrice(null);
@@ -610,33 +555,11 @@ export default function ModelPricesPage() {
     }
   }
 
-  function handleImport() {
-    let items: ImportModelPriceItem[];
-    try {
-      items = normalizeImportItems(importText);
-    } catch {
-      setImportError(t('model_prices.import_invalid'));
-      return;
-    }
-    if (items.length === 0) {
-      setImportError(t('model_prices.import_empty'));
-      return;
-    }
-    setImportError('');
-    importMutation.mutate(items);
-  }
-
   const saving = createMutation.isPending || updateMutation.isPending;
   const priceDialogState = useOverlayState({
     isOpen: modalOpen,
     onOpenChange: (open) => {
       if (!open) closeModal();
-    },
-  });
-  const importDialogState = useOverlayState({
-    isOpen: importOpen,
-    onOpenChange: (open) => {
-      if (!open) setImportOpen(false);
     },
   });
 
@@ -715,10 +638,6 @@ export default function ModelPricesPage() {
             onPress={() => refetch()}
           >
             <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button variant="secondary" onPress={() => setImportOpen(true)}>
-            <FileUp className="h-4 w-4" />
-            {t('model_prices.import')}
           </Button>
           <Button variant="primary" onPress={openCreate}>
             <Plus className="h-4 w-4" />
@@ -1032,48 +951,6 @@ export default function ModelPricesPage() {
                 <Button isDisabled={saving} variant="primary" onPress={handleSubmit}>
                   {saving ? <Spinner size="sm" /> : null}
                   {editingPrice ? t('common.save') : t('common.create')}
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
-
-      {/* 批量导入弹窗 */}
-      <Modal state={importDialogState}>
-        <DialogTriggerShim />
-        <Modal.Backdrop>
-          <Modal.Container placement="center" scroll="inside" size="lg">
-            <Modal.Dialog className="ag-elevation-modal">
-              <Modal.Header>
-                <Modal.Heading>{t('model_prices.import_title')}</Modal.Heading>
-                <Modal.CloseTrigger />
-              </Modal.Header>
-              <Modal.Body>
-                <div className="space-y-2">
-                  <p className="text-xs text-text-tertiary">{t('model_prices.import_hint')}</p>
-                  <TextArea
-                    aria-label={t('model_prices.import_title')}
-                    className={`w-full font-mono text-xs leading-5${importError ? ' border-danger' : ''}`}
-                    placeholder={'[\n  { "model": "gpt-4o", "input_price": 2.5, "output_price": 10 }\n]'}
-                    rows={12}
-                    value={importText}
-                    onChange={(event) => setImportText(event.target.value)}
-                  />
-                  {importError ? <p className="text-xs text-danger">{importError}</p> : null}
-                </div>
-              </Modal.Body>
-              <Modal.Footer>
-                <Button variant="secondary" onPress={() => setImportOpen(false)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  isDisabled={importMutation.isPending}
-                  variant="primary"
-                  onPress={handleImport}
-                >
-                  {importMutation.isPending ? <Spinner size="sm" /> : null}
-                  {t('model_prices.import')}
                 </Button>
               </Modal.Footer>
             </Modal.Dialog>

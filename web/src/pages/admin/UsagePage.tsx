@@ -1,7 +1,7 @@
-import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { lazy, memo, Suspense, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Button, Card, Chip, ComboBox, Input, ListBox, Tabs } from '@heroui/react';
+import { Button, Chip, ComboBox, Input, ListBox, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { apikeysApi } from '../../shared/api/apikeys';
@@ -11,10 +11,15 @@ import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation'
 import { queryKeys } from '../../shared/queryKeys';
 import { UpstreamLogsTable } from './usage/UpstreamLogsTable';
 import { Activity, Coins, Hash, Search } from 'lucide-react';
-import { useUsageColumns, fmtNum, type UsageColumnConfig } from '../../shared/columns/usageColumns';
+import { useUsageColumns, type UsageColumnConfig } from '../../shared/columns/usageColumns';
 import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
+import { DashboardCard } from '../../shared/components/DashboardCard';
+import { StatCard } from '../../shared/components/StatCard';
+import { fmtNum } from '../../shared/utils/format';
 import { UsageRecordsTable } from '../../shared/components/UsageRecordsTable';
+import { ColumnVisibilityControl } from '../../shared/components/ColumnVisibilityControl';
+import { usePersistentHiddenColumns } from '../../shared/hooks/usePersistentHiddenColumns';
 import { UsageDateRangeFilter } from '../../shared/components/UsageDateRangeFilter';
 import { UsageModelFilterInput } from '../../shared/components/UsageModelFilterInput';
 import { PIE_CHART_COLORS } from '../../shared/constants';
@@ -23,71 +28,12 @@ import { AutoRefreshControl } from '../../shared/components/AutoRefreshControl';
 import { ADMIN_AUTO_REFRESH_OPTIONS, usePersistentAutoRefresh } from '../../shared/hooks/usePersistentAutoRefresh';
 
 const UsagePieChart = lazy(() =>
-  import('./usage/UsageCharts').then((m) => ({ default: m.UsagePieChart })),
+  import('../../shared/components/charts').then((m) => ({ default: m.UsagePieChart })),
 );
 const UsageTokenTrendChart = lazy(() =>
   import('./usage/UsageCharts').then((m) => ({ default: m.UsageTokenTrendChart })),
 );
 
-
-function SectionCard({
-  children,
-  extra,
-  title,
-}: {
-  children: ReactNode;
-  extra?: ReactNode;
-  title: string;
-}) {
-  return (
-    <Card className="ag-dashboard-panel">
-      <div
-        className="flex min-w-0 items-center justify-between gap-3 p-3 pb-2 2xl:p-4 2xl:pb-2"
-      >
-        <h3 className="min-w-0 truncate text-base font-semibold leading-none text-text">{title}</h3>
-        {extra ? (
-          <div className="min-w-0 shrink">{extra}</div>
-        ) : null}
-      </div>
-      <Card.Content className="px-3 pb-3 2xl:px-4 2xl:pb-4">{children}</Card.Content>
-    </Card>
-  );
-}
-
-function StatCard({
-  accentColor,
-  icon,
-  title,
-  value,
-}: {
-  accentColor: string;
-  icon: ReactNode;
-  title: string;
-  value: ReactNode;
-}) {
-  return (
-    <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
-      <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
-        <div className="ag-dashboard-metric-copy">
-          <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
-          <div className="mt-1 flex min-w-0 items-baseline gap-2">
-            <div className="min-w-0 truncate font-mono text-[22px] font-semibold leading-none text-text 2xl:text-2xl">{value}</div>
-          </div>
-        </div>
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:h-11 2xl:w-11"
-          style={{
-            background: `color-mix(in srgb, ${accentColor} 14%, transparent)`,
-            color: accentColor,
-            borderColor: `color-mix(in srgb, ${accentColor} 24%, transparent)`,
-          }}
-        >
-          {icon}
-        </div>
-      </Card.Content>
-    </Card>
-  );
-}
 
 // 分组统计 key 映射
 const groupByKeys: Record<string, string> = {
@@ -107,6 +53,9 @@ const groupByHeaderKeys: Record<string, string> = {
 const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,channel,user';
 const USAGE_PAGE_ACTIVATION_DELAY_MS = 180;
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.admin.usage.auto_update';
+const ADMIN_USAGE_HIDDEN_COLUMNS_STORAGE_KEY = 'airgate.admin.usage.hidden_columns';
+// 稳定的空数组引用：避免 `trendData ?? []` 每次渲染新建数组击穿 TokenTrendCard 的 memo。
+const EMPTY_TREND_DATA: UsageTrendBucket[] = [];
 
 // ==================== 分布饼图卡片 ====================
 
@@ -120,7 +69,8 @@ interface DistributionItem {
   actualCost: number;
 }
 
-function DistributionCard({
+// memo：页面顶层 state（筛选、列显隐等）频繁变化，图表卡片数据没变时跳过 recharts 重绘。
+const DistributionCard = memo(function DistributionCard({
   title,
   data,
   firstColumnTitle,
@@ -158,7 +108,7 @@ function DistributionCard({
   );
 
   return (
-    <SectionCard title={title} extra={metricTabs}>
+    <DashboardCard title={title} extra={metricTabs}>
       <div className="ag-distribution-card-body grid items-start gap-3 2xl:grid-cols-[176px_minmax(0,1fr)]">
         <div className="ag-distribution-chart-frame">
           <Suspense fallback={<div className="h-[176px] w-[176px]" />}>
@@ -221,9 +171,9 @@ function DistributionCard({
           />
         </div>
       </div>
-    </SectionCard>
+    </DashboardCard>
   );
-}
+});
 
 type GroupStatsRow = {
   key: string | number;
@@ -234,7 +184,7 @@ type GroupStatsRow = {
   actual_cost: number;
 };
 
-function GroupStatsCard({
+const GroupStatsCard = memo(function GroupStatsCard({
   activeKey,
   rows,
   onActiveKeyChange,
@@ -246,7 +196,7 @@ function GroupStatsCard({
   const { t } = useTranslation();
 
   return (
-    <SectionCard
+    <DashboardCard
       title={t('usage.group_stats')}
       extra={
         <Tabs
@@ -325,13 +275,13 @@ function GroupStatsCard({
           ]}
         />
       </div>
-    </SectionCard>
+    </DashboardCard>
   );
-}
+});
 
 // ==================== Token 使用趋势 ====================
 
-function TokenTrendCard({
+const TokenTrendCard = memo(function TokenTrendCard({
   data,
   granularity,
   onGranularityChange,
@@ -366,16 +316,16 @@ function TokenTrendCard({
 
   if (data.length === 0) {
     return (
-      <SectionCard title={t('usage.token_trend')} extra={granularityTabs}>
+      <DashboardCard title={t('usage.token_trend')} extra={granularityTabs}>
         <div className="flex h-[248px] items-center justify-center text-sm text-text-tertiary 2xl:h-[288px]">
           {t('common.no_data')}
         </div>
-      </SectionCard>
+      </DashboardCard>
     );
   }
 
   return (
-    <SectionCard
+    <DashboardCard
       title={t('usage.token_trend')}
       extra={granularityTabs}
     >
@@ -384,9 +334,9 @@ function TokenTrendCard({
           <UsageTokenTrendChart data={data} lineLabels={lineLabels} />
         </Suspense>
       </div>
-    </SectionCard>
+    </DashboardCard>
   );
-}
+});
 
 // ==================== 主页面 ====================
 
@@ -605,6 +555,8 @@ export default function UsagePage() {
         key: 'user_id',
         title: t('common.user'),
         width: '160px',
+        // 管理端列多需横向滚动，用户列吸附在最左侧保持可见。
+        stickyLeft: true,
         render: (row) => {
           // 渠道测试落账行：无用户归属，发起方标为「渠道测试」。
           if (row.source === 'channel_test') {
@@ -685,6 +637,17 @@ export default function UsagePage() {
       channelColumn,
     ] as UsageColumnConfig<UsageLogResp>[];
   }, [sharedColumns, t]);
+
+  // 列显隐：吸附的用户列锁定不可隐藏，其余列可按需关闭并持久化。
+  const [hiddenColumnKeys, setHiddenColumnKeys] = usePersistentHiddenColumns(ADMIN_USAGE_HIDDEN_COLUMNS_STORAGE_KEY);
+  const columnPickerItems = useMemo(
+    () => columns.map((column) => ({ key: column.key, label: column.title, locked: column.stickyLeft })),
+    [columns],
+  );
+  const visibleColumns = useMemo(
+    () => columns.filter((column) => column.stickyLeft || !hiddenColumnKeys.has(column.key)),
+    [columns, hiddenColumnKeys],
+  );
   const total = data?.total ?? 0;
 
   return (
@@ -741,7 +704,7 @@ export default function UsagePage() {
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <TokenTrendCard
-              data={trendData ?? []}
+              data={trendData ?? EMPTY_TREND_DATA}
               granularity={granularity}
               onGranularityChange={setGranularity}
             />
@@ -907,22 +870,31 @@ export default function UsagePage() {
       </div>
 
       {/* 记录区：消费记录 | 失败请求（切换共享筛选） */}
-      <Tabs
-        className="ag-segmented-tabs ag-segmented-tabs-compact mb-3"
-        selectedKey={recordsTab}
-        onSelectionChange={(key) => setRecordsTab(key as 'usage' | 'upstream')}
-      >
-        <Tabs.List>
-          <Tabs.Tab id="usage">
-            <Tabs.Indicator />
-            {t('usage.records_tab_usage')}
-          </Tabs.Tab>
-          <Tabs.Tab id="upstream">
-            <Tabs.Indicator />
-            {t('usage.records_tab_upstream')}
-          </Tabs.Tab>
-        </Tabs.List>
-      </Tabs>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <Tabs
+          className="ag-segmented-tabs ag-segmented-tabs-compact"
+          selectedKey={recordsTab}
+          onSelectionChange={(key) => setRecordsTab(key as 'usage' | 'upstream')}
+        >
+          <Tabs.List>
+            <Tabs.Tab id="usage">
+              <Tabs.Indicator />
+              {t('usage.records_tab_usage')}
+            </Tabs.Tab>
+            <Tabs.Tab id="upstream">
+              <Tabs.Indicator />
+              {t('usage.records_tab_upstream')}
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs>
+        {recordsTab === 'usage' && (
+          <ColumnVisibilityControl
+            hiddenKeys={hiddenColumnKeys}
+            items={columnPickerItems}
+            onChange={setHiddenColumnKeys}
+          />
+        )}
+      </div>
 
       {recordsTab === 'upstream' && (
         <UpstreamLogsTable
@@ -939,7 +911,7 @@ export default function UsagePage() {
       {recordsTab === 'usage' && (
       <UsageRecordsTable
         ariaLabel={t('usage.title', 'Usage')}
-        columns={columns}
+        columns={visibleColumns}
         dataVersion={pageActive ? dataUpdatedAt : undefined}
         emptyAction={filters.start_date || filters.end_date ? (
           <Button

@@ -12,9 +12,11 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 )
 
-// SSE 扫描缓冲：初始 64KB，单行上限 8MB（reasoning 大事件可能超 1MB）。
+// SSE 扫描缓冲：初始 8KB，单行上限 8MB（reasoning 大事件可能超 1MB）。
+// 初始值按「每并发流一份常驻缓冲」取小：万级并发流下 64KB 初始缓冲即 GB 级内存，
+// 8KB 覆盖绝大多数 chunk，超长行由 Scanner 按需增长到上限。
 const (
-	sseInitialBufSize = 64 << 10
+	sseInitialBufSize = 8 << 10
 	sseMaxLineBytes   = 8 << 20
 	// sseMaxLineBytesResponses Responses 流的单行上限（64MB）。
 	// Responses 的 usage 嵌在 response.completed 事件里，该事件内嵌完整 response
@@ -81,8 +83,14 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 	flusher, _ := w.(http.Flusher)
 
 	// writeLine 写出一行（补行尾换行）并 Flush；返回 false 表示客户端写失败。
+	// 行与换行分两次写（net/http 侧有写缓冲，Flush 前不落 socket）：
+	// 避免 line+"\n" 每行拼接一个新字符串——万级并发流下这是主要 GC 压力源之一。
 	writeLine := func(line string) bool {
-		if _, err := io.WriteString(w, line+"\n"); err != nil {
+		if _, err := io.WriteString(w, line); err != nil {
+			result.err = err
+			return false
+		}
+		if _, err := io.WriteString(w, "\n"); err != nil {
 			result.err = err
 			return false
 		}

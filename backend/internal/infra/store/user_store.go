@@ -12,6 +12,7 @@ import (
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
 	entbalancelog "github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
+	enttier "github.com/DouDOU-start/airgate-core/ent/tier"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
 	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
@@ -29,7 +30,7 @@ func NewUserStore(db *ent.Client) *UserStore {
 
 // FindByID 查询用户。
 func (s *UserStore) FindByID(ctx context.Context, id int, withAllowedGroups bool) (appuser.User, error) {
-	query := s.db.User.Query().Where(entuser.IDEQ(id))
+	query := s.db.User.Query().Where(entuser.IDEQ(id)).WithTier()
 	if withAllowedGroups {
 		query = query.WithAllowedGroups()
 	}
@@ -60,6 +61,9 @@ func (s *UserStore) List(ctx context.Context, filter appuser.ListFilter) ([]appu
 	if filter.Role != "" {
 		query = query.Where(entuser.RoleEQ(entuser.Role(filter.Role)))
 	}
+	if filter.TierID > 0 {
+		query = query.Where(entuser.HasTierWith(enttier.IDEQ(int(filter.TierID))))
+	}
 
 	total, err := query.Count(ctx)
 	if err != nil {
@@ -68,6 +72,7 @@ func (s *UserStore) List(ctx context.Context, filter appuser.ListFilter) ([]appu
 
 	users, err := query.
 		WithAllowedGroups().
+		WithTier().
 		Offset((filter.Page - 1) * filter.PageSize).
 		Limit(filter.PageSize).
 		Order(ent.Desc(entuser.FieldCreatedAt)).
@@ -132,6 +137,9 @@ func (s *UserStore) Create(ctx context.Context, mutation appuser.Mutation) (appu
 	applyUserMutationCreate(builder, mutation)
 	item, err := builder.Save(ctx)
 	if err != nil {
+		if ent.IsConstraintError(err) && mutation.HasTier && mutation.TierID != nil {
+			return appuser.User{}, appuser.ErrTierNotFound
+		}
 		return appuser.User{}, err
 	}
 	return s.FindByID(ctx, item.ID, true)
@@ -144,6 +152,9 @@ func (s *UserStore) Update(ctx context.Context, id int, mutation appuser.Mutatio
 	if _, err := builder.Save(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return appuser.User{}, appuser.ErrUserNotFound
+		}
+		if ent.IsConstraintError(err) && mutation.HasTier && mutation.TierID != nil {
+			return appuser.User{}, appuser.ErrTierNotFound
 		}
 		return appuser.User{}, err
 	}
@@ -422,6 +433,9 @@ func applyUserMutationCreate(builder *ent.UserCreate, mutation appuser.Mutation)
 	if mutation.HasGroupRates {
 		builder.SetGroupRates(cloneUserGroupRates(mutation.GroupRates))
 	}
+	if mutation.HasTier && mutation.TierID != nil {
+		builder.SetTierID(int(*mutation.TierID))
+	}
 }
 
 func applyUserMutationUpdate(builder *ent.UserUpdateOne, mutation appuser.Mutation) {
@@ -448,6 +462,13 @@ func applyUserMutationUpdate(builder *ent.UserUpdateOne, mutation appuser.Mutati
 				ids = append(ids, int(value))
 			}
 			builder.AddAllowedGroupIDs(ids...)
+		}
+	}
+	if mutation.HasTier {
+		if mutation.TierID != nil {
+			builder.SetTierID(int(*mutation.TierID))
+		} else {
+			builder.ClearTier()
 		}
 	}
 	if mutation.Status != nil {
@@ -491,6 +512,12 @@ func mapUser(item *ent.User) appuser.User {
 		for _, group := range item.Edges.AllowedGroups {
 			result.AllowedGroupIDs = append(result.AllowedGroupIDs, int64(group.ID))
 		}
+	}
+	if tier := item.Edges.Tier; tier != nil {
+		id := int64(tier.ID)
+		result.TierID = &id
+		result.TierName = tier.Name
+		result.TierRates = cloneUserGroupRates(tier.Rates)
 	}
 	return result
 }

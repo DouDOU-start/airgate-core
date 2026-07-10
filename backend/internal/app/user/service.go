@@ -175,6 +175,8 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (User, error) {
 		MaxConcurrency: intPtrIfPositive(input.MaxConcurrency),
 		GroupRates:     cloneGroupRates(input.GroupRates),
 		HasGroupRates:  input.GroupRates != nil,
+		TierID:         input.TierID,
+		HasTier:        input.TierID != nil,
 	})
 	if err != nil {
 		logger.Error("user_create_failed",
@@ -209,6 +211,8 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (User, 
 		HasGroupRates:      input.HasGroupRates,
 		AllowedGroupIDs:    append([]int64(nil), input.AllowedGroupIDs...),
 		HasAllowedGroupIDs: input.HasAllowedGroupIDs,
+		TierID:             input.TierID,
+		HasTier:            input.HasTier,
 		Status:             input.Status,
 	}
 	if input.Password != nil {
@@ -316,6 +320,16 @@ func (s *Service) checkBalanceAlert(ctx context.Context, user User) {
 	if user.Balance >= threshold && user.BalanceAlertNotified {
 		_ = s.repo.SetBalanceAlertNotified(ctx, user.ID, false)
 	}
+}
+
+// BillingRates 返回用户的专属倍率与等级倍率（均按 group_id 键），
+// 供可用分组列表解析"该用户在各分组的实际计费倍率"。
+func (s *Service) BillingRates(ctx context.Context, userID int) (groupRates, tierRates map[int64]float64, err error) {
+	u, err := s.repo.FindByID(ctx, userID, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	return u.GroupRates, u.TierRates, nil
 }
 
 // ListGroupRateOverrides 返回指定分组下所有设置了专属倍率的用户。

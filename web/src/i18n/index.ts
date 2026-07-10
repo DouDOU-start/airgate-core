@@ -3,7 +3,7 @@ import { initReactI18next } from 'react-i18next';
 import zh from './zh.json';
 import en from './en.json';
 
-export function getStoredLanguage() {
+function getStoredLanguage() {
   if (typeof window === 'undefined') return 'zh';
   try {
     return window.localStorage.getItem('lang') || 'zh';

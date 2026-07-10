@@ -29,6 +29,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/ent/task"
+	"github.com/DouDOU-start/airgate-core/ent/tier"
 	"github.com/DouDOU-start/airgate-core/ent/upstreamrequestlog"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -67,6 +68,8 @@ type Client struct {
 	Setting *SettingClient
 	// Task is the client for interacting with the Task builders.
 	Task *TaskClient
+	// Tier is the client for interacting with the Tier builders.
+	Tier *TierClient
 	// UpstreamRequestLog is the client for interacting with the UpstreamRequestLog builders.
 	UpstreamRequestLog *UpstreamRequestLogClient
 	// UsageLog is the client for interacting with the UsageLog builders.
@@ -98,6 +101,7 @@ func (c *Client) init() {
 	c.RedemptionCode = NewRedemptionCodeClient(c.config)
 	c.Setting = NewSettingClient(c.config)
 	c.Task = NewTaskClient(c.config)
+	c.Tier = NewTierClient(c.config)
 	c.UpstreamRequestLog = NewUpstreamRequestLogClient(c.config)
 	c.UsageLog = NewUsageLogClient(c.config)
 	c.User = NewUserClient(c.config)
@@ -207,6 +211,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		RedemptionCode:        NewRedemptionCodeClient(cfg),
 		Setting:               NewSettingClient(cfg),
 		Task:                  NewTaskClient(cfg),
+		Tier:                  NewTierClient(cfg),
 		UpstreamRequestLog:    NewUpstreamRequestLogClient(cfg),
 		UsageLog:              NewUsageLogClient(cfg),
 		User:                  NewUserClient(cfg),
@@ -243,6 +248,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		RedemptionCode:        NewRedemptionCodeClient(cfg),
 		Setting:               NewSettingClient(cfg),
 		Task:                  NewTaskClient(cfg),
+		Tier:                  NewTierClient(cfg),
 		UpstreamRequestLog:    NewUpstreamRequestLogClient(cfg),
 		UsageLog:              NewUsageLogClient(cfg),
 		User:                  NewUserClient(cfg),
@@ -277,7 +283,7 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel, c.Group,
 		c.ModelPrice, c.ModelTag, c.OAuthClient, c.PaymentOrder,
-		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task,
+		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task, c.Tier,
 		c.UpstreamRequestLog, c.UsageLog, c.User,
 	} {
 		n.Use(hooks...)
@@ -290,7 +296,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel, c.Group,
 		c.ModelPrice, c.ModelTag, c.OAuthClient, c.PaymentOrder,
-		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task,
+		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task, c.Tier,
 		c.UpstreamRequestLog, c.UsageLog, c.User,
 	} {
 		n.Intercept(interceptors...)
@@ -328,6 +334,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Setting.mutate(ctx, m)
 	case *TaskMutation:
 		return c.Task.mutate(ctx, m)
+	case *TierMutation:
+		return c.Tier.mutate(ctx, m)
 	case *UpstreamRequestLogMutation:
 		return c.UpstreamRequestLog.mutate(ctx, m)
 	case *UsageLogMutation:
@@ -2393,6 +2401,155 @@ func (c *TaskClient) mutate(ctx context.Context, m *TaskMutation) (Value, error)
 	}
 }
 
+// TierClient is a client for the Tier schema.
+type TierClient struct {
+	config
+}
+
+// NewTierClient returns a client for the Tier from the given config.
+func NewTierClient(c config) *TierClient {
+	return &TierClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `tier.Hooks(f(g(h())))`.
+func (c *TierClient) Use(hooks ...Hook) {
+	c.hooks.Tier = append(c.hooks.Tier, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `tier.Intercept(f(g(h())))`.
+func (c *TierClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Tier = append(c.inters.Tier, interceptors...)
+}
+
+// Create returns a builder for creating a Tier entity.
+func (c *TierClient) Create() *TierCreate {
+	mutation := newTierMutation(c.config, OpCreate)
+	return &TierCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Tier entities.
+func (c *TierClient) CreateBulk(builders ...*TierCreate) *TierCreateBulk {
+	return &TierCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TierClient) MapCreateBulk(slice any, setFunc func(*TierCreate, int)) *TierCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TierCreateBulk{err: fmt.Errorf("calling to TierClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TierCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TierCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Tier.
+func (c *TierClient) Update() *TierUpdate {
+	mutation := newTierMutation(c.config, OpUpdate)
+	return &TierUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TierClient) UpdateOne(t *Tier) *TierUpdateOne {
+	mutation := newTierMutation(c.config, OpUpdateOne, withTier(t))
+	return &TierUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TierClient) UpdateOneID(id int) *TierUpdateOne {
+	mutation := newTierMutation(c.config, OpUpdateOne, withTierID(id))
+	return &TierUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Tier.
+func (c *TierClient) Delete() *TierDelete {
+	mutation := newTierMutation(c.config, OpDelete)
+	return &TierDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TierClient) DeleteOne(t *Tier) *TierDeleteOne {
+	return c.DeleteOneID(t.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TierClient) DeleteOneID(id int) *TierDeleteOne {
+	builder := c.Delete().Where(tier.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TierDeleteOne{builder}
+}
+
+// Query returns a query builder for Tier.
+func (c *TierClient) Query() *TierQuery {
+	return &TierQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTier},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Tier entity by its id.
+func (c *TierClient) Get(ctx context.Context, id int) (*Tier, error) {
+	return c.Query().Where(tier.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TierClient) GetX(ctx context.Context, id int) *Tier {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryUsers queries the users edge of a Tier.
+func (c *TierClient) QueryUsers(t *Tier) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := t.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tier.Table, tier.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, tier.UsersTable, tier.UsersColumn),
+		)
+		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *TierClient) Hooks() []Hook {
+	return c.hooks.Tier
+}
+
+// Interceptors returns the client interceptors.
+func (c *TierClient) Interceptors() []Interceptor {
+	return c.inters.Tier
+}
+
+func (c *TierClient) mutate(ctx context.Context, m *TierMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TierCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TierUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TierUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TierDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Tier mutation op: %q", m.Op())
+	}
+}
+
 // UpstreamRequestLogClient is a client for the UpstreamRequestLog schema.
 type UpstreamRequestLogClient struct {
 	config
@@ -2879,6 +3036,22 @@ func (c *UserClient) QueryAllowedGroups(u *User) *GroupQuery {
 	return query
 }
 
+// QueryTier queries the tier edge of a User.
+func (c *UserClient) QueryTier(u *User) *TierQuery {
+	query := (&TierClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := u.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(tier.Table, tier.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, user.TierTable, user.TierColumn),
+		)
+		fromV = sqlgraph.Neighbors(u.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryBalanceLogs queries the balance_logs edge of a User.
 func (c *UserClient) QueryBalanceLogs(u *User) *BalanceLogQuery {
 	query := (&BalanceLogClient{config: c.config}).Query()
@@ -2925,11 +3098,11 @@ type (
 	hooks struct {
 		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, Group, ModelPrice,
 		ModelTag, OAuthClient, PaymentOrder, PaymentProviderConfig, RedemptionCode,
-		Setting, Task, UpstreamRequestLog, UsageLog, User []ent.Hook
+		Setting, Task, Tier, UpstreamRequestLog, UsageLog, User []ent.Hook
 	}
 	inters struct {
 		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, Group, ModelPrice,
 		ModelTag, OAuthClient, PaymentOrder, PaymentProviderConfig, RedemptionCode,
-		Setting, Task, UpstreamRequestLog, UsageLog, User []ent.Interceptor
+		Setting, Task, Tier, UpstreamRequestLog, UsageLog, User []ent.Interceptor
 	}
 )

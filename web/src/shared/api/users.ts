@@ -18,7 +18,7 @@ export const usersApi = {
     get<PagedData<BalanceLogResp>>('/api/v1/users/me/balance-history', params),
 
   // 管理员接口
-  list: (params: PageReq & { status?: string; role?: string }) =>
+  list: (params: PageReq & { status?: string; role?: string; tier_id?: number }) =>
     get<PagedData<UserResp>>('/api/v1/admin/users', params),
   create: (data: CreateUserReq) => post<UserResp>('/api/v1/admin/users', data),
   update: (id: number, data: UpdateUserReq) => put<void>(`/api/v1/admin/users/${id}`, data),

@@ -73,7 +73,7 @@ const adminMenuItems: MenuItem[] = [
 ];
 
 const userMenuItems: MenuItem[] = [
-  { path: '/', labelKey: 'nav.my_overview', icon: <LayoutDashboard className="h-5 w-5" />, sectionKey: 'nav.personal' },
+  { path: '/overview', labelKey: 'nav.my_overview', icon: <LayoutDashboard className="h-5 w-5" />, sectionKey: 'nav.personal' },
   { path: '/profile', labelKey: 'nav.profile', icon: <UserRoundCog className="h-5 w-5" /> },
   { path: '/keys', labelKey: 'nav.my_keys', icon: <KeyRound className="h-5 w-5" /> },
   { path: '/usage', labelKey: 'nav.my_usage', icon: <ReceiptText className="h-5 w-5" /> },
@@ -142,13 +142,11 @@ export function AppShell({ children }: AppShellProps) {
   });
   const appEntries = (navApps ?? []).filter((app) => app.launch_url);
   const sections = useMemo(() => {
-    const adminUserItems = userMenuItems
-      .filter((item) => item.path !== '/')
-      .map((item, i) => (i === 0 ? { ...item, sectionKey: 'nav.personal' } : item));
+    // 个人概览已独立在 /overview，与管理仪表盘（/）不再冲突，管理员直接拼完整用户菜单。
     const menuItems = isAPIKeySession
       ? apiKeyMenuItems
       : isAdmin
-        ? [...adminMenuItems, ...adminUserItems]
+        ? [...adminMenuItems, ...userMenuItems]
         : [...userMenuItems];
 
     const nextSections: Array<{ titleKey?: string; items: MenuItem[] }> = [];
@@ -468,8 +466,13 @@ export function AppShell({ children }: AppShellProps) {
             <div className="hidden items-center gap-2.5 pl-1 sm:flex">
               {!isAPIKeySession && (
                 <div className="hidden text-right md:block">
-                  <p className="text-sm font-medium leading-tight text-text">
-                    {displayName}
+                  <p className="flex items-center justify-end gap-1.5 text-sm font-medium leading-tight text-text">
+                    {user?.tier_name ? (
+                      <span className="inline-flex shrink-0 items-center rounded-full bg-warning-subtle px-1.5 py-px text-[10px] font-medium leading-tight text-warning">
+                        {user.tier_name}
+                      </span>
+                    ) : null}
+                    <span className="min-w-0 truncate">{displayName}</span>
                   </p>
                   <p className="text-xs leading-tight text-text-tertiary">
                     {user?.email}

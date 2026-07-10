@@ -138,6 +138,13 @@ func (s *Server) registerRoutes() {
 		adminGroup.PUT("/announcements/:id", handlers.Announcement.UpdateAnnouncement)
 		adminGroup.DELETE("/announcements/:id", handlers.Announcement.DeleteAnnouncement)
 
+		// 用户等级管理（等级×分组倍率，批量分层定价）
+		adminGroup.GET("/tiers", handlers.Tier.ListTiers)
+		adminGroup.POST("/tiers", handlers.Tier.CreateTier)
+		adminGroup.GET("/tiers/:id", handlers.Tier.GetTier)
+		adminGroup.PUT("/tiers/:id", handlers.Tier.UpdateTier)
+		adminGroup.DELETE("/tiers/:id", handlers.Tier.DeleteTier)
+
 		// 分组专属倍率管理（reverse 视角：某个分组下哪些用户有专属倍率）
 		adminGroup.GET("/groups/:id/rate-overrides", handlers.User.ListGroupRateOverrides)
 		adminGroup.PUT("/groups/:id/rate-overrides/:userId", handlers.User.SetGroupRateOverride)
@@ -166,7 +173,6 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/model-prices", handlers.ModelPrice.CreateModelPrice)
 		adminGroup.PUT("/model-prices/:id", handlers.ModelPrice.UpdateModelPrice)
 		adminGroup.DELETE("/model-prices/:id", handlers.ModelPrice.DeleteModelPrice)
-		adminGroup.POST("/model-prices/import", handlers.ModelPrice.ImportModelPrices)
 
 		// 模型标签（家族归类，归属模型管理）
 		adminGroup.GET("/model-tags", handlers.ModelPrice.ListModelTags)

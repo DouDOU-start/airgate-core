@@ -15,6 +15,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
+	"github.com/DouDOU-start/airgate-core/ent/tier"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 )
@@ -243,6 +244,25 @@ func (uu *UserUpdate) AddAllowedGroups(g ...*Group) *UserUpdate {
 	return uu.AddAllowedGroupIDs(ids...)
 }
 
+// SetTierID sets the "tier" edge to the Tier entity by ID.
+func (uu *UserUpdate) SetTierID(id int) *UserUpdate {
+	uu.mutation.SetTierID(id)
+	return uu
+}
+
+// SetNillableTierID sets the "tier" edge to the Tier entity by ID if the given value is not nil.
+func (uu *UserUpdate) SetNillableTierID(id *int) *UserUpdate {
+	if id != nil {
+		uu = uu.SetTierID(*id)
+	}
+	return uu
+}
+
+// SetTier sets the "tier" edge to the Tier entity.
+func (uu *UserUpdate) SetTier(t *Tier) *UserUpdate {
+	return uu.SetTierID(t.ID)
+}
+
 // AddBalanceLogIDs adds the "balance_logs" edge to the BalanceLog entity by IDs.
 func (uu *UserUpdate) AddBalanceLogIDs(ids ...int) *UserUpdate {
 	uu.mutation.AddBalanceLogIDs(ids...)
@@ -324,6 +344,12 @@ func (uu *UserUpdate) RemoveAllowedGroups(g ...*Group) *UserUpdate {
 		ids[i] = g[i].ID
 	}
 	return uu.RemoveAllowedGroupIDs(ids...)
+}
+
+// ClearTier clears the "tier" edge to the Tier entity.
+func (uu *UserUpdate) ClearTier() *UserUpdate {
+	uu.mutation.ClearTier()
+	return uu
 }
 
 // ClearBalanceLogs clears all "balance_logs" edges to the BalanceLog entity.
@@ -611,6 +637,35 @@ func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if uu.mutation.TierCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   user.TierTable,
+			Columns: []string{user.TierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tier.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uu.mutation.TierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   user.TierTable,
+			Columns: []string{user.TierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if uu.mutation.BalanceLogsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -888,6 +943,25 @@ func (uuo *UserUpdateOne) AddAllowedGroups(g ...*Group) *UserUpdateOne {
 	return uuo.AddAllowedGroupIDs(ids...)
 }
 
+// SetTierID sets the "tier" edge to the Tier entity by ID.
+func (uuo *UserUpdateOne) SetTierID(id int) *UserUpdateOne {
+	uuo.mutation.SetTierID(id)
+	return uuo
+}
+
+// SetNillableTierID sets the "tier" edge to the Tier entity by ID if the given value is not nil.
+func (uuo *UserUpdateOne) SetNillableTierID(id *int) *UserUpdateOne {
+	if id != nil {
+		uuo = uuo.SetTierID(*id)
+	}
+	return uuo
+}
+
+// SetTier sets the "tier" edge to the Tier entity.
+func (uuo *UserUpdateOne) SetTier(t *Tier) *UserUpdateOne {
+	return uuo.SetTierID(t.ID)
+}
+
 // AddBalanceLogIDs adds the "balance_logs" edge to the BalanceLog entity by IDs.
 func (uuo *UserUpdateOne) AddBalanceLogIDs(ids ...int) *UserUpdateOne {
 	uuo.mutation.AddBalanceLogIDs(ids...)
@@ -969,6 +1043,12 @@ func (uuo *UserUpdateOne) RemoveAllowedGroups(g ...*Group) *UserUpdateOne {
 		ids[i] = g[i].ID
 	}
 	return uuo.RemoveAllowedGroupIDs(ids...)
+}
+
+// ClearTier clears the "tier" edge to the Tier entity.
+func (uuo *UserUpdateOne) ClearTier() *UserUpdateOne {
+	uuo.mutation.ClearTier()
+	return uuo
 }
 
 // ClearBalanceLogs clears all "balance_logs" edges to the BalanceLog entity.
@@ -1279,6 +1359,35 @@ func (uuo *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if uuo.mutation.TierCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   user.TierTable,
+			Columns: []string{user.TierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tier.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uuo.mutation.TierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   user.TierTable,
+			Columns: []string{user.TierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tier.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

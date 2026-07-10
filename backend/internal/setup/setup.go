@@ -4,6 +4,7 @@ package setup
 import (
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
@@ -83,11 +84,18 @@ func EnvRedisConfig() *config.RedisConfig {
 			dbNum = n
 		}
 	}
+	tlsEnabled := false
+	if v := os.Getenv("REDIS_TLS"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			tlsEnabled = b
+		}
+	}
 	return &config.RedisConfig{
 		Host:     host,
 		Port:     port,
 		Password: password,
 		DB:       dbNum,
+		TLS:      tlsEnabled,
 	}
 }
 
@@ -244,13 +252,18 @@ func quoteIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
-// TestRedisConnection 测试 Redis 连接
-func TestRedisConnection(host string, port int, password string, db int) error {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", host, port),
-		Password: password,
-		DB:       db,
-	})
+// TestRedisConnection 测试 Redis 连接（TLS 语义与 cmd/server/main.go 的正式客户端一致，
+// 向导测通的配置正式启动必然可连）。
+func TestRedisConnection(cfg config.RedisConfig) error {
+	opts := &redis.Options{
+		Addr:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Password: cfg.Password,
+		DB:       cfg.DB,
+	}
+	if cfg.TLS {
+		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
+	rdb := redis.NewClient(opts)
 	defer func() {
 		if err := rdb.Close(); err != nil {
 			slog.Warn("redis_close_failed", "stage", "setup_test", logx.LogFieldError, err)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -210,12 +211,18 @@ func startMainServer(cfg *config.Config) {
 	// 导入默认模型价目表种子（insert-if-absent，不覆盖已有条目；失败只 Warn 不阻塞）
 	priceseed.Load(context.Background(), store.NewModelPriceStore(db), config.ConfigPath())
 
-	// 初始化 Redis
-	rdb := redis.NewClient(&redis.Options{
+	// 初始化 Redis（PoolSize <= 0 时 go-redis 用默认值 10 × CPU 核数）
+	redisOpts := &redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port),
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.DB,
-	})
+		PoolSize: cfg.Redis.PoolSize,
+	}
+	if cfg.Redis.TLS {
+		// ServerName 留空由 crypto/tls 从 Addr 推导（托管 Redis 常见 TLS 形态）。
+		redisOpts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
+	rdb := redis.NewClient(redisOpts)
 	const redisPingMaxRetries = 30
 	const redisPingRetryInterval = 2 * time.Second
 	for attempt := 1; attempt <= redisPingMaxRetries; attempt++ {

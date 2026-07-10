@@ -58,22 +58,24 @@ func (r *RPMCounter) incrementByKey(ctx context.Context, key string) (int, error
 	return int(incrCmd.Val()), nil
 }
 
-// IncrementUserRPM 递增用户当前分钟的请求计数（管理端观测口径，不做限流；
-// 计入所有已通过鉴权进入转发链路的请求，失败请求不回退）。
-func (r *RPMCounter) IncrementUserRPM(ctx context.Context, userID int) {
+// IncrementUserGroupRPM 单 pipeline 合并递增用户与分组当前分钟的请求计数
+// （管理端观测口径，不做限流；已鉴权进入转发链路即计入，失败请求不回退）。
+// groupID <= 0 时只计用户维度。合并成一次 Redis RTT：这是转发热路径每请求必经的调用。
+func (r *RPMCounter) IncrementUserGroupRPM(ctx context.Context, userID, groupID int) {
 	if r.rdb == nil {
 		return
 	}
-	_, _ = r.incrementByKey(ctx, userMinuteKey(userID, currentMinute()))
-}
-
-// IncrementGroupRPM 递增分组当前分钟的请求计数（管理端观测口径，不做限流；
-// 口径与 IncrementUserRPM 一致：已鉴权进入转发链路即计入，失败请求不回退）。
-func (r *RPMCounter) IncrementGroupRPM(ctx context.Context, groupID int) {
-	if r.rdb == nil {
-		return
+	minute := currentMinute()
+	pipe := r.rdb.TxPipeline()
+	userKey := userMinuteKey(userID, minute)
+	pipe.Incr(ctx, userKey)
+	pipe.Expire(ctx, userKey, rpmKeyTTL)
+	if groupID > 0 {
+		groupKey := groupMinuteKey(groupID, minute)
+		pipe.Incr(ctx, groupKey)
+		pipe.Expire(ctx, groupKey, rpmKeyTTL)
 	}
-	_, _ = r.incrementByKey(ctx, groupMinuteKey(groupID, currentMinute()))
+	_, _ = pipe.Exec(ctx)
 }
 
 // GetGroupRPMs 批量获取多个分组当前分钟的请求计数（管理端观测用）。

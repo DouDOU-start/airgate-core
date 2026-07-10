@@ -12,6 +12,8 @@ type UserResp struct {
 	CurrentRPM            int               `json:"current_rpm"`                 // 当前分钟请求数（管理员列表）
 	GroupRates            map[int64]float64 `json:"group_rates,omitempty"`       // 用户专属分组倍率
 	AllowedGroupIDs       []int64           `json:"allowed_group_ids,omitempty"` // 已分配的专属分组 ID
+	TierID                *int64            `json:"tier_id,omitempty"`           // 用户等级 ID
+	TierName              string            `json:"tier_name,omitempty"`         // 用户等级名称
 	BalanceAlertThreshold float64           `json:"balance_alert_threshold"`
 	Status                string            `json:"status"`
 	APIKeyID              int64             `json:"api_key_id,omitempty"`        // API Key 登录时返回
@@ -46,6 +48,7 @@ type CreateUserReq struct {
 	Role           string            `json:"role" binding:"oneof=admin user"`
 	MaxConcurrency *int              `json:"max_concurrency" binding:"omitempty,gte=0"`
 	GroupRates     map[int64]float64 `json:"group_rates"`
+	TierID         *int64            `json:"tier_id" binding:"omitempty,gt=0"`
 }
 
 // UpdateUserReq 管理员更新用户请求
@@ -56,6 +59,7 @@ type UpdateUserReq struct {
 	MaxConcurrency  *int              `json:"max_concurrency"`
 	GroupRates      map[int64]float64 `json:"group_rates"`
 	AllowedGroupIDs *[]int64          `json:"allowed_group_ids"` // nil=不修改, []=清空, [1,2]=设置
+	TierID          *int64            `json:"tier_id"`           // nil=不修改, 0=清除, >0=设置
 	Status          *string           `json:"status" binding:"omitempty,oneof=active disabled"`
 }
 

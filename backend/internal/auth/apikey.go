@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 
@@ -54,7 +55,15 @@ var (
 
 	// negativeCacheCount 本地负缓存当前条目数（有界闸门，CAS 维护）。
 	negativeCacheCount atomic.Int64
+
+	// apiKeyLoadGroup DB 加载 singleflight：本地与 Redis 缓存 TTL 相同、会同时过期，
+	// 热 key 过期瞬间的并发未命中只放一个去打 DB，其余共享同一结果（防缓存击穿）。
+	apiKeyLoadGroup singleflight.Group
 )
+
+// apiKeyLoadTimeout 单次 DB 加载超时：加载用剥离取消的独立 ctx，
+// 领跑请求中途断连不应让 singleflight 共乘的其余请求全部失败。
+const apiKeyLoadTimeout = 5 * time.Second
 
 var (
 	ErrInvalidAPIKey      = errors.New("无效的 API Key")
@@ -82,6 +91,11 @@ type APIKeyInfo struct {
 	// SellRate Reseller 设置的销售倍率（>0 时启用 markup，独立于平台计费）
 	SellRate float64
 
+	// MaxRate 密钥可接受的最高计费倍率，0 表示不限制。
+	// >0 时若实际扣费倍率（ResolveBillingRate）超过该值，转发预检直接拒绝，
+	// 防止管理员临时上调分组/用户倍率后下游不知情按新价扣费。
+	MaxRate float64
+
 	// KeyMaxConcurrency API Key 级并发上限，0 表示不限制。
 	// 转发管线用 Redis ZSET 按 key_id 维度争抢槽位。
 	KeyMaxConcurrency int
@@ -94,6 +108,7 @@ type APIKeyInfo struct {
 	// 预加载字段，避免转发管线重复查询
 	UserBalance         float64           // 用户余额
 	UserGroupRates      map[int64]float64 // 用户级专属倍率（按 group_id），用于 ResolveBillingRate 优先级链
+	TierGroupRates      map[int64]float64 // 用户等级倍率（按 group_id），优先级低于 UserGroupRates
 	GroupRateMultiplier float64           // 分组倍率
 }
 
@@ -171,13 +186,29 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 	}
 	slog.Debug("api_key_cache_miss")
 
-	// 缓存未命中，查 DB
+	// 缓存未命中，经 singleflight 查 DB（同 hash 并发未命中合并为一次查询）。
+	v, err, _ := apiKeyLoadGroup.Do(hash, func() (any, error) {
+		loadCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), apiKeyLoadTimeout)
+		defer cancel()
+		return loadAndCacheAPIKey(loadCtx, db, hash)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.(*APIKeyInfo), nil
+}
+
+// loadAndCacheAPIKey 查 DB 加载 key 信息并写入缓存（ValidateAPIKey 的未命中路径，
+// 经 singleflight 调用；错误语义与缓存策略见 ValidateAPIKey 注释）。
+func loadAndCacheAPIKey(ctx context.Context, db *ent.Client, hash string) (*APIKeyInfo, error) {
 	ak, err := db.APIKey.Query().
 		Where(
 			apikey.KeyHash(hash),
 			apikey.StatusEQ(apikey.StatusActive),
 		).
-		WithUser().
+		WithUser(func(q *ent.UserQuery) {
+			q.WithTier()
+		}).
 		WithGroup().
 		Only(ctx)
 	if err != nil {
@@ -221,12 +252,16 @@ func ValidateAPIKey(ctx context.Context, db *ent.Client, key string) (*APIKeyInf
 		UserEmail:          u.Email,
 		GroupID:            g.ID,
 		SellRate:           ak.SellRate,
+		MaxRate:            ak.MaxRate,
 		KeyMaxConcurrency:  ak.MaxConcurrency,
 		UserMaxConcurrency: u.MaxConcurrency,
 
 		UserBalance:         u.Balance,
 		UserGroupRates:      u.GroupRates,
 		GroupRateMultiplier: g.RateMultiplier,
+	}
+	if tier := u.Edges.Tier; tier != nil {
+		info.TierGroupRates = tier.Rates
 	}
 	cacheAPIKeyResult(hash, info, nil)
 	return info, nil

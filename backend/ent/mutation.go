@@ -27,6 +27,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/ent/task"
+	"github.com/DouDOU-start/airgate-core/ent/tier"
 	"github.com/DouDOU-start/airgate-core/ent/upstreamrequestlog"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -55,6 +56,7 @@ const (
 	TypeRedemptionCode        = "RedemptionCode"
 	TypeSetting               = "Setting"
 	TypeTask                  = "Task"
+	TypeTier                  = "Tier"
 	TypeUpstreamRequestLog    = "UpstreamRequestLog"
 	TypeUsageLog              = "UsageLog"
 	TypeUser                  = "User"
@@ -82,6 +84,8 @@ type APIKeyMutation struct {
 	addused_quota_actual *float64
 	sell_rate            *float64
 	addsell_rate         *float64
+	max_rate             *float64
+	addmax_rate          *float64
 	max_concurrency      *int
 	addmax_concurrency   *int
 	expires_at           *time.Time
@@ -711,6 +715,62 @@ func (m *APIKeyMutation) ResetSellRate() {
 	m.addsell_rate = nil
 }
 
+// SetMaxRate sets the "max_rate" field.
+func (m *APIKeyMutation) SetMaxRate(f float64) {
+	m.max_rate = &f
+	m.addmax_rate = nil
+}
+
+// MaxRate returns the value of the "max_rate" field in the mutation.
+func (m *APIKeyMutation) MaxRate() (r float64, exists bool) {
+	v := m.max_rate
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaxRate returns the old "max_rate" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldMaxRate(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaxRate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaxRate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaxRate: %w", err)
+	}
+	return oldValue.MaxRate, nil
+}
+
+// AddMaxRate adds f to the "max_rate" field.
+func (m *APIKeyMutation) AddMaxRate(f float64) {
+	if m.addmax_rate != nil {
+		*m.addmax_rate += f
+	} else {
+		m.addmax_rate = &f
+	}
+}
+
+// AddedMaxRate returns the value that was added to the "max_rate" field in this mutation.
+func (m *APIKeyMutation) AddedMaxRate() (r float64, exists bool) {
+	v := m.addmax_rate
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetMaxRate resets all changes to the "max_rate" field.
+func (m *APIKeyMutation) ResetMaxRate() {
+	m.max_rate = nil
+	m.addmax_rate = nil
+}
+
 // SetMaxConcurrency sets the "max_concurrency" field.
 func (m *APIKeyMutation) SetMaxConcurrency(i int) {
 	m.max_concurrency = &i
@@ -1126,7 +1186,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 17)
 	if m.name != nil {
 		fields = append(fields, apikey.FieldName)
 	}
@@ -1156,6 +1216,9 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.sell_rate != nil {
 		fields = append(fields, apikey.FieldSellRate)
+	}
+	if m.max_rate != nil {
+		fields = append(fields, apikey.FieldMaxRate)
 	}
 	if m.max_concurrency != nil {
 		fields = append(fields, apikey.FieldMaxConcurrency)
@@ -1203,6 +1266,8 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.UsedQuotaActual()
 	case apikey.FieldSellRate:
 		return m.SellRate()
+	case apikey.FieldMaxRate:
+		return m.MaxRate()
 	case apikey.FieldMaxConcurrency:
 		return m.MaxConcurrency()
 	case apikey.FieldExpiresAt:
@@ -1244,6 +1309,8 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldUsedQuotaActual(ctx)
 	case apikey.FieldSellRate:
 		return m.OldSellRate(ctx)
+	case apikey.FieldMaxRate:
+		return m.OldMaxRate(ctx)
 	case apikey.FieldMaxConcurrency:
 		return m.OldMaxConcurrency(ctx)
 	case apikey.FieldExpiresAt:
@@ -1335,6 +1402,13 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSellRate(v)
 		return nil
+	case apikey.FieldMaxRate:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaxRate(v)
+		return nil
 	case apikey.FieldMaxConcurrency:
 		v, ok := value.(int)
 		if !ok {
@@ -1397,6 +1471,9 @@ func (m *APIKeyMutation) AddedFields() []string {
 	if m.addsell_rate != nil {
 		fields = append(fields, apikey.FieldSellRate)
 	}
+	if m.addmax_rate != nil {
+		fields = append(fields, apikey.FieldMaxRate)
+	}
 	if m.addmax_concurrency != nil {
 		fields = append(fields, apikey.FieldMaxConcurrency)
 	}
@@ -1416,6 +1493,8 @@ func (m *APIKeyMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedUsedQuotaActual()
 	case apikey.FieldSellRate:
 		return m.AddedSellRate()
+	case apikey.FieldMaxRate:
+		return m.AddedMaxRate()
 	case apikey.FieldMaxConcurrency:
 		return m.AddedMaxConcurrency()
 	}
@@ -1454,6 +1533,13 @@ func (m *APIKeyMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddSellRate(v)
+		return nil
+	case apikey.FieldMaxRate:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMaxRate(v)
 		return nil
 	case apikey.FieldMaxConcurrency:
 		v, ok := value.(int)
@@ -1545,6 +1631,9 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldSellRate:
 		m.ResetSellRate()
+		return nil
+	case apikey.FieldMaxRate:
+		m.ResetMaxRate()
 		return nil
 	case apikey.FieldMaxConcurrency:
 		m.ResetMaxConcurrency()
@@ -15406,6 +15495,753 @@ func (m *TaskMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown Task edge %s", name)
 }
 
+// TierMutation represents an operation that mutates the Tier nodes in the graph.
+type TierMutation struct {
+	config
+	op             Op
+	typ            string
+	id             *int
+	name           *string
+	rates          *map[int64]float64
+	note           *string
+	sort_weight    *int
+	addsort_weight *int
+	created_at     *time.Time
+	updated_at     *time.Time
+	clearedFields  map[string]struct{}
+	users          map[int]struct{}
+	removedusers   map[int]struct{}
+	clearedusers   bool
+	done           bool
+	oldValue       func(context.Context) (*Tier, error)
+	predicates     []predicate.Tier
+}
+
+var _ ent.Mutation = (*TierMutation)(nil)
+
+// tierOption allows management of the mutation configuration using functional options.
+type tierOption func(*TierMutation)
+
+// newTierMutation creates new mutation for the Tier entity.
+func newTierMutation(c config, op Op, opts ...tierOption) *TierMutation {
+	m := &TierMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeTier,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withTierID sets the ID field of the mutation.
+func withTierID(id int) tierOption {
+	return func(m *TierMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *Tier
+		)
+		m.oldValue = func(ctx context.Context) (*Tier, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().Tier.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withTier sets the old Tier of the mutation.
+func withTier(node *Tier) tierOption {
+	return func(m *TierMutation) {
+		m.oldValue = func(context.Context) (*Tier, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m TierMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m TierMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *TierMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *TierMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().Tier.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetName sets the "name" field.
+func (m *TierMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *TierMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the Tier entity.
+// If the Tier object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TierMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *TierMutation) ResetName() {
+	m.name = nil
+}
+
+// SetRates sets the "rates" field.
+func (m *TierMutation) SetRates(value map[int64]float64) {
+	m.rates = &value
+}
+
+// Rates returns the value of the "rates" field in the mutation.
+func (m *TierMutation) Rates() (r map[int64]float64, exists bool) {
+	v := m.rates
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRates returns the old "rates" field's value of the Tier entity.
+// If the Tier object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TierMutation) OldRates(ctx context.Context) (v map[int64]float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRates is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRates requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRates: %w", err)
+	}
+	return oldValue.Rates, nil
+}
+
+// ClearRates clears the value of the "rates" field.
+func (m *TierMutation) ClearRates() {
+	m.rates = nil
+	m.clearedFields[tier.FieldRates] = struct{}{}
+}
+
+// RatesCleared returns if the "rates" field was cleared in this mutation.
+func (m *TierMutation) RatesCleared() bool {
+	_, ok := m.clearedFields[tier.FieldRates]
+	return ok
+}
+
+// ResetRates resets all changes to the "rates" field.
+func (m *TierMutation) ResetRates() {
+	m.rates = nil
+	delete(m.clearedFields, tier.FieldRates)
+}
+
+// SetNote sets the "note" field.
+func (m *TierMutation) SetNote(s string) {
+	m.note = &s
+}
+
+// Note returns the value of the "note" field in the mutation.
+func (m *TierMutation) Note() (r string, exists bool) {
+	v := m.note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNote returns the old "note" field's value of the Tier entity.
+// If the Tier object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TierMutation) OldNote(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNote: %w", err)
+	}
+	return oldValue.Note, nil
+}
+
+// ResetNote resets all changes to the "note" field.
+func (m *TierMutation) ResetNote() {
+	m.note = nil
+}
+
+// SetSortWeight sets the "sort_weight" field.
+func (m *TierMutation) SetSortWeight(i int) {
+	m.sort_weight = &i
+	m.addsort_weight = nil
+}
+
+// SortWeight returns the value of the "sort_weight" field in the mutation.
+func (m *TierMutation) SortWeight() (r int, exists bool) {
+	v := m.sort_weight
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSortWeight returns the old "sort_weight" field's value of the Tier entity.
+// If the Tier object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TierMutation) OldSortWeight(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSortWeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSortWeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSortWeight: %w", err)
+	}
+	return oldValue.SortWeight, nil
+}
+
+// AddSortWeight adds i to the "sort_weight" field.
+func (m *TierMutation) AddSortWeight(i int) {
+	if m.addsort_weight != nil {
+		*m.addsort_weight += i
+	} else {
+		m.addsort_weight = &i
+	}
+}
+
+// AddedSortWeight returns the value that was added to the "sort_weight" field in this mutation.
+func (m *TierMutation) AddedSortWeight() (r int, exists bool) {
+	v := m.addsort_weight
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSortWeight resets all changes to the "sort_weight" field.
+func (m *TierMutation) ResetSortWeight() {
+	m.sort_weight = nil
+	m.addsort_weight = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *TierMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *TierMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the Tier entity.
+// If the Tier object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TierMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *TierMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *TierMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *TierMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the Tier entity.
+// If the Tier object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TierMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *TierMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// AddUserIDs adds the "users" edge to the User entity by ids.
+func (m *TierMutation) AddUserIDs(ids ...int) {
+	if m.users == nil {
+		m.users = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.users[ids[i]] = struct{}{}
+	}
+}
+
+// ClearUsers clears the "users" edge to the User entity.
+func (m *TierMutation) ClearUsers() {
+	m.clearedusers = true
+}
+
+// UsersCleared reports if the "users" edge to the User entity was cleared.
+func (m *TierMutation) UsersCleared() bool {
+	return m.clearedusers
+}
+
+// RemoveUserIDs removes the "users" edge to the User entity by IDs.
+func (m *TierMutation) RemoveUserIDs(ids ...int) {
+	if m.removedusers == nil {
+		m.removedusers = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.users, ids[i])
+		m.removedusers[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedUsers returns the removed IDs of the "users" edge to the User entity.
+func (m *TierMutation) RemovedUsersIDs() (ids []int) {
+	for id := range m.removedusers {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// UsersIDs returns the "users" edge IDs in the mutation.
+func (m *TierMutation) UsersIDs() (ids []int) {
+	for id := range m.users {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetUsers resets all changes to the "users" edge.
+func (m *TierMutation) ResetUsers() {
+	m.users = nil
+	m.clearedusers = false
+	m.removedusers = nil
+}
+
+// Where appends a list predicates to the TierMutation builder.
+func (m *TierMutation) Where(ps ...predicate.Tier) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the TierMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *TierMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Tier, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *TierMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *TierMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (Tier).
+func (m *TierMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *TierMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.name != nil {
+		fields = append(fields, tier.FieldName)
+	}
+	if m.rates != nil {
+		fields = append(fields, tier.FieldRates)
+	}
+	if m.note != nil {
+		fields = append(fields, tier.FieldNote)
+	}
+	if m.sort_weight != nil {
+		fields = append(fields, tier.FieldSortWeight)
+	}
+	if m.created_at != nil {
+		fields = append(fields, tier.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, tier.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *TierMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case tier.FieldName:
+		return m.Name()
+	case tier.FieldRates:
+		return m.Rates()
+	case tier.FieldNote:
+		return m.Note()
+	case tier.FieldSortWeight:
+		return m.SortWeight()
+	case tier.FieldCreatedAt:
+		return m.CreatedAt()
+	case tier.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *TierMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case tier.FieldName:
+		return m.OldName(ctx)
+	case tier.FieldRates:
+		return m.OldRates(ctx)
+	case tier.FieldNote:
+		return m.OldNote(ctx)
+	case tier.FieldSortWeight:
+		return m.OldSortWeight(ctx)
+	case tier.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case tier.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown Tier field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TierMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case tier.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case tier.FieldRates:
+		v, ok := value.(map[int64]float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRates(v)
+		return nil
+	case tier.FieldNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNote(v)
+		return nil
+	case tier.FieldSortWeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSortWeight(v)
+		return nil
+	case tier.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case tier.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Tier field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *TierMutation) AddedFields() []string {
+	var fields []string
+	if m.addsort_weight != nil {
+		fields = append(fields, tier.FieldSortWeight)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *TierMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case tier.FieldSortWeight:
+		return m.AddedSortWeight()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TierMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case tier.FieldSortWeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSortWeight(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Tier numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *TierMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(tier.FieldRates) {
+		fields = append(fields, tier.FieldRates)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *TierMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *TierMutation) ClearField(name string) error {
+	switch name {
+	case tier.FieldRates:
+		m.ClearRates()
+		return nil
+	}
+	return fmt.Errorf("unknown Tier nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *TierMutation) ResetField(name string) error {
+	switch name {
+	case tier.FieldName:
+		m.ResetName()
+		return nil
+	case tier.FieldRates:
+		m.ResetRates()
+		return nil
+	case tier.FieldNote:
+		m.ResetNote()
+		return nil
+	case tier.FieldSortWeight:
+		m.ResetSortWeight()
+		return nil
+	case tier.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case tier.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown Tier field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *TierMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.users != nil {
+		edges = append(edges, tier.EdgeUsers)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *TierMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case tier.EdgeUsers:
+		ids := make([]ent.Value, 0, len(m.users))
+		for id := range m.users {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *TierMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.removedusers != nil {
+		edges = append(edges, tier.EdgeUsers)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *TierMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case tier.EdgeUsers:
+		ids := make([]ent.Value, 0, len(m.removedusers))
+		for id := range m.removedusers {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *TierMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedusers {
+		edges = append(edges, tier.EdgeUsers)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *TierMutation) EdgeCleared(name string) bool {
+	switch name {
+	case tier.EdgeUsers:
+		return m.clearedusers
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *TierMutation) ClearEdge(name string) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown Tier unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *TierMutation) ResetEdge(name string) error {
+	switch name {
+	case tier.EdgeUsers:
+		m.ResetUsers()
+		return nil
+	}
+	return fmt.Errorf("unknown Tier edge %s", name)
+}
+
 // UpstreamRequestLogMutation represents an operation that mutates the UpstreamRequestLog nodes in the graph.
 type UpstreamRequestLogMutation struct {
 	config
@@ -20788,6 +21624,8 @@ type UserMutation struct {
 	allowed_groups             map[int]struct{}
 	removedallowed_groups      map[int]struct{}
 	clearedallowed_groups      bool
+	tier                       *int
+	clearedtier                bool
 	balance_logs               map[int]struct{}
 	removedbalance_logs        map[int]struct{}
 	clearedbalance_logs        bool
@@ -21561,6 +22399,45 @@ func (m *UserMutation) ResetAllowedGroups() {
 	m.removedallowed_groups = nil
 }
 
+// SetTierID sets the "tier" edge to the Tier entity by id.
+func (m *UserMutation) SetTierID(id int) {
+	m.tier = &id
+}
+
+// ClearTier clears the "tier" edge to the Tier entity.
+func (m *UserMutation) ClearTier() {
+	m.clearedtier = true
+}
+
+// TierCleared reports if the "tier" edge to the Tier entity was cleared.
+func (m *UserMutation) TierCleared() bool {
+	return m.clearedtier
+}
+
+// TierID returns the "tier" edge ID in the mutation.
+func (m *UserMutation) TierID() (id int, exists bool) {
+	if m.tier != nil {
+		return *m.tier, true
+	}
+	return
+}
+
+// TierIDs returns the "tier" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TierID instead. It exists only for internal usage by the builders.
+func (m *UserMutation) TierIDs() (ids []int) {
+	if id := m.tier; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTier resets all changes to the "tier" edge.
+func (m *UserMutation) ResetTier() {
+	m.tier = nil
+	m.clearedtier = false
+}
+
 // AddBalanceLogIDs adds the "balance_logs" edge to the BalanceLog entity by ids.
 func (m *UserMutation) AddBalanceLogIDs(ids ...int) {
 	if m.balance_logs == nil {
@@ -21983,7 +22860,7 @@ func (m *UserMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UserMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.api_keys != nil {
 		edges = append(edges, user.EdgeAPIKeys)
 	}
@@ -21992,6 +22869,9 @@ func (m *UserMutation) AddedEdges() []string {
 	}
 	if m.allowed_groups != nil {
 		edges = append(edges, user.EdgeAllowedGroups)
+	}
+	if m.tier != nil {
+		edges = append(edges, user.EdgeTier)
 	}
 	if m.balance_logs != nil {
 		edges = append(edges, user.EdgeBalanceLogs)
@@ -22021,6 +22901,10 @@ func (m *UserMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case user.EdgeTier:
+		if id := m.tier; id != nil {
+			return []ent.Value{*id}
+		}
 	case user.EdgeBalanceLogs:
 		ids := make([]ent.Value, 0, len(m.balance_logs))
 		for id := range m.balance_logs {
@@ -22033,7 +22917,7 @@ func (m *UserMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UserMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.removedapi_keys != nil {
 		edges = append(edges, user.EdgeAPIKeys)
 	}
@@ -22083,7 +22967,7 @@ func (m *UserMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UserMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.clearedapi_keys {
 		edges = append(edges, user.EdgeAPIKeys)
 	}
@@ -22092,6 +22976,9 @@ func (m *UserMutation) ClearedEdges() []string {
 	}
 	if m.clearedallowed_groups {
 		edges = append(edges, user.EdgeAllowedGroups)
+	}
+	if m.clearedtier {
+		edges = append(edges, user.EdgeTier)
 	}
 	if m.clearedbalance_logs {
 		edges = append(edges, user.EdgeBalanceLogs)
@@ -22109,6 +22996,8 @@ func (m *UserMutation) EdgeCleared(name string) bool {
 		return m.clearedusage_logs
 	case user.EdgeAllowedGroups:
 		return m.clearedallowed_groups
+	case user.EdgeTier:
+		return m.clearedtier
 	case user.EdgeBalanceLogs:
 		return m.clearedbalance_logs
 	}
@@ -22119,6 +23008,9 @@ func (m *UserMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *UserMutation) ClearEdge(name string) error {
 	switch name {
+	case user.EdgeTier:
+		m.ClearTier()
+		return nil
 	}
 	return fmt.Errorf("unknown User unique edge %s", name)
 }
@@ -22135,6 +23027,9 @@ func (m *UserMutation) ResetEdge(name string) error {
 		return nil
 	case user.EdgeAllowedGroups:
 		m.ResetAllowedGroups()
+		return nil
+	case user.EdgeTier:
+		m.ResetTier()
 		return nil
 	case user.EdgeBalanceLogs:
 		m.ResetBalanceLogs()

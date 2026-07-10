@@ -1,9 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  PieChart,
-  Pie,
-  Cell,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   LineChart,
@@ -13,79 +10,10 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { fmtNum } from '../../../shared/columns/usageColumns';
 import { CostValue } from '../../../shared/components/CostValue';
-import { PIE_CHART_COLORS, USAGE_TOKEN_COLORS } from '../../../shared/constants';
+import { TOKEN_TREND_LINE_ORDER, TOKEN_TREND_RATIO_KEYS, USAGE_TOKEN_COLORS } from '../../../shared/constants';
+import { fmtNum, fmtTrendTime } from '../../../shared/utils/format';
 import type { UsageTrendBucket } from '../../../shared/types';
-
-const TOKEN_TREND_LINE_ORDER: Array<keyof typeof USAGE_TOKEN_COLORS> = ['input', 'output', 'cacheCreation', 'cacheRead', 'cacheRatio', 'cacheCumulativeRatio'];
-const TOKEN_TREND_RATIO_KEYS = new Set<keyof typeof USAGE_TOKEN_COLORS>(['cacheRatio', 'cacheCumulativeRatio']);
-
-type PieTooltipPayload = Array<{
-  name?: unknown;
-  payload?: {
-    name?: unknown;
-  };
-}>;
-
-function PieNameTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: PieTooltipPayload;
-}) {
-  const name = payload?.[0]?.payload?.name ?? payload?.[0]?.name;
-  if (!active || name == null || name === '') return null;
-
-  return (
-    <div className="max-w-56 truncate rounded-[var(--radius)] border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text shadow-lg">
-      {String(name)}
-    </div>
-  );
-}
-
-export interface UsagePieChartItem {
-  name: string;
-  value: number;
-}
-
-export function UsagePieChart({ data }: { data: UsagePieChartItem[] }) {
-  return (
-    <PieChart width={176} height={176}>
-      <Pie
-        data={data}
-        cx="50%"
-        cy="50%"
-        innerRadius={42}
-        outerRadius={68}
-        dataKey="value"
-        isAnimationActive={false}
-        minAngle={3}
-        stroke="var(--ag-surface)"
-        strokeWidth={2}
-      >
-        {data.map((_, i) => (
-          <Cell key={i} fill={PIE_CHART_COLORS[i % PIE_CHART_COLORS.length]} />
-        ))}
-      </Pie>
-      <RechartsTooltip
-        animationDuration={0}
-        content={<PieNameTooltip />}
-        cursor={false}
-        isAnimationActive={false}
-      />
-    </PieChart>
-  );
-}
-
-function fmtTime(timeStr: string): string {
-  if (timeStr.includes(' ')) {
-    return timeStr.split(' ')[1] ?? timeStr;
-  }
-  const parts = timeStr.split('-');
-  return `${parts[1] ?? ''}/${parts[2] ?? ''}`;
-}
 
 export function UsageTokenTrendChart({
   data,
@@ -112,7 +40,7 @@ export function UsageTokenTrendChart({
         : 0;
 
       return {
-        time: fmtTime(d.time),
+        time: fmtTrendTime(d.time),
         rawTime: d.time,
         input: d.input_tokens,
         output: d.output_tokens,

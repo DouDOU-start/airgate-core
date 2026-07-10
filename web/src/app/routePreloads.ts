@@ -50,6 +50,8 @@ export const OAuthClientsPage = lazyWithPreload(() => import('../pages/admin/OAu
 
 export const ADMIN_IDLE_PRELOADS = [
   DashboardPage,
+  // 管理员侧边栏个人区也有个人概览（/overview），空闲时一并预热
+  UserOverviewPage,
 ];
 
 export const USER_IDLE_PRELOADS = [

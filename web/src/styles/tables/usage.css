@@ -110,6 +110,28 @@
   background: color-mix(in oklab, var(--default) 82%, var(--background) 18%) !important;
 }
 
+/* 吸附列：横向滚动时固定在表格左侧（参照 ag-api-keys-table 右侧操作列的写法）。 */
+.ag-usage-table th.ag-usage-col--sticky-left,
+.ag-usage-table td.ag-usage-col--sticky-left {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  box-shadow: 4px 0 8px -4px color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.ag-usage-table th.ag-usage-col--sticky-left {
+  z-index: 3;
+  background: var(--surface-secondary) !important;
+}
+
+.ag-usage-table td.ag-usage-col--sticky-left {
+  background: var(--surface) !important;
+}
+
+.ag-usage-table tbody tr:hover td.ag-usage-col--sticky-left {
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%) !important;
+}
+
 @keyframes ag-usage-row-new-enter {
   0% {
     background: color-mix(in oklab, var(--success) 24%, transparent);

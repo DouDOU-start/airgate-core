@@ -35,6 +35,8 @@ const (
 	FieldUsedQuotaActual = "used_quota_actual"
 	// FieldSellRate holds the string denoting the sell_rate field in the database.
 	FieldSellRate = "sell_rate"
+	// FieldMaxRate holds the string denoting the max_rate field in the database.
+	FieldMaxRate = "max_rate"
 	// FieldMaxConcurrency holds the string denoting the max_concurrency field in the database.
 	FieldMaxConcurrency = "max_concurrency"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
@@ -91,6 +93,7 @@ var Columns = []string{
 	FieldUsedQuota,
 	FieldUsedQuotaActual,
 	FieldSellRate,
+	FieldMaxRate,
 	FieldMaxConcurrency,
 	FieldExpiresAt,
 	FieldStatus,
@@ -138,6 +141,10 @@ var (
 	DefaultSellRate float64
 	// SellRateValidator is a validator for the "sell_rate" field. It is called by the builders before save.
 	SellRateValidator func(float64) error
+	// DefaultMaxRate holds the default value on creation for the "max_rate" field.
+	DefaultMaxRate float64
+	// MaxRateValidator is a validator for the "max_rate" field. It is called by the builders before save.
+	MaxRateValidator func(float64) error
 	// DefaultMaxConcurrency holds the default value on creation for the "max_concurrency" field.
 	DefaultMaxConcurrency int
 	// MaxConcurrencyValidator is a validator for the "max_concurrency" field. It is called by the builders before save.
@@ -224,6 +231,11 @@ func ByUsedQuotaActual(opts ...sql.OrderTermOption) OrderOption {
 // BySellRate orders the results by the sell_rate field.
 func BySellRate(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSellRate, opts...).ToFunc()
+}
+
+// ByMaxRate orders the results by the max_rate field.
+func ByMaxRate(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMaxRate, opts...).ToFunc()
 }
 
 // ByMaxConcurrency orders the results by the max_concurrency field.

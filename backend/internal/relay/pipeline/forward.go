@@ -32,6 +32,10 @@ const (
 	// queuePollInterval / queueMaxPollInterval 排队退避：200ms 起指数退避，2s 封顶。
 	queuePollInterval    = 200 * time.Millisecond
 	queueMaxPollInterval = 2 * time.Second
+	// maxQueueWaiters 排队退避的全局在途上限。每个排队请求在最长 60s 的等待期内
+	// 整段持有完整请求体（上限 32MB）与 user/key 并发槽，过载时无上限排队会把内存
+	// 撑爆（万级排队 × 平均百 KB 请求体即 GB 级）；超限按渠道容量满快速失败泄压。
+	maxQueueWaiters = 4096
 
 	// nonStreamTimeout 非流式请求总超时；流式无总超时（连接/TLS 超时在 Transport 层）。
 	nonStreamTimeout = 5 * time.Minute
@@ -123,10 +127,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	protocol := protocolForEndpoint(endpoint)
 
 	// 用户 / 分组 RPM 观测计数：已鉴权即计入（含后续被预检拒绝的请求），供管理端展示请求速率。
-	p.rpm.IncrementUserRPM(ctx, keyInfo.UserID)
-	if keyInfo.GroupID > 0 {
-		p.rpm.IncrementGroupRPM(ctx, keyInfo.GroupID)
-	}
+	p.rpm.IncrementUserGroupRPM(ctx, keyInfo.UserID, keyInfo.GroupID)
 
 	// 1. 余额预检（异步扣款模型：只挡余额已为负/零的用户）。
 	if keyInfo.UserBalance <= 0 {
@@ -138,9 +139,23 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		return
 	}
 
+	// 2. 倍率预检：实际扣费倍率超过密钥最高倍率时拒绝（管理员临时调价的保护闸）；
+	// 零计费端点（countTokens 类）不产生消费，不拦。
+	if !opts.zeroBilling {
+		if rate := billing.ResolveBillingRate(keyInfo); billing.ExceedsKeyMaxRate(keyInfo, rate) {
+			msg := fmt.Sprintf("当前计费倍率 %.2f 超过密钥最高倍率 %.2f", rate, keyInfo.MaxRate)
+			writeError(c, http.StatusForbidden, "permission_error", "billing_rate_exceeded", msg)
+			p.recordFailure(c, keyInfo, req, start, errlog.Entry{
+				Phase: errlog.PhasePrecheckRate, StatusCode: http.StatusForbidden,
+				ErrorType: "permission_error", ErrorCode: "billing_rate_exceeded", Message: msg,
+			})
+			return
+		}
+	}
+
 	settings := p.settings.Get(ctx)
 
-	// 2. 缺价预检：未配置模型价格一律 400 拒绝（无放行开关，杜绝零成本记账漏洞）。
+	// 3. 缺价预检：未配置模型价格一律 400 拒绝（无放行开关，杜绝零成本记账漏洞）。
 	// 解析到的 Price 随请求传递到计费收尾复用（不二次 Get），
 	// 避免请求期间缓存失效/重载失败把已定价模型静默记 0。
 	price, priced := p.pricing.Get(req.Model)
@@ -155,7 +170,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		return
 	}
 
-	// 3. user / key 并发闸门。
+	// 4. user / key 并发闸门。
 	releaseClient, limitCode := p.acquireClientSlots(c, keyInfo)
 	if limitCode != "" {
 		p.recordFailure(c, keyInfo, req, start, errlog.Entry{
@@ -166,7 +181,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	}
 	defer releaseClient()
 
-	// 4. failover 主循环：
+	// 5. failover 主循环：
 	//    hardExclude 跨循环持久（429 限流 / 认证失败 / 配置故障，仅本次请求内生效），
 	//    softExclude 容量满（RPM/并发）——排队退避时清空重新竞争。
 	var hardExclude, softExclude []int
@@ -202,8 +217,16 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		if err != nil {
 			// 排队退避：有渠道只是"暂时满"（软排除）且未超排队上限 → 清空软排除重新竞争。
 			if len(softExclude) > 0 && time.Now().Before(queueDeadline) {
+				// 全局排队上限：超限不再等待，按容量满语义快速失败泄压。
+				if p.queueWaiters.Add(1) > maxQueueWaiters {
+					p.queueWaiters.Add(-1)
+					summary.localCapacity = true
+					break
+				}
 				softExclude = softExclude[:0]
-				if !sleepOrCancel(ctx, pollDelay, queueDeadline) {
+				waited := sleepOrCancel(ctx, pollDelay, queueDeadline)
+				p.queueWaiters.Add(-1)
+				if !waited {
 					markCanceled(c)
 					recordCanceled()
 					return

@@ -89,20 +89,6 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
-// Import 批量导入（按 model 名 upsert），返回新建/更新条数。
-func (s *Service) Import(ctx context.Context, items []ImportItem) (ImportResult, error) {
-	logger := logx.LoggerFromContext(ctx)
-	created, updated, err := s.repo.Upsert(ctx, items)
-	if err != nil {
-		logger.Error("model_price_persist_failed", "op", "import", logx.LogFieldError, err)
-		return ImportResult{}, err
-	}
-	logger.Info("model_price_imported", "created", created, "updated", updated)
-
-	s.invalidate()
-	return ImportResult{Created: created, Updated: updated}, nil
-}
-
 // LoadAllPrices 实现 pricing.Loader：全量加载价目表为缓存数据。
 func (s *Service) LoadAllPrices(ctx context.Context) (map[string]pricing.Price, error) {
 	items, err := s.repo.ListAll(ctx)

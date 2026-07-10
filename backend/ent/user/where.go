@@ -624,6 +624,29 @@ func HasAllowedGroupsWith(preds ...predicate.Group) predicate.User {
 	})
 }
 
+// HasTier applies the HasEdge predicate on the "tier" edge.
+func HasTier() predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, TierTable, TierColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasTierWith applies the HasEdge predicate on the "tier" edge with a given conditions (other predicates).
+func HasTierWith(preds ...predicate.Tier) predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := newTierStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasBalanceLogs applies the HasEdge predicate on the "balance_logs" edge.
 func HasBalanceLogs() predicate.User {
 	return predicate.User(func(s *sql.Selector) {

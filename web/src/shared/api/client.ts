@@ -51,7 +51,7 @@ export function getToken(): string | null {
   return accessToken;
 }
 
-export function getTokenClaims(token = accessToken): TokenClaims | null {
+function getTokenClaims(token = accessToken): TokenClaims | null {
   if (!token) return null;
 
   const payload = token.split('.')[1];
@@ -282,15 +282,3 @@ export function patch<T>(path: string, body?: unknown): Promise<T> {
   return request<T>('PATCH', path, body);
 }
 
-// 文件上传（multipart/form-data）
-export async function upload<T>(path: string, formData: FormData): Promise<T> {
-  const url = new URL(`${BASE_URL}${path}`, window.location.origin);
-
-  const res = await doFetch(url.toString(), {
-    method: 'POST',
-    headers: buildHeaders(false),
-    body: formData,
-  });
-
-  return handleResponse<T>(res);
-}

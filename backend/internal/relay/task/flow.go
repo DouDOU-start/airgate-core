@@ -204,10 +204,7 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 	ctx := c.Request.Context()
 
 	// 用户 / 分组 RPM 观测计数（已鉴权即计入，口径同 pipeline）。
-	f.rpm.IncrementUserRPM(ctx, keyInfo.UserID)
-	if keyInfo.GroupID > 0 {
-		f.rpm.IncrementGroupRPM(ctx, keyInfo.GroupID)
-	}
+	f.rpm.IncrementUserGroupRPM(ctx, keyInfo.UserID, keyInfo.GroupID)
 
 	// 1. 缺价预检：任务不允许零价兜底（长任务白嫖面大），未配任务计价一律 400。
 	price, priced := f.pricing.Get(sub.Model)
@@ -226,9 +223,20 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 	}
 	sub.Seconds = estSeconds
 
-	// 2. 预扣：余额预检与扣款一次完成（同步动账，与同步转发的异步扣款模型不同——
-	// 任务成本在提交时未知实耗，预扣防止长任务把余额打穿）。
+	// 2. 倍率预检：实际扣费倍率超过密钥最高倍率时拒绝（口径同 pipeline，管理员临时调价的保护闸）。
 	billingRate := billing.ResolveBillingRate(keyInfo)
+	if billing.ExceedsKeyMaxRate(keyInfo, billingRate) {
+		msg := fmt.Sprintf("当前计费倍率 %.2f 超过密钥最高倍率 %.2f", billingRate, keyInfo.MaxRate)
+		writeError(c, http.StatusForbidden, "permission_error", "billing_rate_exceeded", msg)
+		f.recordFailure(c, keyInfo, sub.Model, start, errlog.Entry{
+			Phase: errlog.PhasePrecheckRate, StatusCode: http.StatusForbidden,
+			ErrorType: "permission_error", ErrorCode: "billing_rate_exceeded", Message: msg,
+		})
+		return
+	}
+
+	// 3. 预扣：余额预检与扣款一次完成（同步动账，与同步转发的异步扣款模型不同——
+	// 任务成本在提交时未知实耗，预扣防止长任务把余额打穿）。
 	hold := estTotal * billingRate
 	holdRemark := fmt.Sprintf("任务预扣 %s %s", platform, sub.Model)
 	if err := f.balance.Hold(ctx, keyInfo.UserID, hold, holdRemark); err != nil {
@@ -249,7 +257,7 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 		f.refundHold(keyInfo.UserID, hold, reason)
 	}
 
-	// 3. user / key 并发闸门（口径同 pipeline，任务提交同样占槽，防提交洪泛）。
+	// 4. user / key 并发闸门（口径同 pipeline，任务提交同样占槽，防提交洪泛）。
 	releaseClient, limitCode := f.acquireClientSlots(c, keyInfo)
 	if limitCode != "" {
 		refund("并发上限拒绝")
@@ -263,7 +271,7 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 
 	settings := f.settings.Get(ctx)
 
-	// 4. failover 主循环。
+	// 5. failover 主循环。
 	var hardExclude, softExclude []int
 	summary := submitFailureSummary{}
 	var hops []errlog.AttemptHop

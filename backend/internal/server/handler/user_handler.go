@@ -28,7 +28,8 @@ func (h *UserHandler) handleError(logMessage, publicMessage string, err error) (
 		errors.Is(err, appuser.ErrInsufficientBalance),
 		errors.Is(err, appuser.ErrInvalidBalanceAction),
 		errors.Is(err, appuser.ErrDeleteAdminForbidden),
-		errors.Is(err, appuser.ErrInvalidRateMultiplier):
+		errors.Is(err, appuser.ErrInvalidRateMultiplier),
+		errors.Is(err, appuser.ErrTierNotFound):
 		return 400, err.Error()
 	default:
 		slog.Error(logMessage, "error", err)

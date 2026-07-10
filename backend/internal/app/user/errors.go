@@ -19,4 +19,6 @@ var (
 	ErrInvalidRateMultiplier = errors.New("专属倍率不能为负数")
 	// ErrDuplicateBalanceChange 幂等键已存在，同一笔余额变更已入账。
 	ErrDuplicateBalanceChange = errors.New("余额变更已入账（幂等键重复）")
+	// ErrTierNotFound 指定的用户等级不存在。
+	ErrTierNotFound = errors.New("等级不存在")
 )

@@ -11,10 +11,16 @@ import (
 )
 
 const (
-	defaultBufferSize = 1000            // 内存 channel 缓冲大小
-	batchSize         = 100             // 批量写入阈值
-	flushInterval     = 5 * time.Second // 定时刷新间隔
-	maxRetries        = 3               // 写入失败最大重试次数
+	// defaultBufferSize 内存 channel 缓冲大小。计费记录不可丢：flush 整批失败时
+	// 重试退避（最长 1s+2s）会阻塞唯一的消费 goroutine，缓冲须扛住
+	// 「DB 抖动窗口 × 峰值请求速率」——按 1000 req/s × 100s 余量取 10 万条
+	// （每条几百字节，满载约几十 MB，可接受）。
+	defaultBufferSize = 100_000
+	// batchSize 批量写入阈值。usage_logs 约 40 列，500 条 ≈ 2 万绑定参数，
+	// 远低于 PostgreSQL 65535 上限；批越大高峰期事务次数越少。
+	batchSize     = 500
+	flushInterval = 5 * time.Second // 定时刷新间隔
+	maxRetries    = 3               // 写入失败最大重试次数
 )
 
 // UsageRecord 使用记录

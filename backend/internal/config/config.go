@@ -94,6 +94,9 @@ type RedisConfig struct {
 	Password string `yaml:"password"`
 	DB       int    `yaml:"db"`
 	TLS      bool   `yaml:"tls"`
+	// PoolSize 连接池大小。<= 0 用 go-redis 默认值（10 × CPU 核数）；
+	// 转发热路径每请求有多次串行 Redis 调用，小核数容器高并发时建议显式调大。
+	PoolSize int `yaml:"pool_size"`
 }
 
 // JWTConfig JWT 配置
@@ -178,6 +181,8 @@ func applyEnvOverrides(cfg *Config) {
 	envInt("REDIS_PORT", &cfg.Redis.Port)
 	envStr("REDIS_PASSWORD", &cfg.Redis.Password)
 	envInt("REDIS_DB", &cfg.Redis.DB)
+	envBool("REDIS_TLS", &cfg.Redis.TLS)
+	envInt("REDIS_POOL_SIZE", &cfg.Redis.PoolSize)
 
 	// JWT
 	envStr("JWT_SECRET", &cfg.JWT.Secret)
@@ -203,6 +208,15 @@ func envInt(key string, dst *int) {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			*dst = n
+		}
+	}
+}
+
+// envBool 如果环境变量存在且为合法布尔值（true/false/1/0 等），覆盖目标布尔
+func envBool(key string, dst *bool) {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			*dst = b
 		}
 	}
 }

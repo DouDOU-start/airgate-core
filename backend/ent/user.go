@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/DouDOU-start/airgate-core/ent/tier"
 	"github.com/DouDOU-start/airgate-core/ent/user"
 )
 
@@ -45,6 +46,7 @@ type User struct {
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UserQuery when eager-loading is set.
 	Edges        UserEdges `json:"edges"`
+	tier_users   *int
 	selectValues sql.SelectValues
 }
 
@@ -56,11 +58,13 @@ type UserEdges struct {
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// AllowedGroups holds the value of the allowed_groups edge.
 	AllowedGroups []*Group `json:"allowed_groups,omitempty"`
+	// Tier holds the value of the tier edge.
+	Tier *Tier `json:"tier,omitempty"`
 	// BalanceLogs holds the value of the balance_logs edge.
 	BalanceLogs []*BalanceLog `json:"balance_logs,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [5]bool
 }
 
 // APIKeysOrErr returns the APIKeys value or an error if the edge
@@ -90,10 +94,21 @@ func (e UserEdges) AllowedGroupsOrErr() ([]*Group, error) {
 	return nil, &NotLoadedError{edge: "allowed_groups"}
 }
 
+// TierOrErr returns the Tier value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e UserEdges) TierOrErr() (*Tier, error) {
+	if e.Tier != nil {
+		return e.Tier, nil
+	} else if e.loadedTypes[3] {
+		return nil, &NotFoundError{label: tier.Label}
+	}
+	return nil, &NotLoadedError{edge: "tier"}
+}
+
 // BalanceLogsOrErr returns the BalanceLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) BalanceLogsOrErr() ([]*BalanceLog, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[4] {
 		return e.BalanceLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "balance_logs"}
@@ -116,6 +131,8 @@ func (*User) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullString)
 		case user.FieldCreatedAt, user.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
+		case user.ForeignKeys[0]: // tier_users
+			values[i] = new(sql.NullInt64)
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -211,6 +228,13 @@ func (u *User) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				u.UpdatedAt = value.Time
 			}
+		case user.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for edge-field tier_users", value)
+			} else if value.Valid {
+				u.tier_users = new(int)
+				*u.tier_users = int(value.Int64)
+			}
 		default:
 			u.selectValues.Set(columns[i], values[i])
 		}
@@ -237,6 +261,11 @@ func (u *User) QueryUsageLogs() *UsageLogQuery {
 // QueryAllowedGroups queries the "allowed_groups" edge of the User entity.
 func (u *User) QueryAllowedGroups() *GroupQuery {
 	return NewUserClient(u.config).QueryAllowedGroups(u)
+}
+
+// QueryTier queries the "tier" edge of the User entity.
+func (u *User) QueryTier() *TierQuery {
+	return NewUserClient(u.config).QueryTier(u)
 }
 
 // QueryBalanceLogs queries the "balance_logs" edge of the User entity.

@@ -18,6 +18,8 @@ func toUserRespFromDomain(item appuser.User) dto.UserResp {
 		CurrentRPM:            item.CurrentRPM,
 		GroupRates:            item.GroupRates,
 		AllowedGroupIDs:       item.AllowedGroupIDs,
+		TierID:                item.TierID,
+		TierName:              item.TierName,
 		BalanceAlertThreshold: item.BalanceAlertThreshold,
 		Status:                item.Status,
 		TimeMixin: dto.TimeMixin{
