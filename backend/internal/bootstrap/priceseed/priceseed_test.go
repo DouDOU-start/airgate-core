@@ -153,9 +153,9 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		byModel[it.Model] = it
 	}
 
-	// 覆盖总数：15 claude（含 5 别名）+ 4 openai + 7 gemini + 6 grok = 32。
-	if len(items) != 32 {
-		t.Errorf("seed model count = %d, want 32", len(items))
+	// 覆盖总数：15 claude（含 5 别名）+ 7 openai + 7 gemini + 6 grok = 35。
+	if len(items) != 35 {
+		t.Errorf("seed model count = %d, want 35", len(items))
 	}
 
 	// 抽样核对（claude/openai 值来自 airgate-claude/models.go 与 airgate-openai/registry.go，
@@ -169,6 +169,9 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		{"claude-opus-4-1-20250805", 15.0, 75.0, 1.5, 18.75},
 		{"claude-fable-5", 10.0, 50.0, 1.0, 12.5},
 		{"gpt-5.5", 5.0, 30.0, 0.5, 0},
+		{"gpt-5.6-sol", 5.0, 30.0, 0.5, 0},
+		{"gpt-5.6-terra", 2.5, 15.0, 0.25, 0},
+		{"gpt-5.6-luna", 1.0, 6.0, 0.1, 0},
 		{"gemini-2.5-pro", 1.25, 10.0, 0.31, 0},
 		{"gemini-3.1-pro-preview", 2.0, 12.0, 0.2, 0},
 		{"gemini-3.5-flash", 1.5, 9.0, 0.15, 0},
@@ -222,7 +225,7 @@ func TestParseEmbeddedSeed(t *testing.T) {
 	}
 
 	// 所有 openai 条目 cache_creation 应为 0（无 5m 缓存写入档）。
-	for _, m := range []string{"gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini", "gpt-5.5"} {
+	for _, m := range []string{"gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini", "gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"} {
 		if byModel[m].CacheCreationPrice != 0 {
 			t.Errorf("openai model %q cache_creation = %v, want 0", m, byModel[m].CacheCreationPrice)
 		}
@@ -285,7 +288,7 @@ func TestSeedPricingExtra(t *testing.T) {
 	}
 
 	// std 家族：priority=2×、flex=0.5×。
-	for _, m := range []string{"gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini"} {
+	for _, m := range []string{"gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"} {
 		st := serviceTiers(m)
 		if p := num(st["priority"]); p != 2.0 {
 			t.Errorf("%s priority = %v, want 2.0", m, p)

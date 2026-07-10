@@ -187,6 +187,42 @@ models:
       service_tiers:
         priority: 2.5
         flex: 0.5
+  # gpt-5.6 三档（Sol/Terra/Luna），developers.openai.com 官方价 2026-07 核实：
+  # priority 2×、flex/batch 0.5×。定价表列缓存写入 1.25× 输入价，但 OpenAI usage
+  # 不上报缓存写入 token 数，cache_creation 沿用 0（与其余 openai 模型一致）。
+  - model: gpt-5.6-sol
+    tag: openai
+    input: 5.0
+    output: 30.0
+    cached_input: 0.5
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+        flex: 0.5
+  - model: gpt-5.6-terra
+    tag: openai
+    input: 2.5
+    output: 15.0
+    cached_input: 0.25
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+        flex: 0.5
+  - model: gpt-5.6-luna
+    tag: openai
+    input: 1.0
+    output: 6.0
+    cached_input: 0.1
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+        flex: 0.5
   # ── gemini（ai.google.dev 官方价 2026-07 核实；Pro 系列长上下文阶梯阈值 200K；
   #    2.0 系列已于 2026-06-01 停服不收录。3.1-flash-lite / 3-flash-preview 官方未列
   #    缓存读价，按「缓存读 = 输入价 10%」的现行折扣规则推算。──
