@@ -183,19 +183,16 @@
   padding-block: clamp(1rem, 3vh, 3rem) !important;
 }
 
+/* 弹窗遮罩：一层安静的墨色 veil，让纸面卡片浮起来 */
 .modal__backdrop,
 .modal__backdrop--opaque,
 .modal__backdrop--blur,
 .alert-dialog__backdrop,
 .alert-dialog__backdrop--opaque,
 .alert-dialog__backdrop--blur {
-  background:
-    radial-gradient(circle at 18% 12%, color-mix(in oklab, var(--primary) 9%, transparent), transparent 24rem),
-    radial-gradient(circle at 82% 18%, color-mix(in oklab, white 10%, transparent), transparent 22rem),
-    repeating-linear-gradient(135deg, color-mix(in oklab, white 4%, transparent) 0 1px, transparent 1px 12px),
-    color-mix(in oklab, var(--background) 58%, transparent) !important;
-  -webkit-backdrop-filter: saturate(125%) blur(10px);
-  backdrop-filter: saturate(125%) blur(10px);
+  background: color-mix(in oklab, oklch(20% 0.02 275) 42%, transparent) !important;
+  -webkit-backdrop-filter: saturate(90%) blur(6px);
+  backdrop-filter: saturate(90%) blur(6px);
   animation: none;
 }
 
@@ -211,38 +208,49 @@
 .dark .alert-dialog__backdrop,
 .dark .alert-dialog__backdrop--opaque,
 .dark .alert-dialog__backdrop--blur {
-  background:
-    radial-gradient(circle at 18% 12%, color-mix(in oklab, var(--primary) 11%, transparent), transparent 24rem),
-    radial-gradient(circle at 82% 18%, color-mix(in oklab, white 4%, transparent), transparent 22rem),
-    repeating-linear-gradient(135deg, color-mix(in oklab, white 3%, transparent) 0 1px, transparent 1px 12px),
-    color-mix(in oklab, var(--background) 68%, transparent) !important;
+  background: color-mix(in oklab, oklch(8% 0.015 275) 58%, transparent) !important;
 }
 
+/* 弹窗卡片：hairline 边 + 深浮影 */
 .ag-elevation-modal {
   position: relative;
   overflow: hidden;
   max-height: min(86dvh, 62rem) !important;
-  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
-  border-radius: var(--radius-3xl) !important;
-  background-color: var(--overlay) !important;
-  background-image:
-    linear-gradient(180deg, color-mix(in oklab, white 12%, transparent), transparent 34%),
-    radial-gradient(circle at 16% 0%, color-mix(in oklab, var(--primary) 5%, transparent), transparent 18rem) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.75rem !important;
+  background: var(--overlay) !important;
   color: var(--overlay-foreground) !important;
-  box-shadow:
-    0 1px 0 color-mix(in oklab, white 32%, transparent) inset,
-    0 12px 28px color-mix(in oklab, black 12%, transparent) !important;
+  box-shadow: var(--overlay-shadow) !important;
+}
+
+.ag-elevation-modal :where(.modal__heading, [data-slot="modal-heading"], .alert-dialog__heading, [data-slot="alert-dialog-heading"]) {
+  font-weight: 620;
+  letter-spacing: -0.012em;
+  font-size: 1.125rem;
 }
 
 [data-theme="dark"] .ag-elevation-modal,
 .dark .ag-elevation-modal {
-  background-color: var(--overlay) !important;
-  background-image:
-    linear-gradient(180deg, color-mix(in oklab, white 6%, transparent), transparent 34%),
-    radial-gradient(circle at 16% 0%, color-mix(in oklab, var(--primary) 7%, transparent), transparent 18rem) !important;
-  box-shadow:
-    0 1px 0 color-mix(in oklab, white 8%, transparent) inset,
-    0 12px 28px color-mix(in oklab, black 24%, transparent) !important;
+  border-color: color-mix(in oklab, var(--border) 90%, var(--foreground) 10%) !important;
+}
+
+/* 主按钮：白/黑实色反转 + hover 辉光（Monolith 签名） */
+.button--primary {
+  background: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+  box-shadow: 0 1px 2px 0 color-mix(in oklab, black 20%, transparent) !important;
+  transition: box-shadow 180ms ease, background-color 180ms ease !important;
+}
+
+.button--primary:hover,
+.button--primary[data-hovered="true"] {
+  background: var(--accent-hover) !important;
+  box-shadow: 0 0 24px -4px var(--ag-primary-glow), 0 1px 2px 0 color-mix(in oklab, black 20%, transparent) !important;
+}
+
+.button--primary:active,
+.button--primary[data-pressed="true"] {
+  background: var(--accent) !important;
 }
 
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
@@ -466,8 +474,8 @@
 .dropdown__popover,
 .popover {
   max-height: min(28rem, calc(100dvh - 6rem)) !important;
-  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent) !important;
-  border-radius: var(--radius-3xl) !important;
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent) !important;
+  border-radius: 0.75rem !important;
   background: var(--overlay) !important;
   color: var(--overlay-foreground) !important;
   box-shadow: var(--overlay-shadow) !important;

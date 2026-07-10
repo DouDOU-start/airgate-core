@@ -22,33 +22,41 @@
   min-height: 2.25rem;
   gap: 0.75rem;
   border-radius: var(--radius);
-  color: var(--foreground);
-  font-size: 0.9375rem;
-  font-weight: 400;
+  color: color-mix(in oklab, var(--foreground) 80%, var(--muted) 20%);
+  font-size: 0.9063rem;
+  font-weight: 450;
   line-height: 1.25rem;
   letter-spacing: 0;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .ag-sidebar-nav-item svg {
   width: 1.25rem;
   height: 1.25rem;
   color: var(--muted);
-  stroke-width: 2.1;
+  stroke-width: 1.9;
+  transition: color 120ms ease;
 }
 
 .ag-sidebar-nav-item:hover {
-  background: var(--default);
+  background: color-mix(in oklab, var(--default) 60%, transparent);
   color: var(--foreground);
 }
 
-.ag-sidebar-nav-item[data-active="true"] {
-  background: var(--default);
+.ag-sidebar-nav-item:hover svg {
   color: var(--foreground);
-  font-weight: 500;
+}
+
+/* 活性态：accent 软底药丸 */
+.ag-sidebar-nav-item[data-active="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 550;
 }
 
 .ag-sidebar-nav-item[data-active="true"] svg {
-  color: var(--foreground);
+  color: var(--accent);
+  stroke-width: 2.1;
 }
 
 .ag-sidebar-nav-item-label {
@@ -58,22 +66,16 @@
 }
 
 .ag-topbar {
-  background: color-mix(in oklab, var(--background) 78%, transparent);
-  border-bottom: 1px solid color-mix(in oklab, var(--border) 28%, transparent);
-  box-shadow:
-    0 1px 0 color-mix(in oklab, white 16%, transparent) inset,
-    0 4px 16px color-mix(in oklab, var(--background) 10%, transparent);
-  -webkit-backdrop-filter: saturate(160%) blur(16px);
-  backdrop-filter: saturate(160%) blur(16px);
+  background: color-mix(in oklab, var(--background) 82%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 62%, transparent);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+  backdrop-filter: saturate(140%) blur(14px);
 }
 
 [data-theme="dark"] .ag-topbar,
 .dark .ag-topbar {
-  background: color-mix(in oklab, var(--background) 82%, transparent);
-  border-bottom-color: color-mix(in oklab, var(--border) 34%, transparent);
-  box-shadow:
-    0 1px 0 color-mix(in oklab, white 4%, transparent) inset,
-    0 4px 16px color-mix(in oklab, black 10%, transparent);
+  background: color-mix(in oklab, var(--background) 84%, transparent);
+  border-bottom-color: color-mix(in oklab, var(--border) 70%, transparent);
 }
 
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
@@ -126,10 +128,17 @@
 .ag-dashboard-panel,
 .ag-dashboard-metric,
 .ag-dashboard-toolbar {
-  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
-  border-radius: var(--radius-3xl);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
   background: var(--surface);
-  box-shadow: var(--surface-shadow);
+  box-shadow: var(--ag-shadow-sm);
+  transition: border-color 200ms ease;
+}
+
+/* Monolith 签名交互：悬停时边框提亮 */
+.ag-dashboard-panel:hover,
+.ag-dashboard-metric:hover {
+  border-color: var(--ag-border-strong);
 }
 
 .ag-dashboard-panel,

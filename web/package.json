@@ -12,7 +12,7 @@
     "type-check": "tsc -b --noEmit"
   },
   "dependencies": {
-    "@fontsource/geist-mono": "^5.2.7",
+    "@fontsource/geist-mono": "^5.2.8",
     "@fontsource/geist-sans": "^5.2.5",
     "@heroui/react": "^3.0.3",
     "@heroui/styles": "^3.0.3",

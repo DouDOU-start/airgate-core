@@ -1,11 +1,6 @@
 /* ==========================================================================
-   04. Global Base
+   04. Global Base —— 编辑部排版基因
    ========================================================================== */
-
-/* 亮色主题：干净纯白背景 */
-[data-theme="light"] body {
-  background: var(--background);
-}
 
 * {
   scrollbar-width: thin;
@@ -46,9 +41,79 @@ body {
   letter-spacing: 0;
 }
 
+/* 标题：无衬线、收紧字距的现代系统标题 */
+h1,
+h2,
+h3,
+.ag-display {
+  font-weight: 620;
+  letter-spacing: -0.014em;
+}
+
+h4,
+h5,
+h6 {
+  letter-spacing: -0.006em;
+}
+
+/* Kicker：等宽大写微标签（Monolith 签名——指标卡标题、分组名、状态标签共用） */
+.ag-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* 渐变文字：白→灰（暗）/ 黑→灰（亮），点睛词专用 */
+.ag-gradient-text {
+  background-image: linear-gradient(94deg, var(--ag-gradient-from), var(--ag-gradient-to) 55%, var(--ag-gradient-text-end));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* 辉光文字/元素 */
+.ag-glow {
+  filter: drop-shadow(0 0 18px color-mix(in oklab, var(--foreground) 45%, transparent));
+}
+
+/* 扫描光线：放在 1px 分隔线容器里，一道光周期性扫过 */
+.ag-scanline {
+  position: relative;
+  height: 1px;
+  background: var(--separator);
+  overflow: hidden;
+}
+
+.ag-scanline::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -30%;
+  width: 30%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--foreground), transparent);
+  animation: ag-scan 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes ag-scan {
+  to {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ag-scanline::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 ::selection {
-  background: var(--accent-soft);
-  color: var(--accent-soft-foreground);
+  background: color-mix(in oklab, var(--accent) 22%, transparent);
+  color: var(--foreground);
 }
 
 :focus-visible {

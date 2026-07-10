@@ -89,11 +89,11 @@ function MetricCard({
     <Card className="ag-dashboard-metric min-h-[72px] 2xl:min-h-[78px]">
       <Card.Content className="ag-dashboard-metric-content p-3 2xl:p-3.5">
         <div className="ag-dashboard-metric-copy">
-          <div className="truncate text-sm font-semibold tracking-normal text-text-tertiary">{title}</div>
-          <div className="mt-1 flex min-w-0 items-baseline gap-2">
-            <div className="flex min-w-0 items-baseline font-mono text-xl font-semibold leading-none text-text 2xl:text-2xl">
+          <div className="ag-kicker truncate">{title}</div>
+          <div className="mt-1.5 flex min-w-0 items-baseline gap-2">
+            <div className="ag-display flex min-w-0 items-baseline text-[21px] leading-none tabular-nums text-text 2xl:text-[23px]">
               {value}
-              {valueSuffix ? <span className="ml-1.5 text-xs font-medium text-text-tertiary 2xl:text-sm">{valueSuffix}</span> : null}
+              {valueSuffix ? <span className="ml-1.5 text-xs font-medium tracking-normal text-text-tertiary 2xl:text-sm">{valueSuffix}</span> : null}
             </div>
             <div className={`min-w-0 truncate text-xs font-semibold ${META_TONE_CLASSES[metaTone]}`}>{meta}</div>
           </div>

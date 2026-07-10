@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import DOMPurify from 'dompurify';
-import { Button, Card, Link as HeroLink } from '@heroui/react';
+import { Button, Link as HeroLink } from '@heroui/react';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
 import { useTheme } from '../app/providers/ThemeProvider';
 import { getToken } from '../shared/api/client';
@@ -36,11 +36,18 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-bg-deep text-text relative overflow-hidden">
+      {/* 中央辉光（黑白光几何：光即是色彩） */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-[8rem] h-[30rem] w-[30rem] -translate-x-1/2 rounded-full"
+        style={{ background: 'radial-gradient(closest-side, color-mix(in oklab, var(--ag-text) 10%, transparent), transparent 70%)' }}
+      />
+
       {/* 导航栏 */}
       <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-4 max-w-6xl mx-auto">
         <div className="flex items-center gap-2.5">
-          <img src={site.site_logo || defaultLogoUrl} alt="" className="w-8 h-8 rounded-sm object-cover" />
-          <span className="text-base font-bold">{site.site_name || 'AirGate'}</span>
+          <img src={site.site_logo || defaultLogoUrl} alt="" className="w-8 h-8 rounded-md object-cover" />
+          <span className="text-base font-semibold tracking-tight">{site.site_name || 'AirGate'}</span>
         </div>
         <div className="flex items-center gap-2">
           <HeroLink
@@ -70,16 +77,19 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="relative z-10 text-center px-6 pt-16 pb-20 md:pt-24 md:pb-28 max-w-4xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-[var(--radius)] text-xs font-medium mb-6 border border-border bg-surface">
-          <Code className="w-3.5 h-3.5 text-[var(--ag-primary)]" />
-          <span className="text-text-secondary">{t('home.badge')}</span>
+      {/* Hero：发光几何 + 大字 */}
+      <section className="relative z-10 text-center px-6 pt-14 pb-16 md:pt-20 md:pb-20 max-w-4xl mx-auto">
+        <span className="ag-breathe mx-auto mb-9 flex h-16 w-16 items-center justify-center rounded-xl bg-text">
+          <img src={site.site_logo || defaultLogoUrl} alt="" className="h-11 w-11 rounded-lg object-cover" />
+        </span>
+        <div className="mb-6 inline-flex items-center gap-2.5">
+          <Code className="w-3.5 h-3.5 text-text-tertiary" />
+          <span className="ag-kicker">{t('home.badge')}</span>
         </div>
-        <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-4">
+        <h1 className="text-[2.75rem] md:text-[4rem] font-semibold leading-[1.05] tracking-[-0.035em] mb-6">
           {site.site_name || 'AirGate'}
         </h1>
-        <p className="text-base md:text-lg text-text-tertiary max-w-xl mx-auto mb-8 leading-relaxed">
+        <p className="text-base md:text-lg text-text-tertiary max-w-xl mx-auto mb-10 leading-relaxed">
           {site.site_subtitle || t('home.subtitle')}
         </p>
         <div className="flex items-center justify-center gap-3">
@@ -94,7 +104,7 @@ export default function HomePage() {
           <HeroLink
             href={docs.href}
             {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-            className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium rounded-[var(--radius)] border border-border text-text-secondary hover:text-text hover:bg-bg-hover transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium rounded-[var(--field-radius)] border border-border bg-surface text-text-secondary transition-colors hover:border-[var(--ag-border-strong)] hover:text-text"
           >
             {t('home.view_docs')}
           </HeroLink>
@@ -102,26 +112,38 @@ export default function HomePage() {
 
         {/* API 地址展示 */}
         {site.api_base_url && (
-          <div className="mt-10 inline-flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius)] bg-surface border border-border text-sm font-mono">
-            <span className="text-text-tertiary">API</span>
+          <div className="mt-10 inline-flex items-center gap-3 px-4 py-2.5 rounded-[var(--field-radius)] bg-surface border border-border text-sm font-mono">
+            <span className="ag-kicker">API</span>
+            <span className="h-3 w-px bg-border" />
             <span className="text-text">{site.api_base_url}</span>
           </div>
         )}
       </section>
 
-      {/* 特性卡片 */}
+      {/* 扫描线分隔 */}
+      <div className="relative z-10 mx-auto mb-14 max-w-5xl px-6">
+        <div className="ag-scanline" />
+      </div>
+
+      {/* 特性卡片：hover 边框提亮 */}
       <section className="relative z-10 px-6 pb-20 max-w-5xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {features.map((f) => (
-            <Card key={f.titleKey}>
-              <Card.Content className="p-5">
-                <div className="flex items-center justify-center w-10 h-10 rounded-[var(--radius)] bg-primary-subtle text-primary mb-3">
+          {features.map((f, i) => (
+            <div
+              key={f.titleKey}
+              className="group rounded-[var(--radius-xl)] border border-border bg-surface p-5 transition-colors hover:border-[var(--ag-border-strong)]"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-text-secondary transition-colors group-hover:text-text [&>svg]:h-5 [&>svg]:w-5">
                   {f.icon}
-                </div>
-                <h3 className="text-sm font-semibold mb-1">{t(f.titleKey)}</h3>
-                <p className="text-xs text-text-tertiary leading-relaxed">{t(f.descKey)}</p>
-              </Card.Content>
-            </Card>
+                </span>
+                <span className="font-mono text-[10px] tabular-nums tracking-[0.14em] text-text-tertiary">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+              </div>
+              <h3 className="text-[15px] font-semibold mb-1">{t(f.titleKey)}</h3>
+              <p className="text-[13px] text-text-tertiary leading-relaxed">{t(f.descKey)}</p>
+            </div>
           ))}
         </div>
       </section>

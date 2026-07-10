@@ -20,15 +20,15 @@ export function DashboardCard({
     <Card className="ag-dashboard-panel">
       {hasHeader ? (
         <div
-          className={`flex min-w-0 items-center gap-3 p-3 pb-2 2xl:p-4 2xl:pb-2 ${title ? 'justify-between' : 'justify-end'}`}
+          className={`flex min-w-0 items-center gap-3 border-b border-separator p-3 pb-2.5 2xl:p-4 2xl:pb-3 ${title ? 'justify-between' : 'justify-end'}`}
         >
-          {title ? <h3 className="min-w-0 truncate text-base font-semibold leading-none text-text">{title}</h3> : null}
+          {title ? <h3 className="min-w-0 truncate text-base leading-none text-text">{title}</h3> : null}
           {extra ? (
             <div className="min-w-0 shrink">{extra}</div>
           ) : null}
         </div>
       ) : null}
-      <Card.Content className={hasHeader ? 'px-3 pb-3 2xl:px-4 2xl:pb-4' : 'p-3 2xl:p-4'}>{children}</Card.Content>
+      <Card.Content className={hasHeader ? 'p-3 2xl:p-4' : 'p-3 2xl:p-4'}>{children}</Card.Content>
     </Card>
   );
 }

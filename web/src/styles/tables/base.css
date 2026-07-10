@@ -15,6 +15,7 @@
   width: 100%;
 }
 
+/* 表头：等宽大写微标签（Monolith 签名） */
 :where([data-slot="table-column"], [data-slot="th"]) {
   box-sizing: border-box;
   height: 2.375rem !important;
@@ -22,12 +23,13 @@
   border-radius: 0 !important;
   background: var(--surface-secondary) !important;
   color: var(--muted) !important;
-  font-size: 0.75rem !important;
-  font-weight: 600 !important;
-  letter-spacing: 0;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.1em;
   line-height: 1 !important;
   padding: 0.625rem 0.75rem !important;
-  text-transform: none;
+  text-transform: uppercase;
   vertical-align: middle !important;
   white-space: nowrap;
 }

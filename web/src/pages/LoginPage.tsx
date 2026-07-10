@@ -7,7 +7,7 @@ import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsPr
 import { authApi } from '../shared/api/auth';
 import { useTheme } from '../app/providers/ThemeProvider';
 import { ApiError, setSessionAPIKey } from '../shared/api/client';
-import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key, Layers, Zap, BarChart3 } from 'lucide-react';
 
 type TabKey = 'login' | 'register' | 'apikey';
 
@@ -486,50 +486,74 @@ export default function LoginPage() {
     setActiveTab('login');
   };
 
+  const features = [
+    { icon: <Layers className="w-4 h-4" />, title: t('auth.feature_1'), desc: t('auth.feature_1_desc') },
+    { icon: <Zap className="w-4 h-4" />, title: t('auth.feature_2'), desc: t('auth.feature_2_desc') },
+    { icon: <BarChart3 className="w-4 h-4" />, title: t('auth.feature_3'), desc: t('auth.feature_3_desc') },
+  ];
+
+  // Monolith：左面板是恒黑幕布（不随主题翻转），只有黑、白、光
+  const inkFaint = 'rgba(255,255,255,0.55)';
+  const inkDim = 'rgba(255,255,255,0.38)';
+  const inkLine = 'rgba(255,255,255,0.14)';
+
   return (
     <div className="min-h-screen flex relative overflow-hidden bg-bg-deep text-text">
-      {/* ===== 左侧装饰面板（桌面端） ===== */}
+      {/* ===== 左侧：黑幕光几何海报（桌面端，恒定纯黑） ===== */}
       <div
-        className="hidden lg:flex lg:w-[45%] xl:w-[50%] relative items-center justify-center overflow-hidden"
-        style={{
-          background: theme === 'dark'
-            ? 'radial-gradient(circle at 25% 35%, oklch(29% 0.018 250), transparent 32%), linear-gradient(135deg, oklch(18% 0.012 250), oklch(12% 0.006 250))'
-            : 'radial-gradient(circle at 25% 35%, oklch(34% 0.025 250), transparent 34%), linear-gradient(135deg, oklch(25% 0.018 250), oklch(16% 0.01 250))',
-          color: 'oklch(96% 0.004 250)',
-        }}
+        className="hidden lg:flex lg:w-[45%] xl:w-[50%] relative flex-col justify-between overflow-hidden p-10 xl:p-14"
+        style={{ background: '#000', color: '#f4f4f4' }}
       >
+        {/* 中央辉光 */}
         <div
-          className="pointer-events-none absolute -left-28 -top-28 h-72 w-72 rounded-full blur-3xl"
-          style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.07)' }}
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-[38%] h-[26rem] w-[26rem] -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ background: 'radial-gradient(closest-side, rgba(255,255,255,0.14), transparent 70%)' }}
         />
-        <div
-          className="pointer-events-none absolute -bottom-32 right-10 h-80 w-80 rounded-full blur-3xl"
-          style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.05)' }}
-        />
-        {/* 内容 */}
-        <div className="relative z-10 px-12 max-w-md">
-          <div className="flex items-center gap-3 mb-8">
-            <img src={site.site_logo || defaultLogoUrl} alt="" className="w-10 h-10 rounded-sm object-cover" />
-            <span className="text-xl font-bold">{site.site_name || 'AirGate'}</span>
+
+        {/* 品牌 */}
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src={site.site_logo || defaultLogoUrl} alt="" className="h-8 w-8 rounded-md object-cover" />
+            <span className="text-base font-semibold tracking-tight">{site.site_name || 'AirGate'}</span>
           </div>
-          <h2 className="text-3xl font-bold leading-snug mb-4">
-            {t('auth.welcome_title')}
+          <span className="font-mono text-[10px] uppercase tracking-[0.28em]" style={{ color: inkDim }}>
+            AI Gateway
+          </span>
+        </div>
+
+        {/* 发光几何 + 主题句 */}
+        <div className="relative z-10 flex flex-col items-center text-center">
+          <span
+            className="ag-breathe mb-10 flex h-20 w-20 items-center justify-center rounded-2xl"
+            style={{ background: '#fff' }}
+          >
+            <img src={site.site_logo || defaultLogoUrl} alt="" className="h-14 w-14 rounded-xl object-cover" />
+          </span>
+          <h2 className="text-[2.5rem] xl:text-[3rem] font-semibold leading-[1.1] tracking-[-0.03em] mb-5" style={{ color: '#fff' }}>
+            {t('auth.welcome_title_1')}
+            <br />
+            {t('auth.welcome_title_2')}
           </h2>
-          <p className="text-sm leading-relaxed opacity-65">
+          <p className="text-sm xl:text-[15px] leading-relaxed max-w-md" style={{ color: inkFaint }}>
             {t('auth.welcome_desc')}
           </p>
-          <div className="flex gap-3 mt-10">
-            {[t('auth.feature_1'), t('auth.feature_2'), t('auth.feature_3')].map((f) => (
-              <span
-                key={f}
-                className="text-[11px] px-3 py-1.5 rounded-[var(--radius)] font-medium border"
-                style={{
-                  background: 'rgba(255,255,255,0.08)',
-                  borderColor: 'rgba(255,255,255,0.10)',
-                }}
-              >
-                {f}
-              </span>
+        </div>
+
+        {/* 扫描线 + 特性（等宽大写索引） */}
+        <div className="relative z-10">
+          <div className="ag-scanline mb-6" style={{ background: inkLine }} />
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between xl:gap-6">
+            {features.map((f) => (
+              <div key={f.title} className="flex items-start gap-3 xl:max-w-[30%]">
+                <span className="mt-0.5 shrink-0" style={{ color: '#fff' }}>{f.icon}</span>
+                <span className="min-w-0">
+                  <span className="block font-mono text-[11px] font-medium uppercase tracking-[0.14em]" style={{ color: '#fff' }}>
+                    {f.title}
+                  </span>
+                  <span className="mt-1 block text-xs leading-relaxed" style={{ color: inkDim }}>{f.desc}</span>
+                </span>
+              </div>
             ))}
           </div>
         </div>

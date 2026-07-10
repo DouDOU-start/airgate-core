@@ -177,10 +177,6 @@ export function AppShell({ children }: AppShellProps) {
   const roleLabel = user?.role === 'api_key'
     ? 'API Key'
     : isAdmin ? t('users.role_admin', 'Admin') : t('users.role_user', 'User');
-  useEffect(() => {
-    document.title = site.site_name || 'AirGate';
-  }, [site.site_name]);
-
   // 移动端抽屉内侧边栏恒为展开态
   const sidebarCollapsed = isMobile ? false : collapsed;
 
@@ -241,7 +237,7 @@ export function AppShell({ children }: AppShellProps) {
         {sections.map((section, si) => (
           <div key={si}>
             {section.titleKey && !sidebarCollapsed && (
-              <p className="px-2.5 pb-2 text-[10px] font-medium uppercase text-text-tertiary">
+              <p className="ag-kicker px-2.5 pb-2">
                 {t(section.titleKey)}
               </p>
             )}
@@ -289,7 +285,7 @@ export function AppShell({ children }: AppShellProps) {
         {appEntries.length > 0 && (
           <div>
             {!sidebarCollapsed && (
-              <p className="px-2.5 pb-2 text-[10px] font-medium uppercase text-text-tertiary">
+              <p className="ag-kicker px-2.5 pb-2">
                 {t('nav.apps')}
               </p>
             )}
