@@ -32,13 +32,22 @@ AirGate Core 是一个**自包含的单体 AI 网关**：管理员配置**渠道
 | OpenAI | `POST /v1/chat/completions` · `/v1/responses` · `/v1/images/generations` · `/v1/images/edits` · `GET /v1/models` | `openai_compatible` / `custom` |
 | Anthropic | `POST /v1/messages` · `/v1/messages/count_tokens` | `anthropic` |
 | Gemini | `POST /v1beta/models/{model}:generateContent` 等 · `GET /v1beta/models` | `gemini` |
+| OpenAI 视频（异步任务） | `POST /v1/videos` · `GET /v1/videos/{id}` · `GET /v1/videos/{id}/content` | `openai_video` |
+| Suno 音乐（异步任务） | `POST /suno/submit/{music\|lyrics}` · `POST /suno/fetch` · `GET /suno/fetch/{id}` | `suno` |
 
 SSE 流式全协议支持；`count_tokens` 两端点零计费。
+
+异步任务（视频/音乐）为「提交-轮询」模型：提交时按估价**预扣**余额（按次价或
+`pricing_extra.video.per_second` 按秒价 × 时长），后台每 10s 轮询上游刷新状态，
+成功按实际用量**差额多退少补**并落用量日志，失败/超时（默认 30 分钟，
+`task_timeout_minutes` 可调）**全额退款**。任务查询读本地快照，不穿透上游；
+Suno 的计费模型名由动作合成（`suno_music` / `suno_lyrics`），渠道模型列表与价目表需配置这两个名字。
 
 ## 功能一览
 
 - **渠道管理**：多渠道多 key、优先级/权重、渠道测试、余额刷新、上游模型拉取、批量操作、失败统计
-- **计费**：模型价目表（token 单价 / 按次计价）+ 三管道计费（实扣 / 账面 / 渠道成本），支持分组倍率与用户专属倍率
+- **计费**：模型价目表（token 单价 / 按次计价 / 视频按秒计价）+ 三管道计费（实扣 / 账面 / 渠道成本），支持分组倍率与用户专属倍率
+- **异步任务**：视频（Sora 形态 `/v1/videos`）与 Suno 音乐的提交-轮询转发，预扣-结算-退款三段式计费
 - **用户体系**：注册（邮箱验证码）/ 登录 / API Key 自助管理 / 余额预警 / 用量明细与趋势
 - **分组**：渠道按分组隔离，用户按分组授权，倍率可按组覆盖
 - **充值**：易支付等支付渠道、兑换码
@@ -109,7 +118,7 @@ airgate-core/
 │   ├── cmd/server/          # 入口
 │   ├── ent/schema/          # 数据模型（唯一事实源，改后 make ent）
 │   └── internal/
-│       ├── relay/           # 转发子系统：registry 调度 / adaptor 透传 / pipeline 主循环 / errfmt 错误形态 / pricing 价目
+│       ├── relay/           # 转发子系统：registry 调度 / adaptor 透传 / pipeline 主循环 / task 异步任务 / errfmt 错误形态 / pricing 价目 / outcome 判定
 │       ├── billing/         # 三管道计费与异步记账
 │       ├── scheduler/       # Redis 限流原语（并发闸门 / RPM）
 │       ├── app/             # 领域服务（user / channel / group / usage / payment / ...）
