@@ -111,6 +111,11 @@ func (s *Service) Trend(ctx context.Context, query TrendQuery) (Trend, error) {
 	loc := timezone.Resolve(query.TZ)
 	now := s.now().In(loc)
 	startTime, endTime := resolveTrendTimeRange(query, now)
+	// 小时粒度仅在单日窗口内可读（today / 单日 custom）；跨多天时小时桶的
+	// X 轴标签会跨天重复且点数过多，一律收敛为按天聚合。
+	if query.Granularity == "hour" && endTime.Sub(startTime) > maxHourlySpan {
+		query.Granularity = "day"
+	}
 	cacheKey := trendCacheKey(query, loc, startTime, endTime)
 	if trend, ok := s.loadTrendCache(ctx, cacheKey); ok {
 		return trend, nil
@@ -159,11 +164,12 @@ func (s *Service) loadTrendFresh(ctx context.Context, query TrendQuery, loc *tim
 		return Trend{}, err
 	}
 
+	fillKeys := trendBucketKeys(startTime, endTime, query.Granularity, loc)
 	return Trend{
 		ModelDistribution: aggregateModelDistribution(logs),
 		UserRanking:       aggregateUserRanking(logs),
-		TokenTrend:        aggregateTokenTrend(logs, query.Granularity, loc),
-		TopUsers:          aggregateTopUsers(logs, query.Granularity, loc),
+		TokenTrend:        aggregateTokenTrend(logs, query.Granularity, loc, fillKeys),
+		TopUsers:          aggregateTopUsers(logs, query.Granularity, loc, fillKeys),
 	}, nil
 }
 
@@ -352,7 +358,7 @@ func aggregateUserRanking(logs []TrendLog) []UserRanking {
 	return result
 }
 
-func aggregateTokenTrend(logs []TrendLog, granularity string, loc *time.Location) []TimeBucket {
+func aggregateTokenTrend(logs []TrendLog, granularity string, loc *time.Location, fillKeys []string) []TimeBucket {
 	layout := trendTimeLayout(granularity)
 	bucketMap := make(map[string]*TimeBucket)
 	for _, item := range logs {
@@ -369,6 +375,12 @@ func aggregateTokenTrend(logs []TrendLog, granularity string, loc *time.Location
 		bucket.ActualCost += item.ActualCost
 		bucket.StandardCost += item.StandardCost
 	}
+	// 空桶零填充：没有请求的时段也要出现在折线图上，避免 category 轴压缩时间轴。
+	for _, key := range fillKeys {
+		if bucketMap[key] == nil {
+			bucketMap[key] = &TimeBucket{Time: key}
+		}
+	}
 
 	result := make([]TimeBucket, 0, len(bucketMap))
 	for _, item := range bucketMap {
@@ -380,7 +392,7 @@ func aggregateTokenTrend(logs []TrendLog, granularity string, loc *time.Location
 	return result
 }
 
-func aggregateTopUsers(logs []TrendLog, granularity string, loc *time.Location) []UserTrend {
+func aggregateTopUsers(logs []TrendLog, granularity string, loc *time.Location, fillKeys []string) []UserTrend {
 	type userTotal struct {
 		UserID int
 		Email  string
@@ -425,6 +437,14 @@ func aggregateTopUsers(logs []TrendLog, granularity string, loc *time.Location) 
 		}
 		userBuckets[item.UserID][key] += item.InputTokens + item.OutputTokens + item.CachedInputTokens + item.CacheCreationTokens
 	}
+	// 空桶零填充：每个用户的折线补齐无请求时段，保证各条线共享同一条时间轴。
+	for _, buckets := range userBuckets {
+		for _, key := range fillKeys {
+			if _, ok := buckets[key]; !ok {
+				buckets[key] = 0
+			}
+		}
+	}
 
 	result := make([]UserTrend, 0, len(totals))
 	for _, item := range totals {
@@ -453,4 +473,38 @@ func trendTimeLayout(granularity string) string {
 		return "2006-01-02 15:00"
 	}
 	return "2006-01-02"
+}
+
+const (
+	// maxHourlySpan 小时粒度允许的最大时间窗口（单日 + DST 余量）。
+	maxHourlySpan = 36 * time.Hour
+	// maxTrendFillBuckets 零填充的桶数上限；超限（如跨多年的 custom 范围）时
+	// 放弃填充退回稀疏输出，避免响应体膨胀。
+	maxTrendFillBuckets = 400
+)
+
+// trendBucketKeys 生成 [startTime, endTime) 区间内完整的时间桶 key 序列（空桶零填充用）。
+// 超出 maxTrendFillBuckets 时返回 nil，表示跳过填充。
+func trendBucketKeys(startTime, endTime time.Time, granularity string, loc *time.Location) []string {
+	layout := trendTimeLayout(granularity)
+	cur := startTime.In(loc)
+	if granularity == "hour" {
+		cur = time.Date(cur.Year(), cur.Month(), cur.Day(), cur.Hour(), 0, 0, 0, loc)
+	} else {
+		cur = timezone.StartOfDay(cur)
+	}
+	end := endTime.In(loc)
+	keys := make([]string, 0, 128)
+	for cur.Before(end) {
+		if len(keys) >= maxTrendFillBuckets {
+			return nil
+		}
+		keys = append(keys, cur.Format(layout))
+		if granularity == "hour" {
+			cur = cur.Add(time.Hour)
+		} else {
+			cur = cur.AddDate(0, 0, 1)
+		}
+	}
+	return keys
 }

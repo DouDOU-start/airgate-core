@@ -99,7 +99,7 @@ func TestTrendAggregatesTopUsersAndBuckets(t *testing.T) {
 					CachedInputTokens: 5,
 					ActualCost:        1.2,
 					StandardCost:      1.5,
-					CreatedAt:         time.Date(2026, 4, 1, 10, 15, 0, 0, time.UTC),
+					CreatedAt:         time.Date(2026, 4, 2, 10, 15, 0, 0, time.UTC),
 				},
 				{
 					UserID:            1,
@@ -110,7 +110,7 @@ func TestTrendAggregatesTopUsersAndBuckets(t *testing.T) {
 					CachedInputTokens: 0,
 					ActualCost:        0.2,
 					StandardCost:      0.3,
-					CreatedAt:         time.Date(2026, 4, 1, 10, 45, 0, 0, time.UTC),
+					CreatedAt:         time.Date(2026, 4, 2, 10, 45, 0, 0, time.UTC),
 				},
 				{
 					UserID:            2,
@@ -121,14 +121,14 @@ func TestTrendAggregatesTopUsersAndBuckets(t *testing.T) {
 					CachedInputTokens: 0,
 					ActualCost:        0.5,
 					StandardCost:      0.8,
-					CreatedAt:         time.Date(2026, 4, 1, 11, 0, 0, 0, time.UTC),
+					CreatedAt:         time.Date(2026, 4, 2, 11, 0, 0, 0, time.UTC),
 				},
 			}, nil
 		},
 	})
 	service.now = func() time.Time { return now }
 
-	result, err := service.Trend(t.Context(), TrendQuery{Range: "today", Granularity: "hour"})
+	result, err := service.Trend(t.Context(), TrendQuery{Range: "today", Granularity: "hour", TZ: "UTC"})
 	if err != nil {
 		t.Fatalf("Trend() returned error: %v", err)
 	}
@@ -138,11 +138,50 @@ func TestTrendAggregatesTopUsersAndBuckets(t *testing.T) {
 	if result.ModelDistribution[0].Model != "gpt-4.1" || result.ModelDistribution[0].Requests != 2 {
 		t.Fatalf("unexpected first model stat: %+v", result.ModelDistribution[0])
 	}
-	if len(result.TokenTrend) != 2 {
-		t.Fatalf("len(TokenTrend) = %d, want 2", len(result.TokenTrend))
+	// 零填充：today 12:00 时应有 00:00~11:00 共 12 个小时桶，其中 10:00/11:00 有数据。
+	if len(result.TokenTrend) != 12 {
+		t.Fatalf("len(TokenTrend) = %d, want 12", len(result.TokenTrend))
+	}
+	if result.TokenTrend[0].Time != "2026-04-02 00:00" || result.TokenTrend[0].InputTokens != 0 {
+		t.Fatalf("unexpected zero-filled first bucket: %+v", result.TokenTrend[0])
+	}
+	if result.TokenTrend[10].Time != "2026-04-02 10:00" || result.TokenTrend[10].InputTokens != 12 {
+		t.Fatalf("unexpected data bucket: %+v", result.TokenTrend[10])
 	}
 	if len(result.TopUsers) == 0 || result.TopUsers[0].UserID != 1 {
 		t.Fatalf("unexpected top users: %+v", result.TopUsers)
+	}
+	if len(result.TopUsers[0].Trend) != 12 {
+		t.Fatalf("len(TopUsers[0].Trend) = %d, want 12（零填充）", len(result.TopUsers[0].Trend))
+	}
+}
+
+func TestTrendCoercesHourToDayForMultiDayRange(t *testing.T) {
+	now := time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC)
+	service := NewService(dashboardStubRepository{
+		listTrendLogs: func(_ context.Context, _, _ time.Time) ([]TrendLog, error) {
+			return []TrendLog{{
+				UserID:       1,
+				UserEmail:    "a@test.com",
+				Model:        "gpt-4.1",
+				InputTokens:  10,
+				OutputTokens: 20,
+				CreatedAt:    time.Date(2026, 4, 5, 10, 15, 0, 0, time.UTC),
+			}}, nil
+		},
+	})
+	service.now = func() time.Time { return now }
+
+	result, err := service.Trend(t.Context(), TrendQuery{Range: "7d", Granularity: "hour", TZ: "UTC"})
+	if err != nil {
+		t.Fatalf("Trend() returned error: %v", err)
+	}
+	// 多天范围的小时粒度应收敛为按天：4/1~4/8 共 8 个天桶，key 为日期格式。
+	if len(result.TokenTrend) != 8 {
+		t.Fatalf("len(TokenTrend) = %d, want 8", len(result.TokenTrend))
+	}
+	if result.TokenTrend[0].Time != "2026-04-01" {
+		t.Fatalf("bucket key 应为天粒度日期: %+v", result.TokenTrend[0])
 	}
 }
 

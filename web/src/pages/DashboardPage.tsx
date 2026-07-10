@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Card, ComboBox, Input, Label, ListBox, Select, Skeleton, Tabs } from '@heroui/react';
+import { Alert, Button, Card, ComboBox, Input, ListBox, Skeleton, Tabs } from '@heroui/react';
 import {
   CartesianGrid,
   Cell,
@@ -17,12 +17,13 @@ import {
 } from 'recharts';
 import {
   Activity,
-  CalendarDays,
   Clock,
   Coins,
   Database,
   KeyRound,
+  LineChart as LineChartIcon,
   Monitor,
+  PieChart as PieChartIcon,
   RefreshCw,
   Search,
   Users,
@@ -67,7 +68,6 @@ function PieNameTooltip({
 }
 
 type RangePreset = 'today' | '7d' | '30d' | '90d';
-type Granularity = 'hour' | 'day';
 
 const RANGE_PRESETS = ['today', '7d', '30d', '90d'] as const;
 type MetricTone = 'blue' | 'violet' | 'emerald' | 'teal' | 'amber' | 'indigo' | 'purple' | 'rose';
@@ -143,6 +143,19 @@ function DashboardCard({
       ) : null}
       <Card.Content className={hasHeader ? 'px-3 pb-3 2xl:px-4 2xl:pb-4' : 'p-3 2xl:p-4'}>{children}</Card.Content>
     </Card>
+  );
+}
+
+function ChartEmptyState({ className = '', icon }: { className?: string; icon: ReactNode }) {
+  const { t } = useTranslation();
+
+  return (
+    <div className={`flex w-full flex-col items-center justify-center ${className}`}>
+      <span className="flex h-11 w-11 items-center justify-center rounded-full border border-dashed border-border text-text-tertiary">
+        {icon}
+      </span>
+      <div className="mt-3 text-sm font-medium text-text-secondary">{t('common.no_data')}</div>
+    </div>
   );
 }
 
@@ -436,9 +449,11 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
 
   return (
     <DashboardCard title={activeTitle} extra={distributionTabs}>
-      <div className="ag-distribution-card-body grid items-start gap-3 2xl:grid-cols-[176px_minmax(0,1fr)]">
-        <div className="ag-distribution-chart-frame">
-          {activePieData.length > 0 ? (
+      {activePieData.length === 0 ? (
+        <ChartEmptyState className="min-h-44" icon={<PieChartIcon className="h-5 w-5" />} />
+      ) : (
+        <div className="ag-distribution-card-body grid items-start gap-3 2xl:grid-cols-[176px_minmax(0,1fr)]">
+          <div className="ag-distribution-chart-frame">
             <PieChart width={176} height={176}>
               <Pie data={activePieData} cx="50%" cy="50%" dataKey="value" innerRadius={42} isAnimationActive={false} minAngle={3} outerRadius={68} stroke="var(--ag-surface)" strokeWidth={2}>
                 {activePieData.map((_, index) => (
@@ -452,64 +467,62 @@ function ModelDistributionCard({ trend }: { trend: DashboardTrendResp }) {
                 isAnimationActive={false}
               />
             </PieChart>
-          ) : (
-            <div className="flex h-44 w-44 items-center justify-center text-xs text-text">{t('common.no_data')}</div>
-          )}
-        </div>
+          </div>
 
-        <div className="ag-distribution-table-scroll">
-          <CompactDataTable
-            ariaLabel={activeTitle}
-            className="ag-compact-data-table--dense"
-            emptyText={t('common.no_data')}
-            minWidth={480}
-            rowKey={(row) => row.key}
-            rows={tableRows}
-            columns={[
-              {
-                key: 'name',
-                title: firstColumnTitle,
-                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.name,
-                render: (row, index) => (
-                  <>
-                    <span className="shrink-0 font-mono text-[11px] font-semibold text-text">#{index + 1}</span>
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_CHART_COLORS[index % PIE_CHART_COLORS.length] }} />
-                    <span className="min-w-0 truncate font-medium text-text" title={row.name}>{row.name}</span>
-                  </>
-                ),
-              },
-              {
-                align: 'end',
-                key: 'requests',
-                title: t('dashboard.requests'),
-                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.requests,
-                render: (row) => <span className="truncate font-mono text-text">{row.requests.toLocaleString()}</span>,
-              },
-              {
-                align: 'end',
-                key: 'tokens',
-                title: t('dashboard.tokens'),
-                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.tokens,
-                render: (row) => <span className="truncate font-mono text-text">{fmtNum(row.tokens)}</span>,
-              },
-              {
-                align: 'end',
-                key: 'actual',
-                title: t('dashboard.actual'),
-                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.actual,
-                render: (row) => <CostValue className="truncate font-mono" value={row.actualCost} tone="actual" />,
-              },
-              {
-                align: 'end',
-                key: 'standard',
-                title: t('dashboard.standard'),
-                width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.standard,
-                render: (row) => <CostValue className="truncate font-mono" value={row.standardCost} tone="standard" />,
-              },
-            ]}
-          />
+          <div className="ag-distribution-table-scroll">
+            <CompactDataTable
+              ariaLabel={activeTitle}
+              className="ag-compact-data-table--dense"
+              emptyText={t('common.no_data')}
+              minWidth={480}
+              rowKey={(row) => row.key}
+              rows={tableRows}
+              columns={[
+                {
+                  key: 'name',
+                  title: firstColumnTitle,
+                  width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.name,
+                  render: (row, index) => (
+                    <>
+                      <span className="shrink-0 font-mono text-[11px] font-semibold text-text">#{index + 1}</span>
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PIE_CHART_COLORS[index % PIE_CHART_COLORS.length] }} />
+                      <span className="min-w-0 truncate font-medium text-text" title={row.name}>{row.name}</span>
+                    </>
+                  ),
+                },
+                {
+                  align: 'end',
+                  key: 'requests',
+                  title: t('dashboard.requests'),
+                  width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.requests,
+                  render: (row) => <span className="truncate font-mono text-text">{row.requests.toLocaleString()}</span>,
+                },
+                {
+                  align: 'end',
+                  key: 'tokens',
+                  title: t('dashboard.tokens'),
+                  width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.tokens,
+                  render: (row) => <span className="truncate font-mono text-text">{fmtNum(row.tokens)}</span>,
+                },
+                {
+                  align: 'end',
+                  key: 'actual',
+                  title: t('dashboard.actual'),
+                  width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.actual,
+                  render: (row) => <CostValue className="truncate font-mono" value={row.actualCost} tone="actual" />,
+                },
+                {
+                  align: 'end',
+                  key: 'standard',
+                  title: t('dashboard.standard'),
+                  width: DASHBOARD_DISTRIBUTION_COLUMN_WIDTHS.standard,
+                  render: (row) => <CostValue className="truncate font-mono" value={row.standardCost} tone="standard" />,
+                },
+              ]}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </DashboardCard>
   );
 }
@@ -603,7 +616,7 @@ function TokenTrendCard({ trend }: { trend: DashboardTrendResp }) {
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="flex h-[248px] items-center justify-center text-sm text-text 2xl:h-[288px]">{t('common.no_data')}</div>
+        <ChartEmptyState className="h-[248px] 2xl:h-[288px]" icon={<LineChartIcon className="h-5 w-5" />} />
       )}
     </DashboardCard>
   );
@@ -643,7 +656,7 @@ function TopUsersCard({ trend }: { trend: DashboardTrendResp }) {
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="flex h-[268px] items-center justify-center text-sm text-text 2xl:h-[320px]">{t('common.no_data')}</div>
+        <ChartEmptyState className="h-[268px] 2xl:h-[320px]" icon={<Users className="h-5 w-5" />} />
       )}
     </DashboardCard>
   );
@@ -664,7 +677,6 @@ function TrendCharts({ trend }: { trend: DashboardTrendResp }) {
 export default function DashboardPage() {
   const { t } = useTranslation();
   const [range, setRange] = useState<RangePreset>('today');
-  const [granularity, setGranularity] = useState<Granularity>('day');
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>();
   const [userKeyword, setUserKeyword] = useState('');
   const debouncedUserKeyword = useDebouncedValue(userKeyword.trim(), 250);
@@ -698,12 +710,6 @@ export default function DashboardPage() {
       ...userOptions,
     ];
   })();
-  const granularityOptions = [
-    { id: 'day', label: t('dashboard.granularity_day') },
-    { id: 'hour', label: t('dashboard.granularity_hour') },
-  ];
-  const selectedGranularity = range === 'today' ? 'hour' : granularity;
-  const selectedGranularityLabel = granularityOptions.find((item) => item.id === selectedGranularity)?.label ?? '';
   const userFilter = selectedUserId ? { user_id: selectedUserId } : undefined;
 
   const statsQuery = useQuery({
@@ -711,11 +717,12 @@ export default function DashboardPage() {
     queryFn: () => dashboardApi.stats(userFilter),
   });
 
+  // 粒度由范围直接决定：今天按小时，多天范围按天（小时桶跨天时标签重复、点数过多，不可读）。
   const trendParams = useMemo(() => ({
     range,
-    granularity: range === 'today' ? 'hour' as const : granularity,
+    granularity: range === 'today' ? 'hour' as const : 'day' as const,
     ...(selectedUserId ? { user_id: selectedUserId } : {}),
-  }), [range, granularity, selectedUserId]);
+  }), [range, selectedUserId]);
 
   const trendQuery = useQuery({
     queryKey: queryKeys.dashboardTrend(trendParams),
@@ -825,33 +832,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <span className="shrink-0 text-sm font-semibold text-text">{t('dashboard.granularity')}</span>
-            <div className="w-full sm:w-48">
-              <Select
-                fullWidth
-                isDisabled={range === 'today'}
-                selectedKey={selectedGranularity}
-                onSelectionChange={(key) => setGranularity(key as Granularity)}
-              >
-                <Label className="sr-only">{t('dashboard.granularity')}</Label>
-                <Select.Trigger>
-                  <CalendarDays className="mr-2 h-4 w-4 text-text" />
-                  <Select.Value>{selectedGranularityLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox items={granularityOptions}>
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        {item.label}
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
-            </div>
-          </div>
         </div>
       </div>
 
