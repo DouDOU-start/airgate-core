@@ -284,21 +284,49 @@ func (s *ChannelStore) UpdateBalance(ctx context.Context, id int, balance float6
 	return nil
 }
 
-// GetChannelMoneyStats 按渠道聚合累计金额（实现 appchannel.StatsReader）：
+// GetChannelMoneyStats 按渠道聚合金额（实现 appchannel.StatsReader）：
 // 成本 = Σ(total_cost × account_rate_multiplier)（渠道成本查询期现算，见 usagelog schema），
-// 收益 = Σ(actual_cost)（平台对用户的真实扣费）。
-func (s *ChannelStore) GetChannelMoneyStats(ctx context.Context, channelIDs []int) (map[int]appchannel.MoneyStats, error) {
+// 收益 = Σ(actual_cost)（平台对用户的真实扣费）；
+// 累计与今日（created_at >= todayStart）两个口径分两次分组聚合，方言无关。
+func (s *ChannelStore) GetChannelMoneyStats(ctx context.Context, channelIDs []int, todayStart time.Time) (map[int]appchannel.MoneyStats, error) {
 	result := make(map[int]appchannel.MoneyStats, len(channelIDs))
 	if len(channelIDs) == 0 {
 		return result, nil
 	}
+	total, err := s.sumChannelMoney(ctx, channelIDs)
+	if err != nil {
+		return nil, err
+	}
+	today, err := s.sumChannelMoney(ctx, channelIDs, entusagelog.CreatedAtGTE(todayStart))
+	if err != nil {
+		return nil, err
+	}
+	for id, item := range total {
+		result[id] = appchannel.MoneyStats{
+			Cost:         item.Cost,
+			Revenue:      item.Revenue,
+			TodayCost:    today[id].Cost,
+			TodayRevenue: today[id].Revenue,
+		}
+	}
+	return result, nil
+}
+
+// channelMoneyRow 渠道金额分组聚合的单口径结果。
+type channelMoneyRow struct {
+	Cost    float64
+	Revenue float64
+}
+
+func (s *ChannelStore) sumChannelMoney(ctx context.Context, channelIDs []int, extra ...predicate.UsageLog) (map[int]channelMoneyRow, error) {
 	var rows []struct {
 		ChannelID int     `json:"channel_usage_logs"`
 		Cost      float64 `json:"cost"`
 		Revenue   float64 `json:"revenue"`
 	}
+	preds := append([]predicate.UsageLog{entusagelog.ChannelIDIn(channelIDs...)}, extra...)
 	err := s.db.UsageLog.Query().
-		Where(entusagelog.ChannelIDIn(channelIDs...)).
+		Where(preds...).
 		GroupBy(entusagelog.ChannelColumn).
 		Aggregate(
 			ent.As(func(sel *sql.Selector) string {
@@ -312,8 +340,9 @@ func (s *ChannelStore) GetChannelMoneyStats(ctx context.Context, channelIDs []in
 	if err != nil {
 		return nil, err
 	}
+	result := make(map[int]channelMoneyRow, len(rows))
 	for _, row := range rows {
-		result[row.ChannelID] = appchannel.MoneyStats{Cost: row.Cost, Revenue: row.Revenue}
+		result[row.ChannelID] = channelMoneyRow{Cost: row.Cost, Revenue: row.Revenue}
 	}
 	return result, nil
 }

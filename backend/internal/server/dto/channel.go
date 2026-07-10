@@ -35,8 +35,11 @@ type ChannelResp struct {
 	CurrentConcurrency int `json:"current_concurrency"`
 	CurrentRPM         int `json:"current_rpm"`
 	// TotalCost / TotalRevenue 累计金额统计：渠道成本 = Σ(total_cost×成本倍率快照)，收益 = Σ(actual_cost)。
+	// TodayCost / TodayRevenue 为同口径的今日统计（按请求 tz 参数的当日零点起算）。
 	TotalCost    float64 `json:"total_cost"`
 	TotalRevenue float64 `json:"total_revenue"`
+	TodayCost    float64 `json:"today_cost"`
+	TodayRevenue float64 `json:"today_revenue"`
 	TimeMixin
 }
 

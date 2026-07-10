@@ -10,6 +10,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 )
 
@@ -100,7 +101,7 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 		s.decorate(&list[i])
 	}
 	s.attachRuntimeStats(ctx, list)
-	s.attachMoneyStats(ctx, list)
+	s.attachMoneyStats(ctx, list, filter.TZ)
 	return ListResult{
 		List:     list,
 		Total:    total,
@@ -109,9 +110,9 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 	}, nil
 }
 
-// attachMoneyStats 为列表页渠道批量填充累计成本/收益（基于 usage_logs 聚合）。
-// 读取器未注入或查询失败时保持 0 值，不影响列表主流程。
-func (s *Service) attachMoneyStats(ctx context.Context, list []Channel) {
+// attachMoneyStats 为列表页渠道批量填充累计/今日成本收益（基于 usage_logs 聚合）。
+// tz 决定今日口径的当日起点；读取器未注入或查询失败时保持 0 值，不影响列表主流程。
+func (s *Service) attachMoneyStats(ctx context.Context, list []Channel, tz string) {
 	if s.stats == nil || len(list) == 0 {
 		return
 	}
@@ -119,7 +120,8 @@ func (s *Service) attachMoneyStats(ctx context.Context, list []Channel) {
 	for i, ch := range list {
 		ids[i] = ch.ID
 	}
-	stats, err := s.stats.GetChannelMoneyStats(ctx, ids)
+	todayStart := timezone.StartOfDay(time.Now().In(timezone.Resolve(tz)))
+	stats, err := s.stats.GetChannelMoneyStats(ctx, ids, todayStart)
 	if err != nil {
 		logx.LoggerFromContext(ctx).Warn("channel_money_stats_failed", logx.LogFieldError, err)
 		return
@@ -127,6 +129,8 @@ func (s *Service) attachMoneyStats(ctx context.Context, list []Channel) {
 	for i := range list {
 		list[i].TotalCost = stats[list[i].ID].Cost
 		list[i].TotalRevenue = stats[list[i].ID].Revenue
+		list[i].TodayCost = stats[list[i].ID].TodayCost
+		list[i].TodayRevenue = stats[list[i].ID].TodayRevenue
 	}
 }
 

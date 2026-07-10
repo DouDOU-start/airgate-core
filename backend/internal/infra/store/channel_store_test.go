@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	appchannel "github.com/DouDOU-start/airgate-core/internal/app/channel"
@@ -35,17 +36,23 @@ func TestChannelStoreGetChannelMoneyStats(t *testing.T) {
 	chB := createTestChannel(t, db, "channel-b")
 	chIdle := createTestChannel(t, db, "channel-idle")
 
-	// chA：两条记录，成本 = 10×1.5 + 4×2 = 23，收益 = 8 + 3 = 11。
-	// chB：一条记录，成本 = 5×0.5 = 2.5，收益 = 6。
+	now := time.Now()
+	todayStart := now.Add(-time.Hour)
+	yesterday := now.Add(-2 * time.Hour)
+
+	// chA：今日两条，成本 = 10×1.5 + 4×2 = 23，收益 = 8 + 3 = 11。
+	// chB：今日一条（成本 5×0.5 = 2.5，收益 6）+ 今日之前一条（成本 8×1 = 8，收益 2）。
 	fixtures := []struct {
 		channelID  int
 		totalCost  float64
 		accountRM  float64
 		actualCost float64
+		createdAt  time.Time
 	}{
-		{chA.ID, 10, 1.5, 8},
-		{chA.ID, 4, 2, 3},
-		{chB.ID, 5, 0.5, 6},
+		{chA.ID, 10, 1.5, 8, now},
+		{chA.ID, 4, 2, 3, now},
+		{chB.ID, 5, 0.5, 6, now},
+		{chB.ID, 8, 1, 2, yesterday},
 	}
 	for _, item := range fixtures {
 		if _, err := db.UsageLog.Create().
@@ -54,13 +61,14 @@ func TestChannelStoreGetChannelMoneyStats(t *testing.T) {
 			SetTotalCost(item.totalCost).
 			SetAccountRateMultiplier(item.accountRM).
 			SetActualCost(item.actualCost).
+			SetCreatedAt(item.createdAt).
 			Save(ctx); err != nil {
 			t.Fatalf("create usage log: %v", err)
 		}
 	}
 
 	store := NewChannelStore(db)
-	stats, err := store.GetChannelMoneyStats(ctx, []int{chA.ID, chB.ID, chIdle.ID})
+	stats, err := store.GetChannelMoneyStats(ctx, []int{chA.ID, chB.ID, chIdle.ID}, todayStart)
 	if err != nil {
 		t.Fatalf("GetChannelMoneyStats returned error: %v", err)
 	}
@@ -73,8 +81,12 @@ func TestChannelStoreGetChannelMoneyStats(t *testing.T) {
 	}
 	assertMoney("chA.Cost", stats[chA.ID].Cost, 23)
 	assertMoney("chA.Revenue", stats[chA.ID].Revenue, 11)
-	assertMoney("chB.Cost", stats[chB.ID].Cost, 2.5)
-	assertMoney("chB.Revenue", stats[chB.ID].Revenue, 6)
+	assertMoney("chA.TodayCost", stats[chA.ID].TodayCost, 23)
+	assertMoney("chA.TodayRevenue", stats[chA.ID].TodayRevenue, 11)
+	assertMoney("chB.Cost", stats[chB.ID].Cost, 10.5)
+	assertMoney("chB.Revenue", stats[chB.ID].Revenue, 8)
+	assertMoney("chB.TodayCost", stats[chB.ID].TodayCost, 2.5)
+	assertMoney("chB.TodayRevenue", stats[chB.ID].TodayRevenue, 6)
 
 	// 无用量渠道不出现在聚合结果里，零值由调用方兜底。
 	if _, ok := stats[chIdle.ID]; ok {
@@ -82,7 +94,7 @@ func TestChannelStoreGetChannelMoneyStats(t *testing.T) {
 	}
 
 	// 空入参：返回空表不查库。
-	empty, err := store.GetChannelMoneyStats(ctx, nil)
+	empty, err := store.GetChannelMoneyStats(ctx, nil, todayStart)
 	if err != nil {
 		t.Fatalf("GetChannelMoneyStats(nil) returned error: %v", err)
 	}

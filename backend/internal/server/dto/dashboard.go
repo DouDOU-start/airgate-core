@@ -59,7 +59,9 @@ type DashboardTrendReq struct {
 	StartDate   string `form:"start_date"`
 	EndDate     string `form:"end_date"`
 	UserID      int    `form:"user_id"`
-	TZ          string `form:"tz"` // IANA 时区名；为空时使用服务器本地时区
+	// ChannelID 渠道过滤（渠道消耗统计弹窗用）；0 表示不过滤。
+	ChannelID int    `form:"channel_id"`
+	TZ        string `form:"tz"` // IANA 时区名；为空时使用服务器本地时区
 }
 
 // DashboardTrendResp 仪表盘趋势响应
@@ -70,13 +72,14 @@ type DashboardTrendResp struct {
 	TopUsers          []DashboardUserTrend   `json:"top_users"`
 }
 
-// DashboardModelStats 模型分布统计
+// DashboardModelStats 模型分布统计（channel_cost = Σ(total_cost×渠道成本倍率快照)）
 type DashboardModelStats struct {
 	Model        string  `json:"model"`
 	Requests     int64   `json:"requests"`
 	Tokens       int64   `json:"tokens"`
 	ActualCost   float64 `json:"actual_cost"`
 	StandardCost float64 `json:"standard_cost"`
+	ChannelCost  float64 `json:"channel_cost"`
 }
 
 // DashboardUserRanking 用户消费排行
@@ -89,15 +92,17 @@ type DashboardUserRanking struct {
 	StandardCost float64 `json:"standard_cost"`
 }
 
-// DashboardTimeBucket Token 趋势时间桶
+// DashboardTimeBucket Token 趋势时间桶（channel_cost 口径同 DashboardModelStats）
 type DashboardTimeBucket struct {
 	Time          string  `json:"time"`
+	Requests      int64   `json:"requests"`
 	InputTokens   int64   `json:"input_tokens"`
 	OutputTokens  int64   `json:"output_tokens"`
 	CachedInput   int64   `json:"cached_input"`
 	CacheCreation int64   `json:"cache_creation"`
 	ActualCost    float64 `json:"actual_cost"`
 	StandardCost  float64 `json:"standard_cost"`
+	ChannelCost   float64 `json:"channel_cost"`
 }
 
 // DashboardUserTrend Top 用户使用趋势

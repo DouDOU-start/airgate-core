@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -137,7 +138,7 @@ func TestDashboardStoreListTrendLogsIncludesSnapshotOnlyRows(t *testing.T) {
 	}
 
 	store := NewDashboardStore(db)
-	logs, err := store.ListTrendLogs(ctx, todayStart, endTime, u.ID)
+	logs, err := store.ListTrendLogs(ctx, todayStart, endTime, u.ID, 0)
 	if err != nil {
 		t.Fatalf("ListTrendLogs returned error: %v", err)
 	}
@@ -156,5 +157,53 @@ func TestDashboardStoreListTrendLogsIncludesSnapshotOnlyRows(t *testing.T) {
 	}
 	if !snapshotOnlyFound {
 		t.Fatal("snapshot-only usage log was not returned")
+	}
+}
+
+// TestDashboardStoreListTrendLogsChannelFilter channel_id 过滤只返回该渠道日志，
+// 且 ChannelCost 按 total_cost×account_rate_multiplier 现算。
+func TestDashboardStoreListTrendLogsChannelFilter(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	startTime := time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC)
+	endTime := startTime.Add(24 * time.Hour)
+
+	chA := createTestChannel(t, db, "trend-channel-a")
+	chB := createTestChannel(t, db, "trend-channel-b")
+
+	if _, err := db.UsageLog.Create().
+		SetModel("gpt-5").
+		SetTotalCost(4.0).
+		SetAccountRateMultiplier(1.5).
+		SetChannelID(chA.ID).
+		SetCreatedAt(startTime.Add(time.Hour)).
+		Save(ctx); err != nil {
+		t.Fatalf("create channel-a usage log: %v", err)
+	}
+	if _, err := db.UsageLog.Create().
+		SetModel("gpt-5-mini").
+		SetTotalCost(2.0).
+		SetChannelID(chB.ID).
+		SetCreatedAt(startTime.Add(2 * time.Hour)).
+		Save(ctx); err != nil {
+		t.Fatalf("create channel-b usage log: %v", err)
+	}
+
+	store := NewDashboardStore(db)
+	logs, err := store.ListTrendLogs(ctx, startTime, endTime, 0, chA.ID)
+	if err != nil {
+		t.Fatalf("ListTrendLogs returned error: %v", err)
+	}
+	if len(logs) != 1 || logs[0].Model != "gpt-5" {
+		t.Fatalf("logs = %+v, want 仅 channel-a 的一条", logs)
+	}
+	if math.Abs(logs[0].ChannelCost-6.0) > 1e-9 {
+		t.Fatalf("ChannelCost = %v, want 6.0", logs[0].ChannelCost)
 	}
 }

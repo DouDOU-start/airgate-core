@@ -39,16 +39,20 @@ type Repository interface {
 	UpdateBalance(ctx context.Context, id int, balance float64, updatedAt time.Time) error
 }
 
-// MoneyStats 渠道金额统计（累计）：
+// MoneyStats 渠道金额统计：
 // Cost = Σ(total_cost × account_rate_multiplier) 渠道成本；Revenue = Σ(actual_cost) 平台真实收入。
+// Today* 为今日口径（created_at >= 调用方时区的当日零点），其余为累计口径。
 type MoneyStats struct {
-	Cost    float64
-	Revenue float64
+	Cost         float64
+	Revenue      float64
+	TodayCost    float64
+	TodayRevenue float64
 }
 
 // StatsReader 渠道金额聚合读取器（由 store 基于 usage_logs 实现），列表页展示成本/收益用。
+// todayStart 为今日口径的起点（按调用方时区解析的当日零点）。
 type StatsReader interface {
-	GetChannelMoneyStats(ctx context.Context, channelIDs []int) (map[int]MoneyStats, error)
+	GetChannelMoneyStats(ctx context.Context, channelIDs []int, todayStart time.Time) (map[int]MoneyStats, error)
 }
 
 // Channel 渠道领域对象。APIKeys 存密文（AES-GCM base64），
@@ -88,9 +92,12 @@ type Channel struct {
 	CurrentRPM         int
 
 	// TotalCost / TotalRevenue 累计金额统计（渠道成本 / 平台真实收入），
+	// TodayCost / TodayRevenue 为今日口径（按调用方时区），
 	// 仅列表查询时由 SetStatsReader 注入的读取器填充，不落库。
 	TotalCost    float64
 	TotalRevenue float64
+	TodayCost    float64
+	TodayRevenue float64
 }
 
 // ListFilter 渠道列表查询参数。
@@ -102,6 +109,8 @@ type ListFilter struct {
 	Status   string
 	Tag      string
 	GroupID  *int
+	// TZ 调用方 IANA 时区名，决定今日金额口径的当日起点；为空时用服务器本地时区。
+	TZ string
 }
 
 // ListResult 渠道分页结果。

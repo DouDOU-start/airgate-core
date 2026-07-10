@@ -39,6 +39,8 @@ func toChannelRespFromDomain(item appchannel.Channel) dto.ChannelResp {
 		CurrentRPM:         item.CurrentRPM,
 		TotalCost:          item.TotalCost,
 		TotalRevenue:       item.TotalRevenue,
+		TodayCost:          item.TodayCost,
+		TodayRevenue:       item.TodayRevenue,
 		TimeMixin: dto.TimeMixin{
 			CreatedAt: item.CreatedAt,
 			UpdatedAt: item.UpdatedAt,

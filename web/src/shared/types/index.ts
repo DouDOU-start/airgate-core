@@ -571,6 +571,10 @@ export interface ChannelResp {
   total_cost?: number;
   /** 累计平台收益（Σ actual_cost 实际扣费） */
   total_revenue?: number;
+  /** 今日渠道成本（口径同 total_cost，按请求 tz 当日零点起算） */
+  today_cost?: number;
+  /** 今日平台收益（口径同 total_revenue） */
+  today_revenue?: number;
   created_at: string;
   updated_at: string;
 }
@@ -774,6 +778,8 @@ export interface DashboardTrendReq {
   granularity: 'hour' | 'day';
   start_date?: string;
   end_date?: string;
+  /** 渠道过滤（渠道消耗统计弹窗用）；缺省不过滤 */
+  channel_id?: number;
 }
 
 export interface DashboardTrendResp {
@@ -789,6 +795,8 @@ export interface DashboardModelStats {
   tokens: number;
   actual_cost: number;
   standard_cost: number;
+  /** 渠道成本（Σ total_cost × 成本倍率快照） */
+  channel_cost?: number;
 }
 
 export interface DashboardUserRanking {
@@ -802,6 +810,8 @@ export interface DashboardUserRanking {
 
 export interface DashboardTimeBucket {
   time: string;
+  /** 该时段请求数 */
+  requests?: number;
   input_tokens: number;
   output_tokens: number;
   cached_input: number;
@@ -809,6 +819,8 @@ export interface DashboardTimeBucket {
   cache_creation?: number;
   actual_cost: number;
   standard_cost: number;
+  /** 渠道成本（Σ total_cost × 成本倍率快照） */
+  channel_cost?: number;
 }
 
 export interface DashboardUserTrend {

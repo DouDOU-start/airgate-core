@@ -52,6 +52,7 @@ func toDashboardModelStats(items []appdashboard.ModelStats) []dto.DashboardModel
 			Tokens:       item.Tokens,
 			ActualCost:   item.ActualCost,
 			StandardCost: item.StandardCost,
+			ChannelCost:  item.ChannelCost,
 		})
 	}
 	return result
@@ -77,12 +78,14 @@ func toDashboardTimeBuckets(items []appdashboard.TimeBucket) []dto.DashboardTime
 	for _, item := range items {
 		result = append(result, dto.DashboardTimeBucket{
 			Time:          item.Time,
+			Requests:      item.Requests,
 			InputTokens:   item.InputTokens,
 			OutputTokens:  item.OutputTokens,
 			CachedInput:   item.CachedInput,
 			CacheCreation: item.CacheCreation,
 			ActualCost:    item.ActualCost,
 			StandardCost:  item.StandardCost,
+			ChannelCost:   item.ChannelCost,
 		})
 	}
 	return result

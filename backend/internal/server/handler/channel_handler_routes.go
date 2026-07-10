@@ -27,6 +27,7 @@ func (h *ChannelHandler) ListChannels(c *gin.Context) {
 		Status:   c.Query("status"),
 		Tag:      c.Query("tag"),
 		GroupID:  parseOptionalInt(c.Query("group_id")),
+		TZ:       c.Query("tz"),
 	})
 	if err != nil {
 		httpCode, message := h.handleError("查询渠道列表失败", "查询失败", err)

@@ -8,7 +8,8 @@ import (
 // Repository 定义仪表盘域持久化接口。
 type Repository interface {
 	LoadStatsSnapshot(ctx context.Context, todayStart, fiveMinAgo time.Time, userID int) (StatsSnapshot, error)
-	ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]TrendLog, error)
+	// ListTrendLogs 读取趋势聚合所需日志；userID / channelID 为 0 表示不过滤该维度。
+	ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID, channelID int) ([]TrendLog, error)
 }
 
 // StatsSnapshot 表示从存储层读取的原始统计快照。
@@ -76,7 +77,9 @@ type TrendQuery struct {
 	StartDate   string
 	EndDate     string
 	UserID      int
-	TZ          string // IANA 时区名；为空时使用服务器本地时区
+	// ChannelID 渠道过滤（管理端渠道消耗统计用）；0 表示不过滤。
+	ChannelID int
+	TZ        string // IANA 时区名；为空时使用服务器本地时区
 }
 
 // Trend 表示仪表盘趋势结果。
@@ -98,7 +101,9 @@ type TrendLog struct {
 	CacheCreationTokens int64
 	ActualCost          float64
 	StandardCost        float64
-	CreatedAt           time.Time
+	// ChannelCost 渠道成本 = total_cost × account_rate_multiplier（查询期现算，见 usagelog schema）。
+	ChannelCost float64
+	CreatedAt   time.Time
 }
 
 // ModelStats 表示模型分布统计。
@@ -108,6 +113,7 @@ type ModelStats struct {
 	Tokens       int64
 	ActualCost   float64
 	StandardCost float64
+	ChannelCost  float64
 }
 
 // UserRanking 表示用户消费排行。
@@ -123,12 +129,14 @@ type UserRanking struct {
 // TimeBucket 表示趋势时间桶。
 type TimeBucket struct {
 	Time          string
+	Requests      int64
 	InputTokens   int64
 	OutputTokens  int64
 	CachedInput   int64
 	CacheCreation int64
 	ActualCost    float64
 	StandardCost  float64
+	ChannelCost   float64
 }
 
 // UserTrend 表示单个用户的趋势。

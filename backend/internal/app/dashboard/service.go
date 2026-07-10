@@ -159,7 +159,7 @@ func (s *Service) Trend(ctx context.Context, query TrendQuery) (Trend, error) {
 }
 
 func (s *Service) loadTrendFresh(ctx context.Context, query TrendQuery, loc *time.Location, startTime, endTime time.Time) (Trend, error) {
-	logs, err := s.repo.ListTrendLogs(ctx, startTime, endTime, query.UserID)
+	logs, err := s.repo.ListTrendLogs(ctx, startTime, endTime, query.UserID, query.ChannelID)
 	if err != nil {
 		return Trend{}, err
 	}
@@ -175,11 +175,12 @@ func (s *Service) loadTrendFresh(ctx context.Context, query TrendQuery, loc *tim
 
 func trendCacheKey(query TrendQuery, loc *time.Location, startTime, endTime time.Time) string {
 	const trendBucketSeconds = 15
-	return fmt.Sprintf("%s:%s:%s:%d:%d:%d:%d:%s:%s:%s",
+	return fmt.Sprintf("%s:%s:%s:%d:%d:%d:%d:%d:%s:%s:%s",
 		trendCacheV1Key,
 		loc.String(),
 		query.Range,
 		query.UserID,
+		query.ChannelID,
 		startTime.UTC().Unix(),
 		endTime.UTC().Unix()/trendBucketSeconds,
 		trendBucketSeconds,
@@ -319,6 +320,7 @@ func aggregateModelDistribution(logs []TrendLog) []ModelStats {
 		stat.Tokens += item.InputTokens + item.OutputTokens + item.CachedInputTokens + item.CacheCreationTokens
 		stat.ActualCost += item.ActualCost
 		stat.StandardCost += item.StandardCost
+		stat.ChannelCost += item.ChannelCost
 	}
 
 	result := make([]ModelStats, 0, len(modelMap))
@@ -368,12 +370,14 @@ func aggregateTokenTrend(logs []TrendLog, granularity string, loc *time.Location
 			bucket = &TimeBucket{Time: key}
 			bucketMap[key] = bucket
 		}
+		bucket.Requests++
 		bucket.InputTokens += item.InputTokens
 		bucket.OutputTokens += item.OutputTokens
 		bucket.CachedInput += item.CachedInputTokens
 		bucket.CacheCreation += item.CacheCreationTokens
 		bucket.ActualCost += item.ActualCost
 		bucket.StandardCost += item.StandardCost
+		bucket.ChannelCost += item.ChannelCost
 	}
 	// 空桶零填充：没有请求的时段也要出现在折线图上，避免 category 轴压缩时间轴。
 	for _, key := range fillKeys {

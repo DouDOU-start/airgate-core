@@ -40,6 +40,7 @@ func (h *DashboardHandler) Trend(c *gin.Context) {
 		StartDate:   req.StartDate,
 		EndDate:     req.EndDate,
 		UserID:      req.UserID,
+		ChannelID:   req.ChannelID,
 		TZ:          req.TZ,
 	})
 	if err != nil {

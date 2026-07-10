@@ -6,7 +6,7 @@ import {
   Select, Spinner, TextField as HeroTextField, Tooltip, useOverlayState,
 } from '@heroui/react';
 import {
-  ArrowUpDown, Boxes, CircleCheck, CircleOff, Pencil, Plus, RefreshCw, Search, Trash2,
+  ArrowUpDown, BarChart3, Boxes, CircleCheck, CircleOff, Pencil, Plus, RefreshCw, Search, Trash2,
 } from 'lucide-react';
 import { channelsApi } from '../../shared/api/channels';
 import { upstreamLogsApi } from '../../shared/api/upstreamLogs';
@@ -22,6 +22,7 @@ import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { ChannelFormModal, CHANNEL_TYPE_OPTIONS } from './channels/ChannelFormModal';
+import { ChannelStatsModal } from './channels/ChannelStatsModal';
 import { ChannelTestModal } from './channels/ChannelTestModal';
 import { formatDate, formatDateTime } from '../../shared/utils/format';
 import type { BulkChannelAction, ChannelFailureCounts, ChannelResp, ChannelType } from '../../shared/types';
@@ -159,6 +160,7 @@ export default function ChannelsPage() {
   const [priorityModalOpen, setPriorityModalOpen] = useState(false);
   const [bulkPriority, setBulkPriority] = useState('50');
   const [testTarget, setTestTarget] = useState<ChannelResp | null>(null);
+  const [statsTarget, setStatsTarget] = useState<ChannelResp | null>(null);
 
   const listQuery = useMemo(() => ({
     page,
@@ -624,6 +626,14 @@ export default function ChannelsPage() {
                     className="ag-metric-chips--stack ag-metric-chips--compact-y"
                     items={[
                       {
+                        amount: row.today_cost ?? 0,
+                        color: 'warning' as const,
+                        decimals: 2,
+                        dollarTone: 'warning' as const,
+                        label: t('channels.stats_today_cost'),
+                        mutedWhenZero: true,
+                      },
+                      {
                         amount: row.total_cost ?? 0,
                         color: 'warning' as const,
                         decimals: 2,
@@ -682,6 +692,14 @@ export default function ChannelsPage() {
                       {t('channels.models')}
                     </Button>
                     <Button
+                      size="sm"
+                      variant="secondary"
+                      onPress={() => setStatsTarget(row)}
+                    >
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      {t('channels.stats_action')}
+                    </Button>
+                    <Button
                       className="text-danger"
                       size="sm"
                       variant="danger-soft"
@@ -712,6 +730,12 @@ export default function ChannelsPage() {
       <ChannelTestModal
         channel={testTarget}
         onClose={() => setTestTarget(null)}
+      />
+
+      {/* 消耗统计弹窗（每日消耗 + 模型分布，按渠道过滤的仪表盘趋势） */}
+      <ChannelStatsModal
+        channel={statsTarget}
+        onClose={() => setStatsTarget(null)}
       />
 
       {/* 批量改优先级 */}

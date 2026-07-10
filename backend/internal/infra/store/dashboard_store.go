@@ -82,14 +82,17 @@ func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, five
 	return snapshot, nil
 }
 
-// ListTrendLogs 读取趋势聚合所需日志。userID 为 0 表示查全部。
-func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID int) ([]appdashboard.TrendLog, error) {
+// ListTrendLogs 读取趋势聚合所需日志。userID / channelID 为 0 表示不过滤该维度。
+func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID, channelID int) ([]appdashboard.TrendLog, error) {
 	preds := []predicate.UsageLog{
 		entusagelog.CreatedAtGTE(startTime),
 		entusagelog.CreatedAtLT(endTime),
 	}
 	if userID > 0 {
 		preds = append(preds, usageUserPredicate(int64(userID)))
+	}
+	if channelID > 0 {
+		preds = append(preds, entusagelog.ChannelIDEQ(channelID))
 	}
 
 	const trendLogLimit = 50000
@@ -105,6 +108,7 @@ func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime t
 			entusagelog.FieldCacheCreationTokens,
 			entusagelog.FieldActualCost,
 			entusagelog.FieldTotalCost,
+			entusagelog.FieldAccountRateMultiplier,
 			entusagelog.FieldCreatedAt,
 		).
 		Order(ent.Desc(entusagelog.FieldCreatedAt)).
@@ -148,6 +152,7 @@ func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime t
 			CacheCreationTokens: int64(item.CacheCreationTokens),
 			ActualCost:          item.ActualCost,
 			StandardCost:        item.TotalCost,
+			ChannelCost:         item.TotalCost * item.AccountRateMultiplier,
 			CreatedAt:           item.CreatedAt,
 		}
 		result = append(result, log)
