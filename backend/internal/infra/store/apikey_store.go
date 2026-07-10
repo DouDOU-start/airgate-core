@@ -196,12 +196,13 @@ func (s *APIKeyStore) DeleteOwned(ctx context.Context, userID, id int) error {
 	return tx.Commit()
 }
 
-// FindProvisioned 查找某用户名下由指定应用 provision 的 key。
-func (s *APIKeyStore) FindProvisioned(ctx context.Context, userID int, clientID string) (appapikey.Key, bool, error) {
+// FindProvisioned 查找某用户名下由指定应用在指定分组 provision 的 key。
+func (s *APIKeyStore) FindProvisioned(ctx context.Context, userID int, clientID string, groupID int) (appapikey.Key, bool, error) {
 	item, err := s.db.APIKey.Query().
 		Where(
 			entapikey.HasUserWith(entuser.IDEQ(userID)),
 			entapikey.ProvisionedByEQ(clientID),
+			entapikey.HasGroupWith(entgroup.IDEQ(groupID)),
 		).
 		WithUser().
 		WithGroup().

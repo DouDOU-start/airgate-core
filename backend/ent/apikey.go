@@ -46,7 +46,7 @@ type APIKey struct {
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// Status holds the value of the "status" field.
 	Status apikey.Status `json:"status,omitempty"`
-	// 经 OAuth provision-key 自动创建时记录来源应用的 client_id；空 = 用户手动创建。同一用户同一应用只保留一把 provisioned key（get-or-create 幂等依据）。
+	// 经 OAuth provision-key 自动创建时记录来源应用的 client_id；空 = 用户手动创建。同一用户同一应用同一分组只保留一把 provisioned key（get-or-create 幂等依据），应用可按分组为用户领多把 key。
 	ProvisionedBy string `json:"provisioned_by,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`

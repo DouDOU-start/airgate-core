@@ -134,10 +134,10 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	upgradeService := upgrade.NewService(upgrade.DetectMode(), dep.Redis)
 
 	// OAuth 应用接入：客户端仓储兼任 UserReader，授权码/令牌走 Redis，
-	// provision-key 复用 apikey 服务的 get-or-create。
+	// provision-key 复用 apikey 服务的 get-or-create，可用分组适配 group 服务。
 	oauthClientStore := store.NewOAuthClientStore(dep.DB)
 	oauthGrantStore := store.NewOAuthGrantStore(dep.Redis)
-	oauthService := appoauth.NewService(oauthClientStore, oauthGrantStore, oauthClientStore, apiKeyService)
+	oauthService := appoauth.NewService(oauthClientStore, oauthGrantStore, oauthClientStore, oauthGroupAdapter{groupService}, apiKeyService)
 
 	return &HTTPHandlers{
 		Auth:         handler.NewAuthHandler(authService, dep.JWTMgr),
@@ -163,6 +163,23 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		UpstreamLogService: upstreamLogService,
 		PaymentService:     paymentService,
 	}
+}
+
+// oauthGroupAdapter 将 appgroup.Service 适配为 appoauth.GroupReader 接口。
+type oauthGroupAdapter struct {
+	svc *appgroup.Service
+}
+
+func (a oauthGroupAdapter) AvailableForUser(ctx context.Context, userID int) ([]appoauth.GroupInfo, error) {
+	list, err := a.svc.AvailableForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]appoauth.GroupInfo, len(list))
+	for i, g := range list {
+		out[i] = appoauth.GroupInfo{ID: g.ID, Name: g.Name, RateMultiplier: g.RateMultiplier, Note: g.Note}
+	}
+	return out, nil
 }
 
 // paymentSettingsAdapter 将 appsettings.Service 适配为 apppayment.SettingsLister 接口。

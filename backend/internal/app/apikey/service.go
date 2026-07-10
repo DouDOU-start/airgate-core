@@ -269,40 +269,42 @@ func (s *Service) RevealOwned(ctx context.Context, userID, id int) (Key, error) 
 	return item, nil
 }
 
-// ProvisionForClient 为用户按应用 get-or-create 一把 sk- key（OAuth provision-key 用）。
+// ProvisionForClient 为用户按应用按分组 get-or-create 一把 sk- key（OAuth provision-key 用）。
 //
-// 幂等依据 (user, provisioned_by=clientID)：已存在且启用 → 解密返回既有明文；
-// 已禁用 → 报错（视为用户暂时封禁该应用，可在密钥管理中重新启用）；
-// 用户删除该 key 则下次 provision 自动重建。groupID=0 时选默认分组。
-func (s *Service) ProvisionForClient(ctx context.Context, userID int, clientID, keyName string, groupID int) (string, string, bool, error) {
+// 幂等依据 (user, provisioned_by=clientID, group)：已存在且启用 → 解密返回既有明文；
+// 已禁用 → 报错（视为用户暂时封禁该应用在该分组的 key，可在密钥管理中重新启用）；
+// 用户删除该 key 则下次 provision 自动重建。groupID=0 时先解析默认分组再做幂等查找。
+// 返回值中的 groupID 为实际落点分组（应用侧按组存 key 用）。
+func (s *Service) ProvisionForClient(ctx context.Context, userID int, clientID, keyName string, groupID int) (string, string, int, bool, error) {
 	logger := logx.LoggerFromContext(ctx)
-
-	plainKey, hint, found, err := s.revealProvisioned(ctx, userID, clientID)
-	if err != nil || found {
-		return plainKey, hint, false, err
-	}
 
 	if groupID == 0 {
 		gid, ok, err := s.repo.DefaultGroupID(ctx)
 		if err != nil {
-			return "", "", false, err
+			return "", "", 0, false, err
 		}
 		if !ok {
-			return "", "", false, ErrNoDefaultGroup
+			return "", "", 0, false, ErrNoDefaultGroup
 		}
 		groupID = gid
 	}
+
+	plainKey, hint, found, err := s.revealProvisioned(ctx, userID, clientID, groupID)
+	if err != nil || found {
+		return plainKey, hint, groupID, false, err
+	}
+
 	if err := s.ensureUserCanUseGroup(ctx, userID, groupID); err != nil {
-		return "", "", false, err
+		return "", "", 0, false, err
 	}
 
 	rawKey, keyHash, err := auth.GenerateAPIKey()
 	if err != nil {
-		return "", "", false, err
+		return "", "", 0, false, err
 	}
 	encrypted, err := auth.EncryptAPIKey(rawKey, s.secret)
 	if err != nil {
-		return "", "", false, err
+		return "", "", 0, false, err
 	}
 	name := keyName
 	if name == "" {
@@ -319,25 +321,25 @@ func (s *Service) ProvisionForClient(ctx context.Context, userID int, clientID, 
 		ProvisionedBy: &clientID,
 	})
 	if err != nil {
-		// 并发 provision 撞 (user, provisioned_by) 部分唯一索引：重查一次自愈。
-		plainKey, hint, found, retryErr := s.revealProvisioned(ctx, userID, clientID)
+		// 并发 provision 撞 (user, provisioned_by, group) 部分唯一索引：重查一次自愈。
+		plainKey, hint, found, retryErr := s.revealProvisioned(ctx, userID, clientID, groupID)
 		if retryErr == nil && found {
-			return plainKey, hint, false, nil
+			return plainKey, hint, groupID, false, nil
 		}
 		logger.Error("api_key_provision_failed",
 			logx.LogFieldUserID, userID,
 			logx.LogFieldReason, "create",
 			logx.LogFieldError, err,
 		)
-		return "", "", false, err
+		return "", "", 0, false, err
 	}
-	logger.Info("api_key_provisioned", logx.LogFieldUserID, userID, "client_id", clientID)
-	return rawKey, keyHint, true, nil
+	logger.Info("api_key_provisioned", logx.LogFieldUserID, userID, "client_id", clientID, "group_id", groupID)
+	return rawKey, keyHint, groupID, true, nil
 }
 
-// revealProvisioned 查找既有 provisioned key 并解回明文；不存在时 found=false 且无错误。
-func (s *Service) revealProvisioned(ctx context.Context, userID int, clientID string) (string, string, bool, error) {
-	existing, found, err := s.repo.FindProvisioned(ctx, userID, clientID)
+// revealProvisioned 查找既有 provisioned key（按应用+分组）并解回明文；不存在时 found=false 且无错误。
+func (s *Service) revealProvisioned(ctx context.Context, userID int, clientID string, groupID int) (string, string, bool, error) {
+	existing, found, err := s.repo.FindProvisioned(ctx, userID, clientID, groupID)
 	if err != nil {
 		return "", "", false, err
 	}

@@ -62,9 +62,9 @@ var (
 				Columns: []*schema.Column{APIKeysColumns[13], APIKeysColumns[15]},
 			},
 			{
-				Name:    "apikey_provisioned_by_user_api_keys",
+				Name:    "apikey_provisioned_by_user_api_keys_group_api_keys",
 				Unique:  true,
-				Columns: []*schema.Column{APIKeysColumns[14], APIKeysColumns[18]},
+				Columns: []*schema.Column{APIKeysColumns[14], APIKeysColumns[18], APIKeysColumns[17]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "provisioned_by <> ''",
 				},

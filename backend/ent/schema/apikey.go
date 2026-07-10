@@ -33,7 +33,7 @@ func (APIKey) Fields() []ent.Field {
 		field.Time("expires_at").Optional().Nillable(),
 		field.Enum("status").Values("active", "disabled").Default("active"),
 		field.String("provisioned_by").Default("").
-			Comment("经 OAuth provision-key 自动创建时记录来源应用的 client_id；空 = 用户手动创建。同一用户同一应用只保留一把 provisioned key（get-or-create 幂等依据）。"),
+			Comment("经 OAuth provision-key 自动创建时记录来源应用的 client_id；空 = 用户手动创建。同一用户同一应用同一分组只保留一把 provisioned key（get-or-create 幂等依据），应用可按分组为用户领多把 key。"),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
 	}
@@ -43,9 +43,9 @@ func (APIKey) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("key_hash").Unique(),
 		index.Fields("status", "created_at"),
-		// 同一用户同一应用只允许一把 provisioned key（部分唯一索引，
+		// 同一用户同一应用同一分组只允许一把 provisioned key（部分唯一索引，
 		// 空串 = 手动创建不受约束）；并发 provision 时第二个事务撞唯一约束后重查。
-		index.Fields("provisioned_by").Edges("user").Unique().
+		index.Fields("provisioned_by").Edges("user", "group").Unique().
 			Annotations(entsql.IndexWhere("provisioned_by <> ''")),
 	}
 }

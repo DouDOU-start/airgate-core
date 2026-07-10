@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -77,15 +78,27 @@ func (s *stubUserReader) BasicInfo(_ context.Context, id int) (UserInfo, error) 
 	return UserInfo{}, errors.New("user not found")
 }
 
+type stubGroupReader struct {
+	groups []GroupInfo
+}
+
+func (s *stubGroupReader) AvailableForUser(context.Context, int) ([]GroupInfo, error) {
+	return s.groups, nil
+}
+
 type stubProvisioner struct {
 	calls   int
 	lastKey string
 }
 
-func (s *stubProvisioner) ProvisionForClient(_ context.Context, userID int, clientID, keyName string, _ int) (string, string, bool, error) {
+func (s *stubProvisioner) ProvisionForClient(_ context.Context, userID int, clientID, keyName string, groupID int) (string, string, int, bool, error) {
 	s.calls++
-	s.lastKey = "sk-test-" + clientID
-	return s.lastKey, "sk-test...abcd", s.calls == 1, nil
+	// 模拟 groupID=0 → 默认分组 1 的解析，并按分组区分 key（幂等键含分组）。
+	if groupID == 0 {
+		groupID = 1
+	}
+	s.lastKey = fmt.Sprintf("sk-test-%s-g%d", clientID, groupID)
+	return s.lastKey, "sk-test...abcd", groupID, s.calls == 1, nil
 }
 
 // ==================== 工具 ====================
@@ -106,7 +119,8 @@ func newTestService(clients ...Client) (*Service, *memGrantStore, *stubProvision
 		2: {ID: 2, Email: "d@example.com", Username: "d", Role: "user", Status: "disabled"},
 	}}
 	prov := &stubProvisioner{}
-	return NewService(repo, grants, users, prov), grants, prov
+	groups := &stubGroupReader{groups: []GroupInfo{{ID: 1, Name: "default", RateMultiplier: 1}}}
+	return NewService(repo, grants, users, groups, prov), grants, prov
 }
 
 func testClient(secret string) Client {
@@ -318,7 +332,7 @@ func TestProvisionKeyDisabledClient(t *testing.T) {
 	disabled := c
 	disabled.Enabled = false
 	repo.clients["ac_test"] = disabled
-	svc := NewService(repo, grants, &stubUserReader{users: map[int]UserInfo{1: {ID: 1, Status: "active"}}}, &stubProvisioner{})
+	svc := NewService(repo, grants, &stubUserReader{users: map[int]UserInfo{1: {ID: 1, Status: "active"}}}, &stubGroupReader{}, &stubProvisioner{})
 
 	if _, err := svc.ProvisionKey(context.Background(), "oat_ok", 0); !errors.Is(err, ErrClientDisabled) {
 		t.Fatalf("err = %v, 期望 ErrClientDisabled", err)

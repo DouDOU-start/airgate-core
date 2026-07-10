@@ -32,12 +32,13 @@ type Service struct {
 	repo   Repository
 	grants GrantStore
 	users  UserReader
+	groups GroupReader
 	keys   KeyProvisioner
 }
 
 // NewService 创建 OAuth 服务。
-func NewService(repo Repository, grants GrantStore, users UserReader, keys KeyProvisioner) *Service {
-	return &Service{repo: repo, grants: grants, users: users, keys: keys}
+func NewService(repo Repository, grants GrantStore, users UserReader, groups GroupReader, keys KeyProvisioner) *Service {
+	return &Service{repo: repo, grants: grants, users: users, groups: groups, keys: keys}
 }
 
 // ==================== 管理面：客户端 CRUD ====================
@@ -212,8 +213,13 @@ func (s *Service) ResolveUserInfo(ctx context.Context, token string) (UserInfo, 
 	return info, err
 }
 
-// ProvisionKey 为令牌对应用户 get-or-create 一把该应用专属的 sk- key。
-// groupID=0 时由 apikey 域选默认分组。
+// UserGroups 返回用户可用分组（userinfo 端点附带；调用方须已用令牌完成身份解析）。
+func (s *Service) UserGroups(ctx context.Context, userID int) ([]GroupInfo, error) {
+	return s.groups.AvailableForUser(ctx, userID)
+}
+
+// ProvisionKey 为令牌对应用户按分组 get-or-create 一把该应用专属的 sk- key。
+// groupID=0 时由 apikey 域选默认分组；同一应用可按分组为用户领多把 key。
 func (s *Service) ProvisionKey(ctx context.Context, token string, groupID int) (ProvisionResult, error) {
 	grant, _, err := s.resolveActiveUser(ctx, token)
 	if err != nil {
@@ -226,15 +232,15 @@ func (s *Service) ProvisionKey(ctx context.Context, token string, groupID int) (
 	if !client.Enabled {
 		return ProvisionResult{}, ErrClientDisabled
 	}
-	plainKey, hint, created, err := s.keys.ProvisionForClient(ctx, grant.UserID, client.ClientID, client.Name, groupID)
+	plainKey, hint, resolvedGroupID, created, err := s.keys.ProvisionForClient(ctx, grant.UserID, client.ClientID, client.Name, groupID)
 	if err != nil {
 		return ProvisionResult{}, err
 	}
 	if created {
 		logx.LoggerFromContext(ctx).Info("oauth_key_provisioned",
-			"client_id", client.ClientID, logx.LogFieldUserID, grant.UserID)
+			"client_id", client.ClientID, logx.LogFieldUserID, grant.UserID, "group_id", resolvedGroupID)
 	}
-	return ProvisionResult{APIKey: plainKey, KeyHint: hint, Created: created}, nil
+	return ProvisionResult{APIKey: plainKey, KeyHint: hint, GroupID: resolvedGroupID, Created: created}, nil
 }
 
 // ==================== 内部工具 ====================

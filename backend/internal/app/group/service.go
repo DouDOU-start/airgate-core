@@ -81,6 +81,15 @@ func (s *Service) StatsForGroups(ctx context.Context, groupIDs []int, tz string)
 	return s.repo.StatsForGroups(ctx, groupIDs, todayStart)
 }
 
+// availableForUserMax AvailableForUser 的分组数上限（远超实际规模的保护值）。
+const availableForUserMax = 500
+
+// AvailableForUser 返回用户全部可用分组（不分页；OAuth userinfo 场景）。
+func (s *Service) AvailableForUser(ctx context.Context, userID int) ([]Group, error) {
+	list, _, err := s.repo.ListAvailable(ctx, AvailableFilter{UserID: userID, Page: 1, PageSize: availableForUserMax})
+	return list, err
+}
+
 // ListAvailable 查询用户可用分组列表。
 func (s *Service) ListAvailable(ctx context.Context, filter AvailableFilter) (ListResult, error) {
 	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)

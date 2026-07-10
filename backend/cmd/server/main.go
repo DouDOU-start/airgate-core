@@ -22,7 +22,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 
 	"github.com/DouDOU-start/airgate-core/ent"
-	"github.com/DouDOU-start/airgate-core/ent/migrate"
+	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
 	"github.com/DouDOU-start/airgate-core/internal/bootstrap/priceseed"
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
@@ -201,8 +201,8 @@ func startMainServer(cfg *config.Config) {
 		}
 	}()
 
-	// 按最新 schema 建齐缺失表与字段（非破坏性；存量库结构变更由生产环境手动迁移）。
-	if err := db.Schema.Create(context.Background(), migrate.WithDropIndex(false), migrate.WithDropColumn(false)); err != nil {
+	// 结构迁移：ent 非破坏性建表建列 + 存量库定点修复（见 bootstrap.Migrate）。
+	if err := bootstrap.Migrate(context.Background(), db, drv.DB()); err != nil {
 		slog.Error("db_migration_failed", logx.LogFieldError, err)
 		os.Exit(1)
 	}

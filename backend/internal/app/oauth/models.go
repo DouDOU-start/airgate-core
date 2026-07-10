@@ -93,10 +93,23 @@ type UserReader interface {
 	BasicInfo(ctx context.Context, id int) (UserInfo, error)
 }
 
-// KeyProvisioner 为用户按应用 get-or-create 一把 sk- key（由 app/apikey.Service 实现）。
-// 返回明文 key（既有 key 经 AES-GCM 解回）、展示 hint 与是否新建。
+// GroupInfo userinfo 端点返回的用户可用分组（应用据此做「按组领 key / 分组货架」）。
+type GroupInfo struct {
+	ID             int
+	Name           string
+	RateMultiplier float64
+	Note           string
+}
+
+// GroupReader 读取用户可用分组（由 app/group.Service 适配实现）。
+type GroupReader interface {
+	AvailableForUser(ctx context.Context, userID int) ([]GroupInfo, error)
+}
+
+// KeyProvisioner 为用户按应用按分组 get-or-create 一把 sk- key（由 app/apikey.Service 实现）。
+// 返回明文 key（既有 key 经 AES-GCM 解回）、展示 hint、实际落点分组与是否新建。
 type KeyProvisioner interface {
-	ProvisionForClient(ctx context.Context, userID int, clientID, keyName string, groupID int) (plainKey, keyHint string, created bool, err error)
+	ProvisionForClient(ctx context.Context, userID int, clientID, keyName string, groupID int) (plainKey, keyHint string, resolvedGroupID int, created bool, err error)
 }
 
 // AuthorizeInput 授权码签发入参（用户已登录，由 SPA 授权页转发）。
@@ -126,9 +139,10 @@ type TokenOutput struct {
 	Scope       string
 }
 
-// ProvisionResult provision-key 结果。
+// ProvisionResult provision-key 结果。GroupID 为 key 的实际落点分组（group_id=0 时为默认分组）。
 type ProvisionResult struct {
 	APIKey  string
 	KeyHint string
+	GroupID int
 	Created bool
 }

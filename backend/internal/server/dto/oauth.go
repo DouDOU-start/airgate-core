@@ -120,21 +120,33 @@ type OAuthErrorResp struct {
 	ErrorDescription string `json:"error_description,omitempty"`
 }
 
-// OAuthUserInfoResp /oauth/userinfo 响应（OIDC userinfo 形态）。
+// OAuthUserInfoResp /oauth/userinfo 响应（OIDC userinfo 形态 + 可用分组扩展）。
 type OAuthUserInfoResp struct {
-	Sub   string `json:"sub"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	Sub    string               `json:"sub"`
+	Name   string               `json:"name"`
+	Email  string               `json:"email"`
+	Groups []OAuthUserGroupResp `json:"groups"`
 }
 
-// ProvisionKeyReq /oauth/provision-key 请求。group_id 缺省时用默认分组。
+// OAuthUserGroupResp userinfo 附带的用户可用分组（应用据此做按组领 key / 分组货架）。
+type OAuthUserGroupResp struct {
+	ID             int     `json:"id"`
+	Name           string  `json:"name"`
+	RateMultiplier float64 `json:"rate_multiplier"`
+	Note           string  `json:"note"`
+}
+
+// ProvisionKeyReq /oauth/provision-key 请求。group_id 缺省时用默认分组；
+// 同一应用可按分组为用户领多把 key（幂等键 = 用户×应用×分组）。
 type ProvisionKeyReq struct {
 	GroupID int `json:"group_id"`
 }
 
-// ProvisionKeyResp /oauth/provision-key 响应。api_key 为明文（应用后端持有，勿下发浏览器）。
+// ProvisionKeyResp /oauth/provision-key 响应。api_key 为明文（应用后端持有，勿下发浏览器）；
+// group_id 为 key 实际落点分组（缺省请求时为默认分组），应用按组存 key 用。
 type ProvisionKeyResp struct {
 	APIKey  string `json:"api_key"`
 	KeyHint string `json:"key_hint"`
+	GroupID int    `json:"group_id"`
 	Created bool   `json:"created"`
 }

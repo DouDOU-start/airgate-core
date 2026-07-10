@@ -205,14 +205,30 @@ func (h *OAuthHandler) UserInfo(c *gin.Context) {
 		c.JSON(httpCode, dto.OAuthErrorResp{Error: code})
 		return
 	}
+	groups, err := h.service.UserGroups(c.Request.Context(), info.ID)
+	if err != nil {
+		httpCode, code := oauthProtocolError(err)
+		c.JSON(httpCode, dto.OAuthErrorResp{Error: code})
+		return
+	}
 	name := info.Username
 	if name == "" {
 		name = info.Email
 	}
+	groupList := make([]dto.OAuthUserGroupResp, 0, len(groups))
+	for _, g := range groups {
+		groupList = append(groupList, dto.OAuthUserGroupResp{
+			ID:             g.ID,
+			Name:           g.Name,
+			RateMultiplier: g.RateMultiplier,
+			Note:           g.Note,
+		})
+	}
 	c.JSON(http.StatusOK, dto.OAuthUserInfoResp{
-		Sub:   strconv.Itoa(info.ID),
-		Name:  name,
-		Email: info.Email,
+		Sub:    strconv.Itoa(info.ID),
+		Name:   name,
+		Email:  info.Email,
+		Groups: groupList,
 	})
 }
 
@@ -240,6 +256,7 @@ func (h *OAuthHandler) ProvisionKey(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.ProvisionKeyResp{
 		APIKey:  result.APIKey,
 		KeyHint: result.KeyHint,
+		GroupID: result.GroupID,
 		Created: result.Created,
 	})
 }

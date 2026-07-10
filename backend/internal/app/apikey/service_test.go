@@ -278,7 +278,7 @@ type apiKeyStubRepository struct {
 	updateAdmin     func(context.Context, int, Mutation) (Key, error)
 	deleteOwned     func(context.Context, int, int) error
 	findOwned       func(context.Context, int, int) (Key, error)
-	findProvisioned func(context.Context, int, string) (Key, bool, error)
+	findProvisioned func(context.Context, int, string, int) (Key, bool, error)
 	defaultGroupID  func(context.Context) (int, bool, error)
 }
 
@@ -345,11 +345,11 @@ func (s apiKeyStubRepository) FindOwned(ctx context.Context, userID, id int) (Ke
 	return s.findOwned(ctx, userID, id)
 }
 
-func (s apiKeyStubRepository) FindProvisioned(ctx context.Context, userID int, clientID string) (Key, bool, error) {
+func (s apiKeyStubRepository) FindProvisioned(ctx context.Context, userID int, clientID string, groupID int) (Key, bool, error) {
 	if s.findProvisioned == nil {
 		return Key{}, false, nil
 	}
-	return s.findProvisioned(ctx, userID, clientID)
+	return s.findProvisioned(ctx, userID, clientID, groupID)
 }
 
 func (s apiKeyStubRepository) DefaultGroupID(ctx context.Context) (int, bool, error) {
@@ -385,12 +385,12 @@ func TestProvisionForClientCreates(t *testing.T) {
 		},
 	}, testAESSecret)
 
-	plainKey, hint, isNew, err := service.ProvisionForClient(context.Background(), 7, "ac_chat", "对话", 0)
+	plainKey, hint, groupID, isNew, err := service.ProvisionForClient(context.Background(), 7, "ac_chat", "对话", 0)
 	if err != nil {
 		t.Fatalf("ProvisionForClient 失败: %v", err)
 	}
-	if !isNew || plainKey == "" || hint == "" {
-		t.Fatalf("新建结果异常: key=%q hint=%q created=%v", plainKey, hint, isNew)
+	if !isNew || plainKey == "" || hint == "" || groupID != 1 {
+		t.Fatalf("新建结果异常: key=%q hint=%q group=%d created=%v", plainKey, hint, groupID, isNew)
 	}
 	if created.ProvisionedBy == nil || *created.ProvisionedBy != "ac_chat" {
 		t.Fatalf("Mutation 未带 ProvisionedBy: %+v", created.ProvisionedBy)
@@ -414,9 +414,10 @@ func TestProvisionForClientReturnsExisting(t *testing.T) {
 		t.Fatalf("加密失败: %v", err)
 	}
 	service := NewService(apiKeyStubRepository{
-		findProvisioned: func(_ context.Context, userID int, clientID string) (Key, bool, error) {
-			if userID != 7 || clientID != "ac_chat" {
-				t.Fatalf("查询参数异常: %d %s", userID, clientID)
+		findProvisioned: func(_ context.Context, userID int, clientID string, groupID int) (Key, bool, error) {
+			// groupID=0 的请求应先解析成默认分组再做幂等查找。
+			if userID != 7 || clientID != "ac_chat" || groupID != 1 {
+				t.Fatalf("查询参数异常: %d %s %d", userID, clientID, groupID)
 			}
 			return Key{ID: 1, Status: "active", KeyEncrypted: encrypted, KeyHint: "sk-exis...ting"}, true, nil
 		},
@@ -426,12 +427,12 @@ func TestProvisionForClientReturnsExisting(t *testing.T) {
 		},
 	}, testAESSecret)
 
-	plainKey, hint, isNew, err := service.ProvisionForClient(context.Background(), 7, "ac_chat", "对话", 0)
+	plainKey, hint, groupID, isNew, err := service.ProvisionForClient(context.Background(), 7, "ac_chat", "对话", 0)
 	if err != nil {
 		t.Fatalf("ProvisionForClient 失败: %v", err)
 	}
-	if isNew || plainKey != "sk-existing" || hint == "" {
-		t.Fatalf("应返回既有 key: key=%q created=%v", plainKey, isNew)
+	if isNew || plainKey != "sk-existing" || hint == "" || groupID != 1 {
+		t.Fatalf("应返回既有 key: key=%q group=%d created=%v", plainKey, groupID, isNew)
 	}
 }
 
@@ -444,7 +445,7 @@ func TestProvisionForClientRejections(t *testing.T) {
 		{
 			name: "既有 key 被禁用",
 			repo: apiKeyStubRepository{
-				findProvisioned: func(context.Context, int, string) (Key, bool, error) {
+				findProvisioned: func(context.Context, int, string, int) (Key, bool, error) {
 					return Key{ID: 1, Status: "disabled"}, true, nil
 				},
 			},
@@ -470,7 +471,7 @@ func TestProvisionForClientRejections(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := NewService(tt.repo, testAESSecret)
-			if _, _, _, err := service.ProvisionForClient(context.Background(), 7, "ac_chat", "对话", 0); !errors.Is(err, tt.wantErr) {
+			if _, _, _, _, err := service.ProvisionForClient(context.Background(), 7, "ac_chat", "对话", 0); !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, 期望 %v", err, tt.wantErr)
 			}
 		})

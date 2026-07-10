@@ -116,8 +116,8 @@ type Repository interface {
 	UpdateAdmin(context.Context, int, Mutation) (Key, error)
 	DeleteOwned(context.Context, int, int) error
 	FindOwned(context.Context, int, int) (Key, error)
-	// FindProvisioned 查找某用户名下由指定应用 provision 的 key（不含用量聚合）。
-	FindProvisioned(ctx context.Context, userID int, clientID string) (Key, bool, error)
+	// FindProvisioned 查找某用户名下由指定应用在指定分组 provision 的 key（不含用量聚合）。
+	FindProvisioned(ctx context.Context, userID int, clientID string, groupID int) (Key, bool, error)
 	// DefaultGroupID 返回默认分组（非专属分组中 sort_weight 最高者）；无可用分组时 ok=false。
 	DefaultGroupID(ctx context.Context) (groupID int, ok bool, err error)
 }
