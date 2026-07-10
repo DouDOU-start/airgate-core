@@ -188,14 +188,14 @@ models:
         priority: 2.5
         flex: 0.5
   # gpt-5.6 三档（Sol/Terra/Luna），developers.openai.com 官方价 2026-07 核实：
-  # priority 2×、flex/batch 0.5×。定价表列缓存写入 1.25× 输入价，但 OpenAI usage
-  # 不上报缓存写入 token 数，cache_creation 沿用 0（与其余 openai 模型一致）。
+  # priority 2×、flex/batch 0.5×；缓存写入 1.25× 输入价（$6.25/$3.125/$1.25）填入
+  # cache_creation——GPT 缓存写入不分 5m/1h 档（单一档），上游上报缓存写入 token 即按此计，未上报不计。
   - model: gpt-5.6-sol
     tag: openai
     input: 5.0
     output: 30.0
     cached_input: 0.5
-    cache_creation: 0
+    cache_creation: 6.25
     per_request: 0
     pricing_extra:
       service_tiers:
@@ -206,7 +206,7 @@ models:
     input: 2.5
     output: 15.0
     cached_input: 0.25
-    cache_creation: 0
+    cache_creation: 3.125
     per_request: 0
     pricing_extra:
       service_tiers:
@@ -217,7 +217,7 @@ models:
     input: 1.0
     output: 6.0
     cached_input: 0.1
-    cache_creation: 0
+    cache_creation: 1.25
     per_request: 0
     pricing_extra:
       service_tiers:

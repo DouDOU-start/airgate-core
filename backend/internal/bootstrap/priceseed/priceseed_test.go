@@ -169,9 +169,9 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		{"claude-opus-4-1-20250805", 15.0, 75.0, 1.5, 18.75},
 		{"claude-fable-5", 10.0, 50.0, 1.0, 12.5},
 		{"gpt-5.5", 5.0, 30.0, 0.5, 0},
-		{"gpt-5.6-sol", 5.0, 30.0, 0.5, 0},
-		{"gpt-5.6-terra", 2.5, 15.0, 0.25, 0},
-		{"gpt-5.6-luna", 1.0, 6.0, 0.1, 0},
+		{"gpt-5.6-sol", 5.0, 30.0, 0.5, 6.25},
+		{"gpt-5.6-terra", 2.5, 15.0, 0.25, 3.125},
+		{"gpt-5.6-luna", 1.0, 6.0, 0.1, 1.25},
 		{"gemini-2.5-pro", 1.25, 10.0, 0.31, 0},
 		{"gemini-3.1-pro-preview", 2.0, 12.0, 0.2, 0},
 		{"gemini-3.5-flash", 1.5, 9.0, 0.15, 0},
@@ -224,8 +224,9 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		}
 	}
 
-	// 所有 openai 条目 cache_creation 应为 0（无 5m 缓存写入档）。
-	for _, m := range []string{"gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini", "gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"} {
+	// gpt-5.6 之前的 openai 条目 cache_creation 应为 0（无缓存写入档）；
+	// gpt-5.6 三档缓存写入价单独在抽样 cases 里核对。
+	for _, m := range []string{"gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini", "gpt-5.5"} {
 		if byModel[m].CacheCreationPrice != 0 {
 			t.Errorf("openai model %q cache_creation = %v, want 0", m, byModel[m].CacheCreationPrice)
 		}
