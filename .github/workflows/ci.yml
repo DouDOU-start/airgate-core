@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master, standalone-gateway]
+    branches: [standalone-gateway]
   pull_request:
-    branches: [master, standalone-gateway]
+    branches: [standalone-gateway]
 
 jobs:
   ci:

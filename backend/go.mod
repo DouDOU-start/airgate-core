@@ -67,3 +67,5 @@ require (
 	golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
+
+tool entgo.io/ent/cmd/ent
