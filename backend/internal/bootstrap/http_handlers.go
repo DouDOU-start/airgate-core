@@ -34,7 +34,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/handler"
-	"github.com/DouDOU-start/airgate-core/internal/upgrade"
 )
 
 // HTTPDependencies 描述 HTTP 处理器装配所需依赖。
@@ -63,7 +62,6 @@ type HTTPHandlers struct {
 	Payment      *handler.PaymentHandler
 	Redemption   *handler.RedemptionHandler
 	Version      *handler.VersionHandler
-	Upgrade      *handler.UpgradeHandler
 	OAuth        *handler.OAuthHandler
 
 	// ChannelService / ModelPriceService / SettingsService 暴露给 server.go：
@@ -141,8 +139,6 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	redemptionStore := store.NewRedemptionStore(dep.DB)
 	redemptionService := appredemption.NewService(redemptionStore)
 
-	upgradeService := upgrade.NewService(upgrade.DetectMode(), dep.Redis)
-
 	// OAuth 应用接入：客户端仓储兼任 UserReader，授权码/令牌走 Redis，
 	// provision-key 复用 apikey 服务的 get-or-create，可用分组适配 group 服务。
 	oauthClientStore := store.NewOAuthClientStore(dep.DB)
@@ -165,7 +161,6 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Payment:      handler.NewPaymentHandler(paymentService),
 		Redemption:   handler.NewRedemptionHandler(redemptionService),
 		Version:      handler.NewVersionHandler(),
-		Upgrade:      handler.NewUpgradeHandler(upgradeService),
 		OAuth:        handler.NewOAuthHandler(oauthService),
 
 		ChannelService:     channelService,

@@ -12,10 +12,9 @@ import { queryKeys } from '../../shared/queryKeys';
 import { useToast } from '../../shared/ui';
 import {
   Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound, Download,
+  ShieldCheck, Copy, Trash2, KeyRound,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
-import { SystemUpdatePanel } from './SystemUpdatePanel';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { CommonModal } from '../../shared/components/CommonModal';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
@@ -87,17 +86,15 @@ const DEFAULT_BALANCE_ALERT_BODY = `<div style="font-family: -apple-system, Blin
 
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'security' | 'smtp' | 'system';
+type TabKey = 'site' | 'security' | 'smtp';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
   { key: 'security', labelKey: 'settings.tab_security', icon: ShieldCheck },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
-  { key: 'system', labelKey: 'settings.tab_system', icon: Download },
 ];
 
-// system tab 通过独立的 upgrade API 管理，不走通用 settings save 流程。
-type SaveTabKey = Exclude<TabKey, 'security' | 'system'>;
+type SaveTabKey = Exclude<TabKey, 'security'>;
 
 const TAB_GROUP: Record<SaveTabKey, string> = {
   site: 'site',
@@ -183,7 +180,6 @@ export default function SettingsPage() {
   }
 
   function buildSaveItems(): SettingItem[] {
-    if (activeTab === 'system') return [];
     if (activeTab === 'security') {
       return [
         ...REG_KEYS.map((key) => ({
@@ -241,7 +237,6 @@ export default function SettingsPage() {
   }
 
   function renderSaveAction(left?: React.ReactNode) {
-    if (activeTab === 'system') return null;
     return (
       <div className="ag-settings-card-footer">
         {left ? <div className="ag-settings-card-footer-left">{left}</div> : null}
@@ -538,8 +533,6 @@ export default function SettingsPage() {
             </Card.Content>
           </Card>
         )}
-
-        {activeTab === 'system' && <SystemUpdatePanel />}
       </div>
 
       <SmtpTestModal

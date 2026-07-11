@@ -213,11 +213,6 @@ func (s *Server) registerRoutes() {
 		// core 版本信息（仅管理员可见，避免对外暴露版本指纹）
 		adminGroup.GET("/version", handlers.Version.GetVersion)
 
-		// 系统更新（仅管理员；run 接口在 systemd 模式下生效，Docker 模式只返回升级指令）
-		adminGroup.GET("/upgrade/info", handlers.Upgrade.GetInfo)
-		adminGroup.GET("/upgrade/status", handlers.Upgrade.GetStatus)
-		adminGroup.POST("/upgrade/run", handlers.Upgrade.Run)
-
 		// 支付管理：订单总览 + 服务商实例配置（保存即热加载）
 		adminGroup.GET("/payment/orders", handlers.Payment.AdminListOrders)
 		adminGroup.GET("/payment/providers", handlers.Payment.AdminListProviders)
