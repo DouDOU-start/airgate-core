@@ -25,18 +25,16 @@ export function getStoredTheme(): ThemeName {
   }
 }
 
-/** 装饰色板：头像底色等按索引取色的确定性配色。 */
+/** 装饰色板：头像底色等按索引取色的确定性配色，取自有机花园调色板（跟随主题明暗自适应）。 */
 export const decorativePalette = [
-  '#3b82f6', // blue
-  '#10b981', // emerald
-  '#f59e0b', // amber
-  '#ef4444', // red
-  '#8b5cf6', // violet
-  '#06b6d4', // cyan
-  '#ec4899', // pink
-  '#84cc16', // lime
-  '#f97316', // orange
-  '#6366f1', // indigo
-  '#0d9488', // teal
-  '#a855f7', // purple
+  'var(--ag-tone-emerald)',
+  'var(--ag-secondary)',
+  'var(--ag-tone-blue)',
+  'var(--ag-tone-violet)',
+  'var(--ag-tone-teal)',
+  'var(--ag-tone-amber)',
+  'var(--ag-tone-rose)',
+  'var(--ag-tone-indigo)',
+  'var(--ag-primary)',
+  'var(--ag-tone-purple)',
 ];

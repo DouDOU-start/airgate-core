@@ -42,7 +42,7 @@ import { ChartEmptyState } from '../shared/components/ChartEmptyState';
 import { ChartLineTooltip, UsagePieChart } from '../shared/components/charts';
 import { CompactDataTable } from '../shared/components/CompactDataTable';
 import { DashboardCard } from '../shared/components/DashboardCard';
-import { METRIC_TONE_CLASSES, type MetricTone } from '../shared/components/StatCard';
+import { METRIC_TONE_VARS, type MetricTone } from '../shared/components/StatCard';
 import { useDebouncedValue } from '../shared/hooks/useDebouncedValue';
 import { CostPair, CostValue } from '../shared/components/CostValue';
 import { fmtNum, fmtTrendTime } from '../shared/utils/format';
@@ -56,8 +56,8 @@ const META_TONE_CLASSES: Record<MetaTone, string> = {
   accent: 'text-primary',
   danger: 'text-danger',
   default: 'text-text',
-  success: 'text-emerald-600 dark:text-emerald-400',
-  warning: 'text-amber-600 dark:text-amber-400',
+  success: 'text-success',
+  warning: 'text-warning',
 };
 
 function fmtDurationMs(ms: number | undefined | null): string {
@@ -98,7 +98,13 @@ function MetricCard({
             <div className={`min-w-0 truncate text-xs font-semibold ${META_TONE_CLASSES[metaTone]}`}>{meta}</div>
           </div>
         </div>
-        <span className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:flex ${METRIC_TONE_CLASSES[tone]}`}>
+        <span
+          className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 ring-border shadow-sm 2xl:flex"
+          style={{
+            background: `color-mix(in oklab, var(${METRIC_TONE_VARS[tone]}) 14%, transparent)`,
+            color: `var(${METRIC_TONE_VARS[tone]})`,
+          }}
+        >
           {icon}
         </span>
       </Card.Content>

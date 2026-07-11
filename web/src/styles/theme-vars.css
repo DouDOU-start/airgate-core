@@ -1,156 +1,188 @@
 /* ==========================================================================
-   AirGate 主题 CSS 变量 —— 「Monolith 黑白光几何」设计语言（Vercel 式）
-   只有黑、白、光。暗色 = 纯黑幕布 + 白色辉光；亮色 = 纯白纸面 + 黑色几何。
-   主色即前景色（白/黑互为反转），蓝色只保留给数据、链接与信息态；
-   动效系统：辉光呼吸、扫描光线、hover 边框提亮。
+   AirGate 主题 CSS 变量 —— 「Living Paper 有机纸感」设计语言
+   暖纸白为底、苔藓绿为魂，陶土橙点睛；圆润几何、柔光量感阴影、无硬边直线。
+   亮色是主场（编辑部质感的高级浅色），暗色是苔藓夜色的自然延伸，而非纯黑翻转。
    调整主题直接改本文件（:root 静态 token + dark/light 两套主题变量）。
    ========================================================================== */
 
 :root {
-  --ag-radius-sm: 0.25rem;
-  --ag-radius-md: 0.375rem;
-  --ag-radius-lg: 0.5rem;
-  --ag-radius-xl: 0.625rem;
-  --ag-field-radius: 0.375rem;
-  --ag-font-sans: 'Geist Sans', -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
-  --ag-font-display: var(--ag-font-sans);
-  --ag-font-mono: 'Geist Mono', 'SF Mono', 'Cascadia Code', monospace;
-  --ag-transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  --ag-transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
-  --ag-sidebar-width: 260px;
-  --ag-sidebar-collapsed: 72px;
+  --ag-radius-sm: 0.5rem;
+  --ag-radius-md: 0.75rem;
+  --ag-radius-lg: 1.125rem;
+  --ag-radius-xl: 1.75rem;
+  --ag-field-radius: 0.875rem;
+  --ag-font-sans: 'Hanken Grotesk Variable', -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --ag-font-display: 'Fraunces Variable', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', serif;
+  --ag-font-mono: 'JetBrains Mono Variable', 'SF Mono', 'Cascadia Code', monospace;
+  --ag-transition: 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  --ag-transition-slow: 480ms cubic-bezier(0.22, 1, 0.36, 1);
+  --ag-sidebar-width: 264px;
+  --ag-sidebar-collapsed: 76px;
   --ag-topbar-height: 64px;
 }
 
-/* ── Dark · Monolith Night ──
-   纯黑幕布。主色 = 白。数据蓝是唯一的功能色彩。 */
-:root[data-theme="dark"] {
-  /* 功能蓝：链接 / 数据 / 信息态专用，不做品牌主色 */
-  --ag-data-blue: oklch(64% 0.155 250);
-  --ag-gradient-from: oklch(98% 0 0);
-  --ag-gradient-to: oklch(80% 0 0);
-  --ag-gradient-text-end: oklch(66% 0 0);
-  --ag-primary: oklch(98.5% 0 0);
-  --ag-primary-foreground: oklch(10% 0 0);
-  --ag-primary-hover: oklch(90% 0 0);
-  --ag-primary-subtle: color-mix(in oklab, white 9%, transparent);
-  --ag-primary-glow: color-mix(in oklab, white 30%, transparent);
-  --ag-success: oklch(72% 0.14 160);
-  --ag-success-foreground: oklch(15% 0.05 160);
-  --ag-success-subtle: color-mix(in oklab, oklch(72% 0.14 160) 14%, transparent);
-  --ag-warning: oklch(80% 0.135 82);
-  --ag-warning-foreground: oklch(18% 0.05 82);
-  --ag-warning-subtle: color-mix(in oklab, oklch(80% 0.135 82) 14%, transparent);
-  --ag-danger: oklch(66% 0.19 24);
-  --ag-danger-foreground: oklch(98% 0.01 24);
-  --ag-danger-subtle: color-mix(in oklab, oklch(66% 0.19 24) 15%, transparent);
-  --ag-info: oklch(64% 0.155 250);
-  --ag-info-subtle: color-mix(in oklab, oklch(64% 0.155 250) 16%, transparent);
-  --ag-default-bg: oklch(24% 0 0);
-  --ag-default-foreground: oklch(93% 0 0);
-  --ag-field-background: oklch(8% 0 0);
-  --ag-field-foreground: oklch(93% 0 0);
-  --ag-field-placeholder: oklch(50% 0 0);
-  --ag-muted: oklch(62% 0 0);
-  --ag-overlay: oklch(12% 0 0);
-  --ag-overlay-foreground: oklch(93% 0 0);
-  --ag-scrollbar: oklch(32% 0 0);
-  --ag-segment: oklch(26% 0 0);
-  --ag-segment-foreground: oklch(96% 0 0);
-  --ag-surface: oklch(10.5% 0 0);
-  --ag-surface-foreground: oklch(93% 0 0);
-  --ag-surface-secondary: oklch(14% 0 0);
-  --ag-surface-secondary-foreground: oklch(93% 0 0);
-  --ag-surface-tertiary: oklch(17.5% 0 0);
-  --ag-surface-tertiary-foreground: oklch(93% 0 0);
-  --ag-bg-deep: oklch(0% 0 0);
-  --ag-bg: oklch(5% 0 0);
-  --ag-bg-elevated: oklch(12% 0 0);
-  --ag-bg-surface: oklch(10.5% 0 0);
-  --ag-bg-hover: oklch(15% 0 0);
-  --ag-bg-active: oklch(18.5% 0 0);
-  --ag-border: oklch(24% 0 0);
-  --ag-border-subtle: oklch(18% 0 0);
-  --ag-border-strong: oklch(42% 0 0);
-  --ag-border-focus: oklch(98.5% 0 0);
-  --ag-text: oklch(93% 0 0);
-  --ag-text-secondary: oklch(72% 0 0);
-  --ag-text-tertiary: oklch(58% 0 0);
-  --ag-text-inverse: oklch(10% 0 0);
-  --ag-glass: color-mix(in oklab, oklch(8% 0 0) 82%, transparent);
-  --ag-glass-border: oklch(24% 0 0);
-  --ag-shadow-sm: 0 1px 2px 0 #000000cc;
-  --ag-shadow-md: 0 2px 10px -2px #000000e0;
+/* ── Light · Living Paper Day ──
+   暖纸白纸面。主色 = 苔藓绿，辅色 = 陶土橙。 */
+:root[data-theme="light"] {
+  --ag-data-blue: oklch(53% 0.1 234);
+  --ag-gradient-from: oklch(35% 0.115 152);
+  --ag-gradient-to: oklch(62% 0.16 78);
+  --ag-gradient-text-end: oklch(66% 0.17 42);
+  --ag-primary: oklch(40% 0.09 152);
+  --ag-primary-foreground: oklch(98.5% 0.012 140);
+  --ag-primary-hover: oklch(33% 0.095 152);
+  --ag-primary-subtle: color-mix(in oklab, oklch(40% 0.09 152) 12%, transparent);
+  --ag-primary-glow: color-mix(in oklab, oklch(40% 0.09 152) 35%, transparent);
+  --ag-secondary: oklch(64% 0.14 48);
+  --ag-secondary-foreground: oklch(99% 0.01 60);
+  --ag-secondary-subtle: color-mix(in oklab, oklch(64% 0.14 48) 14%, transparent);
+  --ag-success: oklch(57% 0.14 145);
+  --ag-success-foreground: oklch(98.5% 0.012 145);
+  --ag-success-subtle: color-mix(in oklab, oklch(57% 0.14 145) 12%, transparent);
+  --ag-warning: oklch(70% 0.135 75);
+  --ag-warning-foreground: oklch(20% 0.04 75);
+  --ag-warning-subtle: color-mix(in oklab, oklch(70% 0.135 75) 16%, transparent);
+  --ag-danger: oklch(54% 0.19 27);
+  --ag-danger-foreground: oklch(98.5% 0.012 27);
+  --ag-danger-subtle: color-mix(in oklab, oklch(54% 0.19 27) 10%, transparent);
+  --ag-info: oklch(53% 0.1 234);
+  --ag-info-subtle: color-mix(in oklab, oklch(53% 0.1 234) 10%, transparent);
+
+  /* 指标图标底色：8 色有机花园调色板，text=icon 色，chip 用 color-mix 14%/24% */
+  --ag-tone-emerald: oklch(40% 0.09 152);
+  --ag-tone-teal: oklch(46% 0.085 194);
+  --ag-tone-blue: oklch(50% 0.09 235);
+  --ag-tone-indigo: oklch(46% 0.12 267);
+  --ag-tone-violet: oklch(50% 0.14 296);
+  --ag-tone-purple: oklch(48% 0.15 320);
+  --ag-tone-amber: oklch(58% 0.13 75);
+  --ag-tone-rose: oklch(56% 0.17 20);
+
+  /* 亮色中性阶整体调低亮度、调高一点暖调 chroma —— 从"近白纸"改为柔和的亚麻/牛皮纸质感，
+     避免大面积高亮度平涂显得刺眼；文字对比度不受影响（反而因底色变深而略有提升）。 */
+  --ag-default-bg: oklch(90% 0.016 80);
+  --ag-default-foreground: oklch(28% 0.02 55);
+  --ag-field-background: oklch(97% 0.007 84);
+  --ag-field-foreground: oklch(22% 0.02 55);
+  --ag-field-placeholder: oklch(58% 0.016 62);
+  --ag-muted: oklch(49% 0.021 55);
+  --ag-overlay: oklch(97% 0.007 84);
+  --ag-overlay-foreground: oklch(22% 0.02 55);
+  --ag-scrollbar: oklch(79% 0.016 78);
+  --ag-segment: oklch(96.5% 0.008 84);
+  --ag-segment-foreground: oklch(22% 0.02 55);
+  --ag-surface: oklch(96.5% 0.008 84);
+  --ag-surface-foreground: oklch(22% 0.02 55);
+  --ag-surface-secondary: oklch(93% 0.014 81);
+  --ag-surface-secondary-foreground: oklch(22% 0.02 55);
+  --ag-surface-tertiary: oklch(90% 0.017 79);
+  --ag-surface-tertiary-foreground: oklch(22% 0.02 55);
+  --ag-bg-deep: oklch(90.5% 0.017 78);
+  --ag-bg: oklch(94% 0.013 82);
+  --ag-bg-elevated: oklch(97% 0.007 84);
+  --ag-bg-surface: oklch(96.5% 0.008 84);
+  --ag-bg-hover: oklch(92% 0.015 81);
+  --ag-bg-active: oklch(89.5% 0.017 79);
+  --ag-border: oklch(84% 0.017 77);
+  --ag-border-subtle: oklch(89% 0.015 80);
+  --ag-border-strong: oklch(64% 0.022 68);
+  --ag-border-focus: oklch(40% 0.09 152);
+  --ag-text: oklch(23% 0.02 55);
+  --ag-text-secondary: oklch(43% 0.022 55);
+  --ag-text-tertiary: oklch(58% 0.018 55);
+  --ag-text-inverse: oklch(97% 0.007 84);
+  --ag-glass: color-mix(in oklab, oklch(96.5% 0.008 84) 82%, transparent);
+  --ag-glass-border: oklch(84% 0.017 77);
+  --ag-shadow-sm: 0 1px 2px 0 oklch(30% 0.032 60 / 0.07), 0 0 0 1px oklch(30% 0.032 60 / 0.045);
+  --ag-shadow-md:
+    0 6px 16px -6px oklch(30% 0.032 60 / 0.14),
+    0 2px 6px -2px oklch(30% 0.032 60 / 0.09),
+    0 0 0 1px oklch(30% 0.032 60 / 0.04);
   --ag-shadow-lg:
-    0 0 0 1px oklch(100% 0 0 / 0.06) inset,
-    0 24px 64px -16px #000000;
-  --ag-shadow-glow: 0 0 0 1px oklch(98.5% 0 0 / 0.6), 0 0 20px -4px oklch(98.5% 0 0 / 0.45);
+    0 0 0 1px oklch(30% 0.032 60 / 0.05),
+    0 12px 28px -10px oklch(30% 0.032 60 / 0.16),
+    0 32px 64px -20px oklch(30% 0.032 60 / 0.22);
+  --ag-shadow-glow: 0 0 0 1px color-mix(in oklab, oklch(40% 0.09 152) 55%, transparent), 0 10px 32px -6px color-mix(in oklab, oklch(40% 0.09 152) 45%, transparent);
 }
 
-/* ── Light · Monolith Day ──
-   纯白纸面。主色 = 黑。 */
-:root[data-theme="light"] {
-  --ag-data-blue: oklch(52% 0.17 252);
-  --ag-gradient-from: oklch(15% 0 0);
-  --ag-gradient-to: oklch(38% 0 0);
-  --ag-gradient-text-end: oklch(52% 0 0);
-  --ag-primary: oklch(13% 0 0);
-  --ag-primary-foreground: oklch(99.5% 0 0);
-  --ag-primary-hover: oklch(28% 0 0);
-  --ag-primary-subtle: color-mix(in oklab, black 6%, transparent);
-  --ag-primary-glow: color-mix(in oklab, black 18%, transparent);
-  --ag-success: oklch(55% 0.13 158);
-  --ag-success-foreground: oklch(98.5% 0.01 158);
-  --ag-success-subtle: color-mix(in oklab, oklch(55% 0.13 158) 11%, transparent);
-  --ag-warning: oklch(61% 0.13 78);
-  --ag-warning-foreground: oklch(98.5% 0.012 78);
-  --ag-warning-subtle: color-mix(in oklab, oklch(65% 0.13 78) 13%, transparent);
-  --ag-danger: oklch(55% 0.20 26);
-  --ag-danger-foreground: oklch(98.5% 0.012 26);
-  --ag-danger-subtle: color-mix(in oklab, oklch(55% 0.20 26) 9%, transparent);
-  --ag-info: oklch(52% 0.17 252);
-  --ag-info-subtle: color-mix(in oklab, oklch(52% 0.17 252) 9%, transparent);
-  --ag-default-bg: oklch(93.5% 0 0);
-  --ag-default-foreground: oklch(22% 0 0);
-  --ag-field-background: oklch(100% 0 0);
-  --ag-field-foreground: oklch(18% 0 0);
-  --ag-field-placeholder: oklch(60% 0 0);
-  --ag-muted: oklch(48% 0 0);
-  --ag-overlay: oklch(100% 0 0);
-  --ag-overlay-foreground: oklch(18% 0 0);
-  --ag-scrollbar: oklch(84% 0 0);
-  --ag-segment: oklch(100% 0 0);
-  --ag-segment-foreground: oklch(18% 0 0);
-  --ag-surface: oklch(100% 0 0);
-  --ag-surface-foreground: oklch(18% 0 0);
-  --ag-surface-secondary: oklch(97.3% 0 0);
-  --ag-surface-tertiary: oklch(95.5% 0 0);
-  --ag-surface-secondary-foreground: oklch(18% 0 0);
-  --ag-surface-tertiary-foreground: oklch(18% 0 0);
-  --ag-bg-deep: oklch(98% 0 0);
-  --ag-bg: oklch(99% 0 0);
-  --ag-bg-elevated: oklch(100% 0 0);
-  --ag-bg-surface: oklch(100% 0 0);
-  --ag-bg-hover: oklch(96.3% 0 0);
-  --ag-bg-active: oklch(94.2% 0 0);
-  --ag-border: oklch(90% 0 0);
-  --ag-border-subtle: oklch(93.5% 0 0);
-  --ag-border-strong: oklch(72% 0 0);
-  --ag-border-focus: oklch(13% 0 0);
-  --ag-text: oklch(18% 0 0);
-  --ag-text-secondary: oklch(42% 0 0);
-  --ag-text-tertiary: oklch(54% 0 0);
-  --ag-text-inverse: oklch(99.5% 0 0);
-  --ag-glass: color-mix(in oklab, oklch(100% 0 0) 85%, transparent);
-  --ag-glass-border: oklch(90% 0 0);
-  --ag-shadow-sm: 0 1px 2px 0 oklch(0% 0 0 / 0.05), 0 0 0 1px oklch(0% 0 0 / 0.035);
+/* ── Dark · Living Paper Night ──
+   暖炭黑幕布（非纯黑），苔藓绿转亮为鼠尾草绿，陶土橙同步提亮。 */
+:root[data-theme="dark"] {
+  --ag-data-blue: oklch(75% 0.095 234);
+  --ag-gradient-from: oklch(78% 0.135 150);
+  --ag-gradient-to: oklch(76% 0.15 85);
+  --ag-gradient-text-end: oklch(74% 0.16 48);
+  --ag-primary: oklch(76% 0.125 150);
+  --ag-primary-foreground: oklch(16% 0.025 152);
+  --ag-primary-hover: oklch(82% 0.115 150);
+  --ag-primary-subtle: color-mix(in oklab, oklch(76% 0.125 150) 16%, transparent);
+  --ag-primary-glow: color-mix(in oklab, oklch(76% 0.125 150) 38%, transparent);
+  --ag-secondary: oklch(73% 0.125 50);
+  --ag-secondary-foreground: oklch(17% 0.03 50);
+  --ag-secondary-subtle: color-mix(in oklab, oklch(73% 0.125 50) 18%, transparent);
+  --ag-success: oklch(74% 0.14 145);
+  --ag-success-foreground: oklch(16% 0.03 145);
+  --ag-success-subtle: color-mix(in oklab, oklch(74% 0.14 145) 16%, transparent);
+  --ag-warning: oklch(79% 0.13 78);
+  --ag-warning-foreground: oklch(18% 0.04 78);
+  --ag-warning-subtle: color-mix(in oklab, oklch(79% 0.13 78) 16%, transparent);
+  --ag-danger: oklch(70% 0.18 26);
+  --ag-danger-foreground: oklch(16% 0.03 26);
+  --ag-danger-subtle: color-mix(in oklab, oklch(70% 0.18 26) 16%, transparent);
+  --ag-info: oklch(75% 0.095 234);
+  --ag-info-subtle: color-mix(in oklab, oklch(75% 0.095 234) 16%, transparent);
+
+  --ag-tone-emerald: oklch(76% 0.125 150);
+  --ag-tone-teal: oklch(74% 0.1 194);
+  --ag-tone-blue: oklch(75% 0.095 234);
+  --ag-tone-indigo: oklch(74% 0.115 267);
+  --ag-tone-violet: oklch(76% 0.13 296);
+  --ag-tone-purple: oklch(76% 0.135 320);
+  --ag-tone-amber: oklch(79% 0.13 78);
+  --ag-tone-rose: oklch(74% 0.15 20);
+
+  /* 中性阶（背景/表面/边框/字段）是全站主要工作面（侧边栏/顶栏/表格/卡片），大面积平涂对色相极敏感——
+     只留极微弱的苔藓绿底色相（chroma ≈ 0.004-0.01，肉眼应读作"高级炭黑"而非"绿"），不与品牌色抢戏；
+     浓度饱和的绿色只留给按钮/激活态/链接/首页与登录页等"品牌时刻"。字色保留暖色相，冷底暖字对比更克制。 */
+  --ag-default-bg: oklch(29% 0.007 150);
+  --ag-default-foreground: oklch(88% 0.01 90);
+  --ag-field-background: oklch(19% 0.006 150);
+  --ag-field-foreground: oklch(92% 0.008 85);
+  --ag-field-placeholder: oklch(53% 0.008 130);
+  --ag-muted: oklch(61% 0.009 100);
+  --ag-overlay: oklch(22% 0.007 150);
+  --ag-overlay-foreground: oklch(92% 0.008 85);
+  --ag-scrollbar: oklch(37% 0.008 148);
+  --ag-segment: oklch(24% 0.007 150);
+  --ag-segment-foreground: oklch(92% 0.008 85);
+  --ag-surface: oklch(20% 0.007 150);
+  --ag-surface-foreground: oklch(92% 0.008 85);
+  --ag-surface-secondary: oklch(23.5% 0.007 150);
+  --ag-surface-secondary-foreground: oklch(92% 0.008 85);
+  --ag-surface-tertiary: oklch(27.5% 0.008 150);
+  --ag-surface-tertiary-foreground: oklch(92% 0.008 85);
+  --ag-bg-deep: oklch(9.5% 0.005 152);
+  --ag-bg: oklch(13.5% 0.006 152);
+  --ag-bg-elevated: oklch(22% 0.007 150);
+  --ag-bg-surface: oklch(20% 0.007 150);
+  --ag-bg-hover: oklch(25% 0.007 150);
+  --ag-bg-active: oklch(29% 0.008 150);
+  --ag-border: oklch(30% 0.008 148);
+  --ag-border-subtle: oklch(25.5% 0.007 150);
+  --ag-border-strong: oklch(46% 0.011 145);
+  --ag-border-focus: oklch(76% 0.125 150);
+  --ag-text: oklch(93% 0.012 85);
+  --ag-text-secondary: oklch(75% 0.014 80);
+  --ag-text-tertiary: oklch(59% 0.014 75);
+  --ag-text-inverse: oklch(16% 0.007 150);
+  --ag-glass: color-mix(in oklab, oklch(20% 0.007 150) 80%, transparent);
+  --ag-glass-border: oklch(30% 0.008 148);
+  --ag-shadow-sm: 0 1px 2px 0 oklch(3% 0.006 150 / 0.45);
   --ag-shadow-md:
-    0 2px 4px -1px oklch(0% 0 0 / 0.06),
-    0 1px 2px 0 oklch(0% 0 0 / 0.04),
-    0 0 0 1px oklch(0% 0 0 / 0.035);
+    0 6px 18px -6px oklch(3% 0.006 150 / 0.55),
+    0 2px 6px -2px oklch(3% 0.006 150 / 0.4);
   --ag-shadow-lg:
-    0 0 0 1px oklch(0% 0 0 / 0.04),
-    0 4px 12px -2px oklch(0% 0 0 / 0.07),
-    0 24px 56px -16px oklch(0% 0 0 / 0.16);
-  --ag-shadow-glow: 0 0 0 1px oklch(13% 0 0 / 0.5), 0 0 16px -6px oklch(13% 0 0 / 0.4);
+    0 0 0 1px oklch(100% 0 0 / 0.045) inset,
+    0 28px 60px -18px oklch(2% 0.006 150 / 0.7);
+  --ag-shadow-glow: 0 0 0 1px color-mix(in oklab, oklch(76% 0.125 150) 55%, transparent), 0 0 28px -4px color-mix(in oklab, oklch(76% 0.125 150) 50%, transparent);
 }

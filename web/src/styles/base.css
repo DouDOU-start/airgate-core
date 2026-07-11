@@ -1,6 +1,41 @@
 /* ==========================================================================
-   04. Global Base —— 编辑部排版基因
+   04. Global Base —— 有机纸感排版基因
    ========================================================================== */
+
+/* 有机画布：柔光色块 + 细颗粒纹理，用于 Hero / 登录页等表达型页面的背景层 */
+.ag-organic-canvas {
+  position: relative;
+  isolation: isolate;
+}
+
+.ag-organic-canvas::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(46rem 32rem at 10% -8%, color-mix(in oklab, var(--ag-primary) 16%, transparent), transparent 62%),
+    radial-gradient(38rem 30rem at 94% 6%, color-mix(in oklab, var(--ag-secondary) 15%, transparent), transparent 64%),
+    radial-gradient(58rem 44rem at 50% 118%, color-mix(in oklab, var(--ag-primary) 11%, transparent), transparent 66%);
+}
+
+.ag-organic-canvas::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.45;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 180px 180px;
+}
+
+[data-theme="dark"] .ag-organic-canvas::after,
+.dark .ag-organic-canvas::after {
+  opacity: 0.28;
+}
 
 * {
   scrollbar-width: thin;
@@ -41,73 +76,86 @@ body {
   letter-spacing: 0;
 }
 
-/* 标题：无衬线、收紧字距的现代系统标题 */
+/* 标题：暖调有机衬线（Fraunces soft 轴），中文回落至系统黑体 */
 h1,
 h2,
 h3,
 .ag-display {
-  font-weight: 620;
-  letter-spacing: -0.014em;
+  font-family: var(--font-display);
+  font-weight: 560;
+  letter-spacing: -0.012em;
 }
 
 h4,
 h5,
 h6 {
-  letter-spacing: -0.006em;
+  font-family: var(--font-display);
+  font-weight: 540;
+  letter-spacing: -0.004em;
 }
 
-/* Kicker：等宽大写微标签（Monolith 签名——指标卡标题、分组名、状态标签共用） */
+/* Kicker：等宽大写微标签——指标卡标题、分组名、状态标签共用 */
 .ag-kicker {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-/* 渐变文字：白→灰（暗）/ 黑→灰（亮），点睛词专用 */
+/* 渐变文字：苔藓绿→暖金→陶土橙，点睛词专用 */
 .ag-gradient-text {
+  font-family: var(--font-display);
   background-image: linear-gradient(94deg, var(--ag-gradient-from), var(--ag-gradient-to) 55%, var(--ag-gradient-text-end));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-/* 辉光文字/元素 */
+/* 辉光文字/元素：暖色柔光，非纯白/黑 */
 .ag-glow {
-  filter: drop-shadow(0 0 18px color-mix(in oklab, var(--foreground) 45%, transparent));
+  filter: drop-shadow(0 0 20px color-mix(in oklab, var(--accent) 45%, transparent));
 }
 
-/* 扫描光线：放在 1px 分隔线容器里，一道光周期性扫过 */
+/* 有机分隔线：柔光两端渐隐 + 中心一枚呼吸光点，替代硬边扫描线 */
 .ag-scanline {
   position: relative;
   height: 1px;
-  background: var(--separator);
-  overflow: hidden;
+  background: linear-gradient(90deg, transparent, var(--separator) 18%, var(--separator) 82%, transparent);
 }
 
 .ag-scanline::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: -30%;
-  width: 30%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--foreground), transparent);
-  animation: ag-scan 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  top: 50%;
+  left: 50%;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 14px 3px color-mix(in oklab, var(--accent) 55%, transparent);
+  transform: translate(-50%, -50%);
+  animation: ag-pulse-dot 3.2s ease-in-out infinite;
 }
 
-@keyframes ag-scan {
-  to {
-    left: 100%;
+@keyframes ag-pulse-dot {
+
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.35);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ag-scanline::after {
     animation: none;
-    opacity: 0;
   }
 }
 

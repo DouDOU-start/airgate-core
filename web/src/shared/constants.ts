@@ -5,28 +5,28 @@ export const DEFAULT_PAGE_SIZE = 20;
 export const FETCH_ALL_PARAMS = { page: 1, page_size: 100 } as const;
 
 /** 使用记录 Token 指标色，表格与趋势图共用。
-    Monolith 谱：数据蓝领衔 + 前景灰阶，彩色只留给功能语义。 */
+    有机花园谱：每个指标一个独立色调，克制但可辨，跟随主题明暗自适应。 */
 export const USAGE_TOKEN_COLORS = {
-  input: 'var(--ag-data-blue)',
-  output: 'var(--ag-text-secondary)',
-  cacheCreation: 'oklch(72% 0.125 82)',
+  input: 'var(--ag-tone-blue)',
+  output: 'var(--ag-tone-teal)',
+  cacheCreation: 'var(--ag-tone-amber)',
   cacheRead: 'var(--ag-muted)',
-  cacheRatio: 'oklch(64% 0.11 200)',
+  cacheRatio: 'var(--ag-tone-violet)',
   cacheCumulativeRatio: 'var(--success)',
 } as const;
 
-/** 饼图调色板：Monolith 谱 —— 数据蓝深浅交替 + 中性灰阶，克制但可辨 */
+/** 饼图调色板：有机花园谱 —— 苔藓绿领衔，陶土橙、鼠尾草蓝等辅色轮转 */
 export const PIE_CHART_COLORS = [
-  'oklch(60% 0.155 250)',
-  'oklch(70% 0 0)',
-  'oklch(72% 0.11 220)',
-  'oklch(52% 0 0)',
-  'oklch(46% 0.14 255)',
-  'oklch(84% 0 0)',
-  'oklch(66% 0.12 190)',
-  'oklch(38% 0 0)',
-  'oklch(78% 0.09 240)',
-  'oklch(60% 0 0)',
+  'var(--ag-tone-emerald)',
+  'var(--ag-tone-blue)',
+  'var(--ag-secondary)',
+  'var(--ag-tone-violet)',
+  'var(--ag-tone-teal)',
+  'var(--ag-tone-amber)',
+  'var(--ag-tone-indigo)',
+  'var(--ag-tone-rose)',
+  'var(--ag-tone-purple)',
+  'var(--ag-muted)',
 ] as const;
 
 /** 仪表盘时间范围预设，管理员仪表盘与用户概览共用 */

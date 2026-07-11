@@ -15,7 +15,7 @@
   width: 100%;
 }
 
-/* 表头：等宽大写微标签（Monolith 签名） */
+/* 表头：等宽大写微标签 */
 :where([data-slot="table-column"], [data-slot="th"]) {
   box-sizing: border-box;
   height: 2.375rem !important;

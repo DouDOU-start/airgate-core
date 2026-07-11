@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { Alert, Button, Card, FieldError, Form, Input, Label, Tabs, TextField as HeroTextField } from '@heroui/react';
@@ -7,7 +7,41 @@ import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsPr
 import { authApi } from '../shared/api/auth';
 import { useTheme } from '../app/providers/ThemeProvider';
 import { ApiError, setSessionAPIKey } from '../shared/api/client';
-import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key, Layers, Zap, BarChart3 } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key, Sprout, Layers, Zap, BarChart3 } from 'lucide-react';
+
+/** 浮尘光点的固定布局（避免 Math.random 每次渲染重排） */
+const MOTES = [
+  { left: '8%', size: 5, duration: '10s', delay: '0s', drift: '10px' },
+  { left: '18%', size: 3, duration: '13s', delay: '2.4s', drift: '-14px' },
+  { left: '30%', size: 4, duration: '9s', delay: '4.8s', drift: '6px' },
+  { left: '46%', size: 6, duration: '14s', delay: '1.2s', drift: '-8px' },
+  { left: '62%', size: 3, duration: '11s', delay: '5.6s', drift: '12px' },
+  { left: '75%', size: 5, duration: '12s', delay: '3.1s', drift: '-10px' },
+  { left: '88%', size: 4, duration: '10.5s', delay: '6.4s', drift: '8px' },
+] as const;
+
+function FloatingMotes({ tint }: { tint: string }) {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      {MOTES.map((m, i) => (
+        <span
+          key={i}
+          className="ag-float-mote absolute bottom-0 rounded-full"
+          style={{
+            left: m.left,
+            width: m.size,
+            height: m.size,
+            background: tint,
+            boxShadow: `0 0 ${m.size * 2.5}px ${tint}`,
+            '--mote-duration': m.duration,
+            '--mote-delay': m.delay,
+            '--mote-drift-x': m.drift,
+          } as CSSProperties}
+        />
+      ))}
+    </div>
+  );
+}
 
 type TabKey = 'login' | 'register' | 'apikey';
 
@@ -492,32 +526,35 @@ export default function LoginPage() {
     { icon: <BarChart3 className="w-4 h-4" />, title: t('auth.feature_3'), desc: t('auth.feature_3_desc') },
   ];
 
-  // Monolith：左面板是恒黑幕布（不随主题翻转），只有黑、白、光
-  const inkFaint = 'rgba(255,255,255,0.55)';
-  const inkDim = 'rgba(255,255,255,0.38)';
-  const inkLine = 'rgba(255,255,255,0.14)';
+  // 左面板恒为深林墨（不随主题翻转）——品牌时刻的固定基调，与右侧随主题翻转的纸面表单区形成对比
+  const inkFaint = 'rgba(247,243,234,0.62)';
+  const inkDim = 'rgba(247,243,234,0.4)';
+  const inkLine = 'rgba(247,243,234,0.16)';
+  const inkFull = '#f7f3ea';
 
   return (
-    <div className="min-h-screen flex relative overflow-hidden bg-bg-deep text-text">
-      {/* ===== 左侧：黑幕光几何海报（桌面端，恒定纯黑） ===== */}
+    <div className="flex min-h-screen relative overflow-hidden bg-bg text-text lg:flex-row flex-col">
+      {/* ===== 左侧：深林墨海报（桌面端，恒定深绿黑） ===== */}
       <div
-        className="hidden lg:flex lg:w-[45%] xl:w-[50%] relative flex-col justify-between overflow-hidden p-10 xl:p-14"
-        style={{ background: '#000', color: '#f4f4f4' }}
+        className="ag-organic-canvas relative hidden flex-col justify-between overflow-hidden p-10 lg:flex lg:w-[44%] xl:w-[46%] xl:p-14"
+        style={{ background: 'radial-gradient(120% 120% at 18% -8%, #1c3a25 0%, #0e1c14 52%, #070c09 100%)', color: inkFull }}
       >
-        {/* 中央辉光 */}
+        {/* 中央柔光 */}
         <div
           aria-hidden
-          className="pointer-events-none absolute left-1/2 top-[38%] h-[26rem] w-[26rem] -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{ background: 'radial-gradient(closest-side, rgba(255,255,255,0.14), transparent 70%)' }}
+          className="ag-blob-drift pointer-events-none absolute left-1/2 top-[36%] h-[28rem] w-[28rem] -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ background: 'radial-gradient(closest-side, rgba(154,214,166,0.22), transparent 72%)' }}
         />
+        <FloatingMotes tint="rgba(198,224,178,0.85)" />
 
         {/* 品牌 */}
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={site.site_logo || defaultLogoUrl} alt="" className="h-8 w-8 rounded-md object-cover" />
-            <span className="text-base font-semibold tracking-tight">{site.site_name || 'AirGate'}</span>
+            <img src={site.site_logo || defaultLogoUrl} alt="" className="h-8 w-8 rounded-[var(--radius-md)] object-cover" />
+            <span className="font-display text-base font-semibold tracking-tight">{site.site_name || 'AirGate'}</span>
           </div>
-          <span className="font-mono text-[10px] uppercase tracking-[0.28em]" style={{ color: inkDim }}>
+          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.28em]" style={{ color: inkDim }}>
+            <Sprout className="h-3 w-3" strokeWidth={2.25} />
             AI Gateway
           </span>
         </div>
@@ -525,30 +562,30 @@ export default function LoginPage() {
         {/* 发光几何 + 主题句 */}
         <div className="relative z-10 flex flex-col items-center text-center">
           <span
-            className="ag-breathe mb-10 flex h-20 w-20 items-center justify-center rounded-2xl"
-            style={{ background: '#fff' }}
+            className="ag-breathe mb-10 flex h-20 w-20 items-center justify-center rounded-[var(--radius-lg)]"
+            style={{ background: inkFull }}
           >
-            <img src={site.site_logo || defaultLogoUrl} alt="" className="h-14 w-14 rounded-xl object-cover" />
+            <img src={site.site_logo || defaultLogoUrl} alt="" className="h-14 w-14 rounded-[var(--radius-md)] object-cover" />
           </span>
-          <h2 className="text-[2.5rem] xl:text-[3rem] font-semibold leading-[1.1] tracking-[-0.03em] mb-5" style={{ color: '#fff' }}>
+          <h2 className="font-display mb-5 text-[2.5rem] font-medium leading-[1.12] tracking-[-0.02em] xl:text-[3rem]" style={{ color: inkFull }}>
             {t('auth.welcome_title_1')}
             <br />
             {t('auth.welcome_title_2')}
           </h2>
-          <p className="text-sm xl:text-[15px] leading-relaxed max-w-md" style={{ color: inkFaint }}>
+          <p className="max-w-md text-sm leading-relaxed xl:text-[15px]" style={{ color: inkFaint }}>
             {t('auth.welcome_desc')}
           </p>
         </div>
 
-        {/* 扫描线 + 特性（等宽大写索引） */}
+        {/* 有机分隔线 + 特性（等宽大写索引） */}
         <div className="relative z-10">
           <div className="ag-scanline mb-6" style={{ background: inkLine }} />
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between xl:gap-6">
             {features.map((f) => (
               <div key={f.title} className="flex items-start gap-3 xl:max-w-[30%]">
-                <span className="mt-0.5 shrink-0" style={{ color: '#fff' }}>{f.icon}</span>
+                <span className="mt-0.5 shrink-0" style={{ color: inkFull }}>{f.icon}</span>
                 <span className="min-w-0">
-                  <span className="block font-mono text-[11px] font-medium uppercase tracking-[0.14em]" style={{ color: '#fff' }}>
+                  <span className="block font-mono text-[11px] font-medium uppercase tracking-[0.14em]" style={{ color: inkFull }}>
                     {f.title}
                   </span>
                   <span className="mt-1 block text-xs leading-relaxed" style={{ color: inkDim }}>{f.desc}</span>
@@ -559,12 +596,19 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* ===== 右侧表单区 ===== */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-8 bg-bg-deep relative">
+      {/* ===== 右侧表单区（暖纸面，随主题翻转）——与首页共用同一套有机画布纹理，视觉语言统一 ===== */}
+      <div className="ag-organic-canvas relative flex flex-1 items-center justify-center overflow-hidden p-6 sm:p-8">
+        {/* 接缝柔光：贴左侧品牌墨绿向右侧渗透一层极淡色带，弥合两块面板的色相断层 */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 w-24"
+          style={{ background: 'linear-gradient(90deg, color-mix(in oklab, var(--ag-primary) 10%, transparent), transparent)' }}
+        />
+
         {/* 主题切换按钮 */}
         <Button
           aria-label={theme === 'dark' ? t('common.toggle_theme_light') : t('common.toggle_theme_dark')}
-          className="absolute top-4 right-4 z-10"
+          className="absolute right-4 top-4 z-10"
           isIconOnly
           size="sm"
           variant="ghost"
@@ -572,13 +616,20 @@ export default function LoginPage() {
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </Button>
-        <div className="relative w-full max-w-[420px]">
-          {/* 移动端 Logo */}
-          <div className="text-center mb-8 lg:hidden">
-            <img src={site.site_logo || defaultLogoUrl} alt="" className="w-11 h-11 rounded-sm mb-3 mx-auto object-cover" />
-            <h1 className="text-lg font-bold text-text">
+
+        <div className="ag-page-body relative w-full max-w-[420px]">
+          {/* 移动端品牌区：圆润徽标 + 站名 + 标语，呼应桌面端左面板的品牌时刻 */}
+          <div className="mb-8 flex flex-col items-center text-center lg:hidden">
+            <span className="ag-breathe mb-4 flex h-14 w-14 items-center justify-center rounded-[var(--radius-lg)] bg-primary shadow-[var(--ag-shadow-md)]">
+              <img src={site.site_logo || defaultLogoUrl} alt="" className="h-10 w-10 rounded-[var(--radius-md)] object-cover" />
+            </span>
+            <h1 className="font-display text-xl font-medium tracking-tight text-text">
               {site.site_name || t('app_name')}
             </h1>
+            <span className="mt-1.5 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.24em] text-text-tertiary">
+              <Sprout className="h-3 w-3" strokeWidth={2.25} />
+              AI Gateway
+            </span>
           </div>
 
           {/* Tab 切换 */}
@@ -601,7 +652,7 @@ export default function LoginPage() {
           </Tabs>
 
           {/* 表单 */}
-          <Card>
+          <Card className="shadow-[var(--ag-shadow-lg)]">
             <Card.Content className="p-6">
             {registerSuccess && activeTab === 'login' && (
               <Alert status="success" className="mb-5">
@@ -623,7 +674,7 @@ export default function LoginPage() {
 
           {/* 底部 */}
           <div className="mt-6 flex flex-col items-center gap-2">
-            <p className="text-center text-[10px] text-text-tertiary font-mono uppercase">
+            <p className="text-center text-[10px] text-text-tertiary font-mono uppercase tracking-[0.14em]">
               Powered by {site.site_name || 'AirGate'}
             </p>
           </div>

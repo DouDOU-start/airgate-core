@@ -129,16 +129,26 @@
 .ag-dashboard-metric,
 .ag-dashboard-toolbar {
   border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--ag-shadow-sm);
-  transition: border-color 200ms ease;
+  transition: border-color var(--ag-transition), box-shadow var(--ag-transition), transform var(--ag-transition);
 }
 
-/* Monolith 签名交互：悬停时边框提亮 */
+/* 有机签名交互：悬停轻微上浮 + 柔光阴影加深，替代冷调纯边框提亮 */
 .ag-dashboard-panel:hover,
 .ag-dashboard-metric:hover {
   border-color: var(--ag-border-strong);
+  box-shadow: var(--ag-shadow-md);
+  transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .ag-dashboard-panel:hover,
+  .ag-dashboard-metric:hover {
+    transform: none;
+  }
 }
 
 .ag-dashboard-panel,

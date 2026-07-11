@@ -1,22 +1,18 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Card } from '@heroui/react';
 
-/** 指标卡图标底色的预设色调（tailwind 类，带暗色适配） */
+/** 指标卡图标底色的预设色调：有机花园调色板，每个色调映射到 theme-vars.css 里的 --ag-tone-* */
 export type MetricTone = 'blue' | 'violet' | 'emerald' | 'teal' | 'amber' | 'indigo' | 'purple' | 'rose';
 
-/* Monolith：黑白系统里图标底一律中性，彩色只留给语义状态。
-   保留 tone API 以免改动所有调用点，但所有色调映射到同一套中性样式。 */
-const NEUTRAL_TONE = 'bg-surface-secondary text-text-secondary ring-border';
-
-export const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
-  amber: NEUTRAL_TONE,
-  blue: NEUTRAL_TONE,
-  emerald: NEUTRAL_TONE,
-  indigo: NEUTRAL_TONE,
-  purple: NEUTRAL_TONE,
-  rose: NEUTRAL_TONE,
-  teal: NEUTRAL_TONE,
-  violet: NEUTRAL_TONE,
+export const METRIC_TONE_VARS: Record<MetricTone, string> = {
+  amber: '--ag-tone-amber',
+  blue: '--ag-tone-blue',
+  emerald: '--ag-tone-emerald',
+  indigo: '--ag-tone-indigo',
+  purple: '--ag-tone-purple',
+  rose: '--ag-tone-rose',
+  teal: '--ag-tone-teal',
+  violet: '--ag-tone-violet',
 };
 
 /**
@@ -36,12 +32,13 @@ export function StatCard({
   tone?: MetricTone;
   value: ReactNode;
 }) {
-  const accentStyle: CSSProperties | undefined = accentColor
+  const toneColor = accentColor ?? (tone ? `var(${METRIC_TONE_VARS[tone]})` : undefined);
+  const iconStyle: CSSProperties | undefined = toneColor
     ? {
-        background: `color-mix(in srgb, ${accentColor} 14%, transparent)`,
-        color: accentColor,
-        borderColor: `color-mix(in srgb, ${accentColor} 24%, transparent)`,
-      }
+        background: `color-mix(in oklab, ${toneColor} 14%, transparent)`,
+        color: toneColor,
+        '--tw-ring-color': `color-mix(in oklab, ${toneColor} 26%, transparent)`,
+      } as CSSProperties
     : undefined;
 
   return (
@@ -56,8 +53,8 @@ export function StatCard({
           </div>
         </div>
         <span
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 shadow-sm 2xl:h-11 2xl:w-11 ${tone ? METRIC_TONE_CLASSES[tone] : ''}`}
-          style={accentStyle}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--field-radius)] ring-1 ring-border shadow-sm 2xl:h-11 2xl:w-11"
+          style={iconStyle}
         >
           {icon}
         </span>

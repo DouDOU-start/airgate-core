@@ -25,10 +25,9 @@
   --skeleton-animation: shimmer;
 
   /* HeroUI radius preset */
-  --radius: 0.375rem;
-  --field-radius: 0.5rem;
-  --font-geist: var(--ag-font-sans);
-  --font-sans: var(--font-geist);
+  --radius: var(--ag-radius-md);
+  --field-radius: var(--ag-field-radius);
+  --font-sans: var(--ag-font-sans);
   --font-display: var(--ag-font-display);
   --font-mono: var(--ag-font-mono);
 
@@ -52,6 +51,10 @@
   --accent-hover: var(--ag-primary-hover);
   --accent-soft: var(--ag-primary-subtle);
   --accent-soft-foreground: var(--ag-primary);
+
+  --secondary: var(--ag-secondary);
+  --secondary-foreground: var(--ag-secondary-foreground);
+  --secondary-soft: var(--ag-secondary-subtle);
 
   --success: var(--ag-success);
   --success-foreground: var(--ag-success-foreground);
@@ -125,6 +128,10 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-soft-foreground: var(--accent-soft-foreground);
 
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-soft: var(--secondary-soft);
+
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-success-subtle: var(--ag-success-subtle);
@@ -180,7 +187,7 @@
   --color-glass-border: var(--ag-glass-border);
 
   /* ── Font Family ── */
-  --font-sans: var(--font-geist);
+  --font-sans: var(--ag-font-sans);
   --font-display: var(--ag-font-display);
   --font-mono: var(--ag-font-mono);
 
@@ -189,4 +196,13 @@
   --shadow-md: var(--surface-shadow);
   --shadow-lg: var(--overlay-shadow);
   --shadow-glow: var(--ag-shadow-glow);
+
+  /* ── Radius Scale ──
+     覆盖 Tailwind 内置 radius 刻度，让全站 rounded-lg/xl/2xl 统一跟随「有机纸感」圆度 */
+  --radius-sm: var(--ag-radius-sm);
+  --radius-md: var(--ag-radius-md);
+  --radius-lg: var(--ag-radius-lg);
+  --radius-xl: var(--ag-radius-xl);
+  --radius-2xl: 2.25rem;
+  --radius-3xl: 3rem;
 }

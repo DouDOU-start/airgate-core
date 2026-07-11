@@ -183,16 +183,16 @@
   padding-block: clamp(1rem, 3vh, 3rem) !important;
 }
 
-/* 弹窗遮罩：一层安静的墨色 veil，让纸面卡片浮起来 */
+/* 弹窗遮罩：一层安静的暖墨色 veil，让纸面卡片浮起来 */
 .modal__backdrop,
 .modal__backdrop--opaque,
 .modal__backdrop--blur,
 .alert-dialog__backdrop,
 .alert-dialog__backdrop--opaque,
 .alert-dialog__backdrop--blur {
-  background: color-mix(in oklab, oklch(20% 0.02 275) 42%, transparent) !important;
-  -webkit-backdrop-filter: saturate(90%) blur(6px);
-  backdrop-filter: saturate(90%) blur(6px);
+  background: color-mix(in oklab, oklch(18% 0.025 55) 40%, transparent) !important;
+  -webkit-backdrop-filter: saturate(92%) blur(6px);
+  backdrop-filter: saturate(92%) blur(6px);
   animation: none;
 }
 
@@ -208,16 +208,16 @@
 .dark .alert-dialog__backdrop,
 .dark .alert-dialog__backdrop--opaque,
 .dark .alert-dialog__backdrop--blur {
-  background: color-mix(in oklab, oklch(8% 0.015 275) 58%, transparent) !important;
+  background: color-mix(in oklab, oklch(6% 0.015 55) 58%, transparent) !important;
 }
 
-/* 弹窗卡片：hairline 边 + 深浮影 */
+/* 弹窗卡片：hairline 边 + 柔光浮影 */
 .ag-elevation-modal {
   position: relative;
   overflow: hidden;
   max-height: min(86dvh, 62rem) !important;
   border: 1px solid var(--border) !important;
-  border-radius: 0.75rem !important;
+  border-radius: var(--radius-lg) !important;
   background: var(--overlay) !important;
   color: var(--overlay-foreground) !important;
   box-shadow: var(--overlay-shadow) !important;
@@ -234,11 +234,11 @@
   border-color: color-mix(in oklab, var(--border) 90%, var(--foreground) 10%) !important;
 }
 
-/* 主按钮：白/黑实色反转 + hover 辉光（Monolith 签名） */
+/* 主按钮：苔藓绿实色 + hover 柔光晕染 */
 .button--primary {
   background: var(--accent) !important;
   color: var(--accent-foreground) !important;
-  box-shadow: 0 1px 2px 0 color-mix(in oklab, black 20%, transparent) !important;
+  box-shadow: 0 1px 3px 0 color-mix(in oklab, var(--ag-text) 22%, transparent) !important;
   transition: box-shadow 180ms ease, background-color 180ms ease !important;
 }
 
@@ -475,7 +475,7 @@
 .popover {
   max-height: min(28rem, calc(100dvh - 6rem)) !important;
   border: 1px solid color-mix(in oklab, var(--border) 80%, transparent) !important;
-  border-radius: 0.75rem !important;
+  border-radius: var(--radius-md) !important;
   background: var(--overlay) !important;
   color: var(--overlay-foreground) !important;
   box-shadow: var(--overlay-shadow) !important;

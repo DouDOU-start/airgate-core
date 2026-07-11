@@ -37,15 +37,17 @@
     transform: translateX(365%);
   }
 }
-/* 辉光呼吸：发光几何体专用 */
+/* 柔光呼吸：品牌几何体专用，暖色辉光 + 轻微起伏，模拟自然呼吸节律 */
 @keyframes ag-breathe {
   0%,
   100% {
-    filter: drop-shadow(0 0 12px color-mix(in oklab, var(--foreground) 30%, transparent));
+    filter: drop-shadow(0 0 14px color-mix(in oklab, var(--accent) 32%, transparent));
+    transform: translateY(0);
   }
 
   50% {
-    filter: drop-shadow(0 0 32px color-mix(in oklab, var(--foreground) 60%, transparent));
+    filter: drop-shadow(0 0 34px color-mix(in oklab, var(--accent) 55%, transparent));
+    transform: translateY(-0.25rem);
   }
 }
 
@@ -85,6 +87,58 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ag-page-body > * {
+    animation: none;
+  }
+}
+
+/* 浮尘光点：Hero 暗幕板上缓慢升起并消散的光点，营造"有生命感"的静谧氛围 */
+@keyframes ag-float-mote {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.75);
+    opacity: 0;
+  }
+
+  12% {
+    opacity: 0.85;
+  }
+
+  55% {
+    transform: translate3d(var(--mote-drift-x, 8px), -64px, 0) scale(1);
+    opacity: 0.7;
+  }
+
+  100% {
+    transform: translate3d(calc(var(--mote-drift-x, 8px) * 1.7), -132px, 0) scale(0.6);
+    opacity: 0;
+  }
+}
+
+.ag-float-mote {
+  animation: ag-float-mote var(--mote-duration, 9s) ease-in-out infinite;
+  animation-delay: var(--mote-delay, 0s);
+}
+
+/* 光斑漂移：背景柔光色块的极缓慢呼吸位移，避免静态背景显得呆板 */
+@keyframes ag-blob-drift {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate(2%, -3%) scale(1.06);
+  }
+}
+
+.ag-blob-drift {
+  animation: ag-blob-drift 18s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .ag-float-mote,
+  .ag-blob-drift {
     animation: none;
   }
 }

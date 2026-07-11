@@ -4,8 +4,9 @@
 
 @import "tailwindcss";
 @import "@heroui/styles";
-@import "@fontsource/geist-sans/latin.css";
-@import "@fontsource/geist-mono/latin.css";
+@import "@fontsource-variable/fraunces/soft.css";
+@import "@fontsource-variable/hanken-grotesk/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
 
 @import "./styles/theme-vars.css";
 @import "./styles/theme.css";
