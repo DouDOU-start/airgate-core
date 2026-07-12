@@ -24,12 +24,14 @@ export function GroupFormModal({
   const { t } = useTranslation();
   const isEdit = !!group;
 
+  // 数字字段以字符串存储：受控数字输入若每次 onChange 都 Number() 往返，
+  // 会把 "0." / "0.0" 等小数中间态吃成 0（输入 0.01 时光标"跳"），故保留输入原文，提交时再转。
   const buildForm = () => ({
     is_exclusive: group?.is_exclusive ?? false,
     name: group?.name ?? '',
     note: group?.note ?? '',
-    rate_multiplier: group?.rate_multiplier ?? 1,
-    sort_weight: group?.sort_weight ?? 0,
+    rate_multiplier: String(group?.rate_multiplier ?? 1),
+    sort_weight: String(group?.sort_weight ?? 0),
     status_visible: group?.status_visible ?? true,
   });
 
@@ -44,7 +46,11 @@ export function GroupFormModal({
 
   const handleSubmit = () => {
     if (!isEdit && !form.name) return;
-    onSubmit(form);
+    onSubmit({
+      ...form,
+      rate_multiplier: form.rate_multiplier === '' ? 1 : Number(form.rate_multiplier),
+      sort_weight: form.sort_weight === '' ? 0 : Number(form.sort_weight),
+    });
   };
 
   const modalState = useOverlayState({
@@ -87,8 +93,8 @@ export function GroupFormModal({
           <Input
             type="number"
             step="0.1"
-            value={String(form.rate_multiplier)}
-            onChange={(e) => setForm({ ...form, rate_multiplier: Number(e.target.value) })}
+            value={form.rate_multiplier}
+            onChange={(e) => setForm({ ...form, rate_multiplier: e.target.value })}
           />
         </HeroTextField>
 
@@ -113,8 +119,8 @@ export function GroupFormModal({
             <Input
               className="pl-9"
               type="number"
-              value={String(form.sort_weight)}
-              onChange={(e) => setForm({ ...form, sort_weight: Number(e.target.value) })}
+              value={form.sort_weight}
+              onChange={(e) => setForm({ ...form, sort_weight: e.target.value })}
             />
           </div>
           <Description>{t('groups.sort_weight_hint')}</Description>

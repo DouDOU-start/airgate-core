@@ -20,6 +20,8 @@ export function BalanceModal({ open, user, defaultAction, onClose, onSubmit, loa
     amount: 0,
     remark: t('users.remark_admin_adjust'),
   });
+  // 金额输入原文（字符串）：避免受控数字输入每次 Number() 往返吃掉 "0." 等小数中间态。
+  const [amountInput, setAmountInput] = useState('0');
 
   const isRefund = defaultAction === 'subtract';
   const afterBalance = useMemo(() => {
@@ -72,9 +74,12 @@ export function BalanceModal({ open, user, defaultAction, onClose, onSubmit, loa
                         min="0"
                         max={isRefund ? String(user.balance) : undefined}
                         step="0.01"
-                        value={String(form.amount)}
+                        value={amountInput}
                         onChange={(e) => {
-                          const value = Number(e.target.value);
+                          const raw = e.target.value;
+                          setAmountInput(raw);
+                          const n = raw === '' ? 0 : Number(raw);
+                          const value = Number.isFinite(n) ? n : 0;
                           setForm({ ...form, amount: isRefund ? Math.min(value, user.balance) : value });
                         }}
                         required
@@ -82,7 +87,7 @@ export function BalanceModal({ open, user, defaultAction, onClose, onSubmit, loa
                     </div>
                   </HeroTextField>
                   {isRefund ? (
-                    <Button size="sm" variant="ghost" onPress={() => setForm({ ...form, amount: user.balance })}>
+                    <Button size="sm" variant="ghost" onPress={() => { setAmountInput(String(user.balance)); setForm({ ...form, amount: user.balance }); }}>
                       {t('users.withdraw_all')}
                     </Button>
                   ) : null}
