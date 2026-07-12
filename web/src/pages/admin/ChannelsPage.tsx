@@ -393,8 +393,14 @@ export default function ChannelsPage() {
     setBatchBalanceRunning(true);
     let ok = 0;
     try {
-      const all = await channelsApi.list({ page: 1, page_size: 1000 });
-      const keys = all.list.flatMap((ch) => ch.keys).filter((k) => k.type === 'openai_compatible');
+      // 按 100（后端 page_size 上限）分页循环拉全部渠道，避免单页超限被 400。
+      const channels: ChannelResp[] = [];
+      for (let page = 1; ; page += 1) {
+        const resp = await channelsApi.list({ page, page_size: 100 });
+        channels.push(...resp.list);
+        if (resp.list.length === 0 || channels.length >= resp.total) break;
+      }
+      const keys = channels.flatMap((ch) => ch.keys).filter((k) => k.type === 'openai_compatible');
       const total = keys.length;
       if (total === 0) {
         toast('info', t('channels.balance_batch_none'));

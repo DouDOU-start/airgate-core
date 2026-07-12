@@ -98,15 +98,16 @@ type UsageFilterQuery struct {
 
 // UsageStatsResp 聚合统计响应
 type UsageStatsResp struct {
-	TotalRequests   int64          `json:"total_requests"`
-	TotalTokens     int64          `json:"total_tokens"`
-	TotalCost       float64        `json:"total_cost"`
-	TotalActualCost float64        `json:"total_actual_cost"`
-	TotalBilledCost float64        `json:"total_billed_cost,omitempty"` // 客户视角 / reseller scope 的账面费用；admin scope omit
-	ByModel         []ModelStats   `json:"by_model,omitempty"`
-	ByUser          []UserStats    `json:"by_user,omitempty"`
-	ByChannel       []ChannelStats `json:"by_channel,omitempty"`
-	ByGroup         []GroupStats   `json:"by_group,omitempty"`
+	TotalRequests   int64             `json:"total_requests"`
+	TotalTokens     int64             `json:"total_tokens"`
+	TotalCost       float64           `json:"total_cost"`
+	TotalActualCost float64           `json:"total_actual_cost"`
+	TotalBilledCost float64           `json:"total_billed_cost,omitempty"` // 客户视角 / reseller scope 的账面费用；admin scope omit
+	ByModel         []ModelStats      `json:"by_model,omitempty"`
+	ByUser          []UserStats       `json:"by_user,omitempty"`
+	ByChannel       []ChannelStats    `json:"by_channel,omitempty"`
+	ByChannelKey    []ChannelKeyStats `json:"by_channel_key,omitempty"`
+	ByGroup         []GroupStats      `json:"by_group,omitempty"`
 }
 
 // ModelStats 按模型统计
@@ -139,6 +140,18 @@ type ChannelStats struct {
 	TotalCost  float64 `json:"total_cost"`
 	ActualCost float64 `json:"actual_cost"`
 	BilledCost float64 `json:"billed_cost,omitempty"`
+}
+
+// ChannelKeyStats 按密钥端点统计。name 为 key 标签（可空），channel_name 为所属渠道名。
+type ChannelKeyStats struct {
+	ChannelKeyID int64   `json:"channel_key_id"`
+	Name         string  `json:"name"`
+	ChannelName  string  `json:"channel_name"`
+	Requests     int64   `json:"requests"`
+	Tokens       int64   `json:"tokens"`
+	TotalCost    float64 `json:"total_cost"`
+	ActualCost   float64 `json:"actual_cost"`
+	BilledCost   float64 `json:"billed_cost,omitempty"`
 }
 
 // GroupStats 按分组统计

@@ -132,6 +132,18 @@ func toUsageStatsResp(result appusage.StatsResult) dto.UsageStatsResp {
 			BilledCost: item.BilledCost,
 		})
 	}
+	for _, item := range result.ByChannelKey {
+		resp.ByChannelKey = append(resp.ByChannelKey, dto.ChannelKeyStats{
+			ChannelKeyID: item.ChannelKeyID,
+			Name:         item.Name,
+			ChannelName:  item.ChannelName,
+			Requests:     item.Requests,
+			Tokens:       item.Tokens,
+			TotalCost:    item.TotalCost,
+			ActualCost:   item.ActualCost,
+			BilledCost:   item.BilledCost,
+		})
+	}
 	for _, item := range result.ByGroup {
 		resp.ByGroup = append(resp.ByGroup, dto.GroupStats{
 			GroupID:    item.GroupID,

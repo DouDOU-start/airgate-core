@@ -206,6 +206,12 @@ func (s *Service) AdminStats(ctx context.Context, filter StatsFilter, groupBy st
 					result.ByChannel = stats
 					return err
 				})
+			case "channel_key":
+				g.Go(func() error {
+					stats, err := s.repo.StatsByChannelKey(gctx, filter)
+					result.ByChannelKey = stats
+					return err
+				})
 			case "group":
 				g.Go(func() error {
 					stats, err := s.repo.StatsByGroup(gctx, filter)
@@ -253,13 +259,14 @@ func normalizeStatsGroupBy(groupBy string) string {
 		return ""
 	}
 	allowed := map[string]struct{}{
-		"model":   {},
-		"user":    {},
-		"channel": {},
-		"group":   {},
+		"model":       {},
+		"user":        {},
+		"channel":     {},
+		"channel_key": {},
+		"group":       {},
 	}
 	seen := make(map[string]struct{})
-	dimensions := make([]string, 0, 4)
+	dimensions := make([]string, 0, 5)
 	for _, item := range strings.Split(groupBy, ",") {
 		dimension := strings.TrimSpace(item)
 		if _, ok := allowed[dimension]; !ok {

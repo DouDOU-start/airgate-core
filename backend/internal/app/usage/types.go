@@ -152,13 +152,27 @@ type GroupStats struct {
 	BilledCost float64
 }
 
+// ChannelKeyStats 按密钥端点（channel_key）统计。Name 为 key 标签（可空），
+// ChannelName 为所属渠道名，供前端在 key 无名时兜底展示。
+type ChannelKeyStats struct {
+	ChannelKeyID int64  `json:"channel_key_id"`
+	Name         string `json:"name"`
+	ChannelName  string `json:"channel_name"`
+	Requests     int64  `json:"requests"`
+	Tokens       int64  `json:"tokens"`
+	TotalCost    float64
+	ActualCost   float64
+	BilledCost   float64
+}
+
 // StatsResult 管理员统计结果。
 type StatsResult struct {
 	Summary
-	ByModel   []ModelStats
-	ByUser    []UserStats
-	ByChannel []ChannelStats
-	ByGroup   []GroupStats
+	ByModel      []ModelStats
+	ByUser       []UserStats
+	ByChannel    []ChannelStats
+	ByChannelKey []ChannelKeyStats
+	ByGroup      []GroupStats
 }
 
 // UserStatsResult 当前用户统计页需要的完整聚合结果。
@@ -204,6 +218,7 @@ type Repository interface {
 	StatsByModel(context.Context, StatsFilter) ([]ModelStats, error)
 	StatsByUser(context.Context, StatsFilter) ([]UserStats, error)
 	StatsByChannel(context.Context, StatsFilter) ([]ChannelStats, error)
+	StatsByChannelKey(context.Context, StatsFilter) ([]ChannelKeyStats, error)
 	StatsByGroup(context.Context, StatsFilter) ([]GroupStats, error)
 	TrendEntries(context.Context, TrendFilter) ([]TrendEntry, error)
 }

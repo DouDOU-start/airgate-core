@@ -127,4 +127,20 @@ BEGIN
         END IF;
     END LOOP;
 END $$`,
+
+	// 2026-07：usage_logs 曾有 platform 列（String NOT NULL 且无 DB 级默认值）。渠道多 key 化后
+	// platform 维度改由 channel_key_id → channel_keys.type 表达，schema 已删除该字段。但自动迁移
+	// 不删列（WithDropColumn(false)），存量库仍保留 platform NOT NULL，新计费记录（不含 platform）
+	// 写入即撞 not-null，导致整批 UsageLog 被丢弃。去掉 NOT NULL 放行插入（保留列供回滚，不删数据）；
+	// 全新库无此列则空转，幂等。
+	`DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'usage_logs'
+          AND column_name = 'platform' AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE usage_logs ALTER COLUMN platform DROP NOT NULL;
+    END IF;
+END $$`,
 }

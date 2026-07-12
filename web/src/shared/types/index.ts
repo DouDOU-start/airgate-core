@@ -474,6 +474,7 @@ export interface UsageStatsResp {
   by_model?: ModelStats[];
   by_user?: UserStats[];
   by_channel?: ChannelStats[];
+  by_channel_key?: ChannelKeyStats[];
   by_group?: GroupStats[];
 }
 
@@ -499,6 +500,17 @@ export interface UserStats {
 export interface ChannelStats {
   channel_id: number;
   name: string;
+  requests: number;
+  tokens: number;
+  total_cost: number;
+  actual_cost: number;
+  billed_cost?: number;
+}
+
+export interface ChannelKeyStats {
+  channel_key_id: number;
+  name: string;
+  channel_name: string;
   requests: number;
   tokens: number;
   total_cost: number;

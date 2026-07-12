@@ -11,6 +11,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	entchannel "github.com/DouDOU-start/airgate-core/ent/channel"
+	entchannelkey "github.com/DouDOU-start/airgate-core/ent/channelkey"
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -283,6 +284,80 @@ func (s *UsageStore) StatsByChannel(ctx context.Context, filter appusage.StatsFi
 	sort.Slice(result, func(i, j int) bool {
 		if result[i].Requests == result[j].Requests {
 			return result[i].ChannelID < result[j].ChannelID
+		}
+		return result[i].Requests > result[j].Requests
+	})
+	return result, nil
+}
+
+// StatsByChannelKey 按密钥端点（channel_key）分组统计。
+func (s *UsageStore) StatsByChannelKey(ctx context.Context, filter appusage.StatsFilter) ([]appusage.ChannelKeyStats, error) {
+	query := s.db.UsageLog.Query()
+	if filter.UserID != nil {
+		query = query.Where(usageUserPredicate(*filter.UserID))
+	}
+	query = applyUsageStatsFilter(query, filter)
+
+	var rows []struct {
+		ChannelKeyID int     `json:"channel_key_usage_logs"`
+		Count        int     `json:"count"`
+		InputTokens  int64   `json:"input_tokens"`
+		OutputTokens int64   `json:"output_tokens"`
+		TotalCost    float64 `json:"total_cost"`
+		ActualCost   float64 `json:"actual_cost"`
+		BilledCost   float64 `json:"billed_cost"`
+	}
+	err := query.GroupBy("channel_key_usage_logs").
+		Aggregate(
+			ent.Count(),
+			ent.As(ent.Sum(entusagelog.FieldInputTokens), "input_tokens"),
+			ent.As(ent.Sum(entusagelog.FieldOutputTokens), "output_tokens"),
+			ent.As(ent.Sum(entusagelog.FieldTotalCost), "total_cost"),
+			ent.As(ent.Sum(entusagelog.FieldActualCost), "actual_cost"),
+			ent.As(ent.Sum(entusagelog.FieldBilledCost), "billed_cost"),
+		).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+
+	keyIDs := make([]int, 0, len(rows))
+	for _, row := range rows {
+		if row.ChannelKeyID > 0 {
+			keyIDs = append(keyIDs, row.ChannelKeyID)
+		}
+	}
+	nameMap := make(map[int]string)
+	channelNameMap := make(map[int]string)
+	if len(keyIDs) > 0 {
+		keys, err := s.db.ChannelKey.Query().Where(entchannelkey.IDIn(keyIDs...)).WithChannel().All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range keys {
+			nameMap[item.ID] = item.Name
+			if ch, err := item.Edges.ChannelOrErr(); err == nil {
+				channelNameMap[item.ID] = ch.Name
+			}
+		}
+	}
+
+	result := make([]appusage.ChannelKeyStats, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, appusage.ChannelKeyStats{
+			ChannelKeyID: int64(row.ChannelKeyID),
+			Name:         nameMap[row.ChannelKeyID],
+			ChannelName:  channelNameMap[row.ChannelKeyID],
+			Requests:     int64(row.Count),
+			Tokens:       row.InputTokens + row.OutputTokens,
+			TotalCost:    row.TotalCost,
+			ActualCost:   row.ActualCost,
+			BilledCost:   row.BilledCost,
+		})
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Requests == result[j].Requests {
+			return result[i].ChannelKeyID < result[j].ChannelKeyID
 		}
 		return result[i].Requests > result[j].Requests
 	})

@@ -118,6 +118,10 @@ func (s *stubUsageRepository) StatsByChannel(ctx context.Context, filter StatsFi
 	return nil, nil
 }
 
+func (s *stubUsageRepository) StatsByChannelKey(context.Context, StatsFilter) ([]ChannelKeyStats, error) {
+	return nil, nil
+}
+
 func (s *stubUsageRepository) StatsByGroup(ctx context.Context, filter StatsFilter) ([]GroupStats, error) {
 	if s.statsByGroupFn != nil {
 		return s.statsByGroupFn(ctx, filter)

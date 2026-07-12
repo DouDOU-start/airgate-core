@@ -13,7 +13,8 @@ import { queryKeys } from '../../shared/queryKeys';
 import { UpstreamLogsTable } from './usage/UpstreamLogsTable';
 import { Activity, Coins, Hash, Search } from 'lucide-react';
 import { useUsageColumns, type UsageColumnConfig } from '../../shared/columns/usageColumns';
-import type { APIKeyResp, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
+import type { APIKeyResp, ChannelKeyStats, UsageLogResp, UsageQuery, UsageTrendBucket } from '../../shared/types';
+import type { TFunction } from 'i18next';
 import { CompactDataTable } from '../../shared/components/CompactDataTable';
 import { DashboardCard } from '../../shared/components/DashboardCard';
 import { StatCard } from '../../shared/components/StatCard';
@@ -41,6 +42,7 @@ const groupByKeys: Record<string, string> = {
   model: 'usage.by_model',
   user: 'usage.by_user',
   channel: 'usage.by_channel',
+  channel_key: 'usage.by_channel_key',
   group: 'usage.by_group',
 };
 
@@ -48,10 +50,18 @@ const groupByHeaderKeys: Record<string, string> = {
   model: 'usage.model',
   user: 'usage.user_id',
   channel: 'usage.channel',
+  channel_key: 'usage.channel_key',
   group: 'usage.by_group',
 };
 
-const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,channel,user';
+const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,channel,channel_key,user';
+
+// 按 key 统计的展示名：未命名回退 #id，前缀所属渠道名；key 已删除（id=0）显示占位。
+function channelKeyStatName(s: ChannelKeyStats, t: TFunction): string {
+  if (s.channel_key_id <= 0) return t('usage.deleted_key');
+  const label = s.name || `#${s.channel_key_id}`;
+  return s.channel_name ? `${s.channel_name} · ${label}` : label;
+}
 const USAGE_PAGE_ACTIVATION_DELAY_MS = 180;
 const ADMIN_USAGE_AUTO_UPDATE_STORAGE_KEY = 'airgate.admin.usage.auto_update';
 const ADMIN_USAGE_HIDDEN_COLUMNS_STORAGE_KEY = 'airgate.admin.usage.hidden_columns';
@@ -430,21 +440,26 @@ export default function UsagePage() {
   // 渠道 + 渠道下 Key 级联筛选（可输入搜索）：渠道一次拉全，keys 内嵌于渠道响应，无需二次请求。
   const { data: channelsData } = useQuery({
     queryKey: queryKeys.channels('usage-filter'),
-    queryFn: () => channelsApi.list({ page: 1, page_size: 1000 }),
+    queryFn: () => channelsApi.list({ page: 1, page_size: 100 }),
     enabled: pageActive,
   });
   const channelList = channelsData?.list ?? [];
   const selectedChannel = channelList.find((ch) => ch.id === filters.channel_id);
 
   // 渠道搜索：客户端按名称过滤（渠道数量有限，无需服务端搜索）。
+  // 关键：输入框既显示已选渠道名、又当搜索词用。当输入等于已选渠道名时视为「仅展示选中项」
+  // 而非搜索，返回全量列表——否则选中后重新展开只剩当前渠道，无法切换到其它渠道。
   const [channelKeyword, setChannelKeyword] = useState('');
   const channelOptions = channelList.map((ch) => ({
     id: String(ch.id),
     label: ch.name,
     textValue: ch.name,
   }));
-  const visibleChannelOptions = channelKeyword.trim()
-    ? channelOptions.filter((o) => o.label.toLowerCase().includes(channelKeyword.trim().toLowerCase()))
+  const trimmedChannelKeyword = channelKeyword.trim();
+  const channelSearchActive = trimmedChannelKeyword.length > 0
+    && trimmedChannelKeyword !== (selectedChannel?.name ?? '').trim();
+  const visibleChannelOptions = channelSearchActive
+    ? channelOptions.filter((o) => o.label.toLowerCase().includes(trimmedChannelKeyword.toLowerCase()))
     : channelOptions;
 
   // 渠道下 Key 搜索：选项级联自选中渠道的内嵌 keys；名称为空时用尾 4 位 hint 兜底。
@@ -454,8 +469,14 @@ export default function UsagePage() {
     label: key.name || key.api_key_hint || `#${key.id}`,
     textValue: key.name || key.api_key_hint || String(key.id),
   }));
-  const visibleChannelKeyOptions = channelKeyKeyword.trim()
-    ? channelKeyOptions.filter((o) => o.label.toLowerCase().includes(channelKeyKeyword.trim().toLowerCase()))
+  const selectedChannelKeyLabel = channelKeyOptions.find(
+    (o) => o.id === (filters.channel_key_id ? String(filters.channel_key_id) : ''),
+  )?.label ?? '';
+  const trimmedChannelKeyKeyword = channelKeyKeyword.trim();
+  const channelKeySearchActive = trimmedChannelKeyKeyword.length > 0
+    && trimmedChannelKeyKeyword !== selectedChannelKeyLabel.trim();
+  const visibleChannelKeyOptions = channelKeySearchActive
+    ? channelKeyOptions.filter((o) => o.label.toLowerCase().includes(trimmedChannelKeyKeyword.toLowerCase()))
     : channelKeyOptions;
 
   // 清空渠道筛选（连带清空 Key 筛选与两处搜索词）。
@@ -599,13 +620,14 @@ export default function UsagePage() {
   const groupStatsRows: GroupStatsRow[] = useMemo(() => {
     if (!activeStats) return [];
     const dataMap: Record<string, GroupStatsRow[]> = {
-      channel: activeStats.by_channel?.map((s) => ({ key: s.channel_id, name: s.name, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      channel: activeStats.by_channel?.map((s) => ({ key: s.channel_id, name: s.name || (s.channel_id > 0 ? `#${s.channel_id}` : t('usage.deleted_channel')), requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
+      channel_key: activeStats.by_channel_key?.map((s) => ({ key: s.channel_key_id, name: channelKeyStatName(s, t), requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
       group: activeStats.by_group?.map((s) => ({ key: s.group_id, name: s.name || `#${s.group_id}`, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
       model: activeStats.by_model?.map((s) => ({ key: s.model, name: s.model, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
       user: activeStats.by_user?.map((s) => ({ key: s.user_id, name: s.email, requests: s.requests, tokens: s.tokens, total_cost: s.total_cost, actual_cost: s.actual_cost })) ?? [],
     };
     return dataMap[statsGroupBy] ?? [];
-  }, [activeStats, statsGroupBy]);
+  }, [activeStats, statsGroupBy, t]);
 
   const sharedColumns = useUsageColumns();
 
