@@ -334,12 +334,14 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 		if result.buildErr != nil {
 			f.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
 			refund("构建上游请求失败")
-			msg := outcome.SanitizeKeyLeak(result.buildErr.Error(), []string{apiKey})
-			writeError(c, http.StatusBadRequest, "invalid_request_error", "bad_request", msg)
+			// 用户可见消息额外抹掉上游渠道身份；管理端留痕保留渠道细节。
+			adminMsg := outcome.SanitizeKeyLeak(result.buildErr.Error(), []string{apiKey})
+			userMsg := outcome.SanitizeUpstreamLeak(result.buildErr.Error(), []string{apiKey}, ch.BaseURL)
+			writeError(c, http.StatusBadRequest, "invalid_request_error", "bad_request", userMsg)
 			f.recordFailure(c, keyInfo, sub.Model, start, errlog.Entry{
 				Phase: errlog.PhaseBadRequest, StatusCode: http.StatusBadRequest,
 				ErrorType: "invalid_request_error", ErrorCode: "bad_request",
-				Message: msg, Attempts: attempts,
+				Message: adminMsg, Attempts: attempts,
 				ChannelID: ch.ChannelID, ChannelName: ch.ChannelName,
 			})
 			return
@@ -410,7 +412,8 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 		default: // outcome.ClientError：语义重建终止，不重试；预扣退回。
 			refund("上游拒绝请求")
 			up := errfmt.ParseUpstream(result.statusCode, result.body)
-			up.Message = outcome.SanitizeKeyLeak(up.Message, []string{apiKey})
+			// 出口给用户前抹掉上游渠道身份（密钥 + base_url/主机/IP）。
+			up.Message = outcome.SanitizeUpstreamLeak(up.Message, []string{apiKey}, ch.BaseURL)
 			writeUpstreamError(c, result.statusCode, up)
 			hop := attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "clientError", o.Reason, 0, attemptLatency, false)
 			f.recordFailure(c, keyInfo, sub.Model, start, errlog.Entry{

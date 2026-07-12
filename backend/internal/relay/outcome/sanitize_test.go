@@ -84,3 +84,51 @@ func TestTruncateErrorMsg(t *testing.T) {
 		}
 	})
 }
+
+func TestSanitizeUpstreamLeak(t *testing.T) {
+	const baseURL = "https://api.reseller.example.com/v1"
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "抹掉 base_url 全串",
+			in:   "failed to reach " + baseURL + "/chat/completions",
+			want: "failed to reach [upstream]",
+		},
+		{
+			name: "抹掉裸主机名（无 scheme）",
+			in:   "dial tcp: lookup api.reseller.example.com: no such host",
+			want: "dial tcp: lookup [upstream]: no such host",
+		},
+		{
+			name: "抹掉裸 IP:port",
+			in:   "dial tcp 203.0.113.9:443: connect: connection refused",
+			want: "dial tcp [upstream]: connect: connection refused",
+		},
+		{
+			name: "抹掉任意上游 URL",
+			in:   "invalid url (POST https://cdn.other-host.net/api)",
+			want: "invalid url (POST [upstream])",
+		},
+		{
+			name: "同时抹掉密钥与主机",
+			in:   "unauthorized key sk-abcdefgh1234 at api.reseller.example.com",
+			want: "unauthorized key sk-***1234 at [upstream]",
+		},
+		{
+			name: "普通业务错误保持不变",
+			in:   "model not found",
+			want: "model not found",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := SanitizeUpstreamLeak(tc.in, []string{"sk-abcdefgh1234"}, baseURL)
+			if got != tc.want {
+				t.Errorf("SanitizeUpstreamLeak(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}

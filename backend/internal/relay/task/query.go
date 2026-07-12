@@ -74,7 +74,8 @@ func (f *Flow) HandleVideoContent(c *gin.Context) {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 		up := errfmt.ParseUpstream(resp.StatusCode, body)
-		up.Message = outcome.SanitizeKeyLeak(up.Message, []string{apiKey})
+		// 出口给用户前抹掉上游渠道身份（密钥 + base_url/主机/IP）。
+		up.Message = outcome.SanitizeUpstreamLeak(up.Message, []string{apiKey}, ch.BaseURL)
 		writeUpstreamError(c, resp.StatusCode, up)
 		return
 	}

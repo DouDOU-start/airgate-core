@@ -289,12 +289,14 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		// 一次性 400 终止，不 failover、不计渠道健康信号。
 		if result.buildErr != nil {
 			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
-			msg := outcome.SanitizeKeyLeak(result.buildErr.Error(), []string{apiKey})
-			writeError(c, http.StatusBadRequest, "invalid_request_error", "bad_request", msg)
+			// 用户可见消息额外抹掉上游渠道身份（base_url/主机/IP）；管理端留痕保留渠道细节。
+			adminMsg := outcome.SanitizeKeyLeak(result.buildErr.Error(), []string{apiKey})
+			userMsg := outcome.SanitizeUpstreamLeak(result.buildErr.Error(), []string{apiKey}, ch.BaseURL)
+			writeError(c, http.StatusBadRequest, "invalid_request_error", "bad_request", userMsg)
 			p.recordFailure(c, keyInfo, req, start, errlog.Entry{
 				Phase: errlog.PhaseBadRequest, StatusCode: http.StatusBadRequest,
 				ErrorType: "invalid_request_error", ErrorCode: "bad_request",
-				Message: msg, Attempts: attempts,
+				Message: adminMsg, Attempts: attempts,
 				ChannelID: ch.ChannelID, ChannelName: ch.ChannelName,
 			})
 			return
@@ -363,7 +365,8 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		// 语义重建渲染（见循环末）。chat 的 404 仍归 verdictClientError（一次性终止不重试）。
 		if info.Endpoint == adaptor.EndpointResponses && result.statusCode == http.StatusNotFound && o.Verdict == outcome.ClientError {
 			up := errfmt.ParseUpstream(result.statusCode, result.body)
-			up.Message = outcome.SanitizeKeyLeak(up.Message, []string{apiKey})
+			// 上游错误 message 出口给用户前抹掉渠道身份（含 base_url/主机/IP），不止密钥。
+			up.Message = outcome.SanitizeUpstreamLeak(up.Message, []string{apiKey}, ch.BaseURL)
 			responsesNotFound = &up
 			o.Verdict = outcome.Transient
 			o.Reason = "responses 端点上游 404（渠道可能不支持），换渠道重试"
@@ -431,10 +434,11 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				p.recordUsage(c, keyInfo, ch, req, result, start, price)
 			}
 			// 语义保留、载体重建：解析上游错误体提取 (message/type/code)，按入口协议
-			// 渲染（HTTP 状态码保留上游原值）；message 可能回显凭证，先做精确 key 替换。
+			// 渲染（HTTP 状态码保留上游原值）；message 出口给用户前抹掉渠道身份
+			// （密钥 + base_url/主机/IP），确保用户看不到实际上游渠道。
 			// 原始响应体不透传，仅经 o.Reason 片段进失败留痕。
 			up := errfmt.ParseUpstream(result.statusCode, result.body)
-			up.Message = outcome.SanitizeKeyLeak(up.Message, []string{apiKey})
+			up.Message = outcome.SanitizeUpstreamLeak(up.Message, []string{apiKey}, ch.BaseURL)
 			writeUpstreamError(c, result.statusCode, up)
 			// clientError 多为调用方参数问题，不计入渠道错误率（防脏渠道健康信号）。
 			hop := attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "clientError", o.Reason, 0, attemptLatency, false)
