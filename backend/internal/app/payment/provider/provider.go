@@ -33,7 +33,7 @@ type Provider interface {
 	// Name 用于在 admin 配置页和订单表中展示的人类可读名称
 	Name() string
 
-	// Kind 协议家族常量（KindEpayXunhu / KindAlipayOfficial / ...），决定后端按何种协议处理
+	// Kind 协议家族常量（当前内置 KindEpayEasyPay），决定后端按何种协议处理
 	Kind() string
 
 	// SupportedMethods 此 Provider 能服务的 PayMethod 列表
@@ -106,12 +106,12 @@ type CallbackResult struct {
 }
 
 // 协议家族常量（Kind() 返回值）
+//
+// 目前仅内置 EasyPay 一种实现。其余服务商（虎皮椒/彩虹易支付/支付宝官方/
+// 微信官方等）的抽象骨架保留，后续新增实现时在此追加对应 Kind 常量并在实现文件
+// init() 里注册即可，无需改动 Registry / Factory / 前端。
 const (
-	KindEpayXunhu      = "epay_xunhu"
-	KindEpayCaihong    = "epay_caihong"
-	KindEpayEasyPay    = "epay_easypay"
-	KindAlipayOfficial = "alipay_official"
-	KindWxpayOfficial  = "wxpay_official"
+	KindEpayEasyPay = "epay_easypay"
 )
 
 // 错误常量

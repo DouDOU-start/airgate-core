@@ -52,6 +52,13 @@ type CreateOrderInput struct {
 	ClientIP string
 }
 
+// UserOrderFilter 用户充值记录分页筛选。
+type UserOrderFilter struct {
+	UserID   int
+	Page     int
+	PageSize int
+}
+
 // AdminOrderFilter 管理端订单列表筛选。
 type AdminOrderFilter struct {
 	Page     int
@@ -82,7 +89,7 @@ type CreditInput struct {
 type Repository interface {
 	CreateOrder(ctx context.Context, o Order) (Order, error)
 	GetOrder(ctx context.Context, outTradeNo string) (Order, error)
-	ListUserOrders(ctx context.Context, userID, limit int) ([]Order, error)
+	ListUserOrders(ctx context.Context, f UserOrderFilter) ([]Order, int64, error)
 	AdminListOrders(ctx context.Context, f AdminOrderFilter) ([]Order, int64, error)
 	OrderStats(ctx context.Context, todayStart time.Time) (OrderStats, error)
 	// PaidAmountSince 用户自 since 起累计已支付金额（单日限额校验）。

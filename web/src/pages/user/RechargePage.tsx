@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert, Button, Card, Chip, EmptyState, Input, Modal, Spinner, useOverlayState,
 } from '@heroui/react';
@@ -12,10 +12,14 @@ import { paymentApi } from '../../shared/api/payment';
 import { redemptionApi } from '../../shared/api/redemption';
 import { queryKeys } from '../../shared/queryKeys';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { usePagination } from '../../shared/hooks/usePagination';
 import { useToast } from '../../shared/ui';
+import { DEFAULT_PAGE_SIZE } from '../../shared/constants';
+import { getTotalPages } from '../../shared/utils/pagination';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { formatDateTime } from '../../shared/utils/format';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
+import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import type { CreatePaymentOrderReq, PaymentOrder, PaymentOrderStatus, RedeemResp } from '../../shared/types';
 
@@ -60,10 +64,12 @@ export default function RechargePage() {
     queryFn: () => paymentApi.methods(),
   });
 
-  // 充值记录
+  // 充值记录（分页）
+  const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'user.recharge');
   const { data: ordersData, isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
-    queryKey: queryKeys.paymentOrders(),
-    queryFn: () => paymentApi.listOrders(50),
+    queryKey: queryKeys.paymentOrders({ page, page_size: pageSize }),
+    queryFn: () => paymentApi.listOrders({ page, page_size: pageSize }),
+    placeholderData: keepPreviousData,
   });
 
   // 支付状态轮询：活跃订单为 pending 时每 3s 查一次，查到终态即停
@@ -177,6 +183,8 @@ export default function RechargePage() {
   });
 
   const rows = ordersData?.list ?? [];
+  const total = ordersData?.total ?? 0;
+  const totalPages = getTotalPages(total, pageSize);
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -332,7 +340,20 @@ export default function RechargePage() {
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
-        <CommonTable ariaLabel={t('payment.records_title')} minWidth={720}>
+        <CommonTable
+          ariaLabel={t('payment.records_title')}
+          footer={(
+            <TablePaginationFooter
+              page={page}
+              pageSize={pageSize}
+              setPage={setPage}
+              setPageSize={setPageSize}
+              total={total}
+              totalPages={totalPages}
+            />
+          )}
+          minWidth={720}
+        >
           <CommonTable.Header>
             <CommonTable.Column id="created_at">{t('payment.order_time')}</CommonTable.Column>
             <CommonTable.Column id="out_trade_no">{t('payment.order_no')}</CommonTable.Column>

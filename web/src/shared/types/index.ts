@@ -950,9 +950,10 @@ export interface CreatePaymentOrderReq {
   subject?: string;
 }
 
-// 用户充值记录响应
+// 用户充值记录响应（分页）
 export interface PaymentOrderListResp {
   list: PaymentOrder[];
+  total: number;
 }
 
 // 管理端订单统计

@@ -37,9 +37,10 @@ type PaymentOrderResp struct {
 	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
-// PaymentOrderListResp 用户充值记录。
+// PaymentOrderListResp 用户充值记录（分页）。
 type PaymentOrderListResp struct {
-	List []PaymentOrderResp `json:"list"`
+	List  []PaymentOrderResp `json:"list"`
+	Total int64              `json:"total"`
 }
 
 // PaymentOrderStatsResp 管理端订单统计。

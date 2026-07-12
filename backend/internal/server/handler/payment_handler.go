@@ -97,8 +97,13 @@ func (h *PaymentHandler) ListUserOrders(c *gin.Context) {
 		response.Unauthorized(c, "用户未认证")
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
-	orders, err := h.service.ListUserOrders(c.Request.Context(), userID, limit)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	orders, total, err := h.service.ListUserOrders(c.Request.Context(), apppayment.UserOrderFilter{
+		UserID:   userID,
+		Page:     page,
+		PageSize: pageSize,
+	})
 	if err != nil {
 		response.InternalError(c, "查询失败")
 		return
@@ -107,7 +112,7 @@ func (h *PaymentHandler) ListUserOrders(c *gin.Context) {
 	for _, o := range orders {
 		list = append(list, toPaymentOrderResp(o))
 	}
-	response.Success(c, dto.PaymentOrderListResp{List: list})
+	response.Success(c, dto.PaymentOrderListResp{List: list, Total: total})
 }
 
 // GetUserOrder 用户查单（续付/支付状态轮询）。

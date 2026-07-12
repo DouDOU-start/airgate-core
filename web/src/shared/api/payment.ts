@@ -9,7 +9,8 @@ export const paymentApi = {
   // ===== 用户端 =====
   methods: () => get<PaymentMethodsResp>('/api/v1/payment/methods'),
   createOrder: (data: CreatePaymentOrderReq) => post<PaymentOrder>('/api/v1/payment/orders', data),
-  listOrders: (limit = 50) => get<PaymentOrderListResp>('/api/v1/payment/orders', { limit }),
+  listOrders: (params?: { page?: number; page_size?: number }) =>
+    get<PaymentOrderListResp>('/api/v1/payment/orders', params),
   getOrder: (outTradeNo: string) => get<PaymentOrder>(`/api/v1/payment/orders/${outTradeNo}`),
 
   // ===== 管理端 =====

@@ -276,12 +276,15 @@ func (s *Service) GetUserOrder(ctx context.Context, userID int, outTradeNo strin
 	return order, nil
 }
 
-// ListUserOrders 用户充值记录。
-func (s *Service) ListUserOrders(ctx context.Context, userID, limit int) ([]Order, error) {
-	if limit <= 0 || limit > 200 {
-		limit = 50
+// ListUserOrders 用户充值记录（分页），返回当页列表与总数。
+func (s *Service) ListUserOrders(ctx context.Context, f UserOrderFilter) ([]Order, int64, error) {
+	if f.Page <= 0 {
+		f.Page = 1
 	}
-	return s.repo.ListUserOrders(ctx, userID, limit)
+	if f.PageSize <= 0 || f.PageSize > 100 {
+		f.PageSize = 20
+	}
+	return s.repo.ListUserOrders(ctx, f)
 }
 
 // ===================== 回调 =====================

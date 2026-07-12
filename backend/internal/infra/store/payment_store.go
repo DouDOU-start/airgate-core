@@ -77,21 +77,28 @@ func (s *PaymentStore) GetOrder(ctx context.Context, outTradeNo string) (apppaym
 	return toPaymentOrder(item), nil
 }
 
-// ListUserOrders 用户充值记录（按创建时间倒序）。
-func (s *PaymentStore) ListUserOrders(ctx context.Context, userID, limit int) ([]apppayment.Order, error) {
-	items, err := s.db.PaymentOrder.Query().
-		Where(entpaymentorder.UserIDEQ(userID)).
+// ListUserOrders 用户充值记录（按创建时间倒序，分页），并返回总数。
+func (s *PaymentStore) ListUserOrders(ctx context.Context, f apppayment.UserOrderFilter) ([]apppayment.Order, int64, error) {
+	query := s.db.PaymentOrder.Query().
+		Where(entpaymentorder.UserIDEQ(f.UserID))
+
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	items, err := query.
 		Order(ent.Desc(entpaymentorder.FieldCreatedAt)).
-		Limit(limit).
+		Offset((f.Page - 1) * f.PageSize).
+		Limit(f.PageSize).
 		All(ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	out := make([]apppayment.Order, 0, len(items))
 	for _, item := range items {
 		out = append(out, toPaymentOrder(item))
 	}
-	return out, nil
+	return out, int64(total), nil
 }
 
 // AdminListOrders 管理端订单列表（email 子串过滤 + 状态过滤 + 分页），

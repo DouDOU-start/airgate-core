@@ -8,17 +8,25 @@ import { useTheme } from '../app/providers/ThemeProvider';
 import { getToken } from '../shared/api/client';
 import { effectiveDocUrl } from '../shared/utils/docUrl';
 import { METRIC_TONE_VARS } from '../shared/components/StatCard';
+import { setStoredLanguage } from '../i18n';
 import { AmbientAurora } from './login/AmbientAurora';
 import {
   Zap, Shield, Coins, ArrowRight, Sun, Moon, Sprout, BarChart3, KeyRound, Layers,
+  Github, Languages, MessageCircle,
 } from 'lucide-react';
 
 export default function HomePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const site = useSiteSettings();
   const { theme, toggleTheme } = useTheme();
   const isLoggedIn = !!getToken();
+
+  const toggleLanguage = () => {
+    const nextLang = i18n.language === 'zh' ? 'en' : 'zh';
+    i18n.changeLanguage(nextLang);
+    setStoredLanguage(nextLang);
+  };
   // 文档入口：仅当管理员填写了外部 doc_url 时才显示（详见 docUrl.ts）
   const docsUrl = effectiveDocUrl(site.doc_url);
   // 自定义首页内容为管理员可编辑的富文本，注入前统一经 DOMPurify 白名单消毒，防存储型 XSS
@@ -50,7 +58,16 @@ export default function HomePage() {
           <img src={site.site_logo || defaultLogoUrl} alt="" className="h-8 w-8 rounded-[var(--radius-md)] object-cover" />
           <span className="font-display text-base font-semibold tracking-tight">{site.site_name || 'AirGate'}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {site.contact_info && (
+            <span
+              className="mr-1 hidden items-center gap-1.5 text-xs text-text-tertiary md:inline-flex"
+              title={t('home.contact')}
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              <span>{site.contact_info}</span>
+            </span>
+          )}
           {docsUrl && (
             <HeroLink
               href={docsUrl}
@@ -61,6 +78,25 @@ export default function HomePage() {
               {t('home.docs')}
             </HeroLink>
           )}
+          <HeroLink
+            href="https://github.com/DouDOU-start/airgate-core"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub"
+            className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-text-secondary transition-colors hover:text-text"
+          >
+            <Github className="w-4 h-4" />
+          </HeroLink>
+          <Button
+            aria-label={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
+            size="sm"
+            variant="ghost"
+            className="gap-1.5 px-2.5"
+            onPress={toggleLanguage}
+          >
+            <Languages className="w-4 h-4" />
+            <span className="font-mono text-xs uppercase">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
+          </Button>
           <Button
             aria-label={theme === 'dark' ? t('common.toggle_theme_light') : t('common.toggle_theme_dark')}
             isIconOnly
@@ -169,16 +205,10 @@ export default function HomePage() {
       )}
       </div>
 
-      {/* 联系方式 & 底部 */}
+      {/* 底部：版权（联系方式已移至顶部导航） */}
       <footer className="relative z-10 border-t border-[var(--ag-glass-border)] py-5 text-center">
         <div className="flex items-center justify-center gap-4 text-xs text-text-tertiary">
           <span>© {new Date().getFullYear()} {site.site_name || 'AirGate'} · {t('home.copyright')}</span>
-          {site.contact_info && (
-            <>
-              <span className="w-px h-3 bg-[var(--ag-border)]" />
-              <span>{site.contact_info}</span>
-            </>
-          )}
         </div>
       </footer>
     </div>
