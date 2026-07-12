@@ -14,6 +14,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
 	entchannel "github.com/DouDOU-start/airgate-core/ent/channel"
+	entchannelkey "github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
@@ -82,8 +83,8 @@ func (s *DashboardStore) LoadStatsSnapshot(ctx context.Context, todayStart, five
 	return snapshot, nil
 }
 
-// ListTrendLogs 读取趋势聚合所需日志。userID / channelID 为 0 表示不过滤该维度。
-func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID, channelID int) ([]appdashboard.TrendLog, error) {
+// ListTrendLogs 读取趋势聚合所需日志。userID / channelID / channelKeyID 为 0 表示不过滤该维度。
+func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID, channelID, channelKeyID int) ([]appdashboard.TrendLog, error) {
 	preds := []predicate.UsageLog{
 		entusagelog.CreatedAtGTE(startTime),
 		entusagelog.CreatedAtLT(endTime),
@@ -93,6 +94,9 @@ func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime t
 	}
 	if channelID > 0 {
 		preds = append(preds, entusagelog.ChannelIDEQ(channelID))
+	}
+	if channelKeyID > 0 {
+		preds = append(preds, entusagelog.ChannelKeyIDEQ(channelKeyID))
 	}
 
 	const trendLogLimit = 50000
@@ -371,20 +375,15 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
-	// "enabled" = 状态为 enabled 的渠道。
+	// "enabled" = 至少有一把 enabled key 的渠道（key 级状态）。
 	enabledChannels, err := s.db.Channel.Query().
-		Where(entchannel.StatusEQ(entchannel.StatusEnabled)).
+		Where(entchannel.HasKeysWith(entchannelkey.StatusEQ(entchannelkey.StatusEnabled))).
 		Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
-	// "disabled" = 手动禁用 + 自动禁用的合计。
-	disabledChannels, err := s.db.Channel.Query().
-		Where(entchannel.StatusIn(entchannel.StatusDisabledManual, entchannel.StatusDisabledAuto)).
-		Count(ctx)
-	if err != nil {
-		return appdashboard.StatsSnapshot{}, err
-	}
+	// "disabled" = 无任何 enabled key 的渠道（全部 key 停用或无 key）。
+	disabledChannels := totalChannels - enabledChannels
 
 	totalUsers, err := s.db.User.Query().Count(ctx)
 	if err != nil {

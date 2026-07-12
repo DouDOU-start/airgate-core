@@ -32,8 +32,8 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
-	// EdgeChannels holds the string denoting the channels edge name in mutations.
-	EdgeChannels = "channels"
+	// EdgeChannelKeys holds the string denoting the channel_keys edge name in mutations.
+	EdgeChannelKeys = "channel_keys"
 	// EdgeAllowedUsers holds the string denoting the allowed_users edge name in mutations.
 	EdgeAllowedUsers = "allowed_users"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
@@ -42,11 +42,11 @@ const (
 	EdgeUsageLogs = "usage_logs"
 	// Table holds the table name of the group in the database.
 	Table = "groups"
-	// ChannelsTable is the table that holds the channels relation/edge. The primary key declared below.
-	ChannelsTable = "channel_groups"
-	// ChannelsInverseTable is the table name for the Channel entity.
-	// It exists in this package in order to avoid circular dependency with the "channel" package.
-	ChannelsInverseTable = "channels"
+	// ChannelKeysTable is the table that holds the channel_keys relation/edge. The primary key declared below.
+	ChannelKeysTable = "channel_key_groups"
+	// ChannelKeysInverseTable is the table name for the ChannelKey entity.
+	// It exists in this package in order to avoid circular dependency with the "channelkey" package.
+	ChannelKeysInverseTable = "channel_keys"
 	// AllowedUsersTable is the table that holds the allowed_users relation/edge. The primary key declared below.
 	AllowedUsersTable = "user_allowed_groups"
 	// AllowedUsersInverseTable is the table name for the User entity.
@@ -83,9 +83,9 @@ var Columns = []string{
 }
 
 var (
-	// ChannelsPrimaryKey and ChannelsColumn2 are the table columns denoting the
-	// primary key for the channels relation (M2M).
-	ChannelsPrimaryKey = []string{"channel_id", "group_id"}
+	// ChannelKeysPrimaryKey and ChannelKeysColumn2 are the table columns denoting the
+	// primary key for the channel_keys relation (M2M).
+	ChannelKeysPrimaryKey = []string{"channel_key_id", "group_id"}
 	// AllowedUsersPrimaryKey and AllowedUsersColumn2 are the table columns denoting the
 	// primary key for the allowed_users relation (M2M).
 	AllowedUsersPrimaryKey = []string{"user_id", "group_id"}
@@ -177,17 +177,17 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
-// ByChannelsCount orders the results by channels count.
-func ByChannelsCount(opts ...sql.OrderTermOption) OrderOption {
+// ByChannelKeysCount orders the results by channel_keys count.
+func ByChannelKeysCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newChannelsStep(), opts...)
+		sqlgraph.OrderByNeighborsCount(s, newChannelKeysStep(), opts...)
 	}
 }
 
-// ByChannels orders the results by channels terms.
-func ByChannels(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+// ByChannelKeys orders the results by channel_keys terms.
+func ByChannelKeys(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newChannelsStep(), append([]sql.OrderTerm{term}, terms...)...)
+		sqlgraph.OrderByNeighborTerms(s, newChannelKeysStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
 
@@ -232,11 +232,11 @@ func ByUsageLogs(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newUsageLogsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
-func newChannelsStep() *sqlgraph.Step {
+func newChannelKeysStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(ChannelsInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2M, true, ChannelsTable, ChannelsPrimaryKey...),
+		sqlgraph.To(ChannelKeysInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2M, true, ChannelKeysTable, ChannelKeysPrimaryKey...),
 	)
 }
 func newAllowedUsersStep() *sqlgraph.Step {

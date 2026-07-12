@@ -67,6 +67,9 @@ func (Task) Fields() []ent.Field {
 		field.Int("api_key_id").Default(0),
 		field.Int("group_id").Default(0),
 		field.Int("channel_id").Default(0),
+		// channel_key_id 提交时选中的密钥端点 ID（轮询/成片代理须回到同一把 key）。
+		// 存量任务为 0，由 poller 回退到渠道任一可用 key 兜底。
+		field.Int("channel_key_id").Default(0),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
 	}

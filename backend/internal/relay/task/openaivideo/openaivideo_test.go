@@ -14,8 +14,8 @@ import (
 
 func testInfo(mapping map[string]string) *task.Info {
 	return &task.Info{
-		Channel: &registry.ChannelSnapshot{
-			ID: 1, Type: "openai_video", BaseURL: "https://up.example.com",
+		ChannelKey: &registry.ChannelKeySnapshot{
+			KeyID: 1, Type: "openai_video", BaseURL: "https://up.example.com",
 			ModelMapping:   mapping,
 			HeaderOverride: map[string]string{"X-Extra": "1"},
 		},

@@ -25,23 +25,23 @@ func TestConcurrencyAcquireReleaseSemantics(t *testing.T) {
 	cm := NewConcurrencyManager(rdb)
 	ctx := context.Background()
 
-	if err := cm.AcquireChannelSlot(ctx, 1, "r1", 2, time.Minute); err != nil {
+	if err := cm.AcquireKeySlot(ctx, 1, "r1", 2, time.Minute); err != nil {
 		t.Fatalf("第 1 个槽位获取失败: %v", err)
 	}
-	if err := cm.AcquireChannelSlot(ctx, 1, "r2", 2, time.Minute); err != nil {
+	if err := cm.AcquireKeySlot(ctx, 1, "r2", 2, time.Minute); err != nil {
 		t.Fatalf("第 2 个槽位获取失败: %v", err)
 	}
-	if err := cm.AcquireChannelSlot(ctx, 1, "r3", 2, time.Minute); !errors.Is(err, ErrConcurrencyLimit) {
+	if err := cm.AcquireKeySlot(ctx, 1, "r3", 2, time.Minute); !errors.Is(err, ErrConcurrencyLimit) {
 		t.Fatalf("超上限期望 ErrConcurrencyLimit，实际 %v", err)
 	}
 
-	cm.ReleaseChannelSlot(ctx, 1, "r1")
-	if err := cm.AcquireChannelSlot(ctx, 1, "r3", 2, time.Minute); err != nil {
+	cm.ReleaseKeySlot(ctx, 1, "r1")
+	if err := cm.AcquireKeySlot(ctx, 1, "r3", 2, time.Minute); err != nil {
 		t.Fatalf("释放后应可再获取: %v", err)
 	}
 
 	// 不同渠道的槽位互相隔离。
-	if err := cm.AcquireChannelSlot(ctx, 2, "r4", 1, time.Minute); err != nil {
+	if err := cm.AcquireKeySlot(ctx, 2, "r4", 1, time.Minute); err != nil {
 		t.Fatalf("其他渠道不应受影响: %v", err)
 	}
 }
@@ -54,7 +54,7 @@ func TestConcurrencyZombieCleanup(t *testing.T) {
 	ctx := context.Background()
 
 	// 直接种一个已过期的僵尸 slot（模拟进程崩溃后 Release 没跑）。
-	key := channelConcurrencyKey(1)
+	key := keyConcurrencyKey(1)
 	if err := rdb.ZAdd(ctx, key, redis.Z{
 		Score:  float64(time.Now().Unix() - 10),
 		Member: "zombie",
@@ -63,7 +63,7 @@ func TestConcurrencyZombieCleanup(t *testing.T) {
 	}
 
 	// max=1：若僵尸未被清理则此处必被拒绝。
-	if err := cm.AcquireChannelSlot(ctx, 1, "r1", 1, time.Minute); err != nil {
+	if err := cm.AcquireKeySlot(ctx, 1, "r1", 1, time.Minute); err != nil {
 		t.Fatalf("僵尸 slot 应被清理后放行: %v", err)
 	}
 	if n, _ := rdb.ZScore(ctx, key, "zombie").Result(); n != 0 {
@@ -78,17 +78,17 @@ func TestConcurrencyKeyTTL(t *testing.T) {
 	cm := NewConcurrencyManager(rdb)
 	ctx := context.Background()
 
-	if err := cm.AcquireChannelSlot(ctx, 1, "long", 10, 30*time.Minute); err != nil {
+	if err := cm.AcquireKeySlot(ctx, 1, "long", 10, 30*time.Minute); err != nil {
 		t.Fatalf("获取长 TTL 槽位失败: %v", err)
 	}
-	key := channelConcurrencyKey(1)
+	key := keyConcurrencyKey(1)
 	longTTL := mr.TTL(key)
 	if longTTL <= 0 {
 		t.Fatalf("key 应有兜底 TTL，实际 %v", longTTL)
 	}
 
 	// 短 TTL 的 acquire 不缩短整 key TTL。
-	if err := cm.AcquireChannelSlot(ctx, 1, "short", 10, time.Minute); err != nil {
+	if err := cm.AcquireKeySlot(ctx, 1, "short", 10, time.Minute); err != nil {
 		t.Fatalf("获取短 TTL 槽位失败: %v", err)
 	}
 	if got := mr.TTL(key); got < longTTL {
@@ -110,10 +110,10 @@ func TestConcurrencyUnlimitedBypass(t *testing.T) {
 		t.Fatal("用户级不限并发不应写入 Redis")
 	}
 
-	if err := cm.AcquireChannelSlot(ctx, 1, "r2", 0, time.Minute); err != nil {
+	if err := cm.AcquireKeySlot(ctx, 1, "r2", 0, time.Minute); err != nil {
 		t.Fatalf("渠道级不限并发应放行: %v", err)
 	}
-	if n, _ := rdb.ZCard(ctx, channelConcurrencyKey(1)).Result(); n != 1 {
+	if n, _ := rdb.ZCard(ctx, keyConcurrencyKey(1)).Result(); n != 1 {
 		t.Fatalf("渠道级不限并发仍应记录 slot（观测口径），实际 %d 个", n)
 	}
 }
@@ -124,7 +124,7 @@ func TestConcurrencyFailOpen(t *testing.T) {
 	cm := NewConcurrencyManager(rdb)
 	mr.Close() // 模拟 Redis 故障
 
-	if err := cm.AcquireChannelSlot(context.Background(), 1, "r1", 1, time.Minute); err != nil {
+	if err := cm.AcquireKeySlot(context.Background(), 1, "r1", 1, time.Minute); err != nil {
 		t.Fatalf("Redis 故障应 fail-open 放行: %v", err)
 	}
 }
@@ -137,27 +137,27 @@ func TestRPMTryIncrementAtomicLimit(t *testing.T) {
 
 	var minute int64
 	for i := 0; i < 2; i++ {
-		ok, m, err := r.TryIncrementChannelRPM(ctx, 1, 2)
+		ok, m, err := r.TryIncrementKeyRPM(ctx, 1, 2)
 		if err != nil || !ok {
 			t.Fatalf("第 %d 次递增应放行: ok=%v err=%v", i+1, ok, err)
 		}
 		minute = m
 	}
-	ok, _, err := r.TryIncrementChannelRPM(ctx, 1, 2)
+	ok, _, err := r.TryIncrementKeyRPM(ctx, 1, 2)
 	if err != nil {
-		t.Fatalf("TryIncrementChannelRPM err = %v", err)
+		t.Fatalf("TryIncrementKeyRPM err = %v", err)
 	}
 	if ok {
 		t.Fatal("达到上限应拒绝")
 	}
 	// 被拒的尝试不应递增计数。
-	if got, _ := rdb.Get(ctx, channelMinuteKey(1, minute)).Int(); got != 2 {
+	if got, _ := rdb.Get(ctx, keyMinuteKey(1, minute)).Int(); got != 2 {
 		t.Fatalf("计数 = %d, 期望 2（拒绝不递增）", got)
 	}
 
 	// 回退后可再次放行。
-	r.DecrementChannelRPM(ctx, 1, minute)
-	if ok, _, _ := r.TryIncrementChannelRPM(ctx, 1, 2); !ok {
+	r.DecrementKeyRPM(ctx, 1, minute)
+	if ok, _, _ := r.TryIncrementKeyRPM(ctx, 1, 2); !ok {
 		t.Fatal("回退后应可再次放行")
 	}
 }
@@ -167,11 +167,11 @@ func TestRPMTryIncrementSetsTTL(t *testing.T) {
 	mr, rdb := newTestRedis(t)
 	r := NewRPMCounter(rdb)
 
-	_, minute, err := r.TryIncrementChannelRPM(context.Background(), 1, 10)
+	_, minute, err := r.TryIncrementKeyRPM(context.Background(), 1, 10)
 	if err != nil {
-		t.Fatalf("TryIncrementChannelRPM err = %v", err)
+		t.Fatalf("TryIncrementKeyRPM err = %v", err)
 	}
-	if ttl := mr.TTL(channelMinuteKey(1, minute)); ttl <= 0 {
+	if ttl := mr.TTL(keyMinuteKey(1, minute)); ttl <= 0 {
 		t.Fatalf("分钟 key 应带 TTL，实际 %v", ttl)
 	}
 }
@@ -183,8 +183,8 @@ func TestRPMDecrementOnlyIfExists(t *testing.T) {
 	r := NewRPMCounter(rdb)
 	ctx := context.Background()
 
-	r.DecrementChannelRPM(ctx, 1, 12345)
-	if n, _ := rdb.Exists(ctx, channelMinuteKey(1, 12345)).Result(); n != 0 {
+	r.DecrementKeyRPM(ctx, 1, 12345)
+	if n, _ := rdb.Exists(ctx, keyMinuteKey(1, 12345)).Result(); n != 0 {
 		t.Fatal("不存在的 key 不应被 decrement 创建")
 	}
 }
@@ -195,7 +195,7 @@ func TestRPMFailOpen(t *testing.T) {
 	r := NewRPMCounter(rdb)
 	mr.Close()
 
-	ok, _, err := r.TryIncrementChannelRPM(context.Background(), 1, 1)
+	ok, _, err := r.TryIncrementKeyRPM(context.Background(), 1, 1)
 	if err != nil || !ok {
 		t.Fatalf("Redis 故障应 fail-open 放行: ok=%v err=%v", ok, err)
 	}

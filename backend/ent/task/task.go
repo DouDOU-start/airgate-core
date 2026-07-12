@@ -62,6 +62,8 @@ const (
 	FieldGroupID = "group_id"
 	// FieldChannelID holds the string denoting the channel_id field in the database.
 	FieldChannelID = "channel_id"
+	// FieldChannelKeyID holds the string denoting the channel_key_id field in the database.
+	FieldChannelKeyID = "channel_key_id"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -97,6 +99,7 @@ var Columns = []string{
 	FieldAPIKeyID,
 	FieldGroupID,
 	FieldChannelID,
+	FieldChannelKeyID,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -154,6 +157,8 @@ var (
 	DefaultGroupID int
 	// DefaultChannelID holds the default value on creation for the "channel_id" field.
 	DefaultChannelID int
+	// DefaultChannelKeyID holds the default value on creation for the "channel_key_id" field.
+	DefaultChannelKeyID int
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -312,6 +317,11 @@ func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
 // ByChannelID orders the results by the channel_id field.
 func ByChannelID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldChannelID, opts...).ToFunc()
+}
+
+// ByChannelKeyID orders the results by the channel_key_id field.
+func ByChannelKeyID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldChannelKeyID, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

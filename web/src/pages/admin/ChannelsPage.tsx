@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -6,7 +6,8 @@ import {
   Select, Spinner, TextField as HeroTextField, Tooltip, useOverlayState,
 } from '@heroui/react';
 import {
-  ArrowUpDown, BarChart3, Boxes, CircleCheck, CircleOff, Pencil, Plus, RefreshCw, Search, Trash2,
+  ArrowUpDown, BarChart3, Boxes, ChevronDown, ChevronRight, CircleCheck, CircleOff,
+  KeyRound, Pencil, Plus, RefreshCw, Search, Trash2,
 } from 'lucide-react';
 import { channelsApi } from '../../shared/api/channels';
 import { upstreamLogsApi } from '../../shared/api/upstreamLogs';
@@ -17,31 +18,25 @@ import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useToast } from '../../shared/ui';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { CommonTable } from '../../shared/components/CommonTable';
-import { MetricChips } from '../../shared/components/MetricChips';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
+import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { ChannelFormModal, CHANNEL_TYPE_OPTIONS } from './channels/ChannelFormModal';
+import { KeyFormModal } from './channels/KeyFormModal';
 import { ChannelStatsModal } from './channels/ChannelStatsModal';
 import { ChannelTestModal } from './channels/ChannelTestModal';
 import { formatDate, formatDateTime } from '../../shared/utils/format';
-import type { BulkChannelAction, ChannelFailureCounts, ChannelResp, ChannelType } from '../../shared/types';
+import type {
+  ChannelFailureCounts, ChannelKeyResp, ChannelResp, ChannelStatus, ChannelType,
+} from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
-const COLUMN_COUNT = 14;
+const COLUMN_COUNT = 7;
 
-// 仅 openai_compatible 中转站支持经 key 查余额；官方直连渠道无此接口。
-const BALANCE_SUPPORTED_TYPES = new Set(['openai_compatible']);
-
-// 余额自动刷新的陈旧阈值：更新时间早于此则视为陈旧、进入页面时后台刷新。
-// 取 60s：主要用于「打开/切回渠道页时看到较新余额」，同时把 React 双挂载/快速
-// 连续刷新去重掉，不至于每次渲染都打上游。
-const BALANCE_STALE_MS = 60_000;
-
-// isBalanceStale 从未刷新过、或超过阈值 → 陈旧。
-function isBalanceStale(updatedAt: string | undefined): boolean {
-  if (!updatedAt) return true;
-  return Date.now() - new Date(updatedAt).getTime() > BALANCE_STALE_MS;
+// 仅 openai_compatible 中转站支持经 key 查余额。
+function keySupportsBalance(key: ChannelKeyResp): boolean {
+  return key.type === 'openai_compatible';
 }
 
 // 渠道类型 → 徽章配色
@@ -58,26 +53,26 @@ function typeLabel(type: string): string {
   return CHANNEL_TYPE_OPTIONS.find((item) => item.id === type)?.label ?? type;
 }
 
-// 状态徽章：enabled 绿 / disabled_manual 灰 / disabled_auto 红 + error_msg tooltip
-function ChannelStatusChip({ channel }: { channel: ChannelResp }) {
+// key 状态徽章：enabled 绿 / disabled_manual 灰 / disabled_auto 红 + error_msg tooltip
+function KeyStatusChip({ status, errorMsg }: { status: ChannelStatus; errorMsg: string }) {
   const { t } = useTranslation();
 
-  if (channel.status === 'disabled_auto') {
+  if (status === 'disabled_auto') {
     const chip = (
       <Chip color="danger" size="sm" variant="soft">
         {t('channels.status_disabled_auto')}
       </Chip>
     );
-    if (!channel.error_msg) return chip;
+    if (!errorMsg) return chip;
     return (
       <Tooltip>
         <Tooltip.Trigger className="inline-flex">{chip}</Tooltip.Trigger>
-        <Tooltip.Content className="max-w-xs break-all">{channel.error_msg}</Tooltip.Content>
+        <Tooltip.Content className="max-w-xs break-all">{errorMsg}</Tooltip.Content>
       </Tooltip>
     );
   }
 
-  if (channel.status === 'disabled_manual') {
+  if (status === 'disabled_manual') {
     return (
       <Chip color="default" size="sm" variant="soft">
         {t('channels.status_disabled_manual')}
@@ -92,51 +87,156 @@ function ChannelStatusChip({ channel }: { channel: ChannelResp }) {
   );
 }
 
-// 余额单元格：openai_compatible 显示 $X.XX + 刷新时间 + 刷新按钮；其余类型显示"不支持"。
-function BalanceCell({
-  row,
-  isRefreshing,
-  onRefresh,
+// 一段带标签的行内指标：小标题在上、值在下，视觉上成组。
+function Metric({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5 leading-none">
+      <span className="text-[10px] uppercase tracking-wide text-text-tertiary">{label}</span>
+      <span className="font-mono text-xs text-text-secondary">{children}</span>
+    </div>
+  );
+}
+
+// 展开区的一把 key 子行：两行卡片——头部（名称/类型/启停/密钥/操作）+ 指标行。
+function KeyRow({
+  channelKey,
+  onOpenModels,
+  onEdit,
+  onDelete,
+  onStats,
+  onRefreshBalance,
+  refreshingBalance,
+  onToggleEnabled,
+  toggling,
 }: {
-  row: ChannelResp;
-  isRefreshing: boolean;
-  onRefresh: () => void;
+  channelKey: ChannelKeyResp;
+  onOpenModels: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onStats: () => void;
+  onRefreshBalance: () => void;
+  refreshingBalance: boolean;
+  onToggleEnabled: (enabled: boolean) => void;
+  toggling: boolean;
 }) {
   const { t } = useTranslation();
+  const supportsBalance = keySupportsBalance(channelKey);
+  const balanceUpdated = channelKey.balance_updated_at ? new Date(channelKey.balance_updated_at) : null;
+  const fmt = (n: number) => `$${n.toFixed(2)}`;
 
-  if (!BALANCE_SUPPORTED_TYPES.has(row.type)) {
-    return (
-      <span className="text-xs text-text-tertiary" title={t('channels.balance_unsupported_hint')}>
-        {t('channels.balance_unsupported')}
-      </span>
-    );
-  }
-
-  const updated = row.balance_updated_at ? new Date(row.balance_updated_at) : null;
   return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex min-w-0 flex-col">
-        {updated ? (
-          <span className="font-mono text-[13px] font-medium text-text">${row.balance.toFixed(2)}</span>
-        ) : (
-          <span className="text-xs text-text-tertiary">{t('channels.balance_never')}</span>
-        )}
-        {updated ? (
-          <span className="text-[11px] text-text-tertiary" title={formatDateTime(updated)}>
-            {formatDate(updated)}
-          </span>
+    <div className="border-b border-border px-4 py-3 last:border-b-0">
+      {/* 头部：名称 · 类型 · 启停开关 · 密钥提示 —— 操作靠右 */}
+      <div className="flex items-center gap-2.5">
+        <span className="max-w-[200px] truncate font-medium text-text" title={channelKey.name}>
+          {channelKey.name || t('channels.key_unnamed')}
+        </span>
+        <Chip color={TYPE_CHIP_COLORS[channelKey.type] ?? 'default'} size="sm" variant="soft">
+          {typeLabel(channelKey.type)}
+        </Chip>
+        {/* 直接点击启停：on=enabled，off=手动禁用 */}
+        <NativeSwitch
+          ariaLabel={t('channels.status_enabled')}
+          isDisabled={toggling}
+          isSelected={channelKey.status === 'enabled'}
+          onChange={onToggleEnabled}
+        />
+        {channelKey.status === 'disabled_auto' ? (
+          <KeyStatusChip errorMsg={channelKey.error_msg} status={channelKey.status} />
+        ) : null}
+        <span className="font-mono text-[11px] text-text-tertiary" title={t('channels.api_key')}>
+          {channelKey.api_key_hint || '-'}
+        </span>
+        <div className="ml-auto flex items-center gap-1">
+          <Button size="sm" variant="secondary" onPress={onStats}>
+            <BarChart3 className="h-3.5 w-3.5" />
+            {t('channels.stats_action')}
+          </Button>
+          <Button size="sm" variant="secondary" onPress={onOpenModels}>
+            <Boxes className="h-3.5 w-3.5" />
+            {t('channels.models')}
+          </Button>
+          <Button size="sm" variant="secondary" onPress={onEdit}>
+            <Pencil className="h-3.5 w-3.5" />
+            {t('common.edit')}
+          </Button>
+          <Button className="text-danger" size="sm" variant="danger-soft" onPress={onDelete}>
+            <Trash2 className="h-3.5 w-3.5" />
+            {t('common.delete')}
+          </Button>
+        </div>
+      </div>
+
+      {/* 指标行：模型 | 优先级/权重 · 成本倍率 | 并发/RPM | 成本·收益 | 余额 | 标签 */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-2.5">
+        <Metric label={t('channels.models')}>
+          {channelKey.models.length > 0 ? (
+            <Tooltip>
+              <Tooltip.Trigger className="inline-flex">
+                <span className="cursor-default text-text underline decoration-dotted underline-offset-2">
+                  {t('channels.model_count', { count: channelKey.models.length })}
+                </span>
+              </Tooltip.Trigger>
+              <Tooltip.Content className="max-w-sm">
+                <div className="max-h-56 overflow-y-auto font-mono text-xs leading-5">
+                  {channelKey.models.map((model) => (
+                    <div key={model}>{model}</div>
+                  ))}
+                </div>
+              </Tooltip.Content>
+            </Tooltip>
+          ) : (
+            <span className="text-text-tertiary">{t('channels.no_models')}</span>
+          )}
+        </Metric>
+
+        <Metric label={`${t('channels.priority')}·${t('channels.weight')}`}>
+          P{channelKey.priority} · W{channelKey.weight}
+        </Metric>
+        <Metric label={t('channels.cost_ratio')}>×{channelKey.cost_ratio}</Metric>
+        <Metric label={t('channels.concurrency_label')}>
+          {channelKey.current_concurrency}/{channelKey.max_concurrency > 0 ? channelKey.max_concurrency : '∞'}
+        </Metric>
+        <Metric label="RPM">{channelKey.current_rpm}</Metric>
+
+        <Metric label={t('channels.stats_today_cost')}>
+          <span className={channelKey.today_cost > 0 ? 'text-warning' : ''}>{fmt(channelKey.today_cost)}</span>
+        </Metric>
+        <Metric label={t('channels.stats_cost')}>
+          <span className={channelKey.total_cost > 0 ? 'text-warning' : ''}>{fmt(channelKey.total_cost)}</span>
+        </Metric>
+        <Metric label={t('channels.stats_revenue')}>
+          <span className={channelKey.total_revenue > 0 ? 'text-success' : ''}>{fmt(channelKey.total_revenue)}</span>
+        </Metric>
+
+        {supportsBalance ? (
+          <Metric label={t('channels.balance')}>
+            <span className="inline-flex items-center gap-1">
+              {balanceUpdated ? fmt(channelKey.balance) : <span className="text-text-tertiary">{t('channels.balance_never')}</span>}
+              <Button
+                isIconOnly
+                aria-label={t('channels.refresh_balance')}
+                isDisabled={refreshingBalance}
+                size="sm"
+                variant="ghost"
+                onPress={onRefreshBalance}
+              >
+                {refreshingBalance ? <Spinner size="sm" /> : <RefreshCw className="h-3 w-3" />}
+              </Button>
+            </span>
+          </Metric>
+        ) : null}
+
+        {channelKey.tags.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {channelKey.tags.map((tag) => (
+              <Chip color="default" key={tag} size="sm" variant="soft">
+                {tag}
+              </Chip>
+            ))}
+          </div>
         ) : null}
       </div>
-      <Button
-        isIconOnly
-        aria-label={t('channels.refresh_balance')}
-        isDisabled={isRefreshing}
-        size="sm"
-        variant="ghost"
-        onPress={onRefresh}
-      >
-        {isRefreshing ? <Spinner size="sm" /> : <RefreshCw className="h-3.5 w-3.5" />}
-      </Button>
     </div>
   );
 }
@@ -152,6 +252,7 @@ export default function ChannelsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<ChannelResp | null>(null);
@@ -159,8 +260,14 @@ export default function ChannelsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [priorityModalOpen, setPriorityModalOpen] = useState(false);
   const [bulkPriority, setBulkPriority] = useState('50');
-  const [testTarget, setTestTarget] = useState<ChannelResp | null>(null);
-  const [statsTarget, setStatsTarget] = useState<ChannelResp | null>(null);
+  // 「模型」弹窗与统计弹窗都按 key
+  const [testTarget, setTestTarget] = useState<ChannelKeyResp | null>(null);
+  const [keyStatsTarget, setKeyStatsTarget] = useState<ChannelKeyResp | null>(null);
+  // 新增/编辑 key 弹窗：addChannelId 走新增模式，editingKey 走编辑模式
+  const [keyFormOpen, setKeyFormOpen] = useState(false);
+  const [addKeyChannelId, setAddKeyChannelId] = useState<number | null>(null);
+  const [editingKey, setEditingKey] = useState<ChannelKeyResp | null>(null);
+  const [deleteKeyTarget, setDeleteKeyTarget] = useState<ChannelKeyResp | null>(null);
 
   const listQuery = useMemo(() => ({
     page,
@@ -206,9 +313,17 @@ export default function ChannelsPage() {
     },
   });
 
-  // 批量操作（启用/禁用/删除/改优先级）
+  // 删除单把 key
+  const deleteKeyMutation = useCrudMutation({
+    mutationFn: (id: number) => channelsApi.deleteKey(id),
+    successMessage: t('channels.delete_key_success'),
+    queryKey: queryKeys.channels(),
+    onSuccess: () => setDeleteKeyTarget(null),
+  });
+
+  // 批量操作（启用/禁用/删除/改优先级，作用于选中渠道下全部 key）
   const bulkMutation = useMutation({
-    mutationFn: (payload: { ids: number[]; action: BulkChannelAction; priority?: number }) =>
+    mutationFn: (payload: { ids: number[]; action: 'enable' | 'disable' | 'delete' | 'set_priority'; priority?: number }) =>
       channelsApi.bulkUpdate(payload),
     onSuccess: (resp) => {
       toast('success', t('channels.bulk_success', { count: resp.affected }));
@@ -220,68 +335,25 @@ export default function ChannelsPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  // 刷新单个渠道余额（经 key 查上游）。variables 记录目标 id，用于给对应行按钮显示 loading。
-  const balanceMutation = useMutation({
-    mutationFn: (id: number) => channelsApi.refreshBalance(id),
+  // 直接启停单把 key（不弹窗）：on=enabled，off=手动禁用。
+  const keyStatusMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
+      channelsApi.updateKey(id, { status: enabled ? 'enabled' : 'disabled_manual' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  // 刷新单把 key 余额。variables 记录目标 keyID，用于给对应按钮显示 loading。
+  const keyBalanceMutation = useMutation({
+    mutationFn: (keyId: number) => channelsApi.refreshBalance(keyId),
     onSuccess: (resp) => {
       toast('success', t('channels.balance_refreshed', { amount: resp.balance.toFixed(2) }));
       queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
     },
     onError: (err: Error) => toast('error', err.message),
   });
-
-  // 进入渠道页 / 翻页时自动刷新可见渠道的余额（后台、串行、只刷陈旧的）。
-  // autoRefreshedRef 记录本次挂载已发起过的渠道，防 React 重渲染/双挂载重复打上游；
-  // 刷新后 balance_updated_at 变新 → isBalanceStale 返回 false → 不再重刷（天然收敛）。
-  const autoRefreshedRef = useRef<Set<number>>(new Set());
-  useEffect(() => {
-    const stale = rows.filter(
-      (row) =>
-        BALANCE_SUPPORTED_TYPES.has(row.type) &&
-        !autoRefreshedRef.current.has(row.id) &&
-        isBalanceStale(row.balance_updated_at),
-    );
-    if (stale.length === 0) return;
-    stale.forEach((row) => autoRefreshedRef.current.add(row.id));
-
-    let cancelled = false;
-    void (async () => {
-      let updated = false;
-      for (const row of stale) {
-        if (cancelled) break;
-        try {
-          await channelsApi.refreshBalance(row.id);
-          updated = true;
-        } catch {
-          // 不支持/失败静默跳过：自动刷新不打扰用户，手动刷新才提示错误。
-        }
-      }
-      if (!cancelled && updated) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [rows, queryClient]);
-
-  // 批量刷新余额：串行逐个刷（避免并发打爆中转站），支持的渠道成功、不支持的跳过。
-  const [batchBalanceRunning, setBatchBalanceRunning] = useState(false);
-  async function handleBatchRefreshBalance() {
-    setBatchBalanceRunning(true);
-    let ok = 0;
-    for (const id of selectedIds) {
-      try {
-        await channelsApi.refreshBalance(id);
-        ok += 1;
-      } catch {
-        // 不支持/失败的渠道跳过，不中断整批。
-      }
-    }
-    setBatchBalanceRunning(false);
-    queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
-    toast('success', t('channels.balance_batch_done', { ok, total: selectedIds.length }));
-  }
 
   function openCreate() {
     setEditingChannel(null);
@@ -291,6 +363,28 @@ export default function ChannelsPage() {
   function openEdit(channel: ChannelResp) {
     setEditingChannel(channel);
     setFormOpen(true);
+  }
+
+  function openAddKey(channelId: number) {
+    setEditingKey(null);
+    setAddKeyChannelId(channelId);
+    setKeyFormOpen(true);
+    setExpandedIds((prev) => new Set(prev).add(channelId));
+  }
+
+  function openEditKey(key: ChannelKeyResp) {
+    setAddKeyChannelId(null);
+    setEditingKey(key);
+    setKeyFormOpen(true);
+  }
+
+  function toggleExpanded(id: number) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   function toggleSelected(id: number, selected: boolean) {
@@ -439,15 +533,6 @@ export default function ChannelsPage() {
             {t('common.disable')}
           </Button>
           <Button
-            isDisabled={bulkPending || batchBalanceRunning}
-            size="sm"
-            variant="secondary"
-            onPress={handleBatchRefreshBalance}
-          >
-            {batchBalanceRunning ? <Spinner size="sm" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            {t('channels.refresh_balance')}
-          </Button>
-          <Button
             isDisabled={bulkPending}
             size="sm"
             variant="secondary"
@@ -490,9 +575,10 @@ export default function ChannelsPage() {
             totalPages={totalPages}
           />
         )}
-        minWidth={1220}
+        minWidth={980}
       >
         <CommonTable.Header>
+          <CommonTable.Column id="expand" style={{ width: 40 }} />
           <CommonTable.Column id="select" style={{ width: 44 }}>
             <Checkbox
               aria-label={t('channels.select_all')}
@@ -508,22 +594,8 @@ export default function ChannelsPage() {
             {t('common.id')}
           </CommonTable.Column>
           <CommonTable.Column id="name">{t('common.name')}</CommonTable.Column>
-          <CommonTable.Column id="type">{t('common.type')}</CommonTable.Column>
-          <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
-          <CommonTable.Column id="priority">{t('channels.priority')}</CommonTable.Column>
-          <CommonTable.Column id="weight">{t('channels.weight')}</CommonTable.Column>
-          <CommonTable.Column id="models">{t('channels.models')}</CommonTable.Column>
-          <CommonTable.Column id="runtime" style={{ width: '9.75rem' }}>
-            <span title={t('channels.concurrency_rpm_hint')}>{t('channels.concurrency_rpm')}</span>
-          </CommonTable.Column>
-          <CommonTable.Column id="money" style={{ width: '9.75rem' }}>
-            <span title={t('channels.stats_hint')}>{t('channels.stats_header')}</span>
-          </CommonTable.Column>
-          <CommonTable.Column id="response_time">{t('channels.response_time')}</CommonTable.Column>
-          <CommonTable.Column id="balance" style={{ width: '9rem' }}>
-            <span title={t('channels.balance_hint')}>{t('channels.balance')}</span>
-          </CommonTable.Column>
-          <CommonTable.Column id="tags">{t('channels.tags')}</CommonTable.Column>
+          <CommonTable.Column id="keys">{t('channels.keys_label')}</CommonTable.Column>
+          <CommonTable.Column id="created">{t('channels.created_at')}</CommonTable.Column>
           <CommonTable.Column id="actions">{t('common.actions')}</CommonTable.Column>
         </CommonTable.Header>
         <CommonTable.Body>
@@ -538,185 +610,129 @@ export default function ChannelsPage() {
               </CommonTable.Cell>
             </CommonTable.Row>
           ) : (
-            rows.map((row) => (
-              <CommonTable.Row id={String(row.id)} key={row.id}>
-                <CommonTable.Cell>
-                  <Checkbox
-                    aria-label={`select ${row.name}`}
-                    isSelected={selectedIds.includes(row.id)}
-                    onChange={(selected) => toggleSelected(row.id, selected)}
-                  >
-                    <Checkbox.Control>
-                      <Checkbox.Indicator />
-                    </Checkbox.Control>
-                  </Checkbox>
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  <span className="font-mono text-text-tertiary">{row.id}</span>
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate font-medium text-text" title={row.name}>{row.name}</span>
-                    <span className="truncate font-mono text-[11px] text-text-tertiary" title={row.base_url}>
-                      {row.base_url}
-                    </span>
-                  </div>
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  <Chip color={TYPE_CHIP_COLORS[row.type] ?? 'default'} size="sm" variant="soft">
-                    {typeLabel(row.type)}
-                  </Chip>
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  <ChannelStatusChip channel={row} />
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  <span className="font-mono text-text-secondary">{row.priority}</span>
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  <span className="font-mono text-text-secondary">{row.weight}</span>
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  {row.models.length > 0 ? (
-                    <Tooltip>
-                      <Tooltip.Trigger className="inline-flex">
+            rows.map((row) => {
+              const expanded = expandedIds.has(row.id);
+              const failures = failureByChannel.get(row.id)?.total ?? 0;
+              return (
+                <Fragment key={row.id}>
+                  <CommonTable.Row id={String(row.id)}>
+                    <CommonTable.Cell>
+                      <Button
+                        isIconOnly
+                        aria-label={expanded ? t('channels.collapse') : t('channels.expand')}
+                        size="sm"
+                        variant="ghost"
+                        onPress={() => toggleExpanded(row.id)}
+                      >
+                        {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </Button>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <Checkbox
+                        aria-label={`select ${row.name}`}
+                        isSelected={selectedIds.includes(row.id)}
+                        onChange={(selected) => toggleSelected(row.id, selected)}
+                      >
+                        <Checkbox.Control>
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                      </Checkbox>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="font-mono text-text-tertiary">{row.id}</span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate font-medium text-text" title={row.name}>{row.name}</span>
+                        <span className="truncate font-mono text-[11px] text-text-tertiary" title={row.base_url}>
+                          {row.base_url}
+                        </span>
+                      </div>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <div className="flex items-center gap-1.5">
                         <Chip color="default" size="sm" variant="soft">
-                          {t('channels.model_count', { count: row.models.length })}
+                          {t('channels.key_count', { count: row.keys.length })}
                         </Chip>
-                      </Tooltip.Trigger>
-                      <Tooltip.Content className="max-w-sm">
-                        <div className="max-h-56 overflow-y-auto font-mono text-xs leading-5">
-                          {row.models.map((model) => (
-                            <div key={model}>{model}</div>
-                          ))}
+                        {failures > 0 ? (
+                          <Tooltip>
+                            <Tooltip.Trigger className="inline-flex">
+                              <Chip color="danger" size="sm" variant="soft">
+                                {failures}
+                              </Chip>
+                            </Tooltip.Trigger>
+                            <Tooltip.Content className="max-w-xs">{t('channels.concurrency_rpm_hint')}</Tooltip.Content>
+                          </Tooltip>
+                        ) : null}
+                      </div>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="text-xs text-text-secondary" title={formatDateTime(row.created_at)}>
+                        {formatDate(row.created_at)}
+                      </span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <div className="ag-table-row-actions flex justify-center gap-1">
+                        <Button size="sm" variant="secondary" onPress={() => openAddKey(row.id)}>
+                          <KeyRound className="h-3.5 w-3.5" />
+                          {t('channels.add_key')}
+                        </Button>
+                        <Button size="sm" variant="secondary" onPress={() => openEdit(row)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                          {t('common.edit')}
+                        </Button>
+                        <Button
+                          className="text-danger"
+                          size="sm"
+                          variant="danger-soft"
+                          onPress={() => setDeleteTarget(row)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          {t('common.delete')}
+                        </Button>
+                      </div>
+                    </CommonTable.Cell>
+                  </CommonTable.Row>
+                  {expanded ? (
+                    <CommonTable.Row id={`${row.id}-keys`}>
+                      <CommonTable.Cell colSpan={COLUMN_COUNT}>
+                        <div className="rounded-[var(--radius)] border border-border bg-surface">
+                          {row.keys.length === 0 ? (
+                            <div className="flex items-center justify-between px-3 py-4">
+                              <span className="text-xs text-text-tertiary">{t('channels.no_keys')}</span>
+                              <Button size="sm" variant="secondary" onPress={() => openAddKey(row.id)}>
+                                <Plus className="h-3.5 w-3.5" />
+                                {t('channels.add_key')}
+                              </Button>
+                            </div>
+                          ) : (
+                            row.keys.map((key) => (
+                              <KeyRow
+                                channelKey={key}
+                                key={key.id}
+                                refreshingBalance={keyBalanceMutation.isPending && keyBalanceMutation.variables === key.id}
+                                toggling={keyStatusMutation.isPending && keyStatusMutation.variables?.id === key.id}
+                                onDelete={() => setDeleteKeyTarget(key)}
+                                onEdit={() => openEditKey(key)}
+                                onOpenModels={() => setTestTarget(key)}
+                                onRefreshBalance={() => keyBalanceMutation.mutate(key.id)}
+                                onStats={() => setKeyStatsTarget(key)}
+                                onToggleEnabled={(enabled) => keyStatusMutation.mutate({ id: key.id, enabled })}
+                              />
+                            ))
+                          )}
                         </div>
-                      </Tooltip.Content>
-                    </Tooltip>
-                  ) : (
-                    <span className="text-text-tertiary">-</span>
-                  )}
-                </CommonTable.Cell>
-                <CommonTable.Cell className="ag-channels-metric-cell">
-                  <MetricChips
-                    className="ag-metric-chips--stack ag-metric-chips--compact-y"
-                    items={[
-                      {
-                        color: 'accent' as const,
-                        label: t('channels.concurrency_label'),
-                        muted: (row.current_concurrency ?? 0) === 0,
-                        value: `${row.current_concurrency ?? 0}/${row.max_concurrency > 0 ? row.max_concurrency : '∞'}`,
-                      },
-                      {
-                        color: 'success' as const,
-                        label: 'RPM',
-                        muted: (row.current_rpm ?? 0) === 0,
-                        value: String(row.current_rpm ?? 0),
-                      },
-                      {
-                        color: 'danger' as const,
-                        label: t('channels.failures_label'),
-                        muted: (failureByChannel.get(row.id)?.total ?? 0) === 0,
-                        value: String(failureByChannel.get(row.id)?.total ?? 0),
-                      },
-                    ]}
-                  />
-                </CommonTable.Cell>
-                <CommonTable.Cell className="ag-channels-metric-cell">
-                  <MetricChips
-                    className="ag-metric-chips--stack ag-metric-chips--compact-y"
-                    items={[
-                      {
-                        amount: row.today_cost ?? 0,
-                        color: 'warning' as const,
-                        decimals: 2,
-                        dollarTone: 'warning' as const,
-                        label: t('channels.stats_today_cost'),
-                        mutedWhenZero: true,
-                      },
-                      {
-                        amount: row.total_cost ?? 0,
-                        color: 'warning' as const,
-                        decimals: 2,
-                        dollarTone: 'warning' as const,
-                        label: t('channels.stats_cost'),
-                        mutedWhenZero: true,
-                      },
-                      {
-                        amount: row.total_revenue ?? 0,
-                        color: 'success' as const,
-                        decimals: 2,
-                        dollarTone: 'success' as const,
-                        label: t('channels.stats_revenue'),
-                        mutedWhenZero: true,
-                      },
-                    ]}
-                  />
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  <span className="font-mono text-text-secondary">
-                    {row.response_time_ms > 0 ? `${row.response_time_ms}ms` : '-'}
-                  </span>
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  <BalanceCell
-                    row={row}
-                    isRefreshing={balanceMutation.isPending && balanceMutation.variables === row.id}
-                    onRefresh={() => balanceMutation.mutate(row.id)}
-                  />
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  {row.tags.length > 0 ? (
-                    <div className="flex max-w-[180px] flex-wrap gap-1">
-                      {row.tags.map((tag) => (
-                        <Chip color="default" key={tag} size="sm" variant="soft">
-                          {tag}
-                        </Chip>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-text-tertiary">-</span>
-                  )}
-                </CommonTable.Cell>
-                <CommonTable.Cell>
-                  <div className="ag-table-row-actions flex justify-center gap-1">
-                    <Button size="sm" variant="secondary" onPress={() => openEdit(row)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                      {t('common.edit')}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onPress={() => setTestTarget(row)}
-                    >
-                      <Boxes className="h-3.5 w-3.5" />
-                      {t('channels.models')}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onPress={() => setStatsTarget(row)}
-                    >
-                      <BarChart3 className="h-3.5 w-3.5" />
-                      {t('channels.stats_action')}
-                    </Button>
-                    <Button
-                      className="text-danger"
-                      size="sm"
-                      variant="danger-soft"
-                      onPress={() => setDeleteTarget(row)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      {t('common.delete')}
-                    </Button>
-                  </div>
-                </CommonTable.Cell>
-              </CommonTable.Row>
-            ))
+                      </CommonTable.Cell>
+                    </CommonTable.Row>
+                  ) : null}
+                </Fragment>
+              );
+            })
           )}
         </CommonTable.Body>
       </CommonTable>
 
-      {/* 创建/编辑弹窗 */}
+      {/* 创建/编辑渠道弹窗（仅 name / base_url） */}
       <ChannelFormModal
         channel={editingChannel}
         open={formOpen}
@@ -726,16 +742,28 @@ export default function ChannelsPage() {
         }}
       />
 
-      {/* 模型与测试弹窗（模型清单/映射/测试模型管理 + 逐个或全部测试） */}
+      {/* 新增/编辑单把 key 弹窗 */}
+      <KeyFormModal
+        channelId={addKeyChannelId}
+        channelKey={editingKey}
+        open={keyFormOpen}
+        onClose={() => {
+          setKeyFormOpen(false);
+          setEditingKey(null);
+          setAddKeyChannelId(null);
+        }}
+      />
+
+      {/* 模型与测试弹窗（按 key：模型清单/映射/测试模型管理 + 逐个或全部测试） */}
       <ChannelTestModal
-        channel={testTarget}
+        channelKey={testTarget}
         onClose={() => setTestTarget(null)}
       />
 
-      {/* 消耗统计弹窗（每日消耗 + 模型分布，按渠道过滤的仪表盘趋势） */}
+      {/* 消耗统计弹窗（每日消耗 + 模型分布，按 key 过滤的仪表盘趋势） */}
       <ChannelStatsModal
-        channel={statsTarget}
-        onClose={() => setStatsTarget(null)}
+        channelKey={keyStatsTarget}
+        onClose={() => setKeyStatsTarget(null)}
       />
 
       {/* 批量改优先级 */}
@@ -782,7 +810,7 @@ export default function ChannelsPage() {
         </Modal.Backdrop>
       </Modal>
 
-      {/* 删除单个确认 */}
+      {/* 删除单个渠道确认 */}
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => {
@@ -792,6 +820,18 @@ export default function ChannelsPage() {
         description={t('channels.delete_confirm', { name: deleteTarget?.name })}
         loading={deleteMutation.isPending}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
+
+      {/* 删除单把 key 确认 */}
+      <ConfirmDialog
+        open={!!deleteKeyTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteKeyTarget(null);
+        }}
+        title={t('channels.delete_key')}
+        description={t('channels.delete_key_confirm', { name: deleteKeyTarget?.name || deleteKeyTarget?.api_key_hint })}
+        loading={deleteKeyMutation.isPending}
+        onConfirm={() => deleteKeyTarget && deleteKeyMutation.mutate(deleteKeyTarget.id)}
       />
 
       {/* 批量删除确认 */}

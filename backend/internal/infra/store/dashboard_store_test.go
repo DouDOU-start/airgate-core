@@ -138,7 +138,7 @@ func TestDashboardStoreListTrendLogsIncludesSnapshotOnlyRows(t *testing.T) {
 	}
 
 	store := NewDashboardStore(db)
-	logs, err := store.ListTrendLogs(ctx, todayStart, endTime, u.ID, 0)
+	logs, err := store.ListTrendLogs(ctx, todayStart, endTime, u.ID, 0, 0)
 	if err != nil {
 		t.Fatalf("ListTrendLogs returned error: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestDashboardStoreListTrendLogsChannelFilter(t *testing.T) {
 	}
 
 	store := NewDashboardStore(db)
-	logs, err := store.ListTrendLogs(ctx, startTime, endTime, 0, chA.ID)
+	logs, err := store.ListTrendLogs(ctx, startTime, endTime, 0, chA.ID, 0)
 	if err != nil {
 		t.Fatalf("ListTrendLogs returned error: %v", err)
 	}

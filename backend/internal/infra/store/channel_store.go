@@ -9,13 +9,14 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	entchannel "github.com/DouDOU-start/airgate-core/ent/channel"
+	entchannelkey "github.com/DouDOU-start/airgate-core/ent/channelkey"
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	appchannel "github.com/DouDOU-start/airgate-core/internal/app/channel"
 )
 
-// ChannelStore 使用 Ent 实现渠道仓储。
+// ChannelStore 使用 Ent 实现渠道仓储（渠道 + 其下 ChannelKey 子实体）。
 type ChannelStore struct {
 	db *ent.Client
 }
@@ -25,26 +26,33 @@ func NewChannelStore(db *ent.Client) *ChannelStore {
 	return &ChannelStore{db: db}
 }
 
-// List 查询渠道列表（keyword/type/status/tag/group_id 筛选）。
+// withKeys 预加载渠道下的 key（含各 key 的 groups 边），按 ID 升序。
+func withKeys(q *ent.ChannelQuery) *ent.ChannelQuery {
+	return q.WithKeys(func(kq *ent.ChannelKeyQuery) {
+		kq.WithGroups().Order(ent.Asc(entchannelkey.FieldID))
+	})
+}
+
+// List 查询渠道列表（keyword 筛渠道名；type/status/tag/group_id 筛渠道下的 key）。
 func (s *ChannelStore) List(ctx context.Context, filter appchannel.ListFilter) ([]appchannel.Channel, int64, error) {
 	query := s.db.Channel.Query()
 	if filter.Keyword != "" {
 		query = query.Where(entchannel.NameContains(filter.Keyword))
 	}
 	if filter.Type != "" {
-		query = query.Where(entchannel.TypeEQ(entchannel.Type(filter.Type)))
+		query = query.Where(entchannel.HasKeysWith(entchannelkey.TypeEQ(entchannelkey.Type(filter.Type))))
 	}
 	if filter.Status != "" {
-		query = query.Where(entchannel.StatusEQ(entchannel.Status(filter.Status)))
+		query = query.Where(entchannel.HasKeysWith(entchannelkey.StatusEQ(entchannelkey.Status(filter.Status))))
 	}
 	if filter.Tag != "" {
 		tag := filter.Tag
-		query = query.Where(predicate.Channel(func(selector *sql.Selector) {
-			selector.Where(sqljson.ValueContains(entchannel.FieldTags, tag))
-		}))
+		query = query.Where(entchannel.HasKeysWith(predicate.ChannelKey(func(selector *sql.Selector) {
+			selector.Where(sqljson.ValueContains(entchannelkey.FieldTags, tag))
+		})))
 	}
 	if filter.GroupID != nil {
-		query = query.Where(entchannel.HasGroupsWith(entgroup.IDEQ(*filter.GroupID)))
+		query = query.Where(entchannel.HasKeysWith(entchannelkey.HasGroupsWith(entgroup.IDEQ(*filter.GroupID))))
 	}
 
 	total, err := query.Count(ctx)
@@ -52,11 +60,10 @@ func (s *ChannelStore) List(ctx context.Context, filter appchannel.ListFilter) (
 		return nil, 0, err
 	}
 
-	items, err := query.
+	items, err := withKeys(query).
 		Offset((filter.Page - 1) * filter.PageSize).
 		Limit(filter.PageSize).
 		Order(ent.Desc(entchannel.FieldCreatedAt)).
-		WithGroups().
 		All(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -65,23 +72,18 @@ func (s *ChannelStore) List(ctx context.Context, filter appchannel.ListFilter) (
 	return mapChannelList(items), int64(total), nil
 }
 
-// ListAll 全量加载渠道（含 groups 边），供注册表 Reload 使用。
+// ListAll 全量加载渠道（含 keys 及其 groups 边），供注册表 Reload 使用。
 func (s *ChannelStore) ListAll(ctx context.Context) ([]appchannel.Channel, error) {
-	items, err := s.db.Channel.Query().
-		WithGroups().
-		All(ctx)
+	items, err := withKeys(s.db.Channel.Query()).All(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return mapChannelList(items), nil
 }
 
-// FindByID 按 ID 查询渠道（含 groups 边）。
+// FindByID 按 ID 查询渠道（含 keys 及其 groups 边）。
 func (s *ChannelStore) FindByID(ctx context.Context, id int) (appchannel.Channel, error) {
-	item, err := s.db.Channel.Query().
-		Where(entchannel.IDEQ(id)).
-		WithGroups().
-		Only(ctx)
+	item, err := withKeys(s.db.Channel.Query().Where(entchannel.IDEQ(id))).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return appchannel.Channel{}, appchannel.ErrChannelNotFound
@@ -91,113 +93,180 @@ func (s *ChannelStore) FindByID(ctx context.Context, id int) (appchannel.Channel
 	return mapChannel(item), nil
 }
 
-// Create 创建渠道。
-func (s *ChannelStore) Create(ctx context.Context, input appchannel.CreateInput) (appchannel.Channel, error) {
-	// models 可空（创建时允许不配模型），归一为空切片避免 JSON 列落 null。
-	models := input.Models
-	if models == nil {
-		models = []string{}
-	}
-	builder := s.db.Channel.Create().
-		SetName(input.Name).
-		SetType(entchannel.Type(input.Type)).
-		SetBaseURL(input.BaseURL).
-		SetAPIKeys(input.APIKeys).
-		SetModels(models).
-		SetNillablePriority(input.Priority).
-		SetNillableWeight(input.Weight).
-		SetNillableMaxConcurrency(input.MaxConcurrency).
-		SetNillableMaxRpm(input.MaxRPM).
-		SetNillableCostRatio(input.CostRatio)
-
-	if input.ModelMapping != nil {
-		builder = builder.SetModelMapping(input.ModelMapping)
-	}
-	if input.ParamOverride != nil {
-		builder = builder.SetParamOverride(input.ParamOverride)
-	}
-	if input.HeaderOverride != nil {
-		builder = builder.SetHeaderOverride(input.HeaderOverride)
-	}
-	if input.Status != nil {
-		builder = builder.SetStatus(entchannel.Status(*input.Status))
-	}
-	if input.Tags != nil {
-		builder = builder.SetTags(input.Tags)
-	}
-	if input.TestModel != "" {
-		builder = builder.SetTestModel(input.TestModel)
-	}
-	if len(input.GroupIDs) > 0 {
-		builder = builder.AddGroupIDs(input.GroupIDs...)
-	}
-
-	item, err := builder.Save(ctx)
+// FindKeyByID 按密钥端点 ID 查单把 key（含所属渠道 base_url 与 groups 边）。
+func (s *ChannelStore) FindKeyByID(ctx context.Context, keyID int) (appchannel.ChannelKey, error) {
+	item, err := s.db.ChannelKey.Query().
+		Where(entchannelkey.IDEQ(keyID)).
+		WithChannel().
+		WithGroups().
+		Only(ctx)
 	if err != nil {
-		if ent.IsConstraintError(err) {
-			return appchannel.Channel{}, appchannel.ErrInvalidReference
+		if ent.IsNotFound(err) {
+			return appchannel.ChannelKey{}, appchannel.ErrChannelNotFound
 		}
-		return appchannel.Channel{}, err
+		return appchannel.ChannelKey{}, err
 	}
-	// 重新加载边，保证返回值带 group_ids。
-	return s.FindByID(ctx, item.ID)
+	baseURL := ""
+	if ch, err := item.Edges.ChannelOrErr(); err == nil {
+		baseURL = ch.BaseURL
+	}
+	return mapChannelKey(item, baseURL), nil
 }
 
-// Update 更新渠道（partial 语义见 appchannel.UpdateInput）。
+// Create 创建渠道（仅 name/base_url；key 建后单独添加）。
+func (s *ChannelStore) Create(ctx context.Context, input appchannel.CreateInput) (appchannel.Channel, error) {
+	ch, err := s.db.Channel.Create().
+		SetName(input.Name).
+		SetBaseURL(input.BaseURL).
+		Save(ctx)
+	if err != nil {
+		return appchannel.Channel{}, err
+	}
+	return s.FindByID(ctx, ch.ID)
+}
+
+// Update 更新渠道（partial，仅 name/base_url）。
 func (s *ChannelStore) Update(ctx context.Context, id int, input appchannel.UpdateInput) (appchannel.Channel, error) {
-	builder := s.db.Channel.UpdateOneID(id).
+	if err := s.db.Channel.UpdateOneID(id).
 		SetNillableName(input.Name).
 		SetNillableBaseURL(input.BaseURL).
-		SetNillableTestModel(input.TestModel).
-		SetNillableErrorMsg(input.ErrorMsg).
-		SetNillablePriority(input.Priority).
-		SetNillableWeight(input.Weight).
-		SetNillableMaxConcurrency(input.MaxConcurrency).
-		SetNillableMaxRpm(input.MaxRPM).
-		SetNillableCostRatio(input.CostRatio)
-
-	if input.Type != nil {
-		builder = builder.SetType(entchannel.Type(*input.Type))
-	}
-	if input.Status != nil {
-		builder = builder.SetStatus(entchannel.Status(*input.Status))
-	}
-	if len(input.APIKeys) > 0 {
-		builder = builder.SetAPIKeys(input.APIKeys)
-	}
-	if len(input.Models) > 0 {
-		builder = builder.SetModels(input.Models)
-	}
-	if input.ModelMapping != nil {
-		builder = builder.SetModelMapping(input.ModelMapping)
-	}
-	if input.ParamOverride != nil {
-		builder = builder.SetParamOverride(input.ParamOverride)
-	}
-	if input.HeaderOverride != nil {
-		builder = builder.SetHeaderOverride(input.HeaderOverride)
-	}
-	if input.Tags != nil {
-		builder = builder.SetTags(input.Tags)
-	}
-	if input.GroupIDs != nil {
-		builder = builder.ClearGroups().AddGroupIDs(input.GroupIDs...)
-	}
-
-	item, err := builder.Save(ctx)
-	if err != nil {
+		Exec(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return appchannel.Channel{}, appchannel.ErrChannelNotFound
 		}
-		if ent.IsConstraintError(err) {
-			return appchannel.Channel{}, appchannel.ErrInvalidReference
-		}
 		return appchannel.Channel{}, err
 	}
-	return s.FindByID(ctx, item.ID)
+	return s.FindByID(ctx, id)
 }
 
-// Delete 删除渠道。
+// CreateKey 在指定渠道下新增一把 key。
+func (s *ChannelStore) CreateKey(ctx context.Context, channelID int, key appchannel.KeyInput) (appchannel.ChannelKey, error) {
+	item, err := applyKeyCreate(s.db.ChannelKey.Create().SetChannelID(channelID), key).Save(ctx)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			return appchannel.ChannelKey{}, appchannel.ErrInvalidReference
+		}
+		return appchannel.ChannelKey{}, err
+	}
+	return s.FindKeyByID(ctx, item.ID)
+}
+
+// DeleteKey 删除一把 key。
+func (s *ChannelStore) DeleteKey(ctx context.Context, keyID int) error {
+	if err := s.db.ChannelKey.DeleteOneID(keyID).Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return appchannel.ErrChannelNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+// applyKeyCreate 把 KeyInput 应用到 ChannelKey 创建构建器（APIKey 为密文）。
+func applyKeyCreate(builder *ent.ChannelKeyCreate, key appchannel.KeyInput) *ent.ChannelKeyCreate {
+	models := key.Models
+	if models == nil {
+		models = []string{}
+	}
+	builder = builder.
+		SetName(key.Name).
+		SetType(entchannelkey.Type(key.Type)).
+		SetAPIKey(key.APIKey).
+		SetModels(models).
+		SetNillablePriority(key.Priority).
+		SetNillableWeight(key.Weight).
+		SetNillableMaxConcurrency(key.MaxConcurrency).
+		SetNillableMaxRpm(key.MaxRPM).
+		SetNillableCostRatio(key.CostRatio)
+	if key.ModelMapping != nil {
+		builder = builder.SetModelMapping(key.ModelMapping)
+	}
+	if key.ParamOverride != nil {
+		builder = builder.SetParamOverride(key.ParamOverride)
+	}
+	if key.HeaderOverride != nil {
+		builder = builder.SetHeaderOverride(key.HeaderOverride)
+	}
+	if key.Status != nil {
+		builder = builder.SetStatus(entchannelkey.Status(*key.Status))
+	}
+	if key.Tags != nil {
+		builder = builder.SetTags(key.Tags)
+	}
+	if key.TestModel != nil {
+		builder = builder.SetTestModel(*key.TestModel)
+	}
+	if len(key.GroupIDs) > 0 {
+		builder = builder.AddGroupIDs(key.GroupIDs...)
+	}
+	return builder
+}
+
+// applyKeyUpdate 把 KeyInput 应用到 ChannelKey 更新构建器（partial）。
+// APIKey 空串 = 保持原密钥；Models/映射/覆写/Tags/GroupIDs 非 nil = 整组替换。
+func applyKeyUpdate(builder *ent.ChannelKeyUpdateOne, key appchannel.KeyInput) *ent.ChannelKeyUpdateOne {
+	builder = builder.
+		SetNillablePriority(key.Priority).
+		SetNillableWeight(key.Weight).
+		SetNillableMaxConcurrency(key.MaxConcurrency).
+		SetNillableMaxRpm(key.MaxRPM).
+		SetNillableCostRatio(key.CostRatio)
+	// name 为可选标签：空串视为不改（单 key 更新路径可能不带 name）。
+	if key.Name != "" {
+		builder = builder.SetName(key.Name)
+	}
+	if key.Type != "" {
+		builder = builder.SetType(entchannelkey.Type(key.Type))
+	}
+	if key.APIKey != "" {
+		builder = builder.SetAPIKey(key.APIKey)
+	}
+	if key.Models != nil {
+		builder = builder.SetModels(key.Models)
+	}
+	if key.ModelMapping != nil {
+		builder = builder.SetModelMapping(key.ModelMapping)
+	}
+	if key.ParamOverride != nil {
+		builder = builder.SetParamOverride(key.ParamOverride)
+	}
+	if key.HeaderOverride != nil {
+		builder = builder.SetHeaderOverride(key.HeaderOverride)
+	}
+	if key.Tags != nil {
+		builder = builder.SetTags(key.Tags)
+	}
+	if key.TestModel != nil {
+		builder = builder.SetTestModel(*key.TestModel)
+	}
+	// 手动重新启用时清理上一轮状态残留（错误信息）。
+	if key.Status != nil {
+		builder = builder.SetStatus(entchannelkey.Status(*key.Status))
+		if *key.Status == appchannel.StatusEnabled {
+			builder = builder.SetErrorMsg("")
+		}
+	}
+	if key.GroupIDs != nil {
+		builder = builder.ClearGroups().AddGroupIDs(key.GroupIDs...)
+	}
+	return builder
+}
+
+// UpdateKey 单把密钥端点 partial 更新（模型弹窗等按 key 编辑用）。
+func (s *ChannelStore) UpdateKey(ctx context.Context, keyID int, key appchannel.KeyInput) (appchannel.ChannelKey, error) {
+	if err := applyKeyUpdate(s.db.ChannelKey.UpdateOneID(keyID), key).Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return appchannel.ChannelKey{}, appchannel.ErrChannelNotFound
+		}
+		if ent.IsConstraintError(err) {
+			return appchannel.ChannelKey{}, appchannel.ErrInvalidReference
+		}
+		return appchannel.ChannelKey{}, err
+	}
+	return s.FindKeyByID(ctx, keyID)
+}
+
+// Delete 删除渠道（级联删除其 key）。
 func (s *ChannelStore) Delete(ctx context.Context, id int) error {
 	if err := s.db.Channel.DeleteOneID(id).Exec(ctx); err != nil {
 		if ent.IsNotFound(err) {
@@ -208,20 +277,21 @@ func (s *ChannelStore) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
-// BulkUpdate 批量启停/删除/调优先级，返回受影响行数。
+// BulkUpdate 批量启停/删除/调优先级：enable/disable/set_priority 作用于选中渠道下的
+// 全部 key；delete 删渠道（级联删 key）。返回受影响行数。
 func (s *ChannelStore) BulkUpdate(ctx context.Context, input appchannel.BulkUpdateInput) (int, error) {
+	keysOfChannels := entchannelkey.HasChannelWith(entchannel.IDIn(input.IDs...))
 	switch input.Action {
 	case appchannel.BulkActionEnable:
-		// 重新启用同时清理上一轮状态残留。
-		return s.db.Channel.Update().
-			Where(entchannel.IDIn(input.IDs...)).
-			SetStatus(entchannel.StatusEnabled).
+		return s.db.ChannelKey.Update().
+			Where(keysOfChannels).
+			SetStatus(entchannelkey.StatusEnabled).
 			SetErrorMsg("").
 			Save(ctx)
 	case appchannel.BulkActionDisable:
-		return s.db.Channel.Update().
-			Where(entchannel.IDIn(input.IDs...)).
-			SetStatus(entchannel.StatusDisabledManual).
+		return s.db.ChannelKey.Update().
+			Where(keysOfChannels).
+			SetStatus(entchannelkey.StatusDisabledManual).
 			Save(ctx)
 	case appchannel.BulkActionDelete:
 		return s.db.Channel.Delete().
@@ -231,8 +301,8 @@ func (s *ChannelStore) BulkUpdate(ctx context.Context, input appchannel.BulkUpda
 		if input.Priority == nil {
 			return 0, appchannel.ErrInvalidBulkAction
 		}
-		return s.db.Channel.Update().
-			Where(entchannel.IDIn(input.IDs...)).
+		return s.db.ChannelKey.Update().
+			Where(keysOfChannels).
 			SetPriority(*input.Priority).
 			Save(ctx)
 	default:
@@ -240,12 +310,12 @@ func (s *ChannelStore) BulkUpdate(ctx context.Context, input appchannel.BulkUpda
 	}
 }
 
-// UpdateState 更新渠道调度状态（status / error_msg）。
-func (s *ChannelStore) UpdateState(ctx context.Context, id int, status string, errMsg string) error {
-	builder := s.db.Channel.UpdateOneID(id).
-		SetStatus(entchannel.Status(status)).
-		SetErrorMsg(errMsg)
-	if err := builder.Exec(ctx); err != nil {
+// UpdateKeyState 更新密钥端点调度状态（status / error_msg）。
+func (s *ChannelStore) UpdateKeyState(ctx context.Context, keyID int, status string, errMsg string) error {
+	if err := s.db.ChannelKey.UpdateOneID(keyID).
+		SetStatus(entchannelkey.Status(status)).
+		SetErrorMsg(errMsg).
+		Exec(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return appchannel.ErrChannelNotFound
 		}
@@ -254,13 +324,12 @@ func (s *ChannelStore) UpdateState(ctx context.Context, id int, status string, e
 	return nil
 }
 
-// UpdateTestResult 记录渠道测试结果（响应耗时与测试时间）。
-func (s *ChannelStore) UpdateTestResult(ctx context.Context, id int, responseTimeMs int, testedAt time.Time) error {
-	err := s.db.Channel.UpdateOneID(id).
+// UpdateKeyTestResult 记录密钥端点测试结果（响应耗时与测试时间）。
+func (s *ChannelStore) UpdateKeyTestResult(ctx context.Context, keyID int, responseTimeMs int, testedAt time.Time) error {
+	if err := s.db.ChannelKey.UpdateOneID(keyID).
 		SetResponseTimeMs(responseTimeMs).
 		SetTestedAt(testedAt).
-		Exec(ctx)
-	if err != nil {
+		Exec(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return appchannel.ErrChannelNotFound
 		}
@@ -269,13 +338,12 @@ func (s *ChannelStore) UpdateTestResult(ctx context.Context, id int, responseTim
 	return nil
 }
 
-// UpdateBalance 记录渠道余额刷新结果。
-func (s *ChannelStore) UpdateBalance(ctx context.Context, id int, balance float64, updatedAt time.Time) error {
-	err := s.db.Channel.UpdateOneID(id).
+// UpdateKeyBalance 记录密钥端点余额刷新结果（key 级）。
+func (s *ChannelStore) UpdateKeyBalance(ctx context.Context, keyID int, balance float64, updatedAt time.Time) error {
+	if err := s.db.ChannelKey.UpdateOneID(keyID).
 		SetBalance(balance).
 		SetBalanceUpdatedAt(updatedAt).
-		Exec(ctx)
-	if err != nil {
+		Exec(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return appchannel.ErrChannelNotFound
 		}
@@ -284,20 +352,19 @@ func (s *ChannelStore) UpdateBalance(ctx context.Context, id int, balance float6
 	return nil
 }
 
-// GetChannelMoneyStats 按渠道聚合金额（实现 appchannel.StatsReader）：
-// 成本 = Σ(total_cost × account_rate_multiplier)（渠道成本查询期现算，见 usagelog schema），
-// 收益 = Σ(actual_cost)（平台对用户的真实扣费）；
-// 累计与今日（created_at >= todayStart）两个口径分两次分组聚合，方言无关。
-func (s *ChannelStore) GetChannelMoneyStats(ctx context.Context, channelIDs []int, todayStart time.Time) (map[int]appchannel.MoneyStats, error) {
-	result := make(map[int]appchannel.MoneyStats, len(channelIDs))
-	if len(channelIDs) == 0 {
+// GetChannelKeyMoneyStats 按密钥端点聚合金额（实现 appchannel.StatsReader）：
+// 成本 = Σ(total_cost × account_rate_multiplier)，收益 = Σ(actual_cost)；
+// 累计与今日两个口径分两次分组聚合，方言无关。
+func (s *ChannelStore) GetChannelKeyMoneyStats(ctx context.Context, channelKeyIDs []int, todayStart time.Time) (map[int]appchannel.MoneyStats, error) {
+	result := make(map[int]appchannel.MoneyStats, len(channelKeyIDs))
+	if len(channelKeyIDs) == 0 {
 		return result, nil
 	}
-	total, err := s.sumChannelMoney(ctx, channelIDs)
+	total, err := s.sumChannelKeyMoney(ctx, channelKeyIDs)
 	if err != nil {
 		return nil, err
 	}
-	today, err := s.sumChannelMoney(ctx, channelIDs, entusagelog.CreatedAtGTE(todayStart))
+	today, err := s.sumChannelKeyMoney(ctx, channelKeyIDs, entusagelog.CreatedAtGTE(todayStart))
 	if err != nil {
 		return nil, err
 	}
@@ -312,22 +379,19 @@ func (s *ChannelStore) GetChannelMoneyStats(ctx context.Context, channelIDs []in
 	return result, nil
 }
 
-// channelMoneyRow 渠道金额分组聚合的单口径结果。
+// channelMoneyRow 金额分组聚合的单口径结果。
 type channelMoneyRow struct {
-	Cost    float64
-	Revenue float64
+	KeyID   int     `json:"channel_key_usage_logs"`
+	Cost    float64 `json:"cost"`
+	Revenue float64 `json:"revenue"`
 }
 
-func (s *ChannelStore) sumChannelMoney(ctx context.Context, channelIDs []int, extra ...predicate.UsageLog) (map[int]channelMoneyRow, error) {
-	var rows []struct {
-		ChannelID int     `json:"channel_usage_logs"`
-		Cost      float64 `json:"cost"`
-		Revenue   float64 `json:"revenue"`
-	}
-	preds := append([]predicate.UsageLog{entusagelog.ChannelIDIn(channelIDs...)}, extra...)
+func (s *ChannelStore) sumChannelKeyMoney(ctx context.Context, channelKeyIDs []int, extra ...predicate.UsageLog) (map[int]channelMoneyRow, error) {
+	var rows []channelMoneyRow
+	preds := append([]predicate.UsageLog{entusagelog.ChannelKeyIDIn(channelKeyIDs...)}, extra...)
 	err := s.db.UsageLog.Query().
 		Where(preds...).
-		GroupBy(entusagelog.ChannelColumn).
+		GroupBy(entusagelog.ChannelKeyColumn).
 		Aggregate(
 			ent.As(func(sel *sql.Selector) string {
 				return "COALESCE(SUM(" + sel.C(entusagelog.FieldTotalCost) + " * " + sel.C(entusagelog.FieldAccountRateMultiplier) + "), 0)"
@@ -342,7 +406,7 @@ func (s *ChannelStore) sumChannelMoney(ctx context.Context, channelIDs []int, ex
 	}
 	result := make(map[int]channelMoneyRow, len(rows))
 	for _, row := range rows {
-		result[row.ChannelID] = channelMoneyRow{Cost: row.Cost, Revenue: row.Revenue}
+		result[row.KeyID] = row
 	}
 	return result, nil
 }
@@ -357,11 +421,30 @@ func mapChannelList(items []*ent.Channel) []appchannel.Channel {
 
 func mapChannel(item *ent.Channel) appchannel.Channel {
 	ch := appchannel.Channel{
+		ID:        item.ID,
+		Name:      item.Name,
+		BaseURL:   item.BaseURL,
+		CreatedAt: item.CreatedAt,
+		UpdatedAt: item.UpdatedAt,
+	}
+	if keys, err := item.Edges.KeysOrErr(); err == nil {
+		ch.Keys = make([]appchannel.ChannelKey, 0, len(keys))
+		for _, k := range keys {
+			mk := mapChannelKey(k, item.BaseURL)
+			mk.ChannelID = item.ID
+			ch.Keys = append(ch.Keys, mk)
+		}
+	}
+	return ch
+}
+
+func mapChannelKey(item *ent.ChannelKey, baseURL string) appchannel.ChannelKey {
+	key := appchannel.ChannelKey{
 		ID:               item.ID,
+		BaseURL:          baseURL,
 		Name:             item.Name,
 		Type:             item.Type.String(),
-		BaseURL:          item.BaseURL,
-		APIKeys:          item.APIKeys,
+		APIKey:           item.APIKey,
 		Models:           item.Models,
 		ModelMapping:     item.ModelMapping,
 		ParamOverride:    item.ParamOverride,
@@ -377,17 +460,20 @@ func mapChannel(item *ent.Channel) appchannel.Channel {
 		TestModel:        item.TestModel,
 		ResponseTimeMs:   item.ResponseTimeMs,
 		TestedAt:         item.TestedAt,
+		LastUsedAt:       item.LastUsedAt,
 		Balance:          item.Balance,
 		BalanceUpdatedAt: item.BalanceUpdatedAt,
-		LastUsedAt:       item.LastUsedAt,
 		CreatedAt:        item.CreatedAt,
 		UpdatedAt:        item.UpdatedAt,
 	}
+	if ch, err := item.Edges.ChannelOrErr(); err == nil {
+		key.ChannelID = ch.ID
+	}
 	if groups, err := item.Edges.GroupsOrErr(); err == nil {
-		ch.GroupIDs = make([]int, 0, len(groups))
+		key.GroupIDs = make([]int, 0, len(groups))
 		for _, g := range groups {
-			ch.GroupIDs = append(ch.GroupIDs, g.ID)
+			key.GroupIDs = append(key.GroupIDs, g.ID)
 		}
 	}
-	return ch
+	return key
 }

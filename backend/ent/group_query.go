@@ -12,7 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
-	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -26,7 +26,7 @@ type GroupQuery struct {
 	order            []group.OrderOption
 	inters           []Interceptor
 	predicates       []predicate.Group
-	withChannels     *ChannelQuery
+	withChannelKeys  *ChannelKeyQuery
 	withAllowedUsers *UserQuery
 	withAPIKeys      *APIKeyQuery
 	withUsageLogs    *UsageLogQuery
@@ -67,9 +67,9 @@ func (gq *GroupQuery) Order(o ...group.OrderOption) *GroupQuery {
 	return gq
 }
 
-// QueryChannels chains the current query on the "channels" edge.
-func (gq *GroupQuery) QueryChannels() *ChannelQuery {
-	query := (&ChannelClient{config: gq.config}).Query()
+// QueryChannelKeys chains the current query on the "channel_keys" edge.
+func (gq *GroupQuery) QueryChannelKeys() *ChannelKeyQuery {
+	query := (&ChannelKeyClient{config: gq.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := gq.prepareQuery(ctx); err != nil {
 			return nil, err
@@ -80,8 +80,8 @@ func (gq *GroupQuery) QueryChannels() *ChannelQuery {
 		}
 		step := sqlgraph.NewStep(
 			sqlgraph.From(group.Table, group.FieldID, selector),
-			sqlgraph.To(channel.Table, channel.FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, true, group.ChannelsTable, group.ChannelsPrimaryKey...),
+			sqlgraph.To(channelkey.Table, channelkey.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, group.ChannelKeysTable, group.ChannelKeysPrimaryKey...),
 		)
 		fromU = sqlgraph.SetNeighbors(gq.driver.Dialect(), step)
 		return fromU, nil
@@ -347,7 +347,7 @@ func (gq *GroupQuery) Clone() *GroupQuery {
 		order:            append([]group.OrderOption{}, gq.order...),
 		inters:           append([]Interceptor{}, gq.inters...),
 		predicates:       append([]predicate.Group{}, gq.predicates...),
-		withChannels:     gq.withChannels.Clone(),
+		withChannelKeys:  gq.withChannelKeys.Clone(),
 		withAllowedUsers: gq.withAllowedUsers.Clone(),
 		withAPIKeys:      gq.withAPIKeys.Clone(),
 		withUsageLogs:    gq.withUsageLogs.Clone(),
@@ -357,14 +357,14 @@ func (gq *GroupQuery) Clone() *GroupQuery {
 	}
 }
 
-// WithChannels tells the query-builder to eager-load the nodes that are connected to
-// the "channels" edge. The optional arguments are used to configure the query builder of the edge.
-func (gq *GroupQuery) WithChannels(opts ...func(*ChannelQuery)) *GroupQuery {
-	query := (&ChannelClient{config: gq.config}).Query()
+// WithChannelKeys tells the query-builder to eager-load the nodes that are connected to
+// the "channel_keys" edge. The optional arguments are used to configure the query builder of the edge.
+func (gq *GroupQuery) WithChannelKeys(opts ...func(*ChannelKeyQuery)) *GroupQuery {
+	query := (&ChannelKeyClient{config: gq.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	gq.withChannels = query
+	gq.withChannelKeys = query
 	return gq
 }
 
@@ -480,7 +480,7 @@ func (gq *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 		nodes       = []*Group{}
 		_spec       = gq.querySpec()
 		loadedTypes = [4]bool{
-			gq.withChannels != nil,
+			gq.withChannelKeys != nil,
 			gq.withAllowedUsers != nil,
 			gq.withAPIKeys != nil,
 			gq.withUsageLogs != nil,
@@ -507,10 +507,10 @@ func (gq *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
-	if query := gq.withChannels; query != nil {
-		if err := gq.loadChannels(ctx, query, nodes,
-			func(n *Group) { n.Edges.Channels = []*Channel{} },
-			func(n *Group, e *Channel) { n.Edges.Channels = append(n.Edges.Channels, e) }); err != nil {
+	if query := gq.withChannelKeys; query != nil {
+		if err := gq.loadChannelKeys(ctx, query, nodes,
+			func(n *Group) { n.Edges.ChannelKeys = []*ChannelKey{} },
+			func(n *Group, e *ChannelKey) { n.Edges.ChannelKeys = append(n.Edges.ChannelKeys, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -538,7 +538,7 @@ func (gq *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 	return nodes, nil
 }
 
-func (gq *GroupQuery) loadChannels(ctx context.Context, query *ChannelQuery, nodes []*Group, init func(*Group), assign func(*Group, *Channel)) error {
+func (gq *GroupQuery) loadChannelKeys(ctx context.Context, query *ChannelKeyQuery, nodes []*Group, init func(*Group), assign func(*Group, *ChannelKey)) error {
 	edgeIDs := make([]driver.Value, len(nodes))
 	byID := make(map[int]*Group)
 	nids := make(map[int]map[*Group]struct{})
@@ -550,11 +550,11 @@ func (gq *GroupQuery) loadChannels(ctx context.Context, query *ChannelQuery, nod
 		}
 	}
 	query.Where(func(s *sql.Selector) {
-		joinT := sql.Table(group.ChannelsTable)
-		s.Join(joinT).On(s.C(channel.FieldID), joinT.C(group.ChannelsPrimaryKey[0]))
-		s.Where(sql.InValues(joinT.C(group.ChannelsPrimaryKey[1]), edgeIDs...))
+		joinT := sql.Table(group.ChannelKeysTable)
+		s.Join(joinT).On(s.C(channelkey.FieldID), joinT.C(group.ChannelKeysPrimaryKey[0]))
+		s.Where(sql.InValues(joinT.C(group.ChannelKeysPrimaryKey[1]), edgeIDs...))
 		columns := s.SelectedColumns()
-		s.Select(joinT.C(group.ChannelsPrimaryKey[1]))
+		s.Select(joinT.C(group.ChannelKeysPrimaryKey[1]))
 		s.AppendSelect(columns...)
 		s.SetDistinct(false)
 	})
@@ -584,14 +584,14 @@ func (gq *GroupQuery) loadChannels(ctx context.Context, query *ChannelQuery, nod
 			}
 		})
 	})
-	neighbors, err := withInterceptors[[]*Channel](ctx, query, qr, query.inters)
+	neighbors, err := withInterceptors[[]*ChannelKey](ctx, query, qr, query.inters)
 	if err != nil {
 		return err
 	}
 	for _, n := range neighbors {
 		nodes, ok := nids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected "channels" node returned %v`, n.ID)
+			return fmt.Errorf(`unexpected "channel_keys" node returned %v`, n.ID)
 		}
 		for kn := range nodes {
 			assign(kn, n)

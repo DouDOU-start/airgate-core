@@ -22,6 +22,8 @@ type Tx struct {
 	BalanceLog *BalanceLogClient
 	// Channel is the client for interacting with the Channel builders.
 	Channel *ChannelClient
+	// ChannelKey is the client for interacting with the ChannelKey builders.
+	ChannelKey *ChannelKeyClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
 	// ModelPrice is the client for interacting with the ModelPrice builders.
@@ -184,6 +186,7 @@ func (tx *Tx) init() {
 	tx.AnnouncementRead = NewAnnouncementReadClient(tx.config)
 	tx.BalanceLog = NewBalanceLogClient(tx.config)
 	tx.Channel = NewChannelClient(tx.config)
+	tx.ChannelKey = NewChannelKeyClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
 	tx.ModelPrice = NewModelPriceClient(tx.config)
 	tx.ModelTag = NewModelTagClient(tx.config)

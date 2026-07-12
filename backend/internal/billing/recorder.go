@@ -29,6 +29,7 @@ type UsageRecord struct {
 	UserEmail             string
 	APIKeyID              int
 	ChannelID             int
+	ChannelKeyID          int
 	GroupID               int
 	Model                 string
 	InputTokens           int
@@ -355,6 +356,9 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord, withChannel bool) *ent.UsageLog
 	}
 	if withChannel && rec.ChannelID > 0 {
 		b.SetChannelID(rec.ChannelID)
+	}
+	if withChannel && rec.ChannelKeyID > 0 {
+		b.SetChannelKeyID(rec.ChannelKeyID)
 	}
 	if rec.APIKeyID > 0 {
 		b.SetAPIKeyID(rec.APIKeyID)

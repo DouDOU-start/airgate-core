@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -550,6 +551,20 @@ func (ulc *UsageLogCreate) SetNillableChannelID(i *int) *UsageLogCreate {
 	return ulc
 }
 
+// SetChannelKeyID sets the "channel_key_id" field.
+func (ulc *UsageLogCreate) SetChannelKeyID(i int) *UsageLogCreate {
+	ulc.mutation.SetChannelKeyID(i)
+	return ulc
+}
+
+// SetNillableChannelKeyID sets the "channel_key_id" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableChannelKeyID(i *int) *UsageLogCreate {
+	if i != nil {
+		ulc.SetChannelKeyID(*i)
+	}
+	return ulc
+}
+
 // SetGroupID sets the "group_id" field.
 func (ulc *UsageLogCreate) SetGroupID(i int) *UsageLogCreate {
 	ulc.mutation.SetGroupID(i)
@@ -577,6 +592,11 @@ func (ulc *UsageLogCreate) SetAPIKey(a *APIKey) *UsageLogCreate {
 // SetChannel sets the "channel" edge to the Channel entity.
 func (ulc *UsageLogCreate) SetChannel(c *Channel) *UsageLogCreate {
 	return ulc.SetChannelID(c.ID)
+}
+
+// SetChannelKey sets the "channel_key" edge to the ChannelKey entity.
+func (ulc *UsageLogCreate) SetChannelKey(c *ChannelKey) *UsageLogCreate {
+	return ulc.SetChannelKeyID(c.ID)
 }
 
 // SetGroup sets the "group" edge to the Group entity.
@@ -1085,6 +1105,23 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.ChannelID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := ulc.mutation.ChannelKeyIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.ChannelKeyTable,
+			Columns: []string{usagelog.ChannelKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ChannelKeyID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := ulc.mutation.GroupIDs(); len(nodes) > 0 {
@@ -1765,6 +1802,24 @@ func (u *UsageLogUpsert) UpdateChannelID() *UsageLogUpsert {
 // ClearChannelID clears the value of the "channel_id" field.
 func (u *UsageLogUpsert) ClearChannelID() *UsageLogUpsert {
 	u.SetNull(usagelog.FieldChannelID)
+	return u
+}
+
+// SetChannelKeyID sets the "channel_key_id" field.
+func (u *UsageLogUpsert) SetChannelKeyID(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldChannelKeyID, v)
+	return u
+}
+
+// UpdateChannelKeyID sets the "channel_key_id" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateChannelKeyID() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldChannelKeyID)
+	return u
+}
+
+// ClearChannelKeyID clears the value of the "channel_key_id" field.
+func (u *UsageLogUpsert) ClearChannelKeyID() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldChannelKeyID)
 	return u
 }
 
@@ -2542,6 +2597,27 @@ func (u *UsageLogUpsertOne) UpdateChannelID() *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) ClearChannelID() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.ClearChannelID()
+	})
+}
+
+// SetChannelKeyID sets the "channel_key_id" field.
+func (u *UsageLogUpsertOne) SetChannelKeyID(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetChannelKeyID(v)
+	})
+}
+
+// UpdateChannelKeyID sets the "channel_key_id" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateChannelKeyID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateChannelKeyID()
+	})
+}
+
+// ClearChannelKeyID clears the value of the "channel_key_id" field.
+func (u *UsageLogUpsertOne) ClearChannelKeyID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearChannelKeyID()
 	})
 }
 
@@ -3488,6 +3564,27 @@ func (u *UsageLogUpsertBulk) UpdateChannelID() *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) ClearChannelID() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.ClearChannelID()
+	})
+}
+
+// SetChannelKeyID sets the "channel_key_id" field.
+func (u *UsageLogUpsertBulk) SetChannelKeyID(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetChannelKeyID(v)
+	})
+}
+
+// UpdateChannelKeyID sets the "channel_key_id" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateChannelKeyID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateChannelKeyID()
+	})
+}
+
+// ClearChannelKeyID clears the value of the "channel_key_id" field.
+func (u *UsageLogUpsertBulk) ClearChannelKeyID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearChannelKeyID()
 	})
 }
 

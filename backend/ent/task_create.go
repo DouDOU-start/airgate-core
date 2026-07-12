@@ -327,6 +327,20 @@ func (tc *TaskCreate) SetNillableChannelID(i *int) *TaskCreate {
 	return tc
 }
 
+// SetChannelKeyID sets the "channel_key_id" field.
+func (tc *TaskCreate) SetChannelKeyID(i int) *TaskCreate {
+	tc.mutation.SetChannelKeyID(i)
+	return tc
+}
+
+// SetNillableChannelKeyID sets the "channel_key_id" field if the given value is not nil.
+func (tc *TaskCreate) SetNillableChannelKeyID(i *int) *TaskCreate {
+	if i != nil {
+		tc.SetChannelKeyID(*i)
+	}
+	return tc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (tc *TaskCreate) SetCreatedAt(t time.Time) *TaskCreate {
 	tc.mutation.SetCreatedAt(t)
@@ -466,6 +480,10 @@ func (tc *TaskCreate) defaults() {
 		v := task.DefaultChannelID
 		tc.mutation.SetChannelID(v)
 	}
+	if _, ok := tc.mutation.ChannelKeyID(); !ok {
+		v := task.DefaultChannelKeyID
+		tc.mutation.SetChannelKeyID(v)
+	}
 	if _, ok := tc.mutation.CreatedAt(); !ok {
 		v := task.DefaultCreatedAt()
 		tc.mutation.SetCreatedAt(v)
@@ -563,6 +581,9 @@ func (tc *TaskCreate) check() error {
 	}
 	if _, ok := tc.mutation.ChannelID(); !ok {
 		return &ValidationError{Name: "channel_id", err: errors.New(`ent: missing required field "Task.channel_id"`)}
+	}
+	if _, ok := tc.mutation.ChannelKeyID(); !ok {
+		return &ValidationError{Name: "channel_key_id", err: errors.New(`ent: missing required field "Task.channel_key_id"`)}
 	}
 	if _, ok := tc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Task.created_at"`)}
@@ -692,6 +713,10 @@ func (tc *TaskCreate) createSpec() (*Task, *sqlgraph.CreateSpec) {
 	if value, ok := tc.mutation.ChannelID(); ok {
 		_spec.SetField(task.FieldChannelID, field.TypeInt, value)
 		_node.ChannelID = value
+	}
+	if value, ok := tc.mutation.ChannelKeyID(); ok {
+		_spec.SetField(task.FieldChannelKeyID, field.TypeInt, value)
+		_node.ChannelKeyID = value
 	}
 	if value, ok := tc.mutation.CreatedAt(); ok {
 		_spec.SetField(task.FieldCreatedAt, field.TypeTime, value)
@@ -1116,6 +1141,24 @@ func (u *TaskUpsert) UpdateChannelID() *TaskUpsert {
 // AddChannelID adds v to the "channel_id" field.
 func (u *TaskUpsert) AddChannelID(v int) *TaskUpsert {
 	u.Add(task.FieldChannelID, v)
+	return u
+}
+
+// SetChannelKeyID sets the "channel_key_id" field.
+func (u *TaskUpsert) SetChannelKeyID(v int) *TaskUpsert {
+	u.Set(task.FieldChannelKeyID, v)
+	return u
+}
+
+// UpdateChannelKeyID sets the "channel_key_id" field to the value that was provided on create.
+func (u *TaskUpsert) UpdateChannelKeyID() *TaskUpsert {
+	u.SetExcluded(task.FieldChannelKeyID)
+	return u
+}
+
+// AddChannelKeyID adds v to the "channel_key_id" field.
+func (u *TaskUpsert) AddChannelKeyID(v int) *TaskUpsert {
+	u.Add(task.FieldChannelKeyID, v)
 	return u
 }
 
@@ -1600,6 +1643,27 @@ func (u *TaskUpsertOne) AddChannelID(v int) *TaskUpsertOne {
 func (u *TaskUpsertOne) UpdateChannelID() *TaskUpsertOne {
 	return u.Update(func(s *TaskUpsert) {
 		s.UpdateChannelID()
+	})
+}
+
+// SetChannelKeyID sets the "channel_key_id" field.
+func (u *TaskUpsertOne) SetChannelKeyID(v int) *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.SetChannelKeyID(v)
+	})
+}
+
+// AddChannelKeyID adds v to the "channel_key_id" field.
+func (u *TaskUpsertOne) AddChannelKeyID(v int) *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.AddChannelKeyID(v)
+	})
+}
+
+// UpdateChannelKeyID sets the "channel_key_id" field to the value that was provided on create.
+func (u *TaskUpsertOne) UpdateChannelKeyID() *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.UpdateChannelKeyID()
 	})
 }
 
@@ -2252,6 +2316,27 @@ func (u *TaskUpsertBulk) AddChannelID(v int) *TaskUpsertBulk {
 func (u *TaskUpsertBulk) UpdateChannelID() *TaskUpsertBulk {
 	return u.Update(func(s *TaskUpsert) {
 		s.UpdateChannelID()
+	})
+}
+
+// SetChannelKeyID sets the "channel_key_id" field.
+func (u *TaskUpsertBulk) SetChannelKeyID(v int) *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.SetChannelKeyID(v)
+	})
+}
+
+// AddChannelKeyID adds v to the "channel_key_id" field.
+func (u *TaskUpsertBulk) AddChannelKeyID(v int) *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.AddChannelKeyID(v)
+	})
+}
+
+// UpdateChannelKeyID sets the "channel_key_id" field to the value that was provided on create.
+func (u *TaskUpsertBulk) UpdateChannelKeyID() *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.UpdateChannelKeyID()
 	})
 }
 

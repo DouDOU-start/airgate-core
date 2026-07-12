@@ -15,29 +15,29 @@ func TestChannelMinuteKey(t *testing.T) {
 		minute    int64
 		want      string
 	}{
-		{"常规窗口", 5, 100, "rpm:channel:5:100"},
-		{"跨分钟边界仍用原窗口", 5, 99, "rpm:channel:5:99"},
-		{"不同渠道隔离", 7, 100, "rpm:channel:7:100"},
+		{"常规窗口", 5, 100, "rpm:chkey:5:100"},
+		{"跨分钟边界仍用原窗口", 5, 99, "rpm:chkey:5:99"},
+		{"不同渠道隔离", 7, 100, "rpm:chkey:7:100"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := channelMinuteKey(tc.channelID, tc.minute); got != tc.want {
-				t.Errorf("channelMinuteKey(%d, %d) = %q, want %q", tc.channelID, tc.minute, got, tc.want)
+			if got := keyMinuteKey(tc.channelID, tc.minute); got != tc.want {
+				t.Errorf("keyMinuteKey(%d, %d) = %q, want %q", tc.channelID, tc.minute, got, tc.want)
 			}
 		})
 	}
 }
 
-// TestTryIncrementChannelRPMReturnsMinute TryIncrement 返回本次计数所用的分钟窗口；
+// TestTryIncrementKeyRPMReturnsMinute TryIncrement 返回本次计数所用的分钟窗口；
 // 请求跨分钟后回退时用该窗口而非重算当前时间。
-func TestTryIncrementChannelRPMReturnsMinute(t *testing.T) {
+func TestTryIncrementKeyRPMReturnsMinute(t *testing.T) {
 	r := NewRPMCounter(nil) // nil redis：no-op 但窗口语义仍须成立
 
 	before := time.Now().Unix() / 60
-	ok, minute, err := r.TryIncrementChannelRPM(context.Background(), 5, 10)
+	ok, minute, err := r.TryIncrementKeyRPM(context.Background(), 5, 10)
 	after := time.Now().Unix() / 60
 	if err != nil {
-		t.Fatalf("TryIncrementChannelRPM err = %v", err)
+		t.Fatalf("TryIncrementKeyRPM err = %v", err)
 	}
 	if !ok {
 		t.Fatal("nil redis 应 fail-open 放行")
@@ -47,6 +47,6 @@ func TestTryIncrementChannelRPMReturnsMinute(t *testing.T) {
 	}
 
 	// 回退接受任意历史窗口（nil redis no-op，不 panic 即可）。
-	r.DecrementChannelRPM(context.Background(), 5, minute)
-	r.DecrementChannelRPM(context.Background(), 5, minute-1)
+	r.DecrementKeyRPM(context.Background(), 5, minute)
+	r.DecrementKeyRPM(context.Background(), 5, minute-1)
 }

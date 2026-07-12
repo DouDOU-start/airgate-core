@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -97,6 +98,8 @@ type UsageLog struct {
 	APIKeyID int `json:"api_key_id,omitempty"`
 	// ChannelID holds the value of the "channel_id" field.
 	ChannelID int `json:"channel_id,omitempty"`
+	// ChannelKeyID holds the value of the "channel_key_id" field.
+	ChannelKeyID int `json:"channel_key_id,omitempty"`
 	// GroupID holds the value of the "group_id" field.
 	GroupID int `json:"group_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -113,11 +116,13 @@ type UsageLogEdges struct {
 	APIKey *APIKey `json:"api_key,omitempty"`
 	// Channel holds the value of the channel edge.
 	Channel *Channel `json:"channel,omitempty"`
+	// ChannelKey holds the value of the channel_key edge.
+	ChannelKey *ChannelKey `json:"channel_key,omitempty"`
 	// Group holds the value of the group edge.
 	Group *Group `json:"group,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [5]bool
 }
 
 // UserOrErr returns the User value or an error if the edge
@@ -153,12 +158,23 @@ func (e UsageLogEdges) ChannelOrErr() (*Channel, error) {
 	return nil, &NotLoadedError{edge: "channel"}
 }
 
+// ChannelKeyOrErr returns the ChannelKey value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e UsageLogEdges) ChannelKeyOrErr() (*ChannelKey, error) {
+	if e.ChannelKey != nil {
+		return e.ChannelKey, nil
+	} else if e.loadedTypes[3] {
+		return nil, &NotFoundError{label: channelkey.Label}
+	}
+	return nil, &NotLoadedError{edge: "channel_key"}
+}
+
 // GroupOrErr returns the Group value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e UsageLogEdges) GroupOrErr() (*Group, error) {
 	if e.Group != nil {
 		return e.Group, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[4] {
 		return nil, &NotFoundError{label: group.Label}
 	}
 	return nil, &NotLoadedError{edge: "group"}
@@ -173,7 +189,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case usagelog.FieldInputPrice, usagelog.FieldOutputPrice, usagelog.FieldCachedInputPrice, usagelog.FieldCacheCreationPrice, usagelog.FieldCacheCreation1hPrice, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldCacheCreationCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldBilledCost, usagelog.FieldRateMultiplier, usagelog.FieldSellRate, usagelog.FieldAccountRateMultiplier:
 			values[i] = new(sql.NullFloat64)
-		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldCalls, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldUserIDSnapshot, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldChannelID, usagelog.FieldGroupID:
+		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldCalls, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldUserIDSnapshot, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldChannelID, usagelog.FieldChannelKeyID, usagelog.FieldGroupID:
 			values[i] = new(sql.NullInt64)
 		case usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldSource, usagelog.FieldRequestID, usagelog.FieldUserEmailSnapshot:
 			values[i] = new(sql.NullString)
@@ -428,6 +444,12 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.ChannelID = int(value.Int64)
 			}
+		case usagelog.FieldChannelKeyID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field channel_key_id", values[i])
+			} else if value.Valid {
+				ul.ChannelKeyID = int(value.Int64)
+			}
 		case usagelog.FieldGroupID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field group_id", values[i])
@@ -460,6 +482,11 @@ func (ul *UsageLog) QueryAPIKey() *APIKeyQuery {
 // QueryChannel queries the "channel" edge of the UsageLog entity.
 func (ul *UsageLog) QueryChannel() *ChannelQuery {
 	return NewUsageLogClient(ul.config).QueryChannel(ul)
+}
+
+// QueryChannelKey queries the "channel_key" edge of the UsageLog entity.
+func (ul *UsageLog) QueryChannelKey() *ChannelKeyQuery {
+	return NewUsageLogClient(ul.config).QueryChannelKey(ul)
 }
 
 // QueryGroup queries the "group" edge of the UsageLog entity.
@@ -603,6 +630,9 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("channel_id=")
 	builder.WriteString(fmt.Sprintf("%v", ul.ChannelID))
+	builder.WriteString(", ")
+	builder.WriteString("channel_key_id=")
+	builder.WriteString(fmt.Sprintf("%v", ul.ChannelKeyID))
 	builder.WriteString(", ")
 	builder.WriteString("group_id=")
 	builder.WriteString(fmt.Sprintf("%v", ul.GroupID))

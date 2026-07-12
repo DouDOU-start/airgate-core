@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -21,15 +22,16 @@ import (
 // UsageLogQuery is the builder for querying UsageLog entities.
 type UsageLogQuery struct {
 	config
-	ctx         *QueryContext
-	order       []usagelog.OrderOption
-	inters      []Interceptor
-	predicates  []predicate.UsageLog
-	withUser    *UserQuery
-	withAPIKey  *APIKeyQuery
-	withChannel *ChannelQuery
-	withGroup   *GroupQuery
-	modifiers   []func(*sql.Selector)
+	ctx            *QueryContext
+	order          []usagelog.OrderOption
+	inters         []Interceptor
+	predicates     []predicate.UsageLog
+	withUser       *UserQuery
+	withAPIKey     *APIKeyQuery
+	withChannel    *ChannelQuery
+	withChannelKey *ChannelKeyQuery
+	withGroup      *GroupQuery
+	modifiers      []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -125,6 +127,28 @@ func (ulq *UsageLogQuery) QueryChannel() *ChannelQuery {
 			sqlgraph.From(usagelog.Table, usagelog.FieldID, selector),
 			sqlgraph.To(channel.Table, channel.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, usagelog.ChannelTable, usagelog.ChannelColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(ulq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryChannelKey chains the current query on the "channel_key" edge.
+func (ulq *UsageLogQuery) QueryChannelKey() *ChannelKeyQuery {
+	query := (&ChannelKeyClient{config: ulq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := ulq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := ulq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(usagelog.Table, usagelog.FieldID, selector),
+			sqlgraph.To(channelkey.Table, channelkey.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, usagelog.ChannelKeyTable, usagelog.ChannelKeyColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(ulq.driver.Dialect(), step)
 		return fromU, nil
@@ -341,15 +365,16 @@ func (ulq *UsageLogQuery) Clone() *UsageLogQuery {
 		return nil
 	}
 	return &UsageLogQuery{
-		config:      ulq.config,
-		ctx:         ulq.ctx.Clone(),
-		order:       append([]usagelog.OrderOption{}, ulq.order...),
-		inters:      append([]Interceptor{}, ulq.inters...),
-		predicates:  append([]predicate.UsageLog{}, ulq.predicates...),
-		withUser:    ulq.withUser.Clone(),
-		withAPIKey:  ulq.withAPIKey.Clone(),
-		withChannel: ulq.withChannel.Clone(),
-		withGroup:   ulq.withGroup.Clone(),
+		config:         ulq.config,
+		ctx:            ulq.ctx.Clone(),
+		order:          append([]usagelog.OrderOption{}, ulq.order...),
+		inters:         append([]Interceptor{}, ulq.inters...),
+		predicates:     append([]predicate.UsageLog{}, ulq.predicates...),
+		withUser:       ulq.withUser.Clone(),
+		withAPIKey:     ulq.withAPIKey.Clone(),
+		withChannel:    ulq.withChannel.Clone(),
+		withChannelKey: ulq.withChannelKey.Clone(),
+		withGroup:      ulq.withGroup.Clone(),
 		// clone intermediate query.
 		sql:  ulq.sql.Clone(),
 		path: ulq.path,
@@ -386,6 +411,17 @@ func (ulq *UsageLogQuery) WithChannel(opts ...func(*ChannelQuery)) *UsageLogQuer
 		opt(query)
 	}
 	ulq.withChannel = query
+	return ulq
+}
+
+// WithChannelKey tells the query-builder to eager-load the nodes that are connected to
+// the "channel_key" edge. The optional arguments are used to configure the query builder of the edge.
+func (ulq *UsageLogQuery) WithChannelKey(opts ...func(*ChannelKeyQuery)) *UsageLogQuery {
+	query := (&ChannelKeyClient{config: ulq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	ulq.withChannelKey = query
 	return ulq
 }
 
@@ -478,10 +514,11 @@ func (ulq *UsageLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Us
 	var (
 		nodes       = []*UsageLog{}
 		_spec       = ulq.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [5]bool{
 			ulq.withUser != nil,
 			ulq.withAPIKey != nil,
 			ulq.withChannel != nil,
+			ulq.withChannelKey != nil,
 			ulq.withGroup != nil,
 		}
 	)
@@ -521,6 +558,12 @@ func (ulq *UsageLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Us
 	if query := ulq.withChannel; query != nil {
 		if err := ulq.loadChannel(ctx, query, nodes, nil,
 			func(n *UsageLog, e *Channel) { n.Edges.Channel = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := ulq.withChannelKey; query != nil {
+		if err := ulq.loadChannelKey(ctx, query, nodes, nil,
+			func(n *UsageLog, e *ChannelKey) { n.Edges.ChannelKey = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -620,6 +663,35 @@ func (ulq *UsageLogQuery) loadChannel(ctx context.Context, query *ChannelQuery, 
 	}
 	return nil
 }
+func (ulq *UsageLogQuery) loadChannelKey(ctx context.Context, query *ChannelKeyQuery, nodes []*UsageLog, init func(*UsageLog), assign func(*UsageLog, *ChannelKey)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*UsageLog)
+	for i := range nodes {
+		fk := nodes[i].ChannelKeyID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(channelkey.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "channel_key_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 func (ulq *UsageLogQuery) loadGroup(ctx context.Context, query *GroupQuery, nodes []*UsageLog, init func(*UsageLog), assign func(*UsageLog, *Group)) error {
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*UsageLog)
@@ -686,6 +758,9 @@ func (ulq *UsageLogQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if ulq.withChannel != nil {
 			_spec.Node.AddColumnOnce(usagelog.FieldChannelID)
+		}
+		if ulq.withChannelKey != nil {
+			_spec.Node.AddColumnOnce(usagelog.FieldChannelKeyID)
 		}
 		if ulq.withGroup != nil {
 			_spec.Node.AddColumnOnce(usagelog.FieldGroupID)

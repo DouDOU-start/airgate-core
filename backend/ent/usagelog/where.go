@@ -245,6 +245,11 @@ func ChannelID(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldChannelID, v))
 }
 
+// ChannelKeyID applies equality check predicate on the "channel_key_id" field. It's identical to ChannelKeyIDEQ.
+func ChannelKeyID(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldChannelKeyID, v))
+}
+
 // GroupID applies equality check predicate on the "group_id" field. It's identical to GroupIDEQ.
 func GroupID(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldGroupID, v))
@@ -1910,6 +1915,36 @@ func ChannelIDNotNil() predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldNotNull(FieldChannelID))
 }
 
+// ChannelKeyIDEQ applies the EQ predicate on the "channel_key_id" field.
+func ChannelKeyIDEQ(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldChannelKeyID, v))
+}
+
+// ChannelKeyIDNEQ applies the NEQ predicate on the "channel_key_id" field.
+func ChannelKeyIDNEQ(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldChannelKeyID, v))
+}
+
+// ChannelKeyIDIn applies the In predicate on the "channel_key_id" field.
+func ChannelKeyIDIn(vs ...int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldChannelKeyID, vs...))
+}
+
+// ChannelKeyIDNotIn applies the NotIn predicate on the "channel_key_id" field.
+func ChannelKeyIDNotIn(vs ...int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldChannelKeyID, vs...))
+}
+
+// ChannelKeyIDIsNil applies the IsNil predicate on the "channel_key_id" field.
+func ChannelKeyIDIsNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIsNull(FieldChannelKeyID))
+}
+
+// ChannelKeyIDNotNil applies the NotNil predicate on the "channel_key_id" field.
+func ChannelKeyIDNotNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotNull(FieldChannelKeyID))
+}
+
 // GroupIDEQ applies the EQ predicate on the "group_id" field.
 func GroupIDEQ(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldGroupID, v))
@@ -2001,6 +2036,29 @@ func HasChannel() predicate.UsageLog {
 func HasChannelWith(preds ...predicate.Channel) predicate.UsageLog {
 	return predicate.UsageLog(func(s *sql.Selector) {
 		step := newChannelStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasChannelKey applies the HasEdge predicate on the "channel_key" edge.
+func HasChannelKey() predicate.UsageLog {
+	return predicate.UsageLog(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ChannelKeyTable, ChannelKeyColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasChannelKeyWith applies the HasEdge predicate on the "channel_key" edge with a given conditions (other predicates).
+func HasChannelKeyWith(preds ...predicate.ChannelKey) predicate.UsageLog {
+	return predicate.UsageLog(func(s *sql.Selector) {
+		step := newChannelKeyStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

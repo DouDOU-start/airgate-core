@@ -24,7 +24,7 @@ func mustReq(t *testing.T, body string) *dto.ChatRequest {
 
 func info(model, upstream string, stream bool) *adaptor.RelayInfo {
 	return &adaptor.RelayInfo{
-		Channel:       &registry.ChannelSnapshot{BaseURL: "https://api.anthropic.com"},
+		ChannelKey:    &registry.ChannelKeySnapshot{BaseURL: "https://api.anthropic.com"},
 		APIKey:        "sk-ant-test",
 		RequestModel:  model,
 		UpstreamModel: upstream,
@@ -70,7 +70,7 @@ func TestBuildRequestPassthrough(t *testing.T) {
 	}`
 	req := mustReq(t, original)
 	in := info("claude", "claude-3-5-sonnet", true)
-	in.Channel.ParamOverride = map[string]any{"temperature": 0.1}
+	in.ChannelKey.ParamOverride = map[string]any{"temperature": 0.1}
 
 	httpReq, err := Adaptor{}.BuildRequest(context.Background(), in, req)
 	if err != nil {
@@ -129,7 +129,7 @@ func TestBuildRequestNoMaxTokensInjection(t *testing.T) {
 func TestBuildRequestParamOverrideRemove(t *testing.T) {
 	req := mustReq(t, `{"model":"c","messages":[],"top_k":40,"max_tokens":10}`)
 	in := info("c", "", false)
-	in.Channel.ParamOverride = map[string]any{"top_k": nil, "max_tokens": float64(99)}
+	in.ChannelKey.ParamOverride = map[string]any{"top_k": nil, "max_tokens": float64(99)}
 	httpReq, _ := Adaptor{}.BuildRequest(context.Background(), in, req)
 	body, _ := io.ReadAll(httpReq.Body)
 	sent := fieldsOf(t, body)

@@ -68,4 +68,63 @@ var legacyFixups = []string{
 	// 见 ent/schema/apikey.go）。旧的两维部分唯一索引已被三维索引取代，
 	// 不清理会导致同应用按组领第二把 key 时撞旧约束。
 	`DROP INDEX IF EXISTS apikey_provisioned_by_user_api_keys`,
+
+	// 2026-07：渠道多 key 独立配置化——把旧 channels 表的 api_keys[] 及随行配置
+	// （type/models/mapping/override/priority/weight/并发/RPM/cost_ratio/tags/status/...）
+	// 拆成独立的 channel_keys 子实体，每把 key 继承当时渠道配置，并复制分组绑定。
+	// 幂等：仅当旧 api_keys 列仍存在、且渠道尚无 channel_key 时回填；回填后把该渠道
+	// api_keys 清空，避免管理员日后清空某渠道全部 key 时旧值被再次复活。
+	`DO $$
+DECLARE c record; k text; new_id int;
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'channels' AND column_name = 'api_keys'
+    ) THEN
+        FOR c IN SELECT * FROM channels ch WHERE NOT EXISTS (
+            SELECT 1 FROM channel_keys ck WHERE ck.channel_keys = ch.id
+        ) LOOP
+            FOR k IN SELECT jsonb_array_elements_text(c.api_keys::jsonb) LOOP
+                INSERT INTO channel_keys (
+                    name, type, api_key, models, model_mapping, param_override, header_override,
+                    status, error_msg, priority, weight, max_concurrency, max_rpm, cost_ratio,
+                    tags, test_model, response_time_ms, tested_at, last_used_at,
+                    created_at, updated_at, channel_keys
+                ) VALUES (
+                    '', c.type, k, c.models, c.model_mapping, c.param_override, c.header_override,
+                    c.status, c.error_msg, c.priority, c.weight, c.max_concurrency, c.max_rpm, c.cost_ratio,
+                    c.tags, c.test_model, c.response_time_ms, c.tested_at, c.last_used_at,
+                    now(), now(), c.id
+                ) RETURNING id INTO new_id;
+                IF to_regclass('channel_groups') IS NOT NULL THEN
+                    INSERT INTO channel_key_groups (channel_key_id, group_id)
+                    SELECT new_id, cg.group_id FROM channel_groups cg WHERE cg.channel_id = c.id;
+                END IF;
+            END LOOP;
+            UPDATE channels SET api_keys = '[]'::jsonb WHERE id = c.id;
+        END LOOP;
+    END IF;
+END $$`,
+
+	// 2026-07：渠道多 key 化后，channels 表的配置列全部下沉到 channel_keys（见上一条回填）。
+	// 这些遗留列多为 NOT NULL 且无 DB 级默认值（ent 的 .Default() 在 Go 层生效，不落 DB
+	// DEFAULT），新的渠道插入（仅 name/base_url）会逐个撞 not-null 约束。逐列去掉 NOT NULL
+	// 约束以放行新插入（保留旧列供回滚，不删数据）；全新库无这些列则空转，幂等。
+	`DO $$
+DECLARE col text;
+BEGIN
+    FOREACH col IN ARRAY ARRAY[
+        'type','api_keys','models','model_mapping','param_override','header_override',
+        'status','error_msg','priority','weight','max_concurrency','max_rpm','cost_ratio',
+        'tags','test_model','response_time_ms','tested_at','last_used_at'
+    ] LOOP
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = current_schema() AND table_name = 'channels'
+              AND column_name = col AND is_nullable = 'NO'
+        ) THEN
+            EXECUTE format('ALTER TABLE channels ALTER COLUMN %I DROP NOT NULL', col);
+        END IF;
+    END LOOP;
+END $$`,
 }

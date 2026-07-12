@@ -97,9 +97,9 @@ func (f *fakeErrSink) entryCount() int {
 }
 
 // fakeChannelLoader 固定渠道快照。
-type fakeChannelLoader struct{ snaps []registry.ChannelSnapshot }
+type fakeChannelLoader struct{ snaps []registry.ChannelKeySnapshot }
 
-func (f *fakeChannelLoader) LoadAllForRegistry(context.Context) ([]registry.ChannelSnapshot, error) {
+func (f *fakeChannelLoader) LoadAllForRegistry(context.Context) ([]registry.ChannelKeySnapshot, error) {
 	return f.snaps, nil
 }
 
@@ -201,7 +201,7 @@ type testEnv struct {
 
 // newTestEnv 组装管线：注册表注入指定快照（不接 DB），
 // ConcurrencyManager/RPMCounter 传 nil redis（no-op），UsageSink 用 fake。
-func newTestEnv(t *testing.T, snaps ...registry.ChannelSnapshot) *testEnv {
+func newTestEnv(t *testing.T, snaps ...registry.ChannelKeySnapshot) *testEnv {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -252,13 +252,14 @@ func newTestEnv(t *testing.T, snaps ...registry.ChannelSnapshot) *testEnv {
 }
 
 // testSnap 构造指向指定上游的渠道快照。
-func testSnap(id int, baseURL string, mutate ...func(*registry.ChannelSnapshot)) registry.ChannelSnapshot {
-	s := registry.ChannelSnapshot{
-		ID:           id,
-		Name:         fmt.Sprintf("ch-%d", id),
+func testSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapshot)) registry.ChannelKeySnapshot {
+	s := registry.ChannelKeySnapshot{
+		KeyID:        id,
+		ChannelID:    id,
+		ChannelName:  fmt.Sprintf("ch-%d", id),
 		Type:         "openai_compatible",
 		BaseURL:      baseURL,
-		APIKeys:      []string{fmt.Sprintf("sk-up-%d", id)},
+		APIKey:       fmt.Sprintf("sk-up-%d", id),
 		Models:       map[string]struct{}{testModel: {}},
 		ModelMapping: map[string]string{testModel: "gpt-4o-upstream"},
 		Priority:     10,
@@ -458,8 +459,8 @@ func TestFailover429(t *testing.T) {
 	defer bad.Close()
 
 	env := newTestEnv(t,
-		testSnap(1, good.URL, func(s *registry.ChannelSnapshot) { s.Priority = 1 }),
-		testSnap(2, bad.URL, func(s *registry.ChannelSnapshot) { s.Priority = 100 }), // 高优先级先被选中
+		testSnap(1, good.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 1 }),
+		testSnap(2, bad.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 100 }), // 高优先级先被选中
 	)
 	w := env.do(t, `{"model":"gpt-4o","messages":[]}`)
 
@@ -530,8 +531,8 @@ func TestUpstream500Failover(t *testing.T) {
 	defer bad.Close()
 
 	env := newTestEnv(t,
-		testSnap(1, good.URL, func(s *registry.ChannelSnapshot) { s.Priority = 1 }),
-		testSnap(2, bad.URL, func(s *registry.ChannelSnapshot) { s.Priority = 100 }),
+		testSnap(1, good.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 1 }),
+		testSnap(2, bad.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 100 }),
 	)
 	w := env.do(t, `{"model":"gpt-4o","messages":[]}`)
 	if w.Code != http.StatusOK {
@@ -589,7 +590,7 @@ func TestBalancePrecheck(t *testing.T) {
 
 // TestUnpricedModelRejected 缺价预检 400（缺价模型一律拒绝，无放行开关）。
 func TestUnpricedModelRejected(t *testing.T) {
-	env := newTestEnv(t, testSnap(1, "http://127.0.0.1:0", func(s *registry.ChannelSnapshot) {
+	env := newTestEnv(t, testSnap(1, "http://127.0.0.1:0", func(s *registry.ChannelKeySnapshot) {
 		s.Models["unpriced-model"] = struct{}{}
 	}))
 	w := env.do(t, `{"model":"unpriced-model","messages":[]}`)
@@ -604,10 +605,10 @@ func TestUnpricedModelRejected(t *testing.T) {
 // TestHandleModels /v1/models 按分组返回模型并集。
 func TestHandleModels(t *testing.T) {
 	env := newTestEnv(t,
-		testSnap(1, "http://u1", func(s *registry.ChannelSnapshot) {
+		testSnap(1, "http://u1", func(s *registry.ChannelKeySnapshot) {
 			s.Models = map[string]struct{}{"gpt-4o": {}, "gpt-4o-mini": {}}
 		}),
-		testSnap(2, "http://u2", func(s *registry.ChannelSnapshot) {
+		testSnap(2, "http://u2", func(s *registry.ChannelKeySnapshot) {
 			s.Models = map[string]struct{}{"claude-x": {}}
 			s.GroupIDs = map[int]struct{}{99: {}} // 非本分组渠道，不应出现
 		}),
@@ -886,7 +887,7 @@ func TestExecutePanicRecovered(t *testing.T) {
 	defer good.Close()
 
 	env := newTestEnv(t,
-		testSnap(1, "http://ignored.invalid", func(s *registry.ChannelSnapshot) { s.Type = "custom" }),
+		testSnap(1, "http://ignored.invalid", func(s *registry.ChannelKeySnapshot) { s.Type = "custom" }),
 	)
 	engine := gin.New()
 	engine.Use(gin.Recovery())
@@ -916,7 +917,7 @@ func TestPerRequestPriceSnapshot(t *testing.T) {
 	upstream := newGoodUpstream(t, &hits, &lastBody)
 	defer upstream.Close()
 
-	env := newTestEnv(t, testSnap(1, upstream.URL, func(s *registry.ChannelSnapshot) {
+	env := newTestEnv(t, testSnap(1, upstream.URL, func(s *registry.ChannelKeySnapshot) {
 		s.Models[perRequestModel] = struct{}{}
 		s.ModelMapping[perRequestModel] = "gpt-4o-upstream"
 	}))
@@ -967,8 +968,8 @@ func TestStreamUsageMissingWarns(t *testing.T) {
 	if !strings.Contains(logs, "relay_stream_usage_missing") {
 		t.Errorf("缺少 relay_stream_usage_missing 告警日志:\n%s", logs)
 	}
-	if !strings.Contains(logs, "channel_id=1") || !strings.Contains(logs, "model=gpt-4o") {
-		t.Errorf("告警日志缺少 channel_id/model 字段:\n%s", logs)
+	if !strings.Contains(logs, "channel_key_id=1") || !strings.Contains(logs, "model=gpt-4o") {
+		t.Errorf("告警日志缺少 channel_key_id/model 字段:\n%s", logs)
 	}
 
 	rec := env.sink.last(t)
@@ -1136,8 +1137,8 @@ func TestForwardResponses404Failover(t *testing.T) {
 	defer bad.Close()
 
 	env := newTestEnv(t,
-		testSnap(1, good.URL, func(s *registry.ChannelSnapshot) { s.Priority = 1 }),
-		testSnap(2, bad.URL, func(s *registry.ChannelSnapshot) { s.Priority = 100 }), // 高优先级先被选中
+		testSnap(1, good.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 1 }),
+		testSnap(2, bad.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 100 }), // 高优先级先被选中
 	)
 	w := env.doResponses(t, `{"model":"gpt-4o","input":"hi"}`)
 
@@ -1236,7 +1237,7 @@ func TestErrLogTerminalPathsLeaveTrace(t *testing.T) {
 	})
 
 	t.Run("缺价预检 400", func(t *testing.T) {
-		env := newTestEnv(t, testSnap(1, "http://127.0.0.1:0", func(s *registry.ChannelSnapshot) {
+		env := newTestEnv(t, testSnap(1, "http://127.0.0.1:0", func(s *registry.ChannelKeySnapshot) {
 			s.Models["unpriced-model"] = struct{}{}
 		}))
 		w := env.do(t, `{"model":"unpriced-model","messages":[]}`)
@@ -1335,8 +1336,8 @@ func TestErrLogTerminalPathsLeaveTrace(t *testing.T) {
 // ===== 原生协议入口（纯透传）：/v1/messages 与 /v1beta generateContent =====
 
 // anthSnap 构造 anthropic 类型渠道快照。
-func anthSnap(id int, baseURL string, mutate ...func(*registry.ChannelSnapshot)) registry.ChannelSnapshot {
-	s := testSnap(id, baseURL, func(s *registry.ChannelSnapshot) {
+func anthSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapshot)) registry.ChannelKeySnapshot {
+	s := testSnap(id, baseURL, func(s *registry.ChannelKeySnapshot) {
 		s.Type = "anthropic"
 		s.Models = map[string]struct{}{anthModel: {}}
 		s.ModelMapping = map[string]string{anthModel: "claude-upstream"}
@@ -1348,8 +1349,8 @@ func anthSnap(id int, baseURL string, mutate ...func(*registry.ChannelSnapshot))
 }
 
 // gemSnap 构造 gemini 类型渠道快照。
-func gemSnap(id int, baseURL string, mutate ...func(*registry.ChannelSnapshot)) registry.ChannelSnapshot {
-	s := testSnap(id, baseURL, func(s *registry.ChannelSnapshot) {
+func gemSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapshot)) registry.ChannelKeySnapshot {
+	s := testSnap(id, baseURL, func(s *registry.ChannelKeySnapshot) {
 		s.Type = "gemini"
 		s.Models = map[string]struct{}{gemModel: {}}
 		s.ModelMapping = map[string]string{gemModel: "gemini-upstream"}
@@ -1611,9 +1612,9 @@ func TestForwardMessagesFailover(t *testing.T) {
 	defer oai.Close()
 
 	env := newTestEnv(t,
-		anthSnap(1, good.URL, func(s *registry.ChannelSnapshot) { s.Priority = 1 }),
-		anthSnap(2, bad.URL, func(s *registry.ChannelSnapshot) { s.Priority = 100 }), // 高优先级先选中
-		testSnap(3, oai.URL, func(s *registry.ChannelSnapshot) { // openai 渠道也声明同模型
+		anthSnap(1, good.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 1 }),
+		anthSnap(2, bad.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 100 }), // 高优先级先选中
+		testSnap(3, oai.URL, func(s *registry.ChannelKeySnapshot) { // openai 渠道也声明同模型
 			s.Priority = 200
 			s.Models = map[string]struct{}{anthModel: {}}
 		}),
@@ -1719,7 +1720,7 @@ func TestUpstreamClientErrorRebuiltNativeShape(t *testing.T) {
 // TestMessagesNoChannelAnthropicErrorShape 协议隔离 + 错误形态：仅 openai 渠道
 // 服务该模型时 /v1/messages 无可用渠道，错误体为 Anthropic 原生形态。
 func TestMessagesNoChannelAnthropicErrorShape(t *testing.T) {
-	env := newTestEnv(t, testSnap(1, "http://127.0.0.1:0", func(s *registry.ChannelSnapshot) {
+	env := newTestEnv(t, testSnap(1, "http://127.0.0.1:0", func(s *registry.ChannelKeySnapshot) {
 		s.Models = map[string]struct{}{anthModel: {}}
 	}))
 	w := env.doMessages(t, `{"model":"`+anthModel+`","max_tokens":8,"messages":[]}`)
@@ -1829,8 +1830,8 @@ func TestForwardGeminiFailover(t *testing.T) {
 	defer bad.Close()
 
 	env := newTestEnv(t,
-		gemSnap(1, good.URL, func(s *registry.ChannelSnapshot) { s.Priority = 1 }),
-		gemSnap(2, bad.URL, func(s *registry.ChannelSnapshot) { s.Priority = 100 }),
+		gemSnap(1, good.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 1 }),
+		gemSnap(2, bad.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 100 }),
 	)
 	w := env.doGemini(t, gemModel+":generateContent", `{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`)
 
@@ -1848,7 +1849,7 @@ func TestForwardGeminiFailover(t *testing.T) {
 // TestGenerateContentGeminiErrorShape gemini 入口的网关自产错误按 Gemini 原生形态出：
 // 未知动词 404 NOT_FOUND；缺价模型 400 INVALID_ARGUMENT。
 func TestGenerateContentGeminiErrorShape(t *testing.T) {
-	env := newTestEnv(t, gemSnap(1, "http://127.0.0.1:0", func(s *registry.ChannelSnapshot) {
+	env := newTestEnv(t, gemSnap(1, "http://127.0.0.1:0", func(s *registry.ChannelKeySnapshot) {
 		s.Models["unpriced-gem"] = struct{}{}
 	}))
 
@@ -1903,8 +1904,8 @@ func (e *testEnv) doImagesEdits(t *testing.T, body []byte, contentType string) *
 }
 
 // imgSnap 构造服务图像模型的 openai_compatible 渠道快照。
-func imgSnap(id int, baseURL string, mutate ...func(*registry.ChannelSnapshot)) registry.ChannelSnapshot {
-	s := testSnap(id, baseURL, func(s *registry.ChannelSnapshot) {
+func imgSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapshot)) registry.ChannelKeySnapshot {
+	s := testSnap(id, baseURL, func(s *registry.ChannelKeySnapshot) {
 		s.Models = map[string]struct{}{imgPerReqModel: {}, testModel: {}}
 		s.ModelMapping = map[string]string{imgPerReqModel: "gpt-image-upstream", testModel: "gpt-4o-upstream"}
 	})
@@ -2200,7 +2201,7 @@ func TestForwardImagesEditsMultipartNoMappingIdentity(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	env := newTestEnv(t, imgSnap(1, upstream.URL, func(s *registry.ChannelSnapshot) {
+	env := newTestEnv(t, imgSnap(1, upstream.URL, func(s *registry.ChannelKeySnapshot) {
 		delete(s.ModelMapping, imgPerReqModel) // 无映射 → 原样直发路径
 	}))
 	w := env.doImagesEdits(t, sentBody, sentCT)
@@ -2265,7 +2266,7 @@ func TestForwardPredictPerImageBilling(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	env := newTestEnv(t, gemSnap(1, upstream.URL, func(s *registry.ChannelSnapshot) {
+	env := newTestEnv(t, gemSnap(1, upstream.URL, func(s *registry.ChannelKeySnapshot) {
 		s.Models[imagenModel] = struct{}{}
 		s.ModelMapping[imagenModel] = "imagen-upstream"
 	}))
@@ -2382,7 +2383,7 @@ func TestCountTokensZeroBilling(t *testing.T) {
 func TestGeminiModelsList(t *testing.T) {
 	env := newTestEnv(t,
 		gemSnap(1, "http://u1"),
-		gemSnap(2, "http://u2", func(s *registry.ChannelSnapshot) {
+		gemSnap(2, "http://u2", func(s *registry.ChannelKeySnapshot) {
 			s.Models = map[string]struct{}{"other-gem": {}}
 			s.GroupIDs = map[int]struct{}{99: {}} // 非本分组渠道，不应出现
 		}),

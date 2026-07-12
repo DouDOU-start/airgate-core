@@ -11,11 +11,11 @@ import (
 
 // Info 单次上游调用的上下文（提交/轮询/内容代理共用；每个 attempt 独立构造）。
 type Info struct {
-	// Channel 本次选中（或任务落库时快照）的渠道（只读）。
-	Channel *registry.ChannelSnapshot
-	// APIKey 本次轮询到的上游密钥（明文）。
+	// ChannelKey 本次选中（或任务落库时快照）的密钥端点（只读）。
+	ChannelKey *registry.ChannelKeySnapshot
+	// APIKey 本次选中的上游密钥（明文）。
 	APIKey string
-	// RequestModel 对外模型名 / UpstreamModel 上游模型名（经渠道 model_mapping）。
+	// RequestModel 对外模型名 / UpstreamModel 上游模型名（经 key 的 model_mapping）。
 	RequestModel  string
 	UpstreamModel string
 	// Client 出口 HTTP 客户端（子系统共享复用）。

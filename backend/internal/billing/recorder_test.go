@@ -32,7 +32,6 @@ func TestRecordPersistsUserEmailSnapshot(t *testing.T) {
 	}
 	channel, err := db.Channel.Create().
 		SetName("chan").
-		SetType("openai_compatible").
 		SetBaseURL("https://api.openai.com").
 		Save(ctx)
 	if err != nil {

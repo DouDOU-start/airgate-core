@@ -22,7 +22,7 @@ import { UsagePieChart } from '../../../shared/components/charts';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { PIE_CHART_COLORS } from '../../../shared/constants';
 import { fmtNum, fmtTrendTime } from '../../../shared/utils/format';
-import type { ChannelResp, DashboardTimeBucket } from '../../../shared/types';
+import type { ChannelKeyResp, DashboardTimeBucket } from '../../../shared/types';
 
 /** 统计范围预设：今日按小时聚合，其余按天聚合 */
 const RANGE_PRESETS = ['today', '7d', '30d', '90d'] as const;
@@ -119,14 +119,14 @@ function ChannelCostTrendChart({ data }: { data: CostBucketDatum[] }) {
 }
 
 /**
- * 渠道消耗统计弹窗：按渠道过滤的仪表盘趋势数据
+ * 密钥端点消耗统计弹窗：按 key 过滤的仪表盘趋势数据
  * （每日/每小时消耗柱状图 + 模型分布饼图与明细表）。
  */
 export function ChannelStatsModal({
-  channel,
+  channelKey,
   onClose,
 }: {
-  channel: ChannelResp | null;
+  channelKey: ChannelKeyResp | null;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -135,13 +135,13 @@ export function ChannelStatsModal({
   const trendParams = useMemo(() => ({
     range,
     granularity: range === 'today' ? ('hour' as const) : ('day' as const),
-    channel_id: channel?.id ?? 0,
-  }), [range, channel?.id]);
+    channel_key_id: channelKey?.id ?? 0,
+  }), [range, channelKey?.id]);
 
   const { data: trend, isLoading } = useQuery({
-    queryKey: queryKeys.dashboardTrend('channel', trendParams),
+    queryKey: queryKeys.dashboardTrend('channel-key', trendParams),
     queryFn: () => dashboardApi.trend(trendParams),
-    enabled: !!channel,
+    enabled: !!channelKey,
     placeholderData: keepPreviousData,
   });
 
@@ -163,7 +163,7 @@ export function ChannelStatsModal({
   const hasUsage = summary.requests > 0;
 
   const dialogState = useOverlayState({
-    isOpen: !!channel,
+    isOpen: !!channelKey,
     onOpenChange: (open) => {
       if (!open) onClose();
     },
@@ -176,7 +176,7 @@ export function ChannelStatsModal({
         <Modal.Container placement="center" scroll="inside" size="lg">
           <Modal.Dialog className="ag-elevation-modal">
             <Modal.Header>
-              <Modal.Heading>{t('channels.stats_modal_title', { name: channel?.name ?? '' })}</Modal.Heading>
+              <Modal.Heading>{t('channels.stats_modal_title', { name: channelKey?.name || channelKey?.api_key_hint || '' })}</Modal.Heading>
               <Modal.CloseTrigger />
             </Modal.Header>
             <Modal.Body>

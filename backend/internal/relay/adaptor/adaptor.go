@@ -43,9 +43,10 @@ const (
 
 // RelayInfo 单次上游调用的上下文（每个 failover attempt 独立构造）。
 type RelayInfo struct {
-	// Channel 本次选中的渠道快照（只读）。
-	Channel *registry.ChannelSnapshot
-	// APIKey 本次轮询到的上游密钥（明文）。
+	// ChannelKey 本次选中的密钥端点快照（只读）：BaseURL 来自所属渠道，
+	// 类型/模型/param_override/header_override 等均为该把 key 的配置。
+	ChannelKey *registry.ChannelKeySnapshot
+	// APIKey 本次选中的上游密钥（明文）。
 	APIKey string
 	// RequestModel 对外模型名（客户端请求原始值）。
 	RequestModel string

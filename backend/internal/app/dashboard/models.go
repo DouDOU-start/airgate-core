@@ -8,8 +8,8 @@ import (
 // Repository 定义仪表盘域持久化接口。
 type Repository interface {
 	LoadStatsSnapshot(ctx context.Context, todayStart, fiveMinAgo time.Time, userID int) (StatsSnapshot, error)
-	// ListTrendLogs 读取趋势聚合所需日志；userID / channelID 为 0 表示不过滤该维度。
-	ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID, channelID int) ([]TrendLog, error)
+	// ListTrendLogs 读取趋势聚合所需日志；userID / channelID / channelKeyID 为 0 表示不过滤该维度。
+	ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID, channelID, channelKeyID int) ([]TrendLog, error)
 }
 
 // StatsSnapshot 表示从存储层读取的原始统计快照。
@@ -79,7 +79,9 @@ type TrendQuery struct {
 	UserID      int
 	// ChannelID 渠道过滤（管理端渠道消耗统计用）；0 表示不过滤。
 	ChannelID int
-	TZ        string // IANA 时区名；为空时使用服务器本地时区
+	// ChannelKeyID 密钥端点过滤（key 消耗统计用）；0 表示不过滤。
+	ChannelKeyID int
+	TZ           string // IANA 时区名；为空时使用服务器本地时区
 }
 
 // Trend 表示仪表盘趋势结果。

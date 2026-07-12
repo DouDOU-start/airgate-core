@@ -187,9 +187,9 @@ func (f *pollErrSink) Record(e errlog.Entry) {
 func (f *pollErrSink) CountFailure(context.Context, int, string, string) {}
 
 // pollLoader / pollPriceLoader 注册表与价目表替身。
-type pollLoader struct{ snaps []registry.ChannelSnapshot }
+type pollLoader struct{ snaps []registry.ChannelKeySnapshot }
 
-func (f *pollLoader) LoadAllForRegistry(context.Context) ([]registry.ChannelSnapshot, error) {
+func (f *pollLoader) LoadAllForRegistry(context.Context) ([]registry.ChannelKeySnapshot, error) {
 	return f.snaps, nil
 }
 
@@ -214,7 +214,7 @@ func (fakePollAdaptor) BuildSubmitRequest(context.Context, *Info, *SubmitRequest
 func (fakePollAdaptor) ParseSubmitResponse([]byte) (string, *Status, error) { return "", nil, nil }
 
 func (fakePollAdaptor) BuildQueryRequest(ctx context.Context, info *Info, taskID string) (*http.Request, error) {
-	return http.NewRequestWithContext(ctx, http.MethodGet, info.Channel.BaseURL+"/query/"+taskID, nil)
+	return http.NewRequestWithContext(ctx, http.MethodGet, info.ChannelKey.BaseURL+"/query/"+taskID, nil)
 }
 
 func (fakePollAdaptor) ParseQueryResponse(body []byte) (*Status, error) {
@@ -232,7 +232,7 @@ func (fakePollAdaptor) RenderTask(*Task) []byte { return []byte(`{}`) }
 type fakeBatchAdaptor struct{ fakePollAdaptor }
 
 func (fakeBatchAdaptor) BuildBatchQueryRequest(ctx context.Context, info *Info, ids []string) (*http.Request, error) {
-	return http.NewRequestWithContext(ctx, http.MethodGet, info.Channel.BaseURL+"/batch", nil)
+	return http.NewRequestWithContext(ctx, http.MethodGet, info.ChannelKey.BaseURL+"/batch", nil)
 }
 
 func (fakeBatchAdaptor) ParseBatchQueryResponse(body []byte) (map[string]*Status, error) {
@@ -251,7 +251,7 @@ func init() {
 }
 
 // newTestPoller 组装轮询器（渠道 Type=pollplat/pollbatch）。
-func newTestPoller(t *testing.T, snaps ...registry.ChannelSnapshot) (*Poller, *pollStore, *pollBalance, *pollSink, *pollErrSink) {
+func newTestPoller(t *testing.T, snaps ...registry.ChannelKeySnapshot) (*Poller, *pollStore, *pollBalance, *pollSink, *pollErrSink) {
 	t.Helper()
 	reg := registry.New(&pollLoader{snaps: snaps}, nil)
 	if err := reg.Reload(context.Background()); err != nil {
@@ -281,10 +281,10 @@ func newTestPoller(t *testing.T, snaps ...registry.ChannelSnapshot) (*Poller, *p
 	return p, st, bal, sink, errSink
 }
 
-func pollSnap(id int, chType, baseURL string) registry.ChannelSnapshot {
-	return registry.ChannelSnapshot{
-		ID: id, Name: fmt.Sprintf("pch-%d", id), Type: chType, BaseURL: baseURL,
-		APIKeys: []string{"sk-poll"}, Status: registry.StatusEnabled, CostRatio: 1.0,
+func pollSnap(id int, chType, baseURL string) registry.ChannelKeySnapshot {
+	return registry.ChannelKeySnapshot{
+		KeyID: id, ChannelID: id, ChannelName: fmt.Sprintf("pch-%d", id), Type: chType, BaseURL: baseURL,
+		APIKey: "sk-poll", Status: registry.StatusEnabled, CostRatio: 1.0,
 	}
 }
 
@@ -294,7 +294,7 @@ func seedTask(st *pollStore, channelID int, mutate ...func(*Task)) *Task {
 		TaskID: "tk-1", Platform: "pollplat", Status: StatusInProgress,
 		RequestModel: "pv-model", HoldAmount: 0.8, EstTotal: 0.4,
 		RateMultiplier: 2.0, AccountRateMultiplier: 1.0, Seconds: 4,
-		SubmitTime: time.Now(), UserID: 22, APIKeyID: 11, GroupID: 7, ChannelID: channelID,
+		SubmitTime: time.Now(), UserID: 22, APIKeyID: 11, GroupID: 7, ChannelID: channelID, ChannelKeyID: channelID,
 	}
 	for _, m := range mutate {
 		m(t)
@@ -440,12 +440,12 @@ func TestPollerBatchQuery(t *testing.T) {
 	st.seed(&Task{
 		TaskID: "bt-1", Platform: "pollbatch", Status: StatusInProgress,
 		RequestModel: "flat-model", HoldAmount: 1.0, EstTotal: 0.5,
-		RateMultiplier: 2.0, SubmitTime: time.Now(), UserID: 22, ChannelID: 1,
+		RateMultiplier: 2.0, SubmitTime: time.Now(), UserID: 22, ChannelID: 1, ChannelKeyID: 1,
 	})
 	st.seed(&Task{
 		TaskID: "bt-2", Platform: "pollbatch", Status: StatusSubmitted,
 		RequestModel: "flat-model", HoldAmount: 1.0, EstTotal: 0.5,
-		RateMultiplier: 2.0, SubmitTime: time.Now(), UserID: 22, ChannelID: 1,
+		RateMultiplier: 2.0, SubmitTime: time.Now(), UserID: 22, ChannelID: 1, ChannelKeyID: 1,
 	})
 	p.tick(context.Background())
 

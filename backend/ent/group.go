@@ -43,8 +43,8 @@ type Group struct {
 
 // GroupEdges holds the relations/edges for other nodes in the graph.
 type GroupEdges struct {
-	// Channels holds the value of the channels edge.
-	Channels []*Channel `json:"channels,omitempty"`
+	// ChannelKeys holds the value of the channel_keys edge.
+	ChannelKeys []*ChannelKey `json:"channel_keys,omitempty"`
 	// AllowedUsers holds the value of the allowed_users edge.
 	AllowedUsers []*User `json:"allowed_users,omitempty"`
 	// APIKeys holds the value of the api_keys edge.
@@ -56,13 +56,13 @@ type GroupEdges struct {
 	loadedTypes [4]bool
 }
 
-// ChannelsOrErr returns the Channels value or an error if the edge
+// ChannelKeysOrErr returns the ChannelKeys value or an error if the edge
 // was not loaded in eager-loading.
-func (e GroupEdges) ChannelsOrErr() ([]*Channel, error) {
+func (e GroupEdges) ChannelKeysOrErr() ([]*ChannelKey, error) {
 	if e.loadedTypes[0] {
-		return e.Channels, nil
+		return e.ChannelKeys, nil
 	}
-	return nil, &NotLoadedError{edge: "channels"}
+	return nil, &NotLoadedError{edge: "channel_keys"}
 }
 
 // AllowedUsersOrErr returns the AllowedUsers value or an error if the edge
@@ -195,9 +195,9 @@ func (gr *Group) Value(name string) (ent.Value, error) {
 	return gr.selectValues.Get(name)
 }
 
-// QueryChannels queries the "channels" edge of the Group entity.
-func (gr *Group) QueryChannels() *ChannelQuery {
-	return NewGroupClient(gr.config).QueryChannels(gr)
+// QueryChannelKeys queries the "channel_keys" edge of the Group entity.
+func (gr *Group) QueryChannelKeys() *ChannelKeyQuery {
+	return NewGroupClient(gr.config).QueryChannelKeys(gr)
 }
 
 // QueryAllowedUsers queries the "allowed_users" edge of the Group entity.

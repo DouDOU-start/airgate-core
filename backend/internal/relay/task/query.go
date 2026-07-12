@@ -47,17 +47,17 @@ func (f *Flow) HandleVideoContent(c *gin.Context) {
 		return
 	}
 
-	ch, ok := f.registry.Snapshot(t.ChannelID)
+	ch, ok := f.resolveTaskKey(t)
 	if !ok {
-		writeError(c, http.StatusBadGateway, "server_error", "channel_gone", "任务所属渠道已不存在，无法获取内容")
+		writeError(c, http.StatusBadGateway, "server_error", "channel_gone", "任务所属密钥端点已不存在，无法获取内容")
 		return
 	}
-	apiKey := f.registry.NextKey(ch.ID)
+	apiKey := ch.APIKey
 	if apiKey == "" {
-		writeError(c, http.StatusBadGateway, "server_error", "channel_no_key", "任务所属渠道无可用密钥")
+		writeError(c, http.StatusBadGateway, "server_error", "channel_no_key", "任务所属密钥端点无可用密钥")
 		return
 	}
-	info := &Info{Channel: ch, APIKey: apiKey, RequestModel: t.RequestModel, UpstreamModel: t.UpstreamModel, Client: f.client}
+	info := &Info{ChannelKey: ch, APIKey: apiKey, RequestModel: t.RequestModel, UpstreamModel: t.UpstreamModel, Client: f.client}
 
 	httpReq, err := cp.BuildContentRequest(c.Request.Context(), info, t.TaskID)
 	if err != nil {
@@ -74,7 +74,7 @@ func (f *Flow) HandleVideoContent(c *gin.Context) {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 		up := errfmt.ParseUpstream(resp.StatusCode, body)
-		up.Message = outcome.SanitizeKeyLeak(up.Message, ch.APIKeys)
+		up.Message = outcome.SanitizeKeyLeak(up.Message, []string{apiKey})
 		writeUpstreamError(c, resp.StatusCode, up)
 		return
 	}
@@ -94,6 +94,20 @@ func (f *Flow) HandleVideoContent(c *gin.Context) {
 	if _, err := io.Copy(c.Writer, resp.Body); err != nil {
 		slog.Warn("task_content_proxy_aborted", "task_id", t.TaskID, "error", err)
 	}
+}
+
+// resolveTaskKey 解析任务对应的密钥端点快照（内容代理用）：
+// 优先按 channel_key_id 取；已删除或存量任务（key_id=0）回退到同渠道任一可用 key。
+func (f *Flow) resolveTaskKey(t *Task) (*registry.ChannelKeySnapshot, bool) {
+	if t.ChannelKeyID > 0 {
+		if ch, ok := f.registry.Snapshot(t.ChannelKeyID); ok {
+			return ch, true
+		}
+	}
+	if t.ChannelID > 0 {
+		return f.registry.AnyKeyForChannel(t.ChannelID)
+	}
+	return nil, false
 }
 
 // HandleSunoFetchByID GET /suno/fetch/:task_id：单任务查询（本地快照）。

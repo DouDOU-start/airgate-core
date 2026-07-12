@@ -33,8 +33,8 @@ func (Group) Fields() []ent.Field {
 
 func (Group) Edges() []ent.Edge {
 	return []ent.Edge{
-		// 分组关联的渠道（多对多反向）
-		edge.From("channels", Channel.Type).Ref("groups"),
+		// 分组关联的渠道密钥端点（多对多反向）
+		edge.From("channel_keys", ChannelKey.Type).Ref("groups"),
 		// 允许访问此专属分组的用户（多对多反向）
 		edge.From("allowed_users", User.Type).Ref("allowed_groups"),
 		edge.To("api_keys", APIKey.Type),

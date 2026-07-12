@@ -534,17 +534,17 @@ export type ChannelType = 'openai_compatible' | 'anthropic' | 'gemini' | 'custom
 /** 渠道状态：enabled 启用 / disabled_manual 手动禁用 / disabled_auto 自动禁用 */
 export type ChannelStatus = 'enabled' | 'disabled_manual' | 'disabled_auto';
 
-// 渠道响应 —— 与后端 dto.ChannelResp 对应。api_keys 明文永不出现在任何响应，
-// 仅回 api_keys_count 与 api_key_hints（尾 4 位提示）。
-export interface ChannelResp {
+// 渠道下的一把上游 Key —— 与后端 dto.ChannelKeyResp 对应。
+// 明文密钥永不回显，仅回 api_key_hint（尾 4 位提示）。每把 key 有独立的
+// 类型 / 模型 / 映射 / 覆写 / 分组 / 优先级权重并发限流 / 成本倍率 / 标签 / 启停状态。
+export interface ChannelKeyResp {
   id: number;
+  channel_id: number;
   name: string;
   type: ChannelType;
-  base_url: string;
-  api_keys_count: number;
-  api_key_hints: string[];
+  api_key_hint: string;
   models: string[];
-  model_mapping: Record<string, string> | null;
+  model_mapping: Record<string, string>;
   param_override: Record<string, unknown> | null;
   header_override: Record<string, string> | null;
   status: ChannelStatus;
@@ -558,33 +558,60 @@ export interface ChannelResp {
   test_model: string;
   response_time_ms: number;
   tested_at?: string;
-  /** 上游账户余额（USD，多 key 求和）；仅 openai_compatible 中转站可查 */
-  balance: number;
-  balance_updated_at?: string;
   last_used_at?: string;
   group_ids: number[];
   /** 当前在途请求数（列表实时观测） */
-  current_concurrency?: number;
+  current_concurrency: number;
   /** 当前分钟请求数（列表实时观测） */
-  current_rpm?: number;
-  /** 累计渠道成本（Σ total_cost × 成本倍率快照） */
-  total_cost?: number;
-  /** 累计平台收益（Σ actual_cost 实际扣费） */
-  total_revenue?: number;
-  /** 今日渠道成本（口径同 total_cost，按请求 tz 当日零点起算） */
-  today_cost?: number;
+  current_rpm: number;
+  /** 上游账户余额（USD）；仅 openai_compatible key 可查，按 key 刷新 */
+  balance: number;
+  balance_updated_at?: string;
+  /** 累计成本（standard × cost_ratio 快照） */
+  total_cost: number;
+  /** 累计平台收益（actual_cost 实际扣费） */
+  total_revenue: number;
+  /** 今日成本（按请求 tz 当日零点起算） */
+  today_cost: number;
   /** 今日平台收益（口径同 total_revenue） */
-  today_revenue?: number;
+  today_revenue: number;
   created_at: string;
   updated_at: string;
 }
 
-export interface CreateChannelReq {
+// 渠道响应 —— 渠道退化为「容器」，只保留 name / base_url；
+// 类型、模型、限流、计费、余额等落到每把 key（keys）。
+// balance/total_cost/... 为各 key 的汇总（rollup），仅只读展示，不再有渠道级余额刷新。
+export interface ChannelResp {
+  id: number;
   name: string;
-  type: ChannelType;
   base_url: string;
-  api_keys: string[];
-  /** 可空：创建时可不配模型（渠道不会被调度命中），建后在「模型」弹窗维护 */
+  /** 上游账户余额汇总（各 key 求和，只读） */
+  balance: number;
+  balance_updated_at?: string;
+  /** 渠道下的全部 key */
+  keys: ChannelKeyResp[];
+  /** 累计成本汇总（各 key 求和，只读） */
+  total_cost: number;
+  /** 累计平台收益汇总（只读） */
+  total_revenue: number;
+  /** 今日成本汇总（只读） */
+  today_cost: number;
+  /** 今日平台收益汇总（只读） */
+  today_revenue: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// 单把 key 的新增/更新请求（共用）。语义：
+// - 新增（POST /channels/:id/keys）：type / api_key 必填。
+// - 更新（PUT /channels/keys/:id）：api_key 留空 = 保持原密钥；type 留空 = 不改。
+// - models/model_mapping 由列表页「模型」弹窗维护，表单不携带。
+export interface ChannelKeyReq {
+  name?: string;
+  // 新增时必填；更新（模型弹窗、单 key 编辑）时可省：type 省=不改、api_key 省/空=保持原密钥。
+  type?: ChannelType;
+  api_key?: string;
   models?: string[];
   model_mapping?: Record<string, string>;
   param_override?: Record<string, unknown>;
@@ -600,26 +627,15 @@ export interface CreateChannelReq {
   group_ids?: number[];
 }
 
-// 更新渠道请求（partial）：字段缺省 = 不改；api_keys/models 提供非空数组 = 整组替换，
-// 留空 = 不改；映射/覆写/标签/分组提供（含空集合）= 整组替换。
+// 渠道只管 name / base_url；key 增删改走独立端点。
+export interface CreateChannelReq {
+  name: string;
+  base_url: string;
+}
+
 export interface UpdateChannelReq {
   name?: string;
-  type?: ChannelType;
   base_url?: string;
-  api_keys?: string[];
-  models?: string[];
-  model_mapping?: Record<string, string>;
-  param_override?: Record<string, unknown>;
-  header_override?: Record<string, string>;
-  status?: 'enabled' | 'disabled_manual';
-  priority?: number;
-  weight?: number;
-  max_concurrency?: number;
-  max_rpm?: number;
-  cost_ratio?: number;
-  tags?: string[];
-  test_model?: string;
-  group_ids?: number[];
 }
 
 export interface TestChannelReq {
@@ -641,6 +657,13 @@ export interface FetchChannelModelsResp {
 export interface RefreshChannelBalanceResp {
   balance: number;
   balance_updated_at?: string;
+}
+
+// 未保存前的模型预览请求（POST /channels/fetch-models）：用临时凭据探测上游模型列表。
+export interface FetchChannelModelsPreviewReq {
+  type: ChannelType;
+  base_url: string;
+  api_key: string;
 }
 
 export type BulkChannelAction = 'enable' | 'disable' | 'delete' | 'set_priority';
@@ -780,6 +803,8 @@ export interface DashboardTrendReq {
   end_date?: string;
   /** 渠道过滤（渠道消耗统计弹窗用）；缺省不过滤 */
   channel_id?: number;
+  /** 密钥端点过滤（key 消耗统计弹窗用）；缺省不过滤 */
+  channel_key_id?: number;
 }
 
 export interface DashboardTrendResp {

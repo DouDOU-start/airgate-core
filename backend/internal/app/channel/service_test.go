@@ -11,10 +11,11 @@ import (
 
 // stubRepo 渠道仓储替身：按需覆盖各方法，未覆盖返回零值。
 type stubRepo struct {
-	findByID         func(ctx context.Context, id int) (Channel, error)
-	updateState      func(ctx context.Context, id int, status string, errMsg string) error
-	updateTestResult func(ctx context.Context, id int, responseTimeMs int, testedAt time.Time) error
-	updateBalance    func(ctx context.Context, id int, balance float64, updatedAt time.Time) error
+	findByID            func(ctx context.Context, id int) (Channel, error)
+	findKeyByID         func(ctx context.Context, keyID int) (ChannelKey, error)
+	updateKeyState      func(ctx context.Context, keyID int, status string, errMsg string) error
+	updateKeyTestResult func(ctx context.Context, keyID int, responseTimeMs int, testedAt time.Time) error
+	updateKeyBalance    func(ctx context.Context, keyID int, balance float64, updatedAt time.Time) error
 }
 
 func (s *stubRepo) List(context.Context, ListFilter) ([]Channel, int64, error) { return nil, 0, nil }
@@ -29,29 +30,42 @@ func (s *stubRepo) Create(context.Context, CreateInput) (Channel, error)      { 
 func (s *stubRepo) Update(context.Context, int, UpdateInput) (Channel, error) { return Channel{}, nil }
 func (s *stubRepo) Delete(context.Context, int) error                         { return nil }
 func (s *stubRepo) BulkUpdate(context.Context, BulkUpdateInput) (int, error)  { return 0, nil }
-func (s *stubRepo) UpdateState(ctx context.Context, id int, status string, errMsg string) error {
-	if s.updateState == nil {
-		return nil
+func (s *stubRepo) FindKeyByID(ctx context.Context, keyID int) (ChannelKey, error) {
+	if s.findKeyByID == nil {
+		return ChannelKey{}, nil
 	}
-	return s.updateState(ctx, id, status, errMsg)
+	return s.findKeyByID(ctx, keyID)
 }
-func (s *stubRepo) UpdateTestResult(ctx context.Context, id int, responseTimeMs int, testedAt time.Time) error {
-	if s.updateTestResult == nil {
-		return nil
-	}
-	return s.updateTestResult(ctx, id, responseTimeMs, testedAt)
+func (s *stubRepo) CreateKey(context.Context, int, KeyInput) (ChannelKey, error) {
+	return ChannelKey{}, nil
 }
-func (s *stubRepo) UpdateBalance(ctx context.Context, id int, balance float64, updatedAt time.Time) error {
-	if s.updateBalance == nil {
+func (s *stubRepo) UpdateKey(context.Context, int, KeyInput) (ChannelKey, error) {
+	return ChannelKey{}, nil
+}
+func (s *stubRepo) DeleteKey(context.Context, int) error { return nil }
+func (s *stubRepo) UpdateKeyState(ctx context.Context, keyID int, status string, errMsg string) error {
+	if s.updateKeyState == nil {
 		return nil
 	}
-	return s.updateBalance(ctx, id, balance, updatedAt)
+	return s.updateKeyState(ctx, keyID, status, errMsg)
+}
+func (s *stubRepo) UpdateKeyTestResult(ctx context.Context, keyID int, responseTimeMs int, testedAt time.Time) error {
+	if s.updateKeyTestResult == nil {
+		return nil
+	}
+	return s.updateKeyTestResult(ctx, keyID, responseTimeMs, testedAt)
+}
+func (s *stubRepo) UpdateKeyBalance(ctx context.Context, keyID int, balance float64, updatedAt time.Time) error {
+	if s.updateKeyBalance == nil {
+		return nil
+	}
+	return s.updateKeyBalance(ctx, keyID, balance, updatedAt)
 }
 
-// stubTester 恒成功的渠道测试器。
+// stubTester 恒成功的密钥端点测试器。
 type stubTester struct{ latency int }
 
-func (s stubTester) Test(context.Context, Channel, string, string) (int, error) {
+func (s stubTester) Test(context.Context, ChannelKey, string, string) (int, error) {
 	return s.latency, nil
 }
 
@@ -95,15 +109,15 @@ func TestTestRecoverRereadsCurrentStatus(t *testing.T) {
 			findCalls := 0
 			recovered := false
 			repo := &stubRepo{
-				findByID: func(_ context.Context, id int) (Channel, error) {
+				findKeyByID: func(_ context.Context, keyID int) (ChannelKey, error) {
 					findCalls++
 					status := tc.statusAtStart
 					if findCalls > 1 { // 恢复前的重读拿到最新状态
 						status = tc.statusAtEnd
 					}
-					return Channel{ID: id, Status: status, TestModel: "gpt-4o"}, nil
+					return ChannelKey{ID: keyID, Status: status, TestModel: "gpt-4o"}, nil
 				},
-				updateState: func(_ context.Context, _ int, status string, _ string) error {
+				updateKeyState: func(_ context.Context, _ int, status string, _ string) error {
 					if status != StatusEnabled {
 						t.Errorf("恢复状态 = %q, want enabled", status)
 					}
@@ -152,7 +166,7 @@ func (s *stubFetcher) FetchBalance(_ context.Context, _, _, apiKey string) (floa
 	return s.balance, nil
 }
 
-// TestFetchModelsDelegatesToFetcher fetch-models 解密渠道首个 API Key 后委托拉取器。
+// TestFetchModelsDelegatesToFetcher fetch-models 解密指定 key 后委托拉取器。
 func TestFetchModelsDelegatesToFetcher(t *testing.T) {
 	// secret 须为 hex 且解码后 ≥32 字节（AES-256）。
 	const secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -162,12 +176,12 @@ func TestFetchModelsDelegatesToFetcher(t *testing.T) {
 	}
 
 	repo := &stubRepo{
-		findByID: func(_ context.Context, id int) (Channel, error) {
-			return Channel{
-				ID:      id,
+		findKeyByID: func(_ context.Context, keyID int) (ChannelKey, error) {
+			return ChannelKey{
+				ID:      keyID,
 				Type:    "openai_compatible",
 				BaseURL: "https://api.example.com",
-				APIKeys: []string{encrypted},
+				APIKey:  encrypted,
 			}, nil
 		},
 	}
@@ -190,51 +204,50 @@ func TestFetchModelsDelegatesToFetcher(t *testing.T) {
 	}
 }
 
-// TestRefreshBalanceSumsAcrossKeys 多 key 渠道余额求和并落库。
-func TestRefreshBalanceSumsAcrossKeys(t *testing.T) {
+// TestRefreshBalancePersistsForKey 刷新单把 key 的上游余额并落库。
+func TestRefreshBalancePersistsForKey(t *testing.T) {
 	const secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	k1, _ := auth.EncryptAPIKey("sk-1", secret)
-	k2, _ := auth.EncryptAPIKey("sk-2", secret)
 
 	var persisted float64
 	repo := &stubRepo{
-		findByID: func(_ context.Context, id int) (Channel, error) {
-			return Channel{ID: id, Type: "openai_compatible", BaseURL: "https://x", APIKeys: []string{k1, k2}}, nil
+		findKeyByID: func(_ context.Context, keyID int) (ChannelKey, error) {
+			return ChannelKey{ID: keyID, Type: "openai_compatible", BaseURL: "https://x", APIKey: k1}, nil
 		},
-		updateBalance: func(_ context.Context, _ int, balance float64, _ time.Time) error {
+		updateKeyBalance: func(_ context.Context, _ int, balance float64, _ time.Time) error {
 			persisted = balance
 			return nil
 		},
 	}
 	svc := NewService(repo, secret)
-	fetcher := &stubFetcher{balance: 30} // 每 key $30
+	fetcher := &stubFetcher{balance: 30}
 	svc.fetcher = fetcher
 
 	bal, updatedAt, err := svc.RefreshBalance(context.Background(), 1)
 	if err != nil {
 		t.Fatalf("RefreshBalance err = %v", err)
 	}
-	if bal != 60 {
-		t.Errorf("balance = %v, want 60 (2 keys × 30)", bal)
+	if bal != 30 {
+		t.Errorf("balance = %v, want 30", bal)
 	}
-	if len(fetcher.balanceKeys) != 2 {
-		t.Errorf("queried %d keys, want 2", len(fetcher.balanceKeys))
+	if len(fetcher.balanceKeys) != 1 || fetcher.balanceKeys[0] != "sk-1" {
+		t.Errorf("queried keys = %v, want [sk-1]", fetcher.balanceKeys)
 	}
-	if persisted != 60 {
-		t.Errorf("persisted = %v, want 60", persisted)
+	if persisted != 30 {
+		t.Errorf("persisted = %v, want 30", persisted)
 	}
 	if updatedAt == nil {
 		t.Error("updatedAt nil")
 	}
 }
 
-// TestRefreshBalanceUnsupportedShortCircuits 不支持类型直接透传 ErrBalanceUnsupported。
-func TestRefreshBalanceUnsupportedShortCircuits(t *testing.T) {
+// TestRefreshBalanceUnsupported 不支持类型的 key 透传 ErrBalanceUnsupported。
+func TestRefreshBalanceUnsupported(t *testing.T) {
 	const secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	k1, _ := auth.EncryptAPIKey("sk-1", secret)
 	repo := &stubRepo{
-		findByID: func(_ context.Context, id int) (Channel, error) {
-			return Channel{ID: id, Type: "anthropic", BaseURL: "https://x", APIKeys: []string{k1}}, nil
+		findKeyByID: func(_ context.Context, keyID int) (ChannelKey, error) {
+			return ChannelKey{ID: keyID, Type: "anthropic", BaseURL: "https://x", APIKey: k1}, nil
 		},
 	}
 	svc := NewService(repo, secret)

@@ -5,46 +5,95 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 )
 
-// toChannelRespFromDomain 领域对象 → 响应 DTO。
-// api_keys 密文不映射出去，仅回数量与尾 4 位提示。
+// toChannelRespFromDomain 领域对象 → 响应 DTO（含其下各 key）。
+// 明文密钥不映射出去，仅回各 key 的尾 4 位提示。
 func toChannelRespFromDomain(item appchannel.Channel) dto.ChannelResp {
+	keys := make([]dto.ChannelKeyResp, 0, len(item.Keys))
+	for _, k := range item.Keys {
+		keys = append(keys, toChannelKeyResp(k))
+	}
 	return dto.ChannelResp{
 		ID:               int64(item.ID),
 		Name:             item.Name,
-		Type:             item.Type,
 		BaseURL:          item.BaseURL,
-		APIKeysCount:     len(item.APIKeys),
-		APIKeyHints:      emptyIfNilStrings(item.APIKeyHints),
-		Models:           emptyIfNilStrings(item.Models),
-		ModelMapping:     item.ModelMapping,
-		ParamOverride:    item.ParamOverride,
-		HeaderOverride:   item.HeaderOverride,
-		Status:           item.Status,
-		ErrorMsg:         item.ErrorMsg,
-		Priority:         item.Priority,
-		Weight:           item.Weight,
-		MaxConcurrency:   item.MaxConcurrency,
-		MaxRPM:           item.MaxRPM,
-		CostRatio:        item.CostRatio,
-		Tags:             emptyIfNilStrings(item.Tags),
-		TestModel:        item.TestModel,
-		ResponseTimeMs:   item.ResponseTimeMs,
-		TestedAt:         item.TestedAt,
 		Balance:          item.Balance,
 		BalanceUpdatedAt: item.BalanceUpdatedAt,
-		LastUsedAt:       item.LastUsedAt,
-		GroupIDs:         emptyIfNilInts(item.GroupIDs),
-
-		CurrentConcurrency: item.CurrentConcurrency,
-		CurrentRPM:         item.CurrentRPM,
-		TotalCost:          item.TotalCost,
-		TotalRevenue:       item.TotalRevenue,
-		TodayCost:          item.TodayCost,
-		TodayRevenue:       item.TodayRevenue,
+		Keys:             keys,
+		TotalCost:        item.TotalCost,
+		TotalRevenue:     item.TotalRevenue,
+		TodayCost:        item.TodayCost,
+		TodayRevenue:     item.TodayRevenue,
 		TimeMixin: dto.TimeMixin{
 			CreatedAt: item.CreatedAt,
 			UpdatedAt: item.UpdatedAt,
 		},
+	}
+}
+
+// toChannelKeyResp 密钥端点领域对象 → 响应 DTO。
+func toChannelKeyResp(k appchannel.ChannelKey) dto.ChannelKeyResp {
+	return dto.ChannelKeyResp{
+		ID:               int64(k.ID),
+		ChannelID:        int64(k.ChannelID),
+		Name:             k.Name,
+		Type:             k.Type,
+		APIKeyHint:       k.APIKeyHint,
+		Models:           emptyIfNilStrings(k.Models),
+		ModelMapping:     k.ModelMapping,
+		ParamOverride:    k.ParamOverride,
+		HeaderOverride:   k.HeaderOverride,
+		Status:           k.Status,
+		ErrorMsg:         k.ErrorMsg,
+		Priority:         k.Priority,
+		Weight:           k.Weight,
+		MaxConcurrency:   k.MaxConcurrency,
+		MaxRPM:           k.MaxRPM,
+		CostRatio:        k.CostRatio,
+		Tags:             emptyIfNilStrings(k.Tags),
+		TestModel:        k.TestModel,
+		ResponseTimeMs:   k.ResponseTimeMs,
+		TestedAt:         k.TestedAt,
+		LastUsedAt:       k.LastUsedAt,
+		GroupIDs:         emptyIfNilInts(k.GroupIDs),
+		Balance:          k.Balance,
+		BalanceUpdatedAt: k.BalanceUpdatedAt,
+
+		CurrentConcurrency: k.CurrentConcurrency,
+		CurrentRPM:         k.CurrentRPM,
+		TotalCost:          k.TotalCost,
+		TotalRevenue:       k.TotalRevenue,
+		TodayCost:          k.TodayCost,
+		TodayRevenue:       k.TodayRevenue,
+		TimeMixin: dto.TimeMixin{
+			CreatedAt: k.CreatedAt,
+			UpdatedAt: k.UpdatedAt,
+		},
+	}
+}
+
+// toKeyInput 请求 DTO → 领域 KeyInput（新增/更新 key 共用）。
+func toKeyInput(req dto.ChannelKeyReq) appchannel.KeyInput {
+	name := ""
+	if req.Name != nil {
+		name = *req.Name
+	}
+	return appchannel.KeyInput{
+		Name:           name,
+		Type:           req.Type,
+		APIKey:         req.APIKey,
+		Models:         req.Models,
+		ModelMapping:   req.ModelMapping,
+		ParamOverride:  req.ParamOverride,
+		HeaderOverride: req.HeaderOverride,
+		Status:         req.Status,
+		Priority:       req.Priority,
+		Weight:         req.Weight,
+		MaxConcurrency: req.MaxConcurrency,
+		MaxRPM:         req.MaxRPM,
+		CostRatio:      req.CostRatio,
+		Tags:           req.Tags,
+		TestModel:      req.TestModel,
+		GroupIDs:       req.GroupIDs,
 	}
 }
 

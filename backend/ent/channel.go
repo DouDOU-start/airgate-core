@@ -3,7 +3,6 @@
 package ent
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -20,48 +19,8 @@ type Channel struct {
 	ID int `json:"id,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
-	// Type holds the value of the "type" field.
-	Type channel.Type `json:"type,omitempty"`
 	// BaseURL holds the value of the "base_url" field.
 	BaseURL string `json:"base_url,omitempty"`
-	// APIKeys holds the value of the "api_keys" field.
-	APIKeys []string `json:"-"`
-	// Models holds the value of the "models" field.
-	Models []string `json:"models,omitempty"`
-	// ModelMapping holds the value of the "model_mapping" field.
-	ModelMapping map[string]string `json:"model_mapping,omitempty"`
-	// ParamOverride holds the value of the "param_override" field.
-	ParamOverride map[string]interface{} `json:"param_override,omitempty"`
-	// HeaderOverride holds the value of the "header_override" field.
-	HeaderOverride map[string]string `json:"header_override,omitempty"`
-	// Status holds the value of the "status" field.
-	Status channel.Status `json:"status,omitempty"`
-	// 进入当前状态的原因（给运维看）
-	ErrorMsg string `json:"error_msg,omitempty"`
-	// Priority holds the value of the "priority" field.
-	Priority int `json:"priority,omitempty"`
-	// Weight holds the value of the "weight" field.
-	Weight int `json:"weight,omitempty"`
-	// MaxConcurrency holds the value of the "max_concurrency" field.
-	MaxConcurrency int `json:"max_concurrency,omitempty"`
-	// MaxRpm holds the value of the "max_rpm" field.
-	MaxRpm int `json:"max_rpm,omitempty"`
-	// 采购折扣率：官方 1.0、三折中转 0.3，用于渠道成本统计
-	CostRatio float64 `json:"cost_ratio,omitempty"`
-	// Tags holds the value of the "tags" field.
-	Tags []string `json:"tags,omitempty"`
-	// TestModel holds the value of the "test_model" field.
-	TestModel string `json:"test_model,omitempty"`
-	// ResponseTimeMs holds the value of the "response_time_ms" field.
-	ResponseTimeMs int `json:"response_time_ms,omitempty"`
-	// TestedAt holds the value of the "tested_at" field.
-	TestedAt *time.Time `json:"tested_at,omitempty"`
-	// 上游账户余额（USD）；多 key 求和；仅 openai_compatible 中转站可查
-	Balance float64 `json:"balance,omitempty"`
-	// 余额最近刷新时间；nil 表示从未刷新过
-	BalanceUpdatedAt *time.Time `json:"balance_updated_at,omitempty"`
-	// LastUsedAt holds the value of the "last_used_at" field.
-	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -74,8 +33,8 @@ type Channel struct {
 
 // ChannelEdges holds the relations/edges for other nodes in the graph.
 type ChannelEdges struct {
-	// Groups holds the value of the groups edge.
-	Groups []*Group `json:"groups,omitempty"`
+	// Keys holds the value of the keys edge.
+	Keys []*ChannelKey `json:"keys,omitempty"`
 	// UsageLogs holds the value of the usage_logs edge.
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// loadedTypes holds the information for reporting if a
@@ -83,13 +42,13 @@ type ChannelEdges struct {
 	loadedTypes [2]bool
 }
 
-// GroupsOrErr returns the Groups value or an error if the edge
+// KeysOrErr returns the Keys value or an error if the edge
 // was not loaded in eager-loading.
-func (e ChannelEdges) GroupsOrErr() ([]*Group, error) {
+func (e ChannelEdges) KeysOrErr() ([]*ChannelKey, error) {
 	if e.loadedTypes[0] {
-		return e.Groups, nil
+		return e.Keys, nil
 	}
-	return nil, &NotLoadedError{edge: "groups"}
+	return nil, &NotLoadedError{edge: "keys"}
 }
 
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
@@ -106,15 +65,11 @@ func (*Channel) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case channel.FieldAPIKeys, channel.FieldModels, channel.FieldModelMapping, channel.FieldParamOverride, channel.FieldHeaderOverride, channel.FieldTags:
-			values[i] = new([]byte)
-		case channel.FieldCostRatio, channel.FieldBalance:
-			values[i] = new(sql.NullFloat64)
-		case channel.FieldID, channel.FieldPriority, channel.FieldWeight, channel.FieldMaxConcurrency, channel.FieldMaxRpm, channel.FieldResponseTimeMs:
+		case channel.FieldID:
 			values[i] = new(sql.NullInt64)
-		case channel.FieldName, channel.FieldType, channel.FieldBaseURL, channel.FieldStatus, channel.FieldErrorMsg, channel.FieldTestModel:
+		case channel.FieldName, channel.FieldBaseURL:
 			values[i] = new(sql.NullString)
-		case channel.FieldTestedAt, channel.FieldBalanceUpdatedAt, channel.FieldLastUsedAt, channel.FieldCreatedAt, channel.FieldUpdatedAt:
+		case channel.FieldCreatedAt, channel.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -143,146 +98,11 @@ func (c *Channel) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				c.Name = value.String
 			}
-		case channel.FieldType:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field type", values[i])
-			} else if value.Valid {
-				c.Type = channel.Type(value.String)
-			}
 		case channel.FieldBaseURL:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field base_url", values[i])
 			} else if value.Valid {
 				c.BaseURL = value.String
-			}
-		case channel.FieldAPIKeys:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field api_keys", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &c.APIKeys); err != nil {
-					return fmt.Errorf("unmarshal field api_keys: %w", err)
-				}
-			}
-		case channel.FieldModels:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field models", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &c.Models); err != nil {
-					return fmt.Errorf("unmarshal field models: %w", err)
-				}
-			}
-		case channel.FieldModelMapping:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field model_mapping", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &c.ModelMapping); err != nil {
-					return fmt.Errorf("unmarshal field model_mapping: %w", err)
-				}
-			}
-		case channel.FieldParamOverride:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field param_override", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &c.ParamOverride); err != nil {
-					return fmt.Errorf("unmarshal field param_override: %w", err)
-				}
-			}
-		case channel.FieldHeaderOverride:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field header_override", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &c.HeaderOverride); err != nil {
-					return fmt.Errorf("unmarshal field header_override: %w", err)
-				}
-			}
-		case channel.FieldStatus:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field status", values[i])
-			} else if value.Valid {
-				c.Status = channel.Status(value.String)
-			}
-		case channel.FieldErrorMsg:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field error_msg", values[i])
-			} else if value.Valid {
-				c.ErrorMsg = value.String
-			}
-		case channel.FieldPriority:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field priority", values[i])
-			} else if value.Valid {
-				c.Priority = int(value.Int64)
-			}
-		case channel.FieldWeight:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field weight", values[i])
-			} else if value.Valid {
-				c.Weight = int(value.Int64)
-			}
-		case channel.FieldMaxConcurrency:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field max_concurrency", values[i])
-			} else if value.Valid {
-				c.MaxConcurrency = int(value.Int64)
-			}
-		case channel.FieldMaxRpm:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field max_rpm", values[i])
-			} else if value.Valid {
-				c.MaxRpm = int(value.Int64)
-			}
-		case channel.FieldCostRatio:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field cost_ratio", values[i])
-			} else if value.Valid {
-				c.CostRatio = value.Float64
-			}
-		case channel.FieldTags:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field tags", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &c.Tags); err != nil {
-					return fmt.Errorf("unmarshal field tags: %w", err)
-				}
-			}
-		case channel.FieldTestModel:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field test_model", values[i])
-			} else if value.Valid {
-				c.TestModel = value.String
-			}
-		case channel.FieldResponseTimeMs:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field response_time_ms", values[i])
-			} else if value.Valid {
-				c.ResponseTimeMs = int(value.Int64)
-			}
-		case channel.FieldTestedAt:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field tested_at", values[i])
-			} else if value.Valid {
-				c.TestedAt = new(time.Time)
-				*c.TestedAt = value.Time
-			}
-		case channel.FieldBalance:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field balance", values[i])
-			} else if value.Valid {
-				c.Balance = value.Float64
-			}
-		case channel.FieldBalanceUpdatedAt:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field balance_updated_at", values[i])
-			} else if value.Valid {
-				c.BalanceUpdatedAt = new(time.Time)
-				*c.BalanceUpdatedAt = value.Time
-			}
-		case channel.FieldLastUsedAt:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field last_used_at", values[i])
-			} else if value.Valid {
-				c.LastUsedAt = new(time.Time)
-				*c.LastUsedAt = value.Time
 			}
 		case channel.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -309,9 +129,9 @@ func (c *Channel) Value(name string) (ent.Value, error) {
 	return c.selectValues.Get(name)
 }
 
-// QueryGroups queries the "groups" edge of the Channel entity.
-func (c *Channel) QueryGroups() *GroupQuery {
-	return NewChannelClient(c.config).QueryGroups(c)
+// QueryKeys queries the "keys" edge of the Channel entity.
+func (c *Channel) QueryKeys() *ChannelKeyQuery {
+	return NewChannelClient(c.config).QueryKeys(c)
 }
 
 // QueryUsageLogs queries the "usage_logs" edge of the Channel entity.
@@ -345,73 +165,8 @@ func (c *Channel) String() string {
 	builder.WriteString("name=")
 	builder.WriteString(c.Name)
 	builder.WriteString(", ")
-	builder.WriteString("type=")
-	builder.WriteString(fmt.Sprintf("%v", c.Type))
-	builder.WriteString(", ")
 	builder.WriteString("base_url=")
 	builder.WriteString(c.BaseURL)
-	builder.WriteString(", ")
-	builder.WriteString("api_keys=<sensitive>")
-	builder.WriteString(", ")
-	builder.WriteString("models=")
-	builder.WriteString(fmt.Sprintf("%v", c.Models))
-	builder.WriteString(", ")
-	builder.WriteString("model_mapping=")
-	builder.WriteString(fmt.Sprintf("%v", c.ModelMapping))
-	builder.WriteString(", ")
-	builder.WriteString("param_override=")
-	builder.WriteString(fmt.Sprintf("%v", c.ParamOverride))
-	builder.WriteString(", ")
-	builder.WriteString("header_override=")
-	builder.WriteString(fmt.Sprintf("%v", c.HeaderOverride))
-	builder.WriteString(", ")
-	builder.WriteString("status=")
-	builder.WriteString(fmt.Sprintf("%v", c.Status))
-	builder.WriteString(", ")
-	builder.WriteString("error_msg=")
-	builder.WriteString(c.ErrorMsg)
-	builder.WriteString(", ")
-	builder.WriteString("priority=")
-	builder.WriteString(fmt.Sprintf("%v", c.Priority))
-	builder.WriteString(", ")
-	builder.WriteString("weight=")
-	builder.WriteString(fmt.Sprintf("%v", c.Weight))
-	builder.WriteString(", ")
-	builder.WriteString("max_concurrency=")
-	builder.WriteString(fmt.Sprintf("%v", c.MaxConcurrency))
-	builder.WriteString(", ")
-	builder.WriteString("max_rpm=")
-	builder.WriteString(fmt.Sprintf("%v", c.MaxRpm))
-	builder.WriteString(", ")
-	builder.WriteString("cost_ratio=")
-	builder.WriteString(fmt.Sprintf("%v", c.CostRatio))
-	builder.WriteString(", ")
-	builder.WriteString("tags=")
-	builder.WriteString(fmt.Sprintf("%v", c.Tags))
-	builder.WriteString(", ")
-	builder.WriteString("test_model=")
-	builder.WriteString(c.TestModel)
-	builder.WriteString(", ")
-	builder.WriteString("response_time_ms=")
-	builder.WriteString(fmt.Sprintf("%v", c.ResponseTimeMs))
-	builder.WriteString(", ")
-	if v := c.TestedAt; v != nil {
-		builder.WriteString("tested_at=")
-		builder.WriteString(v.Format(time.ANSIC))
-	}
-	builder.WriteString(", ")
-	builder.WriteString("balance=")
-	builder.WriteString(fmt.Sprintf("%v", c.Balance))
-	builder.WriteString(", ")
-	if v := c.BalanceUpdatedAt; v != nil {
-		builder.WriteString("balance_updated_at=")
-		builder.WriteString(v.Format(time.ANSIC))
-	}
-	builder.WriteString(", ")
-	if v := c.LastUsedAt; v != nil {
-		builder.WriteString("last_used_at=")
-		builder.WriteString(v.Format(time.ANSIC))
-	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(c.CreatedAt.Format(time.ANSIC))

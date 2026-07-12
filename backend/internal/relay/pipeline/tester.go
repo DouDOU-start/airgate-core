@@ -52,8 +52,8 @@ func channelTestPlan(channelType, model, testEndpoint string) (endpoint, body st
 // 测试结果落库与 disabled_auto 恢复由 channel service 编排，此处只做请求。
 // 测试是真实的上游消耗：成功按 0 费用落消费记录（渠道成本口径照记），
 // 失败与转发失败同表留痕。testEndpoint 语义见 channelTestPlan。
-func (p *Pipeline) TestChannel(ctx context.Context, snap *registry.ChannelSnapshot, model, testEndpoint string) (latencyMs int, err error) {
-	// 任务类渠道（视频/音乐）测试会真实产生付费任务，不支持一键测试；
+func (p *Pipeline) TestChannel(ctx context.Context, snap *registry.ChannelKeySnapshot, model, testEndpoint string) (latencyMs int, err error) {
+	// 任务类 key（视频/音乐）测试会真实产生付费任务，不支持一键测试；
 	// 直接拒绝，不留失败痕（配置性限制而非渠道故障）。
 	if snap.Type == registry.ProtocolOpenAIVideo || snap.Type == registry.ProtocolSuno {
 		return 0, errors.New("任务类渠道（视频/音乐）暂不支持一键测试")
@@ -68,8 +68,8 @@ func (p *Pipeline) TestChannel(ctx context.Context, snap *registry.ChannelSnapsh
 				RequestID:   uuid.NewString(),
 				Source:      errlog.SourceChannelTest,
 				Model:       model,
-				ChannelID:   snap.ID,
-				ChannelName: snap.Name,
+				ChannelID:   snap.ChannelID,
+				ChannelName: snap.ChannelName,
 				DurationMs:  time.Since(start).Milliseconds(),
 				Message:     err.Error(),
 			})
@@ -99,7 +99,7 @@ func testEndpointPath(endpoint string) string {
 // （不扣任何人余额），total 照价目表实算（缺价记 0），渠道成本口径照常成立
 // （total × cost_ratio——测试确实消耗了渠道额度）。source 固定 channel_test，
 // 供前端把发起方标为「渠道测试」。
-func (p *Pipeline) recordTestUsage(snap *registry.ChannelSnapshot, model, endpoint string, usage *dto.Usage, durationMs int64) {
+func (p *Pipeline) recordTestUsage(snap *registry.ChannelKeySnapshot, model, endpoint string, usage *dto.Usage, durationMs int64) {
 	if p.sink == nil {
 		return
 	}
@@ -131,7 +131,8 @@ func (p *Pipeline) recordTestUsage(snap *registry.ChannelSnapshot, model, endpoi
 		inputTokens = 0
 	}
 	p.sink.Record(billing.UsageRecord{
-		ChannelID:             snap.ID,
+		ChannelID:             snap.ChannelID,
+		ChannelKeyID:          snap.KeyID,
 		Model:                 model,
 		InputTokens:           inputTokens,
 		OutputTokens:          u.CompletionTokens,
@@ -159,12 +160,12 @@ func (p *Pipeline) recordTestUsage(snap *registry.ChannelSnapshot, model, endpoi
 }
 
 // testChannel 渠道测试主体；成功时回传实际使用的端点常量与上游 usage（可能为 nil）供落账。
-func (p *Pipeline) testChannel(ctx context.Context, snap *registry.ChannelSnapshot, model, testEndpoint string) (int, string, *dto.Usage, error) {
+func (p *Pipeline) testChannel(ctx context.Context, snap *registry.ChannelKeySnapshot, model, testEndpoint string) (int, string, *dto.Usage, error) {
 	if model == "" {
 		return 0, "", nil, errors.New("缺少测试模型")
 	}
-	if len(snap.APIKeys) == 0 {
-		return 0, "", nil, errors.New("渠道未配置 API Key")
+	if snap.APIKey == "" {
+		return 0, "", nil, errors.New("密钥端点未配置 API Key")
 	}
 
 	ad, err := adaptor.GetAdaptor(snap.Type)
@@ -181,8 +182,8 @@ func (p *Pipeline) testChannel(ctx context.Context, snap *registry.ChannelSnapsh
 	req.Model = model
 
 	info := &adaptor.RelayInfo{
-		Channel:       snap,
-		APIKey:        snap.APIKeys[0],
+		ChannelKey:    snap,
+		APIKey:        snap.APIKey,
 		RequestModel:  model,
 		UpstreamModel: upstreamModel(snap, model),
 		Stream:        false,
@@ -207,9 +208,9 @@ func (p *Pipeline) testChannel(ctx context.Context, snap *registry.ChannelSnapsh
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, maxTestBodyBytes))
 	latency := int(time.Since(start).Milliseconds())
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// 错误体片段会进入管理端 502 响应与日志：先对渠道全部 key 脱敏。
+		// 错误体片段会进入管理端 502 响应与日志：先对本 key 脱敏。
 		return 0, "", nil, fmt.Errorf("上游返回 HTTP %d: %s", resp.StatusCode,
-			outcome.SanitizeKeyLeak(outcome.BodySnippet(body), snap.APIKeys))
+			outcome.SanitizeKeyLeak(outcome.BodySnippet(body), []string{snap.APIKey}))
 	}
 	// 解析上游 usage 供落账；解析失败不影响测试结果（usage 记 0）。
 	_, usage := ad.ParseNonStreamResponse(info, body)
@@ -222,9 +223,9 @@ func (p *Pipeline) testChannel(ctx context.Context, snap *registry.ChannelSnapsh
 		// 2xx 却提不出 usage：上游返回了非预期形态（缺 usage 字段等）。
 		// 留脱敏片段定位，勿静默记零。
 		slog.Warn("channel_test_usage_missing",
-			"channel_id", snap.ID, "model", model, "endpoint", endpoint,
+			"channel_key_id", snap.KeyID, "model", model, "endpoint", endpoint,
 			"content_type", resp.Header.Get("Content-Type"),
-			"body_snippet", outcome.SanitizeKeyLeak(outcome.BodySnippet(body), snap.APIKeys))
+			"body_snippet", outcome.SanitizeKeyLeak(outcome.BodySnippet(body), []string{snap.APIKey}))
 	}
 	return latency, endpoint, usage, nil
 }

@@ -295,30 +295,30 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 		if err != nil {
 			break
 		}
-		apiKey := f.registry.NextKey(ch.ID)
+		apiKey := ch.APIKey
 		if apiKey == "" {
-			slog.Warn("task_channel_no_api_key", "channel_id", ch.ID)
-			hardExclude = append(hardExclude, ch.ID)
+			slog.Warn("task_channel_key_no_api_key", "channel_key_id", ch.KeyID)
+			hardExclude = append(hardExclude, ch.KeyID)
 			continue
 		}
 
-		// 渠道 RPM + 并发闸门：满则软排除（任务提交不排队，客户端重试成本低）。
-		rpmOK, rpmMinute, _ := f.rpm.TryIncrementChannelRPM(ctx, ch.ID, ch.MaxRPM)
+		// key RPM + 并发闸门：满则软排除（任务提交不排队，客户端重试成本低）。
+		rpmOK, rpmMinute, _ := f.rpm.TryIncrementKeyRPM(ctx, ch.KeyID, ch.MaxRPM)
 		if !rpmOK {
 			summary.localCapacity = true
-			softExclude = append(softExclude, ch.ID)
+			softExclude = append(softExclude, ch.KeyID)
 			continue
 		}
 		slotID := uuid.New().String()
-		if err := f.concurrency.AcquireChannelSlot(ctx, ch.ID, slotID, ch.MaxConcurrency, 0); err != nil {
-			f.rpm.DecrementChannelRPM(ctx, ch.ID, rpmMinute)
+		if err := f.concurrency.AcquireKeySlot(ctx, ch.KeyID, slotID, ch.MaxConcurrency, 0); err != nil {
+			f.rpm.DecrementKeyRPM(ctx, ch.KeyID, rpmMinute)
 			summary.localCapacity = true
-			softExclude = append(softExclude, ch.ID)
+			softExclude = append(softExclude, ch.KeyID)
 			continue
 		}
 
 		info := &Info{
-			Channel:       ch,
+			ChannelKey:    ch,
 			APIKey:        apiKey,
 			RequestModel:  sub.Model,
 			UpstreamModel: upstreamModel(ch, sub.Model),
@@ -326,27 +326,27 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 		}
 		attemptStart := time.Now()
 		result := f.executeSubmit(ctx, ad, info, sub)
-		f.concurrency.ReleaseChannelSlot(context.Background(), ch.ID, slotID)
+		f.concurrency.ReleaseKeySlot(context.Background(), ch.KeyID, slotID)
 		attemptLatency := time.Since(attemptStart).Milliseconds()
 		attempts++
 
 		// 构建上游请求即失败：客户端/配置问题，一次性 400 终止（不计渠道健康）。
 		if result.buildErr != nil {
-			f.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
+			f.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
 			refund("构建上游请求失败")
-			msg := outcome.SanitizeKeyLeak(result.buildErr.Error(), ch.APIKeys)
+			msg := outcome.SanitizeKeyLeak(result.buildErr.Error(), []string{apiKey})
 			writeError(c, http.StatusBadRequest, "invalid_request_error", "bad_request", msg)
 			f.recordFailure(c, keyInfo, sub.Model, start, errlog.Entry{
 				Phase: errlog.PhaseBadRequest, StatusCode: http.StatusBadRequest,
 				ErrorType: "invalid_request_error", ErrorCode: "bad_request",
 				Message: msg, Attempts: attempts,
-				ChannelID: ch.ID, ChannelName: ch.Name,
+				ChannelID: ch.ChannelID, ChannelName: ch.ChannelName,
 			})
 			return
 		}
 
 		o := outcome.Classify(result.statusCode, result.headers, result.body, result.netErr)
-		o.Reason = outcome.SanitizeKeyLeak(o.Reason, ch.APIKeys)
+		o.Reason = outcome.SanitizeKeyLeak(o.Reason, []string{apiKey})
 
 		if o.Verdict == outcome.Success {
 			taskID, st, perr := ad.ParseSubmitResponse(result.body)
@@ -357,13 +357,13 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 				o.Verdict = outcome.Transient
 				o.Reason = "提交响应解析失败: " + outcome.BodySnippet(result.body)
 			} else {
-				f.registry.MarkRecovered(ch.ID)
+				f.registry.MarkRecovered(ch.KeyID)
 				t := f.newTask(c, keyInfo, platform, ch, info, sub, taskID, st, hold, estTotal, billingRate)
 				id, err := f.store.Insert(context.Background(), t)
 				if err != nil {
 					// 上游任务已受理但落库失败：无法跟踪即无法结算，退款并放弃跟踪。
 					slog.Error("task_insert_failed_after_submit",
-						"platform", platform, "task_id", taskID, "channel_id", ch.ID, "error", err)
+						"platform", platform, "task_id", taskID, "channel_key_id", ch.KeyID, "error", err)
 					refund("任务落库失败")
 					writeError(c, http.StatusInternalServerError, "server_error", "internal_error", "任务保存失败，费用已退回")
 					return
@@ -376,47 +376,47 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 
 		switch o.Verdict {
 		case outcome.RateLimited:
-			f.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
-			hardExclude = append(hardExclude, ch.ID)
+			f.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			hardExclude = append(hardExclude, ch.KeyID)
 			summary.rateLimited = true
 			summary.observeRetryAfter(o.RetryAfter)
 			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "rateLimited", o.Reason, o.RetryAfter.Milliseconds(), attemptLatency, false))
-			f.countFailure(ch.ID, "rateLimited")
+			f.countFailure(ch.ChannelID, "rateLimited")
 			continue
 
 		case outcome.AuthFailed:
-			f.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
+			f.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
 			if settings.AutoBanEnabled {
-				f.registry.MarkAutoDisabled(ch.ID, outcome.TruncateErrorMsg(o.Reason))
+				f.registry.MarkAutoDisabled(ch.KeyID, outcome.TruncateErrorMsg(o.Reason))
 			}
-			hardExclude = append(hardExclude, ch.ID)
+			hardExclude = append(hardExclude, ch.KeyID)
 			summary.authFailed = true
 			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "authFailed", o.Reason, 0, attemptLatency, settings.AutoBanEnabled))
-			f.countFailure(ch.ID, "authFailed")
+			f.countFailure(ch.ChannelID, "authFailed")
 			continue
 
 		case outcome.Transient:
-			f.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
-			softExclude = append(softExclude, ch.ID)
+			f.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			softExclude = append(softExclude, ch.KeyID)
 			summary.transient = true
 			verdictName := "transient"
 			if result.netErr != nil {
 				verdictName = "networkError"
 			}
 			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, verdictName, o.Reason, 0, attemptLatency, false))
-			f.countFailure(ch.ID, verdictName)
+			f.countFailure(ch.ChannelID, verdictName)
 			continue
 
 		default: // outcome.ClientError：语义重建终止，不重试；预扣退回。
 			refund("上游拒绝请求")
 			up := errfmt.ParseUpstream(result.statusCode, result.body)
-			up.Message = outcome.SanitizeKeyLeak(up.Message, ch.APIKeys)
+			up.Message = outcome.SanitizeKeyLeak(up.Message, []string{apiKey})
 			writeUpstreamError(c, result.statusCode, up)
 			hop := attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "clientError", o.Reason, 0, attemptLatency, false)
 			f.recordFailure(c, keyInfo, sub.Model, start, errlog.Entry{
 				Phase: errlog.PhaseUpstreamClientError, StatusCode: result.statusCode,
 				Message: o.Reason, Attempts: attempts, Chain: append(hops, hop),
-				ChannelID: ch.ID, ChannelName: ch.Name,
+				ChannelID: ch.ChannelID, ChannelName: ch.ChannelName,
 			})
 			return
 		}
@@ -433,7 +433,7 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 }
 
 // newTask 构造落库任务行（计费快照 + 归属快照）。
-func (f *Flow) newTask(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string, ch *registry.ChannelSnapshot, info *Info, sub *SubmitRequest, taskID string, st *Status, hold, estTotal, billingRate float64) *Task {
+func (f *Flow) newTask(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string, ch *registry.ChannelKeySnapshot, info *Info, sub *SubmitRequest, taskID string, st *Status, hold, estTotal, billingRate float64) *Task {
 	now := time.Now()
 	t := &Task{
 		TaskID:                taskID,
@@ -454,7 +454,8 @@ func (f *Flow) newTask(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string
 		UserEmail:             keyInfo.UserEmail,
 		APIKeyID:              keyInfo.KeyID,
 		GroupID:               keyInfo.GroupID,
-		ChannelID:             ch.ID,
+		ChannelID:             ch.ChannelID,
+		ChannelKeyID:          ch.KeyID,
 		CreatedAt:             now,
 		UpdatedAt:             now,
 	}
@@ -582,11 +583,12 @@ func (f *Flow) recordFailure(c *gin.Context, keyInfo *auth.APIKeyInfo, model str
 }
 
 // attemptHop 构造重试链一跳（reason 已由调用方脱敏）。
-func attemptHop(seq int, ch *registry.ChannelSnapshot, apiKey string, upstreamStatus int, verdict, reason string, retryAfterMs, latencyMs int64, autoDisabled bool) errlog.AttemptHop {
+func attemptHop(seq int, ch *registry.ChannelKeySnapshot, apiKey string, upstreamStatus int, verdict, reason string, retryAfterMs, latencyMs int64, autoDisabled bool) errlog.AttemptHop {
 	return errlog.AttemptHop{
 		Seq:          seq,
-		ChannelID:    ch.ID,
-		ChannelName:  ch.Name,
+		ChannelID:    ch.ChannelID,
+		ChannelName:  ch.ChannelName,
+		KeyID:        ch.KeyID,
 		KeyHint:      outcome.KeyHint(apiKey),
 		UpstreamStat: upstreamStatus,
 		Verdict:      verdict,
@@ -663,8 +665,8 @@ func requireKeyInfo(c *gin.Context) (*auth.APIKeyInfo, bool) {
 	return keyInfo, true
 }
 
-// upstreamModel 经渠道 model_mapping 解析上游模型名；无映射用对外名。
-func upstreamModel(ch *registry.ChannelSnapshot, model string) string {
+// upstreamModel 经 key 的 model_mapping 解析上游模型名；无映射用对外名。
+func upstreamModel(ch *registry.ChannelKeySnapshot, model string) string {
 	if mapped, ok := ch.ModelMapping[model]; ok && mapped != "" {
 		return mapped
 	}

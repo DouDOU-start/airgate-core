@@ -108,50 +108,58 @@ func (p *Poller) tick(ctx context.Context) {
 	}
 
 	timeout := time.Duration(p.settings.Get(ctx).TaskTimeoutMinutes) * time.Minute
+	// 按密钥端点分组批量轮询（suno 合批需同一把 key）。存量任务无 channel_key_id
+	// （为 0）：退化为按渠道分组的 legacy 桶（groupKey 取 -channelID，与正常 keyID 空间隔离），
+	// pollChannel 内回退到该渠道任一可用 key。
 	groups := map[int][]*Task{}
 	for _, t := range tasks {
 		if p.now().Sub(t.SubmitTime) > timeout {
 			p.failTask(ctx, t, "任务超时（超过 "+timeout.String()+" 未完成）", errlog.PhaseTaskTimeout)
 			continue
 		}
-		groups[t.ChannelID] = append(groups[t.ChannelID], t)
+		groupKey := t.ChannelKeyID
+		if groupKey == 0 {
+			groupKey = -t.ChannelID
+		}
+		groups[groupKey] = append(groups[groupKey], t)
 	}
 
 	sem := make(chan struct{}, pollChannelConcurrency)
 	var wg sync.WaitGroup
-	for chID, ts := range groups {
+	for groupKey, ts := range groups {
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(chID int, ts []*Task) {
+		go func(groupKey int, ts []*Task) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			p.pollChannel(ctx, chID, ts)
-		}(chID, ts)
+			p.pollChannel(ctx, groupKey, ts)
+		}(groupKey, ts)
 	}
 	wg.Wait()
 }
 
-// pollChannel 单渠道组查询：suno 走批量接口，其余逐任务查询（组内限速）。
-func (p *Poller) pollChannel(ctx context.Context, chID int, tasks []*Task) {
-	ch, ok := p.registry.Snapshot(chID)
+// pollChannel 单密钥端点组查询：suno 走批量接口，其余逐任务查询（组内限速）。
+// groupKey>0 为 channel_key_id；<0 为存量任务的 legacy 渠道桶（-channelID）。
+func (p *Poller) pollChannel(ctx context.Context, groupKey int, tasks []*Task) {
+	ch, ok := p.resolveKey(groupKey, tasks)
 	if !ok {
-		// 渠道已删除：任务永远无法向上游查询，置失败退款（而非无限挂起到超时）。
+		// 密钥端点/渠道已删除：任务永远无法向上游查询，置失败退款（而非无限挂起到超时）。
 		for _, t := range tasks {
-			p.failTask(ctx, t, "任务所属渠道已删除，无法跟踪", errlog.PhaseTaskFailed)
+			p.failTask(ctx, t, "任务所属密钥端点已删除，无法跟踪", errlog.PhaseTaskFailed)
 		}
 		return
 	}
 	ad, err := GetAdaptor(ch.Type)
 	if err != nil {
-		slog.Warn("task_poll_adaptor_missing", "channel_id", chID, "type", ch.Type)
+		slog.Warn("task_poll_adaptor_missing", "channel_key_id", ch.KeyID, "type", ch.Type)
 		return
 	}
-	apiKey := p.registry.NextKey(chID)
+	apiKey := ch.APIKey
 	if apiKey == "" {
-		slog.Warn("task_poll_channel_no_api_key", "channel_id", chID)
+		slog.Warn("task_poll_channel_key_no_api_key", "channel_key_id", ch.KeyID)
 		return
 	}
-	info := &Info{Channel: ch, APIKey: apiKey, Client: p.client}
+	info := &Info{ChannelKey: ch, APIKey: apiKey, Client: p.client}
 
 	if bq, ok := ad.(BatchQuerying); ok {
 		p.pollBatch(ctx, bq, info, tasks)
@@ -189,7 +197,7 @@ func (p *Poller) pollBatch(ctx context.Context, bq BatchQuerying, info *Info, ta
 	defer cancel()
 	httpReq, err := bq.BuildBatchQueryRequest(reqCtx, info, ids)
 	if err != nil {
-		slog.Warn("task_poll_batch_build_failed", "channel_id", info.Channel.ID, "error", err)
+		slog.Warn("task_poll_batch_build_failed", "channel_key_id", info.ChannelKey.KeyID, "error", err)
 		return
 	}
 	status, body, netErr := p.doQuery(httpReq)
@@ -198,7 +206,7 @@ func (p *Poller) pollBatch(ctx context.Context, bq BatchQuerying, info *Info, ta
 	case outcome.Success:
 		sts, err := bq.ParseBatchQueryResponse(body)
 		if err != nil {
-			slog.Warn("task_poll_batch_parse_failed", "channel_id", info.Channel.ID, "error", err)
+			slog.Warn("task_poll_batch_parse_failed", "channel_key_id", info.ChannelKey.KeyID, "error", err)
 			return
 		}
 		for id, st := range sts {
@@ -207,10 +215,10 @@ func (p *Poller) pollBatch(ctx context.Context, bq BatchQuerying, info *Info, ta
 			}
 		}
 	case outcome.AuthFailed:
-		p.autoBan(ctx, info.Channel, "任务轮询上游认证失败")
+		p.autoBan(ctx, info.ChannelKey, "任务轮询上游认证失败")
 	default:
-		slog.Warn("task_poll_batch_failed", "channel_id", info.Channel.ID,
-			"reason", outcome.SanitizeKeyLeak(o.Reason, info.Channel.APIKeys))
+		slog.Warn("task_poll_batch_failed", "channel_key_id", info.ChannelKey.KeyID,
+			"reason", outcome.SanitizeKeyLeak(o.Reason, []string{info.ChannelKey.APIKey}))
 	}
 }
 
@@ -238,7 +246,7 @@ func (p *Poller) queryOne(ctx context.Context, ad Adaptor, info *Info, t *Task) 
 		return nil, true
 	default:
 		slog.Warn("task_poll_query_failed", "task_id", t.TaskID,
-			"reason", outcome.SanitizeKeyLeak(o.Reason, info.Channel.APIKeys))
+			"reason", outcome.SanitizeKeyLeak(o.Reason, []string{info.ChannelKey.APIKey}))
 		return nil, false
 	}
 }
@@ -257,14 +265,31 @@ func (p *Poller) doQuery(req *http.Request) (int, []byte, error) {
 	return resp.StatusCode, body, nil
 }
 
+// resolveKey 解析轮询组对应的密钥端点快照：
+// groupKey>0 直接按 keyID 取；<0 为存量任务 legacy 桶，回退到该渠道任一可用 key；
+// keyID 已删除但渠道仍在时同样回退（best-effort）。
+func (p *Poller) resolveKey(groupKey int, tasks []*Task) (*registry.ChannelKeySnapshot, bool) {
+	if groupKey > 0 {
+		if ch, ok := p.registry.Snapshot(groupKey); ok {
+			return ch, true
+		}
+		// key 已删除：回退到同渠道任一可用 key（base_url 共享，成片下载仍可用）。
+		if len(tasks) > 0 && tasks[0].ChannelID > 0 {
+			return p.registry.AnyKeyForChannel(tasks[0].ChannelID)
+		}
+		return nil, false
+	}
+	return p.registry.AnyKeyForChannel(-groupKey)
+}
+
 // autoBan 轮询侧自动禁用（开关与同步转发共用 channel_auto_ban_enabled）。
-func (p *Poller) autoBan(ctx context.Context, ch *registry.ChannelSnapshot, reason string) {
+func (p *Poller) autoBan(ctx context.Context, ch *registry.ChannelKeySnapshot, reason string) {
 	if !p.settings.Get(ctx).AutoBanEnabled {
 		return
 	}
-	p.registry.MarkAutoDisabled(ch.ID, outcome.TruncateErrorMsg(reason))
+	p.registry.MarkAutoDisabled(ch.KeyID, outcome.TruncateErrorMsg(reason))
 	if p.errSink != nil {
-		p.errSink.CountFailure(context.Background(), ch.ID, "authFailed", "")
+		p.errSink.CountFailure(context.Background(), ch.ChannelID, "authFailed", "")
 	}
 }
 
@@ -379,6 +404,7 @@ func (p *Poller) settleSuccess(ctx context.Context, t *Task, seconds int) {
 		UserEmail:             t.UserEmail,
 		APIKeyID:              t.APIKeyID,
 		ChannelID:             t.ChannelID,
+		ChannelKeyID:          t.ChannelKeyID,
 		GroupID:               t.GroupID,
 		Model:                 t.RequestModel,
 		Calls:                 calls,

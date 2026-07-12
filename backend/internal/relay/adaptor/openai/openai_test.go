@@ -84,8 +84,8 @@ func TestImagesURLs(t *testing.T) {
 // buildInfo 构造测试 RelayInfo。
 func buildInfo(mutate ...func(*adaptor.RelayInfo)) *adaptor.RelayInfo {
 	info := &adaptor.RelayInfo{
-		Channel: &registry.ChannelSnapshot{
-			ID:      1,
+		ChannelKey: &registry.ChannelKeySnapshot{
+			KeyID:   1,
 			Type:    "openai_compatible",
 			BaseURL: "https://api.example.com",
 		},
@@ -117,7 +117,7 @@ func TestBuildRequestRewrite(t *testing.T) {
 			name: "param_override set 与 remove",
 			body: `{"model":"gpt-4o","temperature":0.9,"top_p":0.5}`,
 			info: buildInfo(func(i *adaptor.RelayInfo) {
-				i.Channel.ParamOverride = map[string]any{
+				i.ChannelKey.ParamOverride = map[string]any{
 					"temperature": 0.1, // set：覆盖
 					"top_p":       nil, // remove：删除
 					"max_tokens":  float64(128),
@@ -257,7 +257,7 @@ func TestBuildRequestResponses(t *testing.T) {
 		req, _ := dto.ParseChatRequest([]byte(`{"model":"gpt-4o","input":"hi","temperature":0.9,"top_p":0.5}`))
 		info := respInfo(func(i *adaptor.RelayInfo) {
 			i.UpstreamModel = "gpt-4o-upstream"
-			i.Channel.ParamOverride = map[string]any{
+			i.ChannelKey.ParamOverride = map[string]any{
 				"temperature": 0.1, // set：覆盖
 				"top_p":       nil, // remove：删除
 			}
@@ -440,7 +440,7 @@ func normalizeJSON(t *testing.T, v map[string]any) map[string]any {
 
 func TestBuildRequestHeaders(t *testing.T) {
 	info := buildInfo(func(i *adaptor.RelayInfo) {
-		i.Channel.HeaderOverride = map[string]string{
+		i.ChannelKey.HeaderOverride = map[string]string{
 			"X-Custom":      "v1",
 			"Authorization": "Bearer overridden", // header_override 优先于默认 Bearer
 		}

@@ -78,7 +78,7 @@ func (Adaptor) BuildSubmitRequest(ctx context.Context, info *task.Info, req *tas
 		}
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, videosURL(info.Channel.BaseURL), bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, videosURL(info.ChannelKey.BaseURL), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (Adaptor) ParseSubmitResponse(body []byte) (string, *task.Status, error) {
 
 // BuildQueryRequest 构建上游任务查询请求。
 func (Adaptor) BuildQueryRequest(ctx context.Context, info *task.Info, taskID string) (*http.Request, error) {
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, videosURL(info.Channel.BaseURL)+"/"+taskID, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, videosURL(info.ChannelKey.BaseURL)+"/"+taskID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func (Adaptor) ParseQueryResponse(body []byte) (*task.Status, error) {
 
 // BuildContentRequest 实现 task.ContentProxy：成片内容下载。
 func (Adaptor) BuildContentRequest(ctx context.Context, info *task.Info, taskID string) (*http.Request, error) {
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, videosURL(info.Channel.BaseURL)+"/"+taskID+"/content", nil)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, videosURL(info.ChannelKey.BaseURL)+"/"+taskID+"/content", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +277,7 @@ func rewriteJSONModel(body []byte, upstreamModel string) ([]byte, error) {
 // setAuthHeaders 设置认证头 + 渠道 header_override。
 func setAuthHeaders(req *http.Request, info *task.Info) {
 	req.Header.Set("Authorization", "Bearer "+info.APIKey)
-	for k, v := range info.Channel.HeaderOverride {
+	for k, v := range info.ChannelKey.HeaderOverride {
 		req.Header.Set(k, v)
 	}
 }

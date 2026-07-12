@@ -44,13 +44,13 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 	var url string
 	switch info.Endpoint {
 	case adaptor.EndpointGenerateContent:
-		url = generateURL(info.Channel.BaseURL, model, info.Stream)
+		url = generateURL(info.ChannelKey.BaseURL, model, info.Stream)
 	case adaptor.EndpointPredict:
 		// Imagen 系按次生图端点（无流式形态）。
-		url = methodURL(info.Channel.BaseURL, model, "predict", false)
+		url = methodURL(info.ChannelKey.BaseURL, model, "predict", false)
 	case adaptor.EndpointCountTokens:
 		// token 计数端点（零计费，记账跳过在 pipeline 侧）。
-		url = methodURL(info.Channel.BaseURL, model, "countTokens", false)
+		url = methodURL(info.ChannelKey.BaseURL, model, "countTokens", false)
 	default:
 		return nil, errors.New("gemini 渠道仅支持 generateContent / predict / countTokens 端点")
 	}
@@ -66,7 +66,7 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("x-goog-api-key", info.APIKey)
-	for k, v := range info.Channel.HeaderOverride {
+	for k, v := range info.ChannelKey.HeaderOverride {
 		httpReq.Header.Set(k, v)
 	}
 	return httpReq, nil
@@ -76,7 +76,7 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 // 各字段 RawMessage 原样保留（原 req 不动，failover 各 attempt 互不污染）。
 func rewriteBody(info *adaptor.RelayInfo, req *dto.ChatRequest) ([]byte, error) {
 	r := req.Clone()
-	for k, v := range info.Channel.ParamOverride {
+	for k, v := range info.ChannelKey.ParamOverride {
 		if v == nil {
 			r.Remove(k)
 			continue

@@ -237,40 +237,40 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			break
 		}
 
-		// 渠道级配置检查：适配器 / 密钥，任一缺失即硬排除（不消耗 attempt）。
+		// key 级配置检查：适配器 / 密钥，任一缺失即硬排除（不消耗 attempt）。
 		ad, err := adaptor.GetAdaptor(ch.Type)
 		if err != nil {
-			slog.Warn("relay_channel_type_unsupported", "channel_id", ch.ID, "type", ch.Type)
-			hardExclude = append(hardExclude, ch.ID)
+			slog.Warn("relay_channel_key_type_unsupported", "channel_key_id", ch.KeyID, "type", ch.Type)
+			hardExclude = append(hardExclude, ch.KeyID)
 			continue
 		}
-		apiKey := p.registry.NextKey(ch.ID)
+		apiKey := ch.APIKey
 		if apiKey == "" {
-			slog.Warn("relay_channel_no_api_key", "channel_id", ch.ID)
-			hardExclude = append(hardExclude, ch.ID)
+			slog.Warn("relay_channel_key_no_api_key", "channel_key_id", ch.KeyID)
+			hardExclude = append(hardExclude, ch.KeyID)
 			continue
 		}
 
-		// 渠道 RPM + 并发闸门：满则软排除（可排队重竞争），不消耗 attempt。
+		// key RPM + 并发闸门：满则软排除（可排队重竞争），不消耗 attempt。
 		// rpmMinute 为预递增所用的分钟窗口，失败回退时对同一窗口 decrement
 		//（不重取当前时间，防跨分钟边界扣穿新窗口）。
-		rpmOK, rpmMinute, _ := p.rpm.TryIncrementChannelRPM(ctx, ch.ID, ch.MaxRPM)
+		rpmOK, rpmMinute, _ := p.rpm.TryIncrementKeyRPM(ctx, ch.KeyID, ch.MaxRPM)
 		if !rpmOK {
 			summary.localCapacity = true
-			softExclude = append(softExclude, ch.ID)
+			softExclude = append(softExclude, ch.KeyID)
 			continue
 		}
 		requestID := uuid.New().String()
-		if err := p.concurrency.AcquireChannelSlot(ctx, ch.ID, requestID, ch.MaxConcurrency, channelSlotTTL(req.Stream)); err != nil {
-			p.rpm.DecrementChannelRPM(ctx, ch.ID, rpmMinute)
+		if err := p.concurrency.AcquireKeySlot(ctx, ch.KeyID, requestID, ch.MaxConcurrency, channelSlotTTL(req.Stream)); err != nil {
+			p.rpm.DecrementKeyRPM(ctx, ch.KeyID, rpmMinute)
 			summary.localCapacity = true
-			softExclude = append(softExclude, ch.ID)
+			softExclude = append(softExclude, ch.KeyID)
 			continue
 		}
 		pollDelay = queuePollInterval // 抢到槽位即重置退避
 
 		info := &adaptor.RelayInfo{
-			Channel:        ch,
+			ChannelKey:     ch,
 			APIKey:         apiKey,
 			RequestModel:   req.Model,
 			UpstreamModel:  upstreamModel(ch, req.Model),
@@ -281,28 +281,28 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			Client:         p.client,
 		}
 		attemptStart := time.Now()
-		result := p.executeAttempt(c, ad, info, req, start, ch.ID, requestID, rpmMinute)
+		result := p.executeAttempt(c, ad, info, req, start, ch.KeyID, requestID, rpmMinute)
 		attemptLatency := time.Since(attemptStart).Milliseconds()
 		attempts++
 
 		// 构建上游请求即失败（坏请求体/不支持端点/翻译失败）：客户端/配置问题，
 		// 一次性 400 终止，不 failover、不计渠道健康信号。
 		if result.buildErr != nil {
-			p.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
-			msg := outcome.SanitizeKeyLeak(result.buildErr.Error(), ch.APIKeys)
+			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			msg := outcome.SanitizeKeyLeak(result.buildErr.Error(), []string{apiKey})
 			writeError(c, http.StatusBadRequest, "invalid_request_error", "bad_request", msg)
 			p.recordFailure(c, keyInfo, req, start, errlog.Entry{
 				Phase: errlog.PhaseBadRequest, StatusCode: http.StatusBadRequest,
 				ErrorType: "invalid_request_error", ErrorCode: "bad_request",
 				Message: msg, Attempts: attempts,
-				ChannelID: ch.ID, ChannelName: ch.Name,
+				ChannelID: ch.ChannelID, ChannelName: ch.ChannelName,
 			})
 			return
 		}
 
-		// 客户端已取消且未写出任何字节：直接终止（不迁怒渠道）。
+		// 客户端已取消且未写出任何字节：直接终止（不迁怒 key）。
 		if ctx.Err() != nil && !result.written {
-			p.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
+			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
 			markCanceled(c)
 			recordCanceled()
 			return
@@ -319,13 +319,13 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			}
 			if result.streamErr != nil {
 				slog.Warn("relay_stream_aborted",
-					"channel_id", ch.ID, "model", req.Model, "error", result.streamErr)
+					"channel_key_id", ch.KeyID, "model", req.Model, "error", result.streamErr)
 			} else {
-				p.registry.MarkRecovered(ch.ID)
+				p.registry.MarkRecovered(ch.KeyID)
 				if result.usage == nil {
 					// 契约要求：流式成功但未捕获 usage → 记 0 并告警（可疑的计费缺口）。
 					slog.Warn("relay_stream_usage_missing",
-						"channel_id", ch.ID, "model", req.Model)
+						"channel_key_id", ch.KeyID, "model", req.Model)
 				}
 			}
 			if !opts.zeroBilling {
@@ -338,17 +338,17 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				// 而 Message 会透出到用户端失败视图；明细只进重试链（仅管理员可见）。
 				reason := "上游未发送完成标志即断流"
 				if result.streamErr != nil {
-					reason = outcome.SanitizeKeyLeak(result.streamErr.Error(), ch.APIKeys)
+					reason = outcome.SanitizeKeyLeak(result.streamErr.Error(), []string{apiKey})
 				}
 				hop := attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "streamAborted", reason, 0, attemptLatency, false)
 				if p.errSink != nil {
-					p.errSink.CountFailure(context.Background(), ch.ID, "streamAborted", "")
+					p.errSink.CountFailure(context.Background(), ch.ChannelID, "streamAborted", "")
 				}
 				p.recordFailure(c, keyInfo, req, start, errlog.Entry{
 					Phase: errlog.PhaseStreamAborted, StatusCode: result.statusCode,
 					Message: "上游流中断，响应未完成", Billed: true,
 					Attempts: attempts, Chain: append(hops, hop),
-					ChannelID: ch.ID, ChannelName: ch.Name,
+					ChannelID: ch.ChannelID, ChannelName: ch.ChannelName,
 				})
 			}
 			return
@@ -356,21 +356,21 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 
 		o := outcome.Classify(result.statusCode, result.headers, result.body, result.netErr)
 		// 判定原因可能携带上游回显的渠道密钥（进日志/落库/管理端），出口前脱敏。
-		o.Reason = outcome.SanitizeKeyLeak(o.Reason, ch.APIKeys)
+		o.Reason = outcome.SanitizeKeyLeak(o.Reason, []string{apiKey})
 
 		// 仅 Responses 端点：上游 404（渠道可能不支持 /v1/responses）当作可重试的软排除，
 		// 换同组其他渠道尝试；错误语义先解析脱敏并记住，failover 耗尽后按 404 原状态码
 		// 语义重建渲染（见循环末）。chat 的 404 仍归 verdictClientError（一次性终止不重试）。
 		if info.Endpoint == adaptor.EndpointResponses && result.statusCode == http.StatusNotFound && o.Verdict == outcome.ClientError {
 			up := errfmt.ParseUpstream(result.statusCode, result.body)
-			up.Message = outcome.SanitizeKeyLeak(up.Message, ch.APIKeys)
+			up.Message = outcome.SanitizeKeyLeak(up.Message, []string{apiKey})
 			responsesNotFound = &up
 			o.Verdict = outcome.Transient
 			o.Reason = "responses 端点上游 404（渠道可能不支持），换渠道重试"
 		}
 		switch o.Verdict {
 		case outcome.Success:
-			p.registry.MarkRecovered(ch.ID)
+			p.registry.MarkRecovered(ch.KeyID)
 			// 零计费端点（countTokens 类）：usage 归零、不写 usage_log；
 			// failover/outcome/透传语义与常规端点完全一致。
 			if !opts.zeroBilling {
@@ -380,38 +380,38 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			return
 
 		case outcome.RateLimited:
-			// 仅本次请求内硬排除换渠道重试；不设冷却状态，下次请求照常调度。
-			p.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
-			hardExclude = append(hardExclude, ch.ID)
+			// 仅本次请求内硬排除换 key 重试；不设冷却状态，下次请求照常调度。
+			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			hardExclude = append(hardExclude, ch.KeyID)
 			summary.rateLimited = true
 			summary.observeRetryAfter(o.RetryAfter)
 			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "rateLimited", o.Reason, o.RetryAfter.Milliseconds(), attemptLatency, false))
 			if p.errSink != nil {
-				p.errSink.CountFailure(context.Background(), ch.ID, "rateLimited", "")
+				p.errSink.CountFailure(context.Background(), ch.ChannelID, "rateLimited", "")
 			}
-			slog.Warn("relay_channel_rate_limited",
-				"channel_id", ch.ID, "model", req.Model, "retry_after", o.RetryAfter.String())
+			slog.Warn("relay_channel_key_rate_limited",
+				"channel_key_id", ch.KeyID, "model", req.Model, "retry_after", o.RetryAfter.String())
 			continue
 
 		case outcome.AuthFailed:
-			p.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
+			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
 			if settings.AutoBanEnabled {
-				p.registry.MarkAutoDisabled(ch.ID, outcome.TruncateErrorMsg(o.Reason))
+				p.registry.MarkAutoDisabled(ch.KeyID, outcome.TruncateErrorMsg(o.Reason))
 			}
-			hardExclude = append(hardExclude, ch.ID)
+			hardExclude = append(hardExclude, ch.KeyID)
 			summary.authFailed = true
 			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "authFailed", o.Reason, 0, attemptLatency, settings.AutoBanEnabled))
 			if p.errSink != nil {
-				p.errSink.CountFailure(context.Background(), ch.ID, "authFailed", "")
+				p.errSink.CountFailure(context.Background(), ch.ChannelID, "authFailed", "")
 			}
-			slog.Warn("relay_channel_auth_failed",
-				"channel_id", ch.ID, "model", req.Model,
+			slog.Warn("relay_channel_key_auth_failed",
+				"channel_key_id", ch.KeyID, "model", req.Model,
 				"auto_ban", settings.AutoBanEnabled, "reason", o.Reason)
 			continue
 
 		case outcome.Transient:
-			p.rpm.DecrementChannelRPM(context.Background(), ch.ID, rpmMinute)
-			softExclude = append(softExclude, ch.ID)
+			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			softExclude = append(softExclude, ch.KeyID)
 			summary.transient = true
 			verdictName := "transient"
 			if result.netErr != nil {
@@ -419,10 +419,10 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			}
 			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, verdictName, o.Reason, 0, attemptLatency, false))
 			if p.errSink != nil {
-				p.errSink.CountFailure(context.Background(), ch.ID, verdictName, "")
+				p.errSink.CountFailure(context.Background(), ch.ChannelID, verdictName, "")
 			}
-			slog.Warn("relay_channel_transient_failure",
-				"channel_id", ch.ID, "model", req.Model, "reason", o.Reason)
+			slog.Warn("relay_channel_key_transient_failure",
+				"channel_key_id", ch.KeyID, "model", req.Model, "reason", o.Reason)
 			continue
 
 		default: // verdictClientError：语义重建终止，不重试；带 usage 仍计费（零计费端点除外）。
@@ -434,7 +434,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			// 渲染（HTTP 状态码保留上游原值）；message 可能回显凭证，先做精确 key 替换。
 			// 原始响应体不透传，仅经 o.Reason 片段进失败留痕。
 			up := errfmt.ParseUpstream(result.statusCode, result.body)
-			up.Message = outcome.SanitizeKeyLeak(up.Message, ch.APIKeys)
+			up.Message = outcome.SanitizeKeyLeak(up.Message, []string{apiKey})
 			writeUpstreamError(c, result.statusCode, up)
 			// clientError 多为调用方参数问题，不计入渠道错误率（防脏渠道健康信号）。
 			hop := attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "clientError", o.Reason, 0, attemptLatency, false)
@@ -442,7 +442,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				Phase: errlog.PhaseUpstreamClientError, StatusCode: result.statusCode,
 				Message: o.Reason, Billed: billed,
 				Attempts: attempts, Chain: append(hops, hop),
-				ChannelID: ch.ID, ChannelName: ch.Name,
+				ChannelID: ch.ChannelID, ChannelName: ch.ChannelName,
 			})
 			return
 		}
@@ -474,11 +474,12 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 
 // attemptHop 构造重试链一跳（reason 已由调用方 sanitizeKeyLeak 脱敏，
 // errlog sink 端还会再过通用凭证正则与截断）。
-func attemptHop(seq int, ch *registry.ChannelSnapshot, apiKey string, upstreamStatus int, verdict, reason string, retryAfterMs, latencyMs int64, autoDisabled bool) errlog.AttemptHop {
+func attemptHop(seq int, ch *registry.ChannelKeySnapshot, apiKey string, upstreamStatus int, verdict, reason string, retryAfterMs, latencyMs int64, autoDisabled bool) errlog.AttemptHop {
 	return errlog.AttemptHop{
 		Seq:          seq,
-		ChannelID:    ch.ID,
-		ChannelName:  ch.Name,
+		ChannelID:    ch.ChannelID,
+		ChannelName:  ch.ChannelName,
+		KeyID:        ch.KeyID,
 		KeyHint:      outcome.KeyHint(apiKey),
 		UpstreamStat: upstreamStatus,
 		Verdict:      verdict,
@@ -524,11 +525,11 @@ func channelSlotTTL(stream bool) time.Duration {
 
 // executeAttempt 执行单次上游调用，并保证渠道并发槽/RPM 在 panic 时也正确回收：
 // 槽位恒经 defer 释放；panic 时回退 RPM 预递增后继续向上抛（由 Recovery 中间件转 500）。
-func (p *Pipeline) executeAttempt(c *gin.Context, ad adaptor.Adaptor, info *adaptor.RelayInfo, req *dto.ChatRequest, start time.Time, channelID int, requestID string, rpmMinute int64) attemptResult {
+func (p *Pipeline) executeAttempt(c *gin.Context, ad adaptor.Adaptor, info *adaptor.RelayInfo, req *dto.ChatRequest, start time.Time, channelKeyID int, requestID string, rpmMinute int64) attemptResult {
 	defer func() {
-		p.concurrency.ReleaseChannelSlot(context.Background(), channelID, requestID)
+		p.concurrency.ReleaseKeySlot(context.Background(), channelKeyID, requestID)
 		if rec := recover(); rec != nil {
-			p.rpm.DecrementChannelRPM(context.Background(), channelID, rpmMinute)
+			p.rpm.DecrementKeyRPM(context.Background(), channelKeyID, rpmMinute)
 			panic(rec)
 		}
 	}()
@@ -657,7 +658,7 @@ func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.Rel
 			return result
 		}
 		slog.Warn("relay_stream_content_type_mismatch",
-			"channel_id", info.Channel.ID, "model", info.RequestModel,
+			"channel_key_id", info.ChannelKey.KeyID, "model", info.RequestModel,
 			"content_type", result.contentType)
 	}
 
@@ -685,7 +686,7 @@ func isSSEContentType(contentType string) bool {
 // recordUsage 计费收尾：ComputeCosts → Calculate 三管道 → UsageRecord 落账。
 // price 为转发前缺价预检解析的快照（每请求解析一次，不二次 Get，
 // 避免请求期间缓存失效把已定价请求静默记 0）；缺价请求在预检已被拒绝，进不到这里。
-func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *registry.ChannelSnapshot, req *dto.ChatRequest, result attemptResult, start time.Time, price pricing.Price) {
+func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *registry.ChannelKeySnapshot, req *dto.ChatRequest, result attemptResult, start time.Time, price pricing.Price) {
 	if p.sink == nil {
 		return
 	}
@@ -732,7 +733,8 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		UserID:                keyInfo.UserID,
 		UserEmail:             keyInfo.UserEmail,
 		APIKeyID:              keyInfo.KeyID,
-		ChannelID:             ch.ID,
+		ChannelID:             ch.ChannelID,
+		ChannelKeyID:          ch.KeyID,
 		GroupID:               keyInfo.GroupID,
 		Model:                 req.Model,
 		InputTokens:           inputTokens,
@@ -874,8 +876,8 @@ func serviceTierOf(req *dto.ChatRequest) string {
 	return tier
 }
 
-// upstreamModel 经渠道 model_mapping 解析上游模型名；无映射用对外名。
-func upstreamModel(ch *registry.ChannelSnapshot, model string) string {
+// upstreamModel 经 key 的 model_mapping 解析上游模型名；无映射用对外名。
+func upstreamModel(ch *registry.ChannelKeySnapshot, model string) string {
 	if mapped, ok := ch.ModelMapping[model]; ok && mapped != "" {
 		return mapped
 	}

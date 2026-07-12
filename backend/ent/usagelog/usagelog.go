@@ -90,6 +90,8 @@ const (
 	FieldAPIKeyID = "api_key_usage_logs"
 	// FieldChannelID holds the string denoting the channel_id field in the database.
 	FieldChannelID = "channel_usage_logs"
+	// FieldChannelKeyID holds the string denoting the channel_key_id field in the database.
+	FieldChannelKeyID = "channel_key_usage_logs"
 	// FieldGroupID holds the string denoting the group_id field in the database.
 	FieldGroupID = "group_usage_logs"
 	// EdgeUser holds the string denoting the user edge name in mutations.
@@ -98,6 +100,8 @@ const (
 	EdgeAPIKey = "api_key"
 	// EdgeChannel holds the string denoting the channel edge name in mutations.
 	EdgeChannel = "channel"
+	// EdgeChannelKey holds the string denoting the channel_key edge name in mutations.
+	EdgeChannelKey = "channel_key"
 	// EdgeGroup holds the string denoting the group edge name in mutations.
 	EdgeGroup = "group"
 	// Table holds the table name of the usagelog in the database.
@@ -123,6 +127,13 @@ const (
 	ChannelInverseTable = "channels"
 	// ChannelColumn is the table column denoting the channel relation/edge.
 	ChannelColumn = "channel_usage_logs"
+	// ChannelKeyTable is the table that holds the channel_key relation/edge.
+	ChannelKeyTable = "usage_logs"
+	// ChannelKeyInverseTable is the table name for the ChannelKey entity.
+	// It exists in this package in order to avoid circular dependency with the "channelkey" package.
+	ChannelKeyInverseTable = "channel_keys"
+	// ChannelKeyColumn is the table column denoting the channel_key relation/edge.
+	ChannelKeyColumn = "channel_key_usage_logs"
 	// GroupTable is the table that holds the group relation/edge.
 	GroupTable = "usage_logs"
 	// GroupInverseTable is the table name for the Group entity.
@@ -173,6 +184,7 @@ var Columns = []string{
 	FieldUserID,
 	FieldAPIKeyID,
 	FieldChannelID,
+	FieldChannelKeyID,
 	FieldGroupID,
 }
 
@@ -457,6 +469,11 @@ func ByChannelID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldChannelID, opts...).ToFunc()
 }
 
+// ByChannelKeyID orders the results by the channel_key_id field.
+func ByChannelKeyID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldChannelKeyID, opts...).ToFunc()
+}
+
 // ByGroupID orders the results by the group_id field.
 func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
@@ -480,6 +497,13 @@ func ByAPIKeyField(field string, opts ...sql.OrderTermOption) OrderOption {
 func ByChannelField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newChannelStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByChannelKeyField orders the results by channel_key field.
+func ByChannelKeyField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newChannelKeyStep(), sql.OrderByField(field, opts...))
 	}
 }
 
@@ -508,6 +532,13 @@ func newChannelStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ChannelInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, ChannelTable, ChannelColumn),
+	)
+}
+func newChannelKeyStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ChannelKeyInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ChannelKeyTable, ChannelKeyColumn),
 	)
 }
 func newGroupStep() *sqlgraph.Step {

@@ -19,37 +19,30 @@ type channelTester struct {
 	secret string
 }
 
-// Test 实现 appchannel.Tester。endpoint 仅对 openai 协议渠道生效（空值默认 chat completions）。
-func (t *channelTester) Test(ctx context.Context, ch appchannel.Channel, model, endpoint string) (int, error) {
-	keys := make([]string, 0, len(ch.APIKeys))
-	for _, encrypted := range ch.APIKeys {
-		plain, err := auth.DecryptAPIKey(encrypted, t.secret)
-		if err != nil {
-			continue
-		}
-		keys = append(keys, plain)
-	}
-	if len(keys) == 0 {
-		return 0, errors.New("渠道无可解密的 API Key")
+// Test 实现 appchannel.Tester。endpoint 仅对 openai 协议 key 生效（空值默认 chat completions）。
+func (t *channelTester) Test(ctx context.Context, key appchannel.ChannelKey, model, endpoint string) (int, error) {
+	plain, err := auth.DecryptAPIKey(key.APIKey, t.secret)
+	if err != nil {
+		return 0, errors.New("密钥端点无可解密的 API Key")
 	}
 
-	models := make(map[string]struct{}, len(ch.Models))
-	for _, m := range ch.Models {
+	models := make(map[string]struct{}, len(key.Models))
+	for _, m := range key.Models {
 		models[m] = struct{}{}
 	}
-	snap := &registry.ChannelSnapshot{
-		ID:             ch.ID,
-		Name:           ch.Name,
-		Type:           ch.Type,
-		BaseURL:        ch.BaseURL,
-		APIKeys:        keys,
+	snap := &registry.ChannelKeySnapshot{
+		KeyID:          key.ID,
+		ChannelID:      key.ChannelID,
+		BaseURL:        key.BaseURL,
+		Type:           key.Type,
+		APIKey:         plain,
 		Models:         models,
-		ModelMapping:   ch.ModelMapping,
-		ParamOverride:  ch.ParamOverride,
-		HeaderOverride: ch.HeaderOverride,
-		CostRatio:      ch.CostRatio,
-		Status:         ch.Status,
-		TestModel:      ch.TestModel,
+		ModelMapping:   key.ModelMapping,
+		ParamOverride:  key.ParamOverride,
+		HeaderOverride: key.HeaderOverride,
+		CostRatio:      key.CostRatio,
+		Status:         key.Status,
+		TestModel:      key.TestModel,
 	}
 	return t.pipe.TestChannel(ctx, snap, model, endpoint)
 }

@@ -21,6 +21,9 @@ type BalanceLog func(*sql.Selector)
 // Channel is the predicate function for channel builders.
 type Channel func(*sql.Selector)
 
+// ChannelKey is the predicate function for channelkey builders.
+type ChannelKey func(*sql.Selector)
+
 // Group is the predicate function for group builders.
 type Group func(*sql.Selector)
 

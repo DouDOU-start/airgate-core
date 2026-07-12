@@ -49,7 +49,8 @@ func (s *TaskStore) Insert(ctx context.Context, t *relaytask.Task) (int, error) 
 		SetUserEmailSnapshot(t.UserEmail).
 		SetAPIKeyID(t.APIKeyID).
 		SetGroupID(t.GroupID).
-		SetChannelID(t.ChannelID)
+		SetChannelID(t.ChannelID).
+		SetChannelKeyID(t.ChannelKeyID)
 	if len(t.Data) > 0 {
 		create.SetData(t.Data)
 	}
@@ -185,6 +186,7 @@ func mapTask(item *ent.Task) *relaytask.Task {
 		APIKeyID:              item.APIKeyID,
 		GroupID:               item.GroupID,
 		ChannelID:             item.ChannelID,
+		ChannelKeyID:          item.ChannelKeyID,
 		CreatedAt:             item.CreatedAt,
 		UpdatedAt:             item.UpdatedAt,
 	}

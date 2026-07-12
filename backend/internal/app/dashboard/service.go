@@ -159,7 +159,7 @@ func (s *Service) Trend(ctx context.Context, query TrendQuery) (Trend, error) {
 }
 
 func (s *Service) loadTrendFresh(ctx context.Context, query TrendQuery, loc *time.Location, startTime, endTime time.Time) (Trend, error) {
-	logs, err := s.repo.ListTrendLogs(ctx, startTime, endTime, query.UserID, query.ChannelID)
+	logs, err := s.repo.ListTrendLogs(ctx, startTime, endTime, query.UserID, query.ChannelID, query.ChannelKeyID)
 	if err != nil {
 		return Trend{}, err
 	}
@@ -175,12 +175,13 @@ func (s *Service) loadTrendFresh(ctx context.Context, query TrendQuery, loc *tim
 
 func trendCacheKey(query TrendQuery, loc *time.Location, startTime, endTime time.Time) string {
 	const trendBucketSeconds = 15
-	return fmt.Sprintf("%s:%s:%s:%d:%d:%d:%d:%d:%s:%s:%s",
+	return fmt.Sprintf("%s:%s:%s:%d:%d:%d:%d:%d:%d:%s:%s:%s",
 		trendCacheV1Key,
 		loc.String(),
 		query.Range,
 		query.UserID,
 		query.ChannelID,
+		query.ChannelKeyID,
 		startTime.UTC().Unix(),
 		endTime.UTC().Unix()/trendBucketSeconds,
 		trendBucketSeconds,

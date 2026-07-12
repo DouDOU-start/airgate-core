@@ -73,11 +73,12 @@ type Task struct {
 	FinishTime *time.Time
 	RequestID  string
 
-	UserID    int
-	UserEmail string
-	APIKeyID  int
-	GroupID   int
-	ChannelID int
+	UserID       int
+	UserEmail    string
+	APIKeyID     int
+	GroupID      int
+	ChannelID    int
+	ChannelKeyID int
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

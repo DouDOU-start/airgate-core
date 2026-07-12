@@ -257,9 +257,9 @@ func (f *fakeErrSink) Record(e errlog.Entry) {
 func (f *fakeErrSink) CountFailure(context.Context, int, string, string) {}
 
 // fakeChannelLoader / fakePriceLoader 与 pipeline 测试同构。
-type fakeChannelLoader struct{ snaps []registry.ChannelSnapshot }
+type fakeChannelLoader struct{ snaps []registry.ChannelKeySnapshot }
 
-func (f *fakeChannelLoader) LoadAllForRegistry(context.Context) ([]registry.ChannelSnapshot, error) {
+func (f *fakeChannelLoader) LoadAllForRegistry(context.Context) ([]registry.ChannelKeySnapshot, error) {
 	return f.snaps, nil
 }
 
@@ -297,7 +297,7 @@ type testEnv struct {
 	registry *registry.Registry
 }
 
-func newTestEnv(t *testing.T, snaps ...registry.ChannelSnapshot) *testEnv {
+func newTestEnv(t *testing.T, snaps ...registry.ChannelKeySnapshot) *testEnv {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -346,13 +346,14 @@ func newTestEnv(t *testing.T, snaps ...registry.ChannelSnapshot) *testEnv {
 }
 
 // videoSnap 构造视频渠道快照。
-func videoSnap(id int, baseURL string, mutate ...func(*registry.ChannelSnapshot)) registry.ChannelSnapshot {
-	s := registry.ChannelSnapshot{
-		ID:      id,
-		Name:    fmt.Sprintf("vch-%d", id),
-		Type:    "openai_video",
-		BaseURL: baseURL,
-		APIKeys: []string{fmt.Sprintf("sk-video-%d", id)},
+func videoSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapshot)) registry.ChannelKeySnapshot {
+	s := registry.ChannelKeySnapshot{
+		KeyID:       id,
+		ChannelID:   id,
+		ChannelName: fmt.Sprintf("vch-%d", id),
+		Type:        "openai_video",
+		BaseURL:     baseURL,
+		APIKey:      fmt.Sprintf("sk-video-%d", id),
 		Models: map[string]struct{}{
 			videoModel: {}, videoFlatModel: {},
 		},
@@ -368,13 +369,14 @@ func videoSnap(id int, baseURL string, mutate ...func(*registry.ChannelSnapshot)
 }
 
 // sunoSnap 构造 suno 渠道快照。
-func sunoSnap(id int, baseURL string) registry.ChannelSnapshot {
-	return registry.ChannelSnapshot{
-		ID:      id,
-		Name:    fmt.Sprintf("sch-%d", id),
-		Type:    "suno",
-		BaseURL: baseURL,
-		APIKeys: []string{fmt.Sprintf("sk-suno-%d", id)},
+func sunoSnap(id int, baseURL string) registry.ChannelKeySnapshot {
+	return registry.ChannelKeySnapshot{
+		KeyID:       id,
+		ChannelID:   id,
+		ChannelName: fmt.Sprintf("sch-%d", id),
+		Type:        "suno",
+		BaseURL:     baseURL,
+		APIKey:      fmt.Sprintf("sk-suno-%d", id),
 		Models: map[string]struct{}{
 			"suno_music": {}, "suno_lyrics": {},
 		},
@@ -404,7 +406,7 @@ func TestVideoSubmitSuccess(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	env := newTestEnv(t, videoSnap(1, upstream.URL, func(s *registry.ChannelSnapshot) {
+	env := newTestEnv(t, videoSnap(1, upstream.URL, func(s *registry.ChannelKeySnapshot) {
 		s.ModelMapping = map[string]string{videoModel: "sora-2-upstream"}
 	}))
 	w := doJSON(t, env.engine, http.MethodPost, "/v1/videos", `{"model":"sora-2","prompt":"a cat","seconds":8}`)
@@ -459,7 +461,7 @@ func TestVideoSubmitInsufficientBalance(t *testing.T) {
 }
 
 func TestVideoSubmitNoTaskPriceRejected(t *testing.T) {
-	env := newTestEnv(t, videoSnap(1, "http://127.0.0.1:1", func(s *registry.ChannelSnapshot) {
+	env := newTestEnv(t, videoSnap(1, "http://127.0.0.1:1", func(s *registry.ChannelKeySnapshot) {
 		s.Models["token-model"] = struct{}{}
 	}))
 	w := doJSON(t, env.engine, http.MethodPost, "/v1/videos", `{"model":"token-model"}`)
@@ -487,7 +489,7 @@ func TestVideoSubmitFailoverOn429(t *testing.T) {
 
 	// bad 渠道更高优先级，先被选中。
 	env := newTestEnv(t,
-		videoSnap(1, bad.URL, func(s *registry.ChannelSnapshot) { s.Priority = 90 }),
+		videoSnap(1, bad.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 90 }),
 		videoSnap(2, good.URL),
 	)
 	w := doJSON(t, env.engine, http.MethodPost, "/v1/videos", `{"model":"sora-2","seconds":4}`)

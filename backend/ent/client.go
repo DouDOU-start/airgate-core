@@ -20,6 +20,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
 	"github.com/DouDOU-start/airgate-core/ent/modeltag"
@@ -50,6 +51,8 @@ type Client struct {
 	BalanceLog *BalanceLogClient
 	// Channel is the client for interacting with the Channel builders.
 	Channel *ChannelClient
+	// ChannelKey is the client for interacting with the ChannelKey builders.
+	ChannelKey *ChannelKeyClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
 	// ModelPrice is the client for interacting with the ModelPrice builders.
@@ -92,6 +95,7 @@ func (c *Client) init() {
 	c.AnnouncementRead = NewAnnouncementReadClient(c.config)
 	c.BalanceLog = NewBalanceLogClient(c.config)
 	c.Channel = NewChannelClient(c.config)
+	c.ChannelKey = NewChannelKeyClient(c.config)
 	c.Group = NewGroupClient(c.config)
 	c.ModelPrice = NewModelPriceClient(c.config)
 	c.ModelTag = NewModelTagClient(c.config)
@@ -202,6 +206,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		AnnouncementRead:      NewAnnouncementReadClient(cfg),
 		BalanceLog:            NewBalanceLogClient(cfg),
 		Channel:               NewChannelClient(cfg),
+		ChannelKey:            NewChannelKeyClient(cfg),
 		Group:                 NewGroupClient(cfg),
 		ModelPrice:            NewModelPriceClient(cfg),
 		ModelTag:              NewModelTagClient(cfg),
@@ -239,6 +244,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		AnnouncementRead:      NewAnnouncementReadClient(cfg),
 		BalanceLog:            NewBalanceLogClient(cfg),
 		Channel:               NewChannelClient(cfg),
+		ChannelKey:            NewChannelKeyClient(cfg),
 		Group:                 NewGroupClient(cfg),
 		ModelPrice:            NewModelPriceClient(cfg),
 		ModelTag:              NewModelTagClient(cfg),
@@ -281,8 +287,8 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel, c.Group,
-		c.ModelPrice, c.ModelTag, c.OAuthClient, c.PaymentOrder,
+		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel,
+		c.ChannelKey, c.Group, c.ModelPrice, c.ModelTag, c.OAuthClient, c.PaymentOrder,
 		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task, c.Tier,
 		c.UpstreamRequestLog, c.UsageLog, c.User,
 	} {
@@ -294,8 +300,8 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel, c.Group,
-		c.ModelPrice, c.ModelTag, c.OAuthClient, c.PaymentOrder,
+		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel,
+		c.ChannelKey, c.Group, c.ModelPrice, c.ModelTag, c.OAuthClient, c.PaymentOrder,
 		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task, c.Tier,
 		c.UpstreamRequestLog, c.UsageLog, c.User,
 	} {
@@ -316,6 +322,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.BalanceLog.mutate(ctx, m)
 	case *ChannelMutation:
 		return c.Channel.mutate(ctx, m)
+	case *ChannelKeyMutation:
+		return c.ChannelKey.mutate(ctx, m)
 	case *GroupMutation:
 		return c.Group.mutate(ctx, m)
 	case *ModelPriceMutation:
@@ -1051,15 +1059,15 @@ func (c *ChannelClient) GetX(ctx context.Context, id int) *Channel {
 	return obj
 }
 
-// QueryGroups queries the groups edge of a Channel.
-func (c *ChannelClient) QueryGroups(ch *Channel) *GroupQuery {
-	query := (&GroupClient{config: c.config}).Query()
+// QueryKeys queries the keys edge of a Channel.
+func (c *ChannelClient) QueryKeys(ch *Channel) *ChannelKeyQuery {
+	query := (&ChannelKeyClient{config: c.config}).Query()
 	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
 		id := ch.ID
 		step := sqlgraph.NewStep(
 			sqlgraph.From(channel.Table, channel.FieldID, id),
-			sqlgraph.To(group.Table, group.FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, false, channel.GroupsTable, channel.GroupsPrimaryKey...),
+			sqlgraph.To(channelkey.Table, channelkey.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, channel.KeysTable, channel.KeysColumn),
 		)
 		fromV = sqlgraph.Neighbors(ch.driver.Dialect(), step)
 		return fromV, nil
@@ -1105,6 +1113,187 @@ func (c *ChannelClient) mutate(ctx context.Context, m *ChannelMutation) (Value, 
 		return (&ChannelDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Channel mutation op: %q", m.Op())
+	}
+}
+
+// ChannelKeyClient is a client for the ChannelKey schema.
+type ChannelKeyClient struct {
+	config
+}
+
+// NewChannelKeyClient returns a client for the ChannelKey from the given config.
+func NewChannelKeyClient(c config) *ChannelKeyClient {
+	return &ChannelKeyClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `channelkey.Hooks(f(g(h())))`.
+func (c *ChannelKeyClient) Use(hooks ...Hook) {
+	c.hooks.ChannelKey = append(c.hooks.ChannelKey, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `channelkey.Intercept(f(g(h())))`.
+func (c *ChannelKeyClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ChannelKey = append(c.inters.ChannelKey, interceptors...)
+}
+
+// Create returns a builder for creating a ChannelKey entity.
+func (c *ChannelKeyClient) Create() *ChannelKeyCreate {
+	mutation := newChannelKeyMutation(c.config, OpCreate)
+	return &ChannelKeyCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ChannelKey entities.
+func (c *ChannelKeyClient) CreateBulk(builders ...*ChannelKeyCreate) *ChannelKeyCreateBulk {
+	return &ChannelKeyCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ChannelKeyClient) MapCreateBulk(slice any, setFunc func(*ChannelKeyCreate, int)) *ChannelKeyCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ChannelKeyCreateBulk{err: fmt.Errorf("calling to ChannelKeyClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ChannelKeyCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ChannelKeyCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ChannelKey.
+func (c *ChannelKeyClient) Update() *ChannelKeyUpdate {
+	mutation := newChannelKeyMutation(c.config, OpUpdate)
+	return &ChannelKeyUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ChannelKeyClient) UpdateOne(ck *ChannelKey) *ChannelKeyUpdateOne {
+	mutation := newChannelKeyMutation(c.config, OpUpdateOne, withChannelKey(ck))
+	return &ChannelKeyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ChannelKeyClient) UpdateOneID(id int) *ChannelKeyUpdateOne {
+	mutation := newChannelKeyMutation(c.config, OpUpdateOne, withChannelKeyID(id))
+	return &ChannelKeyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ChannelKey.
+func (c *ChannelKeyClient) Delete() *ChannelKeyDelete {
+	mutation := newChannelKeyMutation(c.config, OpDelete)
+	return &ChannelKeyDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ChannelKeyClient) DeleteOne(ck *ChannelKey) *ChannelKeyDeleteOne {
+	return c.DeleteOneID(ck.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ChannelKeyClient) DeleteOneID(id int) *ChannelKeyDeleteOne {
+	builder := c.Delete().Where(channelkey.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ChannelKeyDeleteOne{builder}
+}
+
+// Query returns a query builder for ChannelKey.
+func (c *ChannelKeyClient) Query() *ChannelKeyQuery {
+	return &ChannelKeyQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeChannelKey},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ChannelKey entity by its id.
+func (c *ChannelKeyClient) Get(ctx context.Context, id int) (*ChannelKey, error) {
+	return c.Query().Where(channelkey.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ChannelKeyClient) GetX(ctx context.Context, id int) *ChannelKey {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryChannel queries the channel edge of a ChannelKey.
+func (c *ChannelKeyClient) QueryChannel(ck *ChannelKey) *ChannelQuery {
+	query := (&ChannelClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ck.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(channelkey.Table, channelkey.FieldID, id),
+			sqlgraph.To(channel.Table, channel.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, channelkey.ChannelTable, channelkey.ChannelColumn),
+		)
+		fromV = sqlgraph.Neighbors(ck.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryGroups queries the groups edge of a ChannelKey.
+func (c *ChannelKeyClient) QueryGroups(ck *ChannelKey) *GroupQuery {
+	query := (&GroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ck.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(channelkey.Table, channelkey.FieldID, id),
+			sqlgraph.To(group.Table, group.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, channelkey.GroupsTable, channelkey.GroupsPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(ck.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUsageLogs queries the usage_logs edge of a ChannelKey.
+func (c *ChannelKeyClient) QueryUsageLogs(ck *ChannelKey) *UsageLogQuery {
+	query := (&UsageLogClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ck.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(channelkey.Table, channelkey.FieldID, id),
+			sqlgraph.To(usagelog.Table, usagelog.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, channelkey.UsageLogsTable, channelkey.UsageLogsColumn),
+		)
+		fromV = sqlgraph.Neighbors(ck.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ChannelKeyClient) Hooks() []Hook {
+	return c.hooks.ChannelKey
+}
+
+// Interceptors returns the client interceptors.
+func (c *ChannelKeyClient) Interceptors() []Interceptor {
+	return c.inters.ChannelKey
+}
+
+func (c *ChannelKeyClient) mutate(ctx context.Context, m *ChannelKeyMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ChannelKeyCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ChannelKeyUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ChannelKeyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ChannelKeyDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ChannelKey mutation op: %q", m.Op())
 	}
 }
 
@@ -1216,15 +1405,15 @@ func (c *GroupClient) GetX(ctx context.Context, id int) *Group {
 	return obj
 }
 
-// QueryChannels queries the channels edge of a Group.
-func (c *GroupClient) QueryChannels(gr *Group) *ChannelQuery {
-	query := (&ChannelClient{config: c.config}).Query()
+// QueryChannelKeys queries the channel_keys edge of a Group.
+func (c *GroupClient) QueryChannelKeys(gr *Group) *ChannelKeyQuery {
+	query := (&ChannelKeyClient{config: c.config}).Query()
 	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
 		id := gr.ID
 		step := sqlgraph.NewStep(
 			sqlgraph.From(group.Table, group.FieldID, id),
-			sqlgraph.To(channel.Table, channel.FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, true, group.ChannelsTable, group.ChannelsPrimaryKey...),
+			sqlgraph.To(channelkey.Table, channelkey.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, group.ChannelKeysTable, group.ChannelKeysPrimaryKey...),
 		)
 		fromV = sqlgraph.Neighbors(gr.driver.Dialect(), step)
 		return fromV, nil
@@ -2839,6 +3028,22 @@ func (c *UsageLogClient) QueryChannel(ul *UsageLog) *ChannelQuery {
 	return query
 }
 
+// QueryChannelKey queries the channel_key edge of a UsageLog.
+func (c *UsageLogClient) QueryChannelKey(ul *UsageLog) *ChannelKeyQuery {
+	query := (&ChannelKeyClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ul.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(usagelog.Table, usagelog.FieldID, id),
+			sqlgraph.To(channelkey.Table, channelkey.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, usagelog.ChannelKeyTable, usagelog.ChannelKeyColumn),
+		)
+		fromV = sqlgraph.Neighbors(ul.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryGroup queries the group edge of a UsageLog.
 func (c *UsageLogClient) QueryGroup(ul *UsageLog) *GroupQuery {
 	query := (&GroupClient{config: c.config}).Query()
@@ -3096,13 +3301,15 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, Group, ModelPrice,
-		ModelTag, OAuthClient, PaymentOrder, PaymentProviderConfig, RedemptionCode,
-		Setting, Task, Tier, UpstreamRequestLog, UsageLog, User []ent.Hook
+		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, ChannelKey, Group,
+		ModelPrice, ModelTag, OAuthClient, PaymentOrder, PaymentProviderConfig,
+		RedemptionCode, Setting, Task, Tier, UpstreamRequestLog, UsageLog,
+		User []ent.Hook
 	}
 	inters struct {
-		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, Group, ModelPrice,
-		ModelTag, OAuthClient, PaymentOrder, PaymentProviderConfig, RedemptionCode,
-		Setting, Task, Tier, UpstreamRequestLog, UsageLog, User []ent.Interceptor
+		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, ChannelKey, Group,
+		ModelPrice, ModelTag, OAuthClient, PaymentOrder, PaymentProviderConfig,
+		RedemptionCode, Setting, Task, Tier, UpstreamRequestLog, UsageLog,
+		User []ent.Interceptor
 	}
 )

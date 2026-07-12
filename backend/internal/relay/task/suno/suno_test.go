@@ -12,8 +12,8 @@ import (
 
 func testInfo() *task.Info {
 	return &task.Info{
-		Channel: &registry.ChannelSnapshot{
-			ID: 1, Type: "suno", BaseURL: "https://up.example.com",
+		ChannelKey: &registry.ChannelKeySnapshot{
+			KeyID: 1, Type: "suno", BaseURL: "https://up.example.com",
 		},
 		APIKey: "sk-up",
 	}

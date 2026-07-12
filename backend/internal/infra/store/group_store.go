@@ -7,6 +7,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
 	entchannel "github.com/DouDOU-start/airgate-core/ent/channel"
+	entchannelkey "github.com/DouDOU-start/airgate-core/ent/channelkey"
 	entgroup "github.com/DouDOU-start/airgate-core/ent/group"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
@@ -155,10 +156,10 @@ func (s *GroupStore) Delete(ctx context.Context, id int) error {
 		return err
 	}
 
-	// 渠道绑定守卫：channel_groups 对 group_id 是 ON DELETE CASCADE，
-	// 直接删除会静默解绑，使专属渠道变成公共渠道（对所有分组可调度）。
+	// 渠道绑定守卫：分组与密钥端点的关联对 group_id 是 ON DELETE CASCADE，
+	// 直接删除会静默解绑，使专属 key 变成公共 key（对所有分组可调度）。
 	channelCount, err := tx.Channel.Query().
-		Where(entchannel.HasGroupsWith(entgroup.IDEQ(id))).
+		Where(entchannel.HasKeysWith(entchannelkey.HasGroupsWith(entgroup.IDEQ(id)))).
 		Count(ctx)
 	if err != nil {
 		return err

@@ -81,6 +81,7 @@ func (UsageLog) Fields() []ent.Field {
 		field.Int("user_id").Optional().StorageKey("user_usage_logs"),
 		field.Int("api_key_id").Optional().StorageKey("api_key_usage_logs"),
 		field.Int("channel_id").Optional().StorageKey("channel_usage_logs"),
+		field.Int("channel_key_id").Optional().StorageKey("channel_key_usage_logs"),
 		field.Int("group_id").Optional().StorageKey("group_usage_logs"),
 	}
 }
@@ -92,6 +93,8 @@ func (UsageLog) Edges() []ent.Edge {
 		// channel FK 的 ON DELETE SET NULL 声明在 Channel 侧 assoc 边
 		//（ent 生成 FK 时只读 edge.To 的注解）；见 schema/channel.go。
 		edge.From("channel", Channel.Type).Ref("usage_logs").Unique().Field("channel_id"),
+		// channel_key FK 的 ON DELETE SET NULL 声明在 ChannelKey 侧 assoc 边。
+		edge.From("channel_key", ChannelKey.Type).Ref("usage_logs").Unique().Field("channel_key_id"),
 		edge.From("group", Group.Type).Ref("usage_logs").Unique().Field("group_id"),
 	}
 }
@@ -118,6 +121,8 @@ func (UsageLog) Indexes() []ent.Index {
 			StorageKey("usage_log_api_key_created_at"),
 		index.Fields("channel_id", "created_at").
 			StorageKey("usage_log_channel_created_at"),
+		index.Fields("channel_key_id", "created_at").
+			StorageKey("usage_log_channel_key_created_at"),
 		index.Fields("group_id", "created_at").
 			StorageKey("usage_log_group_created_at"),
 		// request_id 互查：从失败留痕跳查计费行，无索引则大表全扫。

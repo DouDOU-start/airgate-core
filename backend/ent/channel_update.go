@@ -10,10 +10,9 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
-	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
-	"github.com/DouDOU-start/airgate-core/ent/group"
+	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 )
@@ -46,20 +45,6 @@ func (cu *ChannelUpdate) SetNillableName(s *string) *ChannelUpdate {
 	return cu
 }
 
-// SetType sets the "type" field.
-func (cu *ChannelUpdate) SetType(c channel.Type) *ChannelUpdate {
-	cu.mutation.SetType(c)
-	return cu
-}
-
-// SetNillableType sets the "type" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableType(c *channel.Type) *ChannelUpdate {
-	if c != nil {
-		cu.SetType(*c)
-	}
-	return cu
-}
-
 // SetBaseURL sets the "base_url" field.
 func (cu *ChannelUpdate) SetBaseURL(s string) *ChannelUpdate {
 	cu.mutation.SetBaseURL(s)
@@ -74,352 +59,25 @@ func (cu *ChannelUpdate) SetNillableBaseURL(s *string) *ChannelUpdate {
 	return cu
 }
 
-// SetAPIKeys sets the "api_keys" field.
-func (cu *ChannelUpdate) SetAPIKeys(s []string) *ChannelUpdate {
-	cu.mutation.SetAPIKeys(s)
-	return cu
-}
-
-// AppendAPIKeys appends s to the "api_keys" field.
-func (cu *ChannelUpdate) AppendAPIKeys(s []string) *ChannelUpdate {
-	cu.mutation.AppendAPIKeys(s)
-	return cu
-}
-
-// SetModels sets the "models" field.
-func (cu *ChannelUpdate) SetModels(s []string) *ChannelUpdate {
-	cu.mutation.SetModels(s)
-	return cu
-}
-
-// AppendModels appends s to the "models" field.
-func (cu *ChannelUpdate) AppendModels(s []string) *ChannelUpdate {
-	cu.mutation.AppendModels(s)
-	return cu
-}
-
-// SetModelMapping sets the "model_mapping" field.
-func (cu *ChannelUpdate) SetModelMapping(m map[string]string) *ChannelUpdate {
-	cu.mutation.SetModelMapping(m)
-	return cu
-}
-
-// ClearModelMapping clears the value of the "model_mapping" field.
-func (cu *ChannelUpdate) ClearModelMapping() *ChannelUpdate {
-	cu.mutation.ClearModelMapping()
-	return cu
-}
-
-// SetParamOverride sets the "param_override" field.
-func (cu *ChannelUpdate) SetParamOverride(m map[string]interface{}) *ChannelUpdate {
-	cu.mutation.SetParamOverride(m)
-	return cu
-}
-
-// ClearParamOverride clears the value of the "param_override" field.
-func (cu *ChannelUpdate) ClearParamOverride() *ChannelUpdate {
-	cu.mutation.ClearParamOverride()
-	return cu
-}
-
-// SetHeaderOverride sets the "header_override" field.
-func (cu *ChannelUpdate) SetHeaderOverride(m map[string]string) *ChannelUpdate {
-	cu.mutation.SetHeaderOverride(m)
-	return cu
-}
-
-// ClearHeaderOverride clears the value of the "header_override" field.
-func (cu *ChannelUpdate) ClearHeaderOverride() *ChannelUpdate {
-	cu.mutation.ClearHeaderOverride()
-	return cu
-}
-
-// SetStatus sets the "status" field.
-func (cu *ChannelUpdate) SetStatus(c channel.Status) *ChannelUpdate {
-	cu.mutation.SetStatus(c)
-	return cu
-}
-
-// SetNillableStatus sets the "status" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableStatus(c *channel.Status) *ChannelUpdate {
-	if c != nil {
-		cu.SetStatus(*c)
-	}
-	return cu
-}
-
-// SetErrorMsg sets the "error_msg" field.
-func (cu *ChannelUpdate) SetErrorMsg(s string) *ChannelUpdate {
-	cu.mutation.SetErrorMsg(s)
-	return cu
-}
-
-// SetNillableErrorMsg sets the "error_msg" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableErrorMsg(s *string) *ChannelUpdate {
-	if s != nil {
-		cu.SetErrorMsg(*s)
-	}
-	return cu
-}
-
-// SetPriority sets the "priority" field.
-func (cu *ChannelUpdate) SetPriority(i int) *ChannelUpdate {
-	cu.mutation.ResetPriority()
-	cu.mutation.SetPriority(i)
-	return cu
-}
-
-// SetNillablePriority sets the "priority" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillablePriority(i *int) *ChannelUpdate {
-	if i != nil {
-		cu.SetPriority(*i)
-	}
-	return cu
-}
-
-// AddPriority adds i to the "priority" field.
-func (cu *ChannelUpdate) AddPriority(i int) *ChannelUpdate {
-	cu.mutation.AddPriority(i)
-	return cu
-}
-
-// SetWeight sets the "weight" field.
-func (cu *ChannelUpdate) SetWeight(i int) *ChannelUpdate {
-	cu.mutation.ResetWeight()
-	cu.mutation.SetWeight(i)
-	return cu
-}
-
-// SetNillableWeight sets the "weight" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableWeight(i *int) *ChannelUpdate {
-	if i != nil {
-		cu.SetWeight(*i)
-	}
-	return cu
-}
-
-// AddWeight adds i to the "weight" field.
-func (cu *ChannelUpdate) AddWeight(i int) *ChannelUpdate {
-	cu.mutation.AddWeight(i)
-	return cu
-}
-
-// SetMaxConcurrency sets the "max_concurrency" field.
-func (cu *ChannelUpdate) SetMaxConcurrency(i int) *ChannelUpdate {
-	cu.mutation.ResetMaxConcurrency()
-	cu.mutation.SetMaxConcurrency(i)
-	return cu
-}
-
-// SetNillableMaxConcurrency sets the "max_concurrency" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableMaxConcurrency(i *int) *ChannelUpdate {
-	if i != nil {
-		cu.SetMaxConcurrency(*i)
-	}
-	return cu
-}
-
-// AddMaxConcurrency adds i to the "max_concurrency" field.
-func (cu *ChannelUpdate) AddMaxConcurrency(i int) *ChannelUpdate {
-	cu.mutation.AddMaxConcurrency(i)
-	return cu
-}
-
-// SetMaxRpm sets the "max_rpm" field.
-func (cu *ChannelUpdate) SetMaxRpm(i int) *ChannelUpdate {
-	cu.mutation.ResetMaxRpm()
-	cu.mutation.SetMaxRpm(i)
-	return cu
-}
-
-// SetNillableMaxRpm sets the "max_rpm" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableMaxRpm(i *int) *ChannelUpdate {
-	if i != nil {
-		cu.SetMaxRpm(*i)
-	}
-	return cu
-}
-
-// AddMaxRpm adds i to the "max_rpm" field.
-func (cu *ChannelUpdate) AddMaxRpm(i int) *ChannelUpdate {
-	cu.mutation.AddMaxRpm(i)
-	return cu
-}
-
-// SetCostRatio sets the "cost_ratio" field.
-func (cu *ChannelUpdate) SetCostRatio(f float64) *ChannelUpdate {
-	cu.mutation.ResetCostRatio()
-	cu.mutation.SetCostRatio(f)
-	return cu
-}
-
-// SetNillableCostRatio sets the "cost_ratio" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableCostRatio(f *float64) *ChannelUpdate {
-	if f != nil {
-		cu.SetCostRatio(*f)
-	}
-	return cu
-}
-
-// AddCostRatio adds f to the "cost_ratio" field.
-func (cu *ChannelUpdate) AddCostRatio(f float64) *ChannelUpdate {
-	cu.mutation.AddCostRatio(f)
-	return cu
-}
-
-// SetTags sets the "tags" field.
-func (cu *ChannelUpdate) SetTags(s []string) *ChannelUpdate {
-	cu.mutation.SetTags(s)
-	return cu
-}
-
-// AppendTags appends s to the "tags" field.
-func (cu *ChannelUpdate) AppendTags(s []string) *ChannelUpdate {
-	cu.mutation.AppendTags(s)
-	return cu
-}
-
-// ClearTags clears the value of the "tags" field.
-func (cu *ChannelUpdate) ClearTags() *ChannelUpdate {
-	cu.mutation.ClearTags()
-	return cu
-}
-
-// SetTestModel sets the "test_model" field.
-func (cu *ChannelUpdate) SetTestModel(s string) *ChannelUpdate {
-	cu.mutation.SetTestModel(s)
-	return cu
-}
-
-// SetNillableTestModel sets the "test_model" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableTestModel(s *string) *ChannelUpdate {
-	if s != nil {
-		cu.SetTestModel(*s)
-	}
-	return cu
-}
-
-// SetResponseTimeMs sets the "response_time_ms" field.
-func (cu *ChannelUpdate) SetResponseTimeMs(i int) *ChannelUpdate {
-	cu.mutation.ResetResponseTimeMs()
-	cu.mutation.SetResponseTimeMs(i)
-	return cu
-}
-
-// SetNillableResponseTimeMs sets the "response_time_ms" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableResponseTimeMs(i *int) *ChannelUpdate {
-	if i != nil {
-		cu.SetResponseTimeMs(*i)
-	}
-	return cu
-}
-
-// AddResponseTimeMs adds i to the "response_time_ms" field.
-func (cu *ChannelUpdate) AddResponseTimeMs(i int) *ChannelUpdate {
-	cu.mutation.AddResponseTimeMs(i)
-	return cu
-}
-
-// SetTestedAt sets the "tested_at" field.
-func (cu *ChannelUpdate) SetTestedAt(t time.Time) *ChannelUpdate {
-	cu.mutation.SetTestedAt(t)
-	return cu
-}
-
-// SetNillableTestedAt sets the "tested_at" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableTestedAt(t *time.Time) *ChannelUpdate {
-	if t != nil {
-		cu.SetTestedAt(*t)
-	}
-	return cu
-}
-
-// ClearTestedAt clears the value of the "tested_at" field.
-func (cu *ChannelUpdate) ClearTestedAt() *ChannelUpdate {
-	cu.mutation.ClearTestedAt()
-	return cu
-}
-
-// SetBalance sets the "balance" field.
-func (cu *ChannelUpdate) SetBalance(f float64) *ChannelUpdate {
-	cu.mutation.ResetBalance()
-	cu.mutation.SetBalance(f)
-	return cu
-}
-
-// SetNillableBalance sets the "balance" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableBalance(f *float64) *ChannelUpdate {
-	if f != nil {
-		cu.SetBalance(*f)
-	}
-	return cu
-}
-
-// AddBalance adds f to the "balance" field.
-func (cu *ChannelUpdate) AddBalance(f float64) *ChannelUpdate {
-	cu.mutation.AddBalance(f)
-	return cu
-}
-
-// SetBalanceUpdatedAt sets the "balance_updated_at" field.
-func (cu *ChannelUpdate) SetBalanceUpdatedAt(t time.Time) *ChannelUpdate {
-	cu.mutation.SetBalanceUpdatedAt(t)
-	return cu
-}
-
-// SetNillableBalanceUpdatedAt sets the "balance_updated_at" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableBalanceUpdatedAt(t *time.Time) *ChannelUpdate {
-	if t != nil {
-		cu.SetBalanceUpdatedAt(*t)
-	}
-	return cu
-}
-
-// ClearBalanceUpdatedAt clears the value of the "balance_updated_at" field.
-func (cu *ChannelUpdate) ClearBalanceUpdatedAt() *ChannelUpdate {
-	cu.mutation.ClearBalanceUpdatedAt()
-	return cu
-}
-
-// SetLastUsedAt sets the "last_used_at" field.
-func (cu *ChannelUpdate) SetLastUsedAt(t time.Time) *ChannelUpdate {
-	cu.mutation.SetLastUsedAt(t)
-	return cu
-}
-
-// SetNillableLastUsedAt sets the "last_used_at" field if the given value is not nil.
-func (cu *ChannelUpdate) SetNillableLastUsedAt(t *time.Time) *ChannelUpdate {
-	if t != nil {
-		cu.SetLastUsedAt(*t)
-	}
-	return cu
-}
-
-// ClearLastUsedAt clears the value of the "last_used_at" field.
-func (cu *ChannelUpdate) ClearLastUsedAt() *ChannelUpdate {
-	cu.mutation.ClearLastUsedAt()
-	return cu
-}
-
 // SetUpdatedAt sets the "updated_at" field.
 func (cu *ChannelUpdate) SetUpdatedAt(t time.Time) *ChannelUpdate {
 	cu.mutation.SetUpdatedAt(t)
 	return cu
 }
 
-// AddGroupIDs adds the "groups" edge to the Group entity by IDs.
-func (cu *ChannelUpdate) AddGroupIDs(ids ...int) *ChannelUpdate {
-	cu.mutation.AddGroupIDs(ids...)
+// AddKeyIDs adds the "keys" edge to the ChannelKey entity by IDs.
+func (cu *ChannelUpdate) AddKeyIDs(ids ...int) *ChannelUpdate {
+	cu.mutation.AddKeyIDs(ids...)
 	return cu
 }
 
-// AddGroups adds the "groups" edges to the Group entity.
-func (cu *ChannelUpdate) AddGroups(g ...*Group) *ChannelUpdate {
-	ids := make([]int, len(g))
-	for i := range g {
-		ids[i] = g[i].ID
+// AddKeys adds the "keys" edges to the ChannelKey entity.
+func (cu *ChannelUpdate) AddKeys(c ...*ChannelKey) *ChannelUpdate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return cu.AddGroupIDs(ids...)
+	return cu.AddKeyIDs(ids...)
 }
 
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
@@ -442,25 +100,25 @@ func (cu *ChannelUpdate) Mutation() *ChannelMutation {
 	return cu.mutation
 }
 
-// ClearGroups clears all "groups" edges to the Group entity.
-func (cu *ChannelUpdate) ClearGroups() *ChannelUpdate {
-	cu.mutation.ClearGroups()
+// ClearKeys clears all "keys" edges to the ChannelKey entity.
+func (cu *ChannelUpdate) ClearKeys() *ChannelUpdate {
+	cu.mutation.ClearKeys()
 	return cu
 }
 
-// RemoveGroupIDs removes the "groups" edge to Group entities by IDs.
-func (cu *ChannelUpdate) RemoveGroupIDs(ids ...int) *ChannelUpdate {
-	cu.mutation.RemoveGroupIDs(ids...)
+// RemoveKeyIDs removes the "keys" edge to ChannelKey entities by IDs.
+func (cu *ChannelUpdate) RemoveKeyIDs(ids ...int) *ChannelUpdate {
+	cu.mutation.RemoveKeyIDs(ids...)
 	return cu
 }
 
-// RemoveGroups removes "groups" edges to Group entities.
-func (cu *ChannelUpdate) RemoveGroups(g ...*Group) *ChannelUpdate {
-	ids := make([]int, len(g))
-	for i := range g {
-		ids[i] = g[i].ID
+// RemoveKeys removes "keys" edges to ChannelKey entities.
+func (cu *ChannelUpdate) RemoveKeys(c ...*ChannelKey) *ChannelUpdate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return cu.RemoveGroupIDs(ids...)
+	return cu.RemoveKeyIDs(ids...)
 }
 
 // ClearUsageLogs clears all "usage_logs" edges to the UsageLog entity.
@@ -527,29 +185,9 @@ func (cu *ChannelUpdate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Channel.name": %w`, err)}
 		}
 	}
-	if v, ok := cu.mutation.GetType(); ok {
-		if err := channel.TypeValidator(v); err != nil {
-			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Channel.type": %w`, err)}
-		}
-	}
 	if v, ok := cu.mutation.BaseURL(); ok {
 		if err := channel.BaseURLValidator(v); err != nil {
 			return &ValidationError{Name: "base_url", err: fmt.Errorf(`ent: validator failed for field "Channel.base_url": %w`, err)}
-		}
-	}
-	if v, ok := cu.mutation.Status(); ok {
-		if err := channel.StatusValidator(v); err != nil {
-			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Channel.status": %w`, err)}
-		}
-	}
-	if v, ok := cu.mutation.Priority(); ok {
-		if err := channel.PriorityValidator(v); err != nil {
-			return &ValidationError{Name: "priority", err: fmt.Errorf(`ent: validator failed for field "Channel.priority": %w`, err)}
-		}
-	}
-	if v, ok := cu.mutation.Weight(); ok {
-		if err := channel.WeightValidator(v); err != nil {
-			return &ValidationError{Name: "weight", err: fmt.Errorf(`ent: validator failed for field "Channel.weight": %w`, err)}
 		}
 	}
 	return nil
@@ -576,151 +214,34 @@ func (cu *ChannelUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := cu.mutation.Name(); ok {
 		_spec.SetField(channel.FieldName, field.TypeString, value)
 	}
-	if value, ok := cu.mutation.GetType(); ok {
-		_spec.SetField(channel.FieldType, field.TypeEnum, value)
-	}
 	if value, ok := cu.mutation.BaseURL(); ok {
 		_spec.SetField(channel.FieldBaseURL, field.TypeString, value)
-	}
-	if value, ok := cu.mutation.APIKeys(); ok {
-		_spec.SetField(channel.FieldAPIKeys, field.TypeJSON, value)
-	}
-	if value, ok := cu.mutation.AppendedAPIKeys(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, channel.FieldAPIKeys, value)
-		})
-	}
-	if value, ok := cu.mutation.Models(); ok {
-		_spec.SetField(channel.FieldModels, field.TypeJSON, value)
-	}
-	if value, ok := cu.mutation.AppendedModels(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, channel.FieldModels, value)
-		})
-	}
-	if value, ok := cu.mutation.ModelMapping(); ok {
-		_spec.SetField(channel.FieldModelMapping, field.TypeJSON, value)
-	}
-	if cu.mutation.ModelMappingCleared() {
-		_spec.ClearField(channel.FieldModelMapping, field.TypeJSON)
-	}
-	if value, ok := cu.mutation.ParamOverride(); ok {
-		_spec.SetField(channel.FieldParamOverride, field.TypeJSON, value)
-	}
-	if cu.mutation.ParamOverrideCleared() {
-		_spec.ClearField(channel.FieldParamOverride, field.TypeJSON)
-	}
-	if value, ok := cu.mutation.HeaderOverride(); ok {
-		_spec.SetField(channel.FieldHeaderOverride, field.TypeJSON, value)
-	}
-	if cu.mutation.HeaderOverrideCleared() {
-		_spec.ClearField(channel.FieldHeaderOverride, field.TypeJSON)
-	}
-	if value, ok := cu.mutation.Status(); ok {
-		_spec.SetField(channel.FieldStatus, field.TypeEnum, value)
-	}
-	if value, ok := cu.mutation.ErrorMsg(); ok {
-		_spec.SetField(channel.FieldErrorMsg, field.TypeString, value)
-	}
-	if value, ok := cu.mutation.Priority(); ok {
-		_spec.SetField(channel.FieldPriority, field.TypeInt, value)
-	}
-	if value, ok := cu.mutation.AddedPriority(); ok {
-		_spec.AddField(channel.FieldPriority, field.TypeInt, value)
-	}
-	if value, ok := cu.mutation.Weight(); ok {
-		_spec.SetField(channel.FieldWeight, field.TypeInt, value)
-	}
-	if value, ok := cu.mutation.AddedWeight(); ok {
-		_spec.AddField(channel.FieldWeight, field.TypeInt, value)
-	}
-	if value, ok := cu.mutation.MaxConcurrency(); ok {
-		_spec.SetField(channel.FieldMaxConcurrency, field.TypeInt, value)
-	}
-	if value, ok := cu.mutation.AddedMaxConcurrency(); ok {
-		_spec.AddField(channel.FieldMaxConcurrency, field.TypeInt, value)
-	}
-	if value, ok := cu.mutation.MaxRpm(); ok {
-		_spec.SetField(channel.FieldMaxRpm, field.TypeInt, value)
-	}
-	if value, ok := cu.mutation.AddedMaxRpm(); ok {
-		_spec.AddField(channel.FieldMaxRpm, field.TypeInt, value)
-	}
-	if value, ok := cu.mutation.CostRatio(); ok {
-		_spec.SetField(channel.FieldCostRatio, field.TypeFloat64, value)
-	}
-	if value, ok := cu.mutation.AddedCostRatio(); ok {
-		_spec.AddField(channel.FieldCostRatio, field.TypeFloat64, value)
-	}
-	if value, ok := cu.mutation.Tags(); ok {
-		_spec.SetField(channel.FieldTags, field.TypeJSON, value)
-	}
-	if value, ok := cu.mutation.AppendedTags(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, channel.FieldTags, value)
-		})
-	}
-	if cu.mutation.TagsCleared() {
-		_spec.ClearField(channel.FieldTags, field.TypeJSON)
-	}
-	if value, ok := cu.mutation.TestModel(); ok {
-		_spec.SetField(channel.FieldTestModel, field.TypeString, value)
-	}
-	if value, ok := cu.mutation.ResponseTimeMs(); ok {
-		_spec.SetField(channel.FieldResponseTimeMs, field.TypeInt, value)
-	}
-	if value, ok := cu.mutation.AddedResponseTimeMs(); ok {
-		_spec.AddField(channel.FieldResponseTimeMs, field.TypeInt, value)
-	}
-	if value, ok := cu.mutation.TestedAt(); ok {
-		_spec.SetField(channel.FieldTestedAt, field.TypeTime, value)
-	}
-	if cu.mutation.TestedAtCleared() {
-		_spec.ClearField(channel.FieldTestedAt, field.TypeTime)
-	}
-	if value, ok := cu.mutation.Balance(); ok {
-		_spec.SetField(channel.FieldBalance, field.TypeFloat64, value)
-	}
-	if value, ok := cu.mutation.AddedBalance(); ok {
-		_spec.AddField(channel.FieldBalance, field.TypeFloat64, value)
-	}
-	if value, ok := cu.mutation.BalanceUpdatedAt(); ok {
-		_spec.SetField(channel.FieldBalanceUpdatedAt, field.TypeTime, value)
-	}
-	if cu.mutation.BalanceUpdatedAtCleared() {
-		_spec.ClearField(channel.FieldBalanceUpdatedAt, field.TypeTime)
-	}
-	if value, ok := cu.mutation.LastUsedAt(); ok {
-		_spec.SetField(channel.FieldLastUsedAt, field.TypeTime, value)
-	}
-	if cu.mutation.LastUsedAtCleared() {
-		_spec.ClearField(channel.FieldLastUsedAt, field.TypeTime)
 	}
 	if value, ok := cu.mutation.UpdatedAt(); ok {
 		_spec.SetField(channel.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if cu.mutation.GroupsCleared() {
+	if cu.mutation.KeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
+			Rel:     sqlgraph.O2M,
 			Inverse: false,
-			Table:   channel.GroupsTable,
-			Columns: channel.GroupsPrimaryKey,
+			Table:   channel.KeysTable,
+			Columns: []string{channel.KeysColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := cu.mutation.RemovedGroupsIDs(); len(nodes) > 0 && !cu.mutation.GroupsCleared() {
+	if nodes := cu.mutation.RemovedKeysIDs(); len(nodes) > 0 && !cu.mutation.KeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
+			Rel:     sqlgraph.O2M,
 			Inverse: false,
-			Table:   channel.GroupsTable,
-			Columns: channel.GroupsPrimaryKey,
+			Table:   channel.KeysTable,
+			Columns: []string{channel.KeysColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -728,15 +249,15 @@ func (cu *ChannelUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := cu.mutation.GroupsIDs(); len(nodes) > 0 {
+	if nodes := cu.mutation.KeysIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
+			Rel:     sqlgraph.O2M,
 			Inverse: false,
-			Table:   channel.GroupsTable,
-			Columns: channel.GroupsPrimaryKey,
+			Table:   channel.KeysTable,
+			Columns: []string{channel.KeysColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -825,20 +346,6 @@ func (cuo *ChannelUpdateOne) SetNillableName(s *string) *ChannelUpdateOne {
 	return cuo
 }
 
-// SetType sets the "type" field.
-func (cuo *ChannelUpdateOne) SetType(c channel.Type) *ChannelUpdateOne {
-	cuo.mutation.SetType(c)
-	return cuo
-}
-
-// SetNillableType sets the "type" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableType(c *channel.Type) *ChannelUpdateOne {
-	if c != nil {
-		cuo.SetType(*c)
-	}
-	return cuo
-}
-
 // SetBaseURL sets the "base_url" field.
 func (cuo *ChannelUpdateOne) SetBaseURL(s string) *ChannelUpdateOne {
 	cuo.mutation.SetBaseURL(s)
@@ -853,352 +360,25 @@ func (cuo *ChannelUpdateOne) SetNillableBaseURL(s *string) *ChannelUpdateOne {
 	return cuo
 }
 
-// SetAPIKeys sets the "api_keys" field.
-func (cuo *ChannelUpdateOne) SetAPIKeys(s []string) *ChannelUpdateOne {
-	cuo.mutation.SetAPIKeys(s)
-	return cuo
-}
-
-// AppendAPIKeys appends s to the "api_keys" field.
-func (cuo *ChannelUpdateOne) AppendAPIKeys(s []string) *ChannelUpdateOne {
-	cuo.mutation.AppendAPIKeys(s)
-	return cuo
-}
-
-// SetModels sets the "models" field.
-func (cuo *ChannelUpdateOne) SetModels(s []string) *ChannelUpdateOne {
-	cuo.mutation.SetModels(s)
-	return cuo
-}
-
-// AppendModels appends s to the "models" field.
-func (cuo *ChannelUpdateOne) AppendModels(s []string) *ChannelUpdateOne {
-	cuo.mutation.AppendModels(s)
-	return cuo
-}
-
-// SetModelMapping sets the "model_mapping" field.
-func (cuo *ChannelUpdateOne) SetModelMapping(m map[string]string) *ChannelUpdateOne {
-	cuo.mutation.SetModelMapping(m)
-	return cuo
-}
-
-// ClearModelMapping clears the value of the "model_mapping" field.
-func (cuo *ChannelUpdateOne) ClearModelMapping() *ChannelUpdateOne {
-	cuo.mutation.ClearModelMapping()
-	return cuo
-}
-
-// SetParamOverride sets the "param_override" field.
-func (cuo *ChannelUpdateOne) SetParamOverride(m map[string]interface{}) *ChannelUpdateOne {
-	cuo.mutation.SetParamOverride(m)
-	return cuo
-}
-
-// ClearParamOverride clears the value of the "param_override" field.
-func (cuo *ChannelUpdateOne) ClearParamOverride() *ChannelUpdateOne {
-	cuo.mutation.ClearParamOverride()
-	return cuo
-}
-
-// SetHeaderOverride sets the "header_override" field.
-func (cuo *ChannelUpdateOne) SetHeaderOverride(m map[string]string) *ChannelUpdateOne {
-	cuo.mutation.SetHeaderOverride(m)
-	return cuo
-}
-
-// ClearHeaderOverride clears the value of the "header_override" field.
-func (cuo *ChannelUpdateOne) ClearHeaderOverride() *ChannelUpdateOne {
-	cuo.mutation.ClearHeaderOverride()
-	return cuo
-}
-
-// SetStatus sets the "status" field.
-func (cuo *ChannelUpdateOne) SetStatus(c channel.Status) *ChannelUpdateOne {
-	cuo.mutation.SetStatus(c)
-	return cuo
-}
-
-// SetNillableStatus sets the "status" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableStatus(c *channel.Status) *ChannelUpdateOne {
-	if c != nil {
-		cuo.SetStatus(*c)
-	}
-	return cuo
-}
-
-// SetErrorMsg sets the "error_msg" field.
-func (cuo *ChannelUpdateOne) SetErrorMsg(s string) *ChannelUpdateOne {
-	cuo.mutation.SetErrorMsg(s)
-	return cuo
-}
-
-// SetNillableErrorMsg sets the "error_msg" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableErrorMsg(s *string) *ChannelUpdateOne {
-	if s != nil {
-		cuo.SetErrorMsg(*s)
-	}
-	return cuo
-}
-
-// SetPriority sets the "priority" field.
-func (cuo *ChannelUpdateOne) SetPriority(i int) *ChannelUpdateOne {
-	cuo.mutation.ResetPriority()
-	cuo.mutation.SetPriority(i)
-	return cuo
-}
-
-// SetNillablePriority sets the "priority" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillablePriority(i *int) *ChannelUpdateOne {
-	if i != nil {
-		cuo.SetPriority(*i)
-	}
-	return cuo
-}
-
-// AddPriority adds i to the "priority" field.
-func (cuo *ChannelUpdateOne) AddPriority(i int) *ChannelUpdateOne {
-	cuo.mutation.AddPriority(i)
-	return cuo
-}
-
-// SetWeight sets the "weight" field.
-func (cuo *ChannelUpdateOne) SetWeight(i int) *ChannelUpdateOne {
-	cuo.mutation.ResetWeight()
-	cuo.mutation.SetWeight(i)
-	return cuo
-}
-
-// SetNillableWeight sets the "weight" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableWeight(i *int) *ChannelUpdateOne {
-	if i != nil {
-		cuo.SetWeight(*i)
-	}
-	return cuo
-}
-
-// AddWeight adds i to the "weight" field.
-func (cuo *ChannelUpdateOne) AddWeight(i int) *ChannelUpdateOne {
-	cuo.mutation.AddWeight(i)
-	return cuo
-}
-
-// SetMaxConcurrency sets the "max_concurrency" field.
-func (cuo *ChannelUpdateOne) SetMaxConcurrency(i int) *ChannelUpdateOne {
-	cuo.mutation.ResetMaxConcurrency()
-	cuo.mutation.SetMaxConcurrency(i)
-	return cuo
-}
-
-// SetNillableMaxConcurrency sets the "max_concurrency" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableMaxConcurrency(i *int) *ChannelUpdateOne {
-	if i != nil {
-		cuo.SetMaxConcurrency(*i)
-	}
-	return cuo
-}
-
-// AddMaxConcurrency adds i to the "max_concurrency" field.
-func (cuo *ChannelUpdateOne) AddMaxConcurrency(i int) *ChannelUpdateOne {
-	cuo.mutation.AddMaxConcurrency(i)
-	return cuo
-}
-
-// SetMaxRpm sets the "max_rpm" field.
-func (cuo *ChannelUpdateOne) SetMaxRpm(i int) *ChannelUpdateOne {
-	cuo.mutation.ResetMaxRpm()
-	cuo.mutation.SetMaxRpm(i)
-	return cuo
-}
-
-// SetNillableMaxRpm sets the "max_rpm" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableMaxRpm(i *int) *ChannelUpdateOne {
-	if i != nil {
-		cuo.SetMaxRpm(*i)
-	}
-	return cuo
-}
-
-// AddMaxRpm adds i to the "max_rpm" field.
-func (cuo *ChannelUpdateOne) AddMaxRpm(i int) *ChannelUpdateOne {
-	cuo.mutation.AddMaxRpm(i)
-	return cuo
-}
-
-// SetCostRatio sets the "cost_ratio" field.
-func (cuo *ChannelUpdateOne) SetCostRatio(f float64) *ChannelUpdateOne {
-	cuo.mutation.ResetCostRatio()
-	cuo.mutation.SetCostRatio(f)
-	return cuo
-}
-
-// SetNillableCostRatio sets the "cost_ratio" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableCostRatio(f *float64) *ChannelUpdateOne {
-	if f != nil {
-		cuo.SetCostRatio(*f)
-	}
-	return cuo
-}
-
-// AddCostRatio adds f to the "cost_ratio" field.
-func (cuo *ChannelUpdateOne) AddCostRatio(f float64) *ChannelUpdateOne {
-	cuo.mutation.AddCostRatio(f)
-	return cuo
-}
-
-// SetTags sets the "tags" field.
-func (cuo *ChannelUpdateOne) SetTags(s []string) *ChannelUpdateOne {
-	cuo.mutation.SetTags(s)
-	return cuo
-}
-
-// AppendTags appends s to the "tags" field.
-func (cuo *ChannelUpdateOne) AppendTags(s []string) *ChannelUpdateOne {
-	cuo.mutation.AppendTags(s)
-	return cuo
-}
-
-// ClearTags clears the value of the "tags" field.
-func (cuo *ChannelUpdateOne) ClearTags() *ChannelUpdateOne {
-	cuo.mutation.ClearTags()
-	return cuo
-}
-
-// SetTestModel sets the "test_model" field.
-func (cuo *ChannelUpdateOne) SetTestModel(s string) *ChannelUpdateOne {
-	cuo.mutation.SetTestModel(s)
-	return cuo
-}
-
-// SetNillableTestModel sets the "test_model" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableTestModel(s *string) *ChannelUpdateOne {
-	if s != nil {
-		cuo.SetTestModel(*s)
-	}
-	return cuo
-}
-
-// SetResponseTimeMs sets the "response_time_ms" field.
-func (cuo *ChannelUpdateOne) SetResponseTimeMs(i int) *ChannelUpdateOne {
-	cuo.mutation.ResetResponseTimeMs()
-	cuo.mutation.SetResponseTimeMs(i)
-	return cuo
-}
-
-// SetNillableResponseTimeMs sets the "response_time_ms" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableResponseTimeMs(i *int) *ChannelUpdateOne {
-	if i != nil {
-		cuo.SetResponseTimeMs(*i)
-	}
-	return cuo
-}
-
-// AddResponseTimeMs adds i to the "response_time_ms" field.
-func (cuo *ChannelUpdateOne) AddResponseTimeMs(i int) *ChannelUpdateOne {
-	cuo.mutation.AddResponseTimeMs(i)
-	return cuo
-}
-
-// SetTestedAt sets the "tested_at" field.
-func (cuo *ChannelUpdateOne) SetTestedAt(t time.Time) *ChannelUpdateOne {
-	cuo.mutation.SetTestedAt(t)
-	return cuo
-}
-
-// SetNillableTestedAt sets the "tested_at" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableTestedAt(t *time.Time) *ChannelUpdateOne {
-	if t != nil {
-		cuo.SetTestedAt(*t)
-	}
-	return cuo
-}
-
-// ClearTestedAt clears the value of the "tested_at" field.
-func (cuo *ChannelUpdateOne) ClearTestedAt() *ChannelUpdateOne {
-	cuo.mutation.ClearTestedAt()
-	return cuo
-}
-
-// SetBalance sets the "balance" field.
-func (cuo *ChannelUpdateOne) SetBalance(f float64) *ChannelUpdateOne {
-	cuo.mutation.ResetBalance()
-	cuo.mutation.SetBalance(f)
-	return cuo
-}
-
-// SetNillableBalance sets the "balance" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableBalance(f *float64) *ChannelUpdateOne {
-	if f != nil {
-		cuo.SetBalance(*f)
-	}
-	return cuo
-}
-
-// AddBalance adds f to the "balance" field.
-func (cuo *ChannelUpdateOne) AddBalance(f float64) *ChannelUpdateOne {
-	cuo.mutation.AddBalance(f)
-	return cuo
-}
-
-// SetBalanceUpdatedAt sets the "balance_updated_at" field.
-func (cuo *ChannelUpdateOne) SetBalanceUpdatedAt(t time.Time) *ChannelUpdateOne {
-	cuo.mutation.SetBalanceUpdatedAt(t)
-	return cuo
-}
-
-// SetNillableBalanceUpdatedAt sets the "balance_updated_at" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableBalanceUpdatedAt(t *time.Time) *ChannelUpdateOne {
-	if t != nil {
-		cuo.SetBalanceUpdatedAt(*t)
-	}
-	return cuo
-}
-
-// ClearBalanceUpdatedAt clears the value of the "balance_updated_at" field.
-func (cuo *ChannelUpdateOne) ClearBalanceUpdatedAt() *ChannelUpdateOne {
-	cuo.mutation.ClearBalanceUpdatedAt()
-	return cuo
-}
-
-// SetLastUsedAt sets the "last_used_at" field.
-func (cuo *ChannelUpdateOne) SetLastUsedAt(t time.Time) *ChannelUpdateOne {
-	cuo.mutation.SetLastUsedAt(t)
-	return cuo
-}
-
-// SetNillableLastUsedAt sets the "last_used_at" field if the given value is not nil.
-func (cuo *ChannelUpdateOne) SetNillableLastUsedAt(t *time.Time) *ChannelUpdateOne {
-	if t != nil {
-		cuo.SetLastUsedAt(*t)
-	}
-	return cuo
-}
-
-// ClearLastUsedAt clears the value of the "last_used_at" field.
-func (cuo *ChannelUpdateOne) ClearLastUsedAt() *ChannelUpdateOne {
-	cuo.mutation.ClearLastUsedAt()
-	return cuo
-}
-
 // SetUpdatedAt sets the "updated_at" field.
 func (cuo *ChannelUpdateOne) SetUpdatedAt(t time.Time) *ChannelUpdateOne {
 	cuo.mutation.SetUpdatedAt(t)
 	return cuo
 }
 
-// AddGroupIDs adds the "groups" edge to the Group entity by IDs.
-func (cuo *ChannelUpdateOne) AddGroupIDs(ids ...int) *ChannelUpdateOne {
-	cuo.mutation.AddGroupIDs(ids...)
+// AddKeyIDs adds the "keys" edge to the ChannelKey entity by IDs.
+func (cuo *ChannelUpdateOne) AddKeyIDs(ids ...int) *ChannelUpdateOne {
+	cuo.mutation.AddKeyIDs(ids...)
 	return cuo
 }
 
-// AddGroups adds the "groups" edges to the Group entity.
-func (cuo *ChannelUpdateOne) AddGroups(g ...*Group) *ChannelUpdateOne {
-	ids := make([]int, len(g))
-	for i := range g {
-		ids[i] = g[i].ID
+// AddKeys adds the "keys" edges to the ChannelKey entity.
+func (cuo *ChannelUpdateOne) AddKeys(c ...*ChannelKey) *ChannelUpdateOne {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return cuo.AddGroupIDs(ids...)
+	return cuo.AddKeyIDs(ids...)
 }
 
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
@@ -1221,25 +401,25 @@ func (cuo *ChannelUpdateOne) Mutation() *ChannelMutation {
 	return cuo.mutation
 }
 
-// ClearGroups clears all "groups" edges to the Group entity.
-func (cuo *ChannelUpdateOne) ClearGroups() *ChannelUpdateOne {
-	cuo.mutation.ClearGroups()
+// ClearKeys clears all "keys" edges to the ChannelKey entity.
+func (cuo *ChannelUpdateOne) ClearKeys() *ChannelUpdateOne {
+	cuo.mutation.ClearKeys()
 	return cuo
 }
 
-// RemoveGroupIDs removes the "groups" edge to Group entities by IDs.
-func (cuo *ChannelUpdateOne) RemoveGroupIDs(ids ...int) *ChannelUpdateOne {
-	cuo.mutation.RemoveGroupIDs(ids...)
+// RemoveKeyIDs removes the "keys" edge to ChannelKey entities by IDs.
+func (cuo *ChannelUpdateOne) RemoveKeyIDs(ids ...int) *ChannelUpdateOne {
+	cuo.mutation.RemoveKeyIDs(ids...)
 	return cuo
 }
 
-// RemoveGroups removes "groups" edges to Group entities.
-func (cuo *ChannelUpdateOne) RemoveGroups(g ...*Group) *ChannelUpdateOne {
-	ids := make([]int, len(g))
-	for i := range g {
-		ids[i] = g[i].ID
+// RemoveKeys removes "keys" edges to ChannelKey entities.
+func (cuo *ChannelUpdateOne) RemoveKeys(c ...*ChannelKey) *ChannelUpdateOne {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
 	}
-	return cuo.RemoveGroupIDs(ids...)
+	return cuo.RemoveKeyIDs(ids...)
 }
 
 // ClearUsageLogs clears all "usage_logs" edges to the UsageLog entity.
@@ -1319,29 +499,9 @@ func (cuo *ChannelUpdateOne) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Channel.name": %w`, err)}
 		}
 	}
-	if v, ok := cuo.mutation.GetType(); ok {
-		if err := channel.TypeValidator(v); err != nil {
-			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Channel.type": %w`, err)}
-		}
-	}
 	if v, ok := cuo.mutation.BaseURL(); ok {
 		if err := channel.BaseURLValidator(v); err != nil {
 			return &ValidationError{Name: "base_url", err: fmt.Errorf(`ent: validator failed for field "Channel.base_url": %w`, err)}
-		}
-	}
-	if v, ok := cuo.mutation.Status(); ok {
-		if err := channel.StatusValidator(v); err != nil {
-			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Channel.status": %w`, err)}
-		}
-	}
-	if v, ok := cuo.mutation.Priority(); ok {
-		if err := channel.PriorityValidator(v); err != nil {
-			return &ValidationError{Name: "priority", err: fmt.Errorf(`ent: validator failed for field "Channel.priority": %w`, err)}
-		}
-	}
-	if v, ok := cuo.mutation.Weight(); ok {
-		if err := channel.WeightValidator(v); err != nil {
-			return &ValidationError{Name: "weight", err: fmt.Errorf(`ent: validator failed for field "Channel.weight": %w`, err)}
 		}
 	}
 	return nil
@@ -1385,151 +545,34 @@ func (cuo *ChannelUpdateOne) sqlSave(ctx context.Context) (_node *Channel, err e
 	if value, ok := cuo.mutation.Name(); ok {
 		_spec.SetField(channel.FieldName, field.TypeString, value)
 	}
-	if value, ok := cuo.mutation.GetType(); ok {
-		_spec.SetField(channel.FieldType, field.TypeEnum, value)
-	}
 	if value, ok := cuo.mutation.BaseURL(); ok {
 		_spec.SetField(channel.FieldBaseURL, field.TypeString, value)
-	}
-	if value, ok := cuo.mutation.APIKeys(); ok {
-		_spec.SetField(channel.FieldAPIKeys, field.TypeJSON, value)
-	}
-	if value, ok := cuo.mutation.AppendedAPIKeys(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, channel.FieldAPIKeys, value)
-		})
-	}
-	if value, ok := cuo.mutation.Models(); ok {
-		_spec.SetField(channel.FieldModels, field.TypeJSON, value)
-	}
-	if value, ok := cuo.mutation.AppendedModels(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, channel.FieldModels, value)
-		})
-	}
-	if value, ok := cuo.mutation.ModelMapping(); ok {
-		_spec.SetField(channel.FieldModelMapping, field.TypeJSON, value)
-	}
-	if cuo.mutation.ModelMappingCleared() {
-		_spec.ClearField(channel.FieldModelMapping, field.TypeJSON)
-	}
-	if value, ok := cuo.mutation.ParamOverride(); ok {
-		_spec.SetField(channel.FieldParamOverride, field.TypeJSON, value)
-	}
-	if cuo.mutation.ParamOverrideCleared() {
-		_spec.ClearField(channel.FieldParamOverride, field.TypeJSON)
-	}
-	if value, ok := cuo.mutation.HeaderOverride(); ok {
-		_spec.SetField(channel.FieldHeaderOverride, field.TypeJSON, value)
-	}
-	if cuo.mutation.HeaderOverrideCleared() {
-		_spec.ClearField(channel.FieldHeaderOverride, field.TypeJSON)
-	}
-	if value, ok := cuo.mutation.Status(); ok {
-		_spec.SetField(channel.FieldStatus, field.TypeEnum, value)
-	}
-	if value, ok := cuo.mutation.ErrorMsg(); ok {
-		_spec.SetField(channel.FieldErrorMsg, field.TypeString, value)
-	}
-	if value, ok := cuo.mutation.Priority(); ok {
-		_spec.SetField(channel.FieldPriority, field.TypeInt, value)
-	}
-	if value, ok := cuo.mutation.AddedPriority(); ok {
-		_spec.AddField(channel.FieldPriority, field.TypeInt, value)
-	}
-	if value, ok := cuo.mutation.Weight(); ok {
-		_spec.SetField(channel.FieldWeight, field.TypeInt, value)
-	}
-	if value, ok := cuo.mutation.AddedWeight(); ok {
-		_spec.AddField(channel.FieldWeight, field.TypeInt, value)
-	}
-	if value, ok := cuo.mutation.MaxConcurrency(); ok {
-		_spec.SetField(channel.FieldMaxConcurrency, field.TypeInt, value)
-	}
-	if value, ok := cuo.mutation.AddedMaxConcurrency(); ok {
-		_spec.AddField(channel.FieldMaxConcurrency, field.TypeInt, value)
-	}
-	if value, ok := cuo.mutation.MaxRpm(); ok {
-		_spec.SetField(channel.FieldMaxRpm, field.TypeInt, value)
-	}
-	if value, ok := cuo.mutation.AddedMaxRpm(); ok {
-		_spec.AddField(channel.FieldMaxRpm, field.TypeInt, value)
-	}
-	if value, ok := cuo.mutation.CostRatio(); ok {
-		_spec.SetField(channel.FieldCostRatio, field.TypeFloat64, value)
-	}
-	if value, ok := cuo.mutation.AddedCostRatio(); ok {
-		_spec.AddField(channel.FieldCostRatio, field.TypeFloat64, value)
-	}
-	if value, ok := cuo.mutation.Tags(); ok {
-		_spec.SetField(channel.FieldTags, field.TypeJSON, value)
-	}
-	if value, ok := cuo.mutation.AppendedTags(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, channel.FieldTags, value)
-		})
-	}
-	if cuo.mutation.TagsCleared() {
-		_spec.ClearField(channel.FieldTags, field.TypeJSON)
-	}
-	if value, ok := cuo.mutation.TestModel(); ok {
-		_spec.SetField(channel.FieldTestModel, field.TypeString, value)
-	}
-	if value, ok := cuo.mutation.ResponseTimeMs(); ok {
-		_spec.SetField(channel.FieldResponseTimeMs, field.TypeInt, value)
-	}
-	if value, ok := cuo.mutation.AddedResponseTimeMs(); ok {
-		_spec.AddField(channel.FieldResponseTimeMs, field.TypeInt, value)
-	}
-	if value, ok := cuo.mutation.TestedAt(); ok {
-		_spec.SetField(channel.FieldTestedAt, field.TypeTime, value)
-	}
-	if cuo.mutation.TestedAtCleared() {
-		_spec.ClearField(channel.FieldTestedAt, field.TypeTime)
-	}
-	if value, ok := cuo.mutation.Balance(); ok {
-		_spec.SetField(channel.FieldBalance, field.TypeFloat64, value)
-	}
-	if value, ok := cuo.mutation.AddedBalance(); ok {
-		_spec.AddField(channel.FieldBalance, field.TypeFloat64, value)
-	}
-	if value, ok := cuo.mutation.BalanceUpdatedAt(); ok {
-		_spec.SetField(channel.FieldBalanceUpdatedAt, field.TypeTime, value)
-	}
-	if cuo.mutation.BalanceUpdatedAtCleared() {
-		_spec.ClearField(channel.FieldBalanceUpdatedAt, field.TypeTime)
-	}
-	if value, ok := cuo.mutation.LastUsedAt(); ok {
-		_spec.SetField(channel.FieldLastUsedAt, field.TypeTime, value)
-	}
-	if cuo.mutation.LastUsedAtCleared() {
-		_spec.ClearField(channel.FieldLastUsedAt, field.TypeTime)
 	}
 	if value, ok := cuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(channel.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if cuo.mutation.GroupsCleared() {
+	if cuo.mutation.KeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
+			Rel:     sqlgraph.O2M,
 			Inverse: false,
-			Table:   channel.GroupsTable,
-			Columns: channel.GroupsPrimaryKey,
+			Table:   channel.KeysTable,
+			Columns: []string{channel.KeysColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := cuo.mutation.RemovedGroupsIDs(); len(nodes) > 0 && !cuo.mutation.GroupsCleared() {
+	if nodes := cuo.mutation.RemovedKeysIDs(); len(nodes) > 0 && !cuo.mutation.KeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
+			Rel:     sqlgraph.O2M,
 			Inverse: false,
-			Table:   channel.GroupsTable,
-			Columns: channel.GroupsPrimaryKey,
+			Table:   channel.KeysTable,
+			Columns: []string{channel.KeysColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1537,15 +580,15 @@ func (cuo *ChannelUpdateOne) sqlSave(ctx context.Context) (_node *Channel, err e
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := cuo.mutation.GroupsIDs(); len(nodes) > 0 {
+	if nodes := cuo.mutation.KeysIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
+			Rel:     sqlgraph.O2M,
 			Inverse: false,
-			Table:   channel.GroupsTable,
-			Columns: channel.GroupsPrimaryKey,
+			Table:   channel.KeysTable,
+			Columns: []string{channel.KeysColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

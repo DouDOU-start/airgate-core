@@ -30,10 +30,10 @@ func currentMinute() int64 {
 	return time.Now().Unix() / 60
 }
 
-// channelMinuteKey 生成渠道维度指定分钟窗口的 Redis key。
-// 前缀带 channel: 段，与用户/分组维度 key 的 ID 空间隔离。
-func channelMinuteKey(channelID int, minute int64) string {
-	return fmt.Sprintf("rpm:channel:%d:%d", channelID, minute)
+// keyMinuteKey 生成密钥端点维度指定分钟窗口的 Redis key。
+// 前缀带 chkey: 段，与用户/分组/渠道维度 key 的 ID 空间隔离。
+func keyMinuteKey(channelKeyID int, minute int64) string {
+	return fmt.Sprintf("rpm:chkey:%d:%d", channelKeyID, minute)
 }
 
 // userMinuteKey 生成用户维度指定分钟窗口的 Redis key。
@@ -120,17 +120,17 @@ func (r *RPMCounter) GetUserRPMs(ctx context.Context, userIDs []int) map[int]int
 	return result
 }
 
-// GetChannelRPMs 批量获取多个渠道当前分钟的请求计数（管理端观测用）。
-func (r *RPMCounter) GetChannelRPMs(ctx context.Context, channelIDs []int) map[int]int {
-	result := make(map[int]int, len(channelIDs))
+// GetKeyRPMs 批量获取多个密钥端点当前分钟的请求计数（管理端观测用）。
+func (r *RPMCounter) GetKeyRPMs(ctx context.Context, channelKeyIDs []int) map[int]int {
+	result := make(map[int]int, len(channelKeyIDs))
 	if r.rdb == nil {
 		return result
 	}
 	minute := currentMinute()
 	pipe := r.rdb.Pipeline()
-	cmds := make(map[int]*redis.StringCmd, len(channelIDs))
-	for _, id := range channelIDs {
-		cmds[id] = pipe.Get(ctx, channelMinuteKey(id, minute))
+	cmds := make(map[int]*redis.StringCmd, len(channelKeyIDs))
+	for _, id := range channelKeyIDs {
+		cmds[id] = pipe.Get(ctx, keyMinuteKey(id, minute))
 	}
 	_, _ = pipe.Exec(ctx)
 	for id, cmd := range cmds {
@@ -149,14 +149,14 @@ var decrementRPMScript = redis.NewScript(`
 	return 0
 `)
 
-// DecrementChannelRPM 回退渠道维度 RPM 计数（请求失败时撤销预递增）。
-// minute 须传 TryIncrementChannelRPM 返回的分钟窗口：请求跨分钟边界失败时
+// DecrementKeyRPM 回退密钥端点维度 RPM 计数（请求失败时撤销预递增）。
+// minute 须传 TryIncrementKeyRPM 返回的分钟窗口：请求跨分钟边界失败时
 // 仍撤销原窗口的预递增，而不是扣穿新窗口/漏撤旧窗口。
-func (r *RPMCounter) DecrementChannelRPM(ctx context.Context, channelID int, minute int64) {
+func (r *RPMCounter) DecrementKeyRPM(ctx context.Context, channelKeyID int, minute int64) {
 	if r.rdb == nil {
 		return
 	}
-	decrementRPMScript.Run(ctx, r.rdb, []string{channelMinuteKey(channelID, minute)})
+	decrementRPMScript.Run(ctx, r.rdb, []string{keyMinuteKey(channelKeyID, minute)})
 }
 
 // tryIncrementScript 原子检查 RPM 限制并递增
@@ -203,13 +203,13 @@ func (r *RPMCounter) tryIncrementByKey(ctx context.Context, key string, maxRPM i
 	return result >= 0, nil
 }
 
-// TryIncrementChannelRPM 原子检查渠道维度 RPM 限制并递增。
-// 返回本次计数所用的分钟窗口，供失败回退 DecrementChannelRPM 对同一窗口撤销。
-func (r *RPMCounter) TryIncrementChannelRPM(ctx context.Context, channelID int, maxRPM int) (bool, int64, error) {
+// TryIncrementKeyRPM 原子检查密钥端点维度 RPM 限制并递增。
+// 返回本次计数所用的分钟窗口，供失败回退 DecrementKeyRPM 对同一窗口撤销。
+func (r *RPMCounter) TryIncrementKeyRPM(ctx context.Context, channelKeyID int, maxRPM int) (bool, int64, error) {
 	minute := currentMinute()
 	if r.rdb == nil {
 		return true, minute, nil
 	}
-	ok, err := r.tryIncrementByKey(ctx, channelMinuteKey(channelID, minute), maxRPM)
+	ok, err := r.tryIncrementByKey(ctx, keyMinuteKey(channelKeyID, minute), maxRPM)
 	return ok, minute, err
 }

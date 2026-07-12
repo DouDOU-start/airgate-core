@@ -155,10 +155,15 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/channels", handlers.Channel.CreateChannel)
 		adminGroup.PUT("/channels/:id", handlers.Channel.UpdateChannel)
 		adminGroup.DELETE("/channels/:id", handlers.Channel.DeleteChannel)
-		adminGroup.POST("/channels/:id/test", handlers.Channel.TestChannel)
-		adminGroup.POST("/channels/:id/balance", handlers.Channel.RefreshChannelBalance)
-		adminGroup.POST("/channels/:id/fetch-models", handlers.Channel.FetchChannelModels)
-		// 预览拉取：渠道未保存时按表单连接参数试拉模型（静态段，先于 :id 匹配）
+		// 渠道下新增一把 key
+		adminGroup.POST("/channels/:id/keys", handlers.Channel.AddChannelKey)
+		// 密钥端点级操作（:id 为 channel_key_id）：更新 / 删除 / 测试 / 拉模型 / 刷余额
+		adminGroup.PUT("/channels/keys/:id", handlers.Channel.UpdateChannelKey)
+		adminGroup.DELETE("/channels/keys/:id", handlers.Channel.DeleteChannelKey)
+		adminGroup.POST("/channels/keys/:id/test", handlers.Channel.TestChannel)
+		adminGroup.POST("/channels/keys/:id/fetch-models", handlers.Channel.FetchChannelModels)
+		adminGroup.POST("/channels/keys/:id/balance", handlers.Channel.RefreshChannelBalance)
+		// 预览拉取：key 未保存时按表单连接参数试拉模型（静态段，先于 :id 匹配）
 		adminGroup.POST("/channels/fetch-models", handlers.Channel.FetchChannelModelsPreview)
 		adminGroup.POST("/channels/bulk-update", handlers.Channel.BulkUpdateChannels)
 		// 渠道近 N 分钟失败计数（errlog Redis 分钟桶，渠道页监控列）

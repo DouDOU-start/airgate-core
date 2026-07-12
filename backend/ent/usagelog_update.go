@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -743,6 +744,26 @@ func (ulu *UsageLogUpdate) ClearChannelID() *UsageLogUpdate {
 	return ulu
 }
 
+// SetChannelKeyID sets the "channel_key_id" field.
+func (ulu *UsageLogUpdate) SetChannelKeyID(i int) *UsageLogUpdate {
+	ulu.mutation.SetChannelKeyID(i)
+	return ulu
+}
+
+// SetNillableChannelKeyID sets the "channel_key_id" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableChannelKeyID(i *int) *UsageLogUpdate {
+	if i != nil {
+		ulu.SetChannelKeyID(*i)
+	}
+	return ulu
+}
+
+// ClearChannelKeyID clears the value of the "channel_key_id" field.
+func (ulu *UsageLogUpdate) ClearChannelKeyID() *UsageLogUpdate {
+	ulu.mutation.ClearChannelKeyID()
+	return ulu
+}
+
 // SetGroupID sets the "group_id" field.
 func (ulu *UsageLogUpdate) SetGroupID(i int) *UsageLogUpdate {
 	ulu.mutation.SetGroupID(i)
@@ -778,6 +799,11 @@ func (ulu *UsageLogUpdate) SetChannel(c *Channel) *UsageLogUpdate {
 	return ulu.SetChannelID(c.ID)
 }
 
+// SetChannelKey sets the "channel_key" edge to the ChannelKey entity.
+func (ulu *UsageLogUpdate) SetChannelKey(c *ChannelKey) *UsageLogUpdate {
+	return ulu.SetChannelKeyID(c.ID)
+}
+
 // SetGroup sets the "group" edge to the Group entity.
 func (ulu *UsageLogUpdate) SetGroup(g *Group) *UsageLogUpdate {
 	return ulu.SetGroupID(g.ID)
@@ -803,6 +829,12 @@ func (ulu *UsageLogUpdate) ClearAPIKey() *UsageLogUpdate {
 // ClearChannel clears the "channel" edge to the Channel entity.
 func (ulu *UsageLogUpdate) ClearChannel() *UsageLogUpdate {
 	ulu.mutation.ClearChannel()
+	return ulu
+}
+
+// ClearChannelKey clears the "channel_key" edge to the ChannelKey entity.
+func (ulu *UsageLogUpdate) ClearChannelKey() *UsageLogUpdate {
+	ulu.mutation.ClearChannelKey()
 	return ulu
 }
 
@@ -1124,6 +1156,35 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if ulu.mutation.ChannelKeyCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.ChannelKeyTable,
+			Columns: []string{usagelog.ChannelKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := ulu.mutation.ChannelKeyIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.ChannelKeyTable,
+			Columns: []string{usagelog.ChannelKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1893,6 +1954,26 @@ func (uluo *UsageLogUpdateOne) ClearChannelID() *UsageLogUpdateOne {
 	return uluo
 }
 
+// SetChannelKeyID sets the "channel_key_id" field.
+func (uluo *UsageLogUpdateOne) SetChannelKeyID(i int) *UsageLogUpdateOne {
+	uluo.mutation.SetChannelKeyID(i)
+	return uluo
+}
+
+// SetNillableChannelKeyID sets the "channel_key_id" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableChannelKeyID(i *int) *UsageLogUpdateOne {
+	if i != nil {
+		uluo.SetChannelKeyID(*i)
+	}
+	return uluo
+}
+
+// ClearChannelKeyID clears the value of the "channel_key_id" field.
+func (uluo *UsageLogUpdateOne) ClearChannelKeyID() *UsageLogUpdateOne {
+	uluo.mutation.ClearChannelKeyID()
+	return uluo
+}
+
 // SetGroupID sets the "group_id" field.
 func (uluo *UsageLogUpdateOne) SetGroupID(i int) *UsageLogUpdateOne {
 	uluo.mutation.SetGroupID(i)
@@ -1928,6 +2009,11 @@ func (uluo *UsageLogUpdateOne) SetChannel(c *Channel) *UsageLogUpdateOne {
 	return uluo.SetChannelID(c.ID)
 }
 
+// SetChannelKey sets the "channel_key" edge to the ChannelKey entity.
+func (uluo *UsageLogUpdateOne) SetChannelKey(c *ChannelKey) *UsageLogUpdateOne {
+	return uluo.SetChannelKeyID(c.ID)
+}
+
 // SetGroup sets the "group" edge to the Group entity.
 func (uluo *UsageLogUpdateOne) SetGroup(g *Group) *UsageLogUpdateOne {
 	return uluo.SetGroupID(g.ID)
@@ -1953,6 +2039,12 @@ func (uluo *UsageLogUpdateOne) ClearAPIKey() *UsageLogUpdateOne {
 // ClearChannel clears the "channel" edge to the Channel entity.
 func (uluo *UsageLogUpdateOne) ClearChannel() *UsageLogUpdateOne {
 	uluo.mutation.ClearChannel()
+	return uluo
+}
+
+// ClearChannelKey clears the "channel_key" edge to the ChannelKey entity.
+func (uluo *UsageLogUpdateOne) ClearChannelKey() *UsageLogUpdateOne {
+	uluo.mutation.ClearChannelKey()
 	return uluo
 }
 
@@ -2304,6 +2396,35 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if uluo.mutation.ChannelKeyCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.ChannelKeyTable,
+			Columns: []string{usagelog.ChannelKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uluo.mutation.ChannelKeyIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.ChannelKeyTable,
+			Columns: []string{usagelog.ChannelKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

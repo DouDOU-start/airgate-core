@@ -55,10 +55,10 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 	switch info.Endpoint {
 	case adaptor.EndpointResponses:
 		body, err = rewritePlainBody(info, req)
-		url = ResponsesURL(info.Channel.BaseURL)
+		url = ResponsesURL(info.ChannelKey.BaseURL)
 	case adaptor.EndpointImagesGenerations:
 		body, err = rewritePlainBody(info, req)
-		url = ImagesGenerationsURL(info.Channel.BaseURL)
+		url = ImagesGenerationsURL(info.ChannelKey.BaseURL)
 	case adaptor.EndpointImagesEdits:
 		if len(info.RawBody) == 0 {
 			return nil, errors.New("images edits 缺少原始 multipart 请求体")
@@ -70,10 +70,10 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 		if info.UpstreamModel != "" && info.UpstreamModel != info.RequestModel {
 			body, err = RewriteMultipartModel(info.RawBody, info.RawContentType, info.UpstreamModel)
 		}
-		url = ImagesEditsURL(info.Channel.BaseURL)
+		url = ImagesEditsURL(info.ChannelKey.BaseURL)
 	case adaptor.EndpointChatCompletions:
 		body, err = rewriteChatBody(info, req)
-		url = ChatCompletionsURL(info.Channel.BaseURL)
+		url = ChatCompletionsURL(info.ChannelKey.BaseURL)
 	default:
 		// 纯透传：openai 协议渠道只可从 chat/responses/images 入口路由到（Pick 协议过滤保证）。
 		return nil, errors.New("openai 兼容渠道仅支持 chat completions / responses / images 端点")
@@ -88,7 +88,7 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 	}
 	httpReq.Header.Set("Content-Type", contentType)
 	httpReq.Header.Set("Authorization", "Bearer "+info.APIKey)
-	for k, v := range info.Channel.HeaderOverride {
+	for k, v := range info.ChannelKey.HeaderOverride {
 		httpReq.Header.Set(k, v)
 	}
 	return httpReq, nil
@@ -104,7 +104,7 @@ func rewriteCommon(info *adaptor.RelayInfo, req *dto.ChatRequest) (*dto.ChatRequ
 			return nil, err
 		}
 	}
-	for k, v := range info.Channel.ParamOverride {
+	for k, v := range info.ChannelKey.ParamOverride {
 		if v == nil {
 			r.Remove(k)
 			continue

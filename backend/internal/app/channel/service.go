@@ -19,28 +19,27 @@ type Reloader interface {
 	Reload(ctx context.Context) error
 }
 
-// Tester 渠道连通性测试接口：走完整 relay adaptor 链路发起一次真实请求。
-// 本棒（P1 第一棒）不提供实现，由 relay 管线落地后注入。
+// Tester 密钥端点连通性测试接口：走完整 relay adaptor 链路发起一次真实请求。
 type Tester interface {
-	// endpoint 仅对 openai 协议渠道生效（chat_completions / responses，空值默认前者）。
-	Test(ctx context.Context, ch Channel, model, endpoint string) (latencyMs int, err error)
+	// endpoint 仅对 openai 协议 key 生效（chat_completions / responses，空值默认前者）。
+	Test(ctx context.Context, key ChannelKey, model, endpoint string) (latencyMs int, err error)
 }
 
 // ModelFetcher 上游拉取接口：模型列表与账户余额。
 type ModelFetcher interface {
 	FetchModels(ctx context.Context, channelType, baseURL, apiKey string) ([]string, error)
-	// FetchBalance 经 key 查上游余额（USD）；不支持的渠道类型返回 ErrBalanceUnsupported。
+	// FetchBalance 经 key 查上游余额（USD）；不支持的类型返回 ErrBalanceUnsupported。
 	FetchBalance(ctx context.Context, channelType, baseURL, apiKey string) (float64, error)
 }
 
-// ConcurrencyReader 渠道在途并发数批量读取（由 scheduler.ConcurrencyManager 实现）。
+// ConcurrencyReader 密钥端点在途并发数批量读取（由 scheduler.ConcurrencyManager 实现）。
 type ConcurrencyReader interface {
-	GetChannelCurrentCounts(ctx context.Context, channelIDs []int) map[int]int
+	GetKeyCurrentCounts(ctx context.Context, channelKeyIDs []int) map[int]int
 }
 
-// RPMReader 渠道当前分钟 RPM 批量读取（由 scheduler.RPMCounter 实现）。
+// RPMReader 密钥端点当前分钟 RPM 批量读取（由 scheduler.RPMCounter 实现）。
 type RPMReader interface {
-	GetChannelRPMs(ctx context.Context, channelIDs []int) map[int]int
+	GetKeyRPMs(ctx context.Context, channelKeyIDs []int) map[int]int
 }
 
 // Service 提供渠道域用例编排。
@@ -69,7 +68,7 @@ func (s *Service) SetReloader(reloader Reloader) {
 	s.reloader = reloader
 }
 
-// SetTester 注入渠道测试器（relay 管线落地后由 server 装配阶段调用）。
+// SetTester 注入密钥端点测试器（relay 管线落地后由 server 装配阶段调用）。
 func (s *Service) SetTester(tester Tester) {
 	s.tester = tester
 }
@@ -110,93 +109,117 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 	}, nil
 }
 
-// attachMoneyStats 为列表页渠道批量填充累计/今日成本收益（基于 usage_logs 聚合）。
-// tz 决定今日口径的当日起点；读取器未注入或查询失败时保持 0 值，不影响列表主流程。
+// attachMoneyStats 为列表页各 key 批量填充成本收益（基于 usage_logs 按 key 聚合），
+// 并把各 key 汇总到所属渠道（rollup）。
 func (s *Service) attachMoneyStats(ctx context.Context, list []Channel, tz string) {
-	if s.stats == nil || len(list) == 0 {
-		return
-	}
-	ids := make([]int, len(list))
-	for i, ch := range list {
-		ids[i] = ch.ID
-	}
-	todayStart := timezone.StartOfDay(time.Now().In(timezone.Resolve(tz)))
-	stats, err := s.stats.GetChannelMoneyStats(ctx, ids, todayStart)
-	if err != nil {
-		logx.LoggerFromContext(ctx).Warn("channel_money_stats_failed", logx.LogFieldError, err)
-		return
-	}
-	for i := range list {
-		list[i].TotalCost = stats[list[i].ID].Cost
-		list[i].TotalRevenue = stats[list[i].ID].Revenue
-		list[i].TodayCost = stats[list[i].ID].TodayCost
-		list[i].TodayRevenue = stats[list[i].ID].TodayRevenue
-	}
-}
-
-// attachRuntimeStats 为列表页渠道批量填充运行时观测指标（在途并发 / 当前分钟 RPM）。
-// 读取器未注入或 Redis 不可用时保持 0 值，不影响列表主流程。
-func (s *Service) attachRuntimeStats(ctx context.Context, list []Channel) {
 	if len(list) == 0 {
 		return
 	}
-	ids := make([]int, len(list))
-	for i, ch := range list {
-		ids[i] = ch.ID
+	// 先按各 key 的余额汇总渠道 Balance（即便无金额读取器也生效）。
+	s.rollupBalance(list)
+
+	if s.stats == nil {
+		return
 	}
-	var counts, rpms map[int]int
-	if s.concurrency != nil {
-		counts = s.concurrency.GetChannelCurrentCounts(ctx, ids)
+	var keyIDs []int
+	for i := range list {
+		for j := range list[i].Keys {
+			keyIDs = append(keyIDs, list[i].Keys[j].ID)
+		}
 	}
-	if s.rpm != nil {
-		rpms = s.rpm.GetChannelRPMs(ctx, ids)
+	if len(keyIDs) == 0 {
+		return
+	}
+	todayStart := timezone.StartOfDay(time.Now().In(timezone.Resolve(tz)))
+	stats, err := s.stats.GetChannelKeyMoneyStats(ctx, keyIDs, todayStart)
+	if err != nil {
+		logx.LoggerFromContext(ctx).Warn("channel_key_money_stats_failed", logx.LogFieldError, err)
+		return
 	}
 	for i := range list {
-		list[i].CurrentConcurrency = counts[list[i].ID]
-		list[i].CurrentRPM = rpms[list[i].ID]
+		var tc, tr, dc, dr float64
+		for j := range list[i].Keys {
+			m := stats[list[i].Keys[j].ID]
+			list[i].Keys[j].TotalCost = m.Cost
+			list[i].Keys[j].TotalRevenue = m.Revenue
+			list[i].Keys[j].TodayCost = m.TodayCost
+			list[i].Keys[j].TodayRevenue = m.TodayRevenue
+			tc += m.Cost
+			tr += m.Revenue
+			dc += m.TodayCost
+			dr += m.TodayRevenue
+		}
+		list[i].TotalCost = tc
+		list[i].TotalRevenue = tr
+		list[i].TodayCost = dc
+		list[i].TodayRevenue = dr
 	}
 }
 
-// Create 创建渠道：api_keys 在本层逐元素加密后落库。
+// rollupBalance 把各 key 的余额汇总到渠道 Balance（求和）、BalanceUpdatedAt 取最新一次刷新。
+func (s *Service) rollupBalance(list []Channel) {
+	for i := range list {
+		var total float64
+		var latest *time.Time
+		for j := range list[i].Keys {
+			k := list[i].Keys[j]
+			total += k.Balance
+			if k.BalanceUpdatedAt != nil && (latest == nil || k.BalanceUpdatedAt.After(*latest)) {
+				latest = k.BalanceUpdatedAt
+			}
+		}
+		list[i].Balance = total
+		list[i].BalanceUpdatedAt = latest
+	}
+}
+
+// attachRuntimeStats 为列表页各 key 批量填充运行时观测指标（在途并发 / 当前分钟 RPM）。
+// 读取器未注入或 Redis 不可用时保持 0 值，不影响列表主流程。
+func (s *Service) attachRuntimeStats(ctx context.Context, list []Channel) {
+	var keyIDs []int
+	for i := range list {
+		for j := range list[i].Keys {
+			keyIDs = append(keyIDs, list[i].Keys[j].ID)
+		}
+	}
+	if len(keyIDs) == 0 {
+		return
+	}
+	var counts, rpms map[int]int
+	if s.concurrency != nil {
+		counts = s.concurrency.GetKeyCurrentCounts(ctx, keyIDs)
+	}
+	if s.rpm != nil {
+		rpms = s.rpm.GetKeyRPMs(ctx, keyIDs)
+	}
+	for i := range list {
+		for j := range list[i].Keys {
+			id := list[i].Keys[j].ID
+			list[i].Keys[j].CurrentConcurrency = counts[id]
+			list[i].Keys[j].CurrentRPM = rpms[id]
+		}
+	}
+}
+
+// Create 创建渠道（仅 name/base_url；key 建后单独添加）。
 func (s *Service) Create(ctx context.Context, input CreateInput) (Channel, error) {
 	logger := logx.LoggerFromContext(ctx)
-
-	encrypted, err := s.encryptKeys(input.APIKeys)
-	if err != nil {
-		logger.Error("channel_api_key_encrypt_failed", "name", input.Name, logx.LogFieldError, err)
-		return Channel{}, err
-	}
-	input.APIKeys = encrypted
 
 	item, err := s.repo.Create(ctx, input)
 	if err != nil {
 		logger.Error("channel_persist_failed", "op", "create", "name", input.Name, logx.LogFieldError, err)
 		return Channel{}, err
 	}
-	logger.Info("channel_created", "channel_id", item.ID, "name", item.Name, "type", item.Type)
+	logger.Info("channel_created", "channel_id", item.ID, "name", item.Name)
 
 	s.reloadRegistry(ctx)
 	s.decorate(&item)
 	return item, nil
 }
 
-// Update 更新渠道（partial）：api_keys 提供即整组替换（本层加密）。
+// Update 更新渠道（partial，仅 name/base_url）。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Channel, error) {
 	logger := logx.LoggerFromContext(ctx)
-
-	if len(input.APIKeys) > 0 {
-		encrypted, err := s.encryptKeys(input.APIKeys)
-		if err != nil {
-			logger.Error("channel_api_key_encrypt_failed", "channel_id", id, logx.LogFieldError, err)
-			return Channel{}, err
-		}
-		input.APIKeys = encrypted
-	}
-	// 手动重新启用时清理上一轮状态残留（错误信息）。
-	if input.Status != nil && *input.Status == StatusEnabled {
-		emptyMsg := ""
-		input.ErrorMsg = &emptyMsg
-	}
 
 	item, err := s.repo.Update(ctx, id, input)
 	if err != nil {
@@ -209,7 +232,64 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Channe
 	return item, nil
 }
 
-// Delete 删除渠道。
+// AddKey 在指定渠道下新增一把 key（明文密钥在本层加密）。
+func (s *Service) AddKey(ctx context.Context, channelID int, key KeyInput) (ChannelKey, error) {
+	logger := logx.LoggerFromContext(ctx)
+
+	cipher, err := s.encryptPlainKey(key.APIKey, true)
+	if err != nil {
+		return ChannelKey{}, err
+	}
+	key.APIKey = cipher
+
+	item, err := s.repo.CreateKey(ctx, channelID, key)
+	if err != nil {
+		logger.Error("channel_persist_failed", "op", "add_key", "channel_id", channelID, logx.LogFieldError, err)
+		return ChannelKey{}, err
+	}
+	logger.Info("channel_key_added", "channel_id", channelID, "channel_key_id", item.ID, "type", item.Type)
+
+	s.reloadRegistry(ctx)
+	item.APIKeyHint = s.keyHint(item.APIKey)
+	return item, nil
+}
+
+// UpdateKey 单把密钥端点 partial 更新（模型/映射弹窗、单 key 编辑用）。
+// APIKey 提供即加密替换（空串保持原密钥）。
+func (s *Service) UpdateKey(ctx context.Context, keyID int, key KeyInput) (ChannelKey, error) {
+	logger := logx.LoggerFromContext(ctx)
+
+	cipher, err := s.encryptPlainKey(key.APIKey, false)
+	if err != nil {
+		return ChannelKey{}, err
+	}
+	key.APIKey = cipher
+
+	item, err := s.repo.UpdateKey(ctx, keyID, key)
+	if err != nil {
+		logger.Error("channel_persist_failed", "op", "update_key", "channel_key_id", keyID, logx.LogFieldError, err)
+		return ChannelKey{}, err
+	}
+
+	s.reloadRegistry(ctx)
+	item.APIKeyHint = s.keyHint(item.APIKey)
+	return item, nil
+}
+
+// DeleteKey 删除一把 key。
+func (s *Service) DeleteKey(ctx context.Context, keyID int) error {
+	logger := logx.LoggerFromContext(ctx)
+	if err := s.repo.DeleteKey(ctx, keyID); err != nil {
+		logger.Error("channel_persist_failed", "op", "delete_key", "channel_key_id", keyID, logx.LogFieldError, err)
+		return err
+	}
+	logger.Info("channel_key_deleted", "channel_key_id", keyID)
+
+	s.reloadRegistry(ctx)
+	return nil
+}
+
+// Delete 删除渠道（级联删除其 key）。
 func (s *Service) Delete(ctx context.Context, id int) error {
 	logger := logx.LoggerFromContext(ctx)
 	if err := s.repo.Delete(ctx, id); err != nil {
@@ -222,7 +302,7 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
-// BulkUpdate 批量启停/删除/调优先级，返回受影响行数。
+// BulkUpdate 批量启停/删除/调优先级（作用于选中渠道下的全部 key），返回受影响渠道数。
 func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) (int, error) {
 	logger := logx.LoggerFromContext(ctx)
 
@@ -247,12 +327,12 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) (int, e
 	return affected, nil
 }
 
-// Test 测试渠道连通性：走 relay adaptor 链路发一次真实请求。
-// 成功后记录响应耗时；若渠道处于 disabled_auto 则恢复 enabled 并清 error_msg。
-func (s *Service) Test(ctx context.Context, id int, model, endpoint string) (int, error) {
+// Test 测试单把密钥端点连通性：走 relay adaptor 链路发一次真实请求。
+// 成功后记录响应耗时；若 key 处于 disabled_auto 则恢复 enabled 并清 error_msg。
+func (s *Service) Test(ctx context.Context, keyID int, model, endpoint string) (int, error) {
 	logger := logx.LoggerFromContext(ctx)
 
-	ch, err := s.repo.FindByID(ctx, id)
+	key, err := s.repo.FindKeyByID(ctx, keyID)
 	if err != nil {
 		return 0, err
 	}
@@ -261,33 +341,33 @@ func (s *Service) Test(ctx context.Context, id int, model, endpoint string) (int
 	}
 
 	if model == "" {
-		model = ch.TestModel
+		model = key.TestModel
 	}
-	if model == "" && len(ch.Models) > 0 {
-		model = ch.Models[0]
+	if model == "" && len(key.Models) > 0 {
+		model = key.Models[0]
 	}
 
-	latency, err := s.tester.Test(ctx, ch, model, endpoint)
+	latency, err := s.tester.Test(ctx, key, model, endpoint)
 	if err != nil {
-		logger.Warn("channel_test_failed", "channel_id", id, "model", model, logx.LogFieldError, err)
+		logger.Warn("channel_key_test_failed", "channel_key_id", keyID, "model", model, logx.LogFieldError, err)
 		return 0, fmt.Errorf("%w: %v", ErrTestFailed, err)
 	}
 
-	if err := s.repo.UpdateTestResult(ctx, id, latency, time.Now()); err != nil {
-		logger.Warn("channel_persist_failed", "op", "test_result", "channel_id", id, logx.LogFieldError, err)
+	if err := s.repo.UpdateKeyTestResult(ctx, keyID, latency, time.Now()); err != nil {
+		logger.Warn("channel_persist_failed", "op", "test_result", "channel_key_id", keyID, logx.LogFieldError, err)
 	}
-	// 测试通过 → 自动禁用渠道恢复可用（手动禁用不恢复）。
+	// 测试通过 → 自动禁用 key 恢复可用（手动禁用不恢复）。
 	// 重读当前状态再判断：测试窗口（最长 30s）内管理员可能已改为手动禁用，
 	// 凭测前快照恢复会静默推翻手动操作。
-	if ch.Status == StatusDisabledAuto {
-		current, err := s.repo.FindByID(ctx, id)
+	if key.Status == StatusDisabledAuto {
+		current, err := s.repo.FindKeyByID(ctx, keyID)
 		if err != nil {
-			logger.Warn("channel_persist_failed", "op", "test_recover_recheck", "channel_id", id, logx.LogFieldError, err)
+			logger.Warn("channel_persist_failed", "op", "test_recover_recheck", "channel_key_id", keyID, logx.LogFieldError, err)
 		} else if current.Status == StatusDisabledAuto {
-			if err := s.repo.UpdateState(ctx, id, StatusEnabled, ""); err != nil {
-				logger.Warn("channel_persist_failed", "op", "test_recover", "channel_id", id, logx.LogFieldError, err)
+			if err := s.repo.UpdateKeyState(ctx, keyID, StatusEnabled, ""); err != nil {
+				logger.Warn("channel_persist_failed", "op", "test_recover", "channel_key_id", keyID, logx.LogFieldError, err)
 			} else {
-				logger.Info("channel_recovered_by_test", "channel_id", id)
+				logger.Info("channel_key_recovered_by_test", "channel_key_id", keyID)
 			}
 		}
 	}
@@ -296,86 +376,65 @@ func (s *Service) Test(ctx context.Context, id int, model, endpoint string) (int
 	return latency, nil
 }
 
-// FetchModels 从上游拉取模型列表（用渠道第一个 API Key）。成败均写上游请求日志。
-func (s *Service) FetchModels(ctx context.Context, id int) ([]string, error) {
+// FetchModels 从上游拉取模型列表（用指定密钥端点）。
+func (s *Service) FetchModels(ctx context.Context, keyID int) ([]string, error) {
 	logger := logx.LoggerFromContext(ctx)
 
-	ch, err := s.repo.FindByID(ctx, id)
+	key, err := s.repo.FindKeyByID(ctx, keyID)
 	if err != nil {
 		return nil, err
 	}
-	if len(ch.APIKeys) == 0 {
+	if key.APIKey == "" {
 		return nil, ErrNoAPIKey
 	}
-	apiKey, err := auth.DecryptAPIKey(ch.APIKeys[0], s.secret)
+	apiKey, err := auth.DecryptAPIKey(key.APIKey, s.secret)
 	if err != nil {
-		logger.Error("channel_api_key_decrypt_failed", "channel_id", id, logx.LogFieldError, err)
+		logger.Error("channel_api_key_decrypt_failed", "channel_key_id", keyID, logx.LogFieldError, err)
 		return nil, fmt.Errorf("%w: API Key 解密失败", ErrModelFetchFailed)
 	}
 
-	return s.fetchModels(ctx, ch.Type, ch.BaseURL, apiKey)
+	return s.fetchModels(ctx, key.Type, key.BaseURL, apiKey)
 }
 
 // FetchModelsWithKey 按给定连接参数（明文 key）拉取上游模型列表。
-// 供渠道尚未保存时的预览拉取使用：表单填好 type/base_url/api_key 即可试拉，
-// 不要求渠道已落库，解开「保存要先有模型、拉模型要先保存」的死锁。
-// 结果当场返回给管理员，不留痕（留痕判据：事后排障需要且当场看不到）。
+// 供 key 尚未保存时的预览拉取使用：表单填好 type/base_url/api_key 即可试拉，
+// 不要求已落库，解开「保存要先有模型、拉模型要先保存」的死锁。
 func (s *Service) FetchModelsWithKey(ctx context.Context, channelType, baseURL, apiKey string) ([]string, error) {
 	return s.fetchModels(ctx, channelType, baseURL, apiKey)
 }
 
-// RefreshBalance 经渠道全部 key 查询上游余额并求和，落库后返回。
-// 多 key 求和 = 该渠道背后总可用额度；单个 key 查询失败跳过并计入告警，
-// 全部失败才整体报错。仅 openai_compatible 中转站可查（其余返回 ErrBalanceUnsupported）。
-func (s *Service) RefreshBalance(ctx context.Context, id int) (float64, *time.Time, error) {
+// RefreshBalance 查询指定 key 的上游余额并落库返回（key 级）。
+// 仅 openai_compatible 中转站可查，其余类型返回 ErrBalanceUnsupported。
+func (s *Service) RefreshBalance(ctx context.Context, keyID int) (float64, *time.Time, error) {
 	logger := logx.LoggerFromContext(ctx)
 
-	ch, err := s.repo.FindByID(ctx, id)
+	key, err := s.repo.FindKeyByID(ctx, keyID)
 	if err != nil {
 		return 0, nil, err
 	}
-	if len(ch.APIKeys) == 0 {
+	if key.APIKey == "" {
 		return 0, nil, ErrNoAPIKey
 	}
-
-	var total float64
-	var okCount, failCount int
-	var lastErr error
-	for _, encrypted := range ch.APIKeys {
-		apiKey, derr := auth.DecryptAPIKey(encrypted, s.secret)
-		if derr != nil {
-			logger.Warn("channel_api_key_decrypt_failed", "channel_id", id, logx.LogFieldError, derr)
-			failCount++
-			lastErr = derr
-			continue
-		}
-		bal, berr := s.fetcher.FetchBalance(ctx, ch.Type, ch.BaseURL, apiKey)
-		if berr != nil {
-			// 类型不支持是确定性结果，无需逐 key 重试——直接透传。
-			if errors.Is(berr, ErrBalanceUnsupported) {
-				return 0, nil, ErrBalanceUnsupported
-			}
-			logger.Warn("channel_fetch_balance_failed", "channel_id", id, logx.LogFieldError, berr)
-			failCount++
-			lastErr = berr
-			continue
-		}
-		total += bal
-		okCount++
+	apiKey, derr := auth.DecryptAPIKey(key.APIKey, s.secret)
+	if derr != nil {
+		logger.Warn("channel_api_key_decrypt_failed", "channel_key_id", keyID, logx.LogFieldError, derr)
+		return 0, nil, fmt.Errorf("%w: %v", ErrBalanceFetchFailed, derr)
 	}
-	if okCount == 0 {
-		return 0, nil, fmt.Errorf("%w: %v", ErrBalanceFetchFailed, lastErr)
+	bal, berr := s.fetcher.FetchBalance(ctx, key.Type, key.BaseURL, apiKey)
+	if berr != nil {
+		if errors.Is(berr, ErrBalanceUnsupported) {
+			return 0, nil, ErrBalanceUnsupported
+		}
+		logger.Warn("channel_fetch_balance_failed", "channel_key_id", keyID, logx.LogFieldError, berr)
+		return 0, nil, fmt.Errorf("%w: %v", ErrBalanceFetchFailed, berr)
 	}
 
 	now := time.Now()
-	if err := s.repo.UpdateBalance(ctx, id, total, now); err != nil {
-		logger.Warn("channel_persist_failed", "op", "balance", "channel_id", id, logx.LogFieldError, err)
+	if err := s.repo.UpdateKeyBalance(ctx, keyID, bal, now); err != nil {
+		logger.Warn("channel_persist_failed", "op", "balance", "channel_key_id", keyID, logx.LogFieldError, err)
 		return 0, nil, err
 	}
-	if failCount > 0 {
-		logger.Warn("channel_balance_partial", "channel_id", id, "ok", okCount, "fail", failCount)
-	}
-	return total, &now, nil
+	return bal, &now, nil
 }
 
 // fetchModels 拉取主体（无留痕）。
@@ -388,9 +447,9 @@ func (s *Service) fetchModels(ctx context.Context, channelType, baseURL, apiKey 
 	return models, nil
 }
 
-// LoadAllForRegistry 实现 registry.Loader：全量加载渠道并
-// 解密 api_keys，产出运行时快照。
-func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelSnapshot, error) {
+// LoadAllForRegistry 实现 registry.Loader：全量加载渠道及其 key，
+// 逐 key 解密 api_key，产出运行时快照（每把 key 一份，携带所属渠道 base_url）。
+func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelKeySnapshot, error) {
 	logger := logx.LoggerFromContext(ctx)
 
 	items, err := s.repo.ListAll(ctx)
@@ -398,99 +457,87 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelSna
 		return nil, err
 	}
 
-	snaps := make([]registry.ChannelSnapshot, 0, len(items))
+	var snaps []registry.ChannelKeySnapshot
 	for _, ch := range items {
-		keys := make([]string, 0, len(ch.APIKeys))
-		for _, encrypted := range ch.APIKeys {
-			plain, err := auth.DecryptAPIKey(encrypted, s.secret)
+		for _, key := range ch.Keys {
+			plain, err := auth.DecryptAPIKey(key.APIKey, s.secret)
 			if err != nil {
-				logger.Warn("channel_api_key_decrypt_failed", "channel_id", ch.ID, logx.LogFieldError, err)
+				logger.Warn("channel_api_key_decrypt_failed", "channel_key_id", key.ID, logx.LogFieldError, err)
 				continue
 			}
-			keys = append(keys, plain)
-		}
 
-		models := make(map[string]struct{}, len(ch.Models))
-		for _, m := range ch.Models {
-			models[m] = struct{}{}
-		}
-		groups := make(map[int]struct{}, len(ch.GroupIDs))
-		for _, g := range ch.GroupIDs {
-			groups[g] = struct{}{}
-		}
+			models := make(map[string]struct{}, len(key.Models))
+			for _, m := range key.Models {
+				models[m] = struct{}{}
+			}
+			groups := make(map[int]struct{}, len(key.GroupIDs))
+			for _, g := range key.GroupIDs {
+				groups[g] = struct{}{}
+			}
 
-		snaps = append(snaps, registry.ChannelSnapshot{
-			ID:             ch.ID,
-			Name:           ch.Name,
-			Type:           ch.Type,
-			BaseURL:        ch.BaseURL,
-			APIKeys:        keys,
-			Models:         models,
-			ModelMapping:   ch.ModelMapping,
-			ParamOverride:  ch.ParamOverride,
-			HeaderOverride: ch.HeaderOverride,
-			Priority:       ch.Priority,
-			Weight:         ch.Weight,
-			MaxConcurrency: ch.MaxConcurrency,
-			MaxRPM:         ch.MaxRPM,
-			CostRatio:      ch.CostRatio,
-			Status:         ch.Status,
-			GroupIDs:       groups,
-			TestModel:      ch.TestModel,
-		})
+			snaps = append(snaps, registry.ChannelKeySnapshot{
+				KeyID:          key.ID,
+				ChannelID:      ch.ID,
+				ChannelName:    ch.Name,
+				BaseURL:        ch.BaseURL,
+				Type:           key.Type,
+				APIKey:         plain,
+				Models:         models,
+				ModelMapping:   key.ModelMapping,
+				ParamOverride:  key.ParamOverride,
+				HeaderOverride: key.HeaderOverride,
+				Priority:       key.Priority,
+				Weight:         key.Weight,
+				MaxConcurrency: key.MaxConcurrency,
+				MaxRPM:         key.MaxRPM,
+				CostRatio:      key.CostRatio,
+				Status:         key.Status,
+				GroupIDs:       groups,
+				TestModel:      key.TestModel,
+			})
+		}
 	}
 	return snaps, nil
 }
 
-// PersistState 实现 registry.Persister：渠道调度状态异步落库。
-func (s *Service) PersistState(ctx context.Context, id int, status string, errMsg string) error {
-	return s.repo.UpdateState(ctx, id, status, errMsg)
+// PersistState 实现 registry.Persister：密钥端点调度状态异步落库。
+func (s *Service) PersistState(ctx context.Context, keyID int, status string, errMsg string) error {
+	return s.repo.UpdateKeyState(ctx, keyID, status, errMsg)
 }
 
-// encryptKeys 逐元素加密 API Key（去除首尾空白、跳过空行）。
-func (s *Service) encryptKeys(keys []string) ([]string, error) {
-	encrypted := make([]string, 0, len(keys))
-	for _, key := range keys {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
+// encryptPlainKey 加密明文密钥；requireKey=true（新增）时必须非空，
+// false（更新）时空串返回空串（表示保持原密钥不变）。
+func (s *Service) encryptPlainKey(plain string, requireKey bool) (string, error) {
+	plain = strings.TrimSpace(plain)
+	if plain == "" {
+		if requireKey {
+			return "", ErrNoAPIKey
 		}
-		cipher, err := auth.EncryptAPIKey(key, s.secret)
-		if err != nil {
-			return nil, err
-		}
-		encrypted = append(encrypted, cipher)
+		return "", nil
 	}
-	if len(encrypted) == 0 {
-		return nil, ErrNoAPIKey
-	}
-	return encrypted, nil
+	return auth.EncryptAPIKey(plain, s.secret)
 }
 
-// decorate 为领域对象补充解密派生字段（api_key_hints）。
+// decorate 为渠道下各 key 补充解密派生字段（api_key_hint）。
 //
 // 有意保留"列表时逐 key 解密生成 hint"的实现：AES-GCM 解密为纯内存操作
-// （微秒级），渠道数量为管理面小规模数据，代价可忽略；相比 hint 落库省去
-// schema 变更与存量回填。若未来渠道/key 规模显著增长再考虑物化。
+// （微秒级），渠道数量为管理面小规模数据，代价可忽略。
 func (s *Service) decorate(ch *Channel) {
-	hints := make([]string, 0, len(ch.APIKeys))
-	for _, encrypted := range ch.APIKeys {
-		plain, err := auth.DecryptAPIKey(encrypted, s.secret)
-		if err != nil {
-			hints = append(hints, "（无法解密）")
-			continue
-		}
-		hints = append(hints, buildChannelKeyHint(plain))
+	for i := range ch.Keys {
+		ch.Keys[i].APIKeyHint = s.keyHint(ch.Keys[i].APIKey)
 	}
-	ch.APIKeyHints = hints
 }
 
-// buildChannelKeyHint 生成密钥提示：前 3 字符 + 省略号 + 尾 4 位（形如 "sk-…f3ab"）。
-func buildChannelKeyHint(key string) string {
-	if len(key) <= 8 {
+// keyHint 解密密文生成密钥提示（前 3 字符 + 省略号 + 尾 4 位，形如 "sk-…f3ab"）。
+func (s *Service) keyHint(cipher string) string {
+	plain, err := auth.DecryptAPIKey(cipher, s.secret)
+	if err != nil {
+		return "（无法解密）"
+	}
+	if len(plain) <= 8 {
 		return "…"
 	}
-	return key[:3] + "…" + key[len(key)-4:]
+	return plain[:3] + "…" + plain[len(plain)-4:]
 }
 
 // reloadRegistry 写操作成功后触发注册表重载；失败仅记日志，不影响主流程。

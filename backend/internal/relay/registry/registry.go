@@ -1,7 +1,10 @@
-// Package registry 提供渠道调度的内存注册表：
-// 全量渠道快照（api_keys 已解密）常驻内存，
-// 转发管线经 Pick 选渠道、NextKey 轮询密钥；状态变更（自动禁用/恢复）
+// Package registry 提供密钥端点调度的内存注册表：
+// 全量渠道密钥端点快照（api_key 已解密）常驻内存，
+// 转发管线经 Pick 直接选中一把 key；状态变更（自动禁用/恢复）
 // 内存即时生效并经 Persister 异步落库。
+//
+// 路由单元为「渠道下的一把 key（ChannelKey）」：协议类型、模型、分组、
+// 优先级/权重、限流上限、成本倍率、启停状态均在 key 级；base_url 由所属渠道共享。
 //
 // 依赖约束：本包禁止 import ent 或 internal/app/channel（防环）；
 // 数据加载与落库均经 Loader / Persister 窄接口由外部注入。
@@ -18,15 +21,15 @@ import (
 	"time"
 )
 
-// 渠道状态常量，与 ent schema 的 status 枚举一致。
+// key 端点状态常量，与 ent schema 的 channel_key.status 枚举一致。
 const (
 	StatusEnabled        = "enabled"
 	StatusDisabledManual = "disabled_manual"
 	StatusDisabledAuto   = "disabled_auto"
 )
 
-// 入口协议常量：纯透传网关不做跨协议翻译，Pick 只在与入口协议同构的渠道类型集合内调度。
-// 任务类协议（openai_video / suno）的常量值与渠道 Type、task.platform 同值——
+// 入口协议常量：纯透传网关不做跨协议翻译，Pick 只在与入口协议同构的 key 类型集合内调度。
+// 任务类协议（openai_video / suno）的常量值与 key.Type、task.platform 同值——
 // 任务子系统按平台分树路由，协议即平台。
 const (
 	ProtocolOpenAI      = "openai"
@@ -36,9 +39,9 @@ const (
 	ProtocolSuno        = "suno"
 )
 
-// protocolChannelTypes 入口协议 → 可路由渠道 Type 集合。
-// custom 语义为「OpenAI 兼容自定义渠道」，归 openai 协议组。
-var protocolChannelTypes = map[string]map[string]struct{}{
+// protocolKeyTypes 入口协议 → 可路由 key Type 集合。
+// custom 语义为「OpenAI 兼容自定义端点」，归 openai 协议组。
+var protocolKeyTypes = map[string]map[string]struct{}{
 	ProtocolOpenAI:      {"openai_compatible": {}, "custom": {}},
 	ProtocolAnthropic:   {"anthropic": {}},
 	ProtocolGemini:      {"gemini": {}},
@@ -46,37 +49,41 @@ var protocolChannelTypes = map[string]map[string]struct{}{
 	ProtocolSuno:        {"suno": {}},
 }
 
-// channelTypesForProtocol 返回协议可路由的渠道类型集合；
-// 未知协议（含空串）返回 nil，Pick 侧表现为无可用渠道。
-func channelTypesForProtocol(protocol string) map[string]struct{} {
-	return protocolChannelTypes[protocol]
+// keyTypesForProtocol 返回协议可路由的 key 类型集合；
+// 未知协议（含空串）返回 nil，Pick 侧表现为无可用 key。
+func keyTypesForProtocol(protocol string) map[string]struct{} {
+	return protocolKeyTypes[protocol]
 }
 
-// protocolForChannelType 渠道 Type → 入口协议（protocolChannelTypes 的反向映射）；
+// protocolForKeyType key Type → 入口协议（protocolKeyTypes 的反向映射）；
 // 未知类型返回空串（不进模型目录）。
-func protocolForChannelType(chType string) string {
-	for proto, types := range protocolChannelTypes {
-		if _, ok := types[chType]; ok {
+func protocolForKeyType(keyType string) string {
+	for proto, types := range protocolKeyTypes {
+		if _, ok := types[keyType]; ok {
 			return proto
 		}
 	}
 	return ""
 }
 
-// ErrNoAvailableChannel 表示当前分组/模型下无可调度渠道。
+// ErrNoAvailableChannel 表示当前分组/模型下无可调度的 key 端点。
 var ErrNoAvailableChannel = errors.New("无可用渠道")
 
-// ChannelSnapshot 渠道运行时快照（解密后）。
+// ChannelKeySnapshot 渠道密钥端点运行时快照（解密后）。
 //
 // Pick 返回的快照为只读视图：注册表内部以 copy-on-write 方式更新，
 // 调用方持有的指针不会被并发修改，但也禁止就地改写。
-type ChannelSnapshot struct {
-	ID      int
-	Name    string
-	Type    string
+type ChannelKeySnapshot struct {
+	// KeyID 密钥端点（channel_key）ID：调度/限流/故障隔离的最小单元标识。
+	KeyID int
+	// ChannelID / ChannelName 所属渠道（供应商）标识，供计费聚合与留痕。
+	ChannelID   int
+	ChannelName string
+	// BaseURL 上游地址，来自所属渠道（供应商共享）。
 	BaseURL string
-	// APIKeys 已解密的明文密钥列表。
-	APIKeys []string
+	Type    string
+	// APIKey 已解密的明文密钥。
+	APIKey string
 	// Models 可服务的对外模型名集合。
 	Models map[string]struct{}
 	// ModelMapping 对外模型名 → 上游模型名。
@@ -89,19 +96,19 @@ type ChannelSnapshot struct {
 	MaxRPM         int
 	CostRatio      float64
 	Status         string
-	// GroupIDs 绑定分组集合；空集合表示公共渠道，对所有分组可用。
+	// GroupIDs 绑定分组集合；空集合表示公共 key，对所有分组可用。
 	GroupIDs  map[int]struct{}
 	TestModel string
 }
 
-// Loader 全量加载渠道快照（由 channel service 实现：解密 api_keys）。
+// Loader 全量加载密钥端点快照（由 channel service 实现：解密 api_key）。
 type Loader interface {
-	LoadAllForRegistry(ctx context.Context) ([]ChannelSnapshot, error)
+	LoadAllForRegistry(ctx context.Context) ([]ChannelKeySnapshot, error)
 }
 
-// Persister 渠道状态异步落库（由 channel service 实现）。
+// Persister 密钥端点状态异步落库（由 channel service 实现）。
 type Persister interface {
-	PersistState(ctx context.Context, id int, status string, errMsg string) error
+	PersistState(ctx context.Context, keyID int, status string, errMsg string) error
 }
 
 // 惰性兜底加载参数：注册表从未成功加载过（如启动时 DB 瞬断）时，
@@ -111,14 +118,13 @@ const (
 	lazyReloadInterval = 3 * time.Second
 )
 
-// Registry 渠道注册表：RWMutex 保护的全量快照 + 渠道内 key 轮询计数器。
+// Registry 密钥端点注册表：RWMutex 保护的全量快照（按 keyID 组织）。
 type Registry struct {
 	loader    Loader
 	persister Persister
 
-	mu       sync.RWMutex
-	channels map[int]*ChannelSnapshot
-	counters map[int]*atomic.Uint64
+	mu   sync.RWMutex
+	keys map[int]*ChannelKeySnapshot
 
 	// loadedOnce 是否成功加载过：false 时 Pick 触发惰性兜底重载。
 	loadedOnce atomic.Bool
@@ -134,51 +140,38 @@ type Registry struct {
 	persistTimeout time.Duration
 }
 
-// New 创建渠道注册表。loader 必填；persister 可为 nil（不落库，仅内存生效）。
+// New 创建密钥端点注册表。loader 必填；persister 可为 nil（不落库，仅内存生效）。
 func New(loader Loader, persister Persister) *Registry {
 	return &Registry{
 		loader:         loader,
 		persister:      persister,
-		channels:       map[int]*ChannelSnapshot{},
-		counters:       map[int]*atomic.Uint64{},
+		keys:           map[int]*ChannelKeySnapshot{},
 		randFn:         rand.IntN,
 		persistTimeout: 5 * time.Second,
 	}
 }
 
-// Reload 从 Loader 拉取全量快照并整体替换；保留仍存在渠道的 key 轮询计数器。
+// Reload 从 Loader 拉取全量快照并整体替换。
 func (r *Registry) Reload(ctx context.Context) error {
 	snaps, err := r.loader.LoadAllForRegistry(ctx)
 	if err != nil {
 		return err
 	}
 
-	next := make(map[int]*ChannelSnapshot, len(snaps))
+	next := make(map[int]*ChannelKeySnapshot, len(snaps))
 	for i := range snaps {
 		snap := snaps[i]
-		next[snap.ID] = &snap
+		next[snap.KeyID] = &snap
 	}
 
 	r.mu.Lock()
-	r.channels = next
-	for id := range next {
-		if _, ok := r.counters[id]; !ok {
-			r.counters[id] = new(atomic.Uint64)
-		}
-	}
-	for id := range r.counters {
-		if _, ok := next[id]; !ok {
-			delete(r.counters, id)
-		}
-	}
+	r.keys = next
 	r.mu.Unlock()
 	r.loadedOnce.Store(true)
 	return nil
 }
 
 // ensureLoaded 注册表从未成功加载过时惰性触发一次重载（Pick 前调用）。
-// TryLock 单飞：另一请求正在重载时直接返回用当前（空）快照；
-// 节流间隔内不重复打 DB。加载成功后此路径永不再触发。
 func (r *Registry) ensureLoaded() {
 	if r.loadedOnce.Load() {
 		return
@@ -203,104 +196,101 @@ func (r *Registry) ensureLoaded() {
 	}
 }
 
-// Pick 为指定分组、模型与入口协议选择一个渠道：
+// Pick 为指定分组、模型与入口协议选择一把 key 端点：
 //
 //	候选 = status==enabled 且模型命中
-//	       且渠道 Type 属于入口协议的同构类型集合（纯透传：不做跨协议翻译，
-//	       同一模型可同时存在于多协议渠道，Pick 只在协议匹配的集合内调度）
-//	       且分组命中（渠道 GroupIDs 为空 = 公共渠道）且不在 exclude 中
+//	       且 key.Type 属于入口协议的同构类型集合（纯透传：不做跨协议翻译）
+//	       且分组命中（key.GroupIDs 为空 = 公共 key）且不在 exclude（按 keyID）中
 //	→ 取最高 priority 档 → 档内按 weight+10 加权随机。
 //
 // 无候选返回 ErrNoAvailableChannel。
-func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*ChannelSnapshot, error) {
+func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*ChannelKeySnapshot, error) {
 	r.ensureLoaded()
 
 	excluded := make(map[int]struct{}, len(exclude))
 	for _, id := range exclude {
 		excluded[id] = struct{}{}
 	}
-	allowedTypes := channelTypesForProtocol(protocol)
+	allowedTypes := keyTypesForProtocol(protocol)
 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	// 单趟扫描：维护当前最高 priority 档。
-	var tier []*ChannelSnapshot
+	var tier []*ChannelKeySnapshot
 	best := -1
-	for _, ch := range r.channels {
-		if _, skip := excluded[ch.ID]; skip {
+	for _, k := range r.keys {
+		if _, skip := excluded[k.KeyID]; skip {
 			continue
 		}
-		if _, ok := allowedTypes[ch.Type]; !ok {
+		if _, ok := allowedTypes[k.Type]; !ok {
 			continue
 		}
-		if ch.Status != StatusEnabled {
+		if k.Status != StatusEnabled {
 			continue
 		}
-		if _, ok := ch.Models[model]; !ok {
+		if _, ok := k.Models[model]; !ok {
 			continue
 		}
-		if len(ch.GroupIDs) > 0 {
-			if _, ok := ch.GroupIDs[groupID]; !ok {
+		if len(k.GroupIDs) > 0 {
+			if _, ok := k.GroupIDs[groupID]; !ok {
 				continue
 			}
 		}
-		if ch.Priority > best {
-			best = ch.Priority
+		if k.Priority > best {
+			best = k.Priority
 			tier = tier[:0]
 		}
-		if ch.Priority == best {
-			tier = append(tier, ch)
+		if k.Priority == best {
+			tier = append(tier, k)
 		}
 	}
 	if len(tier) == 0 {
 		return nil, ErrNoAvailableChannel
 	}
 
-	// 档内按 ID 排序：map 遍历无序，排序保证同一随机值的选择结果可复现（也便于测试）。
-	sort.Slice(tier, func(i, j int) bool { return tier[i].ID < tier[j].ID })
+	// 档内按 KeyID 排序：map 遍历无序，排序保证同一随机值的选择结果可复现（也便于测试）。
+	sort.Slice(tier, func(i, j int) bool { return tier[i].KeyID < tier[j].KeyID })
 
 	total := 0
-	for _, ch := range tier {
-		total += ch.Weight + 10
+	for _, k := range tier {
+		total += k.Weight + 10
 	}
 	n := r.randFn(total)
-	for _, ch := range tier {
-		n -= ch.Weight + 10
+	for _, k := range tier {
+		n -= k.Weight + 10
 		if n < 0 {
-			return ch, nil
+			return k, nil
 		}
 	}
 	return tier[len(tier)-1], nil
 }
 
 // ModelEntry 模型目录条目：对外模型名 + 可经哪些入口协议调用（升序）。
-// 同一模型可能同时由多协议渠道供给（如 claude 系模型既有 anthropic 原生渠道
-// 又有 openai 兼容聚合渠道），第一方应用据 Protocols 选端点。
 type ModelEntry struct {
 	Name      string
 	Protocols []string
 }
 
-// ModelEntriesForGroup 返回指定分组可用渠道（status==enabled）的
+// ModelEntriesForGroup 返回指定分组可用 key 端点（status==enabled）的
 // 模型目录（含协议集合），按模型名字典序。
 func (r *Registry) ModelEntriesForGroup(groupID int) []ModelEntry {
 	r.mu.RLock()
 	set := map[string]map[string]struct{}{}
-	for _, ch := range r.channels {
-		if ch.Status != StatusEnabled {
+	for _, k := range r.keys {
+		if k.Status != StatusEnabled {
 			continue
 		}
-		if len(ch.GroupIDs) > 0 {
-			if _, ok := ch.GroupIDs[groupID]; !ok {
+		if len(k.GroupIDs) > 0 {
+			if _, ok := k.GroupIDs[groupID]; !ok {
 				continue
 			}
 		}
-		proto := protocolForChannelType(ch.Type)
+		proto := protocolForKeyType(k.Type)
 		if proto == "" {
 			continue
 		}
-		for m := range ch.Models {
+		for m := range k.Models {
 			if set[m] == nil {
 				set[m] = map[string]struct{}{}
 			}
@@ -322,84 +312,84 @@ func (r *Registry) ModelEntriesForGroup(groupID int) []ModelEntry {
 	return entries
 }
 
-// Snapshot 按 ID 返回渠道只读快照；不存在返回 (nil, false)。
-// 任务子系统用：轮询已落库任务、代理成片内容时须回到提交时的原渠道。
-func (r *Registry) Snapshot(id int) (*ChannelSnapshot, bool) {
+// Snapshot 按 keyID 返回 key 端点只读快照；不存在返回 (nil, false)。
+// 任务子系统用：轮询已落库任务、代理成片内容时须回到提交时的原 key。
+func (r *Registry) Snapshot(keyID int) (*ChannelKeySnapshot, bool) {
 	r.ensureLoaded()
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	ch, ok := r.channels[id]
-	return ch, ok
+	k, ok := r.keys[keyID]
+	return k, ok
 }
 
-// NextKey 渠道内 API Key 原子轮询；渠道不存在或无密钥返回空串。
-func (r *Registry) NextKey(channelID int) string {
+// AnyKeyForChannel 返回指定渠道下任一 enabled key 端点快照（存量任务无 key_id 时回退用）。
+// 无可用 key 返回 (nil, false)。
+func (r *Registry) AnyKeyForChannel(channelID int) (*ChannelKeySnapshot, bool) {
+	r.ensureLoaded()
 	r.mu.RLock()
-	ch, ok := r.channels[channelID]
-	counter := r.counters[channelID]
-	r.mu.RUnlock()
-
-	if !ok || len(ch.APIKeys) == 0 || counter == nil {
-		return ""
+	defer r.mu.RUnlock()
+	for _, k := range r.keys {
+		if k.ChannelID == channelID && k.Status == StatusEnabled {
+			return k, true
+		}
 	}
-	n := counter.Add(1) - 1
-	return ch.APIKeys[int(n%uint64(len(ch.APIKeys)))]
+	return nil, false
 }
 
-// MarkAutoDisabled 自动禁用渠道（上游 401/403）：内存即时生效 + 异步落库。
-func (r *Registry) MarkAutoDisabled(id int, reason string) {
-	snap := r.mutate(id, func(c *ChannelSnapshot) {
-		c.Status = StatusDisabledAuto
+// MarkAutoDisabled 自动禁用 key 端点（上游 401/403）：内存即时生效 + 异步落库。
+func (r *Registry) MarkAutoDisabled(keyID int, reason string) {
+	snap := r.mutate(keyID, func(k *ChannelKeySnapshot) {
+		k.Status = StatusDisabledAuto
 	})
 	if snap == nil {
 		return
 	}
-	r.persistAsync(id, StatusDisabledAuto, reason)
+	r.persistAsync(keyID, StatusDisabledAuto, reason)
 }
 
-// MarkRecovered 将 disabled_auto 渠道恢复为 enabled；其余状态不动（手动禁用不自动恢复）。
-func (r *Registry) MarkRecovered(id int) {
+// MarkRecovered 将 disabled_auto 的 key 恢复为 enabled；其余状态不动（手动禁用不自动恢复）。
+func (r *Registry) MarkRecovered(keyID int) {
 	recovered := false
-	snap := r.mutate(id, func(c *ChannelSnapshot) {
-		if c.Status != StatusDisabledAuto {
+	snap := r.mutate(keyID, func(k *ChannelKeySnapshot) {
+		if k.Status != StatusDisabledAuto {
 			return
 		}
-		c.Status = StatusEnabled
+		k.Status = StatusEnabled
 		recovered = true
 	})
 	if snap == nil || !recovered {
 		return
 	}
-	r.persistAsync(id, StatusEnabled, "")
+	r.persistAsync(keyID, StatusEnabled, "")
 }
 
-// mutate 以 copy-on-write 方式更新指定渠道快照，返回更新后的快照；渠道不存在返回 nil。
-func (r *Registry) mutate(id int, apply func(*ChannelSnapshot)) *ChannelSnapshot {
+// mutate 以 copy-on-write 方式更新指定 key 快照，返回更新后的快照；key 不存在返回 nil。
+func (r *Registry) mutate(keyID int, apply func(*ChannelKeySnapshot)) *ChannelKeySnapshot {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	old, ok := r.channels[id]
+	old, ok := r.keys[keyID]
 	if !ok {
 		return nil
 	}
 	// 浅拷贝：map/slice 字段只读共享，仅标量状态字段被改写。
 	next := *old
 	apply(&next)
-	r.channels[id] = &next
+	r.keys[keyID] = &next
 	return &next
 }
 
-// persistAsync 异步落库渠道状态；失败仅记日志，不影响内存状态。
-func (r *Registry) persistAsync(id int, status string, errMsg string) {
+// persistAsync 异步落库 key 状态；失败仅记日志，不影响内存状态。
+func (r *Registry) persistAsync(keyID int, status string, errMsg string) {
 	if r.persister == nil {
 		return
 	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), r.persistTimeout)
 		defer cancel()
-		if err := r.persister.PersistState(ctx, id, status, errMsg); err != nil {
-			slog.Error("channel_state_persist_failed",
-				"channel_id", id,
+		if err := r.persister.PersistState(ctx, keyID, status, errMsg); err != nil {
+			slog.Error("channel_key_state_persist_failed",
+				"channel_key_id", keyID,
 				"status", status,
 				"error", err)
 		}

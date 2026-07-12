@@ -12,7 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
-	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 	"github.com/DouDOU-start/airgate-core/ent/user"
@@ -144,19 +144,19 @@ func (gc *GroupCreate) SetNillableUpdatedAt(t *time.Time) *GroupCreate {
 	return gc
 }
 
-// AddChannelIDs adds the "channels" edge to the Channel entity by IDs.
-func (gc *GroupCreate) AddChannelIDs(ids ...int) *GroupCreate {
-	gc.mutation.AddChannelIDs(ids...)
+// AddChannelKeyIDs adds the "channel_keys" edge to the ChannelKey entity by IDs.
+func (gc *GroupCreate) AddChannelKeyIDs(ids ...int) *GroupCreate {
+	gc.mutation.AddChannelKeyIDs(ids...)
 	return gc
 }
 
-// AddChannels adds the "channels" edges to the Channel entity.
-func (gc *GroupCreate) AddChannels(c ...*Channel) *GroupCreate {
+// AddChannelKeys adds the "channel_keys" edges to the ChannelKey entity.
+func (gc *GroupCreate) AddChannelKeys(c ...*ChannelKey) *GroupCreate {
 	ids := make([]int, len(c))
 	for i := range c {
 		ids[i] = c[i].ID
 	}
-	return gc.AddChannelIDs(ids...)
+	return gc.AddChannelKeyIDs(ids...)
 }
 
 // AddAllowedUserIDs adds the "allowed_users" edge to the User entity by IDs.
@@ -370,15 +370,15 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		_spec.SetField(group.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
 	}
-	if nodes := gc.mutation.ChannelsIDs(); len(nodes) > 0 {
+	if nodes := gc.mutation.ChannelKeysIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.ChannelsTable,
-			Columns: group.ChannelsPrimaryKey,
+			Table:   group.ChannelKeysTable,
+			Columns: group.ChannelKeysPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

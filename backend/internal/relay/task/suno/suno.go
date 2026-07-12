@@ -50,7 +50,7 @@ func (Adaptor) ParseSubmit(action, contentType string, body []byte) (*task.Submi
 
 // BuildSubmitRequest 构建上游提交请求（体透传；suno 无 model 字段，无需重写）。
 func (Adaptor) BuildSubmitRequest(ctx context.Context, info *task.Info, req *task.SubmitRequest) (*http.Request, error) {
-	url := sunoBase(info.Channel.BaseURL) + "/submit/" + req.Action
+	url := sunoBase(info.ChannelKey.BaseURL) + "/submit/" + req.Action
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(req.Body))
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (Adaptor) ParseSubmitResponse(body []byte) (string, *task.Status, error) {
 
 // BuildQueryRequest 单任务查询（GET {base}/suno/fetch/{id}）。
 func (Adaptor) BuildQueryRequest(ctx context.Context, info *task.Info, taskID string) (*http.Request, error) {
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, sunoBase(info.Channel.BaseURL)+"/fetch/"+taskID, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, sunoBase(info.ChannelKey.BaseURL)+"/fetch/"+taskID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func (Adaptor) BuildBatchQueryRequest(ctx context.Context, info *task.Info, task
 	if err != nil {
 		return nil, err
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, sunoBase(info.Channel.BaseURL)+"/fetch", bytes.NewReader(payload))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, sunoBase(info.ChannelKey.BaseURL)+"/fetch", bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +276,7 @@ func parseProgress(s string) int {
 // setAuthHeaders 设置认证头 + 渠道 header_override。
 func setAuthHeaders(req *http.Request, info *task.Info) {
 	req.Header.Set("Authorization", "Bearer "+info.APIKey)
-	for k, v := range info.Channel.HeaderOverride {
+	for k, v := range info.ChannelKey.HeaderOverride {
 		req.Header.Set(k, v)
 	}
 }

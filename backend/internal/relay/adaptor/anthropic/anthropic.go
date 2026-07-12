@@ -44,10 +44,10 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 	var url string
 	switch info.Endpoint {
 	case adaptor.EndpointMessages:
-		url = messagesURL(info.Channel.BaseURL)
+		url = messagesURL(info.ChannelKey.BaseURL)
 	case adaptor.EndpointMessagesCountTokens:
 		// token 计数端点（零计费，记账跳过在 pipeline 侧）；请求改写与 messages 一致。
-		url = messagesURL(info.Channel.BaseURL) + "/count_tokens"
+		url = messagesURL(info.ChannelKey.BaseURL) + "/count_tokens"
 	default:
 		return nil, errors.New("anthropic 渠道仅支持 /v1/messages 与 /v1/messages/count_tokens 端点")
 	}
@@ -63,7 +63,7 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("x-api-key", info.APIKey)
 	httpReq.Header.Set("anthropic-version", anthropicVersion)
-	for k, v := range info.Channel.HeaderOverride {
+	for k, v := range info.ChannelKey.HeaderOverride {
 		httpReq.Header.Set(k, v)
 	}
 	return httpReq, nil
@@ -78,7 +78,7 @@ func rewriteBody(info *adaptor.RelayInfo, req *dto.ChatRequest) ([]byte, error) 
 			return nil, err
 		}
 	}
-	for k, v := range info.Channel.ParamOverride {
+	for k, v := range info.ChannelKey.ParamOverride {
 		if v == nil {
 			r.Remove(k)
 			continue

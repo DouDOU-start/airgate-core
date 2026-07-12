@@ -475,21 +475,21 @@ func UpdatedAtLTE(v time.Time) predicate.Group {
 	return predicate.Group(sql.FieldLTE(FieldUpdatedAt, v))
 }
 
-// HasChannels applies the HasEdge predicate on the "channels" edge.
-func HasChannels() predicate.Group {
+// HasChannelKeys applies the HasEdge predicate on the "channel_keys" edge.
+func HasChannelKeys() predicate.Group {
 	return predicate.Group(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, true, ChannelsTable, ChannelsPrimaryKey...),
+			sqlgraph.Edge(sqlgraph.M2M, true, ChannelKeysTable, ChannelKeysPrimaryKey...),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
 }
 
-// HasChannelsWith applies the HasEdge predicate on the "channels" edge with a given conditions (other predicates).
-func HasChannelsWith(preds ...predicate.Channel) predicate.Group {
+// HasChannelKeysWith applies the HasEdge predicate on the "channel_keys" edge with a given conditions (other predicates).
+func HasChannelKeysWith(preds ...predicate.ChannelKey) predicate.Group {
 	return predicate.Group(func(s *sql.Selector) {
-		step := newChannelsStep()
+		step := newChannelKeysStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

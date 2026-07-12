@@ -167,9 +167,22 @@ var (
 	ChannelsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "name", Type: field.TypeString},
-		{Name: "type", Type: field.TypeEnum, Enums: []string{"openai_compatible", "anthropic", "gemini", "custom", "openai_video", "suno"}},
 		{Name: "base_url", Type: field.TypeString},
-		{Name: "api_keys", Type: field.TypeJSON},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// ChannelsTable holds the schema information for the "channels" table.
+	ChannelsTable = &schema.Table{
+		Name:       "channels",
+		Columns:    ChannelsColumns,
+		PrimaryKey: []*schema.Column{ChannelsColumns[0]},
+	}
+	// ChannelKeysColumns holds the columns for the "channel_keys" table.
+	ChannelKeysColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "name", Type: field.TypeString, Default: ""},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"openai_compatible", "anthropic", "gemini", "custom", "openai_video", "suno"}},
+		{Name: "api_key", Type: field.TypeString},
 		{Name: "models", Type: field.TypeJSON},
 		{Name: "model_mapping", Type: field.TypeJSON, Nullable: true},
 		{Name: "param_override", Type: field.TypeJSON, Nullable: true},
@@ -185,22 +198,31 @@ var (
 		{Name: "test_model", Type: field.TypeString, Default: ""},
 		{Name: "response_time_ms", Type: field.TypeInt, Default: 0},
 		{Name: "tested_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
 		{Name: "balance", Type: field.TypeFloat64, Default: 0},
 		{Name: "balance_updated_at", Type: field.TypeTime, Nullable: true},
-		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "channel_keys", Type: field.TypeInt},
 	}
-	// ChannelsTable holds the schema information for the "channels" table.
-	ChannelsTable = &schema.Table{
-		Name:       "channels",
-		Columns:    ChannelsColumns,
-		PrimaryKey: []*schema.Column{ChannelsColumns[0]},
+	// ChannelKeysTable holds the schema information for the "channel_keys" table.
+	ChannelKeysTable = &schema.Table{
+		Name:       "channel_keys",
+		Columns:    ChannelKeysColumns,
+		PrimaryKey: []*schema.Column{ChannelKeysColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "channel_keys_channels_keys",
+				Columns:    []*schema.Column{ChannelKeysColumns[24]},
+				RefColumns: []*schema.Column{ChannelsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
-				Name:    "channel_type_status",
+				Name:    "channelkey_type_status",
 				Unique:  false,
-				Columns: []*schema.Column{ChannelsColumns[2], ChannelsColumns[9]},
+				Columns: []*schema.Column{ChannelKeysColumns[2], ChannelKeysColumns[8]},
 			},
 		},
 	}
@@ -428,6 +450,7 @@ var (
 		{Name: "api_key_id", Type: field.TypeInt, Default: 0},
 		{Name: "group_id", Type: field.TypeInt, Default: 0},
 		{Name: "channel_id", Type: field.TypeInt, Default: 0},
+		{Name: "channel_key_id", Type: field.TypeInt, Default: 0},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 	}
@@ -445,12 +468,12 @@ var (
 			{
 				Name:    "task_status_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[4], TasksColumns[26]},
+				Columns: []*schema.Column{TasksColumns[4], TasksColumns[27]},
 			},
 			{
 				Name:    "task_user_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[20], TasksColumns[25]},
+				Columns: []*schema.Column{TasksColumns[20], TasksColumns[26]},
 			},
 			{
 				Name:    "task_request_id",
@@ -581,6 +604,7 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "api_key_usage_logs", Type: field.TypeInt, Nullable: true},
 		{Name: "channel_usage_logs", Type: field.TypeInt, Nullable: true},
+		{Name: "channel_key_usage_logs", Type: field.TypeInt, Nullable: true},
 		{Name: "group_usage_logs", Type: field.TypeInt, Nullable: true},
 		{Name: "user_usage_logs", Type: field.TypeInt, Nullable: true},
 	}
@@ -603,14 +627,20 @@ var (
 				OnDelete:   schema.SetNull,
 			},
 			{
-				Symbol:     "usage_logs_groups_usage_logs",
+				Symbol:     "usage_logs_channel_keys_usage_logs",
 				Columns:    []*schema.Column{UsageLogsColumns[38]},
+				RefColumns: []*schema.Column{ChannelKeysColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "usage_logs_groups_usage_logs",
+				Columns:    []*schema.Column{UsageLogsColumns[39]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_users_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[39]},
+				Columns:    []*schema.Column{UsageLogsColumns[40]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -634,7 +664,7 @@ var (
 			{
 				Name:    "usage_log_user",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[39]},
+				Columns: []*schema.Column{UsageLogsColumns[40]},
 			},
 			{
 				Name:    "usage_log_api_key",
@@ -649,7 +679,7 @@ var (
 			{
 				Name:    "usage_log_group",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[38]},
+				Columns: []*schema.Column{UsageLogsColumns[39]},
 			},
 			{
 				Name:    "usage_log_api_key_created_at",
@@ -662,9 +692,14 @@ var (
 				Columns: []*schema.Column{UsageLogsColumns[37], UsageLogsColumns[35]},
 			},
 			{
-				Name:    "usage_log_group_created_at",
+				Name:    "usage_log_channel_key_created_at",
 				Unique:  false,
 				Columns: []*schema.Column{UsageLogsColumns[38], UsageLogsColumns[35]},
+			},
+			{
+				Name:    "usage_log_group_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[39], UsageLogsColumns[35]},
 			},
 			{
 				Name:    "usage_log_request_id",
@@ -704,26 +739,26 @@ var (
 			},
 		},
 	}
-	// ChannelGroupsColumns holds the columns for the "channel_groups" table.
-	ChannelGroupsColumns = []*schema.Column{
-		{Name: "channel_id", Type: field.TypeInt},
+	// ChannelKeyGroupsColumns holds the columns for the "channel_key_groups" table.
+	ChannelKeyGroupsColumns = []*schema.Column{
+		{Name: "channel_key_id", Type: field.TypeInt},
 		{Name: "group_id", Type: field.TypeInt},
 	}
-	// ChannelGroupsTable holds the schema information for the "channel_groups" table.
-	ChannelGroupsTable = &schema.Table{
-		Name:       "channel_groups",
-		Columns:    ChannelGroupsColumns,
-		PrimaryKey: []*schema.Column{ChannelGroupsColumns[0], ChannelGroupsColumns[1]},
+	// ChannelKeyGroupsTable holds the schema information for the "channel_key_groups" table.
+	ChannelKeyGroupsTable = &schema.Table{
+		Name:       "channel_key_groups",
+		Columns:    ChannelKeyGroupsColumns,
+		PrimaryKey: []*schema.Column{ChannelKeyGroupsColumns[0], ChannelKeyGroupsColumns[1]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "channel_groups_channel_id",
-				Columns:    []*schema.Column{ChannelGroupsColumns[0]},
-				RefColumns: []*schema.Column{ChannelsColumns[0]},
+				Symbol:     "channel_key_groups_channel_key_id",
+				Columns:    []*schema.Column{ChannelKeyGroupsColumns[0]},
+				RefColumns: []*schema.Column{ChannelKeysColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
 			{
-				Symbol:     "channel_groups_group_id",
-				Columns:    []*schema.Column{ChannelGroupsColumns[1]},
+				Symbol:     "channel_key_groups_group_id",
+				Columns:    []*schema.Column{ChannelKeyGroupsColumns[1]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -761,6 +796,7 @@ var (
 		AnnouncementReadsTable,
 		BalanceLogsTable,
 		ChannelsTable,
+		ChannelKeysTable,
 		GroupsTable,
 		ModelPricesTable,
 		ModelTagsTable,
@@ -774,7 +810,7 @@ var (
 		UpstreamRequestLogsTable,
 		UsageLogsTable,
 		UsersTable,
-		ChannelGroupsTable,
+		ChannelKeyGroupsTable,
 		UserAllowedGroupsTable,
 	}
 )
@@ -783,14 +819,16 @@ func init() {
 	APIKeysTable.ForeignKeys[0].RefTable = GroupsTable
 	APIKeysTable.ForeignKeys[1].RefTable = UsersTable
 	BalanceLogsTable.ForeignKeys[0].RefTable = UsersTable
+	ChannelKeysTable.ForeignKeys[0].RefTable = ChannelsTable
 	ModelPricesTable.ForeignKeys[0].RefTable = ModelTagsTable
 	UsageLogsTable.ForeignKeys[0].RefTable = APIKeysTable
 	UsageLogsTable.ForeignKeys[1].RefTable = ChannelsTable
-	UsageLogsTable.ForeignKeys[2].RefTable = GroupsTable
-	UsageLogsTable.ForeignKeys[3].RefTable = UsersTable
+	UsageLogsTable.ForeignKeys[2].RefTable = ChannelKeysTable
+	UsageLogsTable.ForeignKeys[3].RefTable = GroupsTable
+	UsageLogsTable.ForeignKeys[4].RefTable = UsersTable
 	UsersTable.ForeignKeys[0].RefTable = TiersTable
-	ChannelGroupsTable.ForeignKeys[0].RefTable = ChannelsTable
-	ChannelGroupsTable.ForeignKeys[1].RefTable = GroupsTable
+	ChannelKeyGroupsTable.ForeignKeys[0].RefTable = ChannelKeysTable
+	ChannelKeyGroupsTable.ForeignKeys[1].RefTable = GroupsTable
 	UserAllowedGroupsTable.ForeignKeys[0].RefTable = UsersTable
 	UserAllowedGroupsTable.ForeignKeys[1].RefTable = GroupsTable
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
 	"github.com/DouDOU-start/airgate-core/ent/modeltag"
@@ -47,6 +48,7 @@ const (
 	TypeAnnouncementRead      = "AnnouncementRead"
 	TypeBalanceLog            = "BalanceLog"
 	TypeChannel               = "Channel"
+	TypeChannelKey            = "ChannelKey"
 	TypeGroup                 = "Group"
 	TypeModelPrice            = "ModelPrice"
 	TypeModelTag              = "ModelTag"
@@ -4064,53 +4066,23 @@ func (m *BalanceLogMutation) ResetEdge(name string) error {
 // ChannelMutation represents an operation that mutates the Channel nodes in the graph.
 type ChannelMutation struct {
 	config
-	op                  Op
-	typ                 string
-	id                  *int
-	name                *string
-	_type               *channel.Type
-	base_url            *string
-	api_keys            *[]string
-	appendapi_keys      []string
-	models              *[]string
-	appendmodels        []string
-	model_mapping       *map[string]string
-	param_override      *map[string]interface{}
-	header_override     *map[string]string
-	status              *channel.Status
-	error_msg           *string
-	priority            *int
-	addpriority         *int
-	weight              *int
-	addweight           *int
-	max_concurrency     *int
-	addmax_concurrency  *int
-	max_rpm             *int
-	addmax_rpm          *int
-	cost_ratio          *float64
-	addcost_ratio       *float64
-	tags                *[]string
-	appendtags          []string
-	test_model          *string
-	response_time_ms    *int
-	addresponse_time_ms *int
-	tested_at           *time.Time
-	balance             *float64
-	addbalance          *float64
-	balance_updated_at  *time.Time
-	last_used_at        *time.Time
-	created_at          *time.Time
-	updated_at          *time.Time
-	clearedFields       map[string]struct{}
-	groups              map[int]struct{}
-	removedgroups       map[int]struct{}
-	clearedgroups       bool
-	usage_logs          map[int]struct{}
-	removedusage_logs   map[int]struct{}
-	clearedusage_logs   bool
-	done                bool
-	oldValue            func(context.Context) (*Channel, error)
-	predicates          []predicate.Channel
+	op                Op
+	typ               string
+	id                *int
+	name              *string
+	base_url          *string
+	created_at        *time.Time
+	updated_at        *time.Time
+	clearedFields     map[string]struct{}
+	keys              map[int]struct{}
+	removedkeys       map[int]struct{}
+	clearedkeys       bool
+	usage_logs        map[int]struct{}
+	removedusage_logs map[int]struct{}
+	clearedusage_logs bool
+	done              bool
+	oldValue          func(context.Context) (*Channel, error)
+	predicates        []predicate.Channel
 }
 
 var _ ent.Mutation = (*ChannelMutation)(nil)
@@ -4247,42 +4219,6 @@ func (m *ChannelMutation) ResetName() {
 	m.name = nil
 }
 
-// SetType sets the "type" field.
-func (m *ChannelMutation) SetType(c channel.Type) {
-	m._type = &c
-}
-
-// GetType returns the value of the "type" field in the mutation.
-func (m *ChannelMutation) GetType() (r channel.Type, exists bool) {
-	v := m._type
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldType returns the old "type" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldType(ctx context.Context) (v channel.Type, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldType is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldType requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldType: %w", err)
-	}
-	return oldValue.Type, nil
-}
-
-// ResetType resets all changes to the "type" field.
-func (m *ChannelMutation) ResetType() {
-	m._type = nil
-}
-
 // SetBaseURL sets the "base_url" field.
 func (m *ChannelMutation) SetBaseURL(s string) {
 	m.base_url = &s
@@ -4317,967 +4253,6 @@ func (m *ChannelMutation) OldBaseURL(ctx context.Context) (v string, err error) 
 // ResetBaseURL resets all changes to the "base_url" field.
 func (m *ChannelMutation) ResetBaseURL() {
 	m.base_url = nil
-}
-
-// SetAPIKeys sets the "api_keys" field.
-func (m *ChannelMutation) SetAPIKeys(s []string) {
-	m.api_keys = &s
-	m.appendapi_keys = nil
-}
-
-// APIKeys returns the value of the "api_keys" field in the mutation.
-func (m *ChannelMutation) APIKeys() (r []string, exists bool) {
-	v := m.api_keys
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldAPIKeys returns the old "api_keys" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldAPIKeys(ctx context.Context) (v []string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldAPIKeys is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldAPIKeys requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldAPIKeys: %w", err)
-	}
-	return oldValue.APIKeys, nil
-}
-
-// AppendAPIKeys adds s to the "api_keys" field.
-func (m *ChannelMutation) AppendAPIKeys(s []string) {
-	m.appendapi_keys = append(m.appendapi_keys, s...)
-}
-
-// AppendedAPIKeys returns the list of values that were appended to the "api_keys" field in this mutation.
-func (m *ChannelMutation) AppendedAPIKeys() ([]string, bool) {
-	if len(m.appendapi_keys) == 0 {
-		return nil, false
-	}
-	return m.appendapi_keys, true
-}
-
-// ResetAPIKeys resets all changes to the "api_keys" field.
-func (m *ChannelMutation) ResetAPIKeys() {
-	m.api_keys = nil
-	m.appendapi_keys = nil
-}
-
-// SetModels sets the "models" field.
-func (m *ChannelMutation) SetModels(s []string) {
-	m.models = &s
-	m.appendmodels = nil
-}
-
-// Models returns the value of the "models" field in the mutation.
-func (m *ChannelMutation) Models() (r []string, exists bool) {
-	v := m.models
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldModels returns the old "models" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldModels(ctx context.Context) (v []string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldModels is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldModels requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldModels: %w", err)
-	}
-	return oldValue.Models, nil
-}
-
-// AppendModels adds s to the "models" field.
-func (m *ChannelMutation) AppendModels(s []string) {
-	m.appendmodels = append(m.appendmodels, s...)
-}
-
-// AppendedModels returns the list of values that were appended to the "models" field in this mutation.
-func (m *ChannelMutation) AppendedModels() ([]string, bool) {
-	if len(m.appendmodels) == 0 {
-		return nil, false
-	}
-	return m.appendmodels, true
-}
-
-// ResetModels resets all changes to the "models" field.
-func (m *ChannelMutation) ResetModels() {
-	m.models = nil
-	m.appendmodels = nil
-}
-
-// SetModelMapping sets the "model_mapping" field.
-func (m *ChannelMutation) SetModelMapping(value map[string]string) {
-	m.model_mapping = &value
-}
-
-// ModelMapping returns the value of the "model_mapping" field in the mutation.
-func (m *ChannelMutation) ModelMapping() (r map[string]string, exists bool) {
-	v := m.model_mapping
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldModelMapping returns the old "model_mapping" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldModelMapping(ctx context.Context) (v map[string]string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldModelMapping is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldModelMapping requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldModelMapping: %w", err)
-	}
-	return oldValue.ModelMapping, nil
-}
-
-// ClearModelMapping clears the value of the "model_mapping" field.
-func (m *ChannelMutation) ClearModelMapping() {
-	m.model_mapping = nil
-	m.clearedFields[channel.FieldModelMapping] = struct{}{}
-}
-
-// ModelMappingCleared returns if the "model_mapping" field was cleared in this mutation.
-func (m *ChannelMutation) ModelMappingCleared() bool {
-	_, ok := m.clearedFields[channel.FieldModelMapping]
-	return ok
-}
-
-// ResetModelMapping resets all changes to the "model_mapping" field.
-func (m *ChannelMutation) ResetModelMapping() {
-	m.model_mapping = nil
-	delete(m.clearedFields, channel.FieldModelMapping)
-}
-
-// SetParamOverride sets the "param_override" field.
-func (m *ChannelMutation) SetParamOverride(value map[string]interface{}) {
-	m.param_override = &value
-}
-
-// ParamOverride returns the value of the "param_override" field in the mutation.
-func (m *ChannelMutation) ParamOverride() (r map[string]interface{}, exists bool) {
-	v := m.param_override
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldParamOverride returns the old "param_override" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldParamOverride(ctx context.Context) (v map[string]interface{}, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldParamOverride is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldParamOverride requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldParamOverride: %w", err)
-	}
-	return oldValue.ParamOverride, nil
-}
-
-// ClearParamOverride clears the value of the "param_override" field.
-func (m *ChannelMutation) ClearParamOverride() {
-	m.param_override = nil
-	m.clearedFields[channel.FieldParamOverride] = struct{}{}
-}
-
-// ParamOverrideCleared returns if the "param_override" field was cleared in this mutation.
-func (m *ChannelMutation) ParamOverrideCleared() bool {
-	_, ok := m.clearedFields[channel.FieldParamOverride]
-	return ok
-}
-
-// ResetParamOverride resets all changes to the "param_override" field.
-func (m *ChannelMutation) ResetParamOverride() {
-	m.param_override = nil
-	delete(m.clearedFields, channel.FieldParamOverride)
-}
-
-// SetHeaderOverride sets the "header_override" field.
-func (m *ChannelMutation) SetHeaderOverride(value map[string]string) {
-	m.header_override = &value
-}
-
-// HeaderOverride returns the value of the "header_override" field in the mutation.
-func (m *ChannelMutation) HeaderOverride() (r map[string]string, exists bool) {
-	v := m.header_override
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldHeaderOverride returns the old "header_override" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldHeaderOverride(ctx context.Context) (v map[string]string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldHeaderOverride is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldHeaderOverride requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldHeaderOverride: %w", err)
-	}
-	return oldValue.HeaderOverride, nil
-}
-
-// ClearHeaderOverride clears the value of the "header_override" field.
-func (m *ChannelMutation) ClearHeaderOverride() {
-	m.header_override = nil
-	m.clearedFields[channel.FieldHeaderOverride] = struct{}{}
-}
-
-// HeaderOverrideCleared returns if the "header_override" field was cleared in this mutation.
-func (m *ChannelMutation) HeaderOverrideCleared() bool {
-	_, ok := m.clearedFields[channel.FieldHeaderOverride]
-	return ok
-}
-
-// ResetHeaderOverride resets all changes to the "header_override" field.
-func (m *ChannelMutation) ResetHeaderOverride() {
-	m.header_override = nil
-	delete(m.clearedFields, channel.FieldHeaderOverride)
-}
-
-// SetStatus sets the "status" field.
-func (m *ChannelMutation) SetStatus(c channel.Status) {
-	m.status = &c
-}
-
-// Status returns the value of the "status" field in the mutation.
-func (m *ChannelMutation) Status() (r channel.Status, exists bool) {
-	v := m.status
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldStatus returns the old "status" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldStatus(ctx context.Context) (v channel.Status, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldStatus requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
-	}
-	return oldValue.Status, nil
-}
-
-// ResetStatus resets all changes to the "status" field.
-func (m *ChannelMutation) ResetStatus() {
-	m.status = nil
-}
-
-// SetErrorMsg sets the "error_msg" field.
-func (m *ChannelMutation) SetErrorMsg(s string) {
-	m.error_msg = &s
-}
-
-// ErrorMsg returns the value of the "error_msg" field in the mutation.
-func (m *ChannelMutation) ErrorMsg() (r string, exists bool) {
-	v := m.error_msg
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldErrorMsg returns the old "error_msg" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldErrorMsg(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldErrorMsg is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldErrorMsg requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldErrorMsg: %w", err)
-	}
-	return oldValue.ErrorMsg, nil
-}
-
-// ResetErrorMsg resets all changes to the "error_msg" field.
-func (m *ChannelMutation) ResetErrorMsg() {
-	m.error_msg = nil
-}
-
-// SetPriority sets the "priority" field.
-func (m *ChannelMutation) SetPriority(i int) {
-	m.priority = &i
-	m.addpriority = nil
-}
-
-// Priority returns the value of the "priority" field in the mutation.
-func (m *ChannelMutation) Priority() (r int, exists bool) {
-	v := m.priority
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldPriority returns the old "priority" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldPriority(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldPriority is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldPriority requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldPriority: %w", err)
-	}
-	return oldValue.Priority, nil
-}
-
-// AddPriority adds i to the "priority" field.
-func (m *ChannelMutation) AddPriority(i int) {
-	if m.addpriority != nil {
-		*m.addpriority += i
-	} else {
-		m.addpriority = &i
-	}
-}
-
-// AddedPriority returns the value that was added to the "priority" field in this mutation.
-func (m *ChannelMutation) AddedPriority() (r int, exists bool) {
-	v := m.addpriority
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetPriority resets all changes to the "priority" field.
-func (m *ChannelMutation) ResetPriority() {
-	m.priority = nil
-	m.addpriority = nil
-}
-
-// SetWeight sets the "weight" field.
-func (m *ChannelMutation) SetWeight(i int) {
-	m.weight = &i
-	m.addweight = nil
-}
-
-// Weight returns the value of the "weight" field in the mutation.
-func (m *ChannelMutation) Weight() (r int, exists bool) {
-	v := m.weight
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldWeight returns the old "weight" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldWeight(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldWeight is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldWeight requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldWeight: %w", err)
-	}
-	return oldValue.Weight, nil
-}
-
-// AddWeight adds i to the "weight" field.
-func (m *ChannelMutation) AddWeight(i int) {
-	if m.addweight != nil {
-		*m.addweight += i
-	} else {
-		m.addweight = &i
-	}
-}
-
-// AddedWeight returns the value that was added to the "weight" field in this mutation.
-func (m *ChannelMutation) AddedWeight() (r int, exists bool) {
-	v := m.addweight
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetWeight resets all changes to the "weight" field.
-func (m *ChannelMutation) ResetWeight() {
-	m.weight = nil
-	m.addweight = nil
-}
-
-// SetMaxConcurrency sets the "max_concurrency" field.
-func (m *ChannelMutation) SetMaxConcurrency(i int) {
-	m.max_concurrency = &i
-	m.addmax_concurrency = nil
-}
-
-// MaxConcurrency returns the value of the "max_concurrency" field in the mutation.
-func (m *ChannelMutation) MaxConcurrency() (r int, exists bool) {
-	v := m.max_concurrency
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldMaxConcurrency returns the old "max_concurrency" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldMaxConcurrency(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldMaxConcurrency is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldMaxConcurrency requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldMaxConcurrency: %w", err)
-	}
-	return oldValue.MaxConcurrency, nil
-}
-
-// AddMaxConcurrency adds i to the "max_concurrency" field.
-func (m *ChannelMutation) AddMaxConcurrency(i int) {
-	if m.addmax_concurrency != nil {
-		*m.addmax_concurrency += i
-	} else {
-		m.addmax_concurrency = &i
-	}
-}
-
-// AddedMaxConcurrency returns the value that was added to the "max_concurrency" field in this mutation.
-func (m *ChannelMutation) AddedMaxConcurrency() (r int, exists bool) {
-	v := m.addmax_concurrency
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetMaxConcurrency resets all changes to the "max_concurrency" field.
-func (m *ChannelMutation) ResetMaxConcurrency() {
-	m.max_concurrency = nil
-	m.addmax_concurrency = nil
-}
-
-// SetMaxRpm sets the "max_rpm" field.
-func (m *ChannelMutation) SetMaxRpm(i int) {
-	m.max_rpm = &i
-	m.addmax_rpm = nil
-}
-
-// MaxRpm returns the value of the "max_rpm" field in the mutation.
-func (m *ChannelMutation) MaxRpm() (r int, exists bool) {
-	v := m.max_rpm
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldMaxRpm returns the old "max_rpm" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldMaxRpm(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldMaxRpm is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldMaxRpm requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldMaxRpm: %w", err)
-	}
-	return oldValue.MaxRpm, nil
-}
-
-// AddMaxRpm adds i to the "max_rpm" field.
-func (m *ChannelMutation) AddMaxRpm(i int) {
-	if m.addmax_rpm != nil {
-		*m.addmax_rpm += i
-	} else {
-		m.addmax_rpm = &i
-	}
-}
-
-// AddedMaxRpm returns the value that was added to the "max_rpm" field in this mutation.
-func (m *ChannelMutation) AddedMaxRpm() (r int, exists bool) {
-	v := m.addmax_rpm
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetMaxRpm resets all changes to the "max_rpm" field.
-func (m *ChannelMutation) ResetMaxRpm() {
-	m.max_rpm = nil
-	m.addmax_rpm = nil
-}
-
-// SetCostRatio sets the "cost_ratio" field.
-func (m *ChannelMutation) SetCostRatio(f float64) {
-	m.cost_ratio = &f
-	m.addcost_ratio = nil
-}
-
-// CostRatio returns the value of the "cost_ratio" field in the mutation.
-func (m *ChannelMutation) CostRatio() (r float64, exists bool) {
-	v := m.cost_ratio
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldCostRatio returns the old "cost_ratio" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldCostRatio(ctx context.Context) (v float64, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldCostRatio is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldCostRatio requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldCostRatio: %w", err)
-	}
-	return oldValue.CostRatio, nil
-}
-
-// AddCostRatio adds f to the "cost_ratio" field.
-func (m *ChannelMutation) AddCostRatio(f float64) {
-	if m.addcost_ratio != nil {
-		*m.addcost_ratio += f
-	} else {
-		m.addcost_ratio = &f
-	}
-}
-
-// AddedCostRatio returns the value that was added to the "cost_ratio" field in this mutation.
-func (m *ChannelMutation) AddedCostRatio() (r float64, exists bool) {
-	v := m.addcost_ratio
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetCostRatio resets all changes to the "cost_ratio" field.
-func (m *ChannelMutation) ResetCostRatio() {
-	m.cost_ratio = nil
-	m.addcost_ratio = nil
-}
-
-// SetTags sets the "tags" field.
-func (m *ChannelMutation) SetTags(s []string) {
-	m.tags = &s
-	m.appendtags = nil
-}
-
-// Tags returns the value of the "tags" field in the mutation.
-func (m *ChannelMutation) Tags() (r []string, exists bool) {
-	v := m.tags
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldTags returns the old "tags" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldTags(ctx context.Context) (v []string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldTags is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldTags requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldTags: %w", err)
-	}
-	return oldValue.Tags, nil
-}
-
-// AppendTags adds s to the "tags" field.
-func (m *ChannelMutation) AppendTags(s []string) {
-	m.appendtags = append(m.appendtags, s...)
-}
-
-// AppendedTags returns the list of values that were appended to the "tags" field in this mutation.
-func (m *ChannelMutation) AppendedTags() ([]string, bool) {
-	if len(m.appendtags) == 0 {
-		return nil, false
-	}
-	return m.appendtags, true
-}
-
-// ClearTags clears the value of the "tags" field.
-func (m *ChannelMutation) ClearTags() {
-	m.tags = nil
-	m.appendtags = nil
-	m.clearedFields[channel.FieldTags] = struct{}{}
-}
-
-// TagsCleared returns if the "tags" field was cleared in this mutation.
-func (m *ChannelMutation) TagsCleared() bool {
-	_, ok := m.clearedFields[channel.FieldTags]
-	return ok
-}
-
-// ResetTags resets all changes to the "tags" field.
-func (m *ChannelMutation) ResetTags() {
-	m.tags = nil
-	m.appendtags = nil
-	delete(m.clearedFields, channel.FieldTags)
-}
-
-// SetTestModel sets the "test_model" field.
-func (m *ChannelMutation) SetTestModel(s string) {
-	m.test_model = &s
-}
-
-// TestModel returns the value of the "test_model" field in the mutation.
-func (m *ChannelMutation) TestModel() (r string, exists bool) {
-	v := m.test_model
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldTestModel returns the old "test_model" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldTestModel(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldTestModel is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldTestModel requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldTestModel: %w", err)
-	}
-	return oldValue.TestModel, nil
-}
-
-// ResetTestModel resets all changes to the "test_model" field.
-func (m *ChannelMutation) ResetTestModel() {
-	m.test_model = nil
-}
-
-// SetResponseTimeMs sets the "response_time_ms" field.
-func (m *ChannelMutation) SetResponseTimeMs(i int) {
-	m.response_time_ms = &i
-	m.addresponse_time_ms = nil
-}
-
-// ResponseTimeMs returns the value of the "response_time_ms" field in the mutation.
-func (m *ChannelMutation) ResponseTimeMs() (r int, exists bool) {
-	v := m.response_time_ms
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldResponseTimeMs returns the old "response_time_ms" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldResponseTimeMs(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldResponseTimeMs is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldResponseTimeMs requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldResponseTimeMs: %w", err)
-	}
-	return oldValue.ResponseTimeMs, nil
-}
-
-// AddResponseTimeMs adds i to the "response_time_ms" field.
-func (m *ChannelMutation) AddResponseTimeMs(i int) {
-	if m.addresponse_time_ms != nil {
-		*m.addresponse_time_ms += i
-	} else {
-		m.addresponse_time_ms = &i
-	}
-}
-
-// AddedResponseTimeMs returns the value that was added to the "response_time_ms" field in this mutation.
-func (m *ChannelMutation) AddedResponseTimeMs() (r int, exists bool) {
-	v := m.addresponse_time_ms
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetResponseTimeMs resets all changes to the "response_time_ms" field.
-func (m *ChannelMutation) ResetResponseTimeMs() {
-	m.response_time_ms = nil
-	m.addresponse_time_ms = nil
-}
-
-// SetTestedAt sets the "tested_at" field.
-func (m *ChannelMutation) SetTestedAt(t time.Time) {
-	m.tested_at = &t
-}
-
-// TestedAt returns the value of the "tested_at" field in the mutation.
-func (m *ChannelMutation) TestedAt() (r time.Time, exists bool) {
-	v := m.tested_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldTestedAt returns the old "tested_at" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldTestedAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldTestedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldTestedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldTestedAt: %w", err)
-	}
-	return oldValue.TestedAt, nil
-}
-
-// ClearTestedAt clears the value of the "tested_at" field.
-func (m *ChannelMutation) ClearTestedAt() {
-	m.tested_at = nil
-	m.clearedFields[channel.FieldTestedAt] = struct{}{}
-}
-
-// TestedAtCleared returns if the "tested_at" field was cleared in this mutation.
-func (m *ChannelMutation) TestedAtCleared() bool {
-	_, ok := m.clearedFields[channel.FieldTestedAt]
-	return ok
-}
-
-// ResetTestedAt resets all changes to the "tested_at" field.
-func (m *ChannelMutation) ResetTestedAt() {
-	m.tested_at = nil
-	delete(m.clearedFields, channel.FieldTestedAt)
-}
-
-// SetBalance sets the "balance" field.
-func (m *ChannelMutation) SetBalance(f float64) {
-	m.balance = &f
-	m.addbalance = nil
-}
-
-// Balance returns the value of the "balance" field in the mutation.
-func (m *ChannelMutation) Balance() (r float64, exists bool) {
-	v := m.balance
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldBalance returns the old "balance" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldBalance(ctx context.Context) (v float64, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldBalance is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldBalance requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldBalance: %w", err)
-	}
-	return oldValue.Balance, nil
-}
-
-// AddBalance adds f to the "balance" field.
-func (m *ChannelMutation) AddBalance(f float64) {
-	if m.addbalance != nil {
-		*m.addbalance += f
-	} else {
-		m.addbalance = &f
-	}
-}
-
-// AddedBalance returns the value that was added to the "balance" field in this mutation.
-func (m *ChannelMutation) AddedBalance() (r float64, exists bool) {
-	v := m.addbalance
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetBalance resets all changes to the "balance" field.
-func (m *ChannelMutation) ResetBalance() {
-	m.balance = nil
-	m.addbalance = nil
-}
-
-// SetBalanceUpdatedAt sets the "balance_updated_at" field.
-func (m *ChannelMutation) SetBalanceUpdatedAt(t time.Time) {
-	m.balance_updated_at = &t
-}
-
-// BalanceUpdatedAt returns the value of the "balance_updated_at" field in the mutation.
-func (m *ChannelMutation) BalanceUpdatedAt() (r time.Time, exists bool) {
-	v := m.balance_updated_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldBalanceUpdatedAt returns the old "balance_updated_at" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldBalanceUpdatedAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldBalanceUpdatedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldBalanceUpdatedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldBalanceUpdatedAt: %w", err)
-	}
-	return oldValue.BalanceUpdatedAt, nil
-}
-
-// ClearBalanceUpdatedAt clears the value of the "balance_updated_at" field.
-func (m *ChannelMutation) ClearBalanceUpdatedAt() {
-	m.balance_updated_at = nil
-	m.clearedFields[channel.FieldBalanceUpdatedAt] = struct{}{}
-}
-
-// BalanceUpdatedAtCleared returns if the "balance_updated_at" field was cleared in this mutation.
-func (m *ChannelMutation) BalanceUpdatedAtCleared() bool {
-	_, ok := m.clearedFields[channel.FieldBalanceUpdatedAt]
-	return ok
-}
-
-// ResetBalanceUpdatedAt resets all changes to the "balance_updated_at" field.
-func (m *ChannelMutation) ResetBalanceUpdatedAt() {
-	m.balance_updated_at = nil
-	delete(m.clearedFields, channel.FieldBalanceUpdatedAt)
-}
-
-// SetLastUsedAt sets the "last_used_at" field.
-func (m *ChannelMutation) SetLastUsedAt(t time.Time) {
-	m.last_used_at = &t
-}
-
-// LastUsedAt returns the value of the "last_used_at" field in the mutation.
-func (m *ChannelMutation) LastUsedAt() (r time.Time, exists bool) {
-	v := m.last_used_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldLastUsedAt returns the old "last_used_at" field's value of the Channel entity.
-// If the Channel object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ChannelMutation) OldLastUsedAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldLastUsedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldLastUsedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldLastUsedAt: %w", err)
-	}
-	return oldValue.LastUsedAt, nil
-}
-
-// ClearLastUsedAt clears the value of the "last_used_at" field.
-func (m *ChannelMutation) ClearLastUsedAt() {
-	m.last_used_at = nil
-	m.clearedFields[channel.FieldLastUsedAt] = struct{}{}
-}
-
-// LastUsedAtCleared returns if the "last_used_at" field was cleared in this mutation.
-func (m *ChannelMutation) LastUsedAtCleared() bool {
-	_, ok := m.clearedFields[channel.FieldLastUsedAt]
-	return ok
-}
-
-// ResetLastUsedAt resets all changes to the "last_used_at" field.
-func (m *ChannelMutation) ResetLastUsedAt() {
-	m.last_used_at = nil
-	delete(m.clearedFields, channel.FieldLastUsedAt)
 }
 
 // SetCreatedAt sets the "created_at" field.
@@ -5352,58 +4327,58 @@ func (m *ChannelMutation) ResetUpdatedAt() {
 	m.updated_at = nil
 }
 
-// AddGroupIDs adds the "groups" edge to the Group entity by ids.
-func (m *ChannelMutation) AddGroupIDs(ids ...int) {
-	if m.groups == nil {
-		m.groups = make(map[int]struct{})
+// AddKeyIDs adds the "keys" edge to the ChannelKey entity by ids.
+func (m *ChannelMutation) AddKeyIDs(ids ...int) {
+	if m.keys == nil {
+		m.keys = make(map[int]struct{})
 	}
 	for i := range ids {
-		m.groups[ids[i]] = struct{}{}
+		m.keys[ids[i]] = struct{}{}
 	}
 }
 
-// ClearGroups clears the "groups" edge to the Group entity.
-func (m *ChannelMutation) ClearGroups() {
-	m.clearedgroups = true
+// ClearKeys clears the "keys" edge to the ChannelKey entity.
+func (m *ChannelMutation) ClearKeys() {
+	m.clearedkeys = true
 }
 
-// GroupsCleared reports if the "groups" edge to the Group entity was cleared.
-func (m *ChannelMutation) GroupsCleared() bool {
-	return m.clearedgroups
+// KeysCleared reports if the "keys" edge to the ChannelKey entity was cleared.
+func (m *ChannelMutation) KeysCleared() bool {
+	return m.clearedkeys
 }
 
-// RemoveGroupIDs removes the "groups" edge to the Group entity by IDs.
-func (m *ChannelMutation) RemoveGroupIDs(ids ...int) {
-	if m.removedgroups == nil {
-		m.removedgroups = make(map[int]struct{})
+// RemoveKeyIDs removes the "keys" edge to the ChannelKey entity by IDs.
+func (m *ChannelMutation) RemoveKeyIDs(ids ...int) {
+	if m.removedkeys == nil {
+		m.removedkeys = make(map[int]struct{})
 	}
 	for i := range ids {
-		delete(m.groups, ids[i])
-		m.removedgroups[ids[i]] = struct{}{}
+		delete(m.keys, ids[i])
+		m.removedkeys[ids[i]] = struct{}{}
 	}
 }
 
-// RemovedGroups returns the removed IDs of the "groups" edge to the Group entity.
-func (m *ChannelMutation) RemovedGroupsIDs() (ids []int) {
-	for id := range m.removedgroups {
+// RemovedKeys returns the removed IDs of the "keys" edge to the ChannelKey entity.
+func (m *ChannelMutation) RemovedKeysIDs() (ids []int) {
+	for id := range m.removedkeys {
 		ids = append(ids, id)
 	}
 	return
 }
 
-// GroupsIDs returns the "groups" edge IDs in the mutation.
-func (m *ChannelMutation) GroupsIDs() (ids []int) {
-	for id := range m.groups {
+// KeysIDs returns the "keys" edge IDs in the mutation.
+func (m *ChannelMutation) KeysIDs() (ids []int) {
+	for id := range m.keys {
 		ids = append(ids, id)
 	}
 	return
 }
 
-// ResetGroups resets all changes to the "groups" edge.
-func (m *ChannelMutation) ResetGroups() {
-	m.groups = nil
-	m.clearedgroups = false
-	m.removedgroups = nil
+// ResetKeys resets all changes to the "keys" edge.
+func (m *ChannelMutation) ResetKeys() {
+	m.keys = nil
+	m.clearedkeys = false
+	m.removedkeys = nil
 }
 
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by ids.
@@ -5494,72 +4469,12 @@ func (m *ChannelMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ChannelMutation) Fields() []string {
-	fields := make([]string, 0, 24)
+	fields := make([]string, 0, 4)
 	if m.name != nil {
 		fields = append(fields, channel.FieldName)
 	}
-	if m._type != nil {
-		fields = append(fields, channel.FieldType)
-	}
 	if m.base_url != nil {
 		fields = append(fields, channel.FieldBaseURL)
-	}
-	if m.api_keys != nil {
-		fields = append(fields, channel.FieldAPIKeys)
-	}
-	if m.models != nil {
-		fields = append(fields, channel.FieldModels)
-	}
-	if m.model_mapping != nil {
-		fields = append(fields, channel.FieldModelMapping)
-	}
-	if m.param_override != nil {
-		fields = append(fields, channel.FieldParamOverride)
-	}
-	if m.header_override != nil {
-		fields = append(fields, channel.FieldHeaderOverride)
-	}
-	if m.status != nil {
-		fields = append(fields, channel.FieldStatus)
-	}
-	if m.error_msg != nil {
-		fields = append(fields, channel.FieldErrorMsg)
-	}
-	if m.priority != nil {
-		fields = append(fields, channel.FieldPriority)
-	}
-	if m.weight != nil {
-		fields = append(fields, channel.FieldWeight)
-	}
-	if m.max_concurrency != nil {
-		fields = append(fields, channel.FieldMaxConcurrency)
-	}
-	if m.max_rpm != nil {
-		fields = append(fields, channel.FieldMaxRpm)
-	}
-	if m.cost_ratio != nil {
-		fields = append(fields, channel.FieldCostRatio)
-	}
-	if m.tags != nil {
-		fields = append(fields, channel.FieldTags)
-	}
-	if m.test_model != nil {
-		fields = append(fields, channel.FieldTestModel)
-	}
-	if m.response_time_ms != nil {
-		fields = append(fields, channel.FieldResponseTimeMs)
-	}
-	if m.tested_at != nil {
-		fields = append(fields, channel.FieldTestedAt)
-	}
-	if m.balance != nil {
-		fields = append(fields, channel.FieldBalance)
-	}
-	if m.balance_updated_at != nil {
-		fields = append(fields, channel.FieldBalanceUpdatedAt)
-	}
-	if m.last_used_at != nil {
-		fields = append(fields, channel.FieldLastUsedAt)
 	}
 	if m.created_at != nil {
 		fields = append(fields, channel.FieldCreatedAt)
@@ -5577,48 +4492,8 @@ func (m *ChannelMutation) Field(name string) (ent.Value, bool) {
 	switch name {
 	case channel.FieldName:
 		return m.Name()
-	case channel.FieldType:
-		return m.GetType()
 	case channel.FieldBaseURL:
 		return m.BaseURL()
-	case channel.FieldAPIKeys:
-		return m.APIKeys()
-	case channel.FieldModels:
-		return m.Models()
-	case channel.FieldModelMapping:
-		return m.ModelMapping()
-	case channel.FieldParamOverride:
-		return m.ParamOverride()
-	case channel.FieldHeaderOverride:
-		return m.HeaderOverride()
-	case channel.FieldStatus:
-		return m.Status()
-	case channel.FieldErrorMsg:
-		return m.ErrorMsg()
-	case channel.FieldPriority:
-		return m.Priority()
-	case channel.FieldWeight:
-		return m.Weight()
-	case channel.FieldMaxConcurrency:
-		return m.MaxConcurrency()
-	case channel.FieldMaxRpm:
-		return m.MaxRpm()
-	case channel.FieldCostRatio:
-		return m.CostRatio()
-	case channel.FieldTags:
-		return m.Tags()
-	case channel.FieldTestModel:
-		return m.TestModel()
-	case channel.FieldResponseTimeMs:
-		return m.ResponseTimeMs()
-	case channel.FieldTestedAt:
-		return m.TestedAt()
-	case channel.FieldBalance:
-		return m.Balance()
-	case channel.FieldBalanceUpdatedAt:
-		return m.BalanceUpdatedAt()
-	case channel.FieldLastUsedAt:
-		return m.LastUsedAt()
 	case channel.FieldCreatedAt:
 		return m.CreatedAt()
 	case channel.FieldUpdatedAt:
@@ -5634,48 +4509,8 @@ func (m *ChannelMutation) OldField(ctx context.Context, name string) (ent.Value,
 	switch name {
 	case channel.FieldName:
 		return m.OldName(ctx)
-	case channel.FieldType:
-		return m.OldType(ctx)
 	case channel.FieldBaseURL:
 		return m.OldBaseURL(ctx)
-	case channel.FieldAPIKeys:
-		return m.OldAPIKeys(ctx)
-	case channel.FieldModels:
-		return m.OldModels(ctx)
-	case channel.FieldModelMapping:
-		return m.OldModelMapping(ctx)
-	case channel.FieldParamOverride:
-		return m.OldParamOverride(ctx)
-	case channel.FieldHeaderOverride:
-		return m.OldHeaderOverride(ctx)
-	case channel.FieldStatus:
-		return m.OldStatus(ctx)
-	case channel.FieldErrorMsg:
-		return m.OldErrorMsg(ctx)
-	case channel.FieldPriority:
-		return m.OldPriority(ctx)
-	case channel.FieldWeight:
-		return m.OldWeight(ctx)
-	case channel.FieldMaxConcurrency:
-		return m.OldMaxConcurrency(ctx)
-	case channel.FieldMaxRpm:
-		return m.OldMaxRpm(ctx)
-	case channel.FieldCostRatio:
-		return m.OldCostRatio(ctx)
-	case channel.FieldTags:
-		return m.OldTags(ctx)
-	case channel.FieldTestModel:
-		return m.OldTestModel(ctx)
-	case channel.FieldResponseTimeMs:
-		return m.OldResponseTimeMs(ctx)
-	case channel.FieldTestedAt:
-		return m.OldTestedAt(ctx)
-	case channel.FieldBalance:
-		return m.OldBalance(ctx)
-	case channel.FieldBalanceUpdatedAt:
-		return m.OldBalanceUpdatedAt(ctx)
-	case channel.FieldLastUsedAt:
-		return m.OldLastUsedAt(ctx)
 	case channel.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case channel.FieldUpdatedAt:
@@ -5696,152 +4531,12 @@ func (m *ChannelMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetName(v)
 		return nil
-	case channel.FieldType:
-		v, ok := value.(channel.Type)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetType(v)
-		return nil
 	case channel.FieldBaseURL:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetBaseURL(v)
-		return nil
-	case channel.FieldAPIKeys:
-		v, ok := value.([]string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetAPIKeys(v)
-		return nil
-	case channel.FieldModels:
-		v, ok := value.([]string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetModels(v)
-		return nil
-	case channel.FieldModelMapping:
-		v, ok := value.(map[string]string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetModelMapping(v)
-		return nil
-	case channel.FieldParamOverride:
-		v, ok := value.(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetParamOverride(v)
-		return nil
-	case channel.FieldHeaderOverride:
-		v, ok := value.(map[string]string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetHeaderOverride(v)
-		return nil
-	case channel.FieldStatus:
-		v, ok := value.(channel.Status)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetStatus(v)
-		return nil
-	case channel.FieldErrorMsg:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetErrorMsg(v)
-		return nil
-	case channel.FieldPriority:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetPriority(v)
-		return nil
-	case channel.FieldWeight:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetWeight(v)
-		return nil
-	case channel.FieldMaxConcurrency:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetMaxConcurrency(v)
-		return nil
-	case channel.FieldMaxRpm:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetMaxRpm(v)
-		return nil
-	case channel.FieldCostRatio:
-		v, ok := value.(float64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetCostRatio(v)
-		return nil
-	case channel.FieldTags:
-		v, ok := value.([]string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetTags(v)
-		return nil
-	case channel.FieldTestModel:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetTestModel(v)
-		return nil
-	case channel.FieldResponseTimeMs:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetResponseTimeMs(v)
-		return nil
-	case channel.FieldTestedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetTestedAt(v)
-		return nil
-	case channel.FieldBalance:
-		v, ok := value.(float64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetBalance(v)
-		return nil
-	case channel.FieldBalanceUpdatedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetBalanceUpdatedAt(v)
-		return nil
-	case channel.FieldLastUsedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetLastUsedAt(v)
 		return nil
 	case channel.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -5864,51 +4559,13 @@ func (m *ChannelMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *ChannelMutation) AddedFields() []string {
-	var fields []string
-	if m.addpriority != nil {
-		fields = append(fields, channel.FieldPriority)
-	}
-	if m.addweight != nil {
-		fields = append(fields, channel.FieldWeight)
-	}
-	if m.addmax_concurrency != nil {
-		fields = append(fields, channel.FieldMaxConcurrency)
-	}
-	if m.addmax_rpm != nil {
-		fields = append(fields, channel.FieldMaxRpm)
-	}
-	if m.addcost_ratio != nil {
-		fields = append(fields, channel.FieldCostRatio)
-	}
-	if m.addresponse_time_ms != nil {
-		fields = append(fields, channel.FieldResponseTimeMs)
-	}
-	if m.addbalance != nil {
-		fields = append(fields, channel.FieldBalance)
-	}
-	return fields
+	return nil
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *ChannelMutation) AddedField(name string) (ent.Value, bool) {
-	switch name {
-	case channel.FieldPriority:
-		return m.AddedPriority()
-	case channel.FieldWeight:
-		return m.AddedWeight()
-	case channel.FieldMaxConcurrency:
-		return m.AddedMaxConcurrency()
-	case channel.FieldMaxRpm:
-		return m.AddedMaxRpm()
-	case channel.FieldCostRatio:
-		return m.AddedCostRatio()
-	case channel.FieldResponseTimeMs:
-		return m.AddedResponseTimeMs()
-	case channel.FieldBalance:
-		return m.AddedBalance()
-	}
 	return nil, false
 }
 
@@ -5917,55 +4574,6 @@ func (m *ChannelMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *ChannelMutation) AddField(name string, value ent.Value) error {
 	switch name {
-	case channel.FieldPriority:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddPriority(v)
-		return nil
-	case channel.FieldWeight:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddWeight(v)
-		return nil
-	case channel.FieldMaxConcurrency:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddMaxConcurrency(v)
-		return nil
-	case channel.FieldMaxRpm:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddMaxRpm(v)
-		return nil
-	case channel.FieldCostRatio:
-		v, ok := value.(float64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddCostRatio(v)
-		return nil
-	case channel.FieldResponseTimeMs:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddResponseTimeMs(v)
-		return nil
-	case channel.FieldBalance:
-		v, ok := value.(float64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddBalance(v)
-		return nil
 	}
 	return fmt.Errorf("unknown Channel numeric field %s", name)
 }
@@ -5973,29 +4581,7 @@ func (m *ChannelMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *ChannelMutation) ClearedFields() []string {
-	var fields []string
-	if m.FieldCleared(channel.FieldModelMapping) {
-		fields = append(fields, channel.FieldModelMapping)
-	}
-	if m.FieldCleared(channel.FieldParamOverride) {
-		fields = append(fields, channel.FieldParamOverride)
-	}
-	if m.FieldCleared(channel.FieldHeaderOverride) {
-		fields = append(fields, channel.FieldHeaderOverride)
-	}
-	if m.FieldCleared(channel.FieldTags) {
-		fields = append(fields, channel.FieldTags)
-	}
-	if m.FieldCleared(channel.FieldTestedAt) {
-		fields = append(fields, channel.FieldTestedAt)
-	}
-	if m.FieldCleared(channel.FieldBalanceUpdatedAt) {
-		fields = append(fields, channel.FieldBalanceUpdatedAt)
-	}
-	if m.FieldCleared(channel.FieldLastUsedAt) {
-		fields = append(fields, channel.FieldLastUsedAt)
-	}
-	return fields
+	return nil
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -6008,29 +4594,6 @@ func (m *ChannelMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *ChannelMutation) ClearField(name string) error {
-	switch name {
-	case channel.FieldModelMapping:
-		m.ClearModelMapping()
-		return nil
-	case channel.FieldParamOverride:
-		m.ClearParamOverride()
-		return nil
-	case channel.FieldHeaderOverride:
-		m.ClearHeaderOverride()
-		return nil
-	case channel.FieldTags:
-		m.ClearTags()
-		return nil
-	case channel.FieldTestedAt:
-		m.ClearTestedAt()
-		return nil
-	case channel.FieldBalanceUpdatedAt:
-		m.ClearBalanceUpdatedAt()
-		return nil
-	case channel.FieldLastUsedAt:
-		m.ClearLastUsedAt()
-		return nil
-	}
 	return fmt.Errorf("unknown Channel nullable field %s", name)
 }
 
@@ -6041,68 +4604,8 @@ func (m *ChannelMutation) ResetField(name string) error {
 	case channel.FieldName:
 		m.ResetName()
 		return nil
-	case channel.FieldType:
-		m.ResetType()
-		return nil
 	case channel.FieldBaseURL:
 		m.ResetBaseURL()
-		return nil
-	case channel.FieldAPIKeys:
-		m.ResetAPIKeys()
-		return nil
-	case channel.FieldModels:
-		m.ResetModels()
-		return nil
-	case channel.FieldModelMapping:
-		m.ResetModelMapping()
-		return nil
-	case channel.FieldParamOverride:
-		m.ResetParamOverride()
-		return nil
-	case channel.FieldHeaderOverride:
-		m.ResetHeaderOverride()
-		return nil
-	case channel.FieldStatus:
-		m.ResetStatus()
-		return nil
-	case channel.FieldErrorMsg:
-		m.ResetErrorMsg()
-		return nil
-	case channel.FieldPriority:
-		m.ResetPriority()
-		return nil
-	case channel.FieldWeight:
-		m.ResetWeight()
-		return nil
-	case channel.FieldMaxConcurrency:
-		m.ResetMaxConcurrency()
-		return nil
-	case channel.FieldMaxRpm:
-		m.ResetMaxRpm()
-		return nil
-	case channel.FieldCostRatio:
-		m.ResetCostRatio()
-		return nil
-	case channel.FieldTags:
-		m.ResetTags()
-		return nil
-	case channel.FieldTestModel:
-		m.ResetTestModel()
-		return nil
-	case channel.FieldResponseTimeMs:
-		m.ResetResponseTimeMs()
-		return nil
-	case channel.FieldTestedAt:
-		m.ResetTestedAt()
-		return nil
-	case channel.FieldBalance:
-		m.ResetBalance()
-		return nil
-	case channel.FieldBalanceUpdatedAt:
-		m.ResetBalanceUpdatedAt()
-		return nil
-	case channel.FieldLastUsedAt:
-		m.ResetLastUsedAt()
 		return nil
 	case channel.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -6117,8 +4620,8 @@ func (m *ChannelMutation) ResetField(name string) error {
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ChannelMutation) AddedEdges() []string {
 	edges := make([]string, 0, 2)
-	if m.groups != nil {
-		edges = append(edges, channel.EdgeGroups)
+	if m.keys != nil {
+		edges = append(edges, channel.EdgeKeys)
 	}
 	if m.usage_logs != nil {
 		edges = append(edges, channel.EdgeUsageLogs)
@@ -6130,9 +4633,9 @@ func (m *ChannelMutation) AddedEdges() []string {
 // name in this mutation.
 func (m *ChannelMutation) AddedIDs(name string) []ent.Value {
 	switch name {
-	case channel.EdgeGroups:
-		ids := make([]ent.Value, 0, len(m.groups))
-		for id := range m.groups {
+	case channel.EdgeKeys:
+		ids := make([]ent.Value, 0, len(m.keys))
+		for id := range m.keys {
 			ids = append(ids, id)
 		}
 		return ids
@@ -6149,8 +4652,8 @@ func (m *ChannelMutation) AddedIDs(name string) []ent.Value {
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ChannelMutation) RemovedEdges() []string {
 	edges := make([]string, 0, 2)
-	if m.removedgroups != nil {
-		edges = append(edges, channel.EdgeGroups)
+	if m.removedkeys != nil {
+		edges = append(edges, channel.EdgeKeys)
 	}
 	if m.removedusage_logs != nil {
 		edges = append(edges, channel.EdgeUsageLogs)
@@ -6162,9 +4665,9 @@ func (m *ChannelMutation) RemovedEdges() []string {
 // the given name in this mutation.
 func (m *ChannelMutation) RemovedIDs(name string) []ent.Value {
 	switch name {
-	case channel.EdgeGroups:
-		ids := make([]ent.Value, 0, len(m.removedgroups))
-		for id := range m.removedgroups {
+	case channel.EdgeKeys:
+		ids := make([]ent.Value, 0, len(m.removedkeys))
+		for id := range m.removedkeys {
 			ids = append(ids, id)
 		}
 		return ids
@@ -6181,8 +4684,8 @@ func (m *ChannelMutation) RemovedIDs(name string) []ent.Value {
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ChannelMutation) ClearedEdges() []string {
 	edges := make([]string, 0, 2)
-	if m.clearedgroups {
-		edges = append(edges, channel.EdgeGroups)
+	if m.clearedkeys {
+		edges = append(edges, channel.EdgeKeys)
 	}
 	if m.clearedusage_logs {
 		edges = append(edges, channel.EdgeUsageLogs)
@@ -6194,8 +4697,8 @@ func (m *ChannelMutation) ClearedEdges() []string {
 // was cleared in this mutation.
 func (m *ChannelMutation) EdgeCleared(name string) bool {
 	switch name {
-	case channel.EdgeGroups:
-		return m.clearedgroups
+	case channel.EdgeKeys:
+		return m.clearedkeys
 	case channel.EdgeUsageLogs:
 		return m.clearedusage_logs
 	}
@@ -6214,14 +4717,2166 @@ func (m *ChannelMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *ChannelMutation) ResetEdge(name string) error {
 	switch name {
-	case channel.EdgeGroups:
-		m.ResetGroups()
+	case channel.EdgeKeys:
+		m.ResetKeys()
 		return nil
 	case channel.EdgeUsageLogs:
 		m.ResetUsageLogs()
 		return nil
 	}
 	return fmt.Errorf("unknown Channel edge %s", name)
+}
+
+// ChannelKeyMutation represents an operation that mutates the ChannelKey nodes in the graph.
+type ChannelKeyMutation struct {
+	config
+	op                  Op
+	typ                 string
+	id                  *int
+	name                *string
+	_type               *channelkey.Type
+	api_key             *string
+	models              *[]string
+	appendmodels        []string
+	model_mapping       *map[string]string
+	param_override      *map[string]interface{}
+	header_override     *map[string]string
+	status              *channelkey.Status
+	error_msg           *string
+	priority            *int
+	addpriority         *int
+	weight              *int
+	addweight           *int
+	max_concurrency     *int
+	addmax_concurrency  *int
+	max_rpm             *int
+	addmax_rpm          *int
+	cost_ratio          *float64
+	addcost_ratio       *float64
+	tags                *[]string
+	appendtags          []string
+	test_model          *string
+	response_time_ms    *int
+	addresponse_time_ms *int
+	tested_at           *time.Time
+	last_used_at        *time.Time
+	balance             *float64
+	addbalance          *float64
+	balance_updated_at  *time.Time
+	created_at          *time.Time
+	updated_at          *time.Time
+	clearedFields       map[string]struct{}
+	channel             *int
+	clearedchannel      bool
+	groups              map[int]struct{}
+	removedgroups       map[int]struct{}
+	clearedgroups       bool
+	usage_logs          map[int]struct{}
+	removedusage_logs   map[int]struct{}
+	clearedusage_logs   bool
+	done                bool
+	oldValue            func(context.Context) (*ChannelKey, error)
+	predicates          []predicate.ChannelKey
+}
+
+var _ ent.Mutation = (*ChannelKeyMutation)(nil)
+
+// channelkeyOption allows management of the mutation configuration using functional options.
+type channelkeyOption func(*ChannelKeyMutation)
+
+// newChannelKeyMutation creates new mutation for the ChannelKey entity.
+func newChannelKeyMutation(c config, op Op, opts ...channelkeyOption) *ChannelKeyMutation {
+	m := &ChannelKeyMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeChannelKey,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withChannelKeyID sets the ID field of the mutation.
+func withChannelKeyID(id int) channelkeyOption {
+	return func(m *ChannelKeyMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ChannelKey
+		)
+		m.oldValue = func(ctx context.Context) (*ChannelKey, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ChannelKey.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withChannelKey sets the old ChannelKey of the mutation.
+func withChannelKey(node *ChannelKey) channelkeyOption {
+	return func(m *ChannelKeyMutation) {
+		m.oldValue = func(context.Context) (*ChannelKey, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ChannelKeyMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ChannelKeyMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ChannelKeyMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ChannelKeyMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ChannelKey.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetName sets the "name" field.
+func (m *ChannelKeyMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *ChannelKeyMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *ChannelKeyMutation) ResetName() {
+	m.name = nil
+}
+
+// SetType sets the "type" field.
+func (m *ChannelKeyMutation) SetType(c channelkey.Type) {
+	m._type = &c
+}
+
+// GetType returns the value of the "type" field in the mutation.
+func (m *ChannelKeyMutation) GetType() (r channelkey.Type, exists bool) {
+	v := m._type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldType returns the old "type" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldType(ctx context.Context) (v channelkey.Type, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldType: %w", err)
+	}
+	return oldValue.Type, nil
+}
+
+// ResetType resets all changes to the "type" field.
+func (m *ChannelKeyMutation) ResetType() {
+	m._type = nil
+}
+
+// SetAPIKey sets the "api_key" field.
+func (m *ChannelKeyMutation) SetAPIKey(s string) {
+	m.api_key = &s
+}
+
+// APIKey returns the value of the "api_key" field in the mutation.
+func (m *ChannelKeyMutation) APIKey() (r string, exists bool) {
+	v := m.api_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAPIKey returns the old "api_key" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldAPIKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAPIKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAPIKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAPIKey: %w", err)
+	}
+	return oldValue.APIKey, nil
+}
+
+// ResetAPIKey resets all changes to the "api_key" field.
+func (m *ChannelKeyMutation) ResetAPIKey() {
+	m.api_key = nil
+}
+
+// SetModels sets the "models" field.
+func (m *ChannelKeyMutation) SetModels(s []string) {
+	m.models = &s
+	m.appendmodels = nil
+}
+
+// Models returns the value of the "models" field in the mutation.
+func (m *ChannelKeyMutation) Models() (r []string, exists bool) {
+	v := m.models
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModels returns the old "models" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldModels(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModels is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModels requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModels: %w", err)
+	}
+	return oldValue.Models, nil
+}
+
+// AppendModels adds s to the "models" field.
+func (m *ChannelKeyMutation) AppendModels(s []string) {
+	m.appendmodels = append(m.appendmodels, s...)
+}
+
+// AppendedModels returns the list of values that were appended to the "models" field in this mutation.
+func (m *ChannelKeyMutation) AppendedModels() ([]string, bool) {
+	if len(m.appendmodels) == 0 {
+		return nil, false
+	}
+	return m.appendmodels, true
+}
+
+// ResetModels resets all changes to the "models" field.
+func (m *ChannelKeyMutation) ResetModels() {
+	m.models = nil
+	m.appendmodels = nil
+}
+
+// SetModelMapping sets the "model_mapping" field.
+func (m *ChannelKeyMutation) SetModelMapping(value map[string]string) {
+	m.model_mapping = &value
+}
+
+// ModelMapping returns the value of the "model_mapping" field in the mutation.
+func (m *ChannelKeyMutation) ModelMapping() (r map[string]string, exists bool) {
+	v := m.model_mapping
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModelMapping returns the old "model_mapping" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldModelMapping(ctx context.Context) (v map[string]string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModelMapping is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModelMapping requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModelMapping: %w", err)
+	}
+	return oldValue.ModelMapping, nil
+}
+
+// ClearModelMapping clears the value of the "model_mapping" field.
+func (m *ChannelKeyMutation) ClearModelMapping() {
+	m.model_mapping = nil
+	m.clearedFields[channelkey.FieldModelMapping] = struct{}{}
+}
+
+// ModelMappingCleared returns if the "model_mapping" field was cleared in this mutation.
+func (m *ChannelKeyMutation) ModelMappingCleared() bool {
+	_, ok := m.clearedFields[channelkey.FieldModelMapping]
+	return ok
+}
+
+// ResetModelMapping resets all changes to the "model_mapping" field.
+func (m *ChannelKeyMutation) ResetModelMapping() {
+	m.model_mapping = nil
+	delete(m.clearedFields, channelkey.FieldModelMapping)
+}
+
+// SetParamOverride sets the "param_override" field.
+func (m *ChannelKeyMutation) SetParamOverride(value map[string]interface{}) {
+	m.param_override = &value
+}
+
+// ParamOverride returns the value of the "param_override" field in the mutation.
+func (m *ChannelKeyMutation) ParamOverride() (r map[string]interface{}, exists bool) {
+	v := m.param_override
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldParamOverride returns the old "param_override" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldParamOverride(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldParamOverride is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldParamOverride requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldParamOverride: %w", err)
+	}
+	return oldValue.ParamOverride, nil
+}
+
+// ClearParamOverride clears the value of the "param_override" field.
+func (m *ChannelKeyMutation) ClearParamOverride() {
+	m.param_override = nil
+	m.clearedFields[channelkey.FieldParamOverride] = struct{}{}
+}
+
+// ParamOverrideCleared returns if the "param_override" field was cleared in this mutation.
+func (m *ChannelKeyMutation) ParamOverrideCleared() bool {
+	_, ok := m.clearedFields[channelkey.FieldParamOverride]
+	return ok
+}
+
+// ResetParamOverride resets all changes to the "param_override" field.
+func (m *ChannelKeyMutation) ResetParamOverride() {
+	m.param_override = nil
+	delete(m.clearedFields, channelkey.FieldParamOverride)
+}
+
+// SetHeaderOverride sets the "header_override" field.
+func (m *ChannelKeyMutation) SetHeaderOverride(value map[string]string) {
+	m.header_override = &value
+}
+
+// HeaderOverride returns the value of the "header_override" field in the mutation.
+func (m *ChannelKeyMutation) HeaderOverride() (r map[string]string, exists bool) {
+	v := m.header_override
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHeaderOverride returns the old "header_override" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldHeaderOverride(ctx context.Context) (v map[string]string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHeaderOverride is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHeaderOverride requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHeaderOverride: %w", err)
+	}
+	return oldValue.HeaderOverride, nil
+}
+
+// ClearHeaderOverride clears the value of the "header_override" field.
+func (m *ChannelKeyMutation) ClearHeaderOverride() {
+	m.header_override = nil
+	m.clearedFields[channelkey.FieldHeaderOverride] = struct{}{}
+}
+
+// HeaderOverrideCleared returns if the "header_override" field was cleared in this mutation.
+func (m *ChannelKeyMutation) HeaderOverrideCleared() bool {
+	_, ok := m.clearedFields[channelkey.FieldHeaderOverride]
+	return ok
+}
+
+// ResetHeaderOverride resets all changes to the "header_override" field.
+func (m *ChannelKeyMutation) ResetHeaderOverride() {
+	m.header_override = nil
+	delete(m.clearedFields, channelkey.FieldHeaderOverride)
+}
+
+// SetStatus sets the "status" field.
+func (m *ChannelKeyMutation) SetStatus(c channelkey.Status) {
+	m.status = &c
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *ChannelKeyMutation) Status() (r channelkey.Status, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldStatus(ctx context.Context) (v channelkey.Status, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *ChannelKeyMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetErrorMsg sets the "error_msg" field.
+func (m *ChannelKeyMutation) SetErrorMsg(s string) {
+	m.error_msg = &s
+}
+
+// ErrorMsg returns the value of the "error_msg" field in the mutation.
+func (m *ChannelKeyMutation) ErrorMsg() (r string, exists bool) {
+	v := m.error_msg
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldErrorMsg returns the old "error_msg" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldErrorMsg(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldErrorMsg is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldErrorMsg requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldErrorMsg: %w", err)
+	}
+	return oldValue.ErrorMsg, nil
+}
+
+// ResetErrorMsg resets all changes to the "error_msg" field.
+func (m *ChannelKeyMutation) ResetErrorMsg() {
+	m.error_msg = nil
+}
+
+// SetPriority sets the "priority" field.
+func (m *ChannelKeyMutation) SetPriority(i int) {
+	m.priority = &i
+	m.addpriority = nil
+}
+
+// Priority returns the value of the "priority" field in the mutation.
+func (m *ChannelKeyMutation) Priority() (r int, exists bool) {
+	v := m.priority
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPriority returns the old "priority" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldPriority(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPriority is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPriority requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPriority: %w", err)
+	}
+	return oldValue.Priority, nil
+}
+
+// AddPriority adds i to the "priority" field.
+func (m *ChannelKeyMutation) AddPriority(i int) {
+	if m.addpriority != nil {
+		*m.addpriority += i
+	} else {
+		m.addpriority = &i
+	}
+}
+
+// AddedPriority returns the value that was added to the "priority" field in this mutation.
+func (m *ChannelKeyMutation) AddedPriority() (r int, exists bool) {
+	v := m.addpriority
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPriority resets all changes to the "priority" field.
+func (m *ChannelKeyMutation) ResetPriority() {
+	m.priority = nil
+	m.addpriority = nil
+}
+
+// SetWeight sets the "weight" field.
+func (m *ChannelKeyMutation) SetWeight(i int) {
+	m.weight = &i
+	m.addweight = nil
+}
+
+// Weight returns the value of the "weight" field in the mutation.
+func (m *ChannelKeyMutation) Weight() (r int, exists bool) {
+	v := m.weight
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWeight returns the old "weight" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldWeight(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWeight: %w", err)
+	}
+	return oldValue.Weight, nil
+}
+
+// AddWeight adds i to the "weight" field.
+func (m *ChannelKeyMutation) AddWeight(i int) {
+	if m.addweight != nil {
+		*m.addweight += i
+	} else {
+		m.addweight = &i
+	}
+}
+
+// AddedWeight returns the value that was added to the "weight" field in this mutation.
+func (m *ChannelKeyMutation) AddedWeight() (r int, exists bool) {
+	v := m.addweight
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetWeight resets all changes to the "weight" field.
+func (m *ChannelKeyMutation) ResetWeight() {
+	m.weight = nil
+	m.addweight = nil
+}
+
+// SetMaxConcurrency sets the "max_concurrency" field.
+func (m *ChannelKeyMutation) SetMaxConcurrency(i int) {
+	m.max_concurrency = &i
+	m.addmax_concurrency = nil
+}
+
+// MaxConcurrency returns the value of the "max_concurrency" field in the mutation.
+func (m *ChannelKeyMutation) MaxConcurrency() (r int, exists bool) {
+	v := m.max_concurrency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaxConcurrency returns the old "max_concurrency" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldMaxConcurrency(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaxConcurrency is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaxConcurrency requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaxConcurrency: %w", err)
+	}
+	return oldValue.MaxConcurrency, nil
+}
+
+// AddMaxConcurrency adds i to the "max_concurrency" field.
+func (m *ChannelKeyMutation) AddMaxConcurrency(i int) {
+	if m.addmax_concurrency != nil {
+		*m.addmax_concurrency += i
+	} else {
+		m.addmax_concurrency = &i
+	}
+}
+
+// AddedMaxConcurrency returns the value that was added to the "max_concurrency" field in this mutation.
+func (m *ChannelKeyMutation) AddedMaxConcurrency() (r int, exists bool) {
+	v := m.addmax_concurrency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetMaxConcurrency resets all changes to the "max_concurrency" field.
+func (m *ChannelKeyMutation) ResetMaxConcurrency() {
+	m.max_concurrency = nil
+	m.addmax_concurrency = nil
+}
+
+// SetMaxRpm sets the "max_rpm" field.
+func (m *ChannelKeyMutation) SetMaxRpm(i int) {
+	m.max_rpm = &i
+	m.addmax_rpm = nil
+}
+
+// MaxRpm returns the value of the "max_rpm" field in the mutation.
+func (m *ChannelKeyMutation) MaxRpm() (r int, exists bool) {
+	v := m.max_rpm
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaxRpm returns the old "max_rpm" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldMaxRpm(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaxRpm is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaxRpm requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaxRpm: %w", err)
+	}
+	return oldValue.MaxRpm, nil
+}
+
+// AddMaxRpm adds i to the "max_rpm" field.
+func (m *ChannelKeyMutation) AddMaxRpm(i int) {
+	if m.addmax_rpm != nil {
+		*m.addmax_rpm += i
+	} else {
+		m.addmax_rpm = &i
+	}
+}
+
+// AddedMaxRpm returns the value that was added to the "max_rpm" field in this mutation.
+func (m *ChannelKeyMutation) AddedMaxRpm() (r int, exists bool) {
+	v := m.addmax_rpm
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetMaxRpm resets all changes to the "max_rpm" field.
+func (m *ChannelKeyMutation) ResetMaxRpm() {
+	m.max_rpm = nil
+	m.addmax_rpm = nil
+}
+
+// SetCostRatio sets the "cost_ratio" field.
+func (m *ChannelKeyMutation) SetCostRatio(f float64) {
+	m.cost_ratio = &f
+	m.addcost_ratio = nil
+}
+
+// CostRatio returns the value of the "cost_ratio" field in the mutation.
+func (m *ChannelKeyMutation) CostRatio() (r float64, exists bool) {
+	v := m.cost_ratio
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCostRatio returns the old "cost_ratio" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldCostRatio(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCostRatio is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCostRatio requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCostRatio: %w", err)
+	}
+	return oldValue.CostRatio, nil
+}
+
+// AddCostRatio adds f to the "cost_ratio" field.
+func (m *ChannelKeyMutation) AddCostRatio(f float64) {
+	if m.addcost_ratio != nil {
+		*m.addcost_ratio += f
+	} else {
+		m.addcost_ratio = &f
+	}
+}
+
+// AddedCostRatio returns the value that was added to the "cost_ratio" field in this mutation.
+func (m *ChannelKeyMutation) AddedCostRatio() (r float64, exists bool) {
+	v := m.addcost_ratio
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCostRatio resets all changes to the "cost_ratio" field.
+func (m *ChannelKeyMutation) ResetCostRatio() {
+	m.cost_ratio = nil
+	m.addcost_ratio = nil
+}
+
+// SetTags sets the "tags" field.
+func (m *ChannelKeyMutation) SetTags(s []string) {
+	m.tags = &s
+	m.appendtags = nil
+}
+
+// Tags returns the value of the "tags" field in the mutation.
+func (m *ChannelKeyMutation) Tags() (r []string, exists bool) {
+	v := m.tags
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTags returns the old "tags" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldTags(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTags is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTags requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTags: %w", err)
+	}
+	return oldValue.Tags, nil
+}
+
+// AppendTags adds s to the "tags" field.
+func (m *ChannelKeyMutation) AppendTags(s []string) {
+	m.appendtags = append(m.appendtags, s...)
+}
+
+// AppendedTags returns the list of values that were appended to the "tags" field in this mutation.
+func (m *ChannelKeyMutation) AppendedTags() ([]string, bool) {
+	if len(m.appendtags) == 0 {
+		return nil, false
+	}
+	return m.appendtags, true
+}
+
+// ClearTags clears the value of the "tags" field.
+func (m *ChannelKeyMutation) ClearTags() {
+	m.tags = nil
+	m.appendtags = nil
+	m.clearedFields[channelkey.FieldTags] = struct{}{}
+}
+
+// TagsCleared returns if the "tags" field was cleared in this mutation.
+func (m *ChannelKeyMutation) TagsCleared() bool {
+	_, ok := m.clearedFields[channelkey.FieldTags]
+	return ok
+}
+
+// ResetTags resets all changes to the "tags" field.
+func (m *ChannelKeyMutation) ResetTags() {
+	m.tags = nil
+	m.appendtags = nil
+	delete(m.clearedFields, channelkey.FieldTags)
+}
+
+// SetTestModel sets the "test_model" field.
+func (m *ChannelKeyMutation) SetTestModel(s string) {
+	m.test_model = &s
+}
+
+// TestModel returns the value of the "test_model" field in the mutation.
+func (m *ChannelKeyMutation) TestModel() (r string, exists bool) {
+	v := m.test_model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTestModel returns the old "test_model" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldTestModel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTestModel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTestModel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTestModel: %w", err)
+	}
+	return oldValue.TestModel, nil
+}
+
+// ResetTestModel resets all changes to the "test_model" field.
+func (m *ChannelKeyMutation) ResetTestModel() {
+	m.test_model = nil
+}
+
+// SetResponseTimeMs sets the "response_time_ms" field.
+func (m *ChannelKeyMutation) SetResponseTimeMs(i int) {
+	m.response_time_ms = &i
+	m.addresponse_time_ms = nil
+}
+
+// ResponseTimeMs returns the value of the "response_time_ms" field in the mutation.
+func (m *ChannelKeyMutation) ResponseTimeMs() (r int, exists bool) {
+	v := m.response_time_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResponseTimeMs returns the old "response_time_ms" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldResponseTimeMs(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResponseTimeMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResponseTimeMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResponseTimeMs: %w", err)
+	}
+	return oldValue.ResponseTimeMs, nil
+}
+
+// AddResponseTimeMs adds i to the "response_time_ms" field.
+func (m *ChannelKeyMutation) AddResponseTimeMs(i int) {
+	if m.addresponse_time_ms != nil {
+		*m.addresponse_time_ms += i
+	} else {
+		m.addresponse_time_ms = &i
+	}
+}
+
+// AddedResponseTimeMs returns the value that was added to the "response_time_ms" field in this mutation.
+func (m *ChannelKeyMutation) AddedResponseTimeMs() (r int, exists bool) {
+	v := m.addresponse_time_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetResponseTimeMs resets all changes to the "response_time_ms" field.
+func (m *ChannelKeyMutation) ResetResponseTimeMs() {
+	m.response_time_ms = nil
+	m.addresponse_time_ms = nil
+}
+
+// SetTestedAt sets the "tested_at" field.
+func (m *ChannelKeyMutation) SetTestedAt(t time.Time) {
+	m.tested_at = &t
+}
+
+// TestedAt returns the value of the "tested_at" field in the mutation.
+func (m *ChannelKeyMutation) TestedAt() (r time.Time, exists bool) {
+	v := m.tested_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTestedAt returns the old "tested_at" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldTestedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTestedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTestedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTestedAt: %w", err)
+	}
+	return oldValue.TestedAt, nil
+}
+
+// ClearTestedAt clears the value of the "tested_at" field.
+func (m *ChannelKeyMutation) ClearTestedAt() {
+	m.tested_at = nil
+	m.clearedFields[channelkey.FieldTestedAt] = struct{}{}
+}
+
+// TestedAtCleared returns if the "tested_at" field was cleared in this mutation.
+func (m *ChannelKeyMutation) TestedAtCleared() bool {
+	_, ok := m.clearedFields[channelkey.FieldTestedAt]
+	return ok
+}
+
+// ResetTestedAt resets all changes to the "tested_at" field.
+func (m *ChannelKeyMutation) ResetTestedAt() {
+	m.tested_at = nil
+	delete(m.clearedFields, channelkey.FieldTestedAt)
+}
+
+// SetLastUsedAt sets the "last_used_at" field.
+func (m *ChannelKeyMutation) SetLastUsedAt(t time.Time) {
+	m.last_used_at = &t
+}
+
+// LastUsedAt returns the value of the "last_used_at" field in the mutation.
+func (m *ChannelKeyMutation) LastUsedAt() (r time.Time, exists bool) {
+	v := m.last_used_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastUsedAt returns the old "last_used_at" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldLastUsedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastUsedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastUsedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastUsedAt: %w", err)
+	}
+	return oldValue.LastUsedAt, nil
+}
+
+// ClearLastUsedAt clears the value of the "last_used_at" field.
+func (m *ChannelKeyMutation) ClearLastUsedAt() {
+	m.last_used_at = nil
+	m.clearedFields[channelkey.FieldLastUsedAt] = struct{}{}
+}
+
+// LastUsedAtCleared returns if the "last_used_at" field was cleared in this mutation.
+func (m *ChannelKeyMutation) LastUsedAtCleared() bool {
+	_, ok := m.clearedFields[channelkey.FieldLastUsedAt]
+	return ok
+}
+
+// ResetLastUsedAt resets all changes to the "last_used_at" field.
+func (m *ChannelKeyMutation) ResetLastUsedAt() {
+	m.last_used_at = nil
+	delete(m.clearedFields, channelkey.FieldLastUsedAt)
+}
+
+// SetBalance sets the "balance" field.
+func (m *ChannelKeyMutation) SetBalance(f float64) {
+	m.balance = &f
+	m.addbalance = nil
+}
+
+// Balance returns the value of the "balance" field in the mutation.
+func (m *ChannelKeyMutation) Balance() (r float64, exists bool) {
+	v := m.balance
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBalance returns the old "balance" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldBalance(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBalance is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBalance requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBalance: %w", err)
+	}
+	return oldValue.Balance, nil
+}
+
+// AddBalance adds f to the "balance" field.
+func (m *ChannelKeyMutation) AddBalance(f float64) {
+	if m.addbalance != nil {
+		*m.addbalance += f
+	} else {
+		m.addbalance = &f
+	}
+}
+
+// AddedBalance returns the value that was added to the "balance" field in this mutation.
+func (m *ChannelKeyMutation) AddedBalance() (r float64, exists bool) {
+	v := m.addbalance
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetBalance resets all changes to the "balance" field.
+func (m *ChannelKeyMutation) ResetBalance() {
+	m.balance = nil
+	m.addbalance = nil
+}
+
+// SetBalanceUpdatedAt sets the "balance_updated_at" field.
+func (m *ChannelKeyMutation) SetBalanceUpdatedAt(t time.Time) {
+	m.balance_updated_at = &t
+}
+
+// BalanceUpdatedAt returns the value of the "balance_updated_at" field in the mutation.
+func (m *ChannelKeyMutation) BalanceUpdatedAt() (r time.Time, exists bool) {
+	v := m.balance_updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBalanceUpdatedAt returns the old "balance_updated_at" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldBalanceUpdatedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBalanceUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBalanceUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBalanceUpdatedAt: %w", err)
+	}
+	return oldValue.BalanceUpdatedAt, nil
+}
+
+// ClearBalanceUpdatedAt clears the value of the "balance_updated_at" field.
+func (m *ChannelKeyMutation) ClearBalanceUpdatedAt() {
+	m.balance_updated_at = nil
+	m.clearedFields[channelkey.FieldBalanceUpdatedAt] = struct{}{}
+}
+
+// BalanceUpdatedAtCleared returns if the "balance_updated_at" field was cleared in this mutation.
+func (m *ChannelKeyMutation) BalanceUpdatedAtCleared() bool {
+	_, ok := m.clearedFields[channelkey.FieldBalanceUpdatedAt]
+	return ok
+}
+
+// ResetBalanceUpdatedAt resets all changes to the "balance_updated_at" field.
+func (m *ChannelKeyMutation) ResetBalanceUpdatedAt() {
+	m.balance_updated_at = nil
+	delete(m.clearedFields, channelkey.FieldBalanceUpdatedAt)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ChannelKeyMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ChannelKeyMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ChannelKeyMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ChannelKeyMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ChannelKeyMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ChannelKeyMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetChannelID sets the "channel" edge to the Channel entity by id.
+func (m *ChannelKeyMutation) SetChannelID(id int) {
+	m.channel = &id
+}
+
+// ClearChannel clears the "channel" edge to the Channel entity.
+func (m *ChannelKeyMutation) ClearChannel() {
+	m.clearedchannel = true
+}
+
+// ChannelCleared reports if the "channel" edge to the Channel entity was cleared.
+func (m *ChannelKeyMutation) ChannelCleared() bool {
+	return m.clearedchannel
+}
+
+// ChannelID returns the "channel" edge ID in the mutation.
+func (m *ChannelKeyMutation) ChannelID() (id int, exists bool) {
+	if m.channel != nil {
+		return *m.channel, true
+	}
+	return
+}
+
+// ChannelIDs returns the "channel" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ChannelID instead. It exists only for internal usage by the builders.
+func (m *ChannelKeyMutation) ChannelIDs() (ids []int) {
+	if id := m.channel; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetChannel resets all changes to the "channel" edge.
+func (m *ChannelKeyMutation) ResetChannel() {
+	m.channel = nil
+	m.clearedchannel = false
+}
+
+// AddGroupIDs adds the "groups" edge to the Group entity by ids.
+func (m *ChannelKeyMutation) AddGroupIDs(ids ...int) {
+	if m.groups == nil {
+		m.groups = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.groups[ids[i]] = struct{}{}
+	}
+}
+
+// ClearGroups clears the "groups" edge to the Group entity.
+func (m *ChannelKeyMutation) ClearGroups() {
+	m.clearedgroups = true
+}
+
+// GroupsCleared reports if the "groups" edge to the Group entity was cleared.
+func (m *ChannelKeyMutation) GroupsCleared() bool {
+	return m.clearedgroups
+}
+
+// RemoveGroupIDs removes the "groups" edge to the Group entity by IDs.
+func (m *ChannelKeyMutation) RemoveGroupIDs(ids ...int) {
+	if m.removedgroups == nil {
+		m.removedgroups = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.groups, ids[i])
+		m.removedgroups[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedGroups returns the removed IDs of the "groups" edge to the Group entity.
+func (m *ChannelKeyMutation) RemovedGroupsIDs() (ids []int) {
+	for id := range m.removedgroups {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// GroupsIDs returns the "groups" edge IDs in the mutation.
+func (m *ChannelKeyMutation) GroupsIDs() (ids []int) {
+	for id := range m.groups {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetGroups resets all changes to the "groups" edge.
+func (m *ChannelKeyMutation) ResetGroups() {
+	m.groups = nil
+	m.clearedgroups = false
+	m.removedgroups = nil
+}
+
+// AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by ids.
+func (m *ChannelKeyMutation) AddUsageLogIDs(ids ...int) {
+	if m.usage_logs == nil {
+		m.usage_logs = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.usage_logs[ids[i]] = struct{}{}
+	}
+}
+
+// ClearUsageLogs clears the "usage_logs" edge to the UsageLog entity.
+func (m *ChannelKeyMutation) ClearUsageLogs() {
+	m.clearedusage_logs = true
+}
+
+// UsageLogsCleared reports if the "usage_logs" edge to the UsageLog entity was cleared.
+func (m *ChannelKeyMutation) UsageLogsCleared() bool {
+	return m.clearedusage_logs
+}
+
+// RemoveUsageLogIDs removes the "usage_logs" edge to the UsageLog entity by IDs.
+func (m *ChannelKeyMutation) RemoveUsageLogIDs(ids ...int) {
+	if m.removedusage_logs == nil {
+		m.removedusage_logs = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.usage_logs, ids[i])
+		m.removedusage_logs[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedUsageLogs returns the removed IDs of the "usage_logs" edge to the UsageLog entity.
+func (m *ChannelKeyMutation) RemovedUsageLogsIDs() (ids []int) {
+	for id := range m.removedusage_logs {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// UsageLogsIDs returns the "usage_logs" edge IDs in the mutation.
+func (m *ChannelKeyMutation) UsageLogsIDs() (ids []int) {
+	for id := range m.usage_logs {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetUsageLogs resets all changes to the "usage_logs" edge.
+func (m *ChannelKeyMutation) ResetUsageLogs() {
+	m.usage_logs = nil
+	m.clearedusage_logs = false
+	m.removedusage_logs = nil
+}
+
+// Where appends a list predicates to the ChannelKeyMutation builder.
+func (m *ChannelKeyMutation) Where(ps ...predicate.ChannelKey) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ChannelKeyMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ChannelKeyMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ChannelKey, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ChannelKeyMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ChannelKeyMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ChannelKey).
+func (m *ChannelKeyMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ChannelKeyMutation) Fields() []string {
+	fields := make([]string, 0, 23)
+	if m.name != nil {
+		fields = append(fields, channelkey.FieldName)
+	}
+	if m._type != nil {
+		fields = append(fields, channelkey.FieldType)
+	}
+	if m.api_key != nil {
+		fields = append(fields, channelkey.FieldAPIKey)
+	}
+	if m.models != nil {
+		fields = append(fields, channelkey.FieldModels)
+	}
+	if m.model_mapping != nil {
+		fields = append(fields, channelkey.FieldModelMapping)
+	}
+	if m.param_override != nil {
+		fields = append(fields, channelkey.FieldParamOverride)
+	}
+	if m.header_override != nil {
+		fields = append(fields, channelkey.FieldHeaderOverride)
+	}
+	if m.status != nil {
+		fields = append(fields, channelkey.FieldStatus)
+	}
+	if m.error_msg != nil {
+		fields = append(fields, channelkey.FieldErrorMsg)
+	}
+	if m.priority != nil {
+		fields = append(fields, channelkey.FieldPriority)
+	}
+	if m.weight != nil {
+		fields = append(fields, channelkey.FieldWeight)
+	}
+	if m.max_concurrency != nil {
+		fields = append(fields, channelkey.FieldMaxConcurrency)
+	}
+	if m.max_rpm != nil {
+		fields = append(fields, channelkey.FieldMaxRpm)
+	}
+	if m.cost_ratio != nil {
+		fields = append(fields, channelkey.FieldCostRatio)
+	}
+	if m.tags != nil {
+		fields = append(fields, channelkey.FieldTags)
+	}
+	if m.test_model != nil {
+		fields = append(fields, channelkey.FieldTestModel)
+	}
+	if m.response_time_ms != nil {
+		fields = append(fields, channelkey.FieldResponseTimeMs)
+	}
+	if m.tested_at != nil {
+		fields = append(fields, channelkey.FieldTestedAt)
+	}
+	if m.last_used_at != nil {
+		fields = append(fields, channelkey.FieldLastUsedAt)
+	}
+	if m.balance != nil {
+		fields = append(fields, channelkey.FieldBalance)
+	}
+	if m.balance_updated_at != nil {
+		fields = append(fields, channelkey.FieldBalanceUpdatedAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, channelkey.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, channelkey.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ChannelKeyMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case channelkey.FieldName:
+		return m.Name()
+	case channelkey.FieldType:
+		return m.GetType()
+	case channelkey.FieldAPIKey:
+		return m.APIKey()
+	case channelkey.FieldModels:
+		return m.Models()
+	case channelkey.FieldModelMapping:
+		return m.ModelMapping()
+	case channelkey.FieldParamOverride:
+		return m.ParamOverride()
+	case channelkey.FieldHeaderOverride:
+		return m.HeaderOverride()
+	case channelkey.FieldStatus:
+		return m.Status()
+	case channelkey.FieldErrorMsg:
+		return m.ErrorMsg()
+	case channelkey.FieldPriority:
+		return m.Priority()
+	case channelkey.FieldWeight:
+		return m.Weight()
+	case channelkey.FieldMaxConcurrency:
+		return m.MaxConcurrency()
+	case channelkey.FieldMaxRpm:
+		return m.MaxRpm()
+	case channelkey.FieldCostRatio:
+		return m.CostRatio()
+	case channelkey.FieldTags:
+		return m.Tags()
+	case channelkey.FieldTestModel:
+		return m.TestModel()
+	case channelkey.FieldResponseTimeMs:
+		return m.ResponseTimeMs()
+	case channelkey.FieldTestedAt:
+		return m.TestedAt()
+	case channelkey.FieldLastUsedAt:
+		return m.LastUsedAt()
+	case channelkey.FieldBalance:
+		return m.Balance()
+	case channelkey.FieldBalanceUpdatedAt:
+		return m.BalanceUpdatedAt()
+	case channelkey.FieldCreatedAt:
+		return m.CreatedAt()
+	case channelkey.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ChannelKeyMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case channelkey.FieldName:
+		return m.OldName(ctx)
+	case channelkey.FieldType:
+		return m.OldType(ctx)
+	case channelkey.FieldAPIKey:
+		return m.OldAPIKey(ctx)
+	case channelkey.FieldModels:
+		return m.OldModels(ctx)
+	case channelkey.FieldModelMapping:
+		return m.OldModelMapping(ctx)
+	case channelkey.FieldParamOverride:
+		return m.OldParamOverride(ctx)
+	case channelkey.FieldHeaderOverride:
+		return m.OldHeaderOverride(ctx)
+	case channelkey.FieldStatus:
+		return m.OldStatus(ctx)
+	case channelkey.FieldErrorMsg:
+		return m.OldErrorMsg(ctx)
+	case channelkey.FieldPriority:
+		return m.OldPriority(ctx)
+	case channelkey.FieldWeight:
+		return m.OldWeight(ctx)
+	case channelkey.FieldMaxConcurrency:
+		return m.OldMaxConcurrency(ctx)
+	case channelkey.FieldMaxRpm:
+		return m.OldMaxRpm(ctx)
+	case channelkey.FieldCostRatio:
+		return m.OldCostRatio(ctx)
+	case channelkey.FieldTags:
+		return m.OldTags(ctx)
+	case channelkey.FieldTestModel:
+		return m.OldTestModel(ctx)
+	case channelkey.FieldResponseTimeMs:
+		return m.OldResponseTimeMs(ctx)
+	case channelkey.FieldTestedAt:
+		return m.OldTestedAt(ctx)
+	case channelkey.FieldLastUsedAt:
+		return m.OldLastUsedAt(ctx)
+	case channelkey.FieldBalance:
+		return m.OldBalance(ctx)
+	case channelkey.FieldBalanceUpdatedAt:
+		return m.OldBalanceUpdatedAt(ctx)
+	case channelkey.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case channelkey.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown ChannelKey field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ChannelKeyMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case channelkey.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case channelkey.FieldType:
+		v, ok := value.(channelkey.Type)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetType(v)
+		return nil
+	case channelkey.FieldAPIKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAPIKey(v)
+		return nil
+	case channelkey.FieldModels:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModels(v)
+		return nil
+	case channelkey.FieldModelMapping:
+		v, ok := value.(map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModelMapping(v)
+		return nil
+	case channelkey.FieldParamOverride:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetParamOverride(v)
+		return nil
+	case channelkey.FieldHeaderOverride:
+		v, ok := value.(map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHeaderOverride(v)
+		return nil
+	case channelkey.FieldStatus:
+		v, ok := value.(channelkey.Status)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case channelkey.FieldErrorMsg:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetErrorMsg(v)
+		return nil
+	case channelkey.FieldPriority:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPriority(v)
+		return nil
+	case channelkey.FieldWeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWeight(v)
+		return nil
+	case channelkey.FieldMaxConcurrency:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaxConcurrency(v)
+		return nil
+	case channelkey.FieldMaxRpm:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaxRpm(v)
+		return nil
+	case channelkey.FieldCostRatio:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCostRatio(v)
+		return nil
+	case channelkey.FieldTags:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTags(v)
+		return nil
+	case channelkey.FieldTestModel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTestModel(v)
+		return nil
+	case channelkey.FieldResponseTimeMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResponseTimeMs(v)
+		return nil
+	case channelkey.FieldTestedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTestedAt(v)
+		return nil
+	case channelkey.FieldLastUsedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastUsedAt(v)
+		return nil
+	case channelkey.FieldBalance:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBalance(v)
+		return nil
+	case channelkey.FieldBalanceUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBalanceUpdatedAt(v)
+		return nil
+	case channelkey.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case channelkey.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ChannelKey field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ChannelKeyMutation) AddedFields() []string {
+	var fields []string
+	if m.addpriority != nil {
+		fields = append(fields, channelkey.FieldPriority)
+	}
+	if m.addweight != nil {
+		fields = append(fields, channelkey.FieldWeight)
+	}
+	if m.addmax_concurrency != nil {
+		fields = append(fields, channelkey.FieldMaxConcurrency)
+	}
+	if m.addmax_rpm != nil {
+		fields = append(fields, channelkey.FieldMaxRpm)
+	}
+	if m.addcost_ratio != nil {
+		fields = append(fields, channelkey.FieldCostRatio)
+	}
+	if m.addresponse_time_ms != nil {
+		fields = append(fields, channelkey.FieldResponseTimeMs)
+	}
+	if m.addbalance != nil {
+		fields = append(fields, channelkey.FieldBalance)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ChannelKeyMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case channelkey.FieldPriority:
+		return m.AddedPriority()
+	case channelkey.FieldWeight:
+		return m.AddedWeight()
+	case channelkey.FieldMaxConcurrency:
+		return m.AddedMaxConcurrency()
+	case channelkey.FieldMaxRpm:
+		return m.AddedMaxRpm()
+	case channelkey.FieldCostRatio:
+		return m.AddedCostRatio()
+	case channelkey.FieldResponseTimeMs:
+		return m.AddedResponseTimeMs()
+	case channelkey.FieldBalance:
+		return m.AddedBalance()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ChannelKeyMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case channelkey.FieldPriority:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPriority(v)
+		return nil
+	case channelkey.FieldWeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWeight(v)
+		return nil
+	case channelkey.FieldMaxConcurrency:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMaxConcurrency(v)
+		return nil
+	case channelkey.FieldMaxRpm:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMaxRpm(v)
+		return nil
+	case channelkey.FieldCostRatio:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCostRatio(v)
+		return nil
+	case channelkey.FieldResponseTimeMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddResponseTimeMs(v)
+		return nil
+	case channelkey.FieldBalance:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBalance(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ChannelKey numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ChannelKeyMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(channelkey.FieldModelMapping) {
+		fields = append(fields, channelkey.FieldModelMapping)
+	}
+	if m.FieldCleared(channelkey.FieldParamOverride) {
+		fields = append(fields, channelkey.FieldParamOverride)
+	}
+	if m.FieldCleared(channelkey.FieldHeaderOverride) {
+		fields = append(fields, channelkey.FieldHeaderOverride)
+	}
+	if m.FieldCleared(channelkey.FieldTags) {
+		fields = append(fields, channelkey.FieldTags)
+	}
+	if m.FieldCleared(channelkey.FieldTestedAt) {
+		fields = append(fields, channelkey.FieldTestedAt)
+	}
+	if m.FieldCleared(channelkey.FieldLastUsedAt) {
+		fields = append(fields, channelkey.FieldLastUsedAt)
+	}
+	if m.FieldCleared(channelkey.FieldBalanceUpdatedAt) {
+		fields = append(fields, channelkey.FieldBalanceUpdatedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ChannelKeyMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ChannelKeyMutation) ClearField(name string) error {
+	switch name {
+	case channelkey.FieldModelMapping:
+		m.ClearModelMapping()
+		return nil
+	case channelkey.FieldParamOverride:
+		m.ClearParamOverride()
+		return nil
+	case channelkey.FieldHeaderOverride:
+		m.ClearHeaderOverride()
+		return nil
+	case channelkey.FieldTags:
+		m.ClearTags()
+		return nil
+	case channelkey.FieldTestedAt:
+		m.ClearTestedAt()
+		return nil
+	case channelkey.FieldLastUsedAt:
+		m.ClearLastUsedAt()
+		return nil
+	case channelkey.FieldBalanceUpdatedAt:
+		m.ClearBalanceUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown ChannelKey nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ChannelKeyMutation) ResetField(name string) error {
+	switch name {
+	case channelkey.FieldName:
+		m.ResetName()
+		return nil
+	case channelkey.FieldType:
+		m.ResetType()
+		return nil
+	case channelkey.FieldAPIKey:
+		m.ResetAPIKey()
+		return nil
+	case channelkey.FieldModels:
+		m.ResetModels()
+		return nil
+	case channelkey.FieldModelMapping:
+		m.ResetModelMapping()
+		return nil
+	case channelkey.FieldParamOverride:
+		m.ResetParamOverride()
+		return nil
+	case channelkey.FieldHeaderOverride:
+		m.ResetHeaderOverride()
+		return nil
+	case channelkey.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case channelkey.FieldErrorMsg:
+		m.ResetErrorMsg()
+		return nil
+	case channelkey.FieldPriority:
+		m.ResetPriority()
+		return nil
+	case channelkey.FieldWeight:
+		m.ResetWeight()
+		return nil
+	case channelkey.FieldMaxConcurrency:
+		m.ResetMaxConcurrency()
+		return nil
+	case channelkey.FieldMaxRpm:
+		m.ResetMaxRpm()
+		return nil
+	case channelkey.FieldCostRatio:
+		m.ResetCostRatio()
+		return nil
+	case channelkey.FieldTags:
+		m.ResetTags()
+		return nil
+	case channelkey.FieldTestModel:
+		m.ResetTestModel()
+		return nil
+	case channelkey.FieldResponseTimeMs:
+		m.ResetResponseTimeMs()
+		return nil
+	case channelkey.FieldTestedAt:
+		m.ResetTestedAt()
+		return nil
+	case channelkey.FieldLastUsedAt:
+		m.ResetLastUsedAt()
+		return nil
+	case channelkey.FieldBalance:
+		m.ResetBalance()
+		return nil
+	case channelkey.FieldBalanceUpdatedAt:
+		m.ResetBalanceUpdatedAt()
+		return nil
+	case channelkey.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case channelkey.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown ChannelKey field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ChannelKeyMutation) AddedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.channel != nil {
+		edges = append(edges, channelkey.EdgeChannel)
+	}
+	if m.groups != nil {
+		edges = append(edges, channelkey.EdgeGroups)
+	}
+	if m.usage_logs != nil {
+		edges = append(edges, channelkey.EdgeUsageLogs)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ChannelKeyMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case channelkey.EdgeChannel:
+		if id := m.channel; id != nil {
+			return []ent.Value{*id}
+		}
+	case channelkey.EdgeGroups:
+		ids := make([]ent.Value, 0, len(m.groups))
+		for id := range m.groups {
+			ids = append(ids, id)
+		}
+		return ids
+	case channelkey.EdgeUsageLogs:
+		ids := make([]ent.Value, 0, len(m.usage_logs))
+		for id := range m.usage_logs {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ChannelKeyMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.removedgroups != nil {
+		edges = append(edges, channelkey.EdgeGroups)
+	}
+	if m.removedusage_logs != nil {
+		edges = append(edges, channelkey.EdgeUsageLogs)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ChannelKeyMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case channelkey.EdgeGroups:
+		ids := make([]ent.Value, 0, len(m.removedgroups))
+		for id := range m.removedgroups {
+			ids = append(ids, id)
+		}
+		return ids
+	case channelkey.EdgeUsageLogs:
+		ids := make([]ent.Value, 0, len(m.removedusage_logs))
+		for id := range m.removedusage_logs {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ChannelKeyMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.clearedchannel {
+		edges = append(edges, channelkey.EdgeChannel)
+	}
+	if m.clearedgroups {
+		edges = append(edges, channelkey.EdgeGroups)
+	}
+	if m.clearedusage_logs {
+		edges = append(edges, channelkey.EdgeUsageLogs)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ChannelKeyMutation) EdgeCleared(name string) bool {
+	switch name {
+	case channelkey.EdgeChannel:
+		return m.clearedchannel
+	case channelkey.EdgeGroups:
+		return m.clearedgroups
+	case channelkey.EdgeUsageLogs:
+		return m.clearedusage_logs
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ChannelKeyMutation) ClearEdge(name string) error {
+	switch name {
+	case channelkey.EdgeChannel:
+		m.ClearChannel()
+		return nil
+	}
+	return fmt.Errorf("unknown ChannelKey unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ChannelKeyMutation) ResetEdge(name string) error {
+	switch name {
+	case channelkey.EdgeChannel:
+		m.ResetChannel()
+		return nil
+	case channelkey.EdgeGroups:
+		m.ResetGroups()
+		return nil
+	case channelkey.EdgeUsageLogs:
+		m.ResetUsageLogs()
+		return nil
+	}
+	return fmt.Errorf("unknown ChannelKey edge %s", name)
 }
 
 // GroupMutation represents an operation that mutates the Group nodes in the graph.
@@ -6242,9 +6897,9 @@ type GroupMutation struct {
 	created_at           *time.Time
 	updated_at           *time.Time
 	clearedFields        map[string]struct{}
-	channels             map[int]struct{}
-	removedchannels      map[int]struct{}
-	clearedchannels      bool
+	channel_keys         map[int]struct{}
+	removedchannel_keys  map[int]struct{}
+	clearedchannel_keys  bool
 	allowed_users        map[int]struct{}
 	removedallowed_users map[int]struct{}
 	clearedallowed_users bool
@@ -6721,58 +7376,58 @@ func (m *GroupMutation) ResetUpdatedAt() {
 	m.updated_at = nil
 }
 
-// AddChannelIDs adds the "channels" edge to the Channel entity by ids.
-func (m *GroupMutation) AddChannelIDs(ids ...int) {
-	if m.channels == nil {
-		m.channels = make(map[int]struct{})
+// AddChannelKeyIDs adds the "channel_keys" edge to the ChannelKey entity by ids.
+func (m *GroupMutation) AddChannelKeyIDs(ids ...int) {
+	if m.channel_keys == nil {
+		m.channel_keys = make(map[int]struct{})
 	}
 	for i := range ids {
-		m.channels[ids[i]] = struct{}{}
+		m.channel_keys[ids[i]] = struct{}{}
 	}
 }
 
-// ClearChannels clears the "channels" edge to the Channel entity.
-func (m *GroupMutation) ClearChannels() {
-	m.clearedchannels = true
+// ClearChannelKeys clears the "channel_keys" edge to the ChannelKey entity.
+func (m *GroupMutation) ClearChannelKeys() {
+	m.clearedchannel_keys = true
 }
 
-// ChannelsCleared reports if the "channels" edge to the Channel entity was cleared.
-func (m *GroupMutation) ChannelsCleared() bool {
-	return m.clearedchannels
+// ChannelKeysCleared reports if the "channel_keys" edge to the ChannelKey entity was cleared.
+func (m *GroupMutation) ChannelKeysCleared() bool {
+	return m.clearedchannel_keys
 }
 
-// RemoveChannelIDs removes the "channels" edge to the Channel entity by IDs.
-func (m *GroupMutation) RemoveChannelIDs(ids ...int) {
-	if m.removedchannels == nil {
-		m.removedchannels = make(map[int]struct{})
+// RemoveChannelKeyIDs removes the "channel_keys" edge to the ChannelKey entity by IDs.
+func (m *GroupMutation) RemoveChannelKeyIDs(ids ...int) {
+	if m.removedchannel_keys == nil {
+		m.removedchannel_keys = make(map[int]struct{})
 	}
 	for i := range ids {
-		delete(m.channels, ids[i])
-		m.removedchannels[ids[i]] = struct{}{}
+		delete(m.channel_keys, ids[i])
+		m.removedchannel_keys[ids[i]] = struct{}{}
 	}
 }
 
-// RemovedChannels returns the removed IDs of the "channels" edge to the Channel entity.
-func (m *GroupMutation) RemovedChannelsIDs() (ids []int) {
-	for id := range m.removedchannels {
+// RemovedChannelKeys returns the removed IDs of the "channel_keys" edge to the ChannelKey entity.
+func (m *GroupMutation) RemovedChannelKeysIDs() (ids []int) {
+	for id := range m.removedchannel_keys {
 		ids = append(ids, id)
 	}
 	return
 }
 
-// ChannelsIDs returns the "channels" edge IDs in the mutation.
-func (m *GroupMutation) ChannelsIDs() (ids []int) {
-	for id := range m.channels {
+// ChannelKeysIDs returns the "channel_keys" edge IDs in the mutation.
+func (m *GroupMutation) ChannelKeysIDs() (ids []int) {
+	for id := range m.channel_keys {
 		ids = append(ids, id)
 	}
 	return
 }
 
-// ResetChannels resets all changes to the "channels" edge.
-func (m *GroupMutation) ResetChannels() {
-	m.channels = nil
-	m.clearedchannels = false
-	m.removedchannels = nil
+// ResetChannelKeys resets all changes to the "channel_keys" edge.
+func (m *GroupMutation) ResetChannelKeys() {
+	m.channel_keys = nil
+	m.clearedchannel_keys = false
+	m.removedchannel_keys = nil
 }
 
 // AddAllowedUserIDs adds the "allowed_users" edge to the User entity by ids.
@@ -7234,8 +7889,8 @@ func (m *GroupMutation) ResetField(name string) error {
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *GroupMutation) AddedEdges() []string {
 	edges := make([]string, 0, 4)
-	if m.channels != nil {
-		edges = append(edges, group.EdgeChannels)
+	if m.channel_keys != nil {
+		edges = append(edges, group.EdgeChannelKeys)
 	}
 	if m.allowed_users != nil {
 		edges = append(edges, group.EdgeAllowedUsers)
@@ -7253,9 +7908,9 @@ func (m *GroupMutation) AddedEdges() []string {
 // name in this mutation.
 func (m *GroupMutation) AddedIDs(name string) []ent.Value {
 	switch name {
-	case group.EdgeChannels:
-		ids := make([]ent.Value, 0, len(m.channels))
-		for id := range m.channels {
+	case group.EdgeChannelKeys:
+		ids := make([]ent.Value, 0, len(m.channel_keys))
+		for id := range m.channel_keys {
 			ids = append(ids, id)
 		}
 		return ids
@@ -7284,8 +7939,8 @@ func (m *GroupMutation) AddedIDs(name string) []ent.Value {
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *GroupMutation) RemovedEdges() []string {
 	edges := make([]string, 0, 4)
-	if m.removedchannels != nil {
-		edges = append(edges, group.EdgeChannels)
+	if m.removedchannel_keys != nil {
+		edges = append(edges, group.EdgeChannelKeys)
 	}
 	if m.removedallowed_users != nil {
 		edges = append(edges, group.EdgeAllowedUsers)
@@ -7303,9 +7958,9 @@ func (m *GroupMutation) RemovedEdges() []string {
 // the given name in this mutation.
 func (m *GroupMutation) RemovedIDs(name string) []ent.Value {
 	switch name {
-	case group.EdgeChannels:
-		ids := make([]ent.Value, 0, len(m.removedchannels))
-		for id := range m.removedchannels {
+	case group.EdgeChannelKeys:
+		ids := make([]ent.Value, 0, len(m.removedchannel_keys))
+		for id := range m.removedchannel_keys {
 			ids = append(ids, id)
 		}
 		return ids
@@ -7334,8 +7989,8 @@ func (m *GroupMutation) RemovedIDs(name string) []ent.Value {
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *GroupMutation) ClearedEdges() []string {
 	edges := make([]string, 0, 4)
-	if m.clearedchannels {
-		edges = append(edges, group.EdgeChannels)
+	if m.clearedchannel_keys {
+		edges = append(edges, group.EdgeChannelKeys)
 	}
 	if m.clearedallowed_users {
 		edges = append(edges, group.EdgeAllowedUsers)
@@ -7353,8 +8008,8 @@ func (m *GroupMutation) ClearedEdges() []string {
 // was cleared in this mutation.
 func (m *GroupMutation) EdgeCleared(name string) bool {
 	switch name {
-	case group.EdgeChannels:
-		return m.clearedchannels
+	case group.EdgeChannelKeys:
+		return m.clearedchannel_keys
 	case group.EdgeAllowedUsers:
 		return m.clearedallowed_users
 	case group.EdgeAPIKeys:
@@ -7377,8 +8032,8 @@ func (m *GroupMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *GroupMutation) ResetEdge(name string) error {
 	switch name {
-	case group.EdgeChannels:
-		m.ResetChannels()
+	case group.EdgeChannelKeys:
+		m.ResetChannelKeys()
 		return nil
 	case group.EdgeAllowedUsers:
 		m.ResetAllowedUsers()
@@ -13437,6 +14092,8 @@ type TaskMutation struct {
 	addgroup_id                *int
 	channel_id                 *int
 	addchannel_id              *int
+	channel_key_id             *int
+	addchannel_key_id          *int
 	created_at                 *time.Time
 	updated_at                 *time.Time
 	clearedFields              map[string]struct{}
@@ -14669,6 +15326,62 @@ func (m *TaskMutation) ResetChannelID() {
 	m.addchannel_id = nil
 }
 
+// SetChannelKeyID sets the "channel_key_id" field.
+func (m *TaskMutation) SetChannelKeyID(i int) {
+	m.channel_key_id = &i
+	m.addchannel_key_id = nil
+}
+
+// ChannelKeyID returns the value of the "channel_key_id" field in the mutation.
+func (m *TaskMutation) ChannelKeyID() (r int, exists bool) {
+	v := m.channel_key_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChannelKeyID returns the old "channel_key_id" field's value of the Task entity.
+// If the Task object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskMutation) OldChannelKeyID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChannelKeyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChannelKeyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChannelKeyID: %w", err)
+	}
+	return oldValue.ChannelKeyID, nil
+}
+
+// AddChannelKeyID adds i to the "channel_key_id" field.
+func (m *TaskMutation) AddChannelKeyID(i int) {
+	if m.addchannel_key_id != nil {
+		*m.addchannel_key_id += i
+	} else {
+		m.addchannel_key_id = &i
+	}
+}
+
+// AddedChannelKeyID returns the value that was added to the "channel_key_id" field in this mutation.
+func (m *TaskMutation) AddedChannelKeyID() (r int, exists bool) {
+	v := m.addchannel_key_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetChannelKeyID resets all changes to the "channel_key_id" field.
+func (m *TaskMutation) ResetChannelKeyID() {
+	m.channel_key_id = nil
+	m.addchannel_key_id = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *TaskMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -14775,7 +15488,7 @@ func (m *TaskMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TaskMutation) Fields() []string {
-	fields := make([]string, 0, 26)
+	fields := make([]string, 0, 27)
 	if m.task_id != nil {
 		fields = append(fields, task.FieldTaskID)
 	}
@@ -14848,6 +15561,9 @@ func (m *TaskMutation) Fields() []string {
 	if m.channel_id != nil {
 		fields = append(fields, task.FieldChannelID)
 	}
+	if m.channel_key_id != nil {
+		fields = append(fields, task.FieldChannelKeyID)
+	}
 	if m.created_at != nil {
 		fields = append(fields, task.FieldCreatedAt)
 	}
@@ -14910,6 +15626,8 @@ func (m *TaskMutation) Field(name string) (ent.Value, bool) {
 		return m.GroupID()
 	case task.FieldChannelID:
 		return m.ChannelID()
+	case task.FieldChannelKeyID:
+		return m.ChannelKeyID()
 	case task.FieldCreatedAt:
 		return m.CreatedAt()
 	case task.FieldUpdatedAt:
@@ -14971,6 +15689,8 @@ func (m *TaskMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldGroupID(ctx)
 	case task.FieldChannelID:
 		return m.OldChannelID(ctx)
+	case task.FieldChannelKeyID:
+		return m.OldChannelKeyID(ctx)
 	case task.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case task.FieldUpdatedAt:
@@ -15152,6 +15872,13 @@ func (m *TaskMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetChannelID(v)
 		return nil
+	case task.FieldChannelKeyID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChannelKeyID(v)
+		return nil
 	case task.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -15207,6 +15934,9 @@ func (m *TaskMutation) AddedFields() []string {
 	if m.addchannel_id != nil {
 		fields = append(fields, task.FieldChannelID)
 	}
+	if m.addchannel_key_id != nil {
+		fields = append(fields, task.FieldChannelKeyID)
+	}
 	return fields
 }
 
@@ -15237,6 +15967,8 @@ func (m *TaskMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedGroupID()
 	case task.FieldChannelID:
 		return m.AddedChannelID()
+	case task.FieldChannelKeyID:
+		return m.AddedChannelKeyID()
 	}
 	return nil, false
 }
@@ -15322,6 +16054,13 @@ func (m *TaskMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddChannelID(v)
+		return nil
+	case task.FieldChannelKeyID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddChannelKeyID(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Task numeric field %s", name)
@@ -15436,6 +16175,9 @@ func (m *TaskMutation) ResetField(name string) error {
 		return nil
 	case task.FieldChannelID:
 		m.ResetChannelID()
+		return nil
+	case task.FieldChannelKeyID:
+		m.ResetChannelKeyID()
 		return nil
 	case task.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -18189,6 +18931,8 @@ type UsageLogMutation struct {
 	clearedapi_key              bool
 	channel                     *int
 	clearedchannel              bool
+	channel_key                 *int
+	clearedchannel_key          bool
 	group                       *int
 	clearedgroup                bool
 	done                        bool
@@ -20201,6 +20945,55 @@ func (m *UsageLogMutation) ResetChannelID() {
 	delete(m.clearedFields, usagelog.FieldChannelID)
 }
 
+// SetChannelKeyID sets the "channel_key_id" field.
+func (m *UsageLogMutation) SetChannelKeyID(i int) {
+	m.channel_key = &i
+}
+
+// ChannelKeyID returns the value of the "channel_key_id" field in the mutation.
+func (m *UsageLogMutation) ChannelKeyID() (r int, exists bool) {
+	v := m.channel_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChannelKeyID returns the old "channel_key_id" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldChannelKeyID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChannelKeyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChannelKeyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChannelKeyID: %w", err)
+	}
+	return oldValue.ChannelKeyID, nil
+}
+
+// ClearChannelKeyID clears the value of the "channel_key_id" field.
+func (m *UsageLogMutation) ClearChannelKeyID() {
+	m.channel_key = nil
+	m.clearedFields[usagelog.FieldChannelKeyID] = struct{}{}
+}
+
+// ChannelKeyIDCleared returns if the "channel_key_id" field was cleared in this mutation.
+func (m *UsageLogMutation) ChannelKeyIDCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldChannelKeyID]
+	return ok
+}
+
+// ResetChannelKeyID resets all changes to the "channel_key_id" field.
+func (m *UsageLogMutation) ResetChannelKeyID() {
+	m.channel_key = nil
+	delete(m.clearedFields, usagelog.FieldChannelKeyID)
+}
+
 // SetGroupID sets the "group_id" field.
 func (m *UsageLogMutation) SetGroupID(i int) {
 	m.group = &i
@@ -20331,6 +21124,33 @@ func (m *UsageLogMutation) ResetChannel() {
 	m.clearedchannel = false
 }
 
+// ClearChannelKey clears the "channel_key" edge to the ChannelKey entity.
+func (m *UsageLogMutation) ClearChannelKey() {
+	m.clearedchannel_key = true
+	m.clearedFields[usagelog.FieldChannelKeyID] = struct{}{}
+}
+
+// ChannelKeyCleared reports if the "channel_key" edge to the ChannelKey entity was cleared.
+func (m *UsageLogMutation) ChannelKeyCleared() bool {
+	return m.ChannelKeyIDCleared() || m.clearedchannel_key
+}
+
+// ChannelKeyIDs returns the "channel_key" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ChannelKeyID instead. It exists only for internal usage by the builders.
+func (m *UsageLogMutation) ChannelKeyIDs() (ids []int) {
+	if id := m.channel_key; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetChannelKey resets all changes to the "channel_key" edge.
+func (m *UsageLogMutation) ResetChannelKey() {
+	m.channel_key = nil
+	m.clearedchannel_key = false
+}
+
 // ClearGroup clears the "group" edge to the Group entity.
 func (m *UsageLogMutation) ClearGroup() {
 	m.clearedgroup = true
@@ -20392,7 +21212,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 39)
+	fields := make([]string, 0, 40)
 	if m.model != nil {
 		fields = append(fields, usagelog.FieldModel)
 	}
@@ -20507,6 +21327,9 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.channel != nil {
 		fields = append(fields, usagelog.FieldChannelID)
 	}
+	if m.channel_key != nil {
+		fields = append(fields, usagelog.FieldChannelKeyID)
+	}
 	if m.group != nil {
 		fields = append(fields, usagelog.FieldGroupID)
 	}
@@ -20594,6 +21417,8 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.APIKeyID()
 	case usagelog.FieldChannelID:
 		return m.ChannelID()
+	case usagelog.FieldChannelKeyID:
+		return m.ChannelKeyID()
 	case usagelog.FieldGroupID:
 		return m.GroupID()
 	}
@@ -20681,6 +21506,8 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldAPIKeyID(ctx)
 	case usagelog.FieldChannelID:
 		return m.OldChannelID(ctx)
+	case usagelog.FieldChannelKeyID:
+		return m.OldChannelKeyID(ctx)
 	case usagelog.FieldGroupID:
 		return m.OldGroupID(ctx)
 	}
@@ -20957,6 +21784,13 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetChannelID(v)
+		return nil
+	case usagelog.FieldChannelKeyID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChannelKeyID(v)
 		return nil
 	case usagelog.FieldGroupID:
 		v, ok := value.(int)
@@ -21307,6 +22141,9 @@ func (m *UsageLogMutation) ClearedFields() []string {
 	if m.FieldCleared(usagelog.FieldChannelID) {
 		fields = append(fields, usagelog.FieldChannelID)
 	}
+	if m.FieldCleared(usagelog.FieldChannelKeyID) {
+		fields = append(fields, usagelog.FieldChannelKeyID)
+	}
 	if m.FieldCleared(usagelog.FieldGroupID) {
 		fields = append(fields, usagelog.FieldGroupID)
 	}
@@ -21332,6 +22169,9 @@ func (m *UsageLogMutation) ClearField(name string) error {
 		return nil
 	case usagelog.FieldChannelID:
 		m.ClearChannelID()
+		return nil
+	case usagelog.FieldChannelKeyID:
+		m.ClearChannelKeyID()
 		return nil
 	case usagelog.FieldGroupID:
 		m.ClearGroupID()
@@ -21458,6 +22298,9 @@ func (m *UsageLogMutation) ResetField(name string) error {
 	case usagelog.FieldChannelID:
 		m.ResetChannelID()
 		return nil
+	case usagelog.FieldChannelKeyID:
+		m.ResetChannelKeyID()
+		return nil
 	case usagelog.FieldGroupID:
 		m.ResetGroupID()
 		return nil
@@ -21467,7 +22310,7 @@ func (m *UsageLogMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UsageLogMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.user != nil {
 		edges = append(edges, usagelog.EdgeUser)
 	}
@@ -21476,6 +22319,9 @@ func (m *UsageLogMutation) AddedEdges() []string {
 	}
 	if m.channel != nil {
 		edges = append(edges, usagelog.EdgeChannel)
+	}
+	if m.channel_key != nil {
+		edges = append(edges, usagelog.EdgeChannelKey)
 	}
 	if m.group != nil {
 		edges = append(edges, usagelog.EdgeGroup)
@@ -21499,6 +22345,10 @@ func (m *UsageLogMutation) AddedIDs(name string) []ent.Value {
 		if id := m.channel; id != nil {
 			return []ent.Value{*id}
 		}
+	case usagelog.EdgeChannelKey:
+		if id := m.channel_key; id != nil {
+			return []ent.Value{*id}
+		}
 	case usagelog.EdgeGroup:
 		if id := m.group; id != nil {
 			return []ent.Value{*id}
@@ -21509,7 +22359,7 @@ func (m *UsageLogMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UsageLogMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	return edges
 }
 
@@ -21521,7 +22371,7 @@ func (m *UsageLogMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UsageLogMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.cleareduser {
 		edges = append(edges, usagelog.EdgeUser)
 	}
@@ -21530,6 +22380,9 @@ func (m *UsageLogMutation) ClearedEdges() []string {
 	}
 	if m.clearedchannel {
 		edges = append(edges, usagelog.EdgeChannel)
+	}
+	if m.clearedchannel_key {
+		edges = append(edges, usagelog.EdgeChannelKey)
 	}
 	if m.clearedgroup {
 		edges = append(edges, usagelog.EdgeGroup)
@@ -21547,6 +22400,8 @@ func (m *UsageLogMutation) EdgeCleared(name string) bool {
 		return m.clearedapi_key
 	case usagelog.EdgeChannel:
 		return m.clearedchannel
+	case usagelog.EdgeChannelKey:
+		return m.clearedchannel_key
 	case usagelog.EdgeGroup:
 		return m.clearedgroup
 	}
@@ -21565,6 +22420,9 @@ func (m *UsageLogMutation) ClearEdge(name string) error {
 		return nil
 	case usagelog.EdgeChannel:
 		m.ClearChannel()
+		return nil
+	case usagelog.EdgeChannelKey:
+		m.ClearChannelKey()
 		return nil
 	case usagelog.EdgeGroup:
 		m.ClearGroup()
@@ -21585,6 +22443,9 @@ func (m *UsageLogMutation) ResetEdge(name string) error {
 		return nil
 	case usagelog.EdgeChannel:
 		m.ResetChannel()
+		return nil
+	case usagelog.EdgeChannelKey:
+		m.ResetChannelKey()
 		return nil
 	case usagelog.EdgeGroup:
 		m.ResetGroup()

@@ -35,13 +35,14 @@ func (h *DashboardHandler) Trend(c *gin.Context) {
 	}
 
 	trend, err := h.service.Trend(c.Request.Context(), appdashboard.TrendQuery{
-		Range:       req.Range,
-		Granularity: req.Granularity,
-		StartDate:   req.StartDate,
-		EndDate:     req.EndDate,
-		UserID:      req.UserID,
-		ChannelID:   req.ChannelID,
-		TZ:          req.TZ,
+		Range:        req.Range,
+		Granularity:  req.Granularity,
+		StartDate:    req.StartDate,
+		EndDate:      req.EndDate,
+		UserID:       req.UserID,
+		ChannelID:    req.ChannelID,
+		ChannelKeyID: req.ChannelKeyID,
+		TZ:           req.TZ,
 	})
 	if err != nil {
 		h.handleError("查询仪表盘趋势失败", err)

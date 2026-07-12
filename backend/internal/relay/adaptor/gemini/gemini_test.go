@@ -23,7 +23,7 @@ func mustReq(t *testing.T, body string) *dto.ChatRequest {
 
 func info(model, upstream string, stream bool) *adaptor.RelayInfo {
 	return &adaptor.RelayInfo{
-		Channel:       &registry.ChannelSnapshot{BaseURL: "https://generativelanguage.googleapis.com"},
+		ChannelKey:    &registry.ChannelKeySnapshot{BaseURL: "https://generativelanguage.googleapis.com"},
 		APIKey:        "goog-test-key",
 		RequestModel:  model,
 		UpstreamModel: upstream,
@@ -116,7 +116,7 @@ func TestBuildRequestPassthrough(t *testing.T) {
 func TestBuildRequestParamOverride(t *testing.T) {
 	req := mustReq(t, `{"contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"temperature":0.9},"safetySettings":[]}`)
 	in := info("g", "", false)
-	in.Channel.ParamOverride = map[string]any{
+	in.ChannelKey.ParamOverride = map[string]any{
 		"generationConfig": map[string]any{"temperature": 0.1, "maxOutputTokens": float64(64)},
 		"safetySettings":   nil, // null 删除
 	}

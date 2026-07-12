@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// 渠道状态常量，与 ent schema 的 status 枚举一致。
+// 密钥端点状态常量，与 ent schema 的 channel_key.status 枚举一致。
 const (
 	StatusEnabled        = "enabled"
 	StatusDisabledManual = "disabled_manual"
@@ -23,20 +23,30 @@ const (
 // Repository 定义渠道域持久化接口。
 type Repository interface {
 	List(context.Context, ListFilter) ([]Channel, int64, error)
-	// ListAll 全量加载（含 groups 边），供注册表 Reload 使用。
+	// ListAll 全量加载（含 keys 及其 groups 边），供注册表 Reload 使用。
 	ListAll(context.Context) ([]Channel, error)
 	FindByID(context.Context, int) (Channel, error)
 	Create(context.Context, CreateInput) (Channel, error)
 	Update(context.Context, int, UpdateInput) (Channel, error)
 	Delete(context.Context, int) error
-	// BulkUpdate 批量启停/删除/调优先级，返回受影响行数。
+	// BulkUpdate 批量启停/删除/调优先级（作用于选中渠道下的全部 key；
+	// delete 删渠道），返回受影响渠道数。
 	BulkUpdate(context.Context, BulkUpdateInput) (int, error)
-	// UpdateState 更新渠道调度状态（注册表异步落库与测试恢复共用）。
-	UpdateState(ctx context.Context, id int, status string, errMsg string) error
-	// UpdateTestResult 记录渠道测试结果。
-	UpdateTestResult(ctx context.Context, id int, responseTimeMs int, testedAt time.Time) error
-	// UpdateBalance 记录渠道余额刷新结果。
-	UpdateBalance(ctx context.Context, id int, balance float64, updatedAt time.Time) error
+
+	// FindKeyByID 按密钥端点 ID 查单把 key（含所属渠道 base_url 与 groups 边）。
+	FindKeyByID(ctx context.Context, keyID int) (ChannelKey, error)
+	// CreateKey 在指定渠道下新增一把 key。
+	CreateKey(ctx context.Context, channelID int, key KeyInput) (ChannelKey, error)
+	// UpdateKey 单把密钥端点 partial 更新（模型弹窗等按 key 编辑用）。
+	UpdateKey(ctx context.Context, keyID int, key KeyInput) (ChannelKey, error)
+	// DeleteKey 删除一把 key。
+	DeleteKey(ctx context.Context, keyID int) error
+	// UpdateKeyState 更新密钥端点调度状态（注册表异步落库与测试恢复共用）。
+	UpdateKeyState(ctx context.Context, keyID int, status string, errMsg string) error
+	// UpdateKeyTestResult 记录密钥端点测试结果。
+	UpdateKeyTestResult(ctx context.Context, keyID int, responseTimeMs int, testedAt time.Time) error
+	// UpdateKeyBalance 记录密钥端点余额刷新结果（key 级）。
+	UpdateKeyBalance(ctx context.Context, keyID int, balance float64, updatedAt time.Time) error
 }
 
 // MoneyStats 渠道金额统计：
@@ -49,21 +59,41 @@ type MoneyStats struct {
 	TodayRevenue float64
 }
 
-// StatsReader 渠道金额聚合读取器（由 store 基于 usage_logs 实现），列表页展示成本/收益用。
+// StatsReader 密钥端点金额聚合读取器（由 store 基于 usage_logs 实现），列表页展示成本/收益用。
 // todayStart 为今日口径的起点（按调用方时区解析的当日零点）。
 type StatsReader interface {
-	GetChannelMoneyStats(ctx context.Context, channelIDs []int, todayStart time.Time) (map[int]MoneyStats, error)
+	GetChannelKeyMoneyStats(ctx context.Context, channelKeyIDs []int, todayStart time.Time) (map[int]MoneyStats, error)
 }
 
-// Channel 渠道领域对象。APIKeys 存密文（AES-GCM base64），
-// APIKeyHints 由 service 解密生成（尾 4 位提示），不落库。
+// Channel 渠道领域对象（供应商级容器）。余额与成本/收益均下沉到 key，
+// 渠道层的 Balance / Total* 为其下各 key 的汇总（rollup，非落库字段）。
 type Channel struct {
+	ID        int
+	Name      string
+	BaseURL   string
+	Keys      []ChannelKey
+	CreatedAt time.Time
+	UpdatedAt time.Time
+
+	// 以下为各 key 汇总（列表查询时由 service 计算填充，不落库）。
+	Balance          float64
+	BalanceUpdatedAt *time.Time
+	TotalCost        float64
+	TotalRevenue     float64
+	TodayCost        float64
+	TodayRevenue     float64
+}
+
+// ChannelKey 渠道下的一把密钥端点领域对象。APIKey 存密文（AES-GCM base64），
+// APIKeyHint 由 service 解密生成（尾 4 位提示），不落库；BaseURL 由所属渠道反规范化填充。
+type ChannelKey struct {
 	ID               int
+	ChannelID        int
+	BaseURL          string
 	Name             string
 	Type             string
-	BaseURL          string
-	APIKeys          []string
-	APIKeyHints      []string
+	APIKey           string
+	APIKeyHint       string
 	Models           []string
 	ModelMapping     map[string]string
 	ParamOverride    map[string]any
@@ -79,9 +109,9 @@ type Channel struct {
 	TestModel        string
 	ResponseTimeMs   int
 	TestedAt         *time.Time
+	LastUsedAt       *time.Time
 	Balance          float64
 	BalanceUpdatedAt *time.Time
-	LastUsedAt       *time.Time
 	GroupIDs         []int
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -90,17 +120,15 @@ type Channel struct {
 	// 仅列表查询时由 SetRuntimeStatsReaders 注入的读取器填充，不落库。
 	CurrentConcurrency int
 	CurrentRPM         int
-
-	// TotalCost / TotalRevenue 累计金额统计（渠道成本 / 平台真实收入），
-	// TodayCost / TodayRevenue 为今日口径（按调用方时区），
-	// 仅列表查询时由 SetStatsReader 注入的读取器填充，不落库。
+	// TotalCost / TotalRevenue 累计金额（key 成本 / 平台真实收入），
+	// TodayCost / TodayRevenue 为今日口径，列表查询时由 StatsReader 填充，不落库。
 	TotalCost    float64
 	TotalRevenue float64
 	TodayCost    float64
 	TodayRevenue float64
 }
 
-// ListFilter 渠道列表查询参数。
+// ListFilter 渠道列表查询参数。type/status/tag/group 作用于渠道下的 key。
 type ListFilter struct {
 	Page     int
 	PageSize int
@@ -121,45 +149,20 @@ type ListResult struct {
 	PageSize int
 }
 
-// CreateInput 创建渠道输入。APIKeys 传入明文，由 service 加密后落库；
-// 可选数值字段用指针表达「未提供 → 取 schema 默认值」。
-type CreateInput struct {
+// KeyInput 单把密钥端点的写入输入（新增/更新共用）。
+//   - APIKey 传明文；更新既有 key 时空串 = 保持原密钥不变。
+//   - 指针标量 nil = 新增取默认 / 更新不改。
+//   - Models/ModelMapping/ParamOverride/HeaderOverride/Tags/GroupIDs
+//     非 nil = 整组替换；更新既有 key 时 nil = 不改。
+type KeyInput struct {
 	Name           string
 	Type           string
-	BaseURL        string
-	APIKeys        []string
+	APIKey         string
 	Models         []string
 	ModelMapping   map[string]string
 	ParamOverride  map[string]any
 	HeaderOverride map[string]string
 	Status         *string
-	Priority       *int
-	Weight         *int
-	MaxConcurrency *int
-	MaxRPM         *int
-	CostRatio      *float64
-	Tags           []string
-	TestModel      string
-	GroupIDs       []int
-}
-
-// UpdateInput 更新渠道输入（partial）：
-//   - 指针字段 nil = 不改；
-//   - APIKeys/Models 非空 = 整组替换（空 = 不改）；
-//   - ModelMapping/ParamOverride/HeaderOverride/Tags/GroupIDs
-//     非 nil = 整组替换（可传空集合清空）。
-type UpdateInput struct {
-	Name           *string
-	Type           *string
-	BaseURL        *string
-	APIKeys        []string
-	Models         []string
-	ModelMapping   map[string]string
-	ParamOverride  map[string]any
-	HeaderOverride map[string]string
-	Status         *string
-	// ErrorMsg 由 service 内部填充（status→enabled 时清理状态残留），不接受外部输入。
-	ErrorMsg       *string
 	Priority       *int
 	Weight         *int
 	MaxConcurrency *int
@@ -170,7 +173,19 @@ type UpdateInput struct {
 	GroupIDs       []int
 }
 
-// BulkUpdateInput 批量操作输入。
+// CreateInput 创建渠道输入（仅供应商级字段；key 建后单独添加）。
+type CreateInput struct {
+	Name    string
+	BaseURL string
+}
+
+// UpdateInput 更新渠道输入（partial，仅 Name/BaseURL；key 单独增删改）。
+type UpdateInput struct {
+	Name    *string
+	BaseURL *string
+}
+
+// BulkUpdateInput 批量操作输入（IDs 为渠道 ID）。
 type BulkUpdateInput struct {
 	IDs      []int
 	Action   string

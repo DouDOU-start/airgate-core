@@ -10,7 +10,7 @@ import { queryKeys } from '../../../shared/queryKeys';
 import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
 import { useToast } from '../../../shared/ui';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
-import type { ChannelResp, UpdateChannelReq } from '../../../shared/types';
+import type { ChannelKeyResp, ChannelKeyReq } from '../../../shared/types';
 
 type ModelTestState =
   | { status: 'testing' }
@@ -25,10 +25,10 @@ interface ModelsDraft {
   mapping: Record<string, string>;
 }
 
-function draftFromChannel(channel: ChannelResp): ModelsDraft {
+function draftFromKey(key: ChannelKeyResp): ModelsDraft {
   return {
-    models: channel.models ?? [],
-    mapping: { ...(channel.model_mapping ?? {}) },
+    models: key.models ?? [],
+    mapping: { ...(key.model_mapping ?? {}) },
   };
 }
 
@@ -106,16 +106,16 @@ function ModelNameField({
 }
 
 /**
- * 模型与测试弹窗：渠道的模型清单与模型映射（行内）在此管理（编辑表单不再承载），
+ * 模型与测试弹窗：单把 key 的模型清单与模型映射（行内）在此管理（编辑表单不再承载），
  * 并支持逐个测试指定模型 /「测试全部」串行跑完整个清单（可中途停止）。
- * 每次测试都走后端 POST /channels/:id/test（真实 relay 请求），未保存的新模型也可先测再存；
- * 成功会刷新渠道的 response_time / 自动禁用恢复。
+ * 每次测试都走后端 POST /channels/keys/:id/test（真实 relay 请求），未保存的新模型也可先测再存；
+ * 成功会刷新该 key 的 response_time / 自动禁用恢复。
  */
 export function ChannelTestModal({
-  channel,
+  channelKey,
   onClose,
 }: {
-  channel: ChannelResp | null;
+  channelKey: ChannelKeyResp | null;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -140,17 +140,17 @@ export function ChannelTestModal({
   const catalogQuery = useQuery({
     queryKey: queryKeys.modelPrices('catalog-names'),
     queryFn: fetchCatalogNames,
-    enabled: !!channel,
+    enabled: !!channelKey,
     staleTime: 60_000,
   });
   const catalog = useMemo(() => new Set(catalogQuery.data ?? []), [catalogQuery.data]);
   // 目录加载失败/未完成时跳过校验，不阻塞编辑
   const catalogReady = catalogQuery.isSuccess;
 
-  // 每次打开（channel 引用变化）重置草稿与上一轮结果
+  // 每次打开（channelKey 引用变化）重置草稿与上一轮结果
   useEffect(() => {
-    if (channel) {
-      const next = draftFromChannel(channel);
+    if (channelKey) {
+      const next = draftFromKey(channelKey);
       setDraft(next);
       setBaseline(draftSignature(next));
       setModelInput('');
@@ -159,7 +159,7 @@ export function ChannelTestModal({
       setTestEndpoint('chat_completions');
       cancelRef.current = false;
     }
-  }, [channel]);
+  }, [channelKey]);
 
   const dirty = useMemo(() => draftSignature(draft) !== baseline, [draft, baseline]);
 
@@ -257,7 +257,7 @@ export function ChannelTestModal({
 
   // 拉取上游模型列表：整组替换草稿（未保存前可关闭弹窗放弃）
   const fetchModelsMutation = useMutation({
-    mutationFn: () => channelsApi.fetchModels(channel!.id),
+    mutationFn: () => channelsApi.fetchModels(channelKey!.id),
     onSuccess: (resp) => {
       setDraft((prev) => ({ ...prev, models: resp.models }));
       toast('success', t('channels.fetch_models_success', { count: resp.models.length }));
@@ -266,7 +266,7 @@ export function ChannelTestModal({
   });
 
   const saveMutation = useCrudMutation({
-    mutationFn: (data: UpdateChannelReq) => channelsApi.update(channel!.id, data),
+    mutationFn: (data: ChannelKeyReq) => channelsApi.updateKey(channelKey!.id, data),
     successMessage: t('channels.update_success'),
     queryKey: queryKeys.channels(),
     onSuccess: () => handleClose(),
@@ -286,12 +286,12 @@ export function ChannelTestModal({
   // ==================== 测试 ====================
 
   async function testOne(model: string, signal: AbortSignal): Promise<void> {
-    if (!channel) return;
+    if (!channelKey) return;
     setResults((prev) => ({ ...prev, [model]: { status: 'testing' } }));
     try {
       const resp = await channelsApi.test(
-        channel.id,
-        { model, ...(channel.type === 'openai_compatible' ? { endpoint: testEndpoint } : {}) },
+        channelKey.id,
+        { model, ...(channelKey.type === 'openai_compatible' ? { endpoint: testEndpoint } : {}) },
         { signal },
       );
       setResults((prev) => ({ ...prev, [model]: { status: 'ok', latencyMs: resp.latency_ms } }));
@@ -343,7 +343,7 @@ export function ChannelTestModal({
   }
 
   const dialogState = useOverlayState({
-    isOpen: !!channel,
+    isOpen: !!channelKey,
     onOpenChange: (open) => {
       if (!open) handleClose();
     },
@@ -356,7 +356,7 @@ export function ChannelTestModal({
         <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog className="ag-elevation-modal">
             <Modal.Header>
-              <Modal.Heading>{t('channels.test_title', { name: channel?.name ?? '' })}</Modal.Heading>
+              <Modal.Heading>{t('channels.test_title', { name: channelKey?.name ?? '' })}</Modal.Heading>
               <Modal.CloseTrigger />
             </Modal.Header>
             <Modal.Body>
@@ -386,7 +386,7 @@ export function ChannelTestModal({
                   {fetchModelsMutation.isPending ? <Spinner size="sm" /> : <DownloadCloud className="h-3.5 w-3.5" />}
                   {t('channels.fetch_models')}
                 </Button>
-                {channel?.type === 'openai_compatible' ? (
+                {channelKey?.type === 'openai_compatible' ? (
                   // openai 协议有 chat_completions / responses 两个端点，部分上游只实现其一
                   <div
                     className="flex items-center gap-0.5 rounded-[var(--radius)] border border-border p-0.5"

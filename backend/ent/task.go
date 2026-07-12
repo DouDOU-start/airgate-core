@@ -66,6 +66,8 @@ type Task struct {
 	GroupID int `json:"group_id,omitempty"`
 	// ChannelID holds the value of the "channel_id" field.
 	ChannelID int `json:"channel_id,omitempty"`
+	// ChannelKeyID holds the value of the "channel_key_id" field.
+	ChannelKeyID int `json:"channel_key_id,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -84,7 +86,7 @@ func (*Task) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case task.FieldHoldAmount, task.FieldEstTotal, task.FieldRateMultiplier, task.FieldSellRate, task.FieldAccountRateMultiplier:
 			values[i] = new(sql.NullFloat64)
-		case task.FieldID, task.FieldProgress, task.FieldSeconds, task.FieldUserID, task.FieldAPIKeyID, task.FieldGroupID, task.FieldChannelID:
+		case task.FieldID, task.FieldProgress, task.FieldSeconds, task.FieldUserID, task.FieldAPIKeyID, task.FieldGroupID, task.FieldChannelID, task.FieldChannelKeyID:
 			values[i] = new(sql.NullInt64)
 		case task.FieldTaskID, task.FieldPlatform, task.FieldAction, task.FieldStatus, task.FieldFailReason, task.FieldRequestModel, task.FieldUpstreamModel, task.FieldRequestID, task.FieldUserEmailSnapshot:
 			values[i] = new(sql.NullString)
@@ -258,6 +260,12 @@ func (t *Task) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				t.ChannelID = int(value.Int64)
 			}
+		case task.FieldChannelKeyID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field channel_key_id", values[i])
+			} else if value.Valid {
+				t.ChannelKeyID = int(value.Int64)
+			}
 		case task.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -379,6 +387,9 @@ func (t *Task) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("channel_id=")
 	builder.WriteString(fmt.Sprintf("%v", t.ChannelID))
+	builder.WriteString(", ")
+	builder.WriteString("channel_key_id=")
+	builder.WriteString(fmt.Sprintf("%v", t.ChannelKeyID))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(t.CreatedAt.Format(time.ANSIC))

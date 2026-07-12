@@ -60,8 +60,10 @@ type DashboardTrendReq struct {
 	EndDate     string `form:"end_date"`
 	UserID      int    `form:"user_id"`
 	// ChannelID 渠道过滤（渠道消耗统计弹窗用）；0 表示不过滤。
-	ChannelID int    `form:"channel_id"`
-	TZ        string `form:"tz"` // IANA 时区名；为空时使用服务器本地时区
+	ChannelID int `form:"channel_id"`
+	// ChannelKeyID 密钥端点过滤（key 消耗统计弹窗用）；0 表示不过滤。
+	ChannelKeyID int    `form:"channel_key_id"`
+	TZ           string `form:"tz"` // IANA 时区名；为空时使用服务器本地时区
 }
 
 // DashboardTrendResp 仪表盘趋势响应

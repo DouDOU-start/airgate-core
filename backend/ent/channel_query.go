@@ -12,7 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
-	"github.com/DouDOU-start/airgate-core/ent/group"
+	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 )
@@ -24,7 +24,7 @@ type ChannelQuery struct {
 	order         []channel.OrderOption
 	inters        []Interceptor
 	predicates    []predicate.Channel
-	withGroups    *GroupQuery
+	withKeys      *ChannelKeyQuery
 	withUsageLogs *UsageLogQuery
 	modifiers     []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -63,9 +63,9 @@ func (cq *ChannelQuery) Order(o ...channel.OrderOption) *ChannelQuery {
 	return cq
 }
 
-// QueryGroups chains the current query on the "groups" edge.
-func (cq *ChannelQuery) QueryGroups() *GroupQuery {
-	query := (&GroupClient{config: cq.config}).Query()
+// QueryKeys chains the current query on the "keys" edge.
+func (cq *ChannelQuery) QueryKeys() *ChannelKeyQuery {
+	query := (&ChannelKeyClient{config: cq.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := cq.prepareQuery(ctx); err != nil {
 			return nil, err
@@ -76,8 +76,8 @@ func (cq *ChannelQuery) QueryGroups() *GroupQuery {
 		}
 		step := sqlgraph.NewStep(
 			sqlgraph.From(channel.Table, channel.FieldID, selector),
-			sqlgraph.To(group.Table, group.FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, false, channel.GroupsTable, channel.GroupsPrimaryKey...),
+			sqlgraph.To(channelkey.Table, channelkey.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, channel.KeysTable, channel.KeysColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(cq.driver.Dialect(), step)
 		return fromU, nil
@@ -299,7 +299,7 @@ func (cq *ChannelQuery) Clone() *ChannelQuery {
 		order:         append([]channel.OrderOption{}, cq.order...),
 		inters:        append([]Interceptor{}, cq.inters...),
 		predicates:    append([]predicate.Channel{}, cq.predicates...),
-		withGroups:    cq.withGroups.Clone(),
+		withKeys:      cq.withKeys.Clone(),
 		withUsageLogs: cq.withUsageLogs.Clone(),
 		// clone intermediate query.
 		sql:  cq.sql.Clone(),
@@ -307,14 +307,14 @@ func (cq *ChannelQuery) Clone() *ChannelQuery {
 	}
 }
 
-// WithGroups tells the query-builder to eager-load the nodes that are connected to
-// the "groups" edge. The optional arguments are used to configure the query builder of the edge.
-func (cq *ChannelQuery) WithGroups(opts ...func(*GroupQuery)) *ChannelQuery {
-	query := (&GroupClient{config: cq.config}).Query()
+// WithKeys tells the query-builder to eager-load the nodes that are connected to
+// the "keys" edge. The optional arguments are used to configure the query builder of the edge.
+func (cq *ChannelQuery) WithKeys(opts ...func(*ChannelKeyQuery)) *ChannelQuery {
+	query := (&ChannelKeyClient{config: cq.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	cq.withGroups = query
+	cq.withKeys = query
 	return cq
 }
 
@@ -408,7 +408,7 @@ func (cq *ChannelQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Chan
 		nodes       = []*Channel{}
 		_spec       = cq.querySpec()
 		loadedTypes = [2]bool{
-			cq.withGroups != nil,
+			cq.withKeys != nil,
 			cq.withUsageLogs != nil,
 		}
 	)
@@ -433,10 +433,10 @@ func (cq *ChannelQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Chan
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
-	if query := cq.withGroups; query != nil {
-		if err := cq.loadGroups(ctx, query, nodes,
-			func(n *Channel) { n.Edges.Groups = []*Group{} },
-			func(n *Channel, e *Group) { n.Edges.Groups = append(n.Edges.Groups, e) }); err != nil {
+	if query := cq.withKeys; query != nil {
+		if err := cq.loadKeys(ctx, query, nodes,
+			func(n *Channel) { n.Edges.Keys = []*ChannelKey{} },
+			func(n *Channel, e *ChannelKey) { n.Edges.Keys = append(n.Edges.Keys, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -450,64 +450,34 @@ func (cq *ChannelQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Chan
 	return nodes, nil
 }
 
-func (cq *ChannelQuery) loadGroups(ctx context.Context, query *GroupQuery, nodes []*Channel, init func(*Channel), assign func(*Channel, *Group)) error {
-	edgeIDs := make([]driver.Value, len(nodes))
-	byID := make(map[int]*Channel)
-	nids := make(map[int]map[*Channel]struct{})
-	for i, node := range nodes {
-		edgeIDs[i] = node.ID
-		byID[node.ID] = node
+func (cq *ChannelQuery) loadKeys(ctx context.Context, query *ChannelKeyQuery, nodes []*Channel, init func(*Channel), assign func(*Channel, *ChannelKey)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Channel)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
 		if init != nil {
-			init(node)
+			init(nodes[i])
 		}
 	}
-	query.Where(func(s *sql.Selector) {
-		joinT := sql.Table(channel.GroupsTable)
-		s.Join(joinT).On(s.C(group.FieldID), joinT.C(channel.GroupsPrimaryKey[1]))
-		s.Where(sql.InValues(joinT.C(channel.GroupsPrimaryKey[0]), edgeIDs...))
-		columns := s.SelectedColumns()
-		s.Select(joinT.C(channel.GroupsPrimaryKey[0]))
-		s.AppendSelect(columns...)
-		s.SetDistinct(false)
-	})
-	if err := query.prepareQuery(ctx); err != nil {
-		return err
-	}
-	qr := QuerierFunc(func(ctx context.Context, q Query) (Value, error) {
-		return query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
-			assign := spec.Assign
-			values := spec.ScanValues
-			spec.ScanValues = func(columns []string) ([]any, error) {
-				values, err := values(columns[1:])
-				if err != nil {
-					return nil, err
-				}
-				return append([]any{new(sql.NullInt64)}, values...), nil
-			}
-			spec.Assign = func(columns []string, values []any) error {
-				outValue := int(values[0].(*sql.NullInt64).Int64)
-				inValue := int(values[1].(*sql.NullInt64).Int64)
-				if nids[inValue] == nil {
-					nids[inValue] = map[*Channel]struct{}{byID[outValue]: {}}
-					return assign(columns[1:], values[1:])
-				}
-				nids[inValue][byID[outValue]] = struct{}{}
-				return nil
-			}
-		})
-	})
-	neighbors, err := withInterceptors[[]*Group](ctx, query, qr, query.inters)
+	query.withFKs = true
+	query.Where(predicate.ChannelKey(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(channel.KeysColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
 	if err != nil {
 		return err
 	}
 	for _, n := range neighbors {
-		nodes, ok := nids[n.ID]
+		fk := n.channel_keys
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "channel_keys" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
 		if !ok {
-			return fmt.Errorf(`unexpected "groups" node returned %v`, n.ID)
+			return fmt.Errorf(`unexpected referenced foreign-key "channel_keys" returned %v for node %v`, *fk, n.ID)
 		}
-		for kn := range nodes {
-			assign(kn, n)
-		}
+		assign(node, n)
 	}
 	return nil
 }

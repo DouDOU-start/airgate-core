@@ -12,7 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
-	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -151,19 +151,19 @@ func (gu *GroupUpdate) SetUpdatedAt(t time.Time) *GroupUpdate {
 	return gu
 }
 
-// AddChannelIDs adds the "channels" edge to the Channel entity by IDs.
-func (gu *GroupUpdate) AddChannelIDs(ids ...int) *GroupUpdate {
-	gu.mutation.AddChannelIDs(ids...)
+// AddChannelKeyIDs adds the "channel_keys" edge to the ChannelKey entity by IDs.
+func (gu *GroupUpdate) AddChannelKeyIDs(ids ...int) *GroupUpdate {
+	gu.mutation.AddChannelKeyIDs(ids...)
 	return gu
 }
 
-// AddChannels adds the "channels" edges to the Channel entity.
-func (gu *GroupUpdate) AddChannels(c ...*Channel) *GroupUpdate {
+// AddChannelKeys adds the "channel_keys" edges to the ChannelKey entity.
+func (gu *GroupUpdate) AddChannelKeys(c ...*ChannelKey) *GroupUpdate {
 	ids := make([]int, len(c))
 	for i := range c {
 		ids[i] = c[i].ID
 	}
-	return gu.AddChannelIDs(ids...)
+	return gu.AddChannelKeyIDs(ids...)
 }
 
 // AddAllowedUserIDs adds the "allowed_users" edge to the User entity by IDs.
@@ -216,25 +216,25 @@ func (gu *GroupUpdate) Mutation() *GroupMutation {
 	return gu.mutation
 }
 
-// ClearChannels clears all "channels" edges to the Channel entity.
-func (gu *GroupUpdate) ClearChannels() *GroupUpdate {
-	gu.mutation.ClearChannels()
+// ClearChannelKeys clears all "channel_keys" edges to the ChannelKey entity.
+func (gu *GroupUpdate) ClearChannelKeys() *GroupUpdate {
+	gu.mutation.ClearChannelKeys()
 	return gu
 }
 
-// RemoveChannelIDs removes the "channels" edge to Channel entities by IDs.
-func (gu *GroupUpdate) RemoveChannelIDs(ids ...int) *GroupUpdate {
-	gu.mutation.RemoveChannelIDs(ids...)
+// RemoveChannelKeyIDs removes the "channel_keys" edge to ChannelKey entities by IDs.
+func (gu *GroupUpdate) RemoveChannelKeyIDs(ids ...int) *GroupUpdate {
+	gu.mutation.RemoveChannelKeyIDs(ids...)
 	return gu
 }
 
-// RemoveChannels removes "channels" edges to Channel entities.
-func (gu *GroupUpdate) RemoveChannels(c ...*Channel) *GroupUpdate {
+// RemoveChannelKeys removes "channel_keys" edges to ChannelKey entities.
+func (gu *GroupUpdate) RemoveChannelKeys(c ...*ChannelKey) *GroupUpdate {
 	ids := make([]int, len(c))
 	for i := range c {
 		ids[i] = c[i].ID
 	}
-	return gu.RemoveChannelIDs(ids...)
+	return gu.RemoveChannelKeyIDs(ids...)
 }
 
 // ClearAllowedUsers clears all "allowed_users" edges to the User entity.
@@ -394,28 +394,28 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := gu.mutation.UpdatedAt(); ok {
 		_spec.SetField(group.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if gu.mutation.ChannelsCleared() {
+	if gu.mutation.ChannelKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.ChannelsTable,
-			Columns: group.ChannelsPrimaryKey,
+			Table:   group.ChannelKeysTable,
+			Columns: group.ChannelKeysPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := gu.mutation.RemovedChannelsIDs(); len(nodes) > 0 && !gu.mutation.ChannelsCleared() {
+	if nodes := gu.mutation.RemovedChannelKeysIDs(); len(nodes) > 0 && !gu.mutation.ChannelKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.ChannelsTable,
-			Columns: group.ChannelsPrimaryKey,
+			Table:   group.ChannelKeysTable,
+			Columns: group.ChannelKeysPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -423,15 +423,15 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := gu.mutation.ChannelsIDs(); len(nodes) > 0 {
+	if nodes := gu.mutation.ChannelKeysIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.ChannelsTable,
-			Columns: group.ChannelsPrimaryKey,
+			Table:   group.ChannelKeysTable,
+			Columns: group.ChannelKeysPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -714,19 +714,19 @@ func (guo *GroupUpdateOne) SetUpdatedAt(t time.Time) *GroupUpdateOne {
 	return guo
 }
 
-// AddChannelIDs adds the "channels" edge to the Channel entity by IDs.
-func (guo *GroupUpdateOne) AddChannelIDs(ids ...int) *GroupUpdateOne {
-	guo.mutation.AddChannelIDs(ids...)
+// AddChannelKeyIDs adds the "channel_keys" edge to the ChannelKey entity by IDs.
+func (guo *GroupUpdateOne) AddChannelKeyIDs(ids ...int) *GroupUpdateOne {
+	guo.mutation.AddChannelKeyIDs(ids...)
 	return guo
 }
 
-// AddChannels adds the "channels" edges to the Channel entity.
-func (guo *GroupUpdateOne) AddChannels(c ...*Channel) *GroupUpdateOne {
+// AddChannelKeys adds the "channel_keys" edges to the ChannelKey entity.
+func (guo *GroupUpdateOne) AddChannelKeys(c ...*ChannelKey) *GroupUpdateOne {
 	ids := make([]int, len(c))
 	for i := range c {
 		ids[i] = c[i].ID
 	}
-	return guo.AddChannelIDs(ids...)
+	return guo.AddChannelKeyIDs(ids...)
 }
 
 // AddAllowedUserIDs adds the "allowed_users" edge to the User entity by IDs.
@@ -779,25 +779,25 @@ func (guo *GroupUpdateOne) Mutation() *GroupMutation {
 	return guo.mutation
 }
 
-// ClearChannels clears all "channels" edges to the Channel entity.
-func (guo *GroupUpdateOne) ClearChannels() *GroupUpdateOne {
-	guo.mutation.ClearChannels()
+// ClearChannelKeys clears all "channel_keys" edges to the ChannelKey entity.
+func (guo *GroupUpdateOne) ClearChannelKeys() *GroupUpdateOne {
+	guo.mutation.ClearChannelKeys()
 	return guo
 }
 
-// RemoveChannelIDs removes the "channels" edge to Channel entities by IDs.
-func (guo *GroupUpdateOne) RemoveChannelIDs(ids ...int) *GroupUpdateOne {
-	guo.mutation.RemoveChannelIDs(ids...)
+// RemoveChannelKeyIDs removes the "channel_keys" edge to ChannelKey entities by IDs.
+func (guo *GroupUpdateOne) RemoveChannelKeyIDs(ids ...int) *GroupUpdateOne {
+	guo.mutation.RemoveChannelKeyIDs(ids...)
 	return guo
 }
 
-// RemoveChannels removes "channels" edges to Channel entities.
-func (guo *GroupUpdateOne) RemoveChannels(c ...*Channel) *GroupUpdateOne {
+// RemoveChannelKeys removes "channel_keys" edges to ChannelKey entities.
+func (guo *GroupUpdateOne) RemoveChannelKeys(c ...*ChannelKey) *GroupUpdateOne {
 	ids := make([]int, len(c))
 	for i := range c {
 		ids[i] = c[i].ID
 	}
-	return guo.RemoveChannelIDs(ids...)
+	return guo.RemoveChannelKeyIDs(ids...)
 }
 
 // ClearAllowedUsers clears all "allowed_users" edges to the User entity.
@@ -987,28 +987,28 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 	if value, ok := guo.mutation.UpdatedAt(); ok {
 		_spec.SetField(group.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if guo.mutation.ChannelsCleared() {
+	if guo.mutation.ChannelKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.ChannelsTable,
-			Columns: group.ChannelsPrimaryKey,
+			Table:   group.ChannelKeysTable,
+			Columns: group.ChannelKeysPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := guo.mutation.RemovedChannelsIDs(); len(nodes) > 0 && !guo.mutation.ChannelsCleared() {
+	if nodes := guo.mutation.RemovedChannelKeysIDs(); len(nodes) > 0 && !guo.mutation.ChannelKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.ChannelsTable,
-			Columns: group.ChannelsPrimaryKey,
+			Table:   group.ChannelKeysTable,
+			Columns: group.ChannelKeysPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1016,15 +1016,15 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := guo.mutation.ChannelsIDs(); len(nodes) > 0 {
+	if nodes := guo.mutation.ChannelKeysIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: true,
-			Table:   group.ChannelsTable,
-			Columns: group.ChannelsPrimaryKey,
+			Table:   group.ChannelKeysTable,
+			Columns: group.ChannelKeysPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(channel.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

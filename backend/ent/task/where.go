@@ -164,6 +164,11 @@ func ChannelID(v int) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldChannelID, v))
 }
 
+// ChannelKeyID applies equality check predicate on the "channel_key_id" field. It's identical to ChannelKeyIDEQ.
+func ChannelKeyID(v int) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldChannelKeyID, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldCreatedAt, v))
@@ -1262,6 +1267,46 @@ func ChannelIDLT(v int) predicate.Task {
 // ChannelIDLTE applies the LTE predicate on the "channel_id" field.
 func ChannelIDLTE(v int) predicate.Task {
 	return predicate.Task(sql.FieldLTE(FieldChannelID, v))
+}
+
+// ChannelKeyIDEQ applies the EQ predicate on the "channel_key_id" field.
+func ChannelKeyIDEQ(v int) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldChannelKeyID, v))
+}
+
+// ChannelKeyIDNEQ applies the NEQ predicate on the "channel_key_id" field.
+func ChannelKeyIDNEQ(v int) predicate.Task {
+	return predicate.Task(sql.FieldNEQ(FieldChannelKeyID, v))
+}
+
+// ChannelKeyIDIn applies the In predicate on the "channel_key_id" field.
+func ChannelKeyIDIn(vs ...int) predicate.Task {
+	return predicate.Task(sql.FieldIn(FieldChannelKeyID, vs...))
+}
+
+// ChannelKeyIDNotIn applies the NotIn predicate on the "channel_key_id" field.
+func ChannelKeyIDNotIn(vs ...int) predicate.Task {
+	return predicate.Task(sql.FieldNotIn(FieldChannelKeyID, vs...))
+}
+
+// ChannelKeyIDGT applies the GT predicate on the "channel_key_id" field.
+func ChannelKeyIDGT(v int) predicate.Task {
+	return predicate.Task(sql.FieldGT(FieldChannelKeyID, v))
+}
+
+// ChannelKeyIDGTE applies the GTE predicate on the "channel_key_id" field.
+func ChannelKeyIDGTE(v int) predicate.Task {
+	return predicate.Task(sql.FieldGTE(FieldChannelKeyID, v))
+}
+
+// ChannelKeyIDLT applies the LT predicate on the "channel_key_id" field.
+func ChannelKeyIDLT(v int) predicate.Task {
+	return predicate.Task(sql.FieldLT(FieldChannelKeyID, v))
+}
+
+// ChannelKeyIDLTE applies the LTE predicate on the "channel_key_id" field.
+func ChannelKeyIDLTE(v int) predicate.Task {
+	return predicate.Task(sql.FieldLTE(FieldChannelKeyID, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

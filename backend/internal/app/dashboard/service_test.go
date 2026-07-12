@@ -197,7 +197,7 @@ func (s dashboardStubRepository) LoadStatsSnapshot(ctx context.Context, todaySta
 	return s.loadStatsSnapshot(ctx, todayStart, fiveMinAgo)
 }
 
-func (s dashboardStubRepository) ListTrendLogs(ctx context.Context, startTime, endTime time.Time, _, _ int) ([]TrendLog, error) {
+func (s dashboardStubRepository) ListTrendLogs(ctx context.Context, startTime, endTime time.Time, _, _, _ int) ([]TrendLog, error) {
 	if s.listTrendLogs == nil {
 		return nil, nil
 	}

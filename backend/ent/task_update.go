@@ -454,6 +454,27 @@ func (tu *TaskUpdate) AddChannelID(i int) *TaskUpdate {
 	return tu
 }
 
+// SetChannelKeyID sets the "channel_key_id" field.
+func (tu *TaskUpdate) SetChannelKeyID(i int) *TaskUpdate {
+	tu.mutation.ResetChannelKeyID()
+	tu.mutation.SetChannelKeyID(i)
+	return tu
+}
+
+// SetNillableChannelKeyID sets the "channel_key_id" field if the given value is not nil.
+func (tu *TaskUpdate) SetNillableChannelKeyID(i *int) *TaskUpdate {
+	if i != nil {
+		tu.SetChannelKeyID(*i)
+	}
+	return tu
+}
+
+// AddChannelKeyID adds i to the "channel_key_id" field.
+func (tu *TaskUpdate) AddChannelKeyID(i int) *TaskUpdate {
+	tu.mutation.AddChannelKeyID(i)
+	return tu
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (tu *TaskUpdate) SetUpdatedAt(t time.Time) *TaskUpdate {
 	tu.mutation.SetUpdatedAt(t)
@@ -659,6 +680,12 @@ func (tu *TaskUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tu.mutation.AddedChannelID(); ok {
 		_spec.AddField(task.FieldChannelID, field.TypeInt, value)
+	}
+	if value, ok := tu.mutation.ChannelKeyID(); ok {
+		_spec.SetField(task.FieldChannelKeyID, field.TypeInt, value)
+	}
+	if value, ok := tu.mutation.AddedChannelKeyID(); ok {
+		_spec.AddField(task.FieldChannelKeyID, field.TypeInt, value)
 	}
 	if value, ok := tu.mutation.UpdatedAt(); ok {
 		_spec.SetField(task.FieldUpdatedAt, field.TypeTime, value)
@@ -1108,6 +1135,27 @@ func (tuo *TaskUpdateOne) AddChannelID(i int) *TaskUpdateOne {
 	return tuo
 }
 
+// SetChannelKeyID sets the "channel_key_id" field.
+func (tuo *TaskUpdateOne) SetChannelKeyID(i int) *TaskUpdateOne {
+	tuo.mutation.ResetChannelKeyID()
+	tuo.mutation.SetChannelKeyID(i)
+	return tuo
+}
+
+// SetNillableChannelKeyID sets the "channel_key_id" field if the given value is not nil.
+func (tuo *TaskUpdateOne) SetNillableChannelKeyID(i *int) *TaskUpdateOne {
+	if i != nil {
+		tuo.SetChannelKeyID(*i)
+	}
+	return tuo
+}
+
+// AddChannelKeyID adds i to the "channel_key_id" field.
+func (tuo *TaskUpdateOne) AddChannelKeyID(i int) *TaskUpdateOne {
+	tuo.mutation.AddChannelKeyID(i)
+	return tuo
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (tuo *TaskUpdateOne) SetUpdatedAt(t time.Time) *TaskUpdateOne {
 	tuo.mutation.SetUpdatedAt(t)
@@ -1343,6 +1391,12 @@ func (tuo *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) 
 	}
 	if value, ok := tuo.mutation.AddedChannelID(); ok {
 		_spec.AddField(task.FieldChannelID, field.TypeInt, value)
+	}
+	if value, ok := tuo.mutation.ChannelKeyID(); ok {
+		_spec.SetField(task.FieldChannelKeyID, field.TypeInt, value)
+	}
+	if value, ok := tuo.mutation.AddedChannelKeyID(); ok {
+		_spec.AddField(task.FieldChannelKeyID, field.TypeInt, value)
 	}
 	if value, ok := tuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(task.FieldUpdatedAt, field.TypeTime, value)
