@@ -13,7 +13,6 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	entapikey "github.com/DouDOU-start/airgate-core/ent/apikey"
-	entchannel "github.com/DouDOU-start/airgate-core/ent/channel"
 	entchannelkey "github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -375,15 +374,19 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
-	// "enabled" = 至少有一把 enabled key 的渠道（key 级状态）。
-	enabledChannels, err := s.db.Channel.Query().
-		Where(entchannel.HasKeysWith(entchannelkey.StatusEQ(entchannelkey.StatusEnabled))).
+	// 状态已下沉到 key 级：渠道仅作供应商容器，启用/停用按密钥端点（ChannelKey）统计。
+	totalKeys, err := s.db.ChannelKey.Query().Count(ctx)
+	if err != nil {
+		return appdashboard.StatsSnapshot{}, err
+	}
+	// enabled = 可参与调度的密钥；disabled = 人工停用 + 自动熔断（disabled_manual / disabled_auto）。
+	enabledKeys, err := s.db.ChannelKey.Query().
+		Where(entchannelkey.StatusEQ(entchannelkey.StatusEnabled)).
 		Count(ctx)
 	if err != nil {
 		return appdashboard.StatsSnapshot{}, err
 	}
-	// "disabled" = 无任何 enabled key 的渠道（全部 key 停用或无 key）。
-	disabledChannels := totalChannels - enabledChannels
+	disabledKeys := totalKeys - enabledKeys
 
 	totalUsers, err := s.db.User.Query().Count(ctx)
 	if err != nil {
@@ -414,8 +417,8 @@ func (s *DashboardStore) loadStatsSnapshotFresh(ctx context.Context, todayStart,
 		TotalAPIKeys:            int64(totalAPIKeys),
 		EnabledAPIKeys:          int64(enabledAPIKeys),
 		TotalChannels:           int64(totalChannels),
-		EnabledChannels:         int64(enabledChannels),
-		DisabledChannels:        int64(disabledChannels),
+		EnabledKeys:             int64(enabledKeys),
+		DisabledKeys:            int64(disabledKeys),
 		TotalUsers:              int64(totalUsers),
 		NewUsersToday:           int64(newUsersToday),
 		TodayRequests:           todayUsage.Requests,

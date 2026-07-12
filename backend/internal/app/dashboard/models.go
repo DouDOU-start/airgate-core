@@ -17,8 +17,8 @@ type StatsSnapshot struct {
 	TotalAPIKeys            int64
 	EnabledAPIKeys          int64
 	TotalChannels           int64
-	EnabledChannels         int64
-	DisabledChannels        int64
+	EnabledKeys             int64
+	DisabledKeys            int64
 	TotalUsers              int64
 	NewUsersToday           int64
 	TodayRequests           int64
@@ -47,8 +47,8 @@ type Stats struct {
 	TotalAPIKeys        int64
 	EnabledAPIKeys      int64
 	TotalChannels       int64
-	EnabledChannels     int64
-	DisabledChannels    int64
+	EnabledKeys         int64
+	DisabledKeys        int64
 	TodayRequests       int64
 	TodayImageRequests  int64
 	AllTimeRequests     int64

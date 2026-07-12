@@ -6,17 +6,18 @@ import (
 
 // ListFilter 使用记录列表筛选。
 type ListFilter struct {
-	Page      int
-	PageSize  int
-	UserID    *int64
-	APIKeyID  *int64
-	ChannelID *int64
-	GroupID   *int64
-	Model     string
-	RequestID string // 精确互查：从失败留痕跳查同一请求的计费行
-	StartDate string
-	EndDate   string
-	TZ        string // IANA 时区名，用于解析 StartDate/EndDate
+	Page         int
+	PageSize     int
+	UserID       *int64
+	APIKeyID     *int64
+	ChannelID    *int64
+	ChannelKeyID *int64
+	GroupID      *int64
+	Model        string
+	RequestID    string // 精确互查：从失败留痕跳查同一请求的计费行
+	StartDate    string
+	EndDate      string
+	TZ           string // IANA 时区名，用于解析 StartDate/EndDate
 	// ScopedToKey 标记当前查询是被某个 API Key（end customer）发起的。
 	// handler 必须根据 CtxKeyAPIKeyID 强制设置 APIKeyID 并打开此标志，
 	// 后续 mapper 据此切换到 CustomerUsageLogResp，避免泄漏平台真实成本。

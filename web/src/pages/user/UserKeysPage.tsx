@@ -410,8 +410,15 @@ export default function UserKeysPage() {
                               color: 'default' as const,
                               label: t('user_keys.group_rate_short', '分组倍率'),
                               value: hasOverride && effectiveRate != null
-                                ? `${effectiveRate.toFixed(2)} ${t('user_keys.user_override_tag', '专属')}`
+                                ? `${group.rate_multiplier.toFixed(2)} → ${effectiveRate.toFixed(2)} ${t('user_keys.user_override_tag', '专属')}`
                                 : group.rate_multiplier.toFixed(2),
+                              valueNode: hasOverride && effectiveRate != null ? (
+                                <>
+                                  <span className="line-through text-text-tertiary">{group.rate_multiplier.toFixed(2)}</span>
+                                  <span className="ml-1">{effectiveRate.toFixed(2)}</span>
+                                  <span className="ml-1 text-warning">{t('user_keys.user_override_tag', '专属')}</span>
+                                </>
+                              ) : undefined,
                             }] : []),
                             ...(hasSellRate ? [{
                               color: 'default' as const,
@@ -453,28 +460,32 @@ export default function UserKeysPage() {
                     />
                   </CommonTable.Cell>
                   <CommonTable.Cell>
-                    <MetricChips
-                      className="ag-metric-chips--stack ag-metric-chips--markup"
-                      items={[
-                        {
-                          color: 'default',
-                          label: t('user_keys.sell_rate_short', '倍率'),
-                          value: hasSellRate ? row.sell_rate.toFixed(2) : '—',
-                        },
-                        {
-                          amount: row.used_quota_actual || 0,
-                          color: 'default',
-                          dollarTone: 'warning',
-                          label: t('user_keys.cost_actual', '成本'),
-                        },
-                        {
-                          amount: profit,
-                          color: 'default',
-                          dollarTone: 'success',
-                          label: t('user_keys.profit', '利润'),
-                        },
-                      ]}
-                    />
+                    {hasSellRate || (row.used_quota_actual || 0) > 0 || profit !== 0 ? (
+                      <MetricChips
+                        className="ag-metric-chips--stack ag-metric-chips--markup"
+                        items={[
+                          {
+                            color: 'default',
+                            label: t('user_keys.sell_rate_short', '倍率'),
+                            value: hasSellRate ? row.sell_rate.toFixed(2) : '—',
+                          },
+                          {
+                            amount: row.used_quota_actual || 0,
+                            color: 'default',
+                            dollarTone: 'warning',
+                            label: t('user_keys.cost_actual', '成本'),
+                          },
+                          {
+                            amount: profit,
+                            color: 'default',
+                            dollarTone: 'success',
+                            label: t('user_keys.profit', '利润'),
+                          },
+                        ]}
+                      />
+                    ) : (
+                      <span className="text-text-tertiary">—</span>
+                    )}
                   </CommonTable.Cell>
                   <CommonTable.Cell>
                     <MetricChips

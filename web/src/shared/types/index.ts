@@ -457,6 +457,7 @@ export interface UsageQuery extends PageReq {
   user_id?: number;
   api_key_id?: number;
   channel_id?: number;
+  channel_key_id?: number;
   group_id?: number;
   model?: string;
   start_date?: string;
@@ -771,8 +772,8 @@ export interface DashboardStatsResp {
   total_api_keys: number;
   enabled_api_keys: number;
   total_channels: number;
-  enabled_channels: number;
-  disabled_channels: number;
+  enabled_keys: number;
+  disabled_keys: number;
   today_requests: number;
   today_image_requests: number;
   alltime_requests: number;

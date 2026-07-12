@@ -6,10 +6,10 @@ type DashboardStatsResp struct {
 	TotalAPIKeys   int64 `json:"total_api_keys"`
 	EnabledAPIKeys int64 `json:"enabled_api_keys"`
 
-	// 渠道
-	TotalChannels    int64 `json:"total_channels"`
-	EnabledChannels  int64 `json:"enabled_channels"`
-	DisabledChannels int64 `json:"disabled_channels"`
+	// 渠道（渠道为供应商容器；启用/停用口径下沉到密钥端点 ChannelKey）
+	TotalChannels int64 `json:"total_channels"`
+	EnabledKeys   int64 `json:"enabled_keys"`
+	DisabledKeys  int64 `json:"disabled_keys"`
 
 	// 请求
 	TodayRequests      int64 `json:"today_requests"`

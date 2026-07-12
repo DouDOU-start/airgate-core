@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -37,6 +37,16 @@ const COLUMN_COUNT = 7;
 // 仅 openai_compatible 中转站支持经 key 查余额。
 function keySupportsBalance(key: ChannelKeyResp): boolean {
   return key.type === 'openai_compatible';
+}
+
+// 余额陈旧阈值：更新时间早于此则进入页面时后台自动刷新。
+const BALANCE_STALE_MS = 60_000;
+
+// isKeyBalanceStale 可查余额的 key 从未刷新过、或超过阈值 → 陈旧。
+function isKeyBalanceStale(key: ChannelKeyResp): boolean {
+  if (!keySupportsBalance(key)) return false;
+  if (!key.balance_updated_at) return true;
+  return Date.now() - new Date(key.balance_updated_at).getTime() > BALANCE_STALE_MS;
 }
 
 // 渠道类型 → 徽章配色
@@ -87,14 +97,19 @@ function KeyStatusChip({ status, errorMsg }: { status: ChannelStatus; errorMsg: 
   );
 }
 
-// 一段带标签的行内指标：小标题在上、值在下，视觉上成组。
+// 一段带标签的行内指标：小标题在上、值在下，右对齐数值成列。
 function Metric({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-0.5 leading-none">
-      <span className="text-[10px] uppercase tracking-wide text-text-tertiary">{label}</span>
-      <span className="font-mono text-xs text-text-secondary">{children}</span>
+    <div className="flex flex-col gap-1 leading-none">
+      <span className="whitespace-nowrap text-[10px] uppercase tracking-wide text-text-tertiary">{label}</span>
+      <span className="whitespace-nowrap font-mono text-xs text-text-secondary">{children}</span>
     </div>
   );
+}
+
+// 指标分组之间的竖向分隔线。
+function MetricDivider() {
+  return <span className="hidden h-7 w-px self-center bg-border sm:block" />;
 }
 
 // 展开区的一把 key 子行：两行卡片——头部（名称/类型/启停/密钥/操作）+ 指标行。
@@ -167,74 +182,91 @@ function KeyRow({
         </div>
       </div>
 
-      {/* 指标行：模型 | 优先级/权重 · 成本倍率 | 并发/RPM | 成本·收益 | 余额 | 标签 */}
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-2.5">
-        <Metric label={t('channels.models')}>
-          {channelKey.models.length > 0 ? (
-            <Tooltip>
-              <Tooltip.Trigger className="inline-flex">
-                <span className="cursor-default text-text underline decoration-dotted underline-offset-2">
-                  {t('channels.model_count', { count: channelKey.models.length })}
-                </span>
-              </Tooltip.Trigger>
-              <Tooltip.Content className="max-w-sm">
-                <div className="max-h-56 overflow-y-auto font-mono text-xs leading-5">
-                  {channelKey.models.map((model) => (
-                    <div key={model}>{model}</div>
-                  ))}
-                </div>
-              </Tooltip.Content>
-            </Tooltip>
-          ) : (
-            <span className="text-text-tertiary">{t('channels.no_models')}</span>
-          )}
-        </Metric>
-
-        <Metric label={`${t('channels.priority')}·${t('channels.weight')}`}>
-          P{channelKey.priority} · W{channelKey.weight}
-        </Metric>
-        <Metric label={t('channels.cost_ratio')}>×{channelKey.cost_ratio}</Metric>
-        <Metric label={t('channels.concurrency_label')}>
-          {channelKey.current_concurrency}/{channelKey.max_concurrency > 0 ? channelKey.max_concurrency : '∞'}
-        </Metric>
-        <Metric label="RPM">{channelKey.current_rpm}</Metric>
-
-        <Metric label={t('channels.stats_today_cost')}>
-          <span className={channelKey.today_cost > 0 ? 'text-warning' : ''}>{fmt(channelKey.today_cost)}</span>
-        </Metric>
-        <Metric label={t('channels.stats_cost')}>
-          <span className={channelKey.total_cost > 0 ? 'text-warning' : ''}>{fmt(channelKey.total_cost)}</span>
-        </Metric>
-        <Metric label={t('channels.stats_revenue')}>
-          <span className={channelKey.total_revenue > 0 ? 'text-success' : ''}>{fmt(channelKey.total_revenue)}</span>
-        </Metric>
-
-        {supportsBalance ? (
-          <Metric label={t('channels.balance')}>
-            <span className="inline-flex items-center gap-1">
-              {balanceUpdated ? fmt(channelKey.balance) : <span className="text-text-tertiary">{t('channels.balance_never')}</span>}
-              <Button
-                isIconOnly
-                aria-label={t('channels.refresh_balance')}
-                isDisabled={refreshingBalance}
-                size="sm"
-                variant="ghost"
-                onPress={onRefreshBalance}
-              >
-                {refreshingBalance ? <Spinner size="sm" /> : <RefreshCw className="h-3 w-3" />}
-              </Button>
-            </span>
+      {/* 指标行：配置组 | 运行时组 | 金额组 | 标签，组间竖线分隔 */}
+      <div className="mt-3 flex flex-wrap items-start gap-x-4 gap-y-3">
+        {/* 配置组：模型 · 优先级权重 · 成本倍率 */}
+        <div className="flex items-start gap-x-4">
+          <Metric label={t('channels.models')}>
+            {channelKey.models.length > 0 ? (
+              <Tooltip>
+                <Tooltip.Trigger className="inline-flex cursor-help">
+                  <span className="text-text">{channelKey.models.length}</span>
+                </Tooltip.Trigger>
+                <Tooltip.Content className="max-w-sm">
+                  <div className="max-h-56 overflow-y-auto font-mono text-xs leading-5">
+                    {channelKey.models.map((model) => (
+                      <div key={model}>{model}</div>
+                    ))}
+                  </div>
+                </Tooltip.Content>
+              </Tooltip>
+            ) : (
+              <span className="text-text-tertiary">-</span>
+            )}
           </Metric>
-        ) : null}
+          <Metric label={`${t('channels.priority')}·${t('channels.weight')}`}>
+            P{channelKey.priority} · W{channelKey.weight}
+          </Metric>
+          <Metric label={t('channels.cost_ratio')}>×{channelKey.cost_ratio}</Metric>
+        </div>
+
+        <MetricDivider />
+
+        {/* 运行时组：并发 · RPM */}
+        <div className="flex items-start gap-x-4">
+          <Metric label={t('channels.concurrency_label')}>
+            {channelKey.current_concurrency}/{channelKey.max_concurrency > 0 ? channelKey.max_concurrency : '∞'}
+          </Metric>
+          <Metric label="RPM">{channelKey.current_rpm}</Metric>
+        </div>
+
+        <MetricDivider />
+
+        {/* 金额组：今日成本 · 今日收益 · 成本 · 收益 · 余额 */}
+        <div className="flex items-start gap-x-4">
+          <Metric label={t('channels.stats_today_cost')}>
+            <span className={channelKey.today_cost > 0 ? 'text-warning' : ''}>{fmt(channelKey.today_cost)}</span>
+          </Metric>
+          <Metric label={t('channels.stats_today_revenue')}>
+            <span className={channelKey.today_revenue > 0 ? 'text-success' : ''}>{fmt(channelKey.today_revenue)}</span>
+          </Metric>
+          <Metric label={t('channels.stats_cost')}>
+            <span className={channelKey.total_cost > 0 ? 'text-warning' : ''}>{fmt(channelKey.total_cost)}</span>
+          </Metric>
+          <Metric label={t('channels.stats_revenue')}>
+            <span className={channelKey.total_revenue > 0 ? 'text-success' : ''}>{fmt(channelKey.total_revenue)}</span>
+          </Metric>
+          {supportsBalance ? (
+            <Metric label={t('channels.balance')}>
+              <span className="inline-flex items-center gap-1">
+                {balanceUpdated ? fmt(channelKey.balance) : <span className="text-text-tertiary">{t('channels.balance_never')}</span>}
+                <Button
+                  isIconOnly
+                  aria-label={t('channels.refresh_balance')}
+                  className="h-5 min-h-0 w-5"
+                  isDisabled={refreshingBalance}
+                  size="sm"
+                  variant="ghost"
+                  onPress={onRefreshBalance}
+                >
+                  {refreshingBalance ? <Spinner size="sm" /> : <RefreshCw className="h-3 w-3" />}
+                </Button>
+              </span>
+            </Metric>
+          ) : null}
+        </div>
 
         {channelKey.tags.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {channelKey.tags.map((tag) => (
-              <Chip color="default" key={tag} size="sm" variant="soft">
-                {tag}
-              </Chip>
-            ))}
-          </div>
+          <>
+            <MetricDivider />
+            <div className="flex flex-wrap gap-1 self-center">
+              {channelKey.tags.map((tag) => (
+                <Chip color="default" key={tag} size="sm" variant="soft">
+                  {tag}
+                </Chip>
+              ))}
+            </div>
+          </>
         ) : null}
       </div>
     </div>
@@ -354,6 +386,64 @@ export default function ChannelsPage() {
     },
     onError: (err: Error) => toast('error', err.message),
   });
+
+  // 一键刷新所有渠道下可查余额（openai_compatible）的 key：串行逐个刷，失败跳过不中断。
+  const [batchBalanceRunning, setBatchBalanceRunning] = useState(false);
+  async function handleRefreshAllBalance() {
+    setBatchBalanceRunning(true);
+    let ok = 0;
+    try {
+      const all = await channelsApi.list({ page: 1, page_size: 1000 });
+      const keys = all.list.flatMap((ch) => ch.keys).filter((k) => k.type === 'openai_compatible');
+      const total = keys.length;
+      if (total === 0) {
+        toast('info', t('channels.balance_batch_none'));
+        return;
+      }
+      for (const k of keys) {
+        try {
+          await channelsApi.refreshBalance(k.id);
+          ok += 1;
+        } catch {
+          // 单把 key 失败跳过，不中断整批。
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+      toast('success', t('channels.balance_batch_done', { ok, total }));
+    } finally {
+      setBatchBalanceRunning(false);
+    }
+  }
+
+  // 进入渠道页 / 翻页时自动刷新可见渠道下陈旧的 key 余额（后台、串行、只刷陈旧的、每 key 每次挂载只刷一次）。
+  const autoRefreshedRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    const stale = rows
+      .flatMap((ch) => ch.keys)
+      .filter((k) => isKeyBalanceStale(k) && !autoRefreshedRef.current.has(k.id));
+    if (stale.length === 0) return;
+    stale.forEach((k) => autoRefreshedRef.current.add(k.id));
+
+    let cancelled = false;
+    void (async () => {
+      let updated = false;
+      for (const k of stale) {
+        if (cancelled) break;
+        try {
+          await channelsApi.refreshBalance(k.id);
+          updated = true;
+        } catch {
+          // 不支持/失败静默跳过：自动刷新不打扰用户，手动刷新才提示错误。
+        }
+      }
+      if (!cancelled && updated) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [rows, queryClient]);
 
   function openCreate() {
     setEditingChannel(null);
@@ -492,6 +582,14 @@ export default function ChannelsPage() {
           </Select>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            isDisabled={batchBalanceRunning}
+            variant="secondary"
+            onPress={handleRefreshAllBalance}
+          >
+            {batchBalanceRunning ? <Spinner size="sm" /> : <RefreshCw className="h-4 w-4" />}
+            {t('channels.refresh_all_balance')}
+          </Button>
           <Button
             isIconOnly
             aria-label={t('common.refresh', 'Refresh')}

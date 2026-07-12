@@ -217,17 +217,18 @@ func (h *UsageHandler) AdminUsage(c *gin.Context) {
 	}
 
 	result, err := h.service.ListAdmin(c.Request.Context(), appusage.ListFilter{
-		Page:      query.Page,
-		PageSize:  query.PageSize,
-		UserID:    query.UserID,
-		APIKeyID:  query.APIKeyID,
-		ChannelID: query.ChannelID,
-		GroupID:   query.GroupID,
-		Model:     query.Model,
-		RequestID: query.RequestID,
-		StartDate: query.StartDate,
-		EndDate:   query.EndDate,
-		TZ:        c.Query("tz"),
+		Page:         query.Page,
+		PageSize:     query.PageSize,
+		UserID:       query.UserID,
+		APIKeyID:     query.APIKeyID,
+		ChannelID:    query.ChannelID,
+		ChannelKeyID: query.ChannelKeyID,
+		GroupID:      query.GroupID,
+		Model:        query.Model,
+		RequestID:    query.RequestID,
+		StartDate:    query.StartDate,
+		EndDate:      query.EndDate,
+		TZ:           c.Query("tz"),
 	})
 	if err != nil {
 		handleUsageError("查询管理员使用记录失败", err)

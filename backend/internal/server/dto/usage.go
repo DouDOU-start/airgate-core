@@ -77,14 +77,15 @@ type CustomerUsageLogResp struct {
 // UsageQuery 使用记录查询参数
 type UsageQuery struct {
 	PageReq
-	UserID    *int64 `form:"user_id"`
-	APIKeyID  *int64 `form:"api_key_id"`
-	ChannelID *int64 `form:"channel_id"`
-	GroupID   *int64 `form:"group_id"`
-	Model     string `form:"model"`
-	RequestID string `form:"request_id"`
-	StartDate string `form:"start_date"`
-	EndDate   string `form:"end_date"`
+	UserID       *int64 `form:"user_id"`
+	APIKeyID     *int64 `form:"api_key_id"`
+	ChannelID    *int64 `form:"channel_id"`
+	ChannelKeyID *int64 `form:"channel_key_id"`
+	GroupID      *int64 `form:"group_id"`
+	Model        string `form:"model"`
+	RequestID    string `form:"request_id"`
+	StartDate    string `form:"start_date"`
+	EndDate      string `form:"end_date"`
 }
 
 // UsageFilterQuery 使用记录筛选参数（不含分页，用于聚合统计）

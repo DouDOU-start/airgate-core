@@ -1,10 +1,11 @@
-import { lazy, memo, Suspense, useCallback, useMemo, useState } from 'react';
+import { lazy, memo, Suspense, useCallback, useMemo, useState, type Key } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button, Chip, ComboBox, Input, ListBox, Tabs } from '@heroui/react';
 import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { apikeysApi } from '../../shared/api/apikeys';
+import { channelsApi } from '../../shared/api/channels';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
@@ -425,6 +426,65 @@ export default function UsagePage() {
       ...apiKeyOptions,
     ];
   })();
+
+  // 渠道 + 渠道下 Key 级联筛选（可输入搜索）：渠道一次拉全，keys 内嵌于渠道响应，无需二次请求。
+  const { data: channelsData } = useQuery({
+    queryKey: queryKeys.channels('usage-filter'),
+    queryFn: () => channelsApi.list({ page: 1, page_size: 1000 }),
+    enabled: pageActive,
+  });
+  const channelList = channelsData?.list ?? [];
+  const selectedChannel = channelList.find((ch) => ch.id === filters.channel_id);
+
+  // 渠道搜索：客户端按名称过滤（渠道数量有限，无需服务端搜索）。
+  const [channelKeyword, setChannelKeyword] = useState('');
+  const channelOptions = channelList.map((ch) => ({
+    id: String(ch.id),
+    label: ch.name,
+    textValue: ch.name,
+  }));
+  const visibleChannelOptions = channelKeyword.trim()
+    ? channelOptions.filter((o) => o.label.toLowerCase().includes(channelKeyword.trim().toLowerCase()))
+    : channelOptions;
+
+  // 渠道下 Key 搜索：选项级联自选中渠道的内嵌 keys；名称为空时用尾 4 位 hint 兜底。
+  const [channelKeyKeyword, setChannelKeyKeyword] = useState('');
+  const channelKeyOptions = (selectedChannel?.keys ?? []).map((key) => ({
+    id: String(key.id),
+    label: key.name || key.api_key_hint || `#${key.id}`,
+    textValue: key.name || key.api_key_hint || String(key.id),
+  }));
+  const visibleChannelKeyOptions = channelKeyKeyword.trim()
+    ? channelKeyOptions.filter((o) => o.label.toLowerCase().includes(channelKeyKeyword.trim().toLowerCase()))
+    : channelKeyOptions;
+
+  // 清空渠道筛选（连带清空 Key 筛选与两处搜索词）。
+  function clearChannelFilter() {
+    setChannelKeyword('');
+    setChannelKeyKeyword('');
+    setFilters((prev) => ({ ...prev, channel_id: undefined, channel_key_id: undefined }));
+    setPage(1);
+  }
+
+  // 选中渠道：写 channel_id 并清空已选 Key（避免残留跨渠道 key 过滤）。
+  function handleChannelSelect(key: Key | null) {
+    const value = key == null ? '' : String(key);
+    if (!value) {
+      clearChannelFilter();
+      return;
+    }
+    setChannelKeyword(channelOptions.find((o) => o.id === value)?.label ?? '');
+    setChannelKeyKeyword('');
+    setFilters((prev) => ({ ...prev, channel_id: Number(value), channel_key_id: undefined }));
+    setPage(1);
+  }
+
+  function handleChannelKeySelect(key: Key | null) {
+    const value = key == null ? '' : String(key);
+    setChannelKeyKeyword(value ? (channelKeyOptions.find((o) => o.id === value)?.label ?? '') : '');
+    setFilters((prev) => ({ ...prev, channel_key_id: value ? Number(value) : undefined }));
+    setPage(1);
+  }
 
   // 构建查询参数
   const queryParams = useMemo<UsageQuery>(() => ({
@@ -847,6 +907,85 @@ export default function UsagePage() {
                         <div className="truncate text-xs text-text-tertiary">{item.description}</div>
                       ) : null}
                     </div>
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </ComboBox.Popover>
+          </ComboBox>
+        </div>
+        <div className="w-full sm:w-44">
+          <ComboBox
+            aria-label={t('usage.search_channel')}
+            allowsEmptyCollection
+            fullWidth
+            inputValue={channelKeyword}
+            items={visibleChannelOptions}
+            menuTrigger="focus"
+            selectedKey={filters.channel_id ? String(filters.channel_id) : null}
+            onInputChange={(value) => {
+              setChannelKeyword(value);
+              if (!value) {
+                clearChannelFilter();
+              }
+            }}
+            onSelectionChange={handleChannelSelect}
+          >
+            <ComboBox.InputGroup className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+              <Input className="pl-9" placeholder={t('usage.search_channel')} />
+            </ComboBox.InputGroup>
+            <ComboBox.Popover>
+              <ListBox
+                items={visibleChannelOptions}
+                renderEmptyState={() => (
+                  <div className="px-3 py-6 text-center text-xs text-text-tertiary">
+                    {channelList.length === 0 ? t('common.no_data') : t('usage.search_channel')}
+                  </div>
+                )}
+              >
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.textValue}>
+                    {item.label}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </ComboBox.Popover>
+          </ComboBox>
+        </div>
+        <div className="w-full sm:w-44">
+          <ComboBox
+            aria-label={t('usage.search_channel_key')}
+            allowsEmptyCollection
+            fullWidth
+            isDisabled={!filters.channel_id}
+            inputValue={channelKeyKeyword}
+            items={visibleChannelKeyOptions}
+            menuTrigger="focus"
+            selectedKey={filters.channel_key_id ? String(filters.channel_key_id) : null}
+            onInputChange={(value) => {
+              setChannelKeyKeyword(value);
+              if (!value) {
+                handleChannelKeySelect(null);
+              }
+            }}
+            onSelectionChange={handleChannelKeySelect}
+          >
+            <ComboBox.InputGroup className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+              <Input className="pl-9" placeholder={t('usage.search_channel_key')} />
+            </ComboBox.InputGroup>
+            <ComboBox.Popover>
+              <ListBox
+                items={visibleChannelKeyOptions}
+                renderEmptyState={() => (
+                  <div className="px-3 py-6 text-center text-xs text-text-tertiary">
+                    {t('common.no_data')}
+                  </div>
+                )}
+              >
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.textValue}>
+                    {item.label}
                   </ListBox.Item>
                 )}
               </ListBox>

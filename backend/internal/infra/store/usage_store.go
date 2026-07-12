@@ -549,6 +549,9 @@ func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) 
 	if filter.ChannelID != nil {
 		query = query.Where(entusagelog.ChannelIDEQ(int(*filter.ChannelID)))
 	}
+	if filter.ChannelKeyID != nil {
+		query = query.Where(entusagelog.ChannelKeyIDEQ(int(*filter.ChannelKeyID)))
+	}
 	if filter.GroupID != nil {
 		query = query.Where(entusagelog.GroupIDEQ(int(*filter.GroupID)))
 	}
