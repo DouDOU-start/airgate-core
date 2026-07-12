@@ -5,9 +5,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"io/fs"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -16,7 +14,6 @@ import (
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
-	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 
@@ -28,9 +25,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
 	"github.com/DouDOU-start/airgate-core/internal/server"
-	"github.com/DouDOU-start/airgate-core/internal/setup"
 	"github.com/DouDOU-start/airgate-core/internal/version"
-	webfs "github.com/DouDOU-start/airgate-core/internal/web"
 )
 
 func main() {
@@ -59,15 +54,9 @@ func main() {
 	logx.InitLogger("core", "info", "text")
 	slog.Info("AirGate Core 启动中...", "version", version.Version)
 
-	// 检查是否需要安装
-	if setup.NeedsSetup() {
-		slog.Info("系统未安装，启动安装向导...")
-		startSetupServer()
-		// 安装完成后继续往下执行，启动正常服务
-		slog.Info("安装完成，启动主服务...")
-	}
-
-	// 加载配置
+	// 加载配置：docker compose 用镜像内置 config.yaml + 环境变量覆盖，
+	// make dev 用本地 config.yaml（由 config.yaml.example 复制）。
+	// 数据库/Redis 连接信息由部署侧提供，不再有页面安装向导。
 	cfgPath := config.ConfigPath()
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
@@ -81,56 +70,6 @@ func main() {
 
 	// 启动正常服务
 	startMainServer(cfg)
-}
-
-// startSetupServer 启动安装向导服务器，安装完成后自动关闭
-func startSetupServer() {
-	r := gin.Default()
-
-	// 用于通知安装完成
-	done := make(chan struct{})
-	setup.RegisterRoutesWithCallback(r, func() {
-		close(done)
-	})
-
-	// 静态文件服务（前端 SPA 来自嵌入资源）
-	distFS, err := webfs.FS()
-	if err != nil {
-		slog.Error("加载嵌入前端失败，安装向导无法启动", "error", err)
-		os.Exit(1)
-	}
-	indexHTML, _ := webfs.IndexHTML()
-	assetsFS, err := fs.Sub(distFS, "assets")
-	if err != nil {
-		slog.Error("嵌入前端缺少 assets 子目录", "error", err)
-		os.Exit(1)
-	}
-	r.StaticFS("/assets", http.FS(assetsFS))
-	r.GET("/", func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
-	})
-	r.NoRoute(func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
-	})
-
-	host := config.GetHost()
-	port := config.GetPort()
-	srv := &http.Server{Addr: fmt.Sprintf("%s:%d", host, port), Handler: r}
-
-	slog.Info("安装向导服务器启动", "host", host, "port", port)
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("安装向导启动失败", "error", err)
-			os.Exit(1)
-		}
-	}()
-
-	// 等待安装完成
-	<-done
-	slog.Info("安装完成，关闭安装向导服务器...")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_ = srv.Shutdown(ctx)
 }
 
 // startMainServer 启动主服务器

@@ -25,12 +25,11 @@
 #   5. 安装 systemd 服务 airgate-core.service
 #
 # 它故意不替你启动服务、不写 config.yaml —— 装完之后请：
-#   sudo systemctl start airgate-core
-#   sudo systemctl enable airgate-core
-#   浏览器打开 http://<your-host>:9517 走安装向导
-#
-# 安装向导会引导你输入 PostgreSQL / Redis 连接信息和管理员账号，
-# 写入 /etc/airgate-core/config.yaml。
+#   1. 参考 config.yaml.example 创建 /etc/airgate-core/config.yaml，
+#      填入 PostgreSQL / Redis 连接信息与 jwt.secret（连接信息也可用环境变量提供）
+#   2. sudo systemctl start airgate-core
+#      sudo systemctl enable airgate-core
+#   3. 浏览器打开 http://<your-host>:9517 注册账号——第一个注册的账号即系统管理员
 #
 # 想要自带 PostgreSQL + Redis 的 Docker Compose 部署？请改用 deploy/docker-deploy.sh。
 # ============================================================
@@ -269,21 +268,18 @@ ${GREEN}✓ AirGate Core ${LATEST_VERSION} 安装完成${NC}
 
 ${BLUE}下一步${NC}
 
-  1. 启动服务：
+  1. 创建配置文件（参考仓库 backend/config.yaml.example）：
+     ${CYAN}${CONFIG_DIR}/config.yaml${NC}
+     填入 PostgreSQL / Redis 连接信息与 jwt.secret（也可用环境变量提供）。
+
+  2. 启动服务：
      ${CYAN}sudo systemctl start ${SERVICE_NAME}${NC}
 
-  2. 设置开机自启：
+  3. 设置开机自启：
      ${CYAN}sudo systemctl enable ${SERVICE_NAME}${NC}
 
-  3. 浏览器打开安装向导：
-     ${CYAN}http://${PUBLIC_IP}:9517${NC}
-
-     向导会引导你完成：
-       - PostgreSQL 连接配置
-       - Redis 连接配置
-       - 创建管理员账号
-
-     最终的连接信息会写到 ${CONFIG_DIR}/config.yaml。
+  4. 浏览器打开 ${CYAN}http://${PUBLIC_IP}:9517${NC} 注册账号：
+     第一个注册的账号会自动成为系统管理员。
 
 ${BLUE}常用命令${NC}
 

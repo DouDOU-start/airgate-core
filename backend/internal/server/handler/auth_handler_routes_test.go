@@ -93,6 +93,9 @@ func (stubAuthRepo) FindByEmail(_ context.Context, _ string) (appauth.User, erro
 func (stubAuthRepo) EmailExists(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }
+func (stubAuthRepo) CountUsers(_ context.Context) (int, error) {
+	return 1, nil
+}
 func (stubAuthRepo) Create(_ context.Context, _ appauth.CreateUserInput) (appauth.User, error) {
 	return appauth.User{}, nil
 }

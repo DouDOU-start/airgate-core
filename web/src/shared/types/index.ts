@@ -834,62 +834,6 @@ export interface DashboardUserTrendPoint {
   tokens: number;
 }
 
-// ==================== Setup ====================
-
-export interface SetupStatusResp {
-  needs_setup: boolean;
-  // 后端检测到 DB 环境变量已配置且可连通时返回提示，前端据此跳过数据库步骤
-  env_db?: EnvDBHint;
-  env_redis?: EnvRedisHint;
-}
-
-export interface EnvDBHint {
-  host: string;
-  port: number;
-  user: string;
-  dbname: string;
-  sslmode: string;
-}
-
-export interface EnvRedisHint {
-  host: string;
-  port: number;
-  db: number;
-}
-
-export interface TestDBReq {
-  host: string;
-  port: number;
-  user: string;
-  password?: string;
-  dbname: string;
-  sslmode?: string;
-}
-
-export interface TestRedisReq {
-  host: string;
-  port: number;
-  password?: string;
-  db?: number;
-  tls?: boolean;
-}
-
-export interface InstallReq {
-  database: TestDBReq;
-  redis: TestRedisReq;
-  admin: AdminSetup;
-}
-
-export interface AdminSetup {
-  email: string;
-  password: string;
-}
-
-export interface TestConnectionResp {
-  success: boolean;
-  error_msg?: string;
-}
-
 // ==================== Announcement ====================
 
 export type AnnouncementStatus = 'draft' | 'active' | 'archived';

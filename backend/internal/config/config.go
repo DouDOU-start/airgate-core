@@ -28,9 +28,7 @@ func GetPort() int {
 	return DefaultPort
 }
 
-// GetHost 获取监听地址（优先环境变量 HOST）
-//
-// 仅用于安装向导阶段（还没有 config.yaml 的时候），主服务启动后以 cfg.Server.Host 为准。
+// GetHost 获取监听地址（优先环境变量 HOST），主服务以 cfg.Server.Host 为准。
 func GetHost() string {
 	if v := os.Getenv("HOST"); v != "" {
 		return v
@@ -140,15 +138,23 @@ func (d DatabaseConfig) DSN() string {
 		" sslmode=" + sslmode
 }
 
-// Load 从 YAML 文件加载配置，环境变量优先级高于配置文件
+// Load 从 YAML 文件加载配置，环境变量优先级高于配置文件。
+//
+// 配置文件不存在时不报错：从默认值出发、仅由环境变量覆盖，
+// 支持 docker compose 纯环境变量启动（DB_*/REDIS_*/JWT_SECRET 等）。
 func Load(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
 	cfg := &Config{
 		Server: ServerConfig{Host: DefaultHost, Port: DefaultPort, Mode: "release"},
 		JWT:    JWTConfig{ExpireHour: 24},
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+		// 无配置文件：完全依赖环境变量。
+		applyEnvOverrides(cfg)
+		return cfg, nil
 	}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err

@@ -109,6 +109,8 @@ type Setting struct {
 type Repository interface {
 	FindByEmail(context.Context, string) (User, error)
 	EmailExists(context.Context, string) (bool, error)
+	// CountUsers 返回用户总数，用于判断是否首个注册用户（首个自动成为管理员）。
+	CountUsers(context.Context) (int, error)
 	Create(context.Context, CreateUserInput) (User, error)
 	FindByID(context.Context, int, bool) (User, error)
 	ValidateAPIKeySession(context.Context, int, int) (User, error)

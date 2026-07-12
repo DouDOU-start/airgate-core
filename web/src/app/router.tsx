@@ -12,13 +12,12 @@ import { useAuth } from './providers/AuthProvider';
 import { ErrorBoundary } from './providers/ErrorBoundary';
 import { getToken, getTokenRole } from '../shared/api/client';
 import { FullPageLoading, PageLoading } from '../shared/components/PageLoading';
-import { checkAdmin, withSetupCheck } from './routeGuards';
+import { checkAdmin } from './routeGuards';
 import {
   ADMIN_IDLE_PRELOADS,
   AnnouncementsPage,
   ChannelsPage,
   DashboardPage,
-  DocsPage,
   GroupsPage,
   lazyWithPreload,
   LoginPage,
@@ -32,7 +31,6 @@ import {
   PublicHomePage,
   RechargePage,
   SettingsPage,
-  SetupPage,
   UsagePage,
   UserKeysPage,
   UserOverviewPage,
@@ -105,42 +103,13 @@ const rootRoute = createRootRoute({
   ),
 });
 
-// 安装向导（无需认证，懒加载）
-const setupRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/setup',
-  beforeLoad: () => withSetupCheck((needs) => {
-    if (!needs) throw redirect({ to: '/login' });
-  }),
-  component: () => (
-    <Suspense fallback={<FullPageLoading />}>
-      <SetupPage />
-    </Suspense>
-  ),
-});
-
 // 公共首页（无需认证，懒加载）
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/home',
-  beforeLoad: () => withSetupCheck((needs) => {
-    if (needs) throw redirect({ to: '/setup' });
-  }),
   component: () => (
     <Suspense fallback={<FullPageLoading />}>
       <PublicHomePage />
-    </Suspense>
-  ),
-});
-
-// 内置默认文档页 —— 当管理员未在 系统设置 → 站点品牌 → 文档链接 中填写外部 URL 时，
-// 所有"文档"按钮 fallback 到这里。公开可访问，独立布局（不挂 AppShell）。
-const docsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/docs',
-  component: () => (
-    <Suspense fallback={<FullPageLoading />}>
-      <DocsPage />
     </Suspense>
   ),
 });
@@ -149,9 +118,6 @@ const docsRoute = createRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  beforeLoad: () => withSetupCheck((needs) => {
-    if (needs) throw redirect({ to: '/setup' });
-  }),
   component: () => (
     <Suspense fallback={<FullPageLoading />}>
       <LoginPage />
@@ -174,10 +140,9 @@ const oauthAuthorizeRoute = createRoute({
 const authLayout = createRoute({
   getParentRoute: () => rootRoute,
   id: 'auth',
-  beforeLoad: () => withSetupCheck((needs) => {
-    if (needs) throw redirect({ to: '/setup' });
+  beforeLoad: () => {
     if (!getToken()) throw redirect({ to: '/home' });
-  }),
+  },
   component: () => (
     <Suspense fallback={<FullPageLoading />}>
       <AppShell>
@@ -255,10 +220,8 @@ const rechargeRoute = createRoute({ getParentRoute: () => authLayout, path: '/re
 
 // 路由树
 const routeTree = rootRoute.addChildren([
-  setupRoute,
   homeRoute,
   loginRoute,
-  docsRoute,
   oauthAuthorizeRoute,
   authLayout.addChildren([
     dashboardRoute,

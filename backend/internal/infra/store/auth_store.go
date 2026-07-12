@@ -40,6 +40,11 @@ func (s *AuthStore) EmailExists(ctx context.Context, email string) (bool, error)
 	return s.db.User.Query().Where(entuser.EmailEQ(email)).Exist(ctx)
 }
 
+// CountUsers 返回用户总数。
+func (s *AuthStore) CountUsers(ctx context.Context) (int, error) {
+	return s.db.User.Query().Count(ctx)
+}
+
 // Create 创建用户。
 func (s *AuthStore) Create(ctx context.Context, input appauth.CreateUserInput) (appauth.User, error) {
 	builder := s.db.User.Create().

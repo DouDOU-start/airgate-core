@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
-	"github.com/DouDOU-start/airgate-core/internal/setup"
 	webfs "github.com/DouDOU-start/airgate-core/internal/web"
 )
 
@@ -30,9 +29,6 @@ func (s *Server) registerRoutes() {
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
-
-	// 安装向导路由（无需认证）
-	setup.RegisterRoutes(r)
 
 	// API v1 路由组
 	v1 := r.Group("/api/v1")

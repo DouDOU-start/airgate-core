@@ -167,13 +167,21 @@ func (s *Service) LoginByAPIKey(ctx context.Context, input LoginByAPIKeyInput) (
 func (s *Service) Register(ctx context.Context, input RegisterInput) (LoginResult, error) {
 	logger := logx.LoggerFromContext(ctx)
 
-	// 检查注册开关
-	if !s.isRegistrationEnabled(ctx) {
+	// 首个注册用户自动成为管理员，用于初始化系统（取代页面安装向导）。
+	userCount, err := s.repo.CountUsers(ctx)
+	if err != nil {
+		logger.Error("user_count_failed", logx.LogFieldError, err)
+		return LoginResult{}, err
+	}
+	isFirstUser := userCount == 0
+
+	// 检查注册开关（首个管理员不受注册开关约束，否则关闭注册后无法初始化系统）
+	if !isFirstUser && !s.isRegistrationEnabled(ctx) {
 		return LoginResult{}, ErrRegistrationDisabled
 	}
 
-	// 检查邮箱验证
-	if s.isEmailVerifyEnabled(ctx) {
+	// 检查邮箱验证（首个管理员跳过验证码，避免尚未配置 SMTP 时无法完成初始化）
+	if !isFirstUser && s.isEmailVerifyEnabled(ctx) {
 		if input.VerifyCode == "" {
 			return LoginResult{}, ErrVerifyCodeRequired
 		}
@@ -201,11 +209,16 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (LoginResul
 		return LoginResult{}, err
 	}
 
+	role := "user"
+	if isFirstUser {
+		role = "admin"
+	}
+
 	user, err := s.repo.Create(ctx, CreateUserInput{
 		Email:          input.Email,
 		PasswordHash:   string(hash),
 		Username:       input.Username,
-		Role:           "user",
+		Role:           role,
 		Status:         "active",
 		Balance:        defaultBalance,
 		MaxConcurrency: defaultConcurrency,

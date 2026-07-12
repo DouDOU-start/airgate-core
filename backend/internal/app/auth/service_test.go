@@ -176,6 +176,36 @@ func TestRegisterCreatesActiveUserAndToken(t *testing.T) {
 	}
 }
 
+// TestRegisterFirstUserBecomesAdmin 首个注册用户自动成为管理员，且不受注册开关约束。
+func TestRegisterFirstUserBecomesAdmin(t *testing.T) {
+	var captured CreateUserInput
+	service := NewService(authStubRepository{
+		countUsers:  func() (int, error) { return 0, nil },
+		emailExists: func() (bool, error) { return false, nil },
+		create: func(input CreateUserInput) (User, error) {
+			captured = input
+			return User{ID: 1, Email: input.Email, Role: input.Role, Status: input.Status}, nil
+		},
+	}, corauth.NewJWTManager("secret", 24))
+	// 即便注册开关关闭，首个用户仍可完成初始化。
+	service.SetSettingsLister(&stubSettingsLister{
+		data: map[string][]Setting{
+			"registration": {{Key: "registration_enabled", Value: "false"}},
+		},
+	})
+
+	_, err := service.Register(t.Context(), RegisterInput{
+		Email:    "admin@test.com",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("首个用户注册失败: %v", err)
+	}
+	if captured.Role != "admin" {
+		t.Fatalf("首个用户角色应为 admin, got %q", captured.Role)
+	}
+}
+
 func TestRefreshTokenPreservesAPIKeyIdentity(t *testing.T) {
 	jwtMgr := corauth.NewJWTManager("secret", 24)
 	service := NewService(authStubRepository{}, jwtMgr)
@@ -265,11 +295,20 @@ func TestRefreshTokenChecksUserStatus(t *testing.T) {
 type authStubRepository struct {
 	findByEmail            func() (User, error)
 	emailExists            func() (bool, error)
+	countUsers             func() (int, error)
 	create                 func(CreateUserInput) (User, error)
 	findByID               func() (User, error)
 	validateAPIKeySession  func(userID, keyID int) (User, error)
 	validateAPIKeyForLogin func(key string) (APIKeyLoginInfo, error)
 	getAPIKeyBrief         func(keyID int) (APIKeyBrief, error)
+}
+
+// CountUsers 缺省返回 1（模拟系统已存在用户）；置 0 可模拟首个注册用户场景。
+func (s authStubRepository) CountUsers(_ context.Context) (int, error) {
+	if s.countUsers == nil {
+		return 1, nil
+	}
+	return s.countUsers()
 }
 
 func (s authStubRepository) FindByEmail(_ context.Context, _ string) (User, error) {

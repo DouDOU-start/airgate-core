@@ -195,8 +195,8 @@ ${C_BOLD}下一步：手动启动容器${C_RESET}
   ${C_CYAN}$COMPOSE logs -f core${C_RESET}
 
 启动后访问 ${C_CYAN}http://<your-host>:${AIRGATE_PORT}${C_RESET}：
-  - 安装向导会检测到 .env 已配置好 DB / Redis，自动跳过这两步
-  - 只需要建立管理员账号
+  - DB / Redis 连接信息已由 .env 提供，容器启动即自动迁移建表
+  - 注册账号——第一个注册的账号会自动成为系统管理员
   - 进入管理后台 → 配置渠道与模型价目表，即可开始转发
 
 ${C_BOLD}常用命令${C_RESET}

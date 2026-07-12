@@ -15,6 +15,7 @@ func TestExtractUsageFromSSE(t *testing.T) {
 		usage := extractUsageFromSSE([]byte(body))
 		if usage == nil {
 			t.Fatal("usage = nil, want parsed")
+			return
 		}
 		if usage.PromptTokens != 547 || usage.CompletionTokens != 16 || usage.CachedTokens != 128 {
 			t.Fatalf("usage = %+v, want prompt=547 completion=16 cached=128", usage)
@@ -28,6 +29,7 @@ func TestExtractUsageFromSSE(t *testing.T) {
 		usage := extractUsageFromSSE([]byte(body))
 		if usage == nil {
 			t.Fatal("usage = nil, want parsed")
+			return
 		}
 		if usage.PromptTokens != 10 || usage.CompletionTokens != 1 {
 			t.Fatalf("usage = %+v, want prompt=10 completion=1", usage)

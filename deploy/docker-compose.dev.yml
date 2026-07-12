@@ -58,9 +58,18 @@ services:
       frontend-builder:
         condition: service_completed_successfully
     environment:
-      # 开发配置由容器内首次启动的安装向导写出（不入库，见根 .gitignore）
-      CONFIG_PATH: /workspace/backend/config.dev.yaml
+      # 无 config.yaml：连接信息全部由环境变量提供（config.Load 缺文件时纯 env 启动）
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: airgate
+      DB_PASSWORD: airgate
+      DB_NAME: airgate
+      DB_SSLMODE: disable
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       REDIS_PASSWORD: airgate-dev
+      JWT_SECRET: airgate-dev-secret
+      GIN_MODE: debug
     volumes:
       - ..:/workspace
       - ../data/go_pkg_mod:/go/pkg/mod

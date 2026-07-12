@@ -65,7 +65,7 @@ curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/standalone
 docker compose up -d
 ```
 
-脚本会生成随机密钥写入 `.env`（权限 600），并准备好数据目录。启动后访问 `http://<host>:9517`，安装向导只需创建管理员账号。
+脚本会生成随机密钥写入 `.env`（权限 600），并准备好数据目录。启动后访问 `http://<host>:9517` 注册账号——第一个注册的账号会自动成为系统管理员。
 
 ### 裸金属（systemd）
 
@@ -74,7 +74,7 @@ curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/standalone
 sudo systemctl enable --now airgate-core
 ```
 
-需要已运行的 PostgreSQL 15+ 与 Redis 7+。浏览器打开 `http://<host>:9517` 走安装向导，连接信息写入 `/etc/airgate-core/config.yaml`。
+需要已运行的 PostgreSQL 15+ 与 Redis 7+。参考 `backend/config.yaml.example` 创建 `/etc/airgate-core/config.yaml`（填入 DB/Redis 连接与 `jwt.secret`，也可用环境变量提供），启动后访问 `http://<host>:9517` 注册的第一个账号即系统管理员。
 
 ### 源码开发
 
@@ -99,7 +99,7 @@ make dev       # 前后端热重载
 | `GIN_MODE` | `release` / `debug` | `debug` |
 | `LOG_LEVEL` / `LOG_FORMAT` | 日志级别 / 格式（`text`/`json`） | `info` / `text` |
 
-安装向导会自动生成随机 `jwt.secret` 写入配置文件。
+配置文件不存在时，连接信息可完全由环境变量提供（docker compose 场景）。首次启动后注册的第一个账号会自动成为系统管理员。
 
 ## 请求链路
 
@@ -125,9 +125,7 @@ airgate-core/
 │       ├── server/          # HTTP 层（dto / handler / middleware / router）
 │       ├── infra/store/     # 数据访问（唯一 import ent 的层）
 │       ├── auth/            # API Key 鉴权与加密
-│       ├── errlog/          # 上游失败留痕
-│       ├── setup/           # 安装向导
-│       └── upgrade/         # 二进制自更新
+│       └── errlog/          # 上游失败留痕
 ├── web/                     # React 19 + Vite + TanStack Query + Tailwind
 └── deploy/                  # Dockerfile / compose / install.sh / systemd unit
 ```
