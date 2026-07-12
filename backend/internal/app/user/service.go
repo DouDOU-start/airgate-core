@@ -305,6 +305,19 @@ func (s *Service) UpdateBalanceAlert(ctx context.Context, userID int, threshold 
 	return s.repo.UpdateBalanceAlert(ctx, userID, threshold)
 }
 
+// CheckBalanceAlert 按用户 ID 拉取后检查余额预警，供 billing 扣费提交后异步调用
+// （转发消费扣费不经用户服务，需外部触发；后台手动调余额已在变更处直接触发）。
+func (s *Service) CheckBalanceAlert(ctx context.Context, userID int) {
+	if s.onBalanceAlert == nil {
+		return
+	}
+	u, err := s.repo.FindByID(ctx, userID, false)
+	if err != nil {
+		return
+	}
+	s.checkBalanceAlert(ctx, u)
+}
+
 // checkBalanceAlert 检查余额是否低于预警阈值，触发通知。
 func (s *Service) checkBalanceAlert(ctx context.Context, user User) {
 	threshold := user.BalanceAlertThreshold

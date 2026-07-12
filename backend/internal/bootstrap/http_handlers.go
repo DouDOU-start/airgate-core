@@ -135,6 +135,10 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 
 	paymentStore := store.NewPaymentStore(dep.DB)
 	paymentService := apppayment.NewService(paymentStore, paymentSettingsAdapter{settingsService}, dep.Config.APIKeySecret())
+	// 充值成功邮件：首次入账成功后从设置读取 SMTP + 模板发送
+	paymentService.SetRechargeSuccessCallback(func(email string, amount, balance float64) {
+		rechargeSuccessSendEmail(settingsService, email, amount, balance)
+	})
 
 	redemptionStore := store.NewRedemptionStore(dep.DB)
 	redemptionService := appredemption.NewService(redemptionStore)
@@ -360,5 +364,87 @@ func balanceAlertSendEmail(settingsService *appsettings.Service, email string, b
 			"to_hash", store.EmailHash(email),
 			"balance", balance,
 			"threshold", threshold)
+	}
+}
+
+// defaultRechargeBody 充值成功邮件默认正文模板。
+const defaultRechargeBody = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 420px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e5e7eb;">
+<div style="padding: 32px 28px;">
+<div style="font-size: 16px; font-weight: 600; color: #111; margin-bottom: 20px;">{{site_name}}</div>
+<p style="color: #555; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">您的充值已成功到账：</p>
+<div style="background: #d1fae5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+<div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+<span style="color: #065f46; font-size: 13px;">充值金额</span>
+<span style="color: #065f46; font-size: 16px; font-weight: 700;">{{amount}}</span>
+</div>
+<div style="display: flex; justify-content: space-between;">
+<span style="color: #065f46; font-size: 13px;">当前余额</span>
+<span style="color: #065f46; font-size: 13px;">{{balance}}</span>
+</div>
+</div>
+<p style="color: #999; font-size: 12px; line-height: 1.6; margin: 0;">感谢您的支持，祝您使用愉快。</p>
+</div>
+<div style="border-top: 1px solid #f0f0f0; padding: 14px 28px;">
+<p style="color: #c0c0c0; font-size: 11px; margin: 0; text-align: center;">此邮件由 {{site_name}} 系统自动发送</p>
+</div>
+</div>`
+
+// rechargeSuccessSendEmail 发送充值成功邮件（首次入账成功后异步调用）。
+func rechargeSuccessSendEmail(settingsService *appsettings.Service, email string, amount, balance float64) {
+	ctx := context.Background()
+
+	// 读取 SMTP 配置
+	smtpSettings, err := settingsService.List(ctx, "smtp")
+	if err != nil {
+		slog.Error("recharge_email_smtp_load_failed", logx.LogFieldError, err)
+		return
+	}
+	cfg := smtpConfigFromSettings(smtpSettings)
+	if cfg.Host == "" {
+		slog.Warn("mail_disabled_no_config", "context", "recharge_success")
+		return
+	}
+
+	// 读取站点名称及充值成功邮件模板
+	siteName := "AirGate"
+	var tplSubject, tplBody string
+	siteSettings, _ := settingsService.List(ctx, "site")
+	for _, s := range siteSettings {
+		if s.Key == "site_name" && s.Value != "" {
+			siteName = s.Value
+		}
+	}
+	for _, s := range smtpSettings {
+		switch s.Key {
+		case "recharge_email_subject":
+			tplSubject = s.Value
+		case "recharge_email_body":
+			tplBody = s.Value
+		}
+	}
+
+	amountStr := fmt.Sprintf("%.2f", amount)
+	balanceStr := fmt.Sprintf("$%.4f", balance)
+
+	if tplSubject == "" {
+		tplSubject = "{{site_name}} - 充值成功"
+	}
+	if tplBody == "" {
+		tplBody = defaultRechargeBody
+	}
+
+	replacer := strings.NewReplacer(
+		"{{site_name}}", siteName,
+		"{{amount}}", amountStr,
+		"{{balance}}", balanceStr,
+	)
+	subject := replacer.Replace(tplSubject)
+	body := replacer.Replace(tplBody)
+
+	m := mailer.New(cfg)
+	if err := m.Send(email, subject, body); err != nil {
+		slog.Error("recharge_email_failed", "to_hash", store.EmailHash(email), logx.LogFieldError, err)
+	} else {
+		slog.Info("recharge_email_sent", "to_hash", store.EmailHash(email), "amount", amount, "balance", balance)
 	}
 }

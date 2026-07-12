@@ -45,6 +45,7 @@ const SMTP_KEYS = [
   'smtp_from_email', 'smtp_from_name', 'smtp_use_tls',
   'email_template_subject', 'email_template_body',
   'balance_alert_email_subject', 'balance_alert_email_body',
+  'recharge_email_subject', 'recharge_email_body',
 ] as const;
 
 const DEFAULT_EMAIL_SUBJECT = '{{site_name}} - 邮箱验证码';
@@ -84,6 +85,28 @@ const DEFAULT_BALANCE_ALERT_BODY = `<div style="font-family: -apple-system, Blin
   </div>
 </div>`;
 
+const DEFAULT_RECHARGE_SUBJECT = '{{site_name}} - 充值成功';
+const DEFAULT_RECHARGE_BODY = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 420px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e5e7eb;">
+  <div style="padding: 32px 28px;">
+    <div style="font-size: 16px; font-weight: 600; color: #111; margin-bottom: 20px;">{{site_name}}</div>
+    <p style="color: #555; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">您的充值已成功到账：</p>
+    <div style="background: #d1fae5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+        <span style="color: #065f46; font-size: 13px;">充值金额</span>
+        <span style="color: #065f46; font-size: 16px; font-weight: 700;">{{amount}}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: #065f46; font-size: 13px;">当前余额</span>
+        <span style="color: #065f46; font-size: 13px;">{{balance}}</span>
+      </div>
+    </div>
+    <p style="color: #999; font-size: 12px; line-height: 1.6; margin: 0;">感谢您的支持，祝您使用愉快。</p>
+  </div>
+  <div style="border-top: 1px solid #f0f0f0; padding: 14px 28px;">
+    <p style="color: #c0c0c0; font-size: 11px; margin: 0; text-align: center;">此邮件由 {{site_name}} 系统自动发送</p>
+  </div>
+</div>`;
+
 // ==================== Tab 定义 ====================
 
 type TabKey = 'site' | 'security' | 'smtp';
@@ -116,7 +139,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('site');
   const [values, setValues] = useState<Record<string, string>>({});
   const [hasChanges, setHasChanges] = useState(false);
-  const [emailTplType, setEmailTplType] = useState<'verify' | 'balance_alert'>('verify');
+  const [emailTplType, setEmailTplType] = useState<'verify' | 'balance_alert' | 'recharge'>('verify');
   const [isEmailPreviewOpen, setEmailPreviewOpen] = useState(false);
   const [isSmtpTestOpen, setSmtpTestOpen] = useState(false);
 
@@ -270,6 +293,11 @@ export default function SettingsPage() {
           if (emailTplType === 'verify') {
             set('email_template_subject', DEFAULT_EMAIL_SUBJECT);
             set('email_template_body', DEFAULT_EMAIL_BODY);
+            return;
+          }
+          if (emailTplType === 'recharge') {
+            set('recharge_email_subject', DEFAULT_RECHARGE_SUBJECT);
+            set('recharge_email_body', DEFAULT_RECHARGE_BODY);
             return;
           }
           set('balance_alert_email_subject', DEFAULT_BALANCE_ALERT_SUBJECT);
@@ -479,7 +507,7 @@ export default function SettingsPage() {
                     <Tabs
                       className="ag-page-tabs ag-page-tabs-compact"
                       selectedKey={emailTplType}
-                      onSelectionChange={(key) => setEmailTplType(key as 'verify' | 'balance_alert')}
+                      onSelectionChange={(key) => setEmailTplType(key as 'verify' | 'balance_alert' | 'recharge')}
                     >
                       <Tabs.List>
                         <Tabs.Tab id="verify">
@@ -491,10 +519,19 @@ export default function SettingsPage() {
                           <Tabs.Indicator />
                           <span>{t('settings.balance_alert_email_template')}</span>
                         </Tabs.Tab>
+                        <Tabs.Tab id="recharge">
+                          <Tabs.Separator />
+                          <Tabs.Indicator />
+                          <span>{t('settings.recharge_email_template')}</span>
+                        </Tabs.Tab>
                       </Tabs.List>
                     </Tabs>
                   )}
-                  title={emailTplType === 'verify' ? t('settings.email_template') : t('settings.balance_alert_email_template')}
+                  title={emailTplType === 'verify'
+                    ? t('settings.email_template')
+                    : emailTplType === 'recharge'
+                      ? t('settings.recharge_email_template')
+                      : t('settings.balance_alert_email_template')}
                 >
                   {emailTplType === 'verify' ? (
                     <EmailTemplateEditor
@@ -507,6 +544,21 @@ export default function SettingsPage() {
                         { name: 'site_name', sample: val('site_name') || 'AirGate' },
                         { name: 'code', sample: '888888' },
                         { name: 'email', sample: 'user@example.com' },
+                      ]}
+                      isPreviewOpen={isEmailPreviewOpen}
+                      onPreviewOpenChange={setEmailPreviewOpen}
+                    />
+                  ) : emailTplType === 'recharge' ? (
+                    <EmailTemplateEditor
+                      subject={val('recharge_email_subject') || DEFAULT_RECHARGE_SUBJECT}
+                      body={val('recharge_email_body') || DEFAULT_RECHARGE_BODY}
+                      onSubjectChange={(v) => set('recharge_email_subject', v)}
+                      onBodyChange={(v) => set('recharge_email_body', v)}
+                      siteName={val('site_name') || 'AirGate'}
+                      variables={[
+                        { name: 'site_name', sample: val('site_name') || 'AirGate' },
+                        { name: 'amount', sample: '10.00' },
+                        { name: 'balance', sample: '$1.2345' },
                       ]}
                       isPreviewOpen={isEmailPreviewOpen}
                       onPreviewOpenChange={setEmailPreviewOpen}

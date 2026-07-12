@@ -196,9 +196,13 @@ func TestPaymentStoreCreditPaidOrder(t *testing.T) {
 	}
 
 	// 正常入账
-	alreadyPaid, err := s.CreditPaidOrder(ctx, apppayment.CreditInput{OutTradeNo: "AG-TEST-1", Amount: 20, Remark: "在线充值"})
-	if err != nil || alreadyPaid {
-		t.Fatalf("入账结果 = (%v, %v)，期望 (false, nil)", alreadyPaid, err)
+	credit, err := s.CreditPaidOrder(ctx, apppayment.CreditInput{OutTradeNo: "AG-TEST-1", Amount: 20, Remark: "在线充值"})
+	if err != nil || credit.AlreadyPaid {
+		t.Fatalf("入账结果 = (%+v, %v)，期望 (AlreadyPaid=false, nil)", credit, err)
+	}
+	// 首次入账返回用户/金额/入账后余额，供充值成功通知
+	if credit.Email == "" || math.Abs(credit.Amount-20) > 1e-9 || math.Abs(credit.BalanceAfter-70) > 1e-9 {
+		t.Fatalf("入账结果字段 = %+v，期望 email 非空、amount=20、balance=70", credit)
 	}
 	if got := userBalance(t, db, user.ID); math.Abs(got-70) > 1e-9 {
 		t.Fatalf("入账后 balance = %v，期望 70", got)
@@ -216,9 +220,9 @@ func TestPaymentStoreCreditPaidOrder(t *testing.T) {
 	}
 
 	// 平台重发回调：已 paid 幂等短路，不重复入账
-	alreadyPaid, err = s.CreditPaidOrder(ctx, apppayment.CreditInput{OutTradeNo: "AG-TEST-1", Amount: 20})
-	if err != nil || !alreadyPaid {
-		t.Fatalf("重复回调结果 = (%v, %v)，期望 (true, nil)", alreadyPaid, err)
+	credit, err = s.CreditPaidOrder(ctx, apppayment.CreditInput{OutTradeNo: "AG-TEST-1", Amount: 20})
+	if err != nil || !credit.AlreadyPaid {
+		t.Fatalf("重复回调结果 = (%+v, %v)，期望 (AlreadyPaid=true, nil)", credit, err)
 	}
 	if got := userBalance(t, db, user.ID); math.Abs(got-70) > 1e-9 {
 		t.Fatalf("重复回调后 balance = %v，期望仍为 70", got)

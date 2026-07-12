@@ -708,6 +708,7 @@
     "smtp_use_tls_desc": "Connect to SMTP server with TLS encryption (usually port 465)",
     "email_template": "Registration Email Template",
     "balance_alert_email_template": "Balance Alert Email Template",
+    "recharge_email_template": "Recharge Success Email Template",
     "template_subject": "Subject",
     "template_body": "Body",
     "template_body_hint": "Supports HTML. Use the variables listed above",

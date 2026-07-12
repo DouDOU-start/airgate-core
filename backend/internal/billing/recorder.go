@@ -99,6 +99,22 @@ type Recorder struct {
 	insertOne   func(ctx context.Context, rec UsageRecord, withChannel bool) error
 	// sleep 重试间隔等待，可注入以便测试（默认 time.Sleep）。
 	sleep func(d time.Duration)
+	// onBalanceCharged 扣费事务提交后触发，传入本次扣减了余额的用户 ID（用于余额预警检查）。
+	// 经 func 注入避免 billing 依赖 app 包；由装配层接到 user 服务。
+	onBalanceCharged func(userIDs []int)
+}
+
+// SetBalanceChargedHook 设置扣费后回调（事务提交成功后异步触发余额预警检查）。
+func (r *Recorder) SetBalanceChargedHook(fn func(userIDs []int)) {
+	r.onBalanceCharged = fn
+}
+
+// fireBalanceCharged 通知扣费回调（提交成功后调用；回调内部自行异步，不阻塞记账）。
+func (r *Recorder) fireBalanceCharged(userIDs []int) {
+	if r.onBalanceCharged == nil || len(userIDs) == 0 {
+		return
+	}
+	r.onBalanceCharged(userIDs)
 }
 
 // NewRecorder 创建使用量记录器
@@ -266,12 +282,14 @@ func (r *Recorder) insertSingle(ctx context.Context, rec UsageRecord, withChanne
 	if _, err := usageLogCreate(tx, rec, withChannel).Save(ctx); err != nil {
 		return fmt.Errorf("插入 UsageLog 失败: %w", err)
 	}
-	if err := applyUsageCharges(ctx, tx, []UsageRecord{rec}); err != nil {
+	chargedIDs, err := applyUsageCharges(ctx, tx, []UsageRecord{rec})
+	if err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("提交事务失败: %w", err)
 	}
+	r.fireBalanceCharged(chargedIDs)
 	return nil
 }
 
@@ -297,7 +315,8 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 		return fmt.Errorf("批量插入 UsageLog 失败: %w", err)
 	}
 
-	if err := applyUsageCharges(ctx, tx, batch); err != nil {
+	chargedIDs, err := applyUsageCharges(ctx, tx, batch)
+	if err != nil {
 		return err
 	}
 
@@ -305,6 +324,7 @@ func (r *Recorder) batchInsert(ctx context.Context, batch []UsageRecord) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("提交事务失败: %w", err)
 	}
+	r.fireBalanceCharged(chargedIDs)
 	return nil
 }
 
@@ -366,7 +386,9 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord, withChannel bool) *ent.UsageLog
 	return b
 }
 
-func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) error {
+// applyUsageCharges 在事务内扣费，返回实际扣减了 user.balance 的用户 ID 列表
+// （供事务提交后触发余额预警检查；SkipBalanceCharge 记录不计入）。
+func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) ([]int, error) {
 	// 在同一事务中扣费 —— 三个独立累加器：
 	// - User.balance：按 actual_cost 扣减。
 	// - APIKey.used_quota：按 billed_cost 累加。
@@ -395,7 +417,7 @@ func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) err
 		if err := tx.User.UpdateOneID(userID).
 			AddBalance(-cost).
 			Exec(ctx); err != nil {
-			return fmt.Errorf("扣减用户余额失败 user_id=%d cost=%.8f: %w", userID, cost, err)
+			return nil, fmt.Errorf("扣减用户余额失败 user_id=%d cost=%.8f: %w", userID, cost, err)
 		}
 	}
 
@@ -420,8 +442,12 @@ func applyUsageCharges(ctx context.Context, tx *ent.Tx, batch []UsageRecord) err
 			update = update.AddUsedQuotaActual(actual)
 		}
 		if err := update.Exec(ctx); err != nil {
-			return fmt.Errorf("更新 API Key 用量失败 key_id=%d: %w", keyID, err)
+			return nil, fmt.Errorf("更新 API Key 用量失败 key_id=%d: %w", keyID, err)
 		}
 	}
-	return nil
+	chargedUserIDs := make([]int, 0, len(userActualCosts))
+	for uid := range userActualCosts {
+		chargedUserIDs = append(chargedUserIDs, uid)
+	}
+	return chargedUserIDs, nil
 }

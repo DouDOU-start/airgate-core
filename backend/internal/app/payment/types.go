@@ -85,6 +85,15 @@ type CreditInput struct {
 	Remark        string // 余额流水备注（如「在线充值（支付宝）」）
 }
 
+// CreditResult 回调入账结果。AlreadyPaid=true 为幂等命中（不重复入账、不发通知）；
+// 首次成功入账时带上用户邮箱、入账金额与入账后余额，供充值成功邮件通知。
+type CreditResult struct {
+	AlreadyPaid  bool
+	Email        string
+	Amount       float64
+	BalanceAfter float64
+}
+
 // Repository 支付域持久化接口（唯一 ent 落点在 infra/store）。
 type Repository interface {
 	CreateOrder(ctx context.Context, o Order) (Order, error)
@@ -97,7 +106,7 @@ type Repository interface {
 	// CreditPaidOrder 单事务完成：订单 pending→paid + 用户加余额 + 余额流水。
 	// 订单已是 paid 时幂等返回 alreadyPaid=true 且不做任何写入；
 	// 非 pending/paid 状态或回调金额与订单金额不符（容差 0.01 元）时报错。
-	CreditPaidOrder(ctx context.Context, in CreditInput) (alreadyPaid bool, err error)
+	CreditPaidOrder(ctx context.Context, in CreditInput) (CreditResult, error)
 	// ExpirePendingOrders 将 expires_at 已过期的 pending 订单置为 expired，返回条数。
 	ExpirePendingOrders(ctx context.Context, now time.Time) (int, error)
 

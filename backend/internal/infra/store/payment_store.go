@@ -251,10 +251,10 @@ func (s *PaymentStore) PaidAmountSince(ctx context.Context, userID int, since ti
 //
 // 幂等/防重四层：out_trade_no 唯一约束 → 条件更新 WHERE status='pending' →
 // balance_log idempotency_key 唯一索引 → 已 paid 幂等短路。
-func (s *PaymentStore) CreditPaidOrder(ctx context.Context, in apppayment.CreditInput) (bool, error) {
+func (s *PaymentStore) CreditPaidOrder(ctx context.Context, in apppayment.CreditInput) (apppayment.CreditResult, error) {
 	tx, err := s.db.Tx(ctx)
 	if err != nil {
-		return false, err
+		return apppayment.CreditResult{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -263,19 +263,19 @@ func (s *PaymentStore) CreditPaidOrder(ctx context.Context, in apppayment.Credit
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return false, apppayment.ErrOrderNotFound
+			return apppayment.CreditResult{}, apppayment.ErrOrderNotFound
 		}
-		return false, err
+		return apppayment.CreditResult{}, err
 	}
 	if order.Status == apppayment.StatusPaid {
-		return true, nil // 幂等：平台重发回调
+		return apppayment.CreditResult{AlreadyPaid: true}, nil // 幂等：平台重发回调
 	}
 	if order.Status != apppayment.StatusPending {
-		return false, fmt.Errorf("%w: %s", apppayment.ErrOrderStateConflict, order.Status)
+		return apppayment.CreditResult{}, fmt.Errorf("%w: %s", apppayment.ErrOrderStateConflict, order.Status)
 	}
 	// 防假回调：渠道告知金额与订单金额差超 1 分钱拒绝入账
 	if math.Abs(order.Amount-in.Amount) > 0.01 {
-		return false, fmt.Errorf("%w: 订单 %.2f / 回调 %.2f", apppayment.ErrAmountMismatch, order.Amount, in.Amount)
+		return apppayment.CreditResult{}, fmt.Errorf("%w: 订单 %.2f / 回调 %.2f", apppayment.ErrAmountMismatch, order.Amount, in.Amount)
 	}
 
 	// 条件更新抢占：并发重复回调只有一个能改成功
@@ -289,10 +289,10 @@ func (s *PaymentStore) CreditPaidOrder(ctx context.Context, in apppayment.Credit
 		SetNotifyPayload(in.NotifyPayload).
 		Save(ctx)
 	if err != nil {
-		return false, err
+		return apppayment.CreditResult{}, err
 	}
 	if affected == 0 {
-		return true, nil // 另一条并发回调已入账
+		return apppayment.CreditResult{AlreadyPaid: true}, nil // 另一条并发回调已入账
 	}
 
 	// 行锁重读余额（Postgres FOR UPDATE），保证流水 before/after 与真实变更一致；
@@ -304,14 +304,14 @@ func (s *PaymentStore) CreditPaidOrder(ctx context.Context, in apppayment.Credit
 	if err != nil {
 		if ent.IsNotFound(err) {
 			// 用户已被删除：订单标记支付但无处入账，回滚保持 pending 供人工处理
-			return false, fmt.Errorf("订单归属用户 %d 不存在", order.UserID)
+			return apppayment.CreditResult{}, fmt.Errorf("订单归属用户 %d 不存在", order.UserID)
 		}
-		return false, err
+		return apppayment.CreditResult{}, err
 	}
 	before := usr.Balance
 	after := before + order.Amount
 	if _, err := tx.User.UpdateOneID(usr.ID).AddBalance(order.Amount).Save(ctx); err != nil {
-		return false, err
+		return apppayment.CreditResult{}, err
 	}
 
 	if _, err := tx.BalanceLog.Create().
@@ -326,15 +326,15 @@ func (s *PaymentStore) CreditPaidOrder(ctx context.Context, in apppayment.Credit
 		SetIdempotencyKey("epay:" + in.OutTradeNo).
 		Save(ctx); err != nil {
 		if ent.IsConstraintError(err) {
-			return true, nil // 幂等键冲突：历史插件时代已入账过同一订单
+			return apppayment.CreditResult{AlreadyPaid: true}, nil // 幂等键冲突：历史插件时代已入账过同一订单
 		}
-		return false, err
+		return apppayment.CreditResult{}, err
 	}
 
 	if err := tx.Commit(); err != nil {
-		return false, err
+		return apppayment.CreditResult{}, err
 	}
-	return false, nil
+	return apppayment.CreditResult{Email: usr.Email, Amount: order.Amount, BalanceAfter: after}, nil
 }
 
 // ExpirePendingOrders 过期清理。

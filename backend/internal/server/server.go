@@ -92,6 +92,15 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Concurrency: concurrency,
 	})
 
+	// 转发消费扣费后触发余额预警检查：billing 不依赖 app，经 hook 注入 user 服务。
+	// 每个用户异步检查（checkBalanceAlert 内部有 notified 幂等，降破发一次、回升重置）。
+	userSvc := s.handlers.UserService
+	recorder.SetBalanceChargedHook(func(userIDs []int) {
+		for _, id := range userIDs {
+			go userSvc.CheckBalanceAlert(context.Background(), id)
+		}
+	})
+
 	// 渠道注册表与价目表缓存：
 	// channel service 充当注册表的 Loader/Persister（解密 api_keys、状态落库），
 	// 注册表反向作为 channel service 的 Reloader（写操作成功后全量重载）；

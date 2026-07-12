@@ -2,6 +2,7 @@ package billing
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"entgo.io/ent/dialect/sql/schema"
@@ -55,6 +56,46 @@ func TestRecordPersistsUserEmailSnapshot(t *testing.T) {
 	}
 	if log.UserIDSnapshot != user.ID || log.UserEmailSnapshot != user.Email {
 		t.Fatalf("用户快照 = (%d, %q), 期望 (%d, %q)", log.UserIDSnapshot, log.UserEmailSnapshot, user.ID, user.Email)
+	}
+}
+
+// TestRecorderFiresBalanceChargedHook 验证扣费事务提交后触发 onBalanceCharged，
+// 且只回传实际扣减了余额的用户 ID（供余额预警检查）。
+func TestRecorderFiresBalanceChargedHook(t *testing.T) {
+	db := enttest.Open(t, "sqlite3", "file:billing_hook?mode=memory&cache=shared&_fk=1", enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("关闭数据库失败: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	user := createBillingTestUser(t, ctx, db, "billing-hook@example.com")
+	if err := db.User.UpdateOneID(user.ID).SetBalance(10).Exec(ctx); err != nil {
+		t.Fatalf("设置余额失败: %v", err)
+	}
+
+	var mu sync.Mutex
+	var got []int
+	recorder := NewRecorder(db, 0)
+	recorder.SetBalanceChargedHook(func(ids []int) {
+		mu.Lock()
+		got = append(got, ids...)
+		mu.Unlock()
+	})
+	recorder.Start()
+	recorder.Record(UsageRecord{
+		UserID:     user.ID,
+		UserEmail:  user.Email,
+		Model:      "gpt-5",
+		ActualCost: 3,
+	})
+	recorder.Stop() // 排空缓冲，保证扣费事务已提交且 hook 已触发
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(got) != 1 || got[0] != user.ID {
+		t.Fatalf("hook 收到 userIDs = %v，期望 [%d]", got, user.ID)
 	}
 }
 

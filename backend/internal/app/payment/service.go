@@ -41,12 +41,21 @@ type moduleConfig struct {
 	ExpireMinutes   int
 }
 
+// RechargeSuccessFunc 充值成功回调（异步调用，不阻塞回调应答）。
+type RechargeSuccessFunc func(email string, amount, balance float64)
+
 // Service 支付域用例编排：下单、回调入账、订单查询、服务商配置管理。
 type Service struct {
-	repo     Repository
-	settings SettingsLister
-	registry *provider.Registry
-	secret   string // AES-256-GCM 密钥（与渠道 api_keys 同源），加密服务商敏感配置
+	repo              Repository
+	settings          SettingsLister
+	registry          *provider.Registry
+	secret            string // AES-256-GCM 密钥（与渠道 api_keys 同源），加密服务商敏感配置
+	onRechargeSuccess RechargeSuccessFunc
+}
+
+// SetRechargeSuccessCallback 设置充值成功回调（首次成功入账时异步触发，用于发送通知邮件）。
+func (s *Service) SetRechargeSuccessCallback(fn RechargeSuccessFunc) {
+	s.onRechargeSuccess = fn
 }
 
 // NewService 创建支付服务并完成首次 Provider 装载。
@@ -307,7 +316,7 @@ func (s *Service) HandleCallback(ctx context.Context, providerID string, req pro
 		return res, nil
 	}
 
-	alreadyPaid, err := s.repo.CreditPaidOrder(ctx, CreditInput{
+	credit, err := s.repo.CreditPaidOrder(ctx, CreditInput{
 		OutTradeNo:    res.OutTradeNo,
 		Amount:        res.Amount,
 		NotifyPayload: flattenRaw(res.Raw),
@@ -317,10 +326,14 @@ func (s *Service) HandleCallback(ctx context.Context, providerID string, req pro
 		logger.Error("payment_credit_failed", "provider", providerID, "out_trade_no", res.OutTradeNo, logx.LogFieldError, err)
 		return nil, err
 	}
-	if alreadyPaid {
+	if credit.AlreadyPaid {
 		logger.Info("payment_callback_idempotent", "out_trade_no", res.OutTradeNo)
 	} else {
 		logger.Info("payment_order_paid", "out_trade_no", res.OutTradeNo, "provider", providerID, "amount", res.Amount)
+		// 首次成功入账：异步发送充值成功通知（不阻塞回调应答）。
+		if s.onRechargeSuccess != nil && credit.Email != "" {
+			go s.onRechargeSuccess(credit.Email, credit.Amount, credit.BalanceAfter)
+		}
 	}
 	return res, nil
 }
