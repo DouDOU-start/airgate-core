@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { Alert, Button, Card, FieldError, Form, Input, Label, Tabs, TextField as HeroTextField } from '@heroui/react';
@@ -7,41 +7,18 @@ import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsPr
 import { authApi } from '../shared/api/auth';
 import { useTheme } from '../app/providers/ThemeProvider';
 import { ApiError, setSessionAPIKey } from '../shared/api/client';
-import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key, Sprout, Layers, Zap, BarChart3 } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key, Sprout, Eye, EyeOff } from 'lucide-react';
+import { AmbientAurora } from './login/AmbientAurora';
 
-/** 浮尘光点的固定布局（避免 Math.random 每次渲染重排） */
-const MOTES = [
-  { left: '8%', size: 5, duration: '10s', delay: '0s', drift: '10px' },
-  { left: '18%', size: 3, duration: '13s', delay: '2.4s', drift: '-14px' },
-  { left: '30%', size: 4, duration: '9s', delay: '4.8s', drift: '6px' },
-  { left: '46%', size: 6, duration: '14s', delay: '1.2s', drift: '-8px' },
-  { left: '62%', size: 3, duration: '11s', delay: '5.6s', drift: '12px' },
-  { left: '75%', size: 5, duration: '12s', delay: '3.1s', drift: '-10px' },
-  { left: '88%', size: 4, duration: '10.5s', delay: '6.4s', drift: '8px' },
-] as const;
-
-function FloatingMotes({ tint }: { tint: string }) {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      {MOTES.map((m, i) => (
-        <span
-          key={i}
-          className="ag-float-mote absolute bottom-0 rounded-full"
-          style={{
-            left: m.left,
-            width: m.size,
-            height: m.size,
-            background: tint,
-            boxShadow: `0 0 ${m.size * 2.5}px ${tint}`,
-            '--mote-duration': m.duration,
-            '--mote-delay': m.delay,
-            '--mote-drift-x': m.drift,
-          } as CSSProperties}
-        />
-      ))}
-    </div>
-  );
-}
+/**
+ * 左侧小人群与右侧表单跨组件通信：表单聚焦哪个字段、密码是否显示，
+ * 通过 context 上报给 LoginPage，驱动 PeekingCrowd 的行为。
+ */
+type VibeApi = {
+  setField: (f: 'email' | 'password' | null) => void;
+  setReveal: (b: boolean) => void;
+};
+const VibeContext = createContext<VibeApi>({ setField: () => {}, setReveal: () => {} });
 
 type TabKey = 'login' | 'register' | 'apikey';
 
@@ -59,11 +36,26 @@ function LoginForm() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const { t } = useTranslation();
+  const vibe = useContext(VibeContext);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // 切换密码可见性：同步告知左侧小人（reveal → 全体惊呼偷看）
+  const toggleReveal = () => {
+    const next = !showPassword;
+    setShowPassword(next);
+    vibe.setReveal(next);
+  };
+
+  // 表单卸载（切 Tab）时复位小人状态，避免停留在偷看/惊呼姿态
+  useEffect(() => () => {
+    vibe.setField(null);
+    vibe.setReveal(false);
+  }, [vibe]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,6 +94,8 @@ function LoginForm() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onFocus={() => vibe.setField('email')}
+            onBlur={() => vibe.setField(null)}
             placeholder={t('auth.email_placeholder')}
             autoComplete="username"
             autoFocus
@@ -114,15 +108,26 @@ function LoginForm() {
         <div className="relative">
           <Lock className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
           <Input
-            className="pl-9"
+            className="pl-9 pr-10"
             name="password"
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onFocus={() => vibe.setField('password')}
+            onBlur={() => vibe.setField(null)}
             placeholder={t('auth.password_placeholder')}
             autoComplete="current-password"
             required
           />
+          <button
+            type="button"
+            onClick={toggleReveal}
+            aria-label={showPassword ? t('auth.hide_password') : t('auth.show_password')}
+            aria-pressed={showPassword}
+            className="absolute right-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-[var(--radius-sm)] text-text-tertiary transition-colors hover:bg-bg-hover hover:text-text"
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </div>
       </HeroTextField>
       {error && (
@@ -515,171 +520,109 @@ export default function LoginPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('login');
   const [registerSuccess, setRegisterSuccess] = useState(false);
 
+  // 左侧动效交互状态：聚焦字段 + 密码是否显示，驱动 GatewayFlux 的流束表现
+  const [field, setField] = useState<'email' | 'password' | null>(null);
+  const [reveal, setReveal] = useState(false);
+  const vibeApi = useMemo<VibeApi>(() => ({ setField, setReveal }), []);
+
+  // 表单聚焦（或显示密码）时极光极轻微提亮
+  const auroraActive = field !== null || reveal;
+
   const handleRegisterSuccess = () => {
     setRegisterSuccess(true);
     setActiveTab('login');
   };
 
-  const features = [
-    { icon: <Layers className="w-4 h-4" />, title: t('auth.feature_1'), desc: t('auth.feature_1_desc') },
-    { icon: <Zap className="w-4 h-4" />, title: t('auth.feature_2'), desc: t('auth.feature_2_desc') },
-    { icon: <BarChart3 className="w-4 h-4" />, title: t('auth.feature_3'), desc: t('auth.feature_3_desc') },
-  ];
-
-  // 左面板恒为深林墨（不随主题翻转）——品牌时刻的固定基调，与右侧随主题翻转的纸面表单区形成对比
-  const inkFaint = 'rgba(247,243,234,0.62)';
-  const inkDim = 'rgba(247,243,234,0.4)';
-  const inkLine = 'rgba(247,243,234,0.16)';
-  const inkFull = '#f7f3ea';
+  // 品牌文字随主题翻转：暗色象牙白，亮色深蓝墨（底色/极光由 AmbientAurora 按主题切换）
+  const isDark = theme === 'dark';
+  const inkFull = isDark ? '#f7f3ea' : '#1b2749';
+  const inkDim = isDark ? 'rgba(247,243,234,0.4)' : 'rgba(27,39,73,0.55)';
 
   return (
-    <div className="flex min-h-screen relative overflow-hidden bg-bg text-text lg:flex-row flex-col">
-      {/* ===== 左侧：深林墨海报（桌面端，恒定深绿黑） ===== */}
-      <div
-        className="ag-organic-canvas relative hidden flex-col justify-between overflow-hidden p-10 lg:flex lg:w-[44%] xl:w-[46%] xl:p-14"
-        style={{ background: 'radial-gradient(120% 120% at 18% -8%, #1c3a25 0%, #0e1c14 52%, #070c09 100%)', color: inkFull }}
+    <VibeContext.Provider value={vibeApi}>
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-bg text-text">
+      {/* 全页统一极光背景：整页共享同一张画布，一个页面而非左右两块 */}
+      <AmbientAurora active={auroraActive} className="pointer-events-none absolute inset-0" />
+
+      {/* 主题切换按钮（右上角） */}
+      <Button
+        aria-label={theme === 'dark' ? t('common.toggle_theme_light') : t('common.toggle_theme_dark')}
+        className="absolute right-4 top-4 z-20"
+        isIconOnly
+        size="sm"
+        variant="ghost"
+        onPress={toggleTheme}
       >
-        {/* 中央柔光 */}
-        <div
-          aria-hidden
-          className="ag-blob-drift pointer-events-none absolute left-1/2 top-[36%] h-[28rem] w-[28rem] -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{ background: 'radial-gradient(closest-side, rgba(154,214,166,0.22), transparent 72%)' }}
-        />
-        <FloatingMotes tint="rgba(198,224,178,0.85)" />
+        {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+      </Button>
 
-        {/* 品牌 */}
-        <div className="relative z-10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={site.site_logo || defaultLogoUrl} alt="" className="h-8 w-8 rounded-[var(--radius-md)] object-cover" />
-            <span className="font-display text-base font-semibold tracking-tight">{site.site_name || 'AirGate'}</span>
-          </div>
-          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.28em]" style={{ color: inkDim }}>
-            <Sprout className="h-3 w-3" strokeWidth={2.25} />
-            AI Gateway
-          </span>
-        </div>
-
-        {/* 发光几何 + 主题句 */}
-        <div className="relative z-10 flex flex-col items-center text-center">
-          <span
-            className="ag-breathe mb-10 flex h-20 w-20 items-center justify-center rounded-[var(--radius-lg)]"
-            style={{ background: inkFull }}
-          >
-            <img src={site.site_logo || defaultLogoUrl} alt="" className="h-14 w-14 rounded-[var(--radius-md)] object-cover" />
-          </span>
-          <h2 className="font-display mb-5 text-[2.5rem] font-medium leading-[1.12] tracking-[-0.02em] xl:text-[3rem]" style={{ color: inkFull }}>
-            {t('auth.welcome_title_1')}
-            <br />
-            {t('auth.welcome_title_2')}
-          </h2>
-          <p className="max-w-md text-sm leading-relaxed xl:text-[15px]" style={{ color: inkFaint }}>
-            {t('auth.welcome_desc')}
-          </p>
-        </div>
-
-        {/* 有机分隔线 + 特性（等宽大写索引） */}
-        <div className="relative z-10">
-          <div className="ag-scanline mb-6" style={{ background: inkLine }} />
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between xl:gap-6">
-            {features.map((f) => (
-              <div key={f.title} className="flex items-start gap-3 xl:max-w-[30%]">
-                <span className="mt-0.5 shrink-0" style={{ color: inkFull }}>{f.icon}</span>
-                <span className="min-w-0">
-                  <span className="block font-mono text-[11px] font-medium uppercase tracking-[0.14em]" style={{ color: inkFull }}>
-                    {f.title}
-                  </span>
-                  <span className="mt-1 block text-xs leading-relaxed" style={{ color: inkDim }}>{f.desc}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ===== 右侧表单区（暖纸面，随主题翻转）——与首页共用同一套有机画布纹理，视觉语言统一 ===== */}
-      <div className="ag-organic-canvas relative flex flex-1 items-center justify-center overflow-hidden p-6 sm:p-8">
-        {/* 接缝柔光：贴左侧品牌墨绿向右侧渗透一层极淡色带，弥合两块面板的色相断层 */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-y-0 left-0 w-24"
-          style={{ background: 'linear-gradient(90deg, color-mix(in oklab, var(--ag-primary) 10%, transparent), transparent)' }}
-        />
-
-        {/* 主题切换按钮 */}
-        <Button
-          aria-label={theme === 'dark' ? t('common.toggle_theme_light') : t('common.toggle_theme_dark')}
-          className="absolute right-4 top-4 z-10"
-          isIconOnly
-          size="sm"
-          variant="ghost"
-          onPress={toggleTheme}
-        >
-          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </Button>
-
-        <div className="ag-page-body relative w-full max-w-[420px]">
-          {/* 移动端品牌区：圆润徽标 + 站名 + 标语，呼应桌面端左面板的品牌时刻 */}
-          <div className="mb-8 flex flex-col items-center text-center lg:hidden">
-            <span className="ag-breathe mb-4 flex h-14 w-14 items-center justify-center rounded-[var(--radius-lg)] bg-primary shadow-[var(--ag-shadow-md)]">
-              <img src={site.site_logo || defaultLogoUrl} alt="" className="h-10 w-10 rounded-[var(--radius-md)] object-cover" />
+      {/* 居中主区：品牌锁定 + 表单卡（表单视觉居中） */}
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-12">
+        <div className="ag-page-body w-full max-w-[420px]">
+          {/* 品牌锁定：磨砂徽标 + 站名 + 副标题 */}
+          <div className="mb-8 flex flex-col items-center text-center" style={{ color: inkFull }}>
+            <span
+              className={`ag-breathe mb-5 flex h-20 w-20 items-center justify-center rounded-[var(--radius-xl)] shadow-[var(--ag-shadow-md)] backdrop-blur-sm ring-1 ${
+                isDark ? 'bg-white/[0.06] ring-white/10' : 'bg-white/60 ring-black/5'
+              }`}
+            >
+              <img src={site.site_logo || defaultLogoUrl} alt="" className="h-14 w-14 rounded-[var(--radius-lg)] object-cover" />
             </span>
-            <h1 className="font-display text-xl font-medium tracking-tight text-text">
+            <h1 className="font-display text-[2rem] font-medium leading-none tracking-tight">
               {site.site_name || t('app_name')}
             </h1>
-            <span className="mt-1.5 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.24em] text-text-tertiary">
-              <Sprout className="h-3 w-3" strokeWidth={2.25} />
-              AI Gateway
+            <span className="mt-3 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.26em]" style={{ color: inkDim }}>
+              <Sprout className="h-3.5 w-3.5" strokeWidth={2.25} />
+              {site.site_subtitle || 'AI Gateway'}
             </span>
           </div>
 
-          {/* Tab 切换 */}
-          <Tabs
-            className="mb-6 w-full"
-            selectedKey={activeTab}
-            onSelectionChange={(key) => {
-              setActiveTab(key as TabKey);
-              setRegisterSuccess(false);
-            }}
-            variant="secondary"
-          >
-            <Tabs.List className="w-full">
-              <Tabs.Tab id="login">{t('common.login')}</Tabs.Tab>
-              {site.registration_enabled ? (
-                <Tabs.Tab id="register">{t('common.register')}</Tabs.Tab>
-              ) : null}
-              <Tabs.Tab id="apikey">API Key</Tabs.Tab>
-            </Tabs.List>
-          </Tabs>
-
-          {/* 表单 */}
+          {/* 表单卡：Tab 切换与对应表单同处一卡 */}
           <Card className="shadow-[var(--ag-shadow-lg)]">
             <Card.Content className="p-6">
-            {registerSuccess && activeTab === 'login' && (
-              <Alert status="success" className="mb-5">
-                <Alert.Content>
-                  <Alert.Description>{t('auth.register_success')}</Alert.Description>
-                </Alert.Content>
-              </Alert>
-            )}
+              <Tabs
+                className="mb-6 w-full"
+                selectedKey={activeTab}
+                onSelectionChange={(key) => {
+                  setActiveTab(key as TabKey);
+                  setRegisterSuccess(false);
+                }}
+                variant="secondary"
+              >
+                <Tabs.List className="w-full">
+                  <Tabs.Tab id="login">{t('common.login')}</Tabs.Tab>
+                  {site.registration_enabled ? (
+                    <Tabs.Tab id="register">{t('common.register')}</Tabs.Tab>
+                  ) : null}
+                  <Tabs.Tab id="apikey">API Key</Tabs.Tab>
+                </Tabs.List>
+              </Tabs>
 
-            {activeTab === 'apikey' ? (
-              <APIKeyLoginForm />
-            ) : activeTab === 'register' && site.registration_enabled ? (
-              <RegisterForm onSuccess={handleRegisterSuccess} />
-            ) : (
-              <LoginForm />
-            )}
+              {registerSuccess && activeTab === 'login' && (
+                <Alert status="success" className="mb-5">
+                  <Alert.Content>
+                    <Alert.Description>{t('auth.register_success')}</Alert.Description>
+                  </Alert.Content>
+                </Alert>
+              )}
+
+              {activeTab === 'apikey' ? (
+                <APIKeyLoginForm />
+              ) : activeTab === 'register' && site.registration_enabled ? (
+                <RegisterForm onSuccess={handleRegisterSuccess} />
+              ) : (
+                <LoginForm />
+              )}
             </Card.Content>
           </Card>
 
-          {/* 底部 */}
-          <div className="mt-6 flex flex-col items-center gap-2">
-            <p className="text-center text-[10px] text-text-tertiary font-mono uppercase tracking-[0.14em]">
-              Powered by {site.site_name || 'AirGate'}
-            </p>
-          </div>
+          {/* Powered by */}
+          <p className="mt-6 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-text-tertiary">
+            Powered by {site.site_name || 'AirGate'}
+          </p>
         </div>
-      </div>
+      </main>
     </div>
+    </VibeContext.Provider>
   );
 }

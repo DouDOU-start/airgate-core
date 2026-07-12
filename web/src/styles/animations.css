@@ -135,10 +135,114 @@
   animation: ag-blob-drift 18s ease-in-out infinite;
 }
 
+/* ======================================================================
+   登录页「柔和氛围极光」AmbientAurora —— 克莱因蓝光雾缓慢呼吸
+   ====================================================================== */
+
+/* 定位由调用方指定（登录页 absolute inset-0；首页 fixed inset-0） */
+.ag-aurora {
+  overflow: hidden;
+  background: #06070f;
+}
+
+.ag-aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(64px);
+  opacity: 0.72;
+  transition: opacity 1s ease, transform 1s ease;
+  will-change: transform;
+}
+
+.ag-aurora-blob--1 {
+  width: 62%;
+  height: 62%;
+  left: -12%;
+  top: -10%;
+  background: radial-gradient(circle, oklch(56% 0.21 264 / 0.55), transparent 62%);
+  animation: ag-aurora-drift-1 23s ease-in-out infinite alternate;
+}
+
+.ag-aurora-blob--2 {
+  width: 68%;
+  height: 68%;
+  left: 8%;
+  top: 30%;
+  background: radial-gradient(circle, oklch(47% 0.2 280 / 0.5), transparent 64%);
+  animation: ag-aurora-drift-2 29s ease-in-out infinite alternate;
+}
+
+.ag-aurora-blob--3 {
+  width: 48%;
+  height: 48%;
+  left: 40%;
+  top: 4%;
+  background: radial-gradient(circle, oklch(63% 0.13 232 / 0.42), transparent 60%);
+  animation: ag-aurora-drift-3 19s ease-in-out infinite alternate;
+}
+
+/* 聚焦时极轻微提亮 —— 有反馈但不喧闹 */
+.ag-aurora.is-active .ag-aurora-blob {
+  opacity: 0.9;
+}
+.ag-aurora.is-active .ag-aurora-blob--2 {
+  transform: scale(1.05);
+}
+
+/* 极淡噪点：柔化渐变带、增胶片质感 */
+.ag-aurora-grain {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.045;
+  mix-blend-mode: soft-light;
+}
+
+/* 亮色主题：浅蓝光雾 + 近白底，配深色文字（跟随主题翻转，不再是恒定深蓝） */
+.light .ag-aurora {
+  background: oklch(96% 0.012 250);
+}
+.light .ag-aurora-blob {
+  opacity: 0.5;
+  filter: blur(72px);
+}
+.light .ag-aurora-blob--1 {
+  background: radial-gradient(circle, oklch(74% 0.14 264 / 0.5), transparent 62%);
+}
+.light .ag-aurora-blob--2 {
+  background: radial-gradient(circle, oklch(72% 0.13 280 / 0.42), transparent 64%);
+}
+.light .ag-aurora-blob--3 {
+  background: radial-gradient(circle, oklch(80% 0.1 232 / 0.4), transparent 60%);
+}
+.light .ag-aurora.is-active .ag-aurora-blob {
+  opacity: 0.68;
+}
+.light .ag-aurora-grain {
+  opacity: 0.028;
+  mix-blend-mode: multiply;
+}
+
+@keyframes ag-aurora-drift-1 {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(7%, 5%) scale(1.12); }
+}
+
+@keyframes ag-aurora-drift-2 {
+  from { transform: translate(0, 0) scale(1.04); }
+  to { transform: translate(-6%, -4%) scale(0.96); }
+}
+
+@keyframes ag-aurora-drift-3 {
+  from { transform: translate(0, 0) scale(0.98); }
+  to { transform: translate(5%, -6%) scale(1.1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   .ag-float-mote,
-  .ag-blob-drift {
+  .ag-blob-drift,
+  .ag-aurora-blob {
     animation: none;
   }
 }

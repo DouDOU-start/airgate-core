@@ -1,19 +1,11 @@
 /**
- * effectiveDocUrl 解析"文档"按钮应该跳转到哪里。
+ * effectiveDocUrl 返回「文档」入口应跳转的外部链接。
  *
- * 优先级：
- *   1. 管理员在 系统设置 → 站点品牌 中显式填写了 doc_url，则跳到该外部链接（target=_blank）
- *   2. 否则回退到内置的 /docs 页面（同源 SPA 路由，AppShell 外，无需登录）
- *
- * 同时返回 isExternal 让调用方决定是否加 target="_blank"。
+ * 仅当管理员在 系统设置 → 站点品牌 中填写了 doc_url 时才存在文档入口，
+ * 返回该外部链接；未配置时返回 null，调用方据此隐藏文档入口
+ * （不再提供内置文档页）。
  */
-export function effectiveDocUrl(docUrl: string | undefined | null): {
-  href: string;
-  isExternal: boolean;
-} {
+export function effectiveDocUrl(docUrl: string | undefined | null): string | null {
   const trimmed = (docUrl ?? '').trim();
-  if (trimmed) {
-    return { href: trimmed, isExternal: true };
-  }
-  return { href: '/docs', isExternal: false };
+  return trimmed || null;
 }

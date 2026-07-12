@@ -1,7 +1,7 @@
 /* ==========================================================================
-   AirGate 主题 CSS 变量 —— 「Living Paper 有机纸感」设计语言
-   暖纸白为底、苔藓绿为魂，陶土橙点睛；圆润几何、柔光量感阴影、无硬边直线。
-   亮色是主场（编辑部质感的高级浅色），暗色是苔藓夜色的自然延伸，而非纯黑翻转。
+   AirGate 主题 CSS 变量 —— 克莱因蓝设计语言
+   冷调微蓝灰为底、克莱因蓝为魂，陶土橙点睛；圆润几何、柔光量感阴影、无硬边直线。
+   亮暗两套中性阶均与品牌同色系（冷底暖字），亮色是冷白日、暗色是蓝调夜。
    调整主题直接改本文件（:root 静态 token + dark/light 两套主题变量）。
    ========================================================================== */
 
@@ -21,18 +21,18 @@
   --ag-topbar-height: 64px;
 }
 
-/* ── Light · Living Paper Day ──
-   暖纸白纸面。主色 = 苔藓绿，辅色 = 陶土橙。 */
+/* ── Light · 冷白日 ──
+   冷调微蓝灰纸面。主色 = 克莱因蓝，辅色 = 陶土橙；中性阶与品牌同色系，全站冷调统一。 */
 :root[data-theme="light"] {
   --ag-data-blue: oklch(53% 0.1 234);
-  --ag-gradient-from: oklch(35% 0.115 152);
-  --ag-gradient-to: oklch(62% 0.16 78);
-  --ag-gradient-text-end: oklch(66% 0.17 42);
-  --ag-primary: oklch(40% 0.09 152);
-  --ag-primary-foreground: oklch(98.5% 0.012 140);
-  --ag-primary-hover: oklch(33% 0.095 152);
-  --ag-primary-subtle: color-mix(in oklab, oklch(40% 0.09 152) 12%, transparent);
-  --ag-primary-glow: color-mix(in oklab, oklch(40% 0.09 152) 35%, transparent);
+  --ag-gradient-from: oklch(38% 0.18 268);
+  --ag-gradient-to: oklch(50% 0.21 262);
+  --ag-gradient-text-end: oklch(62% 0.16 246);
+  --ag-primary: oklch(45% 0.24 264);
+  --ag-primary-foreground: oklch(98.5% 0.01 255);
+  --ag-primary-hover: oklch(39% 0.22 264);
+  --ag-primary-subtle: color-mix(in oklab, oklch(45% 0.24 264) 12%, transparent);
+  --ag-primary-glow: color-mix(in oklab, oklch(45% 0.24 264) 35%, transparent);
   --ag-secondary: oklch(64% 0.14 48);
   --ag-secondary-foreground: oklch(99% 0.01 60);
   --ag-secondary-subtle: color-mix(in oklab, oklch(64% 0.14 48) 14%, transparent);
@@ -58,65 +58,65 @@
   --ag-tone-amber: oklch(58% 0.13 75);
   --ag-tone-rose: oklch(56% 0.17 20);
 
-  /* 亮色中性阶整体调低亮度、调高一点暖调 chroma —— 从"近白纸"改为柔和的亚麻/牛皮纸质感，
-     避免大面积高亮度平涂显得刺眼；文字对比度不受影响（反而因底色变深而略有提升）。 */
-  --ag-default-bg: oklch(90% 0.016 80);
+  /* 亮色中性阶：冷调微蓝灰（hue 255，chroma 极低，肉眼近"高级冷白/浅灰"而非蓝），
+     与克莱因蓝品牌同色系、并呼应首页冷蓝极光；文字保留暖色相（冷底暖字，与暗色同一原则）。 */
+  --ag-default-bg: oklch(90% 0.01 255);
   --ag-default-foreground: oklch(28% 0.02 55);
-  --ag-field-background: oklch(97% 0.007 84);
+  --ag-field-background: oklch(97% 0.005 255);
   --ag-field-foreground: oklch(22% 0.02 55);
-  --ag-field-placeholder: oklch(58% 0.016 62);
-  --ag-muted: oklch(49% 0.021 55);
-  --ag-overlay: oklch(97% 0.007 84);
+  --ag-field-placeholder: oklch(58% 0.014 60);
+  --ag-muted: oklch(49% 0.018 58);
+  --ag-overlay: oklch(97% 0.005 255);
   --ag-overlay-foreground: oklch(22% 0.02 55);
-  --ag-scrollbar: oklch(79% 0.016 78);
-  --ag-segment: oklch(96.5% 0.008 84);
+  --ag-scrollbar: oklch(79% 0.011 255);
+  --ag-segment: oklch(96.5% 0.006 255);
   --ag-segment-foreground: oklch(22% 0.02 55);
-  --ag-surface: oklch(96.5% 0.008 84);
+  --ag-surface: oklch(96.5% 0.006 255);
   --ag-surface-foreground: oklch(22% 0.02 55);
-  --ag-surface-secondary: oklch(93% 0.014 81);
+  --ag-surface-secondary: oklch(93% 0.009 255);
   --ag-surface-secondary-foreground: oklch(22% 0.02 55);
-  --ag-surface-tertiary: oklch(90% 0.017 79);
+  --ag-surface-tertiary: oklch(90% 0.011 255);
   --ag-surface-tertiary-foreground: oklch(22% 0.02 55);
-  --ag-bg-deep: oklch(90.5% 0.017 78);
-  --ag-bg: oklch(94% 0.013 82);
-  --ag-bg-elevated: oklch(97% 0.007 84);
-  --ag-bg-surface: oklch(96.5% 0.008 84);
-  --ag-bg-hover: oklch(92% 0.015 81);
-  --ag-bg-active: oklch(89.5% 0.017 79);
-  --ag-border: oklch(84% 0.017 77);
-  --ag-border-subtle: oklch(89% 0.015 80);
-  --ag-border-strong: oklch(64% 0.022 68);
-  --ag-border-focus: oklch(40% 0.09 152);
+  --ag-bg-deep: oklch(90.5% 0.011 255);
+  --ag-bg: oklch(94% 0.009 255);
+  --ag-bg-elevated: oklch(97% 0.005 255);
+  --ag-bg-surface: oklch(96.5% 0.006 255);
+  --ag-bg-hover: oklch(92% 0.01 255);
+  --ag-bg-active: oklch(89.5% 0.011 255);
+  --ag-border: oklch(84% 0.011 255);
+  --ag-border-subtle: oklch(89% 0.009 255);
+  --ag-border-strong: oklch(64% 0.016 255);
+  --ag-border-focus: oklch(45% 0.24 264);
   --ag-text: oklch(23% 0.02 55);
   --ag-text-secondary: oklch(43% 0.022 55);
   --ag-text-tertiary: oklch(58% 0.018 55);
-  --ag-text-inverse: oklch(97% 0.007 84);
-  --ag-glass: color-mix(in oklab, oklch(96.5% 0.008 84) 82%, transparent);
-  --ag-glass-border: oklch(84% 0.017 77);
-  --ag-shadow-sm: 0 1px 2px 0 oklch(30% 0.032 60 / 0.07), 0 0 0 1px oklch(30% 0.032 60 / 0.045);
+  --ag-text-inverse: oklch(97% 0.005 255);
+  --ag-glass: color-mix(in oklab, oklch(96.5% 0.006 255) 82%, transparent);
+  --ag-glass-border: oklch(84% 0.011 255);
+  --ag-shadow-sm: 0 1px 2px 0 oklch(28% 0.03 258 / 0.08), 0 0 0 1px oklch(28% 0.03 258 / 0.05);
   --ag-shadow-md:
-    0 6px 16px -6px oklch(30% 0.032 60 / 0.14),
-    0 2px 6px -2px oklch(30% 0.032 60 / 0.09),
-    0 0 0 1px oklch(30% 0.032 60 / 0.04);
+    0 6px 16px -6px oklch(28% 0.03 258 / 0.15),
+    0 2px 6px -2px oklch(28% 0.03 258 / 0.1),
+    0 0 0 1px oklch(28% 0.03 258 / 0.045);
   --ag-shadow-lg:
-    0 0 0 1px oklch(30% 0.032 60 / 0.05),
-    0 12px 28px -10px oklch(30% 0.032 60 / 0.16),
-    0 32px 64px -20px oklch(30% 0.032 60 / 0.22);
-  --ag-shadow-glow: 0 0 0 1px color-mix(in oklab, oklch(40% 0.09 152) 55%, transparent), 0 10px 32px -6px color-mix(in oklab, oklch(40% 0.09 152) 45%, transparent);
+    0 0 0 1px oklch(28% 0.03 258 / 0.055),
+    0 12px 28px -10px oklch(28% 0.03 258 / 0.17),
+    0 32px 64px -20px oklch(28% 0.03 258 / 0.24);
+  --ag-shadow-glow: 0 0 0 1px color-mix(in oklab, oklch(45% 0.24 264) 55%, transparent), 0 10px 32px -6px color-mix(in oklab, oklch(45% 0.24 264) 45%, transparent);
 }
 
 /* ── Dark · Living Paper Night ──
-   暖炭黑幕布（非纯黑），苔藓绿转亮为鼠尾草绿，陶土橙同步提亮。 */
+   暖炭黑幕布（非纯黑），主色 = 克莱因蓝，底色微弱蓝相与品牌同色系，渐变收敛于蓝色家族。 */
 :root[data-theme="dark"] {
   --ag-data-blue: oklch(75% 0.095 234);
-  --ag-gradient-from: oklch(78% 0.135 150);
-  --ag-gradient-to: oklch(76% 0.15 85);
-  --ag-gradient-text-end: oklch(74% 0.16 48);
-  --ag-primary: oklch(76% 0.125 150);
-  --ag-primary-foreground: oklch(16% 0.025 152);
-  --ag-primary-hover: oklch(82% 0.115 150);
-  --ag-primary-subtle: color-mix(in oklab, oklch(76% 0.125 150) 16%, transparent);
-  --ag-primary-glow: color-mix(in oklab, oklch(76% 0.125 150) 38%, transparent);
+  --ag-gradient-from: oklch(72% 0.15 266);
+  --ag-gradient-to: oklch(74% 0.15 258);
+  --ag-gradient-text-end: oklch(80% 0.12 242);
+  --ag-primary: oklch(66% 0.19 264);
+  --ag-primary-foreground: oklch(16% 0.03 264);
+  --ag-primary-hover: oklch(73% 0.17 264);
+  --ag-primary-subtle: color-mix(in oklab, oklch(66% 0.19 264) 16%, transparent);
+  --ag-primary-glow: color-mix(in oklab, oklch(66% 0.19 264) 38%, transparent);
   --ag-secondary: oklch(73% 0.125 50);
   --ag-secondary-foreground: oklch(17% 0.03 50);
   --ag-secondary-subtle: color-mix(in oklab, oklch(73% 0.125 50) 18%, transparent);
@@ -142,47 +142,47 @@
   --ag-tone-rose: oklch(74% 0.15 20);
 
   /* 中性阶（背景/表面/边框/字段）是全站主要工作面（侧边栏/顶栏/表格/卡片），大面积平涂对色相极敏感——
-     只留极微弱的苔藓绿底色相（chroma ≈ 0.004-0.01，肉眼应读作"高级炭黑"而非"绿"），不与品牌色抢戏；
-     浓度饱和的绿色只留给按钮/激活态/链接/首页与登录页等"品牌时刻"。字色保留暖色相，冷底暖字对比更克制。 */
-  --ag-default-bg: oklch(29% 0.007 150);
+     只留极微弱的克莱因蓝底色相（chroma ≈ 0.004-0.01，肉眼应读作"高级炭黑"而非"蓝"），不与品牌色抢戏；
+     浓度饱和的蓝色只留给按钮/激活态/链接/首页与登录页等"品牌时刻"。字色保留暖色相，冷底暖字对比更克制。 */
+  --ag-default-bg: oklch(29% 0.007 264);
   --ag-default-foreground: oklch(88% 0.01 90);
-  --ag-field-background: oklch(19% 0.006 150);
+  --ag-field-background: oklch(19% 0.006 264);
   --ag-field-foreground: oklch(92% 0.008 85);
-  --ag-field-placeholder: oklch(53% 0.008 130);
+  --ag-field-placeholder: oklch(53% 0.008 90);
   --ag-muted: oklch(61% 0.009 100);
-  --ag-overlay: oklch(22% 0.007 150);
+  --ag-overlay: oklch(22% 0.007 264);
   --ag-overlay-foreground: oklch(92% 0.008 85);
-  --ag-scrollbar: oklch(37% 0.008 148);
-  --ag-segment: oklch(24% 0.007 150);
+  --ag-scrollbar: oklch(37% 0.008 264);
+  --ag-segment: oklch(24% 0.007 264);
   --ag-segment-foreground: oklch(92% 0.008 85);
-  --ag-surface: oklch(20% 0.007 150);
+  --ag-surface: oklch(20% 0.007 264);
   --ag-surface-foreground: oklch(92% 0.008 85);
-  --ag-surface-secondary: oklch(23.5% 0.007 150);
+  --ag-surface-secondary: oklch(23.5% 0.007 264);
   --ag-surface-secondary-foreground: oklch(92% 0.008 85);
-  --ag-surface-tertiary: oklch(27.5% 0.008 150);
+  --ag-surface-tertiary: oklch(27.5% 0.008 264);
   --ag-surface-tertiary-foreground: oklch(92% 0.008 85);
-  --ag-bg-deep: oklch(9.5% 0.005 152);
-  --ag-bg: oklch(13.5% 0.006 152);
-  --ag-bg-elevated: oklch(22% 0.007 150);
-  --ag-bg-surface: oklch(20% 0.007 150);
-  --ag-bg-hover: oklch(25% 0.007 150);
-  --ag-bg-active: oklch(29% 0.008 150);
-  --ag-border: oklch(30% 0.008 148);
-  --ag-border-subtle: oklch(25.5% 0.007 150);
-  --ag-border-strong: oklch(46% 0.011 145);
-  --ag-border-focus: oklch(76% 0.125 150);
+  --ag-bg-deep: oklch(9.5% 0.005 264);
+  --ag-bg: oklch(13.5% 0.006 264);
+  --ag-bg-elevated: oklch(22% 0.007 264);
+  --ag-bg-surface: oklch(20% 0.007 264);
+  --ag-bg-hover: oklch(25% 0.007 264);
+  --ag-bg-active: oklch(29% 0.008 264);
+  --ag-border: oklch(30% 0.008 264);
+  --ag-border-subtle: oklch(25.5% 0.007 264);
+  --ag-border-strong: oklch(46% 0.011 264);
+  --ag-border-focus: oklch(66% 0.19 264);
   --ag-text: oklch(93% 0.012 85);
   --ag-text-secondary: oklch(75% 0.014 80);
   --ag-text-tertiary: oklch(59% 0.014 75);
-  --ag-text-inverse: oklch(16% 0.007 150);
-  --ag-glass: color-mix(in oklab, oklch(20% 0.007 150) 80%, transparent);
-  --ag-glass-border: oklch(30% 0.008 148);
-  --ag-shadow-sm: 0 1px 2px 0 oklch(3% 0.006 150 / 0.45);
+  --ag-text-inverse: oklch(16% 0.007 264);
+  --ag-glass: color-mix(in oklab, oklch(20% 0.007 264) 80%, transparent);
+  --ag-glass-border: oklch(30% 0.008 264);
+  --ag-shadow-sm: 0 1px 2px 0 oklch(3% 0.006 264 / 0.45);
   --ag-shadow-md:
-    0 6px 18px -6px oklch(3% 0.006 150 / 0.55),
-    0 2px 6px -2px oklch(3% 0.006 150 / 0.4);
+    0 6px 18px -6px oklch(3% 0.006 264 / 0.55),
+    0 2px 6px -2px oklch(3% 0.006 264 / 0.4);
   --ag-shadow-lg:
     0 0 0 1px oklch(100% 0 0 / 0.045) inset,
-    0 28px 60px -18px oklch(2% 0.006 150 / 0.7);
-  --ag-shadow-glow: 0 0 0 1px color-mix(in oklab, oklch(76% 0.125 150) 55%, transparent), 0 0 28px -4px color-mix(in oklab, oklch(76% 0.125 150) 50%, transparent);
+    0 28px 60px -18px oklch(2% 0.006 264 / 0.7);
+  --ag-shadow-glow: 0 0 0 1px color-mix(in oklab, oklch(66% 0.19 264) 55%, transparent), 0 0 28px -4px color-mix(in oklab, oklch(66% 0.19 264) 50%, transparent);
 }

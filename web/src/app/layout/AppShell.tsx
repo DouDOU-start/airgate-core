@@ -92,6 +92,8 @@ export function AppShell({ children }: AppShellProps) {
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const site = useSiteSettings();
+  // 文档入口：仅当管理员填写了外部 doc_url 时才显示
+  const docsUrl = effectiveDocUrl(site.doc_url);
   const [collapsed, setCollapsed] = usePersistentBoolean(SIDEBAR_COLLAPSED_STORAGE_KEY, false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -324,31 +326,33 @@ export function AppShell({ children }: AppShellProps) {
         )}
       </nav>
 
-      <div className="space-y-1 border-t border-border p-3">
-        {!sidebarCollapsed && (
-          <Button
-            className="w-full justify-center"
-            size="sm"
-            variant="ghost"
-            onPress={() => { window.location.href = effectiveDocUrl(site.doc_url).href; }}
-          >
-            <HelpCircle className="h-4 w-4" />
-            {t('nav.docs')}
-          </Button>
-        )}
-        {!isMobile && sidebarCollapsed && (
-          <Button
-            aria-label={t('nav.docs')}
-            className="w-full"
-            isIconOnly
-            size="sm"
-            variant="ghost"
-            onPress={() => { window.location.href = effectiveDocUrl(site.doc_url).href; }}
-          >
-            <HelpCircle className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
+      {docsUrl && (
+        <div className="space-y-1 border-t border-border p-3">
+          {!sidebarCollapsed && (
+            <Button
+              className="w-full justify-center"
+              size="sm"
+              variant="ghost"
+              onPress={() => { window.open(docsUrl, '_blank', 'noopener,noreferrer'); }}
+            >
+              <HelpCircle className="h-4 w-4" />
+              {t('nav.docs')}
+            </Button>
+          )}
+          {!isMobile && sidebarCollapsed && (
+            <Button
+              aria-label={t('nav.docs')}
+              className="w-full"
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              onPress={() => { window.open(docsUrl, '_blank', 'noopener,noreferrer'); }}
+            >
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      )}
     </>
   );
 
@@ -411,20 +415,18 @@ export function AppShell({ children }: AppShellProps) {
             >
               <Github className="h-5 w-5" />
             </HeroLink>
-            {/* Docs：未配置外部链接时回退到内置 /docs */}
-            {(() => {
-              const docs = effectiveDocUrl(site.doc_url);
-              return (
-                <HeroLink
-                  href={docs.href}
-                  {...(docs.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                  aria-label={t('nav.docs')}
-                  className="hidden h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text sm:flex"
-                >
-                  <BookOpen className="h-5 w-5" />
-                </HeroLink>
-              );
-            })()}
+            {/* Docs：仅当管理员配置了外部文档链接时显示 */}
+            {docsUrl && (
+              <HeroLink
+                href={docsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t('nav.docs')}
+                className="hidden h-10 w-10 items-center justify-center rounded-[var(--radius)] text-text-secondary transition-colors hover:text-text sm:flex"
+              >
+                <BookOpen className="h-5 w-5" />
+              </HeroLink>
+            )}
             {/* 联系方式 */}
             {site.contact_info && (
               <div className="hidden items-center gap-2 text-text-tertiary lg:flex">
