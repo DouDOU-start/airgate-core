@@ -462,7 +462,7 @@
     "today_cost": "Today",
     "total_cost": "Total",
     "concurrency_rpm": "Concurrency / RPM",
-    "concurrency_rpm_hint": "In-flight requests; requests in the current minute (live, groups are not rate-limited)",
+    "concurrency_rpm_hint": "In-flight requests; successful requests in the current minute (same basis as dashboard, groups are not rate-limited)",
     "concurrency_label": "Conc.",
     "note": "Note",
     "note_hint": "Operational note shown in the Health Monitor group table",

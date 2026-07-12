@@ -59,8 +59,8 @@ func (r *RPMCounter) incrementByKey(ctx context.Context, key string) (int, error
 }
 
 // IncrementUserGroupRPM 单 pipeline 合并递增用户与分组当前分钟的请求计数
-// （管理端观测口径，不做限流；已鉴权进入转发链路即计入，失败请求不回退）。
-// groupID <= 0 时只计用户维度。合并成一次 Redis RTT：这是转发热路径每请求必经的调用。
+// （管理端观测口径，不做限流；仅成功计费的请求计入，与 usage_log 同源，口径对齐仪表盘）。
+// groupID <= 0 时只计用户维度。合并成一次 Redis RTT，在计费收尾处调用。
 func (r *RPMCounter) IncrementUserGroupRPM(ctx context.Context, userID, groupID int) {
 	if r.rdb == nil {
 		return

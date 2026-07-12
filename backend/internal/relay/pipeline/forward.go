@@ -126,9 +126,6 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	ctx := c.Request.Context()
 	protocol := protocolForEndpoint(endpoint)
 
-	// 用户 / 分组 RPM 观测计数：已鉴权即计入（含后续被预检拒绝的请求），供管理端展示请求速率。
-	p.rpm.IncrementUserGroupRPM(ctx, keyInfo.UserID, keyInfo.GroupID)
-
 	// 1. 余额预检（异步扣款模型：只挡余额已为负/零的用户）。
 	if keyInfo.UserBalance <= 0 {
 		writeError(c, http.StatusPaymentRequired, "insufficient_quota", "insufficient_balance", "账户余额不足")
@@ -694,6 +691,10 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 	if p.sink == nil {
 		return
 	}
+
+	// 用户 / 分组 RPM 观测计数：与 usage_log 同源，仅成功计费的请求计入，口径对齐仪表盘。
+	// 用 Background ctx，避免请求收尾（尤其流式结束）ctx 已取消导致漏计。
+	p.rpm.IncrementUserGroupRPM(context.Background(), keyInfo.UserID, keyInfo.GroupID)
 
 	var usage dto.Usage
 	if result.usage != nil {

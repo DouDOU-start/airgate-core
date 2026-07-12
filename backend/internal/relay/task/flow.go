@@ -203,9 +203,6 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 	start := time.Now()
 	ctx := c.Request.Context()
 
-	// 用户 / 分组 RPM 观测计数（已鉴权即计入，口径同 pipeline）。
-	f.rpm.IncrementUserGroupRPM(ctx, keyInfo.UserID, keyInfo.GroupID)
-
 	// 1. 缺价预检：任务不允许零价兜底（长任务白嫖面大），未配任务计价一律 400。
 	price, priced := f.pricing.Get(sub.Model)
 	estTotal, estSeconds := 0.0, 0
@@ -371,6 +368,8 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 					return
 				}
 				t.ID = id
+				// 用户 / 分组 RPM 观测计数：任务提交成功（已落库）才计入，口径对齐仪表盘。
+				f.rpm.IncrementUserGroupRPM(context.Background(), keyInfo.UserID, keyInfo.GroupID)
 				c.Data(http.StatusOK, "application/json", ad.RenderTask(t))
 				return
 			}

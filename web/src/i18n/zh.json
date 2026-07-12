@@ -462,7 +462,7 @@
     "today_cost": "今日",
     "total_cost": "累计",
     "concurrency_rpm": "并发 / RPM",
-    "concurrency_rpm_hint": "当前在途请求数；当前分钟请求数（实时观测，分组无限流）",
+    "concurrency_rpm_hint": "当前在途请求数；当前分钟成功请求数（口径同仪表盘，分组无限流）",
     "concurrency_label": "并发",
     "note": "备注",
     "note_hint": "运维备注，会显示在「健康监控」页的分组聚合表中",
