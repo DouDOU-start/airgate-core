@@ -21,6 +21,9 @@ var publicGroups = []string{"site", "registration", "invite"}
 var publicSafeKeys = map[string]bool{
 	"registration_enabled": true,
 	"email_verify_enabled": true,
+	// invite 组非 site，需单独加入白名单才会被 ListPublic 透出（否则加进
+	// publicGroups 也不会生效，见下方 ListPublic 的 "site 全公开/其他白名单" 逻辑）。
+	"invite_enabled": true,
 }
 
 // settings key 常量（管理员 API Key / SMTP）。

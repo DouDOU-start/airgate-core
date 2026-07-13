@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Card, EmptyState, Input, Spinner } from '@heroui/react';
+import { Alert, Button, Card, EmptyState, Input, Spinner, Tabs } from '@heroui/react';
 import { AlertTriangle, Copy, Gift, Users, Wallet } from 'lucide-react';
 import { inviteApi } from '../../shared/api/invite';
 import { queryKeys } from '../../shared/queryKeys';
@@ -17,11 +17,14 @@ import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import type { InviteTransferResp } from '../../shared/types';
 
+type RecordTabKey = 'invitees' | 'logs';
+
 export default function InvitePage() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const copy = useClipboard();
+  const [recordTab, setRecordTab] = useState<RecordTabKey>('invitees');
 
   const { data: me, isLoading: meLoading } = useQuery({
     queryKey: queryKeys.inviteMe(),
@@ -122,7 +125,7 @@ export default function InvitePage() {
             <div>
               <p className="mb-2 text-sm font-medium text-text">{t('invite.share_link')}</p>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="w-full sm:max-w-md">
+                <div className="w-full sm:max-w-2xl sm:flex-1">
                   <Input readOnly className="font-mono text-xs" value={shareLink} />
                 </div>
                 <Button
@@ -197,108 +200,121 @@ export default function InvitePage() {
         </Card.Content>
       </Card>
 
-      {/* 我邀请的人 */}
+      {/* 我邀请的人 / 返利流水：切换展示 */}
       <div>
-        <div className="mb-3 flex items-center gap-2">
-          <Users className="h-4 w-4 text-text-tertiary" />
-          <h3 className="text-base font-semibold text-text">{t('invite.invitees_title')}</h3>
+        <div className="mb-3 w-full overflow-x-auto hide-scrollbar pb-1">
+          <Tabs
+            className="ag-page-tabs whitespace-nowrap"
+            selectedKey={recordTab}
+            onSelectionChange={(key) => setRecordTab(key as RecordTabKey)}
+          >
+            <Tabs.List>
+              <Tabs.Tab id="invitees">
+                <Tabs.Indicator />
+                <Users className="w-4 h-4" />
+                <span>{t('invite.invitees_title')}</span>
+              </Tabs.Tab>
+              <Tabs.Tab id="logs">
+                <Tabs.Separator />
+                <Tabs.Indicator />
+                <Wallet className="w-4 h-4" />
+                <span>{t('invite.logs_title')}</span>
+              </Tabs.Tab>
+            </Tabs.List>
+          </Tabs>
         </div>
-        <CommonTable
-          ariaLabel={t('invite.invitees_title')}
-          footer={(
-            <TablePaginationFooter
-              page={inviteesPagination.page}
-              pageSize={inviteesPagination.pageSize}
-              setPage={inviteesPagination.setPage}
-              setPageSize={inviteesPagination.setPageSize}
-              total={inviteeTotal}
-              totalPages={inviteeTotalPages}
-            />
-          )}
-          minWidth={640}
-        >
-          <CommonTable.Header>
-            <CommonTable.Column id="invitee_email">{t('invite.invitee_email')}</CommonTable.Column>
-            <CommonTable.Column id="created_at">{t('invite.bound_at')}</CommonTable.Column>
-            <CommonTable.Column id="total_rebate">{t('invite.total_rebate')}</CommonTable.Column>
-          </CommonTable.Header>
-          <CommonTable.Body>
-            {inviteesLoading ? (
-              <TableLoadingRow colSpan={3} />
-            ) : inviteeRows.length === 0 ? (
-              <CommonTable.Row id="empty">
-                <CommonTable.Cell colSpan={3}>
-                  <EmptyState>
-                    <div className="text-sm text-default-500">{t('common.no_data')}</div>
-                  </EmptyState>
-                </CommonTable.Cell>
-              </CommonTable.Row>
-            ) : (
-              inviteeRows.map((row) => (
-                <CommonTable.Row id={row.invitee_id} key={row.invitee_id}>
-                  <CommonTable.Cell>{row.invitee_email || row.invitee_username || row.invitee_id}</CommonTable.Cell>
-                  <CommonTable.Cell>{formatDateTime(row.created_at)}</CommonTable.Cell>
-                  <CommonTable.Cell>
-                    <span className="font-mono">${row.total_rebate.toFixed(2)}</span>
-                  </CommonTable.Cell>
-                </CommonTable.Row>
-              ))
-            )}
-          </CommonTable.Body>
-        </CommonTable>
-      </div>
 
-      {/* 返利流水 */}
-      <div>
-        <div className="mb-3 flex items-center gap-2">
-          <Wallet className="h-4 w-4 text-text-tertiary" />
-          <h3 className="text-base font-semibold text-text">{t('invite.logs_title')}</h3>
-        </div>
-        <CommonTable
-          ariaLabel={t('invite.logs_title')}
-          footer={(
-            <TablePaginationFooter
-              page={logsPagination.page}
-              pageSize={logsPagination.pageSize}
-              setPage={logsPagination.setPage}
-              setPageSize={logsPagination.setPageSize}
-              total={logTotal}
-              totalPages={logTotalPages}
-            />
-          )}
-          minWidth={640}
-        >
-          <CommonTable.Header>
-            <CommonTable.Column id="created_at">{t('invite.log_time')}</CommonTable.Column>
-            <CommonTable.Column id="action">{t('invite.log_action')}</CommonTable.Column>
-            <CommonTable.Column id="amount">{t('invite.log_amount')}</CommonTable.Column>
-            <CommonTable.Column id="source">{t('invite.log_source')}</CommonTable.Column>
-          </CommonTable.Header>
-          <CommonTable.Body>
-            {logsLoading ? (
-              <TableLoadingRow colSpan={4} />
-            ) : logRows.length === 0 ? (
-              <CommonTable.Row id="empty">
-                <CommonTable.Cell colSpan={4}>
-                  <EmptyState>
-                    <div className="text-sm text-default-500">{t('common.no_data')}</div>
-                  </EmptyState>
-                </CommonTable.Cell>
-              </CommonTable.Row>
-            ) : (
-              logRows.map((row) => (
-                <CommonTable.Row id={row.id} key={row.id}>
-                  <CommonTable.Cell>{formatDateTime(row.created_at)}</CommonTable.Cell>
-                  <CommonTable.Cell>{t(`invite.action_${row.action}`)}</CommonTable.Cell>
-                  <CommonTable.Cell>
-                    <span className="font-mono">${row.amount.toFixed(2)}</span>
-                  </CommonTable.Cell>
-                  <CommonTable.Cell>{row.source_user_email || '-'}</CommonTable.Cell>
-                </CommonTable.Row>
-              ))
+        {recordTab === 'invitees' ? (
+          <CommonTable
+            ariaLabel={t('invite.invitees_title')}
+            footer={(
+              <TablePaginationFooter
+                page={inviteesPagination.page}
+                pageSize={inviteesPagination.pageSize}
+                setPage={inviteesPagination.setPage}
+                setPageSize={inviteesPagination.setPageSize}
+                total={inviteeTotal}
+                totalPages={inviteeTotalPages}
+              />
             )}
-          </CommonTable.Body>
-        </CommonTable>
+            minWidth={640}
+          >
+            <CommonTable.Header>
+              <CommonTable.Column id="invitee_email">{t('invite.invitee_email')}</CommonTable.Column>
+              <CommonTable.Column id="created_at">{t('invite.bound_at')}</CommonTable.Column>
+              <CommonTable.Column id="total_rebate">{t('invite.total_rebate')}</CommonTable.Column>
+            </CommonTable.Header>
+            <CommonTable.Body>
+              {inviteesLoading ? (
+                <TableLoadingRow colSpan={3} />
+              ) : inviteeRows.length === 0 ? (
+                <CommonTable.Row id="empty">
+                  <CommonTable.Cell colSpan={3}>
+                    <EmptyState>
+                      <div className="text-sm text-default-500">{t('common.no_data')}</div>
+                    </EmptyState>
+                  </CommonTable.Cell>
+                </CommonTable.Row>
+              ) : (
+                inviteeRows.map((row) => (
+                  <CommonTable.Row id={row.invitee_id} key={row.invitee_id}>
+                    <CommonTable.Cell>{row.invitee_email || row.invitee_username || row.invitee_id}</CommonTable.Cell>
+                    <CommonTable.Cell>{formatDateTime(row.created_at)}</CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="font-mono">${row.total_rebate.toFixed(2)}</span>
+                    </CommonTable.Cell>
+                  </CommonTable.Row>
+                ))
+              )}
+            </CommonTable.Body>
+          </CommonTable>
+        ) : (
+          <CommonTable
+            ariaLabel={t('invite.logs_title')}
+            footer={(
+              <TablePaginationFooter
+                page={logsPagination.page}
+                pageSize={logsPagination.pageSize}
+                setPage={logsPagination.setPage}
+                setPageSize={logsPagination.setPageSize}
+                total={logTotal}
+                totalPages={logTotalPages}
+              />
+            )}
+            minWidth={640}
+          >
+            <CommonTable.Header>
+              <CommonTable.Column id="created_at">{t('invite.log_time')}</CommonTable.Column>
+              <CommonTable.Column id="action">{t('invite.log_action')}</CommonTable.Column>
+              <CommonTable.Column id="amount">{t('invite.log_amount')}</CommonTable.Column>
+              <CommonTable.Column id="source">{t('invite.log_source')}</CommonTable.Column>
+            </CommonTable.Header>
+            <CommonTable.Body>
+              {logsLoading ? (
+                <TableLoadingRow colSpan={4} />
+              ) : logRows.length === 0 ? (
+                <CommonTable.Row id="empty">
+                  <CommonTable.Cell colSpan={4}>
+                    <EmptyState>
+                      <div className="text-sm text-default-500">{t('common.no_data')}</div>
+                    </EmptyState>
+                  </CommonTable.Cell>
+                </CommonTable.Row>
+              ) : (
+                logRows.map((row) => (
+                  <CommonTable.Row id={row.id} key={row.id}>
+                    <CommonTable.Cell>{formatDateTime(row.created_at)}</CommonTable.Cell>
+                    <CommonTable.Cell>{t(`invite.action_${row.action}`)}</CommonTable.Cell>
+                    <CommonTable.Cell>
+                      <span className="font-mono">${row.amount.toFixed(2)}</span>
+                    </CommonTable.Cell>
+                    <CommonTable.Cell>{row.source_user_email || '-'}</CommonTable.Cell>
+                  </CommonTable.Row>
+                ))
+              )}
+            </CommonTable.Body>
+          </CommonTable>
+        )}
       </div>
     </div>
   );

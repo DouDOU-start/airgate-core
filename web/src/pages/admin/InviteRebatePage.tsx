@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
-  Button, Card, EmptyState, Input, Label, Spinner, Tabs, TextField as HeroTextField,
+  Button, Card, ComboBox, EmptyState, Input, Label, ListBox, Spinner, Tabs, TextField as HeroTextField,
 } from '@heroui/react';
 import { Gift, RefreshCw, Save, Search, Users, Wallet, X } from 'lucide-react';
 import { inviteApi } from '../../shared/api/invite';
 import { settingsApi } from '../../shared/api/settings';
+import { usersApi } from '../../shared/api/users';
 import { queryKeys } from '../../shared/queryKeys';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -111,6 +112,9 @@ function OverridesTab() {
   const debouncedKeyword = useDebouncedValue(keyword, 300);
 
   const [targetUserID, setTargetUserID] = useState('');
+  const [targetUserKeyword, setTargetUserKeyword] = useState('');
+  const debouncedTargetUserKeyword = useDebouncedValue(targetUserKeyword.trim(), 250);
+  const [targetUserLabel, setTargetUserLabel] = useState('');
   const [targetRate, setTargetRate] = useState('');
 
   const { data, isLoading, refetch } = useQuery({
@@ -119,12 +123,27 @@ function OverridesTab() {
     placeholderData: keepPreviousData,
   });
 
+  // 专属比例目标用户：模糊搜索用户邮箱/用户名（同使用记录页的搜索模式）
+  const { data: targetUsersData } = useQuery({
+    queryKey: queryKeys.adminUsersSearch(debouncedTargetUserKeyword),
+    queryFn: () => usersApi.list({ page: 1, page_size: 20, keyword: debouncedTargetUserKeyword }),
+    enabled: debouncedTargetUserKeyword.length > 0,
+  });
+  const targetUserOptions = (targetUsersData?.list ?? []).map((u) => ({
+    id: String(u.id),
+    label: u.username || u.email,
+    description: u.username ? u.email : undefined,
+    textValue: `${u.username || ''} ${u.email}`,
+  }));
+
   const setMutation = useCrudMutation<{ user_id: number }, { userID: number; rate: number | null }>({
     mutationFn: ({ userID, rate }) => inviteApi.adminSetOverride(userID, rate),
     successMessage: t('invite.admin_override_success'),
     queryKey: queryKeys.inviteOverrides(),
     onSuccess: () => {
       setTargetUserID('');
+      setTargetUserKeyword('');
+      setTargetUserLabel('');
       setTargetRate('');
     },
   });
@@ -141,16 +160,57 @@ function OverridesTab() {
         </Card.Header>
         <Card.Content>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="w-full sm:w-32">
-              <HeroTextField fullWidth aria-label={t('invite.user_id')}>
-                <Input
-                  min={1}
-                  placeholder={t('invite.user_id')}
-                  type="number"
-                  value={targetUserID}
-                  onChange={(e) => setTargetUserID(e.target.value)}
-                />
-              </HeroTextField>
+            <div className="w-full sm:w-64">
+              <ComboBox
+                aria-label={t('invite.admin_overrides_search_placeholder')}
+                allowsEmptyCollection
+                fullWidth
+                inputValue={targetUserKeyword}
+                items={targetUserOptions}
+                menuTrigger="focus"
+                selectedKey={targetUserID || null}
+                onInputChange={(value) => {
+                  setTargetUserKeyword(value);
+                  if (!value || (targetUserID && value !== targetUserLabel)) {
+                    setTargetUserID('');
+                    setTargetUserLabel('');
+                  }
+                }}
+                onSelectionChange={(key) => {
+                  const value = key == null ? '' : String(key);
+                  setTargetUserID(value);
+                  const option = targetUserOptions.find((item) => item.id === value);
+                  const label = option?.label ? String(option.label) : '';
+                  setTargetUserLabel(label);
+                  setTargetUserKeyword(label);
+                }}
+              >
+                <ComboBox.InputGroup className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                  <Input className="pl-9" placeholder={t('invite.admin_overrides_search_placeholder')} />
+                </ComboBox.InputGroup>
+                <ComboBox.Popover>
+                  <ListBox
+                    items={targetUserOptions}
+                    renderEmptyState={() => (
+                      <div className="px-3 py-6 text-center text-xs text-text-tertiary">
+                        {targetUserKeyword.trim() ? t('common.no_data') : t('invite.admin_overrides_search_placeholder')}
+                      </div>
+                    )}
+                  >
+                    {(item) => (
+                      <ListBox.Item id={item.id} textValue={item.textValue}>
+                        <div className="min-w-0">
+                          <div className="truncate">{item.label}</div>
+                          {item.description ? (
+                            <div className="truncate text-xs text-text-tertiary">{item.description}</div>
+                          ) : null}
+                        </div>
+                      </ListBox.Item>
+                    )}
+                  </ListBox>
+                </ComboBox.Popover>
+              </ComboBox>
             </div>
             <div className="w-full sm:w-40">
               <HeroTextField fullWidth aria-label={t('invite.admin_rate_percent')}>
