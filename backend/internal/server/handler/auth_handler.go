@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
+	appinvite "github.com/DouDOU-start/airgate-core/internal/app/invite"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 )
 
@@ -44,6 +45,8 @@ func (h *AuthHandler) handleRegisterError(err error) (int, string) {
 	case errors.Is(err, appauth.ErrVerifyCodeInvalid):
 		return 400, err.Error()
 	case errors.Is(err, appauth.ErrEmailAlreadyExists):
+		return 400, err.Error()
+	case errors.Is(err, appinvite.ErrCodeInvalid):
 		return 400, err.Error()
 	default:
 		slog.Error("注册失败", "error", err)

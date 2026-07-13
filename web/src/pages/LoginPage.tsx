@@ -7,7 +7,7 @@ import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsPr
 import { authApi } from '../shared/api/auth';
 import { useTheme } from '../app/providers/ThemeProvider';
 import { ApiError, setSessionAPIKey } from '../shared/api/client';
-import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key, Sprout, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Sun, Moon, ShieldCheck, Key, Sprout, Eye, EyeOff, Gift } from 'lucide-react';
 import { AmbientAurora } from './login/AmbientAurora';
 
 /**
@@ -28,6 +28,28 @@ function consumeLoginRedirect(): string | null {
   const raw = new URLSearchParams(window.location.search).get('redirect');
   if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw;
   return null;
+}
+
+// 邀请返利：邀请码 URL 参数在 sessionStorage 中的落地 key。
+const INVITE_CODE_STORAGE_KEY = 'airgate:invite_code';
+
+// consumeInviteCode 读取 ?invite_code= 邀请码，落 sessionStorage 兜底
+// （两步注册表单中途刷新页面时查询参数会丢失，靠 sessionStorage 保留）。
+function consumeInviteCode(): string {
+  const fromQuery = new URLSearchParams(window.location.search).get('invite_code')?.trim();
+  if (fromQuery) {
+    try {
+      window.sessionStorage.setItem(INVITE_CODE_STORAGE_KEY, fromQuery);
+    } catch {
+      // 隐私模式下 sessionStorage 可能不可用，不影响本次注册当场使用
+    }
+    return fromQuery;
+  }
+  try {
+    return window.sessionStorage.getItem(INVITE_CODE_STORAGE_KEY) ?? '';
+  } catch {
+    return '';
+  }
 }
 
 /* ==================== 登录表单 ==================== */
@@ -159,6 +181,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   const [verifiedEmail, setVerifiedEmail] = useState('');
   const [verifiedCode, setVerifiedCode] = useState('');
   const [username, setUsername] = useState('');
+  const [inviteCode, setInviteCode] = useState(() => consumeInviteCode());
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -262,6 +285,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         password,
         username: username || undefined,
         verify_code: needVerify ? verifiedCode : undefined,
+        invite_code: inviteCode.trim() || undefined,
       });
       onSuccess();
     } catch (err) {
@@ -387,6 +411,19 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
             onChange={(e) => setUsername(e.target.value)}
             placeholder={t('auth.username_placeholder')}
             autoFocus
+          />
+        </div>
+      </HeroTextField>
+      <HeroTextField fullWidth>
+        <Label>{t('auth.invite_code')}</Label>
+        <div className="relative">
+          <Gift className="pointer-events-none absolute left-3 top-1/2 z-10 w-4 h-4 -translate-y-1/2 text-text-tertiary" />
+          <Input
+            className="pl-9"
+            name="invite_code"
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value)}
+            placeholder={t('auth.invite_code_placeholder')}
           />
         </div>
       </HeroTextField>

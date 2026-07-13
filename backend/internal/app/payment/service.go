@@ -44,6 +44,13 @@ type moduleConfig struct {
 // RechargeSuccessFunc 充值成功回调（异步调用，不阻塞回调应答）。
 type RechargeSuccessFunc func(email string, amount, balance float64)
 
+// RebateAccruer 邀请返利域窄接口（由 app/invite.Service 实现），避免 payment 包
+// 直接依赖 invite 包。仅在支付网关真实回调入账（在线充值/订阅）时调用；
+// 卡密兑换、管理员手动调整余额均不经此路径，天然不触发返利。
+type RebateAccruer interface {
+	AccrueRebateForPayment(ctx context.Context, payerUserID int, amount float64, orderNo string) (float64, error)
+}
+
 // Service 支付域用例编排：下单、回调入账、订单查询、服务商配置管理。
 type Service struct {
 	repo              Repository
@@ -51,11 +58,17 @@ type Service struct {
 	registry          *provider.Registry
 	secret            string // AES-256-GCM 密钥（与渠道 api_keys 同源），加密服务商敏感配置
 	onRechargeSuccess RechargeSuccessFunc
+	rebateAccruer     RebateAccruer
 }
 
 // SetRechargeSuccessCallback 设置充值成功回调（首次成功入账时异步触发，用于发送通知邮件）。
 func (s *Service) SetRechargeSuccessCallback(fn RechargeSuccessFunc) {
 	s.onRechargeSuccess = fn
+}
+
+// SetRebateAccruer 注入邀请返利计提依赖（真实付款到账后触发）。
+func (s *Service) SetRebateAccruer(a RebateAccruer) {
+	s.rebateAccruer = a
 }
 
 // NewService 创建支付服务并完成首次 Provider 装载。
@@ -333,6 +346,14 @@ func (s *Service) HandleCallback(ctx context.Context, providerID string, req pro
 		// 首次成功入账：异步发送充值成功通知（不阻塞回调应答）。
 		if s.onRechargeSuccess != nil && credit.Email != "" {
 			go s.onRechargeSuccess(credit.Email, credit.Amount, credit.BalanceAfter)
+		}
+		// 邀请返利：仅真实付款到账触发，独立事务、失败不影响充值本身已成功的响应。
+		if s.rebateAccruer != nil && credit.UserID > 0 {
+			if rebate, err := s.rebateAccruer.AccrueRebateForPayment(ctx, credit.UserID, credit.Amount, res.OutTradeNo); err != nil {
+				logger.Warn("payment_invite_rebate_failed", "out_trade_no", res.OutTradeNo, logx.LogFieldError, err)
+			} else if rebate > 0 {
+				logger.Info("payment_invite_rebate_accrued", "out_trade_no", res.OutTradeNo, "rebate", rebate)
+			}
 		}
 	}
 	return res, nil

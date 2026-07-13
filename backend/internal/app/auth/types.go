@@ -51,6 +51,7 @@ type RegisterInput struct {
 	Password   string
 	Username   string
 	VerifyCode string
+	InviteCode string // 邀请返利：注册时携带的邀请人邀请码，可空
 }
 
 // SendVerifyCodeInput 发送验证码输入。

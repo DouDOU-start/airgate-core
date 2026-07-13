@@ -19,6 +19,7 @@ import (
 	appchannel "github.com/DouDOU-start/airgate-core/internal/app/channel"
 	appdashboard "github.com/DouDOU-start/airgate-core/internal/app/dashboard"
 	appgroup "github.com/DouDOU-start/airgate-core/internal/app/group"
+	appinvite "github.com/DouDOU-start/airgate-core/internal/app/invite"
 	appmodelprice "github.com/DouDOU-start/airgate-core/internal/app/modelprice"
 	appoauth "github.com/DouDOU-start/airgate-core/internal/app/oauth"
 	apppayment "github.com/DouDOU-start/airgate-core/internal/app/payment"
@@ -61,6 +62,7 @@ type HTTPHandlers struct {
 	Dashboard    *handler.DashboardHandler
 	Payment      *handler.PaymentHandler
 	Redemption   *handler.RedemptionHandler
+	Invite       *handler.InviteHandler
 	Version      *handler.VersionHandler
 	OAuth        *handler.OAuthHandler
 
@@ -110,10 +112,15 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	settingsStore := store.NewSettingsStore(dep.DB)
 	settingsService := appsettings.NewService(settingsStore, dep.Config.APIKeySecret())
 
-	// 注入 auth 服务的设置/验证码/邮件依赖
+	inviteStore := store.NewInviteStore(dep.DB)
+	inviteService := appinvite.NewService(inviteStore)
+	inviteService.SetSettingsLister(inviteSettingsAdapter{settingsService})
+
+	// 注入 auth 服务的设置/验证码/邮件/邀请返利依赖
 	authService.SetSettingsLister(&settingsAdapter{settingsService})
 	authService.SetVerifyCodeStore(verifyCodeStore)
 	authService.SetMailerFactory(buildMailerFactory(settingsService))
+	authService.SetInviteBinder(inviteService)
 
 	userStore := store.NewUserStore(dep.DB)
 	userService := appuser.NewService(userStore)
@@ -139,6 +146,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	paymentService.SetRechargeSuccessCallback(func(email string, amount, balance float64) {
 		rechargeSuccessSendEmail(settingsService, email, amount, balance)
 	})
+	// 邀请返利：仅真实付款到账触发计提
+	paymentService.SetRebateAccruer(inviteService)
 
 	redemptionStore := store.NewRedemptionStore(dep.DB)
 	redemptionService := appredemption.NewService(redemptionStore)
@@ -164,6 +173,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Dashboard:    handler.NewDashboardHandler(dashboardService),
 		Payment:      handler.NewPaymentHandler(paymentService),
 		Redemption:   handler.NewRedemptionHandler(redemptionService),
+		Invite:       handler.NewInviteHandler(inviteService),
 		Version:      handler.NewVersionHandler(),
 		OAuth:        handler.NewOAuthHandler(oauthService),
 
@@ -212,6 +222,23 @@ func (a paymentSettingsAdapter) List(ctx context.Context, group string) ([]apppa
 	out := make([]apppayment.SettingItem, len(items))
 	for i, item := range items {
 		out[i] = apppayment.SettingItem{Key: item.Key, Value: item.Value}
+	}
+	return out, nil
+}
+
+// inviteSettingsAdapter 将 appsettings.Service 适配为 appinvite.SettingsLister 接口。
+type inviteSettingsAdapter struct {
+	svc *appsettings.Service
+}
+
+func (a inviteSettingsAdapter) List(ctx context.Context, group string) ([]appinvite.SettingItem, error) {
+	items, err := a.svc.List(ctx, group)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]appinvite.SettingItem, len(items))
+	for i, item := range items {
+		out[i] = appinvite.SettingItem{Key: item.Key, Value: item.Value}
 	}
 	return out, nil
 }

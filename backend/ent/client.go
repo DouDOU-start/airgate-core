@@ -22,6 +22,8 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
+	"github.com/DouDOU-start/airgate-core/ent/inviteprofile"
+	"github.com/DouDOU-start/airgate-core/ent/inviterebatelog"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
 	"github.com/DouDOU-start/airgate-core/ent/modeltag"
 	"github.com/DouDOU-start/airgate-core/ent/oauthclient"
@@ -55,6 +57,10 @@ type Client struct {
 	ChannelKey *ChannelKeyClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
+	// InviteProfile is the client for interacting with the InviteProfile builders.
+	InviteProfile *InviteProfileClient
+	// InviteRebateLog is the client for interacting with the InviteRebateLog builders.
+	InviteRebateLog *InviteRebateLogClient
 	// ModelPrice is the client for interacting with the ModelPrice builders.
 	ModelPrice *ModelPriceClient
 	// ModelTag is the client for interacting with the ModelTag builders.
@@ -97,6 +103,8 @@ func (c *Client) init() {
 	c.Channel = NewChannelClient(c.config)
 	c.ChannelKey = NewChannelKeyClient(c.config)
 	c.Group = NewGroupClient(c.config)
+	c.InviteProfile = NewInviteProfileClient(c.config)
+	c.InviteRebateLog = NewInviteRebateLogClient(c.config)
 	c.ModelPrice = NewModelPriceClient(c.config)
 	c.ModelTag = NewModelTagClient(c.config)
 	c.OAuthClient = NewOAuthClientClient(c.config)
@@ -208,6 +216,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Channel:               NewChannelClient(cfg),
 		ChannelKey:            NewChannelKeyClient(cfg),
 		Group:                 NewGroupClient(cfg),
+		InviteProfile:         NewInviteProfileClient(cfg),
+		InviteRebateLog:       NewInviteRebateLogClient(cfg),
 		ModelPrice:            NewModelPriceClient(cfg),
 		ModelTag:              NewModelTagClient(cfg),
 		OAuthClient:           NewOAuthClientClient(cfg),
@@ -246,6 +256,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Channel:               NewChannelClient(cfg),
 		ChannelKey:            NewChannelKeyClient(cfg),
 		Group:                 NewGroupClient(cfg),
+		InviteProfile:         NewInviteProfileClient(cfg),
+		InviteRebateLog:       NewInviteRebateLogClient(cfg),
 		ModelPrice:            NewModelPriceClient(cfg),
 		ModelTag:              NewModelTagClient(cfg),
 		OAuthClient:           NewOAuthClientClient(cfg),
@@ -288,9 +300,10 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel,
-		c.ChannelKey, c.Group, c.ModelPrice, c.ModelTag, c.OAuthClient, c.PaymentOrder,
-		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task, c.Tier,
-		c.UpstreamRequestLog, c.UsageLog, c.User,
+		c.ChannelKey, c.Group, c.InviteProfile, c.InviteRebateLog, c.ModelPrice,
+		c.ModelTag, c.OAuthClient, c.PaymentOrder, c.PaymentProviderConfig,
+		c.RedemptionCode, c.Setting, c.Task, c.Tier, c.UpstreamRequestLog, c.UsageLog,
+		c.User,
 	} {
 		n.Use(hooks...)
 	}
@@ -301,9 +314,10 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel,
-		c.ChannelKey, c.Group, c.ModelPrice, c.ModelTag, c.OAuthClient, c.PaymentOrder,
-		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task, c.Tier,
-		c.UpstreamRequestLog, c.UsageLog, c.User,
+		c.ChannelKey, c.Group, c.InviteProfile, c.InviteRebateLog, c.ModelPrice,
+		c.ModelTag, c.OAuthClient, c.PaymentOrder, c.PaymentProviderConfig,
+		c.RedemptionCode, c.Setting, c.Task, c.Tier, c.UpstreamRequestLog, c.UsageLog,
+		c.User,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -326,6 +340,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ChannelKey.mutate(ctx, m)
 	case *GroupMutation:
 		return c.Group.mutate(ctx, m)
+	case *InviteProfileMutation:
+		return c.InviteProfile.mutate(ctx, m)
+	case *InviteRebateLogMutation:
+		return c.InviteRebateLog.mutate(ctx, m)
 	case *ModelPriceMutation:
 		return c.ModelPrice.mutate(ctx, m)
 	case *ModelTagMutation:
@@ -1491,6 +1509,272 @@ func (c *GroupClient) mutate(ctx context.Context, m *GroupMutation) (Value, erro
 		return (&GroupDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Group mutation op: %q", m.Op())
+	}
+}
+
+// InviteProfileClient is a client for the InviteProfile schema.
+type InviteProfileClient struct {
+	config
+}
+
+// NewInviteProfileClient returns a client for the InviteProfile from the given config.
+func NewInviteProfileClient(c config) *InviteProfileClient {
+	return &InviteProfileClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `inviteprofile.Hooks(f(g(h())))`.
+func (c *InviteProfileClient) Use(hooks ...Hook) {
+	c.hooks.InviteProfile = append(c.hooks.InviteProfile, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `inviteprofile.Intercept(f(g(h())))`.
+func (c *InviteProfileClient) Intercept(interceptors ...Interceptor) {
+	c.inters.InviteProfile = append(c.inters.InviteProfile, interceptors...)
+}
+
+// Create returns a builder for creating a InviteProfile entity.
+func (c *InviteProfileClient) Create() *InviteProfileCreate {
+	mutation := newInviteProfileMutation(c.config, OpCreate)
+	return &InviteProfileCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of InviteProfile entities.
+func (c *InviteProfileClient) CreateBulk(builders ...*InviteProfileCreate) *InviteProfileCreateBulk {
+	return &InviteProfileCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *InviteProfileClient) MapCreateBulk(slice any, setFunc func(*InviteProfileCreate, int)) *InviteProfileCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &InviteProfileCreateBulk{err: fmt.Errorf("calling to InviteProfileClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*InviteProfileCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &InviteProfileCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for InviteProfile.
+func (c *InviteProfileClient) Update() *InviteProfileUpdate {
+	mutation := newInviteProfileMutation(c.config, OpUpdate)
+	return &InviteProfileUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *InviteProfileClient) UpdateOne(ip *InviteProfile) *InviteProfileUpdateOne {
+	mutation := newInviteProfileMutation(c.config, OpUpdateOne, withInviteProfile(ip))
+	return &InviteProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *InviteProfileClient) UpdateOneID(id int) *InviteProfileUpdateOne {
+	mutation := newInviteProfileMutation(c.config, OpUpdateOne, withInviteProfileID(id))
+	return &InviteProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for InviteProfile.
+func (c *InviteProfileClient) Delete() *InviteProfileDelete {
+	mutation := newInviteProfileMutation(c.config, OpDelete)
+	return &InviteProfileDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *InviteProfileClient) DeleteOne(ip *InviteProfile) *InviteProfileDeleteOne {
+	return c.DeleteOneID(ip.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *InviteProfileClient) DeleteOneID(id int) *InviteProfileDeleteOne {
+	builder := c.Delete().Where(inviteprofile.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &InviteProfileDeleteOne{builder}
+}
+
+// Query returns a query builder for InviteProfile.
+func (c *InviteProfileClient) Query() *InviteProfileQuery {
+	return &InviteProfileQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeInviteProfile},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a InviteProfile entity by its id.
+func (c *InviteProfileClient) Get(ctx context.Context, id int) (*InviteProfile, error) {
+	return c.Query().Where(inviteprofile.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *InviteProfileClient) GetX(ctx context.Context, id int) *InviteProfile {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *InviteProfileClient) Hooks() []Hook {
+	return c.hooks.InviteProfile
+}
+
+// Interceptors returns the client interceptors.
+func (c *InviteProfileClient) Interceptors() []Interceptor {
+	return c.inters.InviteProfile
+}
+
+func (c *InviteProfileClient) mutate(ctx context.Context, m *InviteProfileMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&InviteProfileCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&InviteProfileUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&InviteProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&InviteProfileDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown InviteProfile mutation op: %q", m.Op())
+	}
+}
+
+// InviteRebateLogClient is a client for the InviteRebateLog schema.
+type InviteRebateLogClient struct {
+	config
+}
+
+// NewInviteRebateLogClient returns a client for the InviteRebateLog from the given config.
+func NewInviteRebateLogClient(c config) *InviteRebateLogClient {
+	return &InviteRebateLogClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `inviterebatelog.Hooks(f(g(h())))`.
+func (c *InviteRebateLogClient) Use(hooks ...Hook) {
+	c.hooks.InviteRebateLog = append(c.hooks.InviteRebateLog, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `inviterebatelog.Intercept(f(g(h())))`.
+func (c *InviteRebateLogClient) Intercept(interceptors ...Interceptor) {
+	c.inters.InviteRebateLog = append(c.inters.InviteRebateLog, interceptors...)
+}
+
+// Create returns a builder for creating a InviteRebateLog entity.
+func (c *InviteRebateLogClient) Create() *InviteRebateLogCreate {
+	mutation := newInviteRebateLogMutation(c.config, OpCreate)
+	return &InviteRebateLogCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of InviteRebateLog entities.
+func (c *InviteRebateLogClient) CreateBulk(builders ...*InviteRebateLogCreate) *InviteRebateLogCreateBulk {
+	return &InviteRebateLogCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *InviteRebateLogClient) MapCreateBulk(slice any, setFunc func(*InviteRebateLogCreate, int)) *InviteRebateLogCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &InviteRebateLogCreateBulk{err: fmt.Errorf("calling to InviteRebateLogClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*InviteRebateLogCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &InviteRebateLogCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for InviteRebateLog.
+func (c *InviteRebateLogClient) Update() *InviteRebateLogUpdate {
+	mutation := newInviteRebateLogMutation(c.config, OpUpdate)
+	return &InviteRebateLogUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *InviteRebateLogClient) UpdateOne(irl *InviteRebateLog) *InviteRebateLogUpdateOne {
+	mutation := newInviteRebateLogMutation(c.config, OpUpdateOne, withInviteRebateLog(irl))
+	return &InviteRebateLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *InviteRebateLogClient) UpdateOneID(id int) *InviteRebateLogUpdateOne {
+	mutation := newInviteRebateLogMutation(c.config, OpUpdateOne, withInviteRebateLogID(id))
+	return &InviteRebateLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for InviteRebateLog.
+func (c *InviteRebateLogClient) Delete() *InviteRebateLogDelete {
+	mutation := newInviteRebateLogMutation(c.config, OpDelete)
+	return &InviteRebateLogDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *InviteRebateLogClient) DeleteOne(irl *InviteRebateLog) *InviteRebateLogDeleteOne {
+	return c.DeleteOneID(irl.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *InviteRebateLogClient) DeleteOneID(id int) *InviteRebateLogDeleteOne {
+	builder := c.Delete().Where(inviterebatelog.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &InviteRebateLogDeleteOne{builder}
+}
+
+// Query returns a query builder for InviteRebateLog.
+func (c *InviteRebateLogClient) Query() *InviteRebateLogQuery {
+	return &InviteRebateLogQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeInviteRebateLog},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a InviteRebateLog entity by its id.
+func (c *InviteRebateLogClient) Get(ctx context.Context, id int) (*InviteRebateLog, error) {
+	return c.Query().Where(inviterebatelog.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *InviteRebateLogClient) GetX(ctx context.Context, id int) *InviteRebateLog {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *InviteRebateLogClient) Hooks() []Hook {
+	return c.hooks.InviteRebateLog
+}
+
+// Interceptors returns the client interceptors.
+func (c *InviteRebateLogClient) Interceptors() []Interceptor {
+	return c.inters.InviteRebateLog
+}
+
+func (c *InviteRebateLogClient) mutate(ctx context.Context, m *InviteRebateLogMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&InviteRebateLogCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&InviteRebateLogUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&InviteRebateLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&InviteRebateLogDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown InviteRebateLog mutation op: %q", m.Op())
 	}
 }
 
@@ -3302,14 +3586,14 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 type (
 	hooks struct {
 		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, ChannelKey, Group,
-		ModelPrice, ModelTag, OAuthClient, PaymentOrder, PaymentProviderConfig,
-		RedemptionCode, Setting, Task, Tier, UpstreamRequestLog, UsageLog,
-		User []ent.Hook
+		InviteProfile, InviteRebateLog, ModelPrice, ModelTag, OAuthClient,
+		PaymentOrder, PaymentProviderConfig, RedemptionCode, Setting, Task, Tier,
+		UpstreamRequestLog, UsageLog, User []ent.Hook
 	}
 	inters struct {
 		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, ChannelKey, Group,
-		ModelPrice, ModelTag, OAuthClient, PaymentOrder, PaymentProviderConfig,
-		RedemptionCode, Setting, Task, Tier, UpstreamRequestLog, UsageLog,
-		User []ent.Interceptor
+		InviteProfile, InviteRebateLog, ModelPrice, ModelTag, OAuthClient,
+		PaymentOrder, PaymentProviderConfig, RedemptionCode, Setting, Task, Tier,
+		UpstreamRequestLog, UsageLog, User []ent.Interceptor
 	}
 )

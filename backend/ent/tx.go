@@ -26,6 +26,10 @@ type Tx struct {
 	ChannelKey *ChannelKeyClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
+	// InviteProfile is the client for interacting with the InviteProfile builders.
+	InviteProfile *InviteProfileClient
+	// InviteRebateLog is the client for interacting with the InviteRebateLog builders.
+	InviteRebateLog *InviteRebateLogClient
 	// ModelPrice is the client for interacting with the ModelPrice builders.
 	ModelPrice *ModelPriceClient
 	// ModelTag is the client for interacting with the ModelTag builders.
@@ -188,6 +192,8 @@ func (tx *Tx) init() {
 	tx.Channel = NewChannelClient(tx.config)
 	tx.ChannelKey = NewChannelKeyClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
+	tx.InviteProfile = NewInviteProfileClient(tx.config)
+	tx.InviteRebateLog = NewInviteRebateLogClient(tx.config)
 	tx.ModelPrice = NewModelPriceClient(tx.config)
 	tx.ModelTag = NewModelTagClient(tx.config)
 	tx.OAuthClient = NewOAuthClientClient(tx.config)

@@ -43,6 +43,7 @@ import {
   Ticket,
   Wallet,
   AppWindow,
+  Gift,
 } from 'lucide-react';
 import { oauthApi } from '../../shared/api/oauth';
 import { queryKeys } from '../../shared/queryKeys';
@@ -67,6 +68,7 @@ const adminMenuItems: MenuItem[] = [
   { path: '/admin/usage', labelKey: 'nav.usage', icon: <ChartNoAxesCombined className="h-5 w-5" /> },
   { path: '/admin/payment', labelKey: 'nav.payment', icon: <CreditCard className="h-5 w-5" /> },
   { path: '/admin/redemption', labelKey: 'nav.redemption', icon: <Ticket className="h-5 w-5" /> },
+  { path: '/admin/invite', labelKey: 'nav.admin_invite', icon: <Gift className="h-5 w-5" /> },
   { path: '/admin/announcements', labelKey: 'nav.announcements', icon: <Megaphone className="h-5 w-5" /> },
   { path: '/admin/oauth-clients', labelKey: 'nav.oauth_clients', icon: <AppWindow className="h-5 w-5" /> },
   { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="h-5 w-5" />, sectionKey: 'nav.system' },
@@ -78,6 +80,7 @@ const userMenuItems: MenuItem[] = [
   { path: '/keys', labelKey: 'nav.my_keys', icon: <KeyRound className="h-5 w-5" /> },
   { path: '/usage', labelKey: 'nav.my_usage', icon: <ReceiptText className="h-5 w-5" /> },
   { path: '/recharge', labelKey: 'nav.recharge', icon: <Wallet className="h-5 w-5" /> },
+  { path: '/invite', labelKey: 'nav.invite', icon: <Gift className="h-5 w-5" /> },
 ];
 
 // API Key 登录只能看使用记录
@@ -143,13 +146,17 @@ export function AppShell({ children }: AppShellProps) {
     meta: { globalLoading: false },
   });
   const appEntries = (navApps ?? []).filter((app) => app.launch_url);
+  // 邀请返利未开启时，用户导航不展示入口（管理端入口不受影响，管理员需要它来开启功能）。
+  const visibleUserMenuItems = site.invite_enabled
+    ? userMenuItems
+    : userMenuItems.filter((item) => item.path !== '/invite');
   const sections = useMemo(() => {
     // 个人概览已独立在 /overview，与管理仪表盘（/）不再冲突，管理员直接拼完整用户菜单。
     const menuItems = isAPIKeySession
       ? apiKeyMenuItems
       : isAdmin
-        ? [...adminMenuItems, ...userMenuItems]
-        : [...userMenuItems];
+        ? [...adminMenuItems, ...visibleUserMenuItems]
+        : [...visibleUserMenuItems];
 
     const nextSections: Array<{ titleKey?: string; items: MenuItem[] }> = [];
     let currentSection: { titleKey?: string; items: MenuItem[] } | null = null;
@@ -167,7 +174,7 @@ export function AppShell({ children }: AppShellProps) {
     });
 
     return nextSections;
-  }, [isAPIKeySession, isAdmin]);
+  }, [isAPIKeySession, isAdmin, visibleUserMenuItems]);
 
   const toggleLanguage = () => {
     const nextLang = i18n.language === 'zh' ? 'en' : 'zh';

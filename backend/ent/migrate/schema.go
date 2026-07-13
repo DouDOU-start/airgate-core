@@ -245,6 +245,62 @@ var (
 		Columns:    GroupsColumns,
 		PrimaryKey: []*schema.Column{GroupsColumns[0]},
 	}
+	// InviteProfilesColumns holds the columns for the "invite_profiles" table.
+	InviteProfilesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "user_id", Type: field.TypeInt, Unique: true},
+		{Name: "invite_code", Type: field.TypeString, Unique: true, Size: 32},
+		{Name: "inviter_id", Type: field.TypeInt, Nullable: true},
+		{Name: "rebate_rate_override", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(5,2)"}},
+		{Name: "invited_count", Type: field.TypeInt, Default: 0},
+		{Name: "rebate_balance", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "rebate_total", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// InviteProfilesTable holds the schema information for the "invite_profiles" table.
+	InviteProfilesTable = &schema.Table{
+		Name:       "invite_profiles",
+		Columns:    InviteProfilesColumns,
+		PrimaryKey: []*schema.Column{InviteProfilesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "inviteprofile_inviter_id",
+				Unique:  false,
+				Columns: []*schema.Column{InviteProfilesColumns[3]},
+			},
+		},
+	}
+	// InviteRebateLogsColumns holds the columns for the "invite_rebate_logs" table.
+	InviteRebateLogsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "action", Type: field.TypeEnum, Enums: []string{"accrue", "transfer"}},
+		{Name: "amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "source_user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "source_order_no", Type: field.TypeString, Nullable: true},
+		{Name: "balance_after", Type: field.TypeFloat64, Nullable: true},
+		{Name: "idempotency_key", Type: field.TypeString, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// InviteRebateLogsTable holds the schema information for the "invite_rebate_logs" table.
+	InviteRebateLogsTable = &schema.Table{
+		Name:       "invite_rebate_logs",
+		Columns:    InviteRebateLogsColumns,
+		PrimaryKey: []*schema.Column{InviteRebateLogsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "inviterebatelog_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{InviteRebateLogsColumns[7]},
+			},
+			{
+				Name:    "inviterebatelog_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{InviteRebateLogsColumns[1], InviteRebateLogsColumns[8]},
+			},
+		},
+	}
 	// ModelPricesColumns holds the columns for the "model_prices" table.
 	ModelPricesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -798,6 +854,8 @@ var (
 		ChannelsTable,
 		ChannelKeysTable,
 		GroupsTable,
+		InviteProfilesTable,
+		InviteRebateLogsTable,
 		ModelPricesTable,
 		ModelTagsTable,
 		OauthClientsTable,

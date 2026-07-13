@@ -46,6 +46,7 @@ export interface RegisterReq {
   password: string;
   username?: string;
   verify_code?: string;
+  invite_code?: string;
 }
 
 // ==================== User ====================
@@ -1196,4 +1197,86 @@ export interface RedemptionCodesQuery {
 export interface RedeemResp {
   value: number;
   balance: number;
+}
+
+// ==================== 邀请返利 ====================
+
+// 我的邀请信息
+export interface InviteMe {
+  enabled: boolean;
+  invite_code?: string;
+  inviter_id?: number;
+  effective_rate_percent?: number;
+  invited_count: number;
+  rebate_balance: number;
+  rebate_total: number;
+}
+
+// 邀请关系条目（用户端"我邀请的人" / 管理端全量列表复用）
+export interface InviteeItem {
+  inviter_id: number;
+  inviter_email?: string;
+  inviter_username?: string;
+  invitee_id: number;
+  invitee_email?: string;
+  invitee_username?: string;
+  created_at: string;
+  total_rebate: number;
+}
+
+export interface InviteeListResp {
+  list: InviteeItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+// 返利流水条目
+export interface InviteRebateLogItem {
+  id: number;
+  user_id: number;
+  user_email?: string;
+  action: 'accrue' | 'transfer';
+  amount: number;
+  source_user_id?: number;
+  source_user_email?: string;
+  source_order_no?: string;
+  balance_after?: number;
+  created_at: string;
+}
+
+export interface InviteRebateLogListResp {
+  list: InviteRebateLogItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+// 返利转入余额结果
+export interface InviteTransferResp {
+  transferred: number;
+  balance: number;
+}
+
+// 专属返利比例覆盖列表条目（管理端）
+export interface InviteOverrideEntry {
+  user_id: number;
+  email?: string;
+  username?: string;
+  invite_code: string;
+  rate_percent?: number;
+  invited_count: number;
+}
+
+export interface InviteOverrideListResp {
+  list: InviteOverrideEntry[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface InviteListQuery {
+  page?: number;
+  page_size?: number;
+  keyword?: string;
 }

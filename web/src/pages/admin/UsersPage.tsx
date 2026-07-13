@@ -80,7 +80,7 @@ export default function UsersPage() {
 
   const { data: settings } = useQuery({
     queryKey: queryKeys.settings(),
-    queryFn: settingsApi.list,
+    queryFn: () => settingsApi.list(),
   });
 
   const createMutation = useCrudMutation({

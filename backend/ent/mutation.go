@@ -19,6 +19,8 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
+	"github.com/DouDOU-start/airgate-core/ent/inviteprofile"
+	"github.com/DouDOU-start/airgate-core/ent/inviterebatelog"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
 	"github.com/DouDOU-start/airgate-core/ent/modeltag"
 	"github.com/DouDOU-start/airgate-core/ent/oauthclient"
@@ -50,6 +52,8 @@ const (
 	TypeChannel               = "Channel"
 	TypeChannelKey            = "ChannelKey"
 	TypeGroup                 = "Group"
+	TypeInviteProfile         = "InviteProfile"
+	TypeInviteRebateLog       = "InviteRebateLog"
 	TypeModelPrice            = "ModelPrice"
 	TypeModelTag              = "ModelTag"
 	TypeOAuthClient           = "OAuthClient"
@@ -8046,6 +8050,1928 @@ func (m *GroupMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown Group edge %s", name)
+}
+
+// InviteProfileMutation represents an operation that mutates the InviteProfile nodes in the graph.
+type InviteProfileMutation struct {
+	config
+	op                      Op
+	typ                     string
+	id                      *int
+	user_id                 *int
+	adduser_id              *int
+	invite_code             *string
+	inviter_id              *int
+	addinviter_id           *int
+	rebate_rate_override    *float64
+	addrebate_rate_override *float64
+	invited_count           *int
+	addinvited_count        *int
+	rebate_balance          *float64
+	addrebate_balance       *float64
+	rebate_total            *float64
+	addrebate_total         *float64
+	created_at              *time.Time
+	updated_at              *time.Time
+	clearedFields           map[string]struct{}
+	done                    bool
+	oldValue                func(context.Context) (*InviteProfile, error)
+	predicates              []predicate.InviteProfile
+}
+
+var _ ent.Mutation = (*InviteProfileMutation)(nil)
+
+// inviteprofileOption allows management of the mutation configuration using functional options.
+type inviteprofileOption func(*InviteProfileMutation)
+
+// newInviteProfileMutation creates new mutation for the InviteProfile entity.
+func newInviteProfileMutation(c config, op Op, opts ...inviteprofileOption) *InviteProfileMutation {
+	m := &InviteProfileMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeInviteProfile,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withInviteProfileID sets the ID field of the mutation.
+func withInviteProfileID(id int) inviteprofileOption {
+	return func(m *InviteProfileMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *InviteProfile
+		)
+		m.oldValue = func(ctx context.Context) (*InviteProfile, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().InviteProfile.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withInviteProfile sets the old InviteProfile of the mutation.
+func withInviteProfile(node *InviteProfile) inviteprofileOption {
+	return func(m *InviteProfileMutation) {
+		m.oldValue = func(context.Context) (*InviteProfile, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m InviteProfileMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m InviteProfileMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *InviteProfileMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *InviteProfileMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().InviteProfile.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetUserID sets the "user_id" field.
+func (m *InviteProfileMutation) SetUserID(i int) {
+	m.user_id = &i
+	m.adduser_id = nil
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *InviteProfileMutation) UserID() (r int, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the InviteProfile entity.
+// If the InviteProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteProfileMutation) OldUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// AddUserID adds i to the "user_id" field.
+func (m *InviteProfileMutation) AddUserID(i int) {
+	if m.adduser_id != nil {
+		*m.adduser_id += i
+	} else {
+		m.adduser_id = &i
+	}
+}
+
+// AddedUserID returns the value that was added to the "user_id" field in this mutation.
+func (m *InviteProfileMutation) AddedUserID() (r int, exists bool) {
+	v := m.adduser_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *InviteProfileMutation) ResetUserID() {
+	m.user_id = nil
+	m.adduser_id = nil
+}
+
+// SetInviteCode sets the "invite_code" field.
+func (m *InviteProfileMutation) SetInviteCode(s string) {
+	m.invite_code = &s
+}
+
+// InviteCode returns the value of the "invite_code" field in the mutation.
+func (m *InviteProfileMutation) InviteCode() (r string, exists bool) {
+	v := m.invite_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInviteCode returns the old "invite_code" field's value of the InviteProfile entity.
+// If the InviteProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteProfileMutation) OldInviteCode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInviteCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInviteCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInviteCode: %w", err)
+	}
+	return oldValue.InviteCode, nil
+}
+
+// ResetInviteCode resets all changes to the "invite_code" field.
+func (m *InviteProfileMutation) ResetInviteCode() {
+	m.invite_code = nil
+}
+
+// SetInviterID sets the "inviter_id" field.
+func (m *InviteProfileMutation) SetInviterID(i int) {
+	m.inviter_id = &i
+	m.addinviter_id = nil
+}
+
+// InviterID returns the value of the "inviter_id" field in the mutation.
+func (m *InviteProfileMutation) InviterID() (r int, exists bool) {
+	v := m.inviter_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInviterID returns the old "inviter_id" field's value of the InviteProfile entity.
+// If the InviteProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteProfileMutation) OldInviterID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInviterID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInviterID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInviterID: %w", err)
+	}
+	return oldValue.InviterID, nil
+}
+
+// AddInviterID adds i to the "inviter_id" field.
+func (m *InviteProfileMutation) AddInviterID(i int) {
+	if m.addinviter_id != nil {
+		*m.addinviter_id += i
+	} else {
+		m.addinviter_id = &i
+	}
+}
+
+// AddedInviterID returns the value that was added to the "inviter_id" field in this mutation.
+func (m *InviteProfileMutation) AddedInviterID() (r int, exists bool) {
+	v := m.addinviter_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearInviterID clears the value of the "inviter_id" field.
+func (m *InviteProfileMutation) ClearInviterID() {
+	m.inviter_id = nil
+	m.addinviter_id = nil
+	m.clearedFields[inviteprofile.FieldInviterID] = struct{}{}
+}
+
+// InviterIDCleared returns if the "inviter_id" field was cleared in this mutation.
+func (m *InviteProfileMutation) InviterIDCleared() bool {
+	_, ok := m.clearedFields[inviteprofile.FieldInviterID]
+	return ok
+}
+
+// ResetInviterID resets all changes to the "inviter_id" field.
+func (m *InviteProfileMutation) ResetInviterID() {
+	m.inviter_id = nil
+	m.addinviter_id = nil
+	delete(m.clearedFields, inviteprofile.FieldInviterID)
+}
+
+// SetRebateRateOverride sets the "rebate_rate_override" field.
+func (m *InviteProfileMutation) SetRebateRateOverride(f float64) {
+	m.rebate_rate_override = &f
+	m.addrebate_rate_override = nil
+}
+
+// RebateRateOverride returns the value of the "rebate_rate_override" field in the mutation.
+func (m *InviteProfileMutation) RebateRateOverride() (r float64, exists bool) {
+	v := m.rebate_rate_override
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRebateRateOverride returns the old "rebate_rate_override" field's value of the InviteProfile entity.
+// If the InviteProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteProfileMutation) OldRebateRateOverride(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRebateRateOverride is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRebateRateOverride requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRebateRateOverride: %w", err)
+	}
+	return oldValue.RebateRateOverride, nil
+}
+
+// AddRebateRateOverride adds f to the "rebate_rate_override" field.
+func (m *InviteProfileMutation) AddRebateRateOverride(f float64) {
+	if m.addrebate_rate_override != nil {
+		*m.addrebate_rate_override += f
+	} else {
+		m.addrebate_rate_override = &f
+	}
+}
+
+// AddedRebateRateOverride returns the value that was added to the "rebate_rate_override" field in this mutation.
+func (m *InviteProfileMutation) AddedRebateRateOverride() (r float64, exists bool) {
+	v := m.addrebate_rate_override
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearRebateRateOverride clears the value of the "rebate_rate_override" field.
+func (m *InviteProfileMutation) ClearRebateRateOverride() {
+	m.rebate_rate_override = nil
+	m.addrebate_rate_override = nil
+	m.clearedFields[inviteprofile.FieldRebateRateOverride] = struct{}{}
+}
+
+// RebateRateOverrideCleared returns if the "rebate_rate_override" field was cleared in this mutation.
+func (m *InviteProfileMutation) RebateRateOverrideCleared() bool {
+	_, ok := m.clearedFields[inviteprofile.FieldRebateRateOverride]
+	return ok
+}
+
+// ResetRebateRateOverride resets all changes to the "rebate_rate_override" field.
+func (m *InviteProfileMutation) ResetRebateRateOverride() {
+	m.rebate_rate_override = nil
+	m.addrebate_rate_override = nil
+	delete(m.clearedFields, inviteprofile.FieldRebateRateOverride)
+}
+
+// SetInvitedCount sets the "invited_count" field.
+func (m *InviteProfileMutation) SetInvitedCount(i int) {
+	m.invited_count = &i
+	m.addinvited_count = nil
+}
+
+// InvitedCount returns the value of the "invited_count" field in the mutation.
+func (m *InviteProfileMutation) InvitedCount() (r int, exists bool) {
+	v := m.invited_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInvitedCount returns the old "invited_count" field's value of the InviteProfile entity.
+// If the InviteProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteProfileMutation) OldInvitedCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInvitedCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInvitedCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInvitedCount: %w", err)
+	}
+	return oldValue.InvitedCount, nil
+}
+
+// AddInvitedCount adds i to the "invited_count" field.
+func (m *InviteProfileMutation) AddInvitedCount(i int) {
+	if m.addinvited_count != nil {
+		*m.addinvited_count += i
+	} else {
+		m.addinvited_count = &i
+	}
+}
+
+// AddedInvitedCount returns the value that was added to the "invited_count" field in this mutation.
+func (m *InviteProfileMutation) AddedInvitedCount() (r int, exists bool) {
+	v := m.addinvited_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetInvitedCount resets all changes to the "invited_count" field.
+func (m *InviteProfileMutation) ResetInvitedCount() {
+	m.invited_count = nil
+	m.addinvited_count = nil
+}
+
+// SetRebateBalance sets the "rebate_balance" field.
+func (m *InviteProfileMutation) SetRebateBalance(f float64) {
+	m.rebate_balance = &f
+	m.addrebate_balance = nil
+}
+
+// RebateBalance returns the value of the "rebate_balance" field in the mutation.
+func (m *InviteProfileMutation) RebateBalance() (r float64, exists bool) {
+	v := m.rebate_balance
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRebateBalance returns the old "rebate_balance" field's value of the InviteProfile entity.
+// If the InviteProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteProfileMutation) OldRebateBalance(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRebateBalance is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRebateBalance requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRebateBalance: %w", err)
+	}
+	return oldValue.RebateBalance, nil
+}
+
+// AddRebateBalance adds f to the "rebate_balance" field.
+func (m *InviteProfileMutation) AddRebateBalance(f float64) {
+	if m.addrebate_balance != nil {
+		*m.addrebate_balance += f
+	} else {
+		m.addrebate_balance = &f
+	}
+}
+
+// AddedRebateBalance returns the value that was added to the "rebate_balance" field in this mutation.
+func (m *InviteProfileMutation) AddedRebateBalance() (r float64, exists bool) {
+	v := m.addrebate_balance
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRebateBalance resets all changes to the "rebate_balance" field.
+func (m *InviteProfileMutation) ResetRebateBalance() {
+	m.rebate_balance = nil
+	m.addrebate_balance = nil
+}
+
+// SetRebateTotal sets the "rebate_total" field.
+func (m *InviteProfileMutation) SetRebateTotal(f float64) {
+	m.rebate_total = &f
+	m.addrebate_total = nil
+}
+
+// RebateTotal returns the value of the "rebate_total" field in the mutation.
+func (m *InviteProfileMutation) RebateTotal() (r float64, exists bool) {
+	v := m.rebate_total
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRebateTotal returns the old "rebate_total" field's value of the InviteProfile entity.
+// If the InviteProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteProfileMutation) OldRebateTotal(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRebateTotal is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRebateTotal requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRebateTotal: %w", err)
+	}
+	return oldValue.RebateTotal, nil
+}
+
+// AddRebateTotal adds f to the "rebate_total" field.
+func (m *InviteProfileMutation) AddRebateTotal(f float64) {
+	if m.addrebate_total != nil {
+		*m.addrebate_total += f
+	} else {
+		m.addrebate_total = &f
+	}
+}
+
+// AddedRebateTotal returns the value that was added to the "rebate_total" field in this mutation.
+func (m *InviteProfileMutation) AddedRebateTotal() (r float64, exists bool) {
+	v := m.addrebate_total
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRebateTotal resets all changes to the "rebate_total" field.
+func (m *InviteProfileMutation) ResetRebateTotal() {
+	m.rebate_total = nil
+	m.addrebate_total = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *InviteProfileMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *InviteProfileMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the InviteProfile entity.
+// If the InviteProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteProfileMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *InviteProfileMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *InviteProfileMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *InviteProfileMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the InviteProfile entity.
+// If the InviteProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteProfileMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *InviteProfileMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the InviteProfileMutation builder.
+func (m *InviteProfileMutation) Where(ps ...predicate.InviteProfile) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the InviteProfileMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *InviteProfileMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.InviteProfile, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *InviteProfileMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *InviteProfileMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (InviteProfile).
+func (m *InviteProfileMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *InviteProfileMutation) Fields() []string {
+	fields := make([]string, 0, 9)
+	if m.user_id != nil {
+		fields = append(fields, inviteprofile.FieldUserID)
+	}
+	if m.invite_code != nil {
+		fields = append(fields, inviteprofile.FieldInviteCode)
+	}
+	if m.inviter_id != nil {
+		fields = append(fields, inviteprofile.FieldInviterID)
+	}
+	if m.rebate_rate_override != nil {
+		fields = append(fields, inviteprofile.FieldRebateRateOverride)
+	}
+	if m.invited_count != nil {
+		fields = append(fields, inviteprofile.FieldInvitedCount)
+	}
+	if m.rebate_balance != nil {
+		fields = append(fields, inviteprofile.FieldRebateBalance)
+	}
+	if m.rebate_total != nil {
+		fields = append(fields, inviteprofile.FieldRebateTotal)
+	}
+	if m.created_at != nil {
+		fields = append(fields, inviteprofile.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, inviteprofile.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *InviteProfileMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case inviteprofile.FieldUserID:
+		return m.UserID()
+	case inviteprofile.FieldInviteCode:
+		return m.InviteCode()
+	case inviteprofile.FieldInviterID:
+		return m.InviterID()
+	case inviteprofile.FieldRebateRateOverride:
+		return m.RebateRateOverride()
+	case inviteprofile.FieldInvitedCount:
+		return m.InvitedCount()
+	case inviteprofile.FieldRebateBalance:
+		return m.RebateBalance()
+	case inviteprofile.FieldRebateTotal:
+		return m.RebateTotal()
+	case inviteprofile.FieldCreatedAt:
+		return m.CreatedAt()
+	case inviteprofile.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *InviteProfileMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case inviteprofile.FieldUserID:
+		return m.OldUserID(ctx)
+	case inviteprofile.FieldInviteCode:
+		return m.OldInviteCode(ctx)
+	case inviteprofile.FieldInviterID:
+		return m.OldInviterID(ctx)
+	case inviteprofile.FieldRebateRateOverride:
+		return m.OldRebateRateOverride(ctx)
+	case inviteprofile.FieldInvitedCount:
+		return m.OldInvitedCount(ctx)
+	case inviteprofile.FieldRebateBalance:
+		return m.OldRebateBalance(ctx)
+	case inviteprofile.FieldRebateTotal:
+		return m.OldRebateTotal(ctx)
+	case inviteprofile.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case inviteprofile.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown InviteProfile field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *InviteProfileMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case inviteprofile.FieldUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case inviteprofile.FieldInviteCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInviteCode(v)
+		return nil
+	case inviteprofile.FieldInviterID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInviterID(v)
+		return nil
+	case inviteprofile.FieldRebateRateOverride:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRebateRateOverride(v)
+		return nil
+	case inviteprofile.FieldInvitedCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInvitedCount(v)
+		return nil
+	case inviteprofile.FieldRebateBalance:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRebateBalance(v)
+		return nil
+	case inviteprofile.FieldRebateTotal:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRebateTotal(v)
+		return nil
+	case inviteprofile.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case inviteprofile.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown InviteProfile field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *InviteProfileMutation) AddedFields() []string {
+	var fields []string
+	if m.adduser_id != nil {
+		fields = append(fields, inviteprofile.FieldUserID)
+	}
+	if m.addinviter_id != nil {
+		fields = append(fields, inviteprofile.FieldInviterID)
+	}
+	if m.addrebate_rate_override != nil {
+		fields = append(fields, inviteprofile.FieldRebateRateOverride)
+	}
+	if m.addinvited_count != nil {
+		fields = append(fields, inviteprofile.FieldInvitedCount)
+	}
+	if m.addrebate_balance != nil {
+		fields = append(fields, inviteprofile.FieldRebateBalance)
+	}
+	if m.addrebate_total != nil {
+		fields = append(fields, inviteprofile.FieldRebateTotal)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *InviteProfileMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case inviteprofile.FieldUserID:
+		return m.AddedUserID()
+	case inviteprofile.FieldInviterID:
+		return m.AddedInviterID()
+	case inviteprofile.FieldRebateRateOverride:
+		return m.AddedRebateRateOverride()
+	case inviteprofile.FieldInvitedCount:
+		return m.AddedInvitedCount()
+	case inviteprofile.FieldRebateBalance:
+		return m.AddedRebateBalance()
+	case inviteprofile.FieldRebateTotal:
+		return m.AddedRebateTotal()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *InviteProfileMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case inviteprofile.FieldUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUserID(v)
+		return nil
+	case inviteprofile.FieldInviterID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddInviterID(v)
+		return nil
+	case inviteprofile.FieldRebateRateOverride:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRebateRateOverride(v)
+		return nil
+	case inviteprofile.FieldInvitedCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddInvitedCount(v)
+		return nil
+	case inviteprofile.FieldRebateBalance:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRebateBalance(v)
+		return nil
+	case inviteprofile.FieldRebateTotal:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRebateTotal(v)
+		return nil
+	}
+	return fmt.Errorf("unknown InviteProfile numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *InviteProfileMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(inviteprofile.FieldInviterID) {
+		fields = append(fields, inviteprofile.FieldInviterID)
+	}
+	if m.FieldCleared(inviteprofile.FieldRebateRateOverride) {
+		fields = append(fields, inviteprofile.FieldRebateRateOverride)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *InviteProfileMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *InviteProfileMutation) ClearField(name string) error {
+	switch name {
+	case inviteprofile.FieldInviterID:
+		m.ClearInviterID()
+		return nil
+	case inviteprofile.FieldRebateRateOverride:
+		m.ClearRebateRateOverride()
+		return nil
+	}
+	return fmt.Errorf("unknown InviteProfile nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *InviteProfileMutation) ResetField(name string) error {
+	switch name {
+	case inviteprofile.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case inviteprofile.FieldInviteCode:
+		m.ResetInviteCode()
+		return nil
+	case inviteprofile.FieldInviterID:
+		m.ResetInviterID()
+		return nil
+	case inviteprofile.FieldRebateRateOverride:
+		m.ResetRebateRateOverride()
+		return nil
+	case inviteprofile.FieldInvitedCount:
+		m.ResetInvitedCount()
+		return nil
+	case inviteprofile.FieldRebateBalance:
+		m.ResetRebateBalance()
+		return nil
+	case inviteprofile.FieldRebateTotal:
+		m.ResetRebateTotal()
+		return nil
+	case inviteprofile.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case inviteprofile.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown InviteProfile field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *InviteProfileMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *InviteProfileMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *InviteProfileMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *InviteProfileMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *InviteProfileMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *InviteProfileMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *InviteProfileMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown InviteProfile unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *InviteProfileMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown InviteProfile edge %s", name)
+}
+
+// InviteRebateLogMutation represents an operation that mutates the InviteRebateLog nodes in the graph.
+type InviteRebateLogMutation struct {
+	config
+	op                Op
+	typ               string
+	id                *int
+	user_id           *int
+	adduser_id        *int
+	action            *inviterebatelog.Action
+	amount            *float64
+	addamount         *float64
+	source_user_id    *int
+	addsource_user_id *int
+	source_order_no   *string
+	balance_after     *float64
+	addbalance_after  *float64
+	idempotency_key   *string
+	created_at        *time.Time
+	clearedFields     map[string]struct{}
+	done              bool
+	oldValue          func(context.Context) (*InviteRebateLog, error)
+	predicates        []predicate.InviteRebateLog
+}
+
+var _ ent.Mutation = (*InviteRebateLogMutation)(nil)
+
+// inviterebatelogOption allows management of the mutation configuration using functional options.
+type inviterebatelogOption func(*InviteRebateLogMutation)
+
+// newInviteRebateLogMutation creates new mutation for the InviteRebateLog entity.
+func newInviteRebateLogMutation(c config, op Op, opts ...inviterebatelogOption) *InviteRebateLogMutation {
+	m := &InviteRebateLogMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeInviteRebateLog,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withInviteRebateLogID sets the ID field of the mutation.
+func withInviteRebateLogID(id int) inviterebatelogOption {
+	return func(m *InviteRebateLogMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *InviteRebateLog
+		)
+		m.oldValue = func(ctx context.Context) (*InviteRebateLog, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().InviteRebateLog.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withInviteRebateLog sets the old InviteRebateLog of the mutation.
+func withInviteRebateLog(node *InviteRebateLog) inviterebatelogOption {
+	return func(m *InviteRebateLogMutation) {
+		m.oldValue = func(context.Context) (*InviteRebateLog, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m InviteRebateLogMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m InviteRebateLogMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *InviteRebateLogMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *InviteRebateLogMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().InviteRebateLog.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetUserID sets the "user_id" field.
+func (m *InviteRebateLogMutation) SetUserID(i int) {
+	m.user_id = &i
+	m.adduser_id = nil
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *InviteRebateLogMutation) UserID() (r int, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the InviteRebateLog entity.
+// If the InviteRebateLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRebateLogMutation) OldUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// AddUserID adds i to the "user_id" field.
+func (m *InviteRebateLogMutation) AddUserID(i int) {
+	if m.adduser_id != nil {
+		*m.adduser_id += i
+	} else {
+		m.adduser_id = &i
+	}
+}
+
+// AddedUserID returns the value that was added to the "user_id" field in this mutation.
+func (m *InviteRebateLogMutation) AddedUserID() (r int, exists bool) {
+	v := m.adduser_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *InviteRebateLogMutation) ResetUserID() {
+	m.user_id = nil
+	m.adduser_id = nil
+}
+
+// SetAction sets the "action" field.
+func (m *InviteRebateLogMutation) SetAction(i inviterebatelog.Action) {
+	m.action = &i
+}
+
+// Action returns the value of the "action" field in the mutation.
+func (m *InviteRebateLogMutation) Action() (r inviterebatelog.Action, exists bool) {
+	v := m.action
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAction returns the old "action" field's value of the InviteRebateLog entity.
+// If the InviteRebateLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRebateLogMutation) OldAction(ctx context.Context) (v inviterebatelog.Action, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAction is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAction requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAction: %w", err)
+	}
+	return oldValue.Action, nil
+}
+
+// ResetAction resets all changes to the "action" field.
+func (m *InviteRebateLogMutation) ResetAction() {
+	m.action = nil
+}
+
+// SetAmount sets the "amount" field.
+func (m *InviteRebateLogMutation) SetAmount(f float64) {
+	m.amount = &f
+	m.addamount = nil
+}
+
+// Amount returns the value of the "amount" field in the mutation.
+func (m *InviteRebateLogMutation) Amount() (r float64, exists bool) {
+	v := m.amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAmount returns the old "amount" field's value of the InviteRebateLog entity.
+// If the InviteRebateLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRebateLogMutation) OldAmount(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAmount: %w", err)
+	}
+	return oldValue.Amount, nil
+}
+
+// AddAmount adds f to the "amount" field.
+func (m *InviteRebateLogMutation) AddAmount(f float64) {
+	if m.addamount != nil {
+		*m.addamount += f
+	} else {
+		m.addamount = &f
+	}
+}
+
+// AddedAmount returns the value that was added to the "amount" field in this mutation.
+func (m *InviteRebateLogMutation) AddedAmount() (r float64, exists bool) {
+	v := m.addamount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAmount resets all changes to the "amount" field.
+func (m *InviteRebateLogMutation) ResetAmount() {
+	m.amount = nil
+	m.addamount = nil
+}
+
+// SetSourceUserID sets the "source_user_id" field.
+func (m *InviteRebateLogMutation) SetSourceUserID(i int) {
+	m.source_user_id = &i
+	m.addsource_user_id = nil
+}
+
+// SourceUserID returns the value of the "source_user_id" field in the mutation.
+func (m *InviteRebateLogMutation) SourceUserID() (r int, exists bool) {
+	v := m.source_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceUserID returns the old "source_user_id" field's value of the InviteRebateLog entity.
+// If the InviteRebateLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRebateLogMutation) OldSourceUserID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceUserID: %w", err)
+	}
+	return oldValue.SourceUserID, nil
+}
+
+// AddSourceUserID adds i to the "source_user_id" field.
+func (m *InviteRebateLogMutation) AddSourceUserID(i int) {
+	if m.addsource_user_id != nil {
+		*m.addsource_user_id += i
+	} else {
+		m.addsource_user_id = &i
+	}
+}
+
+// AddedSourceUserID returns the value that was added to the "source_user_id" field in this mutation.
+func (m *InviteRebateLogMutation) AddedSourceUserID() (r int, exists bool) {
+	v := m.addsource_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSourceUserID clears the value of the "source_user_id" field.
+func (m *InviteRebateLogMutation) ClearSourceUserID() {
+	m.source_user_id = nil
+	m.addsource_user_id = nil
+	m.clearedFields[inviterebatelog.FieldSourceUserID] = struct{}{}
+}
+
+// SourceUserIDCleared returns if the "source_user_id" field was cleared in this mutation.
+func (m *InviteRebateLogMutation) SourceUserIDCleared() bool {
+	_, ok := m.clearedFields[inviterebatelog.FieldSourceUserID]
+	return ok
+}
+
+// ResetSourceUserID resets all changes to the "source_user_id" field.
+func (m *InviteRebateLogMutation) ResetSourceUserID() {
+	m.source_user_id = nil
+	m.addsource_user_id = nil
+	delete(m.clearedFields, inviterebatelog.FieldSourceUserID)
+}
+
+// SetSourceOrderNo sets the "source_order_no" field.
+func (m *InviteRebateLogMutation) SetSourceOrderNo(s string) {
+	m.source_order_no = &s
+}
+
+// SourceOrderNo returns the value of the "source_order_no" field in the mutation.
+func (m *InviteRebateLogMutation) SourceOrderNo() (r string, exists bool) {
+	v := m.source_order_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceOrderNo returns the old "source_order_no" field's value of the InviteRebateLog entity.
+// If the InviteRebateLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRebateLogMutation) OldSourceOrderNo(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceOrderNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceOrderNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceOrderNo: %w", err)
+	}
+	return oldValue.SourceOrderNo, nil
+}
+
+// ClearSourceOrderNo clears the value of the "source_order_no" field.
+func (m *InviteRebateLogMutation) ClearSourceOrderNo() {
+	m.source_order_no = nil
+	m.clearedFields[inviterebatelog.FieldSourceOrderNo] = struct{}{}
+}
+
+// SourceOrderNoCleared returns if the "source_order_no" field was cleared in this mutation.
+func (m *InviteRebateLogMutation) SourceOrderNoCleared() bool {
+	_, ok := m.clearedFields[inviterebatelog.FieldSourceOrderNo]
+	return ok
+}
+
+// ResetSourceOrderNo resets all changes to the "source_order_no" field.
+func (m *InviteRebateLogMutation) ResetSourceOrderNo() {
+	m.source_order_no = nil
+	delete(m.clearedFields, inviterebatelog.FieldSourceOrderNo)
+}
+
+// SetBalanceAfter sets the "balance_after" field.
+func (m *InviteRebateLogMutation) SetBalanceAfter(f float64) {
+	m.balance_after = &f
+	m.addbalance_after = nil
+}
+
+// BalanceAfter returns the value of the "balance_after" field in the mutation.
+func (m *InviteRebateLogMutation) BalanceAfter() (r float64, exists bool) {
+	v := m.balance_after
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBalanceAfter returns the old "balance_after" field's value of the InviteRebateLog entity.
+// If the InviteRebateLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRebateLogMutation) OldBalanceAfter(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBalanceAfter is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBalanceAfter requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBalanceAfter: %w", err)
+	}
+	return oldValue.BalanceAfter, nil
+}
+
+// AddBalanceAfter adds f to the "balance_after" field.
+func (m *InviteRebateLogMutation) AddBalanceAfter(f float64) {
+	if m.addbalance_after != nil {
+		*m.addbalance_after += f
+	} else {
+		m.addbalance_after = &f
+	}
+}
+
+// AddedBalanceAfter returns the value that was added to the "balance_after" field in this mutation.
+func (m *InviteRebateLogMutation) AddedBalanceAfter() (r float64, exists bool) {
+	v := m.addbalance_after
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearBalanceAfter clears the value of the "balance_after" field.
+func (m *InviteRebateLogMutation) ClearBalanceAfter() {
+	m.balance_after = nil
+	m.addbalance_after = nil
+	m.clearedFields[inviterebatelog.FieldBalanceAfter] = struct{}{}
+}
+
+// BalanceAfterCleared returns if the "balance_after" field was cleared in this mutation.
+func (m *InviteRebateLogMutation) BalanceAfterCleared() bool {
+	_, ok := m.clearedFields[inviterebatelog.FieldBalanceAfter]
+	return ok
+}
+
+// ResetBalanceAfter resets all changes to the "balance_after" field.
+func (m *InviteRebateLogMutation) ResetBalanceAfter() {
+	m.balance_after = nil
+	m.addbalance_after = nil
+	delete(m.clearedFields, inviterebatelog.FieldBalanceAfter)
+}
+
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (m *InviteRebateLogMutation) SetIdempotencyKey(s string) {
+	m.idempotency_key = &s
+}
+
+// IdempotencyKey returns the value of the "idempotency_key" field in the mutation.
+func (m *InviteRebateLogMutation) IdempotencyKey() (r string, exists bool) {
+	v := m.idempotency_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIdempotencyKey returns the old "idempotency_key" field's value of the InviteRebateLog entity.
+// If the InviteRebateLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRebateLogMutation) OldIdempotencyKey(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIdempotencyKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIdempotencyKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIdempotencyKey: %w", err)
+	}
+	return oldValue.IdempotencyKey, nil
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (m *InviteRebateLogMutation) ClearIdempotencyKey() {
+	m.idempotency_key = nil
+	m.clearedFields[inviterebatelog.FieldIdempotencyKey] = struct{}{}
+}
+
+// IdempotencyKeyCleared returns if the "idempotency_key" field was cleared in this mutation.
+func (m *InviteRebateLogMutation) IdempotencyKeyCleared() bool {
+	_, ok := m.clearedFields[inviterebatelog.FieldIdempotencyKey]
+	return ok
+}
+
+// ResetIdempotencyKey resets all changes to the "idempotency_key" field.
+func (m *InviteRebateLogMutation) ResetIdempotencyKey() {
+	m.idempotency_key = nil
+	delete(m.clearedFields, inviterebatelog.FieldIdempotencyKey)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *InviteRebateLogMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *InviteRebateLogMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the InviteRebateLog entity.
+// If the InviteRebateLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRebateLogMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *InviteRebateLogMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the InviteRebateLogMutation builder.
+func (m *InviteRebateLogMutation) Where(ps ...predicate.InviteRebateLog) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the InviteRebateLogMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *InviteRebateLogMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.InviteRebateLog, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *InviteRebateLogMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *InviteRebateLogMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (InviteRebateLog).
+func (m *InviteRebateLogMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *InviteRebateLogMutation) Fields() []string {
+	fields := make([]string, 0, 8)
+	if m.user_id != nil {
+		fields = append(fields, inviterebatelog.FieldUserID)
+	}
+	if m.action != nil {
+		fields = append(fields, inviterebatelog.FieldAction)
+	}
+	if m.amount != nil {
+		fields = append(fields, inviterebatelog.FieldAmount)
+	}
+	if m.source_user_id != nil {
+		fields = append(fields, inviterebatelog.FieldSourceUserID)
+	}
+	if m.source_order_no != nil {
+		fields = append(fields, inviterebatelog.FieldSourceOrderNo)
+	}
+	if m.balance_after != nil {
+		fields = append(fields, inviterebatelog.FieldBalanceAfter)
+	}
+	if m.idempotency_key != nil {
+		fields = append(fields, inviterebatelog.FieldIdempotencyKey)
+	}
+	if m.created_at != nil {
+		fields = append(fields, inviterebatelog.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *InviteRebateLogMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case inviterebatelog.FieldUserID:
+		return m.UserID()
+	case inviterebatelog.FieldAction:
+		return m.Action()
+	case inviterebatelog.FieldAmount:
+		return m.Amount()
+	case inviterebatelog.FieldSourceUserID:
+		return m.SourceUserID()
+	case inviterebatelog.FieldSourceOrderNo:
+		return m.SourceOrderNo()
+	case inviterebatelog.FieldBalanceAfter:
+		return m.BalanceAfter()
+	case inviterebatelog.FieldIdempotencyKey:
+		return m.IdempotencyKey()
+	case inviterebatelog.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *InviteRebateLogMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case inviterebatelog.FieldUserID:
+		return m.OldUserID(ctx)
+	case inviterebatelog.FieldAction:
+		return m.OldAction(ctx)
+	case inviterebatelog.FieldAmount:
+		return m.OldAmount(ctx)
+	case inviterebatelog.FieldSourceUserID:
+		return m.OldSourceUserID(ctx)
+	case inviterebatelog.FieldSourceOrderNo:
+		return m.OldSourceOrderNo(ctx)
+	case inviterebatelog.FieldBalanceAfter:
+		return m.OldBalanceAfter(ctx)
+	case inviterebatelog.FieldIdempotencyKey:
+		return m.OldIdempotencyKey(ctx)
+	case inviterebatelog.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown InviteRebateLog field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *InviteRebateLogMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case inviterebatelog.FieldUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case inviterebatelog.FieldAction:
+		v, ok := value.(inviterebatelog.Action)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAction(v)
+		return nil
+	case inviterebatelog.FieldAmount:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAmount(v)
+		return nil
+	case inviterebatelog.FieldSourceUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceUserID(v)
+		return nil
+	case inviterebatelog.FieldSourceOrderNo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceOrderNo(v)
+		return nil
+	case inviterebatelog.FieldBalanceAfter:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBalanceAfter(v)
+		return nil
+	case inviterebatelog.FieldIdempotencyKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIdempotencyKey(v)
+		return nil
+	case inviterebatelog.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown InviteRebateLog field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *InviteRebateLogMutation) AddedFields() []string {
+	var fields []string
+	if m.adduser_id != nil {
+		fields = append(fields, inviterebatelog.FieldUserID)
+	}
+	if m.addamount != nil {
+		fields = append(fields, inviterebatelog.FieldAmount)
+	}
+	if m.addsource_user_id != nil {
+		fields = append(fields, inviterebatelog.FieldSourceUserID)
+	}
+	if m.addbalance_after != nil {
+		fields = append(fields, inviterebatelog.FieldBalanceAfter)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *InviteRebateLogMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case inviterebatelog.FieldUserID:
+		return m.AddedUserID()
+	case inviterebatelog.FieldAmount:
+		return m.AddedAmount()
+	case inviterebatelog.FieldSourceUserID:
+		return m.AddedSourceUserID()
+	case inviterebatelog.FieldBalanceAfter:
+		return m.AddedBalanceAfter()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *InviteRebateLogMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case inviterebatelog.FieldUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUserID(v)
+		return nil
+	case inviterebatelog.FieldAmount:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAmount(v)
+		return nil
+	case inviterebatelog.FieldSourceUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSourceUserID(v)
+		return nil
+	case inviterebatelog.FieldBalanceAfter:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBalanceAfter(v)
+		return nil
+	}
+	return fmt.Errorf("unknown InviteRebateLog numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *InviteRebateLogMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(inviterebatelog.FieldSourceUserID) {
+		fields = append(fields, inviterebatelog.FieldSourceUserID)
+	}
+	if m.FieldCleared(inviterebatelog.FieldSourceOrderNo) {
+		fields = append(fields, inviterebatelog.FieldSourceOrderNo)
+	}
+	if m.FieldCleared(inviterebatelog.FieldBalanceAfter) {
+		fields = append(fields, inviterebatelog.FieldBalanceAfter)
+	}
+	if m.FieldCleared(inviterebatelog.FieldIdempotencyKey) {
+		fields = append(fields, inviterebatelog.FieldIdempotencyKey)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *InviteRebateLogMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *InviteRebateLogMutation) ClearField(name string) error {
+	switch name {
+	case inviterebatelog.FieldSourceUserID:
+		m.ClearSourceUserID()
+		return nil
+	case inviterebatelog.FieldSourceOrderNo:
+		m.ClearSourceOrderNo()
+		return nil
+	case inviterebatelog.FieldBalanceAfter:
+		m.ClearBalanceAfter()
+		return nil
+	case inviterebatelog.FieldIdempotencyKey:
+		m.ClearIdempotencyKey()
+		return nil
+	}
+	return fmt.Errorf("unknown InviteRebateLog nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *InviteRebateLogMutation) ResetField(name string) error {
+	switch name {
+	case inviterebatelog.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case inviterebatelog.FieldAction:
+		m.ResetAction()
+		return nil
+	case inviterebatelog.FieldAmount:
+		m.ResetAmount()
+		return nil
+	case inviterebatelog.FieldSourceUserID:
+		m.ResetSourceUserID()
+		return nil
+	case inviterebatelog.FieldSourceOrderNo:
+		m.ResetSourceOrderNo()
+		return nil
+	case inviterebatelog.FieldBalanceAfter:
+		m.ResetBalanceAfter()
+		return nil
+	case inviterebatelog.FieldIdempotencyKey:
+		m.ResetIdempotencyKey()
+		return nil
+	case inviterebatelog.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown InviteRebateLog field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *InviteRebateLogMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *InviteRebateLogMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *InviteRebateLogMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *InviteRebateLogMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *InviteRebateLogMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *InviteRebateLogMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *InviteRebateLogMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown InviteRebateLog unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *InviteRebateLogMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown InviteRebateLog edge %s", name)
 }
 
 // ModelPriceMutation represents an operation that mutates the ModelPrice nodes in the graph.

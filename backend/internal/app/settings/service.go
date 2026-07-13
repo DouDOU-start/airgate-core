@@ -14,7 +14,8 @@ import (
 )
 
 // publicGroups 允许公开访问的设置分组。
-var publicGroups = []string{"site", "registration"}
+// invite 组（开关+全局比例）无敏感信息，整组公开供导航栏判断是否展示邀请入口。
+var publicGroups = []string{"site", "registration", "invite"}
 
 // publicSafeKeys 允许公开的 key（不暴露敏感项）。
 var publicSafeKeys = map[string]bool{

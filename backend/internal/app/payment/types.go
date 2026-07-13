@@ -86,9 +86,11 @@ type CreditInput struct {
 }
 
 // CreditResult 回调入账结果。AlreadyPaid=true 为幂等命中（不重复入账、不发通知）；
-// 首次成功入账时带上用户邮箱、入账金额与入账后余额，供充值成功邮件通知。
+// 首次成功入账时带上用户 ID、邮箱、入账金额与入账后余额，供充值成功邮件通知与
+// 邀请返利计提使用。
 type CreditResult struct {
 	AlreadyPaid  bool
+	UserID       int
 	Email        string
 	Amount       float64
 	BalanceAfter float64

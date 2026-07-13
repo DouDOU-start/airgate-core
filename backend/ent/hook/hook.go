@@ -93,6 +93,30 @@ func (f GroupFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.GroupMutation", m)
 }
 
+// The InviteProfileFunc type is an adapter to allow the use of ordinary
+// function as InviteProfile mutator.
+type InviteProfileFunc func(context.Context, *ent.InviteProfileMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f InviteProfileFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.InviteProfileMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.InviteProfileMutation", m)
+}
+
+// The InviteRebateLogFunc type is an adapter to allow the use of ordinary
+// function as InviteRebateLog mutator.
+type InviteRebateLogFunc func(context.Context, *ent.InviteRebateLogMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f InviteRebateLogFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.InviteRebateLogMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.InviteRebateLogMutation", m)
+}
+
 // The ModelPriceFunc type is an adapter to allow the use of ordinary
 // function as ModelPrice mutator.
 type ModelPriceFunc func(context.Context, *ent.ModelPriceMutation) (ent.Value, error)

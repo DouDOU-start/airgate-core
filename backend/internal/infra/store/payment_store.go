@@ -334,7 +334,7 @@ func (s *PaymentStore) CreditPaidOrder(ctx context.Context, in apppayment.Credit
 	if err := tx.Commit(); err != nil {
 		return apppayment.CreditResult{}, err
 	}
-	return apppayment.CreditResult{Email: usr.Email, Amount: order.Amount, BalanceAfter: after}, nil
+	return apppayment.CreditResult{UserID: usr.ID, Email: usr.Email, Amount: order.Amount, BalanceAfter: after}, nil
 }
 
 // ExpirePendingOrders 过期清理。

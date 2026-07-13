@@ -36,6 +36,16 @@ type MailSender interface {
 // 由 bootstrap 层注入，避免 app 层直接依赖 infra/mailer。
 type MailSenderFactory func(ctx context.Context) (MailSender, error)
 
+// InviteBinder 邀请返利域窄接口（由 app/invite.Service 实现），避免 auth 包
+// 直接依赖 invite 包。ValidateCode 只读校验，供注册前置拦截；BindInviter
+// 在用户创建成功后调用，同时兜底生成该用户自己的邀请码。
+type InviteBinder interface {
+	// ValidateCode 校验邀请码是否存在（不做任何写入）。总开关关闭或码为空返回 nil。
+	ValidateCode(ctx context.Context, code string) error
+	// BindInviter 生成/绑定邀请关系。总开关关闭返回 nil；code 为空只生成自己的邀请码。
+	BindInviter(ctx context.Context, userID int, code string) error
+}
+
 // Service 提供认证域用例编排。
 type Service struct {
 	repo          Repository
@@ -43,6 +53,7 @@ type Service struct {
 	settings      SettingsLister
 	codeStore     VerifyCodeStore
 	mailerFactory MailSenderFactory
+	inviteBinder  InviteBinder
 }
 
 // NewService 创建认证服务。
@@ -66,6 +77,11 @@ func (s *Service) SetVerifyCodeStore(cs VerifyCodeStore) {
 // SetMailerFactory 注入邮件发送器工厂。
 func (s *Service) SetMailerFactory(f MailSenderFactory) {
 	s.mailerFactory = f
+}
+
+// SetInviteBinder 注入邀请返利绑定依赖（注册流程需要）。
+func (s *Service) SetInviteBinder(b InviteBinder) {
+	s.inviteBinder = b
 }
 
 // Login 用户登录。
@@ -190,6 +206,14 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (LoginResul
 		}
 	}
 
+	// 邀请返利：注册前置校验邀请码（无效码直接拒绝，不创建用户）
+	if s.inviteBinder != nil {
+		if err := s.inviteBinder.ValidateCode(ctx, input.InviteCode); err != nil {
+			logger.Warn("user_register_rejected", logx.LogFieldReason, "invite_code_invalid")
+			return LoginResult{}, err
+		}
+	}
+
 	// 读取新用户默认值
 	defaultBalance, defaultConcurrency := s.getNewUserDefaults(ctx)
 
@@ -226,6 +250,14 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (LoginResul
 	if err != nil {
 		logger.Error("user_register_failed", logx.LogFieldReason, "create_user", logx.LogFieldError, err)
 		return LoginResult{}, err
+	}
+
+	// 邀请返利：生成本人邀请码 + 绑定邀请关系（已在 ValidateCode 校验过，
+	// 这里失败只记日志不影响注册结果，避免邀请域故障阻断核心注册流程）。
+	if s.inviteBinder != nil {
+		if err := s.inviteBinder.BindInviter(ctx, user.ID, input.InviteCode); err != nil {
+			logger.Warn("user_register_invite_bind_failed", logx.LogFieldUserID, user.ID, logx.LogFieldError, err)
+		}
 	}
 
 	token, err := s.jwtMgr.GenerateToken(user.ID, user.Role, user.Email)

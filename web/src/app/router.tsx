@@ -19,6 +19,8 @@ import {
   ChannelsPage,
   DashboardPage,
   GroupsPage,
+  InvitePage,
+  InviteRebatePage,
   lazyWithPreload,
   LoginPage,
   ModelPricesPage,
@@ -210,6 +212,7 @@ const adminAnnouncementsRoute = createRoute({ getParentRoute: () => adminLayout,
 const adminUsageRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/usage', component: renderPage(UsagePage) });
 const adminPaymentRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/payment', component: renderPage(PaymentPage) });
 const adminRedemptionRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/redemption', component: renderPage(RedemptionCodesPage) });
+const adminInviteRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/invite', component: renderPage(InviteRebatePage) });
 const adminSettingsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/settings', component: renderPage(SettingsPage) });
 const adminOAuthClientsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/oauth-clients', component: renderPage(OAuthClientsPage) });
 
@@ -217,6 +220,7 @@ const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/pro
 const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/keys', component: renderPage(UserKeysPage) });
 const userUsageRoute = createRoute({ getParentRoute: () => authLayout, path: '/usage', component: renderPage(UserUsagePage) });
 const rechargeRoute = createRoute({ getParentRoute: () => authLayout, path: '/recharge', component: renderPage(RechargePage) });
+const inviteRoute = createRoute({ getParentRoute: () => authLayout, path: '/invite', component: renderPage(InvitePage) });
 
 // 路由树
 const routeTree = rootRoute.addChildren([
@@ -235,6 +239,7 @@ const routeTree = rootRoute.addChildren([
       adminUsageRoute,
       adminPaymentRoute,
       adminRedemptionRoute,
+      adminInviteRoute,
       adminSettingsRoute,
       adminOAuthClientsRoute,
     ]),
@@ -242,6 +247,7 @@ const routeTree = rootRoute.addChildren([
     userKeysRoute,
     userUsageRoute,
     rechargeRoute,
+    inviteRoute,
   ]),
 ]);
 

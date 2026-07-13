@@ -25,6 +25,7 @@ type RegisterReq struct {
 	Password   string `json:"password" binding:"required,min=6"`
 	Username   string `json:"username"`
 	VerifyCode string `json:"verify_code"`
+	InviteCode string `json:"invite_code"`
 }
 
 // SendVerifyCodeReq 发送验证码请求

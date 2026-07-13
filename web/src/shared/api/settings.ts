@@ -8,7 +8,7 @@ export interface CoreVersionInfo {
 }
 
 export const settingsApi = {
-  list: () => get<SettingResp[]>('/api/v1/admin/settings'),
+  list: (group?: string) => get<SettingResp[]>('/api/v1/admin/settings', group ? { group } : undefined),
   update: (data: UpdateSettingsReq) => put<void>('/api/v1/admin/settings', data),
   testSMTP: (data: TestSMTPReq) => post<void>('/api/v1/admin/settings/test-smtp', data),
   getPublic: () => get<Record<string, string>>('/api/v1/settings/public'),

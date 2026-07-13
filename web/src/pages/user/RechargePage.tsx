@@ -21,6 +21,7 @@ import { formatDateTime } from '../../shared/utils/format';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
+import { useSiteSettings } from '../../app/providers/SiteSettingsProvider';
 import type { CreatePaymentOrderReq, PaymentOrder, PaymentOrderStatus, RedeemResp } from '../../shared/types';
 
 // 金额预设（单位 CNY，1 CNY = $1.00 额度）
@@ -46,6 +47,7 @@ export default function RechargePage() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const site = useSiteSettings();
 
   // 表单状态：预设金额 / 自定义金额 / 支付方式
   const [presetAmount, setPresetAmount] = useState<number | null>(PRESET_AMOUNTS[0] ?? null);
@@ -213,8 +215,8 @@ export default function RechargePage() {
             </Alert>
           ) : (
             <div className="space-y-5">
-              {/* 汇率说明 */}
-              <p className="text-sm text-text-tertiary">{t('payment.recharge_note')}</p>
+              {/* 汇率说明：优先展示管理员配置的提示文案，未配置则回退默认文案 */}
+              <p className="text-sm text-text-tertiary">{site.recharge_notice || t('payment.recharge_note')}</p>
 
               {/* 金额选择 */}
               <div>

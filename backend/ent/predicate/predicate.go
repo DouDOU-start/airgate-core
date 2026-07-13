@@ -27,6 +27,12 @@ type ChannelKey func(*sql.Selector)
 // Group is the predicate function for group builders.
 type Group func(*sql.Selector)
 
+// InviteProfile is the predicate function for inviteprofile builders.
+type InviteProfile func(*sql.Selector)
+
+// InviteRebateLog is the predicate function for inviterebatelog builders.
+type InviteRebateLog func(*sql.Selector)
+
 // ModelPrice is the predicate function for modelprice builders.
 type ModelPrice func(*sql.Selector)
 

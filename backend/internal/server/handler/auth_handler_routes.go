@@ -107,6 +107,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		Password:   req.Password,
 		Username:   req.Username,
 		VerifyCode: req.VerifyCode,
+		InviteCode: req.InviteCode,
 	})
 	if err != nil {
 		httpCode, message := h.handleRegisterError(err)

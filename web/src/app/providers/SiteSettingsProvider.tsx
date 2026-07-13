@@ -15,8 +15,10 @@ interface SiteSettings {
   contact_info: string;
   doc_url: string;
   home_content: string;
+  recharge_notice: string;
   registration_enabled: boolean;
   email_verify_enabled: boolean;
+  invite_enabled: boolean;
   settings_loaded: boolean;
 }
 
@@ -29,8 +31,10 @@ const defaults: SiteSettings = {
   contact_info: '',
   doc_url: '',
   home_content: '',
+  recharge_notice: '',
   registration_enabled: true,
   email_verify_enabled: false,
+  invite_enabled: false,
   settings_loaded: false,
 };
 
@@ -50,6 +54,7 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
     // Boolean 字段从字符串转换
     registration_enabled: data?.registration_enabled !== 'false',
     email_verify_enabled: data?.email_verify_enabled === 'true',
+    invite_enabled: data?.invite_enabled === 'true',
     settings_loaded: !isPending,
   }), [data, isPending]);
 

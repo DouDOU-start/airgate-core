@@ -23,7 +23,7 @@ import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
 const SITE_KEYS = [
   'site_name', 'site_subtitle', 'site_logo', 'api_base_url',
-  'contact_info', 'doc_url',
+  'contact_info', 'doc_url', 'recharge_notice',
 ] as const;
 
 const REG_KEYS = [
@@ -360,6 +360,13 @@ export default function SettingsPage() {
                 </Field>
                 <Field className="col-span-1 md:col-span-2" label={t('settings.site_logo')} hint={t('settings.site_logo_hint')}>
                   <LogoUpload value={val('site_logo')} onChange={(url) => set('site_logo', url)} />
+                </Field>
+                <Field className="col-span-1 md:col-span-2" label={t('settings.recharge_notice')} hint={t('settings.recharge_notice_hint')}>
+                  <TextArea
+                    value={val('recharge_notice')}
+                    onChange={(e) => set('recharge_notice', e.target.value)}
+                    rows={3}
+                  />
                 </Field>
               </div>
               {saveAction}

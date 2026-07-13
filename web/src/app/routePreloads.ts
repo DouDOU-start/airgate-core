@@ -38,11 +38,13 @@ export const AnnouncementsPage = lazyWithPreload(() => import('../pages/admin/An
 export const UsagePage = lazyWithPreload(() => import('../pages/admin/UsagePage'));
 export const PaymentPage = lazyWithPreload(() => import('../pages/admin/PaymentPage'));
 export const RedemptionCodesPage = lazyWithPreload(() => import('../pages/admin/RedemptionCodesPage'));
+export const InviteRebatePage = lazyWithPreload(() => import('../pages/admin/InviteRebatePage'));
 export const SettingsPage = lazyWithPreload(() => import('../pages/admin/SettingsPage'));
 export const ProfilePage = lazyWithPreload(() => import('../pages/user/ProfilePage'));
 export const UserKeysPage = lazyWithPreload(() => import('../pages/user/UserKeysPage'));
 export const UserUsagePage = lazyWithPreload(() => import('../pages/user/UserUsagePage'));
 export const RechargePage = lazyWithPreload(() => import('../pages/user/RechargePage'));
+export const InvitePage = lazyWithPreload(() => import('../pages/user/InvitePage'));
 export const OAuthAuthorizePage = lazyWithPreload(() => import('../pages/OAuthAuthorizePage'));
 export const OAuthClientsPage = lazyWithPreload(() => import('../pages/admin/OAuthClientsPage'));
 

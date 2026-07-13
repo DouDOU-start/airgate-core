@@ -100,6 +100,13 @@ func (s *Server) registerRoutes() {
 		// 兑换码充值（同充值：仅真实用户会话）
 		accountGroup.POST("/redeem", handlers.Redemption.Redeem)
 
+		// 邀请返利（用户端）
+		accountGroup.GET("/invite/me", handlers.Invite.GetMe)
+		accountGroup.GET("/invite/invitees", handlers.Invite.ListMyInvitees)
+		accountGroup.GET("/invite/logs", handlers.Invite.ListMyRebateLogs)
+		accountGroup.POST("/invite/bind", handlers.Invite.Bind)
+		accountGroup.POST("/invite/transfer", handlers.Invite.Transfer)
+
 		// OAuth 应用授权（仅真实用户会话；SPA 授权页转发）+ 应用导航入口
 		accountGroup.GET("/oauth/authorize-info", handlers.OAuth.GetAuthorizeInfo)
 		accountGroup.POST("/oauth/authorize", handlers.OAuth.Authorize)
@@ -228,6 +235,12 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/redemption-codes", handlers.Redemption.AdminGenerateCodes)
 		adminGroup.PATCH("/redemption-codes/:id/status", handlers.Redemption.AdminUpdateStatus)
 		adminGroup.DELETE("/redemption-codes/:id", handlers.Redemption.AdminDeleteCode)
+
+		// 邀请返利管理：专属比例覆盖 + 全量邀请关系/流水（总开关+全局比例走通用 /admin/settings?group=invite）
+		adminGroup.GET("/invite/overrides", handlers.Invite.AdminListOverrides)
+		adminGroup.PATCH("/invite/overrides/:userID", handlers.Invite.AdminSetOverride)
+		adminGroup.GET("/invite/invitees", handlers.Invite.AdminListInvitees)
+		adminGroup.GET("/invite/logs", handlers.Invite.AdminListRebateLogs)
 	}
 
 	// 加载嵌入的前端 SPA：所有静态资源通过 //go:embed 打进二进制

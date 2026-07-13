@@ -12,6 +12,8 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
+	"github.com/DouDOU-start/airgate-core/ent/inviteprofile"
+	"github.com/DouDOU-start/airgate-core/ent/inviterebatelog"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
 	"github.com/DouDOU-start/airgate-core/ent/modeltag"
 	"github.com/DouDOU-start/airgate-core/ent/oauthclient"
@@ -287,6 +289,54 @@ func init() {
 	group.DefaultUpdatedAt = groupDescUpdatedAt.Default.(func() time.Time)
 	// group.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	group.UpdateDefaultUpdatedAt = groupDescUpdatedAt.UpdateDefault.(func() time.Time)
+	inviteprofileFields := schema.InviteProfile{}.Fields()
+	_ = inviteprofileFields
+	// inviteprofileDescInviteCode is the schema descriptor for invite_code field.
+	inviteprofileDescInviteCode := inviteprofileFields[1].Descriptor()
+	// inviteprofile.InviteCodeValidator is a validator for the "invite_code" field. It is called by the builders before save.
+	inviteprofile.InviteCodeValidator = func() func(string) error {
+		validators := inviteprofileDescInviteCode.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(invite_code string) error {
+			for _, fn := range fns {
+				if err := fn(invite_code); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// inviteprofileDescInvitedCount is the schema descriptor for invited_count field.
+	inviteprofileDescInvitedCount := inviteprofileFields[4].Descriptor()
+	// inviteprofile.DefaultInvitedCount holds the default value on creation for the invited_count field.
+	inviteprofile.DefaultInvitedCount = inviteprofileDescInvitedCount.Default.(int)
+	// inviteprofileDescRebateBalance is the schema descriptor for rebate_balance field.
+	inviteprofileDescRebateBalance := inviteprofileFields[5].Descriptor()
+	// inviteprofile.DefaultRebateBalance holds the default value on creation for the rebate_balance field.
+	inviteprofile.DefaultRebateBalance = inviteprofileDescRebateBalance.Default.(float64)
+	// inviteprofileDescRebateTotal is the schema descriptor for rebate_total field.
+	inviteprofileDescRebateTotal := inviteprofileFields[6].Descriptor()
+	// inviteprofile.DefaultRebateTotal holds the default value on creation for the rebate_total field.
+	inviteprofile.DefaultRebateTotal = inviteprofileDescRebateTotal.Default.(float64)
+	// inviteprofileDescCreatedAt is the schema descriptor for created_at field.
+	inviteprofileDescCreatedAt := inviteprofileFields[7].Descriptor()
+	// inviteprofile.DefaultCreatedAt holds the default value on creation for the created_at field.
+	inviteprofile.DefaultCreatedAt = inviteprofileDescCreatedAt.Default.(func() time.Time)
+	// inviteprofileDescUpdatedAt is the schema descriptor for updated_at field.
+	inviteprofileDescUpdatedAt := inviteprofileFields[8].Descriptor()
+	// inviteprofile.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	inviteprofile.DefaultUpdatedAt = inviteprofileDescUpdatedAt.Default.(func() time.Time)
+	// inviteprofile.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	inviteprofile.UpdateDefaultUpdatedAt = inviteprofileDescUpdatedAt.UpdateDefault.(func() time.Time)
+	inviterebatelogFields := schema.InviteRebateLog{}.Fields()
+	_ = inviterebatelogFields
+	// inviterebatelogDescCreatedAt is the schema descriptor for created_at field.
+	inviterebatelogDescCreatedAt := inviterebatelogFields[7].Descriptor()
+	// inviterebatelog.DefaultCreatedAt holds the default value on creation for the created_at field.
+	inviterebatelog.DefaultCreatedAt = inviterebatelogDescCreatedAt.Default.(func() time.Time)
 	modelpriceFields := schema.ModelPrice{}.Fields()
 	_ = modelpriceFields
 	// modelpriceDescModel is the schema descriptor for model field.

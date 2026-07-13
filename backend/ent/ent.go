@@ -19,6 +19,8 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
+	"github.com/DouDOU-start/airgate-core/ent/inviteprofile"
+	"github.com/DouDOU-start/airgate-core/ent/inviterebatelog"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
 	"github.com/DouDOU-start/airgate-core/ent/modeltag"
 	"github.com/DouDOU-start/airgate-core/ent/oauthclient"
@@ -98,6 +100,8 @@ func checkColumn(table, column string) error {
 			channel.Table:               channel.ValidColumn,
 			channelkey.Table:            channelkey.ValidColumn,
 			group.Table:                 group.ValidColumn,
+			inviteprofile.Table:         inviteprofile.ValidColumn,
+			inviterebatelog.Table:       inviterebatelog.ValidColumn,
 			modelprice.Table:            modelprice.ValidColumn,
 			modeltag.Table:              modeltag.ValidColumn,
 			oauthclient.Table:           oauthclient.ValidColumn,
