@@ -302,8 +302,13 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Channe
 }
 
 // AddKey 在指定渠道下新增一把 key（明文密钥在本层加密）。
+// 必须绑定至少一个分组：不再支持"空分组=对所有分组公开"的隐式语义。
 func (s *Service) AddKey(ctx context.Context, channelID int, key KeyInput) (ChannelKey, error) {
 	logger := logx.LoggerFromContext(ctx)
+
+	if len(key.GroupIDs) == 0 {
+		return ChannelKey{}, ErrGroupsRequired
+	}
 
 	cipher, err := s.encryptPlainKey(key.APIKey, true)
 	if err != nil {
@@ -324,9 +329,14 @@ func (s *Service) AddKey(ctx context.Context, channelID int, key KeyInput) (Chan
 }
 
 // UpdateKey 单把密钥端点 partial 更新（模型/映射弹窗、单 key 编辑用）。
-// APIKey 提供即加密替换（空串保持原密钥）。
+// APIKey 提供即加密替换（空串保持原密钥）；GroupIDs 非 nil 即整组替换，
+// 不允许显式传空（不再支持"空分组=对所有分组公开"的隐式语义），nil 表示不改动分组。
 func (s *Service) UpdateKey(ctx context.Context, keyID int, key KeyInput) (ChannelKey, error) {
 	logger := logx.LoggerFromContext(ctx)
+
+	if key.GroupIDs != nil && len(key.GroupIDs) == 0 {
+		return ChannelKey{}, ErrGroupsRequired
+	}
 
 	cipher, err := s.encryptPlainKey(key.APIKey, false)
 	if err != nil {

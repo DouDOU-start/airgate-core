@@ -145,6 +145,10 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
       toast('error', t('channels.api_key_required'));
       return;
     }
+    if (form.groupIds.length === 0) {
+      toast('error', t('channels.groups_required'));
+      return;
+    }
 
     const paramSet = kvRowsToRecord(form.paramSetRows, parseParamValue);
     const paramRemove = form.paramRemoveKeys.map((k) => k.trim()).filter(Boolean);

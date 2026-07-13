@@ -251,7 +251,8 @@ func newTestEnv(t *testing.T, snaps ...registry.ChannelKeySnapshot) *testEnv {
 	return &testEnv{pipe: pipe, engine: engine, sink: sink, errSink: errSink, persister: persister, registry: reg}
 }
 
-// testSnap 构造指向指定上游的渠道快照。
+// testSnap 构造指向指定上游的渠道快照。默认绑定分组 7（与 testKeyInfo().GroupID 对应）；
+// 需要测试"未绑定/其他分组不可见"语义时显式覆盖 GroupIDs。
 func testSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapshot)) registry.ChannelKeySnapshot {
 	s := registry.ChannelKeySnapshot{
 		KeyID:        id,
@@ -266,6 +267,7 @@ func testSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapsho
 		Weight:       10,
 		CostRatio:    0.5,
 		Status:       registry.StatusEnabled,
+		GroupIDs:     map[int]struct{}{7: {}},
 	}
 	for _, m := range mutate {
 		m(&s)

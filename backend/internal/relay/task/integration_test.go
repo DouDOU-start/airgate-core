@@ -346,6 +346,7 @@ func newTestEnv(t *testing.T, snaps ...registry.ChannelKeySnapshot) *testEnv {
 }
 
 // videoSnap 构造视频渠道快照。
+// videoSnap 构造视频渠道快照，默认绑定分组 7（与测试 keyInfo 的 GroupID 对应）。
 func videoSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapshot)) registry.ChannelKeySnapshot {
 	s := registry.ChannelKeySnapshot{
 		KeyID:       id,
@@ -361,6 +362,7 @@ func videoSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapsh
 		Weight:    10,
 		Status:    registry.StatusEnabled,
 		CostRatio: 1.0,
+		GroupIDs:  map[int]struct{}{7: {}},
 	}
 	for _, m := range mutate {
 		m(&s)
@@ -368,7 +370,7 @@ func videoSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapsh
 	return s
 }
 
-// sunoSnap 构造 suno 渠道快照。
+// sunoSnap 构造 suno 渠道快照，默认绑定分组 7（与测试 keyInfo 的 GroupID 对应）。
 func sunoSnap(id int, baseURL string) registry.ChannelKeySnapshot {
 	return registry.ChannelKeySnapshot{
 		KeyID:       id,
@@ -382,6 +384,7 @@ func sunoSnap(id int, baseURL string) registry.ChannelKeySnapshot {
 		},
 		Priority: 50, Weight: 10,
 		Status: registry.StatusEnabled, CostRatio: 1.0,
+		GroupIDs: map[int]struct{}{7: {}},
 	}
 }
 

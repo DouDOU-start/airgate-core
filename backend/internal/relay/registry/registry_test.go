@@ -57,6 +57,8 @@ func (f *fakePersister) waitOne(t *testing.T) persistCall {
 }
 
 // snap 构造测试 key 端点快照的便捷函数（KeyID 与 ChannelID 同值，便于断言）。
+// 默认绑定分组 0（与用例里未显式指定的 groupID 零值对应），
+// 需要测试"未绑定分组"语义时显式传 GroupIDs: map[int]struct{}{}。
 func snap(id int, mutate ...func(*ChannelKeySnapshot)) ChannelKeySnapshot {
 	s := ChannelKeySnapshot{
 		KeyID:       id,
@@ -69,7 +71,7 @@ func snap(id int, mutate ...func(*ChannelKeySnapshot)) ChannelKeySnapshot {
 		Priority:    50,
 		Weight:      10,
 		Status:      StatusEnabled,
-		GroupIDs:    map[int]struct{}{},
+		GroupIDs:    map[int]struct{}{0: {}},
 	}
 	for _, m := range mutate {
 		m(&s)
@@ -121,13 +123,13 @@ func TestRegistryPick(t *testing.T) {
 			wantErr: ErrNoAvailableChannel,
 		},
 		{
-			name: "公共 key（空分组）对任意分组可用",
+			name: "空分组 key 不会被任何分组调度到",
 			snaps: []ChannelKeySnapshot{
-				snap(1),
+				snap(1, func(s *ChannelKeySnapshot) { s.GroupIDs = map[int]struct{}{} }),
 			},
 			groupID: 99,
 			model:   "gpt-4o",
-			wantID:  1,
+			wantErr: ErrNoAvailableChannel,
 		},
 		{
 			name: "分组不命中被过滤",
@@ -389,19 +391,25 @@ func TestRegistryAnyKeyForChannel(t *testing.T) {
 }
 
 // TestRegistryModelEntriesForGroup 分组过滤与状态语义：
-// 公共 key 对所有分组可见、绑定分组 key 只对本组可见、停用 key 不进目录。
+// 绑定分组 key 只对本组可见、未绑定分组 key 对任何分组均不可见、停用 key 不进目录。
 func TestRegistryModelEntriesForGroup(t *testing.T) {
 	r := newTestRegistry(t, nil,
 		snap(1, func(s *ChannelKeySnapshot) {
 			s.Models = map[string]struct{}{"gpt-4o": {}, "gpt-4o-mini": {}}
+			s.GroupIDs = map[int]struct{}{7: {}}
 		}),
 		snap(2, func(s *ChannelKeySnapshot) {
 			s.Models = map[string]struct{}{"claude-x": {}}
-			s.GroupIDs = map[int]struct{}{7: {}}
+			s.GroupIDs = map[int]struct{}{8: {}}
 		}),
 		snap(3, func(s *ChannelKeySnapshot) {
 			s.Models = map[string]struct{}{"disabled-model": {}}
+			s.GroupIDs = map[int]struct{}{7: {}}
 			s.Status = StatusDisabledManual
+		}),
+		snap(4, func(s *ChannelKeySnapshot) {
+			s.Models = map[string]struct{}{"unbound-model": {}}
+			s.GroupIDs = map[int]struct{}{}
 		}),
 	)
 
@@ -411,14 +419,19 @@ func TestRegistryModelEntriesForGroup(t *testing.T) {
 		want    []string
 	}{
 		{
-			name:    "绑定分组：公共 key + 本组 key 并集，字典序",
+			name:    "分组 7：仅本组绑定 key 的模型（停用 key 不计入）",
 			groupID: 7,
-			want:    []string{"claude-x", "gpt-4o", "gpt-4o-mini"},
+			want:    []string{"gpt-4o", "gpt-4o-mini"},
 		},
 		{
-			name:    "其他分组：仅公共 key",
+			name:    "分组 8：仅本组绑定 key 的模型",
 			groupID: 8,
-			want:    []string{"gpt-4o", "gpt-4o-mini"},
+			want:    []string{"claude-x"},
+		},
+		{
+			name:    "未绑定 key 对任何分组均不可见",
+			groupID: 999,
+			want:    []string{},
 		},
 	}
 	for _, tc := range cases {

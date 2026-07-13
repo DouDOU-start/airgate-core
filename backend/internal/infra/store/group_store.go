@@ -157,7 +157,7 @@ func (s *GroupStore) Delete(ctx context.Context, id int) error {
 	}
 
 	// 渠道绑定守卫：分组与密钥端点的关联对 group_id 是 ON DELETE CASCADE，
-	// 直接删除会静默解绑，使专属 key 变成公共 key（对所有分组可调度）。
+	// 直接删除会静默解绑；若 key 只绑了这一个分组会变成空分组 key（不再被任何分组调度到）。
 	channelCount, err := tx.Channel.Query().
 		Where(entchannel.HasKeysWith(entchannelkey.HasGroupsWith(entgroup.IDEQ(id)))).
 		Count(ctx)

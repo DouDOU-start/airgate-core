@@ -96,7 +96,8 @@ type ChannelKeySnapshot struct {
 	MaxRPM         int
 	CostRatio      float64
 	Status         string
-	// GroupIDs 绑定分组集合；空集合表示公共 key，对所有分组可用。
+	// GroupIDs 绑定分组集合；空集合表示未绑定任何分组，不会被任何分组调度到
+	// （已不支持"空集合=公共 key，对所有分组可用"的旧语义）。
 	GroupIDs  map[int]struct{}
 	TestModel string
 }
@@ -200,7 +201,7 @@ func (r *Registry) ensureLoaded() {
 //
 //	候选 = status==enabled 且模型命中
 //	       且 key.Type 属于入口协议的同构类型集合（纯透传：不做跨协议翻译）
-//	       且分组命中（key.GroupIDs 为空 = 公共 key）且不在 exclude（按 keyID）中
+//	       且分组命中（key.GroupIDs 为空则不命中任何分组）且不在 exclude（按 keyID）中
 //	→ 取最高 priority 档 → 档内按 weight+10 加权随机。
 //
 // 无候选返回 ErrNoAvailableChannel。
@@ -232,10 +233,8 @@ func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*Ch
 		if _, ok := k.Models[model]; !ok {
 			continue
 		}
-		if len(k.GroupIDs) > 0 {
-			if _, ok := k.GroupIDs[groupID]; !ok {
-				continue
-			}
+		if _, ok := k.GroupIDs[groupID]; !ok {
+			continue
 		}
 		if k.Priority > best {
 			best = k.Priority
@@ -281,10 +280,8 @@ func (r *Registry) ModelEntriesForGroup(groupID int) []ModelEntry {
 		if k.Status != StatusEnabled {
 			continue
 		}
-		if len(k.GroupIDs) > 0 {
-			if _, ok := k.GroupIDs[groupID]; !ok {
-				continue
-			}
+		if _, ok := k.GroupIDs[groupID]; !ok {
+			continue
 		}
 		proto := protocolForKeyType(k.Type)
 		if proto == "" {

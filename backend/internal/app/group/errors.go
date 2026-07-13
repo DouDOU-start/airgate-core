@@ -12,7 +12,8 @@ var (
 
 // GroupHasChannelsError 表示分组仍被渠道绑定引用，不能直接删除。
 // 直接删除会经 channel_groups 的 ON DELETE CASCADE 抹掉绑定行，
-// 使专属渠道静默变成公共渠道（GroupIDs 为空 = 对所有分组可用），越权扩散。
+// 若渠道 key 只绑了这一个分组，会静默变成空分组 key（不再被任何分组调度到），
+// 造成线上渠道悄悄断流。
 type GroupHasChannelsError struct {
 	// Count 仍绑定该分组的渠道数。
 	Count int
