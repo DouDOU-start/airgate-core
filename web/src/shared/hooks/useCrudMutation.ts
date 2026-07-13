@@ -7,6 +7,8 @@ interface CrudMutationOptions<TData, TVariables = void> {
   successMessage?: string;
   /** invalidateQueries 的 queryKey */
   queryKey: readonly unknown[];
+  /** 同一数据的其他视图缓存（如按不同维度平铺查询的独立 queryKey），一并失效 */
+  extraQueryKeys?: readonly (readonly unknown[])[];
   /** 成功后的额外回调（如关闭弹窗） */
   onSuccess?: (data: TData, variables: TVariables) => void;
 }
@@ -22,6 +24,7 @@ export function useCrudMutation<TData, TVariables>(
     onSuccess: (data, variables) => {
       if (opts.successMessage) toast('success', opts.successMessage);
       queryClient.invalidateQueries({ queryKey: opts.queryKey });
+      opts.extraQueryKeys?.forEach((key) => queryClient.invalidateQueries({ queryKey: key }));
       opts.onSuccess?.(data, variables);
     },
     onError: (err: Error) => toast('error', err.message),

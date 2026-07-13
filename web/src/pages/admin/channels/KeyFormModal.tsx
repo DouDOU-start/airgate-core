@@ -123,12 +123,14 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
     mutationFn: ({ id, data }: { id: number; data: ChannelKeyReq }) => channelsApi.addKey(id, data),
     successMessage: t('channels.add_key_success'),
     queryKey: queryKeys.channels(),
+    extraQueryKeys: [queryKeys.channelKeys()],
     onSuccess: () => onClose(),
   });
   const updateMutation = useCrudMutation({
     mutationFn: ({ id, data }: { id: number; data: ChannelKeyReq }) => channelsApi.updateKey(id, data),
     successMessage: t('channels.update_key_success'),
     queryKey: queryKeys.channels(),
+    extraQueryKeys: [queryKeys.channelKeys()],
     onSuccess: () => onClose(),
   });
 

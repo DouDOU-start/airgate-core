@@ -269,6 +269,7 @@ export function ChannelTestModal({
     mutationFn: (data: ChannelKeyReq) => channelsApi.updateKey(channelKey!.id, data),
     successMessage: t('channels.update_success'),
     queryKey: queryKeys.channels(),
+    extraQueryKeys: [queryKeys.channelKeys()],
     onSuccess: () => handleClose(),
   });
 
@@ -314,6 +315,7 @@ export function ChannelTestModal({
     abortRef.current = ac;
     await testOne(model, ac.signal);
     queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.channelKeys() });
   }
 
   async function handleTestAll() {
@@ -329,6 +331,7 @@ export function ChannelTestModal({
     }
     setRunningAll(false);
     queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.channelKeys() });
   }
 
   // 停止：置取消标记（循环下一轮退出）+ 掐断当前在途请求（否则要等它自然返回）

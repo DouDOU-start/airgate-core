@@ -226,11 +226,19 @@ export default function ChannelsPage() {
     return map;
   }, [failureStats]);
 
+  // 渠道视图 / 密钥视图是同一份 key 数据的两个独立 queryKey（跨渠道平铺 vs 按渠道分组），
+  // 任何改动 key 状态的操作都要把两边一并失效，否则停留在密钥视图时改完不刷新，要手动刷新页面才可见。
+  const invalidateChannelViews = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.channelKeys() });
+  };
+
   // 删除单个渠道
   const deleteMutation = useCrudMutation({
     mutationFn: (id: number) => channelsApi.delete(id),
     successMessage: t('channels.delete_success'),
     queryKey: queryKeys.channels(),
+    extraQueryKeys: [queryKeys.channelKeys()],
     onSuccess: (_, id) => {
       setDeleteTarget(null);
       setSelectedIds((prev) => prev.filter((item) => item !== id));
@@ -242,6 +250,7 @@ export default function ChannelsPage() {
     mutationFn: (id: number) => channelsApi.deleteKey(id),
     successMessage: t('channels.delete_key_success'),
     queryKey: queryKeys.channels(),
+    extraQueryKeys: [queryKeys.channelKeys()],
     onSuccess: () => setDeleteKeyTarget(null),
   });
 
@@ -251,7 +260,7 @@ export default function ChannelsPage() {
       channelsApi.bulkUpdate(payload),
     onSuccess: (resp) => {
       toast('success', t('channels.bulk_success', { count: resp.affected }));
-      queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+      invalidateChannelViews();
       setSelectedIds([]);
       setBulkDeleteOpen(false);
       setPriorityModalOpen(false);
@@ -264,7 +273,7 @@ export default function ChannelsPage() {
     mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
       channelsApi.updateKey(id, { status: enabled ? 'enabled' : 'disabled_manual' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+      invalidateChannelViews();
     },
     onError: (err: Error) => toast('error', err.message),
   });
@@ -274,7 +283,7 @@ export default function ChannelsPage() {
     mutationFn: (keyId: number) => channelsApi.refreshBalance(keyId),
     onSuccess: (resp) => {
       toast('success', t('channels.balance_refreshed', { amount: resp.balance.toFixed(2) }));
-      queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+      invalidateChannelViews();
     },
     onError: (err: Error) => toast('error', err.message),
   });
@@ -306,7 +315,7 @@ export default function ChannelsPage() {
           // 单把 key 失败跳过，不中断整批。
         }
       }
-      queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+      invalidateChannelViews();
       toast('success', t('channels.balance_batch_done', { ok, total }));
     } finally {
       setBatchBalanceRunning(false);
@@ -335,7 +344,7 @@ export default function ChannelsPage() {
         }
       }
       if (!cancelled && updated) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.channels() });
+        invalidateChannelViews();
       }
     })();
     return () => {

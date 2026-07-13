@@ -53,12 +53,14 @@ export function ChannelFormModal({ channel, open, onClose }: ChannelFormModalPro
     mutationFn: (data: CreateChannelReq) => channelsApi.create(data),
     successMessage: t('channels.create_success'),
     queryKey: queryKeys.channels(),
+    extraQueryKeys: [queryKeys.channelKeys()],
     onSuccess: () => onClose(),
   });
   const updateMutation = useCrudMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateChannelReq }) => channelsApi.update(id, data),
     successMessage: t('channels.update_success'),
     queryKey: queryKeys.channels(),
+    extraQueryKeys: [queryKeys.channelKeys()],
     onSuccess: () => onClose(),
   });
 
