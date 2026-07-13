@@ -13,7 +13,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { useToast } from '../../shared/ui';
 import {
   Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound,
+  ShieldCheck, Copy, Trash2, KeyRound, Expand,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
@@ -369,7 +369,7 @@ export default function SettingsPage() {
                 <Field className="col-span-1 md:col-span-2" label={t('settings.og_image')} hint={t('settings.og_image_hint')}>
                   <OGImageUpload value={val('og_image')} onChange={(url) => set('og_image', url)} />
                 </Field>
-                <Field className="col-span-1 md:col-span-2" label={t('settings.recharge_notice')} hint={t('settings.recharge_notice_hint')}>
+                <Field className="col-span-1 md:col-span-2" label={t('settings.recharge_notice')}>
                   <TextArea
                     value={val('recharge_notice')}
                     onChange={(e) => set('recharge_notice', e.target.value)}
@@ -1081,6 +1081,11 @@ function OGImageUpload({ value, onChange }: { value: string; onChange: (url: str
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const previewState = useOverlayState({
+    isOpen: previewOpen,
+    onOpenChange: (open) => setPreviewOpen(open),
+  });
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1106,11 +1111,21 @@ function OGImageUpload({ value, onChange }: { value: string; onChange: (url: str
   return (
     <div className="flex items-center gap-3">
       <div className="relative group shrink-0">
-        <img
-          src={previewSrc}
-          alt="OG Cover"
-          className="w-40 aspect-[1200/630] rounded-sm object-cover border border-border"
-        />
+        <button
+          aria-label={t('settings.og_image_preview')}
+          className="block cursor-zoom-in"
+          type="button"
+          onClick={() => setPreviewOpen(true)}
+        >
+          <img
+            src={previewSrc}
+            alt="OG Cover"
+            className="w-40 aspect-[1200/630] rounded-sm object-cover border border-border"
+          />
+          <div className="absolute inset-0 flex items-center justify-center rounded-sm bg-black/0 opacity-0 transition-opacity group-hover:bg-black/30 group-hover:opacity-100">
+            <Expand className="w-5 h-5 text-white" />
+          </div>
+        </button>
         {value && (
           <Button
             aria-label={t('settings.restore_default_og_image')}
@@ -1148,6 +1163,20 @@ function OGImageUpload({ value, onChange }: { value: string; onChange: (url: str
           </Button>
         )}
       </div>
+      <CommonModal
+        bodyClassName="p-0"
+        placement="center"
+        size="lg"
+        state={previewState}
+        surface={false}
+        title={t('settings.og_image_preview')}
+      >
+        <img
+          alt="OG Cover"
+          className="w-full rounded-b-md object-contain"
+          src={previewSrc}
+        />
+      </CommonModal>
     </div>
   );
 }

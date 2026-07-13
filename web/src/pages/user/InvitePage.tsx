@@ -124,10 +124,10 @@ export default function InvitePage() {
             {/* 邀请链接 */}
             <div>
               <p className="mb-2 text-sm font-medium text-text">{t('invite.share_link')}</p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="w-full sm:max-w-2xl sm:flex-1">
-                  <Input readOnly className="font-mono text-xs" value={shareLink} />
-                </div>
+              <div className="flex items-center gap-2">
+                <code className="min-w-0 flex-1 break-all rounded-[var(--radius)] border border-border bg-surface px-3 py-2 font-mono text-xs text-text">
+                  {shareLink}
+                </code>
                 <Button
                   size="sm"
                   variant="secondary"
