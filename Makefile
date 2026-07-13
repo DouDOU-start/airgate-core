@@ -17,7 +17,7 @@ LDFLAGS := -X github.com/DouDOU-start/airgate-core/internal/version.Version=$(VE
 
 .PHONY: help dev dev-backend dev-frontend \
         build build-backend build-frontend ensure-webdist \
-        ent lint fmt test clean install ci pre-commit setup-hooks verify-ent \
+        ent lint fmt test clean install ci pre-commit setup-hooks verify-ent verify-ent-changed \
         docker-build docker-rebuild docker-up docker-down docker-restart docker-dev
 
 help: ## 显示帮助信息
@@ -113,7 +113,7 @@ test: ## 运行测试
 
 ci: lint test verify-ent build-backend ## 本地运行与 CI 完全一致的检查
 
-pre-commit: lint verify-ent build-backend ## pre-commit hook 调用（跳过耗时的测试）
+pre-commit: lint verify-ent-changed build-backend ## pre-commit hook 调用（跳过耗时的测试；ent/schema 本次未改动时跳过重新生成）
 
 verify-ent: ## 验证 Ent 生成代码是否最新（与 make ent 使用同一 go:generate 指令，含 feature flags）
 	@cd $(BACKEND_DIR) && GOWORK=off $(GO) generate ./ent
@@ -124,6 +124,13 @@ verify-ent: ## 验证 Ent 生成代码是否最新（与 make ent 使用同一 g
 		exit 1; \
 	fi
 	@echo "Ent 生成代码一致"
+
+verify-ent-changed: ## pre-commit 专用：本次提交未改动 ent/schema 时跳过重新生成校验
+	@if git diff --cached --quiet -- $(BACKEND_DIR)/ent/schema/; then \
+		echo "ent/schema 无改动，跳过 verify-ent（完整校验见 make verify-ent / make ci）"; \
+	else \
+		$(MAKE) verify-ent; \
+	fi
 
 setup-hooks: ## 安装 Git hooks（pre-commit + commit-msg）
 	@echo '#!/bin/sh' > .git/hooks/pre-commit
