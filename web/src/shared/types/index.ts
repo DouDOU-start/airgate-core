@@ -780,6 +780,13 @@ export interface UpdateModelPriceReq {
 
 // ==================== Model Market（模型广场，未登录可见）====================
 
+export interface ModelMarketLongContext {
+  threshold_tokens: number;
+  input_multiplier: number;
+  output_multiplier: number;
+  cached_multiplier: number;
+}
+
 export interface ModelMarketItemResp {
   model: string;
   input_price: number;
@@ -789,6 +796,8 @@ export interface ModelMarketItemResp {
   cache_creation_1h_price: number;
   per_request_price: number;
   tag?: { id: number; name: string } | null;
+  service_tiers?: Record<string, number>;
+  long_context?: ModelMarketLongContext;
 }
 
 export interface ModelMarketMultiplierRange {

@@ -142,7 +142,7 @@ func (s *Service) LoadAllPrices(ctx context.Context) (map[string]pricing.Price, 
 	}
 	prices := make(map[string]pricing.Price, len(items))
 	for _, item := range items {
-		tiers, longCtx := parsePricingExtra(item.Model, item.PricingExtra)
+		tiers, longCtx := ParsePricingExtra(item.Model, item.PricingExtra)
 		prices[item.Model] = pricing.Price{
 			Input:           item.InputPrice,
 			Output:          item.OutputPrice,
@@ -152,10 +152,24 @@ func (s *Service) LoadAllPrices(ctx context.Context) (map[string]pricing.Price, 
 			PerRequest:      item.PerRequestPrice,
 			VideoPerSecond:  parseVideoPerSecond(item.Model, item.PricingExtra),
 			ServiceTiers:    tiers,
-			LongContext:     longCtx,
+			LongContext:     toPricingLongContextRule(longCtx),
 		}
 	}
 	return prices, nil
+}
+
+// toPricingLongContextRule 把 app 层的 LongContextRule 转成 relay/pricing 包的等价类型
+// （计费缓存需要的形态），nil 原样透传。
+func toPricingLongContextRule(rule *LongContextRule) *pricing.LongContextRule {
+	if rule == nil {
+		return nil
+	}
+	return &pricing.LongContextRule{
+		ThresholdTokens: rule.ThresholdTokens,
+		InputMul:        rule.InputMultiplier,
+		OutputMul:       rule.OutputMultiplier,
+		CachedMul:       rule.CachedMultiplier,
+	}
 }
 
 // parseVideoPerSecond 解析 pricing_extra.video.per_second（视频按秒单价，任务子系统用）。
@@ -176,9 +190,10 @@ func parseVideoPerSecond(model string, extra map[string]interface{}) float64 {
 	return 0
 }
 
-// parsePricingExtra 把 pricing_extra JSON（map 形态）解析为服务档倍率与长上下文阶梯。
-// 解析失败或字段缺失时按"无该扩展"处理（记 warn，不阻断加载）。
-func parsePricingExtra(model string, extra map[string]interface{}) (map[string]float64, *pricing.LongContextRule) {
+// ParsePricingExtra 把 pricing_extra JSON（map 形态）解析为服务档倍率与长上下文阶梯。
+// 解析失败或字段缺失时按"无该扩展"处理（记 warn，不阻断加载）。导出供 server/handler
+// 复用同一套解析规则，展示给模型广场公开页的服务档/长上下文与计费实际使用的口径一致。
+func ParsePricingExtra(model string, extra map[string]interface{}) (map[string]float64, *LongContextRule) {
 	if len(extra) == 0 {
 		return nil, nil
 	}
@@ -200,7 +215,7 @@ func parsePricingExtra(model string, extra map[string]interface{}) (map[string]f
 		}
 	}
 
-	var longCtx *pricing.LongContextRule
+	var longCtx *LongContextRule
 	if raw, ok := extra["long_context"]; ok {
 		if m, ok := raw.(map[string]interface{}); ok {
 			threshold, tok := toFloat(m["threshold_tokens"])
@@ -208,11 +223,11 @@ func parsePricingExtra(model string, extra map[string]interface{}) (map[string]f
 			outMul, ook := toFloat(m["output_multiplier"])
 			cachedMul, cok := toFloat(m["cached_multiplier"])
 			if tok && iok && ook && cok {
-				longCtx = &pricing.LongContextRule{
-					ThresholdTokens: int(threshold),
-					InputMul:        inMul,
-					OutputMul:       outMul,
-					CachedMul:       cachedMul,
+				longCtx = &LongContextRule{
+					ThresholdTokens:  int(threshold),
+					InputMultiplier:  inMul,
+					OutputMultiplier: outMul,
+					CachedMultiplier: cachedMul,
 				}
 			} else {
 				slog.Warn("model_price_pricing_extra_invalid", "model", model, "field", "long_context")

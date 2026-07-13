@@ -47,7 +47,8 @@ func tagIDFromReq(id *int64) *int {
 	return &v
 }
 
-// toModelMarketItemRespFromDomain 领域对象 → 模型广场公开响应 DTO（价格子集，不含内部字段）。
+// toModelMarketItemRespFromDomain 领域对象 → 模型广场公开响应 DTO：价格子集 + 服务档
+// 倍率/长上下文阶梯（与计费实际使用的 ParsePricingExtra 同一套解析，口径一致）。
 func toModelMarketItemRespFromDomain(item appmodelprice.ModelPrice) dto.ModelMarketItemResp {
 	resp := dto.ModelMarketItemResp{
 		Model:                item.Model,
@@ -60,6 +61,18 @@ func toModelMarketItemRespFromDomain(item appmodelprice.ModelPrice) dto.ModelMar
 	}
 	if item.TagID != nil && item.TagName != "" {
 		resp.Tag = &dto.ModelTagRef{ID: int64(*item.TagID), Name: item.TagName}
+	}
+	tiers, longCtx := appmodelprice.ParsePricingExtra(item.Model, item.PricingExtra)
+	if len(tiers) > 0 {
+		resp.ServiceTiers = tiers
+	}
+	if longCtx != nil {
+		resp.LongContext = &dto.ModelMarketLongContext{
+			ThresholdTokens:  longCtx.ThresholdTokens,
+			InputMultiplier:  longCtx.InputMultiplier,
+			OutputMultiplier: longCtx.OutputMultiplier,
+			CachedMultiplier: longCtx.CachedMultiplier,
+		}
 	}
 	return resp
 }

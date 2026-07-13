@@ -70,7 +70,8 @@ type ModelTagResp struct {
 	ModelCount int64  `json:"model_count"`
 }
 
-// ModelMarketItemResp 模型广场公开展示条目：价格字段子集，不含 pricing_extra 等内部字段。
+// ModelMarketItemResp 模型广场公开展示条目：价格字段子集 + 服务档倍率/长上下文阶梯
+// （计价维度，公开展示；pricing_extra 里其余内部键如 video 不对外暴露）。
 type ModelMarketItemResp struct {
 	Model                string       `json:"model"`
 	InputPrice           float64      `json:"input_price"`
@@ -80,6 +81,18 @@ type ModelMarketItemResp struct {
 	CacheCreation1hPrice float64      `json:"cache_creation_1h_price"`
 	PerRequestPrice      float64      `json:"per_request_price"`
 	Tag                  *ModelTagRef `json:"tag,omitempty"`
+	// ServiceTiers 服务档倍率（如 priority=2.0、flex=0.5），未配置时省略。
+	ServiceTiers map[string]float64 `json:"service_tiers,omitempty"`
+	// LongContext 长上下文阶梯，未配置时省略。
+	LongContext *ModelMarketLongContext `json:"long_context,omitempty"`
+}
+
+// ModelMarketLongContext 长上下文阶梯：完整 prompt 超过阈值时各维度单价按对应倍率放大。
+type ModelMarketLongContext struct {
+	ThresholdTokens  int     `json:"threshold_tokens"`
+	InputMultiplier  float64 `json:"input_multiplier"`
+	OutputMultiplier float64 `json:"output_multiplier"`
+	CachedMultiplier float64 `json:"cached_multiplier"`
 }
 
 // ModelMarketMultiplierRange 非专属分组的倍率区间（专属谈价分组不参与，见后端 service 注释）。

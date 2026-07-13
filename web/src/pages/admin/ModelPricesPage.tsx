@@ -100,6 +100,12 @@ function fmtPrice(value: number): string {
   return `$${value}`;
 }
 
+// fmtPricePerM 单价单位为 USD / 1M tokens 的场景（缓存读取/写入），补上 /1M 后缀。
+function fmtPricePerM(value: number): string {
+  if (!value) return '—';
+  return `${fmtPrice(value)}/1M`;
+}
+
 // fmtThreshold 把阈值 token 数缩写为 272K 之类。
 function fmtThreshold(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return '';
@@ -175,7 +181,7 @@ function cacheLine(row: ModelPriceResp, t: Translate): ReactNode {
     parts.push(
       <span className="whitespace-nowrap" key={key}>
         <span className="text-text-tertiary">{label} </span>
-        <span className="font-medium">{fmtPrice(value)}</span>
+        <span className="font-medium">{fmtPricePerM(value)}</span>
       </span>,
     );
   };

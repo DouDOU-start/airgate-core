@@ -51,6 +51,16 @@ type ModelPrice struct {
 	UpdatedAt     time.Time
 }
 
+// LongContextRule 长上下文阶梯：完整 prompt 超过阈值时各维度单价按对应倍率放大。
+// 与 internal/relay/pricing.LongContextRule 字段一一对应，是它的 app 层镜像
+// （避免 handler 直接依赖 relay 内部包类型）。
+type LongContextRule struct {
+	ThresholdTokens  int
+	InputMultiplier  float64
+	OutputMultiplier float64
+	CachedMultiplier float64
+}
+
 // ListFilter 价目表列表查询参数。
 type ListFilter struct {
 	Page     int

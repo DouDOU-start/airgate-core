@@ -44,6 +44,7 @@ import {
   Wallet,
   AppWindow,
   Gift,
+  Sparkles,
 } from 'lucide-react';
 import { oauthApi } from '../../shared/api/oauth';
 import { queryKeys } from '../../shared/queryKeys';
@@ -81,6 +82,7 @@ const userMenuItems: MenuItem[] = [
   { path: '/usage', labelKey: 'nav.my_usage', icon: <ReceiptText className="h-5 w-5" /> },
   { path: '/recharge', labelKey: 'nav.recharge', icon: <Wallet className="h-5 w-5" /> },
   { path: '/invite', labelKey: 'nav.invite', icon: <Gift className="h-5 w-5" /> },
+  { path: '/model-market', labelKey: 'nav.model_market', icon: <Sparkles className="h-5 w-5" /> },
 ];
 
 // API Key 登录只能看使用记录

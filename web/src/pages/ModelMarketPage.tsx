@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Chip, EmptyState, Input } from '@heroui/react';
-import { Inbox, Search, Sparkles } from 'lucide-react';
+import { Inbox, Languages, Moon, Search, Sparkles, Sun } from 'lucide-react';
 import { modelMarketApi } from '../shared/api/modelMarket';
 import { queryKeys } from '../shared/queryKeys';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
+import { useTheme } from '../app/providers/ThemeProvider';
 import { useDebouncedValue } from '../shared/hooks/useDebouncedValue';
 import { getToken } from '../shared/api/client';
+import { setStoredLanguage } from '../i18n';
 import type { ModelMarketItemResp } from '../shared/types';
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
@@ -21,7 +23,73 @@ function fmtPrice(value: number): string {
   return `$${value}`;
 }
 
-// cacheLine 缓存单价行，逻辑与管理端模型卡片一致（公开响应不含 pricing_extra，无需处理服务档/长上下文）。
+// fmtPricePerM 单价单位为 USD / 1M tokens 的场景（缓存读取/写入），补上 /1M 后缀。
+function fmtPricePerM(value: number): string {
+  if (!value) return '—';
+  return `${fmtPrice(value)}/1M`;
+}
+
+// fmtThreshold 阈值展示：>=1000 转 K 简写，与管理端模型卡片一致。
+function fmtThreshold(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '';
+  return value >= 1000 ? `>${value / 1000}K` : `>${value}`;
+}
+
+// tierLabel 已知服务档名复用管理端的翻译（优先 / 弹性），未知档名原样显示。
+function tierLabel(name: string, t: Translate): string {
+  const key = `model_prices.tier_${name}`;
+  const label = t(key);
+  return label === key ? name : label;
+}
+
+// longContextLine 长上下文阶梯独立行：阈值 + 各维度倍率，文案复用管理端 model_prices 命名空间。
+function longContextLine(row: ModelMarketItemResp, t: Translate): ReactNode {
+  const lc = row.long_context;
+  if (!lc) return null;
+  const threshold = fmtThreshold(lc.threshold_tokens);
+  const parts: ReactNode[] = [];
+  const push = (key: string, label: string, value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return;
+    parts.push(
+      <span className="whitespace-nowrap" key={key}>
+        <span className="text-text-tertiary">{label} </span>
+        <span className="font-medium">×{value}</span>
+      </span>,
+    );
+  };
+  push('in', t('model_prices.lc_input'), lc.input_multiplier);
+  push('out', t('model_prices.lc_output'), lc.output_multiplier);
+  push('cached', t('model_prices.lc_cached'), lc.cached_multiplier);
+  if (!threshold || parts.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-x-1" title={t('model_prices.long_context_hint')}>
+      <span className="whitespace-nowrap text-text-tertiary">
+        {t('model_prices.pricing_extra_long_context')} <span className="font-medium text-text-secondary">{threshold}</span>：
+      </span>
+      {parts.map((p, i) => (i === 0 ? p : [<span className="text-text-tertiary/60" key={`s${i}`}> · </span>, p]))}
+    </div>
+  );
+}
+
+// serviceTiersLine 服务档倍率行（priority/flex 等），文案复用管理端 model_prices 命名空间。
+function serviceTiersLine(row: ModelMarketItemResp, t: Translate): ReactNode {
+  const tiers = row.service_tiers;
+  if (!tiers) return null;
+  const parts: ReactNode[] = [];
+  for (const [name, mul] of Object.entries(tiers)) {
+    if (!Number.isFinite(mul) || mul <= 0) continue;
+    parts.push(
+      <span className="whitespace-nowrap" key={name}>
+        <span className="text-text-tertiary">{tierLabel(name, t)} </span>
+        <span className="font-medium">×{mul}</span>
+      </span>,
+    );
+  }
+  if (parts.length === 0) return null;
+  return parts.map((p, i) => (i === 0 ? p : [<span className="text-text-tertiary/60" key={`s${i}`}> · </span>, p]));
+}
+
+// cacheLine 缓存单价行，逻辑与管理端模型卡片一致。
 function cacheLine(row: ModelMarketItemResp, t: Translate): ReactNode {
   const parts: ReactNode[] = [];
   const push = (key: string, label: string, value: number) => {
@@ -29,7 +97,7 @@ function cacheLine(row: ModelMarketItemResp, t: Translate): ReactNode {
     parts.push(
       <span className="whitespace-nowrap" key={key}>
         <span className="text-text-tertiary">{label} </span>
-        <span className="font-medium">{fmtPrice(value)}</span>
+        <span className="font-medium">{fmtPricePerM(value)}</span>
       </span>,
     );
   };
@@ -42,6 +110,8 @@ function cacheLine(row: ModelMarketItemResp, t: Translate): ReactNode {
 
 function MarketPriceCard({ row, t }: { row: ModelMarketItemResp; t: Translate }) {
   const cache = cacheLine(row, t);
+  const tiers = serviceTiersLine(row, t);
+  const longContext = longContextLine(row, t);
   return (
     <div className="flex flex-col rounded-[var(--ag-radius-lg)] border border-border bg-surface p-5 transition-colors hover:border-text-tertiary/50">
       <div className="flex items-start justify-between gap-2">
@@ -76,7 +146,7 @@ function MarketPriceCard({ row, t }: { row: ModelMarketItemResp; t: Translate })
           </div>
         </div>
       </div>
-      {(cache || row.per_request_price > 0) ? (
+      {(cache || row.per_request_price > 0 || tiers || longContext) ? (
         <div className="mt-3 space-y-1 font-mono text-xs tabular-nums text-text-secondary">
           {cache ? <div className="flex flex-wrap gap-x-1">{cache}</div> : null}
           {row.per_request_price > 0 ? (
@@ -86,6 +156,8 @@ function MarketPriceCard({ row, t }: { row: ModelMarketItemResp; t: Translate })
               </span>
             </div>
           ) : null}
+          {tiers ? <div className="flex flex-wrap gap-x-1">{tiers}</div> : null}
+          {longContext}
         </div>
       ) : null}
     </div>
@@ -93,10 +165,17 @@ function MarketPriceCard({ row, t }: { row: ModelMarketItemResp; t: Translate })
 }
 
 export default function ModelMarketPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const site = useSiteSettings();
+  const { theme, toggleTheme } = useTheme();
   const isLoggedIn = !!getToken();
+
+  const toggleLanguage = () => {
+    const nextLang = i18n.language === 'zh' ? 'en' : 'zh';
+    i18n.changeLanguage(nextLang);
+    setStoredLanguage(nextLang);
+  };
 
   const [keyword, setKeyword] = useState('');
   const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
@@ -139,6 +218,25 @@ export default function ModelMarketPage() {
             <Button size="sm" variant="ghost" onPress={() => navigate({ to: '/home' })}>
               {t('model_market.back_home')}
             </Button>
+            <Button
+              aria-label={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
+              size="sm"
+              variant="ghost"
+              className="gap-1.5 px-2.5"
+              onPress={toggleLanguage}
+            >
+              <Languages className="w-4 h-4" />
+              <span className="font-mono text-xs uppercase">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
+            </Button>
+            <Button
+              aria-label={theme === 'dark' ? t('common.toggle_theme_light') : t('common.toggle_theme_dark')}
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              onPress={toggleTheme}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </Button>
             <Button size="sm" variant="primary" onPress={() => navigate({ to: isLoggedIn ? '/' : '/login' })}>
               {isLoggedIn ? t('home.go_dashboard') : t('home.login')}
             </Button>
@@ -147,21 +245,12 @@ export default function ModelMarketPage() {
 
         <section className="mx-auto max-w-6xl px-6 pb-6 pt-10 md:px-12">
           <div className="mb-2 inline-flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5 text-text-tertiary" strokeWidth={2.25} />
-            <span className="ag-kicker">{t('model_market.badge')}</span>
+            <Sparkles className="h-5 w-5 text-text-tertiary" strokeWidth={2.25} />
+            <span className="font-mono text-base font-medium uppercase tracking-[0.13em] text-text-tertiary">
+              {t('model_market.badge')}
+            </span>
           </div>
-          <h1 className="font-display mb-2 text-2xl font-medium tracking-tight text-text md:text-3xl">
-            {t('model_market.title')}
-          </h1>
           <p className="max-w-2xl text-sm text-text-tertiary">{t('model_market.subtitle')}</p>
-
-          {data?.multiplier ? (
-            <div className="mt-4 inline-flex items-center gap-2 rounded-[var(--field-radius)] border border-[var(--ag-glass-border)] bg-[var(--ag-glass)] px-4 py-2 text-sm">
-              <span className="text-text-secondary">
-                {t('model_market.multiplier_hint', { min: data.multiplier.min, max: data.multiplier.max })}
-              </span>
-            </div>
-          ) : null}
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative w-full sm:w-64">
@@ -221,7 +310,7 @@ export default function ModelMarketPage() {
             </div>
           ) : rows.length === 0 ? (
             <div className="rounded-[var(--ag-radius-lg)] border border-border bg-surface py-16">
-              <EmptyState>
+              <EmptyState className="flex flex-col items-center gap-2 text-center">
                 <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface">
                   <Inbox className="h-5 w-5 text-text-tertiary" />
                 </span>
@@ -233,15 +322,6 @@ export default function ModelMarketPage() {
               {rows.map((row) => <MarketPriceCard key={row.model} row={row} t={t} />)}
             </div>
           )}
-
-          {!isLoggedIn && rows.length > 0 ? (
-            <div className="mt-10 flex flex-col items-center gap-3 rounded-[var(--ag-radius-lg)] border border-[var(--ag-glass-border)] bg-[var(--ag-glass)] px-6 py-8 text-center">
-              <p className="text-sm text-text-secondary">{t('model_market.login_cta_desc')}</p>
-              <Button variant="primary" onPress={() => navigate({ to: '/login' })}>
-                {t('model_market.login_cta')}
-              </Button>
-            </div>
-          ) : null}
         </section>
       </div>
 
