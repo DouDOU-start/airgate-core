@@ -553,6 +553,9 @@ export type ChannelStatus = 'enabled' | 'disabled_manual' | 'disabled_auto';
 export interface ChannelKeyResp {
   id: number;
   channel_id: number;
+  /** 所属渠道名 / base_url —— 密钥视图（跨渠道平铺）展示用；渠道视图下与父渠道重复 */
+  channel_name: string;
+  base_url: string;
   name: string;
   type: ChannelType;
   api_key_hint: string;
@@ -696,6 +699,21 @@ export interface ChannelListQuery extends PageReq {
   status?: string;
   tag?: string;
   group_id?: number;
+}
+
+/** 可排序字段：优先级 / 权重 / 名称 / 状态 / 创建时间 */
+export type ChannelKeySortBy = 'priority' | 'weight' | 'name' | 'status' | 'created_at';
+export type SortOrder = 'asc' | 'desc';
+
+// 密钥视图（跨渠道平铺）查询参数：keyword 同时匹配 key 名与渠道名。
+export interface ChannelKeyListQuery extends PageReq {
+  type?: string;
+  status?: string;
+  tag?: string;
+  channel_id?: number;
+  group_id?: number;
+  sort_by?: ChannelKeySortBy;
+  sort_order?: SortOrder;
 }
 
 // ==================== ModelPrice ====================

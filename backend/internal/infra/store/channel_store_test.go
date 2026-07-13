@@ -173,3 +173,70 @@ func TestChannelStoreCreateAndManageKeys(t *testing.T) {
 		t.Fatalf("UpdateKey models = %v, want [claude-z]", updated.Models)
 	}
 }
+
+// TestChannelStoreListKeys 密钥视图：跨渠道平铺，按 priority/weight 排序，keyword 匹配渠道名。
+func TestChannelStoreListKeys(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	store := NewChannelStore(db)
+
+	chA := createTestChannel(t, db, "alpha-provider")
+	chB := createTestChannel(t, db, "beta-provider")
+
+	mustCreateKey := func(channelID, priority, weight int) int {
+		t.Helper()
+		id, err := store.CreateKey(ctx, channelID, appchannel.KeyInput{
+			Type: "openai_compatible", APIKey: "cipher", Models: []string{"gpt-5"},
+			Priority: &priority, Weight: &weight,
+		})
+		if err != nil {
+			t.Fatalf("CreateKey error: %v", err)
+		}
+		return id.ID
+	}
+	lowKey := mustCreateKey(chA.ID, 10, 1)
+	highKey := mustCreateKey(chB.ID, 90, 5)
+
+	// 按 priority 升序：低优先级排前面。
+	list, total, err := store.ListKeys(ctx, appchannel.KeyListFilter{
+		Page: 1, PageSize: 20, SortBy: appchannel.KeySortByPriority, SortOrder: appchannel.SortOrderAsc,
+	})
+	if err != nil {
+		t.Fatalf("ListKeys returned error: %v", err)
+	}
+	if total != 2 || len(list) != 2 {
+		t.Fatalf("ListKeys total/len = %d/%d, want 2/2", total, len(list))
+	}
+	if list[0].ID != lowKey || list[1].ID != highKey {
+		t.Fatalf("ListKeys asc-by-priority order = [%d %d], want [%d %d]", list[0].ID, list[1].ID, lowKey, highKey)
+	}
+	if list[0].ChannelName != "alpha-provider" || list[0].BaseURL != "https://upstream.example.com" {
+		t.Fatalf("ListKeys channel_name/base_url not filled: %+v", list[0])
+	}
+
+	// 按 weight 降序：高权重排前面。
+	list, _, err = store.ListKeys(ctx, appchannel.KeyListFilter{
+		Page: 1, PageSize: 20, SortBy: appchannel.KeySortByWeight, SortOrder: appchannel.SortOrderDesc,
+	})
+	if err != nil {
+		t.Fatalf("ListKeys returned error: %v", err)
+	}
+	if list[0].ID != highKey || list[1].ID != lowKey {
+		t.Fatalf("ListKeys desc-by-weight order = [%d %d], want [%d %d]", list[0].ID, list[1].ID, highKey, lowKey)
+	}
+
+	// keyword 匹配渠道名：只命中 beta-provider 下的 key。
+	list, total, err = store.ListKeys(ctx, appchannel.KeyListFilter{Page: 1, PageSize: 20, Keyword: "beta"})
+	if err != nil {
+		t.Fatalf("ListKeys(keyword) returned error: %v", err)
+	}
+	if total != 1 || list[0].ID != highKey {
+		t.Fatalf("ListKeys(keyword=beta) = %+v, want only highKey", list)
+	}
+}

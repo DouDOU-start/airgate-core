@@ -20,6 +20,18 @@ const (
 	BulkActionSetPriority = "set_priority"
 )
 
+// 密钥列表（密钥视图）可排序字段与排序方向常量。
+const (
+	KeySortByPriority  = "priority"
+	KeySortByWeight    = "weight"
+	KeySortByName      = "name"
+	KeySortByStatus    = "status"
+	KeySortByCreatedAt = "created_at"
+
+	SortOrderAsc  = "asc"
+	SortOrderDesc = "desc"
+)
+
 // Repository 定义渠道域持久化接口。
 type Repository interface {
 	List(context.Context, ListFilter) ([]Channel, int64, error)
@@ -32,6 +44,10 @@ type Repository interface {
 	// BulkUpdate 批量启停/删除/调优先级（作用于选中渠道下的全部 key；
 	// delete 删渠道），返回受影响渠道数。
 	BulkUpdate(context.Context, BulkUpdateInput) (int, error)
+
+	// ListKeys 密钥视图：跨渠道平铺分页查询 key（keyword 同时匹配 key 名与所属渠道名），
+	// 支持按 priority/weight/name/status/created_at 排序。
+	ListKeys(context.Context, KeyListFilter) ([]ChannelKey, int64, error)
 
 	// FindKeyByID 按密钥端点 ID 查单把 key（含所属渠道 base_url 与 groups 边）。
 	FindKeyByID(ctx context.Context, keyID int) (ChannelKey, error)
@@ -89,6 +105,7 @@ type Channel struct {
 type ChannelKey struct {
 	ID               int
 	ChannelID        int
+	ChannelName      string
 	BaseURL          string
 	Name             string
 	Type             string
@@ -144,6 +161,31 @@ type ListFilter struct {
 // ListResult 渠道分页结果。
 type ListResult struct {
 	List     []Channel
+	Total    int64
+	Page     int
+	PageSize int
+}
+
+// KeyListFilter 密钥视图（跨渠道平铺）列表查询参数。
+// Keyword 同时匹配 key 名与所属渠道名；SortBy 为空时按 created_at desc（同渠道列表默认序）。
+type KeyListFilter struct {
+	Page      int
+	PageSize  int
+	Keyword   string
+	Type      string
+	Status    string
+	Tag       string
+	ChannelID *int
+	GroupID   *int
+	SortBy    string
+	SortOrder string
+	// TZ 调用方 IANA 时区名，决定今日金额口径的当日起点；为空时用服务器本地时区。
+	TZ string
+}
+
+// KeyListResult 密钥视图分页结果。
+type KeyListResult struct {
+	List     []ChannelKey
 	Total    int64
 	Page     int
 	PageSize int

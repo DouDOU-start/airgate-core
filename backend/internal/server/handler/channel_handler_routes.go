@@ -42,6 +42,41 @@ func (h *ChannelHandler) ListChannels(c *gin.Context) {
 	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
 }
 
+// ListChannelKeys 密钥视图：跨渠道平铺分页列表密钥端点
+// （keyword 同时匹配 key 名与渠道名；支持 sort_by=priority|weight|name|status|created_at 排序）。
+func (h *ChannelHandler) ListChannelKeys(c *gin.Context) {
+	var page dto.PageReq
+	if err := c.ShouldBindQuery(&page); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	result, err := h.service.ListKeys(c.Request.Context(), appchannel.KeyListFilter{
+		Page:      page.Page,
+		PageSize:  page.PageSize,
+		Keyword:   page.Keyword,
+		Type:      c.Query("type"),
+		Status:    c.Query("status"),
+		Tag:       c.Query("tag"),
+		ChannelID: parseOptionalInt(c.Query("channel_id")),
+		GroupID:   parseOptionalInt(c.Query("group_id")),
+		SortBy:    c.Query("sort_by"),
+		SortOrder: c.Query("sort_order"),
+		TZ:        c.Query("tz"),
+	})
+	if err != nil {
+		httpCode, message := h.handleError("查询密钥列表失败", "查询失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	list := make([]dto.ChannelKeyResp, 0, len(result.List))
+	for _, item := range result.List {
+		list = append(list, toChannelKeyResp(item))
+	}
+	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
+}
+
 // CreateChannel 创建渠道。
 func (h *ChannelHandler) CreateChannel(c *gin.Context) {
 	var req dto.CreateChannelReq

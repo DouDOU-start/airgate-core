@@ -72,6 +72,84 @@ func (s *ChannelStore) List(ctx context.Context, filter appchannel.ListFilter) (
 	return mapChannelList(items), int64(total), nil
 }
 
+// keySortField 密钥视图排序字段 → ent 列名映射；未知/空值落到默认的 created_at。
+func keySortField(sortBy string) string {
+	switch sortBy {
+	case appchannel.KeySortByPriority:
+		return entchannelkey.FieldPriority
+	case appchannel.KeySortByWeight:
+		return entchannelkey.FieldWeight
+	case appchannel.KeySortByName:
+		return entchannelkey.FieldName
+	case appchannel.KeySortByStatus:
+		return entchannelkey.FieldStatus
+	default:
+		return entchannelkey.FieldCreatedAt
+	}
+}
+
+// ListKeys 密钥视图：跨渠道平铺分页查询 key（keyword 同时匹配 key 名与所属渠道名）。
+func (s *ChannelStore) ListKeys(ctx context.Context, filter appchannel.KeyListFilter) ([]appchannel.ChannelKey, int64, error) {
+	query := s.db.ChannelKey.Query()
+	if filter.Keyword != "" {
+		query = query.Where(entchannelkey.Or(
+			entchannelkey.NameContains(filter.Keyword),
+			entchannelkey.HasChannelWith(entchannel.NameContains(filter.Keyword)),
+		))
+	}
+	if filter.Type != "" {
+		query = query.Where(entchannelkey.TypeEQ(entchannelkey.Type(filter.Type)))
+	}
+	if filter.Status != "" {
+		query = query.Where(entchannelkey.StatusEQ(entchannelkey.Status(filter.Status)))
+	}
+	if filter.Tag != "" {
+		tag := filter.Tag
+		query = query.Where(predicate.ChannelKey(func(selector *sql.Selector) {
+			selector.Where(sqljson.ValueContains(entchannelkey.FieldTags, tag))
+		}))
+	}
+	if filter.ChannelID != nil {
+		query = query.Where(entchannelkey.HasChannelWith(entchannel.IDEQ(*filter.ChannelID)))
+	}
+	if filter.GroupID != nil {
+		query = query.Where(entchannelkey.HasGroupsWith(entgroup.IDEQ(*filter.GroupID)))
+	}
+
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	orderField := keySortField(filter.SortBy)
+	orderFn := ent.Desc
+	if filter.SortOrder == appchannel.SortOrderAsc {
+		orderFn = ent.Asc
+	}
+
+	items, err := query.
+		WithChannel().
+		WithGroups().
+		Offset((filter.Page-1)*filter.PageSize).
+		Limit(filter.PageSize).
+		Order(orderFn(orderField), ent.Asc(entchannelkey.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	result := make([]appchannel.ChannelKey, 0, len(items))
+	for _, item := range items {
+		baseURL, channelName := "", ""
+		if ch, err := item.Edges.ChannelOrErr(); err == nil {
+			baseURL = ch.BaseURL
+			channelName = ch.Name
+		}
+		result = append(result, mapChannelKey(item, baseURL, channelName))
+	}
+	return result, int64(total), nil
+}
+
 // ListAll 全量加载渠道（含 keys 及其 groups 边），供注册表 Reload 使用。
 func (s *ChannelStore) ListAll(ctx context.Context) ([]appchannel.Channel, error) {
 	items, err := withKeys(s.db.Channel.Query()).All(ctx)
@@ -106,11 +184,12 @@ func (s *ChannelStore) FindKeyByID(ctx context.Context, keyID int) (appchannel.C
 		}
 		return appchannel.ChannelKey{}, err
 	}
-	baseURL := ""
+	baseURL, channelName := "", ""
 	if ch, err := item.Edges.ChannelOrErr(); err == nil {
 		baseURL = ch.BaseURL
+		channelName = ch.Name
 	}
-	return mapChannelKey(item, baseURL), nil
+	return mapChannelKey(item, baseURL, channelName), nil
 }
 
 // Create 创建渠道（仅 name/base_url；key 建后单独添加）。
@@ -430,7 +509,7 @@ func mapChannel(item *ent.Channel) appchannel.Channel {
 	if keys, err := item.Edges.KeysOrErr(); err == nil {
 		ch.Keys = make([]appchannel.ChannelKey, 0, len(keys))
 		for _, k := range keys {
-			mk := mapChannelKey(k, item.BaseURL)
+			mk := mapChannelKey(k, item.BaseURL, item.Name)
 			mk.ChannelID = item.ID
 			ch.Keys = append(ch.Keys, mk)
 		}
@@ -438,9 +517,10 @@ func mapChannel(item *ent.Channel) appchannel.Channel {
 	return ch
 }
 
-func mapChannelKey(item *ent.ChannelKey, baseURL string) appchannel.ChannelKey {
+func mapChannelKey(item *ent.ChannelKey, baseURL, channelName string) appchannel.ChannelKey {
 	key := appchannel.ChannelKey{
 		ID:               item.ID,
+		ChannelName:      channelName,
 		BaseURL:          baseURL,
 		Name:             item.Name,
 		Type:             item.Type.String(),

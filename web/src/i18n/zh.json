@@ -250,6 +250,9 @@
   },
   "channels": {
     "title": "渠道管理",
+    "view_channel": "渠道视图",
+    "view_keys": "密钥视图",
+    "channel_name": "所属渠道",
     "create": "创建渠道",
     "edit": "编辑渠道",
     "search_placeholder": "搜索渠道名称...",

@@ -250,6 +250,9 @@
   },
   "channels": {
     "title": "Channels",
+    "view_channel": "Channel view",
+    "view_keys": "Key view",
+    "channel_name": "Channel",
     "create": "Create Channel",
     "edit": "Edit Channel",
     "search_placeholder": "Search channel name...",

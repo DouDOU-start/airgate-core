@@ -1,6 +1,7 @@
 export const queryKeys = {
   users: (...args: unknown[]) => ['users', ...args] as const,
   channels: (...args: unknown[]) => ['channels', ...args] as const,
+  channelKeys: (...args: unknown[]) => ['channel-keys', ...args] as const,
   modelPrices: (...args: unknown[]) => ['model-prices', ...args] as const,
   modelTags: () => ['model-tags'] as const,
   usersAll: () => ['users-all'] as const,

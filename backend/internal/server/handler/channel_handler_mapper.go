@@ -35,6 +35,8 @@ func toChannelKeyResp(k appchannel.ChannelKey) dto.ChannelKeyResp {
 	return dto.ChannelKeyResp{
 		ID:               int64(k.ID),
 		ChannelID:        int64(k.ChannelID),
+		ChannelName:      k.ChannelName,
+		BaseURL:          k.BaseURL,
 		Name:             k.Name,
 		Type:             k.Type,
 		APIKeyHint:       k.APIKeyHint,

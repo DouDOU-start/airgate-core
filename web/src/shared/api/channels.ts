@@ -3,12 +3,15 @@ import type {
   ChannelResp, ChannelKeyResp, CreateChannelReq, UpdateChannelReq, ChannelKeyReq,
   TestChannelReq, TestChannelResp, FetchChannelModelsResp, FetchChannelModelsPreviewReq,
   RefreshChannelBalanceResp, BulkUpdateChannelsReq, BulkUpdateChannelsResp,
-  ChannelListQuery, PagedData,
+  ChannelListQuery, ChannelKeyListQuery, PagedData,
 } from '../types';
 
 export const channelsApi = {
   list: (params?: ChannelListQuery) =>
     get<PagedData<ChannelResp>>('/api/v1/admin/channels', params),
+  // 密钥视图：跨渠道平铺分页（priority/weight 等排序）
+  listKeys: (params?: ChannelKeyListQuery) =>
+    get<PagedData<ChannelKeyResp>>('/api/v1/admin/channels/keys', params),
   // 渠道只管 name / base_url
   create: (data: CreateChannelReq) => post<ChannelResp>('/api/v1/admin/channels', data),
   update: (id: number, data: UpdateChannelReq) => put<ChannelResp>(`/api/v1/admin/channels/${id}`, data),

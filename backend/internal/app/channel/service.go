@@ -109,6 +109,30 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 	}, nil
 }
 
+// ListKeys 密钥视图：跨渠道平铺分页查询 key（priority/weight 等排序），
+// 统计口径与渠道视图一致，仅不做渠道级汇总。
+func (s *Service) ListKeys(ctx context.Context, filter KeyListFilter) (KeyListResult, error) {
+	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
+	filter.Page = page
+	filter.PageSize = pageSize
+
+	list, total, err := s.repo.ListKeys(ctx, filter)
+	if err != nil {
+		return KeyListResult{}, err
+	}
+	for i := range list {
+		list[i].APIKeyHint = s.keyHint(list[i].APIKey)
+	}
+	s.attachRuntimeStatsToKeys(ctx, list)
+	s.attachMoneyStatsToKeys(ctx, list, filter.TZ)
+	return KeyListResult{
+		List:     list,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
+}
+
 // attachMoneyStats 为列表页各 key 批量填充成本收益（基于 usage_logs 按 key 聚合），
 // 并把各 key 汇总到所属渠道（rollup）。
 func (s *Service) attachMoneyStats(ctx context.Context, list []Channel, tz string) {
@@ -118,22 +142,14 @@ func (s *Service) attachMoneyStats(ctx context.Context, list []Channel, tz strin
 	// 先按各 key 的余额汇总渠道 Balance（即便无金额读取器也生效）。
 	s.rollupBalance(list)
 
-	if s.stats == nil {
-		return
-	}
 	var keyIDs []int
 	for i := range list {
 		for j := range list[i].Keys {
 			keyIDs = append(keyIDs, list[i].Keys[j].ID)
 		}
 	}
-	if len(keyIDs) == 0 {
-		return
-	}
-	todayStart := timezone.StartOfDay(time.Now().In(timezone.Resolve(tz)))
-	stats, err := s.stats.GetChannelKeyMoneyStats(ctx, keyIDs, todayStart)
-	if err != nil {
-		logx.LoggerFromContext(ctx).Warn("channel_key_money_stats_failed", logx.LogFieldError, err)
+	stats := s.fetchMoneyStats(ctx, keyIDs, tz)
+	if stats == nil {
 		return
 	}
 	for i := range list {
@@ -154,6 +170,39 @@ func (s *Service) attachMoneyStats(ctx context.Context, list []Channel, tz strin
 		list[i].TodayCost = dc
 		list[i].TodayRevenue = dr
 	}
+}
+
+// attachMoneyStatsToKeys 密钥视图：为平铺 key 列表批量填充成本收益（无需渠道汇总）。
+func (s *Service) attachMoneyStatsToKeys(ctx context.Context, keys []ChannelKey, tz string) {
+	keyIDs := make([]int, len(keys))
+	for i := range keys {
+		keyIDs[i] = keys[i].ID
+	}
+	stats := s.fetchMoneyStats(ctx, keyIDs, tz)
+	if stats == nil {
+		return
+	}
+	for i := range keys {
+		m := stats[keys[i].ID]
+		keys[i].TotalCost = m.Cost
+		keys[i].TotalRevenue = m.Revenue
+		keys[i].TodayCost = m.TodayCost
+		keys[i].TodayRevenue = m.TodayRevenue
+	}
+}
+
+// fetchMoneyStats 按 key ID 批量拉取金额统计；未注入读取器、无 key 或查询失败时返回 nil（调用方跳过填充）。
+func (s *Service) fetchMoneyStats(ctx context.Context, keyIDs []int, tz string) map[int]MoneyStats {
+	if s.stats == nil || len(keyIDs) == 0 {
+		return nil
+	}
+	todayStart := timezone.StartOfDay(time.Now().In(timezone.Resolve(tz)))
+	stats, err := s.stats.GetChannelKeyMoneyStats(ctx, keyIDs, todayStart)
+	if err != nil {
+		logx.LoggerFromContext(ctx).Warn("channel_key_money_stats_failed", logx.LogFieldError, err)
+		return nil
+	}
+	return stats
 }
 
 // rollupBalance 把各 key 的余额汇总到渠道 Balance（求和）、BalanceUpdatedAt 取最新一次刷新。
@@ -182,8 +231,34 @@ func (s *Service) attachRuntimeStats(ctx context.Context, list []Channel) {
 			keyIDs = append(keyIDs, list[i].Keys[j].ID)
 		}
 	}
+	counts, rpms := s.fetchRuntimeStats(ctx, keyIDs)
+	for i := range list {
+		for j := range list[i].Keys {
+			id := list[i].Keys[j].ID
+			list[i].Keys[j].CurrentConcurrency = counts[id]
+			list[i].Keys[j].CurrentRPM = rpms[id]
+		}
+	}
+}
+
+// attachRuntimeStatsToKeys 密钥视图：为平铺 key 列表批量填充运行时观测指标。
+func (s *Service) attachRuntimeStatsToKeys(ctx context.Context, keys []ChannelKey) {
+	keyIDs := make([]int, len(keys))
+	for i := range keys {
+		keyIDs[i] = keys[i].ID
+	}
+	counts, rpms := s.fetchRuntimeStats(ctx, keyIDs)
+	for i := range keys {
+		keys[i].CurrentConcurrency = counts[keys[i].ID]
+		keys[i].CurrentRPM = rpms[keys[i].ID]
+	}
+}
+
+// fetchRuntimeStats 按 key ID 批量拉取运行时观测指标（在途并发 / 当前分钟 RPM）；
+// 读取器未注入或 Redis 不可用时返回 nil map，读取仍安全（零值）。
+func (s *Service) fetchRuntimeStats(ctx context.Context, keyIDs []int) (map[int]int, map[int]int) {
 	if len(keyIDs) == 0 {
-		return
+		return nil, nil
 	}
 	var counts, rpms map[int]int
 	if s.concurrency != nil {
@@ -192,13 +267,7 @@ func (s *Service) attachRuntimeStats(ctx context.Context, list []Channel) {
 	if s.rpm != nil {
 		rpms = s.rpm.GetKeyRPMs(ctx, keyIDs)
 	}
-	for i := range list {
-		for j := range list[i].Keys {
-			id := list[i].Keys[j].ID
-			list[i].Keys[j].CurrentConcurrency = counts[id]
-			list[i].Keys[j].CurrentRPM = rpms[id]
-		}
-	}
+	return counts, rpms
 }
 
 // Create 创建渠道（仅 name/base_url；key 建后单独添加）。

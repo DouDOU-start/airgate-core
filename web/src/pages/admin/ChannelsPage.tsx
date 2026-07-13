@@ -1,9 +1,9 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button, Checkbox, Chip, EmptyState, Input, Label, ListBox, Modal,
-  Select, Spinner, TextField as HeroTextField, Tooltip, useOverlayState,
+  Select, Spinner, Tabs, TextField as HeroTextField, Tooltip, useOverlayState,
 } from '@heroui/react';
 import {
   ArrowUpDown, BarChart3, Boxes, ChevronDown, ChevronRight, CircleCheck, CircleOff,
@@ -26,18 +26,17 @@ import { ChannelFormModal, CHANNEL_TYPE_OPTIONS } from './channels/ChannelFormMo
 import { KeyFormModal } from './channels/KeyFormModal';
 import { ChannelStatsModal } from './channels/ChannelStatsModal';
 import { ChannelTestModal } from './channels/ChannelTestModal';
+import { ChannelKeysTable } from './channels/ChannelKeysTable';
+import {
+  KeyMetricsRow, KeyStatusChip, TYPE_CHIP_COLORS, keySupportsBalance, typeLabel,
+} from './channels/keyShared';
 import { formatDate, formatDateTime } from '../../shared/utils/format';
 import type {
-  ChannelFailureCounts, ChannelKeyResp, ChannelResp, ChannelStatus, ChannelType,
+  ChannelFailureCounts, ChannelKeyResp, ChannelKeySortBy, ChannelResp, SortOrder,
 } from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
 const COLUMN_COUNT = 7;
-
-// 仅 openai_compatible 中转站支持经 key 查余额。
-function keySupportsBalance(key: ChannelKeyResp): boolean {
-  return key.type === 'openai_compatible';
-}
 
 // 余额陈旧阈值：更新时间早于此则进入页面时后台自动刷新。
 const BALANCE_STALE_MS = 60_000;
@@ -47,69 +46,6 @@ function isKeyBalanceStale(key: ChannelKeyResp): boolean {
   if (!keySupportsBalance(key)) return false;
   if (!key.balance_updated_at) return true;
   return Date.now() - new Date(key.balance_updated_at).getTime() > BALANCE_STALE_MS;
-}
-
-// 渠道类型 → 徽章配色
-const TYPE_CHIP_COLORS: Record<ChannelType, 'accent' | 'warning' | 'success' | 'default'> = {
-  openai_compatible: 'accent',
-  anthropic: 'warning',
-  gemini: 'success',
-  custom: 'default',
-  openai_video: 'accent',
-  suno: 'warning',
-};
-
-function typeLabel(type: string): string {
-  return CHANNEL_TYPE_OPTIONS.find((item) => item.id === type)?.label ?? type;
-}
-
-// key 状态徽章：enabled 绿 / disabled_manual 灰 / disabled_auto 红 + error_msg tooltip
-function KeyStatusChip({ status, errorMsg }: { status: ChannelStatus; errorMsg: string }) {
-  const { t } = useTranslation();
-
-  if (status === 'disabled_auto') {
-    const chip = (
-      <Chip color="danger" size="sm" variant="soft">
-        {t('channels.status_disabled_auto')}
-      </Chip>
-    );
-    if (!errorMsg) return chip;
-    return (
-      <Tooltip>
-        <Tooltip.Trigger className="inline-flex">{chip}</Tooltip.Trigger>
-        <Tooltip.Content className="max-w-xs break-all">{errorMsg}</Tooltip.Content>
-      </Tooltip>
-    );
-  }
-
-  if (status === 'disabled_manual') {
-    return (
-      <Chip color="default" size="sm" variant="soft">
-        {t('channels.status_disabled_manual')}
-      </Chip>
-    );
-  }
-
-  return (
-    <Chip color="success" size="sm" variant="soft">
-      {t('channels.status_enabled')}
-    </Chip>
-  );
-}
-
-// 一段带标签的行内指标：小标题在上、值在下，右对齐数值成列。
-function Metric({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1 leading-none">
-      <span className="whitespace-nowrap text-[10px] uppercase tracking-wide text-text-tertiary">{label}</span>
-      <span className="whitespace-nowrap font-mono text-xs text-text-secondary">{children}</span>
-    </div>
-  );
-}
-
-// 指标分组之间的竖向分隔线。
-function MetricDivider() {
-  return <span className="hidden h-7 w-px self-center bg-border sm:block" />;
 }
 
 // 展开区的一把 key 子行：两行卡片——头部（名称/类型/启停/密钥/操作）+ 指标行。
@@ -135,9 +71,6 @@ function KeyRow({
   toggling: boolean;
 }) {
   const { t } = useTranslation();
-  const supportsBalance = keySupportsBalance(channelKey);
-  const balanceUpdated = channelKey.balance_updated_at ? new Date(channelKey.balance_updated_at) : null;
-  const fmt = (n: number) => `$${n.toFixed(2)}`;
 
   return (
     <div className="border-b border-border px-4 py-3 last:border-b-0">
@@ -182,92 +115,12 @@ function KeyRow({
         </div>
       </div>
 
-      {/* 指标行：配置组 | 运行时组 | 金额组 | 标签，组间竖线分隔 */}
-      <div className="mt-3 flex flex-wrap items-start gap-x-4 gap-y-3">
-        {/* 配置组：模型 · 优先级权重 · 成本倍率 */}
-        <div className="flex items-start gap-x-4">
-          <Metric label={t('channels.models')}>
-            {channelKey.models.length > 0 ? (
-              <Tooltip>
-                <Tooltip.Trigger className="inline-flex cursor-help">
-                  <span className="text-text">{channelKey.models.length}</span>
-                </Tooltip.Trigger>
-                <Tooltip.Content className="max-w-sm">
-                  <div className="max-h-56 overflow-y-auto font-mono text-xs leading-5">
-                    {channelKey.models.map((model) => (
-                      <div key={model}>{model}</div>
-                    ))}
-                  </div>
-                </Tooltip.Content>
-              </Tooltip>
-            ) : (
-              <span className="text-text-tertiary">-</span>
-            )}
-          </Metric>
-          <Metric label={`${t('channels.priority')}·${t('channels.weight')}`}>
-            P{channelKey.priority} · W{channelKey.weight}
-          </Metric>
-          <Metric label={t('channels.cost_ratio')}>×{channelKey.cost_ratio}</Metric>
-        </div>
-
-        <MetricDivider />
-
-        {/* 运行时组：并发 · RPM */}
-        <div className="flex items-start gap-x-4">
-          <Metric label={t('channels.concurrency_label')}>
-            {channelKey.current_concurrency}/{channelKey.max_concurrency > 0 ? channelKey.max_concurrency : '∞'}
-          </Metric>
-          <Metric label="RPM">{channelKey.current_rpm}</Metric>
-        </div>
-
-        <MetricDivider />
-
-        {/* 金额组：今日成本 · 今日收益 · 成本 · 收益 · 余额 */}
-        <div className="flex items-start gap-x-4">
-          <Metric label={t('channels.stats_today_cost')}>
-            <span className={channelKey.today_cost > 0 ? 'text-warning' : ''}>{fmt(channelKey.today_cost)}</span>
-          </Metric>
-          <Metric label={t('channels.stats_today_revenue')}>
-            <span className={channelKey.today_revenue > 0 ? 'text-success' : ''}>{fmt(channelKey.today_revenue)}</span>
-          </Metric>
-          <Metric label={t('channels.stats_cost')}>
-            <span className={channelKey.total_cost > 0 ? 'text-warning' : ''}>{fmt(channelKey.total_cost)}</span>
-          </Metric>
-          <Metric label={t('channels.stats_revenue')}>
-            <span className={channelKey.total_revenue > 0 ? 'text-success' : ''}>{fmt(channelKey.total_revenue)}</span>
-          </Metric>
-          {supportsBalance ? (
-            <Metric label={t('channels.balance')}>
-              <span className="inline-flex items-center gap-1">
-                {balanceUpdated ? fmt(channelKey.balance) : <span className="text-text-tertiary">{t('channels.balance_never')}</span>}
-                <Button
-                  isIconOnly
-                  aria-label={t('channels.refresh_balance')}
-                  className="h-5 min-h-0 w-5"
-                  isDisabled={refreshingBalance}
-                  size="sm"
-                  variant="ghost"
-                  onPress={onRefreshBalance}
-                >
-                  {refreshingBalance ? <Spinner size="sm" /> : <RefreshCw className="h-3 w-3" />}
-                </Button>
-              </span>
-            </Metric>
-          ) : null}
-        </div>
-
-        {channelKey.tags.length > 0 ? (
-          <>
-            <MetricDivider />
-            <div className="flex flex-wrap gap-1 self-center">
-              {channelKey.tags.map((tag) => (
-                <Chip color="default" key={tag} size="sm" variant="soft">
-                  {tag}
-                </Chip>
-              ))}
-            </div>
-          </>
-        ) : null}
+      <div className="mt-3">
+        <KeyMetricsRow
+          channelKey={channelKey}
+          refreshingBalance={refreshingBalance}
+          onRefreshBalance={onRefreshBalance}
+        />
       </div>
     </div>
   );
@@ -278,6 +131,9 @@ export default function ChannelsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // 渠道视图（按渠道分组+展开）/ 密钥视图（跨渠道平铺+可排序）切换；筛选条件两视图共用，分页各自独立。
+  const [view, setView] = useState<'channel' | 'keys'>('channel');
+
   const { page, setPage, pageSize, setPageSize } = usePagination(20, 'admin.channels');
   const [keyword, setKeyword] = useState('');
   const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
@@ -285,6 +141,20 @@ export default function ChannelsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+
+  const { page: keysPage, setPage: setKeysPage, pageSize: keysPageSize, setPageSize: setKeysPageSize } =
+    usePagination(20, 'admin.channels.keys');
+  const [keysSort, setKeysSort] = useState<{ by?: ChannelKeySortBy; order: SortOrder }>({ order: 'asc' });
+
+  function resetToFirstPage() {
+    setPage(1);
+    setKeysPage(1);
+  }
+
+  function handleKeysSortChange(field: ChannelKeySortBy) {
+    setKeysSort((prev) => (prev.by === field ? { by: field, order: prev.order === 'asc' ? 'desc' : 'asc' } : { by: field, order: 'asc' }));
+    setKeysPage(1);
+  }
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<ChannelResp | null>(null);
@@ -318,6 +188,28 @@ export default function ChannelsPage() {
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
+
+  // 密钥视图：跨渠道平铺查询，筛选条件与渠道视图共用，分页/排序独立。
+  const keysListQuery = useMemo(() => ({
+    page: keysPage,
+    page_size: keysPageSize,
+    keyword: debouncedKeyword || undefined,
+    type: typeFilter || undefined,
+    status: statusFilter || undefined,
+    sort_by: keysSort.by,
+    sort_order: keysSort.by ? keysSort.order : undefined,
+  }), [keysPage, keysPageSize, debouncedKeyword, typeFilter, statusFilter, keysSort]);
+
+  const { data: keysData, isLoading: keysLoading, refetch: refetchKeys } = useQuery({
+    queryKey: queryKeys.channelKeys(keysListQuery),
+    queryFn: () => channelsApi.listKeys(keysListQuery),
+    enabled: view === 'keys',
+    placeholderData: keepPreviousData,
+  });
+
+  const keyRows = keysData?.list ?? [];
+  const keysTotal = keysData?.total ?? 0;
+  const keysTotalPages = getTotalPages(keysTotal, keysPageSize);
 
   // 渠道近 30 分钟失败计数（errlog Redis 分钟桶），30s 轮询；Redis 缺失时后端返回全 0。
   const channelIds = rows.map((row) => row.id);
@@ -524,6 +416,23 @@ export default function ChannelsPage() {
     <div>
       {/* 筛选 + 工具栏 */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <Tabs
+          className="ag-segmented-tabs ag-segmented-tabs-compact"
+          selectedKey={view}
+          onSelectionChange={(key) => setView(key as 'channel' | 'keys')}
+        >
+          <Tabs.List>
+            <Tabs.Tab id="channel">
+              <Tabs.Indicator />
+              <span>{t('channels.view_channel')}</span>
+            </Tabs.Tab>
+            <Tabs.Tab id="keys">
+              <Tabs.Separator />
+              <Tabs.Indicator />
+              <span>{t('channels.view_keys')}</span>
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs>
         <div className="relative w-full sm:w-56">
           <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
           <Input
@@ -533,7 +442,7 @@ export default function ChannelsPage() {
             value={keyword}
             onChange={(event) => {
               setKeyword(event.target.value);
-              setPage(1);
+              resetToFirstPage();
             }}
           />
         </div>
@@ -544,7 +453,7 @@ export default function ChannelsPage() {
             selectedKey={typeFilter}
             onSelectionChange={(key) => {
               setTypeFilter(key == null ? '' : String(key));
-              setPage(1);
+              resetToFirstPage();
             }}
           >
             <Select.Trigger>
@@ -569,7 +478,7 @@ export default function ChannelsPage() {
             selectedKey={statusFilter}
             onSelectionChange={(key) => {
               setStatusFilter(key == null ? '' : String(key));
-              setPage(1);
+              resetToFirstPage();
             }}
           >
             <Select.Trigger>
@@ -601,7 +510,7 @@ export default function ChannelsPage() {
             aria-label={t('common.refresh', 'Refresh')}
             size="md"
             variant="ghost"
-            onPress={() => refetch()}
+            onPress={() => (view === 'keys' ? refetchKeys() : refetch())}
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -612,8 +521,8 @@ export default function ChannelsPage() {
         </div>
       </div>
 
-      {/* 批量操作条 */}
-      {selectedIds.length > 0 ? (
+      {/* 批量操作条（仅渠道视图：批量作用于选中渠道下全部 key） */}
+      {view === 'channel' && selectedIds.length > 0 ? (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius)] border border-border bg-surface px-3 py-2">
           <span className="text-sm text-text-secondary">
             {t('channels.selected_count', { count: selectedIds.length })}
@@ -666,6 +575,7 @@ export default function ChannelsPage() {
         </div>
       ) : null}
 
+      {view === 'channel' ? (
       <CommonTable
         ariaLabel={t('channels.title')}
         className="ag-channels-table"
@@ -835,6 +745,33 @@ export default function ChannelsPage() {
           )}
         </CommonTable.Body>
       </CommonTable>
+      ) : (
+        <ChannelKeysTable
+          isLoading={keysLoading}
+          rows={keyRows}
+          sortBy={keysSort.by}
+          sortOrder={keysSort.order}
+          footer={(
+            <TablePaginationFooter
+              page={keysPage}
+              pageSize={keysPageSize}
+              setPage={setKeysPage}
+              setPageSize={setKeysPageSize}
+              total={keysTotal}
+              totalPages={keysTotalPages}
+            />
+          )}
+          refreshingBalanceId={keyBalanceMutation.isPending ? keyBalanceMutation.variables ?? null : null}
+          togglingId={keyStatusMutation.isPending ? keyStatusMutation.variables?.id ?? null : null}
+          onDelete={(key) => setDeleteKeyTarget(key)}
+          onEdit={(key) => openEditKey(key)}
+          onOpenModels={(key) => setTestTarget(key)}
+          onRefreshBalance={(key) => keyBalanceMutation.mutate(key.id)}
+          onSortChange={handleKeysSortChange}
+          onStats={(key) => setKeyStatsTarget(key)}
+          onToggleEnabled={(key, enabled) => keyStatusMutation.mutate({ id: key.id, enabled })}
+        />
+      )}
 
       {/* 创建/编辑渠道弹窗（仅 name / base_url） */}
       <ChannelFormModal

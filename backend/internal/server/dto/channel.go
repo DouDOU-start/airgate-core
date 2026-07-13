@@ -4,8 +4,11 @@ import "time"
 
 // ChannelKeyResp 渠道下的一把密钥端点响应。明文密钥永不出现，仅回 api_key_hint（尾 4 位）。
 type ChannelKeyResp struct {
-	ID             int64             `json:"id"`
-	ChannelID      int64             `json:"channel_id"`
+	ID        int64 `json:"id"`
+	ChannelID int64 `json:"channel_id"`
+	// ChannelName / BaseURL 所属渠道的冗余展示字段，密钥视图（跨渠道平铺）用；渠道视图下与父渠道重复但无害。
+	ChannelName    string            `json:"channel_name"`
+	BaseURL        string            `json:"base_url"`
 	Name           string            `json:"name"`
 	Type           string            `json:"type"` // openai_compatible / anthropic / gemini / custom / openai_video / suno
 	APIKeyHint     string            `json:"api_key_hint"`

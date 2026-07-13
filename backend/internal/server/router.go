@@ -152,6 +152,8 @@ func (s *Server) registerRoutes() {
 
 		// 渠道管理
 		adminGroup.GET("/channels", handlers.Channel.ListChannels)
+		// 密钥视图：跨渠道平铺分页（静态段，先于 /channels/:id 匹配）
+		adminGroup.GET("/channels/keys", handlers.Channel.ListChannelKeys)
 		adminGroup.POST("/channels", handlers.Channel.CreateChannel)
 		adminGroup.PUT("/channels/:id", handlers.Channel.UpdateChannel)
 		adminGroup.DELETE("/channels/:id", handlers.Channel.DeleteChannel)

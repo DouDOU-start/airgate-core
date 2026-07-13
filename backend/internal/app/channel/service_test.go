@@ -30,6 +30,9 @@ func (s *stubRepo) Create(context.Context, CreateInput) (Channel, error)      { 
 func (s *stubRepo) Update(context.Context, int, UpdateInput) (Channel, error) { return Channel{}, nil }
 func (s *stubRepo) Delete(context.Context, int) error                         { return nil }
 func (s *stubRepo) BulkUpdate(context.Context, BulkUpdateInput) (int, error)  { return 0, nil }
+func (s *stubRepo) ListKeys(context.Context, KeyListFilter) ([]ChannelKey, int64, error) {
+	return nil, 0, nil
+}
 func (s *stubRepo) FindKeyByID(ctx context.Context, keyID int) (ChannelKey, error) {
 	if s.findKeyByID == nil {
 		return ChannelKey{}, nil
