@@ -16,6 +16,7 @@ import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { MetricChips } from '../../shared/components/MetricChips';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
+import { SortableHeader } from '../../shared/components/SortableHeader';
 import { getAvatarColor } from '../../shared/utils/avatar';
 import { formatDateTime } from '../../shared/utils/format';
 import { CreateUserModal } from './users/CreateUserModal';
@@ -25,7 +26,7 @@ import { UserApiKeysModal } from './users/UserApiKeysModal';
 import { BalanceHistoryModal } from './users/BalanceHistoryModal';
 import { UserGroupsModal } from './users/UserGroupsModal';
 import { TiersModal } from './users/TiersModal';
-import type { UserResp } from '../../shared/types';
+import type { SortOrder, UserResp, UserSortBy } from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import {
   Plus, Search, Pencil, MoreHorizontal, RefreshCw,
@@ -49,6 +50,16 @@ export default function UsersPage() {
   const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
   const [statusFilter, setStatusFilter] = useState('');
   const [tierFilter, setTierFilter] = useState('');
+  const [sort, setSort] = useState<{ by?: UserSortBy; order: SortOrder }>({ order: 'desc' });
+
+  function handleSortChange(field: UserSortBy) {
+    setSort((prev) => (prev.by === field ? { by: field, order: prev.order === 'asc' ? 'desc' : 'asc' } : { by: field, order: 'desc' }));
+    setPage(1);
+  }
+
+  function sortState(field: UserSortBy): SortOrder | null {
+    return sort.by === field ? sort.order : null;
+  }
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserResp | null>(null);
@@ -61,7 +72,7 @@ export default function UsersPage() {
   const [showTiersModal, setShowTiersModal] = useState(false);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: queryKeys.users(page, pageSize, debouncedKeyword, statusFilter, tierFilter),
+    queryKey: queryKeys.users(page, pageSize, debouncedKeyword, statusFilter, tierFilter, sort.by, sort.order),
     queryFn: () =>
       usersApi.list({
         page,
@@ -69,6 +80,8 @@ export default function UsersPage() {
         keyword: debouncedKeyword || undefined,
         status: statusFilter || undefined,
         tier_id: tierFilter ? Number(tierFilter) : undefined,
+        sort_by: sort.by,
+        sort_order: sort.by ? sort.order : undefined,
       }),
     placeholderData: keepPreviousData,
   });
@@ -250,9 +263,14 @@ export default function UsersPage() {
               <CommonTable.Column id="email">{t('users.email')}</CommonTable.Column>
               <CommonTable.Column id="username">{t('users.username')}</CommonTable.Column>
               <CommonTable.Column id="role">{t('users.role')}</CommonTable.Column>
-              <CommonTable.Column id="balance">{t('users.balance')}</CommonTable.Column>
+              <CommonTable.Column id="balance">
+                <SortableHeader active={sortState('balance')} label={t('users.balance')} onClick={() => handleSortChange('balance')} />
+              </CommonTable.Column>
               <CommonTable.Column id="runtime" style={{ width: '9.75rem' }}>
-                <span title={t('users.concurrency_rpm_hint')}>{t('users.concurrency_rpm')}</span>
+                <span className="inline-flex items-center gap-2" title={t('users.concurrency_rpm_hint')}>
+                  <SortableHeader active={sortState('concurrency')} label={t('users.concurrency_label')} onClick={() => handleSortChange('concurrency')} />
+                  <SortableHeader active={sortState('rpm')} label="RPM" onClick={() => handleSortChange('rpm')} />
+                </span>
               </CommonTable.Column>
               <CommonTable.Column id="status">{t('common.status')}</CommonTable.Column>
               <CommonTable.Column id="created_at">{t('users.created_at')}</CommonTable.Column>

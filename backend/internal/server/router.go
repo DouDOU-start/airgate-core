@@ -250,6 +250,7 @@ func (s *Server) registerRoutes() {
 		os.Exit(1)
 	}
 	indexHTML, _ := webfs.IndexHTML()
+	ogIndex := newIndexHTMLRenderer(indexHTML, handlers.SettingsService)
 	assetsFS, err := fs.Sub(distFS, "assets")
 	if err != nil {
 		slog.Error("嵌入前端缺少 assets 子目录", "error", err)
@@ -344,10 +345,14 @@ func (s *Server) registerRoutes() {
 
 	// 静态文件服务（前端 SPA）
 	r.StaticFS("/assets", http.FS(assetsFS))
+	// og:image 等分享卡片用的根目录静态文件不在 assets/ 下，未显式注册会落进
+	// NoRoute 兜底、被当成 index.html（text/html）吐回去——图片抓取方（微信等）
+	// 拿到的不是真图，卡片配图会失效。这里显式暴露一个 embed.FS 的根文件。
+	r.StaticFileFS("/og-cover.png", "og-cover.png", http.FS(distFS))
 
 	// NoRoute: 纯 SPA fallback，未匹配的路径一律返回前端 index.html。
 	// P1 起对外网关路由（/v1/chat/completions 等）走显式注册，不再经 NoRoute 分发。
 	r.NoRoute(func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
+		c.Data(http.StatusOK, "text/html; charset=utf-8", ogIndex.Bytes(c.Request.Context()))
 	})
 }

@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"sort"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -12,8 +13,9 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
 )
 
-// BalanceAlertFunc 余额预警回调（异步调用，不阻塞主流程）。
-type BalanceAlertFunc func(email string, balance float64, threshold float64)
+// BalanceAlertFunc 余额预警回调（异步调用，不阻塞主流程）；返回值用于
+// 判断邮件是否真正发出，失败时 checkBalanceAlert 会回滚 notified 标记以便重试。
+type BalanceAlertFunc func(email string, balance float64, threshold float64) error
 
 // Service 用户应用服务。
 type Service struct {
@@ -101,13 +103,18 @@ func (s *Service) ChangePassword(ctx context.Context, id int, oldPassword, newPa
 	return nil
 }
 
-// List 查询用户列表。
+// List 查询用户列表。SortBy 为 concurrency/rpm 时走运行时指标排序路径
+// （Redis 数据非 DB 字段，无法直接下推排序），其余走 DB 层排序。
 func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, error) {
-	logger := logx.LoggerFromContext(ctx)
 	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	filter.Page = page
 	filter.PageSize = pageSize
 
+	if filter.IsRuntimeStatSort() {
+		return s.listByRuntimeStat(ctx, filter)
+	}
+
+	logger := logx.LoggerFromContext(ctx)
 	list, total, err := s.repo.List(ctx, filter)
 	if err != nil {
 		logger.Error("user_lookup_failed",
@@ -118,6 +125,91 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 	}
 	s.attachRuntimeStats(ctx, list)
 	return ListResult{List: list, Total: total, Page: page, PageSize: pageSize}, nil
+}
+
+// listByRuntimeStat 按并发数/RPM 排序：先取筛选后的全量候选 id，批量查 Redis
+// 拿到指标快照后在内存排序分页，再按该页 id 取回完整用户数据。候选集超过
+// maxRuntimeStatSortCandidates 时拒绝排序，避免单次请求触发超大规模 Redis pipeline。
+func (s *Service) listByRuntimeStat(ctx context.Context, filter ListFilter) (ListResult, error) {
+	logger := logx.LoggerFromContext(ctx)
+	ids, err := s.repo.ListIDs(ctx, filter)
+	if err != nil {
+		logger.Error("user_lookup_failed",
+			logx.LogFieldReason, "list_ids",
+			logx.LogFieldError, err,
+		)
+		return ListResult{}, err
+	}
+	if len(ids) > maxRuntimeStatSortCandidates {
+		logger.Warn("user_sort_rejected",
+			logx.LogFieldReason, "too_many_sort_candidates",
+			"sort_by", filter.SortBy,
+			"candidates", len(ids),
+		)
+		return ListResult{}, ErrTooManySortCandidates
+	}
+
+	var metrics map[int]int
+	switch filter.SortBy {
+	case SortByConcurrency:
+		if s.concurrency != nil {
+			metrics = s.concurrency.GetUserCurrentCounts(ctx, ids)
+		}
+	case SortByRPM:
+		if s.rpm != nil {
+			metrics = s.rpm.GetUserRPMs(ctx, ids)
+		}
+	}
+
+	asc := filter.SortOrder == sortOrderAsc
+	sort.SliceStable(ids, func(i, j int) bool {
+		vi, vj := metrics[ids[i]], metrics[ids[j]]
+		if vi == vj {
+			return ids[i] > ids[j] // 指标相同时按 id 倒序兜底，保证分页稳定
+		}
+		if asc {
+			return vi < vj
+		}
+		return vi > vj
+	})
+
+	total := len(ids)
+	start := (filter.Page - 1) * filter.PageSize
+	if start > total {
+		start = total
+	}
+	end := start + filter.PageSize
+	if end > total {
+		end = total
+	}
+	pageIDs := ids[start:end]
+
+	list, err := s.repo.ListByIDs(ctx, pageIDs)
+	if err != nil {
+		logger.Error("user_lookup_failed",
+			logx.LogFieldReason, "list_by_ids",
+			logx.LogFieldError, err,
+		)
+		return ListResult{}, err
+	}
+	list = reorderUsersByIDs(list, pageIDs)
+	s.attachRuntimeStats(ctx, list)
+	return ListResult{List: list, Total: int64(total), Page: filter.Page, PageSize: filter.PageSize}, nil
+}
+
+// reorderUsersByIDs 按 ids 给定的顺序重排 users（ListByIDs 不保证返回顺序）。
+func reorderUsersByIDs(users []User, ids []int) []User {
+	byID := make(map[int]User, len(users))
+	for _, u := range users {
+		byID[u.ID] = u
+	}
+	result := make([]User, 0, len(ids))
+	for _, id := range ids {
+		if u, ok := byID[id]; ok {
+			result = append(result, u)
+		}
+	}
+	return result
 }
 
 // attachRuntimeStats 为列表页用户批量填充运行时观测指标（在途并发 / 当前分钟 RPM）。
@@ -324,10 +416,17 @@ func (s *Service) checkBalanceAlert(ctx context.Context, user User) {
 	if threshold <= 0 || s.onBalanceAlert == nil {
 		return
 	}
-	// 余额从高于阈值降到低于阈值，且尚未通知过
+	// 余额从高于阈值降到低于阈值，且尚未通知过。先占位标记为已通知（防止并发重复
+	// 触发发送），发送失败再回滚，使下次消费能够重试；不能等发送成功后再标记，
+	// 否则并发窗口内会重复发送。
 	if user.Balance < threshold && !user.BalanceAlertNotified {
 		_ = s.repo.SetBalanceAlertNotified(ctx, user.ID, true)
-		go s.onBalanceAlert(user.Email, user.Balance, threshold)
+		email, userID := user.Email, user.ID
+		go func() {
+			if err := s.onBalanceAlert(email, user.Balance, threshold); err != nil {
+				_ = s.repo.SetBalanceAlertNotified(context.Background(), userID, false)
+			}
+		}()
 	}
 	// 余额回到阈值以上（充值），重置通知状态
 	if user.Balance >= threshold && user.BalanceAlertNotified {

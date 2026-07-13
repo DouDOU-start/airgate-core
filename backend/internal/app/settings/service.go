@@ -171,6 +171,24 @@ func (s *Service) NewUserDefaults(ctx context.Context) (balance float64, concurr
 	return
 }
 
+// SiteOGImage 读取分享卡片封面图设置（site 组 og_image 键），未配置时返回空串，
+// 调用方据此回退到内置默认封面。供 server 层渲染 index.html 的 og:image/twitter:image 用。
+func (s *Service) SiteOGImage(ctx context.Context) string {
+	items, err := s.repo.List(ctx, "site")
+	if err != nil {
+		logx.LoggerFromContext(ctx).Error("settings_load_failed",
+			"group", "site",
+			logx.LogFieldError, err)
+		return ""
+	}
+	for _, item := range items {
+		if item.Key == "og_image" {
+			return strings.TrimSpace(item.Value)
+		}
+	}
+	return ""
+}
+
 // ListPublic 获取可公开访问的设置（无需认证），按白名单过滤敏感项。
 func (s *Service) ListPublic(ctx context.Context) (map[string]string, error) {
 	result := make(map[string]string)

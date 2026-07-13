@@ -179,6 +179,49 @@ func TestResolveTestSMTPPassword(t *testing.T) {
 	}
 }
 
+// TestSiteOGImage 分享卡片封面图读取：命中返回值（去空白）、
+// 未配置该 key 或读库失败时都回退空串，交由调用方走默认封面。
+func TestSiteOGImage(t *testing.T) {
+	cases := []struct {
+		name string
+		list func(context.Context, string) ([]Setting, error)
+		want string
+	}{
+		{
+			name: "已配置",
+			list: func(_ context.Context, group string) ([]Setting, error) {
+				if group != "site" {
+					t.Fatalf("应读取 site 组, got %q", group)
+				}
+				return []Setting{{Key: "og_image", Value: " /uploads/cover.png ", Group: "site"}}, nil
+			},
+			want: "/uploads/cover.png",
+		},
+		{
+			name: "未配置该key",
+			list: func(context.Context, string) ([]Setting, error) {
+				return []Setting{{Key: "site_name", Value: "AirGate", Group: "site"}}, nil
+			},
+			want: "",
+		},
+		{
+			name: "读库失败",
+			list: func(context.Context, string) ([]Setting, error) {
+				return nil, errors.New("db down")
+			},
+			want: "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			service := NewService(settingsStubRepository{list: tc.list}, "")
+			if got := service.SiteOGImage(t.Context()); got != tc.want {
+				t.Fatalf("SiteOGImage() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 type settingsStubRepository struct {
 	list       func(context.Context, string) ([]Setting, error)
 	upsertMany func(context.Context, []ItemInput) error

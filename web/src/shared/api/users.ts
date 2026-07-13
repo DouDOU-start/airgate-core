@@ -2,7 +2,7 @@ import { get, put, post, del, patch } from './client';
 import type {
   UserResp, UpdateProfileReq, ChangePasswordReq,
   CreateUserReq, UpdateUserReq, AdjustBalanceReq,
-  BalanceLogResp, PageReq, PagedData,
+  BalanceLogResp, PageReq, PagedData, UserSortBy, SortOrder,
 } from '../types';
 
 // APIKeyResp 从 types 中已有定义，这里直接引用
@@ -18,8 +18,10 @@ export const usersApi = {
     get<PagedData<BalanceLogResp>>('/api/v1/users/me/balance-history', params),
 
   // 管理员接口
-  list: (params: PageReq & { status?: string; role?: string; tier_id?: number }) =>
-    get<PagedData<UserResp>>('/api/v1/admin/users', params),
+  list: (params: PageReq & {
+    status?: string; role?: string; tier_id?: number;
+    sort_by?: UserSortBy; sort_order?: SortOrder;
+  }) => get<PagedData<UserResp>>('/api/v1/admin/users', params),
   create: (data: CreateUserReq) => post<UserResp>('/api/v1/admin/users', data),
   update: (id: number, data: UpdateUserReq) => put<void>(`/api/v1/admin/users/${id}`, data),
   delete: (id: number) => del<void>(`/api/v1/admin/users/${id}`),

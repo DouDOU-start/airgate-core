@@ -1,4 +1,4 @@
-import { get, put, post } from './client';
+import { get, put, post, uploadFile } from './client';
 import type { SettingResp, UpdateSettingsReq, TestSMTPReq } from '../types';
 
 export interface CoreVersionInfo {
@@ -13,4 +13,5 @@ export const settingsApi = {
   testSMTP: (data: TestSMTPReq) => post<void>('/api/v1/admin/settings/test-smtp', data),
   getPublic: () => get<Record<string, string>>('/api/v1/settings/public'),
   getCoreVersion: () => get<CoreVersionInfo>('/api/v1/admin/version'),
+  uploadFile: (file: File) => uploadFile<{ url: string }>('/api/v1/admin/settings/upload', file),
 };

@@ -50,6 +50,34 @@ type ListFilter struct {
 	Role     string
 	// TierID 按用户等级筛选，0 表示不筛选。
 	TierID int64
+	// SortBy 排序字段，取值见 SortBy* 常量；空值或未识别值按 SortByCreatedAt 处理。
+	SortBy string
+	// SortOrder 排序方向："asc" / "desc"；空值或未识别值按 desc 处理。
+	SortOrder string
+}
+
+const (
+	// SortByCreatedAt 按创建时间排序（默认）。
+	SortByCreatedAt = "created_at"
+	// SortByBalance 按余额排序（DB 字段，直接下推排序）。
+	SortByBalance = "balance"
+	// SortByConcurrency 按当前在途并发数排序（Redis 运行时指标，需先取全量 id 再批量查）。
+	SortByConcurrency = "concurrency"
+	// SortByRPM 按当前分钟 RPM 排序（同上）。
+	SortByRPM = "rpm"
+
+	// sortOrderAsc 升序标识。
+	sortOrderAsc = "asc"
+
+	// maxRuntimeStatSortCandidates 并发/RPM 排序允许的最大候选用户数（筛选后）。
+	// 超过该值直接拒绝排序请求（返回 ErrTooManySortCandidates），避免单次请求
+	// 触发超大规模 Redis pipeline；调用方应提示管理员先用筛选条件缩小范围。
+	maxRuntimeStatSortCandidates = 5000
+)
+
+// IsRuntimeStatSort 判断是否为运行时指标排序（需要 Redis 批量查询而非 DB 排序）。
+func (f ListFilter) IsRuntimeStatSort() bool {
+	return f.SortBy == SortByConcurrency || f.SortBy == SortByRPM
 }
 
 // ListResult 用户列表结果。
@@ -193,6 +221,10 @@ type GroupRateOverride struct {
 type Repository interface {
 	FindByID(context.Context, int, bool) (User, error)
 	List(context.Context, ListFilter) ([]User, int64, error)
+	// ListIDs 按筛选条件（忽略分页）返回全部匹配用户 id，用于运行时指标排序场景先取全量候选集。
+	ListIDs(context.Context, ListFilter) ([]int, error)
+	// ListByIDs 按 id 批量取用户详情（顺序不保证与入参一致，由调用方重排）。
+	ListByIDs(ctx context.Context, ids []int) ([]User, error)
 	EmailExists(context.Context, string) (bool, error)
 	ListWithGroupRateOverride(ctx context.Context, groupID int64) ([]GroupRateOverride, error)
 	Create(context.Context, Mutation) (User, error)

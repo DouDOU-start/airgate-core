@@ -164,12 +164,14 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 
 	tierID, _ := strconv.ParseInt(c.Query("tier_id"), 10, 64)
 	result, err := h.service.List(c.Request.Context(), appuser.ListFilter{
-		Page:     page.Page,
-		PageSize: page.PageSize,
-		Keyword:  page.Keyword,
-		Status:   c.Query("status"),
-		Role:     c.Query("role"),
-		TierID:   tierID,
+		Page:      page.Page,
+		PageSize:  page.PageSize,
+		Keyword:   page.Keyword,
+		Status:    c.Query("status"),
+		Role:      c.Query("role"),
+		TierID:    tierID,
+		SortBy:    c.Query("sort_by"),
+		SortOrder: c.Query("sort_order"),
 	})
 	if err != nil {
 		httpCode, message := h.handleError("查询用户列表失败", "查询失败", err)

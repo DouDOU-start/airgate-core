@@ -3,6 +3,12 @@ import i18n from '../../i18n';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
+// 供拼接后端返回的相对资源路径（如 /uploads/xxx.png）用：多数部署下 BASE_URL
+// 为空（前端与 API 同源），显式配置 VITE_API_BASE_URL 的分离部署下才需要这层拼接。
+export function resolveAssetURL(path: string): string {
+  return path ? `${BASE_URL}${path}` : path;
+}
+
 // 旧版本曾把 API Key 登录的明文 Key 写入 sessionStorage（key: apikey_session_secret），
 // 现已改为仅存内存变量；模块加载时清理历史残留，避免明文密钥继续留在浏览器存储中。
 try {
@@ -280,5 +286,19 @@ export function del<T>(path: string): Promise<T> {
 
 export function patch<T>(path: string, body?: unknown): Promise<T> {
   return request<T>('PATCH', path, body);
+}
+
+// 文件上传：body 为 FormData，不能走 request() 的 JSON.stringify 序列化，
+// Content-Type 留给浏览器自动带 multipart boundary。
+export async function uploadFile<T>(path: string, file: File): Promise<T> {
+  const form = new FormData();
+  form.append('file', file);
+  const url = new URL(`${BASE_URL}${path}`, window.location.origin);
+  const res = await doFetch(url.toString(), {
+    method: 'POST',
+    headers: buildHeaders(false),
+    body: form,
+  });
+  return handleResponse<T>(res);
 }
 

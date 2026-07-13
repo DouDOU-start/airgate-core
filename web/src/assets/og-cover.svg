@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <radialGradient id="bgTL" cx="18%" cy="12%" r="70%">
+      <stop offset="0%" stop-color="#123246"/>
+      <stop offset="55%" stop-color="#0a1628"/>
+      <stop offset="100%" stop-color="#050b18"/>
+    </radialGradient>
+    <radialGradient id="bgBR" cx="88%" cy="92%" r="65%">
+      <stop offset="0%" stop-color="#3245a8" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#050b18" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="iconBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="flowGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#67e8f9"/>
+      <stop offset="100%" stop-color="#a5b4fc"/>
+    </linearGradient>
+    <linearGradient id="underline" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背景：深色渐变，左上偏青、右下偏靛蓝的光晕 -->
+  <rect width="1200" height="630" fill="#050b18"/>
+  <rect width="1200" height="630" fill="url(#bgTL)"/>
+  <rect width="1200" height="630" fill="url(#bgBR)"/>
+
+  <!-- 图标：复用 logo.svg 的拱门造型（viewBox 512 缩放到 280 见方），平移到封面左侧 -->
+  <g transform="translate(140,175) scale(0.547)">
+    <rect width="512" height="512" rx="112" fill="url(#iconBg)"/>
+    <path d="M136 400 V240 C136 156 196 96 256 96 C316 96 376 156 376 240 V400"
+          stroke="white" stroke-width="44" stroke-linecap="round" fill="none" opacity="0.95"/>
+    <rect x="136" y="368" width="240" height="44" rx="22" fill="white" opacity="0.3"/>
+    <path d="M200 210 C230 190, 270 230, 312 210"
+          stroke="url(#flowGrad)" stroke-width="14" stroke-linecap="round" fill="none" opacity="0.9"/>
+    <path d="M190 260 C225 240, 275 280, 322 260"
+          stroke="white" stroke-width="14" stroke-linecap="round" fill="none" opacity="0.7"/>
+    <path d="M200 310 C235 290, 275 330, 312 310"
+          stroke="url(#flowGrad)" stroke-width="14" stroke-linecap="round" fill="none" opacity="0.5"/>
+  </g>
+
+  <!-- 文案 -->
+  <g font-family="Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif">
+    <text x="480" y="278" font-size="92" font-weight="800" fill="#f8fafc" letter-spacing="-1">AirGate</text>
+    <rect x="482" y="308" width="150" height="6" rx="3" fill="url(#underline)"/>
+    <text x="480" y="372" font-size="34" font-weight="500" fill="#dbeafe">AI API 统一网关</text>
+    <text x="480" y="413" font-size="23" font-weight="400" fill="#8b9bb4">Unified AI API Gateway</text>
+  </g>
+</svg>

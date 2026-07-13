@@ -21,4 +21,6 @@ var (
 	ErrDuplicateBalanceChange = errors.New("余额变更已入账（幂等键重复）")
 	// ErrTierNotFound 指定的用户等级不存在。
 	ErrTierNotFound = errors.New("等级不存在")
+	// ErrTooManySortCandidates 并发/RPM 排序候选集过大，需先用筛选条件缩小范围。
+	ErrTooManySortCandidates = errors.New("匹配用户数过多，无法按该字段排序，请先缩小筛选范围")
 )

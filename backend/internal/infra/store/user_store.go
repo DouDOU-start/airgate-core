@@ -44,9 +44,9 @@ func (s *UserStore) FindByID(ctx context.Context, id int, withAllowedGroups bool
 	return mapUser(item), nil
 }
 
-// List 查询用户列表。
-func (s *UserStore) List(ctx context.Context, filter appuser.ListFilter) ([]appuser.User, int64, error) {
-	query := s.db.User.Query()
+// applyListFilter 将 ListFilter 的筛选条件（不含分页/排序）应用到查询上，
+// 供 List / ListIDs 共用，避免筛选逻辑漂移。
+func applyListFilter(query *ent.UserQuery, filter appuser.ListFilter) *ent.UserQuery {
 	if filter.Keyword != "" {
 		query = query.Where(
 			entuser.Or(
@@ -64,18 +64,39 @@ func (s *UserStore) List(ctx context.Context, filter appuser.ListFilter) ([]appu
 	if filter.TierID > 0 {
 		query = query.Where(entuser.HasTierWith(enttier.IDEQ(int(filter.TierID))))
 	}
+	return query
+}
+
+// dbSortField 返回 DB 层可下推排序的字段与方向；仅覆盖 List 本身能处理的排序
+// （运行时指标排序由 service 层用 ListIDs+ListByIDs 两段式实现，不在此列）。
+func dbSortField(filter appuser.ListFilter) (field string, asc bool) {
+	if filter.SortBy == appuser.SortByBalance {
+		return entuser.FieldBalance, filter.SortOrder == "asc"
+	}
+	return entuser.FieldCreatedAt, filter.SortOrder == "asc"
+}
+
+// List 查询用户列表。
+func (s *UserStore) List(ctx context.Context, filter appuser.ListFilter) ([]appuser.User, int64, error) {
+	query := applyListFilter(s.db.User.Query(), filter)
 
 	total, err := query.Count(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
+	field, asc := dbSortField(filter)
+	order := ent.Desc(field)
+	if asc {
+		order = ent.Asc(field)
+	}
 	users, err := query.
 		WithAllowedGroups().
 		WithTier().
-		Offset((filter.Page - 1) * filter.PageSize).
+		Offset((filter.Page-1)*filter.PageSize).
 		Limit(filter.PageSize).
-		Order(ent.Desc(entuser.FieldCreatedAt)).
+		// 次序字段兜底稳定分页：主排序字段相同值时按 id 倒序，避免跨页重复/遗漏。
+		Order(order, ent.Desc(entuser.FieldID)).
 		All(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -86,6 +107,32 @@ func (s *UserStore) List(ctx context.Context, filter appuser.ListFilter) ([]appu
 		result = append(result, mapUser(item))
 	}
 	return result, int64(total), nil
+}
+
+// ListIDs 按筛选条件（忽略分页）返回全部匹配用户 id，用于运行时指标排序场景
+// 先取全量候选集，再由 service 层批量查 Redis 后在内存中排序分页。
+func (s *UserStore) ListIDs(ctx context.Context, filter appuser.ListFilter) ([]int, error) {
+	return applyListFilter(s.db.User.Query(), filter).IDs(ctx)
+}
+
+// ListByIDs 按 id 批量取用户详情（ent WHERE id IN 不保证返回顺序，由调用方重排）。
+func (s *UserStore) ListByIDs(ctx context.Context, ids []int) ([]appuser.User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	users, err := s.db.User.Query().
+		Where(entuser.IDIn(ids...)).
+		WithAllowedGroups().
+		WithTier().
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]appuser.User, 0, len(users))
+	for _, item := range users {
+		result = append(result, mapUser(item))
+	}
+	return result, nil
 }
 
 // EmailExists 检查邮箱是否已存在。

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Card, Form, Input, Label, Modal, Spinner, Tabs, TextArea, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { settingsApi } from '../../shared/api/settings';
+import { resolveAssetURL, ApiError } from '../../shared/api/client';
 import { adminApiKeyApi, type AdminAPIKeyResp } from '../../shared/api/adminApiKey';
 import { defaultLogoUrl } from '../../app/providers/SiteSettingsProvider';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -23,8 +24,12 @@ import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
 const SITE_KEYS = [
   'site_name', 'site_subtitle', 'site_logo', 'api_base_url',
-  'contact_info', 'doc_url', 'recharge_notice',
+  'contact_info', 'doc_url', 'recharge_notice', 'og_image',
 ] as const;
+
+// 内置默认分享卡片封面图，与后端 backend/internal/server/ogimage.go 里的
+// defaultOGImagePath 保持一致——未上传自定义封面时两边都以此为准。
+const DEFAULT_OG_IMAGE_URL = '/og-cover.png';
 
 const REG_KEYS = [
   'registration_enabled', 'email_verify_enabled',
@@ -360,6 +365,9 @@ export default function SettingsPage() {
                 </Field>
                 <Field className="col-span-1 md:col-span-2" label={t('settings.site_logo')} hint={t('settings.site_logo_hint')}>
                   <LogoUpload value={val('site_logo')} onChange={(url) => set('site_logo', url)} />
+                </Field>
+                <Field className="col-span-1 md:col-span-2" label={t('settings.og_image')} hint={t('settings.og_image_hint')}>
+                  <OGImageUpload value={val('og_image')} onChange={(url) => set('og_image', url)} />
                 </Field>
                 <Field className="col-span-1 md:col-span-2" label={t('settings.recharge_notice')} hint={t('settings.recharge_notice_hint')}>
                   <TextArea
@@ -1059,6 +1067,84 @@ function LogoUpload({ value, onChange }: { value: string; onChange: (url: string
           >
             <RotateCcw className="w-3.5 h-3.5" />
             {t('settings.restore_default_logo')}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ==================== OG 分享封面图 Upload ====================
+
+function OGImageUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast('error', t('settings.og_image_too_large'));
+      return;
+    }
+    setUploading(true);
+    try {
+      const { url } = await settingsApi.uploadFile(file);
+      onChange(url);
+    } catch (err) {
+      toast('error', err instanceof ApiError ? err.message : t('settings.og_image_upload_failed'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const previewSrc = value ? resolveAssetURL(value) : DEFAULT_OG_IMAGE_URL;
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative group shrink-0">
+        <img
+          src={previewSrc}
+          alt="OG Cover"
+          className="w-40 aspect-[1200/630] rounded-sm object-cover border border-border"
+        />
+        {value && (
+          <Button
+            aria-label={t('settings.restore_default_og_image')}
+            className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+            isIconOnly
+            size="sm"
+            variant="danger"
+            onPress={() => onChange('')}
+          >
+            <X className="w-3 h-3" />
+          </Button>
+        )}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={handleFile}
+          className="hidden"
+        />
+        <Button
+          size="sm"
+          variant="secondary"
+          isDisabled={uploading}
+          onPress={() => fileInputRef.current?.click()}
+        >
+          {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+          {value ? t('settings.change_og_image') : t('settings.upload_og_image')}
+        </Button>
+        {value && (
+          <Button size="sm" variant="ghost" onPress={() => onChange('')}>
+            <RotateCcw className="w-3.5 h-3.5" />
+            {t('settings.restore_default_og_image')}
           </Button>
         )}
       </div>

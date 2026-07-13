@@ -131,8 +131,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	userService.SetRuntimeStatsReaders(dep.Concurrency, rpmCounter)
 
 	// 余额预警回调：从设置读取 SMTP 配置发送邮件
-	userService.SetBalanceAlertCallback(func(email string, balance float64, threshold float64) {
-		balanceAlertSendEmail(settingsService, email, balance, threshold)
+	userService.SetBalanceAlertCallback(func(email string, balance float64, threshold float64) error {
+		return balanceAlertSendEmail(settingsService, email, balance, threshold)
 	})
 	// 生产环境固定 Postgres（见 cmd/server/main.go），显式传入方言以启用趋势聚合下推
 	usageStore := store.NewUsageStore(dep.DB, dialect.Postgres)
@@ -330,20 +330,21 @@ const defaultBalanceAlertBody = `<div style="font-family: -apple-system, BlinkMa
 </div>
 </div>`
 
-// balanceAlertSendEmail 发送余额预警邮件。
-func balanceAlertSendEmail(settingsService *appsettings.Service, email string, balance, threshold float64) {
+// balanceAlertSendEmail 发送余额预警邮件；返回值供调用方判断是否需要
+// 回滚 notified 标记以便下次消费重试（SMTP 未配置/发送失败都应可重试）。
+func balanceAlertSendEmail(settingsService *appsettings.Service, email string, balance, threshold float64) error {
 	ctx := context.Background()
 
 	// 读取 SMTP 配置
 	smtpSettings, err := settingsService.List(ctx, "smtp")
 	if err != nil {
 		slog.Error("balance_alert_smtp_load_failed", logx.LogFieldError, err)
-		return
+		return err
 	}
 	cfg := smtpConfigFromSettings(smtpSettings)
 	if cfg.Host == "" {
 		slog.Warn("mail_disabled_no_config", "context", "balance_alert")
-		return
+		return fmt.Errorf("SMTP 未配置")
 	}
 
 	// 读取站点名称及余额预警邮件模板
@@ -386,12 +387,13 @@ func balanceAlertSendEmail(settingsService *appsettings.Service, email string, b
 	m := mailer.New(cfg)
 	if err := m.Send(email, subject, body); err != nil {
 		slog.Error("balance_alert_email_failed", "to_hash", store.EmailHash(email), logx.LogFieldError, err)
-	} else {
-		slog.Info("balance_alert_email_sent",
-			"to_hash", store.EmailHash(email),
-			"balance", balance,
-			"threshold", threshold)
+		return err
 	}
+	slog.Info("balance_alert_email_sent",
+		"to_hash", store.EmailHash(email),
+		"balance", balance,
+		"threshold", threshold)
+	return nil
 }
 
 // defaultRechargeBody 充值成功邮件默认正文模板。

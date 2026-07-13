@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Chip, EmptyState } from '@heroui/react';
-import {
-  BarChart3, Boxes, ChevronDown, ChevronsUpDown, ChevronUp, Pencil, Trash2,
-} from 'lucide-react';
+import { BarChart3, Boxes, Pencil, Trash2 } from 'lucide-react';
 import { CommonTable } from '../../../shared/components/CommonTable';
 import { TableLoadingRow } from '../../../shared/components/TableLoadingRow';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
+import { SortableHeader } from '../../../shared/components/SortableHeader';
 import { formatDate, formatDateTime } from '../../../shared/utils/format';
 import type { ChannelKeyResp, ChannelKeySortBy, SortOrder } from '../../../shared/types';
 import {
@@ -14,27 +13,6 @@ import {
 } from './keyShared';
 
 const COLUMN_COUNT = 7;
-
-// 可排序表头：当前排序字段高亮箭头方向，非当前字段显示中性上下箭头；点击切换/翻转排序。
-function SortableHeader({
-  active, label, onClick,
-}: {
-  active: SortOrder | null;
-  label: string;
-  onClick: () => void;
-}) {
-  const Icon = active === 'asc' ? ChevronUp : active === 'desc' ? ChevronDown : ChevronsUpDown;
-  return (
-    <button
-      className="inline-flex items-center gap-1 text-inherit"
-      type="button"
-      onClick={onClick}
-    >
-      {label}
-      <Icon className={`h-3.5 w-3.5 ${active ? 'text-text' : 'text-text-tertiary'}`} />
-    </button>
-  );
-}
 
 // 密钥视图：跨渠道平铺展示全部 key（每行一把），priority/weight/created_at 可点击表头排序。
 // 与渠道视图（ChannelsPage 内的 KeyRow）共用类型徽章/状态徽章/指标行渲染逻辑（见 keyShared.tsx）。

@@ -706,6 +706,9 @@ export interface ChannelListQuery extends PageReq {
 export type ChannelKeySortBy = 'priority' | 'weight' | 'name' | 'status' | 'created_at';
 export type SortOrder = 'asc' | 'desc';
 
+/** 用户列表可排序字段：余额（DB 字段）/ 并发数 / RPM（Redis 运行时指标，候选集过大时后端会拒绝排序）。 */
+export type UserSortBy = 'balance' | 'concurrency' | 'rpm';
+
 // 密钥视图（跨渠道平铺）查询参数：keyword 同时匹配 key 名与渠道名。
 export interface ChannelKeyListQuery extends PageReq {
   type?: string;
