@@ -5,6 +5,9 @@
 **/.env.*
 **/backend/data
 **/backend/server
+# 部署数据/运行时目录（生产将仓库根同时作为部署目录时，data 为 pg/redis 挂载点，须排除）
+/data
+docker-compose.override.yml
 **/backend/tmp
 **/.air.toml
 **/.github
