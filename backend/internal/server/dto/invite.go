@@ -13,11 +13,6 @@ type InviteMeResp struct {
 	RebateTotal          float64 `json:"rebate_total"`
 }
 
-// BindInviteCodeReq 绑定邀请码请求（事后补绑）。
-type BindInviteCodeReq struct {
-	Code string `json:"code" binding:"required,max=32"`
-}
-
 // InviteTransferResp 返利转入余额结果。
 type InviteTransferResp struct {
 	Transferred float64 `json:"transferred"`

@@ -104,7 +104,6 @@ func (s *Server) registerRoutes() {
 		accountGroup.GET("/invite/me", handlers.Invite.GetMe)
 		accountGroup.GET("/invite/invitees", handlers.Invite.ListMyInvitees)
 		accountGroup.GET("/invite/logs", handlers.Invite.ListMyRebateLogs)
-		accountGroup.POST("/invite/bind", handlers.Invite.Bind)
 		accountGroup.POST("/invite/transfer", handlers.Invite.Transfer)
 
 		// OAuth 应用授权（仅真实用户会话；SPA 授权页转发）+ 应用导航入口

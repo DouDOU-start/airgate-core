@@ -13,7 +13,6 @@ export const inviteApi = {
   getMe: () => get<InviteMe>('/api/v1/invite/me'),
   listMyInvitees: (params?: InviteListQuery) => get<InviteeListResp>('/api/v1/invite/invitees', params),
   listMyLogs: (params?: InviteListQuery) => get<InviteRebateLogListResp>('/api/v1/invite/logs', params),
-  bind: (code: string) => post<{ bound: boolean }>('/api/v1/invite/bind', { code }),
   transfer: () => post<InviteTransferResp>('/api/v1/invite/transfer'),
 
   // ===== 管理端 =====

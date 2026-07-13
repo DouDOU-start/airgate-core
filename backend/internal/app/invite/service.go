@@ -126,9 +126,9 @@ func (s *Service) ValidateCode(ctx context.Context, rawCode string) error {
 	return nil
 }
 
-// BindInviter 注册成功后调用：总是先为该用户生成自己的邀请画像/邀请码（若尚不存在），
-// 邀请码非空时再绑定邀请关系。总开关关闭时整体跳过（不落库、不报错）。
-// 也用于「事后补绑」：已注册但未绑过邀请人的用户主动输入邀请码。
+// BindInviter 仅在注册成功后由 auth 域调用：总是先为该用户生成自己的邀请画像/
+// 邀请码（若尚不存在），邀请码非空时再绑定邀请关系。总开关关闭时整体跳过（不落库、
+// 不报错）。用户不允许注册后自行补绑邀请人，因此不对外暴露 HTTP 接口。
 func (s *Service) BindInviter(ctx context.Context, userID int, rawCode string) error {
 	if !s.IsEnabled(ctx) {
 		return nil

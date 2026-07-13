@@ -140,25 +140,6 @@ func (h *InviteHandler) ListMyRebateLogs(c *gin.Context) {
 	response.Success(c, response.PagedData(items, total, page.Page, page.PageSize))
 }
 
-// Bind 事后补绑邀请码（已注册但未绑过邀请人的用户）。
-func (h *InviteHandler) Bind(c *gin.Context) {
-	userID, ok := currentUserID(c)
-	if !ok {
-		response.Unauthorized(c, "用户未认证")
-		return
-	}
-	var req dto.BindInviteCodeReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BindError(c, err)
-		return
-	}
-	if err := h.service.BindInviter(c.Request.Context(), userID, req.Code); err != nil {
-		h.respondInviteError(c, "绑定邀请码失败", err)
-		return
-	}
-	response.Success(c, gin.H{"bound": true})
-}
-
 // Transfer 把返利余额转入可消费余额。
 func (h *InviteHandler) Transfer(c *gin.Context) {
 	userID, ok := currentUserID(c)

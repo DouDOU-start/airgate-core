@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Card, EmptyState, Input, Spinner, Tabs } from '@heroui/react';
+import { Alert, Button, Card, EmptyState, Spinner, Tabs } from '@heroui/react';
 import { AlertTriangle, Copy, Gift, Users, Wallet } from 'lucide-react';
 import { inviteApi } from '../../shared/api/invite';
 import { queryKeys } from '../../shared/queryKeys';
@@ -29,16 +29,6 @@ export default function InvitePage() {
   const { data: me, isLoading: meLoading } = useQuery({
     queryKey: queryKeys.inviteMe(),
     queryFn: () => inviteApi.getMe(),
-  });
-
-  const [bindCode, setBindCode] = useState('');
-  const bindMutation = useCrudMutation<{ bound: boolean }, string>({
-    mutationFn: (code) => inviteApi.bind(code),
-    queryKey: queryKeys.inviteMe(),
-    onSuccess: () => {
-      setBindCode('');
-      toast('success', t('invite.bind_success'));
-    },
   });
 
   const transferMutation = useCrudMutation<InviteTransferResp, void>({
@@ -167,35 +157,6 @@ export default function InvitePage() {
                 </Button>
               </div>
             </div>
-
-            {/* 补绑邀请码：尚未绑定邀请人时展示 */}
-            {!me?.inviter_id ? (
-              <div className="border-t border-border pt-4">
-                <p className="mb-2 text-sm font-medium text-text">{t('invite.bind_title')}</p>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <div className="w-full sm:max-w-xs">
-                    <Input
-                      aria-label={t('invite.bind_placeholder')}
-                      className="font-mono"
-                      maxLength={32}
-                      placeholder={t('invite.bind_placeholder')}
-                      value={bindCode}
-                      onChange={(e) => setBindCode(e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    aria-busy={bindMutation.isPending}
-                    isDisabled={bindMutation.isPending || !bindCode.trim()}
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => bindMutation.mutate(bindCode.trim())}
-                  >
-                    {bindMutation.isPending ? <Spinner size="sm" /> : <Gift className="h-3.5 w-3.5" />}
-                    {t('invite.bind_submit')}
-                  </Button>
-                </div>
-              </div>
-            ) : null}
           </div>
         </Card.Content>
       </Card>
