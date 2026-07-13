@@ -253,10 +253,9 @@ export function PriceCard({ onDelete, onEdit, onToggleMarketVisible, row, t, tog
         <div className="flex items-center gap-2">
           {row.tag ? <Chip size="sm" variant="soft">{row.tag.name}</Chip> : null}
           <span
-            className="inline-flex items-center gap-1 text-[11px] text-text-tertiary"
+            className="inline-flex items-center"
             title={t('model_prices.market_visible_hint')}
           >
-            {t('model_prices.market_visible_short')}
             <NativeSwitch
               ariaLabel={t('model_prices.market_visible')}
               isDisabled={togglingMarketVisible}
@@ -302,6 +301,8 @@ export default function ModelPricesPage() {
   const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
   // 标签过滤（null = 全部）：点标签管理块里的标签名切换。
   const [tagFilter, setTagFilter] = useState<number | null>(null);
+  // 广场可见过滤（null = 全部 / true = 已开启 / false = 未开启）。
+  const [marketVisibleFilter, setMarketVisibleFilter] = useState<boolean | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPrice, setEditingPrice] = useState<ModelPriceResp | null>(null);
@@ -329,7 +330,8 @@ export default function ModelPricesPage() {
     page_size: pageSize,
     keyword: debouncedKeyword || undefined,
     tag_id: tagFilter ?? undefined,
-  }), [page, pageSize, debouncedKeyword, tagFilter]);
+    market_visible: marketVisibleFilter ?? undefined,
+  }), [page, pageSize, debouncedKeyword, tagFilter, marketVisibleFilter]);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: queryKeys.modelPrices(listQuery),
@@ -661,6 +663,21 @@ export default function ModelPricesPage() {
             }}
           />
         </div>
+        <ToggleButtonGroup
+          aria-label={t('model_prices.market_visible_filter')}
+          disallowEmptySelection
+          selectedKeys={[marketVisibleFilter === null ? 'all' : marketVisibleFilter ? 'on' : 'off']}
+          selectionMode="single"
+          onSelectionChange={(keys) => {
+            const key = [...keys][0];
+            setPage(1);
+            setMarketVisibleFilter(key === 'on' ? true : key === 'off' ? false : null);
+          }}
+        >
+          <ToggleButton id="all">{t('common.all')}</ToggleButton>
+          <ToggleButton id="on">{t('model_prices.market_visible_on')}</ToggleButton>
+          <ToggleButton id="off">{t('model_prices.market_visible_off')}</ToggleButton>
+        </ToggleButtonGroup>
         <div className="ml-auto flex items-center gap-2">
           <Button
             isIconOnly
@@ -792,12 +809,16 @@ export default function ModelPricesPage() {
         </div>
       ) : rows.length === 0 ? (
         <div className="rounded-[var(--ag-radius-lg)] border border-border bg-surface py-16">
-          <EmptyState>
+          <EmptyState className="flex flex-col items-center gap-2 text-center">
             <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface">
               <Inbox className="h-5 w-5 text-text-tertiary" />
             </span>
             <div className="text-sm text-text-secondary">{t('common.no_data')}</div>
             <div className="text-xs text-text-tertiary">{t('model_prices.empty_hint')}</div>
+            <Button className="mt-2" size="sm" variant="primary" onPress={openCreate}>
+              <Plus className="h-3.5 w-3.5" />
+              {t('model_prices.create')}
+            </Button>
           </EmptyState>
         </div>
       ) : (

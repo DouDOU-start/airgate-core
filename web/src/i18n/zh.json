@@ -442,8 +442,10 @@
     "video_per_second_required": "视频按秒计费需填写大于 0 的每秒单价",
     "price_short_per_second": "按秒",
     "market_visible": "广场可见",
-    "market_visible_short": "广场",
-    "market_visible_hint": "开启后该模型会展示在未登录可见的模型广场页面"
+    "market_visible_hint": "开启后该模型会展示在未登录可见的模型广场页面",
+    "market_visible_filter": "广场可见筛选",
+    "market_visible_on": "已开启",
+    "market_visible_off": "未开启"
   },
   "model_market": {
     "badge": "模型广场",

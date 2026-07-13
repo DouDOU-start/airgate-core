@@ -32,6 +32,9 @@ func (s *ModelPriceStore) List(ctx context.Context, filter appmodelprice.ListFil
 	if filter.MarketVisibleOnly {
 		query = query.Where(entmodelprice.MarketVisibleEQ(true))
 	}
+	if filter.MarketVisible != nil {
+		query = query.Where(entmodelprice.MarketVisibleEQ(*filter.MarketVisible))
+	}
 
 	total, err := query.Count(ctx)
 	if err != nil {

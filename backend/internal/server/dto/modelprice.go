@@ -1,9 +1,11 @@
 package dto
 
-// ListModelPricesReq 价目表列表查询参数（分页/关键词 + 可选标签过滤）。
+// ListModelPricesReq 价目表列表查询参数（分页/关键词 + 可选标签/广场可见过滤）。
 type ListModelPricesReq struct {
 	PageReq
 	TagID *int64 `form:"tag_id" binding:"omitempty,gte=1"`
+	// MarketVisible 按广场可见状态过滤（省略 = 不过滤）。
+	MarketVisible *bool `form:"market_visible"`
 }
 
 // ModelPriceResp 模型价格响应。价格单位 USD / 1M tokens；per_request_price 为 USD / 次。

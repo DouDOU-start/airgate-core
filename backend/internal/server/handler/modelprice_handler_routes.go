@@ -17,10 +17,11 @@ func (h *ModelPriceHandler) ListModelPrices(c *gin.Context) {
 	}
 
 	filter := appmodelprice.ListFilter{
-		Page:     req.Page,
-		PageSize: req.PageSize,
-		Keyword:  req.Keyword,
-		TagID:    tagIDFromReq(req.TagID),
+		Page:          req.Page,
+		PageSize:      req.PageSize,
+		Keyword:       req.Keyword,
+		TagID:         tagIDFromReq(req.TagID),
+		MarketVisible: req.MarketVisible,
 	}
 	result, err := h.service.List(c.Request.Context(), filter)
 	if err != nil {

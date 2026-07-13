@@ -5,7 +5,7 @@ import type {
 } from '../types';
 
 export const modelPricesApi = {
-  list: (params?: PageReq & { tag_id?: number }) =>
+  list: (params?: PageReq & { tag_id?: number; market_visible?: boolean }) =>
     get<PagedData<ModelPriceResp>>('/api/v1/admin/model-prices', params),
   create: (data: CreateModelPriceReq) => post<ModelPriceResp>('/api/v1/admin/model-prices', data),
   update: (id: number, data: UpdateModelPriceReq) => put<ModelPriceResp>(`/api/v1/admin/model-prices/${id}`, data),

@@ -442,8 +442,10 @@
     "video_per_second_required": "Per-second billing requires a price greater than 0",
     "price_short_per_second": "Per-sec",
     "market_visible": "Visible in Market",
-    "market_visible_short": "Market",
-    "market_visible_hint": "When on, this model is shown on the public model market page (no login required)"
+    "market_visible_hint": "When on, this model is shown on the public model market page (no login required)",
+    "market_visible_filter": "Market visibility filter",
+    "market_visible_on": "On",
+    "market_visible_off": "Off"
   },
   "model_market": {
     "badge": "Model Market",

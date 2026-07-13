@@ -70,6 +70,8 @@ type ListFilter struct {
 	TagID *int
 	// MarketVisibleOnly 仅返回 market_visible=true 的条目（模型广场公开查询用）。
 	MarketVisibleOnly bool
+	// MarketVisible 管理端按广场可见状态过滤（nil = 不过滤；非 nil = 按值精确匹配）。
+	MarketVisible *bool
 }
 
 // ListResult 价目表分页结果。
