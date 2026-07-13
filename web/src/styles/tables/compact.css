@@ -181,7 +181,8 @@
     width: 100%;
   }
 
-  .ag-table-page-size {
+  .ag-table-page-size,
+  .ag-table-page-jump {
     margin-left: 0;
   }
 

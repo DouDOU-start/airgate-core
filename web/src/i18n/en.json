@@ -930,7 +930,9 @@
     "page": "Page {{page}} / {{total}}",
     "perPage": "Per page",
     "prev": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "jumpTo": "Go to",
+    "jumpToPage": "Jump to page"
   },
   "error": {
     "page_error": "Something went wrong",

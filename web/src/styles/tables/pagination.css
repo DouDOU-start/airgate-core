@@ -106,6 +106,47 @@
   color: var(--muted);
 }
 
+.ag-table-page-jump {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.25rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.ag-table-page-jump-input {
+  width: 2.25rem;
+  height: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  appearance: textfield;
+}
+
+.ag-table-page-jump-input::-webkit-outer-spin-button,
+.ag-table-page-jump-input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.ag-table-page-jump-input:hover {
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--border) 60%);
+}
+
+.ag-table-page-jump-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 18%, transparent);
+}
+
 .ag-table-pagination .pagination__content {
   gap: 0.1875rem !important;
   margin-left: auto;

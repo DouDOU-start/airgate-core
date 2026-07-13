@@ -930,7 +930,9 @@
     "page": "第 {{page}} / {{total}} 页",
     "perPage": "每页",
     "prev": "上一页",
-    "next": "下一页"
+    "next": "下一页",
+    "jumpTo": "跳至",
+    "jumpToPage": "跳转到指定页"
   },
   "error": {
     "page_error": "页面出现了错误",

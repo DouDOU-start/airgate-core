@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ListBox, Pagination, Select } from '@heroui/react';
 import { useTranslation } from 'react-i18next';
 import { DEFAULT_PAGINATION_PAGE_SIZE_OPTIONS, getPaginationItems } from '../utils/pagination';
@@ -26,6 +27,15 @@ export function TablePaginationFooter({
   const showPageSize = pageSize != null && setPageSize != null;
   const selectedPageSize = pageSize == null ? '' : String(pageSize);
   const pageSizeItems = pageSizeOptions.map((size) => ({ id: String(size), label: String(size) }));
+  const [jumpValue, setJumpValue] = useState('');
+
+  function commitJump() {
+    const parsed = Number(jumpValue);
+    if (jumpValue.trim() !== '' && Number.isFinite(parsed)) {
+      setPage(Math.min(Math.max(Math.trunc(parsed), 1), safeTotalPages));
+    }
+    setJumpValue('');
+  }
 
   return (
     <Pagination className="ag-table-pagination" size="sm">
@@ -60,6 +70,28 @@ export function TablePaginationFooter({
                 </ListBox>
               </Select.Popover>
             </Select>
+          </div>
+        ) : null}
+        {safeTotalPages > 1 ? (
+          <div className="ag-table-page-jump">
+            <span>{t('pagination.jumpTo')}</span>
+            <input
+              aria-label={t('pagination.jumpToPage')}
+              className="ag-table-page-jump-input"
+              max={safeTotalPages}
+              min={1}
+              placeholder={String(page)}
+              type="number"
+              value={jumpValue}
+              onChange={(event) => setJumpValue(event.target.value)}
+              onBlur={commitJump}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                commitJump();
+                event.currentTarget.blur();
+              }}
+            />
           </div>
         ) : null}
       </Pagination.Summary>
