@@ -166,6 +166,12 @@ export interface GroupRateOverrideResp {
   rate: number;
 }
 
+export interface GroupAllowedUserResp {
+  user_id: number;
+  email: string;
+  username: string;
+}
+
 export interface UpdateGroupReq {
   name?: string;
   rate_multiplier?: number;

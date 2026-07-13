@@ -6,6 +6,7 @@ import type {
   PageReq,
   PagedData,
   GroupRateOverrideResp,
+  GroupAllowedUserResp,
 } from '../types';
 
 export const groupsApi = {
@@ -31,4 +32,12 @@ export const groupsApi = {
     put<GroupRateOverrideResp>(`/api/v1/admin/groups/${groupId}/rate-overrides/${userId}`, payload),
   deleteRateOverride: (groupId: number, userId: number) =>
     del<void>(`/api/v1/admin/groups/${groupId}/rate-overrides/${userId}`),
+
+  // 专属分组用户管理（哪些用户被开了这个专属分组）
+  listAllowedUsers: (groupId: number) =>
+    get<GroupAllowedUserResp[]>(`/api/v1/admin/groups/${groupId}/allowed-users`),
+  grantAllowedUser: (groupId: number, userId: number) =>
+    post<void>(`/api/v1/admin/groups/${groupId}/allowed-users/${userId}`),
+  revokeAllowedUser: (groupId: number, userId: number) =>
+    del<void>(`/api/v1/admin/groups/${groupId}/allowed-users/${userId}`),
 };

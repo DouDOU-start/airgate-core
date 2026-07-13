@@ -46,3 +46,10 @@ type UpdateGroupReq struct {
 	Note           *string  `json:"note"`
 	SortWeight     *int     `json:"sort_weight"`
 }
+
+// GroupAllowedUserResp 获准访问专属分组的用户条目。
+type GroupAllowedUserResp struct {
+	UserID   int64  `json:"user_id"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
+}

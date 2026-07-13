@@ -17,6 +17,20 @@ type Repository interface {
 	// PublicRateMultipliers 返回全部非专属分组（is_exclusive=false）的倍率，供模型广场
 	// 展示粗粒度折扣区间；私下谈价的专属分组不参与，避免泄露定价策略。
 	PublicRateMultipliers(ctx context.Context) ([]float64, error)
+
+	// AllowedUsers 列出获准访问该专属分组的用户（按邮箱排序）。
+	AllowedUsers(ctx context.Context, groupID int) ([]AllowedUser, error)
+	// GrantAllowedUser 授予用户访问该专属分组的权限；已授予时幂等成功。
+	GrantAllowedUser(ctx context.Context, groupID, userID int) error
+	// RevokeAllowedUser 撤销用户访问该专属分组的权限；未授予时幂等成功。
+	RevokeAllowedUser(ctx context.Context, groupID, userID int) error
+}
+
+// AllowedUser 描述获准访问专属分组的用户（列表展示用最小字段集）。
+type AllowedUser struct {
+	UserID   int
+	Email    string
+	Username string
 }
 
 // ConcurrencyReader 分组在途并发数批量读取（由 scheduler.ConcurrencyManager 实现）。

@@ -8,6 +8,7 @@ import {
   Trash2,
   RefreshCw,
   Percent,
+  Users,
 } from 'lucide-react';
 import { Button, Chip, EmptyState } from '@heroui/react';
 import { groupsApi } from '../../shared/api/groups';
@@ -22,6 +23,7 @@ import { CommonTable } from '../../shared/components/CommonTable';
 import { MetricChips } from '../../shared/components/MetricChips';
 import { GroupFormModal } from './groups/EditGroupModal';
 import { GroupRateOverridesModal } from './groups/GroupRateOverridesModal';
+import { GroupAllowedUsersModal } from './groups/GroupAllowedUsersModal';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
@@ -35,6 +37,7 @@ export default function GroupsPage() {
   const [editingGroup, setEditingGroup] = useState<GroupResp | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<GroupResp | null>(null);
   const [rateOverrideGroup, setRateOverrideGroup] = useState<GroupResp | null>(null);
+  const [allowedUsersGroup, setAllowedUsersGroup] = useState<GroupResp | null>(null);
 
   // 查询分组列表
   const { data, isLoading, refetch } = useQuery({
@@ -135,7 +138,7 @@ export default function GroupsPage() {
               <CommonTable.Column id="sort_weight" style={{ width: 80 }}>
                 {t('groups.sort_weight')}
               </CommonTable.Column>
-              <CommonTable.Column id="actions" style={{ width: 132 }}>
+              <CommonTable.Column id="actions" style={{ width: 168 }}>
                 {t('common.actions')}
               </CommonTable.Column>
             </CommonTable.Header>
@@ -240,6 +243,17 @@ export default function GroupsPage() {
                         >
                           <Percent className="w-3.5 h-3.5" />
                         </Button>
+                        {row.is_exclusive ? (
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="secondary"
+                            aria-label={t('groups.allowed_users_manage')}
+                            onPress={() => setAllowedUsersGroup(row)}
+                          >
+                            <Users className="w-3.5 h-3.5" />
+                          </Button>
+                        ) : null}
                         <Button
                           isIconOnly
                           size="sm"
@@ -287,6 +301,15 @@ export default function GroupsPage() {
           open
           group={rateOverrideGroup}
           onClose={() => setRateOverrideGroup(null)}
+        />
+      )}
+
+      {/* 专属分组用户管理 */}
+      {allowedUsersGroup && (
+        <GroupAllowedUsersModal
+          open
+          group={allowedUsersGroup}
+          onClose={() => setAllowedUsersGroup(null)}
         />
       )}
 

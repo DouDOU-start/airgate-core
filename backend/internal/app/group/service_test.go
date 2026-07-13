@@ -43,6 +43,9 @@ type groupStubRepository struct {
 	delete         func(context.Context, int) error
 	statsForGroups func(context.Context, []int) (map[int]GroupStats, error)
 	publicRates    func(context.Context) ([]float64, error)
+	allowedUsers   func(context.Context, int) ([]AllowedUser, error)
+	grantUser      func(context.Context, int, int) error
+	revokeUser     func(context.Context, int, int) error
 }
 
 func (s groupStubRepository) List(ctx context.Context, filter ListFilter) ([]Group, int64, error) {
@@ -99,4 +102,25 @@ func (s groupStubRepository) PublicRateMultipliers(ctx context.Context) ([]float
 		return nil, nil
 	}
 	return s.publicRates(ctx)
+}
+
+func (s groupStubRepository) AllowedUsers(ctx context.Context, groupID int) ([]AllowedUser, error) {
+	if s.allowedUsers == nil {
+		return nil, nil
+	}
+	return s.allowedUsers(ctx, groupID)
+}
+
+func (s groupStubRepository) GrantAllowedUser(ctx context.Context, groupID, userID int) error {
+	if s.grantUser == nil {
+		return nil
+	}
+	return s.grantUser(ctx, groupID, userID)
+}
+
+func (s groupStubRepository) RevokeAllowedUser(ctx context.Context, groupID, userID int) error {
+	if s.revokeUser == nil {
+		return nil
+	}
+	return s.revokeUser(ctx, groupID, userID)
 }

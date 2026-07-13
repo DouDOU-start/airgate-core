@@ -157,6 +157,11 @@ func (s *Server) registerRoutes() {
 		adminGroup.PUT("/groups/:id/rate-overrides/:userId", handlers.User.SetGroupRateOverride)
 		adminGroup.DELETE("/groups/:id/rate-overrides/:userId", handlers.User.DeleteGroupRateOverride)
 
+		// 专属分组用户管理：某个专属分组下开放了哪些用户访问
+		adminGroup.GET("/groups/:id/allowed-users", handlers.Group.ListAllowedUsers)
+		adminGroup.POST("/groups/:id/allowed-users/:userId", handlers.Group.GrantAllowedUser)
+		adminGroup.DELETE("/groups/:id/allowed-users/:userId", handlers.Group.RevokeAllowedUser)
+
 		// API 密钥管理（管理员）
 		adminGroup.GET("/api-keys", handlers.APIKey.AdminListKeys)
 		adminGroup.PUT("/api-keys/:id", handlers.APIKey.AdminUpdateKey)

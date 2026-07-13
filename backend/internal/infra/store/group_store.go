@@ -265,6 +265,54 @@ func (s *GroupStore) PublicRateMultipliers(ctx context.Context) ([]float64, erro
 	return result, nil
 }
 
+// AllowedUsers 列出获准访问该专属分组的用户（按邮箱排序）。
+func (s *GroupStore) AllowedUsers(ctx context.Context, groupID int) ([]appgroup.AllowedUser, error) {
+	items, err := s.db.User.Query().
+		Where(entuser.HasAllowedGroupsWith(entgroup.IDEQ(groupID))).
+		Order(ent.Asc(entuser.FieldEmail)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]appgroup.AllowedUser, 0, len(items))
+	for _, item := range items {
+		result = append(result, appgroup.AllowedUser{UserID: item.ID, Email: item.Email, Username: item.Username})
+	}
+	return result, nil
+}
+
+// GrantAllowedUser 授予用户访问该专属分组的权限；已授予时（join 行已存在）幂等成功。
+func (s *GroupStore) GrantAllowedUser(ctx context.Context, groupID, userID int) error {
+	exists, err := s.db.User.Query().Where(entuser.IDEQ(userID)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return appgroup.ErrUserNotFound
+	}
+	if err := s.db.Group.UpdateOneID(groupID).AddAllowedUserIDs(userID).Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return appgroup.ErrGroupNotFound
+		}
+		if ent.IsConstraintError(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// RevokeAllowedUser 撤销用户访问该专属分组的权限；未授予时幂等成功。
+func (s *GroupStore) RevokeAllowedUser(ctx context.Context, groupID, userID int) error {
+	if err := s.db.Group.UpdateOneID(groupID).RemoveAllowedUserIDs(userID).Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return appgroup.ErrGroupNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 func applyGroupListFilters(query *ent.GroupQuery, keyword, platform string) *ent.GroupQuery {
 	if keyword != "" {
 		query = query.Where(entgroup.NameContains(keyword))

@@ -168,6 +168,40 @@ func (s *Service) PublicRateRange(ctx context.Context) (min, max float64, ok boo
 	return min, max, true
 }
 
+// AllowedUsers 列出获准访问该专属分组的用户，供管理员在分组页直接查找，
+// 不用再去用户列表里逐个翻找谁被开了这个专属分组。
+func (s *Service) AllowedUsers(ctx context.Context, groupID int) ([]AllowedUser, error) {
+	return s.repo.AllowedUsers(ctx, groupID)
+}
+
+// GrantAllowedUser 授予用户访问该专属分组的权限。
+func (s *Service) GrantAllowedUser(ctx context.Context, groupID, userID int) error {
+	logger := logx.LoggerFromContext(ctx)
+	if err := s.repo.GrantAllowedUser(ctx, groupID, userID); err != nil {
+		logger.Error("group_allowed_user_grant_failed",
+			logx.LogFieldGroupID, groupID,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldError, err)
+		return err
+	}
+	logger.Info("group_allowed_user_granted", logx.LogFieldGroupID, groupID, logx.LogFieldUserID, userID)
+	return nil
+}
+
+// RevokeAllowedUser 撤销用户访问该专属分组的权限。
+func (s *Service) RevokeAllowedUser(ctx context.Context, groupID, userID int) error {
+	logger := logx.LoggerFromContext(ctx)
+	if err := s.repo.RevokeAllowedUser(ctx, groupID, userID); err != nil {
+		logger.Error("group_allowed_user_revoke_failed",
+			logx.LogFieldGroupID, groupID,
+			logx.LogFieldUserID, userID,
+			logx.LogFieldError, err)
+		return err
+	}
+	logger.Info("group_allowed_user_revoked", logx.LogFieldGroupID, groupID, logx.LogFieldUserID, userID)
+	return nil
+}
+
 // Get 获取分组详情。
 func (s *Service) Get(ctx context.Context, id int) (Group, error) {
 	g, err := s.repo.FindByID(ctx, id)
