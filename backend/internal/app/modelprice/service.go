@@ -15,10 +15,17 @@ type Invalidator interface {
 	Invalidate()
 }
 
+// GroupRateRangeReader 非专属分组倍率区间读取器（由 group.Service 实现），供模型广场展示
+// "大概打几折"的粗粒度区间；未注入或无有效区间时模型广场只展示价格，不展示倍率。
+type GroupRateRangeReader interface {
+	PublicRateRange(ctx context.Context) (min, max float64, ok bool)
+}
+
 // Service 提供模型价目表用例编排。
 type Service struct {
 	repo        Repository
 	invalidator Invalidator
+	groupRates  GroupRateRangeReader
 }
 
 // NewService 创建价目表服务。
@@ -29,6 +36,11 @@ func NewService(repo Repository) *Service {
 // SetInvalidator 注入 pricing 缓存失效器（server 装配阶段调用；nil 安全）。
 func (s *Service) SetInvalidator(invalidator Invalidator) {
 	s.invalidator = invalidator
+}
+
+// SetGroupRateReader 注入分组倍率区间读取器（server 装配阶段调用；nil 安全）。
+func (s *Service) SetGroupRateReader(reader GroupRateRangeReader) {
+	s.groupRates = reader
 }
 
 // List 查询价目表列表。
@@ -47,6 +59,39 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 		Page:     page,
 		PageSize: pageSize,
 	}, nil
+}
+
+// PublicListResult 模型广场公开查询结果：价目分页列表 + 全局倍率区间（与具体模型无关）。
+type PublicListResult struct {
+	List          []ModelPrice
+	Total         int64
+	Page          int
+	PageSize      int
+	MultiplierMin float64
+	MultiplierMax float64
+	HasMultiplier bool
+}
+
+// ListPublic 查询模型广场公开视图：仅 market_visible=true 的条目 + 非专属分组的倍率区间。
+func (s *Service) ListPublic(ctx context.Context, filter ListFilter) (PublicListResult, error) {
+	filter.MarketVisibleOnly = true
+	listResult, err := s.List(ctx, filter)
+	if err != nil {
+		return PublicListResult{}, err
+	}
+
+	result := PublicListResult{
+		List:     listResult.List,
+		Total:    listResult.Total,
+		Page:     listResult.Page,
+		PageSize: listResult.PageSize,
+	}
+	if s.groupRates != nil {
+		if min, max, ok := s.groupRates.PublicRateRange(ctx); ok {
+			result.MultiplierMin, result.MultiplierMax, result.HasMultiplier = min, max, true
+		}
+	}
+	return result, nil
 }
 
 // Create 创建价格条目。

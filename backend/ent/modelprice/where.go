@@ -95,6 +95,11 @@ func TagID(v int) predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldEQ(FieldTagID, v))
 }
 
+// MarketVisible applies equality check predicate on the "market_visible" field. It's identical to MarketVisibleEQ.
+func MarketVisible(v bool) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldEQ(FieldMarketVisible, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldEQ(FieldCreatedAt, v))
@@ -448,6 +453,16 @@ func TagIDIsNil() predicate.ModelPrice {
 // TagIDNotNil applies the NotNil predicate on the "tag_id" field.
 func TagIDNotNil() predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldNotNull(FieldTagID))
+}
+
+// MarketVisibleEQ applies the EQ predicate on the "market_visible" field.
+func MarketVisibleEQ(v bool) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldEQ(FieldMarketVisible, v))
+}
+
+// MarketVisibleNEQ applies the NEQ predicate on the "market_visible" field.
+func MarketVisibleNEQ(v bool) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldNEQ(FieldMarketVisible, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

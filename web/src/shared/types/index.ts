@@ -735,6 +735,8 @@ export interface ModelPriceResp {
   pricing_extra?: Record<string, unknown>;
   /** 模型标签（家族归类，可空）。 */
   tag?: { id: number; name: string } | null;
+  /** 是否在模型广场（未登录可见的公开价目页）展示。 */
+  market_visible: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -757,6 +759,8 @@ export interface CreateModelPriceReq {
   pricing_extra?: Record<string, unknown>;
   /** 模型标签 ID（省略或 0 = 不挂标签）。 */
   tag_id?: number;
+  /** 是否在模型广场展示；省略时默认 true。 */
+  market_visible?: boolean;
 }
 
 export interface UpdateModelPriceReq {
@@ -770,6 +774,35 @@ export interface UpdateModelPriceReq {
   pricing_extra?: Record<string, unknown>;
   /** 三态：省略 = 不改；0 = 清空标签；正数 = 设为该标签。 */
   tag_id?: number;
+  /** 省略 = 不改；否则设为该值。 */
+  market_visible?: boolean;
+}
+
+// ==================== Model Market（模型广场，未登录可见）====================
+
+export interface ModelMarketItemResp {
+  model: string;
+  input_price: number;
+  output_price: number;
+  cached_input_price: number;
+  cache_creation_price: number;
+  cache_creation_1h_price: number;
+  per_request_price: number;
+  tag?: { id: number; name: string } | null;
+}
+
+export interface ModelMarketMultiplierRange {
+  min: number;
+  max: number;
+}
+
+export interface ModelMarketResp {
+  list: ModelMarketItemResp[];
+  total: number;
+  page: number;
+  page_size: number;
+  /** 为空表示无可展示的倍率区间，仅展示价格。 */
+  multiplier?: ModelMarketMultiplierRange;
 }
 
 // ==================== Settings ====================

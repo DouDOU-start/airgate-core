@@ -29,6 +29,9 @@ func (s *ModelPriceStore) List(ctx context.Context, filter appmodelprice.ListFil
 	if filter.TagID != nil {
 		query = query.Where(entmodelprice.TagIDEQ(*filter.TagID))
 	}
+	if filter.MarketVisibleOnly {
+		query = query.Where(entmodelprice.MarketVisibleEQ(true))
+	}
 
 	total, err := query.Count(ctx)
 	if err != nil {
@@ -79,7 +82,8 @@ func (s *ModelPriceStore) Create(ctx context.Context, input appmodelprice.Create
 		SetCacheCreationPrice(input.CacheCreationPrice).
 		SetCacheCreation1hPrice(input.CacheCreation1hPrice).
 		SetPricingExtra(input.PricingExtra).
-		SetPerRequestPrice(input.PerRequestPrice)
+		SetPerRequestPrice(input.PerRequestPrice).
+		SetMarketVisible(input.MarketVisible)
 	if input.TagID != nil && *input.TagID > 0 {
 		builder = builder.SetTagID(*input.TagID)
 	}
@@ -102,7 +106,8 @@ func (s *ModelPriceStore) Update(ctx context.Context, id int, input appmodelpric
 		SetNillableCachedInputPrice(input.CachedInputPrice).
 		SetNillableCacheCreationPrice(input.CacheCreationPrice).
 		SetNillableCacheCreation1hPrice(input.CacheCreation1hPrice).
-		SetNillablePerRequestPrice(input.PerRequestPrice)
+		SetNillablePerRequestPrice(input.PerRequestPrice).
+		SetNillableMarketVisible(input.MarketVisible)
 	// pricing_extra 整体替换：非 nil 时整块写入（空 map 清空扩展）。
 	if input.PricingExtra != nil {
 		builder = builder.SetPricingExtra(input.PricingExtra)
@@ -159,6 +164,7 @@ func mapModelPrice(item *ent.ModelPrice) appmodelprice.ModelPrice {
 		PerRequestPrice:      item.PerRequestPrice,
 		PricingExtra:         item.PricingExtra,
 		TagID:                item.TagID,
+		MarketVisible:        item.MarketVisible,
 		CreatedAt:            item.CreatedAt,
 		UpdatedAt:            item.UpdatedAt,
 	}

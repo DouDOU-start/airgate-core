@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button, Chip, EmptyState, Input, Label, ListBox, Modal, Select,
   Spinner, TextField as HeroTextField, ToggleButton, ToggleButtonGroup,
@@ -227,11 +227,13 @@ function specialLine(row: ModelPriceResp, t: Translate): ReactNode {
 
 // PriceCard 官网风价格卡片：模型名 + 家族标签、输入/输出大字单价为主视觉，
 // 缓存/特殊计费仅在有值时以小字行出现，底部编辑/删除操作。
-export function PriceCard({ onDelete, onEdit, row, t }: {
+export function PriceCard({ onDelete, onEdit, onToggleMarketVisible, row, t, togglingMarketVisible }: {
   onDelete: () => void;
   onEdit: () => void;
+  onToggleMarketVisible: (visible: boolean) => void;
   row: ModelPriceResp;
   t: Translate;
+  togglingMarketVisible?: boolean;
 }) {
   const cache = cacheLine(row, t);
   const special = specialLine(row, t);
@@ -242,7 +244,21 @@ export function PriceCard({ onDelete, onEdit, row, t }: {
         <div className="min-w-0">
           <div className="truncate font-mono text-sm font-medium text-text" title={row.model}>{row.model}</div>
         </div>
-        {row.tag ? <Chip size="sm" variant="soft">{row.tag.name}</Chip> : null}
+        <div className="flex items-center gap-2">
+          {row.tag ? <Chip size="sm" variant="soft">{row.tag.name}</Chip> : null}
+          <span
+            className="inline-flex items-center gap-1 text-[11px] text-text-tertiary"
+            title={t('model_prices.market_visible_hint')}
+          >
+            {t('model_prices.market_visible_short')}
+            <NativeSwitch
+              ariaLabel={t('model_prices.market_visible')}
+              isDisabled={togglingMarketVisible}
+              isSelected={row.market_visible}
+              onChange={onToggleMarketVisible}
+            />
+          </span>
+        </div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <PriceStat label={t('model_prices.price_short_input')} value={row.input_price} />
@@ -342,6 +358,16 @@ export default function ModelPricesPage() {
     successMessage: t('model_prices.delete_success'),
     queryKey: queryKeys.modelPrices(),
     onSuccess: () => setDeleteTarget(null),
+  });
+
+  // 广场可见开关：卡片上直接点击，不弹窗、不出成功提示（同渠道 key 启停交互）。
+  const marketVisibleMutation = useMutation({
+    mutationFn: ({ id, market_visible }: { id: number; market_visible: boolean }) =>
+      modelPricesApi.update(id, { market_visible }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.modelPrices() });
+    },
+    onError: (err: Error) => toast('error', err.message),
   });
 
   // 标签重命名/删除会改动卡片上的标签显示，一并失效价目列表。
@@ -775,8 +801,10 @@ export default function ModelPricesPage() {
               key={row.id}
               row={row}
               t={t}
+              togglingMarketVisible={marketVisibleMutation.isPending && marketVisibleMutation.variables?.id === row.id}
               onDelete={() => setDeleteTarget(row)}
               onEdit={() => openEdit(row)}
+              onToggleMarketVisible={(visible) => marketVisibleMutation.mutate({ id: row.id, market_visible: visible })}
             />
           ))}
         </div>

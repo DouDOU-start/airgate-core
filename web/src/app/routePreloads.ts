@@ -28,6 +28,7 @@ export function lazyWithPreload<TProps>(
 
 export const LoginPage = lazyWithPreload(() => import('../pages/LoginPage'));
 export const PublicHomePage = lazyWithPreload(() => import('../pages/HomePage'));
+export const ModelMarketPage = lazyWithPreload(() => import('../pages/ModelMarketPage'));
 export const DashboardPage = lazyWithPreload(() => import('../pages/DashboardPage'));
 export const UserOverviewPage = lazyWithPreload(() => import('../pages/user/UserOverviewPage'));
 export const UsersPage = lazyWithPreload(() => import('../pages/admin/UsersPage'));

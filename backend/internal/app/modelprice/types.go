@@ -43,10 +43,12 @@ type ModelPrice struct {
 	// PricingExtra 服务档倍率 + 长上下文阶梯等长尾维度（多数模型为空）。
 	PricingExtra map[string]interface{}
 	// TagID / TagName 模型标签（家族归类，可空；TagName 由 store 联查填充）。
-	TagID     *int
-	TagName   string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	TagID   *int
+	TagName string
+	// MarketVisible 是否在模型广场（未登录可见的公开价目页）展示。
+	MarketVisible bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // ListFilter 价目表列表查询参数。
@@ -56,6 +58,8 @@ type ListFilter struct {
 	Keyword  string
 	// TagID 按标签过滤（nil = 不过滤）。
 	TagID *int
+	// MarketVisibleOnly 仅返回 market_visible=true 的条目（模型广场公开查询用）。
+	MarketVisibleOnly bool
 }
 
 // ListResult 价目表分页结果。
@@ -78,6 +82,8 @@ type CreateInput struct {
 	PricingExtra         map[string]interface{}
 	// TagID 模型标签（nil = 不挂标签）。
 	TagID *int
+	// MarketVisible 是否在模型广场展示。
+	MarketVisible bool
 }
 
 // UpdateInput 更新价格输入（partial，指针字段）。
@@ -93,4 +99,6 @@ type UpdateInput struct {
 	PerRequestPrice      *float64
 	PricingExtra         map[string]interface{}
 	TagID                *int
+	// MarketVisible nil = 不改；非 nil = 设为该值。
+	MarketVisible *bool
 }

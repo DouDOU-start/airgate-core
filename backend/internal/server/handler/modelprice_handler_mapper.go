@@ -17,6 +17,7 @@ func toModelPriceRespFromDomain(item appmodelprice.ModelPrice) dto.ModelPriceRes
 		CacheCreation1hPrice: item.CacheCreation1hPrice,
 		PerRequestPrice:      item.PerRequestPrice,
 		PricingExtra:         item.PricingExtra,
+		MarketVisible:        item.MarketVisible,
 		TimeMixin: dto.TimeMixin{
 			CreatedAt: item.CreatedAt,
 			UpdatedAt: item.UpdatedAt,
@@ -44,4 +45,21 @@ func tagIDFromReq(id *int64) *int {
 	}
 	v := int(*id)
 	return &v
+}
+
+// toModelMarketItemRespFromDomain 领域对象 → 模型广场公开响应 DTO（价格子集，不含内部字段）。
+func toModelMarketItemRespFromDomain(item appmodelprice.ModelPrice) dto.ModelMarketItemResp {
+	resp := dto.ModelMarketItemResp{
+		Model:                item.Model,
+		InputPrice:           item.InputPrice,
+		OutputPrice:          item.OutputPrice,
+		CachedInputPrice:     item.CachedInputPrice,
+		CacheCreationPrice:   item.CacheCreationPrice,
+		CacheCreation1hPrice: item.CacheCreation1hPrice,
+		PerRequestPrice:      item.PerRequestPrice,
+	}
+	if item.TagID != nil && item.TagName != "" {
+		resp.Tag = &dto.ModelTagRef{ID: int64(*item.TagID), Name: item.TagName}
+	}
+	return resp
 }

@@ -36,6 +36,11 @@ func (s *Server) registerRoutes() {
 	// === 公共路由（无需认证） ===
 	v1.GET("/settings/public", handlers.Settings.GetPublicSettings)
 
+	// 模型广场（未登录可见的模型价格 + 倍率区间）：IP 限流防刷。
+	modelMarketRL := middleware.NewIPRateLimit(60)
+	s.modelMarketRateLimiter = modelMarketRL.Limiter
+	v1.GET("/model-market", modelMarketRL.Handler, handlers.ModelPrice.PublicListModelMarket)
+
 	// === 认证路由（无需 JWT） ===
 	//
 	// 基于客户端 IP 的速率限制（10 req/min），防止暴力破解和验证码滥用。

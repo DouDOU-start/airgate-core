@@ -23,6 +23,7 @@ import {
   InviteRebatePage,
   lazyWithPreload,
   LoginPage,
+  ModelMarketPage,
   ModelPricesPage,
   OAuthAuthorizePage,
   OAuthClientsPage,
@@ -127,6 +128,19 @@ const loginRoute = createRoute({
   ),
 });
 
+// 模型广场（无需认证，懒加载；未登录用户查看模型价格 + 倍率区间）
+// 注意：路径不能叫 /models —— 后端网关有裸路径兼容端点 GET /models（OpenAI 客户端不带 /v1 前缀时的
+// 兜底转发），vite 开发代理与生产环境都会把它转发到网关而不是渲染这个页面。
+const modelMarketRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/model-market',
+  component: () => (
+    <Suspense fallback={<FullPageLoading />}>
+      <ModelMarketPage />
+    </Suspense>
+  ),
+});
+
 // OAuth 授权页（公开路由，页面内部自行校验登录态并带回跳去登录页）
 const oauthAuthorizeRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -226,6 +240,7 @@ const inviteRoute = createRoute({ getParentRoute: () => authLayout, path: '/invi
 const routeTree = rootRoute.addChildren([
   homeRoute,
   loginRoute,
+  modelMarketRoute,
   oauthAuthorizeRoute,
   authLayout.addChildren([
     dashboardRoute,

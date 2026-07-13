@@ -202,6 +202,20 @@ func (mpu *ModelPriceUpdate) ClearTagID() *ModelPriceUpdate {
 	return mpu
 }
 
+// SetMarketVisible sets the "market_visible" field.
+func (mpu *ModelPriceUpdate) SetMarketVisible(b bool) *ModelPriceUpdate {
+	mpu.mutation.SetMarketVisible(b)
+	return mpu
+}
+
+// SetNillableMarketVisible sets the "market_visible" field if the given value is not nil.
+func (mpu *ModelPriceUpdate) SetNillableMarketVisible(b *bool) *ModelPriceUpdate {
+	if b != nil {
+		mpu.SetMarketVisible(*b)
+	}
+	return mpu
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (mpu *ModelPriceUpdate) SetUpdatedAt(t time.Time) *ModelPriceUpdate {
 	mpu.mutation.SetUpdatedAt(t)
@@ -332,6 +346,9 @@ func (mpu *ModelPriceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if mpu.mutation.PricingExtraCleared() {
 		_spec.ClearField(modelprice.FieldPricingExtra, field.TypeJSON)
+	}
+	if value, ok := mpu.mutation.MarketVisible(); ok {
+		_spec.SetField(modelprice.FieldMarketVisible, field.TypeBool, value)
 	}
 	if value, ok := mpu.mutation.UpdatedAt(); ok {
 		_spec.SetField(modelprice.FieldUpdatedAt, field.TypeTime, value)
@@ -559,6 +576,20 @@ func (mpuo *ModelPriceUpdateOne) ClearTagID() *ModelPriceUpdateOne {
 	return mpuo
 }
 
+// SetMarketVisible sets the "market_visible" field.
+func (mpuo *ModelPriceUpdateOne) SetMarketVisible(b bool) *ModelPriceUpdateOne {
+	mpuo.mutation.SetMarketVisible(b)
+	return mpuo
+}
+
+// SetNillableMarketVisible sets the "market_visible" field if the given value is not nil.
+func (mpuo *ModelPriceUpdateOne) SetNillableMarketVisible(b *bool) *ModelPriceUpdateOne {
+	if b != nil {
+		mpuo.SetMarketVisible(*b)
+	}
+	return mpuo
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (mpuo *ModelPriceUpdateOne) SetUpdatedAt(t time.Time) *ModelPriceUpdateOne {
 	mpuo.mutation.SetUpdatedAt(t)
@@ -719,6 +750,9 @@ func (mpuo *ModelPriceUpdateOne) sqlSave(ctx context.Context) (_node *ModelPrice
 	}
 	if mpuo.mutation.PricingExtraCleared() {
 		_spec.ClearField(modelprice.FieldPricingExtra, field.TypeJSON)
+	}
+	if value, ok := mpuo.mutation.MarketVisible(); ok {
+		_spec.SetField(modelprice.FieldMarketVisible, field.TypeBool, value)
 	}
 	if value, ok := mpuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(modelprice.FieldUpdatedAt, field.TypeTime, value)

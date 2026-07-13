@@ -8,6 +8,7 @@
     "go_dashboard": "进入控制台",
     "view_docs": "查看文档",
     "docs": "文档",
+    "model_market": "模型广场",
     "contact": "联系",
     "copyright": "版权所有",
     "feature_gateway": "统一网关",
@@ -438,7 +439,26 @@
     "video_per_second": "每秒单价",
     "unit_per_second": "USD / 秒",
     "video_per_second_required": "视频按秒计费需填写大于 0 的每秒单价",
-    "price_short_per_second": "按秒"
+    "price_short_per_second": "按秒",
+    "market_visible": "广场可见",
+    "market_visible_short": "广场",
+    "market_visible_hint": "开启后该模型会展示在未登录可见的模型广场页面"
+  },
+  "model_market": {
+    "badge": "模型广场",
+    "title": "模型价格一览",
+    "subtitle": "无需登录即可查看全部模型的价格；不同用户等级可能享有额外折扣，登录后查看专属价格。",
+    "search_placeholder": "搜索模型名称...",
+    "multiplier_hint": "不同等级享 {{min}}x ~ {{max}}x 优惠，登录查看专属价格",
+    "back_home": "返回首页",
+    "login_cta": "登录 / 注册",
+    "login_cta_desc": "登录后即可使用这些模型，部分等级还享有额外折扣",
+    "price_short_input": "输入",
+    "price_short_output": "输出",
+    "price_short_cached": "缓存读取",
+    "price_short_write5m": "缓存写入 5m",
+    "price_short_write1h": "缓存写入 1h",
+    "price_short_per_request": "按次"
   },
   "groups": {
     "title": "分组管理",

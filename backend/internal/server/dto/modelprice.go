@@ -19,6 +19,8 @@ type ModelPriceResp struct {
 	PricingExtra         map[string]interface{} `json:"pricing_extra,omitempty"`
 	// Tag 模型标签（家族归类，可空）。
 	Tag *ModelTagRef `json:"tag,omitempty"`
+	// MarketVisible 是否在模型广场（未登录可见的公开价目页）展示。
+	MarketVisible bool `json:"market_visible"`
 	TimeMixin
 }
 
@@ -40,6 +42,8 @@ type CreateModelPriceReq struct {
 	PricingExtra         map[string]interface{} `json:"pricing_extra"`
 	// TagID 模型标签 ID（省略或 0 = 不挂标签）。
 	TagID *int64 `json:"tag_id" binding:"omitempty,gte=0"`
+	// MarketVisible 是否在模型广场展示；省略时默认 true。
+	MarketVisible *bool `json:"market_visible"`
 }
 
 // UpdateModelPriceReq 更新模型价格请求（partial，指针字段）。
@@ -55,6 +59,8 @@ type UpdateModelPriceReq struct {
 	PricingExtra         map[string]interface{} `json:"pricing_extra"`
 	// TagID 三态：省略 = 不改；0 = 清空标签；正数 = 设为该标签。
 	TagID *int64 `json:"tag_id" binding:"omitempty,gte=0"`
+	// MarketVisible 省略 = 不改；否则设为该值。
+	MarketVisible *bool `json:"market_visible"`
 }
 
 // ModelTagResp 模型标签响应；model_count 为引用该标签的模型数。
@@ -62,6 +68,33 @@ type ModelTagResp struct {
 	ID         int64  `json:"id"`
 	Name       string `json:"name"`
 	ModelCount int64  `json:"model_count"`
+}
+
+// ModelMarketItemResp 模型广场公开展示条目：价格字段子集，不含 pricing_extra 等内部字段。
+type ModelMarketItemResp struct {
+	Model                string       `json:"model"`
+	InputPrice           float64      `json:"input_price"`
+	OutputPrice          float64      `json:"output_price"`
+	CachedInputPrice     float64      `json:"cached_input_price"`
+	CacheCreationPrice   float64      `json:"cache_creation_price"`
+	CacheCreation1hPrice float64      `json:"cache_creation_1h_price"`
+	PerRequestPrice      float64      `json:"per_request_price"`
+	Tag                  *ModelTagRef `json:"tag,omitempty"`
+}
+
+// ModelMarketMultiplierRange 非专属分组的倍率区间（专属谈价分组不参与，见后端 service 注释）。
+type ModelMarketMultiplierRange struct {
+	Min float64 `json:"min"`
+	Max float64 `json:"max"`
+}
+
+// ModelMarketResp 模型广场公开响应；Multiplier 为空表示无可展示的倍率区间，前端只展示价格。
+type ModelMarketResp struct {
+	List       []ModelMarketItemResp       `json:"list"`
+	Total      int64                       `json:"total"`
+	Page       int                         `json:"page"`
+	PageSize   int                         `json:"page_size"`
+	Multiplier *ModelMarketMultiplierRange `json:"multiplier,omitempty"`
 }
 
 // CreateModelTagReq 新建模型标签请求。

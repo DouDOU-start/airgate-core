@@ -36,12 +36,50 @@ func (h *ModelPriceHandler) ListModelPrices(c *gin.Context) {
 	response.Success(c, response.PagedData(list, result.Total, result.Page, result.PageSize))
 }
 
+// PublicListModelMarket 模型广场公开接口：未登录可见的模型价格 + 非专属分组倍率区间。
+func (h *ModelPriceHandler) PublicListModelMarket(c *gin.Context) {
+	var req dto.ListModelPricesReq
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	filter := appmodelprice.ListFilter{
+		Page:     req.Page,
+		PageSize: req.PageSize,
+		Keyword:  req.Keyword,
+		TagID:    tagIDFromReq(req.TagID),
+	}
+	result, err := h.service.ListPublic(c.Request.Context(), filter)
+	if err != nil {
+		httpCode, message := h.handleError("查询模型广场失败", "查询失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	list := make([]dto.ModelMarketItemResp, 0, len(result.List))
+	for _, item := range result.List {
+		list = append(list, toModelMarketItemRespFromDomain(item))
+	}
+	resp := dto.ModelMarketResp{List: list, Total: result.Total, Page: result.Page, PageSize: result.PageSize}
+	if result.HasMultiplier {
+		resp.Multiplier = &dto.ModelMarketMultiplierRange{Min: result.MultiplierMin, Max: result.MultiplierMax}
+	}
+	response.Success(c, resp)
+}
+
 // CreateModelPrice 创建模型价格。
 func (h *ModelPriceHandler) CreateModelPrice(c *gin.Context) {
 	var req dto.CreateModelPriceReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BindError(c, err)
 		return
+	}
+
+	// MarketVisible 未提交时默认 true（保持旧行为兼容：已有接入方不传值就继续对外展示）。
+	marketVisible := true
+	if req.MarketVisible != nil {
+		marketVisible = *req.MarketVisible
 	}
 
 	item, err := h.service.Create(c.Request.Context(), appmodelprice.CreateInput{
@@ -54,6 +92,7 @@ func (h *ModelPriceHandler) CreateModelPrice(c *gin.Context) {
 		PerRequestPrice:      req.PerRequestPrice,
 		PricingExtra:         req.PricingExtra,
 		TagID:                tagIDFromReq(req.TagID),
+		MarketVisible:        marketVisible,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("创建模型价格失败", "创建失败", err)
@@ -88,6 +127,7 @@ func (h *ModelPriceHandler) UpdateModelPrice(c *gin.Context) {
 		PerRequestPrice:      req.PerRequestPrice,
 		PricingExtra:         req.PricingExtra,
 		TagID:                tagIDFromReq(req.TagID),
+		MarketVisible:        req.MarketVisible,
 	})
 	if err != nil {
 		httpCode, message := h.handleError("更新模型价格失败", "更新失败", err)

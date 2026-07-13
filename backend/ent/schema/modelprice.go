@@ -35,6 +35,9 @@ func (ModelPrice) Fields() []ent.Field {
 		field.JSON("pricing_extra", map[string]interface{}{}).Optional(),
 		// tag_id 模型标签外键（家族归类，可空）；删除标签时由 store 层先清引用。
 		field.Int("tag_id").Optional().Nillable(),
+		// market_visible 是否在模型广场（未登录可见的公开价目页）展示；默认展示，
+		// 管理员可在模型管理里对内测/下线中的模型关闭。
+		field.Bool("market_visible").Default(true),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
 	}

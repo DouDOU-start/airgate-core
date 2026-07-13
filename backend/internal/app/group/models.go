@@ -14,6 +14,9 @@ type Repository interface {
 	Update(context.Context, int, UpdateInput) (Group, error)
 	Delete(context.Context, int) error
 	StatsForGroups(ctx context.Context, groupIDs []int, todayStart time.Time) (map[int]GroupStats, error)
+	// PublicRateMultipliers 返回全部非专属分组（is_exclusive=false）的倍率，供模型广场
+	// 展示粗粒度折扣区间；私下谈价的专属分组不参与，避免泄露定价策略。
+	PublicRateMultipliers(ctx context.Context) ([]float64, error)
 }
 
 // ConcurrencyReader 分组在途并发数批量读取（由 scheduler.ConcurrencyManager 实现）。

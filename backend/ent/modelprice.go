@@ -37,6 +37,8 @@ type ModelPrice struct {
 	PricingExtra map[string]interface{} `json:"pricing_extra,omitempty"`
 	// TagID holds the value of the "tag_id" field.
 	TagID *int `json:"tag_id,omitempty"`
+	// MarketVisible holds the value of the "market_visible" field.
+	MarketVisible bool `json:"market_visible,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -74,6 +76,8 @@ func (*ModelPrice) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case modelprice.FieldPricingExtra:
 			values[i] = new([]byte)
+		case modelprice.FieldMarketVisible:
+			values[i] = new(sql.NullBool)
 		case modelprice.FieldInputPrice, modelprice.FieldOutputPrice, modelprice.FieldCachedInputPrice, modelprice.FieldCacheCreationPrice, modelprice.FieldCacheCreation1hPrice, modelprice.FieldPerRequestPrice:
 			values[i] = new(sql.NullFloat64)
 		case modelprice.FieldID, modelprice.FieldTagID:
@@ -160,6 +164,12 @@ func (mp *ModelPrice) assignValues(columns []string, values []any) error {
 				mp.TagID = new(int)
 				*mp.TagID = int(value.Int64)
 			}
+		case modelprice.FieldMarketVisible:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field market_visible", values[i])
+			} else if value.Valid {
+				mp.MarketVisible = value.Bool
+			}
 		case modelprice.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -241,6 +251,9 @@ func (mp *ModelPrice) String() string {
 		builder.WriteString("tag_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("market_visible=")
+	builder.WriteString(fmt.Sprintf("%v", mp.MarketVisible))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(mp.CreatedAt.Format(time.ANSIC))

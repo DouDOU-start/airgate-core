@@ -8,6 +8,7 @@
     "go_dashboard": "Dashboard",
     "view_docs": "Documentation",
     "docs": "Docs",
+    "model_market": "Model Market",
     "contact": "Contact",
     "copyright": "All rights reserved",
     "feature_gateway": "Unified Gateway",
@@ -438,7 +439,26 @@
     "video_per_second": "Price per second",
     "unit_per_second": "USD / second",
     "video_per_second_required": "Per-second billing requires a price greater than 0",
-    "price_short_per_second": "Per-sec"
+    "price_short_per_second": "Per-sec",
+    "market_visible": "Visible in Market",
+    "market_visible_short": "Market",
+    "market_visible_hint": "When on, this model is shown on the public model market page (no login required)"
+  },
+  "model_market": {
+    "badge": "Model Market",
+    "title": "Model Pricing",
+    "subtitle": "Browse every model's pricing without signing in. Some tiers get extra discounts — log in to see your rate.",
+    "search_placeholder": "Search model name...",
+    "multiplier_hint": "Tiers get {{min}}x ~ {{max}}x discounts — log in to see your rate",
+    "back_home": "Back to Home",
+    "login_cta": "Log in / Sign up",
+    "login_cta_desc": "Log in to start using these models — some tiers get extra discounts",
+    "price_short_input": "Input",
+    "price_short_output": "Output",
+    "price_short_cached": "Cached",
+    "price_short_write5m": "Write 5m",
+    "price_short_write1h": "Write 1h",
+    "price_short_per_request": "Per req"
   },
   "groups": {
     "title": "Groups",

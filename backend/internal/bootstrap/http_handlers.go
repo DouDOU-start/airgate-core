@@ -107,6 +107,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	channelService.SetStatsReader(channelStore)
 	modelPriceStore := store.NewModelPriceStore(dep.DB)
 	modelPriceService := appmodelprice.NewService(modelPriceStore)
+	// 模型广场倍率区间：只取非专属分组，避免泄露专属谈价倍率
+	modelPriceService.SetGroupRateReader(groupService)
 	dashboardStore := store.NewDashboardStore(dep.DB, dep.Redis)
 	dashboardService := appdashboard.NewService(dashboardStore, dep.Redis)
 	settingsStore := store.NewSettingsStore(dep.DB)

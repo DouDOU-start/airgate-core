@@ -312,6 +312,7 @@ var (
 		{Name: "cache_creation_1h_price", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "per_request_price", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "pricing_extra", Type: field.TypeJSON, Nullable: true},
+		{Name: "market_visible", Type: field.TypeBool, Default: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "tag_id", Type: field.TypeInt, Nullable: true},
@@ -324,7 +325,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "model_prices_model_tags_prices",
-				Columns:    []*schema.Column{ModelPricesColumns[11]},
+				Columns:    []*schema.Column{ModelPricesColumns[12]},
 				RefColumns: []*schema.Column{ModelTagsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

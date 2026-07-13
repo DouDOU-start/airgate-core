@@ -249,6 +249,22 @@ func (s *GroupStore) StatsForGroups(ctx context.Context, groupIDs []int, todaySt
 	return result, nil
 }
 
+// PublicRateMultipliers 返回全部非专属分组的倍率（模型广场用，见 Repository 接口注释）。
+func (s *GroupStore) PublicRateMultipliers(ctx context.Context) ([]float64, error) {
+	items, err := s.db.Group.Query().
+		Where(entgroup.IsExclusiveEQ(false)).
+		Select(entgroup.FieldRateMultiplier).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]float64, len(items))
+	for i, item := range items {
+		result[i] = item.RateMultiplier
+	}
+	return result, nil
+}
+
 func applyGroupListFilters(query *ent.GroupQuery, keyword, platform string) *ent.GroupQuery {
 	if keyword != "" {
 		query = query.Where(entgroup.NameContains(keyword))

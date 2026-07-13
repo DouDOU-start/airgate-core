@@ -141,6 +141,33 @@ func (s *Service) attachEffectiveRates(ctx context.Context, userID int, list []G
 	}
 }
 
+// PublicRateRange 计算全部非专属分组的倍率区间，供模型广场展示"大概打几折"。
+// ok=false 表示没有可展示的区间（无非专属分组，或所有非专属分组倍率相同——单点区间
+// 没有对比意义），此时调用方应只展示价格、不展示倍率。
+func (s *Service) PublicRateRange(ctx context.Context) (min, max float64, ok bool) {
+	rates, err := s.repo.PublicRateMultipliers(ctx)
+	if err != nil || len(rates) == 0 {
+		if err != nil {
+			logx.LoggerFromContext(ctx).Warn("group_public_rate_range_failed", logx.LogFieldError, err)
+		}
+		return 0, 0, false
+	}
+
+	min, max = rates[0], rates[0]
+	for _, r := range rates[1:] {
+		if r < min {
+			min = r
+		}
+		if r > max {
+			max = r
+		}
+	}
+	if min == max {
+		return 0, 0, false
+	}
+	return min, max, true
+}
+
 // Get 获取分组详情。
 func (s *Service) Get(ctx context.Context, id int) (Group, error) {
 	g, err := s.repo.FindByID(ctx, id)

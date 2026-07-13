@@ -55,6 +55,8 @@ type Server struct {
 	oauthRateLimiter *middleware.IPRateLimiter
 	// ccUsageRateLimiter /v1/usage（cc-switch 兼容端点）的 IP 限流器（防刷）。
 	ccUsageRateLimiter *middleware.IPRateLimiter
+	// modelMarketRateLimiter /api/v1/model-market（模型广场公开端点）的 IP 限流器（防刷）。
+	modelMarketRateLimiter *middleware.IPRateLimiter
 
 	backgroundCancel context.CancelFunc
 }
@@ -239,6 +241,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 	if s.ccUsageRateLimiter != nil {
 		s.ccUsageRateLimiter.Stop()
+	}
+	if s.modelMarketRateLimiter != nil {
+		s.modelMarketRateLimiter.Stop()
 	}
 
 	// 先排空 HTTP 在途请求，再停两个 recorder：在途请求收尾时仍会调 Record，

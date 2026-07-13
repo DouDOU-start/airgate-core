@@ -133,6 +133,20 @@ func (mpc *ModelPriceCreate) SetNillableTagID(i *int) *ModelPriceCreate {
 	return mpc
 }
 
+// SetMarketVisible sets the "market_visible" field.
+func (mpc *ModelPriceCreate) SetMarketVisible(b bool) *ModelPriceCreate {
+	mpc.mutation.SetMarketVisible(b)
+	return mpc
+}
+
+// SetNillableMarketVisible sets the "market_visible" field if the given value is not nil.
+func (mpc *ModelPriceCreate) SetNillableMarketVisible(b *bool) *ModelPriceCreate {
+	if b != nil {
+		mpc.SetMarketVisible(*b)
+	}
+	return mpc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (mpc *ModelPriceCreate) SetCreatedAt(t time.Time) *ModelPriceCreate {
 	mpc.mutation.SetCreatedAt(t)
@@ -225,6 +239,10 @@ func (mpc *ModelPriceCreate) defaults() {
 		v := modelprice.DefaultPerRequestPrice
 		mpc.mutation.SetPerRequestPrice(v)
 	}
+	if _, ok := mpc.mutation.MarketVisible(); !ok {
+		v := modelprice.DefaultMarketVisible
+		mpc.mutation.SetMarketVisible(v)
+	}
 	if _, ok := mpc.mutation.CreatedAt(); !ok {
 		v := modelprice.DefaultCreatedAt()
 		mpc.mutation.SetCreatedAt(v)
@@ -262,6 +280,9 @@ func (mpc *ModelPriceCreate) check() error {
 	}
 	if _, ok := mpc.mutation.PerRequestPrice(); !ok {
 		return &ValidationError{Name: "per_request_price", err: errors.New(`ent: missing required field "ModelPrice.per_request_price"`)}
+	}
+	if _, ok := mpc.mutation.MarketVisible(); !ok {
+		return &ValidationError{Name: "market_visible", err: errors.New(`ent: missing required field "ModelPrice.market_visible"`)}
 	}
 	if _, ok := mpc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "ModelPrice.created_at"`)}
@@ -327,6 +348,10 @@ func (mpc *ModelPriceCreate) createSpec() (*ModelPrice, *sqlgraph.CreateSpec) {
 	if value, ok := mpc.mutation.PricingExtra(); ok {
 		_spec.SetField(modelprice.FieldPricingExtra, field.TypeJSON, value)
 		_node.PricingExtra = value
+	}
+	if value, ok := mpc.mutation.MarketVisible(); ok {
+		_spec.SetField(modelprice.FieldMarketVisible, field.TypeBool, value)
+		_node.MarketVisible = value
 	}
 	if value, ok := mpc.mutation.CreatedAt(); ok {
 		_spec.SetField(modelprice.FieldCreatedAt, field.TypeTime, value)
@@ -558,6 +583,18 @@ func (u *ModelPriceUpsert) UpdateTagID() *ModelPriceUpsert {
 // ClearTagID clears the value of the "tag_id" field.
 func (u *ModelPriceUpsert) ClearTagID() *ModelPriceUpsert {
 	u.SetNull(modelprice.FieldTagID)
+	return u
+}
+
+// SetMarketVisible sets the "market_visible" field.
+func (u *ModelPriceUpsert) SetMarketVisible(v bool) *ModelPriceUpsert {
+	u.Set(modelprice.FieldMarketVisible, v)
+	return u
+}
+
+// UpdateMarketVisible sets the "market_visible" field to the value that was provided on create.
+func (u *ModelPriceUpsert) UpdateMarketVisible() *ModelPriceUpsert {
+	u.SetExcluded(modelprice.FieldMarketVisible)
 	return u
 }
 
@@ -797,6 +834,20 @@ func (u *ModelPriceUpsertOne) UpdateTagID() *ModelPriceUpsertOne {
 func (u *ModelPriceUpsertOne) ClearTagID() *ModelPriceUpsertOne {
 	return u.Update(func(s *ModelPriceUpsert) {
 		s.ClearTagID()
+	})
+}
+
+// SetMarketVisible sets the "market_visible" field.
+func (u *ModelPriceUpsertOne) SetMarketVisible(v bool) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetMarketVisible(v)
+	})
+}
+
+// UpdateMarketVisible sets the "market_visible" field to the value that was provided on create.
+func (u *ModelPriceUpsertOne) UpdateMarketVisible() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateMarketVisible()
 	})
 }
 
@@ -1204,6 +1255,20 @@ func (u *ModelPriceUpsertBulk) UpdateTagID() *ModelPriceUpsertBulk {
 func (u *ModelPriceUpsertBulk) ClearTagID() *ModelPriceUpsertBulk {
 	return u.Update(func(s *ModelPriceUpsert) {
 		s.ClearTagID()
+	})
+}
+
+// SetMarketVisible sets the "market_visible" field.
+func (u *ModelPriceUpsertBulk) SetMarketVisible(v bool) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetMarketVisible(v)
+	})
+}
+
+// UpdateMarketVisible sets the "market_visible" field to the value that was provided on create.
+func (u *ModelPriceUpsertBulk) UpdateMarketVisible() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateMarketVisible()
 	})
 }
 

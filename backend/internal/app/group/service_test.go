@@ -42,6 +42,7 @@ type groupStubRepository struct {
 	update         func(context.Context, int, UpdateInput) (Group, error)
 	delete         func(context.Context, int) error
 	statsForGroups func(context.Context, []int) (map[int]GroupStats, error)
+	publicRates    func(context.Context) ([]float64, error)
 }
 
 func (s groupStubRepository) List(ctx context.Context, filter ListFilter) ([]Group, int64, error) {
@@ -91,4 +92,11 @@ func (s groupStubRepository) StatsForGroups(ctx context.Context, groupIDs []int,
 		return nil, nil
 	}
 	return s.statsForGroups(ctx, groupIDs)
+}
+
+func (s groupStubRepository) PublicRateMultipliers(ctx context.Context) ([]float64, error) {
+	if s.publicRates == nil {
+		return nil, nil
+	}
+	return s.publicRates(ctx)
 }

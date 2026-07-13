@@ -32,6 +32,8 @@ const (
 	FieldPricingExtra = "pricing_extra"
 	// FieldTagID holds the string denoting the tag_id field in the database.
 	FieldTagID = "tag_id"
+	// FieldMarketVisible holds the string denoting the market_visible field in the database.
+	FieldMarketVisible = "market_visible"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -61,6 +63,7 @@ var Columns = []string{
 	FieldPerRequestPrice,
 	FieldPricingExtra,
 	FieldTagID,
+	FieldMarketVisible,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -90,6 +93,8 @@ var (
 	DefaultCacheCreation1hPrice float64
 	// DefaultPerRequestPrice holds the default value on creation for the "per_request_price" field.
 	DefaultPerRequestPrice float64
+	// DefaultMarketVisible holds the default value on creation for the "market_visible" field.
+	DefaultMarketVisible bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -144,6 +149,11 @@ func ByPerRequestPrice(opts ...sql.OrderTermOption) OrderOption {
 // ByTagID orders the results by the tag_id field.
 func ByTagID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTagID, opts...).ToFunc()
+}
+
+// ByMarketVisible orders the results by the market_visible field.
+func ByMarketVisible(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMarketVisible, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

@@ -68,6 +68,14 @@ export default function HomePage() {
               <span>{site.contact_info}</span>
             </span>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="px-3 text-xs font-medium"
+            onPress={() => navigate({ to: '/model-market' })}
+          >
+            {t('home.model_market')}
+          </Button>
           {docsUrl && (
             <HeroLink
               href={docsUrl}
