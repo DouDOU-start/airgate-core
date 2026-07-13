@@ -259,6 +259,19 @@ func (s *Server) registerRoutes() {
 		relayGroup.GET("/videos/:task_id", s.taskFlow.HandleVideoGet)
 		relayGroup.GET("/videos/:task_id/content", s.taskFlow.HandleVideoContent)
 	}
+	// 无 /v1 前缀别名：部分客户端（如 Codex）base_url 不带版本号，直接拼接
+	// /chat/completions 等路径。与上面同协议、同 handler，纯路径别名，不新增业务逻辑。
+	noPrefixGroup := r.Group("", middleware.APIKeyAuth(s.db))
+	{
+		noPrefixGroup.POST("/chat/completions", s.relay.HandleChatCompletions)
+		noPrefixGroup.POST("/responses", s.relay.HandleResponses)
+		noPrefixGroup.POST("/images/generations", s.relay.HandleImagesGenerations)
+		noPrefixGroup.POST("/images/edits", s.relay.HandleImagesEdits)
+		noPrefixGroup.GET("/models", s.relay.HandleModels)
+		noPrefixGroup.POST("/videos", s.taskFlow.HandleVideoSubmit)
+		noPrefixGroup.GET("/videos/:task_id", s.taskFlow.HandleVideoGet)
+		noPrefixGroup.GET("/videos/:task_id/content", s.taskFlow.HandleVideoContent)
+	}
 	// Suno 音乐任务（suno 渠道，Suno-API 社区协议；错误体 {"code":"fail",...}）
 	sunoGroup := r.Group("/suno", middleware.APIKeyAuth(s.db))
 	{
