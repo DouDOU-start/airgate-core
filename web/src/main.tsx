@@ -1,13 +1,14 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useTranslation } from 'react-i18next';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { I18nProvider } from '@heroui/react';
 import { AuthProvider } from './app/providers/AuthProvider';
 import { ThemeProvider } from './app/providers/ThemeProvider';
 import { SiteSettingsProvider } from './app/providers/SiteSettingsProvider';
-import { ToastProvider } from './shared/ui';
+import { ToastProvider, toast } from './shared/ui';
+import { isAbortError } from './shared/api/client';
 import { router } from './app/router';
 import './i18n';
 import './index.css';
@@ -28,6 +29,14 @@ function AppProviders() {
 }
 
 const queryClient = new QueryClient({
+  // query 失败此前是静默的（只有 mutation 会 toast），一个查询因参数/网络问题 400/无法访问时
+  // 界面只会安静地渲染空态，不会有任何提示——这里兜底弹一下，取消（AbortError）不算失败不提示。
+  queryCache: new QueryCache({
+    onError: (error) => {
+      if (isAbortError(error)) return;
+      toast('error', error.message);
+    },
+  }),
   defaultOptions: {
     queries: {
       retry: 1,

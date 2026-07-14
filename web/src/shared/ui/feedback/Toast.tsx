@@ -27,6 +27,10 @@ function notify(type: ToastType, message: ReactNode, title?: ReactNode): string 
 
 const toastApi: ToastApi = { toast: notify };
 
+// 命令式 API：不依赖 React 上下文，供 QueryClient 等渲染树之外的地方直接调用
+// （notify 本身就是纯函数，heroToast 是全局单例）。组件内请优先用 useToast()。
+export const toast = notify;
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <>
