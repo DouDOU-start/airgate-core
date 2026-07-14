@@ -154,6 +154,57 @@ const STREAM_CHIP_STYLE: CSSProperties = {
   color: HEROUI_BLUE,
 };
 
+// 延迟三档着色：[warning 起点, danger 起点]（毫秒），低于 warning 为 success。
+type LatencyTone = 'success' | 'warning' | 'danger';
+
+const FIRST_TOKEN_TONE_THRESHOLDS: [number, number] = [5_000, 15_000];
+const DURATION_TONE_THRESHOLDS: [number, number] = [30_000, 120_000];
+
+const LATENCY_TONE_COLORS: Record<LatencyTone, string> = {
+  success: 'var(--ag-success)',
+  warning: 'var(--ag-warning)',
+  danger: 'var(--ag-danger)',
+};
+
+function latencyTone(ms: number, [warning, danger]: [number, number]): LatencyTone {
+  if (ms >= danger) return 'danger';
+  if (ms >= warning) return 'warning';
+  return 'success';
+}
+
+// 左侧色条上半段随首字档位、下半段随总耗时档位，中段渐变过渡；缺数据的半段用边框色。
+function latencyBarBackground(firstTokenTone: LatencyTone | null, durationTone: LatencyTone | null): string {
+  const top = firstTokenTone ? LATENCY_TONE_COLORS[firstTokenTone] : 'var(--border)';
+  const bottom = durationTone ? LATENCY_TONE_COLORS[durationTone] : 'var(--border)';
+  return `linear-gradient(to bottom, ${top}, ${top} 38%, ${bottom} 62%, ${bottom})`;
+}
+
+// 延迟展示：≥60s 用 "1m 18s"，≥1s 保留两位小数，其余毫秒。
+function fmtLatency(ms: number): string {
+  if (ms >= 60_000) {
+    const totalSeconds = Math.round(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+  if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
+  return `${ms}ms`;
+}
+
+function LatencyValue({ ms, tone }: { ms: number; tone: LatencyTone | null }) {
+  if (ms <= 0 || !tone) {
+    return <span className="text-right font-mono text-xs leading-tight text-text-tertiary">-</span>;
+  }
+  return (
+    <span
+      className="text-right font-mono text-xs font-semibold tabular-nums leading-tight"
+      style={{ color: LATENCY_TONE_COLORS[tone] }}
+    >
+      {fmtLatency(ms)}
+    </span>
+  );
+}
+
 /** 单行 token 数据行：固定宽度图标 + 右对齐等宽数字 */
 function TokenRow({
   color,
@@ -505,26 +556,28 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       ),
     },
     {
-      key: 'first_token_ms',
-      title: t('usage.first_token'),
-      width: '78px',
+      key: 'latency',
+      title: t('usage.latency', '延迟'),
+      width: '118px',
       hideOnMobile: true,
-      render: (row) => (
-        <span className="block text-center font-mono text-[13px] text-text-secondary">
-          {row.first_token_ms > 0 ? (row.first_token_ms >= 1000 ? `${(row.first_token_ms / 1000).toFixed(2)}s` : `${row.first_token_ms}ms`) : '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'duration_ms',
-      title: t('usage.duration'),
-      width: '76px',
-      hideOnMobile: true,
-      render: (row) => (
-        <span className="block text-center font-mono text-[13px] text-text-secondary">
-          {row.duration_ms >= 1000 ? `${(row.duration_ms / 1000).toFixed(2)}s` : `${row.duration_ms}ms`}
-        </span>
-      ),
+      render: (row) => {
+        const firstTokenTone = row.first_token_ms > 0 ? latencyTone(row.first_token_ms, FIRST_TOKEN_TONE_THRESHOLDS) : null;
+        const durationTone = row.duration_ms > 0 ? latencyTone(row.duration_ms, DURATION_TONE_THRESHOLDS) : null;
+        return (
+          <div className="mx-auto flex w-fit items-stretch gap-1.5 py-0.5">
+            <span
+              className="w-[3px] shrink-0 rounded-full"
+              style={{ background: latencyBarBackground(firstTokenTone, durationTone) }}
+            />
+            <div className="grid grid-cols-[max-content_minmax(3.5rem,max-content)] items-center gap-x-2 gap-y-px">
+              <span className="text-[11px] leading-tight text-text-tertiary">{t('usage.latency_first_token', '首字')}</span>
+              <LatencyValue ms={row.first_token_ms} tone={firstTokenTone} />
+              <span className="text-[11px] leading-tight text-text-tertiary">{t('usage.latency_total', '总耗时')}</span>
+              <LatencyValue ms={row.duration_ms} tone={durationTone} />
+            </div>
+          </div>
+        );
+      },
     },
     // customer scope 的响应剥离了 user_agent / ip_address，不渲染客户端列
     ...(customerScope ? [] : [buildClientColumn(t)]),

@@ -664,10 +664,10 @@ export default function UsagePage() {
     ];
     const modelIdx = sharedColumns.findIndex((c) => c.key === 'model');
     const streamColumn = sharedColumns.find((column) => column.key === 'stream');
-    const timingColumns = sharedColumns.filter((column) => column.key === 'first_token_ms' || column.key === 'duration_ms');
+    const timingColumns = sharedColumns.filter((column) => column.key === 'latency');
     const sharedColumnsAfterModel = sharedColumns
       .slice(modelIdx + 1)
-      .filter((column) => column.key !== 'first_token_ms' && column.key !== 'duration_ms' && column.key !== 'stream');
+      .filter((column) => column.key !== 'latency' && column.key !== 'stream');
     const endpointColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'endpoint',
       title: t('usage.endpoint', '端点'),
