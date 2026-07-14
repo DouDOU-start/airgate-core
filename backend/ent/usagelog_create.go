@@ -355,6 +355,20 @@ func (ulc *UsageLogCreate) SetNillableServiceTier(s *string) *UsageLogCreate {
 	return ulc
 }
 
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (ulc *UsageLogCreate) SetReasoningEffort(s string) *UsageLogCreate {
+	ulc.mutation.SetReasoningEffort(s)
+	return ulc
+}
+
+// SetNillableReasoningEffort sets the "reasoning_effort" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableReasoningEffort(s *string) *UsageLogCreate {
+	if s != nil {
+		ulc.SetReasoningEffort(*s)
+	}
+	return ulc
+}
+
 // SetStream sets the "stream" field.
 func (ulc *UsageLogCreate) SetStream(b bool) *UsageLogCreate {
 	ulc.mutation.SetStream(b)
@@ -731,6 +745,10 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultServiceTier
 		ulc.mutation.SetServiceTier(v)
 	}
+	if _, ok := ulc.mutation.ReasoningEffort(); !ok {
+		v := usagelog.DefaultReasoningEffort
+		ulc.mutation.SetReasoningEffort(v)
+	}
 	if _, ok := ulc.mutation.Stream(); !ok {
 		v := usagelog.DefaultStream
 		ulc.mutation.SetStream(v)
@@ -855,6 +873,9 @@ func (ulc *UsageLogCreate) check() error {
 	}
 	if _, ok := ulc.mutation.ServiceTier(); !ok {
 		return &ValidationError{Name: "service_tier", err: errors.New(`ent: missing required field "UsageLog.service_tier"`)}
+	}
+	if _, ok := ulc.mutation.ReasoningEffort(); !ok {
+		return &ValidationError{Name: "reasoning_effort", err: errors.New(`ent: missing required field "UsageLog.reasoning_effort"`)}
 	}
 	if _, ok := ulc.mutation.Stream(); !ok {
 		return &ValidationError{Name: "stream", err: errors.New(`ent: missing required field "UsageLog.stream"`)}
@@ -1011,6 +1032,10 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := ulc.mutation.ServiceTier(); ok {
 		_spec.SetField(usagelog.FieldServiceTier, field.TypeString, value)
 		_node.ServiceTier = value
+	}
+	if value, ok := ulc.mutation.ReasoningEffort(); ok {
+		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
+		_node.ReasoningEffort = value
 	}
 	if value, ok := ulc.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
@@ -1610,6 +1635,18 @@ func (u *UsageLogUpsert) SetServiceTier(v string) *UsageLogUpsert {
 // UpdateServiceTier sets the "service_tier" field to the value that was provided on create.
 func (u *UsageLogUpsert) UpdateServiceTier() *UsageLogUpsert {
 	u.SetExcluded(usagelog.FieldServiceTier)
+	return u
+}
+
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (u *UsageLogUpsert) SetReasoningEffort(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldReasoningEffort, v)
+	return u
+}
+
+// UpdateReasoningEffort sets the "reasoning_effort" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateReasoningEffort() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldReasoningEffort)
 	return u
 }
 
@@ -2373,6 +2410,20 @@ func (u *UsageLogUpsertOne) SetServiceTier(v string) *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) UpdateServiceTier() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateServiceTier()
+	})
+}
+
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (u *UsageLogUpsertOne) SetReasoningEffort(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetReasoningEffort(v)
+	})
+}
+
+// UpdateReasoningEffort sets the "reasoning_effort" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateReasoningEffort() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateReasoningEffort()
 	})
 }
 
@@ -3340,6 +3391,20 @@ func (u *UsageLogUpsertBulk) SetServiceTier(v string) *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) UpdateServiceTier() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateServiceTier()
+	})
+}
+
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (u *UsageLogUpsertBulk) SetReasoningEffort(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetReasoningEffort(v)
+	})
+}
+
+// UpdateReasoningEffort sets the "reasoning_effort" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateReasoningEffort() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateReasoningEffort()
 	})
 }
 

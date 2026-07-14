@@ -62,6 +62,8 @@ const (
 	FieldAccountRateMultiplier = "account_rate_multiplier"
 	// FieldServiceTier holds the string denoting the service_tier field in the database.
 	FieldServiceTier = "service_tier"
+	// FieldReasoningEffort holds the string denoting the reasoning_effort field in the database.
+	FieldReasoningEffort = "reasoning_effort"
 	// FieldStream holds the string denoting the stream field in the database.
 	FieldStream = "stream"
 	// FieldDurationMs holds the string denoting the duration_ms field in the database.
@@ -170,6 +172,7 @@ var Columns = []string{
 	FieldSellRate,
 	FieldAccountRateMultiplier,
 	FieldServiceTier,
+	FieldReasoningEffort,
 	FieldStream,
 	FieldDurationMs,
 	FieldFirstTokenMs,
@@ -247,6 +250,8 @@ var (
 	DefaultAccountRateMultiplier float64
 	// DefaultServiceTier holds the default value on creation for the "service_tier" field.
 	DefaultServiceTier string
+	// DefaultReasoningEffort holds the default value on creation for the "reasoning_effort" field.
+	DefaultReasoningEffort string
 	// DefaultStream holds the default value on creation for the "stream" field.
 	DefaultStream bool
 	// DefaultDurationMs holds the default value on creation for the "duration_ms" field.
@@ -397,6 +402,11 @@ func ByAccountRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 // ByServiceTier orders the results by the service_tier field.
 func ByServiceTier(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldServiceTier, opts...).ToFunc()
+}
+
+// ByReasoningEffort orders the results by the reasoning_effort field.
+func ByReasoningEffort(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReasoningEffort, opts...).ToFunc()
 }
 
 // ByStream orders the results by the stream field.

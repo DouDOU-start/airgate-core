@@ -55,6 +55,7 @@ type UsageRecord struct {
 	SellRate              float64 // 快照：本次生效的销售倍率（0 表示未启用 markup）
 	AccountRateMultiplier float64 // 快照：本次生效的渠道成本倍率（渠道成本查询期现算）
 	ServiceTier           string
+	ReasoningEffort       string
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64
@@ -356,6 +357,7 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord, withChannel bool) *ent.UsageLog
 		SetSellRate(rec.SellRate).
 		SetAccountRateMultiplier(rec.AccountRateMultiplier).
 		SetServiceTier(rec.ServiceTier).
+		SetReasoningEffort(rec.ReasoningEffort).
 		SetStream(rec.Stream).
 		SetDurationMs(rec.DurationMs).
 		SetFirstTokenMs(rec.FirstTokenMs).

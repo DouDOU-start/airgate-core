@@ -412,6 +412,7 @@ export interface UsageLogResp {
   /** 快照：本次请求生效的渠道成本倍率；渠道成本 = total_cost × 本值（前端现算） */
   account_rate_multiplier: number;
   service_tier?: string;
+  reasoning_effort?: string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;
@@ -450,6 +451,7 @@ export interface CustomerUsageLogResp {
   /** 客户视角："本次消耗 = X 美元" */
   cost: number;
   service_tier?: string;
+  reasoning_effort?: string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;

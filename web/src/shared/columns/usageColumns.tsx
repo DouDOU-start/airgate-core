@@ -115,19 +115,23 @@ function TooltipDivider() {
 }
 
 const META_CHIP_SERVICE_TIER_COLOR = 'rgb(168,85,247)';
+const META_CHIP_REASONING_EFFORT_COLOR = 'var(--ag-tone-indigo)';
 
 const MODEL_META_SLOT_WIDTH_CLASS = 'w-[5.5rem]';
 
 function MetaChip({
   color,
   label,
+  compact,
 }: {
   color: string;
   label: string;
+  /** 与另一个 chip 并排展示时用自适应窄宽度，否则占满整个 meta 槽位宽度。 */
+  compact?: boolean;
 }) {
   return (
     <span
-      className={`${MODEL_META_SLOT_WIDTH_CLASS} inline-flex h-4 shrink-0 items-center justify-center truncate rounded px-1.5 text-[12px] font-semibold leading-none whitespace-nowrap`}
+      className={`${compact ? 'w-fit max-w-[3.25rem] px-1' : `${MODEL_META_SLOT_WIDTH_CLASS} px-1.5`} inline-flex h-4 shrink-0 items-center justify-center truncate rounded text-[12px] font-semibold leading-none whitespace-nowrap`}
       style={{
         background: `color-mix(in srgb, ${color} 18%, transparent)`,
         boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 34%, transparent)`,
@@ -329,6 +333,9 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 {row.service_tier && (
                   <TooltipRow label={t('usage.service_tier')} value={<span className="capitalize">{row.service_tier}</span>} />
                 )}
+                {row.reasoning_effort && (
+                  <TooltipRow label={t('usage.reasoning_effort')} value={<span className="capitalize">{row.reasoning_effort}</span>} />
+                )}
                 <TooltipRow label={t('usage.rate_multiplier')} value={fmtRate(row.rate_multiplier)} />
                 {adminView && row.account_rate_multiplier > 0 && (
                   <TooltipRow label={t('usage.account_rate', '渠道倍率')} value={fmtRate(row.account_rate_multiplier)} />
@@ -445,20 +452,34 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
     {
       key: 'model',
       title: t('usage.model'),
-      width: '220px',
+      width: '240px',
       render: (row) => {
         const serviceTier = (row.service_tier ?? '').trim();
-        const fallbackMeta = serviceTier ? (
-          <MetaChip
-            color={META_CHIP_SERVICE_TIER_COLOR}
-            label={serviceTierMetaLabel(serviceTier)}
-          />
-        ) : null;
+        const reasoningEffort = (row.reasoning_effort ?? '').trim();
+        const bothPresent = !!serviceTier && !!reasoningEffort;
+        const metaChips = [
+          serviceTier ? (
+            <MetaChip
+              key="tier"
+              color={META_CHIP_SERVICE_TIER_COLOR}
+              label={serviceTierMetaLabel(serviceTier)}
+              compact={bothPresent}
+            />
+          ) : null,
+          reasoningEffort ? (
+            <MetaChip
+              key="reasoning"
+              color={META_CHIP_REASONING_EFFORT_COLOR}
+              label={reasoningEffort}
+              compact={bothPresent}
+            />
+          ) : null,
+        ].filter(Boolean);
 
         return (
-          <div className="grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2 text-left">
-            <div className={`ag-usage-model-meta-slot ${MODEL_META_SLOT_WIDTH_CLASS} flex h-4 shrink-0 items-center justify-center overflow-hidden`}>
-              {fallbackMeta}
+          <div className="grid w-full min-w-0 grid-cols-[minmax(3.5rem,auto)_minmax(0,1fr)] items-center gap-2 text-left">
+            <div className="ag-usage-model-meta-slot flex h-4 shrink-0 items-center justify-center gap-1 overflow-hidden">
+              {metaChips}
             </div>
             <span className="min-w-0 truncate text-sm font-medium leading-none text-text" title={row.model}>
               {row.model}

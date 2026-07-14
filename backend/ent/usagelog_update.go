@@ -523,6 +523,20 @@ func (ulu *UsageLogUpdate) SetNillableServiceTier(s *string) *UsageLogUpdate {
 	return ulu
 }
 
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (ulu *UsageLogUpdate) SetReasoningEffort(s string) *UsageLogUpdate {
+	ulu.mutation.SetReasoningEffort(s)
+	return ulu
+}
+
+// SetNillableReasoningEffort sets the "reasoning_effort" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableReasoningEffort(s *string) *UsageLogUpdate {
+	if s != nil {
+		ulu.SetReasoningEffort(*s)
+	}
+	return ulu
+}
+
 // SetStream sets the "stream" field.
 func (ulu *UsageLogUpdate) SetStream(b bool) *UsageLogUpdate {
 	ulu.mutation.SetStream(b)
@@ -1036,6 +1050,9 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := ulu.mutation.ServiceTier(); ok {
 		_spec.SetField(usagelog.FieldServiceTier, field.TypeString, value)
+	}
+	if value, ok := ulu.mutation.ReasoningEffort(); ok {
+		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
 	}
 	if value, ok := ulu.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
@@ -1733,6 +1750,20 @@ func (uluo *UsageLogUpdateOne) SetNillableServiceTier(s *string) *UsageLogUpdate
 	return uluo
 }
 
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (uluo *UsageLogUpdateOne) SetReasoningEffort(s string) *UsageLogUpdateOne {
+	uluo.mutation.SetReasoningEffort(s)
+	return uluo
+}
+
+// SetNillableReasoningEffort sets the "reasoning_effort" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableReasoningEffort(s *string) *UsageLogUpdateOne {
+	if s != nil {
+		uluo.SetReasoningEffort(*s)
+	}
+	return uluo
+}
+
 // SetStream sets the "stream" field.
 func (uluo *UsageLogUpdateOne) SetStream(b bool) *UsageLogUpdateOne {
 	uluo.mutation.SetStream(b)
@@ -2276,6 +2307,9 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if value, ok := uluo.mutation.ServiceTier(); ok {
 		_spec.SetField(usagelog.FieldServiceTier, field.TypeString, value)
+	}
+	if value, ok := uluo.mutation.ReasoningEffort(); ok {
+		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
 	}
 	if value, ok := uluo.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)

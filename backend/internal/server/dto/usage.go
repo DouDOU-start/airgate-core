@@ -38,6 +38,7 @@ type UsageLogResp struct {
 	SellRate              float64 `json:"sell_rate"`                         // 销售倍率快照
 	AccountRateMultiplier float64 `json:"account_rate_multiplier,omitempty"` // 渠道成本倍率快照（仅管理端出值，用户视角清零后不序列化）
 	ServiceTier           string  `json:"service_tier,omitempty"`
+	ReasoningEffort       string  `json:"reasoning_effort,omitempty"`
 	Stream                bool    `json:"stream"`
 	DurationMs            int64   `json:"duration_ms"`
 	FirstTokenMs          int64   `json:"first_token_ms"`
@@ -66,6 +67,7 @@ type CustomerUsageLogResp struct {
 	Calls                 int     `json:"calls"` // 按次计费计次数（图像端点=产出张数）
 	BilledCost            float64 `json:"cost"`  // 客户视角："本次消耗 = X 美元"
 	ServiceTier           string  `json:"service_tier,omitempty"`
+	ReasoningEffort       string  `json:"reasoning_effort,omitempty"`
 	Stream                bool    `json:"stream"`
 	DurationMs            int64   `json:"duration_ms"`
 	FirstTokenMs          int64   `json:"first_token_ms"`

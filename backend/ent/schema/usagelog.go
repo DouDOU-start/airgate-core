@@ -57,6 +57,9 @@ func (UsageLog) Fields() []ent.Field {
 		field.Float("account_rate_multiplier").Default(1.0).
 			Comment("快照：本次请求生效的渠道成本倍率（channel.cost_ratio）。渠道成本 = total_cost × 本列，查询期现算不落列。"),
 		field.String("service_tier").Default(""),
+		// 推理强度档位（low/medium/high/xhigh/max）：OpenAI reasoning_effort/
+		// Responses reasoning.effort，Anthropic output_config.effort，三协议统一后的扁平字符串。
+		field.String("reasoning_effort").Default(""),
 		field.Bool("stream").Default(false),
 		field.Int64("duration_ms").Default(0),
 		field.Int64("first_token_ms").Default(0),

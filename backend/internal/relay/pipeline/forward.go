@@ -701,6 +701,7 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		usage = *result.usage
 	}
 	tier := serviceTierOf(req)
+	reasoningEffort := reasoningEffortOf(c, req)
 	costs := pricing.ComputeCosts(price, pricing.Usage{
 		PromptTokens:          usage.PromptTokens,
 		CompletionTokens:      usage.CompletionTokens,
@@ -755,6 +756,7 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		CacheCreationPrice:    price.CacheCreation5m,
 		CacheCreation1hPrice:  price.CacheCreation1h,
 		ServiceTier:           tier,
+		ReasoningEffort:       reasoningEffort,
 		InputCost:             calc.InputCost,
 		OutputCost:            calc.OutputCost,
 		CachedInputCost:       calc.CachedInputCost,
@@ -879,6 +881,44 @@ func serviceTierOf(req *dto.ChatRequest) string {
 		return ""
 	}
 	return tier
+}
+
+// reasoningEffortOf 从请求体读取推理强度档位（low/medium/high/xhigh/max）：
+// OpenAI Chat Completions 顶层 reasoning_effort、Responses 嵌套 reasoning.effort、
+// Anthropic 嵌套 output_config.effort，三协议取值域一致，原样展示不做归一化。
+func reasoningEffortOf(c *gin.Context, req *dto.ChatRequest) string {
+	if entryProtocolOf(c) == registry.ProtocolAnthropic {
+		return nestedStringField(req, "output_config", "effort")
+	}
+	if raw, ok := req.Get("reasoning_effort"); ok {
+		var effort string
+		if err := json.Unmarshal(raw, &effort); err == nil {
+			return effort
+		}
+	}
+	return nestedStringField(req, "reasoning", "effort")
+}
+
+// nestedStringField 读取请求体里形如 {"<parent>": {"<child>": "..."}} 的嵌套字符串字段；
+// parent 缺失/非对象或 child 缺失/非字符串一律返回 ""。
+func nestedStringField(req *dto.ChatRequest, parent, child string) string {
+	raw, ok := req.Get(parent)
+	if !ok {
+		return ""
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return ""
+	}
+	v, ok := obj[child]
+	if !ok {
+		return ""
+	}
+	var s string
+	if err := json.Unmarshal(v, &s); err != nil {
+		return ""
+	}
+	return s
 }
 
 // upstreamModel 经 key 的 model_mapping 解析上游模型名；无映射用对外名。

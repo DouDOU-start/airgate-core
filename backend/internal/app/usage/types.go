@@ -79,6 +79,7 @@ type LogRecord struct {
 	SellRate              float64 // 快照：本次生效的销售倍率（0 表示未启用 markup）
 	AccountRateMultiplier float64 // 快照：本次生效的渠道成本倍率；渠道成本 = TotalCost × 本值，查询期现算
 	ServiceTier           string
+	ReasoningEffort       string
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64
