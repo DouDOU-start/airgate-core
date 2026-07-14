@@ -13,15 +13,23 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
+
+// callbackReplayWindow 回调时间戳/nonce 防重放的容忍窗口：超出此窗口的时间戳直接拒绝，
+// 窗口内的 nonce 记为已消费，重复出现视为重放攻击。
+const callbackReplayWindow = 5 * time.Minute
 
 // easy-pay 对接实现。
 //
 // easy-pay 是一套独立部署的支付网关聚合系统，使用 REST JSON API + HMAC-SHA256 签名。
 // 与易支付协议家族（MD5 签名 / form 表单）完全不同：
 //   - 认证：app_id + app_secret，签名在 HTTP Header 中传递
-//   - 下单：POST JSON 到 /api/payment/create，返回 code_url / h5_url
+//   - 下单：POST JSON 到 /api/v1/pay/create，返回 CodeURL / H5URL
+//     （easy-pay 响应结构体 CreateOrderResult 未打 json tag，字段名走 Go 默认大写驼峰，
+//     这与 easy-pay 自己文档写的 snake_case 示例不一致，属于上游 bug；一旦上游修了 tag，
+//     这里的 Data.OrderNo/CodeURL/H5URL 会全部解析失败，需要跟着改。）
 //   - 回调：POST JSON + HMAC-SHA256 Header 签名，回复 HTTP 2xx
 //   - 金额：分（int64），本 Provider 自动做元↔分转换
 
@@ -66,6 +74,7 @@ type easyPayProvider struct {
 	gateway        string
 	enabledMethods []string
 	client         *http.Client
+	seenNonces     sync.Map // nonce(string) -> 消费时间(time.Time)，防重放
 }
 
 func (p *easyPayProvider) ID() string   { return p.id }
@@ -87,7 +96,7 @@ var easyPayChannelMap = map[string]string{
 	MethodWxpay:  "wechat",
 }
 
-// CreateOrder 调用 easy-pay /api/payment/create 下单。
+// CreateOrder 调用 easy-pay /api/v1/pay/create 下单。
 // easy-pay 金额单位为分，本方法自动将元转分。
 func (p *easyPayProvider) CreateOrder(ctx context.Context, in CreateOrderInput) (*CreateOrderResult, error) {
 	if !p.Enabled() {
@@ -188,6 +197,9 @@ func (p *easyPayProvider) VerifyCallback(_ context.Context, req CallbackRequest)
 	if !hmac.Equal([]byte(gotSig), []byte(wantSig)) {
 		return nil, ErrInvalidSignature
 	}
+	if err := p.checkReplay(ts, nonce); err != nil {
+		return nil, err
+	}
 
 	var payload easyPayNotifyPayload
 	if err := json.Unmarshal(req.Body, &payload); err != nil {
@@ -217,6 +229,32 @@ func (p *easyPayProvider) VerifyCallback(_ context.Context, req CallbackRequest)
 		Reply:     `{"code":"OK"}`,
 		ReplyType: "json",
 	}, nil
+}
+
+// checkReplay 拒绝超出时间窗口的时间戳，并保证同一个 nonce 在窗口内只被消费一次。
+// 签名本身只证明请求来自持有 appSecret 的一方，无法阻止一条被截获的合法请求被反复重放；
+// 这里补上时间戳新鲜度 + nonce 去重，把重放窗口收窄到 callbackReplayWindow 内的一次性消费。
+func (p *easyPayProvider) checkReplay(ts, nonce string) error {
+	tsUnix, err := strconv.ParseInt(ts, 10, 64)
+	if err != nil {
+		return ErrInvalidSignature
+	}
+	now := time.Now()
+	if now.Sub(time.Unix(tsUnix, 0)).Abs() > callbackReplayWindow {
+		return ErrInvalidSignature
+	}
+
+	cutoff := now.Add(-callbackReplayWindow)
+	p.seenNonces.Range(func(k, v any) bool {
+		if v.(time.Time).Before(cutoff) {
+			p.seenNonces.Delete(k)
+		}
+		return true
+	})
+	if _, loaded := p.seenNonces.LoadOrStore(nonce, now); loaded {
+		return ErrInvalidSignature
+	}
+	return nil
 }
 
 // --- 签名 ---
