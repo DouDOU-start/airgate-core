@@ -76,12 +76,6 @@ type Group struct {
 	// EffectiveRate 当前用户在此分组的实际计费倍率（用户专属 > 等级 > 分组档位），
 	// 仅用户视角查询（ListAvailable / AvailableForUser）且倍率读取器已注入时填充，0 表示未解析。
 	EffectiveRate float64
-
-	// Accessible 当前用户是否仍有权限使用此分组。默认 true；仅 ListAvailable /
-	// AvailableForUser 会算出真实值——分组创建/绑定时不是专属，事后被管理员设为专属
-	// 且未把该用户加入白名单时为 false：此时分组仍会出现在列表里（因为用户名下已有
-	// 绑定该分组的密钥），但只用于展示"已受限"提示，不可再被选作新建密钥的分组。
-	Accessible bool
 }
 
 // ListFilter 描述管理员分组列表查询条件。

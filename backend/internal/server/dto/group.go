@@ -9,14 +9,10 @@ type GroupResp struct {
 	// EffectiveRate 当前用户在此分组的实际计费倍率（用户专属 > 等级 > 分组档位），
 	// 仅用户视角接口返回；管理员列表恒为 0 并省略。
 	EffectiveRate float64 `json:"effective_rate,omitempty"`
-	// Accessible 当前用户是否仍有权限使用此分组；仅用户视角接口（ListAvailableGroups）会
-	// 算出真实值，管理员列表恒为 true。为 false 时表示：密钥曾绑定该分组，但分组事后被设为
-	// 专属且未把该用户加入白名单，前端应展示"已受限"提示，且不可作为新建密钥的候选分组。
-	Accessible    bool   `json:"accessible"`
-	IsExclusive   bool   `json:"is_exclusive"`
-	StatusVisible bool   `json:"status_visible"` // 是否在公开 /status 页展示
-	Note          string `json:"note,omitempty"`
-	SortWeight    int    `json:"sort_weight"`
+	IsExclusive   bool    `json:"is_exclusive"`
+	StatusVisible bool    `json:"status_visible"` // 是否在公开 /status 页展示
+	Note          string  `json:"note,omitempty"`
+	SortWeight    int     `json:"sort_weight"`
 
 	// 统计字段（仅管理员列表返回），实扣口径（actual_cost 汇总）
 	TodayCost float64 `json:"today_cost"`

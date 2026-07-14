@@ -221,14 +221,11 @@ export default function UserKeysPage() {
   const groupList = useMemo(() => groupsData?.list ?? [], [groupsData?.list]);
   const groupMap = useMemo(() => new Map<number, GroupResp>(groupList.map((g) => [g.id, g])), [groupList]);
 
-  // 已有密钥绑定的分组事后被设为专属、且未加入白名单时，接口仍会返回该分组
-  // （供下面行内展示"已受限"提示），但不可再被选作新建密钥的分组。
-  const selectableGroupList = useMemo(() => groupList.filter((g) => g.accessible), [groupList]);
-  const hasAvailableGroups = selectableGroupList.length > 0;
+  const hasAvailableGroups = groupList.length > 0;
 
   // 分组选项（后端已按"用户专属 > 等级 > 分组档位"解析 effective_rate；
   // 与分组档位不同时右侧显示划线原价 + 实际倍率）
-  const groupOptions = useMemo(() => selectableGroupList.map((g) => {
+  const groupOptions = useMemo(() => groupList.map((g) => {
     const effective = g.effective_rate != null && g.effective_rate > 0 ? g.effective_rate : g.rate_multiplier;
     const hasOverride = effective !== g.rate_multiplier;
     return {
@@ -243,7 +240,7 @@ export default function UserKeysPage() {
         <span className="text-text-tertiary">{g.rate_multiplier}x {t('user_keys.rate_suffix')}</span>
       ),
     };
-  }), [selectableGroupList, t]);
+  }), [groupList, t]);
 
   // 使用配置弹窗
   const {
@@ -351,14 +348,12 @@ export default function UserKeysPage() {
           ) : (
             rows.map((row) => {
               const group = row.group_id == null ? null : groupMap.get(row.group_id);
-              const isGroupUnbound = row.group_id == null;
-              // 分组创建时不是专属，管理员事后设为专属且未把该用户加入白名单：
-              // 分组仍会返回（供这里查到名字），但 accessible=false，此密钥的请求
-              // 会被网关拒绝，需要在密钥管理页明确提示，而不是静默显示成正常分组。
-              const isGroupRestricted = !isGroupUnbound && group != null && !group.accessible;
-              const groupName = isGroupUnbound
-                ? t('user_keys.group_unbound')
-                : group?.name || `#${row.group_id}`;
+              // group_id 为空（从未绑定/分组被删除时数据库外键自动置空）或者
+              // 分组事后被设为专属且未把该用户加入白名单（此时接口不会再返回该分组，
+              // 避免向用户泄露专属分组的名称/倍率）——两种情况统一按"分组已失效"
+              // 处理，提示用户重新绑定，不去猜测/展示具体是哪个分组。
+              const isGroupUnbound = row.group_id == null || group == null;
+              const groupName = isGroupUnbound ? t('user_keys.group_unbound') : group.name;
               const hasSellRate = row.sell_rate != null && row.sell_rate > 0;
               // 后端已按"用户专属 > 等级 > 分组档位"解析 effective_rate
               const effectiveRate = group?.effective_rate != null && group.effective_rate > 0
@@ -403,11 +398,9 @@ export default function UserKeysPage() {
                         <span
                           className="inline-flex h-6 min-w-0 max-w-full items-center justify-center gap-1 rounded-[var(--radius)] px-1.5 text-[13px] font-medium leading-none text-text-secondary"
                           style={GROUP_CHIP_STYLE}
-                          title={isGroupRestricted ? t('user_keys.group_restricted_hint') : groupName}
+                          title={groupName}
                         >
-                          {isGroupUnbound || isGroupRestricted ? (
-                            <AlertTriangle className={`h-3 w-3 shrink-0 ${isGroupRestricted ? 'text-danger' : 'text-warning'}`} />
-                          ) : null}
+                          {isGroupUnbound ? <AlertTriangle className="h-3 w-3 shrink-0 text-warning" /> : null}
                           <span className="min-w-0 truncate">{groupName}</span>
                         </span>
                       </div>
@@ -416,19 +409,12 @@ export default function UserKeysPage() {
                           className="ag-metric-chips--stack ag-metric-chips--markup"
                           items={[
                             ...(group ? [{
-                              color: isGroupRestricted ? ('danger' as const) : ('default' as const),
+                              color: 'default' as const,
                               label: t('user_keys.group_rate_short', '分组倍率'),
-                              value: isGroupRestricted
-                                ? `${group.rate_multiplier.toFixed(2)} ${t('user_keys.group_restricted_tag')}`
-                                : hasOverride && effectiveRate != null
-                                  ? `${group.rate_multiplier.toFixed(2)} → ${effectiveRate.toFixed(2)} ${t('user_keys.user_override_tag', '专属')}`
-                                  : group.rate_multiplier.toFixed(2),
-                              valueNode: isGroupRestricted ? (
-                                <>
-                                  <span>{group.rate_multiplier.toFixed(2)}</span>
-                                  <span className="ml-1 text-danger">{t('user_keys.group_restricted_tag')}</span>
-                                </>
-                              ) : hasOverride && effectiveRate != null ? (
+                              value: hasOverride && effectiveRate != null
+                                ? `${group.rate_multiplier.toFixed(2)} → ${effectiveRate.toFixed(2)} ${t('user_keys.user_override_tag', '专属')}`
+                                : group.rate_multiplier.toFixed(2),
+                              valueNode: hasOverride && effectiveRate != null ? (
                                 <>
                                   <span className="line-through text-text-tertiary">{group.rate_multiplier.toFixed(2)}</span>
                                   <span className="ml-1">{effectiveRate.toFixed(2)}</span>

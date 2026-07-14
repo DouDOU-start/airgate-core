@@ -12,7 +12,6 @@ func toGroupRespFromDomain(item appgroup.Group) dto.GroupResp {
 		Platform:       item.Platform,
 		RateMultiplier: item.RateMultiplier,
 		EffectiveRate:  item.EffectiveRate,
-		Accessible:     item.Accessible,
 		IsExclusive:    item.IsExclusive,
 		StatusVisible:  item.StatusVisible,
 		Note:           item.Note,

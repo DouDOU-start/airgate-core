@@ -47,11 +47,11 @@ func (s *GroupStore) List(ctx context.Context, filter appgroup.ListFilter) ([]ap
 
 // ListAvailable 查询用户可用分组列表。
 //
-// 除"非专属"或"专属且已加入白名单"外，还纳入用户名下已有密钥绑定的分组——
 // 分组创建时非专属、管理员事后才设为专属且未把该用户加入白名单时，用户已签发
-// 的密钥仍绑定在该分组上，密钥管理页需要能查到分组名并展示"已受限"提示。
-// 这类行 Accessible=false，调用方（密钥创建下拉框等）需按该字段过滤，不能当作
-// 可选的新建密钥分组。
+// 的密钥仍绑定在该分组上——但这里故意不把这类分组纳入结果：专属分组通常对应
+// 私下谈价的定价（倍率本身可能是商业敏感信息），管理员收紧白名单的意图就是
+// 不想再让这个用户看到分组名/倍率，密钥管理页只需要提示"分组已失效，请重新
+// 绑定"，不需要（也不应该）继续展示具体是哪个分组、倍率多少。
 func (s *GroupStore) ListAvailable(ctx context.Context, filter appgroup.AvailableFilter) ([]appgroup.Group, int64, error) {
 	query := s.db.Group.Query().Where(
 		entgroup.Or(
@@ -60,11 +60,8 @@ func (s *GroupStore) ListAvailable(ctx context.Context, filter appgroup.Availabl
 				entgroup.IsExclusiveEQ(true),
 				entgroup.HasAllowedUsersWith(entuser.IDEQ(filter.UserID)),
 			),
-			entgroup.HasAPIKeysWith(entapikey.HasUserWith(entuser.IDEQ(filter.UserID))),
 		),
-	).WithAllowedUsers(func(q *ent.UserQuery) {
-		q.Where(entuser.IDEQ(filter.UserID))
-	})
+	)
 	query = applyGroupListFilters(query, filter.Keyword, filter.Platform)
 
 	total, err := query.Count(ctx)
@@ -81,11 +78,7 @@ func (s *GroupStore) ListAvailable(ctx context.Context, filter appgroup.Availabl
 		return nil, 0, err
 	}
 
-	result := mapGroups(list)
-	for i, item := range list {
-		result[i].Accessible = !item.IsExclusive || len(item.Edges.AllowedUsers) > 0
-	}
-	return result, int64(total), nil
+	return mapGroups(list), int64(total), nil
 }
 
 // FindByID 按 ID 查询分组。
@@ -356,7 +349,5 @@ func mapGroup(item *ent.Group) appgroup.Group {
 		SortWeight:     item.SortWeight,
 		CreatedAt:      item.CreatedAt,
 		UpdatedAt:      item.UpdatedAt,
-		// Accessible 仅 ListAvailable 会按用户视角重新计算，其余路径（管理员视角）恒为 true。
-		Accessible: true,
 	}
 }

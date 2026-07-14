@@ -827,8 +827,6 @@
     "use_key_desc": "将以下环境变量添加到你的终端配置中，即可开始使用。",
     "group_unbound": "未绑定分组",
     "group_unbound_hint": "该 API 密钥当前未绑定分组，暂时无法生成使用配置。请联系管理员重新绑定分组后再试。",
-    "group_restricted_tag": "已受限",
-    "group_restricted_hint": "该分组已被设为专属分组，且未开通你的访问权限，此密钥的请求将被拒绝。请联系管理员开通权限或更换分组。",
     "group_rate_short": "分组倍率",
     "user_override_tag": "专属",
     "markup_title": "销售/成本",
