@@ -70,6 +70,10 @@ var (
 	ErrAPIKeyExpired      = errors.New("API Key 已过期")
 	ErrAPIKeyQuota        = errors.New("API Key 配额已用尽")
 	ErrAPIKeyGroupUnbound = errors.New("API Key 未绑定分组，请联系管理员重新绑定")
+	// ErrAPIKeyGroupExclusive 分组创建/绑定时并非专属分组，管理员事后才设为专属，
+	// 且未把该用户加入白名单：已签发的 key 不再享有"创建时校验过就一直放行"的豁免，
+	// 每次请求都按分组的最新专属状态重新判定（与 apikey_store.go GetGroupAccess 同一套判定口径）。
+	ErrAPIKeyGroupExclusive = errors.New("绑定的分组已设为专属分组，且未开通访问权限，请联系管理员")
 )
 
 const apiKeyPrefix = "sk-"
@@ -209,7 +213,9 @@ func loadAndCacheAPIKey(ctx context.Context, db *ent.Client, hash string) (*APIK
 		WithUser(func(q *ent.UserQuery) {
 			q.WithTier()
 		}).
-		WithGroup().
+		WithGroup(func(q *ent.GroupQuery) {
+			q.WithAllowedUsers()
+		}).
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -245,6 +251,10 @@ func loadAndCacheAPIKey(ctx context.Context, db *ent.Client, hash string) (*APIK
 		cacheAPIKeyResult(hash, nil, ErrAPIKeyGroupUnbound)
 		return nil, ErrAPIKeyGroupUnbound
 	}
+	if g.IsExclusive && !userAllowedForGroup(g, u.ID) {
+		cacheAPIKeyResult(hash, nil, ErrAPIKeyGroupExclusive)
+		return nil, ErrAPIKeyGroupExclusive
+	}
 
 	info := &APIKeyInfo{
 		KeyID:              ak.ID,
@@ -265,6 +275,16 @@ func loadAndCacheAPIKey(ctx context.Context, db *ent.Client, hash string) (*APIK
 	}
 	cacheAPIKeyResult(hash, info, nil)
 	return info, nil
+}
+
+// userAllowedForGroup 判断用户是否在专属分组的白名单内。
+func userAllowedForGroup(g *ent.Group, userID int) bool {
+	for _, u := range g.Edges.AllowedUsers {
+		if u.ID == userID {
+			return true
+		}
+	}
+	return false
 }
 
 // cacheAPIKeyResult 把验证结果（成功或已知失败）写入缓存。
@@ -386,6 +406,8 @@ func apiKeyCacheErrorCode(err error) string {
 		return "quota"
 	case ErrAPIKeyGroupUnbound:
 		return "group_unbound"
+	case ErrAPIKeyGroupExclusive:
+		return "group_exclusive"
 	default:
 		return ""
 	}
@@ -401,6 +423,8 @@ func apiKeyCacheErrorFromCode(code string) error {
 		return ErrAPIKeyQuota
 	case "group_unbound":
 		return ErrAPIKeyGroupUnbound
+	case "group_exclusive":
+		return ErrAPIKeyGroupExclusive
 	default:
 		return nil
 	}

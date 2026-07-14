@@ -136,6 +136,12 @@ export interface GroupResp {
   rate_multiplier: number;
   /** 当前用户在此分组的实际计费倍率（用户专属 > 等级 > 分组档位），仅用户视角接口返回 */
   effective_rate?: number;
+  /**
+   * 当前用户是否仍有权限使用此分组；仅用户视角接口（listAvailable）会算出真实值。
+   * 为 false 表示：密钥曾绑定该分组，但分组事后被设为专属且未把该用户加入白名单——
+   * 分组仍会出现在列表里（用于展示密钥绑定的分组名），但不可再被选作新建密钥的分组。
+   */
+  accessible: boolean;
   is_exclusive: boolean;
   status_visible: boolean;
   note?: string;

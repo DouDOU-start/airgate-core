@@ -827,6 +827,8 @@
     "use_key_desc": "Add the following environment variables to your terminal configuration to get started.",
     "group_unbound": "Unbound Group",
     "group_unbound_hint": "This API key is currently not bound to any group, so usage configuration cannot be generated. Please ask an administrator to bind it to a group first.",
+    "group_restricted_tag": "restricted",
+    "group_restricted_hint": "This group has been made exclusive and you haven't been granted access — requests from this key will be rejected. Contact an administrator for access, or switch this key to another group.",
     "group_rate_short": "Group Rate",
     "user_override_tag": "override",
     "markup_title": "Sales/Cost",
