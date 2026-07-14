@@ -118,7 +118,7 @@ export default function HomePage() {
             className="ml-2"
             size="sm"
             variant="primary"
-            onPress={() => navigate({ to: isLoggedIn ? '/' : '/login' })}
+            onPress={() => navigate({ to: isLoggedIn ? '/' : '/login', search: (prev: Record<string, unknown>) => prev })}
           >
             {isLoggedIn ? t('home.go_dashboard') : t('home.login')}
           </Button>
@@ -140,7 +140,7 @@ export default function HomePage() {
               size="lg"
               variant="primary"
               className="w-full sm:w-auto"
-              onPress={() => navigate({ to: isLoggedIn ? '/' : '/login' })}
+              onPress={() => navigate({ to: isLoggedIn ? '/' : '/login', search: (prev: Record<string, unknown>) => prev })}
             >
               {isLoggedIn ? t('home.go_dashboard') : t('home.get_started')}
               <ArrowRight className="w-4 h-4" />

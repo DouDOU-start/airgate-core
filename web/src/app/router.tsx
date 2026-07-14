@@ -157,7 +157,7 @@ const authLayout = createRoute({
   getParentRoute: () => rootRoute,
   id: 'auth',
   beforeLoad: () => {
-    if (!getToken()) throw redirect({ to: '/home' });
+    if (!getToken()) throw redirect({ to: '/home', search: (prev: Record<string, unknown>) => prev });
   },
   component: () => (
     <Suspense fallback={<FullPageLoading />}>

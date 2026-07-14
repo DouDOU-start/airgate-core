@@ -31,12 +31,13 @@ function consumeLoginRedirect(): string | null {
 }
 
 // 邀请返利：邀请码 URL 参数在 sessionStorage 中的落地 key。
-const INVITE_CODE_STORAGE_KEY = 'airgate:invite_code';
+const INVITE_CODE_STORAGE_KEY = 'airgate:ref';
 
-// consumeInviteCode 读取 ?invite_code= 邀请码，落 sessionStorage 兜底
+// consumeInviteCode 读取 ?ref= 邀请码，落 sessionStorage 兜底
 // （两步注册表单中途刷新页面时查询参数会丢失，靠 sessionStorage 保留）。
+// URL 参数名用 ref（短链接更简洁），提交给后端时仍映射为 invite_code 字段。
 function consumeInviteCode(): string {
-  const fromQuery = new URLSearchParams(window.location.search).get('invite_code')?.trim();
+  const fromQuery = new URLSearchParams(window.location.search).get('ref')?.trim();
   if (fromQuery) {
     try {
       window.sessionStorage.setItem(INVITE_CODE_STORAGE_KEY, fromQuery);

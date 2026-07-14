@@ -60,7 +60,7 @@ export default function InvitePage() {
   });
 
   const shareLink = me?.invite_code
-    ? `${window.location.origin}/?invite_code=${encodeURIComponent(me.invite_code)}`
+    ? `${window.location.origin}/login?ref=${encodeURIComponent(me.invite_code)}`
     : '';
 
   const inviteeRows = inviteesData?.list ?? [];
