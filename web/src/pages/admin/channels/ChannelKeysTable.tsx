@@ -104,9 +104,15 @@ export function ChannelKeysTable({
               <CommonTable.Cell>
                 <div className="flex min-w-0 flex-col">
                   <span className="truncate font-medium text-text" title={key.channel_name}>{key.channel_name}</span>
-                  <span className="truncate font-mono text-[11px] text-text-tertiary" title={key.base_url}>
+                  <a
+                    className="truncate font-mono text-[11px] text-text-tertiary hover:text-accent hover:underline"
+                    href={key.base_url}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                    title={key.base_url}
+                  >
                     {key.base_url}
-                  </span>
+                  </a>
                 </div>
               </CommonTable.Cell>
               <CommonTable.Cell>

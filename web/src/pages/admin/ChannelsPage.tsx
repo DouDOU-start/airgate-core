@@ -667,9 +667,15 @@ export default function ChannelsPage() {
                     <CommonTable.Cell>
                       <div className="flex min-w-0 flex-col">
                         <span className="truncate font-medium text-text" title={row.name}>{row.name}</span>
-                        <span className="truncate font-mono text-[11px] text-text-tertiary" title={row.base_url}>
+                        <a
+                          className="truncate font-mono text-[11px] text-text-tertiary hover:text-accent hover:underline"
+                          href={row.base_url}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                          title={row.base_url}
+                        >
                           {row.base_url}
-                        </span>
+                        </a>
                       </div>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
