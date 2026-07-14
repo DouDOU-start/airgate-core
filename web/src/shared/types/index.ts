@@ -1265,6 +1265,8 @@ export interface InviteMe {
   invited_count: number;
   rebate_balance: number;
   rebate_total: number;
+  // 管理员配置的邀请描述文案（渲染进邀请海报）
+  description?: string;
 }
 
 // 邀请关系条目（用户端"我邀请的人" / 管理端全量列表复用）

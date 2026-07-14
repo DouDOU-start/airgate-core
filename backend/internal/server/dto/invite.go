@@ -11,6 +11,8 @@ type InviteMeResp struct {
 	InvitedCount         int     `json:"invited_count"`
 	RebateBalance        float64 `json:"rebate_balance"`
 	RebateTotal          float64 `json:"rebate_total"`
+	// Description 管理员配置的邀请描述文案（渲染进邀请海报）。
+	Description string `json:"description,omitempty"`
 }
 
 // InviteTransferResp 返利转入余额结果。

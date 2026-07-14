@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   Button, Card, ComboBox, EmptyState, Input, Label, ListBox, Modal, Spinner, Tabs,
-  TextField as HeroTextField, useOverlayState,
+  TextArea, TextField as HeroTextField, useOverlayState,
 } from '@heroui/react';
 import { Gift, Pencil, Percent, Plus, RefreshCw, Save, Search, Users, Wallet, X } from 'lucide-react';
 import { inviteApi } from '../../shared/api/invite';
@@ -37,6 +37,7 @@ function OverviewTab() {
 
   const [enabled, setEnabled] = useState(false);
   const [ratePercent, setRatePercent] = useState('5');
+  const [description, setDescription] = useState('');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ function OverviewTab() {
     const map = Object.fromEntries(data.map((item) => [item.key, item.value]));
     setEnabled(map.invite_enabled === 'true');
     setRatePercent(map.invite_rebate_rate_percent || '5');
+    setDescription(map.invite_description || '');
     setLoaded(true);
   }, [data, loaded]);
 
@@ -52,6 +54,7 @@ function OverviewTab() {
       settings: [
         { key: 'invite_enabled', value: String(enabled), group: 'invite' },
         { key: 'invite_rebate_rate_percent', value: ratePercent, group: 'invite' },
+        { key: 'invite_description', value: description.trim(), group: 'invite' },
       ],
     }),
     successMessage: t('invite.admin_save_success'),
@@ -90,6 +93,19 @@ function OverviewTab() {
                 onChange={(e) => setRatePercent(e.target.value)}
               />
             </HeroTextField>
+          </div>
+          <div className="max-w-xl">
+            <HeroTextField fullWidth>
+              <Label>{t('invite.admin_description')}</Label>
+              <TextArea
+                maxLength={120}
+                placeholder={t('invite.admin_description_placeholder')}
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </HeroTextField>
+            <p className="mt-1 text-xs text-text-tertiary">{t('invite.admin_description_hint')}</p>
           </div>
           <Button
             aria-busy={saveMutation.isPending}

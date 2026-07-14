@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Card, EmptyState, Spinner, Tabs } from '@heroui/react';
-import { AlertTriangle, Copy, Gift, Users, Wallet } from 'lucide-react';
+import { Alert, Button, Card, EmptyState, Modal, Spinner, Tabs, useOverlayState } from '@heroui/react';
+import { AlertTriangle, Copy, Download, Gift, QrCode, Users, Wallet } from 'lucide-react';
+import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
+import { defaultLogoUrl, useSiteSettings } from '../../app/providers/SiteSettingsProvider';
+import { renderInviteCard } from './inviteQrCard';
 import { inviteApi } from '../../shared/api/invite';
 import { queryKeys } from '../../shared/queryKeys';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -62,6 +65,49 @@ export default function InvitePage() {
   const shareLink = me?.invite_code
     ? `${window.location.origin}/login?ref=${encodeURIComponent(me.invite_code)}`
     : '';
+
+  // 邀请海报卡片：品牌区 + 二维码 + 邀请码，预览与保存同一张 PNG
+  const siteSettings = useSiteSettings();
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const qrModalState = useOverlayState({
+    isOpen: qrModalOpen,
+    onOpenChange: setQrModalOpen,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!shareLink || !me?.invite_code) {
+      setQrDataUrl('');
+      return;
+    }
+    renderInviteCard({
+      shareLink,
+      inviteCode: me.invite_code,
+      siteName: siteSettings.site_name || 'AirGate',
+      tagline: t('home.badge'),
+      codeLabel: t('invite.qr_code_label'),
+      description: me.description,
+      logoUrl: siteSettings.site_logo || defaultLogoUrl,
+    })
+      .then((url) => {
+        if (!cancelled) setQrDataUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setQrDataUrl('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [shareLink, me?.invite_code, me?.description, siteSettings.site_name, siteSettings.site_logo, t]);
+
+  function downloadQr() {
+    if (!qrDataUrl) return;
+    const anchor = document.createElement('a');
+    anchor.href = qrDataUrl;
+    anchor.download = `invite-${me?.invite_code ?? 'qr'}.png`;
+    anchor.click();
+  }
 
   const inviteeRows = inviteesData?.list ?? [];
   const inviteeTotal = inviteesData?.total ?? 0;
@@ -125,6 +171,14 @@ export default function InvitePage() {
                 >
                   <Copy className="h-3.5 w-3.5" />
                   {t('common.copy')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => setQrModalOpen(true)}
+                >
+                  <QrCode className="h-3.5 w-3.5" />
+                  {t('invite.qr_button')}
                 </Button>
               </div>
             </div>
@@ -277,6 +331,55 @@ export default function InvitePage() {
           </CommonTable>
         )}
       </div>
+
+      {/* 邀请二维码弹窗：扫码直达注册页（自动带邀请码），支持保存 PNG 分享 */}
+      <Modal state={qrModalState}>
+        <DialogTriggerShim />
+        <Modal.Backdrop>
+          <Modal.Container placement="center" scroll="inside" size="sm">
+            <Modal.Dialog className="ag-elevation-modal">
+              <Modal.Header>
+                <Modal.Heading>{t('invite.qr_title')}</Modal.Heading>
+                <Modal.CloseTrigger />
+              </Modal.Header>
+              <Modal.Body>
+                <div className="flex flex-col items-center gap-4 py-2 text-center">
+                  {qrDataUrl ? (
+                    <img
+                      alt={t('invite.qr_title')}
+                      className="w-full max-w-[19rem] rounded-xl shadow-lg ring-1 ring-border"
+                      src={qrDataUrl}
+                    />
+                  ) : (
+                    <div className="flex aspect-[27/35] w-full max-w-[19rem] items-center justify-center rounded-xl border border-border">
+                      <span className="text-sm text-text-tertiary">{t('invite.qr_generating')}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      isDisabled={!qrDataUrl}
+                      size="sm"
+                      variant="primary"
+                      onPress={downloadQr}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      {t('invite.qr_save')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onPress={() => copy(shareLink)}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      {t('invite.qr_copy_link')}
+                    </Button>
+                  </div>
+                </div>
+              </Modal.Body>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
     </div>
   );
 }

@@ -63,6 +63,8 @@ type MyInfo struct {
 	InvitedCount         int
 	RebateBalance        float64
 	RebateTotal          float64
+	// Description 管理员配置的邀请描述文案，前端渲染进邀请海报。
+	Description string
 }
 
 // ListFilter 分页筛选。

@@ -83,6 +83,7 @@ func (h *InviteHandler) GetMe(c *gin.Context) {
 		InvitedCount:         info.InvitedCount,
 		RebateBalance:        info.RebateBalance,
 		RebateTotal:          info.RebateTotal,
+		Description:          info.Description,
 	})
 }
 

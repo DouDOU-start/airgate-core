@@ -8,11 +8,12 @@ import (
 	"strings"
 )
 
-// settings 表 invite 组：全局开关 + 全局返利比例。
+// settings 表 invite 组：全局开关 + 全局返利比例 + 邀请描述（渲染进邀请海报）。
 const (
 	settingGroup             = "invite"
 	settingKeyEnabled        = "invite_enabled"
 	settingKeyRebateRate     = "invite_rebate_rate_percent"
+	settingKeyDescription    = "invite_description"
 	defaultRebateRatePercent = 5.0
 )
 
@@ -34,36 +35,30 @@ func (s *Service) SetSettingsLister(sl SettingsLister) {
 
 // IsEnabled 邀请返利总开关（默认关闭）。
 func (s *Service) IsEnabled(ctx context.Context) bool {
+	return s.settingValue(ctx, settingKeyEnabled) == "true"
+}
+
+// settingValue 读取 invite 组单个设置值；缺失/读取失败返回空串。
+func (s *Service) settingValue(ctx context.Context, key string) string {
 	if s.settings == nil {
-		return false
+		return ""
 	}
 	items, err := s.settings.List(ctx, settingGroup)
 	if err != nil {
-		return false
+		return ""
 	}
 	for _, item := range items {
-		if item.Key == settingKeyEnabled {
-			return item.Value == "true"
+		if item.Key == key {
+			return item.Value
 		}
 	}
-	return false
+	return ""
 }
 
 // globalRatePercent 读取并 clamp 全局返利比例；解析失败/缺失回退默认值。
 func (s *Service) globalRatePercent(ctx context.Context) float64 {
-	if s.settings == nil {
-		return defaultRebateRatePercent
-	}
-	items, err := s.settings.List(ctx, settingGroup)
-	if err != nil {
-		return defaultRebateRatePercent
-	}
-	for _, item := range items {
-		if item.Key == settingKeyRebateRate {
-			if v, err := strconv.ParseFloat(strings.TrimSpace(item.Value), 64); err == nil {
-				return clampRate(v)
-			}
-		}
+	if v, err := strconv.ParseFloat(strings.TrimSpace(s.settingValue(ctx, settingKeyRebateRate)), 64); err == nil {
+		return clampRate(v)
 	}
 	return defaultRebateRatePercent
 }
@@ -107,6 +102,7 @@ func (s *Service) GetMyInfo(ctx context.Context, userID int) (MyInfo, error) {
 		InvitedCount:         profile.InvitedCount,
 		RebateBalance:        profile.RebateBalance,
 		RebateTotal:          profile.RebateTotal,
+		Description:          strings.TrimSpace(s.settingValue(ctx, settingKeyDescription)),
 	}, nil
 }
 
