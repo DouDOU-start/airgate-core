@@ -9,6 +9,7 @@ import { channelsApi } from '../../../shared/api/channels';
 import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { queryKeys } from '../../../shared/queryKeys';
+import { FETCH_ALL_PARAMS } from '../../../shared/constants';
 import { KeyStatusChip } from '../channels/keyShared';
 import type { GroupResp, ChannelKeyResp } from '../../../shared/types';
 
@@ -28,7 +29,7 @@ export function GroupChannelKeysModal({ open, group, onClose }: GroupChannelKeys
   const boundKey = ['group-channel-keys', group.id] as const;
   const { data: boundData, isLoading } = useQuery({
     queryKey: boundKey,
-    queryFn: () => channelsApi.listKeys({ group_id: group.id, page: 1, page_size: 200 }),
+    queryFn: () => channelsApi.listKeys({ group_id: group.id, ...FETCH_ALL_PARAMS }),
     enabled: open,
   });
   const boundKeys = boundData?.list ?? [];
