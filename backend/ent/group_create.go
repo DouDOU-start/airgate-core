@@ -60,6 +60,20 @@ func (gc *GroupCreate) SetNillableRateMultiplier(f *float64) *GroupCreate {
 	return gc
 }
 
+// SetAlphaSearchPrice sets the "alpha_search_price" field.
+func (gc *GroupCreate) SetAlphaSearchPrice(f float64) *GroupCreate {
+	gc.mutation.SetAlphaSearchPrice(f)
+	return gc
+}
+
+// SetNillableAlphaSearchPrice sets the "alpha_search_price" field if the given value is not nil.
+func (gc *GroupCreate) SetNillableAlphaSearchPrice(f *float64) *GroupCreate {
+	if f != nil {
+		gc.SetAlphaSearchPrice(*f)
+	}
+	return gc
+}
+
 // SetIsExclusive sets the "is_exclusive" field.
 func (gc *GroupCreate) SetIsExclusive(b bool) *GroupCreate {
 	gc.mutation.SetIsExclusive(b)
@@ -346,6 +360,10 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		_spec.SetField(group.FieldRateMultiplier, field.TypeFloat64, value)
 		_node.RateMultiplier = value
 	}
+	if value, ok := gc.mutation.AlphaSearchPrice(); ok {
+		_spec.SetField(group.FieldAlphaSearchPrice, field.TypeFloat64, value)
+		_node.AlphaSearchPrice = &value
+	}
 	if value, ok := gc.mutation.IsExclusive(); ok {
 		_spec.SetField(group.FieldIsExclusive, field.TypeBool, value)
 		_node.IsExclusive = value
@@ -528,6 +546,30 @@ func (u *GroupUpsert) AddRateMultiplier(v float64) *GroupUpsert {
 	return u
 }
 
+// SetAlphaSearchPrice sets the "alpha_search_price" field.
+func (u *GroupUpsert) SetAlphaSearchPrice(v float64) *GroupUpsert {
+	u.Set(group.FieldAlphaSearchPrice, v)
+	return u
+}
+
+// UpdateAlphaSearchPrice sets the "alpha_search_price" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateAlphaSearchPrice() *GroupUpsert {
+	u.SetExcluded(group.FieldAlphaSearchPrice)
+	return u
+}
+
+// AddAlphaSearchPrice adds v to the "alpha_search_price" field.
+func (u *GroupUpsert) AddAlphaSearchPrice(v float64) *GroupUpsert {
+	u.Add(group.FieldAlphaSearchPrice, v)
+	return u
+}
+
+// ClearAlphaSearchPrice clears the value of the "alpha_search_price" field.
+func (u *GroupUpsert) ClearAlphaSearchPrice() *GroupUpsert {
+	u.SetNull(group.FieldAlphaSearchPrice)
+	return u
+}
+
 // SetIsExclusive sets the "is_exclusive" field.
 func (u *GroupUpsert) SetIsExclusive(v bool) *GroupUpsert {
 	u.Set(group.FieldIsExclusive, v)
@@ -685,6 +727,34 @@ func (u *GroupUpsertOne) AddRateMultiplier(v float64) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateRateMultiplier() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateRateMultiplier()
+	})
+}
+
+// SetAlphaSearchPrice sets the "alpha_search_price" field.
+func (u *GroupUpsertOne) SetAlphaSearchPrice(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetAlphaSearchPrice(v)
+	})
+}
+
+// AddAlphaSearchPrice adds v to the "alpha_search_price" field.
+func (u *GroupUpsertOne) AddAlphaSearchPrice(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddAlphaSearchPrice(v)
+	})
+}
+
+// UpdateAlphaSearchPrice sets the "alpha_search_price" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateAlphaSearchPrice() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateAlphaSearchPrice()
+	})
+}
+
+// ClearAlphaSearchPrice clears the value of the "alpha_search_price" field.
+func (u *GroupUpsertOne) ClearAlphaSearchPrice() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearAlphaSearchPrice()
 	})
 }
 
@@ -1022,6 +1092,34 @@ func (u *GroupUpsertBulk) AddRateMultiplier(v float64) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateRateMultiplier() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateRateMultiplier()
+	})
+}
+
+// SetAlphaSearchPrice sets the "alpha_search_price" field.
+func (u *GroupUpsertBulk) SetAlphaSearchPrice(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetAlphaSearchPrice(v)
+	})
+}
+
+// AddAlphaSearchPrice adds v to the "alpha_search_price" field.
+func (u *GroupUpsertBulk) AddAlphaSearchPrice(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddAlphaSearchPrice(v)
+	})
+}
+
+// UpdateAlphaSearchPrice sets the "alpha_search_price" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateAlphaSearchPrice() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateAlphaSearchPrice()
+	})
+}
+
+// ClearAlphaSearchPrice clears the value of the "alpha_search_price" field.
+func (u *GroupUpsertBulk) ClearAlphaSearchPrice() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearAlphaSearchPrice()
 	})
 }
 

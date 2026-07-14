@@ -6886,36 +6886,38 @@ func (m *ChannelKeyMutation) ResetEdge(name string) error {
 // GroupMutation represents an operation that mutates the Group nodes in the graph.
 type GroupMutation struct {
 	config
-	op                   Op
-	typ                  string
-	id                   *int
-	name                 *string
-	platform             *string
-	rate_multiplier      *float64
-	addrate_multiplier   *float64
-	is_exclusive         *bool
-	status_visible       *bool
-	note                 *string
-	sort_weight          *int
-	addsort_weight       *int
-	created_at           *time.Time
-	updated_at           *time.Time
-	clearedFields        map[string]struct{}
-	channel_keys         map[int]struct{}
-	removedchannel_keys  map[int]struct{}
-	clearedchannel_keys  bool
-	allowed_users        map[int]struct{}
-	removedallowed_users map[int]struct{}
-	clearedallowed_users bool
-	api_keys             map[int]struct{}
-	removedapi_keys      map[int]struct{}
-	clearedapi_keys      bool
-	usage_logs           map[int]struct{}
-	removedusage_logs    map[int]struct{}
-	clearedusage_logs    bool
-	done                 bool
-	oldValue             func(context.Context) (*Group, error)
-	predicates           []predicate.Group
+	op                    Op
+	typ                   string
+	id                    *int
+	name                  *string
+	platform              *string
+	rate_multiplier       *float64
+	addrate_multiplier    *float64
+	alpha_search_price    *float64
+	addalpha_search_price *float64
+	is_exclusive          *bool
+	status_visible        *bool
+	note                  *string
+	sort_weight           *int
+	addsort_weight        *int
+	created_at            *time.Time
+	updated_at            *time.Time
+	clearedFields         map[string]struct{}
+	channel_keys          map[int]struct{}
+	removedchannel_keys   map[int]struct{}
+	clearedchannel_keys   bool
+	allowed_users         map[int]struct{}
+	removedallowed_users  map[int]struct{}
+	clearedallowed_users  bool
+	api_keys              map[int]struct{}
+	removedapi_keys       map[int]struct{}
+	clearedapi_keys       bool
+	usage_logs            map[int]struct{}
+	removedusage_logs     map[int]struct{}
+	clearedusage_logs     bool
+	done                  bool
+	oldValue              func(context.Context) (*Group, error)
+	predicates            []predicate.Group
 }
 
 var _ ent.Mutation = (*GroupMutation)(nil)
@@ -7142,6 +7144,76 @@ func (m *GroupMutation) AddedRateMultiplier() (r float64, exists bool) {
 func (m *GroupMutation) ResetRateMultiplier() {
 	m.rate_multiplier = nil
 	m.addrate_multiplier = nil
+}
+
+// SetAlphaSearchPrice sets the "alpha_search_price" field.
+func (m *GroupMutation) SetAlphaSearchPrice(f float64) {
+	m.alpha_search_price = &f
+	m.addalpha_search_price = nil
+}
+
+// AlphaSearchPrice returns the value of the "alpha_search_price" field in the mutation.
+func (m *GroupMutation) AlphaSearchPrice() (r float64, exists bool) {
+	v := m.alpha_search_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAlphaSearchPrice returns the old "alpha_search_price" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldAlphaSearchPrice(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAlphaSearchPrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAlphaSearchPrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAlphaSearchPrice: %w", err)
+	}
+	return oldValue.AlphaSearchPrice, nil
+}
+
+// AddAlphaSearchPrice adds f to the "alpha_search_price" field.
+func (m *GroupMutation) AddAlphaSearchPrice(f float64) {
+	if m.addalpha_search_price != nil {
+		*m.addalpha_search_price += f
+	} else {
+		m.addalpha_search_price = &f
+	}
+}
+
+// AddedAlphaSearchPrice returns the value that was added to the "alpha_search_price" field in this mutation.
+func (m *GroupMutation) AddedAlphaSearchPrice() (r float64, exists bool) {
+	v := m.addalpha_search_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearAlphaSearchPrice clears the value of the "alpha_search_price" field.
+func (m *GroupMutation) ClearAlphaSearchPrice() {
+	m.alpha_search_price = nil
+	m.addalpha_search_price = nil
+	m.clearedFields[group.FieldAlphaSearchPrice] = struct{}{}
+}
+
+// AlphaSearchPriceCleared returns if the "alpha_search_price" field was cleared in this mutation.
+func (m *GroupMutation) AlphaSearchPriceCleared() bool {
+	_, ok := m.clearedFields[group.FieldAlphaSearchPrice]
+	return ok
+}
+
+// ResetAlphaSearchPrice resets all changes to the "alpha_search_price" field.
+func (m *GroupMutation) ResetAlphaSearchPrice() {
+	m.alpha_search_price = nil
+	m.addalpha_search_price = nil
+	delete(m.clearedFields, group.FieldAlphaSearchPrice)
 }
 
 // SetIsExclusive sets the "is_exclusive" field.
@@ -7630,7 +7702,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 10)
 	if m.name != nil {
 		fields = append(fields, group.FieldName)
 	}
@@ -7639,6 +7711,9 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.rate_multiplier != nil {
 		fields = append(fields, group.FieldRateMultiplier)
+	}
+	if m.alpha_search_price != nil {
+		fields = append(fields, group.FieldAlphaSearchPrice)
 	}
 	if m.is_exclusive != nil {
 		fields = append(fields, group.FieldIsExclusive)
@@ -7672,6 +7747,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.Platform()
 	case group.FieldRateMultiplier:
 		return m.RateMultiplier()
+	case group.FieldAlphaSearchPrice:
+		return m.AlphaSearchPrice()
 	case group.FieldIsExclusive:
 		return m.IsExclusive()
 	case group.FieldStatusVisible:
@@ -7699,6 +7776,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldPlatform(ctx)
 	case group.FieldRateMultiplier:
 		return m.OldRateMultiplier(ctx)
+	case group.FieldAlphaSearchPrice:
+		return m.OldAlphaSearchPrice(ctx)
 	case group.FieldIsExclusive:
 		return m.OldIsExclusive(ctx)
 	case group.FieldStatusVisible:
@@ -7740,6 +7819,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRateMultiplier(v)
+		return nil
+	case group.FieldAlphaSearchPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAlphaSearchPrice(v)
 		return nil
 	case group.FieldIsExclusive:
 		v, ok := value.(bool)
@@ -7794,6 +7880,9 @@ func (m *GroupMutation) AddedFields() []string {
 	if m.addrate_multiplier != nil {
 		fields = append(fields, group.FieldRateMultiplier)
 	}
+	if m.addalpha_search_price != nil {
+		fields = append(fields, group.FieldAlphaSearchPrice)
+	}
 	if m.addsort_weight != nil {
 		fields = append(fields, group.FieldSortWeight)
 	}
@@ -7807,6 +7896,8 @@ func (m *GroupMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case group.FieldRateMultiplier:
 		return m.AddedRateMultiplier()
+	case group.FieldAlphaSearchPrice:
+		return m.AddedAlphaSearchPrice()
 	case group.FieldSortWeight:
 		return m.AddedSortWeight()
 	}
@@ -7825,6 +7916,13 @@ func (m *GroupMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddRateMultiplier(v)
 		return nil
+	case group.FieldAlphaSearchPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAlphaSearchPrice(v)
+		return nil
 	case group.FieldSortWeight:
 		v, ok := value.(int)
 		if !ok {
@@ -7839,7 +7937,11 @@ func (m *GroupMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *GroupMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(group.FieldAlphaSearchPrice) {
+		fields = append(fields, group.FieldAlphaSearchPrice)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -7852,6 +7954,11 @@ func (m *GroupMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *GroupMutation) ClearField(name string) error {
+	switch name {
+	case group.FieldAlphaSearchPrice:
+		m.ClearAlphaSearchPrice()
+		return nil
+	}
 	return fmt.Errorf("unknown Group nullable field %s", name)
 }
 
@@ -7867,6 +7974,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldRateMultiplier:
 		m.ResetRateMultiplier()
+		return nil
+	case group.FieldAlphaSearchPrice:
+		m.ResetAlphaSearchPrice()
 		return nil
 	case group.FieldIsExclusive:
 		m.ResetIsExclusive()

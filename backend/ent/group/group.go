@@ -20,6 +20,8 @@ const (
 	FieldPlatform = "platform"
 	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
 	FieldRateMultiplier = "rate_multiplier"
+	// FieldAlphaSearchPrice holds the string denoting the alpha_search_price field in the database.
+	FieldAlphaSearchPrice = "alpha_search_price"
 	// FieldIsExclusive holds the string denoting the is_exclusive field in the database.
 	FieldIsExclusive = "is_exclusive"
 	// FieldStatusVisible holds the string denoting the status_visible field in the database.
@@ -74,6 +76,7 @@ var Columns = []string{
 	FieldName,
 	FieldPlatform,
 	FieldRateMultiplier,
+	FieldAlphaSearchPrice,
 	FieldIsExclusive,
 	FieldStatusVisible,
 	FieldNote,
@@ -145,6 +148,11 @@ func ByPlatform(opts ...sql.OrderTermOption) OrderOption {
 // ByRateMultiplier orders the results by the rate_multiplier field.
 func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRateMultiplier, opts...).ToFunc()
+}
+
+// ByAlphaSearchPrice orders the results by the alpha_search_price field.
+func ByAlphaSearchPrice(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAlphaSearchPrice, opts...).ToFunc()
 }
 
 // ByIsExclusive orders the results by the is_exclusive field.

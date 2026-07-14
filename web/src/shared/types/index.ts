@@ -134,6 +134,8 @@ export interface GroupResp {
   /** 历史字段：渠道化改造后为可空，新建分组不再填写。 */
   platform?: string;
   rate_multiplier: number;
+  /** codex 联网搜索按次覆盖价（USD/次）；null=沿用全局设置 */
+  alpha_search_price?: number | null;
   /** 当前用户在此分组的实际计费倍率（用户专属 > 等级 > 分组档位），仅用户视角接口返回 */
   effective_rate?: number;
   is_exclusive: boolean;
@@ -153,6 +155,8 @@ export interface GroupResp {
 export interface CreateGroupReq {
   name: string;
   rate_multiplier?: number;
+  /** codex 联网搜索按次覆盖价（USD/次）；缺省/null=沿用全局设置 */
+  alpha_search_price?: number | null;
   is_exclusive?: boolean;
   status_visible?: boolean;
   note?: string;
@@ -175,6 +179,8 @@ export interface GroupAllowedUserResp {
 export interface UpdateGroupReq {
   name?: string;
   rate_multiplier?: number;
+  /** codex 联网搜索按次覆盖价（USD/次）；null=清空为沿用全局设置 */
+  alpha_search_price?: number | null;
   is_exclusive?: boolean;
   status_visible?: boolean;
   note?: string;

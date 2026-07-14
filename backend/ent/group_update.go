@@ -82,6 +82,33 @@ func (gu *GroupUpdate) AddRateMultiplier(f float64) *GroupUpdate {
 	return gu
 }
 
+// SetAlphaSearchPrice sets the "alpha_search_price" field.
+func (gu *GroupUpdate) SetAlphaSearchPrice(f float64) *GroupUpdate {
+	gu.mutation.ResetAlphaSearchPrice()
+	gu.mutation.SetAlphaSearchPrice(f)
+	return gu
+}
+
+// SetNillableAlphaSearchPrice sets the "alpha_search_price" field if the given value is not nil.
+func (gu *GroupUpdate) SetNillableAlphaSearchPrice(f *float64) *GroupUpdate {
+	if f != nil {
+		gu.SetAlphaSearchPrice(*f)
+	}
+	return gu
+}
+
+// AddAlphaSearchPrice adds f to the "alpha_search_price" field.
+func (gu *GroupUpdate) AddAlphaSearchPrice(f float64) *GroupUpdate {
+	gu.mutation.AddAlphaSearchPrice(f)
+	return gu
+}
+
+// ClearAlphaSearchPrice clears the value of the "alpha_search_price" field.
+func (gu *GroupUpdate) ClearAlphaSearchPrice() *GroupUpdate {
+	gu.mutation.ClearAlphaSearchPrice()
+	return gu
+}
+
 // SetIsExclusive sets the "is_exclusive" field.
 func (gu *GroupUpdate) SetIsExclusive(b bool) *GroupUpdate {
 	gu.mutation.SetIsExclusive(b)
@@ -376,6 +403,15 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := gu.mutation.AddedRateMultiplier(); ok {
 		_spec.AddField(group.FieldRateMultiplier, field.TypeFloat64, value)
 	}
+	if value, ok := gu.mutation.AlphaSearchPrice(); ok {
+		_spec.SetField(group.FieldAlphaSearchPrice, field.TypeFloat64, value)
+	}
+	if value, ok := gu.mutation.AddedAlphaSearchPrice(); ok {
+		_spec.AddField(group.FieldAlphaSearchPrice, field.TypeFloat64, value)
+	}
+	if gu.mutation.AlphaSearchPriceCleared() {
+		_spec.ClearField(group.FieldAlphaSearchPrice, field.TypeFloat64)
+	}
 	if value, ok := gu.mutation.IsExclusive(); ok {
 		_spec.SetField(group.FieldIsExclusive, field.TypeBool, value)
 	}
@@ -642,6 +678,33 @@ func (guo *GroupUpdateOne) SetNillableRateMultiplier(f *float64) *GroupUpdateOne
 // AddRateMultiplier adds f to the "rate_multiplier" field.
 func (guo *GroupUpdateOne) AddRateMultiplier(f float64) *GroupUpdateOne {
 	guo.mutation.AddRateMultiplier(f)
+	return guo
+}
+
+// SetAlphaSearchPrice sets the "alpha_search_price" field.
+func (guo *GroupUpdateOne) SetAlphaSearchPrice(f float64) *GroupUpdateOne {
+	guo.mutation.ResetAlphaSearchPrice()
+	guo.mutation.SetAlphaSearchPrice(f)
+	return guo
+}
+
+// SetNillableAlphaSearchPrice sets the "alpha_search_price" field if the given value is not nil.
+func (guo *GroupUpdateOne) SetNillableAlphaSearchPrice(f *float64) *GroupUpdateOne {
+	if f != nil {
+		guo.SetAlphaSearchPrice(*f)
+	}
+	return guo
+}
+
+// AddAlphaSearchPrice adds f to the "alpha_search_price" field.
+func (guo *GroupUpdateOne) AddAlphaSearchPrice(f float64) *GroupUpdateOne {
+	guo.mutation.AddAlphaSearchPrice(f)
+	return guo
+}
+
+// ClearAlphaSearchPrice clears the value of the "alpha_search_price" field.
+func (guo *GroupUpdateOne) ClearAlphaSearchPrice() *GroupUpdateOne {
+	guo.mutation.ClearAlphaSearchPrice()
 	return guo
 }
 
@@ -968,6 +1031,15 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 	}
 	if value, ok := guo.mutation.AddedRateMultiplier(); ok {
 		_spec.AddField(group.FieldRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := guo.mutation.AlphaSearchPrice(); ok {
+		_spec.SetField(group.FieldAlphaSearchPrice, field.TypeFloat64, value)
+	}
+	if value, ok := guo.mutation.AddedAlphaSearchPrice(); ok {
+		_spec.AddField(group.FieldAlphaSearchPrice, field.TypeFloat64, value)
+	}
+	if guo.mutation.AlphaSearchPriceCleared() {
+		_spec.ClearField(group.FieldAlphaSearchPrice, field.TypeFloat64)
 	}
 	if value, ok := guo.mutation.IsExclusive(); ok {
 		_spec.SetField(group.FieldIsExclusive, field.TypeBool, value)

@@ -114,6 +114,9 @@ type APIKeyInfo struct {
 	UserGroupRates      map[int64]float64 // 用户级专属倍率（按 group_id），用于 ResolveBillingRate 优先级链
 	TierGroupRates      map[int64]float64 // 用户等级倍率（按 group_id），优先级低于 UserGroupRates
 	GroupRateMultiplier float64           // 分组倍率
+	// GroupAlphaSearchPrice 分组对 codex 联网搜索的按次覆盖价（USD/次）；
+	// nil=沿用全局 gateway 设置，非 nil（含 0）=覆盖全局。见 Group.alpha_search_price。
+	GroupAlphaSearchPrice *float64
 }
 
 // GenerateAPIKey 生成 API Key 和对应的哈希值
@@ -266,9 +269,10 @@ func loadAndCacheAPIKey(ctx context.Context, db *ent.Client, hash string) (*APIK
 		KeyMaxConcurrency:  ak.MaxConcurrency,
 		UserMaxConcurrency: u.MaxConcurrency,
 
-		UserBalance:         u.Balance,
-		UserGroupRates:      u.GroupRates,
-		GroupRateMultiplier: g.RateMultiplier,
+		UserBalance:           u.Balance,
+		UserGroupRates:        u.GroupRates,
+		GroupRateMultiplier:   g.RateMultiplier,
+		GroupAlphaSearchPrice: g.AlphaSearchPrice,
 	}
 	if tier := u.Edges.Tier; tier != nil {
 		info.TierGroupRates = tier.Rates

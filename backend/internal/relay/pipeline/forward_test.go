@@ -7,9 +7,36 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 )
+
+// TestResolveAlphaSearchPrice 联网搜索按次单价：分组覆盖价优先，nil 回落全局，负值钳 0。
+func TestResolveAlphaSearchPrice(t *testing.T) {
+	ptr := func(f float64) *float64 { return &f }
+	cases := []struct {
+		name     string
+		global   float64
+		override *float64
+		want     float64
+	}{
+		{"无覆盖用全局", 0.01, nil, 0.01},
+		{"覆盖价生效", 0.01, ptr(0.05), 0.05},
+		{"覆盖 0 免费", 0.01, ptr(0), 0},
+		{"覆盖负值钳 0", 0.01, ptr(-3), 0},
+		{"全局负值钳 0", -1, nil, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			settings := GatewaySettings{AlphaSearchPrice: tc.global}
+			keyInfo := &auth.APIKeyInfo{GroupAlphaSearchPrice: tc.override}
+			if got := resolveAlphaSearchPrice(settings, keyInfo); got != tc.want {
+				t.Errorf("resolveAlphaSearchPrice() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
 
 // TestChannelSlotTTL 渠道并发槽 TTL：流式 30min（长流无总超时防僵尸清理），
 // 非流式传 0 走 concurrency 层默认 5min。

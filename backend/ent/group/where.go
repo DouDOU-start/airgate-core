@@ -70,6 +70,11 @@ func RateMultiplier(v float64) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldRateMultiplier, v))
 }
 
+// AlphaSearchPrice applies equality check predicate on the "alpha_search_price" field. It's identical to AlphaSearchPriceEQ.
+func AlphaSearchPrice(v float64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldAlphaSearchPrice, v))
+}
+
 // IsExclusive applies equality check predicate on the "is_exclusive" field. It's identical to IsExclusiveEQ.
 func IsExclusive(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldIsExclusive, v))
@@ -268,6 +273,56 @@ func RateMultiplierLT(v float64) predicate.Group {
 // RateMultiplierLTE applies the LTE predicate on the "rate_multiplier" field.
 func RateMultiplierLTE(v float64) predicate.Group {
 	return predicate.Group(sql.FieldLTE(FieldRateMultiplier, v))
+}
+
+// AlphaSearchPriceEQ applies the EQ predicate on the "alpha_search_price" field.
+func AlphaSearchPriceEQ(v float64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldAlphaSearchPrice, v))
+}
+
+// AlphaSearchPriceNEQ applies the NEQ predicate on the "alpha_search_price" field.
+func AlphaSearchPriceNEQ(v float64) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldAlphaSearchPrice, v))
+}
+
+// AlphaSearchPriceIn applies the In predicate on the "alpha_search_price" field.
+func AlphaSearchPriceIn(vs ...float64) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldAlphaSearchPrice, vs...))
+}
+
+// AlphaSearchPriceNotIn applies the NotIn predicate on the "alpha_search_price" field.
+func AlphaSearchPriceNotIn(vs ...float64) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldAlphaSearchPrice, vs...))
+}
+
+// AlphaSearchPriceGT applies the GT predicate on the "alpha_search_price" field.
+func AlphaSearchPriceGT(v float64) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldAlphaSearchPrice, v))
+}
+
+// AlphaSearchPriceGTE applies the GTE predicate on the "alpha_search_price" field.
+func AlphaSearchPriceGTE(v float64) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldAlphaSearchPrice, v))
+}
+
+// AlphaSearchPriceLT applies the LT predicate on the "alpha_search_price" field.
+func AlphaSearchPriceLT(v float64) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldAlphaSearchPrice, v))
+}
+
+// AlphaSearchPriceLTE applies the LTE predicate on the "alpha_search_price" field.
+func AlphaSearchPriceLTE(v float64) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldAlphaSearchPrice, v))
+}
+
+// AlphaSearchPriceIsNil applies the IsNil predicate on the "alpha_search_price" field.
+func AlphaSearchPriceIsNil() predicate.Group {
+	return predicate.Group(sql.FieldIsNull(FieldAlphaSearchPrice))
+}
+
+// AlphaSearchPriceNotNil applies the NotNil predicate on the "alpha_search_price" field.
+func AlphaSearchPriceNotNil() predicate.Group {
+	return predicate.Group(sql.FieldNotNull(FieldAlphaSearchPrice))
 }
 
 // IsExclusiveEQ applies the EQ predicate on the "is_exclusive" field.

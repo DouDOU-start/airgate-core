@@ -13,7 +13,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { useToast } from '../../shared/ui';
 import {
   Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound, Expand, Plus,
+  ShieldCheck, Copy, Trash2, KeyRound, Expand, Plus, Waypoints,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
@@ -39,6 +39,11 @@ const REG_KEYS = [
 
 const DEFAULT_KEYS = [
   'default_balance', 'default_concurrency',
+] as const;
+
+// 网关转发设置（gateway 分组，见 backend internal/relay/pipeline/settings.go）。
+const GATEWAY_KEYS = [
+  'alpha_search_price',
 ] as const;
 
 // SMTP 密码哨兵值（与后端约定）：GET 返回 "********" 表示已配置；
@@ -115,10 +120,11 @@ const DEFAULT_RECHARGE_BODY = `<div style="font-family: -apple-system, BlinkMacS
 
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'security' | 'smtp';
+type TabKey = 'site' | 'gateway' | 'security' | 'smtp';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
+  { key: 'gateway', labelKey: 'settings.tab_gateway', icon: Waypoints },
   { key: 'security', labelKey: 'settings.tab_security', icon: ShieldCheck },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
 ];
@@ -127,11 +133,13 @@ type SaveTabKey = Exclude<TabKey, 'security'>;
 
 const TAB_GROUP: Record<SaveTabKey, string> = {
   site: 'site',
+  gateway: 'gateway',
   smtp: 'smtp',
 };
 
 const TAB_KEYS: Record<SaveTabKey, readonly string[]> = {
   site: SITE_KEYS,
+  gateway: GATEWAY_KEYS,
   smtp: SMTP_KEYS,
 };
 
@@ -381,6 +389,29 @@ export default function SettingsPage() {
                     value={val('recharge_notice')}
                     onChange={(e) => set('recharge_notice', e.target.value)}
                     rows={3}
+                  />
+                </Field>
+              </div>
+              {saveAction}
+            </Card.Content>
+          </Card>
+        )}
+
+        {activeTab === 'gateway' && (
+          <Card>
+            <Card.Header>
+              <Card.Title>{t('settings.gateway_relay')}</Card.Title>
+            </Card.Header>
+            <Card.Content>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Field label={t('settings.alpha_search_price')} hint={t('settings.alpha_search_price_hint')}>
+                  <Input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={val('alpha_search_price')}
+                    onChange={(e) => set('alpha_search_price', e.target.value)}
+                    placeholder="0.01"
                   />
                 </Field>
               </div>

@@ -101,6 +101,21 @@ func protocolForEndpoint(endpoint string) string {
 	}
 }
 
+// resolveAlphaSearchPrice 解析 codex 联网搜索的按次单价（USD/次）：
+// 分组覆盖价（Group.alpha_search_price，非 nil 即生效，含 0=免费）优先，
+// 否则用全局 gateway 设置 alpha_search_price。负值钳 0（防脏配置写入负成本）。
+// 返回值仅为基础单价，实际扣费在 recordUsage 再叠加分组倍率（billing_rate）。
+func resolveAlphaSearchPrice(settings GatewaySettings, keyInfo *auth.APIKeyInfo) float64 {
+	price := settings.AlphaSearchPrice
+	if keyInfo != nil && keyInfo.GroupAlphaSearchPrice != nil {
+		price = *keyInfo.GroupAlphaSearchPrice
+	}
+	if price < 0 {
+		price = 0
+	}
+	return price
+}
+
 // forwardOptions 端点级转发选项（零值即既有默认行为）。
 type forwardOptions struct {
 	// rawBody / rawContentType 非 JSON 端点（multipart 等）的原样体：
@@ -156,7 +171,11 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	// 解析到的 Price 随请求传递到计费收尾复用（不二次 Get），
 	// 避免请求期间缓存失效/重载失败把已定价模型静默记 0。
 	price, priced := p.pricing.Get(req.Model)
-	if !priced {
+	if endpoint == adaptor.EndpointAlphaSearch {
+		// 联网搜索按次计费：单价取分组覆盖价 ?? 全局 gateway 设置，与模型价目表解耦
+		//（SearchResponse 无 token usage，仅 2xx 成功时按次×1 计价，实际扣费再叠加分组倍率）。
+		price = pricing.Price{PerRequest: resolveAlphaSearchPrice(settings, keyInfo)}
+	} else if !priced {
 		writeError(c, http.StatusBadRequest, "invalid_request_error", "model_price_not_configured",
 			"模型 "+req.Model+" 未配置价格")
 		p.recordFailure(c, keyInfo, req, start, errlog.Entry{
@@ -731,8 +750,14 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 	// InputCost = per_request × 计次数（图像端点计次数=响应产出张数，其余端点恒 1），
 	// 保证 usage_log 的「单价 × 用量 = 成本」对账口径成立。
 	inputPrice := price.Input
+	// billedCalls 落账计次：按次计费下上游未给张数（如联网搜索）时按 1 次记，
+	// 保证 usage_log「单价 × 计次 = 成本」对账口径成立（ComputeCosts 内部同样把 <1 钳为 1）。
+	billedCalls := usage.Calls
 	if price.PerRequest > 0 {
 		inputPrice = price.PerRequest
+		if billedCalls < 1 {
+			billedCalls = 1
+		}
 	}
 
 	p.sink.Record(billing.UsageRecord{
@@ -749,7 +774,7 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		CacheCreationTokens:   usage.CacheCreationTokens,
 		CacheCreation5mTokens: usage.CacheCreation5mTokens,
 		CacheCreation1hTokens: usage.CacheCreation1hTokens,
-		Calls:                 usage.Calls,
+		Calls:                 billedCalls,
 		InputPrice:            inputPrice,
 		OutputPrice:           price.Output,
 		CachedInputPrice:      price.CachedInput,

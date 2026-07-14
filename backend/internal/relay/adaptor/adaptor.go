@@ -39,6 +39,8 @@ const (
 	EndpointPredict = "predict"
 	// EndpointCountTokens Gemini token 计数（/v1beta/models/{model}:countTokens，零计费）。
 	EndpointCountTokens = "count_tokens"
+	// EndpointAlphaSearch codex CLI 内置联网搜索（/v1/alpha/search，POST 非流式，按次计费）。
+	EndpointAlphaSearch = "alpha_search"
 )
 
 // RelayInfo 单次上游调用的上下文（每个 failover attempt 独立构造）。

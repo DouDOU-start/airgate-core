@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Description, Input, Label, Modal, Spinner, TextField as HeroTextField, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
-import { ArrowUpDown, Layers } from 'lucide-react';
+import { ArrowUpDown, Layers, Search } from 'lucide-react';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../../shared/types';
 
@@ -31,6 +31,8 @@ export function GroupFormModal({
     name: group?.name ?? '',
     note: group?.note ?? '',
     rate_multiplier: String(group?.rate_multiplier ?? 1),
+    // 覆盖价：null/undefined → 空串（沿用全局）；0 及以上原样展示。
+    alpha_search_price: group?.alpha_search_price != null ? String(group.alpha_search_price) : '',
     sort_weight: String(group?.sort_weight ?? 0),
     status_visible: group?.status_visible ?? true,
   });
@@ -49,6 +51,8 @@ export function GroupFormModal({
     onSubmit({
       ...form,
       rate_multiplier: form.rate_multiplier === '' ? 1 : Number(form.rate_multiplier),
+      // 空串 → null（沿用全局设置）；否则按次覆盖价（0=该分组免费）。
+      alpha_search_price: form.alpha_search_price === '' ? null : Number(form.alpha_search_price),
       sort_weight: form.sort_weight === '' ? 0 : Number(form.sort_weight),
     });
   };
@@ -96,6 +100,22 @@ export function GroupFormModal({
             value={form.rate_multiplier}
             onChange={(e) => setForm({ ...form, rate_multiplier: e.target.value })}
           />
+        </HeroTextField>
+
+        <HeroTextField fullWidth>
+          <Label>{t('groups.alpha_search_price')}</Label>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+            <Input
+              className="pl-9"
+              type="number"
+              step="0.001"
+              min="0"
+              value={form.alpha_search_price}
+              onChange={(e) => setForm({ ...form, alpha_search_price: e.target.value })}
+              placeholder={t('groups.alpha_search_price_placeholder')}
+            />
+          </div>
         </HeroTextField>
 
         <div className="grid grid-cols-2 gap-3">

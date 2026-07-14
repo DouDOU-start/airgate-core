@@ -264,27 +264,27 @@ func init() {
 	// group.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
 	group.DefaultRateMultiplier = groupDescRateMultiplier.Default.(float64)
 	// groupDescIsExclusive is the schema descriptor for is_exclusive field.
-	groupDescIsExclusive := groupFields[3].Descriptor()
+	groupDescIsExclusive := groupFields[4].Descriptor()
 	// group.DefaultIsExclusive holds the default value on creation for the is_exclusive field.
 	group.DefaultIsExclusive = groupDescIsExclusive.Default.(bool)
 	// groupDescStatusVisible is the schema descriptor for status_visible field.
-	groupDescStatusVisible := groupFields[4].Descriptor()
+	groupDescStatusVisible := groupFields[5].Descriptor()
 	// group.DefaultStatusVisible holds the default value on creation for the status_visible field.
 	group.DefaultStatusVisible = groupDescStatusVisible.Default.(bool)
 	// groupDescNote is the schema descriptor for note field.
-	groupDescNote := groupFields[5].Descriptor()
+	groupDescNote := groupFields[6].Descriptor()
 	// group.DefaultNote holds the default value on creation for the note field.
 	group.DefaultNote = groupDescNote.Default.(string)
 	// groupDescSortWeight is the schema descriptor for sort_weight field.
-	groupDescSortWeight := groupFields[6].Descriptor()
+	groupDescSortWeight := groupFields[7].Descriptor()
 	// group.DefaultSortWeight holds the default value on creation for the sort_weight field.
 	group.DefaultSortWeight = groupDescSortWeight.Default.(int)
 	// groupDescCreatedAt is the schema descriptor for created_at field.
-	groupDescCreatedAt := groupFields[7].Descriptor()
+	groupDescCreatedAt := groupFields[8].Descriptor()
 	// group.DefaultCreatedAt holds the default value on creation for the created_at field.
 	group.DefaultCreatedAt = groupDescCreatedAt.Default.(func() time.Time)
 	// groupDescUpdatedAt is the schema descriptor for updated_at field.
-	groupDescUpdatedAt := groupFields[8].Descriptor()
+	groupDescUpdatedAt := groupFields[9].Descriptor()
 	// group.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	group.DefaultUpdatedAt = groupDescUpdatedAt.Default.(func() time.Time)
 	// group.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

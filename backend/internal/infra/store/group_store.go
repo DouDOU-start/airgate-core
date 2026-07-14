@@ -103,6 +103,9 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 		SetStatusVisible(input.StatusVisible).
 		SetNote(input.Note).
 		SetSortWeight(input.SortWeight)
+	if input.AlphaSearchPrice != nil {
+		builder = builder.SetAlphaSearchPrice(*input.AlphaSearchPrice)
+	}
 
 	item, err := builder.Save(ctx)
 	if err != nil {
@@ -120,6 +123,12 @@ func (s *GroupStore) Update(ctx context.Context, id int, input appgroup.UpdateIn
 	}
 	if input.RateMultiplier != nil {
 		builder = builder.SetRateMultiplier(*input.RateMultiplier)
+	}
+	// 覆盖价为权威写：非 nil 设值，nil 清空为 NULL（回落全局设置）。
+	if input.AlphaSearchPrice != nil {
+		builder = builder.SetAlphaSearchPrice(*input.AlphaSearchPrice)
+	} else {
+		builder = builder.ClearAlphaSearchPrice()
 	}
 	if input.IsExclusive != nil {
 		builder = builder.SetIsExclusive(*input.IsExclusive)
@@ -371,15 +380,16 @@ func mapGroups(items []*ent.Group) []appgroup.Group {
 
 func mapGroup(item *ent.Group) appgroup.Group {
 	return appgroup.Group{
-		ID:             item.ID,
-		Name:           item.Name,
-		Platform:       item.Platform,
-		RateMultiplier: item.RateMultiplier,
-		IsExclusive:    item.IsExclusive,
-		StatusVisible:  item.StatusVisible,
-		Note:           item.Note,
-		SortWeight:     item.SortWeight,
-		CreatedAt:      item.CreatedAt,
-		UpdatedAt:      item.UpdatedAt,
+		ID:               item.ID,
+		Name:             item.Name,
+		Platform:         item.Platform,
+		RateMultiplier:   item.RateMultiplier,
+		AlphaSearchPrice: item.AlphaSearchPrice,
+		IsExclusive:      item.IsExclusive,
+		StatusVisible:    item.StatusVisible,
+		Note:             item.Note,
+		SortWeight:       item.SortWeight,
+		CreatedAt:        item.CreatedAt,
+		UpdatedAt:        item.UpdatedAt,
 	}
 }

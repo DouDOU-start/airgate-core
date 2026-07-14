@@ -18,6 +18,10 @@ func (Group) Fields() []ent.Field {
 		// 仍被 API Key 平台识别链路使用（dto/user.go APIKeyPlatform → 前端 CCS 导入识别），保留。
 		field.String("platform").Default(""),
 		field.Float("rate_multiplier").Default(1.0),
+		// alpha_search_price 分组对 codex /v1/alpha/search 联网搜索的按次覆盖价（USD/次）。
+		// NULL=沿用全局 gateway 设置 alpha_search_price；0=该分组免费；>0=覆盖全局。
+		// 实际扣费仍叠加分组 rate_multiplier（billing_rate 链）。
+		field.Float("alpha_search_price").Optional().Nillable(),
 		field.Bool("is_exclusive").Default(false),
 		// status_visible 控制此分组是否在公开「服务状态」页展示。
 		// 默认 true 保持旧行为兼容；管理员可在「分组管理」中关掉以对外隐藏

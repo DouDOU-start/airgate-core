@@ -39,13 +39,20 @@ type GatewaySettings struct {
 	// TaskTimeoutMinutes 异步任务超时分钟数（task_timeout_minutes，默认 30）：
 	// 提交后超过该时长仍未终态的任务由轮询器置失败并退款。
 	TaskTimeoutMinutes int
+	// AlphaSearchPrice codex /v1/alpha/search 联网搜索的全局按次价（USD/次，默认 0.01）；
+	// 分组可经 Group.alpha_search_price 覆盖，实际扣费再叠加分组倍率。
+	AlphaSearchPrice float64
 }
+
+// defaultAlphaSearchPrice codex 联网搜索默认按次价（对齐 sub2api 默认 $0.01/次）。
+const defaultAlphaSearchPrice = 0.01
 
 // defaultGatewaySettings 返回默认开关（lister 缺失或读失败时的兜底）。
 func defaultGatewaySettings() GatewaySettings {
 	return GatewaySettings{
 		AutoBanEnabled:     true,
 		TaskTimeoutMinutes: 30,
+		AlphaSearchPrice:   defaultAlphaSearchPrice,
 	}
 }
 
@@ -136,6 +143,11 @@ func applySettings(s *GatewaySettings, items []Setting) {
 		case "task_timeout_minutes":
 			if n, err := strconv.Atoi(value); err == nil && n > 0 {
 				s.TaskTimeoutMinutes = n
+			}
+		case "alpha_search_price":
+			// 联网搜索按次价：允许 0（全局免费）；负数/非法值忽略保留默认。
+			if f, err := strconv.ParseFloat(value, 64); err == nil && f >= 0 {
+				s.AlphaSearchPrice = f
 			}
 		}
 	}

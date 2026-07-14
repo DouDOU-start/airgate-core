@@ -23,6 +23,8 @@ type Group struct {
 	Platform string `json:"platform,omitempty"`
 	// RateMultiplier holds the value of the "rate_multiplier" field.
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
+	// AlphaSearchPrice holds the value of the "alpha_search_price" field.
+	AlphaSearchPrice *float64 `json:"alpha_search_price,omitempty"`
 	// IsExclusive holds the value of the "is_exclusive" field.
 	IsExclusive bool `json:"is_exclusive,omitempty"`
 	// StatusVisible holds the value of the "status_visible" field.
@@ -99,7 +101,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case group.FieldIsExclusive, group.FieldStatusVisible:
 			values[i] = new(sql.NullBool)
-		case group.FieldRateMultiplier:
+		case group.FieldRateMultiplier, group.FieldAlphaSearchPrice:
 			values[i] = new(sql.NullFloat64)
 		case group.FieldID, group.FieldSortWeight:
 			values[i] = new(sql.NullInt64)
@@ -145,6 +147,13 @@ func (gr *Group) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field rate_multiplier", values[i])
 			} else if value.Valid {
 				gr.RateMultiplier = value.Float64
+			}
+		case group.FieldAlphaSearchPrice:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field alpha_search_price", values[i])
+			} else if value.Valid {
+				gr.AlphaSearchPrice = new(float64)
+				*gr.AlphaSearchPrice = value.Float64
 			}
 		case group.FieldIsExclusive:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -246,6 +255,11 @@ func (gr *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("rate_multiplier=")
 	builder.WriteString(fmt.Sprintf("%v", gr.RateMultiplier))
+	builder.WriteString(", ")
+	if v := gr.AlphaSearchPrice; v != nil {
+		builder.WriteString("alpha_search_price=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("is_exclusive=")
 	builder.WriteString(fmt.Sprintf("%v", gr.IsExclusive))

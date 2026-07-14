@@ -6,6 +6,8 @@ type GroupResp struct {
 	Name           string  `json:"name"`
 	Platform       string  `json:"platform"`
 	RateMultiplier float64 `json:"rate_multiplier"`
+	// AlphaSearchPrice codex 联网搜索按次覆盖价（USD/次）；null=沿用全局设置。
+	AlphaSearchPrice *float64 `json:"alpha_search_price"`
 	// EffectiveRate 当前用户在此分组的实际计费倍率（用户专属 > 等级 > 分组档位），
 	// 仅用户视角接口返回；管理员列表恒为 0 并省略。
 	EffectiveRate float64 `json:"effective_rate,omitempty"`
@@ -30,7 +32,9 @@ type CreateGroupReq struct {
 	Name           string  `json:"name" binding:"required"`
 	Platform       string  `json:"platform"`
 	RateMultiplier float64 `json:"rate_multiplier"`
-	IsExclusive    bool    `json:"is_exclusive"`
+	// AlphaSearchPrice 联网搜索按次覆盖价（USD/次）；缺省/null=沿用全局设置。
+	AlphaSearchPrice *float64 `json:"alpha_search_price"`
+	IsExclusive      bool     `json:"is_exclusive"`
 	// StatusVisible 用指针区分"字段未提交"和"显式置 false"，缺省视为 true（在公开状态页可见）。
 	StatusVisible *bool  `json:"status_visible"`
 	Note          string `json:"note"`
@@ -41,10 +45,13 @@ type CreateGroupReq struct {
 type UpdateGroupReq struct {
 	Name           *string  `json:"name"`
 	RateMultiplier *float64 `json:"rate_multiplier"`
-	IsExclusive    *bool    `json:"is_exclusive"`
-	StatusVisible  *bool    `json:"status_visible"`
-	Note           *string  `json:"note"`
-	SortWeight     *int     `json:"sort_weight"`
+	// AlphaSearchPrice 联网搜索按次覆盖价：编辑表单提交完整对象，
+	// 有值设价（含 0=免费），null/缺省清空为沿用全局设置。
+	AlphaSearchPrice *float64 `json:"alpha_search_price"`
+	IsExclusive      *bool    `json:"is_exclusive"`
+	StatusVisible    *bool    `json:"status_visible"`
+	Note             *string  `json:"note"`
+	SortWeight       *int     `json:"sort_weight"`
 }
 
 // GroupAllowedUserResp 获准访问专属分组的用户条目。

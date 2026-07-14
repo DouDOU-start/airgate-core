@@ -66,12 +66,14 @@ type Group struct {
 	Name           string
 	Platform       string
 	RateMultiplier float64
-	IsExclusive    bool
-	StatusVisible  bool
-	Note           string
-	SortWeight     int
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// AlphaSearchPrice codex 联网搜索按次覆盖价（USD/次）；nil=沿用全局 gateway 设置。
+	AlphaSearchPrice *float64
+	IsExclusive      bool
+	StatusVisible    bool
+	Note             string
+	SortWeight       int
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 
 	// CurrentConcurrency / CurrentRPM 运行时观测指标（在途请求数 / 当前分钟请求数），
 	// 仅管理员列表查询时由读取器填充，不落库。
@@ -113,18 +115,23 @@ type CreateInput struct {
 	Name           string
 	Platform       string
 	RateMultiplier float64
-	IsExclusive    bool
-	StatusVisible  bool
-	Note           string
-	SortWeight     int
+	// AlphaSearchPrice 联网搜索按次覆盖价（USD/次）；nil=沿用全局设置。
+	AlphaSearchPrice *float64
+	IsExclusive      bool
+	StatusVisible    bool
+	Note             string
+	SortWeight       int
 }
 
 // UpdateInput 描述更新分组输入。
 type UpdateInput struct {
 	Name           *string
 	RateMultiplier *float64
-	IsExclusive    *bool
-	StatusVisible  *bool
-	Note           *string
-	SortWeight     *int
+	// AlphaSearchPrice 联网搜索按次覆盖价：非 nil 设值（含 0=免费），
+	// nil 清空为 NULL（回落全局设置）。更新对该字段是权威写（编辑表单提交完整对象）。
+	AlphaSearchPrice *float64
+	IsExclusive      *bool
+	StatusVisible    *bool
+	Note             *string
+	SortWeight       *int
 }

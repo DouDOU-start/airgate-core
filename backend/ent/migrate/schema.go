@@ -232,6 +232,7 @@ var (
 		{Name: "name", Type: field.TypeString},
 		{Name: "platform", Type: field.TypeString, Default: ""},
 		{Name: "rate_multiplier", Type: field.TypeFloat64, Default: 1},
+		{Name: "alpha_search_price", Type: field.TypeFloat64, Nullable: true},
 		{Name: "is_exclusive", Type: field.TypeBool, Default: false},
 		{Name: "status_visible", Type: field.TypeBool, Default: true},
 		{Name: "note", Type: field.TypeString, Default: ""},

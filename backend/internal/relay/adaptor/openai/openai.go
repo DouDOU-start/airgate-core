@@ -74,6 +74,10 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 	case adaptor.EndpointChatCompletions:
 		body, err = rewriteChatBody(info, req)
 		url = ChatCompletionsURL(info.ChannelKey.BaseURL)
+	case adaptor.EndpointAlphaSearch:
+		// codex 联网搜索：请求体原样透传（含 model 重写），上游 {base}/v1/alpha/search。
+		body, err = rewritePlainBody(info, req)
+		url = AlphaSearchURL(info.ChannelKey.BaseURL)
 	default:
 		// 纯透传：openai 协议渠道只可从 chat/responses/images 入口路由到（Pick 协议过滤保证）。
 		return nil, errors.New("openai 兼容渠道仅支持 chat completions / responses / images 端点")
@@ -231,6 +235,11 @@ func ImagesGenerationsURL(baseURL string) string {
 // ImagesEditsURL 拼接上游图像编辑端点（{base}/v1/images/edits）。
 func ImagesEditsURL(baseURL string) string {
 	return normalizeBaseV1(baseURL) + "/images/edits"
+}
+
+// AlphaSearchURL 拼接上游 codex 联网搜索端点（{base}/v1/alpha/search）。
+func AlphaSearchURL(baseURL string) string {
+	return normalizeBaseV1(baseURL) + "/alpha/search"
 }
 
 // ParseNonStreamResponse 解析非流式 2xx 响应：提取顶层 usage，

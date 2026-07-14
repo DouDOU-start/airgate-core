@@ -92,6 +92,30 @@ func (p *Pipeline) HandleResponses(c *gin.Context) {
 	p.forward(c, keyInfo, req, adaptor.EndpointResponses)
 }
 
+// HandleAlphaSearch POST /v1/alpha/search 入口 handler（codex CLI 内置联网搜索）。
+//
+// 复用 responses 的读体/JSON 校验与 forward 主循环：请求体透传（SearchRequest 原样进
+// 上游），按 model 路由到 openai 协议渠道。非流式；按次计费（全局价 / 分组覆盖价，
+// 见 forward.go 的 alphaSearchPrice），非 2xx 不计费。
+func (p *Pipeline) HandleAlphaSearch(c *gin.Context) {
+	setEntryProtocol(c, registry.ProtocolOpenAI)
+	keyInfo, ok := requireKeyInfo(c)
+	if !ok {
+		return
+	}
+	req, ok := readRelayRequest(c)
+	if !ok {
+		return
+	}
+	if req.Model == "" {
+		writeError(c, http.StatusBadRequest, "invalid_request_error", "missing_model", "缺少 model 字段")
+		return
+	}
+	// 搜索响应为一次性 JSON（SearchResponse），恒非流式。
+	req.Stream = false
+	p.forward(c, keyInfo, req, adaptor.EndpointAlphaSearch)
+}
+
 // HandleImagesGenerations POST /v1/images/generations 入口 handler
 // （OpenAI Images 协议，JSON 透传；gpt-image / DALL·E 系）。
 //

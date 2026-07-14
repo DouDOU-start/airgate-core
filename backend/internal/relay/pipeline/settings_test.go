@@ -50,6 +50,7 @@ func TestSettingsReader(t *testing.T) {
 			want: GatewaySettings{
 				AutoBanEnabled:     false,
 				TaskTimeoutMinutes: 30,
+				AlphaSearchPrice:   defaultAlphaSearchPrice,
 			},
 		},
 		{
@@ -60,7 +61,26 @@ func TestSettingsReader(t *testing.T) {
 			want: GatewaySettings{
 				AutoBanEnabled:     true,
 				TaskTimeoutMinutes: 60,
+				AlphaSearchPrice:   defaultAlphaSearchPrice,
 			},
+		},
+		{
+			name: "联网搜索按次价解析（含 0=全局免费）",
+			lister: &fakeLister{items: []Setting{
+				{Key: "alpha_search_price", Value: "0"},
+			}},
+			want: GatewaySettings{
+				AutoBanEnabled:     true,
+				TaskTimeoutMinutes: 30,
+				AlphaSearchPrice:   0,
+			},
+		},
+		{
+			name: "联网搜索按次价负值保留默认",
+			lister: &fakeLister{items: []Setting{
+				{Key: "alpha_search_price", Value: "-1"},
+			}},
+			want: defaultGatewaySettings(),
 		},
 		{
 			name: "任务超时非法值保留默认",

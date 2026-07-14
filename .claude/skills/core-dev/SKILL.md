@@ -26,10 +26,12 @@ description: airgate-core（standalone-gateway 分支）开发指南：架构、
 
 ```
 请求（middleware.APIKeyAuth 鉴权，入站按协议分树：
-      openai    → POST /v1/chat/completions、/v1/responses、/v1/images/{generations|edits}（openai_compatible/custom 渠道）
+      openai    → POST /v1/chat/completions、/v1/responses、/v1/alpha/search※、/v1/images/{generations|edits}（openai_compatible/custom 渠道）
       anthropic → POST /v1/messages、/v1/messages/count_tokens※（anthropic 渠道）
       gemini    → POST /v1beta/models/{model}:generateContent|:streamGenerateContent|:predict|:countTokens※（gemini 渠道）
-      ※ countTokens 两端点零计费；images/predict 在 per_request_price>0 时按次×产出张数计费）
+      ※ countTokens 两端点零计费；images/predict 在 per_request_price>0 时按次×产出张数计费；
+        alpha/search（codex 内置联网搜索）按次计价，单价取「分组覆盖价 Group.alpha_search_price ?? 全局设置 gateway.alpha_search_price（默认 0.01）」，
+        与模型价目表解耦、实际扣费叠加分组倍率、仅 2xx 成功计费）
   → internal/relay/pipeline：余额预检 → user/key 并发闸门 → failover≤3
       { registry.Pick(分组,模型,协议)（协议过滤 + priority 分档 + weight+10 加权随机 + 多 key 轮询）
         → adaptor 透传直发 HTTP → outcome 判定（429 换渠道 / 401·403 自动禁用 / 5xx 换渠道）}
