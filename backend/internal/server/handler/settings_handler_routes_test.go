@@ -46,7 +46,34 @@ func newSettingsTestRouter(repo *stubSettingsRepo) *gin.Engine {
 	router.GET("/settings", handler.GetSettings)
 	router.PUT("/settings", handler.UpdateSettings)
 	router.POST("/settings/upload", handler.UploadFile)
+	router.GET("/settings/admin-api-key", handler.GetAdminAPIKey)
 	return router
+}
+
+// TestGetAdminAPIKeyEmptyDataIsExplicitNull 管理员 API Key 未生成时，响应体必须带
+// 显式的 "data":null，而不是把 data 字段整个省略——前端 useQuery 的 queryFn 不允许
+// 返回 undefined，键缺失会被 react-query 当成查询失败抛错（回归用例，对应 R.Data 曾经
+// 带 omitempty 导致 nil 被丢字段的 bug）。
+func TestGetAdminAPIKeyEmptyDataIsExplicitNull(t *testing.T) {
+	router := newSettingsTestRouter(&stubSettingsRepo{})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/settings/admin-api-key", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GetAdminAPIKey status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	dataRaw, ok := raw["data"]
+	if !ok {
+		t.Fatalf("response missing \"data\" key entirely, body = %s", rec.Body.String())
+	}
+	if string(dataRaw) != "null" {
+		t.Fatalf("data = %s, want null", dataRaw)
+	}
 }
 
 // TestGetSettingsFiltersSensitive 通用设置端点：security 组整组不回显、

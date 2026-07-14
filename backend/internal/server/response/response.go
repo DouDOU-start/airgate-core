@@ -8,10 +8,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// R 统一响应结构
+// R 统一响应结构。Data 不带 omitempty：nil 也要序列化成显式的 "data": null——
+// 前端 useQuery 的 queryFn 不允许返回 undefined，键缺失会被当成查询失败抛错
+// （曾经查询失败是静默的没暴露，加了全局兜底 toast 后这个坑会立刻炸出来）。
 type R struct {
 	Code    int         `json:"code"`
-	Data    interface{} `json:"data,omitempty"`
+	Data    interface{} `json:"data"`
 	Message string      `json:"message"`
 }
 
