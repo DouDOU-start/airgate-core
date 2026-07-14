@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Copy, ExternalLink } from 'lucide-react';
+import { Copy, ExternalLink, Globe } from 'lucide-react';
 import { useSiteSettings } from '../../../app/providers/SiteSettingsProvider';
 import { useClipboard } from '../../../shared/hooks/useClipboard';
 import { parseCustomEndpoints, speedTestUrl } from '../../../shared/utils/endpoints';
@@ -20,14 +20,22 @@ export function EndpointsBar() {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs text-text-tertiary shrink-0">{t('user_keys.endpoints_label')}</span>
+      <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-accent">
+        <Globe className="w-3.5 h-3.5" />
+        {t('user_keys.endpoints_label')}
+      </span>
       {endpoints.map((ep, idx) => (
         <div
           key={idx}
-          className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-glass-border bg-surface px-2 py-1 text-xs"
+          className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-glass-border bg-surface px-3 py-1.5 text-xs transition-colors hover:border-accent/50"
           title={ep.description || ep.endpoint}
         >
-          {ep.name ? <span className="shrink-0 text-text-tertiary">{ep.name}</span> : null}
+          {ep.name ? (
+            <>
+              <span className="shrink-0 font-medium text-text-secondary">{ep.name}</span>
+              <span className="shrink-0 text-text-tertiary">|</span>
+            </>
+          ) : null}
           <span className="min-w-0 max-w-[220px] truncate font-mono text-text-secondary">{ep.endpoint}</span>
           <button
             aria-label={t('common.copy')}

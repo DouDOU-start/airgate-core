@@ -846,7 +846,7 @@
     "use_key_desc": "将以下环境变量添加到你的终端配置中，即可开始使用。",
     "group_unbound": "未绑定分组",
     "group_unbound_hint": "该 API 密钥当前未绑定分组，暂时无法生成使用配置。请联系管理员重新绑定分组后再试。",
-    "endpoints_label": "接入地址",
+    "endpoints_label": "API 端点",
     "endpoint_default": "默认",
     "endpoint_test": "外部测速",
     "group_rate_short": "分组倍率",
