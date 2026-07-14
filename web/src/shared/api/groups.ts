@@ -40,4 +40,10 @@ export const groupsApi = {
     post<void>(`/api/v1/admin/groups/${groupId}/allowed-users/${userId}`),
   revokeAllowedUser: (groupId: number, userId: number) =>
     del<void>(`/api/v1/admin/groups/${groupId}/allowed-users/${userId}`),
+
+  // 分组渠道 key 绑定管理（查询哪些 key 绑定了该分组走 channelsApi.listKeys({ group_id })）
+  bindChannelKey: (groupId: number, keyId: number) =>
+    post<void>(`/api/v1/admin/groups/${groupId}/channel-keys/${keyId}`),
+  unbindChannelKey: (groupId: number, keyId: number) =>
+    del<void>(`/api/v1/admin/groups/${groupId}/channel-keys/${keyId}`),
 };

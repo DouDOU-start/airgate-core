@@ -319,6 +319,38 @@ func (s *GroupStore) RevokeAllowedUser(ctx context.Context, groupID, userID int)
 	return nil
 }
 
+// BindChannelKey 把渠道 key 绑定到该分组；已绑定时（join 行已存在）幂等成功。
+func (s *GroupStore) BindChannelKey(ctx context.Context, groupID, channelKeyID int) error {
+	exists, err := s.db.ChannelKey.Query().Where(entchannelkey.IDEQ(channelKeyID)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return appgroup.ErrChannelKeyNotFound
+	}
+	if err := s.db.Group.UpdateOneID(groupID).AddChannelKeyIDs(channelKeyID).Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return appgroup.ErrGroupNotFound
+		}
+		if ent.IsConstraintError(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// UnbindChannelKey 把渠道 key 从该分组解绑；未绑定时幂等成功。
+func (s *GroupStore) UnbindChannelKey(ctx context.Context, groupID, channelKeyID int) error {
+	if err := s.db.Group.UpdateOneID(groupID).RemoveChannelKeyIDs(channelKeyID).Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return appgroup.ErrGroupNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 func applyGroupListFilters(query *ent.GroupQuery, keyword, platform string) *ent.GroupQuery {
 	if keyword != "" {
 		query = query.Where(entgroup.NameContains(keyword))

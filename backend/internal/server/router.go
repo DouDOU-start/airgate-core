@@ -162,6 +162,10 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/groups/:id/allowed-users/:userId", handlers.Group.GrantAllowedUser)
 		adminGroup.DELETE("/groups/:id/allowed-users/:userId", handlers.Group.RevokeAllowedUser)
 
+		// 分组渠道 key 绑定管理：绑定/解绑；查询用现成的 GET /channels/keys?group_id= 即可
+		adminGroup.POST("/groups/:id/channel-keys/:keyId", handlers.Group.BindChannelKey)
+		adminGroup.DELETE("/groups/:id/channel-keys/:keyId", handlers.Group.UnbindChannelKey)
+
 		// API 密钥管理（管理员）
 		adminGroup.GET("/api-keys", handlers.APIKey.AdminListKeys)
 		adminGroup.PUT("/api-keys/:id", handlers.APIKey.AdminUpdateKey)

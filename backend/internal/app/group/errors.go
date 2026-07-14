@@ -10,6 +10,8 @@ var (
 	ErrGroupNotFound = errors.New("分组不存在")
 	// ErrUserNotFound 表示目标用户不存在（授予专属分组时校验）。
 	ErrUserNotFound = errors.New("用户不存在")
+	// ErrChannelKeyNotFound 表示目标渠道 key 不存在（绑定分组时校验）。
+	ErrChannelKeyNotFound = errors.New("渠道 key 不存在")
 )
 
 // GroupHasChannelsError 表示分组仍被渠道绑定引用，不能直接删除。

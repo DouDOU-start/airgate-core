@@ -24,6 +24,11 @@ type Repository interface {
 	GrantAllowedUser(ctx context.Context, groupID, userID int) error
 	// RevokeAllowedUser 撤销用户访问该专属分组的权限；未授予时幂等成功。
 	RevokeAllowedUser(ctx context.Context, groupID, userID int) error
+
+	// BindChannelKey 把渠道 key 绑定到该分组；已绑定时幂等成功。
+	BindChannelKey(ctx context.Context, groupID, channelKeyID int) error
+	// UnbindChannelKey 把渠道 key 从该分组解绑；未绑定时幂等成功。
+	UnbindChannelKey(ctx context.Context, groupID, channelKeyID int) error
 }
 
 // AllowedUser 描述获准访问专属分组的用户（列表展示用最小字段集）。

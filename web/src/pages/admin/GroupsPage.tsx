@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Percent,
   Users,
+  Link2,
 } from 'lucide-react';
 import { Button, Chip, EmptyState } from '@heroui/react';
 import { groupsApi } from '../../shared/api/groups';
@@ -24,6 +25,7 @@ import { MetricChips } from '../../shared/components/MetricChips';
 import { GroupFormModal } from './groups/EditGroupModal';
 import { GroupRateOverridesModal } from './groups/GroupRateOverridesModal';
 import { GroupAllowedUsersModal } from './groups/GroupAllowedUsersModal';
+import { GroupChannelKeysModal } from './groups/GroupChannelKeysModal';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 
@@ -38,6 +40,7 @@ export default function GroupsPage() {
   const [deletingGroup, setDeletingGroup] = useState<GroupResp | null>(null);
   const [rateOverrideGroup, setRateOverrideGroup] = useState<GroupResp | null>(null);
   const [allowedUsersGroup, setAllowedUsersGroup] = useState<GroupResp | null>(null);
+  const [channelKeysGroup, setChannelKeysGroup] = useState<GroupResp | null>(null);
 
   // 查询分组列表
   const { data, isLoading, refetch } = useQuery({
@@ -243,6 +246,15 @@ export default function GroupsPage() {
                         >
                           <Percent className="w-3.5 h-3.5" />
                         </Button>
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="secondary"
+                          aria-label={t('groups.channel_keys_manage')}
+                          onPress={() => setChannelKeysGroup(row)}
+                        >
+                          <Link2 className="w-3.5 h-3.5" />
+                        </Button>
                         {row.is_exclusive ? (
                           <Button
                             isIconOnly
@@ -310,6 +322,15 @@ export default function GroupsPage() {
           open
           group={allowedUsersGroup}
           onClose={() => setAllowedUsersGroup(null)}
+        />
+      )}
+
+      {/* 分组渠道 key 绑定管理 */}
+      {channelKeysGroup && (
+        <GroupChannelKeysModal
+          open
+          group={channelKeysGroup}
+          onClose={() => setChannelKeysGroup(null)}
         />
       )}
 

@@ -202,6 +202,34 @@ func (s *Service) RevokeAllowedUser(ctx context.Context, groupID, userID int) er
 	return nil
 }
 
+// BindChannelKey 把渠道 key 绑定到该分组。
+func (s *Service) BindChannelKey(ctx context.Context, groupID, channelKeyID int) error {
+	logger := logx.LoggerFromContext(ctx)
+	if err := s.repo.BindChannelKey(ctx, groupID, channelKeyID); err != nil {
+		logger.Error("group_channel_key_bind_failed",
+			logx.LogFieldGroupID, groupID,
+			"channel_key_id", channelKeyID,
+			logx.LogFieldError, err)
+		return err
+	}
+	logger.Info("group_channel_key_bound", logx.LogFieldGroupID, groupID, "channel_key_id", channelKeyID)
+	return nil
+}
+
+// UnbindChannelKey 把渠道 key 从该分组解绑。
+func (s *Service) UnbindChannelKey(ctx context.Context, groupID, channelKeyID int) error {
+	logger := logx.LoggerFromContext(ctx)
+	if err := s.repo.UnbindChannelKey(ctx, groupID, channelKeyID); err != nil {
+		logger.Error("group_channel_key_unbind_failed",
+			logx.LogFieldGroupID, groupID,
+			"channel_key_id", channelKeyID,
+			logx.LogFieldError, err)
+		return err
+	}
+	logger.Info("group_channel_key_unbound", logx.LogFieldGroupID, groupID, "channel_key_id", channelKeyID)
+	return nil
+}
+
 // Get 获取分组详情。
 func (s *Service) Get(ctx context.Context, id int) (Group, error) {
 	g, err := s.repo.FindByID(ctx, id)

@@ -35,17 +35,19 @@ func (stubConcurrencyReader) GetGroupCurrentCounts(_ context.Context, _ []int) m
 }
 
 type groupStubRepository struct {
-	list           func(context.Context, ListFilter) ([]Group, int64, error)
-	listAvailable  func(context.Context, AvailableFilter) ([]Group, int64, error)
-	findByID       func(context.Context, int) (Group, error)
-	create         func(context.Context, CreateInput) (Group, error)
-	update         func(context.Context, int, UpdateInput) (Group, error)
-	delete         func(context.Context, int) error
-	statsForGroups func(context.Context, []int) (map[int]GroupStats, error)
-	publicRates    func(context.Context) ([]float64, error)
-	allowedUsers   func(context.Context, int) ([]AllowedUser, error)
-	grantUser      func(context.Context, int, int) error
-	revokeUser     func(context.Context, int, int) error
+	list             func(context.Context, ListFilter) ([]Group, int64, error)
+	listAvailable    func(context.Context, AvailableFilter) ([]Group, int64, error)
+	findByID         func(context.Context, int) (Group, error)
+	create           func(context.Context, CreateInput) (Group, error)
+	update           func(context.Context, int, UpdateInput) (Group, error)
+	delete           func(context.Context, int) error
+	statsForGroups   func(context.Context, []int) (map[int]GroupStats, error)
+	publicRates      func(context.Context) ([]float64, error)
+	allowedUsers     func(context.Context, int) ([]AllowedUser, error)
+	grantUser        func(context.Context, int, int) error
+	revokeUser       func(context.Context, int, int) error
+	bindChannelKey   func(context.Context, int, int) error
+	unbindChannelKey func(context.Context, int, int) error
 }
 
 func (s groupStubRepository) List(ctx context.Context, filter ListFilter) ([]Group, int64, error) {
@@ -123,4 +125,18 @@ func (s groupStubRepository) RevokeAllowedUser(ctx context.Context, groupID, use
 		return nil
 	}
 	return s.revokeUser(ctx, groupID, userID)
+}
+
+func (s groupStubRepository) BindChannelKey(ctx context.Context, groupID, channelKeyID int) error {
+	if s.bindChannelKey == nil {
+		return nil
+	}
+	return s.bindChannelKey(ctx, groupID, channelKeyID)
+}
+
+func (s groupStubRepository) UnbindChannelKey(ctx context.Context, groupID, channelKeyID int) error {
+	if s.unbindChannelKey == nil {
+		return nil
+	}
+	return s.unbindChannelKey(ctx, groupID, channelKeyID)
 }

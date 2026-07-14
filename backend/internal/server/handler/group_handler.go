@@ -24,6 +24,8 @@ func (h *GroupHandler) handleError(logMessage, publicMessage string, err error) 
 		return 404, err.Error()
 	case errors.Is(err, appgroup.ErrUserNotFound):
 		return 404, err.Error()
+	case errors.Is(err, appgroup.ErrChannelKeyNotFound):
+		return 404, err.Error()
 	case errors.As(err, &hasChannels):
 		// 分组仍绑定渠道：拒绝删除，提示先解绑（防专属渠道静默变公共）。
 		return 400, err.Error()
