@@ -11,6 +11,7 @@ interface SiteSettings {
   site_subtitle: string;
   site_logo: string;
   api_base_url: string;
+  custom_endpoints: string;
   frontend_url: string;
   contact_info: string;
   doc_url: string;
@@ -27,6 +28,7 @@ const defaults: SiteSettings = {
   site_subtitle: 'Control Panel',
   site_logo: '',
   api_base_url: '',
+  custom_endpoints: '',
   frontend_url: '',
   contact_info: '',
   doc_url: '',

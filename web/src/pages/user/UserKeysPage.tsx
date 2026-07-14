@@ -41,6 +41,7 @@ import type { APIKeyResp, CreateAPIKeyReq, UpdateAPIKeyReq, GroupResp } from '..
 import { EditKeyModal } from './userkeys/EditKeyModal';
 import { CreateKeyModal } from './userkeys/CreateKeyModal';
 import { UseKeyModal, useUseKeyModal } from './userkeys/UseKeyModal';
+import { EndpointsBar } from './userkeys/EndpointsBar';
 import { CcsImportModal, useCcsImportModal } from './userkeys/CcsImportModal';
 import { type KeyForm, emptyForm } from './userkeys/types';
 import { endOfDayLocalISO, formatDate, localDateStr } from '../../shared/utils/format';
@@ -284,7 +285,8 @@ export default function UserKeysPage() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-end mb-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <EndpointsBar />
         <div className="flex items-center gap-2 ml-auto">
           <Button
             isIconOnly

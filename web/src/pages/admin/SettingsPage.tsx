@@ -13,17 +13,18 @@ import { queryKeys } from '../../shared/queryKeys';
 import { useToast } from '../../shared/ui';
 import {
   Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound, Expand,
+  ShieldCheck, Copy, Trash2, KeyRound, Expand, Plus,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq } from '../../shared/types';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { CommonModal } from '../../shared/components/CommonModal';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
+import { parseCustomEndpoints, serializeCustomEndpoints } from '../../shared/utils/endpoints';
 
 // ==================== 设置 key 定义 ====================
 
 const SITE_KEYS = [
-  'site_name', 'site_subtitle', 'site_logo', 'api_base_url',
+  'site_name', 'site_subtitle', 'site_logo', 'api_base_url', 'custom_endpoints',
   'contact_info', 'doc_url', 'recharge_notice', 'og_image',
 ] as const;
 
@@ -228,7 +229,10 @@ export default function SettingsPage() {
     const keys = TAB_KEYS[tab];
     return keys.map((key) => ({
       key,
-      value: values[key] ?? '',
+      // custom_endpoints 保存前清洗掉 endpoint 为空的编辑中行，避免落库脏数据
+      value: key === 'custom_endpoints'
+        ? serializeCustomEndpoints(parseCustomEndpoints(values[key] ?? ''))
+        : values[key] ?? '',
       group,
     }));
   }
@@ -356,6 +360,9 @@ export default function SettingsPage() {
                 </Field>
                 <Field className="col-span-1 md:col-span-2" label={t('settings.api_base_url')} hint={t('settings.api_base_url_hint')}>
                   <Input value={val('api_base_url')} onChange={(e) => set('api_base_url', e.target.value)} placeholder="https://api.example.com" />
+                </Field>
+                <Field className="col-span-1 md:col-span-2" label={t('settings.custom_endpoints')} hint={t('settings.custom_endpoints_hint')}>
+                  <CustomEndpointsEditor value={val('custom_endpoints')} onChange={(v) => set('custom_endpoints', v)} />
                 </Field>
                 <Field label={t('settings.contact_info')}>
                   <Input value={val('contact_info')} onChange={(e) => set('contact_info', e.target.value)} />
@@ -1001,6 +1008,69 @@ function EmailTemplateEditor({
         </Modal>
       ) : null}
     </>
+  );
+}
+
+// ==================== 备用接入地址 Editor ====================
+
+function CustomEndpointsEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { t } = useTranslation();
+  const rows = parseCustomEndpoints(value);
+
+  function updateRow(idx: number, patch: Partial<{ name: string; endpoint: string; description: string }>) {
+    onChange(JSON.stringify(rows.map((r, i) => (i === idx ? { ...r, ...patch } : r))));
+  }
+
+  function addRow() {
+    onChange(JSON.stringify([...rows, { name: '', endpoint: '', description: '' }]));
+  }
+
+  function removeRow(idx: number) {
+    onChange(JSON.stringify(rows.filter((_, i) => i !== idx)));
+  }
+
+  return (
+    <div className="space-y-2">
+      {rows.length === 0 ? (
+        <p className="text-[12px] text-text-tertiary">{t('settings.custom_endpoints_empty')}</p>
+      ) : (
+        rows.map((row, idx) => (
+          <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_2fr_2fr_auto] gap-2 items-center">
+            <Input
+              aria-label={t('settings.custom_endpoints_name')}
+              placeholder={t('settings.custom_endpoints_name')}
+              value={row.name}
+              onChange={(e) => updateRow(idx, { name: e.target.value })}
+            />
+            <Input
+              aria-label={t('settings.custom_endpoints_endpoint')}
+              placeholder="https://mirror.example.com"
+              value={row.endpoint}
+              onChange={(e) => updateRow(idx, { endpoint: e.target.value })}
+            />
+            <Input
+              aria-label={t('settings.custom_endpoints_description')}
+              placeholder={t('settings.custom_endpoints_description')}
+              value={row.description}
+              onChange={(e) => updateRow(idx, { description: e.target.value })}
+            />
+            <Button
+              isIconOnly
+              aria-label={t('common.delete')}
+              size="sm"
+              variant="ghost"
+              onPress={() => removeRow(idx)}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        ))
+      )}
+      <Button size="sm" variant="secondary" onPress={addRow}>
+        <Plus className="w-3.5 h-3.5" />
+        {t('settings.custom_endpoints_add')}
+      </Button>
+    </div>
   );
 }
 
