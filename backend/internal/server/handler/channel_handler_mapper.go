@@ -66,6 +66,7 @@ func toChannelKeyResp(k appchannel.ChannelKey) dto.ChannelKeyResp {
 		TotalRevenue:       k.TotalRevenue,
 		TodayCost:          k.TodayCost,
 		TodayRevenue:       k.TodayRevenue,
+		AvgFirstTokenMs:    k.AvgFirstTokenMs,
 		TimeMixin: dto.TimeMixin{
 			CreatedAt: k.CreatedAt,
 			UpdatedAt: k.UpdatedAt,

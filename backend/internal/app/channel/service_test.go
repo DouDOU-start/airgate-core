@@ -261,27 +261,27 @@ func TestRefreshBalanceUnsupported(t *testing.T) {
 	}
 }
 
-// TestAddKeyRequiresGroups 新增 key 未绑定任何分组时拒绝（不再支持"空分组=公共 key"语义）。
-func TestAddKeyRequiresGroups(t *testing.T) {
+// TestAddKeyAllowsEmptyGroups 新增 key 允许不绑定分组（未绑定分组的 key 不会被任何分组调度到，非法状态）。
+func TestAddKeyAllowsEmptyGroups(t *testing.T) {
 	svc := NewService(&stubRepo{}, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 
-	if _, err := svc.AddKey(context.Background(), 1, KeyInput{APIKey: "sk-1", GroupIDs: nil}); !errors.Is(err, ErrGroupsRequired) {
-		t.Errorf("GroupIDs=nil: err = %v, want ErrGroupsRequired", err)
+	if _, err := svc.AddKey(context.Background(), 1, KeyInput{APIKey: "sk-1", GroupIDs: nil}); err != nil {
+		t.Errorf("GroupIDs=nil: err = %v, want nil", err)
 	}
-	if _, err := svc.AddKey(context.Background(), 1, KeyInput{APIKey: "sk-1", GroupIDs: []int{}}); !errors.Is(err, ErrGroupsRequired) {
-		t.Errorf("GroupIDs=[]: err = %v, want ErrGroupsRequired", err)
+	if _, err := svc.AddKey(context.Background(), 1, KeyInput{APIKey: "sk-1", GroupIDs: []int{}}); err != nil {
+		t.Errorf("GroupIDs=[]: err = %v, want nil", err)
 	}
 	if _, err := svc.AddKey(context.Background(), 1, KeyInput{APIKey: "sk-1", GroupIDs: []int{1}}); err != nil {
 		t.Errorf("GroupIDs=[1]: err = %v, want nil", err)
 	}
 }
 
-// TestUpdateKeyRejectsEmptyGroups 更新 key 时：GroupIDs 显式传空拒绝，nil（不改动分组）放行。
-func TestUpdateKeyRejectsEmptyGroups(t *testing.T) {
+// TestUpdateKeyAllowsEmptyGroups 更新 key 时：GroupIDs 显式传空（解绑全部分组）与 nil（不改动分组）均放行。
+func TestUpdateKeyAllowsEmptyGroups(t *testing.T) {
 	svc := NewService(&stubRepo{}, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 
-	if _, err := svc.UpdateKey(context.Background(), 1, KeyInput{GroupIDs: []int{}}); !errors.Is(err, ErrGroupsRequired) {
-		t.Errorf("GroupIDs=[]: err = %v, want ErrGroupsRequired", err)
+	if _, err := svc.UpdateKey(context.Background(), 1, KeyInput{GroupIDs: []int{}}); err != nil {
+		t.Errorf("GroupIDs=[]: err = %v, want nil", err)
 	}
 	if _, err := svc.UpdateKey(context.Background(), 1, KeyInput{GroupIDs: nil}); err != nil {
 		t.Errorf("GroupIDs=nil（不改动分组）: err = %v, want nil", err)

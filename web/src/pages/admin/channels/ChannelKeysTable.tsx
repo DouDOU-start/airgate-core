@@ -141,6 +141,7 @@ export function ChannelKeysTable({
                 <KeyMetricsRow
                   channelKey={key}
                   refreshingBalance={refreshingBalanceId === key.id}
+                  showPriorityWeight={false}
                   onRefreshBalance={() => onRefreshBalance(key)}
                 />
               </CommonTable.Cell>

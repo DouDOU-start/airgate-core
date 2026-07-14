@@ -65,14 +65,16 @@ type Repository interface {
 	UpdateKeyBalance(ctx context.Context, keyID int, balance float64, updatedAt time.Time) error
 }
 
-// MoneyStats 渠道金额统计：
+// MoneyStats 渠道金额与延迟统计：
 // Cost = Σ(total_cost × account_rate_multiplier) 渠道成本；Revenue = Σ(actual_cost) 平台真实收入。
 // Today* 为今日口径（created_at >= 调用方时区的当日零点），其余为累计口径。
+// AvgFirstTokenMs 为最近 5 分钟窗口的平均首字延迟（ms），窗口内无样本时为 0。
 type MoneyStats struct {
-	Cost         float64
-	Revenue      float64
-	TodayCost    float64
-	TodayRevenue float64
+	Cost            float64
+	Revenue         float64
+	TodayCost       float64
+	TodayRevenue    float64
+	AvgFirstTokenMs float64
 }
 
 // StatsReader 密钥端点金额聚合读取器（由 store 基于 usage_logs 实现），列表页展示成本/收益用。
@@ -138,11 +140,13 @@ type ChannelKey struct {
 	CurrentConcurrency int
 	CurrentRPM         int
 	// TotalCost / TotalRevenue 累计金额（key 成本 / 平台真实收入），
-	// TodayCost / TodayRevenue 为今日口径，列表查询时由 StatsReader 填充，不落库。
-	TotalCost    float64
-	TotalRevenue float64
-	TodayCost    float64
-	TodayRevenue float64
+	// TodayCost / TodayRevenue 为今日口径，AvgFirstTokenMs 为最近 5 分钟平均首字延迟（ms），
+	// 列表查询时由 StatsReader 填充，不落库。
+	TotalCost       float64
+	TotalRevenue    float64
+	TodayCost       float64
+	TodayRevenue    float64
+	AvgFirstTokenMs float64
 }
 
 // ListFilter 渠道列表查询参数。type/status/tag/group 作用于渠道下的 key。

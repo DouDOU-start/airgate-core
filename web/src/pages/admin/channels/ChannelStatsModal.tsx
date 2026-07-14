@@ -176,7 +176,12 @@ export function ChannelStatsModal({
         <Modal.Container placement="center" scroll="inside" size="lg">
           <Modal.Dialog className="ag-elevation-modal">
             <Modal.Header>
-              <Modal.Heading>{t('channels.stats_modal_title', { name: channelKey?.name || channelKey?.api_key_hint || '' })}</Modal.Heading>
+              <Modal.Heading>
+                {t('channels.stats_modal_title', {
+                  channel: channelKey?.channel_name || '',
+                  key: channelKey?.name || channelKey?.api_key_hint || '',
+                })}
+              </Modal.Heading>
               <Modal.CloseTrigger />
             </Modal.Header>
             <Modal.Body>

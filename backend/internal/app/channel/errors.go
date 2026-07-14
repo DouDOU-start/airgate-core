@@ -11,8 +11,6 @@ var (
 	ErrInvalidBulkAction = errors.New("无效的批量操作")
 	// ErrNoAPIKey 表示渠道未配置任何 API Key。
 	ErrNoAPIKey = errors.New("渠道未配置 API Key")
-	// ErrGroupsRequired 表示新增/修改密钥端点时未绑定任何分组（不再支持"公共 key"语义，未绑分组的 key 不会被调度）。
-	ErrGroupsRequired = errors.New("必须至少绑定一个分组")
 	// ErrTesterNotReady 表示转发管线尚未就绪，渠道测试不可用。
 	ErrTesterNotReady = errors.New("转发管线未就绪")
 	// ErrTestFailed 表示渠道测试请求失败（上游返回错误）。

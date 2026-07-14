@@ -41,6 +41,8 @@ type ChannelKeyResp struct {
 	TotalRevenue float64 `json:"total_revenue"`
 	TodayCost    float64 `json:"today_cost"`
 	TodayRevenue float64 `json:"today_revenue"`
+	// AvgFirstTokenMs 最近 5 分钟窗口的平均首字延迟（ms），仅统计非图像、流式返回过首字的请求；窗口内无样本为 0。
+	AvgFirstTokenMs float64 `json:"avg_first_token_ms"`
 	TimeMixin
 }
 

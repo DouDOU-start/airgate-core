@@ -431,9 +431,12 @@ func (s *ChannelStore) UpdateKeyBalance(ctx context.Context, keyID int, balance 
 	return nil
 }
 
-// GetChannelKeyMoneyStats 按密钥端点聚合金额（实现 appchannel.StatsReader）：
+// channelKeyLatencyWindow 密钥端点平均首字延迟的聚合窗口：最近 5 分钟，接近实时观测。
+const channelKeyLatencyWindow = 5 * time.Minute
+
+// GetChannelKeyMoneyStats 按密钥端点聚合金额与延迟（实现 appchannel.StatsReader）：
 // 成本 = Σ(total_cost × account_rate_multiplier)，收益 = Σ(actual_cost)；
-// 累计与今日两个口径分两次分组聚合，方言无关。
+// 累计与今日两个口径分两次分组聚合，方言无关；AvgFirstTokenMs 另按最近 5 分钟窗口聚合。
 func (s *ChannelStore) GetChannelKeyMoneyStats(ctx context.Context, channelKeyIDs []int, todayStart time.Time) (map[int]appchannel.MoneyStats, error) {
 	result := make(map[int]appchannel.MoneyStats, len(channelKeyIDs))
 	if len(channelKeyIDs) == 0 {
@@ -447,12 +450,17 @@ func (s *ChannelStore) GetChannelKeyMoneyStats(ctx context.Context, channelKeyID
 	if err != nil {
 		return nil, err
 	}
+	latency, err := s.avgChannelKeyFirstTokenMs(ctx, channelKeyIDs, time.Now().Add(-channelKeyLatencyWindow))
+	if err != nil {
+		return nil, err
+	}
 	for id, item := range total {
 		result[id] = appchannel.MoneyStats{
-			Cost:         item.Cost,
-			Revenue:      item.Revenue,
-			TodayCost:    today[id].Cost,
-			TodayRevenue: today[id].Revenue,
+			Cost:            item.Cost,
+			Revenue:         item.Revenue,
+			TodayCost:       today[id].Cost,
+			TodayRevenue:    today[id].Revenue,
+			AvgFirstTokenMs: latency[id],
 		}
 	}
 	return result, nil
@@ -486,6 +494,38 @@ func (s *ChannelStore) sumChannelKeyMoney(ctx context.Context, channelKeyIDs []i
 	result := make(map[int]channelMoneyRow, len(rows))
 	for _, row := range rows {
 		result[row.KeyID] = row
+	}
+	return result, nil
+}
+
+// channelLatencyRow 首字延迟分组聚合的单条结果：Sum/Requests 分别为窗口内首字延迟总和与样本数
+// （复用 dashboard_store.go 的 usageLogFirstTokenCondition 口径：非图像 + first_token_ms > 0）。
+type channelLatencyRow struct {
+	KeyID    int   `json:"channel_key_usage_logs"`
+	Sum      int64 `json:"first_token_ms_sum"`
+	Requests int64 `json:"first_token_requests"`
+}
+
+// avgChannelKeyFirstTokenMs 按密钥端点聚合 windowStart 以来的平均首字延迟（ms）；
+// 窗口内无有效样本（无请求或均非流式）的 key 不出现在返回 map 中。
+func (s *ChannelStore) avgChannelKeyFirstTokenMs(ctx context.Context, channelKeyIDs []int, windowStart time.Time) (map[int]float64, error) {
+	var rows []channelLatencyRow
+	err := s.db.UsageLog.Query().
+		Where(entusagelog.ChannelKeyIDIn(channelKeyIDs...), entusagelog.CreatedAtGTE(windowStart)).
+		GroupBy(entusagelog.ChannelKeyColumn).
+		Aggregate(
+			ent.As(usageLogSumIf(usageLogFirstTokenCondition, entusagelog.FieldFirstTokenMs), "first_token_ms_sum"),
+			ent.As(usageLogCountIf(usageLogFirstTokenCondition), "first_token_requests"),
+		).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[int]float64, len(rows))
+	for _, row := range rows {
+		if row.Requests > 0 {
+			result[row.KeyID] = float64(row.Sum) / float64(row.Requests)
+		}
 	}
 	return result, nil
 }

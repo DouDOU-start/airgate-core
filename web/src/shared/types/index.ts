@@ -598,6 +598,8 @@ export interface ChannelKeyResp {
   today_cost: number;
   /** 今日平台收益（口径同 total_revenue） */
   today_revenue: number;
+  /** 最近 5 分钟窗口的平均首字延迟（ms），仅统计流式返回过首字的请求；窗口内无样本为 0 */
+  avg_first_token_ms: number;
   created_at: string;
   updated_at: string;
 }

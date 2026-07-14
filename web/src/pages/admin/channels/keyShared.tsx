@@ -82,10 +82,13 @@ export function KeyMetricsRow({
   channelKey,
   onRefreshBalance,
   refreshingBalance,
+  showPriorityWeight = true,
 }: {
   channelKey: ChannelKeyResp;
   onRefreshBalance: () => void;
   refreshingBalance: boolean;
+  /** 密钥视图已有独立的优先级/权重列，指标行内无需重复展示；渠道视图无独立列，保持展示。 */
+  showPriorityWeight?: boolean;
 }) {
   const { t } = useTranslation();
   const supportsBalance = keySupportsBalance(channelKey);
@@ -114,37 +117,45 @@ export function KeyMetricsRow({
             <span className="text-text-tertiary">-</span>
           )}
         </Metric>
-        <Metric label={`${t('channels.priority')}·${t('channels.weight')}`}>
-          P{channelKey.priority} · W{channelKey.weight}
-        </Metric>
+        {showPriorityWeight ? (
+          <Metric label={`${t('channels.priority')}·${t('channels.weight')}`}>
+            P{channelKey.priority} · W{channelKey.weight}
+          </Metric>
+        ) : null}
         <Metric label={t('channels.cost_ratio')}>×{channelKey.cost_ratio}</Metric>
       </div>
 
       <MetricDivider />
 
-      {/* 运行时组：并发 · RPM */}
+      {/* 运行时组：并发 · RPM · 平均首字延迟（最近 5 分钟） */}
       <div className="flex items-start gap-x-4">
         <Metric label={t('channels.concurrency_label')}>
           {channelKey.current_concurrency}/{channelKey.max_concurrency > 0 ? channelKey.max_concurrency : '∞'}
         </Metric>
         <Metric label="RPM">{channelKey.current_rpm}</Metric>
+        <Tooltip>
+          <Tooltip.Trigger className="inline-flex cursor-help">
+            <Metric label={t('channels.avg_first_token_ms')}>
+              {channelKey.avg_first_token_ms > 0 ? `${Math.round(channelKey.avg_first_token_ms)}ms` : '-'}
+            </Metric>
+          </Tooltip.Trigger>
+          <Tooltip.Content className="max-w-xs">{t('channels.avg_first_token_ms_hint')}</Tooltip.Content>
+        </Tooltip>
       </div>
 
       <MetricDivider />
 
-      {/* 金额组：今日成本 · 今日收益 · 成本 · 收益 · 余额 */}
+      {/* 金额组：今日（成本/收益）· 累计（成本/收益）· 余额 */}
       <div className="flex items-start gap-x-4">
-        <Metric label={t('channels.stats_today_cost')}>
-          <span className={channelKey.today_cost > 0 ? 'text-warning' : ''}>{fmt(channelKey.today_cost)}</span>
+        <Metric label={t('channels.stats_today')}>
+          <span className="text-warning">{fmt(channelKey.today_cost)}</span>
+          <span className="text-text-tertiary">/</span>
+          <span className="text-success">{fmt(channelKey.today_revenue)}</span>
         </Metric>
-        <Metric label={t('channels.stats_today_revenue')}>
-          <span className={channelKey.today_revenue > 0 ? 'text-success' : ''}>{fmt(channelKey.today_revenue)}</span>
-        </Metric>
-        <Metric label={t('channels.stats_cost')}>
-          <span className={channelKey.total_cost > 0 ? 'text-warning' : ''}>{fmt(channelKey.total_cost)}</span>
-        </Metric>
-        <Metric label={t('channels.stats_revenue')}>
-          <span className={channelKey.total_revenue > 0 ? 'text-success' : ''}>{fmt(channelKey.total_revenue)}</span>
+        <Metric label={t('channels.stats_total')}>
+          <span className="text-warning">{fmt(channelKey.total_cost)}</span>
+          <span className="text-text-tertiary">/</span>
+          <span className="text-success">{fmt(channelKey.total_revenue)}</span>
         </Metric>
         {supportsBalance ? (
           <Metric label={t('channels.balance')}>
