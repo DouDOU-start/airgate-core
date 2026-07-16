@@ -42,8 +42,9 @@ const COLUMN_COUNT = 7;
 const BALANCE_STALE_MS = 60_000;
 
 // isKeyBalanceStale 可查余额的 key 从未刷新过、或超过阈值 → 陈旧。
+// 关闭主动查询（balance_check_enabled=false）的 key 不参与自动刷新。
 function isKeyBalanceStale(key: ChannelKeyResp): boolean {
-  if (!keySupportsBalance(key)) return false;
+  if (!keySupportsBalance(key) || !key.balance_check_enabled) return false;
   if (!key.balance_updated_at) return true;
   return Date.now() - new Date(key.balance_updated_at).getTime() > BALANCE_STALE_MS;
 }
@@ -301,7 +302,9 @@ export default function ChannelsPage() {
         channels.push(...resp.list);
         if (resp.list.length === 0 || channels.length >= resp.total) break;
       }
-      const keys = channels.flatMap((ch) => ch.keys).filter((k) => k.type === 'openai_compatible');
+      // 关闭主动查询的 key 不进批量刷新（官方直连等无余额接口的上游）。
+      const keys = channels.flatMap((ch) => ch.keys)
+        .filter((k) => k.type === 'openai_compatible' && k.balance_check_enabled);
       const total = keys.length;
       if (total === 0) {
         toast('info', t('channels.balance_batch_none'));

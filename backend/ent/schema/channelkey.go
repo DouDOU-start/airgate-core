@@ -57,6 +57,11 @@ func (ChannelKey) Fields() []ent.Field {
 			Comment("上游账户余额（USD）；仅 openai_compatible 中转站可查"),
 		field.Time("balance_updated_at").Optional().Nillable().
 			Comment("余额最近刷新时间；nil 表示从未刷新过"),
+		// balance_check_enabled 是否参与主动余额刷新（进页自动刷新/一键刷新）；
+		// 官方直连等不支持余额接口的上游关掉，避免反复打无效请求刷 403 日志。
+		// 关闭后手动单把查询仍可用。
+		field.Bool("balance_check_enabled").Default(true).
+			Comment("是否参与主动余额刷新；官方直连等无余额接口的上游可关闭"),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
 	}

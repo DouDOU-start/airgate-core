@@ -263,6 +263,20 @@ func (ckc *ChannelKeyCreate) SetNillableBalanceUpdatedAt(t *time.Time) *ChannelK
 	return ckc
 }
 
+// SetBalanceCheckEnabled sets the "balance_check_enabled" field.
+func (ckc *ChannelKeyCreate) SetBalanceCheckEnabled(b bool) *ChannelKeyCreate {
+	ckc.mutation.SetBalanceCheckEnabled(b)
+	return ckc
+}
+
+// SetNillableBalanceCheckEnabled sets the "balance_check_enabled" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableBalanceCheckEnabled(b *bool) *ChannelKeyCreate {
+	if b != nil {
+		ckc.SetBalanceCheckEnabled(*b)
+	}
+	return ckc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (ckc *ChannelKeyCreate) SetCreatedAt(t time.Time) *ChannelKeyCreate {
 	ckc.mutation.SetCreatedAt(t)
@@ -415,6 +429,10 @@ func (ckc *ChannelKeyCreate) defaults() {
 		v := channelkey.DefaultBalance
 		ckc.mutation.SetBalance(v)
 	}
+	if _, ok := ckc.mutation.BalanceCheckEnabled(); !ok {
+		v := channelkey.DefaultBalanceCheckEnabled
+		ckc.mutation.SetBalanceCheckEnabled(v)
+	}
 	if _, ok := ckc.mutation.CreatedAt(); !ok {
 		v := channelkey.DefaultCreatedAt()
 		ckc.mutation.SetCreatedAt(v)
@@ -493,6 +511,9 @@ func (ckc *ChannelKeyCreate) check() error {
 	}
 	if _, ok := ckc.mutation.Balance(); !ok {
 		return &ValidationError{Name: "balance", err: errors.New(`ent: missing required field "ChannelKey.balance"`)}
+	}
+	if _, ok := ckc.mutation.BalanceCheckEnabled(); !ok {
+		return &ValidationError{Name: "balance_check_enabled", err: errors.New(`ent: missing required field "ChannelKey.balance_check_enabled"`)}
 	}
 	if _, ok := ckc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "ChannelKey.created_at"`)}
@@ -613,6 +634,10 @@ func (ckc *ChannelKeyCreate) createSpec() (*ChannelKey, *sqlgraph.CreateSpec) {
 	if value, ok := ckc.mutation.BalanceUpdatedAt(); ok {
 		_spec.SetField(channelkey.FieldBalanceUpdatedAt, field.TypeTime, value)
 		_node.BalanceUpdatedAt = &value
+	}
+	if value, ok := ckc.mutation.BalanceCheckEnabled(); ok {
+		_spec.SetField(channelkey.FieldBalanceCheckEnabled, field.TypeBool, value)
+		_node.BalanceCheckEnabled = value
 	}
 	if value, ok := ckc.mutation.CreatedAt(); ok {
 		_spec.SetField(channelkey.FieldCreatedAt, field.TypeTime, value)
@@ -1056,6 +1081,18 @@ func (u *ChannelKeyUpsert) UpdateBalanceUpdatedAt() *ChannelKeyUpsert {
 // ClearBalanceUpdatedAt clears the value of the "balance_updated_at" field.
 func (u *ChannelKeyUpsert) ClearBalanceUpdatedAt() *ChannelKeyUpsert {
 	u.SetNull(channelkey.FieldBalanceUpdatedAt)
+	return u
+}
+
+// SetBalanceCheckEnabled sets the "balance_check_enabled" field.
+func (u *ChannelKeyUpsert) SetBalanceCheckEnabled(v bool) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldBalanceCheckEnabled, v)
+	return u
+}
+
+// UpdateBalanceCheckEnabled sets the "balance_check_enabled" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateBalanceCheckEnabled() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldBalanceCheckEnabled)
 	return u
 }
 
@@ -1505,6 +1542,20 @@ func (u *ChannelKeyUpsertOne) UpdateBalanceUpdatedAt() *ChannelKeyUpsertOne {
 func (u *ChannelKeyUpsertOne) ClearBalanceUpdatedAt() *ChannelKeyUpsertOne {
 	return u.Update(func(s *ChannelKeyUpsert) {
 		s.ClearBalanceUpdatedAt()
+	})
+}
+
+// SetBalanceCheckEnabled sets the "balance_check_enabled" field.
+func (u *ChannelKeyUpsertOne) SetBalanceCheckEnabled(v bool) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetBalanceCheckEnabled(v)
+	})
+}
+
+// UpdateBalanceCheckEnabled sets the "balance_check_enabled" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateBalanceCheckEnabled() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateBalanceCheckEnabled()
 	})
 }
 
@@ -2122,6 +2173,20 @@ func (u *ChannelKeyUpsertBulk) UpdateBalanceUpdatedAt() *ChannelKeyUpsertBulk {
 func (u *ChannelKeyUpsertBulk) ClearBalanceUpdatedAt() *ChannelKeyUpsertBulk {
 	return u.Update(func(s *ChannelKeyUpsert) {
 		s.ClearBalanceUpdatedAt()
+	})
+}
+
+// SetBalanceCheckEnabled sets the "balance_check_enabled" field.
+func (u *ChannelKeyUpsertBulk) SetBalanceCheckEnabled(v bool) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetBalanceCheckEnabled(v)
+	})
+}
+
+// UpdateBalanceCheckEnabled sets the "balance_check_enabled" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateBalanceCheckEnabled() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateBalanceCheckEnabled()
 	})
 }
 

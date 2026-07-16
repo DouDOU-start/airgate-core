@@ -131,9 +131,11 @@ type ChannelKey struct {
 	LastUsedAt       *time.Time
 	Balance          float64
 	BalanceUpdatedAt *time.Time
-	GroupIDs         []int
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	// BalanceCheckEnabled 是否参与主动余额刷新（自动/批量）；关闭后手动单把查询仍可用。
+	BalanceCheckEnabled bool
+	GroupIDs            []int
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 
 	// CurrentConcurrency / CurrentRPM 运行时观测指标（在途请求数 / 当前分钟请求数），
 	// 仅列表查询时由 SetRuntimeStatsReaders 注入的读取器填充，不落库。
@@ -216,7 +218,9 @@ type KeyInput struct {
 	CostRatio      *float64
 	Tags           []string
 	TestModel      *string
-	GroupIDs       []int
+	// BalanceCheckEnabled nil = 新增取默认 true / 更新不改。
+	BalanceCheckEnabled *bool
+	GroupIDs            []int
 }
 
 // CreateInput 创建渠道输入（仅供应商级字段；key 建后单独添加）。

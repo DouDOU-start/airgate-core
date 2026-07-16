@@ -606,6 +606,8 @@ export interface ChannelKeyResp {
   /** 上游账户余额（USD）；仅 openai_compatible key 可查，按 key 刷新 */
   balance: number;
   balance_updated_at?: string;
+  /** 是否参与主动余额刷新（进页自动/一键批量）；关闭后手动单把查询仍可用 */
+  balance_check_enabled: boolean;
   /** 累计成本（standard × cost_ratio 快照） */
   total_cost: number;
   /** 累计平台收益（actual_cost 实际扣费） */
@@ -665,6 +667,8 @@ export interface ChannelKeyReq {
   cost_ratio?: number;
   tags?: string[];
   test_model?: string;
+  /** 是否参与主动余额刷新；省略 = 新增取默认 true / 更新不改 */
+  balance_check_enabled?: boolean;
   group_ids?: number[];
 }
 

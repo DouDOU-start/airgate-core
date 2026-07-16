@@ -52,6 +52,8 @@ interface KeyForm {
   costRatio: string;
   tags: string[];
   enabled: boolean;
+  // 是否参与主动余额刷新（进页自动/一键批量）；官方直连等无余额接口的上游关掉，省得反复打无效请求。
+  balanceCheckEnabled: boolean;
 }
 
 const emptyForm: KeyForm = {
@@ -69,6 +71,7 @@ const emptyForm: KeyForm = {
   costRatio: '1',
   tags: [],
   enabled: true,
+  balanceCheckEnabled: true,
 };
 
 function formFromKey(key: ChannelKeyResp): KeyForm {
@@ -90,6 +93,7 @@ function formFromKey(key: ChannelKeyResp): KeyForm {
     costRatio: String(key.cost_ratio),
     tags: key.tags ?? [],
     enabled: key.status !== 'disabled_manual',
+    balanceCheckEnabled: key.balance_check_enabled,
   };
 }
 
@@ -168,6 +172,7 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
       max_rpm: Number(form.maxRpm) || 0,
       cost_ratio: Number(form.costRatio) || 0,
       tags: form.tags,
+      balance_check_enabled: form.balanceCheckEnabled,
     };
 
     if (isEdit && channelKey) {
@@ -330,12 +335,24 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                   />
                 </div>
 
-                <NativeSwitch
-                  ariaLabel={t('channels.key_enabled')}
-                  isSelected={form.enabled}
-                  label={t('channels.key_enabled')}
-                  onChange={(selected) => setForm((p) => ({ ...p, enabled: selected }))}
-                />
+                <div className="flex items-center gap-8">
+                  <NativeSwitch
+                    ariaLabel={t('channels.key_enabled')}
+                    isSelected={form.enabled}
+                    label={t('channels.key_enabled')}
+                    onChange={(selected) => setForm((p) => ({ ...p, enabled: selected }))}
+                  />
+                  {form.type === 'openai_compatible' ? (
+                    <span title={t('channels.balance_check_enabled_hint')}>
+                      <NativeSwitch
+                        ariaLabel={t('channels.balance_check_enabled')}
+                        isSelected={form.balanceCheckEnabled}
+                        label={t('channels.balance_check_enabled')}
+                        onChange={(selected) => setForm((p) => ({ ...p, balanceCheckEnabled: selected }))}
+                      />
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </Modal.Body>
             <Modal.Footer>

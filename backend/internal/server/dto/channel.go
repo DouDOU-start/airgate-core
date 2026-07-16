@@ -32,6 +32,8 @@ type ChannelKeyResp struct {
 	// Balance 该把 key 的上游账户余额（USD）；仅 openai_compatible 中转站可查。
 	Balance          float64    `json:"balance"`
 	BalanceUpdatedAt *time.Time `json:"balance_updated_at,omitempty"`
+	// BalanceCheckEnabled 是否参与主动余额刷新（进页自动/一键批量）；关闭后手动单把查询仍可用。
+	BalanceCheckEnabled bool `json:"balance_check_enabled"`
 	// CurrentConcurrency / CurrentRPM 运行时观测指标（在途请求数 / 当前分钟请求数），列表实时展示。
 	CurrentConcurrency int `json:"current_concurrency"`
 	CurrentRPM         int `json:"current_rpm"`
@@ -91,7 +93,9 @@ type ChannelKeyReq struct {
 	CostRatio      *float64          `json:"cost_ratio" binding:"omitempty,gte=0"`
 	Tags           []string          `json:"tags"`
 	TestModel      *string           `json:"test_model"`
-	GroupIDs       []int             `json:"group_ids"`
+	// BalanceCheckEnabled 省略 = 新增取默认 true / 更新不改。
+	BalanceCheckEnabled *bool `json:"balance_check_enabled"`
+	GroupIDs            []int `json:"group_ids"`
 }
 
 // TestChannelReq 密钥端点测试请求（model 缺省时取 key 的 test_model 或首个模型）。

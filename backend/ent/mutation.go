@@ -4734,53 +4734,54 @@ func (m *ChannelMutation) ResetEdge(name string) error {
 // ChannelKeyMutation represents an operation that mutates the ChannelKey nodes in the graph.
 type ChannelKeyMutation struct {
 	config
-	op                  Op
-	typ                 string
-	id                  *int
-	name                *string
-	_type               *channelkey.Type
-	api_key             *string
-	models              *[]string
-	appendmodels        []string
-	model_mapping       *map[string]string
-	param_override      *map[string]interface{}
-	header_override     *map[string]string
-	status              *channelkey.Status
-	error_msg           *string
-	priority            *int
-	addpriority         *int
-	weight              *int
-	addweight           *int
-	max_concurrency     *int
-	addmax_concurrency  *int
-	max_rpm             *int
-	addmax_rpm          *int
-	cost_ratio          *float64
-	addcost_ratio       *float64
-	tags                *[]string
-	appendtags          []string
-	test_model          *string
-	response_time_ms    *int
-	addresponse_time_ms *int
-	tested_at           *time.Time
-	last_used_at        *time.Time
-	balance             *float64
-	addbalance          *float64
-	balance_updated_at  *time.Time
-	created_at          *time.Time
-	updated_at          *time.Time
-	clearedFields       map[string]struct{}
-	channel             *int
-	clearedchannel      bool
-	groups              map[int]struct{}
-	removedgroups       map[int]struct{}
-	clearedgroups       bool
-	usage_logs          map[int]struct{}
-	removedusage_logs   map[int]struct{}
-	clearedusage_logs   bool
-	done                bool
-	oldValue            func(context.Context) (*ChannelKey, error)
-	predicates          []predicate.ChannelKey
+	op                    Op
+	typ                   string
+	id                    *int
+	name                  *string
+	_type                 *channelkey.Type
+	api_key               *string
+	models                *[]string
+	appendmodels          []string
+	model_mapping         *map[string]string
+	param_override        *map[string]interface{}
+	header_override       *map[string]string
+	status                *channelkey.Status
+	error_msg             *string
+	priority              *int
+	addpriority           *int
+	weight                *int
+	addweight             *int
+	max_concurrency       *int
+	addmax_concurrency    *int
+	max_rpm               *int
+	addmax_rpm            *int
+	cost_ratio            *float64
+	addcost_ratio         *float64
+	tags                  *[]string
+	appendtags            []string
+	test_model            *string
+	response_time_ms      *int
+	addresponse_time_ms   *int
+	tested_at             *time.Time
+	last_used_at          *time.Time
+	balance               *float64
+	addbalance            *float64
+	balance_updated_at    *time.Time
+	balance_check_enabled *bool
+	created_at            *time.Time
+	updated_at            *time.Time
+	clearedFields         map[string]struct{}
+	channel               *int
+	clearedchannel        bool
+	groups                map[int]struct{}
+	removedgroups         map[int]struct{}
+	clearedgroups         bool
+	usage_logs            map[int]struct{}
+	removedusage_logs     map[int]struct{}
+	clearedusage_logs     bool
+	done                  bool
+	oldValue              func(context.Context) (*ChannelKey, error)
+	predicates            []predicate.ChannelKey
 }
 
 var _ ent.Mutation = (*ChannelKeyMutation)(nil)
@@ -5899,6 +5900,42 @@ func (m *ChannelKeyMutation) ResetBalanceUpdatedAt() {
 	delete(m.clearedFields, channelkey.FieldBalanceUpdatedAt)
 }
 
+// SetBalanceCheckEnabled sets the "balance_check_enabled" field.
+func (m *ChannelKeyMutation) SetBalanceCheckEnabled(b bool) {
+	m.balance_check_enabled = &b
+}
+
+// BalanceCheckEnabled returns the value of the "balance_check_enabled" field in the mutation.
+func (m *ChannelKeyMutation) BalanceCheckEnabled() (r bool, exists bool) {
+	v := m.balance_check_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBalanceCheckEnabled returns the old "balance_check_enabled" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldBalanceCheckEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBalanceCheckEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBalanceCheckEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBalanceCheckEnabled: %w", err)
+	}
+	return oldValue.BalanceCheckEnabled, nil
+}
+
+// ResetBalanceCheckEnabled resets all changes to the "balance_check_enabled" field.
+func (m *ChannelKeyMutation) ResetBalanceCheckEnabled() {
+	m.balance_check_enabled = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *ChannelKeyMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -6152,7 +6189,7 @@ func (m *ChannelKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ChannelKeyMutation) Fields() []string {
-	fields := make([]string, 0, 23)
+	fields := make([]string, 0, 24)
 	if m.name != nil {
 		fields = append(fields, channelkey.FieldName)
 	}
@@ -6216,6 +6253,9 @@ func (m *ChannelKeyMutation) Fields() []string {
 	if m.balance_updated_at != nil {
 		fields = append(fields, channelkey.FieldBalanceUpdatedAt)
 	}
+	if m.balance_check_enabled != nil {
+		fields = append(fields, channelkey.FieldBalanceCheckEnabled)
+	}
 	if m.created_at != nil {
 		fields = append(fields, channelkey.FieldCreatedAt)
 	}
@@ -6272,6 +6312,8 @@ func (m *ChannelKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.Balance()
 	case channelkey.FieldBalanceUpdatedAt:
 		return m.BalanceUpdatedAt()
+	case channelkey.FieldBalanceCheckEnabled:
+		return m.BalanceCheckEnabled()
 	case channelkey.FieldCreatedAt:
 		return m.CreatedAt()
 	case channelkey.FieldUpdatedAt:
@@ -6327,6 +6369,8 @@ func (m *ChannelKeyMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldBalance(ctx)
 	case channelkey.FieldBalanceUpdatedAt:
 		return m.OldBalanceUpdatedAt(ctx)
+	case channelkey.FieldBalanceCheckEnabled:
+		return m.OldBalanceCheckEnabled(ctx)
 	case channelkey.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case channelkey.FieldUpdatedAt:
@@ -6486,6 +6530,13 @@ func (m *ChannelKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetBalanceUpdatedAt(v)
+		return nil
+	case channelkey.FieldBalanceCheckEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBalanceCheckEnabled(v)
 		return nil
 	case channelkey.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -6744,6 +6795,9 @@ func (m *ChannelKeyMutation) ResetField(name string) error {
 		return nil
 	case channelkey.FieldBalanceUpdatedAt:
 		m.ResetBalanceUpdatedAt()
+		return nil
+	case channelkey.FieldBalanceCheckEnabled:
+		m.ResetBalanceCheckEnabled()
 		return nil
 	case channelkey.FieldCreatedAt:
 		m.ResetCreatedAt()

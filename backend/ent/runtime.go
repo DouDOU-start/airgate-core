@@ -239,12 +239,16 @@ func init() {
 	channelkeyDescBalance := channelkeyFields[19].Descriptor()
 	// channelkey.DefaultBalance holds the default value on creation for the balance field.
 	channelkey.DefaultBalance = channelkeyDescBalance.Default.(float64)
+	// channelkeyDescBalanceCheckEnabled is the schema descriptor for balance_check_enabled field.
+	channelkeyDescBalanceCheckEnabled := channelkeyFields[21].Descriptor()
+	// channelkey.DefaultBalanceCheckEnabled holds the default value on creation for the balance_check_enabled field.
+	channelkey.DefaultBalanceCheckEnabled = channelkeyDescBalanceCheckEnabled.Default.(bool)
 	// channelkeyDescCreatedAt is the schema descriptor for created_at field.
-	channelkeyDescCreatedAt := channelkeyFields[21].Descriptor()
+	channelkeyDescCreatedAt := channelkeyFields[22].Descriptor()
 	// channelkey.DefaultCreatedAt holds the default value on creation for the created_at field.
 	channelkey.DefaultCreatedAt = channelkeyDescCreatedAt.Default.(func() time.Time)
 	// channelkeyDescUpdatedAt is the schema descriptor for updated_at field.
-	channelkeyDescUpdatedAt := channelkeyFields[22].Descriptor()
+	channelkeyDescUpdatedAt := channelkeyFields[23].Descriptor()
 	// channelkey.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	channelkey.DefaultUpdatedAt = channelkeyDescUpdatedAt.Default.(func() time.Time)
 	// channelkey.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

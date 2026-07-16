@@ -311,6 +311,11 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
     width: '140px',
     render: (raw) => {
       const row = raw as UsageLogResp;
+      // 按次/按张计费的记录：input_price 快照是「每次/每张」单价（成本 = 单价 × 计次数），
+      // 不是 token 单价；此时 token 单价快照（如兜底价）未参与计费，显示会误导，一并隐藏。
+      const calls = row.calls ?? 0;
+      const perUnit = calls > 0 && row.input_price > 0 && row.output_cost === 0
+        && Math.abs(row.input_price * calls - row.input_cost) < 1e-9;
       return (
         <RichTooltip
           placement="right"
@@ -318,11 +323,20 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
             <TooltipPanel title={t('usage.cost_detail')} subtitle={row.model}>
                 <TooltipRow label={t('usage.input_cost')} value={`$${row.input_cost.toFixed(6)}`} />
                 <TooltipRow label={t('usage.output_cost')} value={`$${row.output_cost.toFixed(6)}`} />
-                {row.input_price > 0 && (
-                  <TooltipRow label={t('usage.input_unit_price')} value={`$${row.input_price.toFixed(4)} / 1M Token`} />
-                )}
-                {row.output_price > 0 && (
-                  <TooltipRow label={t('usage.output_unit_price')} value={`$${row.output_price.toFixed(4)} / 1M Token`} />
+                {perUnit ? (
+                  <TooltipRow
+                    label={t('usage.unit_price', '单价')}
+                    value={`$${row.input_price.toFixed(4)} ${row.image_size ? t('usage.per_image', '/ 张') : t('usage.per_call', '/ 次')}`}
+                  />
+                ) : (
+                  <>
+                    {row.input_price > 0 && (
+                      <TooltipRow label={t('usage.input_unit_price')} value={`$${row.input_price.toFixed(4)} / 1M Token`} />
+                    )}
+                    {row.output_price > 0 && (
+                      <TooltipRow label={t('usage.output_unit_price')} value={`$${row.output_price.toFixed(4)} / 1M Token`} />
+                    )}
+                  </>
                 )}
                 {row.cached_input_cost > 0 && (
                   <TooltipRow label={t('usage.cached_input_cost')} value={`$${row.cached_input_cost.toFixed(6)}`} />

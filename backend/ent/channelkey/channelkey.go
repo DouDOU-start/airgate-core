@@ -57,6 +57,8 @@ const (
 	FieldBalance = "balance"
 	// FieldBalanceUpdatedAt holds the string denoting the balance_updated_at field in the database.
 	FieldBalanceUpdatedAt = "balance_updated_at"
+	// FieldBalanceCheckEnabled holds the string denoting the balance_check_enabled field in the database.
+	FieldBalanceCheckEnabled = "balance_check_enabled"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -114,6 +116,7 @@ var Columns = []string{
 	FieldLastUsedAt,
 	FieldBalance,
 	FieldBalanceUpdatedAt,
+	FieldBalanceCheckEnabled,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -174,6 +177,8 @@ var (
 	DefaultResponseTimeMs int
 	// DefaultBalance holds the default value on creation for the "balance" field.
 	DefaultBalance float64
+	// DefaultBalanceCheckEnabled holds the default value on creation for the "balance_check_enabled" field.
+	DefaultBalanceCheckEnabled bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -322,6 +327,11 @@ func ByBalance(opts ...sql.OrderTermOption) OrderOption {
 // ByBalanceUpdatedAt orders the results by the balance_updated_at field.
 func ByBalanceUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldBalanceUpdatedAt, opts...).ToFunc()
+}
+
+// ByBalanceCheckEnabled orders the results by the balance_check_enabled field.
+func ByBalanceCheckEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBalanceCheckEnabled, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

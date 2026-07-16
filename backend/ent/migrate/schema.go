@@ -201,6 +201,7 @@ var (
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
 		{Name: "balance", Type: field.TypeFloat64, Default: 0},
 		{Name: "balance_updated_at", Type: field.TypeTime, Nullable: true},
+		{Name: "balance_check_enabled", Type: field.TypeBool, Default: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "channel_keys", Type: field.TypeInt},
@@ -213,7 +214,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "channel_keys_channels_keys",
-				Columns:    []*schema.Column{ChannelKeysColumns[24]},
+				Columns:    []*schema.Column{ChannelKeysColumns[25]},
 				RefColumns: []*schema.Column{ChannelsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},

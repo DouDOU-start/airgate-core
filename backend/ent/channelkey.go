@@ -61,6 +61,8 @@ type ChannelKey struct {
 	Balance float64 `json:"balance,omitempty"`
 	// 余额最近刷新时间；nil 表示从未刷新过
 	BalanceUpdatedAt *time.Time `json:"balance_updated_at,omitempty"`
+	// 是否参与主动余额刷新；官方直连等无余额接口的上游可关闭
+	BalanceCheckEnabled bool `json:"balance_check_enabled,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -121,6 +123,8 @@ func (*ChannelKey) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case channelkey.FieldModels, channelkey.FieldModelMapping, channelkey.FieldParamOverride, channelkey.FieldHeaderOverride, channelkey.FieldTags:
 			values[i] = new([]byte)
+		case channelkey.FieldBalanceCheckEnabled:
+			values[i] = new(sql.NullBool)
 		case channelkey.FieldCostRatio, channelkey.FieldBalance:
 			values[i] = new(sql.NullFloat64)
 		case channelkey.FieldID, channelkey.FieldPriority, channelkey.FieldWeight, channelkey.FieldMaxConcurrency, channelkey.FieldMaxRpm, channelkey.FieldResponseTimeMs:
@@ -291,6 +295,12 @@ func (ck *ChannelKey) assignValues(columns []string, values []any) error {
 				ck.BalanceUpdatedAt = new(time.Time)
 				*ck.BalanceUpdatedAt = value.Time
 			}
+		case channelkey.FieldBalanceCheckEnabled:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field balance_check_enabled", values[i])
+			} else if value.Valid {
+				ck.BalanceCheckEnabled = value.Bool
+			}
 		case channelkey.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -428,6 +438,9 @@ func (ck *ChannelKey) String() string {
 		builder.WriteString("balance_updated_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("balance_check_enabled=")
+	builder.WriteString(fmt.Sprintf("%v", ck.BalanceCheckEnabled))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(ck.CreatedAt.Format(time.ANSIC))

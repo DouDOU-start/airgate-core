@@ -390,6 +390,20 @@ func (cku *ChannelKeyUpdate) ClearBalanceUpdatedAt() *ChannelKeyUpdate {
 	return cku
 }
 
+// SetBalanceCheckEnabled sets the "balance_check_enabled" field.
+func (cku *ChannelKeyUpdate) SetBalanceCheckEnabled(b bool) *ChannelKeyUpdate {
+	cku.mutation.SetBalanceCheckEnabled(b)
+	return cku
+}
+
+// SetNillableBalanceCheckEnabled sets the "balance_check_enabled" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableBalanceCheckEnabled(b *bool) *ChannelKeyUpdate {
+	if b != nil {
+		cku.SetBalanceCheckEnabled(*b)
+	}
+	return cku
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (cku *ChannelKeyUpdate) SetUpdatedAt(t time.Time) *ChannelKeyUpdate {
 	cku.mutation.SetUpdatedAt(t)
@@ -691,6 +705,9 @@ func (cku *ChannelKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if cku.mutation.BalanceUpdatedAtCleared() {
 		_spec.ClearField(channelkey.FieldBalanceUpdatedAt, field.TypeTime)
+	}
+	if value, ok := cku.mutation.BalanceCheckEnabled(); ok {
+		_spec.SetField(channelkey.FieldBalanceCheckEnabled, field.TypeBool, value)
 	}
 	if value, ok := cku.mutation.UpdatedAt(); ok {
 		_spec.SetField(channelkey.FieldUpdatedAt, field.TypeTime, value)
@@ -1193,6 +1210,20 @@ func (ckuo *ChannelKeyUpdateOne) ClearBalanceUpdatedAt() *ChannelKeyUpdateOne {
 	return ckuo
 }
 
+// SetBalanceCheckEnabled sets the "balance_check_enabled" field.
+func (ckuo *ChannelKeyUpdateOne) SetBalanceCheckEnabled(b bool) *ChannelKeyUpdateOne {
+	ckuo.mutation.SetBalanceCheckEnabled(b)
+	return ckuo
+}
+
+// SetNillableBalanceCheckEnabled sets the "balance_check_enabled" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableBalanceCheckEnabled(b *bool) *ChannelKeyUpdateOne {
+	if b != nil {
+		ckuo.SetBalanceCheckEnabled(*b)
+	}
+	return ckuo
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (ckuo *ChannelKeyUpdateOne) SetUpdatedAt(t time.Time) *ChannelKeyUpdateOne {
 	ckuo.mutation.SetUpdatedAt(t)
@@ -1524,6 +1555,9 @@ func (ckuo *ChannelKeyUpdateOne) sqlSave(ctx context.Context) (_node *ChannelKey
 	}
 	if ckuo.mutation.BalanceUpdatedAtCleared() {
 		_spec.ClearField(channelkey.FieldBalanceUpdatedAt, field.TypeTime)
+	}
+	if value, ok := ckuo.mutation.BalanceCheckEnabled(); ok {
+		_spec.SetField(channelkey.FieldBalanceCheckEnabled, field.TypeBool, value)
 	}
 	if value, ok := ckuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(channelkey.FieldUpdatedAt, field.TypeTime, value)

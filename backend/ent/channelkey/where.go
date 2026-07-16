@@ -125,6 +125,11 @@ func BalanceUpdatedAt(v time.Time) predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldEQ(FieldBalanceUpdatedAt, v))
 }
 
+// BalanceCheckEnabled applies equality check predicate on the "balance_check_enabled" field. It's identical to BalanceCheckEnabledEQ.
+func BalanceCheckEnabled(v bool) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldBalanceCheckEnabled, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldEQ(FieldCreatedAt, v))
@@ -903,6 +908,16 @@ func BalanceUpdatedAtIsNil() predicate.ChannelKey {
 // BalanceUpdatedAtNotNil applies the NotNil predicate on the "balance_updated_at" field.
 func BalanceUpdatedAtNotNil() predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldNotNull(FieldBalanceUpdatedAt))
+}
+
+// BalanceCheckEnabledEQ applies the EQ predicate on the "balance_check_enabled" field.
+func BalanceCheckEnabledEQ(v bool) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldBalanceCheckEnabled, v))
+}
+
+// BalanceCheckEnabledNEQ applies the NEQ predicate on the "balance_check_enabled" field.
+func BalanceCheckEnabledNEQ(v bool) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldBalanceCheckEnabled, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

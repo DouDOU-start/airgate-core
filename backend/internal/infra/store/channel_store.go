@@ -256,7 +256,8 @@ func applyKeyCreate(builder *ent.ChannelKeyCreate, key appchannel.KeyInput) *ent
 		SetNillableWeight(key.Weight).
 		SetNillableMaxConcurrency(key.MaxConcurrency).
 		SetNillableMaxRpm(key.MaxRPM).
-		SetNillableCostRatio(key.CostRatio)
+		SetNillableCostRatio(key.CostRatio).
+		SetNillableBalanceCheckEnabled(key.BalanceCheckEnabled)
 	if key.ModelMapping != nil {
 		builder = builder.SetModelMapping(key.ModelMapping)
 	}
@@ -289,7 +290,8 @@ func applyKeyUpdate(builder *ent.ChannelKeyUpdateOne, key appchannel.KeyInput) *
 		SetNillableWeight(key.Weight).
 		SetNillableMaxConcurrency(key.MaxConcurrency).
 		SetNillableMaxRpm(key.MaxRPM).
-		SetNillableCostRatio(key.CostRatio)
+		SetNillableCostRatio(key.CostRatio).
+		SetNillableBalanceCheckEnabled(key.BalanceCheckEnabled)
 	// name 为可选标签：空串视为不改（单 key 更新路径可能不带 name）。
 	if key.Name != "" {
 		builder = builder.SetName(key.Name)
@@ -559,32 +561,33 @@ func mapChannel(item *ent.Channel) appchannel.Channel {
 
 func mapChannelKey(item *ent.ChannelKey, baseURL, channelName string) appchannel.ChannelKey {
 	key := appchannel.ChannelKey{
-		ID:               item.ID,
-		ChannelName:      channelName,
-		BaseURL:          baseURL,
-		Name:             item.Name,
-		Type:             item.Type.String(),
-		APIKey:           item.APIKey,
-		Models:           item.Models,
-		ModelMapping:     item.ModelMapping,
-		ParamOverride:    item.ParamOverride,
-		HeaderOverride:   item.HeaderOverride,
-		Status:           item.Status.String(),
-		ErrorMsg:         item.ErrorMsg,
-		Priority:         item.Priority,
-		Weight:           item.Weight,
-		MaxConcurrency:   item.MaxConcurrency,
-		MaxRPM:           item.MaxRpm,
-		CostRatio:        item.CostRatio,
-		Tags:             item.Tags,
-		TestModel:        item.TestModel,
-		ResponseTimeMs:   item.ResponseTimeMs,
-		TestedAt:         item.TestedAt,
-		LastUsedAt:       item.LastUsedAt,
-		Balance:          item.Balance,
-		BalanceUpdatedAt: item.BalanceUpdatedAt,
-		CreatedAt:        item.CreatedAt,
-		UpdatedAt:        item.UpdatedAt,
+		ID:                  item.ID,
+		ChannelName:         channelName,
+		BaseURL:             baseURL,
+		Name:                item.Name,
+		Type:                item.Type.String(),
+		APIKey:              item.APIKey,
+		Models:              item.Models,
+		ModelMapping:        item.ModelMapping,
+		ParamOverride:       item.ParamOverride,
+		HeaderOverride:      item.HeaderOverride,
+		Status:              item.Status.String(),
+		ErrorMsg:            item.ErrorMsg,
+		Priority:            item.Priority,
+		Weight:              item.Weight,
+		MaxConcurrency:      item.MaxConcurrency,
+		MaxRPM:              item.MaxRpm,
+		CostRatio:           item.CostRatio,
+		Tags:                item.Tags,
+		TestModel:           item.TestModel,
+		ResponseTimeMs:      item.ResponseTimeMs,
+		TestedAt:            item.TestedAt,
+		LastUsedAt:          item.LastUsedAt,
+		Balance:             item.Balance,
+		BalanceUpdatedAt:    item.BalanceUpdatedAt,
+		BalanceCheckEnabled: item.BalanceCheckEnabled,
+		CreatedAt:           item.CreatedAt,
+		UpdatedAt:           item.UpdatedAt,
 	}
 	if ch, err := item.Edges.ChannelOrErr(); err == nil {
 		key.ChannelID = ch.ID
