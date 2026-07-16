@@ -116,6 +116,8 @@ function TooltipDivider() {
 
 const META_CHIP_SERVICE_TIER_COLOR = 'rgb(168,85,247)';
 const META_CHIP_REASONING_EFFORT_COLOR = 'var(--ag-tone-indigo)';
+// 图像端点产出档位 chip（分辨率/质量，teal 区别于服务档紫与推理靛蓝）。
+const META_CHIP_IMAGE_COLOR = 'rgb(20,184,166)';
 
 const MODEL_META_SLOT_WIDTH_CLASS = 'w-[5.5rem]';
 
@@ -336,6 +338,13 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 {row.reasoning_effort && (
                   <TooltipRow label={t('usage.reasoning_effort')} value={<span className="capitalize">{row.reasoning_effort}</span>} />
                 )}
+                {row.image_size && (
+                  // 图像端点实际产出档位：按张计费时成本 = input_price × 张数（该档表价）。
+                  <TooltipRow
+                    label={t('usage.image_size', '产出档位')}
+                    value={row.image_quality ? `${row.image_quality} · ${row.image_size}` : row.image_size}
+                  />
+                )}
                 <TooltipRow label={t('usage.rate_multiplier')} value={fmtRate(row.rate_multiplier)} />
                 {adminView && row.account_rate_multiplier > 0 && (
                   <TooltipRow label={t('usage.account_rate', '渠道倍率')} value={fmtRate(row.account_rate_multiplier)} />
@@ -456,6 +465,9 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
       render: (row) => {
         const serviceTier = (row.service_tier ?? '').trim();
         const reasoningEffort = (row.reasoning_effort ?? '').trim();
+        // 图像端点产出档位 chip：图像请求没有服务档/推理强度，独占 meta 槽位。
+        const imageSize = (row.image_size ?? '').trim();
+        const imageQuality = (row.image_quality ?? '').trim();
         const bothPresent = !!serviceTier && !!reasoningEffort;
         const metaChips = [
           serviceTier ? (
@@ -472,6 +484,13 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
               color={META_CHIP_REASONING_EFFORT_COLOR}
               label={reasoningEffort}
               compact={bothPresent}
+            />
+          ) : null,
+          !serviceTier && !reasoningEffort && imageSize ? (
+            <MetaChip
+              key="image"
+              color={META_CHIP_IMAGE_COLOR}
+              label={imageQuality ? `${imageQuality} ${imageSize}` : imageSize}
             />
           ) : null,
         ].filter(Boolean);

@@ -89,6 +89,30 @@ function serviceTiersLine(row: ModelMarketItemResp, t: Translate): ReactNode {
   return parts.map((p, i) => (i === 0 ? p : [<span className="text-text-tertiary/60" key={`s${i}`}> · </span>, p]));
 }
 
+// imageSizePricesLine 图像分辨率价表：公开定价页逐档列出（质量·尺寸 $价/张），
+// 键形态 "quality:size" 或裸 "size"，与后端计费口径一致。
+function imageSizePricesLine(row: ModelMarketItemResp, t: Translate): ReactNode {
+  const prices = row.image_size_prices;
+  if (!prices) return null;
+  const parts: ReactNode[] = [];
+  for (const [key, price] of Object.entries(prices).sort(([a], [b]) => a.localeCompare(b))) {
+    if (!Number.isFinite(price) || price <= 0) continue;
+    parts.push(
+      <span className="whitespace-nowrap" key={key}>
+        <span className="text-text-tertiary">{key.replace(':', ' · ')} </span>
+        <span className="font-medium text-warning">{fmtPrice(price)}</span>
+      </span>,
+    );
+  }
+  if (parts.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-x-1" title={t('model_market.image_size_prices_hint')}>
+      <span className="whitespace-nowrap text-text-tertiary">{t('model_market.price_short_per_image')}：</span>
+      {parts.map((p, i) => (i === 0 ? p : [<span className="text-text-tertiary/60" key={`s${i}`}> · </span>, p]))}
+    </div>
+  );
+}
+
 // cacheLine 缓存单价行，逻辑与管理端模型卡片一致。
 function cacheLine(row: ModelMarketItemResp, t: Translate): ReactNode {
   const parts: ReactNode[] = [];
@@ -112,6 +136,7 @@ function MarketPriceCard({ row, t }: { row: ModelMarketItemResp; t: Translate })
   const cache = cacheLine(row, t);
   const tiers = serviceTiersLine(row, t);
   const longContext = longContextLine(row, t);
+  const imagePrices = imageSizePricesLine(row, t);
   return (
     <div className="flex flex-col rounded-[var(--ag-radius-lg)] border border-border bg-surface p-5 transition-colors hover:border-text-tertiary/50">
       <div className="flex items-start justify-between gap-2">
@@ -146,7 +171,7 @@ function MarketPriceCard({ row, t }: { row: ModelMarketItemResp; t: Translate })
           </div>
         </div>
       </div>
-      {(cache || row.per_request_price > 0 || tiers || longContext) ? (
+      {(cache || row.per_request_price > 0 || tiers || longContext || imagePrices) ? (
         <div className="mt-3 space-y-1 font-mono text-xs tabular-nums text-text-secondary">
           {cache ? <div className="flex flex-wrap gap-x-1">{cache}</div> : null}
           {row.per_request_price > 0 ? (
@@ -156,6 +181,7 @@ function MarketPriceCard({ row, t }: { row: ModelMarketItemResp; t: Translate })
               </span>
             </div>
           ) : null}
+          {imagePrices}
           {tiers ? <div className="flex flex-wrap gap-x-1">{tiers}</div> : null}
           {longContext}
         </div>

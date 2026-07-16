@@ -180,6 +180,16 @@ func ReasoningEffort(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldReasoningEffort, v))
 }
 
+// ImageSize applies equality check predicate on the "image_size" field. It's identical to ImageSizeEQ.
+func ImageSize(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldImageSize, v))
+}
+
+// ImageQuality applies equality check predicate on the "image_quality" field. It's identical to ImageQualityEQ.
+func ImageQuality(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldImageQuality, v))
+}
+
 // Stream applies equality check predicate on the "stream" field. It's identical to StreamEQ.
 func Stream(v bool) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldStream, v))
@@ -1333,6 +1343,136 @@ func ReasoningEffortEqualFold(v string) predicate.UsageLog {
 // ReasoningEffortContainsFold applies the ContainsFold predicate on the "reasoning_effort" field.
 func ReasoningEffortContainsFold(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldContainsFold(FieldReasoningEffort, v))
+}
+
+// ImageSizeEQ applies the EQ predicate on the "image_size" field.
+func ImageSizeEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldImageSize, v))
+}
+
+// ImageSizeNEQ applies the NEQ predicate on the "image_size" field.
+func ImageSizeNEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldImageSize, v))
+}
+
+// ImageSizeIn applies the In predicate on the "image_size" field.
+func ImageSizeIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldImageSize, vs...))
+}
+
+// ImageSizeNotIn applies the NotIn predicate on the "image_size" field.
+func ImageSizeNotIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldImageSize, vs...))
+}
+
+// ImageSizeGT applies the GT predicate on the "image_size" field.
+func ImageSizeGT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldImageSize, v))
+}
+
+// ImageSizeGTE applies the GTE predicate on the "image_size" field.
+func ImageSizeGTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldImageSize, v))
+}
+
+// ImageSizeLT applies the LT predicate on the "image_size" field.
+func ImageSizeLT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldImageSize, v))
+}
+
+// ImageSizeLTE applies the LTE predicate on the "image_size" field.
+func ImageSizeLTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldImageSize, v))
+}
+
+// ImageSizeContains applies the Contains predicate on the "image_size" field.
+func ImageSizeContains(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContains(FieldImageSize, v))
+}
+
+// ImageSizeHasPrefix applies the HasPrefix predicate on the "image_size" field.
+func ImageSizeHasPrefix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasPrefix(FieldImageSize, v))
+}
+
+// ImageSizeHasSuffix applies the HasSuffix predicate on the "image_size" field.
+func ImageSizeHasSuffix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasSuffix(FieldImageSize, v))
+}
+
+// ImageSizeEqualFold applies the EqualFold predicate on the "image_size" field.
+func ImageSizeEqualFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEqualFold(FieldImageSize, v))
+}
+
+// ImageSizeContainsFold applies the ContainsFold predicate on the "image_size" field.
+func ImageSizeContainsFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContainsFold(FieldImageSize, v))
+}
+
+// ImageQualityEQ applies the EQ predicate on the "image_quality" field.
+func ImageQualityEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldImageQuality, v))
+}
+
+// ImageQualityNEQ applies the NEQ predicate on the "image_quality" field.
+func ImageQualityNEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldImageQuality, v))
+}
+
+// ImageQualityIn applies the In predicate on the "image_quality" field.
+func ImageQualityIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldImageQuality, vs...))
+}
+
+// ImageQualityNotIn applies the NotIn predicate on the "image_quality" field.
+func ImageQualityNotIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldImageQuality, vs...))
+}
+
+// ImageQualityGT applies the GT predicate on the "image_quality" field.
+func ImageQualityGT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldImageQuality, v))
+}
+
+// ImageQualityGTE applies the GTE predicate on the "image_quality" field.
+func ImageQualityGTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldImageQuality, v))
+}
+
+// ImageQualityLT applies the LT predicate on the "image_quality" field.
+func ImageQualityLT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldImageQuality, v))
+}
+
+// ImageQualityLTE applies the LTE predicate on the "image_quality" field.
+func ImageQualityLTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldImageQuality, v))
+}
+
+// ImageQualityContains applies the Contains predicate on the "image_quality" field.
+func ImageQualityContains(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContains(FieldImageQuality, v))
+}
+
+// ImageQualityHasPrefix applies the HasPrefix predicate on the "image_quality" field.
+func ImageQualityHasPrefix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasPrefix(FieldImageQuality, v))
+}
+
+// ImageQualityHasSuffix applies the HasSuffix predicate on the "image_quality" field.
+func ImageQualityHasSuffix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasSuffix(FieldImageQuality, v))
+}
+
+// ImageQualityEqualFold applies the EqualFold predicate on the "image_quality" field.
+func ImageQualityEqualFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEqualFold(FieldImageQuality, v))
+}
+
+// ImageQualityContainsFold applies the ContainsFold predicate on the "image_quality" field.
+func ImageQualityContainsFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContainsFold(FieldImageQuality, v))
 }
 
 // StreamEQ applies the EQ predicate on the "stream" field.

@@ -56,6 +56,8 @@ type UsageRecord struct {
 	AccountRateMultiplier float64 // 快照：本次生效的渠道成本倍率（渠道成本查询期现算）
 	ServiceTier           string
 	ReasoningEffort       string
+	ImageSize             string // 图像端点实际产出分辨率（响应为准）；非图像端点恒空
+	ImageQuality          string // 图像端点实际产出质量档（响应为准）；非图像端点恒空
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64
@@ -358,6 +360,8 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord, withChannel bool) *ent.UsageLog
 		SetAccountRateMultiplier(rec.AccountRateMultiplier).
 		SetServiceTier(rec.ServiceTier).
 		SetReasoningEffort(rec.ReasoningEffort).
+		SetImageSize(rec.ImageSize).
+		SetImageQuality(rec.ImageQuality).
 		SetStream(rec.Stream).
 		SetDurationMs(rec.DurationMs).
 		SetFirstTokenMs(rec.FirstTokenMs).

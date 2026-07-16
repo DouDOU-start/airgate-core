@@ -108,6 +108,42 @@ func TestComputeCosts(t *testing.T) {
 			want:  Costs{Input: 0.02},
 		},
 		{
+			name:  "分辨率表 quality:size 命中 × 张数",
+			price: Price{ImageSizePrices: map[string]float64{"high:1024x1024": 0.167}},
+			usage: Usage{Calls: 2, ImageSize: "1024x1024", ImageQuality: "high"},
+			want:  Costs{Input: 0.334},
+		},
+		{
+			name:  "分辨率表裸 size 键回退（不分质量档的模型）",
+			price: Price{ImageSizePrices: map[string]float64{"1024x1024": 0.04}},
+			usage: Usage{Calls: 1, ImageSize: "1024x1024", ImageQuality: "high"},
+			want:  Costs{Input: 0.04},
+		},
+		{
+			name:  "分辨率表命中优先于 per_request 并忽略 token usage（互斥防双计）",
+			price: Price{Input: 3, Output: 15, PerRequest: 0.02, ImageSizePrices: map[string]float64{"low:512x512": 0.011}},
+			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000, Calls: 1, ImageSize: "512x512", ImageQuality: "low"},
+			want:  Costs{Input: 0.011},
+		},
+		{
+			name:  "分辨率表配置但响应无 size：落回 per_request",
+			price: Price{PerRequest: 0.02, ImageSizePrices: map[string]float64{"high:1024x1024": 0.167}},
+			usage: Usage{Calls: 2},
+			want:  Costs{Input: 0.04},
+		},
+		{
+			name:  "分辨率表未命中且 per_request=0：落回 token 计价",
+			price: Price{Input: 3, Output: 15, ImageSizePrices: map[string]float64{"high:1024x1024": 0.167}},
+			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000, ImageSize: "2048x2048", ImageQuality: "high"},
+			want:  Costs{Input: 3, Output: 15},
+		},
+		{
+			name:  "分辨率表命中 Calls=0 钳为 1",
+			price: Price{ImageSizePrices: map[string]float64{"1024x1024": 0.04}},
+			usage: Usage{ImageSize: "1024x1024"},
+			want:  Costs{Input: 0.04},
+		},
+		{
 			name:  "token 计费不受 Calls 影响（PerRequest==0 时张数不参与）",
 			price: Price{Input: 3, Output: 15},
 			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000, Calls: 7},
@@ -199,6 +235,33 @@ func (f *fakePriceLoader) loadCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.loads
+}
+
+func TestImagePriceFor(t *testing.T) {
+	table := map[string]float64{"high:1024x1024": 0.167, "1024x1536": 0.06, "medium:512x512": 0}
+	cases := []struct {
+		name    string
+		price   Price
+		quality string
+		size    string
+		want    float64
+		wantOK  bool
+	}{
+		{name: "quality:size 精确命中", price: Price{ImageSizePrices: table}, quality: "high", size: "1024x1024", want: 0.167, wantOK: true},
+		{name: "quality 未配置回退裸 size 键", price: Price{ImageSizePrices: table}, quality: "high", size: "1024x1536", want: 0.06, wantOK: true},
+		{name: "quality 为空只查裸 size 键", price: Price{ImageSizePrices: table}, size: "1024x1536", want: 0.06, wantOK: true},
+		{name: "size 为空不命中（响应未带档位）", price: Price{ImageSizePrices: table}, quality: "high", wantOK: false},
+		{name: "表价 <=0 视为未配置", price: Price{ImageSizePrices: table}, quality: "medium", size: "512x512", wantOK: false},
+		{name: "空表不命中", price: Price{}, quality: "high", size: "1024x1024", wantOK: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := ImagePriceFor(tc.price, tc.quality, tc.size)
+			if ok != tc.wantOK || got != tc.want {
+				t.Errorf("ImagePriceFor(%q, %q) = (%v, %v), want (%v, %v)", tc.quality, tc.size, got, ok, tc.want, tc.wantOK)
+			}
+		})
+	}
 }
 
 func TestCacheGetAndInvalidate(t *testing.T) {

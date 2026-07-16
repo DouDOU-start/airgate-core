@@ -60,6 +60,10 @@ func (UsageLog) Fields() []ent.Field {
 		// 推理强度档位（low/medium/high/xhigh/max）：OpenAI reasoning_effort/
 		// Responses reasoning.effort，Anthropic output_config.effort，三协议统一后的扁平字符串。
 		field.String("reasoning_effort").Default(""),
+		// 图像端点实际产出档位（响应顶层 size/quality，以响应为准）：
+		// 分辨率价表计费的留痕依据，事后可还原该单按哪档、几张扣费；非图像端点恒空。
+		field.String("image_size").Default(""),
+		field.String("image_quality").Default(""),
 		field.Bool("stream").Default(false),
 		field.Int64("duration_ms").Default(0),
 		field.Int64("first_token_ms").Default(0),

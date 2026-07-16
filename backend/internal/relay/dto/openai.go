@@ -113,6 +113,12 @@ type Usage struct {
 	// Calls 按次计费的计次数：图像端点由 adaptor 从响应 data/predictions 数组长度提取
 	//（产出张数）；其余端点恒 0，计费侧（pricing.ComputeCosts）把 0 视为 1 次。
 	Calls int
+	// ImageSize / ImageQuality 图像端点实际产出的分辨率与质量档
+	//（gpt-image 系响应顶层 size/quality 字段，以响应为准而非请求参数——
+	// 覆盖 size:"auto" 与 edits multipart 场景）；供分辨率价表计费与落账留痕，
+	// 其余端点恒空。
+	ImageSize    string
+	ImageQuality string
 }
 
 // usageWire usage 字段的双协议命名兼容解析载体。

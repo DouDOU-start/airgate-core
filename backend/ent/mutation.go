@@ -21001,6 +21001,8 @@ type UsageLogMutation struct {
 	addaccount_rate_multiplier  *float64
 	service_tier                *string
 	reasoning_effort            *string
+	image_size                  *string
+	image_quality               *string
 	stream                      *bool
 	duration_ms                 *int64
 	addduration_ms              *int64
@@ -22469,6 +22471,78 @@ func (m *UsageLogMutation) ResetReasoningEffort() {
 	m.reasoning_effort = nil
 }
 
+// SetImageSize sets the "image_size" field.
+func (m *UsageLogMutation) SetImageSize(s string) {
+	m.image_size = &s
+}
+
+// ImageSize returns the value of the "image_size" field in the mutation.
+func (m *UsageLogMutation) ImageSize() (r string, exists bool) {
+	v := m.image_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImageSize returns the old "image_size" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldImageSize(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImageSize is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImageSize requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImageSize: %w", err)
+	}
+	return oldValue.ImageSize, nil
+}
+
+// ResetImageSize resets all changes to the "image_size" field.
+func (m *UsageLogMutation) ResetImageSize() {
+	m.image_size = nil
+}
+
+// SetImageQuality sets the "image_quality" field.
+func (m *UsageLogMutation) SetImageQuality(s string) {
+	m.image_quality = &s
+}
+
+// ImageQuality returns the value of the "image_quality" field in the mutation.
+func (m *UsageLogMutation) ImageQuality() (r string, exists bool) {
+	v := m.image_quality
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImageQuality returns the old "image_quality" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldImageQuality(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImageQuality is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImageQuality requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImageQuality: %w", err)
+	}
+	return oldValue.ImageQuality, nil
+}
+
+// ResetImageQuality resets all changes to the "image_quality" field.
+func (m *UsageLogMutation) ResetImageQuality() {
+	m.image_quality = nil
+}
+
 // SetStream sets the "stream" field.
 func (m *UsageLogMutation) SetStream(b bool) {
 	m.stream = &b
@@ -23339,7 +23413,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 41)
+	fields := make([]string, 0, 43)
 	if m.model != nil {
 		fields = append(fields, usagelog.FieldModel)
 	}
@@ -23414,6 +23488,12 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.reasoning_effort != nil {
 		fields = append(fields, usagelog.FieldReasoningEffort)
+	}
+	if m.image_size != nil {
+		fields = append(fields, usagelog.FieldImageSize)
+	}
+	if m.image_quality != nil {
+		fields = append(fields, usagelog.FieldImageQuality)
 	}
 	if m.stream != nil {
 		fields = append(fields, usagelog.FieldStream)
@@ -23521,6 +23601,10 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.ServiceTier()
 	case usagelog.FieldReasoningEffort:
 		return m.ReasoningEffort()
+	case usagelog.FieldImageSize:
+		return m.ImageSize()
+	case usagelog.FieldImageQuality:
+		return m.ImageQuality()
 	case usagelog.FieldStream:
 		return m.Stream()
 	case usagelog.FieldDurationMs:
@@ -23612,6 +23696,10 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldServiceTier(ctx)
 	case usagelog.FieldReasoningEffort:
 		return m.OldReasoningEffort(ctx)
+	case usagelog.FieldImageSize:
+		return m.OldImageSize(ctx)
+	case usagelog.FieldImageQuality:
+		return m.OldImageQuality(ctx)
 	case usagelog.FieldStream:
 		return m.OldStream(ctx)
 	case usagelog.FieldDurationMs:
@@ -23827,6 +23915,20 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetReasoningEffort(v)
+		return nil
+	case usagelog.FieldImageSize:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImageSize(v)
+		return nil
+	case usagelog.FieldImageQuality:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImageQuality(v)
 		return nil
 	case usagelog.FieldStream:
 		v, ok := value.(bool)
@@ -24399,6 +24501,12 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldReasoningEffort:
 		m.ResetReasoningEffort()
+		return nil
+	case usagelog.FieldImageSize:
+		m.ResetImageSize()
+		return nil
+	case usagelog.FieldImageQuality:
+		m.ResetImageQuality()
 		return nil
 	case usagelog.FieldStream:
 		m.ResetStream()

@@ -729,6 +729,8 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		CacheCreation5mTokens: usage.CacheCreation5mTokens,
 		CacheCreation1hTokens: usage.CacheCreation1hTokens,
 		Calls:                 usage.Calls,
+		ImageSize:             usage.ImageSize,
+		ImageQuality:          usage.ImageQuality,
 	}, tier)
 	calc := p.calculator.Calculate(billing.CalculateInput{
 		InputCost:         costs.Input,
@@ -746,14 +748,20 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		inputTokens = 0
 	}
 
-	// 按次计费时把 per_request 单价写入 InputPrice 快照位，成本整单落在
-	// InputCost = per_request × 计次数（图像端点计次数=响应产出张数，其余端点恒 1），
+	// 按次/按张计费时把生效单价写入 InputPrice 快照位，成本整单落在
+	// InputCost = 单价 × 计次数（图像端点计次数=响应产出张数，其余端点恒 1），
 	// 保证 usage_log 的「单价 × 用量 = 成本」对账口径成立。
+	// 单价来源与 ComputeCosts 同一优先级链：分辨率表命中 > per_request。
 	inputPrice := price.Input
 	// billedCalls 落账计次：按次计费下上游未给张数（如联网搜索）时按 1 次记，
 	// 保证 usage_log「单价 × 计次 = 成本」对账口径成立（ComputeCosts 内部同样把 <1 钳为 1）。
 	billedCalls := usage.Calls
-	if price.PerRequest > 0 {
+	if perImage, ok := pricing.ImagePriceFor(price, usage.ImageQuality, usage.ImageSize); ok {
+		inputPrice = perImage
+		if billedCalls < 1 {
+			billedCalls = 1
+		}
+	} else if price.PerRequest > 0 {
 		inputPrice = price.PerRequest
 		if billedCalls < 1 {
 			billedCalls = 1
@@ -782,6 +790,8 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		CacheCreation1hPrice:  price.CacheCreation1h,
 		ServiceTier:           tier,
 		ReasoningEffort:       reasoningEffort,
+		ImageSize:             usage.ImageSize,
+		ImageQuality:          usage.ImageQuality,
 		InputCost:             calc.InputCost,
 		OutputCost:            calc.OutputCost,
 		CachedInputCost:       calc.CachedInputCost,

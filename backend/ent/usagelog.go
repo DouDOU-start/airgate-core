@@ -72,6 +72,10 @@ type UsageLog struct {
 	ServiceTier string `json:"service_tier,omitempty"`
 	// ReasoningEffort holds the value of the "reasoning_effort" field.
 	ReasoningEffort string `json:"reasoning_effort,omitempty"`
+	// ImageSize holds the value of the "image_size" field.
+	ImageSize string `json:"image_size,omitempty"`
+	// ImageQuality holds the value of the "image_quality" field.
+	ImageQuality string `json:"image_quality,omitempty"`
 	// Stream holds the value of the "stream" field.
 	Stream bool `json:"stream,omitempty"`
 	// DurationMs holds the value of the "duration_ms" field.
@@ -193,7 +197,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldCalls, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldUserIDSnapshot, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldChannelID, usagelog.FieldChannelKeyID, usagelog.FieldGroupID:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldReasoningEffort, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldSource, usagelog.FieldRequestID, usagelog.FieldUserEmailSnapshot:
+		case usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldReasoningEffort, usagelog.FieldImageSize, usagelog.FieldImageQuality, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldSource, usagelog.FieldRequestID, usagelog.FieldUserEmailSnapshot:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -367,6 +371,18 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field reasoning_effort", values[i])
 			} else if value.Valid {
 				ul.ReasoningEffort = value.String
+			}
+		case usagelog.FieldImageSize:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field image_size", values[i])
+			} else if value.Valid {
+				ul.ImageSize = value.String
+			}
+		case usagelog.FieldImageQuality:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field image_quality", values[i])
+			} else if value.Valid {
+				ul.ImageQuality = value.String
 			}
 		case usagelog.FieldStream:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -599,6 +615,12 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("reasoning_effort=")
 	builder.WriteString(ul.ReasoningEffort)
+	builder.WriteString(", ")
+	builder.WriteString("image_size=")
+	builder.WriteString(ul.ImageSize)
+	builder.WriteString(", ")
+	builder.WriteString("image_quality=")
+	builder.WriteString(ul.ImageQuality)
 	builder.WriteString(", ")
 	builder.WriteString("stream=")
 	builder.WriteString(fmt.Sprintf("%v", ul.Stream))

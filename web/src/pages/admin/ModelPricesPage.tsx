@@ -91,9 +91,31 @@ const PRICE_SECTIONS: { titleKey: string; fields: readonly PriceFieldKey[] }[] =
   { titleKey: 'model_prices.section_cache', fields: ['cached_input_price', 'cache_creation_price', 'cache_creation_1h_price'] },
 ];
 
-// 计费方式：按 Token（默认）或按次一口价。后端 per_request>0 时短路 token 计价，
-// 服务档/长上下文也不参与，故按次模式下相关配置一律隐藏并清零。
-type BillingMode = 'token' | 'per_request' | 'video_per_second';
+// 计费方式：按 Token（默认）/按次一口价/视频按秒/图像按张（分辨率×质量价表）。
+// 后端 per_request>0 或分辨率表命中时短路 token 计价，服务档/长上下文也不参与，
+// 故非 token 模式下相关配置一律隐藏并清零。
+type BillingMode = 'token' | 'per_request' | 'video_per_second' | 'per_image';
+
+// ImagePriceRow 分辨率价表编辑行：质量档可留空（落库为裸 size 键，不分质量档）。
+interface ImagePriceRow {
+  quality: string;
+  size: string;
+  price: string;
+}
+
+// imageRowsFromExtra 把 pricing_extra.image.size_prices 解析为编辑行
+//（键按第一个 ":" 拆 quality/size；无 ":" 视为裸 size 键）。
+function imageRowsFromExtra(sizePrices: Record<string, unknown>): ImagePriceRow[] {
+  return Object.entries(sizePrices)
+    .filter(([, v]) => Number.isFinite(Number(v)) && Number(v) > 0)
+    .map(([key, v]) => {
+      const idx = key.indexOf(':');
+      return idx > 0
+        ? { quality: key.slice(0, idx), size: key.slice(idx + 1), price: String(v) }
+        : { quality: '', size: key, price: String(v) };
+    })
+    .sort((a, b) => (a.quality + a.size).localeCompare(b.quality + b.size));
+}
 
 function fmtPrice(value: number): string {
   if (!value) return '—';
@@ -213,6 +235,19 @@ function specialLine(row: ModelPriceResp, t: Translate): ReactNode {
       );
     }
   }
+  // 图像分辨率价表：卡片只给价格区间 + 档数概览，明细进编辑弹窗看。
+  const sizePrices = asRecord(asRecord(row.pricing_extra?.image).size_prices);
+  const imagePrices = Object.values(sizePrices).map(Number).filter((n) => Number.isFinite(n) && n > 0);
+  if (imagePrices.length > 0) {
+    const min = Math.min(...imagePrices);
+    const max = Math.max(...imagePrices);
+    parts.push(
+      <span className="whitespace-nowrap font-medium text-warning" key="img">
+        {t('model_prices.price_short_per_image')} {min === max ? fmtPrice(min) : `${fmtPrice(min)}~${fmtPrice(max)}`}
+        <span className="ml-1 font-normal text-text-tertiary">×{imagePrices.length}</span>
+      </span>,
+    );
+  }
   const tiers = row.pricing_extra?.service_tiers;
   if (tiers && typeof tiers === 'object' && !Array.isArray(tiers)) {
     for (const [name, mul] of Object.entries(tiers as Record<string, unknown>)) {
@@ -315,8 +350,11 @@ export default function ModelPricesPage() {
   // 编辑已配置的模型时自动打开对应开关。
   const [tiersEnabled, setTiersEnabled] = useState(false);
   const [lcEnabled, setLcEnabled] = useState(false);
-  // 计费方式切换：token（按量）/ per_request（按次一口价）。
+  // 计费方式切换：token（按量）/ per_request（按次一口价）/ video_per_second / per_image。
   const [billingMode, setBillingMode] = useState<BillingMode>('token');
+  // 图像分辨率价表编辑行 + image 段中 size_prices 之外的键（保存时原样拼回）。
+  const [imageRows, setImageRows] = useState<ImagePriceRow[]>([]);
+  const [imageRest, setImageRest] = useState<Record<string, unknown>>({});
   // 表单选中的标签 ID（0 = 无标签）。
   const [formTagID, setFormTagID] = useState(0);
   // 标签管理块的交互状态：新建输入 / 行内重命名 / 删除确认目标。
@@ -431,6 +469,8 @@ export default function ModelPricesPage() {
     setForm(emptyForm);
     setExtraRest({});
     setTiersRest({});
+    setImageRows([]);
+    setImageRest({});
     setTiersEnabled(false);
     setLcEnabled(false);
     setBillingMode('token');
@@ -440,21 +480,34 @@ export default function ModelPricesPage() {
 
   function openEdit(price: ModelPriceResp) {
     const extra = asRecord(price.pricing_extra);
-    const { long_context: lcRaw, service_tiers: tiersRaw, video: videoRaw, ...restExtra } = extra;
+    const { image: imageRaw, long_context: lcRaw, service_tiers: tiersRaw, video: videoRaw, ...restExtra } = extra;
     const { flex, priority, ...restTiers } = asRecord(tiersRaw);
     const lc = asRecord(lcRaw);
     const videoPerSecond = numToField(asRecord(videoRaw).per_second);
+    const { size_prices: sizePricesRaw, ...restImage } = asRecord(imageRaw);
+    const rows = imageRowsFromExtra(asRecord(sizePricesRaw));
 
     setEditingPrice(price);
     setExtraRest(restExtra);
     setTiersRest(restTiers);
+    setImageRows(rows);
+    setImageRest(restImage);
     setTiersEnabled(
       Object.keys(restTiers).length > 0
       || numToField(priority) !== ''
       || numToField(flex) !== '',
     );
     setLcEnabled(numToField(lc.threshold_tokens) !== '');
-    setBillingMode(price.per_request_price > 0 ? 'per_request' : videoPerSecond !== '' ? 'video_per_second' : 'token');
+    // 计费方式回显与后端计价优先级一致：分辨率表 > 按次 > 视频按秒 > token。
+    setBillingMode(
+      rows.length > 0
+        ? 'per_image'
+        : price.per_request_price > 0
+          ? 'per_request'
+          : videoPerSecond !== ''
+            ? 'video_per_second'
+            : 'token',
+    );
     setFormTagID(price.tag?.id ?? 0);
     setForm({
       model: price.model,
@@ -487,6 +540,11 @@ export default function ModelPricesPage() {
       return;
     }
     const payload: CreateModelPriceReq = { model: form.model.trim() };
+    // image 段中 size_prices 之外的键始终原样保留（切换计费方式只清价表本身）。
+    const baseExtra = (): Record<string, unknown> => ({
+      ...extraRest,
+      ...(Object.keys(imageRest).length > 0 ? { image: { ...imageRest } } : {}),
+    });
 
     // 按次计费：只收按次价（必须 >0），token 价格全部清零；
     // 后端 per_request>0 时短路 token 计价，服务档/长上下文不参与，一并不写入。
@@ -499,7 +557,7 @@ export default function ModelPricesPage() {
       }
       payload.per_request_price = num;
       for (const field of TOKEN_PRICE_FIELDS) payload[field] = 0;
-      payload.pricing_extra = { ...extraRest };
+      payload.pricing_extra = baseExtra();
       payload.tag_id = formTagID;
       if (editingPrice) {
         updateMutation.mutate({ id: editingPrice.id, payload });
@@ -520,7 +578,47 @@ export default function ModelPricesPage() {
       }
       payload.per_request_price = 0;
       for (const field of TOKEN_PRICE_FIELDS) payload[field] = 0;
-      payload.pricing_extra = { ...extraRest, video: { per_second: num } };
+      payload.pricing_extra = { ...baseExtra(), video: { per_second: num } };
+      payload.tag_id = formTagID;
+      if (editingPrice) {
+        updateMutation.mutate({ id: editingPrice.id, payload });
+      } else {
+        createMutation.mutate(payload);
+      }
+      return;
+    }
+
+    // 图像按张计费：分辨率×质量价表（至少一行，尺寸必填、单价 >0），写入
+    // pricing_extra.image.size_prices（键 "quality:size"，质量档留空为裸 "size"）；
+    // 按次价清零，但 token 价保留——后端表命中时短路 token 计价（互斥不双计），
+    // 表未命中（非标准分辨率）时按响应 usage 走 token 兜底，防计 0 放行。
+    if (billingMode === 'per_image') {
+      const sizePrices: Record<string, number> = {};
+      for (const row of imageRows) {
+        const quality = row.quality.trim();
+        const size = row.size.trim();
+        const num = row.price.trim() === '' ? 0 : Number(row.price);
+        if (!size || !Number.isFinite(num) || num <= 0) {
+          toast('error', t('model_prices.image_rows_required'));
+          return;
+        }
+        sizePrices[quality ? `${quality}:${size}` : size] = num;
+      }
+      if (Object.keys(sizePrices).length === 0) {
+        toast('error', t('model_prices.image_rows_required'));
+        return;
+      }
+      payload.per_request_price = 0;
+      for (const field of TOKEN_PRICE_FIELDS) {
+        const raw = form[field];
+        const num = raw === '' ? 0 : Number(raw);
+        if (!Number.isFinite(num) || num < 0) {
+          toast('error', t('model_prices.price_invalid'));
+          return;
+        }
+        payload[field] = num;
+      }
+      payload.pricing_extra = { ...extraRest, image: { ...imageRest, size_prices: sizePrices } };
       payload.tag_id = formTagID;
       if (editingPrice) {
         updateMutation.mutate({ id: editingPrice.id, payload });
@@ -549,7 +647,7 @@ export default function ModelPricesPage() {
       const num = raw === '' ? 0 : Number(raw);
       return Number.isFinite(num) && num >= 0 ? num : null;
     };
-    const extra: Record<string, unknown> = { ...extraRest };
+    const extra: Record<string, unknown> = baseExtra();
     if (tiersEnabled) {
       const priority = parseExtraField('tier_priority');
       const flex = parseExtraField('tier_flex');
@@ -911,18 +1009,93 @@ export default function ModelPricesPage() {
                       selectionMode="single"
                       onSelectionChange={(keys) => {
                         const key = [...keys][0];
-                        if (key === 'token' || key === 'per_request' || key === 'video_per_second') setBillingMode(key);
+                        if (key === 'token' || key === 'per_request' || key === 'video_per_second' || key === 'per_image') setBillingMode(key);
                       }}
                     >
                       <ToggleButton id="token">{t('model_prices.billing_mode_token')}</ToggleButton>
                       <ToggleButton id="per_request">{t('model_prices.billing_mode_per_request')}</ToggleButton>
                       <ToggleButton id="video_per_second">{t('model_prices.billing_mode_video')}</ToggleButton>
+                      <ToggleButton id="per_image">{t('model_prices.billing_mode_per_image')}</ToggleButton>
                     </ToggleButtonGroup>
                   </div>
 
                   {billingMode === 'per_request' ? (
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {renderPriceField('per_request_price')}
+                    </div>
+                  ) : billingMode === 'per_image' ? (
+                    <div className="space-y-2">
+                      <p className="text-[11px] leading-4 text-text-tertiary">{t('model_prices.image_prices_hint')}</p>
+                      {imageRows.map((row, index) => (
+                        <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2" key={index}>
+                          <HeroTextField fullWidth>
+                            {index === 0 ? <Label>{t('model_prices.image_quality')}</Label> : null}
+                            <Input
+                              placeholder={t('model_prices.image_quality_placeholder')}
+                              value={row.quality}
+                              onChange={(event) => setImageRows((prev) =>
+                                prev.map((r, i) => (i === index ? { ...r, quality: event.target.value } : r)))}
+                            />
+                          </HeroTextField>
+                          <HeroTextField fullWidth>
+                            {index === 0 ? <Label>{t('model_prices.image_size')}</Label> : null}
+                            <Input
+                              placeholder="1024x1024"
+                              value={row.size}
+                              onChange={(event) => setImageRows((prev) =>
+                                prev.map((r, i) => (i === index ? { ...r, size: event.target.value } : r)))}
+                            />
+                          </HeroTextField>
+                          <HeroTextField fullWidth>
+                            {index === 0 ? (
+                              <Label>
+                                {t('model_prices.image_price')}
+                                <span className="ml-1 text-[10px] font-normal text-text-tertiary">
+                                  {t('model_prices.unit_per_image')}
+                                </span>
+                              </Label>
+                            ) : null}
+                            <Input
+                              min={0}
+                              placeholder="0"
+                              step="any"
+                              type="number"
+                              value={row.price}
+                              onChange={(event) => setImageRows((prev) =>
+                                prev.map((r, i) => (i === index ? { ...r, price: event.target.value } : r)))}
+                            />
+                          </HeroTextField>
+                          <Button
+                            isIconOnly
+                            aria-label={t('common.delete')}
+                            size="sm"
+                            variant="ghost"
+                            onPress={() => setImageRows((prev) => prev.filter((_, i) => i !== index))}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onPress={() => setImageRows((prev) => [...prev, { quality: '', size: '', price: '' }])}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        {t('model_prices.image_add_row')}
+                      </Button>
+                      <div className="space-y-2 border-t border-border pt-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-text-tertiary">
+                          {t('model_prices.image_token_fallback')}
+                        </p>
+                        <p className="text-[11px] leading-4 text-text-tertiary">
+                          {t('model_prices.image_token_fallback_hint')}
+                        </p>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          {renderPriceField('input_price')}
+                          {renderPriceField('output_price')}
+                        </div>
+                      </div>
                     </div>
                   ) : billingMode === 'video_per_second' ? (
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

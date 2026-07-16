@@ -87,6 +87,8 @@ type ModelMarketItemResp struct {
 	ServiceTiers map[string]float64 `json:"service_tiers,omitempty"`
 	// LongContext 长上下文阶梯，未配置时省略。
 	LongContext *ModelMarketLongContext `json:"long_context,omitempty"`
+	// ImageSizePrices 图像分辨率价表（USD/张，键 "quality:size" 或裸 "size"），未配置时省略。
+	ImageSizePrices map[string]float64 `json:"image_size_prices,omitempty"`
 }
 
 // ModelMarketLongContext 长上下文阶梯：完整 prompt 超过阈值时各维度单价按对应倍率放大。

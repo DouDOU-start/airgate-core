@@ -730,6 +730,8 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		AccountRateMultiplier: item.AccountRateMultiplier,
 		ServiceTier:           item.ServiceTier,
 		ReasoningEffort:       item.ReasoningEffort,
+		ImageSize:             item.ImageSize,
+		ImageQuality:          item.ImageQuality,
 		Stream:                item.Stream,
 		DurationMs:            item.DurationMs,
 		FirstTokenMs:          item.FirstTokenMs,

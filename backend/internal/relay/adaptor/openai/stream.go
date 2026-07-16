@@ -36,6 +36,10 @@ type imageStreamObserver struct {
 	usage *dto.Usage
 	calls int
 	done  bool
+	// size / quality 实际产出档位（completed 事件顶层 size/quality，最后一个非空生效）；
+	// 供分辨率价表计费与落账留痕。
+	size    string
+	quality string
 }
 
 // ObserveLine 旁路观察一行上游 SSE；非 data 行与无法解析的 data 一律忽略。
@@ -48,8 +52,10 @@ func (o *imageStreamObserver) ObserveLine(line string) {
 		return
 	}
 	var probe struct {
-		Type  string          `json:"type"`
-		Usage json.RawMessage `json:"usage"`
+		Type    string          `json:"type"`
+		Usage   json.RawMessage `json:"usage"`
+		Size    string          `json:"size"`
+		Quality string          `json:"quality"`
 	}
 	if err := json.Unmarshal([]byte(data), &probe); err != nil {
 		return
@@ -57,6 +63,12 @@ func (o *imageStreamObserver) ObserveLine(line string) {
 	if strings.HasSuffix(probe.Type, ".completed") {
 		o.calls++
 		o.done = true
+	}
+	if probe.Size != "" {
+		o.size = probe.Size
+	}
+	if probe.Quality != "" {
+		o.quality = probe.Quality
 	}
 	if len(probe.Usage) > 0 && string(probe.Usage) != "null" {
 		if u, parsed := dto.ParseUsage(probe.Usage); parsed {
@@ -78,6 +90,8 @@ func (o *imageStreamObserver) Usage() (dto.Usage, bool) {
 		u = *o.usage
 	}
 	u.Calls = o.calls
+	u.ImageSize = o.size
+	u.ImageQuality = o.quality
 	return u, true
 }
 

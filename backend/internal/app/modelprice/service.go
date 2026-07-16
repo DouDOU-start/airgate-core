@@ -151,6 +151,7 @@ func (s *Service) LoadAllPrices(ctx context.Context) (map[string]pricing.Price, 
 			CacheCreation1h: item.CacheCreation1hPrice,
 			PerRequest:      item.PerRequestPrice,
 			VideoPerSecond:  parseVideoPerSecond(item.Model, item.PricingExtra),
+			ImageSizePrices: ParseImageSizePrices(item.Model, item.PricingExtra),
 			ServiceTiers:    tiers,
 			LongContext:     toPricingLongContextRule(longCtx),
 		}
@@ -188,6 +189,41 @@ func parseVideoPerSecond(model string, extra map[string]interface{}) float64 {
 		return v
 	}
 	return 0
+}
+
+// ParseImageSizePrices 解析 pricing_extra.image.size_prices（图像分辨率价表，USD/张）：
+// 键为 "quality:size" 或裸 "size"，值 <=0 的条目丢弃。字段缺失返回 nil；
+// 形态非法记 warn 不阻断加载。导出供 server/handler 复用同一解析规则
+// （模型广场展示口径与计费口径一致）。
+func ParseImageSizePrices(model string, extra map[string]interface{}) map[string]float64 {
+	raw, ok := extra["image"]
+	if !ok {
+		return nil
+	}
+	m, ok := raw.(map[string]interface{})
+	if !ok {
+		slog.Warn("model_price_pricing_extra_invalid", "model", model, "field", "image")
+		return nil
+	}
+	rawPrices, ok := m["size_prices"]
+	if !ok {
+		return nil
+	}
+	pm, ok := rawPrices.(map[string]interface{})
+	if !ok {
+		slog.Warn("model_price_pricing_extra_invalid", "model", model, "field", "image.size_prices")
+		return nil
+	}
+	prices := make(map[string]float64, len(pm))
+	for key, v := range pm {
+		if f, ok := toFloat(v); ok && f > 0 {
+			prices[key] = f
+		}
+	}
+	if len(prices) == 0 {
+		return nil
+	}
+	return prices
 }
 
 // ParsePricingExtra 把 pricing_extra JSON（map 形态）解析为服务档倍率与长上下文阶梯。

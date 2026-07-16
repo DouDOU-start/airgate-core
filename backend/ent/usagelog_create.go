@@ -369,6 +369,34 @@ func (ulc *UsageLogCreate) SetNillableReasoningEffort(s *string) *UsageLogCreate
 	return ulc
 }
 
+// SetImageSize sets the "image_size" field.
+func (ulc *UsageLogCreate) SetImageSize(s string) *UsageLogCreate {
+	ulc.mutation.SetImageSize(s)
+	return ulc
+}
+
+// SetNillableImageSize sets the "image_size" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableImageSize(s *string) *UsageLogCreate {
+	if s != nil {
+		ulc.SetImageSize(*s)
+	}
+	return ulc
+}
+
+// SetImageQuality sets the "image_quality" field.
+func (ulc *UsageLogCreate) SetImageQuality(s string) *UsageLogCreate {
+	ulc.mutation.SetImageQuality(s)
+	return ulc
+}
+
+// SetNillableImageQuality sets the "image_quality" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableImageQuality(s *string) *UsageLogCreate {
+	if s != nil {
+		ulc.SetImageQuality(*s)
+	}
+	return ulc
+}
+
 // SetStream sets the "stream" field.
 func (ulc *UsageLogCreate) SetStream(b bool) *UsageLogCreate {
 	ulc.mutation.SetStream(b)
@@ -749,6 +777,14 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultReasoningEffort
 		ulc.mutation.SetReasoningEffort(v)
 	}
+	if _, ok := ulc.mutation.ImageSize(); !ok {
+		v := usagelog.DefaultImageSize
+		ulc.mutation.SetImageSize(v)
+	}
+	if _, ok := ulc.mutation.ImageQuality(); !ok {
+		v := usagelog.DefaultImageQuality
+		ulc.mutation.SetImageQuality(v)
+	}
 	if _, ok := ulc.mutation.Stream(); !ok {
 		v := usagelog.DefaultStream
 		ulc.mutation.SetStream(v)
@@ -876,6 +912,12 @@ func (ulc *UsageLogCreate) check() error {
 	}
 	if _, ok := ulc.mutation.ReasoningEffort(); !ok {
 		return &ValidationError{Name: "reasoning_effort", err: errors.New(`ent: missing required field "UsageLog.reasoning_effort"`)}
+	}
+	if _, ok := ulc.mutation.ImageSize(); !ok {
+		return &ValidationError{Name: "image_size", err: errors.New(`ent: missing required field "UsageLog.image_size"`)}
+	}
+	if _, ok := ulc.mutation.ImageQuality(); !ok {
+		return &ValidationError{Name: "image_quality", err: errors.New(`ent: missing required field "UsageLog.image_quality"`)}
 	}
 	if _, ok := ulc.mutation.Stream(); !ok {
 		return &ValidationError{Name: "stream", err: errors.New(`ent: missing required field "UsageLog.stream"`)}
@@ -1036,6 +1078,14 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := ulc.mutation.ReasoningEffort(); ok {
 		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
 		_node.ReasoningEffort = value
+	}
+	if value, ok := ulc.mutation.ImageSize(); ok {
+		_spec.SetField(usagelog.FieldImageSize, field.TypeString, value)
+		_node.ImageSize = value
+	}
+	if value, ok := ulc.mutation.ImageQuality(); ok {
+		_spec.SetField(usagelog.FieldImageQuality, field.TypeString, value)
+		_node.ImageQuality = value
 	}
 	if value, ok := ulc.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
@@ -1647,6 +1697,30 @@ func (u *UsageLogUpsert) SetReasoningEffort(v string) *UsageLogUpsert {
 // UpdateReasoningEffort sets the "reasoning_effort" field to the value that was provided on create.
 func (u *UsageLogUpsert) UpdateReasoningEffort() *UsageLogUpsert {
 	u.SetExcluded(usagelog.FieldReasoningEffort)
+	return u
+}
+
+// SetImageSize sets the "image_size" field.
+func (u *UsageLogUpsert) SetImageSize(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldImageSize, v)
+	return u
+}
+
+// UpdateImageSize sets the "image_size" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateImageSize() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldImageSize)
+	return u
+}
+
+// SetImageQuality sets the "image_quality" field.
+func (u *UsageLogUpsert) SetImageQuality(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldImageQuality, v)
+	return u
+}
+
+// UpdateImageQuality sets the "image_quality" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateImageQuality() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldImageQuality)
 	return u
 }
 
@@ -2424,6 +2498,34 @@ func (u *UsageLogUpsertOne) SetReasoningEffort(v string) *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) UpdateReasoningEffort() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateReasoningEffort()
+	})
+}
+
+// SetImageSize sets the "image_size" field.
+func (u *UsageLogUpsertOne) SetImageSize(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetImageSize(v)
+	})
+}
+
+// UpdateImageSize sets the "image_size" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateImageSize() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateImageSize()
+	})
+}
+
+// SetImageQuality sets the "image_quality" field.
+func (u *UsageLogUpsertOne) SetImageQuality(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetImageQuality(v)
+	})
+}
+
+// UpdateImageQuality sets the "image_quality" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateImageQuality() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateImageQuality()
 	})
 }
 
@@ -3405,6 +3507,34 @@ func (u *UsageLogUpsertBulk) SetReasoningEffort(v string) *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) UpdateReasoningEffort() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateReasoningEffort()
+	})
+}
+
+// SetImageSize sets the "image_size" field.
+func (u *UsageLogUpsertBulk) SetImageSize(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetImageSize(v)
+	})
+}
+
+// UpdateImageSize sets the "image_size" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateImageSize() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateImageSize()
+	})
+}
+
+// SetImageQuality sets the "image_quality" field.
+func (u *UsageLogUpsertBulk) SetImageQuality(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetImageQuality(v)
+	})
+}
+
+// UpdateImageQuality sets the "image_quality" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateImageQuality() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateImageQuality()
 	})
 }
 

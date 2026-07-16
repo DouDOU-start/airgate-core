@@ -264,6 +264,8 @@ func (Adaptor) ParseNonStreamResponse(info *adaptor.RelayInfo, body []byte) ([]b
 	// 图像端点：data 数组长度即产出张数（以响应为准，非请求 n），写入 usage.Calls
 	// 供 PerRequest 按次×张数计费；token usage（gpt-image 系）若存在照常提取，两者并存
 	//（PerRequest==0 时按 token 计费、Calls 不参与）。
+	// 顶层 size/quality（gpt-image 系实际产出档位）一并提取，供分辨率价表计费——
+	// 以响应为准可覆盖 size:"auto" 与 edits multipart 场景；dall-e 系不带则留空。
 	if info.Endpoint == adaptor.EndpointImagesGenerations || info.Endpoint == adaptor.EndpointImagesEdits {
 		if raw, ok := fields["data"]; ok && string(raw) != "null" {
 			var items []json.RawMessage
@@ -273,6 +275,10 @@ func (Adaptor) ParseNonStreamResponse(info *adaptor.RelayInfo, body []byte) ([]b
 				}
 				usage.Calls = len(items)
 			}
+		}
+		if usage != nil {
+			usage.ImageSize = stringField(fields, "size")
+			usage.ImageQuality = stringField(fields, "quality")
 		}
 	}
 
@@ -288,4 +294,17 @@ func (Adaptor) ParseNonStreamResponse(info *adaptor.RelayInfo, body []byte) ([]b
 		}
 	}
 	return body, usage
+}
+
+// stringField 从字段表取字符串值；缺失、null 或非字符串返回空串。
+func stringField(fields map[string]json.RawMessage, key string) string {
+	raw, ok := fields[key]
+	if !ok || string(raw) == "null" {
+		return ""
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return ""
+	}
+	return s
 }

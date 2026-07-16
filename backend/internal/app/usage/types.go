@@ -80,6 +80,8 @@ type LogRecord struct {
 	AccountRateMultiplier float64 // 快照：本次生效的渠道成本倍率；渠道成本 = TotalCost × 本值，查询期现算
 	ServiceTier           string
 	ReasoningEffort       string
+	ImageSize             string // 图像端点实际产出分辨率；非图像端点恒空
+	ImageQuality          string // 图像端点实际产出质量档；非图像端点恒空
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64

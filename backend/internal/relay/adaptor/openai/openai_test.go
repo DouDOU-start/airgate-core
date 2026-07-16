@@ -396,6 +396,17 @@ func TestParseNonStreamResponseImages(t *testing.T) {
 				`"usage":{"input_tokens":100,"output_tokens":200,"input_tokens_details":{"cached_tokens":30}}}`,
 			want: &dto.Usage{PromptTokens: 100, CompletionTokens: 200, CachedTokens: 30, Calls: 1},
 		},
+		{
+			name: "顶层 size/quality 提取（gpt-image 系，供分辨率价表计费）",
+			body: `{"created":1,"data":[{"b64_json":"QUJD"},{"b64_json":"REVG"}],"size":"1024x1536","quality":"high",` +
+				`"usage":{"input_tokens":150,"output_tokens":4160}}`,
+			want: &dto.Usage{PromptTokens: 150, CompletionTokens: 4160, Calls: 2, ImageSize: "1024x1536", ImageQuality: "high"},
+		},
+		{
+			name: "size/quality 缺失或为 null 留空（dall-e 系）",
+			body: `{"created":1,"data":[{"url":"https://x/1.png"}],"quality":null}`,
+			want: &dto.Usage{Calls: 1},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -604,6 +615,16 @@ func TestImageStreamObserver(t *testing.T) {
 				`data: {"type":"weird.event","usage":{"input_tokens":5,"output_tokens":7}}`,
 			},
 			wantUsage: &dto.Usage{PromptTokens: 5, CompletionTokens: 7},
+			wantDone:  true,
+		},
+		{
+			name: "completed 携带 size/quality：提取供分辨率价表计费",
+			lines: []string{
+				`data: {"type":"image_generation.partial_image","b64_json":"QQ==","size":"1024x1024"}`,
+				`data: {"type":"image_generation.completed","b64_json":"Qw==","size":"1024x1536","quality":"high",` +
+					`"usage":{"input_tokens":150,"output_tokens":4160}}`,
+			},
+			wantUsage: &dto.Usage{PromptTokens: 150, CompletionTokens: 4160, Calls: 1, ImageSize: "1024x1536", ImageQuality: "high"},
 			wantDone:  true,
 		},
 	}

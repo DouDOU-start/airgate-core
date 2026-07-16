@@ -64,6 +64,10 @@ const (
 	FieldServiceTier = "service_tier"
 	// FieldReasoningEffort holds the string denoting the reasoning_effort field in the database.
 	FieldReasoningEffort = "reasoning_effort"
+	// FieldImageSize holds the string denoting the image_size field in the database.
+	FieldImageSize = "image_size"
+	// FieldImageQuality holds the string denoting the image_quality field in the database.
+	FieldImageQuality = "image_quality"
 	// FieldStream holds the string denoting the stream field in the database.
 	FieldStream = "stream"
 	// FieldDurationMs holds the string denoting the duration_ms field in the database.
@@ -173,6 +177,8 @@ var Columns = []string{
 	FieldAccountRateMultiplier,
 	FieldServiceTier,
 	FieldReasoningEffort,
+	FieldImageSize,
+	FieldImageQuality,
 	FieldStream,
 	FieldDurationMs,
 	FieldFirstTokenMs,
@@ -252,6 +258,10 @@ var (
 	DefaultServiceTier string
 	// DefaultReasoningEffort holds the default value on creation for the "reasoning_effort" field.
 	DefaultReasoningEffort string
+	// DefaultImageSize holds the default value on creation for the "image_size" field.
+	DefaultImageSize string
+	// DefaultImageQuality holds the default value on creation for the "image_quality" field.
+	DefaultImageQuality string
 	// DefaultStream holds the default value on creation for the "stream" field.
 	DefaultStream bool
 	// DefaultDurationMs holds the default value on creation for the "duration_ms" field.
@@ -407,6 +417,16 @@ func ByServiceTier(opts ...sql.OrderTermOption) OrderOption {
 // ByReasoningEffort orders the results by the reasoning_effort field.
 func ByReasoningEffort(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldReasoningEffort, opts...).ToFunc()
+}
+
+// ByImageSize orders the results by the image_size field.
+func ByImageSize(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImageSize, opts...).ToFunc()
+}
+
+// ByImageQuality orders the results by the image_quality field.
+func ByImageQuality(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImageQuality, opts...).ToFunc()
 }
 
 // ByStream orders the results by the stream field.

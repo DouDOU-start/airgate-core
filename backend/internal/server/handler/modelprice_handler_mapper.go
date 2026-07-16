@@ -74,5 +74,8 @@ func toModelMarketItemRespFromDomain(item appmodelprice.ModelPrice) dto.ModelMar
 			CachedMultiplier: longCtx.CachedMultiplier,
 		}
 	}
+	if prices := appmodelprice.ParseImageSizePrices(item.Model, item.PricingExtra); len(prices) > 0 {
+		resp.ImageSizePrices = prices
+	}
 	return resp
 }

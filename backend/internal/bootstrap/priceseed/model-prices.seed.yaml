@@ -12,7 +12,8 @@
 # 说明：
 #   - claude 别名（如 claude-sonnet-4-5）与其规范模型（claude-sonnet-4-5-20250929）同价，
 #     二者都作为独立条目导入，因为渠道化 core 按客户端请求的 model 名计价。
-#   - openai 纯图像模型（gpt-image-1 / gpt-image-1.5 / gpt-image-2）按次计价结构不同（属 P6），此处跳过。
+#   - openai 纯图像模型：gpt-image-2 按张计费（pricing_extra.image.size_prices 分辨率×质量价表，
+#     单位 USD/张）；gpt-image-1 / gpt-image-1.5 未收录，需要时参照 gpt-image-2 条目补行。
 #   - openai service_tiers：priority/flex 为整单倍率（priority=2×标准，gpt-5.5=2.5×；flex=0.5×标准）。
 #   - openai long_context：仅 gpt-5.4 家族；完整 prompt 超阈值时各维度单价按倍率放大。
 models:
@@ -137,7 +138,7 @@ models:
     cache_creation: 3.75
     cache_creation_1h: 6.0
     per_request: 0
-  # ── openai（airgate-openai / registry.go，标准档；纯图像模型跳过）──
+  # ── openai（airgate-openai / registry.go，标准档；图像模型见本段末尾）──
   - model: gpt-5.3-codex-spark
     tag: openai
     input: 1.75
@@ -223,6 +224,28 @@ models:
       service_tiers:
         priority: 2.0
         flex: 0.5
+  # ── openai 图像（gpt-image-2 按张计费：分辨率×质量价表，网关以上游响应实际产出
+  #    档位计费；官方每张价 2026-07 快照。表命中时互斥短路、忽略 token 价；
+  #    token 价为官方值（text in $5 / image out $30），兜底非标准分辨率
+  #    （官方支持数千种尺寸，表未命中时按响应 usage 走 token 计价，防计 0 放行；
+  #    官方 image input $8 无独立列位，edits 图片输入按 input 价计）。──
+  - model: gpt-image-2
+    tag: openai
+    input: 5.0
+    output: 30.0
+    per_request: 0
+    pricing_extra:
+      image:
+        size_prices:
+          "low:1024x1024": 0.006
+          "low:1024x1536": 0.005
+          "low:1536x1024": 0.005
+          "medium:1024x1024": 0.053
+          "medium:1024x1536": 0.041
+          "medium:1536x1024": 0.041
+          "high:1024x1024": 0.211
+          "high:1024x1536": 0.165
+          "high:1536x1024": 0.165
   # ── gemini（ai.google.dev 官方价 2026-07 核实；Pro 系列长上下文阶梯阈值 200K；
   #    2.0 系列已于 2026-06-01 停服不收录。3.1-flash-lite / 3-flash-preview 官方未列
   #    缓存读价，按「缓存读 = 输入价 10%」的现行折扣规则推算。──

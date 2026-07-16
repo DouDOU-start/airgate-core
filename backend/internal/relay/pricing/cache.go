@@ -29,6 +29,10 @@ type Price struct {
 	// 仅异步任务子系统估价/结算使用（total = per_second × 时长），
 	// 同步转发不读该字段；PerRequest>0 时按次价优先。
 	VideoPerSecond float64
+	// ImageSizePrices 图像分辨率价表（USD/张，pricing_extra.image.size_prices）：
+	// 键为 "quality:size"（如 "high:1024x1024"）或裸 "size"（不分质量档的模型）。
+	// 命中时按表价 × 张数整单计费，优先级高于 PerRequest；未命中落回 PerRequest/token。
+	ImageSizePrices map[string]float64
 
 	// ServiceTiers 服务档倍率表（如 priority=2.0、flex=0.5）；命中时整单各维度统一乘该倍率。
 	ServiceTiers map[string]float64
@@ -57,6 +61,10 @@ type Usage struct {
 	// Calls 按次计费的计次数（图像端点=响应产出张数）；仅 PerRequest>0 时参与计算，
 	// 0 或负数视为 1（chat 等 token 端点不设该字段，行为与历史一致）。
 	Calls int
+	// ImageSize / ImageQuality 图像端点实际产出档位（响应为准）；
+	// 仅分辨率价表（ImageSizePrices）查价参与，其余端点恒空。
+	ImageSize    string
+	ImageQuality string
 }
 
 // Costs ComputeCosts 的分段成本结果（缓存写入拆 5m/1h 两档，供分列落账）。
@@ -176,15 +184,17 @@ func (c *Cache) Invalidate() {
 //
 // 计算顺序（严格）：
 //  1. 全部 token 计数统一钳 0（上游为不可信第三方，负数会虚增 input 费用或写入负成本）。
-//  2. PerRequest > 0：整单按次计费，Input = PerRequest × max(Calls, 1)
+//  2. 图像分辨率价表命中（ImagePriceFor）：整单 Input = 表价 × max(Calls, 1)，
+//     忽略 token usage / PerRequest / 服务档 / 长上下文（计费方式互斥，防双计）。
+//  3. PerRequest > 0：整单按次计费，Input = PerRequest × max(Calls, 1)
 //     （图像端点 Calls=响应产出张数；chat 等未设 Calls 恒按 1 次），
 //     其余为 0（忽略全部 token 单价 / 服务档 / 长上下文）。
-//  3. 取 base 单价 inR/outR/cachedR；若 LongContext!=nil 且 PromptTokens 超阈值，
+//  4. 取 base 单价 inR/outR/cachedR；若 LongContext!=nil 且 PromptTokens 超阈值，
 //     各单价乘对应倍率（长上下文阶梯，阈值比较对象是含 cached 的完整 prompt）。
-//  4. 缓存写入分档：cc5mTokens = CacheCreation5mTokens>0 ? 它 : CacheCreationTokens（泛化回退当 5m）；
+//  5. 缓存写入分档：cc5mTokens = CacheCreation5mTokens>0 ? 它 : CacheCreationTokens（泛化回退当 5m）；
 //     cc1hTokens = CacheCreation1hTokens。
-//  5. 分段计价：input 按 (prompt-cached) 扣减避免与 cached 双计。
-//  6. 服务档：serviceTier 非空且非 standard/auto，且 ServiceTiers[serviceTier]>0，
+//  6. 分段计价：input 按 (prompt-cached) 扣减避免与 cached 双计。
+//  7. 服务档：serviceTier 非空且非 standard/auto，且 ServiceTiers[serviceTier]>0，
 //     则整单五项统一乘该倍率（priority/flex 对各维度倍率一致，按整单处理等价）。
 func ComputeCosts(p Price, u Usage, serviceTier string) Costs {
 	u.PromptTokens = clampNonNegative(u.PromptTokens)
@@ -193,6 +203,14 @@ func ComputeCosts(p Price, u Usage, serviceTier string) Costs {
 	u.CacheCreationTokens = clampNonNegative(u.CacheCreationTokens)
 	u.CacheCreation5mTokens = clampNonNegative(u.CacheCreation5mTokens)
 	u.CacheCreation1hTokens = clampNonNegative(u.CacheCreation1hTokens)
+
+	if perImage, ok := ImagePriceFor(p, u.ImageQuality, u.ImageSize); ok {
+		calls := u.Calls
+		if calls < 1 {
+			calls = 1
+		}
+		return Costs{Input: perImage * float64(calls)}
+	}
 
 	if p.PerRequest > 0 {
 		calls := u.Calls
@@ -238,6 +256,25 @@ func ComputeCosts(p Price, u Usage, serviceTier string) Costs {
 		costs.CacheCreation1h *= m
 	}
 	return costs
+}
+
+// ImagePriceFor 查图像分辨率价表：先精确匹配 "quality:size"，再回退裸 "size" 键
+// （不分质量档的模型只配 size 键即可）。size 为空（响应未带档位，如逆向渠道）
+// 或未命中返回 false——调用方落回 PerRequest/token 链。
+// 导出供落账侧复用同一查价口径（usage_log「单价 × 张数 = 成本」对账）。
+func ImagePriceFor(p Price, quality, size string) (float64, bool) {
+	if len(p.ImageSizePrices) == 0 || size == "" {
+		return 0, false
+	}
+	if quality != "" {
+		if v, ok := p.ImageSizePrices[quality+":"+size]; ok && v > 0 {
+			return v, true
+		}
+	}
+	if v, ok := p.ImageSizePrices[size]; ok && v > 0 {
+		return v, true
+	}
+	return 0, false
 }
 
 // serviceTierMultiplier 返回服务档倍率：tier 为空或 standard/auto（默认档）不生效；

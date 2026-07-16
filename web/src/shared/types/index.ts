@@ -419,6 +419,10 @@ export interface UsageLogResp {
   account_rate_multiplier: number;
   service_tier?: string;
   reasoning_effort?: string;
+  /** 图像端点实际产出分辨率（如 1024x1024）；非图像端点缺省 */
+  image_size?: string;
+  /** 图像端点实际产出质量档（如 high）；非图像端点缺省 */
+  image_quality?: string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;
@@ -458,6 +462,10 @@ export interface CustomerUsageLogResp {
   cost: number;
   service_tier?: string;
   reasoning_effort?: string;
+  /** 图像端点实际产出分辨率（如 1024x1024）；非图像端点缺省 */
+  image_size?: string;
+  /** 图像端点实际产出质量档（如 high）；非图像端点缺省 */
+  image_quality?: string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;
@@ -814,6 +822,8 @@ export interface ModelMarketItemResp {
   tag?: { id: number; name: string } | null;
   service_tiers?: Record<string, number>;
   long_context?: ModelMarketLongContext;
+  /** 图像分辨率价表（USD/张，键 "quality:size" 或裸 "size"），未配置时省略 */
+  image_size_prices?: Record<string, number>;
 }
 
 export interface ModelMarketMultiplierRange {

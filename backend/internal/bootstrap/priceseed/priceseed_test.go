@@ -153,9 +153,9 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		byModel[it.Model] = it
 	}
 
-	// 覆盖总数：15 claude（含 5 别名）+ 7 openai + 7 gemini + 6 grok = 35。
-	if len(items) != 35 {
-		t.Errorf("seed model count = %d, want 35", len(items))
+	// 覆盖总数：15 claude（含 5 别名）+ 8 openai（含 gpt-image-2）+ 7 gemini + 6 grok = 36。
+	if len(items) != 36 {
+		t.Errorf("seed model count = %d, want 36", len(items))
 	}
 
 	// 抽样核对（claude/openai 值来自 airgate-claude/models.go 与 airgate-openai/registry.go，
@@ -189,6 +189,28 @@ func TestParseEmbeddedSeed(t *testing.T) {
 			t.Errorf("model %q = in%.4g/out%.4g/cache%.4g/cc%.4g, want %.4g/%.4g/%.4g/%.4g",
 				c.model, got.InputPrice, got.OutputPrice, got.CachedInputPrice, got.CacheCreationPrice,
 				c.input, c.output, c.cached, c.cacheCr)
+		}
+	}
+
+	// gpt-image-2 按张计费：pricing_extra.image.size_prices 须能被计费侧同一套解析
+	// （ParseImageSizePrices）识别为 9 档表价；token 价为官方值（表未命中时兜底
+	// 非标准分辨率，防计 0 放行），按次价 0。
+	if img, ok := byModel["gpt-image-2"]; !ok {
+		t.Error("model gpt-image-2 missing from seed")
+	} else {
+		if img.InputPrice != 5.0 || img.OutputPrice != 30.0 || img.PerRequestPrice != 0 {
+			t.Errorf("gpt-image-2 token 兜底价 = in%.4g/out%.4g/pr%.4g, want 5/30/0",
+				img.InputPrice, img.OutputPrice, img.PerRequestPrice)
+		}
+		prices := appmodelprice.ParseImageSizePrices(img.Model, img.PricingExtra)
+		if len(prices) != 9 {
+			t.Errorf("gpt-image-2 size_prices 档数 = %d, want 9", len(prices))
+		}
+		if got := prices["high:1024x1024"]; got != 0.211 {
+			t.Errorf("gpt-image-2 high:1024x1024 = %v, want 0.211", got)
+		}
+		if got := prices["low:1024x1536"]; got != 0.005 {
+			t.Errorf("gpt-image-2 low:1024x1536 = %v, want 0.005", got)
 		}
 	}
 
