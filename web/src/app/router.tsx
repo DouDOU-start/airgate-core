@@ -30,6 +30,7 @@ import {
   PaymentPage,
   preloadRoutePage,
   RedemptionCodesPage,
+  RiskControlPage,
   ProfilePage,
   PublicHomePage,
   RechargePage,
@@ -229,6 +230,7 @@ const adminRedemptionRoute = createRoute({ getParentRoute: () => adminLayout, pa
 const adminInviteRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/invite', component: renderPage(InviteRebatePage) });
 const adminSettingsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/settings', component: renderPage(SettingsPage) });
 const adminOAuthClientsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/oauth-clients', component: renderPage(OAuthClientsPage) });
+const adminRiskControlRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/risk-control', component: renderPage(RiskControlPage) });
 
 const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/profile', component: renderPage(ProfilePage) });
 const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/keys', component: renderPage(UserKeysPage) });
@@ -257,6 +259,7 @@ const routeTree = rootRoute.addChildren([
       adminInviteRoute,
       adminSettingsRoute,
       adminOAuthClientsRoute,
+      adminRiskControlRoute,
     ]),
     profileRoute,
     userKeysRoute,

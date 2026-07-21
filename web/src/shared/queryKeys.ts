@@ -51,4 +51,7 @@ export const queryKeys = {
   inviteOverrides: (...args: unknown[]) => ['invite-overrides', ...args] as const,
   inviteAdminInvitees: (...args: unknown[]) => ['invite-admin-invitees', ...args] as const,
   inviteAdminLogs: (...args: unknown[]) => ['invite-admin-logs', ...args] as const,
+  riskControlConfig: () => ['risk-control-config'] as const,
+  riskControlStatus: () => ['risk-control-status'] as const,
+  riskControlLogs: (...args: unknown[]) => ['risk-control-logs', ...args] as const,
 } as const;

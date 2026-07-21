@@ -33,6 +33,7 @@ import {
   Moon,
   Menu,
   ShieldCheck,
+  ShieldAlert,
   BookOpen,
   MessageCircle,
   Github,
@@ -72,6 +73,7 @@ const adminMenuItems: MenuItem[] = [
   { path: '/admin/invite', labelKey: 'nav.admin_invite', icon: <Gift className="h-5 w-5" /> },
   { path: '/admin/announcements', labelKey: 'nav.announcements', icon: <Megaphone className="h-5 w-5" /> },
   { path: '/admin/oauth-clients', labelKey: 'nav.oauth_clients', icon: <AppWindow className="h-5 w-5" /> },
+  { path: '/admin/risk-control', labelKey: 'nav.risk_control', icon: <ShieldAlert className="h-5 w-5" /> },
   { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="h-5 w-5" />, sectionKey: 'nav.system' },
 ];
 
