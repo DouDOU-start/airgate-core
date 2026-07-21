@@ -186,7 +186,12 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		return
 	}
 
-	// 4. user / key 并发闸门。
+	// 4. 内容审核预检（风控中心）：触网前判定，被拦截的请求不占并发槽。
+	if !p.moderationCheck(c, keyInfo, req, endpoint, start) {
+		return
+	}
+
+	// 5. user / key 并发闸门。
 	releaseClient, limitCode := p.acquireClientSlots(c, keyInfo)
 	if limitCode != "" {
 		p.recordFailure(c, keyInfo, req, start, errlog.Entry{
@@ -197,7 +202,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	}
 	defer releaseClient()
 
-	// 5. failover 主循环：
+	// 6. failover 主循环：
 	//    hardExclude 跨循环持久（429 限流 / 认证失败 / 配置故障，仅本次请求内生效），
 	//    softExclude 容量满（RPM/并发）——排队退避时清空重新竞争。
 	var hardExclude, softExclude []int

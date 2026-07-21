@@ -15,6 +15,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
+	"github.com/DouDOU-start/airgate-core/internal/moderation"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/upstreamclient"
 	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
 	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
@@ -73,6 +74,8 @@ type Options struct {
 	Settings    SettingsSource
 	Store       Store
 	Balance     BalanceOps
+	// Moderation 内容审核引擎（风控中心；nil 时全部放行）。
+	Moderation pipeline.ModerationChecker
 }
 
 // Flow 任务提交/查询流程。
@@ -87,6 +90,7 @@ type Flow struct {
 	settings    SettingsSource
 	store       Store
 	balance     BalanceOps
+	moderation  pipeline.ModerationChecker
 	client      *http.Client
 }
 
@@ -111,6 +115,7 @@ func NewFlow(opts Options) *Flow {
 		settings:    settings,
 		store:       opts.Store,
 		balance:     opts.Balance,
+		moderation:  opts.Moderation,
 		client:      upstreamclient.NewClient(0),
 	}
 }
@@ -147,7 +152,59 @@ func (f *Flow) handleSubmit(c *gin.Context, platform, action string) {
 		writeError(c, http.StatusBadRequest, "invalid_request_error", "bad_request", err.Error())
 		return
 	}
+	if !f.moderationCheck(c, keyInfo, platform, sub) {
+		return
+	}
 	f.submit(c, keyInfo, platform, ad, sub)
+}
+
+// moderationCheck 提交前的内容审核预检（风控中心）。放行返回 true；
+// 拦截时按入口协议写出错误体并落失败留痕，返回 false。
+func (f *Flow) moderationCheck(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string, sub *SubmitRequest) bool {
+	if f.moderation == nil {
+		return true
+	}
+	var protocol string
+	switch platform {
+	case PlatformOpenAIVideo:
+		protocol = moderation.ProtocolOpenAIVideo
+	case PlatformSuno:
+		protocol = moderation.ProtocolSuno
+	default:
+		return true
+	}
+	d := f.moderation.Check(c.Request.Context(), moderation.CheckRequest{
+		RequestID:   requestIDOf(c),
+		UserID:      keyInfo.UserID,
+		UserEmail:   keyInfo.UserEmail,
+		APIKeyID:    keyInfo.KeyID,
+		GroupID:     keyInfo.GroupID,
+		Endpoint:    c.Request.URL.Path,
+		Protocol:    protocol,
+		Model:       sub.Model,
+		ContentType: sub.ContentType,
+		Body:        sub.Body,
+	})
+	if d.Allowed {
+		return true
+	}
+	status := d.StatusCode
+	if status < 400 || status > 599 {
+		status = http.StatusForbidden
+	}
+	code := "content_blocked"
+	switch d.Action {
+	case moderation.ActionKeywordBlock:
+		code = "content_keyword_blocked"
+	case moderation.ActionHashBlock:
+		code = "content_hash_blocked"
+	}
+	writeError(c, status, "permission_error", code, d.Message)
+	f.recordFailure(c, keyInfo, sub.Model, time.Now(), errlog.Entry{
+		Phase: errlog.PhasePrecheckModeration, StatusCode: status,
+		ErrorType: "permission_error", ErrorCode: code, Message: d.Message,
+	})
+	return false
 }
 
 // readSubmitBody 读取提交请求体（统一读体上限）；失败时已写出错误体。

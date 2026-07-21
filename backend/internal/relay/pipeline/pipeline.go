@@ -44,6 +44,8 @@ type Options struct {
 	Sink        UsageSink
 	ErrLog      ErrSink
 	Settings    *SettingsReader
+	// Moderation 内容审核引擎（风控中心；nil 时全部放行）。
+	Moderation ModerationChecker
 }
 
 // Pipeline relay 转发管线。
@@ -56,6 +58,7 @@ type Pipeline struct {
 	sink        UsageSink
 	errSink     ErrSink
 	settings    *SettingsReader
+	moderation  ModerationChecker
 	// client 出口 HTTP 客户端：不设总超时（流式无总超时），仅设连接/TLS 层超时；
 	// 非流式的总超时由调用方经 context 施加。重定向不跟随
 	//（upstreamclient.NewClient 统一设 ErrUseLastResponse），
@@ -85,6 +88,7 @@ func New(opts Options) *Pipeline {
 		sink:        opts.Sink,
 		errSink:     opts.ErrLog,
 		settings:    settings,
+		moderation:  opts.Moderation,
 		client:      upstreamclient.NewClient(0),
 	}
 }

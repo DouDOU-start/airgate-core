@@ -63,6 +63,7 @@ const (
 	PhasePrecheckBalance     = "precheck_balance"
 	PhasePrecheckPrice       = "precheck_price"
 	PhasePrecheckRate        = "precheck_rate"
+	PhasePrecheckModeration  = "precheck_moderation"
 	PhaseLocalLimit          = "local_limit"
 	PhaseQueueTimeout        = "queue_timeout"
 	PhaseUpstreamExhausted   = "upstream_exhausted"
