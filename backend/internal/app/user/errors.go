@@ -15,6 +15,8 @@ var (
 	ErrInvalidBalanceAction = errors.New("无效的操作类型")
 	// ErrDeleteAdminForbidden 禁止删除管理员。
 	ErrDeleteAdminForbidden = errors.New("不能删除管理员用户")
+	// ErrDisableAdminForbidden 禁止禁用管理员（手动禁用与风控自动封禁同受此约束）。
+	ErrDisableAdminForbidden = errors.New("不能禁用管理员用户")
 	// ErrInvalidRateMultiplier 专属倍率非法（不能为负）。
 	ErrInvalidRateMultiplier = errors.New("专属倍率不能为负数")
 	// ErrDuplicateBalanceChange 幂等键已存在，同一笔余额变更已入账。

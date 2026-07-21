@@ -22,6 +22,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	entsetting "github.com/DouDOU-start/airgate-core/ent/setting"
+	"github.com/DouDOU-start/airgate-core/ent/user"
 )
 
 // API Key 缓存。
@@ -74,6 +75,9 @@ var (
 	// 且未把该用户加入白名单：已签发的 key 不再享有"创建时校验过就一直放行"的豁免，
 	// 每次请求都按分组的最新专属状态重新判定（与 apikey_store.go GetGroupAccess 同一套判定口径）。
 	ErrAPIKeyGroupExclusive = errors.New("绑定的分组已设为专属分组，且未开通访问权限，请联系管理员")
+	// ErrUserDisabled 账户被禁用（手动禁用或风控自动封禁）：已签发的 key 一并失效。
+	// 封禁/解封经 5s 验证缓存 TTL 自然传播，无需主动失效。
+	ErrUserDisabled = errors.New("账户已被禁用，请联系管理员")
 )
 
 const apiKeyPrefix = "sk-"
@@ -249,6 +253,10 @@ func loadAndCacheAPIKey(ctx context.Context, db *ent.Client, hash string) (*APIK
 		cacheAPIKeyResult(hash, nil, ErrInvalidAPIKey)
 		return nil, ErrInvalidAPIKey
 	}
+	if u.Status == user.StatusDisabled {
+		cacheAPIKeyResult(hash, nil, ErrUserDisabled)
+		return nil, ErrUserDisabled
+	}
 	g := ak.Edges.Group
 	if g == nil {
 		cacheAPIKeyResult(hash, nil, ErrAPIKeyGroupUnbound)
@@ -412,6 +420,8 @@ func apiKeyCacheErrorCode(err error) string {
 		return "group_unbound"
 	case ErrAPIKeyGroupExclusive:
 		return "group_exclusive"
+	case ErrUserDisabled:
+		return "user_disabled"
 	default:
 		return ""
 	}
@@ -429,6 +439,8 @@ func apiKeyCacheErrorFromCode(code string) error {
 		return ErrAPIKeyGroupUnbound
 	case "group_exclusive":
 		return ErrAPIKeyGroupExclusive
+	case "user_disabled":
+		return ErrUserDisabled
 	default:
 		return nil
 	}

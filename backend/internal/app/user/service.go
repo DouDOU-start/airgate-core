@@ -284,6 +284,19 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (User, error) {
 // Update 更新用户。
 func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (User, error) {
 	logger := logx.LoggerFromContext(ctx)
+	if input.Status != nil && *input.Status == "disabled" {
+		item, err := s.repo.FindByID(ctx, id, false)
+		if err != nil {
+			return User{}, err
+		}
+		if item.Role == "admin" {
+			logger.Warn("user_update_rejected",
+				logx.LogFieldUserID, id,
+				logx.LogFieldReason, "disable_admin_forbidden",
+			)
+			return User{}, ErrDisableAdminForbidden
+		}
+	}
 	if input.HasGroupRates {
 		for _, v := range input.GroupRates {
 			if v < 0 {
@@ -544,6 +557,13 @@ func (s *Service) ToggleStatus(ctx context.Context, id int) (ToggleResult, error
 	newStatus := "disabled"
 	if item.Status == "disabled" {
 		newStatus = "active"
+	}
+	if newStatus == "disabled" && item.Role == "admin" {
+		logger.Warn("user_toggle_rejected",
+			logx.LogFieldUserID, id,
+			logx.LogFieldReason, "disable_admin_forbidden",
+		)
+		return ToggleResult{}, ErrDisableAdminForbidden
 	}
 	updated, err := s.repo.Update(ctx, id, Mutation{Status: &newStatus})
 	if err != nil {

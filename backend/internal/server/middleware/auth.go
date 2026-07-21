@@ -126,6 +126,10 @@ func APIKeyAuth(db *ent.Client) gin.HandlerFunc {
 				code = "api_key_group_restricted"
 				status = http.StatusForbidden
 				reason = "group_exclusive_restricted"
+			case auth.ErrUserDisabled:
+				code = "account_disabled"
+				status = http.StatusForbidden
+				reason = "user_disabled"
 			default:
 				// DB 超时 / 连接池满 / ctx 取消 等服务端侧问题：返 503 让客户端重试，
 				// 绝不能误判为"凭证无效"让客户端以为 key 被吊销。
