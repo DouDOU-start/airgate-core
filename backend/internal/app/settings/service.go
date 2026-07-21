@@ -34,6 +34,7 @@ const (
 	settingGroupSecurity     = "security"
 	settingGroupSMTP         = "smtp"
 	settingSMTPPassword      = "smtp_password"
+	settingGroupRiskControl  = "risk_control"
 )
 
 // MaskedValue 敏感设置在管理端回显时的掩码哨兵值。
@@ -43,8 +44,12 @@ const MaskedValue = "********"
 
 // sensitiveGroups 管理端通用读写路径整组屏蔽的分组：security 组存放
 // admin_api_key_hash / admin_api_key_encrypted 等凭证材料，只允许经
-// GetAdminAPIKey / GenerateAdminAPIKey / DeleteAdminAPIKey 专用通道访问。
-var sensitiveGroups = map[string]bool{settingGroupSecurity: true}
+// GetAdminAPIKey / GenerateAdminAPIKey / DeleteAdminAPIKey 专用通道访问；
+// risk_control 组存放审核 key 密文与风控配置，只允许经 /admin/risk-control/* 专用通道访问。
+var sensitiveGroups = map[string]bool{
+	settingGroupSecurity:    true,
+	settingGroupRiskControl: true,
+}
 
 // maskedKeys 管理端回显时以 MaskedValue 掩码的敏感键清单（集中定义，勿散落 handler）。
 var maskedKeys = map[string]bool{settingSMTPPassword: true}

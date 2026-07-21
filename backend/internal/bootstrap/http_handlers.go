@@ -24,6 +24,7 @@ import (
 	appoauth "github.com/DouDOU-start/airgate-core/internal/app/oauth"
 	apppayment "github.com/DouDOU-start/airgate-core/internal/app/payment"
 	appredemption "github.com/DouDOU-start/airgate-core/internal/app/redemption"
+	appriskcontrol "github.com/DouDOU-start/airgate-core/internal/app/riskcontrol"
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
 	apptier "github.com/DouDOU-start/airgate-core/internal/app/tier"
 	appupstreamlog "github.com/DouDOU-start/airgate-core/internal/app/upstreamlog"
@@ -33,6 +34,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
+	"github.com/DouDOU-start/airgate-core/internal/moderation"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/handler"
 )
@@ -65,6 +67,7 @@ type HTTPHandlers struct {
 	Invite       *handler.InviteHandler
 	Version      *handler.VersionHandler
 	OAuth        *handler.OAuthHandler
+	RiskControl  *handler.RiskControlHandler
 
 	// ChannelService / ModelPriceService / SettingsService 暴露给 server.go：
 	// ChannelService 充当渠道注册表的 Loader/Persister 并接收 Reloader/Tester 注入，
@@ -81,6 +84,9 @@ type HTTPHandlers struct {
 	UserService *appuser.Service
 	// TaskStore 暴露给 server.go：任务子系统（relay/task）的持久化实现。
 	TaskStore *store.TaskStore
+	// ModerationEngine 暴露给 server.go：注入 relay 管线/任务子系统的审核预检，
+	// 并由 StartBackground 拉起 worker 池与日志 TTL 清理。
+	ModerationEngine *moderation.Engine
 }
 
 // NewHTTPHandlers 统一构造 HTTP 处理器。
@@ -154,6 +160,18 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	redemptionStore := store.NewRedemptionStore(dep.DB)
 	redemptionService := appredemption.NewService(redemptionStore)
 
+	// 风控中心：service 兼任审核引擎的 ConfigSource（读配置+解密）与
+	// UserBanner（自动封禁，管理员豁免）；hash 缓存走 Redis（未配置则禁用该能力）。
+	moderationLogStore := store.NewModerationLogStore(dep.DB)
+	var moderationHashCache moderation.HashCache
+	if dep.Redis != nil {
+		moderationHashCache = moderation.NewRedisHashCache(dep.Redis)
+	}
+	riskControlService := appriskcontrol.NewService(settingsStore, moderationLogStore, moderationHashCache, userStore, dep.Config.APIKeySecret())
+	moderationEngine := moderation.NewEngine(riskControlService, moderationLogStore, moderationHashCache, riskControlService)
+	moderationEngine.SetNotifier(newModerationNotifier(settingsService))
+	riskControlService.SetEngine(moderationEngine)
+
 	// OAuth 应用接入：客户端仓储兼任 UserReader，授权码/令牌走 Redis，
 	// provision-key 复用 apikey 服务的 get-or-create，可用分组适配 group 服务。
 	oauthClientStore := store.NewOAuthClientStore(dep.DB)
@@ -178,6 +196,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Invite:       handler.NewInviteHandler(inviteService),
 		Version:      handler.NewVersionHandler(),
 		OAuth:        handler.NewOAuthHandler(oauthService),
+		RiskControl:  handler.NewRiskControlHandler(riskControlService),
 
 		ChannelService:     channelService,
 		ModelPriceService:  modelPriceService,
@@ -186,6 +205,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		PaymentService:     paymentService,
 		UserService:        userService,
 		TaskStore:          store.NewTaskStore(dep.DB),
+		ModerationEngine:   moderationEngine,
 	}
 }
 

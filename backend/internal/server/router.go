@@ -211,6 +211,16 @@ func (s *Server) registerRoutes() {
 		// 上游请求日志（失败留痕/渠道测试/拉模型，仅管理员）
 		adminGroup.GET("/upstream-logs", handlers.UpstreamLog.AdminList)
 
+		// 风控中心（内容审核）：配置/状态/探活/日志/解封/命中哈希管理
+		adminGroup.GET("/risk-control/config", handlers.RiskControl.GetConfig)
+		adminGroup.PUT("/risk-control/config", handlers.RiskControl.UpdateConfig)
+		adminGroup.GET("/risk-control/status", handlers.RiskControl.GetStatus)
+		adminGroup.POST("/risk-control/api-keys/test", handlers.RiskControl.TestAPIKeys)
+		adminGroup.GET("/risk-control/logs", handlers.RiskControl.ListLogs)
+		adminGroup.POST("/risk-control/users/:id/unban", handlers.RiskControl.UnbanUser)
+		adminGroup.DELETE("/risk-control/hashes", handlers.RiskControl.DeleteHash)
+		adminGroup.DELETE("/risk-control/hashes/all", handlers.RiskControl.ClearHashes)
+
 		// 系统设置
 		adminGroup.GET("/settings", handlers.Settings.GetSettings)
 		adminGroup.PUT("/settings", handlers.Settings.UpdateSettings)

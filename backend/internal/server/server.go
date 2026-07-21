@@ -125,6 +125,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Sink:        recorder,
 		ErrLog:      errRecorder,
 		Settings:    settingsReader,
+		Moderation:  s.handlers.ModerationEngine,
 	})
 
 	// 异步任务子系统（视频/音乐）：与同步管线同源组件 + task 持久化 + 余额动账适配器。
@@ -139,6 +140,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Settings:    settingsReader,
 		Store:       s.handlers.TaskStore,
 		Balance:     taskBalanceAdapter{svc: s.handlers.UserService},
+		Moderation:  s.handlers.ModerationEngine,
 	}
 	s.taskFlow = task.NewFlow(taskOpts)
 	s.taskPoller = task.NewPoller(taskOpts)
@@ -195,6 +197,9 @@ func (s *Server) StartBackground(ctx context.Context) {
 
 	// 异步任务轮询器：扫未完成任务 → 查上游 → 终态结算/退款。
 	go s.taskPoller.Run(backgroundCtx)
+
+	// 风控审核引擎：observe 异步 worker 池 + 审核日志 TTL 清理。
+	s.handlers.ModerationEngine.StartBackground(backgroundCtx)
 }
 
 // reloadable 后台重试所需的窄接口（registry.Registry 实现；便于测试注入）。
