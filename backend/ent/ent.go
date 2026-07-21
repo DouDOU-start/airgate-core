@@ -23,6 +23,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/inviterebatelog"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
 	"github.com/DouDOU-start/airgate-core/ent/modeltag"
+	"github.com/DouDOU-start/airgate-core/ent/moderationlog"
 	"github.com/DouDOU-start/airgate-core/ent/oauthclient"
 	"github.com/DouDOU-start/airgate-core/ent/paymentorder"
 	"github.com/DouDOU-start/airgate-core/ent/paymentproviderconfig"
@@ -104,6 +105,7 @@ func checkColumn(table, column string) error {
 			inviterebatelog.Table:       inviterebatelog.ValidColumn,
 			modelprice.Table:            modelprice.ValidColumn,
 			modeltag.Table:              modeltag.ValidColumn,
+			moderationlog.Table:         moderationlog.ValidColumn,
 			oauthclient.Table:           oauthclient.ValidColumn,
 			paymentorder.Table:          paymentorder.ValidColumn,
 			paymentproviderconfig.Table: paymentproviderconfig.ValidColumn,

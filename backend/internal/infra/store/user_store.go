@@ -608,3 +608,23 @@ func mapUserAPIKey(item *ent.APIKey, userID int, todayCost, thirtyDayCost float6
 }
 
 var _ appuser.Repository = (*UserStore)(nil)
+
+// GetStatusAndRole 查询用户状态与角色（风控封禁/解封的轻量读路径）。
+func (s *UserStore) GetStatusAndRole(ctx context.Context, id int) (status, role string, err error) {
+	u, err := s.db.User.Query().
+		Where(entuser.IDEQ(id)).
+		Select(entuser.FieldStatus, entuser.FieldRole).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return "", "", appuser.ErrUserNotFound
+		}
+		return "", "", err
+	}
+	return string(u.Status), string(u.Role), nil
+}
+
+// UpdateStatus 直接更新用户状态（风控自动封禁/解封专用；管理员保护由调用方负责）。
+func (s *UserStore) UpdateStatus(ctx context.Context, id int, status string) error {
+	return s.db.User.UpdateOneID(id).SetStatus(entuser.Status(status)).Exec(ctx)
+}

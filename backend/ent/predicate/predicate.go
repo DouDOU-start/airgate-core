@@ -39,6 +39,9 @@ type ModelPrice func(*sql.Selector)
 // ModelTag is the predicate function for modeltag builders.
 type ModelTag func(*sql.Selector)
 
+// ModerationLog is the predicate function for moderationlog builders.
+type ModerationLog func(*sql.Selector)
+
 // OAuthClient is the predicate function for oauthclient builders.
 type OAuthClient func(*sql.Selector)
 

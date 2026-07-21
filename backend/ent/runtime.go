@@ -16,6 +16,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/inviterebatelog"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
 	"github.com/DouDOU-start/airgate-core/ent/modeltag"
+	"github.com/DouDOU-start/airgate-core/ent/moderationlog"
 	"github.com/DouDOU-start/airgate-core/ent/oauthclient"
 	"github.com/DouDOU-start/airgate-core/ent/paymentorder"
 	"github.com/DouDOU-start/airgate-core/ent/paymentproviderconfig"
@@ -401,6 +402,104 @@ func init() {
 	modeltag.DefaultUpdatedAt = modeltagDescUpdatedAt.Default.(func() time.Time)
 	// modeltag.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	modeltag.UpdateDefaultUpdatedAt = modeltagDescUpdatedAt.UpdateDefault.(func() time.Time)
+	moderationlogFields := schema.ModerationLog{}.Fields()
+	_ = moderationlogFields
+	// moderationlogDescRequestID is the schema descriptor for request_id field.
+	moderationlogDescRequestID := moderationlogFields[0].Descriptor()
+	// moderationlog.RequestIDValidator is a validator for the "request_id" field. It is called by the builders before save.
+	moderationlog.RequestIDValidator = moderationlogDescRequestID.Validators[0].(func(string) error)
+	// moderationlogDescUserID is the schema descriptor for user_id field.
+	moderationlogDescUserID := moderationlogFields[1].Descriptor()
+	// moderationlog.DefaultUserID holds the default value on creation for the user_id field.
+	moderationlog.DefaultUserID = moderationlogDescUserID.Default.(int)
+	// moderationlogDescUserEmailSnapshot is the schema descriptor for user_email_snapshot field.
+	moderationlogDescUserEmailSnapshot := moderationlogFields[2].Descriptor()
+	// moderationlog.DefaultUserEmailSnapshot holds the default value on creation for the user_email_snapshot field.
+	moderationlog.DefaultUserEmailSnapshot = moderationlogDescUserEmailSnapshot.Default.(string)
+	// moderationlogDescAPIKeyID is the schema descriptor for api_key_id field.
+	moderationlogDescAPIKeyID := moderationlogFields[3].Descriptor()
+	// moderationlog.DefaultAPIKeyID holds the default value on creation for the api_key_id field.
+	moderationlog.DefaultAPIKeyID = moderationlogDescAPIKeyID.Default.(int)
+	// moderationlogDescGroupID is the schema descriptor for group_id field.
+	moderationlogDescGroupID := moderationlogFields[4].Descriptor()
+	// moderationlog.DefaultGroupID holds the default value on creation for the group_id field.
+	moderationlog.DefaultGroupID = moderationlogDescGroupID.Default.(int)
+	// moderationlogDescGroupNameSnapshot is the schema descriptor for group_name_snapshot field.
+	moderationlogDescGroupNameSnapshot := moderationlogFields[5].Descriptor()
+	// moderationlog.DefaultGroupNameSnapshot holds the default value on creation for the group_name_snapshot field.
+	moderationlog.DefaultGroupNameSnapshot = moderationlogDescGroupNameSnapshot.Default.(string)
+	// moderationlogDescEndpoint is the schema descriptor for endpoint field.
+	moderationlogDescEndpoint := moderationlogFields[6].Descriptor()
+	// moderationlog.DefaultEndpoint holds the default value on creation for the endpoint field.
+	moderationlog.DefaultEndpoint = moderationlogDescEndpoint.Default.(string)
+	// moderationlogDescProtocol is the schema descriptor for protocol field.
+	moderationlogDescProtocol := moderationlogFields[7].Descriptor()
+	// moderationlog.DefaultProtocol holds the default value on creation for the protocol field.
+	moderationlog.DefaultProtocol = moderationlogDescProtocol.Default.(string)
+	// moderationlogDescModel is the schema descriptor for model field.
+	moderationlogDescModel := moderationlogFields[8].Descriptor()
+	// moderationlog.DefaultModel holds the default value on creation for the model field.
+	moderationlog.DefaultModel = moderationlogDescModel.Default.(string)
+	// moderationlogDescMode is the schema descriptor for mode field.
+	moderationlogDescMode := moderationlogFields[9].Descriptor()
+	// moderationlog.DefaultMode holds the default value on creation for the mode field.
+	moderationlog.DefaultMode = moderationlogDescMode.Default.(string)
+	// moderationlogDescAction is the schema descriptor for action field.
+	moderationlogDescAction := moderationlogFields[10].Descriptor()
+	// moderationlog.DefaultAction holds the default value on creation for the action field.
+	moderationlog.DefaultAction = moderationlogDescAction.Default.(string)
+	// moderationlogDescFlagged is the schema descriptor for flagged field.
+	moderationlogDescFlagged := moderationlogFields[11].Descriptor()
+	// moderationlog.DefaultFlagged holds the default value on creation for the flagged field.
+	moderationlog.DefaultFlagged = moderationlogDescFlagged.Default.(bool)
+	// moderationlogDescHighestCategory is the schema descriptor for highest_category field.
+	moderationlogDescHighestCategory := moderationlogFields[12].Descriptor()
+	// moderationlog.DefaultHighestCategory holds the default value on creation for the highest_category field.
+	moderationlog.DefaultHighestCategory = moderationlogDescHighestCategory.Default.(string)
+	// moderationlogDescHighestScore is the schema descriptor for highest_score field.
+	moderationlogDescHighestScore := moderationlogFields[13].Descriptor()
+	// moderationlog.DefaultHighestScore holds the default value on creation for the highest_score field.
+	moderationlog.DefaultHighestScore = moderationlogDescHighestScore.Default.(float64)
+	// moderationlogDescMatchedKeyword is the schema descriptor for matched_keyword field.
+	moderationlogDescMatchedKeyword := moderationlogFields[14].Descriptor()
+	// moderationlog.DefaultMatchedKeyword holds the default value on creation for the matched_keyword field.
+	moderationlog.DefaultMatchedKeyword = moderationlogDescMatchedKeyword.Default.(string)
+	// moderationlogDescInputExcerpt is the schema descriptor for input_excerpt field.
+	moderationlogDescInputExcerpt := moderationlogFields[17].Descriptor()
+	// moderationlog.DefaultInputExcerpt holds the default value on creation for the input_excerpt field.
+	moderationlog.DefaultInputExcerpt = moderationlogDescInputExcerpt.Default.(string)
+	// moderationlogDescInputHash is the schema descriptor for input_hash field.
+	moderationlogDescInputHash := moderationlogFields[18].Descriptor()
+	// moderationlog.DefaultInputHash holds the default value on creation for the input_hash field.
+	moderationlog.DefaultInputHash = moderationlogDescInputHash.Default.(string)
+	// moderationlogDescUpstreamLatencyMs is the schema descriptor for upstream_latency_ms field.
+	moderationlogDescUpstreamLatencyMs := moderationlogFields[19].Descriptor()
+	// moderationlog.DefaultUpstreamLatencyMs holds the default value on creation for the upstream_latency_ms field.
+	moderationlog.DefaultUpstreamLatencyMs = moderationlogDescUpstreamLatencyMs.Default.(int64)
+	// moderationlogDescQueueDelayMs is the schema descriptor for queue_delay_ms field.
+	moderationlogDescQueueDelayMs := moderationlogFields[20].Descriptor()
+	// moderationlog.DefaultQueueDelayMs holds the default value on creation for the queue_delay_ms field.
+	moderationlog.DefaultQueueDelayMs = moderationlogDescQueueDelayMs.Default.(int64)
+	// moderationlogDescError is the schema descriptor for error field.
+	moderationlogDescError := moderationlogFields[21].Descriptor()
+	// moderationlog.DefaultError holds the default value on creation for the error field.
+	moderationlog.DefaultError = moderationlogDescError.Default.(string)
+	// moderationlogDescViolationCount is the schema descriptor for violation_count field.
+	moderationlogDescViolationCount := moderationlogFields[22].Descriptor()
+	// moderationlog.DefaultViolationCount holds the default value on creation for the violation_count field.
+	moderationlog.DefaultViolationCount = moderationlogDescViolationCount.Default.(int)
+	// moderationlogDescAutoBanned is the schema descriptor for auto_banned field.
+	moderationlogDescAutoBanned := moderationlogFields[23].Descriptor()
+	// moderationlog.DefaultAutoBanned holds the default value on creation for the auto_banned field.
+	moderationlog.DefaultAutoBanned = moderationlogDescAutoBanned.Default.(bool)
+	// moderationlogDescEmailSent is the schema descriptor for email_sent field.
+	moderationlogDescEmailSent := moderationlogFields[24].Descriptor()
+	// moderationlog.DefaultEmailSent holds the default value on creation for the email_sent field.
+	moderationlog.DefaultEmailSent = moderationlogDescEmailSent.Default.(bool)
+	// moderationlogDescCreatedAt is the schema descriptor for created_at field.
+	moderationlogDescCreatedAt := moderationlogFields[25].Descriptor()
+	// moderationlog.DefaultCreatedAt holds the default value on creation for the created_at field.
+	moderationlog.DefaultCreatedAt = moderationlogDescCreatedAt.Default.(func() time.Time)
 	oauthclientFields := schema.OAuthClient{}.Fields()
 	_ = oauthclientFields
 	// oauthclientDescClientID is the schema descriptor for client_id field.

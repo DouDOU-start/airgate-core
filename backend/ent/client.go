@@ -26,6 +26,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/inviterebatelog"
 	"github.com/DouDOU-start/airgate-core/ent/modelprice"
 	"github.com/DouDOU-start/airgate-core/ent/modeltag"
+	"github.com/DouDOU-start/airgate-core/ent/moderationlog"
 	"github.com/DouDOU-start/airgate-core/ent/oauthclient"
 	"github.com/DouDOU-start/airgate-core/ent/paymentorder"
 	"github.com/DouDOU-start/airgate-core/ent/paymentproviderconfig"
@@ -65,6 +66,8 @@ type Client struct {
 	ModelPrice *ModelPriceClient
 	// ModelTag is the client for interacting with the ModelTag builders.
 	ModelTag *ModelTagClient
+	// ModerationLog is the client for interacting with the ModerationLog builders.
+	ModerationLog *ModerationLogClient
 	// OAuthClient is the client for interacting with the OAuthClient builders.
 	OAuthClient *OAuthClientClient
 	// PaymentOrder is the client for interacting with the PaymentOrder builders.
@@ -107,6 +110,7 @@ func (c *Client) init() {
 	c.InviteRebateLog = NewInviteRebateLogClient(c.config)
 	c.ModelPrice = NewModelPriceClient(c.config)
 	c.ModelTag = NewModelTagClient(c.config)
+	c.ModerationLog = NewModerationLogClient(c.config)
 	c.OAuthClient = NewOAuthClientClient(c.config)
 	c.PaymentOrder = NewPaymentOrderClient(c.config)
 	c.PaymentProviderConfig = NewPaymentProviderConfigClient(c.config)
@@ -220,6 +224,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		InviteRebateLog:       NewInviteRebateLogClient(cfg),
 		ModelPrice:            NewModelPriceClient(cfg),
 		ModelTag:              NewModelTagClient(cfg),
+		ModerationLog:         NewModerationLogClient(cfg),
 		OAuthClient:           NewOAuthClientClient(cfg),
 		PaymentOrder:          NewPaymentOrderClient(cfg),
 		PaymentProviderConfig: NewPaymentProviderConfigClient(cfg),
@@ -260,6 +265,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		InviteRebateLog:       NewInviteRebateLogClient(cfg),
 		ModelPrice:            NewModelPriceClient(cfg),
 		ModelTag:              NewModelTagClient(cfg),
+		ModerationLog:         NewModerationLogClient(cfg),
 		OAuthClient:           NewOAuthClientClient(cfg),
 		PaymentOrder:          NewPaymentOrderClient(cfg),
 		PaymentProviderConfig: NewPaymentProviderConfigClient(cfg),
@@ -301,9 +307,9 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel,
 		c.ChannelKey, c.Group, c.InviteProfile, c.InviteRebateLog, c.ModelPrice,
-		c.ModelTag, c.OAuthClient, c.PaymentOrder, c.PaymentProviderConfig,
-		c.RedemptionCode, c.Setting, c.Task, c.Tier, c.UpstreamRequestLog, c.UsageLog,
-		c.User,
+		c.ModelTag, c.ModerationLog, c.OAuthClient, c.PaymentOrder,
+		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task, c.Tier,
+		c.UpstreamRequestLog, c.UsageLog, c.User,
 	} {
 		n.Use(hooks...)
 	}
@@ -315,9 +321,9 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel,
 		c.ChannelKey, c.Group, c.InviteProfile, c.InviteRebateLog, c.ModelPrice,
-		c.ModelTag, c.OAuthClient, c.PaymentOrder, c.PaymentProviderConfig,
-		c.RedemptionCode, c.Setting, c.Task, c.Tier, c.UpstreamRequestLog, c.UsageLog,
-		c.User,
+		c.ModelTag, c.ModerationLog, c.OAuthClient, c.PaymentOrder,
+		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task, c.Tier,
+		c.UpstreamRequestLog, c.UsageLog, c.User,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -348,6 +354,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ModelPrice.mutate(ctx, m)
 	case *ModelTagMutation:
 		return c.ModelTag.mutate(ctx, m)
+	case *ModerationLogMutation:
+		return c.ModerationLog.mutate(ctx, m)
 	case *OAuthClientMutation:
 		return c.OAuthClient.mutate(ctx, m)
 	case *PaymentOrderMutation:
@@ -2076,6 +2084,139 @@ func (c *ModelTagClient) mutate(ctx context.Context, m *ModelTagMutation) (Value
 	}
 }
 
+// ModerationLogClient is a client for the ModerationLog schema.
+type ModerationLogClient struct {
+	config
+}
+
+// NewModerationLogClient returns a client for the ModerationLog from the given config.
+func NewModerationLogClient(c config) *ModerationLogClient {
+	return &ModerationLogClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `moderationlog.Hooks(f(g(h())))`.
+func (c *ModerationLogClient) Use(hooks ...Hook) {
+	c.hooks.ModerationLog = append(c.hooks.ModerationLog, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `moderationlog.Intercept(f(g(h())))`.
+func (c *ModerationLogClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ModerationLog = append(c.inters.ModerationLog, interceptors...)
+}
+
+// Create returns a builder for creating a ModerationLog entity.
+func (c *ModerationLogClient) Create() *ModerationLogCreate {
+	mutation := newModerationLogMutation(c.config, OpCreate)
+	return &ModerationLogCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ModerationLog entities.
+func (c *ModerationLogClient) CreateBulk(builders ...*ModerationLogCreate) *ModerationLogCreateBulk {
+	return &ModerationLogCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ModerationLogClient) MapCreateBulk(slice any, setFunc func(*ModerationLogCreate, int)) *ModerationLogCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ModerationLogCreateBulk{err: fmt.Errorf("calling to ModerationLogClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ModerationLogCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ModerationLogCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ModerationLog.
+func (c *ModerationLogClient) Update() *ModerationLogUpdate {
+	mutation := newModerationLogMutation(c.config, OpUpdate)
+	return &ModerationLogUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ModerationLogClient) UpdateOne(ml *ModerationLog) *ModerationLogUpdateOne {
+	mutation := newModerationLogMutation(c.config, OpUpdateOne, withModerationLog(ml))
+	return &ModerationLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ModerationLogClient) UpdateOneID(id int) *ModerationLogUpdateOne {
+	mutation := newModerationLogMutation(c.config, OpUpdateOne, withModerationLogID(id))
+	return &ModerationLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ModerationLog.
+func (c *ModerationLogClient) Delete() *ModerationLogDelete {
+	mutation := newModerationLogMutation(c.config, OpDelete)
+	return &ModerationLogDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ModerationLogClient) DeleteOne(ml *ModerationLog) *ModerationLogDeleteOne {
+	return c.DeleteOneID(ml.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ModerationLogClient) DeleteOneID(id int) *ModerationLogDeleteOne {
+	builder := c.Delete().Where(moderationlog.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ModerationLogDeleteOne{builder}
+}
+
+// Query returns a query builder for ModerationLog.
+func (c *ModerationLogClient) Query() *ModerationLogQuery {
+	return &ModerationLogQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeModerationLog},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ModerationLog entity by its id.
+func (c *ModerationLogClient) Get(ctx context.Context, id int) (*ModerationLog, error) {
+	return c.Query().Where(moderationlog.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ModerationLogClient) GetX(ctx context.Context, id int) *ModerationLog {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ModerationLogClient) Hooks() []Hook {
+	return c.hooks.ModerationLog
+}
+
+// Interceptors returns the client interceptors.
+func (c *ModerationLogClient) Interceptors() []Interceptor {
+	return c.inters.ModerationLog
+}
+
+func (c *ModerationLogClient) mutate(ctx context.Context, m *ModerationLogMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ModerationLogCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ModerationLogUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ModerationLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ModerationLogDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ModerationLog mutation op: %q", m.Op())
+	}
+}
+
 // OAuthClientClient is a client for the OAuthClient schema.
 type OAuthClientClient struct {
 	config
@@ -3586,14 +3727,14 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 type (
 	hooks struct {
 		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, ChannelKey, Group,
-		InviteProfile, InviteRebateLog, ModelPrice, ModelTag, OAuthClient,
-		PaymentOrder, PaymentProviderConfig, RedemptionCode, Setting, Task, Tier,
-		UpstreamRequestLog, UsageLog, User []ent.Hook
+		InviteProfile, InviteRebateLog, ModelPrice, ModelTag, ModerationLog,
+		OAuthClient, PaymentOrder, PaymentProviderConfig, RedemptionCode, Setting,
+		Task, Tier, UpstreamRequestLog, UsageLog, User []ent.Hook
 	}
 	inters struct {
 		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, ChannelKey, Group,
-		InviteProfile, InviteRebateLog, ModelPrice, ModelTag, OAuthClient,
-		PaymentOrder, PaymentProviderConfig, RedemptionCode, Setting, Task, Tier,
-		UpstreamRequestLog, UsageLog, User []ent.Interceptor
+		InviteProfile, InviteRebateLog, ModelPrice, ModelTag, ModerationLog,
+		OAuthClient, PaymentOrder, PaymentProviderConfig, RedemptionCode, Setting,
+		Task, Tier, UpstreamRequestLog, UsageLog, User []ent.Interceptor
 	}
 )

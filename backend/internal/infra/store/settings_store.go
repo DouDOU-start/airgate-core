@@ -82,3 +82,24 @@ func (s *SettingsStore) UpsertMany(ctx context.Context, items []appsettings.Item
 
 	return tx.Commit()
 }
+
+// GroupValues 返回某组全部设置的 key→value 映射（风控中心等专用通道使用，
+// 绕开 app/settings 的敏感组屏蔽——屏蔽只针对管理端通用读写路径）。
+func (s *SettingsStore) GroupValues(ctx context.Context, group string) (map[string]string, error) {
+	items, err := s.db.Setting.Query().
+		Where(entsetting.GroupEQ(group)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(items))
+	for _, item := range items {
+		out[item.Key] = item.Value
+	}
+	return out, nil
+}
+
+// UpsertValue 写单条设置（按 key 冲突合并，与 UpsertMany 同口径）。
+func (s *SettingsStore) UpsertValue(ctx context.Context, group, key, value string) error {
+	return s.UpsertMany(ctx, []appsettings.ItemInput{{Key: key, Value: value, Group: group}})
+}

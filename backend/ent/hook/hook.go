@@ -141,6 +141,18 @@ func (f ModelTagFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, er
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ModelTagMutation", m)
 }
 
+// The ModerationLogFunc type is an adapter to allow the use of ordinary
+// function as ModerationLog mutator.
+type ModerationLogFunc func(context.Context, *ent.ModerationLogMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ModerationLogFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ModerationLogMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ModerationLogMutation", m)
+}
+
 // The OAuthClientFunc type is an adapter to allow the use of ordinary
 // function as OAuthClient mutator.
 type OAuthClientFunc func(context.Context, *ent.OAuthClientMutation) (ent.Value, error)

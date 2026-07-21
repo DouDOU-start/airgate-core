@@ -346,6 +346,69 @@ var (
 		Columns:    ModelTagsColumns,
 		PrimaryKey: []*schema.Column{ModelTagsColumns[0]},
 	}
+	// ModerationLogsColumns holds the columns for the "moderation_logs" table.
+	ModerationLogsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "request_id", Type: field.TypeString},
+		{Name: "user_id", Type: field.TypeInt, Default: 0},
+		{Name: "user_email_snapshot", Type: field.TypeString, Default: ""},
+		{Name: "api_key_id", Type: field.TypeInt, Default: 0},
+		{Name: "group_id", Type: field.TypeInt, Default: 0},
+		{Name: "group_name_snapshot", Type: field.TypeString, Default: ""},
+		{Name: "endpoint", Type: field.TypeString, Default: ""},
+		{Name: "protocol", Type: field.TypeString, Default: ""},
+		{Name: "model", Type: field.TypeString, Default: ""},
+		{Name: "mode", Type: field.TypeString, Default: ""},
+		{Name: "action", Type: field.TypeString, Default: ""},
+		{Name: "flagged", Type: field.TypeBool, Default: false},
+		{Name: "highest_category", Type: field.TypeString, Default: ""},
+		{Name: "highest_score", Type: field.TypeFloat64, Default: 0},
+		{Name: "matched_keyword", Type: field.TypeString, Default: ""},
+		{Name: "category_scores", Type: field.TypeJSON, Nullable: true},
+		{Name: "threshold_snapshot", Type: field.TypeJSON, Nullable: true},
+		{Name: "input_excerpt", Type: field.TypeString, Default: ""},
+		{Name: "input_hash", Type: field.TypeString, Default: ""},
+		{Name: "upstream_latency_ms", Type: field.TypeInt64, Default: 0},
+		{Name: "queue_delay_ms", Type: field.TypeInt64, Default: 0},
+		{Name: "error", Type: field.TypeString, Default: ""},
+		{Name: "violation_count", Type: field.TypeInt, Default: 0},
+		{Name: "auto_banned", Type: field.TypeBool, Default: false},
+		{Name: "email_sent", Type: field.TypeBool, Default: false},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// ModerationLogsTable holds the schema information for the "moderation_logs" table.
+	ModerationLogsTable = &schema.Table{
+		Name:       "moderation_logs",
+		Columns:    ModerationLogsColumns,
+		PrimaryKey: []*schema.Column{ModerationLogsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "moderation_log_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ModerationLogsColumns[26]},
+			},
+			{
+				Name:    "moderation_log_user_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ModerationLogsColumns[2], ModerationLogsColumns[26]},
+			},
+			{
+				Name:    "moderation_log_flagged_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ModerationLogsColumns[12], ModerationLogsColumns[26]},
+			},
+			{
+				Name:    "moderation_log_group_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ModerationLogsColumns[5], ModerationLogsColumns[26]},
+			},
+			{
+				Name:    "moderation_log_request_id",
+				Unique:  false,
+				Columns: []*schema.Column{ModerationLogsColumns[1]},
+			},
+		},
+	}
 	// OauthClientsColumns holds the columns for the "oauth_clients" table.
 	OauthClientsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -864,6 +927,7 @@ var (
 		InviteRebateLogsTable,
 		ModelPricesTable,
 		ModelTagsTable,
+		ModerationLogsTable,
 		OauthClientsTable,
 		PaymentOrdersTable,
 		PaymentProviderConfigsTable,

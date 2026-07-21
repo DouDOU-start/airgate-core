@@ -34,6 +34,8 @@ type Tx struct {
 	ModelPrice *ModelPriceClient
 	// ModelTag is the client for interacting with the ModelTag builders.
 	ModelTag *ModelTagClient
+	// ModerationLog is the client for interacting with the ModerationLog builders.
+	ModerationLog *ModerationLogClient
 	// OAuthClient is the client for interacting with the OAuthClient builders.
 	OAuthClient *OAuthClientClient
 	// PaymentOrder is the client for interacting with the PaymentOrder builders.
@@ -196,6 +198,7 @@ func (tx *Tx) init() {
 	tx.InviteRebateLog = NewInviteRebateLogClient(tx.config)
 	tx.ModelPrice = NewModelPriceClient(tx.config)
 	tx.ModelTag = NewModelTagClient(tx.config)
+	tx.ModerationLog = NewModerationLogClient(tx.config)
 	tx.OAuthClient = NewOAuthClientClient(tx.config)
 	tx.PaymentOrder = NewPaymentOrderClient(tx.config)
 	tx.PaymentProviderConfig = NewPaymentProviderConfigClient(tx.config)
