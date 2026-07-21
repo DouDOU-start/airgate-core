@@ -54,6 +54,7 @@ Suno 的计费模型名由动作合成（`suno_music` / `suno_lyrics`），渠�
 - **OAuth 提供方**：标准 PKCE 授权码流程，供外部应用接入（`/oauth/token`、`/oauth/userinfo`、`/oauth/provision-key`）
 - **运维**：管理仪表盘、上游请求留痕、公告系统、后台一键自更新（systemd/Docker 感知）
 - **限流**：用户/密钥/渠道三级并发闸门 + RPM 限速（Redis 原语）
+- **风控中心**：转发前内容审核（关键词 Aho-Corasick 拦截 + 外部审核 API 多 key 轮询熔断 + 命中哈希缓存），observe/pre_block 双模式，采样率/分组/模型过滤，滑窗违规计数自动封禁（管理员豁免）+ 邮件通知，审核日志双保留期 TTL 清理
 
 ## 快速开始
 
@@ -104,7 +105,7 @@ make dev       # 前后端热重载
 ## 请求链路
 
 ```
-客户端（sk- 密钥） → 鉴权/余额预检 → 用户/密钥并发闸门
+客户端（sk- 密钥） → 鉴权/余额预检 → 内容审核预检（风控中心，可选） → 用户/密钥并发闸门
   → 渠道调度（协议过滤 + 优先级分档 + 权重随机 + 多 key 轮询）
   → 透传直发上游（失败 failover ≤3：429/5xx 换渠道 / 401·403 自动禁用）
   → usage 计量归一化 → 价目表计费 → 异步落账 usage_log
@@ -125,6 +126,7 @@ airgate-core/
 │       ├── server/          # HTTP 层（dto / handler / middleware / router）
 │       ├── infra/store/     # 数据访问（唯一 import ent 的层）
 │       ├── auth/            # API Key 鉴权与加密
+│       ├── moderation/      # 风控判定核心（输入抽取 / 关键词 / 审核 API 熔断 / worker 池 / 封禁副作用）
 │       └── errlog/          # 上游失败留痕
 ├── web/                     # React 19 + Vite + TanStack Query + Tailwind
 └── deploy/                  # Dockerfile / compose / install.sh / systemd unit

@@ -32,7 +32,7 @@ description: airgate-core（standalone-gateway 分支）开发指南：架构、
       ※ countTokens 两端点零计费；images/predict 在 per_request_price>0 时按次×产出张数计费；
         alpha/search（codex 内置联网搜索）按次计价，单价取「分组覆盖价 Group.alpha_search_price ?? 全局设置 gateway.alpha_search_price（默认 0.01）」，
         与模型价目表解耦、实际扣费叠加分组倍率、仅 2xx 成功计费）
-  → internal/relay/pipeline：余额预检 → user/key 并发闸门 → failover≤3
+  → internal/relay/pipeline：余额预检 → 内容审核预检（moderation，可选拦截）→ user/key 并发闸门 → failover≤3
       { registry.Pick(分组,模型,协议)（协议过滤 + priority 分档 + weight+10 加权随机 + 多 key 轮询）
         → adaptor 透传直发 HTTP → outcome 判定（429 换渠道 / 401·403 自动禁用 / 5xx 换渠道）}
   → relay/pricing（token×价目表）→ billing.Calculate 三管道 → recorder → usage_log
@@ -56,6 +56,7 @@ description: airgate-core（standalone-gateway 分支）开发指南：架构、
 - `internal/relay/outcome` — 上游 attempt 判定表与出口脱敏（429/401·403/5xx → 换渠道/禁用），pipeline 与 task 共用的唯一事实源。
 - `internal/relay/errfmt` — 错误体的协议形态渲染（openai/anthropic/gemini/suno），pipeline、task 与鉴权中间件共用。网关自产错误与**上游错误**都经此包渲染：上游错误解析出语义（message/type/code）后按入口协议重建（语义保留、载体重建，非字节透传），HTTP 状态码保留上游原值。
 - `internal/relay/pricing` — 价目表缓存 + token→cost 纯函数。
+- `internal/moderation` — 风控中心判定核心（与 billing/errlog 同级顶层包）：输入抽取（gjson 按协议抽最后一条 user 消息）、关键词 Aho-Corasick、外部审核 API 客户端（多 key round-robin + 按状态分级冻结熔断）、observe 异步 worker 池、命中哈希 Redis 缓存、滑窗计数自动封禁（管理员豁免）与邮件通知副作用、日志双保留期 TTL 清理。**不 import ent**——落库/封禁/配置经窄接口（LogStore/UserBanner/ConfigSource/Notifier）注入；配置存 settings 表 `risk_control` 组（总开关 `risk_control_enabled` + 单 JSON `content_moderation_config`，审核 key AES-256-GCM 密文，加解密在 `app/riskcontrol`）；挂点：pipeline `forwardOpt` 并发闸门前 + task `handleSubmit` 提交前，拦截按入口协议 errfmt 渲染、errlog phase=`precheck_moderation`；引擎 fail-open（任何内部故障放行）。管理面 `/admin/risk-control/*`（app/riskcontrol + riskcontrol_handler 三件套）。注意：转发鉴权校验 `user.status`（禁用用户 sk- key 5s 缓存内失效）；管理员不可被禁用（手动与自动封禁双防线）。
 - `internal/billing` — 三管道计费（actual=total×billing_rate 扣余额；billed=total×sell_rate 累加 key 用量；渠道成本=total×account_rate_multiplier 快照列查询期现算、不落列）与异步记账；billing_rate 优先级链 user.group_rates > tier.rates（用户等级批量分层）> group.rate_multiplier > 1.0（rate.go，鉴权时经 APIKeyInfo 预装载）。
 - `internal/scheduler` — 仅剩 ConcurrencyManager/RPMCounter（Redis 限流原语，渠道/用户/key 维度）。
 
