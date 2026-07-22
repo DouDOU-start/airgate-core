@@ -20,15 +20,17 @@ type ModerationChecker interface {
 }
 
 // moderationProtocolFor 入站端点 → 审核输入抽取协议。
-// countTokens 类端点（不产生生成消费）与 multipart 图像编辑（v1 不审）返回 ok=false。
+// 仅 countTokens 类端点（零计费、不产生生成）返回 ok=false。
 func moderationProtocolFor(endpoint string) (string, bool) {
 	switch endpoint {
 	case adaptor.EndpointChatCompletions:
 		return moderation.ProtocolOpenAIChat, true
 	case adaptor.EndpointResponses:
 		return moderation.ProtocolOpenAIResponses, true
-	case adaptor.EndpointImagesGenerations:
+	case adaptor.EndpointImagesGenerations, adaptor.EndpointImagesEdits:
 		return moderation.ProtocolOpenAIImages, true
+	case adaptor.EndpointAlphaSearch:
+		return moderation.ProtocolOpenAISearch, true
 	case adaptor.EndpointMessages:
 		return moderation.ProtocolAnthropicMessages, true
 	case adaptor.EndpointGenerateContent, adaptor.EndpointPredict:
@@ -41,7 +43,8 @@ func moderationProtocolFor(endpoint string) (string, bool) {
 // moderationCheck 触网前的内容审核预检。放行返回 true；
 // 拦截时按入口协议写出错误体并落失败留痕，返回 false。
 // 引擎未注入、端点不在审核范围、引擎内部故障时均放行（fail-open 由引擎保证）。
-func (p *Pipeline) moderationCheck(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto.ChatRequest, endpoint string, start time.Time) bool {
+// multipart 端点（images/edits）经 opts.rawBody 传原始体，抽取侧按 Content-Type 分派。
+func (p *Pipeline) moderationCheck(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto.ChatRequest, endpoint string, opts forwardOptions, start time.Time) bool {
 	if p.moderation == nil {
 		return true
 	}
@@ -49,20 +52,24 @@ func (p *Pipeline) moderationCheck(c *gin.Context, keyInfo *auth.APIKeyInfo, req
 	if !ok {
 		return true
 	}
-	body, err := req.Marshal()
-	if err != nil {
-		return true
+	body := opts.rawBody
+	if body == nil {
+		var err error
+		if body, err = req.Marshal(); err != nil {
+			return true
+		}
 	}
 	d := p.moderation.Check(c.Request.Context(), moderation.CheckRequest{
-		RequestID: requestIDOf(c),
-		UserID:    keyInfo.UserID,
-		UserEmail: keyInfo.UserEmail,
-		APIKeyID:  keyInfo.KeyID,
-		GroupID:   keyInfo.GroupID,
-		Endpoint:  c.Request.URL.Path,
-		Protocol:  protocol,
-		Model:     req.Model,
-		Body:      body,
+		RequestID:   requestIDOf(c),
+		UserID:      keyInfo.UserID,
+		UserEmail:   keyInfo.UserEmail,
+		APIKeyID:    keyInfo.KeyID,
+		GroupID:     keyInfo.GroupID,
+		Endpoint:    c.Request.URL.Path,
+		Protocol:    protocol,
+		Model:       req.Model,
+		ContentType: opts.rawContentType,
+		Body:        body,
 	})
 	if d.Allowed {
 		return true

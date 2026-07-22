@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
-	"strconv"
 	"strings"
 
 	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
@@ -16,11 +15,8 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 )
 
-// settings 表落点：group=risk_control 下两个 key——
-// 总开关独立存（状态卡/热路径免解析 JSON），其余 30+ 项配置单 JSON 原子更新。
 const (
 	SettingsGroup    = "risk_control"
-	settingKeyEnable = "risk_control_enabled"
 	settingKeyConfig = "content_moderation_config"
 )
 
@@ -50,17 +46,17 @@ func NewService(settings SettingsRepo, logs Repository, hashes moderation.HashCa
 // SetEngine 注入判定引擎（装配期调用；用于读运行时指标、key 探活与缓存失效）。
 func (s *Service) SetEngine(e *moderation.Engine) { s.engine = e }
 
-// Runtime 实现 moderation.ConfigSource：读总开关与配置并解密审核 key。
-func (s *Service) Runtime(ctx context.Context) (bool, *moderation.Config, error) {
+// Runtime 实现 moderation.ConfigSource：读配置并解密审核 key。
+func (s *Service) Runtime(ctx context.Context) (*moderation.Config, error) {
 	values, err := s.settings.GroupValues(ctx, SettingsGroup)
 	if err != nil {
-		return false, nil, err
+		return nil, err
 	}
 	cfg, err := s.parseStored(values[settingKeyConfig])
 	if err != nil {
-		return false, nil, err
+		return nil, err
 	}
-	return values[settingKeyEnable] == "true", cfg, nil
+	return cfg, nil
 }
 
 // DisableUser 实现 moderation.UserBanner：管理员与已禁用用户跳过（返回 false 不报错）。
@@ -93,7 +89,7 @@ func (s *Service) GetConfig(ctx context.Context) (ConfigView, error) {
 	if err != nil {
 		return ConfigView{}, err
 	}
-	return s.configView(values[settingKeyEnable] == "true", cfg), nil
+	return s.configView(cfg), nil
 }
 
 // UpdateConfig 增量更新配置：nil 字段保持现值；审核 key 支持追加/替换/按
@@ -116,15 +112,8 @@ func (s *Service) UpdateConfig(ctx context.Context, input UpdateConfigInput) (Co
 	if err := s.saveConfig(ctx, cfg); err != nil {
 		return ConfigView{}, err
 	}
-	enabled := values[settingKeyEnable] == "true"
-	if input.RiskControlEnabled != nil {
-		enabled = *input.RiskControlEnabled
-		if err := s.settings.UpsertValue(ctx, SettingsGroup, settingKeyEnable, strconv.FormatBool(enabled)); err != nil {
-			return ConfigView{}, err
-		}
-	}
 	s.engine.InvalidateSnapshot()
-	return s.configView(enabled, cfg), nil
+	return s.configView(cfg), nil
 }
 
 // GetStatus 运行时状态（引擎指标 + worker/队列 + key 负载 + hash 计数）。
@@ -141,6 +130,11 @@ func (s *Service) TestAPIKeys(ctx context.Context, input moderation.TestKeysInpu
 func (s *Service) ListLogs(ctx context.Context, filter ListFilter) ([]Record, int64, error) {
 	filter.Page, filter.PageSize = pagination.Normalize(filter.Page, filter.PageSize)
 	return s.logs.List(ctx, filter)
+}
+
+// ClearLogs 按结果类型清空审核日志；空 result 清空全部。
+func (s *Service) ClearLogs(ctx context.Context, result string) (int64, error) {
+	return s.logs.ClearByResult(ctx, result)
 }
 
 // UnbanUser 解封用户（置回 active；封禁传播依赖 5s 鉴权缓存 TTL）。
@@ -218,7 +212,7 @@ func (s *Service) saveConfig(ctx context.Context, cfg *moderation.Config) error 
 	return s.settings.UpsertValue(ctx, SettingsGroup, settingKeyConfig, string(raw))
 }
 
-func (s *Service) configView(enabled bool, cfg *moderation.Config) ConfigView {
+func (s *Service) configView(cfg *moderation.Config) ConfigView {
 	keys := cfg.APIKeys
 	masks := make([]string, 0, len(keys))
 	for _, key := range keys {
@@ -227,11 +221,10 @@ func (s *Service) configView(enabled bool, cfg *moderation.Config) ConfigView {
 	view := *cfg.Clone()
 	view.APIKeys = nil
 	return ConfigView{
-		RiskControlEnabled: enabled,
-		Config:             view,
-		APIKeyCount:        len(keys),
-		APIKeyMasks:        masks,
-		APIKeyStatuses:     s.engine.KeyStatuses(keys),
+		Config:         view,
+		APIKeyCount:    len(keys),
+		APIKeyMasks:    masks,
+		APIKeyStatuses: s.engine.KeyStatuses(keys),
 	}
 }
 
@@ -265,7 +258,6 @@ func (s *Service) applyKeyPatch(current []string, input UpdateConfigInput) []str
 }
 
 func applyConfigPatch(cfg *moderation.Config, in UpdateConfigInput) {
-	setIf(&cfg.Enabled, in.Enabled)
 	setIf(&cfg.Mode, in.Mode)
 	setIf(&cfg.BaseURL, in.BaseURL)
 	setIf(&cfg.Model, in.Model)

@@ -65,6 +65,7 @@ type ListFilter struct {
 // Repository 审核日志仓储（infra/store 实现；查询侧，写入侧见 moderation.LogStore）。
 type Repository interface {
 	List(ctx context.Context, filter ListFilter) ([]Record, int64, error)
+	ClearByResult(ctx context.Context, result string) (int64, error)
 }
 
 // SettingsRepo 配置存取窄接口（store.SettingsStore 实现；直连 store 绕开
@@ -82,17 +83,14 @@ type UserRepo interface {
 
 // ConfigView 配置回显视图：审核 key 只出掩码与健康状态，明文永不出网。
 type ConfigView struct {
-	RiskControlEnabled bool
-	Config             moderation.Config // APIKeys 已清空
-	APIKeyCount        int
-	APIKeyMasks        []string
-	APIKeyStatuses     []moderation.KeyStatus
+	Config         moderation.Config // APIKeys 已清空
+	APIKeyCount    int
+	APIKeyMasks    []string
+	APIKeyStatuses []moderation.KeyStatus
 }
 
 // UpdateConfigInput 配置增量更新（nil 字段不改动）。
 type UpdateConfigInput struct {
-	RiskControlEnabled   *bool
-	Enabled              *bool
 	Mode                 *string
 	BaseURL              *string
 	Model                *string

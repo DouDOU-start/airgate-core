@@ -14,8 +14,6 @@ var ErrBadInput = errors.New("invalid moderation input")
 
 // RuntimeStatus 引擎运行时状态快照（admin 状态页）。
 type RuntimeStatus struct {
-	Enabled              bool        `json:"enabled"`
-	RiskControlEnabled   bool        `json:"risk_control_enabled"`
 	Mode                 string      `json:"mode"`
 	WorkerCount          int         `json:"worker_count"`
 	MaxWorkers           int         `json:"max_workers"`
@@ -50,8 +48,6 @@ func (e *Engine) Status(ctx context.Context) RuntimeStatus {
 	}
 	snap, err := e.loadSnapshot(ctx)
 	if err == nil {
-		out.RiskControlEnabled = snap.enabled
-		out.Enabled = snap.config.Enabled
 		out.Mode = snap.config.Mode
 		out.WorkerCount = snap.config.WorkerCount
 		out.QueueSize = snap.config.QueueSize

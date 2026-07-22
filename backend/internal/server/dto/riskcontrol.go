@@ -7,8 +7,6 @@ import (
 
 // RiskControlConfigResp 风控配置回显（审核 key 只出掩码与健康状态）。
 type RiskControlConfigResp struct {
-	RiskControlEnabled   bool                   `json:"risk_control_enabled"`
-	Enabled              bool                   `json:"enabled"`
 	Mode                 string                 `json:"mode"`
 	BaseURL              string                 `json:"base_url"`
 	Model                string                 `json:"model"`
@@ -41,8 +39,6 @@ type RiskControlConfigResp struct {
 
 // UpdateRiskControlConfigReq 配置增量更新请求（缺省字段不改动）。
 type UpdateRiskControlConfigReq struct {
-	RiskControlEnabled   *bool                   `json:"risk_control_enabled"`
-	Enabled              *bool                   `json:"enabled"`
 	Mode                 *string                 `json:"mode"`
 	BaseURL              *string                 `json:"base_url"`
 	Model                *string                 `json:"model"`
@@ -117,4 +113,15 @@ type DeleteRiskControlHashResp struct {
 // ClearRiskControlHashesResp 清空结果。
 type ClearRiskControlHashesResp struct {
 	Deleted int64 `json:"deleted"`
+}
+
+// ClearRiskControlLogsReq 清空审核日志请求。
+type ClearRiskControlLogsReq struct {
+	Result string `json:"result" binding:"omitempty,oneof=hit blocked pass error"`
+}
+
+// ClearRiskControlLogsResp 清空审核日志结果。
+type ClearRiskControlLogsResp struct {
+	Deleted int64  `json:"deleted"`
+	Result  string `json:"result"`
 }

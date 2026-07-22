@@ -127,6 +127,22 @@ func (h *RiskControlHandler) DeleteHash(c *gin.Context) {
 	response.Success(c, dto.DeleteRiskControlHashResp{InputHash: req.InputHash, Deleted: deleted})
 }
 
+// ClearLogs DELETE /admin/risk-control/logs 清空审核日志（可按 result 类型筛选）。
+func (h *RiskControlHandler) ClearLogs(c *gin.Context) {
+	var req dto.ClearRiskControlLogsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+	deleted, err := h.service.ClearLogs(c.Request.Context(), req.Result)
+	if err != nil {
+		httpCode, message := h.handleError("清空审核日志失败", "清空失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	response.Success(c, dto.ClearRiskControlLogsResp{Deleted: deleted, Result: req.Result})
+}
+
 // ClearHashes DELETE /admin/risk-control/hashes/all 清空命中哈希缓存。
 func (h *RiskControlHandler) ClearHashes(c *gin.Context) {
 	deleted, err := h.service.ClearFlaggedHashes(c.Request.Context())

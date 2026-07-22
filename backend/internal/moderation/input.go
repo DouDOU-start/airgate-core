@@ -64,10 +64,11 @@ func (in Input) Hash() string {
 }
 
 // ExtractInput 按协议从请求体抽取「最后一条用户输入」的文本与图片。
-// contentType 仅 openai_video 的 multipart 提交体需要，JSON 协议传空即可。
+// contentType 仅 multipart 提交体（video / images edits）需要，JSON 协议传空即可。
 // 审核对象刻意只取最后一条 user 消息：历史消息在此前请求中已审过。
 func ExtractInput(protocol, contentType string, body []byte) Input {
-	if protocol == ProtocolOpenAIVideo && strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "multipart/") {
+	if (protocol == ProtocolOpenAIVideo || protocol == ProtocolOpenAIImages) &&
+		strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "multipart/") {
 		return extractMultipartPrompt(contentType, body)
 	}
 	if len(body) == 0 || !gjson.ValidBytes(body) {
@@ -86,6 +87,15 @@ func ExtractInput(protocol, contentType string, body []byte) Input {
 		collectLastGeminiContent(gjson.GetBytes(body, "contents"), &parts, &images)
 	case ProtocolOpenAIImages, ProtocolOpenAIVideo:
 		addText(&parts, gjson.GetBytes(body, "prompt").String())
+	case ProtocolOpenAISearch:
+		// codex 联网搜索体为纯透传（本仓不解析其结构），查询文本按常见字段宽松抽取，
+		// 取第一个非空者；均无则空输入放行（fail-open）。
+		for _, field := range []string{"query", "q", "prompt", "input"} {
+			if v := gjson.GetBytes(body, field); v.Type == gjson.String && strings.TrimSpace(v.String()) != "" {
+				addText(&parts, v.String())
+				break
+			}
+		}
 	case ProtocolSuno:
 		// suno 提交体的文本字段（music：prompt 歌词 / gpt_description_prompt 描述 /
 		// tags 风格 / title 标题；lyrics：prompt 描述）。

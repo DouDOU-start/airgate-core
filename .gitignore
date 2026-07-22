@@ -61,3 +61,5 @@ web/.ds-css/
 
 # Playwright MCP 浏览器会话产物
 .playwright-mcp/
+
+.agents

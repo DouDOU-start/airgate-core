@@ -44,8 +44,6 @@ export interface ModerationKeyLoad {
 }
 
 export interface RiskControlConfig {
-  risk_control_enabled: boolean;
-  enabled: boolean;
   mode: ModerationMode;
   base_url: string;
   model: string;
@@ -77,8 +75,6 @@ export interface RiskControlConfig {
 }
 
 export interface UpdateRiskControlConfigReq {
-  risk_control_enabled?: boolean;
-  enabled?: boolean;
   mode?: ModerationMode;
   base_url?: string;
   model?: string;
@@ -110,8 +106,6 @@ export interface UpdateRiskControlConfigReq {
 }
 
 export interface RiskControlStatus {
-  enabled: boolean;
-  risk_control_enabled: boolean;
   mode: ModerationMode | '';
   worker_count: number;
   max_workers: number;
@@ -218,6 +212,8 @@ export const riskControlApi = {
     post<{ user_id: number; status: string }>(`/api/v1/admin/risk-control/users/${userId}/unban`, {}),
   deleteHash: (inputHash: string) =>
     del<{ input_hash: string; deleted: boolean }>('/api/v1/admin/risk-control/hashes', { input_hash: inputHash }),
+  clearLogs: (result?: string) =>
+    del<{ deleted: number; result: string }>('/api/v1/admin/risk-control/logs', { result: result ?? '' }),
   clearHashes: () =>
     del<{ deleted: number }>('/api/v1/admin/risk-control/hashes/all'),
 };

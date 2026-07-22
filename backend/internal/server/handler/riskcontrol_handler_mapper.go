@@ -9,8 +9,6 @@ import (
 func toRiskControlConfigResp(view appriskcontrol.ConfigView) dto.RiskControlConfigResp {
 	cfg := view.Config
 	return dto.RiskControlConfigResp{
-		RiskControlEnabled:   view.RiskControlEnabled,
-		Enabled:              cfg.Enabled,
 		Mode:                 cfg.Mode,
 		BaseURL:              cfg.BaseURL,
 		Model:                cfg.Model,
@@ -44,8 +42,6 @@ func toRiskControlConfigResp(view appriskcontrol.ConfigView) dto.RiskControlConf
 
 func toRiskControlUpdateInput(req dto.UpdateRiskControlConfigReq) appriskcontrol.UpdateConfigInput {
 	return appriskcontrol.UpdateConfigInput{
-		RiskControlEnabled:   req.RiskControlEnabled,
-		Enabled:              req.Enabled,
 		Mode:                 req.Mode,
 		BaseURL:              req.BaseURL,
 		Model:                req.Model,

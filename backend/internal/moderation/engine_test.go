@@ -10,12 +10,11 @@ import (
 )
 
 type fakeSource struct {
-	enabled bool
-	cfg     *Config
+	cfg *Config
 }
 
-func (s *fakeSource) Runtime(context.Context) (bool, *Config, error) {
-	return s.enabled, s.cfg.Clone(), nil
+func (s *fakeSource) Runtime(context.Context) (*Config, error) {
+	return s.cfg.Clone(), nil
 }
 
 type fakeLogStore struct {
@@ -128,7 +127,6 @@ func drainQueue(t *testing.T, e *Engine, cfg *Config) {
 
 func TestCheckShortCircuits(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Enabled = true
 	cfg.Mode = ModePreBlock
 	cfg.BlockedKeywords = []string{"炸弹"}
 	cfg.KeywordBlockingMode = KeywordModeKeywordOnly
@@ -137,8 +135,6 @@ func TestCheckShortCircuits(t *testing.T) {
 		name   string
 		mutate func(src *fakeSource, in *CheckRequest)
 	}{
-		{"总开关关", func(src *fakeSource, in *CheckRequest) { src.enabled = false }},
-		{"enabled 关", func(src *fakeSource, in *CheckRequest) { src.cfg.Enabled = false }},
 		{"mode off", func(src *fakeSource, in *CheckRequest) { src.cfg.Mode = ModeOff }},
 		{"分组不在范围", func(src *fakeSource, in *CheckRequest) {
 			src.cfg.AllGroups = false
@@ -151,7 +147,7 @@ func TestCheckShortCircuits(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			src := &fakeSource{enabled: true, cfg: cfg.Clone()}
+			src := &fakeSource{cfg: cfg.Clone()}
 			logs := &fakeLogStore{}
 			e := newTestEngine(src, logs, newFakeHashCache(), &fakeBanner{})
 			in := baseCheckRequest("含炸弹的输入")
@@ -166,12 +162,11 @@ func TestCheckShortCircuits(t *testing.T) {
 
 func TestCheckKeywordBlock(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Enabled = true
 	cfg.Mode = ModePreBlock
 	cfg.BlockedKeywords = []string{"炸弹"}
 	cfg.KeywordBlockingMode = KeywordModeKeywordOnly
 
-	src := &fakeSource{enabled: true, cfg: cfg}
+	src := &fakeSource{cfg: cfg}
 	logs := &fakeLogStore{}
 	banner := &fakeBanner{}
 	e := newTestEngine(src, logs, newFakeHashCache(), banner)
@@ -202,12 +197,11 @@ func TestCheckKeywordBlock(t *testing.T) {
 
 func TestCheckHashBlockSkipsBanCount(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Enabled = true
 	cfg.Mode = ModePreBlock
 	cfg.PreHashCheckEnabled = true
 	cfg.KeywordBlockingMode = KeywordModeAPIOnly
 
-	src := &fakeSource{enabled: true, cfg: cfg}
+	src := &fakeSource{cfg: cfg}
 	logs := &fakeLogStore{}
 	banner := &fakeBanner{}
 	hashes := newFakeHashCache()
@@ -239,7 +233,6 @@ func TestCheckPreBlockAPIFlowAndAutoBan(t *testing.T) {
 	defer srv.Close()
 
 	cfg := DefaultConfig()
-	cfg.Enabled = true
 	cfg.Mode = ModePreBlock
 	cfg.BaseURL = srv.URL
 	cfg.APIKeys = []string{"k"}
@@ -247,7 +240,7 @@ func TestCheckPreBlockAPIFlowAndAutoBan(t *testing.T) {
 	cfg.AutoBanEnabled = true
 	cfg.BanThreshold = 3
 
-	src := &fakeSource{enabled: true, cfg: cfg}
+	src := &fakeSource{cfg: cfg}
 	logs := &fakeLogStore{count: 2} // 历史已有 2 次 → 本次第 3 次触发封禁
 	banner := &fakeBanner{}
 	hashes := newFakeHashCache()
@@ -284,12 +277,11 @@ func TestCheckObserveNeverBlocks(t *testing.T) {
 	defer srv.Close()
 
 	cfg := DefaultConfig()
-	cfg.Enabled = true
 	cfg.Mode = ModeObserve
 	cfg.BaseURL = srv.URL
 	cfg.APIKeys = []string{"k"}
 
-	src := &fakeSource{enabled: true, cfg: cfg}
+	src := &fakeSource{cfg: cfg}
 	logs := &fakeLogStore{}
 	banner := &fakeBanner{}
 	e := newTestEngine(src, logs, newFakeHashCache(), banner)
@@ -314,14 +306,13 @@ func TestCheckObserveNeverBlocks(t *testing.T) {
 
 func TestCheckSampleRateZeroSkipsAPI(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Enabled = true
 	cfg.Mode = ModePreBlock
 	cfg.SampleRate = 0
 	cfg.APIKeys = []string{"k"}
 	cfg.KeywordBlockingMode = KeywordModeAPIOnly
 	cfg.BaseURL = "http://127.0.0.1:1" // 若走到 API 会失败，验证根本不触网
 
-	src := &fakeSource{enabled: true, cfg: cfg}
+	src := &fakeSource{cfg: cfg}
 	e := newTestEngine(src, &fakeLogStore{}, newFakeHashCache(), &fakeBanner{})
 	d := e.Check(context.Background(), baseCheckRequest("任意内容"))
 	if !d.Allowed {

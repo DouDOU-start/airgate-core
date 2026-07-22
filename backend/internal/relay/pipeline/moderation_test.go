@@ -1,18 +1,23 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/moderation"
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
+	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 )
 
 // neutralUpstream 中立上游：不校验路径与请求体，只计数。
@@ -54,13 +59,13 @@ func TestModerationProtocolFor(t *testing.T) {
 		{adaptor.EndpointChatCompletions, moderation.ProtocolOpenAIChat, true},
 		{adaptor.EndpointResponses, moderation.ProtocolOpenAIResponses, true},
 		{adaptor.EndpointImagesGenerations, moderation.ProtocolOpenAIImages, true},
+		{adaptor.EndpointImagesEdits, moderation.ProtocolOpenAIImages, true},
+		{adaptor.EndpointAlphaSearch, moderation.ProtocolOpenAISearch, true},
 		{adaptor.EndpointMessages, moderation.ProtocolAnthropicMessages, true},
 		{adaptor.EndpointGenerateContent, moderation.ProtocolGemini, true},
 		{adaptor.EndpointPredict, moderation.ProtocolGemini, true},
 		{adaptor.EndpointMessagesCountTokens, "", false},
 		{adaptor.EndpointCountTokens, "", false},
-		{adaptor.EndpointAlphaSearch, "", false},
-		{adaptor.EndpointImagesEdits, "", false},
 	}
 	for _, tt := range tests {
 		protocol, ok := moderationProtocolFor(tt.endpoint)
@@ -185,6 +190,70 @@ func TestModerationAllowPassesThrough(t *testing.T) {
 		t.Fatalf("CheckRequest 归属不完整: %+v", in)
 	}
 	if in.Protocol != moderation.ProtocolOpenAIChat || in.Model != testModel {
+		t.Fatalf("CheckRequest = %+v", in)
+	}
+}
+
+// alpha/search 的查询文本纳入审核：命中即按 openai 形态拦截、不触网。
+func TestModerationBlocksAlphaSearch(t *testing.T) {
+	var hits atomic.Int32
+	upstream := neutralUpstream(&hits)
+	defer upstream.Close()
+
+	env := newTestEnv(t, testSnap(1, upstream.URL))
+	checker := &fakeModeration{keyword: "敏感词"}
+	env.pipe.moderation = checker
+	env.engine.POST("/v1/alpha/search",
+		func(c *gin.Context) { c.Set(middleware.CtxKeyKeyInfo, testKeyInfo()) },
+		env.pipe.HandleAlphaSearch)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/alpha/search",
+		strings.NewReader(`{"model":"gpt-4o","query":"含敏感词的搜索"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	env.engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if hits.Load() != 0 {
+		t.Fatal("被拦截请求不应触网")
+	}
+	in := checker.last.Load().(moderation.CheckRequest)
+	if in.Protocol != moderation.ProtocolOpenAISearch {
+		t.Fatalf("protocol = %q", in.Protocol)
+	}
+}
+
+// images/edits 的 multipart prompt 纳入审核：rawBody 经 forwardOptions 抵达抽取侧。
+func TestModerationBlocksImagesEditsMultipart(t *testing.T) {
+	var hits atomic.Int32
+	upstream := neutralUpstream(&hits)
+	defer upstream.Close()
+
+	env := newTestEnv(t, testSnap(1, upstream.URL))
+	checker := &fakeModeration{keyword: "敏感词"}
+	env.pipe.moderation = checker
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("model", testModel)
+	_ = mw.WriteField("prompt", "含敏感词的编辑指令")
+	_ = mw.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/edits", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	w := httptest.NewRecorder()
+	env.engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if hits.Load() != 0 {
+		t.Fatal("被拦截请求不应触网")
+	}
+	in := checker.last.Load().(moderation.CheckRequest)
+	if in.Protocol != moderation.ProtocolOpenAIImages || in.ContentType == "" {
 		t.Fatalf("CheckRequest = %+v", in)
 	}
 }

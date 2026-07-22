@@ -107,6 +107,25 @@ func (s *ModerationLogStore) Cleanup(ctx context.Context, hitBefore, nonHitBefor
 	}, nil
 }
 
+// ClearByResult 按结果类型清空日志；空 result 清空全部。
+func (s *ModerationLogStore) ClearByResult(ctx context.Context, result string) (int64, error) {
+	del := s.db.ModerationLog.Delete()
+	switch result {
+	case appriskcontrol.ResultHit:
+		del = del.Where(entmoderationlog.FlaggedEQ(true))
+	case appriskcontrol.ResultBlocked:
+		del = del.Where(entmoderationlog.ActionIn(
+			moderation.ActionBlock, moderation.ActionKeywordBlock, moderation.ActionHashBlock,
+		))
+	case appriskcontrol.ResultPass:
+		del = del.Where(entmoderationlog.FlaggedEQ(false), entmoderationlog.ErrorEQ(""))
+	case appriskcontrol.ResultError:
+		del = del.Where(entmoderationlog.ErrorNEQ(""))
+	}
+	n, err := del.Exec(ctx)
+	return int64(n), err
+}
+
 // List 分页查询（时间倒序，ID 同刻回退保证稳定分页）；附带查询关联用户当前状态。
 func (s *ModerationLogStore) List(ctx context.Context, filter appriskcontrol.ListFilter) ([]appriskcontrol.Record, int64, error) {
 	base := applyModerationLogFilter(s.db.ModerationLog.Query(), filter)

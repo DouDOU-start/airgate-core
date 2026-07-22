@@ -95,7 +95,7 @@ type UserBanner interface {
 
 // ConfigSource 运行时配置源（app 层实现：读 settings 表并解密 api_keys）。
 type ConfigSource interface {
-	Runtime(ctx context.Context) (enabled bool, cfg *Config, err error)
+	Runtime(ctx context.Context) (*Config, error)
 }
 
 // Notifier 命中通知窄接口（可选注入；bootstrap 用 mailer 实现）。
@@ -105,7 +105,6 @@ type Notifier interface {
 }
 
 type runtimeSnapshot struct {
-	enabled        bool
 	config         *Config
 	keywordMatcher *keywordMatcher
 	configDigest   [sha256.Size]byte
@@ -178,11 +177,8 @@ func (e *Engine) Check(ctx context.Context, in CheckRequest) Decision {
 		slog.Warn("moderation.skip_config_load_failed", "user_id", in.UserID, "endpoint", in.Endpoint, "error", err)
 		return allow
 	}
-	if !snap.enabled {
-		return allow
-	}
 	cfg := snap.config
-	if !cfg.Enabled || cfg.Mode == ModeOff {
+	if cfg.Mode == ModeOff {
 		return allow
 	}
 	if !cfg.includesGroup(in.GroupID) || !cfg.includesModel(in.Model) {
@@ -447,7 +443,7 @@ func (e *Engine) triggerSnapshotRefresh() {
 }
 
 func (e *Engine) refreshSnapshot(ctx context.Context) (*runtimeSnapshot, error) {
-	enabled, cfg, err := e.src.Runtime(ctx)
+	cfg, err := e.src.Runtime(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -460,7 +456,6 @@ func (e *Engine) refreshSnapshot(ctx context.Context) (*runtimeSnapshot, error) 
 	// 配置未变时复用已构建的关键词自动机（构建成本随词表增长）。
 	if current := e.snapshot.Load(); current != nil && current.configDigest == digest {
 		snap := &runtimeSnapshot{
-			enabled:        enabled,
 			config:         current.config,
 			keywordMatcher: current.keywordMatcher,
 			configDigest:   digest,
@@ -471,7 +466,6 @@ func (e *Engine) refreshSnapshot(ctx context.Context) (*runtimeSnapshot, error) 
 		return snap, nil
 	}
 	snap := &runtimeSnapshot{
-		enabled:        enabled,
 		config:         cfg,
 		keywordMatcher: newKeywordMatcher(cfg.BlockedKeywords),
 		configDigest:   digest,

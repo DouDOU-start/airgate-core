@@ -109,7 +109,7 @@ func (e *Engine) runTask(ctx context.Context, cfg *Config, task asyncTask) {
 		return
 	}
 	// observe 审核任务：执行前按最新配置复查开关与作用域（入队到出队之间配置可能已变）。
-	if !cfg.Enabled || cfg.Mode == ModeOff || len(cfg.APIKeys) == 0 {
+	if cfg.Mode == ModeOff || len(cfg.APIKeys) == 0 {
 		return
 	}
 	if !cfg.includesGroup(task.input.GroupID) || !cfg.includesModel(task.input.Model) {

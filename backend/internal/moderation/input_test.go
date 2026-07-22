@@ -166,6 +166,18 @@ func TestExtractInput(t *testing.T) {
 			wantText: "日落海边",
 		},
 		{
+			name:     "alpha search query 抽取",
+			protocol: ProtocolOpenAISearch,
+			body:     `{"model":"gpt-5","query":"如何搜索敏感内容"}`,
+			wantText: "如何搜索敏感内容",
+		},
+		{
+			name:     "alpha search 无已知字段放行",
+			protocol: ProtocolOpenAISearch,
+			body:     `{"model":"gpt-5","topic":{"x":1}}`,
+			wantText: "",
+		},
+		{
 			name:     "suno music 多字段拼接",
 			protocol: ProtocolSuno,
 			body:     `{"prompt":"[Verse] 歌词内容","tags":"pop","title":"我的歌","mv":"chirp-v4"}`,
@@ -208,6 +220,12 @@ func TestExtractInputVideoMultipart(t *testing.T) {
 	got := ExtractInput(ProtocolOpenAIVideo, w.FormDataContentType(), buf.Bytes())
 	if got.Text != "海上日出" {
 		t.Fatalf("Text = %q, want 海上日出", got.Text)
+	}
+
+	// images edits 的 multipart 体走同一 prompt 抽取路径。
+	got = ExtractInput(ProtocolOpenAIImages, w.FormDataContentType(), buf.Bytes())
+	if got.Text != "海上日出" {
+		t.Fatalf("images multipart Text = %q, want 海上日出", got.Text)
 	}
 
 	// 坏 multipart 体：安全放行（空输入）。

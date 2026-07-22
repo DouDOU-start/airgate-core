@@ -43,6 +43,7 @@ const (
 	ProtocolOpenAIChat        = "openai_chat"
 	ProtocolOpenAIResponses   = "openai_responses"
 	ProtocolOpenAIImages      = "openai_images"
+	ProtocolOpenAISearch      = "openai_search"
 	ProtocolAnthropicMessages = "anthropic_messages"
 	ProtocolGemini            = "gemini"
 	ProtocolOpenAIVideo       = "openai_video"
@@ -142,7 +143,6 @@ type ModelFilter struct {
 // Config 内容审核配置。整体以单 JSON 存 settings 表（group=risk_control），
 // APIKeys 在本包内始终为明文——持久化时的加密/解密由 app 层（ConfigSource 实现方）完成。
 type Config struct {
-	Enabled              bool               `json:"enabled"`
 	Mode                 string             `json:"mode"`
 	BaseURL              string             `json:"base_url"`
 	Model                string             `json:"model"`
@@ -170,11 +170,10 @@ type Config struct {
 	ModelFilter          ModelFilter        `json:"model_filter"`
 }
 
-// DefaultConfig 出厂默认配置（enabled=false，需管理员显式开启）。
+// DefaultConfig 出厂默认配置（mode=off，需管理员显式开启）。
 func DefaultConfig() *Config {
 	return &Config{
-		Enabled:              false,
-		Mode:                 ModePreBlock,
+		Mode:                 ModeOff,
 		BaseURL:              defaultBaseURL,
 		Model:                defaultModel,
 		TimeoutMS:            defaultTimeoutMS,

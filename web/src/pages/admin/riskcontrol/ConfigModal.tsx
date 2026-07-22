@@ -5,7 +5,7 @@ import {
   Button, Chip, Input, Label, ListBox, Modal, Select, Spinner, TextArea,
   TextField as HeroTextField, useOverlayState,
 } from '@heroui/react';
-import { FlaskConical, Trash2 } from 'lucide-react';
+import { FlaskConical, Plus, Trash2 } from 'lucide-react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { groupsApi } from '../../../shared/api/groups';
@@ -28,13 +28,10 @@ type TabKey = 'basic' | 'scope' | 'runtime' | 'response' | 'thresholds' | 'keywo
 const TABS: TabKey[] = ['basic', 'scope', 'runtime', 'response', 'thresholds', 'keywords', 'retention'];
 
 interface ConfigForm {
-  risk_control_enabled: boolean;
-  enabled: boolean;
   mode: ModerationMode;
   base_url: string;
   model: string;
-  newKeys: string;
-  keysMode: 'append' | 'replace';
+  newKeys: string[];
   deleteKeyHashes: string[];
   timeout_ms: string;
   sample_rate: string;
@@ -66,13 +63,10 @@ function configToForm(cfg: RiskControlConfig): ConfigForm {
     thresholds[category] = String(cfg.thresholds[category] ?? '');
   }
   return {
-    risk_control_enabled: cfg.risk_control_enabled,
-    enabled: cfg.enabled,
     mode: cfg.mode,
     base_url: cfg.base_url,
     model: cfg.model,
-    newKeys: '',
-    keysMode: 'append',
+    newKeys: [''],
     deleteKeyHashes: [],
     timeout_ms: String(cfg.timeout_ms),
     sample_rate: String(cfg.sample_rate),
@@ -109,14 +103,12 @@ function formToPayload(form: ConfigForm): UpdateRiskControlConfigReq {
     const v = Number(raw);
     if (Number.isFinite(v)) thresholds[category] = v;
   }
-  const newKeys = splitLines(form.newKeys);
+  const newKeys = form.newKeys.map((s) => s.trim()).filter(Boolean);
   return {
-    risk_control_enabled: form.risk_control_enabled,
-    enabled: form.enabled,
     mode: form.mode,
     base_url: form.base_url.trim(),
     model: form.model.trim(),
-    ...(newKeys.length > 0 ? { api_keys: newKeys, api_keys_mode: form.keysMode } : {}),
+    ...(newKeys.length > 0 ? { api_keys: newKeys, api_keys_mode: 'append' as const } : {}),
     ...(form.deleteKeyHashes.length > 0 ? { delete_api_key_hashes: form.deleteKeyHashes } : {}),
     timeout_ms: Number(form.timeout_ms) || 0,
     sample_rate: Number(form.sample_rate),
@@ -154,7 +146,7 @@ export function ConfigModal({ config, open, onClose }: ConfigModalProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('basic');
   const [form, setForm] = useState<ConfigForm | null>(null);
   const [testing, setTesting] = useState(false);
-  const [testPrompt, setTestPrompt] = useState('');
+  const [testPrompt, setTestPrompt] = useState('I want to kill everyone in the building');
   const [auditResult, setAuditResult] = useState<RiskControlTestAuditResult | null>(null);
 
   useEffect(() => {
@@ -162,7 +154,6 @@ export function ConfigModal({ config, open, onClose }: ConfigModalProps) {
     setForm(configToForm(config));
     setActiveTab('basic');
     setAuditResult(null);
-    setTestPrompt('');
   }, [open, config]);
 
   const { data: groupsData } = useQuery({
@@ -201,7 +192,7 @@ export function ConfigModal({ config, open, onClose }: ConfigModalProps) {
     setAuditResult(null);
     try {
       const resp = await riskControlApi.testKeys({
-        api_keys: splitLines(form.newKeys),
+        api_keys: form.newKeys.map((s) => s.trim()).filter(Boolean),
         base_url: form.base_url.trim(),
         model: form.model.trim(),
         prompt: testPrompt.trim() || undefined,
@@ -295,16 +286,6 @@ export function ConfigModal({ config, open, onClose }: ConfigModalProps) {
               <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
                 {activeTab === 'basic' && (
                   <>
-                    <NativeSwitch
-                      isSelected={form.risk_control_enabled}
-                      label={t('risk_control.total_switch')}
-                      onChange={(v) => set('risk_control_enabled', v)}
-                    />
-                    <NativeSwitch
-                      isSelected={form.enabled}
-                      label={t('risk_control.enabled')}
-                      onChange={(v) => set('enabled', v)}
-                    />
                     {selectField('risk_control.mode', form.mode, modeOptions, (v) => set('mode', v))}
                     <HeroTextField fullWidth>
                       <Label>{t('risk_control.base_url')}</Label>
@@ -355,20 +336,45 @@ export function ConfigModal({ config, open, onClose }: ConfigModalProps) {
                         </div>
                       )}
                     </div>
-                    <HeroTextField fullWidth>
-                      <Label>{t('risk_control.new_keys')}</Label>
-                      <TextArea
-                        placeholder={t('risk_control.new_keys_placeholder')}
-                        rows={3}
-                        value={form.newKeys}
-                        onChange={(e) => set('newKeys', e.target.value)}
-                      />
-                    </HeroTextField>
-                    <NativeSwitch
-                      isSelected={form.keysMode === 'replace'}
-                      label={t('risk_control.keys_replace_mode')}
-                      onChange={(v) => set('keysMode', v ? 'replace' : 'append')}
-                    />
+                    <div>
+                      <Label className="mb-1 block">{t('risk_control.new_keys')}</Label>
+                      <div className="space-y-2">
+                        {form.newKeys.map((key, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <HeroTextField fullWidth>
+                              <Input
+                                placeholder={t('risk_control.new_key_placeholder')}
+                                value={key}
+                                onChange={(e) => {
+                                  const next = [...form.newKeys];
+                                  next[i] = e.target.value;
+                                  set('newKeys', next);
+                                }}
+                              />
+                            </HeroTextField>
+                            {form.newKeys.length > 1 && (
+                              <Button
+                                isIconOnly
+                                aria-label={t('common.delete')}
+                                size="sm"
+                                variant="ghost"
+                                onPress={() => set('newKeys', form.newKeys.filter((_, j) => j !== i))}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onPress={() => set('newKeys', [...form.newKeys, ''])}
+                        >
+                          <Plus className="w-4 h-4" />
+                          {t('risk_control.add_key')}
+                        </Button>
+                      </div>
+                    </div>
                     <div className="flex items-end gap-2">
                       <HeroTextField fullWidth>
                         <Label>{t('risk_control.test_prompt')}</Label>
@@ -467,26 +473,28 @@ export function ConfigModal({ config, open, onClose }: ConfigModalProps) {
                         onChange={(e) => set('block_message', e.target.value)}
                       />
                     </HeroTextField>
-                    <NativeSwitch
-                      isSelected={form.email_on_hit}
-                      label={t('risk_control.email_on_hit')}
-                      onChange={(v) => set('email_on_hit', v)}
-                    />
-                    <NativeSwitch
-                      isSelected={form.auto_ban_enabled}
-                      label={t('risk_control.auto_ban')}
-                      onChange={(v) => set('auto_ban_enabled', v)}
-                    />
-                    <NativeSwitch
-                      isSelected={form.pre_hash_check_enabled}
-                      label={t('risk_control.pre_hash_check')}
-                      onChange={(v) => set('pre_hash_check_enabled', v)}
-                    />
-                    <NativeSwitch
-                      isSelected={form.record_non_hits}
-                      label={t('risk_control.record_non_hits')}
-                      onChange={(v) => set('record_non_hits', v)}
-                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <NativeSwitch
+                        isSelected={form.email_on_hit}
+                        label={t('risk_control.email_on_hit')}
+                        onChange={(v) => set('email_on_hit', v)}
+                      />
+                      <NativeSwitch
+                        isSelected={form.auto_ban_enabled}
+                        label={t('risk_control.auto_ban')}
+                        onChange={(v) => set('auto_ban_enabled', v)}
+                      />
+                      <NativeSwitch
+                        isSelected={form.pre_hash_check_enabled}
+                        label={t('risk_control.pre_hash_check')}
+                        onChange={(v) => set('pre_hash_check_enabled', v)}
+                      />
+                      <NativeSwitch
+                        isSelected={form.record_non_hits}
+                        label={t('risk_control.record_non_hits')}
+                        onChange={(v) => set('record_non_hits', v)}
+                      />
+                    </div>
                   </>
                 )}
 
@@ -529,7 +537,7 @@ export function ConfigModal({ config, open, onClose }: ConfigModalProps) {
                 {activeTab === 'retention' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {numberField('risk_control.hit_retention_days', 'hit_retention_days')}
-                    {numberField('risk_control.non_hit_retention_days', 'non_hit_retention_days', 'risk_control.non_hit_retention_hint')}
+                    {numberField('risk_control.non_hit_retention_days', 'non_hit_retention_days')}
                   </div>
                 )}
               </div>
