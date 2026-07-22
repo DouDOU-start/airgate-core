@@ -349,6 +349,11 @@ func (s *ChannelStore) UpdateKey(ctx context.Context, keyID int, key appchannel.
 
 // Delete 删除渠道（级联删除其 key）。
 func (s *ChannelStore) Delete(ctx context.Context, id int) error {
+	if _, err := s.db.ChannelKey.Delete().Where(
+		entchannelkey.HasChannelWith(entchannel.IDEQ(id)),
+	).Exec(ctx); err != nil {
+		return err
+	}
 	if err := s.db.Channel.DeleteOneID(id).Exec(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return appchannel.ErrChannelNotFound
@@ -375,6 +380,9 @@ func (s *ChannelStore) BulkUpdate(ctx context.Context, input appchannel.BulkUpda
 			SetStatus(entchannelkey.StatusDisabledManual).
 			Save(ctx)
 	case appchannel.BulkActionDelete:
+		if _, err := s.db.ChannelKey.Delete().Where(keysOfChannels).Exec(ctx); err != nil {
+			return 0, err
+		}
 		return s.db.Channel.Delete().
 			Where(entchannel.IDIn(input.IDs...)).
 			Exec(ctx)

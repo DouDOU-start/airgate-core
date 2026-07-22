@@ -109,6 +109,53 @@ func (s *Service) List(ctx context.Context, filter ListFilter) (ListResult, erro
 	}, nil
 }
 
+// ExportChannels 全量查询渠道（不分页、不装饰运行时/金额），供 JSON 导出用。
+func (s *Service) ExportChannels(ctx context.Context, filter ListFilter) ([]Channel, error) {
+	filter.Page = 1
+	filter.PageSize = 100000
+
+	list, _, err := s.repo.List(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	for i := range list {
+		s.decorate(&list[i])
+	}
+	return list, nil
+}
+
+// ImportChannels 批量导入渠道与密钥（按渠道分组，每渠道含 ≥1 把 key）。
+func (s *Service) ImportChannels(ctx context.Context, items []ImportChannelInput) (ImportResult, error) {
+	logger := logx.LoggerFromContext(ctx)
+	var result ImportResult
+	for _, item := range items {
+		ch, err := s.repo.Create(ctx, CreateInput{Name: item.Name, BaseURL: item.BaseURL})
+		if err != nil {
+			return result, fmt.Errorf("创建渠道 %q 失败: %w", item.Name, err)
+		}
+		result.Channels++
+		created := 0
+		for _, k := range item.Keys {
+			if strings.TrimSpace(k.APIKey) == "" {
+				continue
+			}
+			cipher, err := s.encryptPlainKey(k.APIKey, true)
+			if err != nil {
+				return result, fmt.Errorf("渠道 %q 密钥加密失败: %w", item.Name, err)
+			}
+			k.APIKey = cipher
+			if _, err := s.repo.CreateKey(ctx, ch.ID, k); err != nil {
+				return result, fmt.Errorf("渠道 %q 下添加密钥 %q 失败: %w", item.Name, k.Name, err)
+			}
+			result.Keys++
+			created++
+		}
+		logger.Info("channel_imported", "channel_id", ch.ID, "name", item.Name, "keys", created, "skipped", len(item.Keys)-created)
+	}
+	s.reloadRegistry(ctx)
+	return result, nil
+}
+
 // ListKeys 密钥视图：跨渠道平铺分页查询 key（priority/weight 等排序），
 // 统计口径与渠道视图一致，仅不做渠道级汇总。
 func (s *Service) ListKeys(ctx context.Context, filter KeyListFilter) (KeyListResult, error) {

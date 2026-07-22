@@ -241,3 +241,16 @@ type BulkUpdateInput struct {
 	Action   string
 	Priority *int
 }
+
+// ImportChannelInput 导入渠道输入（含其下密钥列表）。
+type ImportChannelInput struct {
+	Name    string
+	BaseURL string
+	Keys    []KeyInput
+}
+
+// ImportResult 导入结果统计。
+type ImportResult struct {
+	Channels int
+	Keys     int
+}

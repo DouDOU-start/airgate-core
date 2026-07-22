@@ -174,6 +174,9 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/channels", handlers.Channel.ListChannels)
 		// 密钥视图：跨渠道平铺分页（静态段，先于 /channels/:id 匹配）
 		adminGroup.GET("/channels/keys", handlers.Channel.ListChannelKeys)
+		// 渠道导出 / 导入（静态段，先于 /channels/:id 匹配）
+		adminGroup.GET("/channels/export", handlers.Channel.ExportChannels)
+		adminGroup.POST("/channels/import", handlers.Channel.ImportChannels)
 		adminGroup.POST("/channels", handlers.Channel.CreateChannel)
 		adminGroup.PUT("/channels/:id", handlers.Channel.UpdateChannel)
 		adminGroup.DELETE("/channels/:id", handlers.Channel.DeleteChannel)
@@ -217,6 +220,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/risk-control/status", handlers.RiskControl.GetStatus)
 		adminGroup.POST("/risk-control/api-keys/test", handlers.RiskControl.TestAPIKeys)
 		adminGroup.GET("/risk-control/logs", handlers.RiskControl.ListLogs)
+		adminGroup.DELETE("/risk-control/logs", handlers.RiskControl.ClearLogs)
 		adminGroup.POST("/risk-control/users/:id/unban", handlers.RiskControl.UnbanUser)
 		adminGroup.DELETE("/risk-control/hashes", handlers.RiskControl.DeleteHash)
 		adminGroup.DELETE("/risk-control/hashes/all", handlers.RiskControl.ClearHashes)

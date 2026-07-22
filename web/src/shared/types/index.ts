@@ -723,6 +723,11 @@ export interface BulkUpdateChannelsResp {
   affected: number;
 }
 
+export interface ImportChannelsResp {
+  channels: number;
+  keys: number;
+}
+
 export interface ChannelListQuery extends PageReq {
   type?: string;
   status?: string;

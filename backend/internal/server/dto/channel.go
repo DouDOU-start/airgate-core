@@ -140,3 +140,69 @@ type BulkUpdateChannelsReq struct {
 type BulkUpdateChannelsResp struct {
 	Affected int `json:"affected"`
 }
+
+// ChannelExportItem 渠道导出条目（渠道 + 其下密钥列表）。
+type ChannelExportItem struct {
+	Name    string                 `json:"name"`
+	BaseURL string                 `json:"base_url"`
+	Keys    []ChannelKeyExportItem `json:"keys"`
+}
+
+// ChannelKeyExportItem 密钥导出条目。api_key 置空（红线），api_key_hint 供参考。
+type ChannelKeyExportItem struct {
+	Name                string            `json:"name"`
+	Type                string            `json:"type"`
+	APIKey              string            `json:"api_key"`
+	APIKeyHint          string            `json:"api_key_hint,omitempty"`
+	Models              []string          `json:"models"`
+	ModelMapping        map[string]string `json:"model_mapping"`
+	ParamOverride       map[string]any    `json:"param_override"`
+	HeaderOverride      map[string]string `json:"header_override"`
+	Status              string            `json:"status"`
+	Priority            int               `json:"priority"`
+	Weight              int               `json:"weight"`
+	MaxConcurrency      int               `json:"max_concurrency"`
+	MaxRPM              int               `json:"max_rpm"`
+	CostRatio           float64           `json:"cost_ratio"`
+	Tags                []string          `json:"tags"`
+	TestModel           string            `json:"test_model"`
+	BalanceCheckEnabled bool              `json:"balance_check_enabled"`
+	GroupIDs            []int             `json:"group_ids"`
+}
+
+// ImportChannelsReq 渠道导入请求（渠道数组，每渠道含 ≥1 把 key）。
+type ImportChannelsReq []ImportChannelItem
+
+// ImportChannelItem 导入的单个渠道。
+type ImportChannelItem struct {
+	Name    string                 `json:"name" binding:"required"`
+	BaseURL string                 `json:"base_url" binding:"required"`
+	Keys    []ImportChannelKeyItem `json:"keys" binding:"required,min=1,dive"`
+}
+
+// ImportChannelKeyItem 导入的单把密钥。api_key 为空时该 key 跳过不创建。
+type ImportChannelKeyItem struct {
+	Name                string            `json:"name"`
+	Type                string            `json:"type" binding:"required,oneof=openai_compatible anthropic gemini custom openai_video suno"`
+	APIKey              string            `json:"api_key"`
+	Models              []string          `json:"models"`
+	ModelMapping        map[string]string `json:"model_mapping"`
+	ParamOverride       map[string]any    `json:"param_override"`
+	HeaderOverride      map[string]string `json:"header_override"`
+	Status              *string           `json:"status" binding:"omitempty,oneof=enabled disabled_manual"`
+	Priority            *int              `json:"priority" binding:"omitempty,min=0,max=999"`
+	Weight              *int              `json:"weight" binding:"omitempty,min=0"`
+	MaxConcurrency      *int              `json:"max_concurrency" binding:"omitempty,min=0"`
+	MaxRPM              *int              `json:"max_rpm" binding:"omitempty,min=0"`
+	CostRatio           *float64          `json:"cost_ratio" binding:"omitempty,gte=0"`
+	Tags                []string          `json:"tags"`
+	TestModel           *string           `json:"test_model"`
+	BalanceCheckEnabled *bool             `json:"balance_check_enabled"`
+	GroupIDs            []int             `json:"group_ids"`
+}
+
+// ImportChannelsResp 渠道导入响应。
+type ImportChannelsResp struct {
+	Channels int `json:"channels"`
+	Keys     int `json:"keys"`
+}

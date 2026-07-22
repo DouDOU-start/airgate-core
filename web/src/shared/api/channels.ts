@@ -1,9 +1,9 @@
-import { get, post, put, del } from './client';
+import { get, post, put, del, getToken } from './client';
 import type {
   ChannelResp, ChannelKeyResp, CreateChannelReq, UpdateChannelReq, ChannelKeyReq,
   TestChannelReq, TestChannelResp, FetchChannelModelsResp, FetchChannelModelsPreviewReq,
   RefreshChannelBalanceResp, BulkUpdateChannelsReq, BulkUpdateChannelsResp,
-  ChannelListQuery, ChannelKeyListQuery, PagedData,
+  ChannelListQuery, ChannelKeyListQuery, PagedData, ImportChannelsResp,
 } from '../types';
 
 export const channelsApi = {
@@ -36,4 +36,26 @@ export const channelsApi = {
   fetchModelsPreview: (data: FetchChannelModelsPreviewReq) =>
     post<FetchChannelModelsResp>('/api/v1/admin/channels/fetch-models', data),
   bulkUpdate: (data: BulkUpdateChannelsReq) => post<BulkUpdateChannelsResp>('/api/v1/admin/channels/bulk-update', data),
+  export: async (params?: Pick<ChannelListQuery, 'keyword' | 'type' | 'status'>) => {
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+    const url = new URL(`${BASE_URL}/api/v1/admin/channels/export`, window.location.origin);
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v) url.searchParams.set(k, String(v));
+      });
+    }
+    const headers: Record<string, string> = {};
+    const token = getToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(url.toString(), { headers });
+    if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const disposition = res.headers.get('Content-Disposition');
+    a.download = disposition?.match(/filename="(.+)"/)?.[1] ?? 'channels.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  },
+  import: (data: unknown[]) => post<ImportChannelsResp>('/api/v1/admin/channels/import', data),
 };

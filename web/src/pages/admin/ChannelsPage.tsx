@@ -7,7 +7,7 @@ import {
 } from '@heroui/react';
 import {
   ArrowUpDown, BarChart3, Boxes, ChevronDown, ChevronRight, CircleCheck, CircleOff,
-  KeyRound, Pencil, Plus, RefreshCw, Search, Trash2,
+  Download, KeyRound, Pencil, Plus, RefreshCw, Search, Trash2, Upload,
 } from 'lucide-react';
 import { channelsApi } from '../../shared/api/channels';
 import { upstreamLogsApi } from '../../shared/api/upstreamLogs';
@@ -142,6 +142,9 @@ export default function ChannelsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { page: keysPage, setPage: setKeysPage, pageSize: keysPageSize, setPageSize: setKeysPageSize } =
     usePagination(20, 'admin.channels.keys');
@@ -322,6 +325,40 @@ export default function ChannelsPage() {
       toast('success', t('channels.balance_batch_done', { ok, total }));
     } finally {
       setBatchBalanceRunning(false);
+    }
+  }
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      await channelsApi.export({
+        keyword: debouncedKeyword || undefined,
+        type: typeFilter || undefined,
+        status: statusFilter || undefined,
+      });
+    } catch (err) {
+      toast('error', err instanceof Error ? err.message : String(err));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!Array.isArray(data)) throw new Error(t('channels.import_invalid_format'));
+      const resp = await channelsApi.import(data);
+      toast('success', t('channels.import_success', { channels: resp.channels, keys: resp.keys }));
+      invalidateChannelViews();
+    } catch (err) {
+      toast('error', err instanceof Error ? err.message : String(err));
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -509,6 +546,29 @@ export default function ChannelsPage() {
           </Select>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            isDisabled={exporting}
+            variant="secondary"
+            onPress={handleExport}
+          >
+            {exporting ? <Spinner size="sm" /> : <Download className="h-4 w-4" />}
+            {t('channels.export')}
+          </Button>
+          <Button
+            isDisabled={importing}
+            variant="secondary"
+            onPress={() => fileInputRef.current?.click()}
+          >
+            {importing ? <Spinner size="sm" /> : <Upload className="h-4 w-4" />}
+            {t('channels.import')}
+          </Button>
+          <input
+            ref={fileInputRef}
+            accept=".json"
+            className="hidden"
+            type="file"
+            onChange={handleImportFile}
+          />
           <Button
             isDisabled={batchBalanceRunning}
             variant="secondary"

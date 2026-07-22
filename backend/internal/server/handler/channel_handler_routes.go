@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -315,4 +318,92 @@ func (h *ChannelHandler) BulkUpdateChannels(c *gin.Context) {
 	}
 
 	response.Success(c, dto.BulkUpdateChannelsResp{Affected: affected})
+}
+
+// ExportChannels 导出全量渠道为 JSON 文件（支持 type/status/tag/keyword 筛选）。
+// 导出格式与导入格式对齐，api_key 置空（红线），api_key_hint 供参考。
+func (h *ChannelHandler) ExportChannels(c *gin.Context) {
+	var page dto.PageReq
+	if err := c.ShouldBindQuery(&page); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	list, err := h.service.ExportChannels(c.Request.Context(), appchannel.ListFilter{
+		Keyword: page.Keyword,
+		Type:    c.Query("type"),
+		Status:  c.Query("status"),
+		Tag:     c.Query("tag"),
+		GroupID: parseOptionalInt(c.Query("group_id")),
+	})
+	if err != nil {
+		httpCode, message := h.handleError("导出渠道失败", "导出失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	items := make([]dto.ChannelExportItem, 0, len(list))
+	for _, ch := range list {
+		items = append(items, toChannelExportItem(ch))
+	}
+
+	filename := fmt.Sprintf("channels_%s.json", time.Now().Format("20060102_150405"))
+	c.Header("Content-Type", "application/json; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+
+	enc := json.NewEncoder(c.Writer)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(items)
+}
+
+// ImportChannels 导入渠道（JSON 数组，每个渠道含 ≥1 把 key）。
+func (h *ChannelHandler) ImportChannels(c *gin.Context) {
+	var req dto.ImportChannelsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	items := make([]appchannel.ImportChannelInput, 0, len(req))
+	for _, ch := range req {
+		keys := make([]appchannel.KeyInput, 0, len(ch.Keys))
+		for _, k := range ch.Keys {
+			keys = append(keys, appchannel.KeyInput{
+				Name:                k.Name,
+				Type:                k.Type,
+				APIKey:              k.APIKey,
+				Models:              k.Models,
+				ModelMapping:        k.ModelMapping,
+				ParamOverride:       k.ParamOverride,
+				HeaderOverride:      k.HeaderOverride,
+				Status:              k.Status,
+				Priority:            k.Priority,
+				Weight:              k.Weight,
+				MaxConcurrency:      k.MaxConcurrency,
+				MaxRPM:              k.MaxRPM,
+				CostRatio:           k.CostRatio,
+				Tags:                k.Tags,
+				TestModel:           k.TestModel,
+				BalanceCheckEnabled: k.BalanceCheckEnabled,
+				GroupIDs:            k.GroupIDs,
+			})
+		}
+		items = append(items, appchannel.ImportChannelInput{
+			Name:    ch.Name,
+			BaseURL: ch.BaseURL,
+			Keys:    keys,
+		})
+	}
+
+	result, err := h.service.ImportChannels(c.Request.Context(), items)
+	if err != nil {
+		httpCode, message := h.handleError("导入渠道失败", "导入失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	response.Success(c, dto.ImportChannelsResp{
+		Channels: result.Channels,
+		Keys:     result.Keys,
+	})
 }

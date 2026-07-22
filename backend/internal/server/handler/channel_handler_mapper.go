@@ -102,6 +102,38 @@ func toKeyInput(req dto.ChannelKeyReq) appchannel.KeyInput {
 	}
 }
 
+// toChannelExportItem 渠道领域对象 → 导出 DTO（api_key 置空，仅保留 hint）。
+func toChannelExportItem(ch appchannel.Channel) dto.ChannelExportItem {
+	keys := make([]dto.ChannelKeyExportItem, 0, len(ch.Keys))
+	for _, k := range ch.Keys {
+		keys = append(keys, dto.ChannelKeyExportItem{
+			Name:                k.Name,
+			Type:                k.Type,
+			APIKey:              "",
+			APIKeyHint:          k.APIKeyHint,
+			Models:              emptyIfNilStrings(k.Models),
+			ModelMapping:        k.ModelMapping,
+			ParamOverride:       k.ParamOverride,
+			HeaderOverride:      k.HeaderOverride,
+			Status:              k.Status,
+			Priority:            k.Priority,
+			Weight:              k.Weight,
+			MaxConcurrency:      k.MaxConcurrency,
+			MaxRPM:              k.MaxRPM,
+			CostRatio:           k.CostRatio,
+			Tags:                emptyIfNilStrings(k.Tags),
+			TestModel:           k.TestModel,
+			BalanceCheckEnabled: k.BalanceCheckEnabled,
+			GroupIDs:            emptyIfNilInts(k.GroupIDs),
+		})
+	}
+	return dto.ChannelExportItem{
+		Name:    ch.Name,
+		BaseURL: ch.BaseURL,
+		Keys:    keys,
+	}
+}
+
 // emptyIfNilStrings 将 nil 切片归一为空切片，保证 JSON 输出 [] 而非 null。
 func emptyIfNilStrings(items []string) []string {
 	if items == nil {
