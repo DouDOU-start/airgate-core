@@ -128,6 +128,8 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		AlphaSearchPrice: sanitizeAlphaSearchPrice(req.AlphaSearchPrice),
 		IsExclusive:      req.IsExclusive,
 		StatusVisible:    statusVisible,
+		AllowedClients:   req.AllowedClients,
+		FallbackGroupID:  req.FallbackGroupID,
 		Note:             req.Note,
 		SortWeight:       req.SortWeight,
 	})
@@ -154,15 +156,22 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 		return
 	}
 
-	item, err := h.service.Update(c.Request.Context(), id, appgroup.UpdateInput{
+	updateInput := appgroup.UpdateInput{
 		Name:             req.Name,
 		RateMultiplier:   req.RateMultiplier,
 		AlphaSearchPrice: sanitizeAlphaSearchPrice(req.AlphaSearchPrice),
 		IsExclusive:      req.IsExclusive,
 		StatusVisible:    req.StatusVisible,
+		AllowedClients:   req.AllowedClients,
+		FallbackGroupID:  req.FallbackGroupID,
 		Note:             req.Note,
 		SortWeight:       req.SortWeight,
-	})
+	}
+	// allowed_clients 被显式清空时，联动清除降级分组。
+	if req.AllowedClients != nil && len(*req.AllowedClients) == 0 {
+		updateInput.ClearFallbackGroup = true
+	}
+	item, err := h.service.Update(c.Request.Context(), id, updateInput)
 	if err != nil {
 		httpCode, message := h.handleError("更新分组失败", "更新失败", err)
 		response.Error(c, httpCode, httpCode, message)

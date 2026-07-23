@@ -10,6 +10,22 @@ type Repository interface {
 	LoadStatsSnapshot(ctx context.Context, todayStart, fiveMinAgo time.Time, userID int) (StatsSnapshot, error)
 	// ListTrendLogs 读取趋势聚合所需日志；userID / channelID / channelKeyID 为 0 表示不过滤该维度。
 	ListTrendLogs(ctx context.Context, startTime, endTime time.Time, userID, channelID, channelKeyID int) ([]TrendLog, error)
+	// AggregatedTrend 在 SQL 侧完成分桶聚合，避免拉取大量原始行。
+	// 返回 (result, true, nil) 表示成功；(Trend{}, false, nil) 表示不支持（非 Postgres / 无法解析时区），调用方应回退 ListTrendLogs。
+	AggregatedTrend(ctx context.Context, q AggregatedTrendQuery) (Trend, bool, error)
+}
+
+// AggregatedTrendQuery 表示 SQL 聚合趋势查询参数。
+type AggregatedTrendQuery struct {
+	StartTime    time.Time
+	EndTime      time.Time
+	UserID       int
+	ChannelID    int
+	ChannelKeyID int
+	Granularity  string
+	TZName       string
+	Loc          *time.Location
+	FillKeys     []string
 }
 
 // StatsSnapshot 表示从存储层读取的原始统计快照。

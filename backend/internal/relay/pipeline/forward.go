@@ -17,6 +17,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
+	"github.com/DouDOU-start/airgate-core/internal/relay/clientid"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
 	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
@@ -140,6 +141,25 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	start := time.Now()
 	ctx := c.Request.Context()
 	protocol := protocolForEndpoint(endpoint)
+
+	// 0. 客户端识别 + 分组客户端限制预检。
+	clientid.Detect(c)
+	if len(keyInfo.GroupAllowedClients) > 0 {
+		if !clientid.Matches(clientid.Get(c), keyInfo.GroupAllowedClients) {
+			if keyInfo.GroupFallbackID != nil {
+				keyInfo.GroupID = *keyInfo.GroupFallbackID
+			} else {
+				writeError(c, http.StatusForbidden, "permission_error", "client_restricted",
+					"当前客户端类型不允许访问此分组")
+				p.recordFailure(c, keyInfo, req, start, errlog.Entry{
+					Phase: errlog.PhasePrecheckClientRestrict, StatusCode: http.StatusForbidden,
+					ErrorType: "permission_error", ErrorCode: "client_restricted",
+					Message: "当前客户端类型不允许访问此分组",
+				})
+				return
+			}
+		}
+	}
 
 	// 1. 余额预检（异步扣款模型：只挡余额已为负/零的用户）。
 	if keyInfo.UserBalance <= 0 {
@@ -345,6 +365,9 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 					"channel_key_id", ch.KeyID, "model", req.Model, "error", result.streamErr)
 			} else {
 				p.registry.MarkRecovered(ch.KeyID)
+				if p.healthTracker != nil {
+					p.healthTracker.RecordSuccess(ch.KeyID)
+				}
 				if result.usage == nil {
 					// 契约要求：流式成功但未捕获 usage → 记 0 并告警（可疑的计费缺口）。
 					slog.Warn("relay_stream_usage_missing",
@@ -395,6 +418,9 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		switch o.Verdict {
 		case outcome.Success:
 			p.registry.MarkRecovered(ch.KeyID)
+			if p.healthTracker != nil {
+				p.healthTracker.RecordSuccess(ch.KeyID)
+			}
 			// 零计费端点（countTokens 类）：usage 归零、不写 usage_log；
 			// failover/outcome/透传语义与常规端点完全一致。
 			if !opts.zeroBilling {
@@ -406,6 +432,9 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		case outcome.RateLimited:
 			// 仅本次请求内硬排除换 key 重试；不设冷却状态，下次请求照常调度。
 			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			if p.healthTracker != nil {
+				p.healthTracker.RecordFailure(ch.KeyID)
+			}
 			hardExclude = append(hardExclude, ch.KeyID)
 			summary.rateLimited = true
 			summary.observeRetryAfter(o.RetryAfter)
@@ -419,6 +448,9 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 
 		case outcome.AuthFailed:
 			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			if p.healthTracker != nil {
+				p.healthTracker.RecordAuthFailure(ch.KeyID)
+			}
 			if settings.AutoBanEnabled {
 				p.registry.MarkAutoDisabled(ch.KeyID, outcome.TruncateErrorMsg(o.Reason))
 			}
@@ -435,6 +467,9 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 
 		case outcome.Transient:
 			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			if p.healthTracker != nil {
+				p.healthTracker.RecordFailure(ch.KeyID)
+			}
 			softExclude = append(softExclude, ch.KeyID)
 			summary.transient = true
 			verdictName := "transient"

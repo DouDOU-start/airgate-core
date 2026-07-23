@@ -106,6 +106,12 @@ func (s *GroupStore) Create(ctx context.Context, input appgroup.CreateInput) (ap
 	if input.AlphaSearchPrice != nil {
 		builder = builder.SetAlphaSearchPrice(*input.AlphaSearchPrice)
 	}
+	if len(input.AllowedClients) > 0 {
+		builder = builder.SetAllowedClients(input.AllowedClients)
+	}
+	if input.FallbackGroupID != nil {
+		builder = builder.SetFallbackGroupID(*input.FallbackGroupID)
+	}
 
 	item, err := builder.Save(ctx)
 	if err != nil {
@@ -141,6 +147,14 @@ func (s *GroupStore) Update(ctx context.Context, id int, input appgroup.UpdateIn
 	}
 	if input.SortWeight != nil {
 		builder = builder.SetSortWeight(*input.SortWeight)
+	}
+	if input.AllowedClients != nil {
+		builder = builder.SetAllowedClients(*input.AllowedClients)
+	}
+	if input.FallbackGroupID != nil {
+		builder = builder.SetFallbackGroupID(*input.FallbackGroupID)
+	} else if input.ClearFallbackGroup {
+		builder = builder.ClearFallbackGroupID()
 	}
 
 	item, err := builder.Save(ctx)
@@ -387,6 +401,8 @@ func mapGroup(item *ent.Group) appgroup.Group {
 		AlphaSearchPrice: item.AlphaSearchPrice,
 		IsExclusive:      item.IsExclusive,
 		StatusVisible:    item.StatusVisible,
+		AllowedClients:   item.AllowedClients,
+		FallbackGroupID:  item.FallbackGroupID,
 		Note:             item.Note,
 		SortWeight:       item.SortWeight,
 		CreatedAt:        item.CreatedAt,

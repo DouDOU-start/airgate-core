@@ -12,6 +12,14 @@ const (
 	StatusDisabledAuto   = "disabled_auto"
 )
 
+// 密钥端点健康状态常量，与 ent schema 的 channel_key.health_status 枚举一致。
+const (
+	HealthHealthy    = "healthy"
+	HealthDegraded   = "degraded"
+	HealthSuspended  = "suspended"
+	HealthRecovering = "recovering"
+)
+
 // 批量操作动作常量。
 const (
 	BulkActionEnable      = "enable"
@@ -63,6 +71,22 @@ type Repository interface {
 	UpdateKeyTestResult(ctx context.Context, keyID int, responseTimeMs int, testedAt time.Time) error
 	// UpdateKeyBalance 记录密钥端点余额刷新结果（key 级）。
 	UpdateKeyBalance(ctx context.Context, keyID int, balance float64, updatedAt time.Time) error
+
+	// ---- 健康探针 ----
+	// UpdateKeyHealthState 更新密钥端点健康状态与计数器。
+	UpdateKeyHealthState(ctx context.Context, keyID int, health string, failures, successes int) error
+	// UpdateKeyProbeTime 记录最近一次探针执行时间。
+	UpdateKeyProbeTime(ctx context.Context, keyID int, at time.Time) error
+	// ListProbeEnabledKeys 查询所有 probe_enabled=true 的 key 的健康快照。
+	ListProbeEnabledKeys(ctx context.Context) ([]KeyHealthSnapshot, error)
+	// ListBalanceSyncTargets 查询 balance_check_enabled=true 且余额过期的 key ID。
+	ListBalanceSyncTargets(ctx context.Context, staleBefore time.Time) ([]int, error)
+
+	// ---- 上游倍率探测 ----
+	// ListUpstreamRateTargets 查询 upstream_rate_enabled=true 的 key（含 base_url + 解密 API key）。
+	ListUpstreamRateTargets(ctx context.Context) ([]UpstreamRateTarget, error)
+	// UpdateUpstreamRate 更新密钥端点的上游倍率探测结果。
+	UpdateUpstreamRate(ctx context.Context, keyID int, rate float64, at time.Time) error
 }
 
 // MoneyStats 渠道金额与延迟统计：
@@ -133,9 +157,24 @@ type ChannelKey struct {
 	BalanceUpdatedAt *time.Time
 	// BalanceCheckEnabled 是否参与主动余额刷新（自动/批量）；关闭后手动单把查询仍可用。
 	BalanceCheckEnabled bool
-	GroupIDs            []int
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+
+	// ---- 健康探针 ----
+	ProbeEnabled         bool
+	ProbeModel           string
+	HealthStatus         string
+	ConsecutiveFailures  int
+	ConsecutiveSuccesses int
+	LastProbeAt          *time.Time
+
+	// ---- 上游倍率探测 ----
+	UpstreamRateEnabled bool
+	UpstreamRatePath    string
+	UpstreamRate        float64
+	UpstreamRateAt      *time.Time
+
+	GroupIDs  []int
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// CurrentConcurrency / CurrentRPM 运行时观测指标（在途请求数 / 当前分钟请求数），
 	// 仅列表查询时由 SetRuntimeStatsReaders 注入的读取器填充，不落库。
@@ -220,6 +259,12 @@ type KeyInput struct {
 	TestModel      *string
 	// BalanceCheckEnabled nil = 新增取默认 true / 更新不改。
 	BalanceCheckEnabled *bool
+	// ProbeEnabled nil = 新增取默认 false / 更新不改。
+	ProbeEnabled *bool
+	ProbeModel   *string
+	// UpstreamRateEnabled nil = 新增取默认 false / 更新不改。
+	UpstreamRateEnabled *bool
+	UpstreamRatePath    *string
 	GroupIDs            []int
 }
 
@@ -253,4 +298,21 @@ type ImportChannelInput struct {
 type ImportResult struct {
 	Channels int
 	Keys     int
+}
+
+// UpstreamRateTarget 上游倍率探测目标（store 层返回，含密文 API key 和 base_url）。
+type UpstreamRateTarget struct {
+	KeyID            int
+	BaseURL          string
+	APIKeyCipher     string // AES-GCM 密文
+	UpstreamRatePath string
+}
+
+// KeyHealthSnapshot 密钥端点健康状态快照（探针调度用）。
+type KeyHealthSnapshot struct {
+	KeyID               int
+	HealthStatus        string
+	ConsecutiveFailures int
+	ConsecutiveSuccesses int
+	LastProbeAt         *time.Time
 }

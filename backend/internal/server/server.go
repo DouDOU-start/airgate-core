@@ -17,6 +17,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
+	"github.com/DouDOU-start/airgate-core/internal/probe"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pipeline"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
@@ -48,6 +49,7 @@ type Server struct {
 	relay           *pipeline.Pipeline
 	taskFlow        *task.Flow
 	taskPoller      *task.Poller
+	probeEngine     *probe.Engine
 
 	// 中间件组件（需 Shutdown 时释放）
 	ipRateLimiter *middleware.IPRateLimiter
@@ -112,6 +114,21 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	s.pricingCache = pricing.NewCache(s.handlers.ModelPriceService)
 	s.handlers.ModelPriceService.SetInvalidator(s.pricingCache)
 
+	// 健康探针引擎：主动探测 + 分级恢复 + 定时余额同步。
+	channelSvc := s.handlers.ChannelService
+	channelStore := s.handlers.ChannelStore
+	s.probeEngine = probe.New(
+		&probeStoreAdapter{store: channelStore},
+		&probeTesterAdapter{svc: channelSvc},
+		&probeBalanceStoreAdapter{store: channelStore},
+		&probeBalanceSyncerAdapter{svc: channelSvc},
+		s.channelRegistry,
+	)
+	s.probeEngine.SetBillingProbe(
+		&probeBillingProberAdapter{svc: channelSvc},
+		&probeBillingStoreAdapter{store: channelStore, secret: cfg.APIKeySecret()},
+	)
+
 	// relay 转发管线：注册表调度 + 渠道 RPM/并发闸门 + 计费落账；
 	// 渠道测试器走同一 adaptor 链路（server 层适配器负责解密与快照构造）。
 	settingsReader := pipeline.NewSettingsReader(gatewaySettingsSource{s.handlers.SettingsService})
@@ -124,8 +141,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Calculator:  billing.NewCalculator(),
 		Sink:        recorder,
 		ErrLog:      errRecorder,
-		Settings:    settingsReader,
-		Moderation:  s.handlers.ModerationEngine,
+		Settings:      settingsReader,
+		Moderation:    s.handlers.ModerationEngine,
+		HealthTracker: s.probeEngine,
 	})
 
 	// 异步任务子系统（视频/音乐）：与同步管线同源组件 + task 持久化 + 余额动账适配器。
@@ -200,6 +218,10 @@ func (s *Server) StartBackground(ctx context.Context) {
 
 	// 风控审核引擎：observe 异步 worker 池 + 审核日志 TTL 清理。
 	s.handlers.ModerationEngine.StartBackground(backgroundCtx)
+
+	// 健康探针引擎：加载状态 + 拉起探针调度与余额同步后台循环。
+	s.probeEngine.LoadStates(backgroundCtx)
+	s.probeEngine.StartBackground(backgroundCtx)
 }
 
 // reloadable 后台重试所需的窄接口（registry.Registry 实现；便于测试注入）。

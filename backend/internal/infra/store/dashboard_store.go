@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
+	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -23,17 +25,18 @@ import (
 
 // DashboardStore 使用 Ent 实现仪表盘仓储。
 type DashboardStore struct {
-	db  *ent.Client
-	rdb *redis.Client
+	db         *ent.Client
+	rdb        *redis.Client
+	sqlDialect string
 }
 
-// NewDashboardStore 创建仪表盘仓储。
-func NewDashboardStore(db *ent.Client, rdb ...*redis.Client) *DashboardStore {
+// NewDashboardStore 创建仪表盘仓储。sqlDialect 传 dialect.Postgres 以启用 SQL 侧分桶聚合。
+func NewDashboardStore(db *ent.Client, sqlDialect string, rdb ...*redis.Client) *DashboardStore {
 	var cache *redis.Client
 	if len(rdb) > 0 {
 		cache = rdb[0]
 	}
-	return &DashboardStore{db: db, rdb: cache}
+	return &DashboardStore{db: db, rdb: cache, sqlDialect: sqlDialect}
 }
 
 const dashboardStatsCacheTTL = 10 * time.Second
@@ -161,6 +164,313 @@ func (s *DashboardStore) ListTrendLogs(ctx context.Context, startTime, endTime t
 		result = append(result, log)
 	}
 
+	return result, nil
+}
+
+// AggregatedTrend 在 Postgres 侧完成 4 种分桶聚合，避免把数万行原始记录拉进内存。
+// 返回 (Trend{}, false, nil) 表示不支持（非 Postgres / 无效时区），调用方应回退 ListTrendLogs。
+func (s *DashboardStore) AggregatedTrend(ctx context.Context, q appdashboard.AggregatedTrendQuery) (appdashboard.Trend, bool, error) {
+	if s.sqlDialect != dialect.Postgres || q.TZName == "" {
+		return appdashboard.Trend{}, false, nil
+	}
+	if _, err := time.LoadLocation(q.TZName); err != nil {
+		return appdashboard.Trend{}, false, nil
+	}
+
+	baseQuery := func() *ent.UsageLogQuery {
+		preds := []predicate.UsageLog{
+			entusagelog.CreatedAtGTE(q.StartTime),
+			entusagelog.CreatedAtLT(q.EndTime),
+		}
+		if q.UserID > 0 {
+			preds = append(preds, usageUserPredicate(int64(q.UserID)))
+		}
+		if q.ChannelID > 0 {
+			preds = append(preds, entusagelog.ChannelIDEQ(q.ChannelID))
+		}
+		if q.ChannelKeyID > 0 {
+			preds = append(preds, entusagelog.ChannelKeyIDEQ(q.ChannelKeyID))
+		}
+		return s.db.UsageLog.Query().Where(preds...)
+	}
+
+	unit := "day"
+	if q.Granularity == "hour" {
+		unit = "hour"
+	}
+	tzLit := sqlStringLiteral(q.TZName)
+
+	// 1) Token 趋势：按时间桶聚合
+	tokenTrend, err := s.aggTokenTrendPG(ctx, baseQuery(), unit, tzLit, q.Loc, q.FillKeys)
+	if err != nil {
+		return appdashboard.Trend{}, false, err
+	}
+
+	// 2) 模型分布：按 model 聚合
+	modelDist, err := s.aggModelDistPG(ctx, baseQuery(), tzLit)
+	if err != nil {
+		return appdashboard.Trend{}, false, err
+	}
+
+	// 3) 用户排行：按 user_id 聚合
+	userRanking, err := s.aggUserRankingPG(ctx, baseQuery())
+	if err != nil {
+		return appdashboard.Trend{}, false, err
+	}
+
+	// 4) Top 用户趋势：先选 Top 12，再按 (user_id, 时间桶) 聚合
+	topUsers, err := s.aggTopUsersPG(ctx, baseQuery(), unit, tzLit, q.Loc, q.FillKeys)
+	if err != nil {
+		return appdashboard.Trend{}, false, err
+	}
+
+	return appdashboard.Trend{
+		ModelDistribution: modelDist,
+		UserRanking:       userRanking,
+		TokenTrend:        tokenTrend,
+		TopUsers:          topUsers,
+	}, true, nil
+}
+
+func (s *DashboardStore) aggTokenTrendPG(ctx context.Context, query *ent.UsageLogQuery, unit, tzLit string, loc *time.Location, fillKeys []string) ([]appdashboard.TimeBucket, error) {
+	var rows []struct {
+		Bucket              time.Time `json:"bucket"`
+		Requests            int64     `json:"requests"`
+		InputTokens         int64     `json:"input_tokens"`
+		OutputTokens        int64     `json:"output_tokens"`
+		CachedInputTokens   int64     `json:"cached_input_tokens"`
+		CacheCreationTokens int64     `json:"cache_creation_tokens"`
+		ActualCost          float64   `json:"actual_cost"`
+		TotalCost           float64   `json:"total_cost"`
+		ChannelCost         float64   `json:"channel_cost"`
+	}
+	err := query.Modify(func(sel *entsql.Selector) {
+		bucket := fmt.Sprintf("date_trunc('%s', %s AT TIME ZONE %s)", unit, sel.C(entusagelog.FieldCreatedAt), tzLit)
+		chCost := fmt.Sprintf("COALESCE(SUM(%s * %s), 0)", sel.C(entusagelog.FieldTotalCost), sel.C(entusagelog.FieldAccountRateMultiplier))
+		sel.Select(
+			entsql.As(bucket, "bucket"),
+			entsql.As("COUNT(*)", "requests"),
+			entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldInputTokens)+"), 0)", "input_tokens"),
+			entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldOutputTokens)+"), 0)", "output_tokens"),
+			entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldCachedInputTokens)+"), 0)", "cached_input_tokens"),
+			entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldCacheCreationTokens)+"), 0)", "cache_creation_tokens"),
+			entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldActualCost)+"), 0)", "actual_cost"),
+			entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldTotalCost)+"), 0)", "total_cost"),
+			entsql.As(chCost, "channel_cost"),
+		).GroupBy("bucket")
+	}).Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+
+	layout := "2006-01-02"
+	if unit == "hour" {
+		layout = "2006-01-02 15:00"
+	}
+
+	bucketMap := make(map[string]*appdashboard.TimeBucket, len(rows))
+	for _, row := range rows {
+		b := row.Bucket
+		key := time.Date(b.Year(), b.Month(), b.Day(), b.Hour(), b.Minute(), b.Second(), 0, loc).Format(layout)
+		bucketMap[key] = &appdashboard.TimeBucket{
+			Time:          key,
+			Requests:      row.Requests,
+			InputTokens:   row.InputTokens,
+			OutputTokens:  row.OutputTokens,
+			CachedInput:   row.CachedInputTokens,
+			CacheCreation: row.CacheCreationTokens,
+			ActualCost:    row.ActualCost,
+			StandardCost:  row.TotalCost,
+			ChannelCost:   row.ChannelCost,
+		}
+	}
+	for _, key := range fillKeys {
+		if bucketMap[key] == nil {
+			bucketMap[key] = &appdashboard.TimeBucket{Time: key}
+		}
+	}
+
+	result := make([]appdashboard.TimeBucket, 0, len(bucketMap))
+	for _, item := range bucketMap {
+		result = append(result, *item)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Time < result[j].Time })
+	return result, nil
+}
+
+func (s *DashboardStore) aggModelDistPG(ctx context.Context, query *ent.UsageLogQuery, tzLit string) ([]appdashboard.ModelStats, error) {
+	var rows []struct {
+		Model        string  `json:"model"`
+		Requests     int64   `json:"requests"`
+		Tokens       int64   `json:"tokens"`
+		ActualCost   float64 `json:"actual_cost"`
+		TotalCost    float64 `json:"total_cost"`
+		ChannelCost  float64 `json:"channel_cost"`
+	}
+	err := query.Modify(func(sel *entsql.Selector) {
+		tokens := fmt.Sprintf("COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0)",
+			sel.C(entusagelog.FieldInputTokens), sel.C(entusagelog.FieldOutputTokens),
+			sel.C(entusagelog.FieldCachedInputTokens), sel.C(entusagelog.FieldCacheCreationTokens))
+		chCost := fmt.Sprintf("COALESCE(SUM(%s * %s), 0)", sel.C(entusagelog.FieldTotalCost), sel.C(entusagelog.FieldAccountRateMultiplier))
+		sel.Select(
+			sel.C(entusagelog.FieldModel),
+			entsql.As("COUNT(*)", "requests"),
+			entsql.As(tokens, "tokens"),
+			entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldActualCost)+"), 0)", "actual_cost"),
+			entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldTotalCost)+"), 0)", "total_cost"),
+			entsql.As(chCost, "channel_cost"),
+		).GroupBy(sel.C(entusagelog.FieldModel))
+	}).Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]appdashboard.ModelStats, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, appdashboard.ModelStats{
+			Model:        row.Model,
+			Requests:     row.Requests,
+			Tokens:       row.Tokens,
+			ActualCost:   row.ActualCost,
+			StandardCost: row.TotalCost,
+			ChannelCost:  row.ChannelCost,
+		})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ActualCost > result[j].ActualCost })
+	return result, nil
+}
+
+func (s *DashboardStore) aggUserRankingPG(ctx context.Context, query *ent.UsageLogQuery) ([]appdashboard.UserRanking, error) {
+	var rows []struct {
+		UserID       int     `json:"user_id_snapshot"`
+		Email        string  `json:"email"`
+		Requests     int64   `json:"requests"`
+		Tokens       int64   `json:"tokens"`
+		ActualCost   float64 `json:"actual_cost"`
+		TotalCost    float64 `json:"total_cost"`
+	}
+	err := query.Modify(func(sel *entsql.Selector) {
+		tokens := fmt.Sprintf("COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0)",
+			sel.C(entusagelog.FieldInputTokens), sel.C(entusagelog.FieldOutputTokens),
+			sel.C(entusagelog.FieldCachedInputTokens), sel.C(entusagelog.FieldCacheCreationTokens))
+		sel.Select(
+			sel.C(entusagelog.FieldUserIDSnapshot),
+			entsql.As("MAX("+sel.C(entusagelog.FieldUserEmailSnapshot)+")", "email"),
+			entsql.As("COUNT(*)", "requests"),
+			entsql.As(tokens, "tokens"),
+			entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldActualCost)+"), 0)", "actual_cost"),
+			entsql.As("COALESCE(SUM("+sel.C(entusagelog.FieldTotalCost)+"), 0)", "total_cost"),
+		).GroupBy(sel.C(entusagelog.FieldUserIDSnapshot))
+	}).Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]appdashboard.UserRanking, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, appdashboard.UserRanking{
+			UserID:       int64(row.UserID),
+			Email:        row.Email,
+			Requests:     row.Requests,
+			Tokens:       row.Tokens,
+			ActualCost:   row.ActualCost,
+			StandardCost: row.TotalCost,
+		})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ActualCost > result[j].ActualCost })
+	return result, nil
+}
+
+func (s *DashboardStore) aggTopUsersPG(ctx context.Context, query *ent.UsageLogQuery, unit, tzLit string, loc *time.Location, fillKeys []string) ([]appdashboard.UserTrend, error) {
+	// 第一步：找 Top 12 用户
+	var topRows []struct {
+		UserID int   `json:"user_id_snapshot"`
+		Email  string `json:"email"`
+		Tokens int64 `json:"tokens"`
+	}
+	err := query.Clone().Modify(func(sel *entsql.Selector) {
+		tokens := fmt.Sprintf("COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0)",
+			sel.C(entusagelog.FieldInputTokens), sel.C(entusagelog.FieldOutputTokens),
+			sel.C(entusagelog.FieldCachedInputTokens), sel.C(entusagelog.FieldCacheCreationTokens))
+		sel.Select(
+			sel.C(entusagelog.FieldUserIDSnapshot),
+			entsql.As("MAX("+sel.C(entusagelog.FieldUserEmailSnapshot)+")", "email"),
+			entsql.As(tokens, "tokens"),
+		).GroupBy(sel.C(entusagelog.FieldUserIDSnapshot)).
+			OrderBy(entsql.Desc("tokens")).
+			Limit(12)
+	}).Scan(ctx, &topRows)
+	if err != nil {
+		return nil, err
+	}
+	if len(topRows) == 0 {
+		return nil, nil
+	}
+
+	topUserIDs := make([]int, 0, len(topRows))
+	emailByID := make(map[int]string, len(topRows))
+	for _, row := range topRows {
+		topUserIDs = append(topUserIDs, row.UserID)
+		emailByID[row.UserID] = row.Email
+	}
+
+	// 第二步：按 (user_id, 时间桶) 聚合
+	var trendRows []struct {
+		UserID int       `json:"user_id_snapshot"`
+		Bucket time.Time `json:"bucket"`
+		Tokens int64     `json:"tokens"`
+	}
+	err = query.Where(entusagelog.UserIDSnapshotIn(topUserIDs...)).
+		Modify(func(sel *entsql.Selector) {
+			bucket := fmt.Sprintf("date_trunc('%s', %s AT TIME ZONE %s)", unit, sel.C(entusagelog.FieldCreatedAt), tzLit)
+			tokens := fmt.Sprintf("COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0)",
+				sel.C(entusagelog.FieldInputTokens), sel.C(entusagelog.FieldOutputTokens),
+				sel.C(entusagelog.FieldCachedInputTokens), sel.C(entusagelog.FieldCacheCreationTokens))
+			sel.Select(
+				sel.C(entusagelog.FieldUserIDSnapshot),
+				entsql.As(bucket, "bucket"),
+				entsql.As(tokens, "tokens"),
+			).GroupBy(sel.C(entusagelog.FieldUserIDSnapshot), "bucket")
+		}).Scan(ctx, &trendRows)
+	if err != nil {
+		return nil, err
+	}
+
+	layout := "2006-01-02"
+	if unit == "hour" {
+		layout = "2006-01-02 15:00"
+	}
+
+	userBuckets := make(map[int]map[string]int64, len(topUserIDs))
+	for _, row := range trendRows {
+		b := row.Bucket
+		key := time.Date(b.Year(), b.Month(), b.Day(), b.Hour(), b.Minute(), b.Second(), 0, loc).Format(layout)
+		if userBuckets[row.UserID] == nil {
+			userBuckets[row.UserID] = make(map[string]int64)
+		}
+		userBuckets[row.UserID][key] = row.Tokens
+	}
+	for _, buckets := range userBuckets {
+		for _, key := range fillKeys {
+			if _, ok := buckets[key]; !ok {
+				buckets[key] = 0
+			}
+		}
+	}
+
+	result := make([]appdashboard.UserTrend, 0, len(topRows))
+	for _, top := range topRows {
+		points := make([]appdashboard.UserTrendPoint, 0, len(userBuckets[top.UserID]))
+		for key, tokens := range userBuckets[top.UserID] {
+			points = append(points, appdashboard.UserTrendPoint{Time: key, Tokens: tokens})
+		}
+		sort.Slice(points, func(i, j int) bool { return points[i].Time < points[j].Time })
+		result = append(result, appdashboard.UserTrend{
+			UserID: int64(top.UserID),
+			Email:  emailByID[top.UserID],
+			Trend:  points,
+		})
+	}
 	return result, nil
 }
 

@@ -60,7 +60,7 @@ func TestDashboardStoreLoadStatsSnapshotAggregatesUsageLogsInSQL(t *testing.T) {
 		t.Fatalf("create snapshot usage log: %v", err)
 	}
 
-	store := NewDashboardStore(db)
+	store := NewDashboardStore(db, "")
 	snapshot, err := store.LoadStatsSnapshot(ctx, todayStart, fiveMinAgo, u.ID)
 	if err != nil {
 		t.Fatalf("LoadStatsSnapshot returned error: %v", err)
@@ -137,7 +137,7 @@ func TestDashboardStoreListTrendLogsIncludesSnapshotOnlyRows(t *testing.T) {
 		t.Fatalf("create snapshot usage log: %v", err)
 	}
 
-	store := NewDashboardStore(db)
+	store := NewDashboardStore(db, "")
 	logs, err := store.ListTrendLogs(ctx, todayStart, endTime, u.ID, 0, 0)
 	if err != nil {
 		t.Fatalf("ListTrendLogs returned error: %v", err)
@@ -195,7 +195,7 @@ func TestDashboardStoreListTrendLogsChannelFilter(t *testing.T) {
 		t.Fatalf("create channel-b usage log: %v", err)
 	}
 
-	store := NewDashboardStore(db)
+	store := NewDashboardStore(db, "")
 	logs, err := store.ListTrendLogs(ctx, startTime, endTime, 0, chA.ID, 0)
 	if err != nil {
 		t.Fatalf("ListTrendLogs returned error: %v", err)

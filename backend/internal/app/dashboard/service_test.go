@@ -203,3 +203,7 @@ func (s dashboardStubRepository) ListTrendLogs(ctx context.Context, startTime, e
 	}
 	return s.listTrendLogs(ctx, startTime, endTime)
 }
+
+func (s dashboardStubRepository) AggregatedTrend(_ context.Context, _ AggregatedTrendQuery) (Trend, bool, error) {
+	return Trend{}, false, nil
+}

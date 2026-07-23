@@ -159,12 +159,31 @@ func (s *Service) Trend(ctx context.Context, query TrendQuery) (Trend, error) {
 }
 
 func (s *Service) loadTrendFresh(ctx context.Context, query TrendQuery, loc *time.Location, startTime, endTime time.Time) (Trend, error) {
+	fillKeys := trendBucketKeys(startTime, endTime, query.Granularity, loc)
+
+	// Postgres 快路径：SQL 侧分桶聚合，无行数上限。
+	if trend, ok, err := s.repo.AggregatedTrend(ctx, AggregatedTrendQuery{
+		StartTime:    startTime,
+		EndTime:      endTime,
+		UserID:       query.UserID,
+		ChannelID:    query.ChannelID,
+		ChannelKeyID: query.ChannelKeyID,
+		Granularity:  query.Granularity,
+		TZName:       query.TZ,
+		Loc:          loc,
+		FillKeys:     fillKeys,
+	}); err != nil {
+		return Trend{}, err
+	} else if ok {
+		return trend, nil
+	}
+
+	// 回退：拉取原始行 + 内存聚合（非 Postgres 或无法解析时区）。
 	logs, err := s.repo.ListTrendLogs(ctx, startTime, endTime, query.UserID, query.ChannelID, query.ChannelKeyID)
 	if err != nil {
 		return Trend{}, err
 	}
 
-	fillKeys := trendBucketKeys(startTime, endTime, query.Granularity, loc)
 	return Trend{
 		ModelDistribution: aggregateModelDistribution(logs),
 		UserRanking:       aggregateUserRanking(logs),

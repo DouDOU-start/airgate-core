@@ -24,6 +24,7 @@ import (
 	appoauth "github.com/DouDOU-start/airgate-core/internal/app/oauth"
 	apppayment "github.com/DouDOU-start/airgate-core/internal/app/payment"
 	appredemption "github.com/DouDOU-start/airgate-core/internal/app/redemption"
+	appbookmark "github.com/DouDOU-start/airgate-core/internal/app/bookmark"
 	appriskcontrol "github.com/DouDOU-start/airgate-core/internal/app/riskcontrol"
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
 	apptier "github.com/DouDOU-start/airgate-core/internal/app/tier"
@@ -68,6 +69,7 @@ type HTTPHandlers struct {
 	Version      *handler.VersionHandler
 	OAuth        *handler.OAuthHandler
 	RiskControl  *handler.RiskControlHandler
+	Bookmark     *handler.BookmarkHandler
 
 	// ChannelService / ModelPriceService / SettingsService 暴露给 server.go：
 	// ChannelService 充当渠道注册表的 Loader/Persister 并接收 Reloader/Tester 注入，
@@ -87,6 +89,8 @@ type HTTPHandlers struct {
 	// ModerationEngine 暴露给 server.go：注入 relay 管线/任务子系统的审核预检，
 	// 并由 StartBackground 拉起 worker 池与日志 TTL 清理。
 	ModerationEngine *moderation.Engine
+	// ChannelStore 暴露给 server.go：探针引擎的健康状态持久化与余额同步目标查询。
+	ChannelStore *store.ChannelStore
 }
 
 // NewHTTPHandlers 统一构造 HTTP 处理器。
@@ -115,7 +119,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	modelPriceService := appmodelprice.NewService(modelPriceStore)
 	// 模型广场倍率区间：只取非专属分组，避免泄露专属谈价倍率
 	modelPriceService.SetGroupRateReader(groupService)
-	dashboardStore := store.NewDashboardStore(dep.DB, dep.Redis)
+	dashboardStore := store.NewDashboardStore(dep.DB, dialect.Postgres, dep.Redis)
 	dashboardService := appdashboard.NewService(dashboardStore, dep.Redis)
 	settingsStore := store.NewSettingsStore(dep.DB)
 	settingsService := appsettings.NewService(settingsStore, dep.Config.APIKeySecret())
@@ -172,6 +176,9 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	moderationEngine.SetNotifier(newModerationNotifier(settingsService))
 	riskControlService.SetEngine(moderationEngine)
 
+	bookmarkStore := store.NewBookmarkStore(dep.DB)
+	bookmarkService := appbookmark.NewService(bookmarkStore)
+
 	// OAuth 应用接入：客户端仓储兼任 UserReader，授权码/令牌走 Redis，
 	// provision-key 复用 apikey 服务的 get-or-create，可用分组适配 group 服务。
 	oauthClientStore := store.NewOAuthClientStore(dep.DB)
@@ -197,6 +204,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Version:      handler.NewVersionHandler(),
 		OAuth:        handler.NewOAuthHandler(oauthService),
 		RiskControl:  handler.NewRiskControlHandler(riskControlService),
+		Bookmark:     handler.NewBookmarkHandler(bookmarkService),
 
 		ChannelService:     channelService,
 		ModelPriceService:  modelPriceService,
@@ -206,6 +214,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		UserService:        userService,
 		TaskStore:          store.NewTaskStore(dep.DB),
 		ModerationEngine:   moderationEngine,
+		ChannelStore:       channelStore,
 	}
 }
 

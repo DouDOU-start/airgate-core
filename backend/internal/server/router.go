@@ -188,6 +188,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/channels/keys/:id/test", handlers.Channel.TestChannel)
 		adminGroup.POST("/channels/keys/:id/fetch-models", handlers.Channel.FetchChannelModels)
 		adminGroup.POST("/channels/keys/:id/balance", handlers.Channel.RefreshChannelBalance)
+		adminGroup.POST("/channels/keys/:id/upstream-rate", handlers.Channel.RefreshUpstreamRate)
 		// 预览拉取：key 未保存时按表单连接参数试拉模型（静态段，先于 :id 匹配）
 		adminGroup.POST("/channels/fetch-models", handlers.Channel.FetchChannelModelsPreview)
 		adminGroup.POST("/channels/bulk-update", handlers.Channel.BulkUpdateChannels)
@@ -224,6 +225,12 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/risk-control/users/:id/unban", handlers.RiskControl.UnbanUser)
 		adminGroup.DELETE("/risk-control/hashes", handlers.RiskControl.DeleteHash)
 		adminGroup.DELETE("/risk-control/hashes/all", handlers.RiskControl.ClearHashes)
+
+		// 备忘录
+		adminGroup.GET("/bookmarks", handlers.Bookmark.ListBookmarks)
+		adminGroup.POST("/bookmarks", handlers.Bookmark.CreateBookmark)
+		adminGroup.PUT("/bookmarks/:id", handlers.Bookmark.UpdateBookmark)
+		adminGroup.DELETE("/bookmarks/:id", handlers.Bookmark.DeleteBookmark)
 
 		// 系统设置
 		adminGroup.GET("/settings", handlers.Settings.GetSettings)
@@ -296,6 +303,8 @@ func (s *Server) registerRoutes() {
 		relayGroup.POST("/images/generations", s.relay.HandleImagesGenerations)
 		relayGroup.POST("/images/edits", s.relay.HandleImagesEdits)
 		relayGroup.GET("/models", s.relay.HandleModels)
+		// AirGate 计费信息端点：下游网关探测上游倍率用（级联场景）
+		relayGroup.GET("/airgate/billing", s.handleBilling)
 		// Anthropic 协议（anthropic 渠道）
 		relayGroup.POST("/messages", s.relay.HandleMessages)
 		relayGroup.POST("/messages/count_tokens", s.relay.HandleMessagesCountTokens)

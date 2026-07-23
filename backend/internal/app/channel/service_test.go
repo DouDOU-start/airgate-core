@@ -64,6 +64,27 @@ func (s *stubRepo) UpdateKeyBalance(ctx context.Context, keyID int, balance floa
 	}
 	return s.updateKeyBalance(ctx, keyID, balance, updatedAt)
 }
+func (s *stubRepo) UpdateKeyHealthState(_ context.Context, _ int, _ string, _, _ int) error {
+	return nil
+}
+func (s *stubRepo) UpdateKeyProbeTime(_ context.Context, _ int, _ time.Time) error {
+	return nil
+}
+func (s *stubRepo) ListProbeEnabledKeys(context.Context) ([]KeyHealthSnapshot, error) {
+	return nil, nil
+}
+func (s *stubRepo) GetChannelKeyMoneyStats(_ context.Context, _ []int, _ time.Time) (map[int]MoneyStats, error) {
+	return nil, nil
+}
+func (s *stubRepo) ListBalanceSyncTargets(_ context.Context, _ time.Time) ([]int, error) {
+	return nil, nil
+}
+func (s *stubRepo) ListUpstreamRateTargets(context.Context) ([]UpstreamRateTarget, error) {
+	return nil, nil
+}
+func (s *stubRepo) UpdateUpstreamRate(_ context.Context, _ int, _ float64, _ time.Time) error {
+	return nil
+}
 
 // stubTester 恒成功的密钥端点测试器。
 type stubTester struct{ latency int }

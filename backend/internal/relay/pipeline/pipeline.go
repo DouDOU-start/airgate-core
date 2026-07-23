@@ -34,6 +34,13 @@ type ErrSink interface {
 	CountFailure(ctx context.Context, channelID int, verdict, phase string)
 }
 
+// HealthTracker 健康信号接收窄接口（*probe.Engine 实现；nil 安全）。
+type HealthTracker interface {
+	RecordSuccess(keyID int)
+	RecordFailure(keyID int)
+	RecordAuthFailure(keyID int)
+}
+
 // Options 管线装配依赖。
 type Options struct {
 	Registry    *registry.Registry
@@ -46,6 +53,8 @@ type Options struct {
 	Settings    *SettingsReader
 	// Moderation 内容审核引擎（风控中心；nil 时全部放行）。
 	Moderation ModerationChecker
+	// HealthTracker 健康信号接收器（探针引擎；nil 时静默跳过）。
+	HealthTracker HealthTracker
 }
 
 // Pipeline relay 转发管线。
@@ -58,7 +67,8 @@ type Pipeline struct {
 	sink        UsageSink
 	errSink     ErrSink
 	settings    *SettingsReader
-	moderation  ModerationChecker
+	moderation     ModerationChecker
+	healthTracker  HealthTracker
 	// client 出口 HTTP 客户端：不设总超时（流式无总超时），仅设连接/TLS 层超时；
 	// 非流式的总超时由调用方经 context 施加。重定向不跟随
 	//（upstreamclient.NewClient 统一设 ErrUseLastResponse），
@@ -88,7 +98,8 @@ func New(opts Options) *Pipeline {
 		sink:        opts.Sink,
 		errSink:     opts.ErrLog,
 		settings:    settings,
-		moderation:  opts.Moderation,
-		client:      upstreamclient.NewClient(0),
+		moderation:    opts.Moderation,
+		healthTracker: opts.HealthTracker,
+		client:        upstreamclient.NewClient(0),
 	}
 }

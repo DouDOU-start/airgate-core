@@ -15,6 +15,11 @@ func sanitizeAlphaSearchPrice(p *float64) *float64 {
 }
 
 func toGroupRespFromDomain(item appgroup.Group) dto.GroupResp {
+	var fallbackID *int64
+	if item.FallbackGroupID != nil {
+		v := int64(*item.FallbackGroupID)
+		fallbackID = &v
+	}
 	return dto.GroupResp{
 		ID:               int64(item.ID),
 		Name:             item.Name,
@@ -24,6 +29,8 @@ func toGroupRespFromDomain(item appgroup.Group) dto.GroupResp {
 		EffectiveRate:    item.EffectiveRate,
 		IsExclusive:      item.IsExclusive,
 		StatusVisible:    item.StatusVisible,
+		AllowedClients:   item.AllowedClients,
+		FallbackGroupID:  fallbackID,
 		Note:             item.Note,
 		SortWeight:       item.SortWeight,
 

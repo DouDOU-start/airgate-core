@@ -2,8 +2,11 @@ package channel
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -614,6 +617,7 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelKey
 				Status:         key.Status,
 				GroupIDs:       groups,
 				TestModel:      key.TestModel,
+				HealthStatus:   key.HealthStatus,
 			})
 		}
 	}
@@ -623,6 +627,93 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelKey
 // PersistState 实现 registry.Persister：密钥端点调度状态异步落库。
 func (s *Service) PersistState(ctx context.Context, keyID int, status string, errMsg string) error {
 	return s.repo.UpdateKeyState(ctx, keyID, status, errMsg)
+}
+
+// ---- 探针引擎适配器 ----
+
+// TestKeyForProbe 探针引擎调用：对指定 key 发一次轻量测试请求。
+// 探针模型优先级：probe_model → test_model → 首个 model。
+func (s *Service) TestKeyForProbe(ctx context.Context, keyID int) error {
+	key, err := s.repo.FindKeyByID(ctx, keyID)
+	if err != nil {
+		return err
+	}
+	if s.tester == nil {
+		return ErrTesterNotReady
+	}
+	model := key.ProbeModel
+	if model == "" {
+		model = key.TestModel
+	}
+	if model == "" && len(key.Models) > 0 {
+		model = key.Models[0]
+	}
+	_, err = s.tester.Test(ctx, key, model, "")
+	return err
+}
+
+// SyncBalanceForProbe 探针引擎调用：刷新指定 key 的上游余额。
+func (s *Service) SyncBalanceForProbe(ctx context.Context, keyID int) error {
+	_, _, err := s.RefreshBalance(ctx, keyID)
+	return err
+}
+
+// UpdateUpstreamRate 保存上游倍率探测结果。
+func (s *Service) UpdateUpstreamRate(ctx context.Context, keyID int, rate float64, at time.Time) error {
+	return s.repo.UpdateUpstreamRate(ctx, keyID, rate, at)
+}
+
+// ProbeKeyBilling 探针引擎调用：查询上游的计费倍率。
+//
+// 兼容两种上游协议：
+//   - AirGate：GET {base_url}/v1/airgate/billing → {"rate_multiplier": 1.5}
+//   - Sub2API：GET {base_url}/v1/sub2api/billing → {"effective_rate_multiplier": 1.5}
+//
+// 路径可由 key.UpstreamRatePath 自定义，空串默认 /v1/airgate/billing。
+func (s *Service) ProbeKeyBilling(ctx context.Context, keyID int) (float64, error) {
+	key, err := s.repo.FindKeyByID(ctx, keyID)
+	if err != nil {
+		return 0, err
+	}
+	apiKey, err := auth.DecryptAPIKey(key.APIKey, s.secret)
+	if err != nil {
+		return 0, fmt.Errorf("decrypt api key: %w", err)
+	}
+
+	path := key.UpstreamRatePath
+	if path == "" {
+		path = "/v1/airgate/billing"
+	}
+	url := strings.TrimSuffix(key.BaseURL, "/") + path
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return 0, fmt.Errorf("upstream billing probe: HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		RateMultiplier          float64  `json:"rate_multiplier"`
+		EffectiveRateMultiplier *float64 `json:"effective_rate_multiplier"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, fmt.Errorf("upstream billing probe: decode: %w", err)
+	}
+	// sub2api 格式优先取 effective_rate_multiplier，兼容 AirGate 的 rate_multiplier
+	if result.EffectiveRateMultiplier != nil {
+		return *result.EffectiveRateMultiplier, nil
+	}
+	return result.RateMultiplier, nil
 }
 
 // encryptPlainKey 加密明文密钥；requireKey=true（新增）时必须非空，

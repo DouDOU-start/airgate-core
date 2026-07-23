@@ -17,6 +17,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/moderation"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/upstreamclient"
+	"github.com/DouDOU-start/airgate-core/internal/relay/clientid"
 	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
 	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pipeline"
@@ -259,6 +260,25 @@ func (s *submitFailureSummary) observeRetryAfter(d time.Duration) {
 func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string, ad Adaptor, sub *SubmitRequest) {
 	start := time.Now()
 	ctx := c.Request.Context()
+
+	// 0. 客户端限制预检（口径同 pipeline）。
+	clientid.Detect(c)
+	if len(keyInfo.GroupAllowedClients) > 0 {
+		if !clientid.Matches(clientid.Get(c), keyInfo.GroupAllowedClients) {
+			if keyInfo.GroupFallbackID != nil {
+				keyInfo.GroupID = *keyInfo.GroupFallbackID
+			} else {
+				writeError(c, http.StatusForbidden, "permission_error", "client_restricted",
+					"当前客户端类型不允许访问此分组")
+				f.recordFailure(c, keyInfo, sub.Model, start, errlog.Entry{
+					Phase: errlog.PhasePrecheckClientRestrict, StatusCode: http.StatusForbidden,
+					ErrorType: "permission_error", ErrorCode: "client_restricted",
+					Message: "当前客户端类型不允许访问此分组",
+				})
+				return
+			}
+		}
+	}
 
 	// 1. 缺价预检：任务不允许零价兜底（长任务白嫖面大），未配任务计价一律 400。
 	price, priced := f.pricing.Get(sub.Model)

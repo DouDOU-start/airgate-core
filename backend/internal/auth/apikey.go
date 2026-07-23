@@ -121,6 +121,11 @@ type APIKeyInfo struct {
 	// GroupAlphaSearchPrice 分组对 codex 联网搜索的按次覆盖价（USD/次）；
 	// nil=沿用全局 gateway 设置，非 nil（含 0）=覆盖全局。见 Group.alpha_search_price。
 	GroupAlphaSearchPrice *float64
+
+	// GroupAllowedClients 分组客户端白名单；空=不限制。
+	GroupAllowedClients []string
+	// GroupFallbackID 客户端不匹配时降级到的分组 ID；nil=直接拒绝。
+	GroupFallbackID *int
 }
 
 // GenerateAPIKey 生成 API Key 和对应的哈希值
@@ -281,6 +286,8 @@ func loadAndCacheAPIKey(ctx context.Context, db *ent.Client, hash string) (*APIK
 		UserGroupRates:        u.GroupRates,
 		GroupRateMultiplier:   g.RateMultiplier,
 		GroupAlphaSearchPrice: g.AlphaSearchPrice,
+		GroupAllowedClients:   g.AllowedClients,
+		GroupFallbackID:       g.FallbackGroupID,
 	}
 	if tier := u.Edges.Tier; tier != nil {
 		info.TierGroupRates = tier.Rates

@@ -100,6 +100,9 @@ type ChannelKeySnapshot struct {
 	// （已不支持"空集合=公共 key，对所有分组可用"的旧语义）。
 	GroupIDs  map[int]struct{}
 	TestModel string
+	// HealthStatus 健康状态（healthy/degraded/suspended/recovering）。
+	// degraded 时 Pick 降权（有效权重减半）；suspended/recovering 由探针驱动恢复。
+	HealthStatus string
 }
 
 // Loader 全量加载密钥端点快照（由 channel service 实现：解密 api_key）。
@@ -253,11 +256,19 @@ func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*Ch
 
 	total := 0
 	for _, k := range tier {
-		total += k.Weight + 10
+		w := k.Weight + 10
+		if k.HealthStatus == "degraded" {
+			w /= 2
+		}
+		total += w
 	}
 	n := r.randFn(total)
 	for _, k := range tier {
-		n -= k.Weight + 10
+		w := k.Weight + 10
+		if k.HealthStatus == "degraded" {
+			w /= 2
+		}
+		n -= w
 		if n < 0 {
 			return k, nil
 		}
@@ -358,6 +369,13 @@ func (r *Registry) MarkRecovered(keyID int) {
 		return
 	}
 	r.persistAsync(keyID, StatusEnabled, "")
+}
+
+// UpdateHealth 更新 key 的健康状态（内存即时生效，不落库——由探针引擎负责落库）。
+func (r *Registry) UpdateHealth(keyID int, health string) {
+	r.mutate(keyID, func(k *ChannelKeySnapshot) {
+		k.HealthStatus = health
+	})
 }
 
 // mutate 以 copy-on-write 方式更新指定 key 快照，返回更新后的快照；key 不存在返回 nil。

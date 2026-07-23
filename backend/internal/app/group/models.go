@@ -70,10 +70,15 @@ type Group struct {
 	AlphaSearchPrice *float64
 	IsExclusive      bool
 	StatusVisible    bool
-	Note             string
-	SortWeight       int
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	// AllowedClients 客户端白名单：非空时仅允许指定类型的客户端访问。
+	// 值域: "claude_code", "codex"。空=不限制。
+	AllowedClients []string
+	// FallbackGroupID 客户端不匹配 AllowedClients 时降级到的分组；nil=直接拒绝。
+	FallbackGroupID *int
+	Note            string
+	SortWeight      int
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 
 	// CurrentConcurrency / CurrentRPM 运行时观测指标（在途请求数 / 当前分钟请求数），
 	// 仅管理员列表查询时由读取器填充，不落库。
@@ -119,6 +124,8 @@ type CreateInput struct {
 	AlphaSearchPrice *float64
 	IsExclusive      bool
 	StatusVisible    bool
+	AllowedClients   []string
+	FallbackGroupID  *int
 	Note             string
 	SortWeight       int
 }
@@ -132,6 +139,12 @@ type UpdateInput struct {
 	AlphaSearchPrice *float64
 	IsExclusive      *bool
 	StatusVisible    *bool
-	Note             *string
-	SortWeight       *int
+	// AllowedClients 权威写：编辑表单提交完整对象。nil=不修改，空数组=清除限制。
+	AllowedClients *[]string
+	// FallbackGroupID 权威写：nil=不修改，零值指针=清除降级分组。
+	FallbackGroupID *int
+	// ClearFallbackGroup 显式清除降级分组（FallbackGroupID 为 nil 时生效）。
+	ClearFallbackGroup bool
+	Note               *string
+	SortWeight         *int
 }

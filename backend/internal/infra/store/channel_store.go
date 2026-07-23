@@ -257,7 +257,15 @@ func applyKeyCreate(builder *ent.ChannelKeyCreate, key appchannel.KeyInput) *ent
 		SetNillableMaxConcurrency(key.MaxConcurrency).
 		SetNillableMaxRpm(key.MaxRPM).
 		SetNillableCostRatio(key.CostRatio).
-		SetNillableBalanceCheckEnabled(key.BalanceCheckEnabled)
+		SetNillableBalanceCheckEnabled(key.BalanceCheckEnabled).
+		SetNillableProbeEnabled(key.ProbeEnabled).
+		SetNillableUpstreamRateEnabled(key.UpstreamRateEnabled)
+	if key.ProbeModel != nil {
+		builder = builder.SetProbeModel(*key.ProbeModel)
+	}
+	if key.UpstreamRatePath != nil {
+		builder = builder.SetUpstreamRatePath(*key.UpstreamRatePath)
+	}
 	if key.ModelMapping != nil {
 		builder = builder.SetModelMapping(key.ModelMapping)
 	}
@@ -291,7 +299,15 @@ func applyKeyUpdate(builder *ent.ChannelKeyUpdateOne, key appchannel.KeyInput) *
 		SetNillableMaxConcurrency(key.MaxConcurrency).
 		SetNillableMaxRpm(key.MaxRPM).
 		SetNillableCostRatio(key.CostRatio).
-		SetNillableBalanceCheckEnabled(key.BalanceCheckEnabled)
+		SetNillableBalanceCheckEnabled(key.BalanceCheckEnabled).
+		SetNillableProbeEnabled(key.ProbeEnabled).
+		SetNillableUpstreamRateEnabled(key.UpstreamRateEnabled)
+	if key.ProbeModel != nil {
+		builder = builder.SetProbeModel(*key.ProbeModel)
+	}
+	if key.UpstreamRatePath != nil {
+		builder = builder.SetUpstreamRatePath(*key.UpstreamRatePath)
+	}
 	// name 为可选标签：空串视为不改（单 key 更新路径可能不带 name）。
 	if key.Name != "" {
 		builder = builder.SetName(key.Name)
@@ -441,6 +457,114 @@ func (s *ChannelStore) UpdateKeyBalance(ctx context.Context, keyID int, balance 
 	return nil
 }
 
+// ---- 健康探针持久化 ----
+
+// UpdateKeyHealthState 更新密钥端点健康状态与计数器。
+func (s *ChannelStore) UpdateKeyHealthState(ctx context.Context, keyID int, health string, failures, successes int) error {
+	if err := s.db.ChannelKey.UpdateOneID(keyID).
+		SetHealthStatus(entchannelkey.HealthStatus(health)).
+		SetConsecutiveFailures(failures).
+		SetConsecutiveSuccesses(successes).
+		Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return appchannel.ErrChannelNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+// UpdateKeyProbeTime 记录最近一次探针执行时间。
+func (s *ChannelStore) UpdateKeyProbeTime(ctx context.Context, keyID int, at time.Time) error {
+	if err := s.db.ChannelKey.UpdateOneID(keyID).
+		SetLastProbeAt(at).
+		Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return appchannel.ErrChannelNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+// ListProbeEnabledKeys 查询所有 probe_enabled=true 的 key 的健康快照。
+func (s *ChannelStore) ListProbeEnabledKeys(ctx context.Context) ([]appchannel.KeyHealthSnapshot, error) {
+	keys, err := s.db.ChannelKey.Query().
+		Where(entchannelkey.ProbeEnabled(true)).
+		Select(
+			entchannelkey.FieldID,
+			entchannelkey.FieldHealthStatus,
+			entchannelkey.FieldConsecutiveFailures,
+			entchannelkey.FieldConsecutiveSuccesses,
+			entchannelkey.FieldLastProbeAt,
+		).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]appchannel.KeyHealthSnapshot, len(keys))
+	for i, k := range keys {
+		result[i] = appchannel.KeyHealthSnapshot{
+			KeyID:                k.ID,
+			HealthStatus:         k.HealthStatus.String(),
+			ConsecutiveFailures:  k.ConsecutiveFailures,
+			ConsecutiveSuccesses: k.ConsecutiveSuccesses,
+			LastProbeAt:          k.LastProbeAt,
+		}
+	}
+	return result, nil
+}
+
+// ListBalanceSyncTargets 查询 balance_check_enabled=true 且余额过期的 key ID。
+func (s *ChannelStore) ListBalanceSyncTargets(ctx context.Context, staleBefore time.Time) ([]int, error) {
+	return s.db.ChannelKey.Query().
+		Where(
+			entchannelkey.BalanceCheckEnabled(true),
+			entchannelkey.StatusEQ(entchannelkey.StatusEnabled),
+			entchannelkey.Or(
+				entchannelkey.BalanceUpdatedAtIsNil(),
+				entchannelkey.BalanceUpdatedAtLT(staleBefore),
+			),
+		).
+		IDs(ctx)
+}
+
+// ListUpstreamRateTargets 查询 upstream_rate_enabled=true 的 key（含所属渠道 base_url）。
+func (s *ChannelStore) ListUpstreamRateTargets(ctx context.Context) ([]appchannel.UpstreamRateTarget, error) {
+	keys, err := s.db.ChannelKey.Query().
+		Where(
+			entchannelkey.UpstreamRateEnabled(true),
+			entchannelkey.StatusEQ(entchannelkey.StatusEnabled),
+		).
+		WithChannel().
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	targets := make([]appchannel.UpstreamRateTarget, 0, len(keys))
+	for _, k := range keys {
+		baseURL := ""
+		if ch, e := k.Edges.ChannelOrErr(); e == nil {
+			baseURL = ch.BaseURL
+		}
+		targets = append(targets, appchannel.UpstreamRateTarget{
+			KeyID:            k.ID,
+			BaseURL:          baseURL,
+			APIKeyCipher:     k.APIKey,
+			UpstreamRatePath: k.UpstreamRatePath,
+		})
+	}
+	return targets, nil
+}
+
+// UpdateUpstreamRate 更新密钥端点的上游倍率探测结果。
+func (s *ChannelStore) UpdateUpstreamRate(ctx context.Context, keyID int, rate float64, at time.Time) error {
+	return s.db.ChannelKey.UpdateOneID(keyID).
+		SetUpstreamRate(rate).
+		SetUpstreamRateAt(at).
+		Exec(ctx)
+}
+
 // channelKeyLatencyWindow 密钥端点平均首字延迟的聚合窗口：最近 5 分钟，接近实时观测。
 const channelKeyLatencyWindow = 5 * time.Minute
 
@@ -569,33 +693,43 @@ func mapChannel(item *ent.Channel) appchannel.Channel {
 
 func mapChannelKey(item *ent.ChannelKey, baseURL, channelName string) appchannel.ChannelKey {
 	key := appchannel.ChannelKey{
-		ID:                  item.ID,
-		ChannelName:         channelName,
-		BaseURL:             baseURL,
-		Name:                item.Name,
-		Type:                item.Type.String(),
-		APIKey:              item.APIKey,
-		Models:              item.Models,
-		ModelMapping:        item.ModelMapping,
-		ParamOverride:       item.ParamOverride,
-		HeaderOverride:      item.HeaderOverride,
-		Status:              item.Status.String(),
-		ErrorMsg:            item.ErrorMsg,
-		Priority:            item.Priority,
-		Weight:              item.Weight,
-		MaxConcurrency:      item.MaxConcurrency,
-		MaxRPM:              item.MaxRpm,
-		CostRatio:           item.CostRatio,
-		Tags:                item.Tags,
-		TestModel:           item.TestModel,
-		ResponseTimeMs:      item.ResponseTimeMs,
-		TestedAt:            item.TestedAt,
-		LastUsedAt:          item.LastUsedAt,
-		Balance:             item.Balance,
-		BalanceUpdatedAt:    item.BalanceUpdatedAt,
-		BalanceCheckEnabled: item.BalanceCheckEnabled,
-		CreatedAt:           item.CreatedAt,
-		UpdatedAt:           item.UpdatedAt,
+		ID:                   item.ID,
+		ChannelName:          channelName,
+		BaseURL:              baseURL,
+		Name:                 item.Name,
+		Type:                 item.Type.String(),
+		APIKey:               item.APIKey,
+		Models:               item.Models,
+		ModelMapping:         item.ModelMapping,
+		ParamOverride:        item.ParamOverride,
+		HeaderOverride:       item.HeaderOverride,
+		Status:               item.Status.String(),
+		ErrorMsg:             item.ErrorMsg,
+		Priority:             item.Priority,
+		Weight:               item.Weight,
+		MaxConcurrency:       item.MaxConcurrency,
+		MaxRPM:               item.MaxRpm,
+		CostRatio:            item.CostRatio,
+		Tags:                 item.Tags,
+		TestModel:            item.TestModel,
+		ResponseTimeMs:       item.ResponseTimeMs,
+		TestedAt:             item.TestedAt,
+		LastUsedAt:           item.LastUsedAt,
+		Balance:              item.Balance,
+		BalanceUpdatedAt:     item.BalanceUpdatedAt,
+		BalanceCheckEnabled:  item.BalanceCheckEnabled,
+		ProbeEnabled:         item.ProbeEnabled,
+		ProbeModel:           item.ProbeModel,
+		HealthStatus:         item.HealthStatus.String(),
+		ConsecutiveFailures:  item.ConsecutiveFailures,
+		ConsecutiveSuccesses: item.ConsecutiveSuccesses,
+		LastProbeAt:          item.LastProbeAt,
+		UpstreamRateEnabled:  item.UpstreamRateEnabled,
+		UpstreamRatePath:     item.UpstreamRatePath,
+		UpstreamRate:         item.UpstreamRate,
+		UpstreamRateAt:       item.UpstreamRateAt,
+		CreatedAt:            item.CreatedAt,
+		UpdatedAt:            item.UpdatedAt,
 	}
 	if ch, err := item.Edges.ChannelOrErr(); err == nil {
 		key.ChannelID = ch.ID

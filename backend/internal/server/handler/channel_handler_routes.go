@@ -280,6 +280,34 @@ func (h *ChannelHandler) RefreshChannelBalance(c *gin.Context) {
 	})
 }
 
+// RefreshUpstreamRate 手动触发上游倍率探测。
+func (h *ChannelHandler) RefreshUpstreamRate(c *gin.Context) {
+	keyID, err := ParseID(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "无效的密钥端点 ID")
+		return
+	}
+
+	rate, err := h.service.ProbeKeyBilling(c.Request.Context(), keyID)
+	if err != nil {
+		httpCode, message := h.handleError("上游倍率探测失败", "探测失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	now := time.Now()
+	if uerr := h.service.UpdateUpstreamRate(c.Request.Context(), keyID, rate, now); uerr != nil {
+		httpCode, message := h.handleError("保存上游倍率失败", "保存失败", uerr)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+
+	response.Success(c, gin.H{
+		"upstream_rate":    rate,
+		"upstream_rate_at": now,
+	})
+}
+
 // FetchChannelModelsPreview 按表单连接参数预览拉取模型列表（渠道未保存时使用）。
 func (h *ChannelHandler) FetchChannelModelsPreview(c *gin.Context) {
 	var req dto.FetchChannelModelsPreviewReq
@@ -385,6 +413,10 @@ func (h *ChannelHandler) ImportChannels(c *gin.Context) {
 				Tags:                k.Tags,
 				TestModel:           k.TestModel,
 				BalanceCheckEnabled: k.BalanceCheckEnabled,
+				ProbeEnabled:        k.ProbeEnabled,
+				ProbeModel:          k.ProbeModel,
+				UpstreamRateEnabled: k.UpstreamRateEnabled,
+				UpstreamRatePath:    k.UpstreamRatePath,
 				GroupIDs:            k.GroupIDs,
 			})
 		}

@@ -34,6 +34,19 @@ type ChannelKeyResp struct {
 	BalanceUpdatedAt *time.Time `json:"balance_updated_at,omitempty"`
 	// BalanceCheckEnabled 是否参与主动余额刷新（进页自动/一键批量）；关闭后手动单把查询仍可用。
 	BalanceCheckEnabled bool `json:"balance_check_enabled"`
+	// ProbeEnabled 是否启用主动健康探针。
+	ProbeEnabled bool   `json:"probe_enabled"`
+	ProbeModel   string `json:"probe_model"`
+	// HealthStatus 健康状态机：healthy / degraded / suspended / recovering。
+	HealthStatus         string     `json:"health_status"`
+	ConsecutiveFailures  int        `json:"consecutive_failures"`
+	ConsecutiveSuccesses int        `json:"consecutive_successes"`
+	LastProbeAt          *time.Time `json:"last_probe_at,omitempty"`
+	// UpstreamRateEnabled 是否启用上游倍率探测。
+	UpstreamRateEnabled bool       `json:"upstream_rate_enabled"`
+	UpstreamRatePath    string     `json:"upstream_rate_path"`
+	UpstreamRate        float64    `json:"upstream_rate"`
+	UpstreamRateAt      *time.Time `json:"upstream_rate_at,omitempty"`
 	// CurrentConcurrency / CurrentRPM 运行时观测指标（在途请求数 / 当前分钟请求数），列表实时展示。
 	CurrentConcurrency int `json:"current_concurrency"`
 	CurrentRPM         int `json:"current_rpm"`
@@ -95,7 +108,13 @@ type ChannelKeyReq struct {
 	TestModel      *string           `json:"test_model"`
 	// BalanceCheckEnabled 省略 = 新增取默认 true / 更新不改。
 	BalanceCheckEnabled *bool `json:"balance_check_enabled"`
-	GroupIDs            []int `json:"group_ids"`
+	// ProbeEnabled 省略 = 新增取默认 false / 更新不改。
+	ProbeEnabled *bool   `json:"probe_enabled"`
+	ProbeModel   *string `json:"probe_model"`
+	// UpstreamRateEnabled 省略 = 新增取默认 false / 更新不改。
+	UpstreamRateEnabled *bool   `json:"upstream_rate_enabled"`
+	UpstreamRatePath    *string `json:"upstream_rate_path"`
+	GroupIDs            []int   `json:"group_ids"`
 }
 
 // TestChannelReq 密钥端点测试请求（model 缺省时取 key 的 test_model 或首个模型）。
@@ -167,6 +186,10 @@ type ChannelKeyExportItem struct {
 	Tags                []string          `json:"tags"`
 	TestModel           string            `json:"test_model"`
 	BalanceCheckEnabled bool              `json:"balance_check_enabled"`
+	ProbeEnabled        bool              `json:"probe_enabled"`
+	ProbeModel          string            `json:"probe_model"`
+	UpstreamRateEnabled bool              `json:"upstream_rate_enabled"`
+	UpstreamRatePath    string            `json:"upstream_rate_path"`
 	GroupIDs            []int             `json:"group_ids"`
 }
 
@@ -198,6 +221,10 @@ type ImportChannelKeyItem struct {
 	Tags                []string          `json:"tags"`
 	TestModel           *string           `json:"test_model"`
 	BalanceCheckEnabled *bool             `json:"balance_check_enabled"`
+	ProbeEnabled        *bool             `json:"probe_enabled"`
+	ProbeModel          *string           `json:"probe_model"`
+	UpstreamRateEnabled *bool             `json:"upstream_rate_enabled"`
+	UpstreamRatePath    *string           `json:"upstream_rate_path"`
 	GroupIDs            []int             `json:"group_ids"`
 }
 

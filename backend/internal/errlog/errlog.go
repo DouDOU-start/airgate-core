@@ -60,10 +60,11 @@ const (
 
 // relay 失败阶段常量（与 forward.go 终止路径一一对应）。
 const (
-	PhasePrecheckBalance     = "precheck_balance"
-	PhasePrecheckPrice       = "precheck_price"
-	PhasePrecheckRate        = "precheck_rate"
-	PhasePrecheckModeration  = "precheck_moderation"
+	PhasePrecheckBalance        = "precheck_balance"
+	PhasePrecheckPrice          = "precheck_price"
+	PhasePrecheckRate           = "precheck_rate"
+	PhasePrecheckClientRestrict = "precheck_client_restrict"
+	PhasePrecheckModeration     = "precheck_moderation"
 	PhaseLocalLimit          = "local_limit"
 	PhaseQueueTimeout        = "queue_timeout"
 	PhaseUpstreamExhausted   = "upstream_exhausted"

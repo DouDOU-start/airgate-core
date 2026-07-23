@@ -59,7 +59,17 @@ func toChannelKeyResp(k appchannel.ChannelKey) dto.ChannelKeyResp {
 		GroupIDs:            emptyIfNilInts(k.GroupIDs),
 		Balance:             k.Balance,
 		BalanceUpdatedAt:    k.BalanceUpdatedAt,
-		BalanceCheckEnabled: k.BalanceCheckEnabled,
+		BalanceCheckEnabled:  k.BalanceCheckEnabled,
+		ProbeEnabled:         k.ProbeEnabled,
+		ProbeModel:           k.ProbeModel,
+		HealthStatus:         k.HealthStatus,
+		ConsecutiveFailures:  k.ConsecutiveFailures,
+		ConsecutiveSuccesses: k.ConsecutiveSuccesses,
+		LastProbeAt:          k.LastProbeAt,
+		UpstreamRateEnabled: k.UpstreamRateEnabled,
+		UpstreamRatePath:    k.UpstreamRatePath,
+		UpstreamRate:        k.UpstreamRate,
+		UpstreamRateAt:      k.UpstreamRateAt,
 
 		CurrentConcurrency: k.CurrentConcurrency,
 		CurrentRPM:         k.CurrentRPM,
@@ -98,6 +108,10 @@ func toKeyInput(req dto.ChannelKeyReq) appchannel.KeyInput {
 		Tags:                req.Tags,
 		TestModel:           req.TestModel,
 		BalanceCheckEnabled: req.BalanceCheckEnabled,
+		ProbeEnabled:        req.ProbeEnabled,
+		ProbeModel:          req.ProbeModel,
+		UpstreamRateEnabled: req.UpstreamRateEnabled,
+		UpstreamRatePath:    req.UpstreamRatePath,
 		GroupIDs:            req.GroupIDs,
 	}
 }
@@ -124,6 +138,10 @@ func toChannelExportItem(ch appchannel.Channel) dto.ChannelExportItem {
 			Tags:                emptyIfNilStrings(k.Tags),
 			TestModel:           k.TestModel,
 			BalanceCheckEnabled: k.BalanceCheckEnabled,
+			ProbeEnabled:        k.ProbeEnabled,
+			ProbeModel:          k.ProbeModel,
+			UpstreamRateEnabled: k.UpstreamRateEnabled,
+			UpstreamRatePath:    k.UpstreamRatePath,
 			GroupIDs:            emptyIfNilInts(k.GroupIDs),
 		})
 	}
