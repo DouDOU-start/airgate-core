@@ -28,7 +28,7 @@ import { ChannelStatsModal } from './channels/ChannelStatsModal';
 import { ChannelTestModal } from './channels/ChannelTestModal';
 import { ChannelKeysTable } from './channels/ChannelKeysTable';
 import {
-  KeyMetricsRow, KeyStatusChip, TYPE_CHIP_COLORS, keySupportsBalance, typeLabel,
+  HealthStatusChip, KeyMetricsRow, KeyStatusChip, TYPE_CHIP_COLORS, keySupportsBalance, typeLabel,
 } from './channels/keyShared';
 import { formatDate, formatDateTime } from '../../shared/utils/format';
 import type {
@@ -58,6 +58,8 @@ function KeyRow({
   onStats,
   onRefreshBalance,
   refreshingBalance,
+  onRefreshUpstreamRate,
+  refreshingUpstreamRate,
   onToggleEnabled,
   toggling,
 }: {
@@ -68,6 +70,8 @@ function KeyRow({
   onStats: () => void;
   onRefreshBalance: () => void;
   refreshingBalance: boolean;
+  onRefreshUpstreamRate: () => void;
+  refreshingUpstreamRate: boolean;
   onToggleEnabled: (enabled: boolean) => void;
   toggling: boolean;
 }) {
@@ -92,6 +96,9 @@ function KeyRow({
         />
         {channelKey.status === 'disabled_auto' ? (
           <KeyStatusChip errorMsg={channelKey.error_msg} status={channelKey.status} />
+        ) : null}
+        {channelKey.health_status && channelKey.health_status !== 'healthy' ? (
+          <HealthStatusChip status={channelKey.health_status} />
         ) : null}
         <span className="font-mono text-[11px] text-text-tertiary" title={t('channels.api_key')}>
           {channelKey.api_key_hint || '-'}
@@ -120,7 +127,9 @@ function KeyRow({
         <KeyMetricsRow
           channelKey={channelKey}
           refreshingBalance={refreshingBalance}
+          refreshingUpstreamRate={refreshingUpstreamRate}
           onRefreshBalance={onRefreshBalance}
+          onRefreshUpstreamRate={onRefreshUpstreamRate}
         />
       </div>
     </div>
@@ -287,6 +296,16 @@ export default function ChannelsPage() {
     mutationFn: (keyId: number) => channelsApi.refreshBalance(keyId),
     onSuccess: (resp) => {
       toast('success', t('channels.balance_refreshed', { amount: resp.balance.toFixed(2) }));
+      invalidateChannelViews();
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  // 手动刷新单把 key 的上游倍率。
+  const keyUpstreamRateMutation = useMutation({
+    mutationFn: (keyId: number) => channelsApi.refreshUpstreamRate(keyId),
+    onSuccess: (resp) => {
+      toast('success', `${t('channels.upstream_rate')}: ×${resp.upstream_rate}`);
       invalidateChannelViews();
     },
     onError: (err: Error) => toast('error', err.message),
@@ -803,11 +822,13 @@ export default function ChannelsPage() {
                                 channelKey={key}
                                 key={key.id}
                                 refreshingBalance={keyBalanceMutation.isPending && keyBalanceMutation.variables === key.id}
+                                refreshingUpstreamRate={keyUpstreamRateMutation.isPending && keyUpstreamRateMutation.variables === key.id}
                                 toggling={keyStatusMutation.isPending && keyStatusMutation.variables?.id === key.id}
                                 onDelete={() => setDeleteKeyTarget(key)}
                                 onEdit={() => openEditKey(key)}
                                 onOpenModels={() => setTestTarget(key)}
                                 onRefreshBalance={() => keyBalanceMutation.mutate(key.id)}
+                                onRefreshUpstreamRate={() => keyUpstreamRateMutation.mutate(key.id)}
                                 onStats={() => setKeyStatsTarget(key)}
                                 onToggleEnabled={(enabled) => keyStatusMutation.mutate({ id: key.id, enabled })}
                               />
@@ -840,11 +861,13 @@ export default function ChannelsPage() {
             />
           )}
           refreshingBalanceId={keyBalanceMutation.isPending ? keyBalanceMutation.variables ?? null : null}
+          refreshingUpstreamRateId={keyUpstreamRateMutation.isPending ? keyUpstreamRateMutation.variables ?? null : null}
           togglingId={keyStatusMutation.isPending ? keyStatusMutation.variables?.id ?? null : null}
           onDelete={(key) => setDeleteKeyTarget(key)}
           onEdit={(key) => openEditKey(key)}
           onOpenModels={(key) => setTestTarget(key)}
           onRefreshBalance={(key) => keyBalanceMutation.mutate(key.id)}
+          onRefreshUpstreamRate={(key) => keyUpstreamRateMutation.mutate(key.id)}
           onSortChange={handleKeysSortChange}
           onStats={(key) => setKeyStatsTarget(key)}
           onToggleEnabled={(key, enabled) => keyStatusMutation.mutate({ id: key.id, enabled })}

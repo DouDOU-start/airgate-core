@@ -54,6 +54,10 @@ interface KeyForm {
   enabled: boolean;
   // 是否参与主动余额刷新（进页自动/一键批量）；官方直连等无余额接口的上游关掉，省得反复打无效请求。
   balanceCheckEnabled: boolean;
+  probeEnabled: boolean;
+  probeModel: string;
+  upstreamRateEnabled: boolean;
+  upstreamRatePath: string;
 }
 
 const emptyForm: KeyForm = {
@@ -72,6 +76,10 @@ const emptyForm: KeyForm = {
   tags: [],
   enabled: true,
   balanceCheckEnabled: true,
+  probeEnabled: false,
+  probeModel: '',
+  upstreamRateEnabled: false,
+  upstreamRatePath: '',
 };
 
 function formFromKey(key: ChannelKeyResp): KeyForm {
@@ -94,6 +102,10 @@ function formFromKey(key: ChannelKeyResp): KeyForm {
     tags: key.tags ?? [],
     enabled: key.status !== 'disabled_manual',
     balanceCheckEnabled: key.balance_check_enabled,
+    probeEnabled: key.probe_enabled,
+    probeModel: key.probe_model ?? '',
+    upstreamRateEnabled: key.upstream_rate_enabled,
+    upstreamRatePath: key.upstream_rate_path ?? '',
   };
 }
 
@@ -173,6 +185,10 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
       cost_ratio: Number(form.costRatio) || 0,
       tags: form.tags,
       balance_check_enabled: form.balanceCheckEnabled,
+      probe_enabled: form.probeEnabled,
+      probe_model: form.probeModel.trim() || undefined,
+      upstream_rate_enabled: form.upstreamRateEnabled,
+      upstream_rate_path: form.upstreamRatePath.trim() || undefined,
     };
 
     if (isEdit && channelKey) {
@@ -352,7 +368,41 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                       />
                     </span>
                   ) : null}
+                  <NativeSwitch
+                    ariaLabel={t('channels.probe_enabled')}
+                    isSelected={form.probeEnabled}
+                    label={t('channels.probe_enabled')}
+                    onChange={(selected) => setForm((p) => ({ ...p, probeEnabled: selected }))}
+                  />
+                  <NativeSwitch
+                    ariaLabel={t('channels.upstream_rate_enabled')}
+                    isSelected={form.upstreamRateEnabled}
+                    label={t('channels.upstream_rate_enabled')}
+                    onChange={(selected) => setForm((p) => ({ ...p, upstreamRateEnabled: selected }))}
+                  />
                 </div>
+                {form.probeEnabled ? (
+                  <HeroTextField fullWidth>
+                    <Label>{t('channels.probe_model')}</Label>
+                    <Input
+                      autoComplete="off"
+                      placeholder={t('channels.probe_model_placeholder')}
+                      value={form.probeModel}
+                      onChange={(e) => setForm((p) => ({ ...p, probeModel: e.target.value }))}
+                    />
+                  </HeroTextField>
+                ) : null}
+                {form.upstreamRateEnabled ? (
+                  <HeroTextField fullWidth>
+                    <Label>{t('channels.upstream_rate_path')}</Label>
+                    <Input
+                      autoComplete="off"
+                      placeholder={t('channels.upstream_rate_path_placeholder')}
+                      value={form.upstreamRatePath}
+                      onChange={(e) => setForm((p) => ({ ...p, upstreamRatePath: e.target.value }))}
+                    />
+                  </HeroTextField>
+                ) : null}
               </div>
             </Modal.Body>
             <Modal.Footer>

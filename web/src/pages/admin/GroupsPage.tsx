@@ -174,11 +174,18 @@ export default function GroupsPage() {
                       </div>
                     </CommonTable.Cell>
                     <CommonTable.Cell>
-                      {row.is_exclusive ? (
-                        <Chip color="warning" size="sm" variant="soft">{t('groups.type_exclusive')}</Chip>
-                      ) : (
-                        <Chip color="default" size="sm" variant="soft">{t('groups.type_public')}</Chip>
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {row.is_exclusive ? (
+                          <Chip color="warning" size="sm" variant="soft">{t('groups.type_exclusive')}</Chip>
+                        ) : (
+                          <Chip color="default" size="sm" variant="soft">{t('groups.type_public')}</Chip>
+                        )}
+                        {row.allowed_clients && row.allowed_clients.length > 0 && (
+                          <Chip color="accent" size="sm" variant="soft">
+                            {row.allowed_clients.map((c) => t(`groups.client_${c}`)).join(' / ')}
+                          </Chip>
+                        )}
+                      </div>
                     </CommonTable.Cell>
                     <CommonTable.Cell className="ag-groups-metric-cell">
                       <MetricChips
@@ -288,6 +295,7 @@ export default function GroupsPage() {
       <GroupFormModal
         open={showCreateModal}
         title={t('groups.create')}
+        groups={data?.list}
         onClose={() => setShowCreateModal(false)}
         onSubmit={(data) => createMutation.mutate(data as CreateGroupReq)}
         loading={createMutation.isPending}
@@ -299,6 +307,7 @@ export default function GroupsPage() {
           open
           title={t('groups.edit')}
           group={editingGroup}
+          groups={data?.list}
           onClose={() => setEditingGroup(null)}
           onSubmit={(data) =>
             updateMutation.mutate({ id: editingGroup.id, data })

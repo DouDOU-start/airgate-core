@@ -6,10 +6,13 @@ import { ArrowUpDown, Layers, Search } from 'lucide-react';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../../shared/types';
 
+const CLIENT_TYPES = ['claude_code', 'codex'] as const;
+
 export function GroupFormModal({
   open,
   title,
   group,
+  groups,
   onClose,
   onSubmit,
   loading,
@@ -17,6 +20,7 @@ export function GroupFormModal({
   open: boolean;
   title: string;
   group?: GroupResp;
+  groups?: GroupResp[];
   onClose: () => void;
   onSubmit: (data: CreateGroupReq | UpdateGroupReq) => void;
   loading: boolean;
@@ -24,38 +28,52 @@ export function GroupFormModal({
   const { t } = useTranslation();
   const isEdit = !!group;
 
-  // 数字字段以字符串存储：受控数字输入若每次 onChange 都 Number() 往返，
-  // 会把 "0." / "0.0" 等小数中间态吃成 0（输入 0.01 时光标"跳"），故保留输入原文，提交时再转。
   const buildForm = () => ({
     is_exclusive: group?.is_exclusive ?? false,
     name: group?.name ?? '',
     note: group?.note ?? '',
     rate_multiplier: String(group?.rate_multiplier ?? 1),
-    // 覆盖价：null/undefined → 空串（沿用全局）；0 及以上原样展示。
     alpha_search_price: group?.alpha_search_price != null ? String(group.alpha_search_price) : '',
     sort_weight: String(group?.sort_weight ?? 0),
     status_visible: group?.status_visible ?? true,
+    allowed_clients: group?.allowed_clients ?? [] as string[],
+    fallback_group_id: group?.fallback_group_id ?? null as number | null,
   });
 
   const [form, setForm] = useState(buildForm);
 
-  // 弹窗常驻挂载：关闭时把表单重置回初始值，避免下次打开残留上次输入
   useEffect(() => {
     if (!open) {
       setForm(buildForm());
     }
   }, [open, group]);
 
+  const toggleClient = (client: string) => {
+    setForm((prev) => {
+      const next = prev.allowed_clients.includes(client)
+        ? prev.allowed_clients.filter((c) => c !== client)
+        : [...prev.allowed_clients, client];
+      return {
+        ...prev,
+        allowed_clients: next,
+        fallback_group_id: next.length === 0 ? null : prev.fallback_group_id,
+      };
+    });
+  };
+
   const handleSubmit = () => {
     if (!isEdit && !form.name) return;
     onSubmit({
       ...form,
       rate_multiplier: form.rate_multiplier === '' ? 1 : Number(form.rate_multiplier),
-      // 空串 → null（沿用全局设置）；否则按次覆盖价（0=该分组免费）。
       alpha_search_price: form.alpha_search_price === '' ? null : Number(form.alpha_search_price),
       sort_weight: form.sort_weight === '' ? 0 : Number(form.sort_weight),
+      allowed_clients: form.allowed_clients.length > 0 ? form.allowed_clients : [],
+      fallback_group_id: form.allowed_clients.length > 0 ? form.fallback_group_id : null,
     });
   };
+
+  const fallbackOptions = (groups ?? []).filter((g) => g.id !== group?.id);
 
   const modalState = useOverlayState({
     isOpen: open,
@@ -130,6 +148,60 @@ export function GroupFormModal({
             label={<span className="text-sm text-text">{t('groups.status_visible_hint')}</span>}
             onChange={(selected) => setForm({ ...form, status_visible: selected })}
           />
+        </div>
+
+        {/* 客户端限制 */}
+        <div className="rounded-lg border border-border-secondary p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-text">{t('groups.allowed_clients')}</span>
+            <span className="text-xs text-text-tertiary">
+              {form.allowed_clients.length === 0 ? t('groups.allowed_clients_none') : ''}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            {CLIENT_TYPES.map((ct) => {
+              const active = form.allowed_clients.includes(ct);
+              return (
+                <button
+                  key={ct}
+                  type="button"
+                  onClick={() => toggleClient(ct)}
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    active
+                      ? 'border-primary-500 bg-primary-500 text-white'
+                      : 'border-border-secondary bg-transparent text-text-secondary hover:border-text-tertiary'
+                  }`}
+                >
+                  {active && (
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" />
+                    </svg>
+                  )}
+                  {t(`groups.client_${ct}`)}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-text-tertiary">{t('groups.allowed_clients_hint')}</p>
+
+          {form.allowed_clients.length > 0 && (
+            <div className="space-y-1.5 border-t border-border-secondary pt-3">
+              <span className="text-sm font-medium text-text">{t('groups.fallback_group')}</span>
+              <select
+                className="block w-full rounded-md border border-border-secondary bg-surface-primary px-3 py-1.5 text-sm text-text shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                value={form.fallback_group_id ?? ''}
+                onChange={(e) =>
+                  setForm({ ...form, fallback_group_id: e.target.value ? Number(e.target.value) : null })
+                }
+              >
+                <option value="">{t('groups.fallback_group_none')}</option>
+                {fallbackOptions.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+              <p className="text-xs text-text-tertiary">{t('groups.fallback_group_hint')}</p>
+            </div>
+          )}
         </div>
 
         <HeroTextField fullWidth>

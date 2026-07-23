@@ -9,7 +9,7 @@ import { SortableHeader } from '../../../shared/components/SortableHeader';
 import { formatDate, formatDateTime } from '../../../shared/utils/format';
 import type { ChannelKeyResp, ChannelKeySortBy, SortOrder } from '../../../shared/types';
 import {
-  KeyMetricsRow, KeyStatusChip, TYPE_CHIP_COLORS, typeLabel,
+  HealthStatusChip, KeyMetricsRow, KeyStatusChip, TYPE_CHIP_COLORS, typeLabel,
 } from './keyShared';
 
 const COLUMN_COUNT = 7;
@@ -29,6 +29,8 @@ export function ChannelKeysTable({
   onStats,
   onRefreshBalance,
   refreshingBalanceId,
+  onRefreshUpstreamRate,
+  refreshingUpstreamRateId,
   onToggleEnabled,
   togglingId,
 }: {
@@ -44,6 +46,8 @@ export function ChannelKeysTable({
   onStats: (key: ChannelKeyResp) => void;
   onRefreshBalance: (key: ChannelKeyResp) => void;
   refreshingBalanceId: number | null;
+  onRefreshUpstreamRate: (key: ChannelKeyResp) => void;
+  refreshingUpstreamRateId: number | null;
   onToggleEnabled: (key: ChannelKeyResp, enabled: boolean) => void;
   togglingId: number | null;
 }) {
@@ -132,6 +136,9 @@ export function ChannelKeysTable({
                   {key.status === 'disabled_auto' ? (
                     <KeyStatusChip errorMsg={key.error_msg} status={key.status} />
                   ) : null}
+                  {key.health_status && key.health_status !== 'healthy' ? (
+                    <HealthStatusChip status={key.health_status} />
+                  ) : null}
                   <span className="font-mono text-[11px] text-text-tertiary" title={t('channels.api_key')}>
                     {key.api_key_hint || '-'}
                   </span>
@@ -147,8 +154,10 @@ export function ChannelKeysTable({
                 <KeyMetricsRow
                   channelKey={key}
                   refreshingBalance={refreshingBalanceId === key.id}
+                  refreshingUpstreamRate={refreshingUpstreamRateId === key.id}
                   showPriorityWeight={false}
                   onRefreshBalance={() => onRefreshBalance(key)}
+                  onRefreshUpstreamRate={() => onRefreshUpstreamRate(key)}
                 />
               </CommonTable.Cell>
               <CommonTable.Cell>

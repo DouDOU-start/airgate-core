@@ -102,7 +102,8 @@
     "docs": "文档",
     "oauth_clients": "应用接入",
     "apps": "应用",
-    "risk_control": "风控中心"
+    "risk_control": "风控中心",
+    "bookmarks": "备忘录"
   },
   "auth": {
     "email": "邮箱",
@@ -287,6 +288,18 @@
     "key_enabled": "启用",
     "balance_check_enabled": "主动查询余额",
     "balance_check_enabled_hint": "开启后进入渠道页会自动刷新该 key 的上游余额（一键刷新也包含它）。官方直连等不提供余额接口的上游建议关闭，避免反复打无效请求；关闭后仍可手动单把查询。",
+    "probe_enabled": "健康探针",
+    "probe_model": "探针模型",
+    "probe_model_placeholder": "留空使用测试模型或首个可用模型",
+    "health_healthy": "健康",
+    "health_degraded": "降级",
+    "health_suspended": "暂停",
+    "health_recovering": "恢复中",
+    "upstream_rate_enabled": "上游倍率探测",
+    "upstream_rate_path": "探测路径",
+    "upstream_rate_path_placeholder": "默认 /v1/airgate/billing，Sub2API 填 /v1/sub2api/billing",
+    "upstream_rate": "上游倍率",
+    "upstream_rate_never": "未探测",
     "key_unnamed": "未命名",
     "no_keys": "该渠道暂无密钥",
     "models_in_key_modal_hint": "模型清单与模型映射请在密钥的「模型」弹窗中管理",
@@ -537,7 +550,16 @@
     "note": "备注",
     "note_hint": "运维备注，会显示在「健康监控」页的分组聚合表中",
     "note_placeholder": "例：官方维护中 / 配额已耗尽 / 临时停用",
-    "group": "分组"
+    "group": "分组",
+    "allowed_clients": "客户端限制",
+    "allowed_clients_hint": "勾选后仅允许指定客户端访问此分组，未勾选则不限制",
+    "allowed_clients_none": "不限制",
+    "client_claude_code": "Claude Code",
+    "client_codex": "Codex",
+    "fallback_group": "降级分组",
+    "fallback_group_hint": "被限制的客户端将降级到此分组，不选则直接拒绝",
+    "fallback_group_none": "无（直接拒绝）",
+    "fallback_group_none_short": "无"
   },
   "tiers": {
     "title": "等级管理",
@@ -1293,5 +1315,19 @@
     "input_excerpt": "输入摘录（已脱敏）",
     "scores_vs_thresholds": "分值 / 阈值对照",
     "input_hash": "输入哈希"
+  },
+  "bookmarks": {
+    "title": "备忘录",
+    "name": "名称",
+    "base_url": "地址",
+    "remark": "备注",
+    "create": "新增备忘录",
+    "edit": "编辑备忘录",
+    "create_success": "备忘录已创建",
+    "update_success": "备忘录已更新",
+    "delete_success": "备忘录已删除",
+    "delete_confirm": "确定删除备忘录「{{name}}」？",
+    "empty": "暂无备忘录",
+    "search_placeholder": "搜索名称、地址或备注"
   }
 }

@@ -102,7 +102,8 @@
     "docs": "Docs",
     "oauth_clients": "App Integrations",
     "apps": "Apps",
-    "risk_control": "Risk Control"
+    "risk_control": "Risk Control",
+    "bookmarks": "Bookmarks"
   },
   "auth": {
     "email": "Email",
@@ -287,6 +288,18 @@
     "key_enabled": "Enabled",
     "balance_check_enabled": "Auto balance check",
     "balance_check_enabled_hint": "When on, the channel page auto-refreshes this key's upstream balance (batch refresh includes it too). Turn off for upstreams without a balance API (e.g. official OpenAI) to avoid repeated failing requests; manual per-key refresh still works.",
+    "probe_enabled": "Health probe",
+    "probe_model": "Probe model",
+    "probe_model_placeholder": "Leave empty to use test model or first available",
+    "health_healthy": "Healthy",
+    "health_degraded": "Degraded",
+    "health_suspended": "Suspended",
+    "health_recovering": "Recovering",
+    "upstream_rate_enabled": "Upstream rate probe",
+    "upstream_rate_path": "Probe path",
+    "upstream_rate_path_placeholder": "Default /v1/airgate/billing; for Sub2API use /v1/sub2api/billing",
+    "upstream_rate": "Upstream rate",
+    "upstream_rate_never": "Not probed",
     "key_unnamed": "Unnamed",
     "no_keys": "No keys yet",
     "models_in_key_modal_hint": "Manage the model list and mapping in the key's Models dialog",
@@ -537,7 +550,16 @@
     "note": "Note",
     "note_hint": "Operational note shown in the Health Monitor group table",
     "note_placeholder": "e.g. Vendor outage / Quota exhausted / Temporarily disabled",
-    "group": "Group"
+    "group": "Group",
+    "allowed_clients": "Client Restriction",
+    "allowed_clients_hint": "When checked, only specified clients can access this group",
+    "allowed_clients_none": "No restriction",
+    "client_claude_code": "Claude Code",
+    "client_codex": "Codex",
+    "fallback_group": "Fallback Group",
+    "fallback_group_hint": "Restricted clients will be routed to this group; reject if unset",
+    "fallback_group_none": "None (reject)",
+    "fallback_group_none_short": "None"
   },
   "tiers": {
     "title": "User Tiers",
@@ -1293,5 +1315,19 @@
     "input_excerpt": "Input excerpt (redacted)",
     "scores_vs_thresholds": "Scores vs thresholds",
     "input_hash": "Input hash"
+  },
+  "bookmarks": {
+    "title": "Bookmarks",
+    "name": "Name",
+    "base_url": "URL",
+    "remark": "Remark",
+    "create": "New Bookmark",
+    "edit": "Edit Bookmark",
+    "create_success": "Bookmark created",
+    "update_success": "Bookmark updated",
+    "delete_success": "Bookmark deleted",
+    "delete_confirm": "Delete bookmark \"{{name}}\"?",
+    "empty": "No bookmarks yet",
+    "search_placeholder": "Search name, URL or remark"
   }
 }

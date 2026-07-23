@@ -140,6 +140,10 @@ export interface GroupResp {
   effective_rate?: number;
   is_exclusive: boolean;
   status_visible: boolean;
+  /** 客户端白名单；空=不限制。值域: "claude_code", "codex" */
+  allowed_clients?: string[];
+  /** 客户端不匹配时降级到的分组 ID；null=直接拒绝 */
+  fallback_group_id?: number | null;
   note?: string;
   sort_weight: number;
   today_cost: number;
@@ -159,6 +163,8 @@ export interface CreateGroupReq {
   alpha_search_price?: number | null;
   is_exclusive?: boolean;
   status_visible?: boolean;
+  allowed_clients?: string[];
+  fallback_group_id?: number | null;
   note?: string;
   sort_weight?: number;
 }
@@ -183,6 +189,8 @@ export interface UpdateGroupReq {
   alpha_search_price?: number | null;
   is_exclusive?: boolean;
   status_visible?: boolean;
+  allowed_clients?: string[];
+  fallback_group_id?: number | null;
   note?: string;
   sort_weight?: number;
 }
@@ -569,6 +577,7 @@ export type ChannelType = 'openai_compatible' | 'anthropic' | 'gemini' | 'custom
 
 /** 渠道状态：enabled 启用 / disabled_manual 手动禁用 / disabled_auto 自动禁用 */
 export type ChannelStatus = 'enabled' | 'disabled_manual' | 'disabled_auto';
+export type HealthStatus = 'healthy' | 'degraded' | 'suspended' | 'recovering';
 
 // 渠道下的一把上游 Key —— 与后端 dto.ChannelKeyResp 对应。
 // 明文密钥永不回显，仅回 api_key_hint（尾 4 位提示）。每把 key 有独立的
@@ -608,6 +617,26 @@ export interface ChannelKeyResp {
   balance_updated_at?: string;
   /** 是否参与主动余额刷新（进页自动/一键批量）；关闭后手动单把查询仍可用 */
   balance_check_enabled: boolean;
+  /** 是否启用主动健康探针 */
+  probe_enabled: boolean;
+  /** 探针使用的模型 */
+  probe_model: string;
+  /** 健康状态：healthy / degraded / suspended / recovering */
+  health_status: HealthStatus;
+  /** 连续失败计数 */
+  consecutive_failures: number;
+  /** 连续成功计数 */
+  consecutive_successes: number;
+  /** 最近一次探针执行时间 */
+  last_probe_at?: string;
+  /** 是否启用上游倍率探测 */
+  upstream_rate_enabled: boolean;
+  /** 上游倍率端点路径（空串默认 /v1/airgate/billing） */
+  upstream_rate_path: string;
+  /** 最近探测到的上游计费倍率 */
+  upstream_rate: number;
+  /** 上游倍率最近探测时间 */
+  upstream_rate_at?: string;
   /** 累计成本（standard × cost_ratio 快照） */
   total_cost: number;
   /** 累计平台收益（actual_cost 实际扣费） */
@@ -669,6 +698,14 @@ export interface ChannelKeyReq {
   test_model?: string;
   /** 是否参与主动余额刷新；省略 = 新增取默认 true / 更新不改 */
   balance_check_enabled?: boolean;
+  /** 是否启用主动健康探针；省略 = 新增取默认 false / 更新不改 */
+  probe_enabled?: boolean;
+  /** 探针使用的模型 */
+  probe_model?: string;
+  /** 是否启用上游倍率探测；省略 = 新增取默认 false / 更新不改 */
+  upstream_rate_enabled?: boolean;
+  /** 上游倍率端点路径 */
+  upstream_rate_path?: string;
   group_ids?: number[];
 }
 
@@ -1361,4 +1398,27 @@ export interface InviteListQuery {
   page?: number;
   page_size?: number;
   keyword?: string;
+}
+
+// ======================== 备忘录 ========================
+
+export interface BookmarkResp {
+  id: number;
+  name: string;
+  base_url: string;
+  remark: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateBookmarkReq {
+  name: string;
+  base_url?: string;
+  remark?: string;
+}
+
+export interface UpdateBookmarkReq {
+  name?: string;
+  base_url?: string;
+  remark?: string;
 }

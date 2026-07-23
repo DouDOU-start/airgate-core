@@ -30,6 +30,9 @@ export const channelsApi = {
   // 余额按 key 刷新
   refreshBalance: (keyId: number, options?: { signal?: AbortSignal }) =>
     post<RefreshChannelBalanceResp>(`/api/v1/admin/channels/keys/${keyId}/balance`, {}, options),
+  // 手动触发上游倍率探测
+  refreshUpstreamRate: (keyId: number) =>
+    post<{ upstream_rate: number; upstream_rate_at: string }>(`/api/v1/admin/channels/keys/${keyId}/upstream-rate`),
   // 按 key 拉取上游模型列表
   fetchModels: (keyId: number) => post<FetchChannelModelsResp>(`/api/v1/admin/channels/keys/${keyId}/fetch-models`),
   // 未保存前的模型预览（临时凭据）

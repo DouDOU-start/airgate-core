@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Chip, Spinner, Tooltip } from '@heroui/react';
 import { RefreshCw } from 'lucide-react';
-import type { ChannelKeyResp, ChannelStatus, ChannelType } from '../../../shared/types';
+import type { ChannelKeyResp, ChannelStatus, ChannelType, HealthStatus } from '../../../shared/types';
 import { CHANNEL_TYPE_OPTIONS } from './ChannelFormModal';
 
 // 渠道视图（按渠道分组展开）与密钥视图（跨渠道平铺）共用的 key 级展示逻辑，
@@ -25,6 +25,23 @@ export const TYPE_CHIP_COLORS: Record<ChannelType, 'accent' | 'warning' | 'succe
 
 export function typeLabel(type: string): string {
   return CHANNEL_TYPE_OPTIONS.find((item) => item.id === type)?.label ?? type;
+}
+
+const HEALTH_CHIP_COLORS: Record<HealthStatus, 'success' | 'warning' | 'danger' | 'accent'> = {
+  healthy: 'success',
+  degraded: 'warning',
+  suspended: 'danger',
+  recovering: 'accent',
+};
+
+export function HealthStatusChip({ status }: { status: HealthStatus }) {
+  const { t } = useTranslation();
+  if (status === 'healthy') return null;
+  return (
+    <Chip color={HEALTH_CHIP_COLORS[status]} size="sm" variant="soft">
+      {t(`channels.health_${status}`)}
+    </Chip>
+  );
 }
 
 // key 状态徽章：enabled 绿 / disabled_manual 灰 / disabled_auto 红 + error_msg tooltip
@@ -82,11 +99,15 @@ export function KeyMetricsRow({
   channelKey,
   onRefreshBalance,
   refreshingBalance,
+  onRefreshUpstreamRate,
+  refreshingUpstreamRate,
   showPriorityWeight = true,
 }: {
   channelKey: ChannelKeyResp;
   onRefreshBalance: () => void;
   refreshingBalance: boolean;
+  onRefreshUpstreamRate?: () => void;
+  refreshingUpstreamRate?: boolean;
   /** 密钥视图已有独立的优先级/权重列，指标行内无需重复展示；渠道视图无独立列，保持展示。 */
   showPriorityWeight?: boolean;
 }) {
@@ -122,7 +143,39 @@ export function KeyMetricsRow({
             P{channelKey.priority} · W{channelKey.weight}
           </Metric>
         ) : null}
-        <Metric label={t('channels.cost_ratio')}>×{channelKey.cost_ratio}</Metric>
+        <Metric label={t('channels.cost_ratio')}>
+          <span className="inline-flex items-center gap-1">
+            ×{channelKey.cost_ratio}
+            {channelKey.upstream_rate_enabled ? (
+              <>
+                <span className="text-text-tertiary">·</span>
+                <Tooltip>
+                  <Tooltip.Trigger className="inline-flex cursor-help">
+                    <span className="text-accent">
+                      {channelKey.upstream_rate_at
+                        ? `↑×${channelKey.upstream_rate}`
+                        : `↑${t('channels.upstream_rate_never')}`}
+                    </span>
+                  </Tooltip.Trigger>
+                  <Tooltip.Content className="max-w-xs">{t('channels.upstream_rate')}</Tooltip.Content>
+                </Tooltip>
+                {onRefreshUpstreamRate ? (
+                  <Button
+                    isIconOnly
+                    aria-label={t('channels.upstream_rate')}
+                    className="h-5 min-h-0 w-5"
+                    isDisabled={refreshingUpstreamRate}
+                    size="sm"
+                    variant="ghost"
+                    onPress={onRefreshUpstreamRate}
+                  >
+                    {refreshingUpstreamRate ? <Spinner size="sm" /> : <RefreshCw className="h-3 w-3" />}
+                  </Button>
+                ) : null}
+              </>
+            ) : null}
+          </span>
+        </Metric>
       </div>
 
       <MetricDivider />

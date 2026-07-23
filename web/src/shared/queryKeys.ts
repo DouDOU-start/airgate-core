@@ -54,4 +54,5 @@ export const queryKeys = {
   riskControlConfig: () => ['risk-control-config'] as const,
   riskControlStatus: () => ['risk-control-status'] as const,
   riskControlLogs: (...args: unknown[]) => ['risk-control-logs', ...args] as const,
+  bookmarks: (...args: unknown[]) => ['bookmarks', ...args] as const,
 } as const;
