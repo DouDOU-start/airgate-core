@@ -16,6 +16,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/announcementread"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
+	"github.com/DouDOU-start/airgate-core/ent/bookmark"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
@@ -50,6 +51,7 @@ const (
 	TypeAnnouncement          = "Announcement"
 	TypeAnnouncementRead      = "AnnouncementRead"
 	TypeBalanceLog            = "BalanceLog"
+	TypeBookmark              = "Bookmark"
 	TypeChannel               = "Channel"
 	TypeChannelKey            = "ChannelKey"
 	TypeGroup                 = "Group"
@@ -4069,6 +4071,548 @@ func (m *BalanceLogMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown BalanceLog edge %s", name)
 }
 
+// BookmarkMutation represents an operation that mutates the Bookmark nodes in the graph.
+type BookmarkMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *int
+	name          *string
+	base_url      *string
+	remark        *string
+	created_at    *time.Time
+	updated_at    *time.Time
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*Bookmark, error)
+	predicates    []predicate.Bookmark
+}
+
+var _ ent.Mutation = (*BookmarkMutation)(nil)
+
+// bookmarkOption allows management of the mutation configuration using functional options.
+type bookmarkOption func(*BookmarkMutation)
+
+// newBookmarkMutation creates new mutation for the Bookmark entity.
+func newBookmarkMutation(c config, op Op, opts ...bookmarkOption) *BookmarkMutation {
+	m := &BookmarkMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeBookmark,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withBookmarkID sets the ID field of the mutation.
+func withBookmarkID(id int) bookmarkOption {
+	return func(m *BookmarkMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *Bookmark
+		)
+		m.oldValue = func(ctx context.Context) (*Bookmark, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().Bookmark.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withBookmark sets the old Bookmark of the mutation.
+func withBookmark(node *Bookmark) bookmarkOption {
+	return func(m *BookmarkMutation) {
+		m.oldValue = func(context.Context) (*Bookmark, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m BookmarkMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m BookmarkMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *BookmarkMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *BookmarkMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().Bookmark.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetName sets the "name" field.
+func (m *BookmarkMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *BookmarkMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the Bookmark entity.
+// If the Bookmark object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BookmarkMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *BookmarkMutation) ResetName() {
+	m.name = nil
+}
+
+// SetBaseURL sets the "base_url" field.
+func (m *BookmarkMutation) SetBaseURL(s string) {
+	m.base_url = &s
+}
+
+// BaseURL returns the value of the "base_url" field in the mutation.
+func (m *BookmarkMutation) BaseURL() (r string, exists bool) {
+	v := m.base_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBaseURL returns the old "base_url" field's value of the Bookmark entity.
+// If the Bookmark object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BookmarkMutation) OldBaseURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBaseURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBaseURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBaseURL: %w", err)
+	}
+	return oldValue.BaseURL, nil
+}
+
+// ResetBaseURL resets all changes to the "base_url" field.
+func (m *BookmarkMutation) ResetBaseURL() {
+	m.base_url = nil
+}
+
+// SetRemark sets the "remark" field.
+func (m *BookmarkMutation) SetRemark(s string) {
+	m.remark = &s
+}
+
+// Remark returns the value of the "remark" field in the mutation.
+func (m *BookmarkMutation) Remark() (r string, exists bool) {
+	v := m.remark
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRemark returns the old "remark" field's value of the Bookmark entity.
+// If the Bookmark object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BookmarkMutation) OldRemark(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRemark is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRemark requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRemark: %w", err)
+	}
+	return oldValue.Remark, nil
+}
+
+// ResetRemark resets all changes to the "remark" field.
+func (m *BookmarkMutation) ResetRemark() {
+	m.remark = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *BookmarkMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *BookmarkMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the Bookmark entity.
+// If the Bookmark object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BookmarkMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *BookmarkMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *BookmarkMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *BookmarkMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the Bookmark entity.
+// If the Bookmark object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BookmarkMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *BookmarkMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the BookmarkMutation builder.
+func (m *BookmarkMutation) Where(ps ...predicate.Bookmark) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the BookmarkMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *BookmarkMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Bookmark, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *BookmarkMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *BookmarkMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (Bookmark).
+func (m *BookmarkMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *BookmarkMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.name != nil {
+		fields = append(fields, bookmark.FieldName)
+	}
+	if m.base_url != nil {
+		fields = append(fields, bookmark.FieldBaseURL)
+	}
+	if m.remark != nil {
+		fields = append(fields, bookmark.FieldRemark)
+	}
+	if m.created_at != nil {
+		fields = append(fields, bookmark.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, bookmark.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *BookmarkMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case bookmark.FieldName:
+		return m.Name()
+	case bookmark.FieldBaseURL:
+		return m.BaseURL()
+	case bookmark.FieldRemark:
+		return m.Remark()
+	case bookmark.FieldCreatedAt:
+		return m.CreatedAt()
+	case bookmark.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *BookmarkMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case bookmark.FieldName:
+		return m.OldName(ctx)
+	case bookmark.FieldBaseURL:
+		return m.OldBaseURL(ctx)
+	case bookmark.FieldRemark:
+		return m.OldRemark(ctx)
+	case bookmark.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case bookmark.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown Bookmark field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BookmarkMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case bookmark.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case bookmark.FieldBaseURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBaseURL(v)
+		return nil
+	case bookmark.FieldRemark:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRemark(v)
+		return nil
+	case bookmark.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case bookmark.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Bookmark field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *BookmarkMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *BookmarkMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BookmarkMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown Bookmark numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *BookmarkMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *BookmarkMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *BookmarkMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown Bookmark nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *BookmarkMutation) ResetField(name string) error {
+	switch name {
+	case bookmark.FieldName:
+		m.ResetName()
+		return nil
+	case bookmark.FieldBaseURL:
+		m.ResetBaseURL()
+		return nil
+	case bookmark.FieldRemark:
+		m.ResetRemark()
+		return nil
+	case bookmark.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case bookmark.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown Bookmark field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *BookmarkMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *BookmarkMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *BookmarkMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *BookmarkMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *BookmarkMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *BookmarkMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *BookmarkMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown Bookmark unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *BookmarkMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown Bookmark edge %s", name)
+}
+
 // ChannelMutation represents an operation that mutates the Channel nodes in the graph.
 type ChannelMutation struct {
 	config
@@ -4736,54 +5280,67 @@ func (m *ChannelMutation) ResetEdge(name string) error {
 // ChannelKeyMutation represents an operation that mutates the ChannelKey nodes in the graph.
 type ChannelKeyMutation struct {
 	config
-	op                    Op
-	typ                   string
-	id                    *int
-	name                  *string
-	_type                 *channelkey.Type
-	api_key               *string
-	models                *[]string
-	appendmodels          []string
-	model_mapping         *map[string]string
-	param_override        *map[string]interface{}
-	header_override       *map[string]string
-	status                *channelkey.Status
-	error_msg             *string
-	priority              *int
-	addpriority           *int
-	weight                *int
-	addweight             *int
-	max_concurrency       *int
-	addmax_concurrency    *int
-	max_rpm               *int
-	addmax_rpm            *int
-	cost_ratio            *float64
-	addcost_ratio         *float64
-	tags                  *[]string
-	appendtags            []string
-	test_model            *string
-	response_time_ms      *int
-	addresponse_time_ms   *int
-	tested_at             *time.Time
-	last_used_at          *time.Time
-	balance               *float64
-	addbalance            *float64
-	balance_updated_at    *time.Time
-	balance_check_enabled *bool
-	created_at            *time.Time
-	updated_at            *time.Time
-	clearedFields         map[string]struct{}
-	channel               *int
-	clearedchannel        bool
-	groups                map[int]struct{}
-	removedgroups         map[int]struct{}
-	clearedgroups         bool
-	usage_logs            map[int]struct{}
-	removedusage_logs     map[int]struct{}
-	clearedusage_logs     bool
-	done                  bool
-	oldValue              func(context.Context) (*ChannelKey, error)
-	predicates            []predicate.ChannelKey
+	op                       Op
+	typ                      string
+	id                       *int
+	name                     *string
+	_type                    *channelkey.Type
+	api_key                  *string
+	models                   *[]string
+	appendmodels             []string
+	model_mapping            *map[string]string
+	param_override           *map[string]interface{}
+	header_override          *map[string]string
+	status                   *channelkey.Status
+	error_msg                *string
+	priority                 *int
+	addpriority              *int
+	weight                   *int
+	addweight                *int
+	max_concurrency          *int
+	addmax_concurrency       *int
+	max_rpm                  *int
+	addmax_rpm               *int
+	cost_ratio               *float64
+	addcost_ratio            *float64
+	tags                     *[]string
+	appendtags               []string
+	test_model               *string
+	response_time_ms         *int
+	addresponse_time_ms      *int
+	tested_at                *time.Time
+	last_used_at             *time.Time
+	balance                  *float64
+	addbalance               *float64
+	balance_updated_at       *time.Time
+	balance_check_enabled    *bool
+	probe_enabled            *bool
+	probe_model              *string
+	health_status            *channelkey.HealthStatus
+	consecutive_failures     *int
+	addconsecutive_failures  *int
+	consecutive_successes    *int
+	addconsecutive_successes *int
+	last_probe_at            *time.Time
+	upstream_rate_enabled    *bool
+	upstream_rate_path       *string
+	upstream_rate            *float64
+	addupstream_rate         *float64
+	upstream_rate_at         *time.Time
+	created_at               *time.Time
+	updated_at               *time.Time
+	clearedFields            map[string]struct{}
+	channel                  *int
+	clearedchannel           bool
+	groups                   map[int]struct{}
+	removedgroups            map[int]struct{}
+	clearedgroups            bool
+	usage_logs               map[int]struct{}
+	removedusage_logs        map[int]struct{}
+	clearedusage_logs        bool
+	done                     bool
+	oldValue                 func(context.Context) (*ChannelKey, error)
+	predicates               []predicate.ChannelKey
 }
 
 var _ ent.Mutation = (*ChannelKeyMutation)(nil)
@@ -5938,6 +6495,452 @@ func (m *ChannelKeyMutation) ResetBalanceCheckEnabled() {
 	m.balance_check_enabled = nil
 }
 
+// SetProbeEnabled sets the "probe_enabled" field.
+func (m *ChannelKeyMutation) SetProbeEnabled(b bool) {
+	m.probe_enabled = &b
+}
+
+// ProbeEnabled returns the value of the "probe_enabled" field in the mutation.
+func (m *ChannelKeyMutation) ProbeEnabled() (r bool, exists bool) {
+	v := m.probe_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProbeEnabled returns the old "probe_enabled" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldProbeEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProbeEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProbeEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProbeEnabled: %w", err)
+	}
+	return oldValue.ProbeEnabled, nil
+}
+
+// ResetProbeEnabled resets all changes to the "probe_enabled" field.
+func (m *ChannelKeyMutation) ResetProbeEnabled() {
+	m.probe_enabled = nil
+}
+
+// SetProbeModel sets the "probe_model" field.
+func (m *ChannelKeyMutation) SetProbeModel(s string) {
+	m.probe_model = &s
+}
+
+// ProbeModel returns the value of the "probe_model" field in the mutation.
+func (m *ChannelKeyMutation) ProbeModel() (r string, exists bool) {
+	v := m.probe_model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProbeModel returns the old "probe_model" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldProbeModel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProbeModel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProbeModel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProbeModel: %w", err)
+	}
+	return oldValue.ProbeModel, nil
+}
+
+// ResetProbeModel resets all changes to the "probe_model" field.
+func (m *ChannelKeyMutation) ResetProbeModel() {
+	m.probe_model = nil
+}
+
+// SetHealthStatus sets the "health_status" field.
+func (m *ChannelKeyMutation) SetHealthStatus(cs channelkey.HealthStatus) {
+	m.health_status = &cs
+}
+
+// HealthStatus returns the value of the "health_status" field in the mutation.
+func (m *ChannelKeyMutation) HealthStatus() (r channelkey.HealthStatus, exists bool) {
+	v := m.health_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHealthStatus returns the old "health_status" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldHealthStatus(ctx context.Context) (v channelkey.HealthStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHealthStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHealthStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHealthStatus: %w", err)
+	}
+	return oldValue.HealthStatus, nil
+}
+
+// ResetHealthStatus resets all changes to the "health_status" field.
+func (m *ChannelKeyMutation) ResetHealthStatus() {
+	m.health_status = nil
+}
+
+// SetConsecutiveFailures sets the "consecutive_failures" field.
+func (m *ChannelKeyMutation) SetConsecutiveFailures(i int) {
+	m.consecutive_failures = &i
+	m.addconsecutive_failures = nil
+}
+
+// ConsecutiveFailures returns the value of the "consecutive_failures" field in the mutation.
+func (m *ChannelKeyMutation) ConsecutiveFailures() (r int, exists bool) {
+	v := m.consecutive_failures
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConsecutiveFailures returns the old "consecutive_failures" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldConsecutiveFailures(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConsecutiveFailures is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConsecutiveFailures requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConsecutiveFailures: %w", err)
+	}
+	return oldValue.ConsecutiveFailures, nil
+}
+
+// AddConsecutiveFailures adds i to the "consecutive_failures" field.
+func (m *ChannelKeyMutation) AddConsecutiveFailures(i int) {
+	if m.addconsecutive_failures != nil {
+		*m.addconsecutive_failures += i
+	} else {
+		m.addconsecutive_failures = &i
+	}
+}
+
+// AddedConsecutiveFailures returns the value that was added to the "consecutive_failures" field in this mutation.
+func (m *ChannelKeyMutation) AddedConsecutiveFailures() (r int, exists bool) {
+	v := m.addconsecutive_failures
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetConsecutiveFailures resets all changes to the "consecutive_failures" field.
+func (m *ChannelKeyMutation) ResetConsecutiveFailures() {
+	m.consecutive_failures = nil
+	m.addconsecutive_failures = nil
+}
+
+// SetConsecutiveSuccesses sets the "consecutive_successes" field.
+func (m *ChannelKeyMutation) SetConsecutiveSuccesses(i int) {
+	m.consecutive_successes = &i
+	m.addconsecutive_successes = nil
+}
+
+// ConsecutiveSuccesses returns the value of the "consecutive_successes" field in the mutation.
+func (m *ChannelKeyMutation) ConsecutiveSuccesses() (r int, exists bool) {
+	v := m.consecutive_successes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConsecutiveSuccesses returns the old "consecutive_successes" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldConsecutiveSuccesses(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConsecutiveSuccesses is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConsecutiveSuccesses requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConsecutiveSuccesses: %w", err)
+	}
+	return oldValue.ConsecutiveSuccesses, nil
+}
+
+// AddConsecutiveSuccesses adds i to the "consecutive_successes" field.
+func (m *ChannelKeyMutation) AddConsecutiveSuccesses(i int) {
+	if m.addconsecutive_successes != nil {
+		*m.addconsecutive_successes += i
+	} else {
+		m.addconsecutive_successes = &i
+	}
+}
+
+// AddedConsecutiveSuccesses returns the value that was added to the "consecutive_successes" field in this mutation.
+func (m *ChannelKeyMutation) AddedConsecutiveSuccesses() (r int, exists bool) {
+	v := m.addconsecutive_successes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetConsecutiveSuccesses resets all changes to the "consecutive_successes" field.
+func (m *ChannelKeyMutation) ResetConsecutiveSuccesses() {
+	m.consecutive_successes = nil
+	m.addconsecutive_successes = nil
+}
+
+// SetLastProbeAt sets the "last_probe_at" field.
+func (m *ChannelKeyMutation) SetLastProbeAt(t time.Time) {
+	m.last_probe_at = &t
+}
+
+// LastProbeAt returns the value of the "last_probe_at" field in the mutation.
+func (m *ChannelKeyMutation) LastProbeAt() (r time.Time, exists bool) {
+	v := m.last_probe_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastProbeAt returns the old "last_probe_at" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldLastProbeAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastProbeAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastProbeAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastProbeAt: %w", err)
+	}
+	return oldValue.LastProbeAt, nil
+}
+
+// ClearLastProbeAt clears the value of the "last_probe_at" field.
+func (m *ChannelKeyMutation) ClearLastProbeAt() {
+	m.last_probe_at = nil
+	m.clearedFields[channelkey.FieldLastProbeAt] = struct{}{}
+}
+
+// LastProbeAtCleared returns if the "last_probe_at" field was cleared in this mutation.
+func (m *ChannelKeyMutation) LastProbeAtCleared() bool {
+	_, ok := m.clearedFields[channelkey.FieldLastProbeAt]
+	return ok
+}
+
+// ResetLastProbeAt resets all changes to the "last_probe_at" field.
+func (m *ChannelKeyMutation) ResetLastProbeAt() {
+	m.last_probe_at = nil
+	delete(m.clearedFields, channelkey.FieldLastProbeAt)
+}
+
+// SetUpstreamRateEnabled sets the "upstream_rate_enabled" field.
+func (m *ChannelKeyMutation) SetUpstreamRateEnabled(b bool) {
+	m.upstream_rate_enabled = &b
+}
+
+// UpstreamRateEnabled returns the value of the "upstream_rate_enabled" field in the mutation.
+func (m *ChannelKeyMutation) UpstreamRateEnabled() (r bool, exists bool) {
+	v := m.upstream_rate_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpstreamRateEnabled returns the old "upstream_rate_enabled" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldUpstreamRateEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpstreamRateEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpstreamRateEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpstreamRateEnabled: %w", err)
+	}
+	return oldValue.UpstreamRateEnabled, nil
+}
+
+// ResetUpstreamRateEnabled resets all changes to the "upstream_rate_enabled" field.
+func (m *ChannelKeyMutation) ResetUpstreamRateEnabled() {
+	m.upstream_rate_enabled = nil
+}
+
+// SetUpstreamRatePath sets the "upstream_rate_path" field.
+func (m *ChannelKeyMutation) SetUpstreamRatePath(s string) {
+	m.upstream_rate_path = &s
+}
+
+// UpstreamRatePath returns the value of the "upstream_rate_path" field in the mutation.
+func (m *ChannelKeyMutation) UpstreamRatePath() (r string, exists bool) {
+	v := m.upstream_rate_path
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpstreamRatePath returns the old "upstream_rate_path" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldUpstreamRatePath(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpstreamRatePath is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpstreamRatePath requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpstreamRatePath: %w", err)
+	}
+	return oldValue.UpstreamRatePath, nil
+}
+
+// ResetUpstreamRatePath resets all changes to the "upstream_rate_path" field.
+func (m *ChannelKeyMutation) ResetUpstreamRatePath() {
+	m.upstream_rate_path = nil
+}
+
+// SetUpstreamRate sets the "upstream_rate" field.
+func (m *ChannelKeyMutation) SetUpstreamRate(f float64) {
+	m.upstream_rate = &f
+	m.addupstream_rate = nil
+}
+
+// UpstreamRate returns the value of the "upstream_rate" field in the mutation.
+func (m *ChannelKeyMutation) UpstreamRate() (r float64, exists bool) {
+	v := m.upstream_rate
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpstreamRate returns the old "upstream_rate" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldUpstreamRate(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpstreamRate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpstreamRate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpstreamRate: %w", err)
+	}
+	return oldValue.UpstreamRate, nil
+}
+
+// AddUpstreamRate adds f to the "upstream_rate" field.
+func (m *ChannelKeyMutation) AddUpstreamRate(f float64) {
+	if m.addupstream_rate != nil {
+		*m.addupstream_rate += f
+	} else {
+		m.addupstream_rate = &f
+	}
+}
+
+// AddedUpstreamRate returns the value that was added to the "upstream_rate" field in this mutation.
+func (m *ChannelKeyMutation) AddedUpstreamRate() (r float64, exists bool) {
+	v := m.addupstream_rate
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUpstreamRate resets all changes to the "upstream_rate" field.
+func (m *ChannelKeyMutation) ResetUpstreamRate() {
+	m.upstream_rate = nil
+	m.addupstream_rate = nil
+}
+
+// SetUpstreamRateAt sets the "upstream_rate_at" field.
+func (m *ChannelKeyMutation) SetUpstreamRateAt(t time.Time) {
+	m.upstream_rate_at = &t
+}
+
+// UpstreamRateAt returns the value of the "upstream_rate_at" field in the mutation.
+func (m *ChannelKeyMutation) UpstreamRateAt() (r time.Time, exists bool) {
+	v := m.upstream_rate_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpstreamRateAt returns the old "upstream_rate_at" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldUpstreamRateAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpstreamRateAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpstreamRateAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpstreamRateAt: %w", err)
+	}
+	return oldValue.UpstreamRateAt, nil
+}
+
+// ClearUpstreamRateAt clears the value of the "upstream_rate_at" field.
+func (m *ChannelKeyMutation) ClearUpstreamRateAt() {
+	m.upstream_rate_at = nil
+	m.clearedFields[channelkey.FieldUpstreamRateAt] = struct{}{}
+}
+
+// UpstreamRateAtCleared returns if the "upstream_rate_at" field was cleared in this mutation.
+func (m *ChannelKeyMutation) UpstreamRateAtCleared() bool {
+	_, ok := m.clearedFields[channelkey.FieldUpstreamRateAt]
+	return ok
+}
+
+// ResetUpstreamRateAt resets all changes to the "upstream_rate_at" field.
+func (m *ChannelKeyMutation) ResetUpstreamRateAt() {
+	m.upstream_rate_at = nil
+	delete(m.clearedFields, channelkey.FieldUpstreamRateAt)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *ChannelKeyMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -6191,7 +7194,7 @@ func (m *ChannelKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ChannelKeyMutation) Fields() []string {
-	fields := make([]string, 0, 24)
+	fields := make([]string, 0, 34)
 	if m.name != nil {
 		fields = append(fields, channelkey.FieldName)
 	}
@@ -6258,6 +7261,36 @@ func (m *ChannelKeyMutation) Fields() []string {
 	if m.balance_check_enabled != nil {
 		fields = append(fields, channelkey.FieldBalanceCheckEnabled)
 	}
+	if m.probe_enabled != nil {
+		fields = append(fields, channelkey.FieldProbeEnabled)
+	}
+	if m.probe_model != nil {
+		fields = append(fields, channelkey.FieldProbeModel)
+	}
+	if m.health_status != nil {
+		fields = append(fields, channelkey.FieldHealthStatus)
+	}
+	if m.consecutive_failures != nil {
+		fields = append(fields, channelkey.FieldConsecutiveFailures)
+	}
+	if m.consecutive_successes != nil {
+		fields = append(fields, channelkey.FieldConsecutiveSuccesses)
+	}
+	if m.last_probe_at != nil {
+		fields = append(fields, channelkey.FieldLastProbeAt)
+	}
+	if m.upstream_rate_enabled != nil {
+		fields = append(fields, channelkey.FieldUpstreamRateEnabled)
+	}
+	if m.upstream_rate_path != nil {
+		fields = append(fields, channelkey.FieldUpstreamRatePath)
+	}
+	if m.upstream_rate != nil {
+		fields = append(fields, channelkey.FieldUpstreamRate)
+	}
+	if m.upstream_rate_at != nil {
+		fields = append(fields, channelkey.FieldUpstreamRateAt)
+	}
 	if m.created_at != nil {
 		fields = append(fields, channelkey.FieldCreatedAt)
 	}
@@ -6316,6 +7349,26 @@ func (m *ChannelKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.BalanceUpdatedAt()
 	case channelkey.FieldBalanceCheckEnabled:
 		return m.BalanceCheckEnabled()
+	case channelkey.FieldProbeEnabled:
+		return m.ProbeEnabled()
+	case channelkey.FieldProbeModel:
+		return m.ProbeModel()
+	case channelkey.FieldHealthStatus:
+		return m.HealthStatus()
+	case channelkey.FieldConsecutiveFailures:
+		return m.ConsecutiveFailures()
+	case channelkey.FieldConsecutiveSuccesses:
+		return m.ConsecutiveSuccesses()
+	case channelkey.FieldLastProbeAt:
+		return m.LastProbeAt()
+	case channelkey.FieldUpstreamRateEnabled:
+		return m.UpstreamRateEnabled()
+	case channelkey.FieldUpstreamRatePath:
+		return m.UpstreamRatePath()
+	case channelkey.FieldUpstreamRate:
+		return m.UpstreamRate()
+	case channelkey.FieldUpstreamRateAt:
+		return m.UpstreamRateAt()
 	case channelkey.FieldCreatedAt:
 		return m.CreatedAt()
 	case channelkey.FieldUpdatedAt:
@@ -6373,6 +7426,26 @@ func (m *ChannelKeyMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldBalanceUpdatedAt(ctx)
 	case channelkey.FieldBalanceCheckEnabled:
 		return m.OldBalanceCheckEnabled(ctx)
+	case channelkey.FieldProbeEnabled:
+		return m.OldProbeEnabled(ctx)
+	case channelkey.FieldProbeModel:
+		return m.OldProbeModel(ctx)
+	case channelkey.FieldHealthStatus:
+		return m.OldHealthStatus(ctx)
+	case channelkey.FieldConsecutiveFailures:
+		return m.OldConsecutiveFailures(ctx)
+	case channelkey.FieldConsecutiveSuccesses:
+		return m.OldConsecutiveSuccesses(ctx)
+	case channelkey.FieldLastProbeAt:
+		return m.OldLastProbeAt(ctx)
+	case channelkey.FieldUpstreamRateEnabled:
+		return m.OldUpstreamRateEnabled(ctx)
+	case channelkey.FieldUpstreamRatePath:
+		return m.OldUpstreamRatePath(ctx)
+	case channelkey.FieldUpstreamRate:
+		return m.OldUpstreamRate(ctx)
+	case channelkey.FieldUpstreamRateAt:
+		return m.OldUpstreamRateAt(ctx)
 	case channelkey.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case channelkey.FieldUpdatedAt:
@@ -6540,6 +7613,76 @@ func (m *ChannelKeyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetBalanceCheckEnabled(v)
 		return nil
+	case channelkey.FieldProbeEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProbeEnabled(v)
+		return nil
+	case channelkey.FieldProbeModel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProbeModel(v)
+		return nil
+	case channelkey.FieldHealthStatus:
+		v, ok := value.(channelkey.HealthStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHealthStatus(v)
+		return nil
+	case channelkey.FieldConsecutiveFailures:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConsecutiveFailures(v)
+		return nil
+	case channelkey.FieldConsecutiveSuccesses:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConsecutiveSuccesses(v)
+		return nil
+	case channelkey.FieldLastProbeAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastProbeAt(v)
+		return nil
+	case channelkey.FieldUpstreamRateEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpstreamRateEnabled(v)
+		return nil
+	case channelkey.FieldUpstreamRatePath:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpstreamRatePath(v)
+		return nil
+	case channelkey.FieldUpstreamRate:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpstreamRate(v)
+		return nil
+	case channelkey.FieldUpstreamRateAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpstreamRateAt(v)
+		return nil
 	case channelkey.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -6583,6 +7726,15 @@ func (m *ChannelKeyMutation) AddedFields() []string {
 	if m.addbalance != nil {
 		fields = append(fields, channelkey.FieldBalance)
 	}
+	if m.addconsecutive_failures != nil {
+		fields = append(fields, channelkey.FieldConsecutiveFailures)
+	}
+	if m.addconsecutive_successes != nil {
+		fields = append(fields, channelkey.FieldConsecutiveSuccesses)
+	}
+	if m.addupstream_rate != nil {
+		fields = append(fields, channelkey.FieldUpstreamRate)
+	}
 	return fields
 }
 
@@ -6605,6 +7757,12 @@ func (m *ChannelKeyMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedResponseTimeMs()
 	case channelkey.FieldBalance:
 		return m.AddedBalance()
+	case channelkey.FieldConsecutiveFailures:
+		return m.AddedConsecutiveFailures()
+	case channelkey.FieldConsecutiveSuccesses:
+		return m.AddedConsecutiveSuccesses()
+	case channelkey.FieldUpstreamRate:
+		return m.AddedUpstreamRate()
 	}
 	return nil, false
 }
@@ -6663,6 +7821,27 @@ func (m *ChannelKeyMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddBalance(v)
 		return nil
+	case channelkey.FieldConsecutiveFailures:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConsecutiveFailures(v)
+		return nil
+	case channelkey.FieldConsecutiveSuccesses:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConsecutiveSuccesses(v)
+		return nil
+	case channelkey.FieldUpstreamRate:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUpstreamRate(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ChannelKey numeric field %s", name)
 }
@@ -6691,6 +7870,12 @@ func (m *ChannelKeyMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(channelkey.FieldBalanceUpdatedAt) {
 		fields = append(fields, channelkey.FieldBalanceUpdatedAt)
+	}
+	if m.FieldCleared(channelkey.FieldLastProbeAt) {
+		fields = append(fields, channelkey.FieldLastProbeAt)
+	}
+	if m.FieldCleared(channelkey.FieldUpstreamRateAt) {
+		fields = append(fields, channelkey.FieldUpstreamRateAt)
 	}
 	return fields
 }
@@ -6726,6 +7911,12 @@ func (m *ChannelKeyMutation) ClearField(name string) error {
 		return nil
 	case channelkey.FieldBalanceUpdatedAt:
 		m.ClearBalanceUpdatedAt()
+		return nil
+	case channelkey.FieldLastProbeAt:
+		m.ClearLastProbeAt()
+		return nil
+	case channelkey.FieldUpstreamRateAt:
+		m.ClearUpstreamRateAt()
 		return nil
 	}
 	return fmt.Errorf("unknown ChannelKey nullable field %s", name)
@@ -6800,6 +7991,36 @@ func (m *ChannelKeyMutation) ResetField(name string) error {
 		return nil
 	case channelkey.FieldBalanceCheckEnabled:
 		m.ResetBalanceCheckEnabled()
+		return nil
+	case channelkey.FieldProbeEnabled:
+		m.ResetProbeEnabled()
+		return nil
+	case channelkey.FieldProbeModel:
+		m.ResetProbeModel()
+		return nil
+	case channelkey.FieldHealthStatus:
+		m.ResetHealthStatus()
+		return nil
+	case channelkey.FieldConsecutiveFailures:
+		m.ResetConsecutiveFailures()
+		return nil
+	case channelkey.FieldConsecutiveSuccesses:
+		m.ResetConsecutiveSuccesses()
+		return nil
+	case channelkey.FieldLastProbeAt:
+		m.ResetLastProbeAt()
+		return nil
+	case channelkey.FieldUpstreamRateEnabled:
+		m.ResetUpstreamRateEnabled()
+		return nil
+	case channelkey.FieldUpstreamRatePath:
+		m.ResetUpstreamRatePath()
+		return nil
+	case channelkey.FieldUpstreamRate:
+		m.ResetUpstreamRate()
+		return nil
+	case channelkey.FieldUpstreamRateAt:
+		m.ResetUpstreamRateAt()
 		return nil
 	case channelkey.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -6953,6 +8174,10 @@ type GroupMutation struct {
 	addalpha_search_price *float64
 	is_exclusive          *bool
 	status_visible        *bool
+	allowed_clients       *[]string
+	appendallowed_clients []string
+	fallback_group_id     *int
+	addfallback_group_id  *int
 	note                  *string
 	sort_weight           *int
 	addsort_weight        *int
@@ -7342,6 +8567,141 @@ func (m *GroupMutation) OldStatusVisible(ctx context.Context) (v bool, err error
 // ResetStatusVisible resets all changes to the "status_visible" field.
 func (m *GroupMutation) ResetStatusVisible() {
 	m.status_visible = nil
+}
+
+// SetAllowedClients sets the "allowed_clients" field.
+func (m *GroupMutation) SetAllowedClients(s []string) {
+	m.allowed_clients = &s
+	m.appendallowed_clients = nil
+}
+
+// AllowedClients returns the value of the "allowed_clients" field in the mutation.
+func (m *GroupMutation) AllowedClients() (r []string, exists bool) {
+	v := m.allowed_clients
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAllowedClients returns the old "allowed_clients" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldAllowedClients(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAllowedClients is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAllowedClients requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAllowedClients: %w", err)
+	}
+	return oldValue.AllowedClients, nil
+}
+
+// AppendAllowedClients adds s to the "allowed_clients" field.
+func (m *GroupMutation) AppendAllowedClients(s []string) {
+	m.appendallowed_clients = append(m.appendallowed_clients, s...)
+}
+
+// AppendedAllowedClients returns the list of values that were appended to the "allowed_clients" field in this mutation.
+func (m *GroupMutation) AppendedAllowedClients() ([]string, bool) {
+	if len(m.appendallowed_clients) == 0 {
+		return nil, false
+	}
+	return m.appendallowed_clients, true
+}
+
+// ClearAllowedClients clears the value of the "allowed_clients" field.
+func (m *GroupMutation) ClearAllowedClients() {
+	m.allowed_clients = nil
+	m.appendallowed_clients = nil
+	m.clearedFields[group.FieldAllowedClients] = struct{}{}
+}
+
+// AllowedClientsCleared returns if the "allowed_clients" field was cleared in this mutation.
+func (m *GroupMutation) AllowedClientsCleared() bool {
+	_, ok := m.clearedFields[group.FieldAllowedClients]
+	return ok
+}
+
+// ResetAllowedClients resets all changes to the "allowed_clients" field.
+func (m *GroupMutation) ResetAllowedClients() {
+	m.allowed_clients = nil
+	m.appendallowed_clients = nil
+	delete(m.clearedFields, group.FieldAllowedClients)
+}
+
+// SetFallbackGroupID sets the "fallback_group_id" field.
+func (m *GroupMutation) SetFallbackGroupID(i int) {
+	m.fallback_group_id = &i
+	m.addfallback_group_id = nil
+}
+
+// FallbackGroupID returns the value of the "fallback_group_id" field in the mutation.
+func (m *GroupMutation) FallbackGroupID() (r int, exists bool) {
+	v := m.fallback_group_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFallbackGroupID returns the old "fallback_group_id" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldFallbackGroupID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFallbackGroupID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFallbackGroupID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFallbackGroupID: %w", err)
+	}
+	return oldValue.FallbackGroupID, nil
+}
+
+// AddFallbackGroupID adds i to the "fallback_group_id" field.
+func (m *GroupMutation) AddFallbackGroupID(i int) {
+	if m.addfallback_group_id != nil {
+		*m.addfallback_group_id += i
+	} else {
+		m.addfallback_group_id = &i
+	}
+}
+
+// AddedFallbackGroupID returns the value that was added to the "fallback_group_id" field in this mutation.
+func (m *GroupMutation) AddedFallbackGroupID() (r int, exists bool) {
+	v := m.addfallback_group_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearFallbackGroupID clears the value of the "fallback_group_id" field.
+func (m *GroupMutation) ClearFallbackGroupID() {
+	m.fallback_group_id = nil
+	m.addfallback_group_id = nil
+	m.clearedFields[group.FieldFallbackGroupID] = struct{}{}
+}
+
+// FallbackGroupIDCleared returns if the "fallback_group_id" field was cleared in this mutation.
+func (m *GroupMutation) FallbackGroupIDCleared() bool {
+	_, ok := m.clearedFields[group.FieldFallbackGroupID]
+	return ok
+}
+
+// ResetFallbackGroupID resets all changes to the "fallback_group_id" field.
+func (m *GroupMutation) ResetFallbackGroupID() {
+	m.fallback_group_id = nil
+	m.addfallback_group_id = nil
+	delete(m.clearedFields, group.FieldFallbackGroupID)
 }
 
 // SetNote sets the "note" field.
@@ -7758,7 +9118,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 12)
 	if m.name != nil {
 		fields = append(fields, group.FieldName)
 	}
@@ -7776,6 +9136,12 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.status_visible != nil {
 		fields = append(fields, group.FieldStatusVisible)
+	}
+	if m.allowed_clients != nil {
+		fields = append(fields, group.FieldAllowedClients)
+	}
+	if m.fallback_group_id != nil {
+		fields = append(fields, group.FieldFallbackGroupID)
 	}
 	if m.note != nil {
 		fields = append(fields, group.FieldNote)
@@ -7809,6 +9175,10 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.IsExclusive()
 	case group.FieldStatusVisible:
 		return m.StatusVisible()
+	case group.FieldAllowedClients:
+		return m.AllowedClients()
+	case group.FieldFallbackGroupID:
+		return m.FallbackGroupID()
 	case group.FieldNote:
 		return m.Note()
 	case group.FieldSortWeight:
@@ -7838,6 +9208,10 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldIsExclusive(ctx)
 	case group.FieldStatusVisible:
 		return m.OldStatusVisible(ctx)
+	case group.FieldAllowedClients:
+		return m.OldAllowedClients(ctx)
+	case group.FieldFallbackGroupID:
+		return m.OldFallbackGroupID(ctx)
 	case group.FieldNote:
 		return m.OldNote(ctx)
 	case group.FieldSortWeight:
@@ -7897,6 +9271,20 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetStatusVisible(v)
 		return nil
+	case group.FieldAllowedClients:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAllowedClients(v)
+		return nil
+	case group.FieldFallbackGroupID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFallbackGroupID(v)
+		return nil
 	case group.FieldNote:
 		v, ok := value.(string)
 		if !ok {
@@ -7939,6 +9327,9 @@ func (m *GroupMutation) AddedFields() []string {
 	if m.addalpha_search_price != nil {
 		fields = append(fields, group.FieldAlphaSearchPrice)
 	}
+	if m.addfallback_group_id != nil {
+		fields = append(fields, group.FieldFallbackGroupID)
+	}
 	if m.addsort_weight != nil {
 		fields = append(fields, group.FieldSortWeight)
 	}
@@ -7954,6 +9345,8 @@ func (m *GroupMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedRateMultiplier()
 	case group.FieldAlphaSearchPrice:
 		return m.AddedAlphaSearchPrice()
+	case group.FieldFallbackGroupID:
+		return m.AddedFallbackGroupID()
 	case group.FieldSortWeight:
 		return m.AddedSortWeight()
 	}
@@ -7979,6 +9372,13 @@ func (m *GroupMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddAlphaSearchPrice(v)
 		return nil
+	case group.FieldFallbackGroupID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFallbackGroupID(v)
+		return nil
 	case group.FieldSortWeight:
 		v, ok := value.(int)
 		if !ok {
@@ -7997,6 +9397,12 @@ func (m *GroupMutation) ClearedFields() []string {
 	if m.FieldCleared(group.FieldAlphaSearchPrice) {
 		fields = append(fields, group.FieldAlphaSearchPrice)
 	}
+	if m.FieldCleared(group.FieldAllowedClients) {
+		fields = append(fields, group.FieldAllowedClients)
+	}
+	if m.FieldCleared(group.FieldFallbackGroupID) {
+		fields = append(fields, group.FieldFallbackGroupID)
+	}
 	return fields
 }
 
@@ -8013,6 +9419,12 @@ func (m *GroupMutation) ClearField(name string) error {
 	switch name {
 	case group.FieldAlphaSearchPrice:
 		m.ClearAlphaSearchPrice()
+		return nil
+	case group.FieldAllowedClients:
+		m.ClearAllowedClients()
+		return nil
+	case group.FieldFallbackGroupID:
+		m.ClearFallbackGroupID()
 		return nil
 	}
 	return fmt.Errorf("unknown Group nullable field %s", name)
@@ -8039,6 +9451,12 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldStatusVisible:
 		m.ResetStatusVisible()
+		return nil
+	case group.FieldAllowedClients:
+		m.ResetAllowedClients()
+		return nil
+	case group.FieldFallbackGroupID:
+		m.ResetFallbackGroupID()
 		return nil
 	case group.FieldNote:
 		m.ResetNote()

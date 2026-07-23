@@ -102,6 +102,26 @@ func (gc *GroupCreate) SetNillableStatusVisible(b *bool) *GroupCreate {
 	return gc
 }
 
+// SetAllowedClients sets the "allowed_clients" field.
+func (gc *GroupCreate) SetAllowedClients(s []string) *GroupCreate {
+	gc.mutation.SetAllowedClients(s)
+	return gc
+}
+
+// SetFallbackGroupID sets the "fallback_group_id" field.
+func (gc *GroupCreate) SetFallbackGroupID(i int) *GroupCreate {
+	gc.mutation.SetFallbackGroupID(i)
+	return gc
+}
+
+// SetNillableFallbackGroupID sets the "fallback_group_id" field if the given value is not nil.
+func (gc *GroupCreate) SetNillableFallbackGroupID(i *int) *GroupCreate {
+	if i != nil {
+		gc.SetFallbackGroupID(*i)
+	}
+	return gc
+}
+
 // SetNote sets the "note" field.
 func (gc *GroupCreate) SetNote(s string) *GroupCreate {
 	gc.mutation.SetNote(s)
@@ -372,6 +392,14 @@ func (gc *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		_spec.SetField(group.FieldStatusVisible, field.TypeBool, value)
 		_node.StatusVisible = value
 	}
+	if value, ok := gc.mutation.AllowedClients(); ok {
+		_spec.SetField(group.FieldAllowedClients, field.TypeJSON, value)
+		_node.AllowedClients = value
+	}
+	if value, ok := gc.mutation.FallbackGroupID(); ok {
+		_spec.SetField(group.FieldFallbackGroupID, field.TypeInt, value)
+		_node.FallbackGroupID = &value
+	}
 	if value, ok := gc.mutation.Note(); ok {
 		_spec.SetField(group.FieldNote, field.TypeString, value)
 		_node.Note = value
@@ -594,6 +622,48 @@ func (u *GroupUpsert) UpdateStatusVisible() *GroupUpsert {
 	return u
 }
 
+// SetAllowedClients sets the "allowed_clients" field.
+func (u *GroupUpsert) SetAllowedClients(v []string) *GroupUpsert {
+	u.Set(group.FieldAllowedClients, v)
+	return u
+}
+
+// UpdateAllowedClients sets the "allowed_clients" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateAllowedClients() *GroupUpsert {
+	u.SetExcluded(group.FieldAllowedClients)
+	return u
+}
+
+// ClearAllowedClients clears the value of the "allowed_clients" field.
+func (u *GroupUpsert) ClearAllowedClients() *GroupUpsert {
+	u.SetNull(group.FieldAllowedClients)
+	return u
+}
+
+// SetFallbackGroupID sets the "fallback_group_id" field.
+func (u *GroupUpsert) SetFallbackGroupID(v int) *GroupUpsert {
+	u.Set(group.FieldFallbackGroupID, v)
+	return u
+}
+
+// UpdateFallbackGroupID sets the "fallback_group_id" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateFallbackGroupID() *GroupUpsert {
+	u.SetExcluded(group.FieldFallbackGroupID)
+	return u
+}
+
+// AddFallbackGroupID adds v to the "fallback_group_id" field.
+func (u *GroupUpsert) AddFallbackGroupID(v int) *GroupUpsert {
+	u.Add(group.FieldFallbackGroupID, v)
+	return u
+}
+
+// ClearFallbackGroupID clears the value of the "fallback_group_id" field.
+func (u *GroupUpsert) ClearFallbackGroupID() *GroupUpsert {
+	u.SetNull(group.FieldFallbackGroupID)
+	return u
+}
+
 // SetNote sets the "note" field.
 func (u *GroupUpsert) SetNote(v string) *GroupUpsert {
 	u.Set(group.FieldNote, v)
@@ -783,6 +853,55 @@ func (u *GroupUpsertOne) SetStatusVisible(v bool) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateStatusVisible() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateStatusVisible()
+	})
+}
+
+// SetAllowedClients sets the "allowed_clients" field.
+func (u *GroupUpsertOne) SetAllowedClients(v []string) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetAllowedClients(v)
+	})
+}
+
+// UpdateAllowedClients sets the "allowed_clients" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateAllowedClients() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateAllowedClients()
+	})
+}
+
+// ClearAllowedClients clears the value of the "allowed_clients" field.
+func (u *GroupUpsertOne) ClearAllowedClients() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearAllowedClients()
+	})
+}
+
+// SetFallbackGroupID sets the "fallback_group_id" field.
+func (u *GroupUpsertOne) SetFallbackGroupID(v int) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetFallbackGroupID(v)
+	})
+}
+
+// AddFallbackGroupID adds v to the "fallback_group_id" field.
+func (u *GroupUpsertOne) AddFallbackGroupID(v int) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddFallbackGroupID(v)
+	})
+}
+
+// UpdateFallbackGroupID sets the "fallback_group_id" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateFallbackGroupID() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateFallbackGroupID()
+	})
+}
+
+// ClearFallbackGroupID clears the value of the "fallback_group_id" field.
+func (u *GroupUpsertOne) ClearFallbackGroupID() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearFallbackGroupID()
 	})
 }
 
@@ -1148,6 +1267,55 @@ func (u *GroupUpsertBulk) SetStatusVisible(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateStatusVisible() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateStatusVisible()
+	})
+}
+
+// SetAllowedClients sets the "allowed_clients" field.
+func (u *GroupUpsertBulk) SetAllowedClients(v []string) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetAllowedClients(v)
+	})
+}
+
+// UpdateAllowedClients sets the "allowed_clients" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateAllowedClients() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateAllowedClients()
+	})
+}
+
+// ClearAllowedClients clears the value of the "allowed_clients" field.
+func (u *GroupUpsertBulk) ClearAllowedClients() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearAllowedClients()
+	})
+}
+
+// SetFallbackGroupID sets the "fallback_group_id" field.
+func (u *GroupUpsertBulk) SetFallbackGroupID(v int) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetFallbackGroupID(v)
+	})
+}
+
+// AddFallbackGroupID adds v to the "fallback_group_id" field.
+func (u *GroupUpsertBulk) AddFallbackGroupID(v int) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddFallbackGroupID(v)
+	})
+}
+
+// UpdateFallbackGroupID sets the "fallback_group_id" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateFallbackGroupID() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateFallbackGroupID()
+	})
+}
+
+// ClearFallbackGroupID clears the value of the "fallback_group_id" field.
+func (u *GroupUpsertBulk) ClearFallbackGroupID() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearFallbackGroupID()
 	})
 }
 

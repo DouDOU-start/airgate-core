@@ -59,6 +59,26 @@ const (
 	FieldBalanceUpdatedAt = "balance_updated_at"
 	// FieldBalanceCheckEnabled holds the string denoting the balance_check_enabled field in the database.
 	FieldBalanceCheckEnabled = "balance_check_enabled"
+	// FieldProbeEnabled holds the string denoting the probe_enabled field in the database.
+	FieldProbeEnabled = "probe_enabled"
+	// FieldProbeModel holds the string denoting the probe_model field in the database.
+	FieldProbeModel = "probe_model"
+	// FieldHealthStatus holds the string denoting the health_status field in the database.
+	FieldHealthStatus = "health_status"
+	// FieldConsecutiveFailures holds the string denoting the consecutive_failures field in the database.
+	FieldConsecutiveFailures = "consecutive_failures"
+	// FieldConsecutiveSuccesses holds the string denoting the consecutive_successes field in the database.
+	FieldConsecutiveSuccesses = "consecutive_successes"
+	// FieldLastProbeAt holds the string denoting the last_probe_at field in the database.
+	FieldLastProbeAt = "last_probe_at"
+	// FieldUpstreamRateEnabled holds the string denoting the upstream_rate_enabled field in the database.
+	FieldUpstreamRateEnabled = "upstream_rate_enabled"
+	// FieldUpstreamRatePath holds the string denoting the upstream_rate_path field in the database.
+	FieldUpstreamRatePath = "upstream_rate_path"
+	// FieldUpstreamRate holds the string denoting the upstream_rate field in the database.
+	FieldUpstreamRate = "upstream_rate"
+	// FieldUpstreamRateAt holds the string denoting the upstream_rate_at field in the database.
+	FieldUpstreamRateAt = "upstream_rate_at"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -117,6 +137,16 @@ var Columns = []string{
 	FieldBalance,
 	FieldBalanceUpdatedAt,
 	FieldBalanceCheckEnabled,
+	FieldProbeEnabled,
+	FieldProbeModel,
+	FieldHealthStatus,
+	FieldConsecutiveFailures,
+	FieldConsecutiveSuccesses,
+	FieldLastProbeAt,
+	FieldUpstreamRateEnabled,
+	FieldUpstreamRatePath,
+	FieldUpstreamRate,
+	FieldUpstreamRateAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -179,6 +209,20 @@ var (
 	DefaultBalance float64
 	// DefaultBalanceCheckEnabled holds the default value on creation for the "balance_check_enabled" field.
 	DefaultBalanceCheckEnabled bool
+	// DefaultProbeEnabled holds the default value on creation for the "probe_enabled" field.
+	DefaultProbeEnabled bool
+	// DefaultProbeModel holds the default value on creation for the "probe_model" field.
+	DefaultProbeModel string
+	// DefaultConsecutiveFailures holds the default value on creation for the "consecutive_failures" field.
+	DefaultConsecutiveFailures int
+	// DefaultConsecutiveSuccesses holds the default value on creation for the "consecutive_successes" field.
+	DefaultConsecutiveSuccesses int
+	// DefaultUpstreamRateEnabled holds the default value on creation for the "upstream_rate_enabled" field.
+	DefaultUpstreamRateEnabled bool
+	// DefaultUpstreamRatePath holds the default value on creation for the "upstream_rate_path" field.
+	DefaultUpstreamRatePath string
+	// DefaultUpstreamRate holds the default value on creation for the "upstream_rate" field.
+	DefaultUpstreamRate float64
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -238,6 +282,34 @@ func StatusValidator(s Status) error {
 		return nil
 	default:
 		return fmt.Errorf("channelkey: invalid enum value for status field: %q", s)
+	}
+}
+
+// HealthStatus defines the type for the "health_status" enum field.
+type HealthStatus string
+
+// HealthStatusHealthy is the default value of the HealthStatus enum.
+const DefaultHealthStatus = HealthStatusHealthy
+
+// HealthStatus values.
+const (
+	HealthStatusHealthy    HealthStatus = "healthy"
+	HealthStatusDegraded   HealthStatus = "degraded"
+	HealthStatusSuspended  HealthStatus = "suspended"
+	HealthStatusRecovering HealthStatus = "recovering"
+)
+
+func (hs HealthStatus) String() string {
+	return string(hs)
+}
+
+// HealthStatusValidator is a validator for the "health_status" field enum values. It is called by the builders before save.
+func HealthStatusValidator(hs HealthStatus) error {
+	switch hs {
+	case HealthStatusHealthy, HealthStatusDegraded, HealthStatusSuspended, HealthStatusRecovering:
+		return nil
+	default:
+		return fmt.Errorf("channelkey: invalid enum value for health_status field: %q", hs)
 	}
 }
 
@@ -332,6 +404,56 @@ func ByBalanceUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByBalanceCheckEnabled orders the results by the balance_check_enabled field.
 func ByBalanceCheckEnabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldBalanceCheckEnabled, opts...).ToFunc()
+}
+
+// ByProbeEnabled orders the results by the probe_enabled field.
+func ByProbeEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProbeEnabled, opts...).ToFunc()
+}
+
+// ByProbeModel orders the results by the probe_model field.
+func ByProbeModel(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProbeModel, opts...).ToFunc()
+}
+
+// ByHealthStatus orders the results by the health_status field.
+func ByHealthStatus(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldHealthStatus, opts...).ToFunc()
+}
+
+// ByConsecutiveFailures orders the results by the consecutive_failures field.
+func ByConsecutiveFailures(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldConsecutiveFailures, opts...).ToFunc()
+}
+
+// ByConsecutiveSuccesses orders the results by the consecutive_successes field.
+func ByConsecutiveSuccesses(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldConsecutiveSuccesses, opts...).ToFunc()
+}
+
+// ByLastProbeAt orders the results by the last_probe_at field.
+func ByLastProbeAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastProbeAt, opts...).ToFunc()
+}
+
+// ByUpstreamRateEnabled orders the results by the upstream_rate_enabled field.
+func ByUpstreamRateEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUpstreamRateEnabled, opts...).ToFunc()
+}
+
+// ByUpstreamRatePath orders the results by the upstream_rate_path field.
+func ByUpstreamRatePath(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUpstreamRatePath, opts...).ToFunc()
+}
+
+// ByUpstreamRate orders the results by the upstream_rate field.
+func ByUpstreamRate(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUpstreamRate, opts...).ToFunc()
+}
+
+// ByUpstreamRateAt orders the results by the upstream_rate_at field.
+func ByUpstreamRateAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUpstreamRateAt, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

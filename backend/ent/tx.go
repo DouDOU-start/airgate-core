@@ -20,6 +20,8 @@ type Tx struct {
 	AnnouncementRead *AnnouncementReadClient
 	// BalanceLog is the client for interacting with the BalanceLog builders.
 	BalanceLog *BalanceLogClient
+	// Bookmark is the client for interacting with the Bookmark builders.
+	Bookmark *BookmarkClient
 	// Channel is the client for interacting with the Channel builders.
 	Channel *ChannelClient
 	// ChannelKey is the client for interacting with the ChannelKey builders.
@@ -191,6 +193,7 @@ func (tx *Tx) init() {
 	tx.Announcement = NewAnnouncementClient(tx.config)
 	tx.AnnouncementRead = NewAnnouncementReadClient(tx.config)
 	tx.BalanceLog = NewBalanceLogClient(tx.config)
+	tx.Bookmark = NewBookmarkClient(tx.config)
 	tx.Channel = NewChannelClient(tx.config)
 	tx.ChannelKey = NewChannelKeyClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)

@@ -163,6 +163,21 @@ var (
 			},
 		},
 	}
+	// BookmarksColumns holds the columns for the "bookmarks" table.
+	BookmarksColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "base_url", Type: field.TypeString, Default: ""},
+		{Name: "remark", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// BookmarksTable holds the schema information for the "bookmarks" table.
+	BookmarksTable = &schema.Table{
+		Name:       "bookmarks",
+		Columns:    BookmarksColumns,
+		PrimaryKey: []*schema.Column{BookmarksColumns[0]},
+	}
 	// ChannelsColumns holds the columns for the "channels" table.
 	ChannelsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -202,6 +217,16 @@ var (
 		{Name: "balance", Type: field.TypeFloat64, Default: 0},
 		{Name: "balance_updated_at", Type: field.TypeTime, Nullable: true},
 		{Name: "balance_check_enabled", Type: field.TypeBool, Default: true},
+		{Name: "probe_enabled", Type: field.TypeBool, Default: false},
+		{Name: "probe_model", Type: field.TypeString, Default: ""},
+		{Name: "health_status", Type: field.TypeEnum, Enums: []string{"healthy", "degraded", "suspended", "recovering"}, Default: "healthy"},
+		{Name: "consecutive_failures", Type: field.TypeInt, Default: 0},
+		{Name: "consecutive_successes", Type: field.TypeInt, Default: 0},
+		{Name: "last_probe_at", Type: field.TypeTime, Nullable: true},
+		{Name: "upstream_rate_enabled", Type: field.TypeBool, Default: false},
+		{Name: "upstream_rate_path", Type: field.TypeString, Default: ""},
+		{Name: "upstream_rate", Type: field.TypeFloat64, Default: 0},
+		{Name: "upstream_rate_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "channel_keys", Type: field.TypeInt},
@@ -214,7 +239,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "channel_keys_channels_keys",
-				Columns:    []*schema.Column{ChannelKeysColumns[25]},
+				Columns:    []*schema.Column{ChannelKeysColumns[35]},
 				RefColumns: []*schema.Column{ChannelsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -236,6 +261,8 @@ var (
 		{Name: "alpha_search_price", Type: field.TypeFloat64, Nullable: true},
 		{Name: "is_exclusive", Type: field.TypeBool, Default: false},
 		{Name: "status_visible", Type: field.TypeBool, Default: true},
+		{Name: "allowed_clients", Type: field.TypeJSON, Nullable: true},
+		{Name: "fallback_group_id", Type: field.TypeInt, Nullable: true},
 		{Name: "note", Type: field.TypeString, Default: ""},
 		{Name: "sort_weight", Type: field.TypeInt, Default: 0},
 		{Name: "created_at", Type: field.TypeTime},
@@ -920,6 +947,7 @@ var (
 		AnnouncementsTable,
 		AnnouncementReadsTable,
 		BalanceLogsTable,
+		BookmarksTable,
 		ChannelsTable,
 		ChannelKeysTable,
 		GroupsTable,

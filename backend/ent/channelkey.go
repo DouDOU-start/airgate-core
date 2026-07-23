@@ -63,6 +63,26 @@ type ChannelKey struct {
 	BalanceUpdatedAt *time.Time `json:"balance_updated_at,omitempty"`
 	// 是否参与主动余额刷新；官方直连等无余额接口的上游可关闭
 	BalanceCheckEnabled bool `json:"balance_check_enabled,omitempty"`
+	// 是否启用主动健康探针
+	ProbeEnabled bool `json:"probe_enabled,omitempty"`
+	// 探针使用的模型；空串回退 test_model → 首个 model
+	ProbeModel string `json:"probe_model,omitempty"`
+	// 健康状态机：healthy→degraded→suspended→recovering→healthy
+	HealthStatus channelkey.HealthStatus `json:"health_status,omitempty"`
+	// 连续失败计数（用于降级/暂停判定）
+	ConsecutiveFailures int `json:"consecutive_failures,omitempty"`
+	// 连续成功计数（用于恢复判定）
+	ConsecutiveSuccesses int `json:"consecutive_successes,omitempty"`
+	// 最近一次探针执行时间
+	LastProbeAt *time.Time `json:"last_probe_at,omitempty"`
+	// 是否启用上游倍率探测
+	UpstreamRateEnabled bool `json:"upstream_rate_enabled,omitempty"`
+	// 上游倍率端点路径；空串默认 /v1/airgate/billing
+	UpstreamRatePath string `json:"upstream_rate_path,omitempty"`
+	// 最近一次探测到的上游计费倍率
+	UpstreamRate float64 `json:"upstream_rate,omitempty"`
+	// 上游倍率最近探测时间
+	UpstreamRateAt *time.Time `json:"upstream_rate_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -123,15 +143,15 @@ func (*ChannelKey) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case channelkey.FieldModels, channelkey.FieldModelMapping, channelkey.FieldParamOverride, channelkey.FieldHeaderOverride, channelkey.FieldTags:
 			values[i] = new([]byte)
-		case channelkey.FieldBalanceCheckEnabled:
+		case channelkey.FieldBalanceCheckEnabled, channelkey.FieldProbeEnabled, channelkey.FieldUpstreamRateEnabled:
 			values[i] = new(sql.NullBool)
-		case channelkey.FieldCostRatio, channelkey.FieldBalance:
+		case channelkey.FieldCostRatio, channelkey.FieldBalance, channelkey.FieldUpstreamRate:
 			values[i] = new(sql.NullFloat64)
-		case channelkey.FieldID, channelkey.FieldPriority, channelkey.FieldWeight, channelkey.FieldMaxConcurrency, channelkey.FieldMaxRpm, channelkey.FieldResponseTimeMs:
+		case channelkey.FieldID, channelkey.FieldPriority, channelkey.FieldWeight, channelkey.FieldMaxConcurrency, channelkey.FieldMaxRpm, channelkey.FieldResponseTimeMs, channelkey.FieldConsecutiveFailures, channelkey.FieldConsecutiveSuccesses:
 			values[i] = new(sql.NullInt64)
-		case channelkey.FieldName, channelkey.FieldType, channelkey.FieldAPIKey, channelkey.FieldStatus, channelkey.FieldErrorMsg, channelkey.FieldTestModel:
+		case channelkey.FieldName, channelkey.FieldType, channelkey.FieldAPIKey, channelkey.FieldStatus, channelkey.FieldErrorMsg, channelkey.FieldTestModel, channelkey.FieldProbeModel, channelkey.FieldHealthStatus, channelkey.FieldUpstreamRatePath:
 			values[i] = new(sql.NullString)
-		case channelkey.FieldTestedAt, channelkey.FieldLastUsedAt, channelkey.FieldBalanceUpdatedAt, channelkey.FieldCreatedAt, channelkey.FieldUpdatedAt:
+		case channelkey.FieldTestedAt, channelkey.FieldLastUsedAt, channelkey.FieldBalanceUpdatedAt, channelkey.FieldLastProbeAt, channelkey.FieldUpstreamRateAt, channelkey.FieldCreatedAt, channelkey.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		case channelkey.ForeignKeys[0]: // channel_keys
 			values[i] = new(sql.NullInt64)
@@ -301,6 +321,68 @@ func (ck *ChannelKey) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ck.BalanceCheckEnabled = value.Bool
 			}
+		case channelkey.FieldProbeEnabled:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field probe_enabled", values[i])
+			} else if value.Valid {
+				ck.ProbeEnabled = value.Bool
+			}
+		case channelkey.FieldProbeModel:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field probe_model", values[i])
+			} else if value.Valid {
+				ck.ProbeModel = value.String
+			}
+		case channelkey.FieldHealthStatus:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field health_status", values[i])
+			} else if value.Valid {
+				ck.HealthStatus = channelkey.HealthStatus(value.String)
+			}
+		case channelkey.FieldConsecutiveFailures:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field consecutive_failures", values[i])
+			} else if value.Valid {
+				ck.ConsecutiveFailures = int(value.Int64)
+			}
+		case channelkey.FieldConsecutiveSuccesses:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field consecutive_successes", values[i])
+			} else if value.Valid {
+				ck.ConsecutiveSuccesses = int(value.Int64)
+			}
+		case channelkey.FieldLastProbeAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field last_probe_at", values[i])
+			} else if value.Valid {
+				ck.LastProbeAt = new(time.Time)
+				*ck.LastProbeAt = value.Time
+			}
+		case channelkey.FieldUpstreamRateEnabled:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field upstream_rate_enabled", values[i])
+			} else if value.Valid {
+				ck.UpstreamRateEnabled = value.Bool
+			}
+		case channelkey.FieldUpstreamRatePath:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field upstream_rate_path", values[i])
+			} else if value.Valid {
+				ck.UpstreamRatePath = value.String
+			}
+		case channelkey.FieldUpstreamRate:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field upstream_rate", values[i])
+			} else if value.Valid {
+				ck.UpstreamRate = value.Float64
+			}
+		case channelkey.FieldUpstreamRateAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field upstream_rate_at", values[i])
+			} else if value.Valid {
+				ck.UpstreamRateAt = new(time.Time)
+				*ck.UpstreamRateAt = value.Time
+			}
 		case channelkey.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -441,6 +523,40 @@ func (ck *ChannelKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("balance_check_enabled=")
 	builder.WriteString(fmt.Sprintf("%v", ck.BalanceCheckEnabled))
+	builder.WriteString(", ")
+	builder.WriteString("probe_enabled=")
+	builder.WriteString(fmt.Sprintf("%v", ck.ProbeEnabled))
+	builder.WriteString(", ")
+	builder.WriteString("probe_model=")
+	builder.WriteString(ck.ProbeModel)
+	builder.WriteString(", ")
+	builder.WriteString("health_status=")
+	builder.WriteString(fmt.Sprintf("%v", ck.HealthStatus))
+	builder.WriteString(", ")
+	builder.WriteString("consecutive_failures=")
+	builder.WriteString(fmt.Sprintf("%v", ck.ConsecutiveFailures))
+	builder.WriteString(", ")
+	builder.WriteString("consecutive_successes=")
+	builder.WriteString(fmt.Sprintf("%v", ck.ConsecutiveSuccesses))
+	builder.WriteString(", ")
+	if v := ck.LastProbeAt; v != nil {
+		builder.WriteString("last_probe_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("upstream_rate_enabled=")
+	builder.WriteString(fmt.Sprintf("%v", ck.UpstreamRateEnabled))
+	builder.WriteString(", ")
+	builder.WriteString("upstream_rate_path=")
+	builder.WriteString(ck.UpstreamRatePath)
+	builder.WriteString(", ")
+	builder.WriteString("upstream_rate=")
+	builder.WriteString(fmt.Sprintf("%v", ck.UpstreamRate))
+	builder.WriteString(", ")
+	if v := ck.UpstreamRateAt; v != nil {
+		builder.WriteString("upstream_rate_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(ck.CreatedAt.Format(time.ANSIC))

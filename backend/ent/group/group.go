@@ -26,6 +26,10 @@ const (
 	FieldIsExclusive = "is_exclusive"
 	// FieldStatusVisible holds the string denoting the status_visible field in the database.
 	FieldStatusVisible = "status_visible"
+	// FieldAllowedClients holds the string denoting the allowed_clients field in the database.
+	FieldAllowedClients = "allowed_clients"
+	// FieldFallbackGroupID holds the string denoting the fallback_group_id field in the database.
+	FieldFallbackGroupID = "fallback_group_id"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldSortWeight holds the string denoting the sort_weight field in the database.
@@ -79,6 +83,8 @@ var Columns = []string{
 	FieldAlphaSearchPrice,
 	FieldIsExclusive,
 	FieldStatusVisible,
+	FieldAllowedClients,
+	FieldFallbackGroupID,
 	FieldNote,
 	FieldSortWeight,
 	FieldCreatedAt,
@@ -163,6 +169,11 @@ func ByIsExclusive(opts ...sql.OrderTermOption) OrderOption {
 // ByStatusVisible orders the results by the status_visible field.
 func ByStatusVisible(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatusVisible, opts...).ToFunc()
+}
+
+// ByFallbackGroupID orders the results by the fallback_group_id field.
+func ByFallbackGroupID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFallbackGroupID, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

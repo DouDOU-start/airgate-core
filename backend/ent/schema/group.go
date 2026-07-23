@@ -28,6 +28,11 @@ func (Group) Fields() []ent.Field {
 		// （比如仅限熟客的专属分组、调试中的分组等）。
 		// 隐藏仅影响公开状态页 (/status)，不影响 admin 视图和 API 鉴权逻辑。
 		field.Bool("status_visible").Default(true),
+		// allowed_clients 客户端白名单：非空时仅允许指定类型的客户端访问此分组。
+		// 空=不限制。值域: "claude_code", "codex"。
+		field.JSON("allowed_clients", []string{}).Optional(),
+		// fallback_group_id 客户端不匹配 allowed_clients 时降级到的分组；nil=直接拒绝。
+		field.Int("fallback_group_id").Optional().Nillable(),
 		field.String("note").Default(""),
 		field.Int("sort_weight").Default(0),
 		field.Time("created_at").Default(timeNow).Immutable(),

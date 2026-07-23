@@ -16,6 +16,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/announcementread"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
+	"github.com/DouDOU-start/airgate-core/ent/bookmark"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
@@ -98,6 +99,7 @@ func checkColumn(table, column string) error {
 			announcement.Table:          announcement.ValidColumn,
 			announcementread.Table:      announcementread.ValidColumn,
 			balancelog.Table:            balancelog.ValidColumn,
+			bookmark.Table:              bookmark.ValidColumn,
 			channel.Table:               channel.ValidColumn,
 			channelkey.Table:            channelkey.ValidColumn,
 			group.Table:                 group.ValidColumn,

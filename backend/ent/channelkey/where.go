@@ -130,6 +130,51 @@ func BalanceCheckEnabled(v bool) predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldEQ(FieldBalanceCheckEnabled, v))
 }
 
+// ProbeEnabled applies equality check predicate on the "probe_enabled" field. It's identical to ProbeEnabledEQ.
+func ProbeEnabled(v bool) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldProbeEnabled, v))
+}
+
+// ProbeModel applies equality check predicate on the "probe_model" field. It's identical to ProbeModelEQ.
+func ProbeModel(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldProbeModel, v))
+}
+
+// ConsecutiveFailures applies equality check predicate on the "consecutive_failures" field. It's identical to ConsecutiveFailuresEQ.
+func ConsecutiveFailures(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldConsecutiveFailures, v))
+}
+
+// ConsecutiveSuccesses applies equality check predicate on the "consecutive_successes" field. It's identical to ConsecutiveSuccessesEQ.
+func ConsecutiveSuccesses(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldConsecutiveSuccesses, v))
+}
+
+// LastProbeAt applies equality check predicate on the "last_probe_at" field. It's identical to LastProbeAtEQ.
+func LastProbeAt(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldLastProbeAt, v))
+}
+
+// UpstreamRateEnabled applies equality check predicate on the "upstream_rate_enabled" field. It's identical to UpstreamRateEnabledEQ.
+func UpstreamRateEnabled(v bool) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldUpstreamRateEnabled, v))
+}
+
+// UpstreamRatePath applies equality check predicate on the "upstream_rate_path" field. It's identical to UpstreamRatePathEQ.
+func UpstreamRatePath(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldUpstreamRatePath, v))
+}
+
+// UpstreamRate applies equality check predicate on the "upstream_rate" field. It's identical to UpstreamRateEQ.
+func UpstreamRate(v float64) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldUpstreamRate, v))
+}
+
+// UpstreamRateAt applies equality check predicate on the "upstream_rate_at" field. It's identical to UpstreamRateAtEQ.
+func UpstreamRateAt(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldUpstreamRateAt, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldEQ(FieldCreatedAt, v))
@@ -918,6 +963,396 @@ func BalanceCheckEnabledEQ(v bool) predicate.ChannelKey {
 // BalanceCheckEnabledNEQ applies the NEQ predicate on the "balance_check_enabled" field.
 func BalanceCheckEnabledNEQ(v bool) predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldNEQ(FieldBalanceCheckEnabled, v))
+}
+
+// ProbeEnabledEQ applies the EQ predicate on the "probe_enabled" field.
+func ProbeEnabledEQ(v bool) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldProbeEnabled, v))
+}
+
+// ProbeEnabledNEQ applies the NEQ predicate on the "probe_enabled" field.
+func ProbeEnabledNEQ(v bool) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldProbeEnabled, v))
+}
+
+// ProbeModelEQ applies the EQ predicate on the "probe_model" field.
+func ProbeModelEQ(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldProbeModel, v))
+}
+
+// ProbeModelNEQ applies the NEQ predicate on the "probe_model" field.
+func ProbeModelNEQ(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldProbeModel, v))
+}
+
+// ProbeModelIn applies the In predicate on the "probe_model" field.
+func ProbeModelIn(vs ...string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldIn(FieldProbeModel, vs...))
+}
+
+// ProbeModelNotIn applies the NotIn predicate on the "probe_model" field.
+func ProbeModelNotIn(vs ...string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNotIn(FieldProbeModel, vs...))
+}
+
+// ProbeModelGT applies the GT predicate on the "probe_model" field.
+func ProbeModelGT(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGT(FieldProbeModel, v))
+}
+
+// ProbeModelGTE applies the GTE predicate on the "probe_model" field.
+func ProbeModelGTE(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGTE(FieldProbeModel, v))
+}
+
+// ProbeModelLT applies the LT predicate on the "probe_model" field.
+func ProbeModelLT(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLT(FieldProbeModel, v))
+}
+
+// ProbeModelLTE applies the LTE predicate on the "probe_model" field.
+func ProbeModelLTE(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLTE(FieldProbeModel, v))
+}
+
+// ProbeModelContains applies the Contains predicate on the "probe_model" field.
+func ProbeModelContains(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldContains(FieldProbeModel, v))
+}
+
+// ProbeModelHasPrefix applies the HasPrefix predicate on the "probe_model" field.
+func ProbeModelHasPrefix(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldHasPrefix(FieldProbeModel, v))
+}
+
+// ProbeModelHasSuffix applies the HasSuffix predicate on the "probe_model" field.
+func ProbeModelHasSuffix(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldHasSuffix(FieldProbeModel, v))
+}
+
+// ProbeModelEqualFold applies the EqualFold predicate on the "probe_model" field.
+func ProbeModelEqualFold(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEqualFold(FieldProbeModel, v))
+}
+
+// ProbeModelContainsFold applies the ContainsFold predicate on the "probe_model" field.
+func ProbeModelContainsFold(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldContainsFold(FieldProbeModel, v))
+}
+
+// HealthStatusEQ applies the EQ predicate on the "health_status" field.
+func HealthStatusEQ(v HealthStatus) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldHealthStatus, v))
+}
+
+// HealthStatusNEQ applies the NEQ predicate on the "health_status" field.
+func HealthStatusNEQ(v HealthStatus) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldHealthStatus, v))
+}
+
+// HealthStatusIn applies the In predicate on the "health_status" field.
+func HealthStatusIn(vs ...HealthStatus) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldIn(FieldHealthStatus, vs...))
+}
+
+// HealthStatusNotIn applies the NotIn predicate on the "health_status" field.
+func HealthStatusNotIn(vs ...HealthStatus) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNotIn(FieldHealthStatus, vs...))
+}
+
+// ConsecutiveFailuresEQ applies the EQ predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresEQ(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldConsecutiveFailures, v))
+}
+
+// ConsecutiveFailuresNEQ applies the NEQ predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresNEQ(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldConsecutiveFailures, v))
+}
+
+// ConsecutiveFailuresIn applies the In predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresIn(vs ...int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldIn(FieldConsecutiveFailures, vs...))
+}
+
+// ConsecutiveFailuresNotIn applies the NotIn predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresNotIn(vs ...int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNotIn(FieldConsecutiveFailures, vs...))
+}
+
+// ConsecutiveFailuresGT applies the GT predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresGT(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGT(FieldConsecutiveFailures, v))
+}
+
+// ConsecutiveFailuresGTE applies the GTE predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresGTE(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGTE(FieldConsecutiveFailures, v))
+}
+
+// ConsecutiveFailuresLT applies the LT predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresLT(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLT(FieldConsecutiveFailures, v))
+}
+
+// ConsecutiveFailuresLTE applies the LTE predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresLTE(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLTE(FieldConsecutiveFailures, v))
+}
+
+// ConsecutiveSuccessesEQ applies the EQ predicate on the "consecutive_successes" field.
+func ConsecutiveSuccessesEQ(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldConsecutiveSuccesses, v))
+}
+
+// ConsecutiveSuccessesNEQ applies the NEQ predicate on the "consecutive_successes" field.
+func ConsecutiveSuccessesNEQ(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldConsecutiveSuccesses, v))
+}
+
+// ConsecutiveSuccessesIn applies the In predicate on the "consecutive_successes" field.
+func ConsecutiveSuccessesIn(vs ...int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldIn(FieldConsecutiveSuccesses, vs...))
+}
+
+// ConsecutiveSuccessesNotIn applies the NotIn predicate on the "consecutive_successes" field.
+func ConsecutiveSuccessesNotIn(vs ...int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNotIn(FieldConsecutiveSuccesses, vs...))
+}
+
+// ConsecutiveSuccessesGT applies the GT predicate on the "consecutive_successes" field.
+func ConsecutiveSuccessesGT(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGT(FieldConsecutiveSuccesses, v))
+}
+
+// ConsecutiveSuccessesGTE applies the GTE predicate on the "consecutive_successes" field.
+func ConsecutiveSuccessesGTE(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGTE(FieldConsecutiveSuccesses, v))
+}
+
+// ConsecutiveSuccessesLT applies the LT predicate on the "consecutive_successes" field.
+func ConsecutiveSuccessesLT(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLT(FieldConsecutiveSuccesses, v))
+}
+
+// ConsecutiveSuccessesLTE applies the LTE predicate on the "consecutive_successes" field.
+func ConsecutiveSuccessesLTE(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLTE(FieldConsecutiveSuccesses, v))
+}
+
+// LastProbeAtEQ applies the EQ predicate on the "last_probe_at" field.
+func LastProbeAtEQ(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldLastProbeAt, v))
+}
+
+// LastProbeAtNEQ applies the NEQ predicate on the "last_probe_at" field.
+func LastProbeAtNEQ(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldLastProbeAt, v))
+}
+
+// LastProbeAtIn applies the In predicate on the "last_probe_at" field.
+func LastProbeAtIn(vs ...time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldIn(FieldLastProbeAt, vs...))
+}
+
+// LastProbeAtNotIn applies the NotIn predicate on the "last_probe_at" field.
+func LastProbeAtNotIn(vs ...time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNotIn(FieldLastProbeAt, vs...))
+}
+
+// LastProbeAtGT applies the GT predicate on the "last_probe_at" field.
+func LastProbeAtGT(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGT(FieldLastProbeAt, v))
+}
+
+// LastProbeAtGTE applies the GTE predicate on the "last_probe_at" field.
+func LastProbeAtGTE(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGTE(FieldLastProbeAt, v))
+}
+
+// LastProbeAtLT applies the LT predicate on the "last_probe_at" field.
+func LastProbeAtLT(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLT(FieldLastProbeAt, v))
+}
+
+// LastProbeAtLTE applies the LTE predicate on the "last_probe_at" field.
+func LastProbeAtLTE(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLTE(FieldLastProbeAt, v))
+}
+
+// LastProbeAtIsNil applies the IsNil predicate on the "last_probe_at" field.
+func LastProbeAtIsNil() predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldIsNull(FieldLastProbeAt))
+}
+
+// LastProbeAtNotNil applies the NotNil predicate on the "last_probe_at" field.
+func LastProbeAtNotNil() predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNotNull(FieldLastProbeAt))
+}
+
+// UpstreamRateEnabledEQ applies the EQ predicate on the "upstream_rate_enabled" field.
+func UpstreamRateEnabledEQ(v bool) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldUpstreamRateEnabled, v))
+}
+
+// UpstreamRateEnabledNEQ applies the NEQ predicate on the "upstream_rate_enabled" field.
+func UpstreamRateEnabledNEQ(v bool) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldUpstreamRateEnabled, v))
+}
+
+// UpstreamRatePathEQ applies the EQ predicate on the "upstream_rate_path" field.
+func UpstreamRatePathEQ(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldUpstreamRatePath, v))
+}
+
+// UpstreamRatePathNEQ applies the NEQ predicate on the "upstream_rate_path" field.
+func UpstreamRatePathNEQ(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldUpstreamRatePath, v))
+}
+
+// UpstreamRatePathIn applies the In predicate on the "upstream_rate_path" field.
+func UpstreamRatePathIn(vs ...string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldIn(FieldUpstreamRatePath, vs...))
+}
+
+// UpstreamRatePathNotIn applies the NotIn predicate on the "upstream_rate_path" field.
+func UpstreamRatePathNotIn(vs ...string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNotIn(FieldUpstreamRatePath, vs...))
+}
+
+// UpstreamRatePathGT applies the GT predicate on the "upstream_rate_path" field.
+func UpstreamRatePathGT(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGT(FieldUpstreamRatePath, v))
+}
+
+// UpstreamRatePathGTE applies the GTE predicate on the "upstream_rate_path" field.
+func UpstreamRatePathGTE(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGTE(FieldUpstreamRatePath, v))
+}
+
+// UpstreamRatePathLT applies the LT predicate on the "upstream_rate_path" field.
+func UpstreamRatePathLT(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLT(FieldUpstreamRatePath, v))
+}
+
+// UpstreamRatePathLTE applies the LTE predicate on the "upstream_rate_path" field.
+func UpstreamRatePathLTE(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLTE(FieldUpstreamRatePath, v))
+}
+
+// UpstreamRatePathContains applies the Contains predicate on the "upstream_rate_path" field.
+func UpstreamRatePathContains(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldContains(FieldUpstreamRatePath, v))
+}
+
+// UpstreamRatePathHasPrefix applies the HasPrefix predicate on the "upstream_rate_path" field.
+func UpstreamRatePathHasPrefix(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldHasPrefix(FieldUpstreamRatePath, v))
+}
+
+// UpstreamRatePathHasSuffix applies the HasSuffix predicate on the "upstream_rate_path" field.
+func UpstreamRatePathHasSuffix(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldHasSuffix(FieldUpstreamRatePath, v))
+}
+
+// UpstreamRatePathEqualFold applies the EqualFold predicate on the "upstream_rate_path" field.
+func UpstreamRatePathEqualFold(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEqualFold(FieldUpstreamRatePath, v))
+}
+
+// UpstreamRatePathContainsFold applies the ContainsFold predicate on the "upstream_rate_path" field.
+func UpstreamRatePathContainsFold(v string) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldContainsFold(FieldUpstreamRatePath, v))
+}
+
+// UpstreamRateEQ applies the EQ predicate on the "upstream_rate" field.
+func UpstreamRateEQ(v float64) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldUpstreamRate, v))
+}
+
+// UpstreamRateNEQ applies the NEQ predicate on the "upstream_rate" field.
+func UpstreamRateNEQ(v float64) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldUpstreamRate, v))
+}
+
+// UpstreamRateIn applies the In predicate on the "upstream_rate" field.
+func UpstreamRateIn(vs ...float64) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldIn(FieldUpstreamRate, vs...))
+}
+
+// UpstreamRateNotIn applies the NotIn predicate on the "upstream_rate" field.
+func UpstreamRateNotIn(vs ...float64) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNotIn(FieldUpstreamRate, vs...))
+}
+
+// UpstreamRateGT applies the GT predicate on the "upstream_rate" field.
+func UpstreamRateGT(v float64) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGT(FieldUpstreamRate, v))
+}
+
+// UpstreamRateGTE applies the GTE predicate on the "upstream_rate" field.
+func UpstreamRateGTE(v float64) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGTE(FieldUpstreamRate, v))
+}
+
+// UpstreamRateLT applies the LT predicate on the "upstream_rate" field.
+func UpstreamRateLT(v float64) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLT(FieldUpstreamRate, v))
+}
+
+// UpstreamRateLTE applies the LTE predicate on the "upstream_rate" field.
+func UpstreamRateLTE(v float64) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLTE(FieldUpstreamRate, v))
+}
+
+// UpstreamRateAtEQ applies the EQ predicate on the "upstream_rate_at" field.
+func UpstreamRateAtEQ(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldUpstreamRateAt, v))
+}
+
+// UpstreamRateAtNEQ applies the NEQ predicate on the "upstream_rate_at" field.
+func UpstreamRateAtNEQ(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldUpstreamRateAt, v))
+}
+
+// UpstreamRateAtIn applies the In predicate on the "upstream_rate_at" field.
+func UpstreamRateAtIn(vs ...time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldIn(FieldUpstreamRateAt, vs...))
+}
+
+// UpstreamRateAtNotIn applies the NotIn predicate on the "upstream_rate_at" field.
+func UpstreamRateAtNotIn(vs ...time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNotIn(FieldUpstreamRateAt, vs...))
+}
+
+// UpstreamRateAtGT applies the GT predicate on the "upstream_rate_at" field.
+func UpstreamRateAtGT(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGT(FieldUpstreamRateAt, v))
+}
+
+// UpstreamRateAtGTE applies the GTE predicate on the "upstream_rate_at" field.
+func UpstreamRateAtGTE(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldGTE(FieldUpstreamRateAt, v))
+}
+
+// UpstreamRateAtLT applies the LT predicate on the "upstream_rate_at" field.
+func UpstreamRateAtLT(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLT(FieldUpstreamRateAt, v))
+}
+
+// UpstreamRateAtLTE applies the LTE predicate on the "upstream_rate_at" field.
+func UpstreamRateAtLTE(v time.Time) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldLTE(FieldUpstreamRateAt, v))
+}
+
+// UpstreamRateAtIsNil applies the IsNil predicate on the "upstream_rate_at" field.
+func UpstreamRateAtIsNil() predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldIsNull(FieldUpstreamRateAt))
+}
+
+// UpstreamRateAtNotNil applies the NotNil predicate on the "upstream_rate_at" field.
+func UpstreamRateAtNotNil() predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNotNull(FieldUpstreamRateAt))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

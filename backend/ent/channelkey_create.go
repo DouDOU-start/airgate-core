@@ -277,6 +277,146 @@ func (ckc *ChannelKeyCreate) SetNillableBalanceCheckEnabled(b *bool) *ChannelKey
 	return ckc
 }
 
+// SetProbeEnabled sets the "probe_enabled" field.
+func (ckc *ChannelKeyCreate) SetProbeEnabled(b bool) *ChannelKeyCreate {
+	ckc.mutation.SetProbeEnabled(b)
+	return ckc
+}
+
+// SetNillableProbeEnabled sets the "probe_enabled" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableProbeEnabled(b *bool) *ChannelKeyCreate {
+	if b != nil {
+		ckc.SetProbeEnabled(*b)
+	}
+	return ckc
+}
+
+// SetProbeModel sets the "probe_model" field.
+func (ckc *ChannelKeyCreate) SetProbeModel(s string) *ChannelKeyCreate {
+	ckc.mutation.SetProbeModel(s)
+	return ckc
+}
+
+// SetNillableProbeModel sets the "probe_model" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableProbeModel(s *string) *ChannelKeyCreate {
+	if s != nil {
+		ckc.SetProbeModel(*s)
+	}
+	return ckc
+}
+
+// SetHealthStatus sets the "health_status" field.
+func (ckc *ChannelKeyCreate) SetHealthStatus(cs channelkey.HealthStatus) *ChannelKeyCreate {
+	ckc.mutation.SetHealthStatus(cs)
+	return ckc
+}
+
+// SetNillableHealthStatus sets the "health_status" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableHealthStatus(cs *channelkey.HealthStatus) *ChannelKeyCreate {
+	if cs != nil {
+		ckc.SetHealthStatus(*cs)
+	}
+	return ckc
+}
+
+// SetConsecutiveFailures sets the "consecutive_failures" field.
+func (ckc *ChannelKeyCreate) SetConsecutiveFailures(i int) *ChannelKeyCreate {
+	ckc.mutation.SetConsecutiveFailures(i)
+	return ckc
+}
+
+// SetNillableConsecutiveFailures sets the "consecutive_failures" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableConsecutiveFailures(i *int) *ChannelKeyCreate {
+	if i != nil {
+		ckc.SetConsecutiveFailures(*i)
+	}
+	return ckc
+}
+
+// SetConsecutiveSuccesses sets the "consecutive_successes" field.
+func (ckc *ChannelKeyCreate) SetConsecutiveSuccesses(i int) *ChannelKeyCreate {
+	ckc.mutation.SetConsecutiveSuccesses(i)
+	return ckc
+}
+
+// SetNillableConsecutiveSuccesses sets the "consecutive_successes" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableConsecutiveSuccesses(i *int) *ChannelKeyCreate {
+	if i != nil {
+		ckc.SetConsecutiveSuccesses(*i)
+	}
+	return ckc
+}
+
+// SetLastProbeAt sets the "last_probe_at" field.
+func (ckc *ChannelKeyCreate) SetLastProbeAt(t time.Time) *ChannelKeyCreate {
+	ckc.mutation.SetLastProbeAt(t)
+	return ckc
+}
+
+// SetNillableLastProbeAt sets the "last_probe_at" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableLastProbeAt(t *time.Time) *ChannelKeyCreate {
+	if t != nil {
+		ckc.SetLastProbeAt(*t)
+	}
+	return ckc
+}
+
+// SetUpstreamRateEnabled sets the "upstream_rate_enabled" field.
+func (ckc *ChannelKeyCreate) SetUpstreamRateEnabled(b bool) *ChannelKeyCreate {
+	ckc.mutation.SetUpstreamRateEnabled(b)
+	return ckc
+}
+
+// SetNillableUpstreamRateEnabled sets the "upstream_rate_enabled" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableUpstreamRateEnabled(b *bool) *ChannelKeyCreate {
+	if b != nil {
+		ckc.SetUpstreamRateEnabled(*b)
+	}
+	return ckc
+}
+
+// SetUpstreamRatePath sets the "upstream_rate_path" field.
+func (ckc *ChannelKeyCreate) SetUpstreamRatePath(s string) *ChannelKeyCreate {
+	ckc.mutation.SetUpstreamRatePath(s)
+	return ckc
+}
+
+// SetNillableUpstreamRatePath sets the "upstream_rate_path" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableUpstreamRatePath(s *string) *ChannelKeyCreate {
+	if s != nil {
+		ckc.SetUpstreamRatePath(*s)
+	}
+	return ckc
+}
+
+// SetUpstreamRate sets the "upstream_rate" field.
+func (ckc *ChannelKeyCreate) SetUpstreamRate(f float64) *ChannelKeyCreate {
+	ckc.mutation.SetUpstreamRate(f)
+	return ckc
+}
+
+// SetNillableUpstreamRate sets the "upstream_rate" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableUpstreamRate(f *float64) *ChannelKeyCreate {
+	if f != nil {
+		ckc.SetUpstreamRate(*f)
+	}
+	return ckc
+}
+
+// SetUpstreamRateAt sets the "upstream_rate_at" field.
+func (ckc *ChannelKeyCreate) SetUpstreamRateAt(t time.Time) *ChannelKeyCreate {
+	ckc.mutation.SetUpstreamRateAt(t)
+	return ckc
+}
+
+// SetNillableUpstreamRateAt sets the "upstream_rate_at" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableUpstreamRateAt(t *time.Time) *ChannelKeyCreate {
+	if t != nil {
+		ckc.SetUpstreamRateAt(*t)
+	}
+	return ckc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (ckc *ChannelKeyCreate) SetCreatedAt(t time.Time) *ChannelKeyCreate {
 	ckc.mutation.SetCreatedAt(t)
@@ -433,6 +573,38 @@ func (ckc *ChannelKeyCreate) defaults() {
 		v := channelkey.DefaultBalanceCheckEnabled
 		ckc.mutation.SetBalanceCheckEnabled(v)
 	}
+	if _, ok := ckc.mutation.ProbeEnabled(); !ok {
+		v := channelkey.DefaultProbeEnabled
+		ckc.mutation.SetProbeEnabled(v)
+	}
+	if _, ok := ckc.mutation.ProbeModel(); !ok {
+		v := channelkey.DefaultProbeModel
+		ckc.mutation.SetProbeModel(v)
+	}
+	if _, ok := ckc.mutation.HealthStatus(); !ok {
+		v := channelkey.DefaultHealthStatus
+		ckc.mutation.SetHealthStatus(v)
+	}
+	if _, ok := ckc.mutation.ConsecutiveFailures(); !ok {
+		v := channelkey.DefaultConsecutiveFailures
+		ckc.mutation.SetConsecutiveFailures(v)
+	}
+	if _, ok := ckc.mutation.ConsecutiveSuccesses(); !ok {
+		v := channelkey.DefaultConsecutiveSuccesses
+		ckc.mutation.SetConsecutiveSuccesses(v)
+	}
+	if _, ok := ckc.mutation.UpstreamRateEnabled(); !ok {
+		v := channelkey.DefaultUpstreamRateEnabled
+		ckc.mutation.SetUpstreamRateEnabled(v)
+	}
+	if _, ok := ckc.mutation.UpstreamRatePath(); !ok {
+		v := channelkey.DefaultUpstreamRatePath
+		ckc.mutation.SetUpstreamRatePath(v)
+	}
+	if _, ok := ckc.mutation.UpstreamRate(); !ok {
+		v := channelkey.DefaultUpstreamRate
+		ckc.mutation.SetUpstreamRate(v)
+	}
 	if _, ok := ckc.mutation.CreatedAt(); !ok {
 		v := channelkey.DefaultCreatedAt()
 		ckc.mutation.SetCreatedAt(v)
@@ -514,6 +686,35 @@ func (ckc *ChannelKeyCreate) check() error {
 	}
 	if _, ok := ckc.mutation.BalanceCheckEnabled(); !ok {
 		return &ValidationError{Name: "balance_check_enabled", err: errors.New(`ent: missing required field "ChannelKey.balance_check_enabled"`)}
+	}
+	if _, ok := ckc.mutation.ProbeEnabled(); !ok {
+		return &ValidationError{Name: "probe_enabled", err: errors.New(`ent: missing required field "ChannelKey.probe_enabled"`)}
+	}
+	if _, ok := ckc.mutation.ProbeModel(); !ok {
+		return &ValidationError{Name: "probe_model", err: errors.New(`ent: missing required field "ChannelKey.probe_model"`)}
+	}
+	if _, ok := ckc.mutation.HealthStatus(); !ok {
+		return &ValidationError{Name: "health_status", err: errors.New(`ent: missing required field "ChannelKey.health_status"`)}
+	}
+	if v, ok := ckc.mutation.HealthStatus(); ok {
+		if err := channelkey.HealthStatusValidator(v); err != nil {
+			return &ValidationError{Name: "health_status", err: fmt.Errorf(`ent: validator failed for field "ChannelKey.health_status": %w`, err)}
+		}
+	}
+	if _, ok := ckc.mutation.ConsecutiveFailures(); !ok {
+		return &ValidationError{Name: "consecutive_failures", err: errors.New(`ent: missing required field "ChannelKey.consecutive_failures"`)}
+	}
+	if _, ok := ckc.mutation.ConsecutiveSuccesses(); !ok {
+		return &ValidationError{Name: "consecutive_successes", err: errors.New(`ent: missing required field "ChannelKey.consecutive_successes"`)}
+	}
+	if _, ok := ckc.mutation.UpstreamRateEnabled(); !ok {
+		return &ValidationError{Name: "upstream_rate_enabled", err: errors.New(`ent: missing required field "ChannelKey.upstream_rate_enabled"`)}
+	}
+	if _, ok := ckc.mutation.UpstreamRatePath(); !ok {
+		return &ValidationError{Name: "upstream_rate_path", err: errors.New(`ent: missing required field "ChannelKey.upstream_rate_path"`)}
+	}
+	if _, ok := ckc.mutation.UpstreamRate(); !ok {
+		return &ValidationError{Name: "upstream_rate", err: errors.New(`ent: missing required field "ChannelKey.upstream_rate"`)}
 	}
 	if _, ok := ckc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "ChannelKey.created_at"`)}
@@ -638,6 +839,46 @@ func (ckc *ChannelKeyCreate) createSpec() (*ChannelKey, *sqlgraph.CreateSpec) {
 	if value, ok := ckc.mutation.BalanceCheckEnabled(); ok {
 		_spec.SetField(channelkey.FieldBalanceCheckEnabled, field.TypeBool, value)
 		_node.BalanceCheckEnabled = value
+	}
+	if value, ok := ckc.mutation.ProbeEnabled(); ok {
+		_spec.SetField(channelkey.FieldProbeEnabled, field.TypeBool, value)
+		_node.ProbeEnabled = value
+	}
+	if value, ok := ckc.mutation.ProbeModel(); ok {
+		_spec.SetField(channelkey.FieldProbeModel, field.TypeString, value)
+		_node.ProbeModel = value
+	}
+	if value, ok := ckc.mutation.HealthStatus(); ok {
+		_spec.SetField(channelkey.FieldHealthStatus, field.TypeEnum, value)
+		_node.HealthStatus = value
+	}
+	if value, ok := ckc.mutation.ConsecutiveFailures(); ok {
+		_spec.SetField(channelkey.FieldConsecutiveFailures, field.TypeInt, value)
+		_node.ConsecutiveFailures = value
+	}
+	if value, ok := ckc.mutation.ConsecutiveSuccesses(); ok {
+		_spec.SetField(channelkey.FieldConsecutiveSuccesses, field.TypeInt, value)
+		_node.ConsecutiveSuccesses = value
+	}
+	if value, ok := ckc.mutation.LastProbeAt(); ok {
+		_spec.SetField(channelkey.FieldLastProbeAt, field.TypeTime, value)
+		_node.LastProbeAt = &value
+	}
+	if value, ok := ckc.mutation.UpstreamRateEnabled(); ok {
+		_spec.SetField(channelkey.FieldUpstreamRateEnabled, field.TypeBool, value)
+		_node.UpstreamRateEnabled = value
+	}
+	if value, ok := ckc.mutation.UpstreamRatePath(); ok {
+		_spec.SetField(channelkey.FieldUpstreamRatePath, field.TypeString, value)
+		_node.UpstreamRatePath = value
+	}
+	if value, ok := ckc.mutation.UpstreamRate(); ok {
+		_spec.SetField(channelkey.FieldUpstreamRate, field.TypeFloat64, value)
+		_node.UpstreamRate = value
+	}
+	if value, ok := ckc.mutation.UpstreamRateAt(); ok {
+		_spec.SetField(channelkey.FieldUpstreamRateAt, field.TypeTime, value)
+		_node.UpstreamRateAt = &value
 	}
 	if value, ok := ckc.mutation.CreatedAt(); ok {
 		_spec.SetField(channelkey.FieldCreatedAt, field.TypeTime, value)
@@ -1093,6 +1334,156 @@ func (u *ChannelKeyUpsert) SetBalanceCheckEnabled(v bool) *ChannelKeyUpsert {
 // UpdateBalanceCheckEnabled sets the "balance_check_enabled" field to the value that was provided on create.
 func (u *ChannelKeyUpsert) UpdateBalanceCheckEnabled() *ChannelKeyUpsert {
 	u.SetExcluded(channelkey.FieldBalanceCheckEnabled)
+	return u
+}
+
+// SetProbeEnabled sets the "probe_enabled" field.
+func (u *ChannelKeyUpsert) SetProbeEnabled(v bool) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldProbeEnabled, v)
+	return u
+}
+
+// UpdateProbeEnabled sets the "probe_enabled" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateProbeEnabled() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldProbeEnabled)
+	return u
+}
+
+// SetProbeModel sets the "probe_model" field.
+func (u *ChannelKeyUpsert) SetProbeModel(v string) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldProbeModel, v)
+	return u
+}
+
+// UpdateProbeModel sets the "probe_model" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateProbeModel() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldProbeModel)
+	return u
+}
+
+// SetHealthStatus sets the "health_status" field.
+func (u *ChannelKeyUpsert) SetHealthStatus(v channelkey.HealthStatus) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldHealthStatus, v)
+	return u
+}
+
+// UpdateHealthStatus sets the "health_status" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateHealthStatus() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldHealthStatus)
+	return u
+}
+
+// SetConsecutiveFailures sets the "consecutive_failures" field.
+func (u *ChannelKeyUpsert) SetConsecutiveFailures(v int) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldConsecutiveFailures, v)
+	return u
+}
+
+// UpdateConsecutiveFailures sets the "consecutive_failures" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateConsecutiveFailures() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldConsecutiveFailures)
+	return u
+}
+
+// AddConsecutiveFailures adds v to the "consecutive_failures" field.
+func (u *ChannelKeyUpsert) AddConsecutiveFailures(v int) *ChannelKeyUpsert {
+	u.Add(channelkey.FieldConsecutiveFailures, v)
+	return u
+}
+
+// SetConsecutiveSuccesses sets the "consecutive_successes" field.
+func (u *ChannelKeyUpsert) SetConsecutiveSuccesses(v int) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldConsecutiveSuccesses, v)
+	return u
+}
+
+// UpdateConsecutiveSuccesses sets the "consecutive_successes" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateConsecutiveSuccesses() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldConsecutiveSuccesses)
+	return u
+}
+
+// AddConsecutiveSuccesses adds v to the "consecutive_successes" field.
+func (u *ChannelKeyUpsert) AddConsecutiveSuccesses(v int) *ChannelKeyUpsert {
+	u.Add(channelkey.FieldConsecutiveSuccesses, v)
+	return u
+}
+
+// SetLastProbeAt sets the "last_probe_at" field.
+func (u *ChannelKeyUpsert) SetLastProbeAt(v time.Time) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldLastProbeAt, v)
+	return u
+}
+
+// UpdateLastProbeAt sets the "last_probe_at" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateLastProbeAt() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldLastProbeAt)
+	return u
+}
+
+// ClearLastProbeAt clears the value of the "last_probe_at" field.
+func (u *ChannelKeyUpsert) ClearLastProbeAt() *ChannelKeyUpsert {
+	u.SetNull(channelkey.FieldLastProbeAt)
+	return u
+}
+
+// SetUpstreamRateEnabled sets the "upstream_rate_enabled" field.
+func (u *ChannelKeyUpsert) SetUpstreamRateEnabled(v bool) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldUpstreamRateEnabled, v)
+	return u
+}
+
+// UpdateUpstreamRateEnabled sets the "upstream_rate_enabled" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateUpstreamRateEnabled() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldUpstreamRateEnabled)
+	return u
+}
+
+// SetUpstreamRatePath sets the "upstream_rate_path" field.
+func (u *ChannelKeyUpsert) SetUpstreamRatePath(v string) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldUpstreamRatePath, v)
+	return u
+}
+
+// UpdateUpstreamRatePath sets the "upstream_rate_path" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateUpstreamRatePath() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldUpstreamRatePath)
+	return u
+}
+
+// SetUpstreamRate sets the "upstream_rate" field.
+func (u *ChannelKeyUpsert) SetUpstreamRate(v float64) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldUpstreamRate, v)
+	return u
+}
+
+// UpdateUpstreamRate sets the "upstream_rate" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateUpstreamRate() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldUpstreamRate)
+	return u
+}
+
+// AddUpstreamRate adds v to the "upstream_rate" field.
+func (u *ChannelKeyUpsert) AddUpstreamRate(v float64) *ChannelKeyUpsert {
+	u.Add(channelkey.FieldUpstreamRate, v)
+	return u
+}
+
+// SetUpstreamRateAt sets the "upstream_rate_at" field.
+func (u *ChannelKeyUpsert) SetUpstreamRateAt(v time.Time) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldUpstreamRateAt, v)
+	return u
+}
+
+// UpdateUpstreamRateAt sets the "upstream_rate_at" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateUpstreamRateAt() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldUpstreamRateAt)
+	return u
+}
+
+// ClearUpstreamRateAt clears the value of the "upstream_rate_at" field.
+func (u *ChannelKeyUpsert) ClearUpstreamRateAt() *ChannelKeyUpsert {
+	u.SetNull(channelkey.FieldUpstreamRateAt)
 	return u
 }
 
@@ -1556,6 +1947,181 @@ func (u *ChannelKeyUpsertOne) SetBalanceCheckEnabled(v bool) *ChannelKeyUpsertOn
 func (u *ChannelKeyUpsertOne) UpdateBalanceCheckEnabled() *ChannelKeyUpsertOne {
 	return u.Update(func(s *ChannelKeyUpsert) {
 		s.UpdateBalanceCheckEnabled()
+	})
+}
+
+// SetProbeEnabled sets the "probe_enabled" field.
+func (u *ChannelKeyUpsertOne) SetProbeEnabled(v bool) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetProbeEnabled(v)
+	})
+}
+
+// UpdateProbeEnabled sets the "probe_enabled" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateProbeEnabled() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateProbeEnabled()
+	})
+}
+
+// SetProbeModel sets the "probe_model" field.
+func (u *ChannelKeyUpsertOne) SetProbeModel(v string) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetProbeModel(v)
+	})
+}
+
+// UpdateProbeModel sets the "probe_model" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateProbeModel() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateProbeModel()
+	})
+}
+
+// SetHealthStatus sets the "health_status" field.
+func (u *ChannelKeyUpsertOne) SetHealthStatus(v channelkey.HealthStatus) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetHealthStatus(v)
+	})
+}
+
+// UpdateHealthStatus sets the "health_status" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateHealthStatus() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateHealthStatus()
+	})
+}
+
+// SetConsecutiveFailures sets the "consecutive_failures" field.
+func (u *ChannelKeyUpsertOne) SetConsecutiveFailures(v int) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetConsecutiveFailures(v)
+	})
+}
+
+// AddConsecutiveFailures adds v to the "consecutive_failures" field.
+func (u *ChannelKeyUpsertOne) AddConsecutiveFailures(v int) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.AddConsecutiveFailures(v)
+	})
+}
+
+// UpdateConsecutiveFailures sets the "consecutive_failures" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateConsecutiveFailures() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateConsecutiveFailures()
+	})
+}
+
+// SetConsecutiveSuccesses sets the "consecutive_successes" field.
+func (u *ChannelKeyUpsertOne) SetConsecutiveSuccesses(v int) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetConsecutiveSuccesses(v)
+	})
+}
+
+// AddConsecutiveSuccesses adds v to the "consecutive_successes" field.
+func (u *ChannelKeyUpsertOne) AddConsecutiveSuccesses(v int) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.AddConsecutiveSuccesses(v)
+	})
+}
+
+// UpdateConsecutiveSuccesses sets the "consecutive_successes" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateConsecutiveSuccesses() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateConsecutiveSuccesses()
+	})
+}
+
+// SetLastProbeAt sets the "last_probe_at" field.
+func (u *ChannelKeyUpsertOne) SetLastProbeAt(v time.Time) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetLastProbeAt(v)
+	})
+}
+
+// UpdateLastProbeAt sets the "last_probe_at" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateLastProbeAt() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateLastProbeAt()
+	})
+}
+
+// ClearLastProbeAt clears the value of the "last_probe_at" field.
+func (u *ChannelKeyUpsertOne) ClearLastProbeAt() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.ClearLastProbeAt()
+	})
+}
+
+// SetUpstreamRateEnabled sets the "upstream_rate_enabled" field.
+func (u *ChannelKeyUpsertOne) SetUpstreamRateEnabled(v bool) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetUpstreamRateEnabled(v)
+	})
+}
+
+// UpdateUpstreamRateEnabled sets the "upstream_rate_enabled" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateUpstreamRateEnabled() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateUpstreamRateEnabled()
+	})
+}
+
+// SetUpstreamRatePath sets the "upstream_rate_path" field.
+func (u *ChannelKeyUpsertOne) SetUpstreamRatePath(v string) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetUpstreamRatePath(v)
+	})
+}
+
+// UpdateUpstreamRatePath sets the "upstream_rate_path" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateUpstreamRatePath() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateUpstreamRatePath()
+	})
+}
+
+// SetUpstreamRate sets the "upstream_rate" field.
+func (u *ChannelKeyUpsertOne) SetUpstreamRate(v float64) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetUpstreamRate(v)
+	})
+}
+
+// AddUpstreamRate adds v to the "upstream_rate" field.
+func (u *ChannelKeyUpsertOne) AddUpstreamRate(v float64) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.AddUpstreamRate(v)
+	})
+}
+
+// UpdateUpstreamRate sets the "upstream_rate" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateUpstreamRate() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateUpstreamRate()
+	})
+}
+
+// SetUpstreamRateAt sets the "upstream_rate_at" field.
+func (u *ChannelKeyUpsertOne) SetUpstreamRateAt(v time.Time) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetUpstreamRateAt(v)
+	})
+}
+
+// UpdateUpstreamRateAt sets the "upstream_rate_at" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateUpstreamRateAt() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateUpstreamRateAt()
+	})
+}
+
+// ClearUpstreamRateAt clears the value of the "upstream_rate_at" field.
+func (u *ChannelKeyUpsertOne) ClearUpstreamRateAt() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.ClearUpstreamRateAt()
 	})
 }
 
@@ -2187,6 +2753,181 @@ func (u *ChannelKeyUpsertBulk) SetBalanceCheckEnabled(v bool) *ChannelKeyUpsertB
 func (u *ChannelKeyUpsertBulk) UpdateBalanceCheckEnabled() *ChannelKeyUpsertBulk {
 	return u.Update(func(s *ChannelKeyUpsert) {
 		s.UpdateBalanceCheckEnabled()
+	})
+}
+
+// SetProbeEnabled sets the "probe_enabled" field.
+func (u *ChannelKeyUpsertBulk) SetProbeEnabled(v bool) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetProbeEnabled(v)
+	})
+}
+
+// UpdateProbeEnabled sets the "probe_enabled" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateProbeEnabled() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateProbeEnabled()
+	})
+}
+
+// SetProbeModel sets the "probe_model" field.
+func (u *ChannelKeyUpsertBulk) SetProbeModel(v string) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetProbeModel(v)
+	})
+}
+
+// UpdateProbeModel sets the "probe_model" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateProbeModel() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateProbeModel()
+	})
+}
+
+// SetHealthStatus sets the "health_status" field.
+func (u *ChannelKeyUpsertBulk) SetHealthStatus(v channelkey.HealthStatus) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetHealthStatus(v)
+	})
+}
+
+// UpdateHealthStatus sets the "health_status" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateHealthStatus() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateHealthStatus()
+	})
+}
+
+// SetConsecutiveFailures sets the "consecutive_failures" field.
+func (u *ChannelKeyUpsertBulk) SetConsecutiveFailures(v int) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetConsecutiveFailures(v)
+	})
+}
+
+// AddConsecutiveFailures adds v to the "consecutive_failures" field.
+func (u *ChannelKeyUpsertBulk) AddConsecutiveFailures(v int) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.AddConsecutiveFailures(v)
+	})
+}
+
+// UpdateConsecutiveFailures sets the "consecutive_failures" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateConsecutiveFailures() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateConsecutiveFailures()
+	})
+}
+
+// SetConsecutiveSuccesses sets the "consecutive_successes" field.
+func (u *ChannelKeyUpsertBulk) SetConsecutiveSuccesses(v int) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetConsecutiveSuccesses(v)
+	})
+}
+
+// AddConsecutiveSuccesses adds v to the "consecutive_successes" field.
+func (u *ChannelKeyUpsertBulk) AddConsecutiveSuccesses(v int) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.AddConsecutiveSuccesses(v)
+	})
+}
+
+// UpdateConsecutiveSuccesses sets the "consecutive_successes" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateConsecutiveSuccesses() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateConsecutiveSuccesses()
+	})
+}
+
+// SetLastProbeAt sets the "last_probe_at" field.
+func (u *ChannelKeyUpsertBulk) SetLastProbeAt(v time.Time) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetLastProbeAt(v)
+	})
+}
+
+// UpdateLastProbeAt sets the "last_probe_at" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateLastProbeAt() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateLastProbeAt()
+	})
+}
+
+// ClearLastProbeAt clears the value of the "last_probe_at" field.
+func (u *ChannelKeyUpsertBulk) ClearLastProbeAt() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.ClearLastProbeAt()
+	})
+}
+
+// SetUpstreamRateEnabled sets the "upstream_rate_enabled" field.
+func (u *ChannelKeyUpsertBulk) SetUpstreamRateEnabled(v bool) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetUpstreamRateEnabled(v)
+	})
+}
+
+// UpdateUpstreamRateEnabled sets the "upstream_rate_enabled" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateUpstreamRateEnabled() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateUpstreamRateEnabled()
+	})
+}
+
+// SetUpstreamRatePath sets the "upstream_rate_path" field.
+func (u *ChannelKeyUpsertBulk) SetUpstreamRatePath(v string) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetUpstreamRatePath(v)
+	})
+}
+
+// UpdateUpstreamRatePath sets the "upstream_rate_path" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateUpstreamRatePath() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateUpstreamRatePath()
+	})
+}
+
+// SetUpstreamRate sets the "upstream_rate" field.
+func (u *ChannelKeyUpsertBulk) SetUpstreamRate(v float64) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetUpstreamRate(v)
+	})
+}
+
+// AddUpstreamRate adds v to the "upstream_rate" field.
+func (u *ChannelKeyUpsertBulk) AddUpstreamRate(v float64) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.AddUpstreamRate(v)
+	})
+}
+
+// UpdateUpstreamRate sets the "upstream_rate" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateUpstreamRate() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateUpstreamRate()
+	})
+}
+
+// SetUpstreamRateAt sets the "upstream_rate_at" field.
+func (u *ChannelKeyUpsertBulk) SetUpstreamRateAt(v time.Time) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetUpstreamRateAt(v)
+	})
+}
+
+// UpdateUpstreamRateAt sets the "upstream_rate_at" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateUpstreamRateAt() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateUpstreamRateAt()
+	})
+}
+
+// ClearUpstreamRateAt clears the value of the "upstream_rate_at" field.
+func (u *ChannelKeyUpsertBulk) ClearUpstreamRateAt() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.ClearUpstreamRateAt()
 	})
 }
 

@@ -62,6 +62,33 @@ func (ChannelKey) Fields() []ent.Field {
 		// 关闭后手动单把查询仍可用。
 		field.Bool("balance_check_enabled").Default(true).
 			Comment("是否参与主动余额刷新；官方直连等无余额接口的上游可关闭"),
+
+		// ---- 健康探针 ----
+		field.Bool("probe_enabled").Default(false).
+			Comment("是否启用主动健康探针"),
+		field.String("probe_model").Default("").
+			Comment("探针使用的模型；空串回退 test_model → 首个 model"),
+		field.Enum("health_status").
+			Values("healthy", "degraded", "suspended", "recovering").
+			Default("healthy").
+			Comment("健康状态机：healthy→degraded→suspended→recovering→healthy"),
+		field.Int("consecutive_failures").Default(0).
+			Comment("连续失败计数（用于降级/暂停判定）"),
+		field.Int("consecutive_successes").Default(0).
+			Comment("连续成功计数（用于恢复判定）"),
+		field.Time("last_probe_at").Optional().Nillable().
+			Comment("最近一次探针执行时间"),
+
+		// ---- 上游倍率探测 ----
+		field.Bool("upstream_rate_enabled").Default(false).
+			Comment("是否启用上游倍率探测"),
+		field.String("upstream_rate_path").Default("").
+			Comment("上游倍率端点路径；空串默认 /v1/airgate/billing"),
+		field.Float("upstream_rate").Default(0).
+			Comment("最近一次探测到的上游计费倍率"),
+		field.Time("upstream_rate_at").Optional().Nillable().
+			Comment("上游倍率最近探测时间"),
+
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
 	}

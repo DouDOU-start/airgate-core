@@ -9,6 +9,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/announcementread"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
+	"github.com/DouDOU-start/airgate-core/ent/bookmark"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
@@ -152,6 +153,30 @@ func init() {
 	balancelogDescCreatedAt := balancelogFields[8].Descriptor()
 	// balancelog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	balancelog.DefaultCreatedAt = balancelogDescCreatedAt.Default.(func() time.Time)
+	bookmarkFields := schema.Bookmark{}.Fields()
+	_ = bookmarkFields
+	// bookmarkDescName is the schema descriptor for name field.
+	bookmarkDescName := bookmarkFields[0].Descriptor()
+	// bookmark.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	bookmark.NameValidator = bookmarkDescName.Validators[0].(func(string) error)
+	// bookmarkDescBaseURL is the schema descriptor for base_url field.
+	bookmarkDescBaseURL := bookmarkFields[1].Descriptor()
+	// bookmark.DefaultBaseURL holds the default value on creation for the base_url field.
+	bookmark.DefaultBaseURL = bookmarkDescBaseURL.Default.(string)
+	// bookmarkDescRemark is the schema descriptor for remark field.
+	bookmarkDescRemark := bookmarkFields[2].Descriptor()
+	// bookmark.DefaultRemark holds the default value on creation for the remark field.
+	bookmark.DefaultRemark = bookmarkDescRemark.Default.(string)
+	// bookmarkDescCreatedAt is the schema descriptor for created_at field.
+	bookmarkDescCreatedAt := bookmarkFields[3].Descriptor()
+	// bookmark.DefaultCreatedAt holds the default value on creation for the created_at field.
+	bookmark.DefaultCreatedAt = bookmarkDescCreatedAt.Default.(func() time.Time)
+	// bookmarkDescUpdatedAt is the schema descriptor for updated_at field.
+	bookmarkDescUpdatedAt := bookmarkFields[4].Descriptor()
+	// bookmark.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	bookmark.DefaultUpdatedAt = bookmarkDescUpdatedAt.Default.(func() time.Time)
+	// bookmark.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	bookmark.UpdateDefaultUpdatedAt = bookmarkDescUpdatedAt.UpdateDefault.(func() time.Time)
 	channelFields := schema.Channel{}.Fields()
 	_ = channelFields
 	// channelDescName is the schema descriptor for name field.
@@ -244,12 +269,40 @@ func init() {
 	channelkeyDescBalanceCheckEnabled := channelkeyFields[21].Descriptor()
 	// channelkey.DefaultBalanceCheckEnabled holds the default value on creation for the balance_check_enabled field.
 	channelkey.DefaultBalanceCheckEnabled = channelkeyDescBalanceCheckEnabled.Default.(bool)
+	// channelkeyDescProbeEnabled is the schema descriptor for probe_enabled field.
+	channelkeyDescProbeEnabled := channelkeyFields[22].Descriptor()
+	// channelkey.DefaultProbeEnabled holds the default value on creation for the probe_enabled field.
+	channelkey.DefaultProbeEnabled = channelkeyDescProbeEnabled.Default.(bool)
+	// channelkeyDescProbeModel is the schema descriptor for probe_model field.
+	channelkeyDescProbeModel := channelkeyFields[23].Descriptor()
+	// channelkey.DefaultProbeModel holds the default value on creation for the probe_model field.
+	channelkey.DefaultProbeModel = channelkeyDescProbeModel.Default.(string)
+	// channelkeyDescConsecutiveFailures is the schema descriptor for consecutive_failures field.
+	channelkeyDescConsecutiveFailures := channelkeyFields[25].Descriptor()
+	// channelkey.DefaultConsecutiveFailures holds the default value on creation for the consecutive_failures field.
+	channelkey.DefaultConsecutiveFailures = channelkeyDescConsecutiveFailures.Default.(int)
+	// channelkeyDescConsecutiveSuccesses is the schema descriptor for consecutive_successes field.
+	channelkeyDescConsecutiveSuccesses := channelkeyFields[26].Descriptor()
+	// channelkey.DefaultConsecutiveSuccesses holds the default value on creation for the consecutive_successes field.
+	channelkey.DefaultConsecutiveSuccesses = channelkeyDescConsecutiveSuccesses.Default.(int)
+	// channelkeyDescUpstreamRateEnabled is the schema descriptor for upstream_rate_enabled field.
+	channelkeyDescUpstreamRateEnabled := channelkeyFields[28].Descriptor()
+	// channelkey.DefaultUpstreamRateEnabled holds the default value on creation for the upstream_rate_enabled field.
+	channelkey.DefaultUpstreamRateEnabled = channelkeyDescUpstreamRateEnabled.Default.(bool)
+	// channelkeyDescUpstreamRatePath is the schema descriptor for upstream_rate_path field.
+	channelkeyDescUpstreamRatePath := channelkeyFields[29].Descriptor()
+	// channelkey.DefaultUpstreamRatePath holds the default value on creation for the upstream_rate_path field.
+	channelkey.DefaultUpstreamRatePath = channelkeyDescUpstreamRatePath.Default.(string)
+	// channelkeyDescUpstreamRate is the schema descriptor for upstream_rate field.
+	channelkeyDescUpstreamRate := channelkeyFields[30].Descriptor()
+	// channelkey.DefaultUpstreamRate holds the default value on creation for the upstream_rate field.
+	channelkey.DefaultUpstreamRate = channelkeyDescUpstreamRate.Default.(float64)
 	// channelkeyDescCreatedAt is the schema descriptor for created_at field.
-	channelkeyDescCreatedAt := channelkeyFields[22].Descriptor()
+	channelkeyDescCreatedAt := channelkeyFields[32].Descriptor()
 	// channelkey.DefaultCreatedAt holds the default value on creation for the created_at field.
 	channelkey.DefaultCreatedAt = channelkeyDescCreatedAt.Default.(func() time.Time)
 	// channelkeyDescUpdatedAt is the schema descriptor for updated_at field.
-	channelkeyDescUpdatedAt := channelkeyFields[23].Descriptor()
+	channelkeyDescUpdatedAt := channelkeyFields[33].Descriptor()
 	// channelkey.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	channelkey.DefaultUpdatedAt = channelkeyDescUpdatedAt.Default.(func() time.Time)
 	// channelkey.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -277,19 +330,19 @@ func init() {
 	// group.DefaultStatusVisible holds the default value on creation for the status_visible field.
 	group.DefaultStatusVisible = groupDescStatusVisible.Default.(bool)
 	// groupDescNote is the schema descriptor for note field.
-	groupDescNote := groupFields[6].Descriptor()
+	groupDescNote := groupFields[8].Descriptor()
 	// group.DefaultNote holds the default value on creation for the note field.
 	group.DefaultNote = groupDescNote.Default.(string)
 	// groupDescSortWeight is the schema descriptor for sort_weight field.
-	groupDescSortWeight := groupFields[7].Descriptor()
+	groupDescSortWeight := groupFields[9].Descriptor()
 	// group.DefaultSortWeight holds the default value on creation for the sort_weight field.
 	group.DefaultSortWeight = groupDescSortWeight.Default.(int)
 	// groupDescCreatedAt is the schema descriptor for created_at field.
-	groupDescCreatedAt := groupFields[8].Descriptor()
+	groupDescCreatedAt := groupFields[10].Descriptor()
 	// group.DefaultCreatedAt holds the default value on creation for the created_at field.
 	group.DefaultCreatedAt = groupDescCreatedAt.Default.(func() time.Time)
 	// groupDescUpdatedAt is the schema descriptor for updated_at field.
-	groupDescUpdatedAt := groupFields[9].Descriptor()
+	groupDescUpdatedAt := groupFields[11].Descriptor()
 	// group.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	group.DefaultUpdatedAt = groupDescUpdatedAt.Default.(func() time.Time)
 	// group.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

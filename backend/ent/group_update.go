@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
@@ -134,6 +135,51 @@ func (gu *GroupUpdate) SetNillableStatusVisible(b *bool) *GroupUpdate {
 	if b != nil {
 		gu.SetStatusVisible(*b)
 	}
+	return gu
+}
+
+// SetAllowedClients sets the "allowed_clients" field.
+func (gu *GroupUpdate) SetAllowedClients(s []string) *GroupUpdate {
+	gu.mutation.SetAllowedClients(s)
+	return gu
+}
+
+// AppendAllowedClients appends s to the "allowed_clients" field.
+func (gu *GroupUpdate) AppendAllowedClients(s []string) *GroupUpdate {
+	gu.mutation.AppendAllowedClients(s)
+	return gu
+}
+
+// ClearAllowedClients clears the value of the "allowed_clients" field.
+func (gu *GroupUpdate) ClearAllowedClients() *GroupUpdate {
+	gu.mutation.ClearAllowedClients()
+	return gu
+}
+
+// SetFallbackGroupID sets the "fallback_group_id" field.
+func (gu *GroupUpdate) SetFallbackGroupID(i int) *GroupUpdate {
+	gu.mutation.ResetFallbackGroupID()
+	gu.mutation.SetFallbackGroupID(i)
+	return gu
+}
+
+// SetNillableFallbackGroupID sets the "fallback_group_id" field if the given value is not nil.
+func (gu *GroupUpdate) SetNillableFallbackGroupID(i *int) *GroupUpdate {
+	if i != nil {
+		gu.SetFallbackGroupID(*i)
+	}
+	return gu
+}
+
+// AddFallbackGroupID adds i to the "fallback_group_id" field.
+func (gu *GroupUpdate) AddFallbackGroupID(i int) *GroupUpdate {
+	gu.mutation.AddFallbackGroupID(i)
+	return gu
+}
+
+// ClearFallbackGroupID clears the value of the "fallback_group_id" field.
+func (gu *GroupUpdate) ClearFallbackGroupID() *GroupUpdate {
+	gu.mutation.ClearFallbackGroupID()
 	return gu
 }
 
@@ -417,6 +463,26 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := gu.mutation.StatusVisible(); ok {
 		_spec.SetField(group.FieldStatusVisible, field.TypeBool, value)
+	}
+	if value, ok := gu.mutation.AllowedClients(); ok {
+		_spec.SetField(group.FieldAllowedClients, field.TypeJSON, value)
+	}
+	if value, ok := gu.mutation.AppendedAllowedClients(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, group.FieldAllowedClients, value)
+		})
+	}
+	if gu.mutation.AllowedClientsCleared() {
+		_spec.ClearField(group.FieldAllowedClients, field.TypeJSON)
+	}
+	if value, ok := gu.mutation.FallbackGroupID(); ok {
+		_spec.SetField(group.FieldFallbackGroupID, field.TypeInt, value)
+	}
+	if value, ok := gu.mutation.AddedFallbackGroupID(); ok {
+		_spec.AddField(group.FieldFallbackGroupID, field.TypeInt, value)
+	}
+	if gu.mutation.FallbackGroupIDCleared() {
+		_spec.ClearField(group.FieldFallbackGroupID, field.TypeInt)
 	}
 	if value, ok := gu.mutation.Note(); ok {
 		_spec.SetField(group.FieldNote, field.TypeString, value)
@@ -736,6 +802,51 @@ func (guo *GroupUpdateOne) SetNillableStatusVisible(b *bool) *GroupUpdateOne {
 	return guo
 }
 
+// SetAllowedClients sets the "allowed_clients" field.
+func (guo *GroupUpdateOne) SetAllowedClients(s []string) *GroupUpdateOne {
+	guo.mutation.SetAllowedClients(s)
+	return guo
+}
+
+// AppendAllowedClients appends s to the "allowed_clients" field.
+func (guo *GroupUpdateOne) AppendAllowedClients(s []string) *GroupUpdateOne {
+	guo.mutation.AppendAllowedClients(s)
+	return guo
+}
+
+// ClearAllowedClients clears the value of the "allowed_clients" field.
+func (guo *GroupUpdateOne) ClearAllowedClients() *GroupUpdateOne {
+	guo.mutation.ClearAllowedClients()
+	return guo
+}
+
+// SetFallbackGroupID sets the "fallback_group_id" field.
+func (guo *GroupUpdateOne) SetFallbackGroupID(i int) *GroupUpdateOne {
+	guo.mutation.ResetFallbackGroupID()
+	guo.mutation.SetFallbackGroupID(i)
+	return guo
+}
+
+// SetNillableFallbackGroupID sets the "fallback_group_id" field if the given value is not nil.
+func (guo *GroupUpdateOne) SetNillableFallbackGroupID(i *int) *GroupUpdateOne {
+	if i != nil {
+		guo.SetFallbackGroupID(*i)
+	}
+	return guo
+}
+
+// AddFallbackGroupID adds i to the "fallback_group_id" field.
+func (guo *GroupUpdateOne) AddFallbackGroupID(i int) *GroupUpdateOne {
+	guo.mutation.AddFallbackGroupID(i)
+	return guo
+}
+
+// ClearFallbackGroupID clears the value of the "fallback_group_id" field.
+func (guo *GroupUpdateOne) ClearFallbackGroupID() *GroupUpdateOne {
+	guo.mutation.ClearFallbackGroupID()
+	return guo
+}
+
 // SetNote sets the "note" field.
 func (guo *GroupUpdateOne) SetNote(s string) *GroupUpdateOne {
 	guo.mutation.SetNote(s)
@@ -1046,6 +1157,26 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 	}
 	if value, ok := guo.mutation.StatusVisible(); ok {
 		_spec.SetField(group.FieldStatusVisible, field.TypeBool, value)
+	}
+	if value, ok := guo.mutation.AllowedClients(); ok {
+		_spec.SetField(group.FieldAllowedClients, field.TypeJSON, value)
+	}
+	if value, ok := guo.mutation.AppendedAllowedClients(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, group.FieldAllowedClients, value)
+		})
+	}
+	if guo.mutation.AllowedClientsCleared() {
+		_spec.ClearField(group.FieldAllowedClients, field.TypeJSON)
+	}
+	if value, ok := guo.mutation.FallbackGroupID(); ok {
+		_spec.SetField(group.FieldFallbackGroupID, field.TypeInt, value)
+	}
+	if value, ok := guo.mutation.AddedFallbackGroupID(); ok {
+		_spec.AddField(group.FieldFallbackGroupID, field.TypeInt, value)
+	}
+	if guo.mutation.FallbackGroupIDCleared() {
+		_spec.ClearField(group.FieldFallbackGroupID, field.TypeInt)
 	}
 	if value, ok := guo.mutation.Note(); ok {
 		_spec.SetField(group.FieldNote, field.TypeString, value)

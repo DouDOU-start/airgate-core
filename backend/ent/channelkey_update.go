@@ -404,6 +404,179 @@ func (cku *ChannelKeyUpdate) SetNillableBalanceCheckEnabled(b *bool) *ChannelKey
 	return cku
 }
 
+// SetProbeEnabled sets the "probe_enabled" field.
+func (cku *ChannelKeyUpdate) SetProbeEnabled(b bool) *ChannelKeyUpdate {
+	cku.mutation.SetProbeEnabled(b)
+	return cku
+}
+
+// SetNillableProbeEnabled sets the "probe_enabled" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableProbeEnabled(b *bool) *ChannelKeyUpdate {
+	if b != nil {
+		cku.SetProbeEnabled(*b)
+	}
+	return cku
+}
+
+// SetProbeModel sets the "probe_model" field.
+func (cku *ChannelKeyUpdate) SetProbeModel(s string) *ChannelKeyUpdate {
+	cku.mutation.SetProbeModel(s)
+	return cku
+}
+
+// SetNillableProbeModel sets the "probe_model" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableProbeModel(s *string) *ChannelKeyUpdate {
+	if s != nil {
+		cku.SetProbeModel(*s)
+	}
+	return cku
+}
+
+// SetHealthStatus sets the "health_status" field.
+func (cku *ChannelKeyUpdate) SetHealthStatus(cs channelkey.HealthStatus) *ChannelKeyUpdate {
+	cku.mutation.SetHealthStatus(cs)
+	return cku
+}
+
+// SetNillableHealthStatus sets the "health_status" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableHealthStatus(cs *channelkey.HealthStatus) *ChannelKeyUpdate {
+	if cs != nil {
+		cku.SetHealthStatus(*cs)
+	}
+	return cku
+}
+
+// SetConsecutiveFailures sets the "consecutive_failures" field.
+func (cku *ChannelKeyUpdate) SetConsecutiveFailures(i int) *ChannelKeyUpdate {
+	cku.mutation.ResetConsecutiveFailures()
+	cku.mutation.SetConsecutiveFailures(i)
+	return cku
+}
+
+// SetNillableConsecutiveFailures sets the "consecutive_failures" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableConsecutiveFailures(i *int) *ChannelKeyUpdate {
+	if i != nil {
+		cku.SetConsecutiveFailures(*i)
+	}
+	return cku
+}
+
+// AddConsecutiveFailures adds i to the "consecutive_failures" field.
+func (cku *ChannelKeyUpdate) AddConsecutiveFailures(i int) *ChannelKeyUpdate {
+	cku.mutation.AddConsecutiveFailures(i)
+	return cku
+}
+
+// SetConsecutiveSuccesses sets the "consecutive_successes" field.
+func (cku *ChannelKeyUpdate) SetConsecutiveSuccesses(i int) *ChannelKeyUpdate {
+	cku.mutation.ResetConsecutiveSuccesses()
+	cku.mutation.SetConsecutiveSuccesses(i)
+	return cku
+}
+
+// SetNillableConsecutiveSuccesses sets the "consecutive_successes" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableConsecutiveSuccesses(i *int) *ChannelKeyUpdate {
+	if i != nil {
+		cku.SetConsecutiveSuccesses(*i)
+	}
+	return cku
+}
+
+// AddConsecutiveSuccesses adds i to the "consecutive_successes" field.
+func (cku *ChannelKeyUpdate) AddConsecutiveSuccesses(i int) *ChannelKeyUpdate {
+	cku.mutation.AddConsecutiveSuccesses(i)
+	return cku
+}
+
+// SetLastProbeAt sets the "last_probe_at" field.
+func (cku *ChannelKeyUpdate) SetLastProbeAt(t time.Time) *ChannelKeyUpdate {
+	cku.mutation.SetLastProbeAt(t)
+	return cku
+}
+
+// SetNillableLastProbeAt sets the "last_probe_at" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableLastProbeAt(t *time.Time) *ChannelKeyUpdate {
+	if t != nil {
+		cku.SetLastProbeAt(*t)
+	}
+	return cku
+}
+
+// ClearLastProbeAt clears the value of the "last_probe_at" field.
+func (cku *ChannelKeyUpdate) ClearLastProbeAt() *ChannelKeyUpdate {
+	cku.mutation.ClearLastProbeAt()
+	return cku
+}
+
+// SetUpstreamRateEnabled sets the "upstream_rate_enabled" field.
+func (cku *ChannelKeyUpdate) SetUpstreamRateEnabled(b bool) *ChannelKeyUpdate {
+	cku.mutation.SetUpstreamRateEnabled(b)
+	return cku
+}
+
+// SetNillableUpstreamRateEnabled sets the "upstream_rate_enabled" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableUpstreamRateEnabled(b *bool) *ChannelKeyUpdate {
+	if b != nil {
+		cku.SetUpstreamRateEnabled(*b)
+	}
+	return cku
+}
+
+// SetUpstreamRatePath sets the "upstream_rate_path" field.
+func (cku *ChannelKeyUpdate) SetUpstreamRatePath(s string) *ChannelKeyUpdate {
+	cku.mutation.SetUpstreamRatePath(s)
+	return cku
+}
+
+// SetNillableUpstreamRatePath sets the "upstream_rate_path" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableUpstreamRatePath(s *string) *ChannelKeyUpdate {
+	if s != nil {
+		cku.SetUpstreamRatePath(*s)
+	}
+	return cku
+}
+
+// SetUpstreamRate sets the "upstream_rate" field.
+func (cku *ChannelKeyUpdate) SetUpstreamRate(f float64) *ChannelKeyUpdate {
+	cku.mutation.ResetUpstreamRate()
+	cku.mutation.SetUpstreamRate(f)
+	return cku
+}
+
+// SetNillableUpstreamRate sets the "upstream_rate" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableUpstreamRate(f *float64) *ChannelKeyUpdate {
+	if f != nil {
+		cku.SetUpstreamRate(*f)
+	}
+	return cku
+}
+
+// AddUpstreamRate adds f to the "upstream_rate" field.
+func (cku *ChannelKeyUpdate) AddUpstreamRate(f float64) *ChannelKeyUpdate {
+	cku.mutation.AddUpstreamRate(f)
+	return cku
+}
+
+// SetUpstreamRateAt sets the "upstream_rate_at" field.
+func (cku *ChannelKeyUpdate) SetUpstreamRateAt(t time.Time) *ChannelKeyUpdate {
+	cku.mutation.SetUpstreamRateAt(t)
+	return cku
+}
+
+// SetNillableUpstreamRateAt sets the "upstream_rate_at" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableUpstreamRateAt(t *time.Time) *ChannelKeyUpdate {
+	if t != nil {
+		cku.SetUpstreamRateAt(*t)
+	}
+	return cku
+}
+
+// ClearUpstreamRateAt clears the value of the "upstream_rate_at" field.
+func (cku *ChannelKeyUpdate) ClearUpstreamRateAt() *ChannelKeyUpdate {
+	cku.mutation.ClearUpstreamRateAt()
+	return cku
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (cku *ChannelKeyUpdate) SetUpdatedAt(t time.Time) *ChannelKeyUpdate {
 	cku.mutation.SetUpdatedAt(t)
@@ -567,6 +740,11 @@ func (cku *ChannelKeyUpdate) check() error {
 			return &ValidationError{Name: "weight", err: fmt.Errorf(`ent: validator failed for field "ChannelKey.weight": %w`, err)}
 		}
 	}
+	if v, ok := cku.mutation.HealthStatus(); ok {
+		if err := channelkey.HealthStatusValidator(v); err != nil {
+			return &ValidationError{Name: "health_status", err: fmt.Errorf(`ent: validator failed for field "ChannelKey.health_status": %w`, err)}
+		}
+	}
 	if _, ok := cku.mutation.ChannelID(); cku.mutation.ChannelCleared() && !ok {
 		return errors.New(`ent: clearing a required unique edge "ChannelKey.channel"`)
 	}
@@ -708,6 +886,51 @@ func (cku *ChannelKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := cku.mutation.BalanceCheckEnabled(); ok {
 		_spec.SetField(channelkey.FieldBalanceCheckEnabled, field.TypeBool, value)
+	}
+	if value, ok := cku.mutation.ProbeEnabled(); ok {
+		_spec.SetField(channelkey.FieldProbeEnabled, field.TypeBool, value)
+	}
+	if value, ok := cku.mutation.ProbeModel(); ok {
+		_spec.SetField(channelkey.FieldProbeModel, field.TypeString, value)
+	}
+	if value, ok := cku.mutation.HealthStatus(); ok {
+		_spec.SetField(channelkey.FieldHealthStatus, field.TypeEnum, value)
+	}
+	if value, ok := cku.mutation.ConsecutiveFailures(); ok {
+		_spec.SetField(channelkey.FieldConsecutiveFailures, field.TypeInt, value)
+	}
+	if value, ok := cku.mutation.AddedConsecutiveFailures(); ok {
+		_spec.AddField(channelkey.FieldConsecutiveFailures, field.TypeInt, value)
+	}
+	if value, ok := cku.mutation.ConsecutiveSuccesses(); ok {
+		_spec.SetField(channelkey.FieldConsecutiveSuccesses, field.TypeInt, value)
+	}
+	if value, ok := cku.mutation.AddedConsecutiveSuccesses(); ok {
+		_spec.AddField(channelkey.FieldConsecutiveSuccesses, field.TypeInt, value)
+	}
+	if value, ok := cku.mutation.LastProbeAt(); ok {
+		_spec.SetField(channelkey.FieldLastProbeAt, field.TypeTime, value)
+	}
+	if cku.mutation.LastProbeAtCleared() {
+		_spec.ClearField(channelkey.FieldLastProbeAt, field.TypeTime)
+	}
+	if value, ok := cku.mutation.UpstreamRateEnabled(); ok {
+		_spec.SetField(channelkey.FieldUpstreamRateEnabled, field.TypeBool, value)
+	}
+	if value, ok := cku.mutation.UpstreamRatePath(); ok {
+		_spec.SetField(channelkey.FieldUpstreamRatePath, field.TypeString, value)
+	}
+	if value, ok := cku.mutation.UpstreamRate(); ok {
+		_spec.SetField(channelkey.FieldUpstreamRate, field.TypeFloat64, value)
+	}
+	if value, ok := cku.mutation.AddedUpstreamRate(); ok {
+		_spec.AddField(channelkey.FieldUpstreamRate, field.TypeFloat64, value)
+	}
+	if value, ok := cku.mutation.UpstreamRateAt(); ok {
+		_spec.SetField(channelkey.FieldUpstreamRateAt, field.TypeTime, value)
+	}
+	if cku.mutation.UpstreamRateAtCleared() {
+		_spec.ClearField(channelkey.FieldUpstreamRateAt, field.TypeTime)
 	}
 	if value, ok := cku.mutation.UpdatedAt(); ok {
 		_spec.SetField(channelkey.FieldUpdatedAt, field.TypeTime, value)
@@ -1224,6 +1447,179 @@ func (ckuo *ChannelKeyUpdateOne) SetNillableBalanceCheckEnabled(b *bool) *Channe
 	return ckuo
 }
 
+// SetProbeEnabled sets the "probe_enabled" field.
+func (ckuo *ChannelKeyUpdateOne) SetProbeEnabled(b bool) *ChannelKeyUpdateOne {
+	ckuo.mutation.SetProbeEnabled(b)
+	return ckuo
+}
+
+// SetNillableProbeEnabled sets the "probe_enabled" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableProbeEnabled(b *bool) *ChannelKeyUpdateOne {
+	if b != nil {
+		ckuo.SetProbeEnabled(*b)
+	}
+	return ckuo
+}
+
+// SetProbeModel sets the "probe_model" field.
+func (ckuo *ChannelKeyUpdateOne) SetProbeModel(s string) *ChannelKeyUpdateOne {
+	ckuo.mutation.SetProbeModel(s)
+	return ckuo
+}
+
+// SetNillableProbeModel sets the "probe_model" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableProbeModel(s *string) *ChannelKeyUpdateOne {
+	if s != nil {
+		ckuo.SetProbeModel(*s)
+	}
+	return ckuo
+}
+
+// SetHealthStatus sets the "health_status" field.
+func (ckuo *ChannelKeyUpdateOne) SetHealthStatus(cs channelkey.HealthStatus) *ChannelKeyUpdateOne {
+	ckuo.mutation.SetHealthStatus(cs)
+	return ckuo
+}
+
+// SetNillableHealthStatus sets the "health_status" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableHealthStatus(cs *channelkey.HealthStatus) *ChannelKeyUpdateOne {
+	if cs != nil {
+		ckuo.SetHealthStatus(*cs)
+	}
+	return ckuo
+}
+
+// SetConsecutiveFailures sets the "consecutive_failures" field.
+func (ckuo *ChannelKeyUpdateOne) SetConsecutiveFailures(i int) *ChannelKeyUpdateOne {
+	ckuo.mutation.ResetConsecutiveFailures()
+	ckuo.mutation.SetConsecutiveFailures(i)
+	return ckuo
+}
+
+// SetNillableConsecutiveFailures sets the "consecutive_failures" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableConsecutiveFailures(i *int) *ChannelKeyUpdateOne {
+	if i != nil {
+		ckuo.SetConsecutiveFailures(*i)
+	}
+	return ckuo
+}
+
+// AddConsecutiveFailures adds i to the "consecutive_failures" field.
+func (ckuo *ChannelKeyUpdateOne) AddConsecutiveFailures(i int) *ChannelKeyUpdateOne {
+	ckuo.mutation.AddConsecutiveFailures(i)
+	return ckuo
+}
+
+// SetConsecutiveSuccesses sets the "consecutive_successes" field.
+func (ckuo *ChannelKeyUpdateOne) SetConsecutiveSuccesses(i int) *ChannelKeyUpdateOne {
+	ckuo.mutation.ResetConsecutiveSuccesses()
+	ckuo.mutation.SetConsecutiveSuccesses(i)
+	return ckuo
+}
+
+// SetNillableConsecutiveSuccesses sets the "consecutive_successes" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableConsecutiveSuccesses(i *int) *ChannelKeyUpdateOne {
+	if i != nil {
+		ckuo.SetConsecutiveSuccesses(*i)
+	}
+	return ckuo
+}
+
+// AddConsecutiveSuccesses adds i to the "consecutive_successes" field.
+func (ckuo *ChannelKeyUpdateOne) AddConsecutiveSuccesses(i int) *ChannelKeyUpdateOne {
+	ckuo.mutation.AddConsecutiveSuccesses(i)
+	return ckuo
+}
+
+// SetLastProbeAt sets the "last_probe_at" field.
+func (ckuo *ChannelKeyUpdateOne) SetLastProbeAt(t time.Time) *ChannelKeyUpdateOne {
+	ckuo.mutation.SetLastProbeAt(t)
+	return ckuo
+}
+
+// SetNillableLastProbeAt sets the "last_probe_at" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableLastProbeAt(t *time.Time) *ChannelKeyUpdateOne {
+	if t != nil {
+		ckuo.SetLastProbeAt(*t)
+	}
+	return ckuo
+}
+
+// ClearLastProbeAt clears the value of the "last_probe_at" field.
+func (ckuo *ChannelKeyUpdateOne) ClearLastProbeAt() *ChannelKeyUpdateOne {
+	ckuo.mutation.ClearLastProbeAt()
+	return ckuo
+}
+
+// SetUpstreamRateEnabled sets the "upstream_rate_enabled" field.
+func (ckuo *ChannelKeyUpdateOne) SetUpstreamRateEnabled(b bool) *ChannelKeyUpdateOne {
+	ckuo.mutation.SetUpstreamRateEnabled(b)
+	return ckuo
+}
+
+// SetNillableUpstreamRateEnabled sets the "upstream_rate_enabled" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableUpstreamRateEnabled(b *bool) *ChannelKeyUpdateOne {
+	if b != nil {
+		ckuo.SetUpstreamRateEnabled(*b)
+	}
+	return ckuo
+}
+
+// SetUpstreamRatePath sets the "upstream_rate_path" field.
+func (ckuo *ChannelKeyUpdateOne) SetUpstreamRatePath(s string) *ChannelKeyUpdateOne {
+	ckuo.mutation.SetUpstreamRatePath(s)
+	return ckuo
+}
+
+// SetNillableUpstreamRatePath sets the "upstream_rate_path" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableUpstreamRatePath(s *string) *ChannelKeyUpdateOne {
+	if s != nil {
+		ckuo.SetUpstreamRatePath(*s)
+	}
+	return ckuo
+}
+
+// SetUpstreamRate sets the "upstream_rate" field.
+func (ckuo *ChannelKeyUpdateOne) SetUpstreamRate(f float64) *ChannelKeyUpdateOne {
+	ckuo.mutation.ResetUpstreamRate()
+	ckuo.mutation.SetUpstreamRate(f)
+	return ckuo
+}
+
+// SetNillableUpstreamRate sets the "upstream_rate" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableUpstreamRate(f *float64) *ChannelKeyUpdateOne {
+	if f != nil {
+		ckuo.SetUpstreamRate(*f)
+	}
+	return ckuo
+}
+
+// AddUpstreamRate adds f to the "upstream_rate" field.
+func (ckuo *ChannelKeyUpdateOne) AddUpstreamRate(f float64) *ChannelKeyUpdateOne {
+	ckuo.mutation.AddUpstreamRate(f)
+	return ckuo
+}
+
+// SetUpstreamRateAt sets the "upstream_rate_at" field.
+func (ckuo *ChannelKeyUpdateOne) SetUpstreamRateAt(t time.Time) *ChannelKeyUpdateOne {
+	ckuo.mutation.SetUpstreamRateAt(t)
+	return ckuo
+}
+
+// SetNillableUpstreamRateAt sets the "upstream_rate_at" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableUpstreamRateAt(t *time.Time) *ChannelKeyUpdateOne {
+	if t != nil {
+		ckuo.SetUpstreamRateAt(*t)
+	}
+	return ckuo
+}
+
+// ClearUpstreamRateAt clears the value of the "upstream_rate_at" field.
+func (ckuo *ChannelKeyUpdateOne) ClearUpstreamRateAt() *ChannelKeyUpdateOne {
+	ckuo.mutation.ClearUpstreamRateAt()
+	return ckuo
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (ckuo *ChannelKeyUpdateOne) SetUpdatedAt(t time.Time) *ChannelKeyUpdateOne {
 	ckuo.mutation.SetUpdatedAt(t)
@@ -1400,6 +1796,11 @@ func (ckuo *ChannelKeyUpdateOne) check() error {
 			return &ValidationError{Name: "weight", err: fmt.Errorf(`ent: validator failed for field "ChannelKey.weight": %w`, err)}
 		}
 	}
+	if v, ok := ckuo.mutation.HealthStatus(); ok {
+		if err := channelkey.HealthStatusValidator(v); err != nil {
+			return &ValidationError{Name: "health_status", err: fmt.Errorf(`ent: validator failed for field "ChannelKey.health_status": %w`, err)}
+		}
+	}
 	if _, ok := ckuo.mutation.ChannelID(); ckuo.mutation.ChannelCleared() && !ok {
 		return errors.New(`ent: clearing a required unique edge "ChannelKey.channel"`)
 	}
@@ -1558,6 +1959,51 @@ func (ckuo *ChannelKeyUpdateOne) sqlSave(ctx context.Context) (_node *ChannelKey
 	}
 	if value, ok := ckuo.mutation.BalanceCheckEnabled(); ok {
 		_spec.SetField(channelkey.FieldBalanceCheckEnabled, field.TypeBool, value)
+	}
+	if value, ok := ckuo.mutation.ProbeEnabled(); ok {
+		_spec.SetField(channelkey.FieldProbeEnabled, field.TypeBool, value)
+	}
+	if value, ok := ckuo.mutation.ProbeModel(); ok {
+		_spec.SetField(channelkey.FieldProbeModel, field.TypeString, value)
+	}
+	if value, ok := ckuo.mutation.HealthStatus(); ok {
+		_spec.SetField(channelkey.FieldHealthStatus, field.TypeEnum, value)
+	}
+	if value, ok := ckuo.mutation.ConsecutiveFailures(); ok {
+		_spec.SetField(channelkey.FieldConsecutiveFailures, field.TypeInt, value)
+	}
+	if value, ok := ckuo.mutation.AddedConsecutiveFailures(); ok {
+		_spec.AddField(channelkey.FieldConsecutiveFailures, field.TypeInt, value)
+	}
+	if value, ok := ckuo.mutation.ConsecutiveSuccesses(); ok {
+		_spec.SetField(channelkey.FieldConsecutiveSuccesses, field.TypeInt, value)
+	}
+	if value, ok := ckuo.mutation.AddedConsecutiveSuccesses(); ok {
+		_spec.AddField(channelkey.FieldConsecutiveSuccesses, field.TypeInt, value)
+	}
+	if value, ok := ckuo.mutation.LastProbeAt(); ok {
+		_spec.SetField(channelkey.FieldLastProbeAt, field.TypeTime, value)
+	}
+	if ckuo.mutation.LastProbeAtCleared() {
+		_spec.ClearField(channelkey.FieldLastProbeAt, field.TypeTime)
+	}
+	if value, ok := ckuo.mutation.UpstreamRateEnabled(); ok {
+		_spec.SetField(channelkey.FieldUpstreamRateEnabled, field.TypeBool, value)
+	}
+	if value, ok := ckuo.mutation.UpstreamRatePath(); ok {
+		_spec.SetField(channelkey.FieldUpstreamRatePath, field.TypeString, value)
+	}
+	if value, ok := ckuo.mutation.UpstreamRate(); ok {
+		_spec.SetField(channelkey.FieldUpstreamRate, field.TypeFloat64, value)
+	}
+	if value, ok := ckuo.mutation.AddedUpstreamRate(); ok {
+		_spec.AddField(channelkey.FieldUpstreamRate, field.TypeFloat64, value)
+	}
+	if value, ok := ckuo.mutation.UpstreamRateAt(); ok {
+		_spec.SetField(channelkey.FieldUpstreamRateAt, field.TypeTime, value)
+	}
+	if ckuo.mutation.UpstreamRateAtCleared() {
+		_spec.ClearField(channelkey.FieldUpstreamRateAt, field.TypeTime)
 	}
 	if value, ok := ckuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(channelkey.FieldUpdatedAt, field.TypeTime, value)

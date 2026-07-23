@@ -18,6 +18,9 @@ type AnnouncementRead func(*sql.Selector)
 // BalanceLog is the predicate function for balancelog builders.
 type BalanceLog func(*sql.Selector)
 
+// Bookmark is the predicate function for bookmark builders.
+type Bookmark func(*sql.Selector)
+
 // Channel is the predicate function for channel builders.
 type Channel func(*sql.Selector)
 

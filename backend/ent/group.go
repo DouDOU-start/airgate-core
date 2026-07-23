@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -29,6 +30,10 @@ type Group struct {
 	IsExclusive bool `json:"is_exclusive,omitempty"`
 	// StatusVisible holds the value of the "status_visible" field.
 	StatusVisible bool `json:"status_visible,omitempty"`
+	// AllowedClients holds the value of the "allowed_clients" field.
+	AllowedClients []string `json:"allowed_clients,omitempty"`
+	// FallbackGroupID holds the value of the "fallback_group_id" field.
+	FallbackGroupID *int `json:"fallback_group_id,omitempty"`
 	// Note holds the value of the "note" field.
 	Note string `json:"note,omitempty"`
 	// SortWeight holds the value of the "sort_weight" field.
@@ -99,11 +104,13 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case group.FieldAllowedClients:
+			values[i] = new([]byte)
 		case group.FieldIsExclusive, group.FieldStatusVisible:
 			values[i] = new(sql.NullBool)
 		case group.FieldRateMultiplier, group.FieldAlphaSearchPrice:
 			values[i] = new(sql.NullFloat64)
-		case group.FieldID, group.FieldSortWeight:
+		case group.FieldID, group.FieldFallbackGroupID, group.FieldSortWeight:
 			values[i] = new(sql.NullInt64)
 		case group.FieldName, group.FieldPlatform, group.FieldNote:
 			values[i] = new(sql.NullString)
@@ -166,6 +173,21 @@ func (gr *Group) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status_visible", values[i])
 			} else if value.Valid {
 				gr.StatusVisible = value.Bool
+			}
+		case group.FieldAllowedClients:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field allowed_clients", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &gr.AllowedClients); err != nil {
+					return fmt.Errorf("unmarshal field allowed_clients: %w", err)
+				}
+			}
+		case group.FieldFallbackGroupID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field fallback_group_id", values[i])
+			} else if value.Valid {
+				gr.FallbackGroupID = new(int)
+				*gr.FallbackGroupID = int(value.Int64)
 			}
 		case group.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -266,6 +288,14 @@ func (gr *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status_visible=")
 	builder.WriteString(fmt.Sprintf("%v", gr.StatusVisible))
+	builder.WriteString(", ")
+	builder.WriteString("allowed_clients=")
+	builder.WriteString(fmt.Sprintf("%v", gr.AllowedClients))
+	builder.WriteString(", ")
+	if v := gr.FallbackGroupID; v != nil {
+		builder.WriteString("fallback_group_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("note=")
 	builder.WriteString(gr.Note)

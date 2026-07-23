@@ -19,6 +19,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/announcementread"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
+	"github.com/DouDOU-start/airgate-core/ent/bookmark"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
@@ -52,6 +53,8 @@ type Client struct {
 	AnnouncementRead *AnnouncementReadClient
 	// BalanceLog is the client for interacting with the BalanceLog builders.
 	BalanceLog *BalanceLogClient
+	// Bookmark is the client for interacting with the Bookmark builders.
+	Bookmark *BookmarkClient
 	// Channel is the client for interacting with the Channel builders.
 	Channel *ChannelClient
 	// ChannelKey is the client for interacting with the ChannelKey builders.
@@ -103,6 +106,7 @@ func (c *Client) init() {
 	c.Announcement = NewAnnouncementClient(c.config)
 	c.AnnouncementRead = NewAnnouncementReadClient(c.config)
 	c.BalanceLog = NewBalanceLogClient(c.config)
+	c.Bookmark = NewBookmarkClient(c.config)
 	c.Channel = NewChannelClient(c.config)
 	c.ChannelKey = NewChannelKeyClient(c.config)
 	c.Group = NewGroupClient(c.config)
@@ -217,6 +221,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Announcement:          NewAnnouncementClient(cfg),
 		AnnouncementRead:      NewAnnouncementReadClient(cfg),
 		BalanceLog:            NewBalanceLogClient(cfg),
+		Bookmark:              NewBookmarkClient(cfg),
 		Channel:               NewChannelClient(cfg),
 		ChannelKey:            NewChannelKeyClient(cfg),
 		Group:                 NewGroupClient(cfg),
@@ -258,6 +263,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Announcement:          NewAnnouncementClient(cfg),
 		AnnouncementRead:      NewAnnouncementReadClient(cfg),
 		BalanceLog:            NewBalanceLogClient(cfg),
+		Bookmark:              NewBookmarkClient(cfg),
 		Channel:               NewChannelClient(cfg),
 		ChannelKey:            NewChannelKeyClient(cfg),
 		Group:                 NewGroupClient(cfg),
@@ -305,9 +311,9 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel,
-		c.ChannelKey, c.Group, c.InviteProfile, c.InviteRebateLog, c.ModelPrice,
-		c.ModelTag, c.ModerationLog, c.OAuthClient, c.PaymentOrder,
+		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Bookmark,
+		c.Channel, c.ChannelKey, c.Group, c.InviteProfile, c.InviteRebateLog,
+		c.ModelPrice, c.ModelTag, c.ModerationLog, c.OAuthClient, c.PaymentOrder,
 		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task, c.Tier,
 		c.UpstreamRequestLog, c.UsageLog, c.User,
 	} {
@@ -319,9 +325,9 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Channel,
-		c.ChannelKey, c.Group, c.InviteProfile, c.InviteRebateLog, c.ModelPrice,
-		c.ModelTag, c.ModerationLog, c.OAuthClient, c.PaymentOrder,
+		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Bookmark,
+		c.Channel, c.ChannelKey, c.Group, c.InviteProfile, c.InviteRebateLog,
+		c.ModelPrice, c.ModelTag, c.ModerationLog, c.OAuthClient, c.PaymentOrder,
 		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task, c.Tier,
 		c.UpstreamRequestLog, c.UsageLog, c.User,
 	} {
@@ -340,6 +346,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.AnnouncementRead.mutate(ctx, m)
 	case *BalanceLogMutation:
 		return c.BalanceLog.mutate(ctx, m)
+	case *BookmarkMutation:
+		return c.Bookmark.mutate(ctx, m)
 	case *ChannelMutation:
 		return c.Channel.mutate(ctx, m)
 	case *ChannelKeyMutation:
@@ -974,6 +982,139 @@ func (c *BalanceLogClient) mutate(ctx context.Context, m *BalanceLogMutation) (V
 		return (&BalanceLogDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown BalanceLog mutation op: %q", m.Op())
+	}
+}
+
+// BookmarkClient is a client for the Bookmark schema.
+type BookmarkClient struct {
+	config
+}
+
+// NewBookmarkClient returns a client for the Bookmark from the given config.
+func NewBookmarkClient(c config) *BookmarkClient {
+	return &BookmarkClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `bookmark.Hooks(f(g(h())))`.
+func (c *BookmarkClient) Use(hooks ...Hook) {
+	c.hooks.Bookmark = append(c.hooks.Bookmark, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `bookmark.Intercept(f(g(h())))`.
+func (c *BookmarkClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Bookmark = append(c.inters.Bookmark, interceptors...)
+}
+
+// Create returns a builder for creating a Bookmark entity.
+func (c *BookmarkClient) Create() *BookmarkCreate {
+	mutation := newBookmarkMutation(c.config, OpCreate)
+	return &BookmarkCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Bookmark entities.
+func (c *BookmarkClient) CreateBulk(builders ...*BookmarkCreate) *BookmarkCreateBulk {
+	return &BookmarkCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *BookmarkClient) MapCreateBulk(slice any, setFunc func(*BookmarkCreate, int)) *BookmarkCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &BookmarkCreateBulk{err: fmt.Errorf("calling to BookmarkClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*BookmarkCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &BookmarkCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Bookmark.
+func (c *BookmarkClient) Update() *BookmarkUpdate {
+	mutation := newBookmarkMutation(c.config, OpUpdate)
+	return &BookmarkUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *BookmarkClient) UpdateOne(b *Bookmark) *BookmarkUpdateOne {
+	mutation := newBookmarkMutation(c.config, OpUpdateOne, withBookmark(b))
+	return &BookmarkUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *BookmarkClient) UpdateOneID(id int) *BookmarkUpdateOne {
+	mutation := newBookmarkMutation(c.config, OpUpdateOne, withBookmarkID(id))
+	return &BookmarkUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Bookmark.
+func (c *BookmarkClient) Delete() *BookmarkDelete {
+	mutation := newBookmarkMutation(c.config, OpDelete)
+	return &BookmarkDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *BookmarkClient) DeleteOne(b *Bookmark) *BookmarkDeleteOne {
+	return c.DeleteOneID(b.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *BookmarkClient) DeleteOneID(id int) *BookmarkDeleteOne {
+	builder := c.Delete().Where(bookmark.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &BookmarkDeleteOne{builder}
+}
+
+// Query returns a query builder for Bookmark.
+func (c *BookmarkClient) Query() *BookmarkQuery {
+	return &BookmarkQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeBookmark},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Bookmark entity by its id.
+func (c *BookmarkClient) Get(ctx context.Context, id int) (*Bookmark, error) {
+	return c.Query().Where(bookmark.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *BookmarkClient) GetX(ctx context.Context, id int) *Bookmark {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *BookmarkClient) Hooks() []Hook {
+	return c.hooks.Bookmark
+}
+
+// Interceptors returns the client interceptors.
+func (c *BookmarkClient) Interceptors() []Interceptor {
+	return c.inters.Bookmark
+}
+
+func (c *BookmarkClient) mutate(ctx context.Context, m *BookmarkMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&BookmarkCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&BookmarkUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&BookmarkUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&BookmarkDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Bookmark mutation op: %q", m.Op())
 	}
 }
 
@@ -3726,15 +3867,17 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, ChannelKey, Group,
-		InviteProfile, InviteRebateLog, ModelPrice, ModelTag, ModerationLog,
-		OAuthClient, PaymentOrder, PaymentProviderConfig, RedemptionCode, Setting,
-		Task, Tier, UpstreamRequestLog, UsageLog, User []ent.Hook
+		APIKey, Announcement, AnnouncementRead, BalanceLog, Bookmark, Channel,
+		ChannelKey, Group, InviteProfile, InviteRebateLog, ModelPrice, ModelTag,
+		ModerationLog, OAuthClient, PaymentOrder, PaymentProviderConfig,
+		RedemptionCode, Setting, Task, Tier, UpstreamRequestLog, UsageLog,
+		User []ent.Hook
 	}
 	inters struct {
-		APIKey, Announcement, AnnouncementRead, BalanceLog, Channel, ChannelKey, Group,
-		InviteProfile, InviteRebateLog, ModelPrice, ModelTag, ModerationLog,
-		OAuthClient, PaymentOrder, PaymentProviderConfig, RedemptionCode, Setting,
-		Task, Tier, UpstreamRequestLog, UsageLog, User []ent.Interceptor
+		APIKey, Announcement, AnnouncementRead, BalanceLog, Bookmark, Channel,
+		ChannelKey, Group, InviteProfile, InviteRebateLog, ModelPrice, ModelTag,
+		ModerationLog, OAuthClient, PaymentOrder, PaymentProviderConfig,
+		RedemptionCode, Setting, Task, Tier, UpstreamRequestLog, UsageLog,
+		User []ent.Interceptor
 	}
 )
