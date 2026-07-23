@@ -94,7 +94,9 @@ func TestChannelKeySnapshotEffectiveCostRatio(t *testing.T) {
 		snap *ChannelKeySnapshot
 		want float64
 	}{
-		{name: "探测结果优先", snap: &ChannelKeySnapshot{CostRatio: 0.5, UpstreamRate: 0.8}, want: 0.8},
+		{name: "开关开启时探测结果优先", snap: &ChannelKeySnapshot{CostRatio: 0.5, UpstreamRate: 0.8, UseUpstreamRateForCost: true}, want: 0.8},
+		{name: "开关关闭时忽略探测结果", snap: &ChannelKeySnapshot{CostRatio: 0.5, UpstreamRate: 0.8}, want: 0.5},
+		{name: "开关开启但无探测结果时回退配置", snap: &ChannelKeySnapshot{CostRatio: 0.5, UseUpstreamRateForCost: true}, want: 0.5},
 		{name: "无探测结果回退配置", snap: &ChannelKeySnapshot{CostRatio: 0.5}, want: 0.5},
 		{name: "倍率均无效回退一倍", snap: &ChannelKeySnapshot{}, want: 1},
 		{name: "空快照回退一倍", snap: nil, want: 1},

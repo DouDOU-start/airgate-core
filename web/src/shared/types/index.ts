@@ -615,7 +615,7 @@ export interface ChannelKeyResp {
   /** 上游账户余额（USD）；按 key 探测上游兼容余额接口 */
   balance: number;
   balance_updated_at?: string;
-  /** 是否参与主动余额刷新（进页自动/一键批量）；关闭后手动单把查询仍可用 */
+  /** 是否参与进页主动余额刷新；关闭后手动单把查询仍可用 */
   balance_check_enabled: boolean;
   /** 是否启用主动健康探针 */
   probe_enabled: boolean;
@@ -633,6 +633,8 @@ export interface ChannelKeyResp {
   upstream_rate_enabled: boolean;
   /** 上游倍率端点路径（空串默认 /v1/airgate/billing） */
   upstream_rate_path: string;
+  /** 是否使用探测倍率覆盖手动成本倍率 */
+  use_upstream_rate_for_cost: boolean;
   /** 最近探测到的上游计费倍率 */
   upstream_rate: number;
   /** 上游倍率最近探测时间 */
@@ -706,6 +708,8 @@ export interface ChannelKeyReq {
   upstream_rate_enabled?: boolean;
   /** 上游倍率端点路径 */
   upstream_rate_path?: string;
+  /** 是否使用探测倍率覆盖手动成本倍率；省略 = 新增取默认 false / 更新不改 */
+  use_upstream_rate_for_cost?: boolean;
   group_ids?: number[];
 }
 

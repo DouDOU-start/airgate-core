@@ -389,6 +389,20 @@ func (ckc *ChannelKeyCreate) SetNillableUpstreamRatePath(s *string) *ChannelKeyC
 	return ckc
 }
 
+// SetUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field.
+func (ckc *ChannelKeyCreate) SetUseUpstreamRateForCost(b bool) *ChannelKeyCreate {
+	ckc.mutation.SetUseUpstreamRateForCost(b)
+	return ckc
+}
+
+// SetNillableUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableUseUpstreamRateForCost(b *bool) *ChannelKeyCreate {
+	if b != nil {
+		ckc.SetUseUpstreamRateForCost(*b)
+	}
+	return ckc
+}
+
 // SetUpstreamRate sets the "upstream_rate" field.
 func (ckc *ChannelKeyCreate) SetUpstreamRate(f float64) *ChannelKeyCreate {
 	ckc.mutation.SetUpstreamRate(f)
@@ -601,6 +615,10 @@ func (ckc *ChannelKeyCreate) defaults() {
 		v := channelkey.DefaultUpstreamRatePath
 		ckc.mutation.SetUpstreamRatePath(v)
 	}
+	if _, ok := ckc.mutation.UseUpstreamRateForCost(); !ok {
+		v := channelkey.DefaultUseUpstreamRateForCost
+		ckc.mutation.SetUseUpstreamRateForCost(v)
+	}
 	if _, ok := ckc.mutation.UpstreamRate(); !ok {
 		v := channelkey.DefaultUpstreamRate
 		ckc.mutation.SetUpstreamRate(v)
@@ -712,6 +730,9 @@ func (ckc *ChannelKeyCreate) check() error {
 	}
 	if _, ok := ckc.mutation.UpstreamRatePath(); !ok {
 		return &ValidationError{Name: "upstream_rate_path", err: errors.New(`ent: missing required field "ChannelKey.upstream_rate_path"`)}
+	}
+	if _, ok := ckc.mutation.UseUpstreamRateForCost(); !ok {
+		return &ValidationError{Name: "use_upstream_rate_for_cost", err: errors.New(`ent: missing required field "ChannelKey.use_upstream_rate_for_cost"`)}
 	}
 	if _, ok := ckc.mutation.UpstreamRate(); !ok {
 		return &ValidationError{Name: "upstream_rate", err: errors.New(`ent: missing required field "ChannelKey.upstream_rate"`)}
@@ -871,6 +892,10 @@ func (ckc *ChannelKeyCreate) createSpec() (*ChannelKey, *sqlgraph.CreateSpec) {
 	if value, ok := ckc.mutation.UpstreamRatePath(); ok {
 		_spec.SetField(channelkey.FieldUpstreamRatePath, field.TypeString, value)
 		_node.UpstreamRatePath = value
+	}
+	if value, ok := ckc.mutation.UseUpstreamRateForCost(); ok {
+		_spec.SetField(channelkey.FieldUseUpstreamRateForCost, field.TypeBool, value)
+		_node.UseUpstreamRateForCost = value
 	}
 	if value, ok := ckc.mutation.UpstreamRate(); ok {
 		_spec.SetField(channelkey.FieldUpstreamRate, field.TypeFloat64, value)
@@ -1448,6 +1473,18 @@ func (u *ChannelKeyUpsert) SetUpstreamRatePath(v string) *ChannelKeyUpsert {
 // UpdateUpstreamRatePath sets the "upstream_rate_path" field to the value that was provided on create.
 func (u *ChannelKeyUpsert) UpdateUpstreamRatePath() *ChannelKeyUpsert {
 	u.SetExcluded(channelkey.FieldUpstreamRatePath)
+	return u
+}
+
+// SetUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field.
+func (u *ChannelKeyUpsert) SetUseUpstreamRateForCost(v bool) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldUseUpstreamRateForCost, v)
+	return u
+}
+
+// UpdateUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateUseUpstreamRateForCost() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldUseUpstreamRateForCost)
 	return u
 }
 
@@ -2080,6 +2117,20 @@ func (u *ChannelKeyUpsertOne) SetUpstreamRatePath(v string) *ChannelKeyUpsertOne
 func (u *ChannelKeyUpsertOne) UpdateUpstreamRatePath() *ChannelKeyUpsertOne {
 	return u.Update(func(s *ChannelKeyUpsert) {
 		s.UpdateUpstreamRatePath()
+	})
+}
+
+// SetUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field.
+func (u *ChannelKeyUpsertOne) SetUseUpstreamRateForCost(v bool) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetUseUpstreamRateForCost(v)
+	})
+}
+
+// UpdateUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateUseUpstreamRateForCost() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateUseUpstreamRateForCost()
 	})
 }
 
@@ -2886,6 +2937,20 @@ func (u *ChannelKeyUpsertBulk) SetUpstreamRatePath(v string) *ChannelKeyUpsertBu
 func (u *ChannelKeyUpsertBulk) UpdateUpstreamRatePath() *ChannelKeyUpsertBulk {
 	return u.Update(func(s *ChannelKeyUpsert) {
 		s.UpdateUpstreamRatePath()
+	})
+}
+
+// SetUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field.
+func (u *ChannelKeyUpsertBulk) SetUseUpstreamRateForCost(v bool) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetUseUpstreamRateForCost(v)
+	})
+}
+
+// UpdateUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateUseUpstreamRateForCost() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateUseUpstreamRateForCost()
 	})
 }
 

@@ -167,10 +167,11 @@ type ChannelKey struct {
 	LastProbeAt          *time.Time
 
 	// ---- 上游倍率探测 ----
-	UpstreamRateEnabled bool
-	UpstreamRatePath    string
-	UpstreamRate        float64
-	UpstreamRateAt      *time.Time
+	UpstreamRateEnabled    bool
+	UpstreamRatePath       string
+	UseUpstreamRateForCost bool
+	UpstreamRate           float64
+	UpstreamRateAt         *time.Time
 
 	GroupIDs  []int
 	CreatedAt time.Time
@@ -265,7 +266,9 @@ type KeyInput struct {
 	// UpstreamRateEnabled nil = 新增取默认 false / 更新不改。
 	UpstreamRateEnabled *bool
 	UpstreamRatePath    *string
-	GroupIDs            []int
+	// UseUpstreamRateForCost nil = 新增取默认 false / 更新不改。
+	UseUpstreamRateForCost *bool
+	GroupIDs               []int
 }
 
 // CreateInput 创建渠道输入（仅供应商级字段；key 建后单独添加）。

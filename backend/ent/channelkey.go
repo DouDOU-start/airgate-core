@@ -79,6 +79,8 @@ type ChannelKey struct {
 	UpstreamRateEnabled bool `json:"upstream_rate_enabled,omitempty"`
 	// 上游倍率端点路径；空串默认 /v1/airgate/billing
 	UpstreamRatePath string `json:"upstream_rate_path,omitempty"`
+	// 是否使用探测倍率覆盖手动成本倍率
+	UseUpstreamRateForCost bool `json:"use_upstream_rate_for_cost,omitempty"`
 	// 最近一次探测到的上游计费倍率
 	UpstreamRate float64 `json:"upstream_rate,omitempty"`
 	// 上游倍率最近探测时间
@@ -143,7 +145,7 @@ func (*ChannelKey) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case channelkey.FieldModels, channelkey.FieldModelMapping, channelkey.FieldParamOverride, channelkey.FieldHeaderOverride, channelkey.FieldTags:
 			values[i] = new([]byte)
-		case channelkey.FieldBalanceCheckEnabled, channelkey.FieldProbeEnabled, channelkey.FieldUpstreamRateEnabled:
+		case channelkey.FieldBalanceCheckEnabled, channelkey.FieldProbeEnabled, channelkey.FieldUpstreamRateEnabled, channelkey.FieldUseUpstreamRateForCost:
 			values[i] = new(sql.NullBool)
 		case channelkey.FieldCostRatio, channelkey.FieldBalance, channelkey.FieldUpstreamRate:
 			values[i] = new(sql.NullFloat64)
@@ -370,6 +372,12 @@ func (ck *ChannelKey) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ck.UpstreamRatePath = value.String
 			}
+		case channelkey.FieldUseUpstreamRateForCost:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field use_upstream_rate_for_cost", values[i])
+			} else if value.Valid {
+				ck.UseUpstreamRateForCost = value.Bool
+			}
 		case channelkey.FieldUpstreamRate:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
 				return fmt.Errorf("unexpected type %T for field upstream_rate", values[i])
@@ -549,6 +557,9 @@ func (ck *ChannelKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("upstream_rate_path=")
 	builder.WriteString(ck.UpstreamRatePath)
+	builder.WriteString(", ")
+	builder.WriteString("use_upstream_rate_for_cost=")
+	builder.WriteString(fmt.Sprintf("%v", ck.UseUpstreamRateForCost))
 	builder.WriteString(", ")
 	builder.WriteString("upstream_rate=")
 	builder.WriteString(fmt.Sprintf("%v", ck.UpstreamRate))

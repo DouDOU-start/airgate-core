@@ -595,26 +595,27 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelKey
 			}
 
 			snaps = append(snaps, registry.ChannelKeySnapshot{
-				KeyID:          key.ID,
-				ChannelID:      ch.ID,
-				ChannelName:    ch.Name,
-				BaseURL:        ch.BaseURL,
-				Type:           key.Type,
-				APIKey:         plain,
-				Models:         models,
-				ModelMapping:   key.ModelMapping,
-				ParamOverride:  key.ParamOverride,
-				HeaderOverride: key.HeaderOverride,
-				Priority:       key.Priority,
-				Weight:         key.Weight,
-				MaxConcurrency: key.MaxConcurrency,
-				MaxRPM:         key.MaxRPM,
-				CostRatio:      key.CostRatio,
-				UpstreamRate:   key.UpstreamRate,
-				Status:         key.Status,
-				GroupIDs:       groups,
-				TestModel:      key.TestModel,
-				HealthStatus:   key.HealthStatus,
+				KeyID:                  key.ID,
+				ChannelID:              ch.ID,
+				ChannelName:            ch.Name,
+				BaseURL:                ch.BaseURL,
+				Type:                   key.Type,
+				APIKey:                 plain,
+				Models:                 models,
+				ModelMapping:           key.ModelMapping,
+				ParamOverride:          key.ParamOverride,
+				HeaderOverride:         key.HeaderOverride,
+				Priority:               key.Priority,
+				Weight:                 key.Weight,
+				MaxConcurrency:         key.MaxConcurrency,
+				MaxRPM:                 key.MaxRPM,
+				CostRatio:              key.CostRatio,
+				UpstreamRate:           key.UpstreamRate,
+				UseUpstreamRateForCost: key.UpstreamRateEnabled && key.UseUpstreamRateForCost,
+				Status:                 key.Status,
+				GroupIDs:               groups,
+				TestModel:              key.TestModel,
+				HealthStatus:           key.HealthStatus,
 			})
 		}
 	}
@@ -696,7 +697,7 @@ func (s *Service) ProbeKeyBilling(ctx context.Context, keyID int) (float64, erro
 	if err != nil {
 		return 0, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))

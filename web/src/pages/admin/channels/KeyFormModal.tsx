@@ -58,7 +58,14 @@ interface KeyForm {
   probeModel: string;
   upstreamRateEnabled: boolean;
   upstreamRatePath: string;
+  useUpstreamRateForCost: boolean;
 }
+
+const AIRGATE_RATE_PATH = '/v1/airgate/billing';
+const UPSTREAM_RATE_PLATFORM_PRESETS = [
+  { id: AIRGATE_RATE_PATH, labelKey: 'channels.upstream_rate_platform_airgate' },
+  { id: '/v1/sub2api/billing', labelKey: 'channels.upstream_rate_platform_sub2api' },
+] as const;
 
 const emptyForm: KeyForm = {
   name: '',
@@ -79,7 +86,8 @@ const emptyForm: KeyForm = {
   probeEnabled: false,
   probeModel: '',
   upstreamRateEnabled: false,
-  upstreamRatePath: '',
+  upstreamRatePath: AIRGATE_RATE_PATH,
+  useUpstreamRateForCost: false,
 };
 
 function formFromKey(key: ChannelKeyResp): KeyForm {
@@ -105,7 +113,8 @@ function formFromKey(key: ChannelKeyResp): KeyForm {
     probeEnabled: key.probe_enabled,
     probeModel: key.probe_model ?? '',
     upstreamRateEnabled: key.upstream_rate_enabled,
-    upstreamRatePath: key.upstream_rate_path ?? '',
+    upstreamRatePath: key.upstream_rate_path || AIRGATE_RATE_PATH,
+    useUpstreamRateForCost: key.use_upstream_rate_for_cost,
   };
 }
 
@@ -188,9 +197,8 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
       probe_enabled: form.probeEnabled,
       probe_model: form.probeModel.trim() || undefined,
       upstream_rate_enabled: form.upstreamRateEnabled,
-      // 空字符串也必须显式提交：后端以 nil 表示“不修改”，以 "" 表示
-      // 清除自定义路径并恢复默认 /v1/airgate/billing。
       upstream_rate_path: form.upstreamRatePath.trim(),
+      use_upstream_rate_for_cost: form.upstreamRateEnabled && form.useUpstreamRateForCost,
     };
 
     if (isEdit && channelKey) {
@@ -208,6 +216,18 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
     },
   });
   const selectedTypeLabel = CHANNEL_TYPE_OPTIONS.find((item) => item.id === form.type)?.label ?? form.type;
+  const upstreamRatePlatformOptions = UPSTREAM_RATE_PLATFORM_PRESETS.map((item) => ({
+    id: item.id,
+    label: t(item.labelKey),
+  }));
+  if (!UPSTREAM_RATE_PLATFORM_PRESETS.some((item) => item.id === form.upstreamRatePath)) {
+    upstreamRatePlatformOptions.push({
+      id: form.upstreamRatePath,
+      label: t('channels.upstream_rate_platform_existing'),
+    });
+  }
+  const selectedUpstreamRatePlatformLabel = upstreamRatePlatformOptions
+    .find((item) => item.id === form.upstreamRatePath)?.label ?? form.upstreamRatePath;
 
   return (
     <Modal state={modalState}>
@@ -353,7 +373,7 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                   />
                 </div>
 
-                <div className="flex items-center gap-8">
+                <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
                   <NativeSwitch
                     ariaLabel={t('channels.key_enabled')}
                     isSelected={form.enabled}
@@ -378,7 +398,11 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                     ariaLabel={t('channels.upstream_rate_enabled')}
                     isSelected={form.upstreamRateEnabled}
                     label={t('channels.upstream_rate_enabled')}
-                    onChange={(selected) => setForm((p) => ({ ...p, upstreamRateEnabled: selected }))}
+                    onChange={(selected) => setForm((p) => ({
+                      ...p,
+                      upstreamRateEnabled: selected,
+                      useUpstreamRateForCost: selected ? p.useUpstreamRateForCost : false,
+                    }))}
                   />
                 </div>
                 {form.probeEnabled ? (
@@ -393,15 +417,47 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                   </HeroTextField>
                 ) : null}
                 {form.upstreamRateEnabled ? (
-                  <HeroTextField fullWidth>
-                    <Label>{t('channels.upstream_rate_path')}</Label>
-                    <Input
-                      autoComplete="off"
-                      placeholder={t('channels.upstream_rate_path_placeholder')}
-                      value={form.upstreamRatePath}
-                      onChange={(e) => setForm((p) => ({ ...p, upstreamRatePath: e.target.value }))}
-                    />
-                  </HeroTextField>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-stretch sm:gap-x-6">
+                    <div>
+                      <Label className="mb-1.5 block text-sm">{t('channels.upstream_rate_platform')}</Label>
+                      <Select
+                        aria-label={t('channels.upstream_rate_platform')}
+                        fullWidth
+                        selectedKey={form.upstreamRatePath}
+                        onSelectionChange={(key) => setForm((p) => ({ ...p, upstreamRatePath: String(key) }))}
+                      >
+                        <Select.Trigger>
+                          <Select.Value>{selectedUpstreamRatePlatformLabel}</Select.Value>
+                          <Select.Indicator />
+                        </Select.Trigger>
+                        <Select.Popover>
+                          <ListBox items={upstreamRatePlatformOptions}>
+                            {(item) => (
+                              <ListBox.Item id={item.id} textValue={item.label}>
+                                {item.label}
+                              </ListBox.Item>
+                            )}
+                          </ListBox>
+                        </Select.Popover>
+                      </Select>
+                    </div>
+                    <div className="flex flex-col">
+                      {/* 与左列 Label 等高的隐形占位：撑出标题行，使开关中线对齐下拉框中线 */}
+                      <span aria-hidden className="mb-1.5 hidden select-none text-sm sm:block sm:invisible">
+                        {t('channels.upstream_rate_platform')}
+                      </span>
+                      <div className="flex flex-1 items-center">
+                        <span title={t('channels.use_upstream_rate_for_cost_hint')}>
+                          <NativeSwitch
+                            ariaLabel={t('channels.use_upstream_rate_for_cost')}
+                            isSelected={form.useUpstreamRateForCost}
+                            label={t('channels.use_upstream_rate_for_cost')}
+                            onChange={(selected) => setForm((p) => ({ ...p, useUpstreamRateForCost: selected }))}
+                          />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 ) : null}
               </div>
             </Modal.Body>

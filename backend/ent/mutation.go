@@ -5280,67 +5280,68 @@ func (m *ChannelMutation) ResetEdge(name string) error {
 // ChannelKeyMutation represents an operation that mutates the ChannelKey nodes in the graph.
 type ChannelKeyMutation struct {
 	config
-	op                       Op
-	typ                      string
-	id                       *int
-	name                     *string
-	_type                    *channelkey.Type
-	api_key                  *string
-	models                   *[]string
-	appendmodels             []string
-	model_mapping            *map[string]string
-	param_override           *map[string]interface{}
-	header_override          *map[string]string
-	status                   *channelkey.Status
-	error_msg                *string
-	priority                 *int
-	addpriority              *int
-	weight                   *int
-	addweight                *int
-	max_concurrency          *int
-	addmax_concurrency       *int
-	max_rpm                  *int
-	addmax_rpm               *int
-	cost_ratio               *float64
-	addcost_ratio            *float64
-	tags                     *[]string
-	appendtags               []string
-	test_model               *string
-	response_time_ms         *int
-	addresponse_time_ms      *int
-	tested_at                *time.Time
-	last_used_at             *time.Time
-	balance                  *float64
-	addbalance               *float64
-	balance_updated_at       *time.Time
-	balance_check_enabled    *bool
-	probe_enabled            *bool
-	probe_model              *string
-	health_status            *channelkey.HealthStatus
-	consecutive_failures     *int
-	addconsecutive_failures  *int
-	consecutive_successes    *int
-	addconsecutive_successes *int
-	last_probe_at            *time.Time
-	upstream_rate_enabled    *bool
-	upstream_rate_path       *string
-	upstream_rate            *float64
-	addupstream_rate         *float64
-	upstream_rate_at         *time.Time
-	created_at               *time.Time
-	updated_at               *time.Time
-	clearedFields            map[string]struct{}
-	channel                  *int
-	clearedchannel           bool
-	groups                   map[int]struct{}
-	removedgroups            map[int]struct{}
-	clearedgroups            bool
-	usage_logs               map[int]struct{}
-	removedusage_logs        map[int]struct{}
-	clearedusage_logs        bool
-	done                     bool
-	oldValue                 func(context.Context) (*ChannelKey, error)
-	predicates               []predicate.ChannelKey
+	op                         Op
+	typ                        string
+	id                         *int
+	name                       *string
+	_type                      *channelkey.Type
+	api_key                    *string
+	models                     *[]string
+	appendmodels               []string
+	model_mapping              *map[string]string
+	param_override             *map[string]interface{}
+	header_override            *map[string]string
+	status                     *channelkey.Status
+	error_msg                  *string
+	priority                   *int
+	addpriority                *int
+	weight                     *int
+	addweight                  *int
+	max_concurrency            *int
+	addmax_concurrency         *int
+	max_rpm                    *int
+	addmax_rpm                 *int
+	cost_ratio                 *float64
+	addcost_ratio              *float64
+	tags                       *[]string
+	appendtags                 []string
+	test_model                 *string
+	response_time_ms           *int
+	addresponse_time_ms        *int
+	tested_at                  *time.Time
+	last_used_at               *time.Time
+	balance                    *float64
+	addbalance                 *float64
+	balance_updated_at         *time.Time
+	balance_check_enabled      *bool
+	probe_enabled              *bool
+	probe_model                *string
+	health_status              *channelkey.HealthStatus
+	consecutive_failures       *int
+	addconsecutive_failures    *int
+	consecutive_successes      *int
+	addconsecutive_successes   *int
+	last_probe_at              *time.Time
+	upstream_rate_enabled      *bool
+	upstream_rate_path         *string
+	use_upstream_rate_for_cost *bool
+	upstream_rate              *float64
+	addupstream_rate           *float64
+	upstream_rate_at           *time.Time
+	created_at                 *time.Time
+	updated_at                 *time.Time
+	clearedFields              map[string]struct{}
+	channel                    *int
+	clearedchannel             bool
+	groups                     map[int]struct{}
+	removedgroups              map[int]struct{}
+	clearedgroups              bool
+	usage_logs                 map[int]struct{}
+	removedusage_logs          map[int]struct{}
+	clearedusage_logs          bool
+	done                       bool
+	oldValue                   func(context.Context) (*ChannelKey, error)
+	predicates                 []predicate.ChannelKey
 }
 
 var _ ent.Mutation = (*ChannelKeyMutation)(nil)
@@ -6836,6 +6837,42 @@ func (m *ChannelKeyMutation) ResetUpstreamRatePath() {
 	m.upstream_rate_path = nil
 }
 
+// SetUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field.
+func (m *ChannelKeyMutation) SetUseUpstreamRateForCost(b bool) {
+	m.use_upstream_rate_for_cost = &b
+}
+
+// UseUpstreamRateForCost returns the value of the "use_upstream_rate_for_cost" field in the mutation.
+func (m *ChannelKeyMutation) UseUpstreamRateForCost() (r bool, exists bool) {
+	v := m.use_upstream_rate_for_cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUseUpstreamRateForCost returns the old "use_upstream_rate_for_cost" field's value of the ChannelKey entity.
+// If the ChannelKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelKeyMutation) OldUseUpstreamRateForCost(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUseUpstreamRateForCost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUseUpstreamRateForCost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUseUpstreamRateForCost: %w", err)
+	}
+	return oldValue.UseUpstreamRateForCost, nil
+}
+
+// ResetUseUpstreamRateForCost resets all changes to the "use_upstream_rate_for_cost" field.
+func (m *ChannelKeyMutation) ResetUseUpstreamRateForCost() {
+	m.use_upstream_rate_for_cost = nil
+}
+
 // SetUpstreamRate sets the "upstream_rate" field.
 func (m *ChannelKeyMutation) SetUpstreamRate(f float64) {
 	m.upstream_rate = &f
@@ -7194,7 +7231,7 @@ func (m *ChannelKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ChannelKeyMutation) Fields() []string {
-	fields := make([]string, 0, 34)
+	fields := make([]string, 0, 35)
 	if m.name != nil {
 		fields = append(fields, channelkey.FieldName)
 	}
@@ -7285,6 +7322,9 @@ func (m *ChannelKeyMutation) Fields() []string {
 	if m.upstream_rate_path != nil {
 		fields = append(fields, channelkey.FieldUpstreamRatePath)
 	}
+	if m.use_upstream_rate_for_cost != nil {
+		fields = append(fields, channelkey.FieldUseUpstreamRateForCost)
+	}
 	if m.upstream_rate != nil {
 		fields = append(fields, channelkey.FieldUpstreamRate)
 	}
@@ -7365,6 +7405,8 @@ func (m *ChannelKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.UpstreamRateEnabled()
 	case channelkey.FieldUpstreamRatePath:
 		return m.UpstreamRatePath()
+	case channelkey.FieldUseUpstreamRateForCost:
+		return m.UseUpstreamRateForCost()
 	case channelkey.FieldUpstreamRate:
 		return m.UpstreamRate()
 	case channelkey.FieldUpstreamRateAt:
@@ -7442,6 +7484,8 @@ func (m *ChannelKeyMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldUpstreamRateEnabled(ctx)
 	case channelkey.FieldUpstreamRatePath:
 		return m.OldUpstreamRatePath(ctx)
+	case channelkey.FieldUseUpstreamRateForCost:
+		return m.OldUseUpstreamRateForCost(ctx)
 	case channelkey.FieldUpstreamRate:
 		return m.OldUpstreamRate(ctx)
 	case channelkey.FieldUpstreamRateAt:
@@ -7668,6 +7712,13 @@ func (m *ChannelKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpstreamRatePath(v)
+		return nil
+	case channelkey.FieldUseUpstreamRateForCost:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUseUpstreamRateForCost(v)
 		return nil
 	case channelkey.FieldUpstreamRate:
 		v, ok := value.(float64)
@@ -8015,6 +8066,9 @@ func (m *ChannelKeyMutation) ResetField(name string) error {
 		return nil
 	case channelkey.FieldUpstreamRatePath:
 		m.ResetUpstreamRatePath()
+		return nil
+	case channelkey.FieldUseUpstreamRateForCost:
+		m.ResetUseUpstreamRateForCost()
 		return nil
 	case channelkey.FieldUpstreamRate:
 		m.ResetUpstreamRate()

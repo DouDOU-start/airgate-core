@@ -130,6 +130,7 @@ func TestChannelStoreCreateAndManageKeys(t *testing.T) {
 
 	ctx := context.Background()
 	store := NewChannelStore(db)
+	useUpstreamRateForCost := true
 
 	created, err := store.Create(ctx, appchannel.CreateInput{
 		Name:    "reseller",
@@ -138,7 +139,10 @@ func TestChannelStoreCreateAndManageKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create returned error: %v", err)
 	}
-	if _, err := store.CreateKey(ctx, created.ID, appchannel.KeyInput{Name: "claude", Type: "anthropic", APIKey: "cipher-a", Models: []string{"claude-x"}}); err != nil {
+	if _, err := store.CreateKey(ctx, created.ID, appchannel.KeyInput{
+		Name: "claude", Type: "anthropic", APIKey: "cipher-a", Models: []string{"claude-x"},
+		UseUpstreamRateForCost: &useUpstreamRateForCost,
+	}); err != nil {
 		t.Fatalf("CreateKey(claude) error: %v", err)
 	}
 	if _, err := store.CreateKey(ctx, created.ID, appchannel.KeyInput{Name: "gemini", Type: "gemini", APIKey: "cipher-g", Models: []string{"gemini-y"}}); err != nil {
@@ -152,6 +156,9 @@ func TestChannelStoreCreateAndManageKeys(t *testing.T) {
 	types := map[string]string{}
 	for _, k := range got.Keys {
 		types[k.Type] = k.APIKey
+		if k.Type == "anthropic" && !k.UseUpstreamRateForCost {
+			t.Fatal("新增密钥未保存探测倍率成本开关")
+		}
 		if k.ChannelID != created.ID {
 			t.Fatalf("key.ChannelID = %d, want %d", k.ChannelID, created.ID)
 		}
@@ -165,12 +172,18 @@ func TestChannelStoreCreateAndManageKeys(t *testing.T) {
 
 	// 单把 key partial 更新：改类型不动其它 key。
 	keyID := got.Keys[0].ID
-	if _, err := store.UpdateKey(ctx, keyID, appchannel.KeyInput{Models: []string{"claude-z"}}); err != nil {
+	useUpstreamRateForCost = false
+	if _, err := store.UpdateKey(ctx, keyID, appchannel.KeyInput{
+		Models: []string{"claude-z"}, UseUpstreamRateForCost: &useUpstreamRateForCost,
+	}); err != nil {
 		t.Fatalf("UpdateKey error: %v", err)
 	}
 	updated, _ := store.FindKeyByID(ctx, keyID)
 	if len(updated.Models) != 1 || updated.Models[0] != "claude-z" {
 		t.Fatalf("UpdateKey models = %v, want [claude-z]", updated.Models)
+	}
+	if updated.UseUpstreamRateForCost {
+		t.Fatal("更新密钥未关闭探测倍率成本开关")
 	}
 }
 

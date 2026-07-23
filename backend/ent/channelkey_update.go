@@ -536,6 +536,20 @@ func (cku *ChannelKeyUpdate) SetNillableUpstreamRatePath(s *string) *ChannelKeyU
 	return cku
 }
 
+// SetUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field.
+func (cku *ChannelKeyUpdate) SetUseUpstreamRateForCost(b bool) *ChannelKeyUpdate {
+	cku.mutation.SetUseUpstreamRateForCost(b)
+	return cku
+}
+
+// SetNillableUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableUseUpstreamRateForCost(b *bool) *ChannelKeyUpdate {
+	if b != nil {
+		cku.SetUseUpstreamRateForCost(*b)
+	}
+	return cku
+}
+
 // SetUpstreamRate sets the "upstream_rate" field.
 func (cku *ChannelKeyUpdate) SetUpstreamRate(f float64) *ChannelKeyUpdate {
 	cku.mutation.ResetUpstreamRate()
@@ -919,6 +933,9 @@ func (cku *ChannelKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := cku.mutation.UpstreamRatePath(); ok {
 		_spec.SetField(channelkey.FieldUpstreamRatePath, field.TypeString, value)
+	}
+	if value, ok := cku.mutation.UseUpstreamRateForCost(); ok {
+		_spec.SetField(channelkey.FieldUseUpstreamRateForCost, field.TypeBool, value)
 	}
 	if value, ok := cku.mutation.UpstreamRate(); ok {
 		_spec.SetField(channelkey.FieldUpstreamRate, field.TypeFloat64, value)
@@ -1579,6 +1596,20 @@ func (ckuo *ChannelKeyUpdateOne) SetNillableUpstreamRatePath(s *string) *Channel
 	return ckuo
 }
 
+// SetUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field.
+func (ckuo *ChannelKeyUpdateOne) SetUseUpstreamRateForCost(b bool) *ChannelKeyUpdateOne {
+	ckuo.mutation.SetUseUpstreamRateForCost(b)
+	return ckuo
+}
+
+// SetNillableUseUpstreamRateForCost sets the "use_upstream_rate_for_cost" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableUseUpstreamRateForCost(b *bool) *ChannelKeyUpdateOne {
+	if b != nil {
+		ckuo.SetUseUpstreamRateForCost(*b)
+	}
+	return ckuo
+}
+
 // SetUpstreamRate sets the "upstream_rate" field.
 func (ckuo *ChannelKeyUpdateOne) SetUpstreamRate(f float64) *ChannelKeyUpdateOne {
 	ckuo.mutation.ResetUpstreamRate()
@@ -1992,6 +2023,9 @@ func (ckuo *ChannelKeyUpdateOne) sqlSave(ctx context.Context) (_node *ChannelKey
 	}
 	if value, ok := ckuo.mutation.UpstreamRatePath(); ok {
 		_spec.SetField(channelkey.FieldUpstreamRatePath, field.TypeString, value)
+	}
+	if value, ok := ckuo.mutation.UseUpstreamRateForCost(); ok {
+		_spec.SetField(channelkey.FieldUseUpstreamRateForCost, field.TypeBool, value)
 	}
 	if value, ok := ckuo.mutation.UpstreamRate(); ok {
 		_spec.SetField(channelkey.FieldUpstreamRate, field.TypeFloat64, value)

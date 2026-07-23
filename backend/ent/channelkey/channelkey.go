@@ -75,6 +75,8 @@ const (
 	FieldUpstreamRateEnabled = "upstream_rate_enabled"
 	// FieldUpstreamRatePath holds the string denoting the upstream_rate_path field in the database.
 	FieldUpstreamRatePath = "upstream_rate_path"
+	// FieldUseUpstreamRateForCost holds the string denoting the use_upstream_rate_for_cost field in the database.
+	FieldUseUpstreamRateForCost = "use_upstream_rate_for_cost"
 	// FieldUpstreamRate holds the string denoting the upstream_rate field in the database.
 	FieldUpstreamRate = "upstream_rate"
 	// FieldUpstreamRateAt holds the string denoting the upstream_rate_at field in the database.
@@ -145,6 +147,7 @@ var Columns = []string{
 	FieldLastProbeAt,
 	FieldUpstreamRateEnabled,
 	FieldUpstreamRatePath,
+	FieldUseUpstreamRateForCost,
 	FieldUpstreamRate,
 	FieldUpstreamRateAt,
 	FieldCreatedAt,
@@ -221,6 +224,8 @@ var (
 	DefaultUpstreamRateEnabled bool
 	// DefaultUpstreamRatePath holds the default value on creation for the "upstream_rate_path" field.
 	DefaultUpstreamRatePath string
+	// DefaultUseUpstreamRateForCost holds the default value on creation for the "use_upstream_rate_for_cost" field.
+	DefaultUseUpstreamRateForCost bool
 	// DefaultUpstreamRate holds the default value on creation for the "upstream_rate" field.
 	DefaultUpstreamRate float64
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -444,6 +449,11 @@ func ByUpstreamRateEnabled(opts ...sql.OrderTermOption) OrderOption {
 // ByUpstreamRatePath orders the results by the upstream_rate_path field.
 func ByUpstreamRatePath(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpstreamRatePath, opts...).ToFunc()
+}
+
+// ByUseUpstreamRateForCost orders the results by the use_upstream_rate_for_cost field.
+func ByUseUpstreamRateForCost(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUseUpstreamRateForCost, opts...).ToFunc()
 }
 
 // ByUpstreamRate orders the results by the upstream_rate field.

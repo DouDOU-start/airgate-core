@@ -43,10 +43,11 @@ type ChannelKeyResp struct {
 	ConsecutiveSuccesses int        `json:"consecutive_successes"`
 	LastProbeAt          *time.Time `json:"last_probe_at,omitempty"`
 	// UpstreamRateEnabled 是否启用上游倍率探测。
-	UpstreamRateEnabled bool       `json:"upstream_rate_enabled"`
-	UpstreamRatePath    string     `json:"upstream_rate_path"`
-	UpstreamRate        float64    `json:"upstream_rate"`
-	UpstreamRateAt      *time.Time `json:"upstream_rate_at,omitempty"`
+	UpstreamRateEnabled    bool       `json:"upstream_rate_enabled"`
+	UpstreamRatePath       string     `json:"upstream_rate_path"`
+	UseUpstreamRateForCost bool       `json:"use_upstream_rate_for_cost"`
+	UpstreamRate           float64    `json:"upstream_rate"`
+	UpstreamRateAt         *time.Time `json:"upstream_rate_at,omitempty"`
 	// CurrentConcurrency / CurrentRPM 运行时观测指标（在途请求数 / 当前分钟请求数），列表实时展示。
 	CurrentConcurrency int `json:"current_concurrency"`
 	CurrentRPM         int `json:"current_rpm"`
@@ -112,9 +113,10 @@ type ChannelKeyReq struct {
 	ProbeEnabled *bool   `json:"probe_enabled"`
 	ProbeModel   *string `json:"probe_model"`
 	// UpstreamRateEnabled 省略 = 新增取默认 false / 更新不改。
-	UpstreamRateEnabled *bool   `json:"upstream_rate_enabled"`
-	UpstreamRatePath    *string `json:"upstream_rate_path"`
-	GroupIDs            []int   `json:"group_ids"`
+	UpstreamRateEnabled    *bool   `json:"upstream_rate_enabled"`
+	UpstreamRatePath       *string `json:"upstream_rate_path"`
+	UseUpstreamRateForCost *bool   `json:"use_upstream_rate_for_cost"`
+	GroupIDs               []int   `json:"group_ids"`
 }
 
 // TestChannelReq 密钥端点测试请求（model 缺省时取 key 的 test_model 或首个模型）。
@@ -169,28 +171,29 @@ type ChannelExportItem struct {
 
 // ChannelKeyExportItem 密钥导出条目。api_key 置空（红线），api_key_hint 供参考。
 type ChannelKeyExportItem struct {
-	Name                string            `json:"name"`
-	Type                string            `json:"type"`
-	APIKey              string            `json:"api_key"`
-	APIKeyHint          string            `json:"api_key_hint,omitempty"`
-	Models              []string          `json:"models"`
-	ModelMapping        map[string]string `json:"model_mapping"`
-	ParamOverride       map[string]any    `json:"param_override"`
-	HeaderOverride      map[string]string `json:"header_override"`
-	Status              string            `json:"status"`
-	Priority            int               `json:"priority"`
-	Weight              int               `json:"weight"`
-	MaxConcurrency      int               `json:"max_concurrency"`
-	MaxRPM              int               `json:"max_rpm"`
-	CostRatio           float64           `json:"cost_ratio"`
-	Tags                []string          `json:"tags"`
-	TestModel           string            `json:"test_model"`
-	BalanceCheckEnabled bool              `json:"balance_check_enabled"`
-	ProbeEnabled        bool              `json:"probe_enabled"`
-	ProbeModel          string            `json:"probe_model"`
-	UpstreamRateEnabled bool              `json:"upstream_rate_enabled"`
-	UpstreamRatePath    string            `json:"upstream_rate_path"`
-	GroupIDs            []int             `json:"group_ids"`
+	Name                   string            `json:"name"`
+	Type                   string            `json:"type"`
+	APIKey                 string            `json:"api_key"`
+	APIKeyHint             string            `json:"api_key_hint,omitempty"`
+	Models                 []string          `json:"models"`
+	ModelMapping           map[string]string `json:"model_mapping"`
+	ParamOverride          map[string]any    `json:"param_override"`
+	HeaderOverride         map[string]string `json:"header_override"`
+	Status                 string            `json:"status"`
+	Priority               int               `json:"priority"`
+	Weight                 int               `json:"weight"`
+	MaxConcurrency         int               `json:"max_concurrency"`
+	MaxRPM                 int               `json:"max_rpm"`
+	CostRatio              float64           `json:"cost_ratio"`
+	Tags                   []string          `json:"tags"`
+	TestModel              string            `json:"test_model"`
+	BalanceCheckEnabled    bool              `json:"balance_check_enabled"`
+	ProbeEnabled           bool              `json:"probe_enabled"`
+	ProbeModel             string            `json:"probe_model"`
+	UpstreamRateEnabled    bool              `json:"upstream_rate_enabled"`
+	UpstreamRatePath       string            `json:"upstream_rate_path"`
+	UseUpstreamRateForCost bool              `json:"use_upstream_rate_for_cost"`
+	GroupIDs               []int             `json:"group_ids"`
 }
 
 // ImportChannelsReq 渠道导入请求（渠道数组，每渠道含 ≥1 把 key）。
@@ -205,27 +208,28 @@ type ImportChannelItem struct {
 
 // ImportChannelKeyItem 导入的单把密钥。api_key 为空时该 key 跳过不创建。
 type ImportChannelKeyItem struct {
-	Name                string            `json:"name"`
-	Type                string            `json:"type" binding:"required,oneof=openai_compatible anthropic gemini custom openai_video suno"`
-	APIKey              string            `json:"api_key"`
-	Models              []string          `json:"models"`
-	ModelMapping        map[string]string `json:"model_mapping"`
-	ParamOverride       map[string]any    `json:"param_override"`
-	HeaderOverride      map[string]string `json:"header_override"`
-	Status              *string           `json:"status" binding:"omitempty,oneof=enabled disabled_manual"`
-	Priority            *int              `json:"priority" binding:"omitempty,min=0,max=999"`
-	Weight              *int              `json:"weight" binding:"omitempty,min=0"`
-	MaxConcurrency      *int              `json:"max_concurrency" binding:"omitempty,min=0"`
-	MaxRPM              *int              `json:"max_rpm" binding:"omitempty,min=0"`
-	CostRatio           *float64          `json:"cost_ratio" binding:"omitempty,gte=0"`
-	Tags                []string          `json:"tags"`
-	TestModel           *string           `json:"test_model"`
-	BalanceCheckEnabled *bool             `json:"balance_check_enabled"`
-	ProbeEnabled        *bool             `json:"probe_enabled"`
-	ProbeModel          *string           `json:"probe_model"`
-	UpstreamRateEnabled *bool             `json:"upstream_rate_enabled"`
-	UpstreamRatePath    *string           `json:"upstream_rate_path"`
-	GroupIDs            []int             `json:"group_ids"`
+	Name                   string            `json:"name"`
+	Type                   string            `json:"type" binding:"required,oneof=openai_compatible anthropic gemini custom openai_video suno"`
+	APIKey                 string            `json:"api_key"`
+	Models                 []string          `json:"models"`
+	ModelMapping           map[string]string `json:"model_mapping"`
+	ParamOverride          map[string]any    `json:"param_override"`
+	HeaderOverride         map[string]string `json:"header_override"`
+	Status                 *string           `json:"status" binding:"omitempty,oneof=enabled disabled_manual"`
+	Priority               *int              `json:"priority" binding:"omitempty,min=0,max=999"`
+	Weight                 *int              `json:"weight" binding:"omitempty,min=0"`
+	MaxConcurrency         *int              `json:"max_concurrency" binding:"omitempty,min=0"`
+	MaxRPM                 *int              `json:"max_rpm" binding:"omitempty,min=0"`
+	CostRatio              *float64          `json:"cost_ratio" binding:"omitempty,gte=0"`
+	Tags                   []string          `json:"tags"`
+	TestModel              *string           `json:"test_model"`
+	BalanceCheckEnabled    *bool             `json:"balance_check_enabled"`
+	ProbeEnabled           *bool             `json:"probe_enabled"`
+	ProbeModel             *string           `json:"probe_model"`
+	UpstreamRateEnabled    *bool             `json:"upstream_rate_enabled"`
+	UpstreamRatePath       *string           `json:"upstream_rate_path"`
+	UseUpstreamRateForCost *bool             `json:"use_upstream_rate_for_cost"`
+	GroupIDs               []int             `json:"group_ids"`
 }
 
 // ImportChannelsResp 渠道导入响应。

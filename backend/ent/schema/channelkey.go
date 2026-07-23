@@ -84,6 +84,8 @@ func (ChannelKey) Fields() []ent.Field {
 			Comment("是否启用上游倍率探测"),
 		field.String("upstream_rate_path").Default("").
 			Comment("上游倍率端点路径；空串默认 /v1/airgate/billing"),
+		field.Bool("use_upstream_rate_for_cost").Default(false).
+			Comment("是否使用探测倍率覆盖手动成本倍率"),
 		field.Float("upstream_rate").Default(0).
 			Comment("最近一次探测到的上游计费倍率"),
 		field.Time("upstream_rate_at").Optional().Nillable().

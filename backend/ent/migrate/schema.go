@@ -225,6 +225,7 @@ var (
 		{Name: "last_probe_at", Type: field.TypeTime, Nullable: true},
 		{Name: "upstream_rate_enabled", Type: field.TypeBool, Default: false},
 		{Name: "upstream_rate_path", Type: field.TypeString, Default: ""},
+		{Name: "use_upstream_rate_for_cost", Type: field.TypeBool, Default: false},
 		{Name: "upstream_rate", Type: field.TypeFloat64, Default: 0},
 		{Name: "upstream_rate_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
@@ -239,7 +240,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "channel_keys_channels_keys",
-				Columns:    []*schema.Column{ChannelKeysColumns[35]},
+				Columns:    []*schema.Column{ChannelKeysColumns[36]},
 				RefColumns: []*schema.Column{ChannelsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},

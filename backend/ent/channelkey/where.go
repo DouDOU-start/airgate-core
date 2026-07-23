@@ -165,6 +165,11 @@ func UpstreamRatePath(v string) predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldEQ(FieldUpstreamRatePath, v))
 }
 
+// UseUpstreamRateForCost applies equality check predicate on the "use_upstream_rate_for_cost" field. It's identical to UseUpstreamRateForCostEQ.
+func UseUpstreamRateForCost(v bool) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldUseUpstreamRateForCost, v))
+}
+
 // UpstreamRate applies equality check predicate on the "upstream_rate" field. It's identical to UpstreamRateEQ.
 func UpstreamRate(v float64) predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldEQ(FieldUpstreamRate, v))
@@ -1263,6 +1268,16 @@ func UpstreamRatePathEqualFold(v string) predicate.ChannelKey {
 // UpstreamRatePathContainsFold applies the ContainsFold predicate on the "upstream_rate_path" field.
 func UpstreamRatePathContainsFold(v string) predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldContainsFold(FieldUpstreamRatePath, v))
+}
+
+// UseUpstreamRateForCostEQ applies the EQ predicate on the "use_upstream_rate_for_cost" field.
+func UseUpstreamRateForCostEQ(v bool) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldUseUpstreamRateForCost, v))
+}
+
+// UseUpstreamRateForCostNEQ applies the NEQ predicate on the "use_upstream_rate_for_cost" field.
+func UseUpstreamRateForCostNEQ(v bool) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldUseUpstreamRateForCost, v))
 }
 
 // UpstreamRateEQ applies the EQ predicate on the "upstream_rate" field.

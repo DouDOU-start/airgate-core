@@ -259,7 +259,8 @@ func applyKeyCreate(builder *ent.ChannelKeyCreate, key appchannel.KeyInput) *ent
 		SetNillableCostRatio(key.CostRatio).
 		SetNillableBalanceCheckEnabled(key.BalanceCheckEnabled).
 		SetNillableProbeEnabled(key.ProbeEnabled).
-		SetNillableUpstreamRateEnabled(key.UpstreamRateEnabled)
+		SetNillableUpstreamRateEnabled(key.UpstreamRateEnabled).
+		SetNillableUseUpstreamRateForCost(key.UseUpstreamRateForCost)
 	if key.ProbeModel != nil {
 		builder = builder.SetProbeModel(*key.ProbeModel)
 	}
@@ -301,7 +302,8 @@ func applyKeyUpdate(builder *ent.ChannelKeyUpdateOne, key appchannel.KeyInput) *
 		SetNillableCostRatio(key.CostRatio).
 		SetNillableBalanceCheckEnabled(key.BalanceCheckEnabled).
 		SetNillableProbeEnabled(key.ProbeEnabled).
-		SetNillableUpstreamRateEnabled(key.UpstreamRateEnabled)
+		SetNillableUpstreamRateEnabled(key.UpstreamRateEnabled).
+		SetNillableUseUpstreamRateForCost(key.UseUpstreamRateForCost)
 	if key.ProbeModel != nil {
 		builder = builder.SetProbeModel(*key.ProbeModel)
 	}
@@ -694,43 +696,44 @@ func mapChannel(item *ent.Channel) appchannel.Channel {
 
 func mapChannelKey(item *ent.ChannelKey, baseURL, channelName string) appchannel.ChannelKey {
 	key := appchannel.ChannelKey{
-		ID:                   item.ID,
-		ChannelName:          channelName,
-		BaseURL:              baseURL,
-		Name:                 item.Name,
-		Type:                 item.Type.String(),
-		APIKey:               item.APIKey,
-		Models:               item.Models,
-		ModelMapping:         item.ModelMapping,
-		ParamOverride:        item.ParamOverride,
-		HeaderOverride:       item.HeaderOverride,
-		Status:               item.Status.String(),
-		ErrorMsg:             item.ErrorMsg,
-		Priority:             item.Priority,
-		Weight:               item.Weight,
-		MaxConcurrency:       item.MaxConcurrency,
-		MaxRPM:               item.MaxRpm,
-		CostRatio:            item.CostRatio,
-		Tags:                 item.Tags,
-		TestModel:            item.TestModel,
-		ResponseTimeMs:       item.ResponseTimeMs,
-		TestedAt:             item.TestedAt,
-		LastUsedAt:           item.LastUsedAt,
-		Balance:              item.Balance,
-		BalanceUpdatedAt:     item.BalanceUpdatedAt,
-		BalanceCheckEnabled:  item.BalanceCheckEnabled,
-		ProbeEnabled:         item.ProbeEnabled,
-		ProbeModel:           item.ProbeModel,
-		HealthStatus:         item.HealthStatus.String(),
-		ConsecutiveFailures:  item.ConsecutiveFailures,
-		ConsecutiveSuccesses: item.ConsecutiveSuccesses,
-		LastProbeAt:          item.LastProbeAt,
-		UpstreamRateEnabled:  item.UpstreamRateEnabled,
-		UpstreamRatePath:     item.UpstreamRatePath,
-		UpstreamRate:         item.UpstreamRate,
-		UpstreamRateAt:       item.UpstreamRateAt,
-		CreatedAt:            item.CreatedAt,
-		UpdatedAt:            item.UpdatedAt,
+		ID:                     item.ID,
+		ChannelName:            channelName,
+		BaseURL:                baseURL,
+		Name:                   item.Name,
+		Type:                   item.Type.String(),
+		APIKey:                 item.APIKey,
+		Models:                 item.Models,
+		ModelMapping:           item.ModelMapping,
+		ParamOverride:          item.ParamOverride,
+		HeaderOverride:         item.HeaderOverride,
+		Status:                 item.Status.String(),
+		ErrorMsg:               item.ErrorMsg,
+		Priority:               item.Priority,
+		Weight:                 item.Weight,
+		MaxConcurrency:         item.MaxConcurrency,
+		MaxRPM:                 item.MaxRpm,
+		CostRatio:              item.CostRatio,
+		Tags:                   item.Tags,
+		TestModel:              item.TestModel,
+		ResponseTimeMs:         item.ResponseTimeMs,
+		TestedAt:               item.TestedAt,
+		LastUsedAt:             item.LastUsedAt,
+		Balance:                item.Balance,
+		BalanceUpdatedAt:       item.BalanceUpdatedAt,
+		BalanceCheckEnabled:    item.BalanceCheckEnabled,
+		ProbeEnabled:           item.ProbeEnabled,
+		ProbeModel:             item.ProbeModel,
+		HealthStatus:           item.HealthStatus.String(),
+		ConsecutiveFailures:    item.ConsecutiveFailures,
+		ConsecutiveSuccesses:   item.ConsecutiveSuccesses,
+		LastProbeAt:            item.LastProbeAt,
+		UpstreamRateEnabled:    item.UpstreamRateEnabled,
+		UpstreamRatePath:       item.UpstreamRatePath,
+		UseUpstreamRateForCost: item.UseUpstreamRateForCost,
+		UpstreamRate:           item.UpstreamRate,
+		UpstreamRateAt:         item.UpstreamRateAt,
+		CreatedAt:              item.CreatedAt,
+		UpdatedAt:              item.UpdatedAt,
 	}
 	if ch, err := item.Edges.ChannelOrErr(); err == nil {
 		key.ChannelID = ch.ID

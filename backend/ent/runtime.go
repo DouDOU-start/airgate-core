@@ -293,16 +293,20 @@ func init() {
 	channelkeyDescUpstreamRatePath := channelkeyFields[29].Descriptor()
 	// channelkey.DefaultUpstreamRatePath holds the default value on creation for the upstream_rate_path field.
 	channelkey.DefaultUpstreamRatePath = channelkeyDescUpstreamRatePath.Default.(string)
+	// channelkeyDescUseUpstreamRateForCost is the schema descriptor for use_upstream_rate_for_cost field.
+	channelkeyDescUseUpstreamRateForCost := channelkeyFields[30].Descriptor()
+	// channelkey.DefaultUseUpstreamRateForCost holds the default value on creation for the use_upstream_rate_for_cost field.
+	channelkey.DefaultUseUpstreamRateForCost = channelkeyDescUseUpstreamRateForCost.Default.(bool)
 	// channelkeyDescUpstreamRate is the schema descriptor for upstream_rate field.
-	channelkeyDescUpstreamRate := channelkeyFields[30].Descriptor()
+	channelkeyDescUpstreamRate := channelkeyFields[31].Descriptor()
 	// channelkey.DefaultUpstreamRate holds the default value on creation for the upstream_rate field.
 	channelkey.DefaultUpstreamRate = channelkeyDescUpstreamRate.Default.(float64)
 	// channelkeyDescCreatedAt is the schema descriptor for created_at field.
-	channelkeyDescCreatedAt := channelkeyFields[32].Descriptor()
+	channelkeyDescCreatedAt := channelkeyFields[33].Descriptor()
 	// channelkey.DefaultCreatedAt holds the default value on creation for the created_at field.
 	channelkey.DefaultCreatedAt = channelkeyDescCreatedAt.Default.(func() time.Time)
 	// channelkeyDescUpdatedAt is the schema descriptor for updated_at field.
-	channelkeyDescUpdatedAt := channelkeyFields[33].Descriptor()
+	channelkeyDescUpdatedAt := channelkeyFields[34].Descriptor()
 	// channelkey.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	channelkey.DefaultUpdatedAt = channelkeyDescUpdatedAt.Default.(func() time.Time)
 	// channelkey.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

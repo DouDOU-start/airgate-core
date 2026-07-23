@@ -10,6 +10,7 @@ import (
 
 // stubRepo 渠道仓储替身：按需覆盖各方法，未覆盖返回零值。
 type stubRepo struct {
+	listAll             func(ctx context.Context) ([]Channel, error)
 	findByID            func(ctx context.Context, id int) (Channel, error)
 	findKeyByID         func(ctx context.Context, keyID int) (ChannelKey, error)
 	updateKeyState      func(ctx context.Context, keyID int, status string, errMsg string) error
@@ -18,7 +19,12 @@ type stubRepo struct {
 }
 
 func (s *stubRepo) List(context.Context, ListFilter) ([]Channel, int64, error) { return nil, 0, nil }
-func (s *stubRepo) ListAll(context.Context) ([]Channel, error)                 { return nil, nil }
+func (s *stubRepo) ListAll(ctx context.Context) ([]Channel, error) {
+	if s.listAll == nil {
+		return nil, nil
+	}
+	return s.listAll(ctx)
+}
 func (s *stubRepo) FindByID(ctx context.Context, id int) (Channel, error) {
 	if s.findByID == nil {
 		return Channel{}, nil
@@ -261,6 +267,39 @@ func TestRefreshBalancePersistsForKey(t *testing.T) {
 	}
 	if updatedAt == nil {
 		t.Error("updatedAt nil")
+	}
+}
+
+// TestLoadAllForRegistryRequiresBothRateSwitches 验证关闭探测后，历史探测值不会继续覆盖成本倍率。
+func TestLoadAllForRegistryRequiresBothRateSwitches(t *testing.T) {
+	const secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	encrypted, err := auth.EncryptAPIKey("sk-upstream", secret)
+	if err != nil {
+		t.Fatalf("加密失败: %v", err)
+	}
+
+	repo := &stubRepo{listAll: func(context.Context) ([]Channel, error) {
+		return []Channel{{
+			ID: 1,
+			Keys: []ChannelKey{
+				{ID: 1, APIKey: encrypted, UpstreamRateEnabled: true, UseUpstreamRateForCost: true},
+				{ID: 2, APIKey: encrypted, UpstreamRateEnabled: false, UseUpstreamRateForCost: true},
+			},
+		}}, nil
+	}}
+
+	snaps, err := NewService(repo, secret).LoadAllForRegistry(context.Background())
+	if err != nil {
+		t.Fatalf("LoadAllForRegistry error: %v", err)
+	}
+	if len(snaps) != 2 {
+		t.Fatalf("快照数量 = %d，期望 2", len(snaps))
+	}
+	if !snaps[0].UseUpstreamRateForCost {
+		t.Fatal("两个开关均开启时应允许探测倍率计入成本")
+	}
+	if snaps[1].UseUpstreamRateForCost {
+		t.Fatal("探测关闭后不应允许历史探测倍率计入成本")
 	}
 }
 
