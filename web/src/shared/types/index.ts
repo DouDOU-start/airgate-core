@@ -612,7 +612,7 @@ export interface ChannelKeyResp {
   current_concurrency: number;
   /** 当前分钟请求数（列表实时观测） */
   current_rpm: number;
-  /** 上游账户余额（USD）；仅 openai_compatible key 可查，按 key 刷新 */
+  /** 上游账户余额（USD）；按 key 探测上游兼容余额接口 */
   balance: number;
   balance_updated_at?: string;
   /** 是否参与主动余额刷新（进页自动/一键批量）；关闭后手动单把查询仍可用 */

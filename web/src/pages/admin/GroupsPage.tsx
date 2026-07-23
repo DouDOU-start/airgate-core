@@ -6,7 +6,6 @@ import {
   Pencil,
   ArrowUpDown,
   Trash2,
-  RefreshCw,
   Percent,
   Users,
   Link2,
@@ -28,6 +27,7 @@ import { GroupAllowedUsersModal } from './groups/GroupAllowedUsersModal';
 import { GroupChannelKeysModal } from './groups/GroupChannelKeysModal';
 import type { GroupResp, CreateGroupReq, UpdateGroupReq } from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 
 export default function GroupsPage() {
   const { t } = useTranslation();
@@ -43,7 +43,7 @@ export default function GroupsPage() {
   const [channelKeysGroup, setChannelKeysGroup] = useState<GroupResp | null>(null);
 
   // 查询分组列表
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.groups(page, pageSize),
     queryFn: () =>
       groupsApi.list({
@@ -91,15 +91,11 @@ export default function GroupsPage() {
       {/* 工具栏 */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
         <div className="flex items-center gap-2 sm:ml-auto">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh', 'Refresh')}
-            size="sm"
-            variant="ghost"
-            onPress={() => refetch()}
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
+          <RefreshButton
+            ariaLabel={t('common.refresh', 'Refresh')}
+            isRefreshing={isFetching}
+            onRefresh={refetch}
+          />
           <Button variant="primary" onPress={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4" />
             {t('groups.create')}

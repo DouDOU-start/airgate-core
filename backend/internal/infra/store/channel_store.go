@@ -515,7 +515,8 @@ func (s *ChannelStore) ListProbeEnabledKeys(ctx context.Context) ([]appchannel.K
 	return result, nil
 }
 
-// ListBalanceSyncTargets 查询 balance_check_enabled=true 且余额过期的 key ID。
+// ListBalanceSyncTargets 查询 balance_check_enabled=true 且余额过期的已启用 key ID。
+// 协议类型不能代表余额接口能力：Anthropic/Gemini 协议的中转站也可能提供 /v1/usage。
 func (s *ChannelStore) ListBalanceSyncTargets(ctx context.Context, staleBefore time.Time) ([]int, error) {
 	return s.db.ChannelKey.Query().
 		Where(

@@ -6,7 +6,7 @@ import {
   Spinner, TextField as HeroTextField, useOverlayState,
 } from '@heroui/react';
 import {
-  Ban, Copy, Plus, RefreshCw, RotateCcw, Search, Ticket, Trash2,
+  Ban, Copy, Plus, RotateCcw, Search, Ticket, Trash2,
 } from 'lucide-react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { redemptionApi } from '../../shared/api/redemption';
@@ -23,6 +23,7 @@ import { CommonTable } from '../../shared/components/CommonTable';
 import { formatDateTime } from '../../shared/utils/format';
 import type { GenerateRedemptionCodesReq, RedemptionCode, RedemptionCodeStatus } from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 
 // 状态徽章配色
 const STATUS_CHIP_COLORS: Record<RedemptionCodeStatus, 'success' | 'default' | 'warning' | 'danger'> = {
@@ -219,7 +220,7 @@ export default function RedemptionCodesPage() {
   const [deletingCode, setDeletingCode] = useState<RedemptionCode | null>(null);
 
   // 列表
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.redemptionCodes(page, pageSize, statusFilter, debouncedKeyword),
     queryFn: () =>
       redemptionApi.adminList({
@@ -351,15 +352,11 @@ export default function RedemptionCodesPage() {
           </Select>
         </div>
         <div className="flex items-center gap-2 sm:ml-auto">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh', 'Refresh')}
-            size="sm"
-            variant="ghost"
-            onPress={() => refetch()}
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
+          <RefreshButton
+            ariaLabel={t('common.refresh', 'Refresh')}
+            isRefreshing={isFetching}
+            onRefresh={refetch}
+          />
           <Button variant="primary" onPress={() => setShowGenerateModal(true)}>
             <Plus className="w-4 h-4" />
             {t('redemption.generate')}

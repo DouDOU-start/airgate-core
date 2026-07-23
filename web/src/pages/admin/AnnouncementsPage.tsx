@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, RefreshCw, BellRing, Bell } from 'lucide-react';
+import { Plus, Pencil, Trash2, BellRing, Bell } from 'lucide-react';
 import { Button, Chip, EmptyState } from '@heroui/react';
 import { announcementsApi } from '../../shared/api/announcements';
 import { usePagination } from '../../shared/hooks/usePagination';
@@ -15,6 +15,7 @@ import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { AnnouncementFormModal } from './announcements/AnnouncementFormModal';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 import type {
   AnnouncementResp,
   AnnouncementStatus,
@@ -39,7 +40,7 @@ export default function AnnouncementsPage() {
   const [deletingItem, setDeletingItem] = useState<AnnouncementResp | null>(null);
 
   // 查询公告列表
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.announcements(page, pageSize),
     queryFn: () =>
       announcementsApi.list({
@@ -94,15 +95,11 @@ export default function AnnouncementsPage() {
       {/* 工具栏 */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
         <div className="flex items-center gap-2 sm:ml-auto">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh', 'Refresh')}
-            size="sm"
-            variant="ghost"
-            onPress={() => refetch()}
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
+          <RefreshButton
+            ariaLabel={t('common.refresh', 'Refresh')}
+            isRefreshing={isFetching}
+            onRefresh={refetch}
+          />
           <Button variant="primary" onPress={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4" />
             {t('announcements.create')}

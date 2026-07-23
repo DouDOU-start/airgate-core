@@ -126,7 +126,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	)
 	s.probeEngine.SetBillingProbe(
 		&probeBillingProberAdapter{svc: channelSvc},
-		&probeBillingStoreAdapter{store: channelStore, secret: cfg.APIKeySecret()},
+		&probeBillingStoreAdapter{store: channelStore, secret: cfg.APIKeySecret(), registry: s.channelRegistry},
 	)
 
 	// relay 转发管线：注册表调度 + 渠道 RPM/并发闸门 + 计费落账；
@@ -134,13 +134,13 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	settingsReader := pipeline.NewSettingsReader(gatewaySettingsSource{s.handlers.SettingsService})
 	rpmCounter := scheduler.NewRPMCounter(rdb)
 	s.relay = pipeline.New(pipeline.Options{
-		Registry:    s.channelRegistry,
-		Pricing:     s.pricingCache,
-		Concurrency: concurrency,
-		RPM:         rpmCounter,
-		Calculator:  billing.NewCalculator(),
-		Sink:        recorder,
-		ErrLog:      errRecorder,
+		Registry:      s.channelRegistry,
+		Pricing:       s.pricingCache,
+		Concurrency:   concurrency,
+		RPM:           rpmCounter,
+		Calculator:    billing.NewCalculator(),
+		Sink:          recorder,
+		ErrLog:        errRecorder,
 		Settings:      settingsReader,
 		Moderation:    s.handlers.ModerationEngine,
 		HealthTracker: s.probeEngine,

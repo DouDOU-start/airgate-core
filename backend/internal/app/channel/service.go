@@ -3,7 +3,6 @@ package channel
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,7 +30,7 @@ type Tester interface {
 // ModelFetcher 上游拉取接口：模型列表与账户余额。
 type ModelFetcher interface {
 	FetchModels(ctx context.Context, channelType, baseURL, apiKey string) ([]string, error)
-	// FetchBalance 经 key 查上游余额（USD）；不支持的类型返回 ErrBalanceUnsupported。
+	// FetchBalance 经 key 探测上游余额（USD）；协议类型不等同于余额接口能力。
 	FetchBalance(ctx context.Context, channelType, baseURL, apiKey string) (float64, error)
 }
 
@@ -527,7 +526,7 @@ func (s *Service) FetchModelsWithKey(ctx context.Context, channelType, baseURL, 
 }
 
 // RefreshBalance 查询指定 key 的上游余额并落库返回（key 级）。
-// 仅 openai_compatible 中转站可查，其余类型返回 ErrBalanceUnsupported。
+// 所有协议类型均可尝试；是否参与自动刷新由 balance_check_enabled 控制。
 func (s *Service) RefreshBalance(ctx context.Context, keyID int) (float64, *time.Time, error) {
 	logger := logx.LoggerFromContext(ctx)
 
@@ -545,9 +544,6 @@ func (s *Service) RefreshBalance(ctx context.Context, keyID int) (float64, *time
 	}
 	bal, berr := s.fetcher.FetchBalance(ctx, key.Type, key.BaseURL, apiKey)
 	if berr != nil {
-		if errors.Is(berr, ErrBalanceUnsupported) {
-			return 0, nil, ErrBalanceUnsupported
-		}
 		logger.Warn("channel_fetch_balance_failed", "channel_key_id", keyID, logx.LogFieldError, berr)
 		return 0, nil, fmt.Errorf("%w: %v", ErrBalanceFetchFailed, berr)
 	}
@@ -614,6 +610,7 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelKey
 				MaxConcurrency: key.MaxConcurrency,
 				MaxRPM:         key.MaxRPM,
 				CostRatio:      key.CostRatio,
+				UpstreamRate:   key.UpstreamRate,
 				Status:         key.Status,
 				GroupIDs:       groups,
 				TestModel:      key.TestModel,
@@ -660,7 +657,11 @@ func (s *Service) SyncBalanceForProbe(ctx context.Context, keyID int) error {
 
 // UpdateUpstreamRate 保存上游倍率探测结果。
 func (s *Service) UpdateUpstreamRate(ctx context.Context, keyID int, rate float64, at time.Time) error {
-	return s.repo.UpdateUpstreamRate(ctx, keyID, rate, at)
+	if err := s.repo.UpdateUpstreamRate(ctx, keyID, rate, at); err != nil {
+		return err
+	}
+	s.reloadRegistry(ctx)
+	return nil
 }
 
 // ProbeKeyBilling 探针引擎调用：查询上游的计费倍率。

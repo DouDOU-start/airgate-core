@@ -23,8 +23,7 @@ func (h *ChannelHandler) handleError(logMessage, publicMessage string, err error
 		return 404, err.Error()
 	case errors.Is(err, appchannel.ErrInvalidReference),
 		errors.Is(err, appchannel.ErrInvalidBulkAction),
-		errors.Is(err, appchannel.ErrNoAPIKey),
-		errors.Is(err, appchannel.ErrBalanceUnsupported):
+		errors.Is(err, appchannel.ErrNoAPIKey):
 		return 400, err.Error()
 	case errors.Is(err, appchannel.ErrTesterNotReady):
 		return 503, err.Error()

@@ -41,6 +41,7 @@ func (t *channelTester) Test(ctx context.Context, key appchannel.ChannelKey, mod
 		ParamOverride:  key.ParamOverride,
 		HeaderOverride: key.HeaderOverride,
 		CostRatio:      key.CostRatio,
+		UpstreamRate:   key.UpstreamRate,
 		Status:         key.Status,
 		TestModel:      key.TestModel,
 	}

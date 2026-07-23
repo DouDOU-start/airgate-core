@@ -2,7 +2,6 @@ package channel
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -262,23 +261,6 @@ func TestRefreshBalancePersistsForKey(t *testing.T) {
 	}
 	if updatedAt == nil {
 		t.Error("updatedAt nil")
-	}
-}
-
-// TestRefreshBalanceUnsupported 不支持类型的 key 透传 ErrBalanceUnsupported。
-func TestRefreshBalanceUnsupported(t *testing.T) {
-	const secret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	k1, _ := auth.EncryptAPIKey("sk-1", secret)
-	repo := &stubRepo{
-		findKeyByID: func(_ context.Context, keyID int) (ChannelKey, error) {
-			return ChannelKey{ID: keyID, Type: "anthropic", BaseURL: "https://x", APIKey: k1}, nil
-		},
-	}
-	svc := NewService(repo, secret)
-	svc.fetcher = &stubFetcher{balanceErr: ErrBalanceUnsupported}
-
-	if _, _, err := svc.RefreshBalance(context.Background(), 1); !errors.Is(err, ErrBalanceUnsupported) {
-		t.Errorf("err = %v, want ErrBalanceUnsupported", err)
 	}
 }
 

@@ -7,7 +7,7 @@ import {
 } from '@heroui/react';
 import {
   Activity, CheckCircle, Clock, Coins, Pencil, Plus, ReceiptText,
-  RefreshCw, Save, Search, Settings2, Trash2, TrendingUp,
+  Save, Search, Settings2, Trash2, TrendingUp,
 } from 'lucide-react';
 import { paymentApi } from '../../shared/api/payment';
 import { settingsApi } from '../../shared/api/settings';
@@ -26,6 +26,7 @@ import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { StatCard } from '../../shared/components/StatCard';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 import type {
   PaymentOrderStatus, PaymentProviderItem, PaymentProviderKindMeta,
   SettingItem, UpsertPaymentProviderReq,
@@ -79,7 +80,7 @@ function OrdersTab() {
     status: statusFilter || undefined,
   }), [page, pageSize, debouncedEmail, statusFilter]);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.adminPaymentOrders(listQuery),
     queryFn: () => paymentApi.adminListOrders(listQuery),
     placeholderData: keepPreviousData,
@@ -177,15 +178,12 @@ function OrdersTab() {
           </Select>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh', 'Refresh')}
+          <RefreshButton
+            ariaLabel={t('common.refresh', 'Refresh')}
+            isRefreshing={isFetching}
+            onRefresh={refetch}
             size="md"
-            variant="ghost"
-            onPress={() => refetch()}
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+          />
         </div>
       </div>
 

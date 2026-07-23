@@ -29,7 +29,7 @@ type ChannelKeyResp struct {
 	TestedAt       *time.Time        `json:"tested_at,omitempty"`
 	LastUsedAt     *time.Time        `json:"last_used_at,omitempty"`
 	GroupIDs       []int             `json:"group_ids"`
-	// Balance 该把 key 的上游账户余额（USD）；仅 openai_compatible 中转站可查。
+	// Balance 该把 key 的上游账户余额（USD）；是否能查询取决于上游是否提供兼容余额接口。
 	Balance          float64    `json:"balance"`
 	BalanceUpdatedAt *time.Time `json:"balance_updated_at,omitempty"`
 	// BalanceCheckEnabled 是否参与主动余额刷新（进页自动/一键批量）；关闭后手动单把查询仍可用。

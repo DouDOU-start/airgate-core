@@ -88,6 +88,25 @@ func newTestRegistry(t *testing.T, persister Persister, snaps ...ChannelKeySnaps
 	return r
 }
 
+func TestChannelKeySnapshotEffectiveCostRatio(t *testing.T) {
+	tests := []struct {
+		name string
+		snap *ChannelKeySnapshot
+		want float64
+	}{
+		{name: "探测结果优先", snap: &ChannelKeySnapshot{CostRatio: 0.5, UpstreamRate: 0.8}, want: 0.8},
+		{name: "无探测结果回退配置", snap: &ChannelKeySnapshot{CostRatio: 0.5}, want: 0.5},
+		{name: "倍率均无效回退一倍", snap: &ChannelKeySnapshot{}, want: 1},
+		{name: "空快照回退一倍", snap: nil, want: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.snap.EffectiveCostRatio(); got != tt.want {
+				t.Fatalf("EffectiveCostRatio() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 func TestRegistryPick(t *testing.T) {
 	cases := []struct {
 		name    string

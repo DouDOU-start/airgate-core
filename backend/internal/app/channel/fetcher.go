@@ -3,7 +3,6 @@ package channel
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,10 +11,6 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/upstreamclient"
 )
-
-// ErrBalanceUnsupported 该渠道类型不支持经 key 查询余额（官方 OpenAI/Anthropic/Gemini 无此接口，
-// 仅 openai_compatible 中转站实现了 /dashboard/billing 系列）。
-var ErrBalanceUnsupported = errors.New("该渠道类型不支持查询余额")
 
 // DefaultModelFetcher 默认上游模型列表拉取器。
 //
@@ -103,8 +98,10 @@ func fetchOpenAIStyleModels(ctx context.Context, client *http.Client, base strin
 	return ensureNonEmpty(models)
 }
 
-// FetchBalance 经 key 查询上游账户余额（USD）。仅 openai_compatible 中转站支持
-// （anthropic/gemini 官方无此接口，返回 ErrBalanceUnsupported）。
+// FetchBalance 经 key 查询上游账户余额（USD）。
+// 渠道 type 表示转发协议，不代表上游是否提供账户余额接口；例如 Anthropic 协议
+// 的中转站也可能实现统一的 /v1/usage。因此这里对所有类型按同一兼容链路探测，
+// 是否参与自动刷新由 key.balance_check_enabled 决定。
 //
 // 中转站的余额接口无统一标准，按主流→兼容顺序尝试：
 //  1. GET {base}/v1/usage → 顶层 remaining（USD）。sub2api 等新型平台的口径，
@@ -112,11 +109,9 @@ func fetchOpenAIStyleModels(ctx context.Context, client *http.Client, base strin
 //  2. 回退 GET {base}/v1/dashboard/billing/subscription（+ /usage）→
 //     hard_limit_usd − total_usage/100。new-api / one-api 等 OpenAI 早期计费口径。
 //
-// 前者 404（该平台无此路径）才走后者；其它错误（鉴权失败等）直接透传，不再瞎试。
-func (f DefaultModelFetcher) FetchBalance(ctx context.Context, channelType, baseURL, apiKey string) (float64, error) {
-	if channelType != "openai_compatible" {
-		return 0, ErrBalanceUnsupported
-	}
+// 前者未返回有效余额时继续尝试后者。部分中转站虽然注册了 /v1/usage，
+// 但会对普通 API Key 返回 401/403/405，而旧计费接口仍可正常查询余额。
+func (f DefaultModelFetcher) FetchBalance(ctx context.Context, _ string, baseURL, apiKey string) (float64, error) {
 	client := f.Client
 	if client == nil {
 		client = upstreamclient.NewClient(15 * time.Second)
@@ -125,11 +120,8 @@ func (f DefaultModelFetcher) FetchBalance(ctx context.Context, channelType, base
 	auth := map[string]string{"Authorization": "Bearer " + apiKey}
 
 	// ① /v1/usage：顶层 remaining（sub2api 等）。
-	body, status, err := httpGet(ctx, client, joinV1(base, "usage"), auth)
-	if err != nil {
-		return 0, err
-	}
-	if status >= 200 && status < 300 {
+	body, status, usageErr := httpGet(ctx, client, joinV1(base, "usage"), auth)
+	if usageErr == nil && status >= 200 && status < 300 {
 		var u struct {
 			Remaining *float64 `json:"remaining"`
 			Balance   *float64 `json:"balance"`
@@ -143,13 +135,20 @@ func (f DefaultModelFetcher) FetchBalance(ctx context.Context, channelType, base
 			}
 		}
 		// 200 但无 remaining/balance 字段：该平台 /v1/usage 不含余额，转试计费接口。
-	} else if status != http.StatusNotFound {
-		// 非 404（鉴权失败/限流等）：该路径存在但拒绝，直接报错，不必再试兼容路径。
-		return 0, httpStatusError(status, body)
 	}
 
 	// ② 回退 /dashboard/billing/subscription（+ /usage）：OpenAI 早期计费口径。
-	return fetchDashboardBilling(ctx, client, base, auth)
+	bal, dashboardErr := fetchDashboardBilling(ctx, client, base, auth)
+	if dashboardErr == nil {
+		return bal, nil
+	}
+	if usageErr != nil {
+		return 0, fmt.Errorf("余额接口均查询失败: /v1/usage: %v; dashboard billing: %w", usageErr, dashboardErr)
+	}
+	if status < 200 || status >= 300 {
+		return 0, fmt.Errorf("余额接口均查询失败: /v1/usage: %v; dashboard billing: %w", httpStatusError(status, body), dashboardErr)
+	}
+	return 0, fmt.Errorf("余额接口均查询失败: /v1/usage 未返回余额字段; dashboard billing: %w", dashboardErr)
 }
 
 // fetchDashboardBilling 走 OpenAI 早期计费接口算余额（new-api / one-api 兼容）。

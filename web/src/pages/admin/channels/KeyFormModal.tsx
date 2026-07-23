@@ -188,7 +188,9 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
       probe_enabled: form.probeEnabled,
       probe_model: form.probeModel.trim() || undefined,
       upstream_rate_enabled: form.upstreamRateEnabled,
-      upstream_rate_path: form.upstreamRatePath.trim() || undefined,
+      // 空字符串也必须显式提交：后端以 nil 表示“不修改”，以 "" 表示
+      // 清除自定义路径并恢复默认 /v1/airgate/billing。
+      upstream_rate_path: form.upstreamRatePath.trim(),
     };
 
     if (isEdit && channelKey) {
@@ -358,16 +360,14 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                     label={t('channels.key_enabled')}
                     onChange={(selected) => setForm((p) => ({ ...p, enabled: selected }))}
                   />
-                  {form.type === 'openai_compatible' ? (
-                    <span title={t('channels.balance_check_enabled_hint')}>
-                      <NativeSwitch
-                        ariaLabel={t('channels.balance_check_enabled')}
-                        isSelected={form.balanceCheckEnabled}
-                        label={t('channels.balance_check_enabled')}
-                        onChange={(selected) => setForm((p) => ({ ...p, balanceCheckEnabled: selected }))}
-                      />
-                    </span>
-                  ) : null}
+                  <span title={t('channels.balance_check_enabled_hint')}>
+                    <NativeSwitch
+                      ariaLabel={t('channels.balance_check_enabled')}
+                      isSelected={form.balanceCheckEnabled}
+                      label={t('channels.balance_check_enabled')}
+                      onChange={(selected) => setForm((p) => ({ ...p, balanceCheckEnabled: selected }))}
+                    />
+                  </span>
                   <NativeSwitch
                     ariaLabel={t('channels.probe_enabled')}
                     isSelected={form.probeEnabled}

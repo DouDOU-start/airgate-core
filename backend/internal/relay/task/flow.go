@@ -525,7 +525,7 @@ func (f *Flow) newTask(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string
 		EstTotal:              estTotal,
 		RateMultiplier:        billingRate,
 		SellRate:              keyInfo.SellRate,
-		AccountRateMultiplier: ch.CostRatio,
+		AccountRateMultiplier: ch.EffectiveCostRatio(),
 		Seconds:               sub.Seconds,
 		SubmitTime:            now,
 		RequestID:             requestIDOf(c),

@@ -6,7 +6,7 @@ import {
   TextField as HeroTextField,
 } from '@heroui/react';
 import {
-  Activity, Eraser, KeyRound, RefreshCw, Search, Settings2, Shield, Trash2, Unlock, Zap,
+  Activity, Eraser, KeyRound, Search, Settings2, Shield, Trash2, Unlock, Zap,
 } from 'lucide-react';
 import { riskControlApi, type ModerationLog } from '../../shared/api/riskControl';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -17,6 +17,7 @@ import { CommonTable } from '../../shared/components/CommonTable';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 import { StatCard } from '../../shared/components/StatCard';
 import { getTotalPages } from '../../shared/utils/pagination';
 import { ConfigModal } from './riskcontrol/ConfigModal';
@@ -45,7 +46,7 @@ export default function RiskControlPage() {
     queryFn: () => riskControlApi.getConfig(),
   });
 
-  const { data: status, refetch: refetchStatus } = useQuery({
+  const { data: status, isFetching: statusFetching, refetch: refetchStatus } = useQuery({
     queryKey: queryKeys.riskControlStatus(),
     queryFn: () => riskControlApi.getStatus(),
     refetchInterval: 10_000,
@@ -61,7 +62,12 @@ export default function RiskControlPage() {
     [page, pageSize, resultFilter, debouncedSearch],
   );
 
-  const { data: logsData, isLoading: logsLoading, refetch: refetchLogs } = useQuery({
+  const {
+    data: logsData,
+    isFetching: logsFetching,
+    isLoading: logsLoading,
+    refetch: refetchLogs,
+  } = useQuery({
     queryKey: queryKeys.riskControlLogs(listQuery),
     queryFn: () => riskControlApi.listLogs(listQuery),
     placeholderData: keepPreviousData,
@@ -193,15 +199,11 @@ export default function RiskControlPage() {
             <Eraser className="w-3.5 h-3.5" />
             {t('risk_control.clear_hashes')}
           </Button>
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh')}
-            size="sm"
-            variant="ghost"
-            onPress={() => { refetchStatus(); refetchLogs(); }}
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
+          <RefreshButton
+            ariaLabel={t('common.refresh')}
+            isRefreshing={statusFetching || logsFetching}
+            onRefresh={() => { refetchStatus(); refetchLogs(); }}
+          />
           <Button variant="primary" onPress={() => setShowConfig(true)}>
             <Settings2 className="w-4 h-4" />
             {t('risk_control.open_config')}

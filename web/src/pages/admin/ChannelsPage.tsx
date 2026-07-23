@@ -7,7 +7,7 @@ import {
 } from '@heroui/react';
 import {
   ArrowUpDown, BarChart3, Boxes, ChevronDown, ChevronRight, CircleCheck, CircleOff,
-  Download, KeyRound, Pencil, Plus, RefreshCw, Search, Trash2, Upload,
+  Download, KeyRound, Pencil, Plus, Search, Trash2, Upload,
 } from 'lucide-react';
 import { channelsApi } from '../../shared/api/channels';
 import { upstreamLogsApi } from '../../shared/api/upstreamLogs';
@@ -28,23 +28,24 @@ import { ChannelStatsModal } from './channels/ChannelStatsModal';
 import { ChannelTestModal } from './channels/ChannelTestModal';
 import { ChannelKeysTable } from './channels/ChannelKeysTable';
 import {
-  HealthStatusChip, KeyMetricsRow, KeyStatusChip, TYPE_CHIP_COLORS, keySupportsBalance, typeLabel,
+  HealthStatusChip, KeyMetricsRow, KeyStatusChip, TYPE_CHIP_COLORS, typeLabel,
 } from './channels/keyShared';
 import { formatDate, formatDateTime } from '../../shared/utils/format';
 import type {
   ChannelFailureCounts, ChannelKeyResp, ChannelKeySortBy, ChannelResp, SortOrder,
 } from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 
 const COLUMN_COUNT = 7;
 
 // 余额陈旧阈值：更新时间早于此则进入页面时后台自动刷新。
 const BALANCE_STALE_MS = 60_000;
 
-// isKeyBalanceStale 可查余额的 key 从未刷新过、或超过阈值 → 陈旧。
+// isKeyBalanceStale 开启主动查询的 key 从未刷新过、或超过阈值 → 陈旧。
 // 关闭主动查询（balance_check_enabled=false）的 key 不参与自动刷新。
 function isKeyBalanceStale(key: ChannelKeyResp): boolean {
-  if (!keySupportsBalance(key) || !key.balance_check_enabled) return false;
+  if (!key.balance_check_enabled) return false;
   if (!key.balance_updated_at) return true;
   return Date.now() - new Date(key.balance_updated_at).getTime() > BALANCE_STALE_MS;
 }
@@ -192,7 +193,7 @@ export default function ChannelsPage() {
     status: statusFilter || undefined,
   }), [page, pageSize, debouncedKeyword, typeFilter, statusFilter]);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.channels(listQuery),
     queryFn: () => channelsApi.list(listQuery),
     placeholderData: keepPreviousData,
@@ -213,7 +214,12 @@ export default function ChannelsPage() {
     sort_order: keysSort.by ? keysSort.order : undefined,
   }), [keysPage, keysPageSize, debouncedKeyword, typeFilter, statusFilter, keysSort]);
 
-  const { data: keysData, isLoading: keysLoading, refetch: refetchKeys } = useQuery({
+  const {
+    data: keysData,
+    isFetching: keysFetching,
+    isLoading: keysLoading,
+    refetch: refetchKeys,
+  } = useQuery({
     queryKey: queryKeys.channelKeys(keysListQuery),
     queryFn: () => channelsApi.listKeys(keysListQuery),
     enabled: view === 'keys',
@@ -310,42 +316,6 @@ export default function ChannelsPage() {
     },
     onError: (err: Error) => toast('error', err.message),
   });
-
-  // 一键刷新所有渠道下可查余额（openai_compatible）的 key：串行逐个刷，失败跳过不中断。
-  const [batchBalanceRunning, setBatchBalanceRunning] = useState(false);
-  async function handleRefreshAllBalance() {
-    setBatchBalanceRunning(true);
-    let ok = 0;
-    try {
-      // 按 100（后端 page_size 上限）分页循环拉全部渠道，避免单页超限被 400。
-      const channels: ChannelResp[] = [];
-      for (let page = 1; ; page += 1) {
-        const resp = await channelsApi.list({ page, page_size: 100 });
-        channels.push(...resp.list);
-        if (resp.list.length === 0 || channels.length >= resp.total) break;
-      }
-      // 关闭主动查询的 key 不进批量刷新（官方直连等无余额接口的上游）。
-      const keys = channels.flatMap((ch) => ch.keys)
-        .filter((k) => k.type === 'openai_compatible' && k.balance_check_enabled);
-      const total = keys.length;
-      if (total === 0) {
-        toast('info', t('channels.balance_batch_none'));
-        return;
-      }
-      for (const k of keys) {
-        try {
-          await channelsApi.refreshBalance(k.id);
-          ok += 1;
-        } catch {
-          // 单把 key 失败跳过，不中断整批。
-        }
-      }
-      invalidateChannelViews();
-      toast('success', t('channels.balance_batch_done', { ok, total }));
-    } finally {
-      setBatchBalanceRunning(false);
-    }
-  }
 
   async function handleExport() {
     setExporting(true);
@@ -588,23 +558,12 @@ export default function ChannelsPage() {
             type="file"
             onChange={handleImportFile}
           />
-          <Button
-            isDisabled={batchBalanceRunning}
-            variant="secondary"
-            onPress={handleRefreshAllBalance}
-          >
-            {batchBalanceRunning ? <Spinner size="sm" /> : <RefreshCw className="h-4 w-4" />}
-            {t('channels.refresh_all_balance')}
-          </Button>
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh', 'Refresh')}
+          <RefreshButton
+            ariaLabel={t('common.refresh', 'Refresh')}
+            isRefreshing={view === 'keys' ? keysFetching : isFetching}
+            onRefresh={() => (view === 'keys' ? refetchKeys() : refetch())}
             size="md"
-            variant="ghost"
-            onPress={() => (view === 'keys' ? refetchKeys() : refetch())}
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+          />
           <Button variant="primary" onPress={openCreate}>
             <Plus className="h-4 w-4" />
             {t('channels.create')}

@@ -95,7 +95,10 @@ type ChannelKeySnapshot struct {
 	MaxConcurrency int
 	MaxRPM         int
 	CostRatio      float64
-	Status         string
+	// UpstreamRate 是最近一次成功探测到的上游真实倍率；大于 0 时永久优先于
+	// 手工配置的 CostRatio，直到后续成功探测用新值覆盖。探测结果不做过期回退。
+	UpstreamRate float64
+	Status       string
 	// GroupIDs 绑定分组集合；空集合表示未绑定任何分组，不会被任何分组调度到
 	// （已不支持"空集合=公共 key，对所有分组可用"的旧语义）。
 	GroupIDs  map[int]struct{}
@@ -103,6 +106,18 @@ type ChannelKeySnapshot struct {
 	// HealthStatus 健康状态（healthy/degraded/suspended/recovering）。
 	// degraded 时 Pick 降权（有效权重减半）；suspended/recovering 由探针驱动恢复。
 	HealthStatus string
+}
+
+// EffectiveCostRatio 返回请求落账使用的渠道成本倍率。
+// 有成功探测结果时使用上游真实倍率，否则回退手工配置；两者均无效时回退 1。
+func (k *ChannelKeySnapshot) EffectiveCostRatio() float64 {
+	if k != nil && k.UpstreamRate > 0 {
+		return k.UpstreamRate
+	}
+	if k != nil && k.CostRatio > 0 {
+		return k.CostRatio
+	}
+	return 1
 }
 
 // Loader 全量加载密钥端点快照（由 channel service 实现：解密 api_key）。
@@ -375,6 +390,16 @@ func (r *Registry) MarkRecovered(keyID int) {
 func (r *Registry) UpdateHealth(keyID int, health string) {
 	r.mutate(keyID, func(k *ChannelKeySnapshot) {
 		k.HealthStatus = health
+	})
+}
+
+// UpdateUpstreamRate 在探测结果落库后同步更新运行时快照，使后续请求立即按新倍率核算成本。
+func (r *Registry) UpdateUpstreamRate(keyID int, rate float64) {
+	if rate <= 0 {
+		return
+	}
+	r.mutate(keyID, func(k *ChannelKeySnapshot) {
+		k.UpstreamRate = rate
 	})
 }
 

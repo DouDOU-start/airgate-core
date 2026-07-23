@@ -35,7 +35,6 @@ import {
   Terminal,
   Upload,
   MoreHorizontal,
-  RefreshCw,
 } from 'lucide-react';
 import type { APIKeyResp, CreateAPIKeyReq, UpdateAPIKeyReq, GroupResp } from '../../shared/types';
 import { EditKeyModal } from './userkeys/EditKeyModal';
@@ -46,6 +45,7 @@ import { CcsImportModal, useCcsImportModal } from './userkeys/CcsImportModal';
 import { type KeyForm, emptyForm } from './userkeys/types';
 import { endOfDayLocalISO, formatDate, localDateStr } from '../../shared/utils/format';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 
 export default function UserKeysPage() {
   const { t } = useTranslation();
@@ -69,7 +69,7 @@ export default function UserKeysPage() {
   } = useCopyFeedback();
 
   // 密钥列表
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.userKeys(page, pageSize),
     queryFn: () => apikeysApi.list({ page, page_size: pageSize }),
     placeholderData: keepPreviousData,
@@ -288,15 +288,12 @@ export default function UserKeysPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <EndpointsBar />
         <div className="flex items-center gap-2 ml-auto">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh', 'Refresh')}
+          <RefreshButton
+            ariaLabel={t('common.refresh', 'Refresh')}
+            isRefreshing={isFetching}
+            onRefresh={refetch}
             size="md"
-            variant="ghost"
-            onPress={() => refetch()}
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
+          />
           <Button
             isDisabled={!hasAvailableGroups}
             variant="primary"

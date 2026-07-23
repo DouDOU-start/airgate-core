@@ -79,7 +79,7 @@ type Repository interface {
 	UpdateKeyProbeTime(ctx context.Context, keyID int, at time.Time) error
 	// ListProbeEnabledKeys 查询所有 probe_enabled=true 的 key 的健康快照。
 	ListProbeEnabledKeys(ctx context.Context) ([]KeyHealthSnapshot, error)
-	// ListBalanceSyncTargets 查询 balance_check_enabled=true 且余额过期的 key ID。
+	// ListBalanceSyncTargets 查询 balance_check_enabled=true 且余额过期的已启用 key ID。
 	ListBalanceSyncTargets(ctx context.Context, staleBefore time.Time) ([]int, error)
 
 	// ---- 上游倍率探测 ----
@@ -310,9 +310,9 @@ type UpstreamRateTarget struct {
 
 // KeyHealthSnapshot 密钥端点健康状态快照（探针调度用）。
 type KeyHealthSnapshot struct {
-	KeyID               int
-	HealthStatus        string
-	ConsecutiveFailures int
+	KeyID                int
+	HealthStatus         string
+	ConsecutiveFailures  int
 	ConsecutiveSuccesses int
-	LastProbeAt         *time.Time
+	LastProbeAt          *time.Time
 }

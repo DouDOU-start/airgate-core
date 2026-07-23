@@ -174,6 +174,40 @@ func TestChannelStoreCreateAndManageKeys(t *testing.T) {
 	}
 }
 
+func TestChannelStoreListBalanceSyncTargetsIncludesRelayProtocolTypes(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	ch := createTestChannel(t, db, "balance-provider")
+	openAIKeyID := createTestKey(t, db, ch.ID)
+	anthropicKey, err := db.ChannelKey.Create().
+		SetChannelID(ch.ID).
+		SetType("anthropic").
+		SetAPIKey("cipher").
+		SetModels([]string{"claude-sonnet"}).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create anthropic relay key: %v", err)
+	}
+
+	ids, err := NewChannelStore(db).ListBalanceSyncTargets(ctx, time.Now())
+	if err != nil {
+		t.Fatalf("ListBalanceSyncTargets error: %v", err)
+	}
+	got := make(map[int]bool, len(ids))
+	for _, id := range ids {
+		got[id] = true
+	}
+	if len(ids) != 2 || !got[openAIKeyID] || !got[anthropicKey.ID] {
+		t.Fatalf("ListBalanceSyncTargets = %v, want IDs %d and %d", ids, openAIKeyID, anthropicKey.ID)
+	}
+}
+
 // TestChannelStoreListKeys 密钥视图：跨渠道平铺，按 priority/weight 排序，keyword 匹配渠道名。
 func TestChannelStoreListKeys(t *testing.T) {
 	db := enttestOpen(t)

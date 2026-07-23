@@ -6,7 +6,7 @@ import {
   Spinner, TextField as HeroTextField, ToggleButton, ToggleButtonGroup,
   useOverlayState,
 } from '@heroui/react';
-import { Check, Inbox, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { Check, Inbox, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { modelPricesApi, modelTagsApi } from '../../shared/api/modelPrices';
 import { queryKeys } from '../../shared/queryKeys';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -19,6 +19,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import type { CreateModelPriceReq, ModelPriceResp, ModelTagResp } from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 
 type Translate = (key: string) => string;
 
@@ -371,7 +372,7 @@ export default function ModelPricesPage() {
     market_visible: marketVisibleFilter ?? undefined,
   }), [page, pageSize, debouncedKeyword, tagFilter, marketVisibleFilter]);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.modelPrices(listQuery),
     queryFn: () => modelPricesApi.list(listQuery),
     placeholderData: keepPreviousData,
@@ -777,15 +778,12 @@ export default function ModelPricesPage() {
           <ToggleButton id="off">{t('model_prices.market_visible_off')}</ToggleButton>
         </ToggleButtonGroup>
         <div className="ml-auto flex items-center gap-2">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh', 'Refresh')}
+          <RefreshButton
+            ariaLabel={t('common.refresh', 'Refresh')}
+            isRefreshing={isFetching}
+            onRefresh={refetch}
             size="md"
-            variant="ghost"
-            onPress={() => refetch()}
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+          />
           <Button variant="primary" onPress={openCreate}>
             <Plus className="h-4 w-4" />
             {t('model_prices.create')}

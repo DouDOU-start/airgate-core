@@ -779,7 +779,7 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		CacheCreationCost: costs.CacheCreation5m + costs.CacheCreation1h,
 		BillingRate:       billing.ResolveBillingRate(keyInfo),
 		SellRate:          keyInfo.SellRate,
-		AccountRate:       ch.CostRatio,
+		AccountRate:       ch.EffectiveCostRatio(),
 	})
 
 	// 展示口径与成本口径对齐：input 记扣除 cached 后的部分（cached 单列）。

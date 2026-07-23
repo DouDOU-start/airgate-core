@@ -259,7 +259,7 @@ func (h *ChannelHandler) FetchChannelModels(c *gin.Context) {
 	response.Success(c, dto.FetchChannelModelsResp{Models: models})
 }
 
-// RefreshChannelBalance 查询指定 key 的上游余额并落库（仅 openai_compatible 中转站可查）。
+// RefreshChannelBalance 查询指定 key 的上游余额并落库。
 func (h *ChannelHandler) RefreshChannelBalance(c *gin.Context) {
 	keyID, err := ParseID(c.Param("id"))
 	if err != nil {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { Button, EmptyState, Input, TextField as HeroTextField } from '@heroui/react';
 import { bookmarksApi } from '../../shared/api/bookmarks';
 import { usePagination } from '../../shared/hooks/usePagination';
@@ -16,6 +16,7 @@ import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { CommonTable } from '../../shared/components/CommonTable';
 import { BookmarkFormModal } from './bookmarks/BookmarkFormModal';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 import type {
   BookmarkResp,
   CreateBookmarkReq,
@@ -34,7 +35,7 @@ export default function BookmarksPage() {
   const [editingItem, setEditingItem] = useState<BookmarkResp | null>(null);
   const [deletingItem, setDeletingItem] = useState<BookmarkResp | null>(null);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.bookmarks(page, pageSize, debouncedKeyword),
     queryFn: () =>
       bookmarksApi.list({
@@ -91,15 +92,11 @@ export default function BookmarksPage() {
         </HeroTextField>
 
         <div className="flex items-center gap-2 sm:ml-auto">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh', 'Refresh')}
-            size="sm"
-            variant="ghost"
-            onPress={() => refetch()}
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
+          <RefreshButton
+            ariaLabel={t('common.refresh', 'Refresh')}
+            isRefreshing={isFetching}
+            onRefresh={refetch}
+          />
           <Button variant="primary" onPress={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4" />
             {t('bookmarks.create')}

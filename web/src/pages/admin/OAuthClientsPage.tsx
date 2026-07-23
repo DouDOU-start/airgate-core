@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, RefreshCw, KeyRound } from 'lucide-react';
+import { Plus, Pencil, Trash2, KeyRound } from 'lucide-react';
 import { Button, Chip, EmptyState } from '@heroui/react';
 import { oauthApi } from '../../shared/api/oauth';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -12,6 +12,7 @@ import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { OAuthClientFormModal } from './oauthclients/OAuthClientFormModal';
 import { OAuthClientSecretModal } from './oauthclients/OAuthClientSecretModal';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 import type {
   OAuthClientResp,
   OAuthClientSecretResp,
@@ -37,7 +38,7 @@ export default function OAuthClientsPage() {
   const [resettingItem, setResettingItem] = useState<OAuthClientResp | null>(null);
   const [credential, setCredential] = useState<OAuthClientSecretResp | null>(null);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.oauthClients(),
     queryFn: () => oauthApi.list(),
   });
@@ -83,15 +84,11 @@ export default function OAuthClientsPage() {
       {/* 工具栏 */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
         <div className="flex items-center gap-2 sm:ml-auto">
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh', 'Refresh')}
-            size="sm"
-            variant="ghost"
-            onPress={() => refetch()}
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
+          <RefreshButton
+            ariaLabel={t('common.refresh', 'Refresh')}
+            isRefreshing={isFetching}
+            onRefresh={refetch}
+          />
           <Button variant="primary" onPress={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4" />
             {t('oauth_clients.create')}

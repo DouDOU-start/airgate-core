@@ -124,7 +124,7 @@ func (p *Pipeline) recordTestUsage(snap *registry.ChannelKeySnapshot, model, end
 		CacheCreationCost: costs.CacheCreation5m + costs.CacheCreation1h,
 		BillingRate:       0, // 三管道归零：测试不向任何用户/Key 计费
 		SellRate:          0,
-		AccountRate:       snap.CostRatio,
+		AccountRate:       snap.EffectiveCostRatio(),
 	})
 	inputTokens := u.PromptTokens - u.CachedTokens
 	if inputTokens < 0 {

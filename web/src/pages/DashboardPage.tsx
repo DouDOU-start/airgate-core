@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Card, ComboBox, Input, ListBox, Skeleton, Tabs } from '@heroui/react';
+import { Alert, Card, ComboBox, Input, ListBox, Skeleton, Tabs } from '@heroui/react';
 import {
   CartesianGrid,
   Legend,
@@ -21,7 +21,6 @@ import {
   LineChart as LineChartIcon,
   Monitor,
   PieChart as PieChartIcon,
-  RefreshCw,
   Search,
   Users,
   Zap,
@@ -45,6 +44,7 @@ import { DashboardCard } from '../shared/components/DashboardCard';
 import { METRIC_TONE_VARS, type MetricTone } from '../shared/components/StatCard';
 import { useDebouncedValue } from '../shared/hooks/useDebouncedValue';
 import { CostPair, CostValue } from '../shared/components/CostValue';
+import { RefreshButton } from '../shared/components/RefreshButton';
 import { fmtNum, fmtTrendTime } from '../shared/utils/format';
 import type { DashboardStatsResp, DashboardTrendResp } from '../shared/types';
 
@@ -636,9 +636,11 @@ export default function DashboardPage() {
               ))}
             </Tabs.List>
           </Tabs>
-          <Button isIconOnly aria-label={t('common.refresh', 'Refresh')} size="sm" variant="ghost" onPress={refresh}>
-            <RefreshCw className={`h-4 w-4 ${statsQuery.isFetching || trendQuery.isFetching ? 'animate-spin' : ''}`} />
-          </Button>
+          <RefreshButton
+            ariaLabel={t('common.refresh', 'Refresh')}
+            isRefreshing={statsQuery.isFetching || trendQuery.isFetching}
+            onRefresh={refresh}
+          />
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">

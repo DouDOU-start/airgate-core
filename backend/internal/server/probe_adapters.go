@@ -7,6 +7,7 @@ import (
 	appchannel "github.com/DouDOU-start/airgate-core/internal/app/channel"
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
 	"github.com/DouDOU-start/airgate-core/internal/probe"
+	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 )
 
 // probeStoreAdapter 将 ChannelStore 适配为 probe.Store。
@@ -22,11 +23,11 @@ func (a *probeStoreAdapter) ListProbeTargets(ctx context.Context) ([]probe.KeyHe
 	out := make([]probe.KeyHealthState, len(snapshots))
 	for i, s := range snapshots {
 		out[i] = probe.KeyHealthState{
-			KeyID:               s.KeyID,
-			HealthStatus:        probe.HealthStatus(s.HealthStatus),
-			ConsecutiveFailures: s.ConsecutiveFailures,
+			KeyID:                s.KeyID,
+			HealthStatus:         probe.HealthStatus(s.HealthStatus),
+			ConsecutiveFailures:  s.ConsecutiveFailures,
 			ConsecutiveSuccesses: s.ConsecutiveSuccesses,
-			LastProbeAt:         s.LastProbeAt,
+			LastProbeAt:          s.LastProbeAt,
 		}
 	}
 	return out, nil
@@ -82,8 +83,9 @@ func (a *probeBillingProberAdapter) ProbeBilling(ctx context.Context, keyID int)
 
 // probeBillingStoreAdapter 将 ChannelStore 适配为 probe.BillingProbeStore。
 type probeBillingStoreAdapter struct {
-	store  *store.ChannelStore
-	secret string
+	store    *store.ChannelStore
+	secret   string
+	registry *registry.Registry
 }
 
 func (a *probeBillingStoreAdapter) ListBillingProbeTargets(ctx context.Context) ([]probe.BillingProbeTarget, error) {
@@ -103,5 +105,9 @@ func (a *probeBillingStoreAdapter) ListBillingProbeTargets(ctx context.Context) 
 }
 
 func (a *probeBillingStoreAdapter) UpdateUpstreamRate(ctx context.Context, keyID int, rate float64, at time.Time) error {
-	return a.store.UpdateUpstreamRate(ctx, keyID, rate, at)
+	if err := a.store.UpdateUpstreamRate(ctx, keyID, rate, at); err != nil {
+		return err
+	}
+	a.registry.UpdateUpstreamRate(keyID, rate)
+	return nil
 }

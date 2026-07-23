@@ -28,8 +28,9 @@ import { UserGroupsModal } from './users/UserGroupsModal';
 import { TiersModal } from './users/TiersModal';
 import type { SortOrder, UserResp, UserSortBy } from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 import {
-  Plus, Search, Pencil, MoreHorizontal, RefreshCw,
+  Plus, Search, Pencil, MoreHorizontal,
   Key, Users, PlusCircle, MinusCircle, Clock, Trash2, Crown,
 } from 'lucide-react';
 
@@ -217,19 +218,11 @@ export default function UsersPage() {
           </div>
         ) : null}
         <div className="flex items-center gap-2 sm:ml-auto">
-          {isFetching ? (
-            <RefreshCw className="w-4 h-4 text-text-tertiary animate-spin" />
-          ) : (
-            <Button
-              isIconOnly
-              aria-label={t('common.refresh', 'Refresh')}
-              size="sm"
-              variant="ghost"
-              onPress={() => refetch()}
-            >
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-          )}
+          <RefreshButton
+            ariaLabel={t('common.refresh', 'Refresh')}
+            isRefreshing={isFetching}
+            onRefresh={refetch}
+          />
           <Button variant="secondary" onPress={() => setShowTiersModal(true)}>
             <Crown className="w-4 h-4" />
             {t('tiers.title')}

@@ -8,11 +8,6 @@ import { CHANNEL_TYPE_OPTIONS } from './ChannelFormModal';
 // 渠道视图（按渠道分组展开）与密钥视图（跨渠道平铺）共用的 key 级展示逻辑，
 // 避免同一套「类型徽章/状态徽章/指标行」在两个视图里各写一份。
 
-// 仅 openai_compatible 中转站支持经 key 查余额。
-export function keySupportsBalance(key: ChannelKeyResp): boolean {
-  return key.type === 'openai_compatible';
-}
-
 // 渠道类型 → 徽章配色
 export const TYPE_CHIP_COLORS: Record<ChannelType, 'accent' | 'warning' | 'success' | 'default'> = {
   openai_compatible: 'accent',
@@ -112,7 +107,6 @@ export function KeyMetricsRow({
   showPriorityWeight?: boolean;
 }) {
   const { t } = useTranslation();
-  const supportsBalance = keySupportsBalance(channelKey);
   const balanceUpdated = channelKey.balance_updated_at ? new Date(channelKey.balance_updated_at) : null;
   const fmt = (n: number) => `$${n.toFixed(2)}`;
 
@@ -210,24 +204,22 @@ export function KeyMetricsRow({
           <span className="text-text-tertiary">/</span>
           <span className="text-success">{fmt(channelKey.total_revenue)}</span>
         </Metric>
-        {supportsBalance ? (
-          <Metric label={t('channels.balance')}>
-            <span className="inline-flex items-center gap-1">
-              {balanceUpdated ? fmt(channelKey.balance) : <span className="text-text-tertiary">{t('channels.balance_never')}</span>}
-              <Button
-                isIconOnly
-                aria-label={t('channels.refresh_balance')}
-                className="h-5 min-h-0 w-5"
-                isDisabled={refreshingBalance}
-                size="sm"
-                variant="ghost"
-                onPress={onRefreshBalance}
-              >
-                {refreshingBalance ? <Spinner size="sm" /> : <RefreshCw className="h-3 w-3" />}
-              </Button>
-            </span>
-          </Metric>
-        ) : null}
+        <Metric label={t('channels.balance')}>
+          <span className="inline-flex items-center gap-1">
+            {balanceUpdated ? fmt(channelKey.balance) : <span className="text-text-tertiary">{t('channels.balance_never')}</span>}
+            <Button
+              isIconOnly
+              aria-label={t('channels.refresh_balance')}
+              className="h-5 min-h-0 w-5"
+              isDisabled={refreshingBalance}
+              size="sm"
+              variant="ghost"
+              onPress={onRefreshBalance}
+            >
+              {refreshingBalance ? <Spinner size="sm" /> : <RefreshCw className="h-3 w-3" />}
+            </Button>
+          </span>
+        </Metric>
       </div>
 
       {channelKey.tags.length > 0 ? (

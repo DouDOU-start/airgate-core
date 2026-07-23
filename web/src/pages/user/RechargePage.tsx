@@ -6,7 +6,7 @@ import {
 } from '@heroui/react';
 import QRCode from 'qrcode';
 import {
-  AlertTriangle, CheckCircle, Clock, ExternalLink, QrCode, RefreshCw, Ticket, Wallet,
+  AlertTriangle, CheckCircle, Clock, ExternalLink, QrCode, Ticket, Wallet,
 } from 'lucide-react';
 import { paymentApi } from '../../shared/api/payment';
 import { redemptionApi } from '../../shared/api/redemption';
@@ -23,6 +23,7 @@ import { TablePaginationFooter } from '../../shared/components/TablePaginationFo
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { useSiteSettings } from '../../app/providers/SiteSettingsProvider';
 import type { CreatePaymentOrderReq, PaymentOrder, PaymentOrderStatus, RedeemResp } from '../../shared/types';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 
 // 金额预设（单位 CNY，1 CNY = $1.00 额度）
 const PRESET_AMOUNTS = [10, 30, 50, 100, 200, 500];
@@ -68,7 +69,12 @@ export default function RechargePage() {
 
   // 充值记录（分页）
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'user.recharge');
-  const { data: ordersData, isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
+  const {
+    data: ordersData,
+    isFetching: ordersFetching,
+    isLoading: ordersLoading,
+    refetch: refetchOrders,
+  } = useQuery({
     queryKey: queryKeys.paymentOrders({ page, page_size: pageSize }),
     queryFn: () => paymentApi.listOrders({ page, page_size: pageSize }),
     placeholderData: keepPreviousData,
@@ -332,15 +338,11 @@ export default function RechargePage() {
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-base font-semibold text-text">{t('payment.records_title')}</h3>
-          <Button
-            isIconOnly
-            aria-label={t('common.refresh', 'Refresh')}
-            size="sm"
-            variant="ghost"
-            onPress={() => refetchOrders()}
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+          <RefreshButton
+            ariaLabel={t('common.refresh', 'Refresh')}
+            isRefreshing={ordersFetching}
+            onRefresh={refetchOrders}
+          />
         </div>
         <CommonTable
           ariaLabel={t('payment.records_title')}

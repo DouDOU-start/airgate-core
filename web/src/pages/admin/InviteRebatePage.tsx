@@ -5,7 +5,7 @@ import {
   Button, Card, ComboBox, EmptyState, Input, Label, ListBox, Modal, Spinner, Tabs,
   TextArea, TextField as HeroTextField, useOverlayState,
 } from '@heroui/react';
-import { Gift, Pencil, Percent, Plus, RefreshCw, Save, Search, Users, Wallet, X } from 'lucide-react';
+import { Gift, Pencil, Percent, Plus, Save, Search, Users, Wallet, X } from 'lucide-react';
 import { inviteApi } from '../../shared/api/invite';
 import { settingsApi } from '../../shared/api/settings';
 import { usersApi } from '../../shared/api/users';
@@ -22,6 +22,7 @@ import { CommonTable } from '../../shared/components/CommonTable';
 import { TableLoadingRow } from '../../shared/components/TableLoadingRow';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { formatDateTime } from '../../shared/utils/format';
+import { RefreshButton } from '../../shared/components/RefreshButton';
 
 type TabKey = 'overview' | 'overrides' | 'invitees' | 'logs';
 
@@ -289,7 +290,7 @@ function OverridesTab() {
   const debouncedKeyword = useDebouncedValue(keyword, 300);
   const [modalMode, setModalMode] = useState<'add' | InviteOverrideEntry | null>(null);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.inviteOverrides(page, pageSize, debouncedKeyword),
     queryFn: () => inviteApi.adminListOverrides({ page, page_size: pageSize, keyword: debouncedKeyword || undefined }),
     placeholderData: keepPreviousData,
@@ -322,9 +323,11 @@ function OverridesTab() {
             </div>
           </HeroTextField>
         </div>
-        <Button isIconOnly aria-label={t('common.refresh', 'Refresh')} size="sm" variant="ghost" onPress={() => refetch()}>
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <RefreshButton
+          ariaLabel={t('common.refresh', 'Refresh')}
+          isRefreshing={isFetching}
+          onRefresh={refetch}
+        />
         <Button className="sm:ml-auto" variant="primary" onPress={() => setModalMode('add')}>
           <Plus className="h-4 w-4" />
           {t('invite.admin_override_add')}
@@ -423,7 +426,7 @@ function InviteesTab() {
   const [keyword, setKeyword] = useState('');
   const debouncedKeyword = useDebouncedValue(keyword, 300);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.inviteAdminInvitees(page, pageSize, debouncedKeyword),
     queryFn: () => inviteApi.adminListInvitees({ page, page_size: pageSize, keyword: debouncedKeyword || undefined }),
     placeholderData: keepPreviousData,
@@ -449,9 +452,11 @@ function InviteesTab() {
             </div>
           </HeroTextField>
         </div>
-        <Button isIconOnly aria-label={t('common.refresh', 'Refresh')} size="sm" variant="ghost" onPress={() => refetch()}>
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <RefreshButton
+          ariaLabel={t('common.refresh', 'Refresh')}
+          isRefreshing={isFetching}
+          onRefresh={refetch}
+        />
       </div>
 
       <CommonTable
@@ -511,7 +516,7 @@ function LogsTab() {
   const [keyword, setKeyword] = useState('');
   const debouncedKeyword = useDebouncedValue(keyword, 300);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.inviteAdminLogs(page, pageSize, debouncedKeyword),
     queryFn: () => inviteApi.adminListLogs({ page, page_size: pageSize, keyword: debouncedKeyword || undefined }),
     placeholderData: keepPreviousData,
@@ -537,9 +542,11 @@ function LogsTab() {
             </div>
           </HeroTextField>
         </div>
-        <Button isIconOnly aria-label={t('common.refresh', 'Refresh')} size="sm" variant="ghost" onPress={() => refetch()}>
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <RefreshButton
+          ariaLabel={t('common.refresh', 'Refresh')}
+          isRefreshing={isFetching}
+          onRefresh={refetch}
+        />
       </div>
 
       <CommonTable
