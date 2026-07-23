@@ -25,20 +25,20 @@ const (
 	DefaultSuspendThreshold = 6 // 连续失败 >= 此值 → suspended
 	DefaultRecoverThreshold = 3 // 恢复中连续成功 >= 此值 → healthy
 
-	DefaultProbeInterval       = 60 * time.Second  // 探针调度轮询间隔
-	DefaultBalanceSyncInterval = 5 * time.Minute    // 余额同步轮询间隔
-	DefaultBalanceStaleDur     = 10 * time.Minute   // 余额超过此时长视为过期
-	DefaultProbeKeyInterval    = 60 * time.Second   // 同一 key 两次探测的最小间隔
-	DefaultBillingProbeInterval = 30 * time.Minute  // 上游倍率探测间隔
+	DefaultProbeInterval        = 60 * time.Second // 探针调度轮询间隔
+	DefaultBalanceSyncInterval  = 5 * time.Minute  // 余额同步轮询间隔
+	DefaultBalanceStaleDur      = 10 * time.Minute // 余额超过此时长视为过期
+	DefaultProbeKeyInterval     = 60 * time.Second // 同一 key 两次探测的最小间隔
+	DefaultBillingProbeInterval = 30 * time.Minute // 上游倍率探测间隔
 )
 
 // KeyHealthState 单把 key 的健康状态快照（探针调度用）。
 type KeyHealthState struct {
-	KeyID               int
-	HealthStatus        HealthStatus
-	ConsecutiveFailures int
+	KeyID                int
+	HealthStatus         HealthStatus
+	ConsecutiveFailures  int
 	ConsecutiveSuccesses int
-	LastProbeAt         *time.Time
+	LastProbeAt          *time.Time
 }
 
 // Tester 密钥端点连通性测试（由 channel service 适配）。

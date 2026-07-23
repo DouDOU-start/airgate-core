@@ -14,13 +14,13 @@ import (
 //   - 探针调度：对 probe_enabled 且处于 suspended/recovering 的 key 定期发探测请求
 //   - 余额同步：对 balance_check_enabled 且余额过期的 key 定期刷新余额
 type Engine struct {
-	store        Store
-	tester       Tester
-	balStore     BalanceStore
-	balSyncer    BalanceSyncer
-	registry     RegistryMutator
-	bilProber    BillingProber
-	bilStore     BillingProbeStore
+	store     Store
+	tester    Tester
+	balStore  BalanceStore
+	balSyncer BalanceSyncer
+	registry  RegistryMutator
+	bilProber BillingProber
+	bilStore  BillingProbeStore
 
 	// mu 保护 states 内存映射（比 store 查 DB 快得多，转发热路径用）。
 	mu     sync.RWMutex

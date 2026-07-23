@@ -30,11 +30,11 @@ func (s *Server) handleBilling(c *gin.Context) {
 	rate := billing.ResolveBillingRate(keyInfo)
 
 	c.JSON(http.StatusOK, gin.H{
-		"object":              "airgate.key_billing",
-		"rate_multiplier":     rate,
-		"group_rate":          keyInfo.GroupRateMultiplier,
-		"sell_rate":           keyInfo.SellRate,
-		"max_rate":            keyInfo.MaxRate,
-		"observed_at":         time.Now().Format(time.RFC3339),
+		"object":          "airgate.key_billing",
+		"rate_multiplier": rate,
+		"group_rate":      keyInfo.GroupRateMultiplier,
+		"sell_rate":       keyInfo.SellRate,
+		"max_rate":        keyInfo.MaxRate,
+		"observed_at":     time.Now().Format(time.RFC3339),
 	})
 }

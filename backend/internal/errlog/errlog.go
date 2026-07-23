@@ -65,12 +65,12 @@ const (
 	PhasePrecheckRate           = "precheck_rate"
 	PhasePrecheckClientRestrict = "precheck_client_restrict"
 	PhasePrecheckModeration     = "precheck_moderation"
-	PhaseLocalLimit          = "local_limit"
-	PhaseQueueTimeout        = "queue_timeout"
-	PhaseUpstreamExhausted   = "upstream_exhausted"
-	PhaseUpstreamClientError = "upstream_client_error"
-	PhaseCanceled            = "canceled"
-	PhaseStreamAborted       = "stream_aborted"
+	PhaseLocalLimit             = "local_limit"
+	PhaseQueueTimeout           = "queue_timeout"
+	PhaseUpstreamExhausted      = "upstream_exhausted"
+	PhaseUpstreamClientError    = "upstream_client_error"
+	PhaseCanceled               = "canceled"
+	PhaseStreamAborted          = "stream_aborted"
 	// PhaseBadRequest 构建上游请求即失败（非法请求体 / 不支持的端点 / 参数翻译失败）；
 	// 属客户端/配置问题，一次性 400 终止，不 failover、不计渠道健康。
 	PhaseBadRequest = "bad_request"

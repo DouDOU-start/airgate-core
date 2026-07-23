@@ -59,16 +59,16 @@ type Options struct {
 
 // Pipeline relay 转发管线。
 type Pipeline struct {
-	registry    *registry.Registry
-	pricing     *pricing.Cache
-	concurrency *scheduler.ConcurrencyManager
-	rpm         *scheduler.RPMCounter
-	calculator  *billing.Calculator
-	sink        UsageSink
-	errSink     ErrSink
-	settings    *SettingsReader
-	moderation     ModerationChecker
-	healthTracker  HealthTracker
+	registry      *registry.Registry
+	pricing       *pricing.Cache
+	concurrency   *scheduler.ConcurrencyManager
+	rpm           *scheduler.RPMCounter
+	calculator    *billing.Calculator
+	sink          UsageSink
+	errSink       ErrSink
+	settings      *SettingsReader
+	moderation    ModerationChecker
+	healthTracker HealthTracker
 	// client 出口 HTTP 客户端：不设总超时（流式无总超时），仅设连接/TLS 层超时；
 	// 非流式的总超时由调用方经 context 施加。重定向不跟随
 	//（upstreamclient.NewClient 统一设 ErrUseLastResponse），
@@ -90,14 +90,14 @@ func New(opts Options) *Pipeline {
 		calculator = billing.NewCalculator()
 	}
 	return &Pipeline{
-		registry:    opts.Registry,
-		pricing:     opts.Pricing,
-		concurrency: opts.Concurrency,
-		rpm:         opts.RPM,
-		calculator:  calculator,
-		sink:        opts.Sink,
-		errSink:     opts.ErrLog,
-		settings:    settings,
+		registry:      opts.Registry,
+		pricing:       opts.Pricing,
+		concurrency:   opts.Concurrency,
+		rpm:           opts.RPM,
+		calculator:    calculator,
+		sink:          opts.Sink,
+		errSink:       opts.ErrLog,
+		settings:      settings,
 		moderation:    opts.Moderation,
 		healthTracker: opts.HealthTracker,
 		client:        upstreamclient.NewClient(0),

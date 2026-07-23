@@ -300,12 +300,12 @@ func (s *DashboardStore) aggTokenTrendPG(ctx context.Context, query *ent.UsageLo
 
 func (s *DashboardStore) aggModelDistPG(ctx context.Context, query *ent.UsageLogQuery, tzLit string) ([]appdashboard.ModelStats, error) {
 	var rows []struct {
-		Model        string  `json:"model"`
-		Requests     int64   `json:"requests"`
-		Tokens       int64   `json:"tokens"`
-		ActualCost   float64 `json:"actual_cost"`
-		TotalCost    float64 `json:"total_cost"`
-		ChannelCost  float64 `json:"channel_cost"`
+		Model       string  `json:"model"`
+		Requests    int64   `json:"requests"`
+		Tokens      int64   `json:"tokens"`
+		ActualCost  float64 `json:"actual_cost"`
+		TotalCost   float64 `json:"total_cost"`
+		ChannelCost float64 `json:"channel_cost"`
 	}
 	err := query.Modify(func(sel *entsql.Selector) {
 		tokens := fmt.Sprintf("COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0)",
@@ -342,12 +342,12 @@ func (s *DashboardStore) aggModelDistPG(ctx context.Context, query *ent.UsageLog
 
 func (s *DashboardStore) aggUserRankingPG(ctx context.Context, query *ent.UsageLogQuery) ([]appdashboard.UserRanking, error) {
 	var rows []struct {
-		UserID       int     `json:"user_id_snapshot"`
-		Email        string  `json:"email"`
-		Requests     int64   `json:"requests"`
-		Tokens       int64   `json:"tokens"`
-		ActualCost   float64 `json:"actual_cost"`
-		TotalCost    float64 `json:"total_cost"`
+		UserID     int     `json:"user_id_snapshot"`
+		Email      string  `json:"email"`
+		Requests   int64   `json:"requests"`
+		Tokens     int64   `json:"tokens"`
+		ActualCost float64 `json:"actual_cost"`
+		TotalCost  float64 `json:"total_cost"`
 	}
 	err := query.Modify(func(sel *entsql.Selector) {
 		tokens := fmt.Sprintf("COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0)",
@@ -384,9 +384,9 @@ func (s *DashboardStore) aggUserRankingPG(ctx context.Context, query *ent.UsageL
 func (s *DashboardStore) aggTopUsersPG(ctx context.Context, query *ent.UsageLogQuery, unit, tzLit string, loc *time.Location, fillKeys []string) ([]appdashboard.UserTrend, error) {
 	// 第一步：找 Top 12 用户
 	var topRows []struct {
-		UserID int   `json:"user_id_snapshot"`
+		UserID int    `json:"user_id_snapshot"`
 		Email  string `json:"email"`
-		Tokens int64 `json:"tokens"`
+		Tokens int64  `json:"tokens"`
 	}
 	err := query.Clone().Modify(func(sel *entsql.Selector) {
 		tokens := fmt.Sprintf("COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0) + COALESCE(SUM(%s), 0)",

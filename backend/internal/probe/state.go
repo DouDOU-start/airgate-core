@@ -4,10 +4,10 @@ package probe
 type Action int
 
 const (
-	ActionNone           Action = iota
-	ActionUpdateHealth          // 仅更新健康状态（持久化 + 内存）
-	ActionSuspend               // 暂停 key（status→disabled_auto + health→suspended）
-	ActionRecover               // 恢复 key（status→enabled + health→healthy）
+	ActionNone         Action = iota
+	ActionUpdateHealth        // 仅更新健康状态（持久化 + 内存）
+	ActionSuspend             // 暂停 key（status→disabled_auto + health→suspended）
+	ActionRecover             // 恢复 key（status→enabled + health→healthy）
 )
 
 // Transition 状态转移结果。
