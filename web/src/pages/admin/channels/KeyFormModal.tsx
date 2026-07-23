@@ -216,7 +216,7 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
     },
   });
   const selectedTypeLabel = CHANNEL_TYPE_OPTIONS.find((item) => item.id === form.type)?.label ?? form.type;
-  const upstreamRatePlatformOptions = UPSTREAM_RATE_PLATFORM_PRESETS.map((item) => ({
+  const upstreamRatePlatformOptions: Array<{ id: string; label: string }> = UPSTREAM_RATE_PLATFORM_PRESETS.map((item) => ({
     id: item.id,
     label: t(item.labelKey),
   }));
