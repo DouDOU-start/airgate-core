@@ -8,6 +8,20 @@ import (
 	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
 )
 
+func TestToUsageLogResp保留渠道与密钥名称(t *testing.T) {
+	record := appusage.LogRecord{
+		ChannelID:      9,
+		ChannelName:    "主渠道",
+		ChannelKeyID:   11,
+		ChannelKeyName: "生产密钥",
+	}
+
+	resp := toUsageLogResp(record)
+	if resp.ChannelID != 9 || resp.ChannelName != "主渠道" || resp.ChannelKeyID != 11 || resp.ChannelKeyName != "生产密钥" {
+		t.Fatalf("渠道与密钥名称映射异常：%+v", resp)
+	}
+}
+
 // TestToCustomerUsageLogRespStripsResellerFields end customer 视角映射是防
 // reseller 毛利泄漏的关键：只允许 billed_cost 出现，actual/total/单价/倍率/
 // 渠道/IP/UA 等平台侧字段一律不得进入序列化结果。
@@ -20,6 +34,8 @@ func TestToCustomerUsageLogRespStripsResellerFields(t *testing.T) {
 		APIKeyName:            "customer-key",
 		ChannelID:             9,
 		ChannelName:           "leak-channel-name",
+		ChannelKeyID:          11,
+		ChannelKeyName:        "leak-channel-key-name",
 		GroupID:               2,
 		Model:                 "gpt-test",
 		InputTokens:           100,
@@ -96,6 +112,8 @@ func TestToUserUsageLogRespStripsChannelFields(t *testing.T) {
 		UserID:                7,
 		ChannelID:             9,
 		ChannelName:           "leak-channel-name",
+		ChannelKeyID:          11,
+		ChannelKeyName:        "leak-channel-key-name",
 		GroupID:               2,
 		Model:                 "gpt-test",
 		AccountRateMultiplier: 0.8,
@@ -107,7 +125,7 @@ func TestToUserUsageLogRespStripsChannelFields(t *testing.T) {
 	}
 	body := string(data)
 
-	for _, forbidden := range []string{"channel_id", "channel_name", "leak-channel-name", "account_rate_multiplier"} {
+	for _, forbidden := range []string{"channel_id", "channel_name", "channel_key_id", "channel_key_name", "leak-channel-name", "leak-channel-key-name", "account_rate_multiplier"} {
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("用户视角响应泄漏字段 %q: %s", forbidden, body)
 		}

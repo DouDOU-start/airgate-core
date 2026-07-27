@@ -2,11 +2,15 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
+	entchannel "github.com/DouDOU-start/airgate-core/ent/channel"
+	entchannelkey "github.com/DouDOU-start/airgate-core/ent/channelkey"
 	entupstreamrequestlog "github.com/DouDOU-start/airgate-core/ent/upstreamrequestlog"
 	appupstreamlog "github.com/DouDOU-start/airgate-core/internal/app/upstreamlog"
+	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
 )
 
@@ -30,11 +34,107 @@ func (s *UpstreamLogStore) List(ctx context.Context, filter appupstreamlog.ListF
 	if err != nil {
 		return nil, err
 	}
+	channelNames, err := s.missingChannelNames(ctx, items)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.fillMissingAttemptKeyNames(ctx, items); err != nil {
+		return nil, err
+	}
 	result := make([]appupstreamlog.Record, 0, len(items))
 	for _, item := range items {
-		result = append(result, mapUpstreamLog(item))
+		record := mapUpstreamLog(item)
+		if record.ChannelName == "" {
+			record.ChannelName = channelNames[record.ChannelID]
+		}
+		result = append(result, record)
 	}
 	return result, nil
+}
+
+// fillMissingAttemptKeyNames 为旧版重试链中只有 key ID、没有 key 名称的记录补充当前名称。
+// 已写入的名称快照不会被覆盖，因此渠道密钥改名后仍保留请求发生时的名称。
+func (s *UpstreamLogStore) fillMissingAttemptKeyNames(ctx context.Context, items []*ent.UpstreamRequestLog) error {
+	chains := make(map[*ent.UpstreamRequestLog][]errlog.AttemptHop)
+	missing := make(map[int]struct{})
+	for _, item := range items {
+		if len(item.AttemptChain) == 0 {
+			continue
+		}
+		var hops []errlog.AttemptHop
+		if err := json.Unmarshal(item.AttemptChain, &hops); err != nil {
+			continue
+		}
+		chains[item] = hops
+		for _, hop := range hops {
+			if hop.KeyID > 0 && hop.KeyName == "" {
+				missing[hop.KeyID] = struct{}{}
+			}
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+
+	ids := make([]int, 0, len(missing))
+	for id := range missing {
+		ids = append(ids, id)
+	}
+	keys, err := s.db.ChannelKey.Query().Where(entchannelkey.IDIn(ids...)).All(ctx)
+	if err != nil {
+		return err
+	}
+	names := make(map[int]string, len(keys))
+	for _, key := range keys {
+		names[key.ID] = key.Name
+	}
+	for item, hops := range chains {
+		changed := false
+		for i := range hops {
+			if hops[i].KeyName == "" && names[hops[i].KeyID] != "" {
+				hops[i].KeyName = names[hops[i].KeyID]
+				changed = true
+			}
+		}
+		if changed {
+			data, err := json.Marshal(hops)
+			if err != nil {
+				return err
+			}
+			item.AttemptChain = data
+		}
+	}
+	return nil
+}
+
+// missingChannelNames 为旧版漏写渠道名称的失败记录补充当前渠道名。
+// 新记录仍以落库快照为准，确保渠道改名后保留请求发生时的名称。
+func (s *UpstreamLogStore) missingChannelNames(ctx context.Context, items []*ent.UpstreamRequestLog) (map[int]string, error) {
+	missing := make(map[int]struct{})
+	for _, item := range items {
+		if item.ChannelID > 0 && item.ChannelName == "" {
+			missing[item.ChannelID] = struct{}{}
+		}
+	}
+	if len(missing) == 0 {
+		return nil, nil
+	}
+
+	ids := make([]int, 0, len(missing))
+	for id := range missing {
+		ids = append(ids, id)
+	}
+	channels, err := s.db.Channel.Query().
+		Where(entchannel.IDIn(ids...)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[int]string, len(channels))
+	for _, channel := range channels {
+		names[channel.ID] = channel.Name
+	}
+	return names, nil
 }
 
 // Count 统计总数。

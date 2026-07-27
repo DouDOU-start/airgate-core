@@ -581,6 +581,7 @@ func (s *UsageStore) pageUsageLogs(ctx context.Context, query *ent.UsageLogQuery
 		WithUser().
 		WithAPIKey().
 		WithChannel().
+		WithChannelKey().
 		WithGroup().
 		Order(ent.Desc(entusagelog.FieldCreatedAt), ent.Desc(entusagelog.FieldID)).
 		All(ctx)
@@ -762,6 +763,10 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		record.ChannelName = item.Edges.Channel.Name
 	} else {
 		record.ChannelName = "-"
+	}
+	if item.Edges.ChannelKey != nil {
+		record.ChannelKeyID = int64(item.Edges.ChannelKey.ID)
+		record.ChannelKeyName = item.Edges.ChannelKey.Name
 	}
 	if item.Edges.Group != nil {
 		record.GroupID = int64(item.Edges.Group.ID)

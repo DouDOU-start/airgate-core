@@ -596,6 +596,7 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelKey
 
 			snaps = append(snaps, registry.ChannelKeySnapshot{
 				KeyID:                  key.ID,
+				KeyName:                key.Name,
 				ChannelID:              ch.ID,
 				ChannelName:            ch.Name,
 				BaseURL:                ch.BaseURL,

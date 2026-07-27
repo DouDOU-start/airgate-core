@@ -74,8 +74,9 @@ var ErrNoAvailableChannel = errors.New("无可用渠道")
 // Pick 返回的快照为只读视图：注册表内部以 copy-on-write 方式更新，
 // 调用方持有的指针不会被并发修改，但也禁止就地改写。
 type ChannelKeySnapshot struct {
-	// KeyID 密钥端点（channel_key）ID：调度/限流/故障隔离的最小单元标识。
-	KeyID int
+	// KeyID / KeyName 密钥端点标识：调度、故障隔离与管理端留痕展示使用。
+	KeyID   int
+	KeyName string
 	// ChannelID / ChannelName 所属渠道（供应商）标识，供计费聚合与留痕。
 	ChannelID   int
 	ChannelName string

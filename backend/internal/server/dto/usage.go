@@ -13,6 +13,8 @@ type UsageLogResp struct {
 	// 渠道字段仅管理端出值；用户视角在 handler 层清零（用户只能看到分组，见 UserUsage）。
 	ChannelID             int64   `json:"channel_id,omitempty"`
 	ChannelName           string  `json:"channel_name,omitempty"`
+	ChannelKeyID          int64   `json:"channel_key_id,omitempty"`
+	ChannelKeyName        string  `json:"channel_key_name,omitempty"`
 	GroupID               int64   `json:"group_id"`
 	Model                 string  `json:"model"`
 	InputTokens           int     `json:"input_tokens"`

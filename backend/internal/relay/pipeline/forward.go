@@ -540,6 +540,7 @@ func attemptHop(seq int, ch *registry.ChannelKeySnapshot, apiKey string, upstrea
 		ChannelID:    ch.ChannelID,
 		ChannelName:  ch.ChannelName,
 		KeyID:        ch.KeyID,
+		KeyName:      ch.KeyName,
 		KeyHint:      outcome.KeyHint(apiKey),
 		UpstreamStat: upstreamStatus,
 		Verdict:      verdict,

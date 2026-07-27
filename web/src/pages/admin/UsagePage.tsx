@@ -56,10 +56,10 @@ const groupByHeaderKeys: Record<string, string> = {
 
 const ADMIN_USAGE_STATS_GROUP_BY = 'model,group,channel,channel_key,user';
 
-// 按 key 统计的展示名：未命名回退 #id，前缀所属渠道名；key 已删除（id=0）显示占位。
+// 按 key 统计的展示名：使用“渠道名称 · 密钥名称”；未命名与已删除 key 显示对应占位。
 function channelKeyStatName(s: ChannelKeyStats, t: TFunction): string {
   if (s.channel_key_id <= 0) return t('usage.deleted_key');
-  const label = s.name || `#${s.channel_key_id}`;
+  const label = s.name || t('channels.key_unnamed');
   return s.channel_name ? `${s.channel_name} · ${label}` : label;
 }
 const USAGE_PAGE_ACTIVATION_DELAY_MS = 180;
@@ -697,10 +697,13 @@ export default function UsagePage() {
     const channelColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'channel_name',
       title: t('usage.channel', '渠道'),
-      width: '172px',
+      width: '220px',
       hideOnMobile: true,
       render: (row) => {
-        const name = row.channel_name || '-';
+        const channelName = row.channel_name || '-';
+        const keyName = row.channel_key_name
+          || (row.channel_key_id ? t('channels.key_unnamed') : t('usage.deleted_key'));
+        const name = channelName === '-' ? channelName : `${channelName} · ${keyName}`;
         return (
           <div className="flex w-full min-w-0 flex-col items-center text-center" title={name}>
             <span className="block max-w-full truncate text-xs font-medium text-text-secondary">{name}</span>

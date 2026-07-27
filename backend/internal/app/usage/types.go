@@ -54,6 +54,8 @@ type LogRecord struct {
 	APIKeyDeleted         bool
 	ChannelID             int64
 	ChannelName           string
+	ChannelKeyID          int64
+	ChannelKeyName        string
 	GroupID               int64
 	Model                 string
 	InputTokens           int

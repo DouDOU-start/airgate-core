@@ -293,6 +293,8 @@ export interface UpstreamAttemptHop {
   seq: number;
   channel_id: number;
   channel_name: string;
+  channel_key_id?: number;
+  channel_key_name?: string;
   key_hint?: string;
   upstream_status?: number;
   verdict: string; // rateLimited / authFailed / transient / networkError / clientError / streamAborted
@@ -393,6 +395,8 @@ export interface UsageLogResp {
   api_key_deleted: boolean;
   channel_id: number;
   channel_name?: string;
+  channel_key_id?: number;
+  channel_key_name?: string;
   group_id: number;
   model: string;
   input_tokens: number;

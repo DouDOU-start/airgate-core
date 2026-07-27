@@ -65,9 +65,18 @@ func (p *Pipeline) TestChannel(ctx context.Context, snap *registry.ChannelKeySna
 		// ctx 取消是操作行为而非渠道故障；30s 超时属内层 deadline，外层 ctx 无损，照常留痕。
 		if p.errSink != nil && ctx.Err() == nil {
 			p.errSink.Record(errlog.Entry{
-				RequestID:   uuid.NewString(),
-				Source:      errlog.SourceChannelTest,
-				Model:       model,
+				RequestID: uuid.NewString(),
+				Source:    errlog.SourceChannelTest,
+				Model:     model,
+				Attempts:  1,
+				Chain: []errlog.AttemptHop{{
+					Seq:         1,
+					ChannelID:   snap.ChannelID,
+					ChannelName: snap.ChannelName,
+					KeyID:       snap.KeyID,
+					KeyName:     snap.KeyName,
+					Verdict:     "testFailed",
+				}},
 				ChannelID:   snap.ChannelID,
 				ChannelName: snap.ChannelName,
 				DurationMs:  time.Since(start).Milliseconds(),

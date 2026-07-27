@@ -92,6 +92,9 @@ func TestUsageStoreListAdminFiltersByChannelAndKey(t *testing.T) {
 	ch := createTestChannel(t, db, "channel-a")
 	keyA := createTestKey(t, db, ch.ID)
 	keyB := createTestKey(t, db, ch.ID)
+	if _, err := db.ChannelKey.UpdateOneID(keyA).SetName("主密钥").Save(ctx); err != nil {
+		t.Fatalf("设置渠道密钥名称失败：%v", err)
+	}
 	otherCh := createTestChannel(t, db, "channel-b")
 	otherKey := createTestKey(t, db, otherCh.ID)
 
@@ -135,6 +138,17 @@ func TestUsageStoreListAdminFiltersByChannelAndKey(t *testing.T) {
 		}
 		if total != 1 {
 			t.Fatalf("CountAdmin by channel key = %d, want 1", total)
+		}
+
+		items, err := store.ListAdmin(ctx, appusage.ListFilter{Page: 1, PageSize: 20, ChannelKeyID: &channelKeyID})
+		if err != nil {
+			t.Fatalf("ListAdmin by channel key returned error: %v", err)
+		}
+		if len(items) != 1 {
+			t.Fatalf("ListAdmin by channel key length = %d, want 1", len(items))
+		}
+		if items[0].ChannelName != ch.Name || items[0].ChannelKeyID != int64(keyA) || items[0].ChannelKeyName != "主密钥" {
+			t.Fatalf("渠道与密钥名称映射异常：%+v", items[0])
 		}
 	})
 }

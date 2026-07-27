@@ -213,12 +213,17 @@ function ClientCell({ row }: { row: UpstreamLogResp }) {
   );
 }
 
-// ChannelCell 渠道列：单渠道直接显示；多跳重试链 hover 展开每跳明细。
+// ChannelCell 渠道列：统一显示“渠道名称 · 密钥名称”，多跳时用箭头串联并支持展开明细。
 function ChannelCell({ row }: { row: UpstreamLogResp }) {
   const { t } = useTranslation();
   const chain = row.attempt_chain ?? [];
-  const label = chain.length > 1
-    ? chain.map((hop) => hop.channel_name || `#${hop.channel_id}`).join(' → ')
+  const hopLabel = (hop: UpstreamAttemptHop) => {
+    const channelName = hop.channel_name || t('upstream_logs.channel_fallback', { id: hop.channel_id });
+    const keyName = hop.channel_key_name || t('channels.key_unnamed');
+    return `${channelName} · ${keyName}`;
+  };
+  const label = chain.length > 0
+    ? chain.map(hopLabel).join(' → ')
     : row.channel_name || (row.channel_id ? `#${row.channel_id}` : '-');
 
   if (chain.length === 0) {
@@ -246,6 +251,7 @@ function HopLine({ hop }: { hop: UpstreamAttemptHop }) {
     <div className="rounded-[var(--radius)] bg-bg-hover px-2 py-1 font-mono text-[11px] leading-relaxed">
       <span className="text-text">
         #{hop.seq} {hop.channel_name || t('upstream_logs.channel_fallback', { id: hop.channel_id })}
+        {' · '}{hop.channel_key_name || t('channels.key_unnamed')}
         {hop.key_hint ? ` (${hop.key_hint})` : ''}
       </span>
       <span className="text-text-tertiary">

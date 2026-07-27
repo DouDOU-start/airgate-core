@@ -18,6 +18,8 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 		APIKeyDeleted:         record.APIKeyDeleted,
 		ChannelID:             record.ChannelID,
 		ChannelName:           record.ChannelName,
+		ChannelKeyID:          record.ChannelKeyID,
+		ChannelKeyName:        record.ChannelKeyName,
 		GroupID:               record.GroupID,
 		Model:                 record.Model,
 		InputTokens:           record.InputTokens,
@@ -66,6 +68,8 @@ func toUserUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 	resp.AccountRateMultiplier = 0
 	resp.ChannelID = 0
 	resp.ChannelName = ""
+	resp.ChannelKeyID = 0
+	resp.ChannelKeyName = ""
 	return resp
 }
 

@@ -26,17 +26,22 @@ func (t *channelTester) Test(ctx context.Context, key appchannel.ChannelKey, mod
 		return 0, errors.New("密钥端点无可解密的 API Key")
 	}
 
-	models := make(map[string]struct{}, len(key.Models))
-	for _, m := range key.Models {
-		models[m] = struct{}{}
-	}
-	snap := &registry.ChannelKeySnapshot{
+	snap := channelTestSnapshot(key, plain)
+	return t.pipe.TestChannel(ctx, snap, model, endpoint)
+}
+
+// channelTestSnapshot 将数据库中的渠道密钥转换为测试请求使用的运行时快照。
+// 渠道名称必须随 ID 一并传递，否则失败留痕只能在前端回退显示渠道 ID。
+func channelTestSnapshot(key appchannel.ChannelKey, plain string) *registry.ChannelKeySnapshot {
+	return &registry.ChannelKeySnapshot{
 		KeyID:          key.ID,
+		KeyName:        key.Name,
 		ChannelID:      key.ChannelID,
+		ChannelName:    key.ChannelName,
 		BaseURL:        key.BaseURL,
 		Type:           key.Type,
 		APIKey:         plain,
-		Models:         models,
+		Models:         channelTestModelSet(key.Models),
 		ModelMapping:   key.ModelMapping,
 		ParamOverride:  key.ParamOverride,
 		HeaderOverride: key.HeaderOverride,
@@ -45,7 +50,14 @@ func (t *channelTester) Test(ctx context.Context, key appchannel.ChannelKey, mod
 		Status:         key.Status,
 		TestModel:      key.TestModel,
 	}
-	return t.pipe.TestChannel(ctx, snap, model, endpoint)
+}
+
+func channelTestModelSet(values []string) map[string]struct{} {
+	result := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		result[value] = struct{}{}
+	}
+	return result
 }
 
 // gatewaySettingsSource 把 appsettings.Service 适配为 pipeline.SettingsLister。

@@ -1,6 +1,36 @@
 package pipeline
 
-import "testing"
+import (
+	"context"
+	"testing"
+
+	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
+)
+
+func TestChannelTestFailure保留渠道与密钥名称(t *testing.T) {
+	errSink := &fakeErrSink{}
+	pipe := &Pipeline{errSink: errSink}
+	snap := &registry.ChannelKeySnapshot{
+		KeyID:       23,
+		KeyName:     "测试密钥",
+		ChannelID:   7,
+		ChannelName: "测试渠道",
+		Type:        "openai_compatible",
+		APIKey:      "sk-test",
+	}
+
+	if _, err := pipe.TestChannel(context.Background(), snap, "", ""); err == nil {
+		t.Fatal("缺少测试模型时应返回错误")
+	}
+	entry := errSink.lastEntry(t)
+	if len(entry.Chain) != 1 {
+		t.Fatalf("测试失败重试链长度 = %d，期望 1", len(entry.Chain))
+	}
+	hop := entry.Chain[0]
+	if hop.ChannelName != snap.ChannelName || hop.KeyName != snap.KeyName {
+		t.Fatalf("渠道与密钥名称留痕异常：%+v", hop)
+	}
+}
 
 // TestExtractUsageFromSSE 覆盖对 stream:false 仍回 SSE 的上游的 usage 兜底提取：
 // Responses 流的 usage 只在流尾 response.completed 事件（嵌套 response.usage）。
