@@ -19,6 +19,22 @@ const (
 	HealthRecovering HealthStatus = "recovering"
 )
 
+// HealthEvent 渠道密钥端点健康状态变化事件。
+type HealthEvent struct {
+	KeyID      int
+	OldHealth  HealthStatus
+	NewHealth  HealthStatus
+	Failures   int
+	Successes  int
+	Reason     string
+	OccurredAt time.Time
+}
+
+// Notifier 接收关键健康状态变化。实现方必须自行处理配置缺失、去重和发送失败。
+type Notifier interface {
+	Notify(ctx context.Context, event HealthEvent) error
+}
+
 // 分级阈值默认值。
 const (
 	DefaultDegradeThreshold = 3 // 连续失败 >= 此值 → degraded

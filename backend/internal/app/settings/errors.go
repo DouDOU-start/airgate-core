@@ -5,6 +5,12 @@ import "errors"
 // ErrSMTPConnection SMTP 连接/发送失败（用户可修正的配置错误）。
 var ErrSMTPConnection = errors.New("SMTP 连接或发送失败")
 
+// ErrWeChatConnection 微信公众号配置校验或测试消息发送失败。
+var ErrWeChatConnection = errors.New("微信公众号连接或发送失败")
+
+// ErrWeChatBinding 微信公众号管理员扫码绑定失败。
+var ErrWeChatBinding = errors.New("微信公众号管理员扫码绑定失败")
+
 // ErrGenerateKey 密钥生成失败。
 var ErrGenerateKey = errors.New("密钥生成失败")
 

@@ -1,5 +1,7 @@
 package dto
 
+import "time"
+
 // SettingResp 设置响应
 type SettingResp struct {
 	Key   string `json:"key"`
@@ -34,4 +36,26 @@ type TestSMTPReq struct {
 	UseTLS   bool   `json:"use_tls"`
 	From     string `json:"from" binding:"required"`
 	To       string `json:"to" binding:"required"`
+}
+
+// TestWeChatReq 微信公众号测试消息请求。
+type TestWeChatReq struct {
+	AppID      string `json:"app_id" binding:"required"`
+	AppSecret  string `json:"app_secret" binding:"required"`
+	TemplateID string `json:"template_id" binding:"required"`
+	OpenID     string `json:"open_id" binding:"required"`
+	DetailURL  string `json:"detail_url"`
+}
+
+// WeChatBindSessionResp 微信公众号管理员扫码绑定会话响应。
+type WeChatBindSessionResp struct {
+	ID        string    `json:"id"`
+	OAuthURL  string    `json:"oauth_url"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// WeChatBindStatusResp 微信公众号管理员扫码绑定状态响应。
+type WeChatBindStatusResp struct {
+	Status     string `json:"status"`
+	OpenIDHint string `json:"open_id_hint,omitempty"`
 }

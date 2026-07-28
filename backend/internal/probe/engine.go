@@ -21,6 +21,7 @@ type Engine struct {
 	registry  RegistryMutator
 	bilProber BillingProber
 	bilStore  BillingProbeStore
+	notifier  Notifier
 
 	// mu 保护 states 内存映射（比 store 查 DB 快得多，转发热路径用）。
 	mu     sync.RWMutex
@@ -50,6 +51,11 @@ func New(store Store, tester Tester, balStore BalanceStore, balSyncer BalanceSyn
 func (e *Engine) SetBillingProbe(prober BillingProber, store BillingProbeStore) {
 	e.bilProber = prober
 	e.bilStore = store
+}
+
+// SetNotifier 注入渠道健康状态通知器（可选）。
+func (e *Engine) SetNotifier(notifier Notifier) {
+	e.notifier = notifier
 }
 
 // LoadStates 从 DB 加载全量健康状态到内存（启动时调用一次）。
@@ -88,39 +94,42 @@ func (e *Engine) RecordSuccess(keyID int) {
 		e.mu.Unlock()
 		return
 	}
-	tr := OnSuccess(st.health, st.failures, st.successes)
+	oldHealth := st.health
+	tr := OnSuccess(oldHealth, st.failures, st.successes)
 	st.health = tr.NewHealth
 	st.failures = tr.Failures
 	st.successes = tr.Successes
 	e.mu.Unlock()
 
-	e.applyAction(keyID, tr)
+	e.applyAction(keyID, oldHealth, tr, "渠道请求或健康探针已成功")
 }
 
 // RecordFailure 瞬态失败（5xx/网络/限流）时调用。
 func (e *Engine) RecordFailure(keyID int) {
 	e.mu.Lock()
 	st := e.getOrCreate(keyID)
-	tr := OnFailure(st.health, st.failures, st.successes)
+	oldHealth := st.health
+	tr := OnFailure(oldHealth, st.failures, st.successes)
 	st.health = tr.NewHealth
 	st.failures = tr.Failures
 	st.successes = tr.Successes
 	e.mu.Unlock()
 
-	e.applyAction(keyID, tr)
+	e.applyAction(keyID, oldHealth, tr, "上游请求连续失败")
 }
 
 // RecordAuthFailure 鉴权失败（401/403）时调用：直接暂停。
 func (e *Engine) RecordAuthFailure(keyID int) {
 	e.mu.Lock()
 	st := e.getOrCreate(keyID)
-	tr := OnAuthFailure(st.health)
+	oldHealth := st.health
+	tr := OnAuthFailure(oldHealth)
 	st.health = tr.NewHealth
 	st.failures = tr.Failures
 	st.successes = tr.Successes
 	e.mu.Unlock()
 
-	e.applyAction(keyID, tr)
+	e.applyAction(keyID, oldHealth, tr, "上游鉴权失败（HTTP 401/403）")
 }
 
 // getOrCreate 内存中获取或初始化 key 状态（调用方持锁）。
@@ -134,7 +143,7 @@ func (e *Engine) getOrCreate(keyID int) *keyState {
 }
 
 // applyAction 将状态机输出的动作应用到注册表（内存）和持久层（异步）。
-func (e *Engine) applyAction(keyID int, tr Transition) {
+func (e *Engine) applyAction(keyID int, oldHealth HealthStatus, tr Transition, reason string) {
 	switch tr.Action {
 	case ActionNone:
 		return
@@ -161,6 +170,29 @@ func (e *Engine) applyAction(keyID int, tr Transition) {
 			defer cancel()
 			if err := e.store.UpdateHealthState(ctx, keyID, string(tr.NewHealth), tr.Failures, tr.Successes); err != nil {
 				slog.Error("probe_persist_health_failed", "channel_key_id", keyID, "error", err)
+			}
+		}()
+	}
+
+	if e.notifier != nil && oldHealth != tr.NewHealth {
+		event := HealthEvent{
+			KeyID:      keyID,
+			OldHealth:  oldHealth,
+			NewHealth:  tr.NewHealth,
+			Failures:   tr.Failures,
+			Successes:  tr.Successes,
+			Reason:     reason,
+			OccurredAt: time.Now(),
+		}
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			if err := e.notifier.Notify(ctx, event); err != nil {
+				slog.Warn("probe_health_notification_failed",
+					"channel_key_id", keyID,
+					"old_health", oldHealth,
+					"new_health", tr.NewHealth,
+					"error", err)
 			}
 		}()
 	}
@@ -231,13 +263,14 @@ func (e *Engine) runProbes(ctx context.Context) {
 				// 探针成功 → 驱动状态机
 				e.mu.Lock()
 				st := e.getOrCreate(target.KeyID)
-				tr := OnSuccess(st.health, st.failures, st.successes)
+				oldHealth := st.health
+				tr := OnSuccess(oldHealth, st.failures, st.successes)
 				st.health = tr.NewHealth
 				st.failures = tr.Failures
 				st.successes = tr.Successes
 				e.mu.Unlock()
 
-				e.applyAction(target.KeyID, tr)
+				e.applyAction(target.KeyID, oldHealth, tr, "渠道健康探针已成功")
 			}
 		}(t)
 	}

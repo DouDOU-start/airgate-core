@@ -34,6 +34,8 @@ const (
 	settingGroupSecurity     = "security"
 	settingGroupSMTP         = "smtp"
 	settingSMTPPassword      = "smtp_password"
+	settingGroupWeChat       = "wechat"
+	settingWeChatAppSecret   = "wechat_app_secret"
 	settingGroupRiskControl  = "risk_control"
 )
 
@@ -52,7 +54,10 @@ var sensitiveGroups = map[string]bool{
 }
 
 // maskedKeys 管理端回显时以 MaskedValue 掩码的敏感键清单（集中定义，勿散落 handler）。
-var maskedKeys = map[string]bool{settingSMTPPassword: true}
+var maskedKeys = map[string]bool{
+	settingSMTPPassword:    true,
+	settingWeChatAppSecret: true,
+}
 
 // securityKeys security 组键清单。UpsertMany 按 key 冲突合并（不校验 group），
 // 仅拦 group=="security" 会被"换个 group 写同名 key"绕过，故按 key 一并拦截。
@@ -66,6 +71,18 @@ var securityKeys = map[string]bool{
 type Service struct {
 	repo         Repository
 	apiKeySecret string // AES-GCM 加密密钥
+	wechatTester WeChatTester
+	wechatBinder WeChatBinder
+}
+
+// SetWeChatTester 注入微信公众号测试消息发送器。
+func (s *Service) SetWeChatTester(tester WeChatTester) {
+	s.wechatTester = tester
+}
+
+// SetWeChatBinder 注入微信公众号管理员扫码绑定器。
+func (s *Service) SetWeChatBinder(binder WeChatBinder) {
+	s.wechatBinder = binder
 }
 
 // NewService 创建设置服务。
@@ -237,6 +254,90 @@ func (s *Service) resolveTestSMTPPassword(ctx context.Context, password string) 
 		}
 	}
 	return "", nil
+}
+
+// resolveMaskedSetting 解析测试接口传入的敏感设置：哨兵值回退存量，其他值原样使用。
+func (s *Service) resolveMaskedSetting(ctx context.Context, group, key, value string) (string, error) {
+	if value != MaskedValue {
+		return value, nil
+	}
+	items, err := s.repo.List(ctx, group)
+	if err != nil {
+		return "", err
+	}
+	for _, item := range items {
+		if item.Key == key {
+			return item.Value, nil
+		}
+	}
+	return "", nil
+}
+
+// TestWeChat 解析掩码后的 AppSecret，并委托基础设施层发送测试模板消息。
+func (s *Service) TestWeChat(ctx context.Context, input TestWeChatInput) error {
+	if s.wechatTester == nil {
+		return fmt.Errorf("%w：发送器未初始化", ErrWeChatConnection)
+	}
+	secret, err := s.resolveMaskedSetting(ctx, settingGroupWeChat, settingWeChatAppSecret, input.AppSecret)
+	if err != nil {
+		return fmt.Errorf("%w：读取存量 AppSecret 失败：%v", ErrWeChatConnection, err)
+	}
+	input.AppSecret = secret
+	if strings.TrimSpace(input.AppID) == "" || strings.TrimSpace(input.AppSecret) == "" ||
+		strings.TrimSpace(input.TemplateID) == "" || strings.TrimSpace(input.OpenID) == "" {
+		return fmt.Errorf("%w：请完整填写 AppID、AppSecret、模板 ID 和接收人 OpenID", ErrWeChatConnection)
+	}
+	if err := s.wechatTester.SendTest(ctx, input); err != nil {
+		return fmt.Errorf("%w：%v", ErrWeChatConnection, err)
+	}
+	return nil
+}
+
+// CreateWeChatBind 创建管理员扫码绑定会话。
+func (s *Service) CreateWeChatBind(ctx context.Context) (WeChatBindSession, error) {
+	if s.wechatBinder == nil {
+		return WeChatBindSession{}, fmt.Errorf("%w：绑定器未初始化", ErrWeChatBinding)
+	}
+	result, err := s.wechatBinder.CreateBind(ctx)
+	if err != nil {
+		return WeChatBindSession{}, fmt.Errorf("%w：%v", ErrWeChatBinding, err)
+	}
+	return result, nil
+}
+
+// CompleteWeChatBind 完成微信网页授权回调。
+func (s *Service) CompleteWeChatBind(ctx context.Context, code, state string) (WeChatBindStatus, error) {
+	if s.wechatBinder == nil {
+		return WeChatBindStatus{}, fmt.Errorf("%w：绑定器未初始化", ErrWeChatBinding)
+	}
+	result, err := s.wechatBinder.CompleteBind(ctx, code, state)
+	if err != nil {
+		return WeChatBindStatus{}, fmt.Errorf("%w：%v", ErrWeChatBinding, err)
+	}
+	return result, nil
+}
+
+// GetWeChatBindStatus 查询扫码绑定状态。
+func (s *Service) GetWeChatBindStatus(ctx context.Context, id string) (WeChatBindStatus, error) {
+	if s.wechatBinder == nil {
+		return WeChatBindStatus{}, fmt.Errorf("%w：绑定器未初始化", ErrWeChatBinding)
+	}
+	result, err := s.wechatBinder.BindStatus(ctx, id)
+	if err != nil {
+		return WeChatBindStatus{}, fmt.Errorf("%w：%v", ErrWeChatBinding, err)
+	}
+	return result, nil
+}
+
+// UnbindWeChat 解除管理员微信绑定。
+func (s *Service) UnbindWeChat(ctx context.Context) error {
+	if s.wechatBinder == nil {
+		return fmt.Errorf("%w：绑定器未初始化", ErrWeChatBinding)
+	}
+	if err := s.wechatBinder.Unbind(ctx); err != nil {
+		return fmt.Errorf("%w：%v", ErrWeChatBinding, err)
+	}
+	return nil
 }
 
 // TestSMTP 测试 SMTP 连接并发送测试邮件。

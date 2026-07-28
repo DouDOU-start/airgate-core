@@ -35,6 +35,7 @@ func (s *Server) registerRoutes() {
 
 	// === 公共路由（无需认证） ===
 	v1.GET("/settings/public", handlers.Settings.GetPublicSettings)
+	v1.GET("/wechat/admin-bind/callback", handlers.Settings.CompleteWeChatBind)
 
 	// 模型广场（未登录可见的模型价格 + 倍率区间）：IP 限流防刷。
 	modelMarketRL := middleware.NewIPRateLimit(60)
@@ -236,6 +237,10 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/settings", handlers.Settings.GetSettings)
 		adminGroup.PUT("/settings", handlers.Settings.UpdateSettings)
 		adminGroup.POST("/settings/test-smtp", handlers.Settings.TestSMTP)
+		adminGroup.POST("/settings/test-wechat", handlers.Settings.TestWeChat)
+		adminGroup.POST("/settings/wechat-bind", handlers.Settings.CreateWeChatBind)
+		adminGroup.GET("/settings/wechat-bind/:id", handlers.Settings.GetWeChatBindStatus)
+		adminGroup.DELETE("/settings/wechat-bind", handlers.Settings.UnbindWeChat)
 		adminGroup.POST("/settings/upload", handlers.Settings.UploadFile)
 
 		// 管理员 API Key

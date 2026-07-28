@@ -100,6 +100,7 @@ func TestListMasked(t *testing.T) {
 	items := []Setting{
 		{Key: "site_name", Value: "AirGate", Group: "site"},
 		{Key: "smtp_password", Value: "super-secret", Group: "smtp"},
+		{Key: "wechat_app_secret", Value: "wechat-secret", Group: "wechat"},
 		{Key: "admin_api_key_hash", Value: "hash", Group: "security"},
 	}
 	service := NewService(settingsStubRepository{
@@ -120,6 +121,9 @@ func TestListMasked(t *testing.T) {
 	if byKey["smtp_password"].Value != MaskedValue {
 		t.Fatalf("已配置掩码键应回哨兵值, got %q", byKey["smtp_password"].Value)
 	}
+	if byKey["wechat_app_secret"].Value != MaskedValue {
+		t.Fatalf("微信公众号 AppSecret 应回掩码哨兵，got %q", byKey["wechat_app_secret"].Value)
+	}
 	if byKey["site_name"].Value != "AirGate" {
 		t.Fatalf("普通键应原样返回, got %q", byKey["site_name"].Value)
 	}
@@ -132,6 +136,41 @@ func TestListMasked(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Value != "" {
 		t.Fatalf("未配置掩码键应回空串, got %+v", got)
+	}
+}
+
+type captureWeChatTester struct {
+	input TestWeChatInput
+}
+
+func (t *captureWeChatTester) SendTest(_ context.Context, input TestWeChatInput) error {
+	t.input = input
+	return nil
+}
+
+func TestWeChatResolvesMaskedAppSecret(t *testing.T) {
+	service := NewService(settingsStubRepository{
+		list: func(_ context.Context, group string) ([]Setting, error) {
+			if group != "wechat" {
+				t.Fatalf("应读取 wechat 组，got %q", group)
+			}
+			return []Setting{{Key: "wechat_app_secret", Value: "stored-secret", Group: "wechat"}}, nil
+		},
+	}, "")
+	tester := &captureWeChatTester{}
+	service.SetWeChatTester(tester)
+
+	err := service.TestWeChat(t.Context(), TestWeChatInput{
+		AppID:      "wx-test",
+		AppSecret:  MaskedValue,
+		TemplateID: "template-1",
+		OpenID:     "openid-1",
+	})
+	if err != nil {
+		t.Fatalf("TestWeChat() 返回错误：%v", err)
+	}
+	if tester.input.AppSecret != "stored-secret" {
+		t.Fatalf("AppSecret = %q，期望读取存量值", tester.input.AppSecret)
 	}
 }
 

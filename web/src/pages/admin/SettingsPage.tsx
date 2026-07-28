@@ -1,4 +1,5 @@
 import { type FormEvent, useState, useEffect, useRef } from 'react';
+import QRCode from 'qrcode';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Card, Form, Input, Label, Modal, Spinner, Tabs, TextArea, useOverlayState } from '@heroui/react';
@@ -13,9 +14,11 @@ import { queryKeys } from '../../shared/queryKeys';
 import { useToast } from '../../shared/ui';
 import {
   Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound, Expand, Plus, Waypoints,
+  ShieldCheck, Copy, Trash2, KeyRound, Expand, Plus, Waypoints, MessageCircle,
+  CheckCircle2, QrCode, Unlink, Clock3,
 } from 'lucide-react';
-import type { SettingItem, TestSMTPReq } from '../../shared/types';
+import type { SettingItem, TestSMTPReq, TestWeChatReq } from '../../shared/types';
+import type { WeChatBindSessionResp, WeChatBindStatusResp } from '../../shared/types';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { CommonModal } from '../../shared/components/CommonModal';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
@@ -57,6 +60,14 @@ const SMTP_KEYS = [
   'email_template_subject', 'email_template_body',
   'balance_alert_email_subject', 'balance_alert_email_body',
   'recharge_email_subject', 'recharge_email_body',
+] as const;
+
+// 微信公众号 AppSecret 与 SMTP 密码使用相同的掩码哨兵语义。
+const WECHAT_APP_SECRET_SENTINEL = '********';
+
+const WECHAT_KEYS = [
+  'wechat_enabled', 'wechat_app_id', 'wechat_app_secret', 'wechat_template_id',
+  'wechat_alert_detail_url', 'wechat_oauth_callback_url', 'wechat_notify_degraded',
 ] as const;
 
 const DEFAULT_EMAIL_SUBJECT = '{{site_name}} - 邮箱验证码';
@@ -120,13 +131,14 @@ const DEFAULT_RECHARGE_BODY = `<div style="font-family: -apple-system, BlinkMacS
 
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'gateway' | 'security' | 'smtp';
+type TabKey = 'site' | 'gateway' | 'security' | 'smtp' | 'wechat';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
   { key: 'gateway', labelKey: 'settings.tab_gateway', icon: Waypoints },
   { key: 'security', labelKey: 'settings.tab_security', icon: ShieldCheck },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
+  { key: 'wechat', labelKey: 'settings.tab_wechat', icon: MessageCircle },
 ];
 
 type SaveTabKey = Exclude<TabKey, 'security'>;
@@ -135,12 +147,14 @@ const TAB_GROUP: Record<SaveTabKey, string> = {
   site: 'site',
   gateway: 'gateway',
   smtp: 'smtp',
+  wechat: 'wechat',
 };
 
 const TAB_KEYS: Record<SaveTabKey, readonly string[]> = {
   site: SITE_KEYS,
   gateway: GATEWAY_KEYS,
   smtp: SMTP_KEYS,
+  wechat: WECHAT_KEYS,
 };
 
 // ==================== Component ====================
@@ -156,6 +170,10 @@ export default function SettingsPage() {
   const [emailTplType, setEmailTplType] = useState<'verify' | 'balance_alert' | 'recharge'>('verify');
   const [isEmailPreviewOpen, setEmailPreviewOpen] = useState(false);
   const [isSmtpTestOpen, setSmtpTestOpen] = useState(false);
+  const [wechatBindSession, setWechatBindSession] = useState<WeChatBindSessionResp | null>(null);
+  const [wechatBindQrURL, setWechatBindQrURL] = useState('');
+  const [isWechatBindOpen, setWechatBindOpen] = useState(false);
+  const wechatBoundHandledRef = useRef('');
 
   // 获取所有设置
   const { data: settings, isLoading } = useQuery({
@@ -168,6 +186,10 @@ export default function SettingsPage() {
   // 提醒「清空保存 = 删除密码」。
   const smtpPasswordConfigured = settings?.some(
     (s) => s.key === 'smtp_password' && s.value === SMTP_PASSWORD_SENTINEL,
+  ) ?? false;
+
+  const wechatAppSecretConfigured = settings?.some(
+    (s) => s.key === 'wechat_app_secret' && s.value === WECHAT_APP_SECRET_SENTINEL,
   ) ?? false;
 
   // 初始化
@@ -202,6 +224,67 @@ export default function SettingsPage() {
     },
     onError: (err: Error) => toast('error', err.message),
   });
+
+  // 微信公众号测试消息使用表单当前值，便于保存前验证；AppSecret 哨兵由后端回退存量值。
+  const wechatTestMutation = useMutation({
+    mutationFn: (data: TestWeChatReq) => settingsApi.testWeChat(data),
+    onSuccess: () => toast('success', t('settings.wechat_test_success')),
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  const createWechatBindMutation = useMutation({
+    mutationFn: () => settingsApi.createWeChatBind(),
+    onSuccess: (session) => {
+      wechatBoundHandledRef.current = '';
+      setWechatBindSession(session);
+      setWechatBindQrURL('');
+      setWechatBindOpen(true);
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  const unbindWechatMutation = useMutation({
+    mutationFn: () => settingsApi.unbindWeChat(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
+      toast('success', t('settings.wechat_unbind_success'));
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  const { data: wechatBindStatus } = useQuery<WeChatBindStatusResp>({
+    queryKey: ['settings', 'wechat-bind', wechatBindSession?.id],
+    queryFn: () => settingsApi.getWeChatBindStatus(wechatBindSession!.id),
+    enabled: isWechatBindOpen && !!wechatBindSession?.id,
+    refetchInterval: (query) => (query.state.data?.status === 'bound' ? false : 2000),
+    retry: false,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!wechatBindSession?.oauth_url) {
+      setWechatBindQrURL('');
+      return;
+    }
+    QRCode.toDataURL(wechatBindSession.oauth_url, { width: 260, margin: 1 })
+      .then((url) => {
+        if (!cancelled) setWechatBindQrURL(url);
+      })
+      .catch(() => {
+        if (!cancelled) toast('error', t('settings.wechat_qr_generate_failed'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [t, toast, wechatBindSession]);
+
+  useEffect(() => {
+    if (wechatBindStatus?.status !== 'bound' || !wechatBindSession) return;
+    if (wechatBoundHandledRef.current === wechatBindSession.id) return;
+    wechatBoundHandledRef.current = wechatBindSession.id;
+    queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
+    toast('success', t('settings.wechat_bind_success'));
+  }, [queryClient, t, toast, wechatBindSession, wechatBindStatus]);
 
   function set(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -265,6 +348,27 @@ export default function SettingsPage() {
       from: val('smtp_from_email'),
       to: testTo,
     });
+  }
+
+  function handleTestWeChat() {
+    const openID = firstOpenID(val('wechat_admin_open_ids'));
+    if (!openID) {
+      toast('error', t('settings.wechat_open_id_required'));
+      return;
+    }
+    wechatTestMutation.mutate({
+      app_id: val('wechat_app_id').trim(),
+      app_secret: val('wechat_app_secret'),
+      template_id: val('wechat_template_id').trim(),
+      open_id: openID,
+      detail_url: val('wechat_alert_detail_url').trim(),
+    });
+  }
+
+  function closeWechatBind() {
+    setWechatBindOpen(false);
+    setWechatBindSession(null);
+    setWechatBindQrURL('');
   }
 
   if (isLoading) {
@@ -638,6 +742,203 @@ export default function SettingsPage() {
             </Card.Content>
           </Card>
         )}
+
+        {activeTab === 'wechat' && (
+          <Card>
+            <Card.Header className="justify-between gap-3">
+              <Card.Title>{t('settings.wechat_config')}</Card.Title>
+              <Button
+                size="sm"
+                variant="secondary"
+                onPress={handleTestWeChat}
+                isDisabled={
+                  !val('wechat_app_id').trim()
+                  || !val('wechat_app_secret')
+                  || !val('wechat_template_id').trim()
+                  || !firstOpenID(val('wechat_admin_open_ids'))
+                  || wechatTestMutation.isPending
+                }
+                aria-busy={wechatTestMutation.isPending}
+              >
+                {wechatTestMutation.isPending
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Send className="w-3.5 h-3.5" />}
+                {t('settings.wechat_test')}
+              </Button>
+            </Card.Header>
+            <Card.Content>
+              <div className="ag-settings-section-stack">
+                <SettingsSection
+                  title={t('settings.wechat_credentials')}
+                  description={t('settings.wechat_credentials_desc')}
+                >
+                  {boolVal('wechat_enabled') ? (
+                    <div className="mb-5">
+                      <Alert status="success">
+                      <Alert.Content>
+                          <Alert.Description>{t('settings.wechat_enabled_status')}</Alert.Description>
+                      </Alert.Content>
+                      </Alert>
+                    </div>
+                  ) : null}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Field label={t('settings.wechat_app_id')}>
+                      <Input
+                        value={val('wechat_app_id')}
+                        onChange={(e) => set('wechat_app_id', e.target.value)}
+                        placeholder="wx1234567890abcdef"
+                        autoComplete="off"
+                      />
+                    </Field>
+                    <Field
+                      label={t('settings.wechat_app_secret')}
+                      hint={wechatAppSecretConfigured ? t('settings.wechat_app_secret_configured') : undefined}
+                    >
+                      <Input
+                        name="wechat_app_secret"
+                        type="password"
+                        value={val('wechat_app_secret')}
+                        onChange={(e) => set('wechat_app_secret', e.target.value)}
+                        autoComplete="off"
+                      />
+                    </Field>
+                    <Field className="col-span-1 md:col-span-2" label={t('settings.wechat_template_id')} hint={t('settings.wechat_template_id_hint')}>
+                      <Input
+                        value={val('wechat_template_id')}
+                        onChange={(e) => set('wechat_template_id', e.target.value)}
+                        placeholder="模板消息 ID"
+                        autoComplete="off"
+                      />
+                    </Field>
+                  </div>
+                </SettingsSection>
+
+                <SettingsSection>
+                  <div className="space-y-6">
+                    <Field label={t('settings.wechat_oauth_callback_url')} hint={t('settings.wechat_oauth_callback_url_hint')}>
+                      <Input
+                        value={val('wechat_oauth_callback_url')}
+                        onChange={(e) => set('wechat_oauth_callback_url', e.target.value)}
+                        placeholder="https://example.com/api/v1/wechat/admin-bind/callback"
+                      />
+                    </Field>
+
+                    <div className="rounded-2xl border border-glass-border bg-surface/70 p-5 sm:p-6">
+                      <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-start gap-4">
+                          <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
+                            firstOpenID(val('wechat_admin_open_ids'))
+                              ? 'bg-success/12 text-success'
+                              : 'bg-primary/10 text-primary'
+                          }`}>
+                            {firstOpenID(val('wechat_admin_open_ids'))
+                              ? <CheckCircle2 className="h-5 w-5" />
+                              : <QrCode className="h-5 w-5" />}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-text">
+                              {firstOpenID(val('wechat_admin_open_ids'))
+                                ? t('settings.wechat_bound_title')
+                                : t('settings.wechat_unbound_title')}
+                            </div>
+                            <p className="mt-1 text-xs leading-5 text-text-tertiary">
+                              {firstOpenID(val('wechat_admin_open_ids'))
+                                ? t('settings.wechat_bound_desc', { hint: maskOpenID(firstOpenID(val('wechat_admin_open_ids'))) })
+                                : t('settings.wechat_unbound_desc')}
+                            </p>
+                            {hasChanges ? (
+                              <p className="mt-2 text-xs font-medium text-warning">
+                                {t('settings.wechat_bind_save_first')}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap gap-2">
+                          {firstOpenID(val('wechat_admin_open_ids')) ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onPress={() => unbindWechatMutation.mutate()}
+                              isDisabled={unbindWechatMutation.isPending}
+                            >
+                              {unbindWechatMutation.isPending
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <Unlink className="h-3.5 w-3.5" />}
+                              {t('settings.wechat_unbind')}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onPress={() => createWechatBindMutation.mutate()}
+                              isDisabled={
+                                hasChanges
+                                || !val('wechat_app_id').trim()
+                                || !val('wechat_app_secret')
+                                || !val('wechat_oauth_callback_url').trim()
+                                || createWechatBindMutation.isPending
+                              }
+                            >
+                              {createWechatBindMutation.isPending
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <QrCode className="h-3.5 w-3.5" />}
+                              {t('settings.wechat_bind')}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <Field label={t('settings.wechat_alert_detail_url')} hint={t('settings.wechat_alert_detail_url_hint')}>
+                        <Input
+                          value={val('wechat_alert_detail_url')}
+                          onChange={(e) => set('wechat_alert_detail_url', e.target.value)}
+                          placeholder="https://example.com/admin/channels"
+                        />
+                      </Field>
+                      <NativeSwitch
+                        isSelected={boolVal('wechat_notify_degraded')}
+                        label={(
+                          <>
+                            <span className="text-sm font-medium text-text">{t('settings.wechat_notify_degraded')}</span>
+                            <span className="block text-xs text-text-tertiary">{t('settings.wechat_notify_degraded_desc')}</span>
+                          </>
+                        )}
+                        onChange={(v) => set('wechat_notify_degraded', String(v))}
+                      />
+                    </div>
+                  </div>
+                </SettingsSection>
+
+                <SettingsSection title={t('settings.wechat_alert_policy')}>
+                  <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(18rem,0.8fr)] gap-6 items-start">
+                    <div className="space-y-4">
+                      <NativeSwitch
+                        isSelected={boolVal('wechat_enabled')}
+                        label={(
+                          <>
+                            <span className="text-sm font-medium text-text">{t('settings.wechat_enabled')}</span>
+                            <span className="block text-xs text-text-tertiary">{t('settings.wechat_enabled_desc')}</span>
+                          </>
+                        )}
+                        onChange={(v) => set('wechat_enabled', String(v))}
+                      />
+                      <p className="text-xs leading-5 text-text-tertiary">
+                        {t('settings.wechat_policy_desc')}
+                      </p>
+                    </div>
+                    <Alert status="warning">
+                      <Alert.Content>
+                        <Alert.Description>{t('settings.wechat_template_contract')}</Alert.Description>
+                      </Alert.Content>
+                    </Alert>
+                  </div>
+                </SettingsSection>
+              </div>
+              {saveAction}
+            </Card.Content>
+          </Card>
+        )}
       </div>
 
       <SmtpTestModal
@@ -646,7 +947,105 @@ export default function SettingsPage() {
         onClose={() => setSmtpTestOpen(false)}
         onSubmit={submitSmtpTest}
       />
+      <WeChatBindModal
+        isCreating={createWechatBindMutation.isPending}
+        onClose={closeWechatBind}
+        open={isWechatBindOpen}
+        qrDataURL={wechatBindQrURL}
+        session={wechatBindSession}
+        status={wechatBindStatus}
+      />
     </div>
+  );
+}
+
+// 测试消息发送给列表中的第一位管理员；分隔规则与后端保持一致。
+function firstOpenID(value: string): string {
+  return value
+    .split(/[\s,，;；]+/)
+    .map((item) => item.trim())
+    .find(Boolean) ?? '';
+}
+
+function maskOpenID(value: string): string {
+  if (!value) return '';
+  return value.length <= 6 ? value : `••••••${value.slice(-6)}`;
+}
+
+// ==================== 微信管理员扫码绑定 ====================
+
+function WeChatBindModal({
+  isCreating,
+  onClose,
+  open,
+  qrDataURL,
+  session,
+  status,
+}: {
+  isCreating: boolean;
+  onClose: () => void;
+  open: boolean;
+  qrDataURL: string;
+  session: WeChatBindSessionResp | null;
+  status?: WeChatBindStatusResp;
+}) {
+  const { t } = useTranslation();
+  const bound = status?.status === 'bound';
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen && !isCreating) onClose();
+    },
+  });
+
+  return (
+    <CommonModal
+      description={bound ? t('settings.wechat_bind_complete_desc') : t('settings.wechat_bind_modal_desc')}
+      footer={(
+        <div className="flex w-full justify-end">
+          <Button onPress={onClose} variant={bound ? 'primary' : 'secondary'}>
+            {bound ? t('settings.wechat_bind_done') : t('common.close')}
+          </Button>
+        </div>
+      )}
+      icon={bound ? <CheckCircle2 className="h-4 w-4" /> : <QrCode className="h-4 w-4" />}
+      showCloseTrigger
+      size="sm"
+      state={modalState}
+      surface={false}
+      title={bound ? t('settings.wechat_bind_complete') : t('settings.wechat_bind_modal_title')}
+    >
+      {bound ? (
+        <div className="rounded-2xl border border-success/25 bg-success/8 px-5 py-7 text-center">
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-success/15 text-success">
+            <CheckCircle2 className="h-7 w-7" />
+          </div>
+          <div className="mt-4 text-base font-semibold text-text">{t('settings.wechat_bound_title')}</div>
+          <div className="mt-1 text-xs text-text-tertiary">
+            {status?.open_id_hint || t('settings.wechat_bind_complete_desc')}
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-4 py-2">
+          <div className="relative grid h-[284px] w-[284px] place-items-center overflow-hidden rounded-3xl border border-glass-border bg-white p-3 shadow-sm">
+            {qrDataURL ? (
+              <img className="h-full w-full rounded-2xl object-contain" src={qrDataURL} alt={t('settings.wechat_bind_qr_alt')} />
+            ) : (
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-text-tertiary">
+            <Clock3 className="h-3.5 w-3.5" />
+            <span>{t('settings.wechat_bind_expiry')}</span>
+          </div>
+          {session ? (
+            <p className="max-w-sm text-center text-xs leading-5 text-text-tertiary">
+              {t('settings.wechat_bind_scan_hint')}
+            </p>
+          ) : null}
+        </div>
+      )}
+    </CommonModal>
   );
 }
 
@@ -1293,19 +1692,23 @@ function SettingsSection({
   action?: React.ReactNode;
   children: React.ReactNode;
   description?: React.ReactNode;
-  title: React.ReactNode;
+  title?: React.ReactNode;
 }) {
+  const hasHeading = title != null || description != null || action != null;
+
   return (
     <section className="ag-settings-section">
-      <div className="ag-settings-section-heading">
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-text">{title}</h3>
-          {description ? (
-            <p className="mt-1 text-[12px] leading-5 text-text-tertiary">{description}</p>
-          ) : null}
+      {hasHeading ? (
+        <div className="ag-settings-section-heading">
+          <div className="min-w-0">
+            {title != null ? <h3 className="text-sm font-semibold text-text">{title}</h3> : null}
+            {description ? (
+              <p className="mt-1 text-[12px] leading-5 text-text-tertiary">{description}</p>
+            ) : null}
+          </div>
+          {action ? <div className="shrink-0">{action}</div> : null}
         </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
-      </div>
+      ) : null}
       <div className="ag-settings-section-body">{children}</div>
     </section>
   );

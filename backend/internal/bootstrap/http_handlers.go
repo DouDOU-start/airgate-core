@@ -36,6 +36,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
 	"github.com/DouDOU-start/airgate-core/internal/moderation"
+	"github.com/DouDOU-start/airgate-core/internal/probe"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/handler"
 )
@@ -91,6 +92,8 @@ type HTTPHandlers struct {
 	ModerationEngine *moderation.Engine
 	// ChannelStore 暴露给 server.go：探针引擎的健康状态持久化与余额同步目标查询。
 	ChannelStore *store.ChannelStore
+	// ChannelHealthNotifier 接收探针状态变化并按设置发送微信公众号提醒。
+	ChannelHealthNotifier probe.Notifier
 }
 
 // NewHTTPHandlers 统一构造 HTTP 处理器。
@@ -123,6 +126,9 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	dashboardService := appdashboard.NewService(dashboardStore, dep.Redis)
 	settingsStore := store.NewSettingsStore(dep.DB)
 	settingsService := appsettings.NewService(settingsStore, dep.Config.APIKeySecret())
+	channelHealthNotifier := newChannelWechatNotifier(settingsService, channelStore, dep.Redis)
+	settingsService.SetWeChatTester(channelHealthNotifier)
+	settingsService.SetWeChatBinder(channelHealthNotifier)
 
 	inviteStore := store.NewInviteStore(dep.DB)
 	inviteService := appinvite.NewService(inviteStore)
@@ -206,15 +212,16 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		RiskControl:  handler.NewRiskControlHandler(riskControlService),
 		Bookmark:     handler.NewBookmarkHandler(bookmarkService),
 
-		ChannelService:     channelService,
-		ModelPriceService:  modelPriceService,
-		SettingsService:    settingsService,
-		UpstreamLogService: upstreamLogService,
-		PaymentService:     paymentService,
-		UserService:        userService,
-		TaskStore:          store.NewTaskStore(dep.DB),
-		ModerationEngine:   moderationEngine,
-		ChannelStore:       channelStore,
+		ChannelService:        channelService,
+		ModelPriceService:     modelPriceService,
+		SettingsService:       settingsService,
+		UpstreamLogService:    upstreamLogService,
+		PaymentService:        paymentService,
+		UserService:           userService,
+		TaskStore:             store.NewTaskStore(dep.DB),
+		ModerationEngine:      moderationEngine,
+		ChannelStore:          channelStore,
+		ChannelHealthNotifier: channelHealthNotifier,
 	}
 }
 

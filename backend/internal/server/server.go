@@ -128,6 +128,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		&probeBillingProberAdapter{svc: channelSvc},
 		&probeBillingStoreAdapter{store: channelStore, secret: cfg.APIKeySecret(), registry: s.channelRegistry},
 	)
+	s.probeEngine.SetNotifier(s.handlers.ChannelHealthNotifier)
 
 	// relay 转发管线：注册表调度 + 渠道 RPM/并发闸门 + 计费落账；
 	// 渠道测试器走同一 adaptor 链路（server 层适配器负责解密与快照构造）。

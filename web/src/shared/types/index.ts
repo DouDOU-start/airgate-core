@@ -922,6 +922,25 @@ export interface TestSMTPReq {
   to: string;
 }
 
+export interface TestWeChatReq {
+  app_id: string;
+  app_secret: string;
+  template_id: string;
+  open_id: string;
+  detail_url: string;
+}
+
+export interface WeChatBindSessionResp {
+  id: string;
+  oauth_url: string;
+  expires_at: string;
+}
+
+export interface WeChatBindStatusResp {
+  status: 'pending' | 'bound';
+  open_id_hint?: string;
+}
+
 // ==================== Dashboard ====================
 
 export interface DashboardStatsResp {

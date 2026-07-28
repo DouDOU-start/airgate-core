@@ -2,8 +2,10 @@ package handler
 
 import (
 	"errors"
+	"html"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -103,6 +105,98 @@ func (h *SettingsHandler) TestSMTP(c *gin.Context) {
 	}
 
 	response.Success(c, nil)
+}
+
+// TestWeChat 测试微信公众号模板消息。
+func (h *SettingsHandler) TestWeChat(c *gin.Context) {
+	var req dto.TestWeChatReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	input := appsettings.TestWeChatInput{
+		AppID:      req.AppID,
+		AppSecret:  req.AppSecret,
+		TemplateID: req.TemplateID,
+		OpenID:     req.OpenID,
+		DetailURL:  req.DetailURL,
+	}
+	if err := h.service.TestWeChat(c.Request.Context(), input); err != nil {
+		if errors.Is(err, appsettings.ErrWeChatConnection) {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.InternalError(c, "微信公众号测试失败")
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+// CreateWeChatBind 创建管理员微信扫码绑定会话。
+func (h *SettingsHandler) CreateWeChatBind(c *gin.Context) {
+	result, err := h.service.CreateWeChatBind(c.Request.Context())
+	if err != nil {
+		if errors.Is(err, appsettings.ErrWeChatBinding) {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.InternalError(c, "创建微信绑定二维码失败")
+		return
+	}
+	response.Success(c, dto.WeChatBindSessionResp{
+		ID: result.ID, OAuthURL: result.OAuthURL, ExpiresAt: result.ExpiresAt,
+	})
+}
+
+// GetWeChatBindStatus 查询管理员微信扫码绑定状态。
+func (h *SettingsHandler) GetWeChatBindStatus(c *gin.Context) {
+	result, err := h.service.GetWeChatBindStatus(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		if errors.Is(err, appsettings.ErrWeChatBinding) {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.InternalError(c, "查询微信绑定状态失败")
+		return
+	}
+	response.Success(c, dto.WeChatBindStatusResp{Status: result.Status, OpenIDHint: result.OpenIDHint})
+}
+
+// UnbindWeChat 解除管理员微信绑定。
+func (h *SettingsHandler) UnbindWeChat(c *gin.Context) {
+	if err := h.service.UnbindWeChat(c.Request.Context()); err != nil {
+		if errors.Is(err, appsettings.ErrWeChatBinding) {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.InternalError(c, "解除微信绑定失败")
+		return
+	}
+	response.Success(c, nil)
+}
+
+// CompleteWeChatBind 接收微信网页授权回调。该路由无需登录，安全性由一次性随机 state 保证。
+func (h *SettingsHandler) CompleteWeChatBind(c *gin.Context) {
+	result, err := h.service.CompleteWeChatBind(c.Request.Context(), c.Query("code"), c.Query("state"))
+	if err != nil {
+		slog.Warn("wechat_admin_bind_callback_failed", "error", err)
+		writeWeChatBindPage(c, http.StatusBadRequest, "绑定失败", err.Error(), false)
+		return
+	}
+	writeWeChatBindPage(c, http.StatusOK, "绑定成功", "管理员微信已绑定，可以关闭此页面并返回管理后台。", result.Status == "bound")
+}
+
+func writeWeChatBindPage(c *gin.Context, status int, title, message string, success bool) {
+	accent := "#dc2626"
+	icon := "!"
+	if success {
+		accent = "#16a34a"
+		icon = "✓"
+	}
+	body := `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>` + html.EscapeString(title) + `</title></head><body style="margin:0;background:#f5f7f6;color:#17201b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"><main style="min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box"><section style="width:min(420px,100%);background:#fff;border:1px solid #e3e9e5;border-radius:20px;padding:36px 28px;text-align:center;box-shadow:0 20px 60px rgba(23,32,27,.08)"><div style="width:64px;height:64px;margin:0 auto 22px;border-radius:50%;display:grid;place-items:center;background:` + accent + `18;color:` + accent + `;font-size:32px;font-weight:700">` + icon + `</div><h1 style="margin:0 0 12px;font-size:24px">` + html.EscapeString(title) + `</h1><p style="margin:0;color:#657169;line-height:1.8;font-size:15px">` + html.EscapeString(message) + `</p></section></main></body></html>`
+	c.Data(status, "text/html; charset=utf-8", []byte(body))
 }
 
 // UploadFile 上传站点级静态资源（logo / favicon 等）。

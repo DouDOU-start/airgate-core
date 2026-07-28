@@ -83,6 +83,7 @@ func TestGetSettingsFiltersSensitive(t *testing.T) {
 		{Key: "site_name", Value: "AirGate", Group: "site"},
 		{Key: "smtp_host", Value: "smtp.example.com", Group: "smtp"},
 		{Key: "smtp_password", Value: "super-secret", Group: "smtp"},
+		{Key: "wechat_app_secret", Value: "wechat-secret", Group: "wechat"},
 		{Key: "admin_api_key_hash", Value: "hash-value", Group: "security"},
 		{Key: "admin_api_key_encrypted", Value: "cipher-value", Group: "security"},
 		{Key: "admin_api_key_hint", Value: "admin-...abcd", Group: "security"},
@@ -113,11 +114,14 @@ func TestGetSettingsFiltersSensitive(t *testing.T) {
 		}
 		got[item.Key] = item.Value
 	}
-	if body := rec.Body.String(); strings.Contains(body, "hash-value") || strings.Contains(body, "cipher-value") || strings.Contains(body, "super-secret") {
+	if body := rec.Body.String(); strings.Contains(body, "hash-value") || strings.Contains(body, "cipher-value") || strings.Contains(body, "super-secret") || strings.Contains(body, "wechat-secret") {
 		t.Fatalf("响应泄漏敏感值: %s", body)
 	}
 	if v, ok := got["smtp_password"]; !ok || v != appsettings.MaskedValue {
 		t.Fatalf("smtp_password 应掩码为哨兵值 %q，got %q (present=%v)", appsettings.MaskedValue, v, ok)
+	}
+	if v, ok := got["wechat_app_secret"]; !ok || v != appsettings.MaskedValue {
+		t.Fatalf("wechat_app_secret 应掩码为哨兵值 %q，got %q (present=%v)", appsettings.MaskedValue, v, ok)
 	}
 	if got["smtp_host"] != "smtp.example.com" || got["site_name"] != "AirGate" {
 		t.Fatalf("非敏感设置应原样返回: %v", got)
