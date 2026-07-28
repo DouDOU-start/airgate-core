@@ -911,27 +911,20 @@ export default function SettingsPage() {
                 </SettingsSection>
 
                 <SettingsSection title={t('settings.wechat_alert_policy')}>
-                  <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(18rem,0.8fr)] gap-6 items-start">
-                    <div className="space-y-4">
-                      <NativeSwitch
-                        isSelected={boolVal('wechat_enabled')}
-                        label={(
-                          <>
-                            <span className="text-sm font-medium text-text">{t('settings.wechat_enabled')}</span>
-                            <span className="block text-xs text-text-tertiary">{t('settings.wechat_enabled_desc')}</span>
-                          </>
-                        )}
-                        onChange={(v) => set('wechat_enabled', String(v))}
-                      />
-                      <p className="text-xs leading-5 text-text-tertiary">
-                        {t('settings.wechat_policy_desc')}
-                      </p>
-                    </div>
-                    <Alert status="warning">
-                      <Alert.Content>
-                        <Alert.Description>{t('settings.wechat_template_contract')}</Alert.Description>
-                      </Alert.Content>
-                    </Alert>
+                  <div className="space-y-4">
+                    <NativeSwitch
+                      isSelected={boolVal('wechat_enabled')}
+                      label={(
+                        <>
+                          <span className="text-sm font-medium text-text">{t('settings.wechat_enabled')}</span>
+                          <span className="block text-xs text-text-tertiary">{t('settings.wechat_enabled_desc')}</span>
+                        </>
+                      )}
+                      onChange={(v) => set('wechat_enabled', String(v))}
+                    />
+                    <p className="text-xs leading-5 text-text-tertiary">
+                      {t('settings.wechat_policy_desc')}
+                    </p>
                   </div>
                 </SettingsSection>
               </div>

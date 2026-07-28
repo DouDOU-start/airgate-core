@@ -879,7 +879,6 @@
     "wechat_enabled_desc": "启用后，渠道自动暂停和恢复时只向已绑定的管理员微信发送模板消息。",
     "wechat_enabled_status": "微信公众号告警已启用，关键渠道状态变化将异步推送。",
     "wechat_policy_desc": "鉴权失败会立即暂停并通知；普通网络、限流或上游错误连续达到阈值后通知。相同渠道和状态在 10 分钟内自动去重。",
-    "wechat_template_contract": "模板字段必须与公众号后台实际模板匹配。建议先关闭自动告警，保存配置并发送测试消息，确认排版正常后再启用。",
     "wechat_test": "发送测试消息",
     "wechat_test_success": "测试消息已发送，请在微信中查看",
     "wechat_open_id_required": "请先扫码绑定管理员微信"

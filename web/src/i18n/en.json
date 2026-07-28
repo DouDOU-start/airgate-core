@@ -879,7 +879,6 @@
     "wechat_enabled_desc": "When enabled, template messages for automatic channel suspension and recovery are sent only to the bound administrator account.",
     "wechat_enabled_status": "WeChat alerts are enabled. Critical channel status changes will be delivered asynchronously.",
     "wechat_policy_desc": "Authentication failures trigger immediate suspension and notification. Network, rate-limit, and upstream errors notify after reaching the consecutive-failure threshold. Duplicate alerts for the same channel and status are suppressed for 10 minutes.",
-    "wechat_template_contract": "Template fields must match the template configured in the WeChat Official Accounts Platform. Save the configuration and send a test message to verify the layout before enabling automatic alerts.",
     "wechat_test": "Send Test Message",
     "wechat_test_success": "Test message sent. Check WeChat for delivery.",
     "wechat_open_id_required": "Bind an administrator WeChat account via QR code first."
