@@ -786,7 +786,7 @@ export default function SettingsPage() {
                       <Input
                         value={val('wechat_app_id')}
                         onChange={(e) => set('wechat_app_id', e.target.value)}
-                        placeholder="wx1234567890abcdef"
+                        placeholder={t('settings.wechat_app_id')}
                         autoComplete="off"
                       />
                     </Field>
