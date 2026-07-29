@@ -19,6 +19,7 @@ export const queryKeys = {
   usage: (...args: unknown[]) => ['usage', ...args] as const,
   userUsage: (...args: unknown[]) => ['user-usage', ...args] as const,
   settings: (...args: unknown[]) => ['settings', ...args] as const,
+  wechatVerificationFiles: () => ['settings', 'wechat-verification-files'] as const,
   adminApiKey: () => ['admin-api-key'] as const,
   userMe: () => ['user-me'] as const,
   userUsageStats: (...args: unknown[]) => ['user-usage-stats', ...args] as const,

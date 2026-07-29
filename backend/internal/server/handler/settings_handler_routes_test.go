@@ -46,7 +46,16 @@ func newSettingsTestRouter(repo *stubSettingsRepo) *gin.Engine {
 	router.GET("/settings", handler.GetSettings)
 	router.PUT("/settings", handler.UpdateSettings)
 	router.POST("/settings/upload", handler.UploadFile)
+	router.GET("/settings/wechat-verification-files", handler.ListWeChatVerificationFiles)
+	router.POST("/settings/wechat-verification-files", handler.UploadWeChatVerificationFile)
+	router.DELETE("/settings/wechat-verification-files/:filename", handler.DeleteWeChatVerificationFile)
 	router.GET("/settings/admin-api-key", handler.GetAdminAPIKey)
+	router.NoRoute(func(c *gin.Context) {
+		if handler.ServeWeChatVerificationFile(c) {
+			return
+		}
+		c.Status(http.StatusNotFound)
+	})
 	return router
 }
 
@@ -230,6 +239,23 @@ func multipartUpload(t *testing.T, filename string, size int) (*bytes.Buffer, st
 	return buf, writer.FormDataContentType()
 }
 
+func multipartUploadContent(t *testing.T, filename string, content []byte) (*bytes.Buffer, string) {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	writer := multipart.NewWriter(buf)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		t.Fatalf("创建上传表单失败：%v", err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("写入上传表单失败：%v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("关闭上传表单失败：%v", err)
+	}
+	return buf, writer.FormDataContentType()
+}
+
 // TestUploadFileValidation 上传校验：拒绝 .svg（存储型 XSS 载体）与超大文件，
 // 放行位图并生成 UUID 文件名。
 func TestUploadFileValidation(t *testing.T) {
@@ -275,6 +301,99 @@ func TestUploadFileValidation(t *testing.T) {
 				if len(name) != 36 || strings.Count(name, "-") != 4 {
 					t.Fatalf("文件名应为 UUID，got %q", name)
 				}
+			}
+		})
+	}
+}
+
+// TestWeChatVerificationFileLifecycle 覆盖微信校验文件上传、列表、根路径原样访问和删除。
+func TestWeChatVerificationFileLifecycle(t *testing.T) {
+	t.Chdir(t.TempDir())
+	router := newSettingsTestRouter(&stubSettingsRepo{})
+	filename := "MP_verify_airgate123.txt"
+	original := []byte("airgate-wechat-verification-token\n")
+
+	body, contentType := multipartUploadContent(t, filename, original)
+	req := httptest.NewRequest(http.MethodPost, "/settings/wechat-verification-files", body)
+	req.Header.Set("Content-Type", contentType)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("上传微信校验文件 status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var uploadResp struct {
+		Data struct {
+			Filename string `json:"filename"`
+			URL      string `json:"url"`
+			Size     int64  `json:"size"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &uploadResp); err != nil {
+		t.Fatalf("解析上传响应失败：%v", err)
+	}
+	if uploadResp.Data.Filename != filename || uploadResp.Data.URL != "/"+filename || uploadResp.Data.Size != int64(len(original)) {
+		t.Fatalf("上传响应不正确：%+v", uploadResp.Data)
+	}
+
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/"+filename, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("根路径访问微信校验文件 status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if !bytes.Equal(rec.Body.Bytes(), original) {
+		t.Fatalf("微信校验文件内容被修改：got %q, want %q", rec.Body.Bytes(), original)
+	}
+	if contentType := rec.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/plain") {
+		t.Fatalf("Content-Type = %q，期望 text/plain", contentType)
+	}
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatal("微信校验文件响应缺少 nosniff")
+	}
+
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/settings/wechat-verification-files", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), filename) {
+		t.Fatalf("微信校验文件列表不正确：status=%d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/settings/wechat-verification-files/"+filename, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("删除微信校验文件 status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/"+filename, nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("删除后根路径访问 status = %d，期望 404", rec.Code)
+	}
+}
+
+// TestWeChatVerificationFileValidation 拒绝错误文件名、空文件、超大文件和非文本内容。
+func TestWeChatVerificationFileValidation(t *testing.T) {
+	t.Chdir(t.TempDir())
+	router := newSettingsTestRouter(&stubSettingsRepo{})
+
+	cases := []struct {
+		name     string
+		filename string
+		content  []byte
+	}{
+		{name: "错误文件名", filename: "verify.txt", content: []byte("token")},
+		{name: "空文件", filename: "MP_verify_empty.txt", content: []byte{}},
+		{name: "文件过大", filename: "MP_verify_large.txt", content: bytes.Repeat([]byte("a"), wechatVerificationMaxFileSize+1)},
+		{name: "非文本内容", filename: "MP_verify_binary.txt", content: []byte{0xff, 0x00, 0xfe}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body, contentType := multipartUploadContent(t, tc.filename, tc.content)
+			req := httptest.NewRequest(http.MethodPost, "/settings/wechat-verification-files", body)
+			req.Header.Set("Content-Type", contentType)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("上传 %s status = %d，期望 400；body=%s", tc.filename, rec.Code, rec.Body.String())
 			}
 		})
 	}

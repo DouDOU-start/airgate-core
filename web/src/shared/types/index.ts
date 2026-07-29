@@ -941,6 +941,13 @@ export interface WeChatBindStatusResp {
   open_id_hint?: string;
 }
 
+export interface WeChatVerificationFileResp {
+  filename: string;
+  url: string;
+  size: number;
+  updated_at: string;
+}
+
 // ==================== Dashboard ====================
 
 export interface DashboardStatsResp {

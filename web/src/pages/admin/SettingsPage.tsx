@@ -15,14 +15,15 @@ import { useToast } from '../../shared/ui';
 import {
   Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
   ShieldCheck, Copy, Trash2, KeyRound, Expand, Plus, Waypoints, MessageCircle,
-  CheckCircle2, QrCode, Unlink, Clock3,
+  CheckCircle2, QrCode, Unlink, Clock3, FileCheck2, ExternalLink,
 } from 'lucide-react';
 import type { SettingItem, TestSMTPReq, TestWeChatReq } from '../../shared/types';
-import type { WeChatBindSessionResp, WeChatBindStatusResp } from '../../shared/types';
+import type { WeChatBindSessionResp, WeChatBindStatusResp, WeChatVerificationFileResp } from '../../shared/types';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { CommonModal } from '../../shared/components/CommonModal';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { parseCustomEndpoints, serializeCustomEndpoints } from '../../shared/utils/endpoints';
+import { formatDateTime } from '../../shared/utils/format';
 
 // ==================== 设置 key 定义 ====================
 
@@ -910,6 +911,8 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
+                <WeChatVerificationFilesPanel />
+
                 <SettingsSection title={t('settings.wechat_alert_policy')}>
                   <div className="space-y-4">
                     <NativeSwitch
@@ -963,6 +966,181 @@ function firstOpenID(value: string): string {
 function maskOpenID(value: string): string {
   if (!value) return '';
   return value.length <= 6 ? value : `••••••${value.slice(-6)}`;
+}
+
+// ==================== 微信域名校验文件 ====================
+
+const WECHAT_VERIFICATION_MAX_SIZE = 64 * 1024;
+const WECHAT_VERIFICATION_FILENAME = /^MP_verify_[A-Za-z0-9_-]+\.txt$/;
+
+function WeChatVerificationFilesPanel() {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const copy = useClipboard();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WeChatVerificationFileResp | null>(null);
+
+  const { data: files = [], isLoading } = useQuery({
+    queryKey: queryKeys.wechatVerificationFiles(),
+    queryFn: () => settingsApi.listWeChatVerificationFiles(),
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => settingsApi.uploadWeChatVerificationFile(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.wechatVerificationFiles() });
+      toast('success', t('settings.wechat_verification_upload_success'));
+    },
+    onError: (err: Error) => toast('error', err.message || t('settings.wechat_verification_upload_failed')),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (filename: string) => settingsApi.deleteWeChatVerificationFile(filename),
+    onSuccess: () => {
+      setDeleteTarget(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.wechatVerificationFiles() });
+      toast('success', t('settings.wechat_verification_delete_success'));
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!WECHAT_VERIFICATION_FILENAME.test(file.name)) {
+      toast('error', t('settings.wechat_verification_invalid_name'));
+      return;
+    }
+    if (file.size <= 0 || file.size > WECHAT_VERIFICATION_MAX_SIZE) {
+      toast('error', t('settings.wechat_verification_too_large'));
+      return;
+    }
+    uploadMutation.mutate(file);
+  }
+
+  function absoluteURL(file: WeChatVerificationFileResp): string {
+    return new URL(file.url, window.location.origin).toString();
+  }
+
+  return (
+    <>
+      <SettingsSection
+        title={t('settings.wechat_verification_title')}
+        action={(
+          <>
+            <input
+              ref={fileInputRef}
+              className="hidden"
+              type="file"
+              accept=".txt,text/plain"
+              onChange={handleFileChange}
+            />
+            <Button
+              size="sm"
+              variant="secondary"
+              isDisabled={uploadMutation.isPending}
+              onPress={() => fileInputRef.current?.click()}
+            >
+              {uploadMutation.isPending
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Upload className="h-3.5 w-3.5" />}
+              {t('settings.wechat_verification_upload')}
+            </Button>
+          </>
+        )}
+      >
+        {isLoading ? (
+          <div className="flex min-h-24 items-center justify-center text-text-tertiary">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : files.length === 0 ? (
+          <div className="flex min-h-32 flex-col items-center justify-center rounded-2xl border border-dashed border-glass-border bg-surface/45 px-6 text-center">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
+              <FileCheck2 className="h-5 w-5" />
+            </div>
+            <div className="mt-3 text-sm font-medium text-text">{t('settings.wechat_verification_empty')}</div>
+            <p className="mt-1 max-w-lg text-xs leading-5 text-text-tertiary">
+              {t('settings.wechat_verification_empty_hint')}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {files.map((file) => (
+              <div
+                key={file.filename}
+                className="flex flex-col gap-4 rounded-2xl border border-glass-border bg-surface/65 p-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-success/12 text-success">
+                    <FileCheck2 className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <code className="block truncate text-xs font-semibold text-text">{file.filename}</code>
+                    <code className="mt-1 block truncate text-[11px] text-text-tertiary">{absoluteURL(file)}</code>
+                    <div className="mt-1.5 text-[11px] text-text-tertiary">
+                      {t('settings.wechat_verification_meta', {
+                        size: formatVerificationFileSize(file.size),
+                        time: formatDateTime(file.updated_at),
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5 self-end sm:self-auto">
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t('settings.wechat_verification_copy')}
+                    onPress={() => copy(absoluteURL(file), t('settings.wechat_verification_copied'))}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t('settings.wechat_verification_open')}
+                    onPress={() => window.open(absoluteURL(file), '_blank', 'noopener,noreferrer')}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="danger"
+                    aria-label={t('settings.wechat_verification_delete')}
+                    onPress={() => setDeleteTarget(file)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SettingsSection>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) setDeleteTarget(null);
+        }}
+        title={t('settings.wechat_verification_delete_confirm_title')}
+        description={t('settings.wechat_verification_delete_confirm_desc', { filename: deleteTarget?.filename ?? '' })}
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget.filename);
+        }}
+      />
+    </>
+  );
+}
+
+function formatVerificationFileSize(size: number): string {
+  if (size < 1024) return `${size} B`;
+  return `${(size / 1024).toFixed(1)} KB`;
 }
 
 // ==================== 微信管理员扫码绑定 ====================

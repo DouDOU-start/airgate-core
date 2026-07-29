@@ -1,7 +1,7 @@
 import { del, get, put, post, uploadFile } from './client';
 import type {
   SettingResp, UpdateSettingsReq, TestSMTPReq, TestWeChatReq,
-  WeChatBindSessionResp, WeChatBindStatusResp,
+  WeChatBindSessionResp, WeChatBindStatusResp, WeChatVerificationFileResp,
 } from '../types';
 
 export interface CoreVersionInfo {
@@ -18,6 +18,9 @@ export const settingsApi = {
   createWeChatBind: () => post<WeChatBindSessionResp>('/api/v1/admin/settings/wechat-bind'),
   getWeChatBindStatus: (id: string) => get<WeChatBindStatusResp>(`/api/v1/admin/settings/wechat-bind/${encodeURIComponent(id)}`),
   unbindWeChat: () => del<void>('/api/v1/admin/settings/wechat-bind'),
+  listWeChatVerificationFiles: () => get<WeChatVerificationFileResp[]>('/api/v1/admin/settings/wechat-verification-files'),
+  uploadWeChatVerificationFile: (file: File) => uploadFile<WeChatVerificationFileResp>('/api/v1/admin/settings/wechat-verification-files', file),
+  deleteWeChatVerificationFile: (filename: string) => del<void>(`/api/v1/admin/settings/wechat-verification-files/${encodeURIComponent(filename)}`),
   getPublic: () => get<Record<string, string>>('/api/v1/settings/public'),
   getCoreVersion: () => get<CoreVersionInfo>('/api/v1/admin/version'),
   uploadFile: (file: File) => uploadFile<{ url: string }>('/api/v1/admin/settings/upload', file),

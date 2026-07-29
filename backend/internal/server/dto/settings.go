@@ -59,3 +59,11 @@ type WeChatBindStatusResp struct {
 	Status     string `json:"status"`
 	OpenIDHint string `json:"open_id_hint,omitempty"`
 }
+
+// WeChatVerificationFileResp 微信域名校验文件信息。
+type WeChatVerificationFileResp struct {
+	Filename  string    `json:"filename"`
+	URL       string    `json:"url"`
+	Size      int64     `json:"size"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

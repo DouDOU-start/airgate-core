@@ -140,7 +140,7 @@ fi
 
 mkdir -p "$AIRGATE_DIR"
 cd "$AIRGATE_DIR"
-mkdir -p data/postgres data/redis data/uploads
+mkdir -p data/postgres data/redis data/uploads data/wechat-verification
 
 ok "目录就绪：$(pwd)"
 

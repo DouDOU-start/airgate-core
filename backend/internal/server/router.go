@@ -241,6 +241,9 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/settings/wechat-bind", handlers.Settings.CreateWeChatBind)
 		adminGroup.GET("/settings/wechat-bind/:id", handlers.Settings.GetWeChatBindStatus)
 		adminGroup.DELETE("/settings/wechat-bind", handlers.Settings.UnbindWeChat)
+		adminGroup.GET("/settings/wechat-verification-files", handlers.Settings.ListWeChatVerificationFiles)
+		adminGroup.POST("/settings/wechat-verification-files", handlers.Settings.UploadWeChatVerificationFile)
+		adminGroup.DELETE("/settings/wechat-verification-files/:filename", handlers.Settings.DeleteWeChatVerificationFile)
 		adminGroup.POST("/settings/upload", handlers.Settings.UploadFile)
 
 		// 管理员 API Key
@@ -394,9 +397,13 @@ func (s *Server) registerRoutes() {
 	// 拿到的不是真图，卡片配图会失效。这里显式暴露一个 embed.FS 的根文件。
 	r.StaticFileFS("/og-cover.png", "og-cover.png", http.FS(distFS))
 
-	// NoRoute: 纯 SPA fallback，未匹配的路径一律返回前端 index.html。
+	// NoRoute: 先处理微信要求放在域名根目录的 MP_verify_*.txt 校验文件，
+	// 其余未匹配路径再回退前端 index.html。
 	// P1 起对外网关路由（/v1/chat/completions 等）走显式注册，不再经 NoRoute 分发。
 	r.NoRoute(func(c *gin.Context) {
+		if handlers.Settings.ServeWeChatVerificationFile(c) {
+			return
+		}
 		c.Data(http.StatusOK, "text/html; charset=utf-8", ogIndex.Bytes(c.Request.Context()))
 	})
 }
