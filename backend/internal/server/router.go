@@ -376,6 +376,9 @@ func (s *Server) registerRoutes() {
 	r.POST("/oauth/token", oauthRL.Handler, handlers.OAuth.Token)
 	r.GET("/oauth/userinfo", handlers.OAuth.UserInfo)
 	r.POST("/oauth/provision-key", handlers.OAuth.ProvisionKey)
+	r.GET("/oauth/wallet", handlers.OAuth.Wallet)
+	r.POST("/oauth/wallet/debits", handlers.OAuth.DebitWallet)
+	r.POST("/oauth/wallet/refunds", handlers.OAuth.RefundWallet)
 
 	// 上传文件静态服务（这部分仍然在磁盘上，因为是用户上传的运行时数据）
 	//

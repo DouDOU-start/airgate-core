@@ -9,6 +9,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/url"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
@@ -34,7 +36,11 @@ type Service struct {
 	users  UserReader
 	groups GroupReader
 	keys   KeyProvisioner
+	wallet WalletManager
 }
+
+// SetWalletManager 注入平台钱包服务。
+func (s *Service) SetWalletManager(wallet WalletManager) { s.wallet = wallet }
 
 // NewService 创建 OAuth 服务。
 func NewService(repo Repository, grants GrantStore, users UserReader, groups GroupReader, keys KeyProvisioner) *Service {
@@ -119,6 +125,10 @@ func (s *Service) Authorize(ctx context.Context, userID int, input AuthorizeInpu
 	if input.CodeChallenge == "" || input.CodeChallengeMethod != "S256" {
 		return "", ErrPKCERequired
 	}
+	scope, err := normalizeScope(input.Scope)
+	if err != nil {
+		return "", err
+	}
 	code, err := randomToken(codePrefix, 32)
 	if err != nil {
 		return "", err
@@ -128,7 +138,7 @@ func (s *Service) Authorize(ctx context.Context, userID int, input AuthorizeInpu
 		UserID:        userID,
 		RedirectURI:   input.RedirectURI,
 		CodeChallenge: input.CodeChallenge,
-		Scope:         input.Scope,
+		Scope:         scope,
 	}
 	if err := s.grants.SaveCode(ctx, code, grant, codeTTL); err != nil {
 		logx.LoggerFromContext(ctx).Error("oauth_code_save_failed", logx.LogFieldError, err)
@@ -209,7 +219,10 @@ func (s *Service) resolveActiveUser(ctx context.Context, token string) (TokenGra
 
 // ResolveUserInfo userinfo 端点：访问令牌 → 用户基本信息。
 func (s *Service) ResolveUserInfo(ctx context.Context, token string) (UserInfo, error) {
-	_, info, err := s.resolveActiveUser(ctx, token)
+	grant, info, err := s.resolveActiveUser(ctx, token)
+	if err == nil {
+		err = requireScope(grant.Scope, "profile")
+	}
 	return info, err
 }
 
@@ -241,6 +254,49 @@ func (s *Service) ProvisionKey(ctx context.Context, token string, groupID int) (
 			"client_id", client.ClientID, logx.LogFieldUserID, grant.UserID, "group_id", resolvedGroupID)
 	}
 	return ProvisionResult{APIKey: plainKey, KeyHint: hint, GroupID: resolvedGroupID, Created: created}, nil
+}
+
+// WalletBalance 返回令牌对应用户的平台余额。
+func (s *Service) WalletBalance(ctx context.Context, token string) (float64, error) {
+	grant, info, err := s.resolveActiveUser(ctx, token)
+	if err != nil {
+		return 0, err
+	}
+	if err := requireScope(grant.Scope, "wallet.read"); err != nil {
+		return 0, err
+	}
+	return info.Balance, nil
+}
+
+// DebitWallet 校验 wallet.debit scope 后调用钱包服务原子扣款。
+func (s *Service) DebitWallet(ctx context.Context, token string, input WalletDebitInput) (WalletTransaction, error) {
+	grant, _, err := s.resolveActiveUser(ctx, token)
+	if err != nil {
+		return WalletTransaction{}, err
+	}
+	if err := requireScope(grant.Scope, "wallet.debit"); err != nil {
+		return WalletTransaction{}, err
+	}
+	if s.wallet == nil {
+		return WalletTransaction{}, ErrWalletUnavailable
+	}
+	return s.wallet.Debit(ctx, grant.UserID, grant.ClientID, input.ExternalOrderNo, input.Amount, input.Subject)
+}
+
+// RefundWallet 校验 wallet.refund scope 后调用钱包服务执行关联退款。
+func (s *Service) RefundWallet(ctx context.Context, token string, input WalletRefundInput) (WalletTransaction, error) {
+	grant, _, err := s.resolveActiveUser(ctx, token)
+	if err != nil {
+		return WalletTransaction{}, err
+	}
+	if err := requireScope(grant.Scope, "wallet.refund"); err != nil {
+		return WalletTransaction{}, err
+	}
+	if s.wallet == nil {
+		return WalletTransaction{}, ErrWalletUnavailable
+	}
+	return s.wallet.Refund(ctx, grant.UserID, grant.ClientID, input.ExternalRefundNo,
+		input.RelatedTransaction, input.Amount, input.Reason)
 }
 
 // ==================== 内部工具 ====================
@@ -317,4 +373,40 @@ func randomToken(prefix string, n int) (string, error) {
 		return "", fmt.Errorf("生成随机令牌失败: %w", err)
 	}
 	return prefix + hex.EncodeToString(buf), nil
+}
+
+var supportedScopes = map[string]struct{}{
+	"profile":       {},
+	"wallet.read":   {},
+	"wallet.debit":  {},
+	"wallet.refund": {},
+}
+
+func normalizeScope(raw string) (string, error) {
+	fields := strings.Fields(raw)
+	if len(fields) == 0 {
+		fields = []string{"profile"}
+	}
+	unique := make(map[string]struct{}, len(fields))
+	for _, scope := range fields {
+		if _, ok := supportedScopes[scope]; !ok {
+			return "", ErrInvalidScope
+		}
+		unique[scope] = struct{}{}
+	}
+	fields = fields[:0]
+	for scope := range unique {
+		fields = append(fields, scope)
+	}
+	sort.Strings(fields)
+	return strings.Join(fields, " "), nil
+}
+
+func requireScope(granted, required string) error {
+	for _, scope := range strings.Fields(granted) {
+		if scope == required {
+			return nil
+		}
+	}
+	return ErrInsufficientScope
 }

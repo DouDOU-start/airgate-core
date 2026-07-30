@@ -51,7 +51,7 @@ Suno 的计费模型名由动作合成（`suno_music` / `suno_lyrics`），渠�
 - **用户体系**：注册（邮箱验证码）/ 登录 / API Key 自助管理 / 余额预警 / 用量明细与趋势
 - **分组**：渠道按分组隔离，用户按分组授权，倍率可按组覆盖
 - **充值**：易支付等支付渠道、兑换码
-- **OAuth 提供方**：标准 PKCE 授权码流程，供外部应用接入（`/oauth/token`、`/oauth/userinfo`、`/oauth/provision-key`）
+- **OAuth 提供方**：标准 PKCE 授权码流程，供外部应用接入（`/oauth/token`、`/oauth/userinfo`、`/oauth/provision-key`）；支持 scope 约束的共享钱包查询、幂等扣款和关联退款（`/oauth/wallet/*`）
 - **运维**：管理仪表盘、上游请求留痕、公告系统、后台一键自更新（systemd/Docker 感知）
 - **限流**：用户/密钥/渠道三级并发闸门 + RPM 限速（Redis 原语）
 - **风控中心**：转发前内容审核（关键词 Aho-Corasick 拦截 + 外部审核 API 多 key 轮询熔断 + 命中哈希缓存），observe/pre_block 双模式，采样率/分组/模型过滤，滑窗违规计数自动封禁（管理员豁免）+ 邮件通知，审核日志双保留期 TTL 清理

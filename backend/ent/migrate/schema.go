@@ -134,6 +134,11 @@ var (
 		{Name: "user_id_snapshot", Type: field.TypeInt, Default: 0},
 		{Name: "user_email_snapshot", Type: field.TypeString, Default: ""},
 		{Name: "idempotency_key", Type: field.TypeString, Nullable: true},
+		{Name: "transaction_id", Type: field.TypeString, Unique: true, Nullable: true},
+		{Name: "source", Type: field.TypeString, Default: ""},
+		{Name: "oauth_client_id", Type: field.TypeString, Default: ""},
+		{Name: "external_order_no", Type: field.TypeString, Default: ""},
+		{Name: "related_log_id", Type: field.TypeInt, Default: 0},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "user_balance_logs", Type: field.TypeInt, Nullable: true},
 	}
@@ -145,7 +150,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "balance_logs_users_balance_logs",
-				Columns:    []*schema.Column{BalanceLogsColumns[10]},
+				Columns:    []*schema.Column{BalanceLogsColumns[15]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -157,9 +162,19 @@ var (
 				Columns: []*schema.Column{BalanceLogsColumns[8]},
 			},
 			{
+				Name:    "balancelog_oauth_client_id_external_order_no",
+				Unique:  false,
+				Columns: []*schema.Column{BalanceLogsColumns[11], BalanceLogsColumns[12]},
+			},
+			{
+				Name:    "balancelog_related_log_id",
+				Unique:  false,
+				Columns: []*schema.Column{BalanceLogsColumns[13]},
+			},
+			{
 				Name:    "balancelog_user_id_snapshot_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{BalanceLogsColumns[6], BalanceLogsColumns[9]},
+				Columns: []*schema.Column{BalanceLogsColumns[6], BalanceLogsColumns[14]},
 			},
 		},
 	}

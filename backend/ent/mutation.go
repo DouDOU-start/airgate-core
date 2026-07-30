@@ -3107,6 +3107,12 @@ type BalanceLogMutation struct {
 	adduser_id_snapshot *int
 	user_email_snapshot *string
 	idempotency_key     *string
+	transaction_id      *string
+	source              *string
+	oauth_client_id     *string
+	external_order_no   *string
+	related_log_id      *int
+	addrelated_log_id   *int
 	created_at          *time.Time
 	clearedFields       map[string]struct{}
 	user                *int
@@ -3595,6 +3601,219 @@ func (m *BalanceLogMutation) ResetIdempotencyKey() {
 	delete(m.clearedFields, balancelog.FieldIdempotencyKey)
 }
 
+// SetTransactionID sets the "transaction_id" field.
+func (m *BalanceLogMutation) SetTransactionID(s string) {
+	m.transaction_id = &s
+}
+
+// TransactionID returns the value of the "transaction_id" field in the mutation.
+func (m *BalanceLogMutation) TransactionID() (r string, exists bool) {
+	v := m.transaction_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTransactionID returns the old "transaction_id" field's value of the BalanceLog entity.
+// If the BalanceLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BalanceLogMutation) OldTransactionID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTransactionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTransactionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTransactionID: %w", err)
+	}
+	return oldValue.TransactionID, nil
+}
+
+// ClearTransactionID clears the value of the "transaction_id" field.
+func (m *BalanceLogMutation) ClearTransactionID() {
+	m.transaction_id = nil
+	m.clearedFields[balancelog.FieldTransactionID] = struct{}{}
+}
+
+// TransactionIDCleared returns if the "transaction_id" field was cleared in this mutation.
+func (m *BalanceLogMutation) TransactionIDCleared() bool {
+	_, ok := m.clearedFields[balancelog.FieldTransactionID]
+	return ok
+}
+
+// ResetTransactionID resets all changes to the "transaction_id" field.
+func (m *BalanceLogMutation) ResetTransactionID() {
+	m.transaction_id = nil
+	delete(m.clearedFields, balancelog.FieldTransactionID)
+}
+
+// SetSource sets the "source" field.
+func (m *BalanceLogMutation) SetSource(s string) {
+	m.source = &s
+}
+
+// Source returns the value of the "source" field in the mutation.
+func (m *BalanceLogMutation) Source() (r string, exists bool) {
+	v := m.source
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSource returns the old "source" field's value of the BalanceLog entity.
+// If the BalanceLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BalanceLogMutation) OldSource(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSource is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSource requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSource: %w", err)
+	}
+	return oldValue.Source, nil
+}
+
+// ResetSource resets all changes to the "source" field.
+func (m *BalanceLogMutation) ResetSource() {
+	m.source = nil
+}
+
+// SetOauthClientID sets the "oauth_client_id" field.
+func (m *BalanceLogMutation) SetOauthClientID(s string) {
+	m.oauth_client_id = &s
+}
+
+// OauthClientID returns the value of the "oauth_client_id" field in the mutation.
+func (m *BalanceLogMutation) OauthClientID() (r string, exists bool) {
+	v := m.oauth_client_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOauthClientID returns the old "oauth_client_id" field's value of the BalanceLog entity.
+// If the BalanceLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BalanceLogMutation) OldOauthClientID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOauthClientID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOauthClientID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOauthClientID: %w", err)
+	}
+	return oldValue.OauthClientID, nil
+}
+
+// ResetOauthClientID resets all changes to the "oauth_client_id" field.
+func (m *BalanceLogMutation) ResetOauthClientID() {
+	m.oauth_client_id = nil
+}
+
+// SetExternalOrderNo sets the "external_order_no" field.
+func (m *BalanceLogMutation) SetExternalOrderNo(s string) {
+	m.external_order_no = &s
+}
+
+// ExternalOrderNo returns the value of the "external_order_no" field in the mutation.
+func (m *BalanceLogMutation) ExternalOrderNo() (r string, exists bool) {
+	v := m.external_order_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExternalOrderNo returns the old "external_order_no" field's value of the BalanceLog entity.
+// If the BalanceLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BalanceLogMutation) OldExternalOrderNo(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExternalOrderNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExternalOrderNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExternalOrderNo: %w", err)
+	}
+	return oldValue.ExternalOrderNo, nil
+}
+
+// ResetExternalOrderNo resets all changes to the "external_order_no" field.
+func (m *BalanceLogMutation) ResetExternalOrderNo() {
+	m.external_order_no = nil
+}
+
+// SetRelatedLogID sets the "related_log_id" field.
+func (m *BalanceLogMutation) SetRelatedLogID(i int) {
+	m.related_log_id = &i
+	m.addrelated_log_id = nil
+}
+
+// RelatedLogID returns the value of the "related_log_id" field in the mutation.
+func (m *BalanceLogMutation) RelatedLogID() (r int, exists bool) {
+	v := m.related_log_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRelatedLogID returns the old "related_log_id" field's value of the BalanceLog entity.
+// If the BalanceLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BalanceLogMutation) OldRelatedLogID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRelatedLogID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRelatedLogID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRelatedLogID: %w", err)
+	}
+	return oldValue.RelatedLogID, nil
+}
+
+// AddRelatedLogID adds i to the "related_log_id" field.
+func (m *BalanceLogMutation) AddRelatedLogID(i int) {
+	if m.addrelated_log_id != nil {
+		*m.addrelated_log_id += i
+	} else {
+		m.addrelated_log_id = &i
+	}
+}
+
+// AddedRelatedLogID returns the value that was added to the "related_log_id" field in this mutation.
+func (m *BalanceLogMutation) AddedRelatedLogID() (r int, exists bool) {
+	v := m.addrelated_log_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRelatedLogID resets all changes to the "related_log_id" field.
+func (m *BalanceLogMutation) ResetRelatedLogID() {
+	m.related_log_id = nil
+	m.addrelated_log_id = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *BalanceLogMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -3704,7 +3923,7 @@ func (m *BalanceLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BalanceLogMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 14)
 	if m.action != nil {
 		fields = append(fields, balancelog.FieldAction)
 	}
@@ -3728,6 +3947,21 @@ func (m *BalanceLogMutation) Fields() []string {
 	}
 	if m.idempotency_key != nil {
 		fields = append(fields, balancelog.FieldIdempotencyKey)
+	}
+	if m.transaction_id != nil {
+		fields = append(fields, balancelog.FieldTransactionID)
+	}
+	if m.source != nil {
+		fields = append(fields, balancelog.FieldSource)
+	}
+	if m.oauth_client_id != nil {
+		fields = append(fields, balancelog.FieldOauthClientID)
+	}
+	if m.external_order_no != nil {
+		fields = append(fields, balancelog.FieldExternalOrderNo)
+	}
+	if m.related_log_id != nil {
+		fields = append(fields, balancelog.FieldRelatedLogID)
 	}
 	if m.created_at != nil {
 		fields = append(fields, balancelog.FieldCreatedAt)
@@ -3756,6 +3990,16 @@ func (m *BalanceLogMutation) Field(name string) (ent.Value, bool) {
 		return m.UserEmailSnapshot()
 	case balancelog.FieldIdempotencyKey:
 		return m.IdempotencyKey()
+	case balancelog.FieldTransactionID:
+		return m.TransactionID()
+	case balancelog.FieldSource:
+		return m.Source()
+	case balancelog.FieldOauthClientID:
+		return m.OauthClientID()
+	case balancelog.FieldExternalOrderNo:
+		return m.ExternalOrderNo()
+	case balancelog.FieldRelatedLogID:
+		return m.RelatedLogID()
 	case balancelog.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -3783,6 +4027,16 @@ func (m *BalanceLogMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldUserEmailSnapshot(ctx)
 	case balancelog.FieldIdempotencyKey:
 		return m.OldIdempotencyKey(ctx)
+	case balancelog.FieldTransactionID:
+		return m.OldTransactionID(ctx)
+	case balancelog.FieldSource:
+		return m.OldSource(ctx)
+	case balancelog.FieldOauthClientID:
+		return m.OldOauthClientID(ctx)
+	case balancelog.FieldExternalOrderNo:
+		return m.OldExternalOrderNo(ctx)
+	case balancelog.FieldRelatedLogID:
+		return m.OldRelatedLogID(ctx)
 	case balancelog.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -3850,6 +4104,41 @@ func (m *BalanceLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetIdempotencyKey(v)
 		return nil
+	case balancelog.FieldTransactionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTransactionID(v)
+		return nil
+	case balancelog.FieldSource:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSource(v)
+		return nil
+	case balancelog.FieldOauthClientID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOauthClientID(v)
+		return nil
+	case balancelog.FieldExternalOrderNo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExternalOrderNo(v)
+		return nil
+	case balancelog.FieldRelatedLogID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRelatedLogID(v)
+		return nil
 	case balancelog.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -3877,6 +4166,9 @@ func (m *BalanceLogMutation) AddedFields() []string {
 	if m.adduser_id_snapshot != nil {
 		fields = append(fields, balancelog.FieldUserIDSnapshot)
 	}
+	if m.addrelated_log_id != nil {
+		fields = append(fields, balancelog.FieldRelatedLogID)
+	}
 	return fields
 }
 
@@ -3893,6 +4185,8 @@ func (m *BalanceLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedAfterBalance()
 	case balancelog.FieldUserIDSnapshot:
 		return m.AddedUserIDSnapshot()
+	case balancelog.FieldRelatedLogID:
+		return m.AddedRelatedLogID()
 	}
 	return nil, false
 }
@@ -3930,6 +4224,13 @@ func (m *BalanceLogMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddUserIDSnapshot(v)
 		return nil
+	case balancelog.FieldRelatedLogID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRelatedLogID(v)
+		return nil
 	}
 	return fmt.Errorf("unknown BalanceLog numeric field %s", name)
 }
@@ -3940,6 +4241,9 @@ func (m *BalanceLogMutation) ClearedFields() []string {
 	var fields []string
 	if m.FieldCleared(balancelog.FieldIdempotencyKey) {
 		fields = append(fields, balancelog.FieldIdempotencyKey)
+	}
+	if m.FieldCleared(balancelog.FieldTransactionID) {
+		fields = append(fields, balancelog.FieldTransactionID)
 	}
 	return fields
 }
@@ -3957,6 +4261,9 @@ func (m *BalanceLogMutation) ClearField(name string) error {
 	switch name {
 	case balancelog.FieldIdempotencyKey:
 		m.ClearIdempotencyKey()
+		return nil
+	case balancelog.FieldTransactionID:
+		m.ClearTransactionID()
 		return nil
 	}
 	return fmt.Errorf("unknown BalanceLog nullable field %s", name)
@@ -3989,6 +4296,21 @@ func (m *BalanceLogMutation) ResetField(name string) error {
 		return nil
 	case balancelog.FieldIdempotencyKey:
 		m.ResetIdempotencyKey()
+		return nil
+	case balancelog.FieldTransactionID:
+		m.ResetTransactionID()
+		return nil
+	case balancelog.FieldSource:
+		m.ResetSource()
+		return nil
+	case balancelog.FieldOauthClientID:
+		m.ResetOauthClientID()
+		return nil
+	case balancelog.FieldExternalOrderNo:
+		m.ResetExternalOrderNo()
+		return nil
+	case balancelog.FieldRelatedLogID:
+		m.ResetRelatedLogID()
 		return nil
 	case balancelog.FieldCreatedAt:
 		m.ResetCreatedAt()

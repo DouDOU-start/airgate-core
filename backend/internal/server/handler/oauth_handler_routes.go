@@ -9,6 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	appoauth "github.com/DouDOU-start/airgate-core/internal/app/oauth"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/money"
 	"github.com/DouDOU-start/airgate-core/internal/server/dto"
 	"github.com/DouDOU-start/airgate-core/internal/server/response"
 )
@@ -228,8 +230,89 @@ func (h *OAuthHandler) UserInfo(c *gin.Context) {
 		Sub:    strconv.Itoa(info.ID),
 		Name:   name,
 		Email:  info.Email,
+		Role:   info.Role,
 		Groups: groupList,
 	})
+}
+
+// Wallet GET /oauth/wallet（Bearer 访问令牌）
+func (h *OAuthHandler) Wallet(c *gin.Context) {
+	token, ok := bearerAccessToken(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, dto.OAuthErrorResp{Error: "invalid_token"})
+		return
+	}
+	balance, err := h.service.WalletBalance(c.Request.Context(), token)
+	if err != nil {
+		h.writeProtocolError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, dto.OAuthWalletResp{Balance: money.FormatFloat(balance)})
+}
+
+// DebitWallet POST /oauth/wallet/debits（Bearer 访问令牌）
+func (h *OAuthHandler) DebitWallet(c *gin.Context) {
+	token, ok := bearerAccessToken(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, dto.OAuthErrorResp{Error: "invalid_token"})
+		return
+	}
+	var req dto.OAuthWalletDebitReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.OAuthErrorResp{Error: "invalid_request", ErrorDescription: err.Error()})
+		return
+	}
+	result, err := h.service.DebitWallet(c.Request.Context(), token, appoauth.WalletDebitInput{
+		ExternalOrderNo: req.ExternalOrderNo,
+		Amount:          req.Amount,
+		Subject:         req.Subject,
+	})
+	if err != nil {
+		h.writeProtocolError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, dto.OAuthWalletTransactionResp{
+		TransactionID: result.TransactionID,
+		Balance:       money.FormatFloat(result.Balance),
+		Idempotent:    result.Idempotent,
+	})
+}
+
+// RefundWallet POST /oauth/wallet/refunds（Bearer 访问令牌）
+func (h *OAuthHandler) RefundWallet(c *gin.Context) {
+	token, ok := bearerAccessToken(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, dto.OAuthErrorResp{Error: "invalid_token"})
+		return
+	}
+	var req dto.OAuthWalletRefundReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.OAuthErrorResp{Error: "invalid_request", ErrorDescription: err.Error()})
+		return
+	}
+	result, err := h.service.RefundWallet(c.Request.Context(), token, appoauth.WalletRefundInput{
+		ExternalRefundNo:   req.ExternalRefundNo,
+		RelatedTransaction: req.RelatedTransaction,
+		Amount:             req.Amount,
+		Reason:             req.Reason,
+	})
+	if err != nil {
+		h.writeProtocolError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, dto.OAuthWalletTransactionResp{
+		TransactionID: result.TransactionID,
+		Balance:       money.FormatFloat(result.Balance),
+		Idempotent:    result.Idempotent,
+	})
+}
+
+func (h *OAuthHandler) writeProtocolError(c *gin.Context, err error) {
+	httpCode, code := oauthProtocolError(err)
+	c.JSON(httpCode, dto.OAuthErrorResp{Error: code, ErrorDescription: err.Error()})
 }
 
 // ProvisionKey POST /oauth/provision-key（Bearer 访问令牌）

@@ -103,6 +103,76 @@ func (blc *BalanceLogCreate) SetNillableIdempotencyKey(s *string) *BalanceLogCre
 	return blc
 }
 
+// SetTransactionID sets the "transaction_id" field.
+func (blc *BalanceLogCreate) SetTransactionID(s string) *BalanceLogCreate {
+	blc.mutation.SetTransactionID(s)
+	return blc
+}
+
+// SetNillableTransactionID sets the "transaction_id" field if the given value is not nil.
+func (blc *BalanceLogCreate) SetNillableTransactionID(s *string) *BalanceLogCreate {
+	if s != nil {
+		blc.SetTransactionID(*s)
+	}
+	return blc
+}
+
+// SetSource sets the "source" field.
+func (blc *BalanceLogCreate) SetSource(s string) *BalanceLogCreate {
+	blc.mutation.SetSource(s)
+	return blc
+}
+
+// SetNillableSource sets the "source" field if the given value is not nil.
+func (blc *BalanceLogCreate) SetNillableSource(s *string) *BalanceLogCreate {
+	if s != nil {
+		blc.SetSource(*s)
+	}
+	return blc
+}
+
+// SetOauthClientID sets the "oauth_client_id" field.
+func (blc *BalanceLogCreate) SetOauthClientID(s string) *BalanceLogCreate {
+	blc.mutation.SetOauthClientID(s)
+	return blc
+}
+
+// SetNillableOauthClientID sets the "oauth_client_id" field if the given value is not nil.
+func (blc *BalanceLogCreate) SetNillableOauthClientID(s *string) *BalanceLogCreate {
+	if s != nil {
+		blc.SetOauthClientID(*s)
+	}
+	return blc
+}
+
+// SetExternalOrderNo sets the "external_order_no" field.
+func (blc *BalanceLogCreate) SetExternalOrderNo(s string) *BalanceLogCreate {
+	blc.mutation.SetExternalOrderNo(s)
+	return blc
+}
+
+// SetNillableExternalOrderNo sets the "external_order_no" field if the given value is not nil.
+func (blc *BalanceLogCreate) SetNillableExternalOrderNo(s *string) *BalanceLogCreate {
+	if s != nil {
+		blc.SetExternalOrderNo(*s)
+	}
+	return blc
+}
+
+// SetRelatedLogID sets the "related_log_id" field.
+func (blc *BalanceLogCreate) SetRelatedLogID(i int) *BalanceLogCreate {
+	blc.mutation.SetRelatedLogID(i)
+	return blc
+}
+
+// SetNillableRelatedLogID sets the "related_log_id" field if the given value is not nil.
+func (blc *BalanceLogCreate) SetNillableRelatedLogID(i *int) *BalanceLogCreate {
+	if i != nil {
+		blc.SetRelatedLogID(*i)
+	}
+	return blc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (blc *BalanceLogCreate) SetCreatedAt(t time.Time) *BalanceLogCreate {
 	blc.mutation.SetCreatedAt(t)
@@ -183,6 +253,22 @@ func (blc *BalanceLogCreate) defaults() {
 		v := balancelog.DefaultUserEmailSnapshot
 		blc.mutation.SetUserEmailSnapshot(v)
 	}
+	if _, ok := blc.mutation.Source(); !ok {
+		v := balancelog.DefaultSource
+		blc.mutation.SetSource(v)
+	}
+	if _, ok := blc.mutation.OauthClientID(); !ok {
+		v := balancelog.DefaultOauthClientID
+		blc.mutation.SetOauthClientID(v)
+	}
+	if _, ok := blc.mutation.ExternalOrderNo(); !ok {
+		v := balancelog.DefaultExternalOrderNo
+		blc.mutation.SetExternalOrderNo(v)
+	}
+	if _, ok := blc.mutation.RelatedLogID(); !ok {
+		v := balancelog.DefaultRelatedLogID
+		blc.mutation.SetRelatedLogID(v)
+	}
 	if _, ok := blc.mutation.CreatedAt(); !ok {
 		v := balancelog.DefaultCreatedAt()
 		blc.mutation.SetCreatedAt(v)
@@ -216,6 +302,18 @@ func (blc *BalanceLogCreate) check() error {
 	}
 	if _, ok := blc.mutation.UserEmailSnapshot(); !ok {
 		return &ValidationError{Name: "user_email_snapshot", err: errors.New(`ent: missing required field "BalanceLog.user_email_snapshot"`)}
+	}
+	if _, ok := blc.mutation.Source(); !ok {
+		return &ValidationError{Name: "source", err: errors.New(`ent: missing required field "BalanceLog.source"`)}
+	}
+	if _, ok := blc.mutation.OauthClientID(); !ok {
+		return &ValidationError{Name: "oauth_client_id", err: errors.New(`ent: missing required field "BalanceLog.oauth_client_id"`)}
+	}
+	if _, ok := blc.mutation.ExternalOrderNo(); !ok {
+		return &ValidationError{Name: "external_order_no", err: errors.New(`ent: missing required field "BalanceLog.external_order_no"`)}
+	}
+	if _, ok := blc.mutation.RelatedLogID(); !ok {
+		return &ValidationError{Name: "related_log_id", err: errors.New(`ent: missing required field "BalanceLog.related_log_id"`)}
 	}
 	if _, ok := blc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "BalanceLog.created_at"`)}
@@ -278,6 +376,26 @@ func (blc *BalanceLogCreate) createSpec() (*BalanceLog, *sqlgraph.CreateSpec) {
 	if value, ok := blc.mutation.IdempotencyKey(); ok {
 		_spec.SetField(balancelog.FieldIdempotencyKey, field.TypeString, value)
 		_node.IdempotencyKey = &value
+	}
+	if value, ok := blc.mutation.TransactionID(); ok {
+		_spec.SetField(balancelog.FieldTransactionID, field.TypeString, value)
+		_node.TransactionID = &value
+	}
+	if value, ok := blc.mutation.Source(); ok {
+		_spec.SetField(balancelog.FieldSource, field.TypeString, value)
+		_node.Source = value
+	}
+	if value, ok := blc.mutation.OauthClientID(); ok {
+		_spec.SetField(balancelog.FieldOauthClientID, field.TypeString, value)
+		_node.OauthClientID = value
+	}
+	if value, ok := blc.mutation.ExternalOrderNo(); ok {
+		_spec.SetField(balancelog.FieldExternalOrderNo, field.TypeString, value)
+		_node.ExternalOrderNo = value
+	}
+	if value, ok := blc.mutation.RelatedLogID(); ok {
+		_spec.SetField(balancelog.FieldRelatedLogID, field.TypeInt, value)
+		_node.RelatedLogID = value
 	}
 	if value, ok := blc.mutation.CreatedAt(); ok {
 		_spec.SetField(balancelog.FieldCreatedAt, field.TypeTime, value)
@@ -478,6 +596,78 @@ func (u *BalanceLogUpsert) ClearIdempotencyKey() *BalanceLogUpsert {
 	return u
 }
 
+// SetTransactionID sets the "transaction_id" field.
+func (u *BalanceLogUpsert) SetTransactionID(v string) *BalanceLogUpsert {
+	u.Set(balancelog.FieldTransactionID, v)
+	return u
+}
+
+// UpdateTransactionID sets the "transaction_id" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateTransactionID() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldTransactionID)
+	return u
+}
+
+// ClearTransactionID clears the value of the "transaction_id" field.
+func (u *BalanceLogUpsert) ClearTransactionID() *BalanceLogUpsert {
+	u.SetNull(balancelog.FieldTransactionID)
+	return u
+}
+
+// SetSource sets the "source" field.
+func (u *BalanceLogUpsert) SetSource(v string) *BalanceLogUpsert {
+	u.Set(balancelog.FieldSource, v)
+	return u
+}
+
+// UpdateSource sets the "source" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateSource() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldSource)
+	return u
+}
+
+// SetOauthClientID sets the "oauth_client_id" field.
+func (u *BalanceLogUpsert) SetOauthClientID(v string) *BalanceLogUpsert {
+	u.Set(balancelog.FieldOauthClientID, v)
+	return u
+}
+
+// UpdateOauthClientID sets the "oauth_client_id" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateOauthClientID() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldOauthClientID)
+	return u
+}
+
+// SetExternalOrderNo sets the "external_order_no" field.
+func (u *BalanceLogUpsert) SetExternalOrderNo(v string) *BalanceLogUpsert {
+	u.Set(balancelog.FieldExternalOrderNo, v)
+	return u
+}
+
+// UpdateExternalOrderNo sets the "external_order_no" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateExternalOrderNo() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldExternalOrderNo)
+	return u
+}
+
+// SetRelatedLogID sets the "related_log_id" field.
+func (u *BalanceLogUpsert) SetRelatedLogID(v int) *BalanceLogUpsert {
+	u.Set(balancelog.FieldRelatedLogID, v)
+	return u
+}
+
+// UpdateRelatedLogID sets the "related_log_id" field to the value that was provided on create.
+func (u *BalanceLogUpsert) UpdateRelatedLogID() *BalanceLogUpsert {
+	u.SetExcluded(balancelog.FieldRelatedLogID)
+	return u
+}
+
+// AddRelatedLogID adds v to the "related_log_id" field.
+func (u *BalanceLogUpsert) AddRelatedLogID(v int) *BalanceLogUpsert {
+	u.Add(balancelog.FieldRelatedLogID, v)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -667,6 +857,90 @@ func (u *BalanceLogUpsertOne) UpdateIdempotencyKey() *BalanceLogUpsertOne {
 func (u *BalanceLogUpsertOne) ClearIdempotencyKey() *BalanceLogUpsertOne {
 	return u.Update(func(s *BalanceLogUpsert) {
 		s.ClearIdempotencyKey()
+	})
+}
+
+// SetTransactionID sets the "transaction_id" field.
+func (u *BalanceLogUpsertOne) SetTransactionID(v string) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetTransactionID(v)
+	})
+}
+
+// UpdateTransactionID sets the "transaction_id" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateTransactionID() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateTransactionID()
+	})
+}
+
+// ClearTransactionID clears the value of the "transaction_id" field.
+func (u *BalanceLogUpsertOne) ClearTransactionID() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.ClearTransactionID()
+	})
+}
+
+// SetSource sets the "source" field.
+func (u *BalanceLogUpsertOne) SetSource(v string) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetSource(v)
+	})
+}
+
+// UpdateSource sets the "source" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateSource() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateSource()
+	})
+}
+
+// SetOauthClientID sets the "oauth_client_id" field.
+func (u *BalanceLogUpsertOne) SetOauthClientID(v string) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetOauthClientID(v)
+	})
+}
+
+// UpdateOauthClientID sets the "oauth_client_id" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateOauthClientID() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateOauthClientID()
+	})
+}
+
+// SetExternalOrderNo sets the "external_order_no" field.
+func (u *BalanceLogUpsertOne) SetExternalOrderNo(v string) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetExternalOrderNo(v)
+	})
+}
+
+// UpdateExternalOrderNo sets the "external_order_no" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateExternalOrderNo() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateExternalOrderNo()
+	})
+}
+
+// SetRelatedLogID sets the "related_log_id" field.
+func (u *BalanceLogUpsertOne) SetRelatedLogID(v int) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetRelatedLogID(v)
+	})
+}
+
+// AddRelatedLogID adds v to the "related_log_id" field.
+func (u *BalanceLogUpsertOne) AddRelatedLogID(v int) *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.AddRelatedLogID(v)
+	})
+}
+
+// UpdateRelatedLogID sets the "related_log_id" field to the value that was provided on create.
+func (u *BalanceLogUpsertOne) UpdateRelatedLogID() *BalanceLogUpsertOne {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateRelatedLogID()
 	})
 }
 
@@ -1025,6 +1299,90 @@ func (u *BalanceLogUpsertBulk) UpdateIdempotencyKey() *BalanceLogUpsertBulk {
 func (u *BalanceLogUpsertBulk) ClearIdempotencyKey() *BalanceLogUpsertBulk {
 	return u.Update(func(s *BalanceLogUpsert) {
 		s.ClearIdempotencyKey()
+	})
+}
+
+// SetTransactionID sets the "transaction_id" field.
+func (u *BalanceLogUpsertBulk) SetTransactionID(v string) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetTransactionID(v)
+	})
+}
+
+// UpdateTransactionID sets the "transaction_id" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateTransactionID() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateTransactionID()
+	})
+}
+
+// ClearTransactionID clears the value of the "transaction_id" field.
+func (u *BalanceLogUpsertBulk) ClearTransactionID() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.ClearTransactionID()
+	})
+}
+
+// SetSource sets the "source" field.
+func (u *BalanceLogUpsertBulk) SetSource(v string) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetSource(v)
+	})
+}
+
+// UpdateSource sets the "source" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateSource() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateSource()
+	})
+}
+
+// SetOauthClientID sets the "oauth_client_id" field.
+func (u *BalanceLogUpsertBulk) SetOauthClientID(v string) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetOauthClientID(v)
+	})
+}
+
+// UpdateOauthClientID sets the "oauth_client_id" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateOauthClientID() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateOauthClientID()
+	})
+}
+
+// SetExternalOrderNo sets the "external_order_no" field.
+func (u *BalanceLogUpsertBulk) SetExternalOrderNo(v string) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetExternalOrderNo(v)
+	})
+}
+
+// UpdateExternalOrderNo sets the "external_order_no" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateExternalOrderNo() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateExternalOrderNo()
+	})
+}
+
+// SetRelatedLogID sets the "related_log_id" field.
+func (u *BalanceLogUpsertBulk) SetRelatedLogID(v int) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.SetRelatedLogID(v)
+	})
+}
+
+// AddRelatedLogID adds v to the "related_log_id" field.
+func (u *BalanceLogUpsertBulk) AddRelatedLogID(v int) *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.AddRelatedLogID(v)
+	})
+}
+
+// UpdateRelatedLogID sets the "related_log_id" field to the value that was provided on create.
+func (u *BalanceLogUpsertBulk) UpdateRelatedLogID() *BalanceLogUpsertBulk {
+	return u.Update(func(s *BalanceLogUpsert) {
+		s.UpdateRelatedLogID()
 	})
 }
 

@@ -34,6 +34,16 @@ type BalanceLog struct {
 	UserEmailSnapshot string `json:"user_email_snapshot,omitempty"`
 	// 幂等键。支付回调 / 兑换码等入账链路防重复；NULL 表示无幂等要求。
 	IdempotencyKey *string `json:"idempotency_key,omitempty"`
+	// 对外钱包交易号；仅 OAuth 钱包等需要对外引用的流水设置。
+	TransactionID *string `json:"transaction_id,omitempty"`
+	// 余额变更来源，如 oauth_wallet；空值表示历史或通用流水。
+	Source string `json:"source,omitempty"`
+	// 发起余额变更的 OAuth client_id；非外部应用流水为空。
+	OauthClientID string `json:"oauth_client_id,omitempty"`
+	// 外部应用订单号或退款单号，用于业务审计与幂等校验。
+	ExternalOrderNo string `json:"external_order_no,omitempty"`
+	// 退款所关联的原扣款 BalanceLog ID；0 表示无关联。
+	RelatedLogID int `json:"related_log_id,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -70,9 +80,9 @@ func (*BalanceLog) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case balancelog.FieldAmount, balancelog.FieldBeforeBalance, balancelog.FieldAfterBalance:
 			values[i] = new(sql.NullFloat64)
-		case balancelog.FieldID, balancelog.FieldUserIDSnapshot:
+		case balancelog.FieldID, balancelog.FieldUserIDSnapshot, balancelog.FieldRelatedLogID:
 			values[i] = new(sql.NullInt64)
-		case balancelog.FieldAction, balancelog.FieldRemark, balancelog.FieldUserEmailSnapshot, balancelog.FieldIdempotencyKey:
+		case balancelog.FieldAction, balancelog.FieldRemark, balancelog.FieldUserEmailSnapshot, balancelog.FieldIdempotencyKey, balancelog.FieldTransactionID, balancelog.FieldSource, balancelog.FieldOauthClientID, balancelog.FieldExternalOrderNo:
 			values[i] = new(sql.NullString)
 		case balancelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -147,6 +157,37 @@ func (bl *BalanceLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				bl.IdempotencyKey = new(string)
 				*bl.IdempotencyKey = value.String
+			}
+		case balancelog.FieldTransactionID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field transaction_id", values[i])
+			} else if value.Valid {
+				bl.TransactionID = new(string)
+				*bl.TransactionID = value.String
+			}
+		case balancelog.FieldSource:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field source", values[i])
+			} else if value.Valid {
+				bl.Source = value.String
+			}
+		case balancelog.FieldOauthClientID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field oauth_client_id", values[i])
+			} else if value.Valid {
+				bl.OauthClientID = value.String
+			}
+		case balancelog.FieldExternalOrderNo:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field external_order_no", values[i])
+			} else if value.Valid {
+				bl.ExternalOrderNo = value.String
+			}
+		case balancelog.FieldRelatedLogID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field related_log_id", values[i])
+			} else if value.Valid {
+				bl.RelatedLogID = int(value.Int64)
 			}
 		case balancelog.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -227,6 +268,23 @@ func (bl *BalanceLog) String() string {
 		builder.WriteString("idempotency_key=")
 		builder.WriteString(*v)
 	}
+	builder.WriteString(", ")
+	if v := bl.TransactionID; v != nil {
+		builder.WriteString("transaction_id=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("source=")
+	builder.WriteString(bl.Source)
+	builder.WriteString(", ")
+	builder.WriteString("oauth_client_id=")
+	builder.WriteString(bl.OauthClientID)
+	builder.WriteString(", ")
+	builder.WriteString("external_order_no=")
+	builder.WriteString(bl.ExternalOrderNo)
+	builder.WriteString(", ")
+	builder.WriteString("related_log_id=")
+	builder.WriteString(fmt.Sprintf("%v", bl.RelatedLogID))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(bl.CreatedAt.Format(time.ANSIC))

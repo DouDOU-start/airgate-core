@@ -136,7 +136,7 @@ func (s *OAuthClientStore) ListNav(ctx context.Context) ([]appoauth.Client, erro
 func (s *OAuthClientStore) BasicInfo(ctx context.Context, id int) (appoauth.UserInfo, error) {
 	item, err := s.db.User.Query().
 		Where(entuser.IDEQ(id)).
-		Select(entuser.FieldID, entuser.FieldEmail, entuser.FieldUsername, entuser.FieldRole, entuser.FieldStatus).
+		Select(entuser.FieldID, entuser.FieldEmail, entuser.FieldUsername, entuser.FieldRole, entuser.FieldStatus, entuser.FieldBalance).
 		Only(ctx)
 	if err != nil {
 		return appoauth.UserInfo{}, err
@@ -147,6 +147,7 @@ func (s *OAuthClientStore) BasicInfo(ctx context.Context, id int) (appoauth.User
 		Username: item.Username,
 		Role:     item.Role.String(),
 		Status:   item.Status.String(),
+		Balance:  item.Balance,
 	}, nil
 }
 

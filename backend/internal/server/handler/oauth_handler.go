@@ -6,6 +6,7 @@ import (
 
 	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
 	appoauth "github.com/DouDOU-start/airgate-core/internal/app/oauth"
+	appwallet "github.com/DouDOU-start/airgate-core/internal/app/wallet"
 )
 
 // OAuthHandler OAuth 应用接入：管理端客户端 CRUD + 用户端授权 + 协议端点（token/userinfo/provision-key）。
@@ -26,7 +27,8 @@ func (h *OAuthHandler) handleError(logMessage, publicMessage string, err error) 
 	case errors.Is(err, appoauth.ErrClientDisabled),
 		errors.Is(err, appoauth.ErrRedirectURIMismatch),
 		errors.Is(err, appoauth.ErrInvalidRedirectURI),
-		errors.Is(err, appoauth.ErrPKCERequired):
+		errors.Is(err, appoauth.ErrPKCERequired),
+		errors.Is(err, appoauth.ErrInvalidScope):
 		return 400, err.Error()
 	default:
 		slog.Error(logMessage, "error", err)
@@ -47,9 +49,21 @@ func oauthProtocolError(err error) (int, string) {
 		return 401, "invalid_client"
 	case errors.Is(err, appoauth.ErrInvalidToken):
 		return 401, "invalid_token"
+	case errors.Is(err, appoauth.ErrInsufficientScope):
+		return 403, "insufficient_scope"
 	case errors.Is(err, appoauth.ErrUserDisabled),
 		errors.Is(err, appapikey.ErrProvisionedKeyDisabled):
 		return 403, "access_denied"
+	case errors.Is(err, appoauth.ErrInvalidScope),
+		errors.Is(err, appwallet.ErrInvalidAmount):
+		return 400, "invalid_request"
+	case errors.Is(err, appwallet.ErrInsufficientBalance):
+		return 402, "insufficient_balance"
+	case errors.Is(err, appwallet.ErrIdempotencyConflict),
+		errors.Is(err, appwallet.ErrRefundExceeded):
+		return 409, "transaction_conflict"
+	case errors.Is(err, appwallet.ErrTransactionNotFound):
+		return 404, "transaction_not_found"
 	case errors.Is(err, appapikey.ErrGroupNotFound),
 		errors.Is(err, appapikey.ErrGroupForbidden),
 		errors.Is(err, appapikey.ErrNoDefaultGroup):

@@ -175,6 +175,89 @@ func (blu *BalanceLogUpdate) ClearIdempotencyKey() *BalanceLogUpdate {
 	return blu
 }
 
+// SetTransactionID sets the "transaction_id" field.
+func (blu *BalanceLogUpdate) SetTransactionID(s string) *BalanceLogUpdate {
+	blu.mutation.SetTransactionID(s)
+	return blu
+}
+
+// SetNillableTransactionID sets the "transaction_id" field if the given value is not nil.
+func (blu *BalanceLogUpdate) SetNillableTransactionID(s *string) *BalanceLogUpdate {
+	if s != nil {
+		blu.SetTransactionID(*s)
+	}
+	return blu
+}
+
+// ClearTransactionID clears the value of the "transaction_id" field.
+func (blu *BalanceLogUpdate) ClearTransactionID() *BalanceLogUpdate {
+	blu.mutation.ClearTransactionID()
+	return blu
+}
+
+// SetSource sets the "source" field.
+func (blu *BalanceLogUpdate) SetSource(s string) *BalanceLogUpdate {
+	blu.mutation.SetSource(s)
+	return blu
+}
+
+// SetNillableSource sets the "source" field if the given value is not nil.
+func (blu *BalanceLogUpdate) SetNillableSource(s *string) *BalanceLogUpdate {
+	if s != nil {
+		blu.SetSource(*s)
+	}
+	return blu
+}
+
+// SetOauthClientID sets the "oauth_client_id" field.
+func (blu *BalanceLogUpdate) SetOauthClientID(s string) *BalanceLogUpdate {
+	blu.mutation.SetOauthClientID(s)
+	return blu
+}
+
+// SetNillableOauthClientID sets the "oauth_client_id" field if the given value is not nil.
+func (blu *BalanceLogUpdate) SetNillableOauthClientID(s *string) *BalanceLogUpdate {
+	if s != nil {
+		blu.SetOauthClientID(*s)
+	}
+	return blu
+}
+
+// SetExternalOrderNo sets the "external_order_no" field.
+func (blu *BalanceLogUpdate) SetExternalOrderNo(s string) *BalanceLogUpdate {
+	blu.mutation.SetExternalOrderNo(s)
+	return blu
+}
+
+// SetNillableExternalOrderNo sets the "external_order_no" field if the given value is not nil.
+func (blu *BalanceLogUpdate) SetNillableExternalOrderNo(s *string) *BalanceLogUpdate {
+	if s != nil {
+		blu.SetExternalOrderNo(*s)
+	}
+	return blu
+}
+
+// SetRelatedLogID sets the "related_log_id" field.
+func (blu *BalanceLogUpdate) SetRelatedLogID(i int) *BalanceLogUpdate {
+	blu.mutation.ResetRelatedLogID()
+	blu.mutation.SetRelatedLogID(i)
+	return blu
+}
+
+// SetNillableRelatedLogID sets the "related_log_id" field if the given value is not nil.
+func (blu *BalanceLogUpdate) SetNillableRelatedLogID(i *int) *BalanceLogUpdate {
+	if i != nil {
+		blu.SetRelatedLogID(*i)
+	}
+	return blu
+}
+
+// AddRelatedLogID adds i to the "related_log_id" field.
+func (blu *BalanceLogUpdate) AddRelatedLogID(i int) *BalanceLogUpdate {
+	blu.mutation.AddRelatedLogID(i)
+	return blu
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (blu *BalanceLogUpdate) SetUserID(id int) *BalanceLogUpdate {
 	blu.mutation.SetUserID(id)
@@ -298,6 +381,27 @@ func (blu *BalanceLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if blu.mutation.IdempotencyKeyCleared() {
 		_spec.ClearField(balancelog.FieldIdempotencyKey, field.TypeString)
+	}
+	if value, ok := blu.mutation.TransactionID(); ok {
+		_spec.SetField(balancelog.FieldTransactionID, field.TypeString, value)
+	}
+	if blu.mutation.TransactionIDCleared() {
+		_spec.ClearField(balancelog.FieldTransactionID, field.TypeString)
+	}
+	if value, ok := blu.mutation.Source(); ok {
+		_spec.SetField(balancelog.FieldSource, field.TypeString, value)
+	}
+	if value, ok := blu.mutation.OauthClientID(); ok {
+		_spec.SetField(balancelog.FieldOauthClientID, field.TypeString, value)
+	}
+	if value, ok := blu.mutation.ExternalOrderNo(); ok {
+		_spec.SetField(balancelog.FieldExternalOrderNo, field.TypeString, value)
+	}
+	if value, ok := blu.mutation.RelatedLogID(); ok {
+		_spec.SetField(balancelog.FieldRelatedLogID, field.TypeInt, value)
+	}
+	if value, ok := blu.mutation.AddedRelatedLogID(); ok {
+		_spec.AddField(balancelog.FieldRelatedLogID, field.TypeInt, value)
 	}
 	if blu.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -496,6 +600,89 @@ func (bluo *BalanceLogUpdateOne) ClearIdempotencyKey() *BalanceLogUpdateOne {
 	return bluo
 }
 
+// SetTransactionID sets the "transaction_id" field.
+func (bluo *BalanceLogUpdateOne) SetTransactionID(s string) *BalanceLogUpdateOne {
+	bluo.mutation.SetTransactionID(s)
+	return bluo
+}
+
+// SetNillableTransactionID sets the "transaction_id" field if the given value is not nil.
+func (bluo *BalanceLogUpdateOne) SetNillableTransactionID(s *string) *BalanceLogUpdateOne {
+	if s != nil {
+		bluo.SetTransactionID(*s)
+	}
+	return bluo
+}
+
+// ClearTransactionID clears the value of the "transaction_id" field.
+func (bluo *BalanceLogUpdateOne) ClearTransactionID() *BalanceLogUpdateOne {
+	bluo.mutation.ClearTransactionID()
+	return bluo
+}
+
+// SetSource sets the "source" field.
+func (bluo *BalanceLogUpdateOne) SetSource(s string) *BalanceLogUpdateOne {
+	bluo.mutation.SetSource(s)
+	return bluo
+}
+
+// SetNillableSource sets the "source" field if the given value is not nil.
+func (bluo *BalanceLogUpdateOne) SetNillableSource(s *string) *BalanceLogUpdateOne {
+	if s != nil {
+		bluo.SetSource(*s)
+	}
+	return bluo
+}
+
+// SetOauthClientID sets the "oauth_client_id" field.
+func (bluo *BalanceLogUpdateOne) SetOauthClientID(s string) *BalanceLogUpdateOne {
+	bluo.mutation.SetOauthClientID(s)
+	return bluo
+}
+
+// SetNillableOauthClientID sets the "oauth_client_id" field if the given value is not nil.
+func (bluo *BalanceLogUpdateOne) SetNillableOauthClientID(s *string) *BalanceLogUpdateOne {
+	if s != nil {
+		bluo.SetOauthClientID(*s)
+	}
+	return bluo
+}
+
+// SetExternalOrderNo sets the "external_order_no" field.
+func (bluo *BalanceLogUpdateOne) SetExternalOrderNo(s string) *BalanceLogUpdateOne {
+	bluo.mutation.SetExternalOrderNo(s)
+	return bluo
+}
+
+// SetNillableExternalOrderNo sets the "external_order_no" field if the given value is not nil.
+func (bluo *BalanceLogUpdateOne) SetNillableExternalOrderNo(s *string) *BalanceLogUpdateOne {
+	if s != nil {
+		bluo.SetExternalOrderNo(*s)
+	}
+	return bluo
+}
+
+// SetRelatedLogID sets the "related_log_id" field.
+func (bluo *BalanceLogUpdateOne) SetRelatedLogID(i int) *BalanceLogUpdateOne {
+	bluo.mutation.ResetRelatedLogID()
+	bluo.mutation.SetRelatedLogID(i)
+	return bluo
+}
+
+// SetNillableRelatedLogID sets the "related_log_id" field if the given value is not nil.
+func (bluo *BalanceLogUpdateOne) SetNillableRelatedLogID(i *int) *BalanceLogUpdateOne {
+	if i != nil {
+		bluo.SetRelatedLogID(*i)
+	}
+	return bluo
+}
+
+// AddRelatedLogID adds i to the "related_log_id" field.
+func (bluo *BalanceLogUpdateOne) AddRelatedLogID(i int) *BalanceLogUpdateOne {
+	bluo.mutation.AddRelatedLogID(i)
+	return bluo
+}
+
 // SetUserID sets the "user" edge to the User entity by ID.
 func (bluo *BalanceLogUpdateOne) SetUserID(id int) *BalanceLogUpdateOne {
 	bluo.mutation.SetUserID(id)
@@ -649,6 +836,27 @@ func (bluo *BalanceLogUpdateOne) sqlSave(ctx context.Context) (_node *BalanceLog
 	}
 	if bluo.mutation.IdempotencyKeyCleared() {
 		_spec.ClearField(balancelog.FieldIdempotencyKey, field.TypeString)
+	}
+	if value, ok := bluo.mutation.TransactionID(); ok {
+		_spec.SetField(balancelog.FieldTransactionID, field.TypeString, value)
+	}
+	if bluo.mutation.TransactionIDCleared() {
+		_spec.ClearField(balancelog.FieldTransactionID, field.TypeString)
+	}
+	if value, ok := bluo.mutation.Source(); ok {
+		_spec.SetField(balancelog.FieldSource, field.TypeString, value)
+	}
+	if value, ok := bluo.mutation.OauthClientID(); ok {
+		_spec.SetField(balancelog.FieldOauthClientID, field.TypeString, value)
+	}
+	if value, ok := bluo.mutation.ExternalOrderNo(); ok {
+		_spec.SetField(balancelog.FieldExternalOrderNo, field.TypeString, value)
+	}
+	if value, ok := bluo.mutation.RelatedLogID(); ok {
+		_spec.SetField(balancelog.FieldRelatedLogID, field.TypeInt, value)
+	}
+	if value, ok := bluo.mutation.AddedRelatedLogID(); ok {
+		_spec.AddField(balancelog.FieldRelatedLogID, field.TypeInt, value)
 	}
 	if bluo.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{

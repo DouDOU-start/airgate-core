@@ -149,8 +149,24 @@ func init() {
 	balancelogDescUserEmailSnapshot := balancelogFields[6].Descriptor()
 	// balancelog.DefaultUserEmailSnapshot holds the default value on creation for the user_email_snapshot field.
 	balancelog.DefaultUserEmailSnapshot = balancelogDescUserEmailSnapshot.Default.(string)
+	// balancelogDescSource is the schema descriptor for source field.
+	balancelogDescSource := balancelogFields[9].Descriptor()
+	// balancelog.DefaultSource holds the default value on creation for the source field.
+	balancelog.DefaultSource = balancelogDescSource.Default.(string)
+	// balancelogDescOauthClientID is the schema descriptor for oauth_client_id field.
+	balancelogDescOauthClientID := balancelogFields[10].Descriptor()
+	// balancelog.DefaultOauthClientID holds the default value on creation for the oauth_client_id field.
+	balancelog.DefaultOauthClientID = balancelogDescOauthClientID.Default.(string)
+	// balancelogDescExternalOrderNo is the schema descriptor for external_order_no field.
+	balancelogDescExternalOrderNo := balancelogFields[11].Descriptor()
+	// balancelog.DefaultExternalOrderNo holds the default value on creation for the external_order_no field.
+	balancelog.DefaultExternalOrderNo = balancelogDescExternalOrderNo.Default.(string)
+	// balancelogDescRelatedLogID is the schema descriptor for related_log_id field.
+	balancelogDescRelatedLogID := balancelogFields[12].Descriptor()
+	// balancelog.DefaultRelatedLogID holds the default value on creation for the related_log_id field.
+	balancelog.DefaultRelatedLogID = balancelogDescRelatedLogID.Default.(int)
 	// balancelogDescCreatedAt is the schema descriptor for created_at field.
-	balancelogDescCreatedAt := balancelogFields[8].Descriptor()
+	balancelogDescCreatedAt := balancelogFields[13].Descriptor()
 	// balancelog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	balancelog.DefaultCreatedAt = balancelogDescCreatedAt.Default.(func() time.Time)
 	bookmarkFields := schema.Bookmark{}.Fields()

@@ -125,6 +125,7 @@ type OAuthUserInfoResp struct {
 	Sub    string               `json:"sub"`
 	Name   string               `json:"name"`
 	Email  string               `json:"email"`
+	Role   string               `json:"role"`
 	Groups []OAuthUserGroupResp `json:"groups"`
 }
 
@@ -149,4 +150,31 @@ type ProvisionKeyResp struct {
 	KeyHint string `json:"key_hint"`
 	GroupID int    `json:"group_id"`
 	Created bool   `json:"created"`
+}
+
+// OAuthWalletResp 当前平台余额。
+type OAuthWalletResp struct {
+	Balance string `json:"balance"`
+}
+
+// OAuthWalletDebitReq 外部应用扣款请求。
+type OAuthWalletDebitReq struct {
+	ExternalOrderNo string `json:"external_order_no" binding:"required,max=128"`
+	Amount          string `json:"amount" binding:"required"`
+	Subject         string `json:"subject" binding:"max=500"`
+}
+
+// OAuthWalletRefundReq 外部应用退款请求。
+type OAuthWalletRefundReq struct {
+	ExternalRefundNo   string `json:"external_refund_no" binding:"required,max=128"`
+	RelatedTransaction string `json:"related_transaction_id" binding:"required"`
+	Amount             string `json:"amount" binding:"required"`
+	Reason             string `json:"reason" binding:"max=500"`
+}
+
+// OAuthWalletTransactionResp 钱包变更结果。
+type OAuthWalletTransactionResp struct {
+	TransactionID string `json:"transaction_id"`
+	Balance       string `json:"balance"`
+	Idempotent    bool   `json:"idempotent"`
 }

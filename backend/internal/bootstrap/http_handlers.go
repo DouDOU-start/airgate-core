@@ -31,6 +31,7 @@ import (
 	appupstreamlog "github.com/DouDOU-start/airgate-core/internal/app/upstreamlog"
 	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
 	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
+	appwallet "github.com/DouDOU-start/airgate-core/internal/app/wallet"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/infra/mailer"
@@ -190,6 +191,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	oauthClientStore := store.NewOAuthClientStore(dep.DB)
 	oauthGrantStore := store.NewOAuthGrantStore(dep.Redis)
 	oauthService := appoauth.NewService(oauthClientStore, oauthGrantStore, oauthClientStore, oauthGroupAdapter{groupService}, apiKeyService)
+	walletService := appwallet.NewService(store.NewWalletStore(dep.DB))
+	oauthService.SetWalletManager(oauthWalletAdapter{svc: walletService})
 
 	return &HTTPHandlers{
 		Auth:         handler.NewAuthHandler(authService, dep.JWTMgr),
@@ -223,6 +226,35 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		ChannelStore:          channelStore,
 		ChannelHealthNotifier: channelHealthNotifier,
 	}
+}
+
+// oauthWalletAdapter 将 wallet.Service 的领域结果映射到 OAuth 协议域。
+type oauthWalletAdapter struct {
+	svc *appwallet.Service
+}
+
+func (a oauthWalletAdapter) Debit(ctx context.Context, userID int, clientID, externalOrderNo, amount, subject string) (appoauth.WalletTransaction, error) {
+	result, err := a.svc.Debit(ctx, userID, clientID, externalOrderNo, amount, subject)
+	if err != nil {
+		return appoauth.WalletTransaction{}, err
+	}
+	return appoauth.WalletTransaction{
+		TransactionID: result.TransactionID,
+		Balance:       result.AfterBalance,
+		Idempotent:    result.Idempotent,
+	}, nil
+}
+
+func (a oauthWalletAdapter) Refund(ctx context.Context, userID int, clientID, externalRefundNo, relatedTransactionID, amount, reason string) (appoauth.WalletTransaction, error) {
+	result, err := a.svc.Refund(ctx, userID, clientID, externalRefundNo, relatedTransactionID, amount, reason)
+	if err != nil {
+		return appoauth.WalletTransaction{}, err
+	}
+	return appoauth.WalletTransaction{
+		TransactionID: result.TransactionID,
+		Balance:       result.AfterBalance,
+		Idempotent:    result.Idempotent,
+	}, nil
 }
 
 // oauthGroupAdapter 将 appgroup.Service 适配为 appoauth.GroupReader 接口。

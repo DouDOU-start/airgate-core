@@ -23,4 +23,10 @@ var (
 	ErrInvalidToken = errors.New("invalid access token")
 	// ErrUserDisabled 用户已被禁用。
 	ErrUserDisabled = errors.New("user disabled")
+	// ErrInvalidScope 授权请求包含不受支持的 scope。
+	ErrInvalidScope = errors.New("invalid scope")
+	// ErrInsufficientScope 访问令牌未授予当前操作需要的 scope。
+	ErrInsufficientScope = errors.New("insufficient scope")
+	// ErrWalletUnavailable 钱包服务未装配。
+	ErrWalletUnavailable = errors.New("wallet unavailable")
 )

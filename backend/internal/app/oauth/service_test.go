@@ -115,12 +115,49 @@ func newTestService(clients ...Client) (*Service, *memGrantStore, *stubProvision
 	}
 	grants := newMemGrantStore()
 	users := &stubUserReader{users: map[int]UserInfo{
-		1: {ID: 1, Email: "u@example.com", Username: "u", Role: "user", Status: "active"},
+		1: {ID: 1, Email: "u@example.com", Username: "u", Role: "user", Status: "active", Balance: 12.5},
 		2: {ID: 2, Email: "d@example.com", Username: "d", Role: "user", Status: "disabled"},
 	}}
 	prov := &stubProvisioner{}
 	groups := &stubGroupReader{groups: []GroupInfo{{ID: 1, Name: "default", RateMultiplier: 1}}}
 	return NewService(repo, grants, users, groups, prov), grants, prov
+}
+
+type stubWalletManager struct {
+	debits int
+}
+
+func (s *stubWalletManager) Debit(_ context.Context, _ int, _, _, _, _ string) (WalletTransaction, error) {
+	s.debits++
+	return WalletTransaction{TransactionID: "wtx_test", Balance: 10, Idempotent: false}, nil
+}
+
+func (s *stubWalletManager) Refund(_ context.Context, _ int, _, _, _, _, _ string) (WalletTransaction, error) {
+	return WalletTransaction{TransactionID: "wtx_refund", Balance: 12.5}, nil
+}
+
+func TestWalletScopes(t *testing.T) {
+	svc, grants, _ := newTestService(testClient("secret"))
+	wallet := &stubWalletManager{}
+	svc.SetWalletManager(wallet)
+	grants.tokens["read_only"] = TokenGrant{ClientID: "ac_test", UserID: 1, Scope: "profile wallet.read"}
+	grants.tokens["shop"] = TokenGrant{ClientID: "ac_test", UserID: 1, Scope: "profile wallet.read wallet.debit wallet.refund"}
+
+	balance, err := svc.WalletBalance(context.Background(), "read_only")
+	if err != nil || balance != 12.5 {
+		t.Fatalf("WalletBalance = %v, %v", balance, err)
+	}
+	if _, err := svc.DebitWallet(context.Background(), "read_only", WalletDebitInput{
+		ExternalOrderNo: "MK001", Amount: "1",
+	}); !errors.Is(err, ErrInsufficientScope) {
+		t.Fatalf("read_only debit error = %v", err)
+	}
+	result, err := svc.DebitWallet(context.Background(), "shop", WalletDebitInput{
+		ExternalOrderNo: "MK001", Amount: "1",
+	})
+	if err != nil || result.TransactionID != "wtx_test" || wallet.debits != 1 {
+		t.Fatalf("shop debit = %+v, %v, calls=%d", result, err, wallet.debits)
+	}
 }
 
 func testClient(secret string) Client {

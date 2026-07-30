@@ -31,6 +31,16 @@ const (
 	FieldUserEmailSnapshot = "user_email_snapshot"
 	// FieldIdempotencyKey holds the string denoting the idempotency_key field in the database.
 	FieldIdempotencyKey = "idempotency_key"
+	// FieldTransactionID holds the string denoting the transaction_id field in the database.
+	FieldTransactionID = "transaction_id"
+	// FieldSource holds the string denoting the source field in the database.
+	FieldSource = "source"
+	// FieldOauthClientID holds the string denoting the oauth_client_id field in the database.
+	FieldOauthClientID = "oauth_client_id"
+	// FieldExternalOrderNo holds the string denoting the external_order_no field in the database.
+	FieldExternalOrderNo = "external_order_no"
+	// FieldRelatedLogID holds the string denoting the related_log_id field in the database.
+	FieldRelatedLogID = "related_log_id"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeUser holds the string denoting the user edge name in mutations.
@@ -57,6 +67,11 @@ var Columns = []string{
 	FieldUserIDSnapshot,
 	FieldUserEmailSnapshot,
 	FieldIdempotencyKey,
+	FieldTransactionID,
+	FieldSource,
+	FieldOauthClientID,
+	FieldExternalOrderNo,
+	FieldRelatedLogID,
 	FieldCreatedAt,
 }
 
@@ -88,6 +103,14 @@ var (
 	DefaultUserIDSnapshot int
 	// DefaultUserEmailSnapshot holds the default value on creation for the "user_email_snapshot" field.
 	DefaultUserEmailSnapshot string
+	// DefaultSource holds the default value on creation for the "source" field.
+	DefaultSource string
+	// DefaultOauthClientID holds the default value on creation for the "oauth_client_id" field.
+	DefaultOauthClientID string
+	// DefaultExternalOrderNo holds the default value on creation for the "external_order_no" field.
+	DefaultExternalOrderNo string
+	// DefaultRelatedLogID holds the default value on creation for the "related_log_id" field.
+	DefaultRelatedLogID int
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 )
@@ -162,6 +185,31 @@ func ByUserEmailSnapshot(opts ...sql.OrderTermOption) OrderOption {
 // ByIdempotencyKey orders the results by the idempotency_key field.
 func ByIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIdempotencyKey, opts...).ToFunc()
+}
+
+// ByTransactionID orders the results by the transaction_id field.
+func ByTransactionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTransactionID, opts...).ToFunc()
+}
+
+// BySource orders the results by the source field.
+func BySource(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSource, opts...).ToFunc()
+}
+
+// ByOauthClientID orders the results by the oauth_client_id field.
+func ByOauthClientID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOauthClientID, opts...).ToFunc()
+}
+
+// ByExternalOrderNo orders the results by the external_order_no field.
+func ByExternalOrderNo(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExternalOrderNo, opts...).ToFunc()
+}
+
+// ByRelatedLogID orders the results by the related_log_id field.
+func ByRelatedLogID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRelatedLogID, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

@@ -86,6 +86,7 @@ type UserInfo struct {
 	Username string
 	Role     string
 	Status   string
+	Balance  float64
 }
 
 // UserReader 读取用户基本信息（由 infra/store 实现）。
@@ -145,4 +146,32 @@ type ProvisionResult struct {
 	KeyHint string
 	GroupID int
 	Created bool
+}
+
+// WalletTransaction 是外部应用余额扣款或退款的协议结果。
+type WalletTransaction struct {
+	TransactionID string
+	Balance       float64
+	Idempotent    bool
+}
+
+// WalletManager 由 app/wallet.Service 适配实现，OAuth 域只负责令牌、用户与 scope 校验。
+type WalletManager interface {
+	Debit(ctx context.Context, userID int, clientID, externalOrderNo, amount, subject string) (WalletTransaction, error)
+	Refund(ctx context.Context, userID int, clientID, externalRefundNo, relatedTransactionID, amount, reason string) (WalletTransaction, error)
+}
+
+// WalletDebitInput 外部应用扣款入参。
+type WalletDebitInput struct {
+	ExternalOrderNo string
+	Amount          string
+	Subject         string
+}
+
+// WalletRefundInput 外部应用退款入参。
+type WalletRefundInput struct {
+	ExternalRefundNo   string
+	RelatedTransaction string
+	Amount             string
+	Reason             string
 }

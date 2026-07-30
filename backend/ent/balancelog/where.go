@@ -90,6 +90,31 @@ func IdempotencyKey(v string) predicate.BalanceLog {
 	return predicate.BalanceLog(sql.FieldEQ(FieldIdempotencyKey, v))
 }
 
+// TransactionID applies equality check predicate on the "transaction_id" field. It's identical to TransactionIDEQ.
+func TransactionID(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldTransactionID, v))
+}
+
+// Source applies equality check predicate on the "source" field. It's identical to SourceEQ.
+func Source(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldSource, v))
+}
+
+// OauthClientID applies equality check predicate on the "oauth_client_id" field. It's identical to OauthClientIDEQ.
+func OauthClientID(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldOauthClientID, v))
+}
+
+// ExternalOrderNo applies equality check predicate on the "external_order_no" field. It's identical to ExternalOrderNoEQ.
+func ExternalOrderNo(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldExternalOrderNo, v))
+}
+
+// RelatedLogID applies equality check predicate on the "related_log_id" field. It's identical to RelatedLogIDEQ.
+func RelatedLogID(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldRelatedLogID, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.BalanceLog {
 	return predicate.BalanceLog(sql.FieldEQ(FieldCreatedAt, v))
@@ -478,6 +503,316 @@ func IdempotencyKeyEqualFold(v string) predicate.BalanceLog {
 // IdempotencyKeyContainsFold applies the ContainsFold predicate on the "idempotency_key" field.
 func IdempotencyKeyContainsFold(v string) predicate.BalanceLog {
 	return predicate.BalanceLog(sql.FieldContainsFold(FieldIdempotencyKey, v))
+}
+
+// TransactionIDEQ applies the EQ predicate on the "transaction_id" field.
+func TransactionIDEQ(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldTransactionID, v))
+}
+
+// TransactionIDNEQ applies the NEQ predicate on the "transaction_id" field.
+func TransactionIDNEQ(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNEQ(FieldTransactionID, v))
+}
+
+// TransactionIDIn applies the In predicate on the "transaction_id" field.
+func TransactionIDIn(vs ...string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldIn(FieldTransactionID, vs...))
+}
+
+// TransactionIDNotIn applies the NotIn predicate on the "transaction_id" field.
+func TransactionIDNotIn(vs ...string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNotIn(FieldTransactionID, vs...))
+}
+
+// TransactionIDGT applies the GT predicate on the "transaction_id" field.
+func TransactionIDGT(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGT(FieldTransactionID, v))
+}
+
+// TransactionIDGTE applies the GTE predicate on the "transaction_id" field.
+func TransactionIDGTE(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGTE(FieldTransactionID, v))
+}
+
+// TransactionIDLT applies the LT predicate on the "transaction_id" field.
+func TransactionIDLT(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLT(FieldTransactionID, v))
+}
+
+// TransactionIDLTE applies the LTE predicate on the "transaction_id" field.
+func TransactionIDLTE(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLTE(FieldTransactionID, v))
+}
+
+// TransactionIDContains applies the Contains predicate on the "transaction_id" field.
+func TransactionIDContains(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldContains(FieldTransactionID, v))
+}
+
+// TransactionIDHasPrefix applies the HasPrefix predicate on the "transaction_id" field.
+func TransactionIDHasPrefix(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldHasPrefix(FieldTransactionID, v))
+}
+
+// TransactionIDHasSuffix applies the HasSuffix predicate on the "transaction_id" field.
+func TransactionIDHasSuffix(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldHasSuffix(FieldTransactionID, v))
+}
+
+// TransactionIDIsNil applies the IsNil predicate on the "transaction_id" field.
+func TransactionIDIsNil() predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldIsNull(FieldTransactionID))
+}
+
+// TransactionIDNotNil applies the NotNil predicate on the "transaction_id" field.
+func TransactionIDNotNil() predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNotNull(FieldTransactionID))
+}
+
+// TransactionIDEqualFold applies the EqualFold predicate on the "transaction_id" field.
+func TransactionIDEqualFold(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEqualFold(FieldTransactionID, v))
+}
+
+// TransactionIDContainsFold applies the ContainsFold predicate on the "transaction_id" field.
+func TransactionIDContainsFold(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldContainsFold(FieldTransactionID, v))
+}
+
+// SourceEQ applies the EQ predicate on the "source" field.
+func SourceEQ(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldSource, v))
+}
+
+// SourceNEQ applies the NEQ predicate on the "source" field.
+func SourceNEQ(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNEQ(FieldSource, v))
+}
+
+// SourceIn applies the In predicate on the "source" field.
+func SourceIn(vs ...string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldIn(FieldSource, vs...))
+}
+
+// SourceNotIn applies the NotIn predicate on the "source" field.
+func SourceNotIn(vs ...string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNotIn(FieldSource, vs...))
+}
+
+// SourceGT applies the GT predicate on the "source" field.
+func SourceGT(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGT(FieldSource, v))
+}
+
+// SourceGTE applies the GTE predicate on the "source" field.
+func SourceGTE(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGTE(FieldSource, v))
+}
+
+// SourceLT applies the LT predicate on the "source" field.
+func SourceLT(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLT(FieldSource, v))
+}
+
+// SourceLTE applies the LTE predicate on the "source" field.
+func SourceLTE(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLTE(FieldSource, v))
+}
+
+// SourceContains applies the Contains predicate on the "source" field.
+func SourceContains(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldContains(FieldSource, v))
+}
+
+// SourceHasPrefix applies the HasPrefix predicate on the "source" field.
+func SourceHasPrefix(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldHasPrefix(FieldSource, v))
+}
+
+// SourceHasSuffix applies the HasSuffix predicate on the "source" field.
+func SourceHasSuffix(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldHasSuffix(FieldSource, v))
+}
+
+// SourceEqualFold applies the EqualFold predicate on the "source" field.
+func SourceEqualFold(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEqualFold(FieldSource, v))
+}
+
+// SourceContainsFold applies the ContainsFold predicate on the "source" field.
+func SourceContainsFold(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldContainsFold(FieldSource, v))
+}
+
+// OauthClientIDEQ applies the EQ predicate on the "oauth_client_id" field.
+func OauthClientIDEQ(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldOauthClientID, v))
+}
+
+// OauthClientIDNEQ applies the NEQ predicate on the "oauth_client_id" field.
+func OauthClientIDNEQ(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNEQ(FieldOauthClientID, v))
+}
+
+// OauthClientIDIn applies the In predicate on the "oauth_client_id" field.
+func OauthClientIDIn(vs ...string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldIn(FieldOauthClientID, vs...))
+}
+
+// OauthClientIDNotIn applies the NotIn predicate on the "oauth_client_id" field.
+func OauthClientIDNotIn(vs ...string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNotIn(FieldOauthClientID, vs...))
+}
+
+// OauthClientIDGT applies the GT predicate on the "oauth_client_id" field.
+func OauthClientIDGT(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGT(FieldOauthClientID, v))
+}
+
+// OauthClientIDGTE applies the GTE predicate on the "oauth_client_id" field.
+func OauthClientIDGTE(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGTE(FieldOauthClientID, v))
+}
+
+// OauthClientIDLT applies the LT predicate on the "oauth_client_id" field.
+func OauthClientIDLT(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLT(FieldOauthClientID, v))
+}
+
+// OauthClientIDLTE applies the LTE predicate on the "oauth_client_id" field.
+func OauthClientIDLTE(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLTE(FieldOauthClientID, v))
+}
+
+// OauthClientIDContains applies the Contains predicate on the "oauth_client_id" field.
+func OauthClientIDContains(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldContains(FieldOauthClientID, v))
+}
+
+// OauthClientIDHasPrefix applies the HasPrefix predicate on the "oauth_client_id" field.
+func OauthClientIDHasPrefix(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldHasPrefix(FieldOauthClientID, v))
+}
+
+// OauthClientIDHasSuffix applies the HasSuffix predicate on the "oauth_client_id" field.
+func OauthClientIDHasSuffix(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldHasSuffix(FieldOauthClientID, v))
+}
+
+// OauthClientIDEqualFold applies the EqualFold predicate on the "oauth_client_id" field.
+func OauthClientIDEqualFold(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEqualFold(FieldOauthClientID, v))
+}
+
+// OauthClientIDContainsFold applies the ContainsFold predicate on the "oauth_client_id" field.
+func OauthClientIDContainsFold(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldContainsFold(FieldOauthClientID, v))
+}
+
+// ExternalOrderNoEQ applies the EQ predicate on the "external_order_no" field.
+func ExternalOrderNoEQ(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldExternalOrderNo, v))
+}
+
+// ExternalOrderNoNEQ applies the NEQ predicate on the "external_order_no" field.
+func ExternalOrderNoNEQ(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNEQ(FieldExternalOrderNo, v))
+}
+
+// ExternalOrderNoIn applies the In predicate on the "external_order_no" field.
+func ExternalOrderNoIn(vs ...string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldIn(FieldExternalOrderNo, vs...))
+}
+
+// ExternalOrderNoNotIn applies the NotIn predicate on the "external_order_no" field.
+func ExternalOrderNoNotIn(vs ...string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNotIn(FieldExternalOrderNo, vs...))
+}
+
+// ExternalOrderNoGT applies the GT predicate on the "external_order_no" field.
+func ExternalOrderNoGT(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGT(FieldExternalOrderNo, v))
+}
+
+// ExternalOrderNoGTE applies the GTE predicate on the "external_order_no" field.
+func ExternalOrderNoGTE(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGTE(FieldExternalOrderNo, v))
+}
+
+// ExternalOrderNoLT applies the LT predicate on the "external_order_no" field.
+func ExternalOrderNoLT(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLT(FieldExternalOrderNo, v))
+}
+
+// ExternalOrderNoLTE applies the LTE predicate on the "external_order_no" field.
+func ExternalOrderNoLTE(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLTE(FieldExternalOrderNo, v))
+}
+
+// ExternalOrderNoContains applies the Contains predicate on the "external_order_no" field.
+func ExternalOrderNoContains(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldContains(FieldExternalOrderNo, v))
+}
+
+// ExternalOrderNoHasPrefix applies the HasPrefix predicate on the "external_order_no" field.
+func ExternalOrderNoHasPrefix(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldHasPrefix(FieldExternalOrderNo, v))
+}
+
+// ExternalOrderNoHasSuffix applies the HasSuffix predicate on the "external_order_no" field.
+func ExternalOrderNoHasSuffix(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldHasSuffix(FieldExternalOrderNo, v))
+}
+
+// ExternalOrderNoEqualFold applies the EqualFold predicate on the "external_order_no" field.
+func ExternalOrderNoEqualFold(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEqualFold(FieldExternalOrderNo, v))
+}
+
+// ExternalOrderNoContainsFold applies the ContainsFold predicate on the "external_order_no" field.
+func ExternalOrderNoContainsFold(v string) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldContainsFold(FieldExternalOrderNo, v))
+}
+
+// RelatedLogIDEQ applies the EQ predicate on the "related_log_id" field.
+func RelatedLogIDEQ(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldEQ(FieldRelatedLogID, v))
+}
+
+// RelatedLogIDNEQ applies the NEQ predicate on the "related_log_id" field.
+func RelatedLogIDNEQ(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNEQ(FieldRelatedLogID, v))
+}
+
+// RelatedLogIDIn applies the In predicate on the "related_log_id" field.
+func RelatedLogIDIn(vs ...int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldIn(FieldRelatedLogID, vs...))
+}
+
+// RelatedLogIDNotIn applies the NotIn predicate on the "related_log_id" field.
+func RelatedLogIDNotIn(vs ...int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldNotIn(FieldRelatedLogID, vs...))
+}
+
+// RelatedLogIDGT applies the GT predicate on the "related_log_id" field.
+func RelatedLogIDGT(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGT(FieldRelatedLogID, v))
+}
+
+// RelatedLogIDGTE applies the GTE predicate on the "related_log_id" field.
+func RelatedLogIDGTE(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldGTE(FieldRelatedLogID, v))
+}
+
+// RelatedLogIDLT applies the LT predicate on the "related_log_id" field.
+func RelatedLogIDLT(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLT(FieldRelatedLogID, v))
+}
+
+// RelatedLogIDLTE applies the LTE predicate on the "related_log_id" field.
+func RelatedLogIDLTE(v int) predicate.BalanceLog {
+	return predicate.BalanceLog(sql.FieldLTE(FieldRelatedLogID, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
