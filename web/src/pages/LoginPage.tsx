@@ -30,6 +30,12 @@ function consumeLoginRedirect(): string | null {
   return null;
 }
 
+// OAuth 授权必须绑定真实用户身份；API Key 会话没有购买、余额等用户能力。
+function isOAuthAuthorizationLogin(): boolean {
+  const redirect = new URLSearchParams(window.location.search).get('redirect')?.trim();
+  return redirect === '/oauth/authorize' || redirect?.startsWith('/oauth/authorize?') === true;
+}
+
 // 邀请返利：邀请码 URL 参数在 sessionStorage 中的落地 key。
 const INVITE_CODE_STORAGE_KEY = 'airgate:ref';
 
@@ -557,6 +563,7 @@ export default function LoginPage() {
   const site = useSiteSettings();
   const [activeTab, setActiveTab] = useState<TabKey>('login');
   const [registerSuccess, setRegisterSuccess] = useState(false);
+  const allowAPIKeyLogin = !isOAuthAuthorizationLogin();
 
   // 左侧动效交互状态：聚焦字段 + 密码是否显示，驱动 GatewayFlux 的流束表现
   const [field, setField] = useState<'email' | 'password' | null>(null);
@@ -632,7 +639,7 @@ export default function LoginPage() {
                   {site.registration_enabled ? (
                     <Tabs.Tab id="register">{t('common.register')}</Tabs.Tab>
                   ) : null}
-                  <Tabs.Tab id="apikey">API Key</Tabs.Tab>
+                  {allowAPIKeyLogin ? <Tabs.Tab id="apikey">API Key</Tabs.Tab> : null}
                 </Tabs.List>
               </Tabs>
 
@@ -644,7 +651,7 @@ export default function LoginPage() {
                 </Alert>
               )}
 
-              {activeTab === 'apikey' ? (
+              {activeTab === 'apikey' && allowAPIKeyLogin ? (
                 <APIKeyLoginForm />
               ) : activeTab === 'register' && site.registration_enabled ? (
                 <RegisterForm onSuccess={handleRegisterSuccess} />

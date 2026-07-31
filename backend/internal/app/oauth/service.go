@@ -31,16 +31,24 @@ const (
 
 // Service 提供 OAuth 域用例编排。
 type Service struct {
-	repo   Repository
-	grants GrantStore
-	users  UserReader
-	groups GroupReader
-	keys   KeyProvisioner
-	wallet WalletManager
+	repo        Repository
+	grants      GrantStore
+	users       UserReader
+	groups      GroupReader
+	keys        KeyProvisioner
+	wallet      WalletManager
+	payment     PaymentManager
+	balanceLogs BalanceLogReader
 }
 
 // SetWalletManager 注入平台钱包服务。
 func (s *Service) SetWalletManager(wallet WalletManager) { s.wallet = wallet }
+
+// SetPaymentManager 注入平台支付服务。
+func (s *Service) SetPaymentManager(payment PaymentManager) { s.payment = payment }
+
+// SetBalanceLogReader 注入余额流水读取服务。
+func (s *Service) SetBalanceLogReader(reader BalanceLogReader) { s.balanceLogs = reader }
 
 // NewService 创建 OAuth 服务。
 func NewService(repo Repository, grants GrantStore, users UserReader, groups GroupReader, keys KeyProvisioner) *Service {
@@ -268,6 +276,21 @@ func (s *Service) WalletBalance(ctx context.Context, token string) (float64, err
 	return info.Balance, nil
 }
 
+// WalletHistory 返回令牌用户自己的余额流水。
+func (s *Service) WalletHistory(ctx context.Context, token string, page, pageSize int) (BalanceLogList, error) {
+	grant, _, err := s.resolveActiveUser(ctx, token)
+	if err != nil {
+		return BalanceLogList{}, err
+	}
+	if err := requireScope(grant.Scope, "wallet.read"); err != nil {
+		return BalanceLogList{}, err
+	}
+	if s.balanceLogs == nil {
+		return BalanceLogList{}, ErrWalletUnavailable
+	}
+	return s.balanceLogs.ListBalanceLogs(ctx, grant.UserID, page, pageSize)
+}
+
 // DebitWallet 校验 wallet.debit scope 后调用钱包服务原子扣款。
 func (s *Service) DebitWallet(ctx context.Context, token string, input WalletDebitInput) (WalletTransaction, error) {
 	grant, _, err := s.resolveActiveUser(ctx, token)
@@ -297,6 +320,77 @@ func (s *Service) RefundWallet(ctx context.Context, token string, input WalletRe
 	}
 	return s.wallet.Refund(ctx, grant.UserID, grant.ClientID, input.ExternalRefundNo,
 		input.RelatedTransaction, input.Amount, input.Reason)
+}
+
+// PaymentMethods 返回令牌对应用户可用的充值方式。
+func (s *Service) PaymentMethods(ctx context.Context, token string) (PaymentMethodsResult, error) {
+	grant, _, err := s.resolveActiveUser(ctx, token)
+	if err != nil {
+		return PaymentMethodsResult{}, err
+	}
+	if err := requireScope(grant.Scope, "payment.read"); err != nil {
+		return PaymentMethodsResult{}, err
+	}
+	if s.payment == nil {
+		return PaymentMethodsResult{}, ErrPaymentUnavailable
+	}
+	return s.payment.AvailableMethods(ctx), nil
+}
+
+// CreatePaymentOrder 校验 payment.create scope 后，以令牌用户身份创建充值订单。
+func (s *Service) CreatePaymentOrder(ctx context.Context, token string, input PaymentOrderInput) (PaymentOrder, error) {
+	grant, _, err := s.resolveActiveUser(ctx, token)
+	if err != nil {
+		return PaymentOrder{}, err
+	}
+	if err := requireScope(grant.Scope, "payment.create"); err != nil {
+		return PaymentOrder{}, err
+	}
+	if s.payment == nil {
+		return PaymentOrder{}, ErrPaymentUnavailable
+	}
+	client, err := s.repo.FindByClientID(ctx, grant.ClientID)
+	if err != nil {
+		return PaymentOrder{}, ErrClientNotFound
+	}
+	if !client.Enabled {
+		return PaymentOrder{}, ErrClientDisabled
+	}
+	returnURL, err := paymentReturnURL(client)
+	if err != nil {
+		return PaymentOrder{}, err
+	}
+	return s.payment.CreateOrder(ctx, grant.UserID, input.Amount, input.Method, input.Subject, input.ClientIP, returnURL)
+}
+
+// GetPaymentOrder 返回令牌用户自己的充值订单，供支付状态轮询。
+func (s *Service) GetPaymentOrder(ctx context.Context, token, outTradeNo string) (PaymentOrder, error) {
+	grant, _, err := s.resolveActiveUser(ctx, token)
+	if err != nil {
+		return PaymentOrder{}, err
+	}
+	if err := requireScope(grant.Scope, "payment.read"); err != nil {
+		return PaymentOrder{}, err
+	}
+	if s.payment == nil {
+		return PaymentOrder{}, ErrPaymentUnavailable
+	}
+	return s.payment.GetUserOrder(ctx, grant.UserID, outTradeNo)
+}
+
+// ListPaymentOrders 返回令牌用户自己的充值订单记录。
+func (s *Service) ListPaymentOrders(ctx context.Context, token string, page, pageSize int) ([]PaymentOrder, int64, error) {
+	grant, _, err := s.resolveActiveUser(ctx, token)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := requireScope(grant.Scope, "payment.read"); err != nil {
+		return nil, 0, err
+	}
+	if s.payment == nil {
+		return nil, 0, ErrPaymentUnavailable
+	}
+	return s.payment.ListUserOrders(ctx, grant.UserID, page, pageSize)
 }
 
 // ==================== 内部工具 ====================
@@ -342,6 +436,39 @@ func isAbsoluteHTTPURL(raw string) bool {
 	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
+// paymentReturnURL 只从已登记的客户端地址推导支付回跳地址，避免开放跳转。
+// 优先使用与任一 redirect_uri 同源的 launch_url，否则回到首个 redirect_uri 的站点根路径。
+func paymentReturnURL(client Client) (string, error) {
+	allowedOrigins := make(map[string]struct{}, len(client.RedirectURIs))
+	for _, raw := range client.RedirectURIs {
+		u, err := url.Parse(raw)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			continue
+		}
+		allowedOrigins[u.Scheme+"://"+u.Host] = struct{}{}
+	}
+	if len(allowedOrigins) == 0 {
+		return "", ErrInvalidRedirectURI
+	}
+	if client.LaunchURL != "" {
+		launch, err := url.Parse(client.LaunchURL)
+		if err == nil {
+			if _, ok := allowedOrigins[launch.Scheme+"://"+launch.Host]; ok {
+				return launch.String(), nil
+			}
+		}
+	}
+	for _, raw := range client.RedirectURIs {
+		u, err := url.Parse(raw)
+		if err == nil {
+			if _, ok := allowedOrigins[u.Scheme+"://"+u.Host]; ok {
+				return u.Scheme + "://" + u.Host + "/", nil
+			}
+		}
+	}
+	return "", ErrInvalidRedirectURI
+}
+
 // verifyPKCE 校验 S256：base64url(sha256(verifier)) == challenge。
 func verifyPKCE(challenge, verifier string) bool {
 	if challenge == "" || verifier == "" {
@@ -376,10 +503,12 @@ func randomToken(prefix string, n int) (string, error) {
 }
 
 var supportedScopes = map[string]struct{}{
-	"profile":       {},
-	"wallet.read":   {},
-	"wallet.debit":  {},
-	"wallet.refund": {},
+	"profile":        {},
+	"wallet.read":    {},
+	"wallet.debit":   {},
+	"wallet.refund":  {},
+	"payment.read":   {},
+	"payment.create": {},
 }
 
 func normalizeScope(raw string) (string, error) {

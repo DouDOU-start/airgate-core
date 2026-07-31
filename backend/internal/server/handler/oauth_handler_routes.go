@@ -251,6 +251,34 @@ func (h *OAuthHandler) Wallet(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.OAuthWalletResp{Balance: money.FormatFloat(balance)})
 }
 
+// WalletHistory GET /oauth/wallet/history（Bearer 访问令牌）。
+func (h *OAuthHandler) WalletHistory(c *gin.Context) {
+	token, ok := bearerAccessToken(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, dto.OAuthErrorResp{Error: "invalid_token"})
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	result, err := h.service.WalletHistory(c.Request.Context(), token, page, pageSize)
+	if err != nil {
+		h.writeProtocolError(c, err)
+		return
+	}
+	list := make([]dto.OAuthBalanceLogResp, 0, len(result.List))
+	for _, item := range result.List {
+		list = append(list, dto.OAuthBalanceLogResp{
+			ID: item.ID, Action: item.Action, Amount: money.FormatFloat(item.Amount),
+			BeforeBalance: money.FormatFloat(item.BeforeBalance), AfterBalance: money.FormatFloat(item.AfterBalance),
+			Remark: item.Remark, CreatedAt: item.CreatedAt,
+		})
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, dto.OAuthBalanceLogListResp{
+		List: list, Total: result.Total, Page: result.Page, PageSize: result.PageSize,
+	})
+}
+
 // DebitWallet POST /oauth/wallet/debits（Bearer 访问令牌）
 func (h *OAuthHandler) DebitWallet(c *gin.Context) {
 	token, ok := bearerAccessToken(c)
@@ -308,6 +336,98 @@ func (h *OAuthHandler) RefundWallet(c *gin.Context) {
 		Balance:       money.FormatFloat(result.Balance),
 		Idempotent:    result.Idempotent,
 	})
+}
+
+// PaymentMethods GET /oauth/payment/methods（Bearer 访问令牌）。
+func (h *OAuthHandler) PaymentMethods(c *gin.Context) {
+	token, ok := bearerAccessToken(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, dto.OAuthErrorResp{Error: "invalid_token"})
+		return
+	}
+	result, err := h.service.PaymentMethods(c.Request.Context(), token)
+	if err != nil {
+		h.writeProtocolError(c, err)
+		return
+	}
+	methods := make([]dto.OAuthPaymentMethodResp, 0, len(result.Methods))
+	for _, method := range result.Methods {
+		methods = append(methods, dto.OAuthPaymentMethodResp{
+			Key: method.Key, Label: method.Label, Icon: method.Icon, Description: method.Description,
+		})
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, dto.OAuthPaymentMethodsResp{Methods: methods, Configured: result.Configured})
+}
+
+// CreatePaymentOrder POST /oauth/payment/orders（Bearer 访问令牌）。
+func (h *OAuthHandler) CreatePaymentOrder(c *gin.Context) {
+	token, ok := bearerAccessToken(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, dto.OAuthErrorResp{Error: "invalid_token"})
+		return
+	}
+	var req dto.OAuthCreatePaymentOrderReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.OAuthErrorResp{Error: "invalid_request", ErrorDescription: err.Error()})
+		return
+	}
+	order, err := h.service.CreatePaymentOrder(c.Request.Context(), token, appoauth.PaymentOrderInput{
+		Amount: req.Amount, Method: req.Method, Subject: req.Subject, ClientIP: req.ClientIP,
+	})
+	if err != nil {
+		h.writeProtocolError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, toOAuthPaymentOrderResp(order))
+}
+
+// ListPaymentOrders GET /oauth/payment/orders（Bearer 访问令牌）。
+func (h *OAuthHandler) ListPaymentOrders(c *gin.Context) {
+	token, ok := bearerAccessToken(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, dto.OAuthErrorResp{Error: "invalid_token"})
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	orders, total, err := h.service.ListPaymentOrders(c.Request.Context(), token, page, pageSize)
+	if err != nil {
+		h.writeProtocolError(c, err)
+		return
+	}
+	list := make([]dto.OAuthPaymentOrderResp, 0, len(orders))
+	for _, order := range orders {
+		list = append(list, toOAuthPaymentOrderResp(order))
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, dto.OAuthPaymentOrderListResp{List: list, Total: total})
+}
+
+// GetPaymentOrder GET /oauth/payment/orders/:out_trade_no（Bearer 访问令牌）。
+func (h *OAuthHandler) GetPaymentOrder(c *gin.Context) {
+	token, ok := bearerAccessToken(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, dto.OAuthErrorResp{Error: "invalid_token"})
+		return
+	}
+	order, err := h.service.GetPaymentOrder(c.Request.Context(), token, c.Param("out_trade_no"))
+	if err != nil {
+		h.writeProtocolError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, toOAuthPaymentOrderResp(order))
+}
+
+func toOAuthPaymentOrderResp(order appoauth.PaymentOrder) dto.OAuthPaymentOrderResp {
+	return dto.OAuthPaymentOrderResp{
+		OutTradeNo: order.OutTradeNo, Method: order.Method, ProviderID: order.ProviderID,
+		Amount: order.Amount, Status: order.Status, Subject: order.Subject,
+		PaymentURL: order.PaymentURL, QRCodeContent: order.QRCodeContent, PaidAt: order.PaidAt,
+		ExpiresAt: order.ExpiresAt, CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt,
+	}
 }
 
 func (h *OAuthHandler) writeProtocolError(c *gin.Context, err error) {

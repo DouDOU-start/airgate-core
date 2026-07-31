@@ -161,6 +161,30 @@ type WalletManager interface {
 	Refund(ctx context.Context, userID int, clientID, externalRefundNo, relatedTransactionID, amount, reason string) (WalletTransaction, error)
 }
 
+// BalanceLog 是 OAuth 应用可读取的用户余额变更记录。
+type BalanceLog struct {
+	ID            int64
+	Action        string
+	Amount        float64
+	BeforeBalance float64
+	AfterBalance  float64
+	Remark        string
+	CreatedAt     string
+}
+
+// BalanceLogList 是余额流水分页结果。
+type BalanceLogList struct {
+	List     []BalanceLog
+	Total    int64
+	Page     int
+	PageSize int
+}
+
+// BalanceLogReader 由 user.Service 适配实现，只读取令牌用户自己的余额流水。
+type BalanceLogReader interface {
+	ListBalanceLogs(ctx context.Context, userID, page, pageSize int) (BalanceLogList, error)
+}
+
 // WalletDebitInput 外部应用扣款入参。
 type WalletDebitInput struct {
 	ExternalOrderNo string
@@ -174,4 +198,50 @@ type WalletRefundInput struct {
 	RelatedTransaction string
 	Amount             string
 	Reason             string
+}
+
+// PaymentMethod 是外部应用可展示的支付方式元信息。
+type PaymentMethod struct {
+	Key         string
+	Label       string
+	Icon        string
+	Description string
+}
+
+// PaymentMethodsResult 是当前支付模块的可用状态与支付方式。
+type PaymentMethodsResult struct {
+	Methods    []PaymentMethod
+	Configured bool
+}
+
+// PaymentOrder 是 OAuth 协议对外暴露的充值订单。
+type PaymentOrder struct {
+	OutTradeNo    string
+	Method        string
+	ProviderID    string
+	Amount        float64
+	Status        string
+	Subject       string
+	PaymentURL    string
+	QRCodeContent string
+	PaidAt        *time.Time
+	ExpiresAt     time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+// PaymentManager 由 payment.Service 适配实现，充值订单与余额入账仍完全归 Core 管理。
+type PaymentManager interface {
+	AvailableMethods(ctx context.Context) PaymentMethodsResult
+	CreateOrder(ctx context.Context, userID int, amount float64, method, subject, clientIP, returnURL string) (PaymentOrder, error)
+	GetUserOrder(ctx context.Context, userID int, outTradeNo string) (PaymentOrder, error)
+	ListUserOrders(ctx context.Context, userID, page, pageSize int) ([]PaymentOrder, int64, error)
+}
+
+// PaymentOrderInput OAuth 应用创建充值订单的输入。
+type PaymentOrderInput struct {
+	Amount   float64
+	Method   string
+	Subject  string
+	ClientIP string
 }

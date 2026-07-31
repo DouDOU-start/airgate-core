@@ -377,8 +377,13 @@ func (s *Server) registerRoutes() {
 	r.GET("/oauth/userinfo", handlers.OAuth.UserInfo)
 	r.POST("/oauth/provision-key", handlers.OAuth.ProvisionKey)
 	r.GET("/oauth/wallet", handlers.OAuth.Wallet)
+	r.GET("/oauth/wallet/history", handlers.OAuth.WalletHistory)
 	r.POST("/oauth/wallet/debits", handlers.OAuth.DebitWallet)
 	r.POST("/oauth/wallet/refunds", handlers.OAuth.RefundWallet)
+	r.GET("/oauth/payment/methods", handlers.OAuth.PaymentMethods)
+	r.POST("/oauth/payment/orders", handlers.OAuth.CreatePaymentOrder)
+	r.GET("/oauth/payment/orders", handlers.OAuth.ListPaymentOrders)
+	r.GET("/oauth/payment/orders/:out_trade_no", handlers.OAuth.GetPaymentOrder)
 
 	// 上传文件静态服务（这部分仍然在磁盘上，因为是用户上传的运行时数据）
 	//

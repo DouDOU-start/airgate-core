@@ -127,6 +127,47 @@ type stubWalletManager struct {
 	debits int
 }
 
+type stubPaymentManager struct {
+	createdUserID int
+	returnURL     string
+	orders        map[string]PaymentOrder
+}
+
+type stubBalanceLogReader struct {
+	userID int
+}
+
+func (s *stubBalanceLogReader) ListBalanceLogs(_ context.Context, userID, page, pageSize int) (BalanceLogList, error) {
+	s.userID = userID
+	return BalanceLogList{
+		List:  []BalanceLog{{ID: 1, Action: "add", Amount: 20, BeforeBalance: 10, AfterBalance: 30, Remark: "在线充值"}},
+		Total: 1, Page: page, PageSize: pageSize,
+	}, nil
+}
+
+func (s *stubPaymentManager) AvailableMethods(context.Context) PaymentMethodsResult {
+	return PaymentMethodsResult{Configured: true, Methods: []PaymentMethod{{Key: "alipay", Label: "支付宝"}}}
+}
+
+func (s *stubPaymentManager) CreateOrder(_ context.Context, userID int, amount float64, method, _, _, returnURL string) (PaymentOrder, error) {
+	s.createdUserID = userID
+	s.returnURL = returnURL
+	order := PaymentOrder{OutTradeNo: "R_TEST", Amount: amount, Method: method, Status: "pending"}
+	if s.orders == nil {
+		s.orders = map[string]PaymentOrder{}
+	}
+	s.orders[order.OutTradeNo] = order
+	return order, nil
+}
+
+func (s *stubPaymentManager) GetUserOrder(_ context.Context, _ int, outTradeNo string) (PaymentOrder, error) {
+	return s.orders[outTradeNo], nil
+}
+
+func (s *stubPaymentManager) ListUserOrders(context.Context, int, int, int) ([]PaymentOrder, int64, error) {
+	return []PaymentOrder{s.orders["R_TEST"]}, 1, nil
+}
+
 func (s *stubWalletManager) Debit(_ context.Context, _ int, _, _, _, _ string) (WalletTransaction, error) {
 	s.debits++
 	return WalletTransaction{TransactionID: "wtx_test", Balance: 10, Idempotent: false}, nil
@@ -157,6 +198,67 @@ func TestWalletScopes(t *testing.T) {
 	})
 	if err != nil || result.TransactionID != "wtx_test" || wallet.debits != 1 {
 		t.Fatalf("shop debit = %+v, %v, calls=%d", result, err, wallet.debits)
+	}
+}
+
+func TestWalletHistoryUsesTokenUser(t *testing.T) {
+	svc, grants, _ := newTestService(testClient("secret"))
+	reader := &stubBalanceLogReader{}
+	svc.SetBalanceLogReader(reader)
+	grants.tokens["read_only"] = TokenGrant{ClientID: "ac_test", UserID: 1, Scope: "profile wallet.read"}
+	grants.tokens["no_wallet"] = TokenGrant{ClientID: "ac_test", UserID: 1, Scope: "profile"}
+
+	result, err := svc.WalletHistory(context.Background(), "read_only", 2, 10)
+	if err != nil || result.Total != 1 || result.Page != 2 || reader.userID != 1 {
+		t.Fatalf("WalletHistory = %+v, %v, user=%d", result, err, reader.userID)
+	}
+	if _, err := svc.WalletHistory(context.Background(), "no_wallet", 1, 20); !errors.Is(err, ErrInsufficientScope) {
+		t.Fatalf("无 wallet.read scope err = %v", err)
+	}
+}
+
+func TestPaymentScopesAndSafeReturnURL(t *testing.T) {
+	client := testClient("secret")
+	client.LaunchURL = "https://chat.example.com/store"
+	svc, grants, _ := newTestService(client)
+	payment := &stubPaymentManager{}
+	svc.SetPaymentManager(payment)
+	grants.tokens["read_only"] = TokenGrant{ClientID: "ac_test", UserID: 1, Scope: "profile payment.read"}
+	grants.tokens["recharge"] = TokenGrant{ClientID: "ac_test", UserID: 1, Scope: "profile payment.read payment.create"}
+
+	methods, err := svc.PaymentMethods(context.Background(), "read_only")
+	if err != nil || !methods.Configured || len(methods.Methods) != 1 {
+		t.Fatalf("PaymentMethods = %+v, %v", methods, err)
+	}
+	if _, err := svc.CreatePaymentOrder(context.Background(), "read_only", PaymentOrderInput{Amount: 20, Method: "alipay"}); !errors.Is(err, ErrInsufficientScope) {
+		t.Fatalf("只读令牌创建订单 err = %v", err)
+	}
+	order, err := svc.CreatePaymentOrder(context.Background(), "recharge", PaymentOrderInput{Amount: 20, Method: "alipay"})
+	if err != nil || order.OutTradeNo != "R_TEST" {
+		t.Fatalf("CreatePaymentOrder = %+v, %v", order, err)
+	}
+	if payment.createdUserID != 1 || payment.returnURL != "https://chat.example.com/store" {
+		t.Fatalf("支付下单身份或回跳地址错误: user=%d return=%q", payment.createdUserID, payment.returnURL)
+	}
+	got, err := svc.GetPaymentOrder(context.Background(), "recharge", "R_TEST")
+	if err != nil || got.OutTradeNo != "R_TEST" {
+		t.Fatalf("GetPaymentOrder = %+v, %v", got, err)
+	}
+}
+
+func TestPaymentReturnURLRejectsCrossOriginLaunchURL(t *testing.T) {
+	client := testClient("secret")
+	client.LaunchURL = "https://evil.example.com/steal"
+	got, err := paymentReturnURL(client)
+	if err != nil || got != "https://chat.example.com/" {
+		t.Fatalf("paymentReturnURL = %q, %v", got, err)
+	}
+}
+
+func TestNormalizePaymentScopes(t *testing.T) {
+	got, err := normalizeScope("payment.create profile payment.read payment.create")
+	if err != nil || got != "payment.create payment.read profile" {
+		t.Fatalf("normalizeScope = %q, %v", got, err)
 	}
 }
 

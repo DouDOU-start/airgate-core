@@ -29,4 +29,6 @@ var (
 	ErrInsufficientScope = errors.New("insufficient scope")
 	// ErrWalletUnavailable 钱包服务未装配。
 	ErrWalletUnavailable = errors.New("wallet unavailable")
+	// ErrPaymentUnavailable 支付服务未装配。
+	ErrPaymentUnavailable = errors.New("payment unavailable")
 )

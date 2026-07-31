@@ -1,5 +1,7 @@
 package dto
 
+import "time"
+
 // ==================== 管理面：OAuth 客户端 CRUD ====================
 
 // OAuthClientResp OAuth 客户端响应（管理面）。secret 只出 hint。
@@ -157,6 +159,25 @@ type OAuthWalletResp struct {
 	Balance string `json:"balance"`
 }
 
+// OAuthBalanceLogResp 用户余额变更记录。
+type OAuthBalanceLogResp struct {
+	ID            int64  `json:"id"`
+	Action        string `json:"action"`
+	Amount        string `json:"amount"`
+	BeforeBalance string `json:"before_balance"`
+	AfterBalance  string `json:"after_balance"`
+	Remark        string `json:"remark"`
+	CreatedAt     string `json:"created_at"`
+}
+
+// OAuthBalanceLogListResp 用户余额流水分页结果。
+type OAuthBalanceLogListResp struct {
+	List     []OAuthBalanceLogResp `json:"list"`
+	Total    int64                 `json:"total"`
+	Page     int                   `json:"page"`
+	PageSize int                   `json:"page_size"`
+}
+
 // OAuthWalletDebitReq 外部应用扣款请求。
 type OAuthWalletDebitReq struct {
 	ExternalOrderNo string `json:"external_order_no" binding:"required,max=128"`
@@ -177,4 +198,48 @@ type OAuthWalletTransactionResp struct {
 	TransactionID string `json:"transaction_id"`
 	Balance       string `json:"balance"`
 	Idempotent    bool   `json:"idempotent"`
+}
+
+// OAuthPaymentMethodResp OAuth 应用可展示的支付方式。
+type OAuthPaymentMethodResp struct {
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Icon        string `json:"icon"`
+	Description string `json:"description"`
+}
+
+// OAuthPaymentMethodsResp 当前支付模块的可用状态与支付方式。
+type OAuthPaymentMethodsResp struct {
+	Methods    []OAuthPaymentMethodResp `json:"methods"`
+	Configured bool                     `json:"configured"`
+}
+
+// OAuthCreatePaymentOrderReq OAuth 应用创建充值订单请求。
+type OAuthCreatePaymentOrderReq struct {
+	Amount   float64 `json:"amount" binding:"required,gt=0"`
+	Method   string  `json:"method" binding:"required"`
+	Subject  string  `json:"subject" binding:"max=500"`
+	ClientIP string  `json:"client_ip" binding:"max=128"`
+}
+
+// OAuthPaymentOrderResp OAuth 应用充值订单响应。
+type OAuthPaymentOrderResp struct {
+	OutTradeNo    string     `json:"out_trade_no"`
+	Method        string     `json:"method"`
+	ProviderID    string     `json:"provider_id"`
+	Amount        float64    `json:"amount"`
+	Status        string     `json:"status"`
+	Subject       string     `json:"subject"`
+	PaymentURL    string     `json:"payment_url,omitempty"`
+	QRCodeContent string     `json:"qr_code_content,omitempty"`
+	PaidAt        *time.Time `json:"paid_at,omitempty"`
+	ExpiresAt     time.Time  `json:"expires_at"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+}
+
+// OAuthPaymentOrderListResp OAuth 应用充值订单分页响应。
+type OAuthPaymentOrderListResp struct {
+	List  []OAuthPaymentOrderResp `json:"list"`
+	Total int64                   `json:"total"`
 }

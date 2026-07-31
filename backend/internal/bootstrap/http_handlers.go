@@ -193,6 +193,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	oauthService := appoauth.NewService(oauthClientStore, oauthGrantStore, oauthClientStore, oauthGroupAdapter{groupService}, apiKeyService)
 	walletService := appwallet.NewService(store.NewWalletStore(dep.DB))
 	oauthService.SetWalletManager(oauthWalletAdapter{svc: walletService})
+	oauthService.SetPaymentManager(oauthPaymentAdapter{svc: paymentService})
+	oauthService.SetBalanceLogReader(oauthBalanceLogAdapter{svc: userService})
 
 	return &HTTPHandlers{
 		Auth:         handler.NewAuthHandler(authService, dep.JWTMgr),
@@ -231,6 +233,82 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 // oauthWalletAdapter 将 wallet.Service 的领域结果映射到 OAuth 协议域。
 type oauthWalletAdapter struct {
 	svc *appwallet.Service
+}
+
+// oauthBalanceLogAdapter 将 user.Service 的余额历史映射到 OAuth 协议域。
+type oauthBalanceLogAdapter struct {
+	svc *appuser.Service
+}
+
+func (a oauthBalanceLogAdapter) ListBalanceLogs(ctx context.Context, userID, page, pageSize int) (appoauth.BalanceLogList, error) {
+	result, err := a.svc.ListBalanceLogs(ctx, userID, page, pageSize)
+	if err != nil {
+		return appoauth.BalanceLogList{}, err
+	}
+	list := make([]appoauth.BalanceLog, 0, len(result.List))
+	for _, item := range result.List {
+		list = append(list, appoauth.BalanceLog{
+			ID: item.ID, Action: item.Action, Amount: item.Amount,
+			BeforeBalance: item.BeforeBalance, AfterBalance: item.AfterBalance,
+			Remark: item.Remark, CreatedAt: item.CreatedAt,
+		})
+	}
+	return appoauth.BalanceLogList{List: list, Total: result.Total, Page: result.Page, PageSize: result.PageSize}, nil
+}
+
+// oauthPaymentAdapter 将 payment.Service 的领域结果映射到 OAuth 协议域。
+type oauthPaymentAdapter struct {
+	svc *apppayment.Service
+}
+
+func (a oauthPaymentAdapter) AvailableMethods(ctx context.Context) appoauth.PaymentMethodsResult {
+	result := a.svc.AvailableMethods(ctx)
+	methods := make([]appoauth.PaymentMethod, 0, len(result.Methods))
+	for _, method := range result.Methods {
+		methods = append(methods, appoauth.PaymentMethod{
+			Key: method.Key, Label: method.Label, Icon: method.Icon, Description: method.Description,
+		})
+	}
+	return appoauth.PaymentMethodsResult{Methods: methods, Configured: result.Configured}
+}
+
+func (a oauthPaymentAdapter) CreateOrder(ctx context.Context, userID int, amount float64, method, subject, clientIP, returnURL string) (appoauth.PaymentOrder, error) {
+	order, err := a.svc.CreateOrder(ctx, apppayment.CreateOrderInput{
+		UserID: userID, Amount: amount, Method: method, Subject: subject, ClientIP: clientIP, ReturnURL: returnURL,
+	})
+	if err != nil {
+		return appoauth.PaymentOrder{}, err
+	}
+	return toOAuthPaymentOrder(order), nil
+}
+
+func (a oauthPaymentAdapter) GetUserOrder(ctx context.Context, userID int, outTradeNo string) (appoauth.PaymentOrder, error) {
+	order, err := a.svc.GetUserOrder(ctx, userID, outTradeNo)
+	if err != nil {
+		return appoauth.PaymentOrder{}, err
+	}
+	return toOAuthPaymentOrder(order), nil
+}
+
+func (a oauthPaymentAdapter) ListUserOrders(ctx context.Context, userID, page, pageSize int) ([]appoauth.PaymentOrder, int64, error) {
+	orders, total, err := a.svc.ListUserOrders(ctx, apppayment.UserOrderFilter{UserID: userID, Page: page, PageSize: pageSize})
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]appoauth.PaymentOrder, 0, len(orders))
+	for _, order := range orders {
+		out = append(out, toOAuthPaymentOrder(order))
+	}
+	return out, total, nil
+}
+
+func toOAuthPaymentOrder(order apppayment.Order) appoauth.PaymentOrder {
+	return appoauth.PaymentOrder{
+		OutTradeNo: order.OutTradeNo, Method: order.Method, ProviderID: order.ProviderID,
+		Amount: order.Amount, Status: order.Status, Subject: order.Subject,
+		PaymentURL: order.PaymentURL, QRCodeContent: order.QRCodeContent, PaidAt: order.PaidAt,
+		ExpiresAt: order.ExpiresAt, CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt,
+	}
 }
 
 func (a oauthWalletAdapter) Debit(ctx context.Context, userID int, clientID, externalOrderNo, amount, subject string) (appoauth.WalletTransaction, error) {

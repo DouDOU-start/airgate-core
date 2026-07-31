@@ -252,13 +252,17 @@ func (s *Service) CreateOrder(ctx context.Context, in CreateOrderInput) (Order, 
 	}
 	expiresAt := time.Now().Add(time.Duration(cfg.ExpireMinutes) * time.Minute)
 
+	returnURL := strings.TrimSpace(in.ReturnURL)
+	if returnURL == "" {
+		returnURL = cfg.CallbackBaseURL + "/recharge"
+	}
 	res, err := prov.CreateOrder(ctx, provider.CreateOrderInput{
 		OutTradeNo:    outTradeNo,
 		Amount:        in.Amount,
 		Subject:       subject,
 		Method:        in.Method,
 		NotifyURL:     cfg.CallbackBaseURL + "/api/v1/payment/notify/" + prov.ID(),
-		ReturnURL:     cfg.CallbackBaseURL + "/recharge",
+		ReturnURL:     returnURL,
 		ClientIP:      in.ClientIP,
 		ExpireSeconds: cfg.ExpireMinutes * 60,
 	})

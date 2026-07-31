@@ -6,6 +6,7 @@ import (
 
 	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
 	appoauth "github.com/DouDOU-start/airgate-core/internal/app/oauth"
+	apppayment "github.com/DouDOU-start/airgate-core/internal/app/payment"
 	appwallet "github.com/DouDOU-start/airgate-core/internal/app/wallet"
 )
 
@@ -55,7 +56,11 @@ func oauthProtocolError(err error) (int, string) {
 		errors.Is(err, appapikey.ErrProvisionedKeyDisabled):
 		return 403, "access_denied"
 	case errors.Is(err, appoauth.ErrInvalidScope),
-		errors.Is(err, appwallet.ErrInvalidAmount):
+		errors.Is(err, appwallet.ErrInvalidAmount),
+		errors.Is(err, apppayment.ErrInvalidAmount),
+		errors.Is(err, apppayment.ErrDailyLimit),
+		errors.Is(err, apppayment.ErrNoProvider),
+		errors.Is(err, apppayment.ErrNotConfigured):
 		return 400, "invalid_request"
 	case errors.Is(err, appwallet.ErrInsufficientBalance):
 		return 402, "insufficient_balance"
@@ -64,6 +69,8 @@ func oauthProtocolError(err error) (int, string) {
 		return 409, "transaction_conflict"
 	case errors.Is(err, appwallet.ErrTransactionNotFound):
 		return 404, "transaction_not_found"
+	case errors.Is(err, apppayment.ErrOrderNotFound):
+		return 404, "payment_order_not_found"
 	case errors.Is(err, appapikey.ErrGroupNotFound),
 		errors.Is(err, appapikey.ErrGroupForbidden),
 		errors.Is(err, appapikey.ErrNoDefaultGroup):

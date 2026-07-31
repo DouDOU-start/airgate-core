@@ -13,8 +13,10 @@ import {
 } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
-import { AppWindow } from 'lucide-react';
+import { AppWindow, ChevronDown, Link2, ShieldCheck } from 'lucide-react';
 import type { OAuthClientResp, UpdateOAuthClientReq } from '../../../shared/types';
+
+const DEFAULT_CALLBACK_PATH = '/api/v1/auth/callback';
 
 // redirect_uris 表单里一行一个，提交时拆分过滤空行
 function splitLines(value: string): string[] {
@@ -22,6 +24,29 @@ function splitLines(value: string): string[] {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+// AirGate 生态应用默认将 OAuth 回调放在入口地址下的固定路径；特殊应用仍可使用高级配置覆盖。
+function buildDefaultRedirectURI(launchURL: string): string {
+  const trimmed = launchURL.trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+    parsed.search = '';
+    parsed.hash = '';
+    const basePath = parsed.pathname.replace(/\/+$/, '');
+    parsed.pathname = `${basePath}${DEFAULT_CALLBACK_PATH}`;
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+}
+
+function usesAdvancedRedirects(client?: OAuthClientResp): boolean {
+  if (!client) return false;
+  const generated = buildDefaultRedirectURI(client.launch_url);
+  return generated === '' || client.redirect_uris.length !== 1 || client.redirect_uris[0] !== generated;
 }
 
 export function OAuthClientFormModal({
@@ -51,6 +76,7 @@ export function OAuthClientFormModal({
     first_party: client?.first_party ?? true,
     enabled: client?.enabled ?? true,
     show_in_nav: client?.show_in_nav ?? true,
+    advanced_redirects: usesAdvancedRedirects(client),
   });
 
   const [form, setForm] = useState(buildForm);
@@ -63,10 +89,11 @@ export function OAuthClientFormModal({
   }, [open, client]);
 
   const handleSubmit = () => {
+    const defaultRedirectURI = buildDefaultRedirectURI(form.launch_url);
     onSubmit({
       name: form.name.trim(),
       description: form.description.trim(),
-      redirect_uris: splitLines(form.redirect_uris),
+      redirect_uris: form.advanced_redirects ? splitLines(form.redirect_uris) : defaultRedirectURI ? [defaultRedirectURI] : [],
       launch_url: form.launch_url.trim(),
       icon: form.icon.trim(),
       sort_order: Number(form.sort_order) || 0,
@@ -76,7 +103,9 @@ export function OAuthClientFormModal({
     });
   };
 
-  const canSubmit = form.name.trim() !== '' && splitLines(form.redirect_uris).length > 0;
+  const defaultRedirectURI = buildDefaultRedirectURI(form.launch_url);
+  const redirectURIs = form.advanced_redirects ? splitLines(form.redirect_uris) : defaultRedirectURI ? [defaultRedirectURI] : [];
+  const canSubmit = form.name.trim() !== '' && redirectURIs.length > 0 && (!form.show_in_nav || form.launch_url.trim() !== '');
 
   const modalState = useOverlayState({
     isOpen: open,
@@ -122,28 +151,69 @@ export function OAuthClientFormModal({
                   />
                 </HeroTextField>
 
-                <HeroTextField fullWidth isRequired>
-                  <Label>{t('oauth_clients.form_redirect_uris')}</Label>
-                  <TextArea
-                    rows={3}
-                    value={form.redirect_uris}
-                    onChange={(e) => setForm({ ...form, redirect_uris: e.target.value })}
-                    placeholder={'https://chat.example.com/oauth/callback'}
-                    required
-                  />
-                  <Description>{t('oauth_clients.form_redirect_uris_hint')}</Description>
-                </HeroTextField>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <HeroTextField fullWidth>
-                    <Label>{t('oauth_clients.form_launch_url')}</Label>
+                <HeroTextField fullWidth isRequired={form.show_in_nav}>
+                  <Label>{t('oauth_clients.form_launch_url')}</Label>
+                  <div className="relative">
+                    <Link2 className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
                     <Input
+                      className="pl-9"
                       value={form.launch_url}
                       onChange={(e) => setForm({ ...form, launch_url: e.target.value })}
-                      placeholder="https://chat.example.com"
+                      placeholder="https://market.example.com"
+                      required={form.show_in_nav}
                     />
-                    <Description>{t('oauth_clients.form_launch_url_hint')}</Description>
-                  </HeroTextField>
+                  </div>
+                  <Description>{t('oauth_clients.form_launch_url_hint')}</Description>
+                </HeroTextField>
+
+                <div className="overflow-hidden rounded-xl border border-border bg-surface-secondary/45">
+                  <div className="flex items-start gap-3 px-4 py-3.5">
+                    <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-success/25 bg-success/10 text-success">
+                      <ShieldCheck className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-text">{t('oauth_clients.form_redirect_auto_title')}</span>
+                        <button
+                          aria-expanded={form.advanced_redirects}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-primary transition-colors hover:bg-primary/10"
+                          type="button"
+                          onClick={() => setForm({
+                            ...form,
+                            advanced_redirects: !form.advanced_redirects,
+                            redirect_uris: form.redirect_uris || defaultRedirectURI,
+                          })}
+                        >
+                          {form.advanced_redirects ? t('oauth_clients.form_redirect_simple') : t('oauth_clients.form_redirect_advanced')}
+                          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${form.advanced_redirects ? 'rotate-180' : ''}`} />
+                        </button>
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-text-tertiary">{t('oauth_clients.form_redirect_auto_hint')}</p>
+                      {!form.advanced_redirects ? (
+                        <code className="mt-2 block overflow-x-auto rounded-lg border border-border/70 bg-surface px-3 py-2 text-xs text-text-secondary">
+                          {defaultRedirectURI || t('oauth_clients.form_redirect_pending')}
+                        </code>
+                      ) : null}
+                    </div>
+                  </div>
+                  {form.advanced_redirects ? (
+                    <div className="border-t border-border px-4 py-3.5">
+                      <HeroTextField fullWidth isRequired>
+                        <Label>{t('oauth_clients.form_redirect_uris')}</Label>
+                        <TextArea
+                          rows={3}
+                          value={form.redirect_uris}
+                          onChange={(e) => setForm({ ...form, redirect_uris: e.target.value })}
+                          placeholder={'https://market.example.com/api/v1/auth/callback'}
+                          required
+                        />
+                        <Description>{t('oauth_clients.form_redirect_uris_hint')}</Description>
+                      </HeroTextField>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <HeroTextField fullWidth>
                     <Label>{t('oauth_clients.form_icon')}</Label>
                     <Input
@@ -153,9 +223,6 @@ export function OAuthClientFormModal({
                     />
                     <Description>{t('oauth_clients.form_icon_hint')}</Description>
                   </HeroTextField>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <HeroTextField fullWidth>
                     <Label>{t('oauth_clients.form_sort_order')}</Label>
                     <Input

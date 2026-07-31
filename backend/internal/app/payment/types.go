@@ -50,6 +50,9 @@ type CreateOrderInput struct {
 	Method   string
 	Subject  string
 	ClientIP string
+	// ReturnURL 为支付完成后的同步回跳地址。为空时回到 Core 充值页；
+	// OAuth 应用下单时由 Core 根据已登记的客户端地址生成，不能直接信任浏览器输入。
+	ReturnURL string
 }
 
 // UserOrderFilter 用户充值记录分页筛选。
