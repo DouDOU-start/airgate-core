@@ -1,6 +1,10 @@
 package account
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"sync"
 	"testing"
@@ -80,5 +84,41 @@ func TestOAuthSessionConcurrentTerminalTransitionsAreSafe(t *testing.T) {
 	case <-entry.done:
 	default:
 		t.Fatal("终态会话必须关闭完成信号")
+	}
+}
+
+func TestPollXAIToken写入OAuth转发元数据(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("解析表单失败: %v", err)
+		}
+		if got := r.Form.Get("grant_type"); got != "urn:ietf:params:oauth:grant-type:device_code" {
+			t.Fatalf("grant_type = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "access-token",
+			"refresh_token": "refresh-token",
+			"token_type":    "Bearer",
+			"expires_in":    21600,
+		})
+	}))
+	defer server.Close()
+
+	creds, pending, err := pollXAIToken(context.Background(), "device-code", server.URL, "")
+	if err != nil {
+		t.Fatalf("pollXAIToken() 错误: %v", err)
+	}
+	if pending {
+		t.Fatal("成功换票后不应继续等待")
+	}
+	if creds["auth_kind"] != TypeOAuth || creds["credential_origin"] != TypeOAuth {
+		t.Fatalf("OAuth 元数据不完整: %#v", creds)
+	}
+	if creds["type"] != "xai" || creds["token_endpoint"] != server.URL {
+		t.Fatalf("xAI 元数据不完整: %#v", creds)
+	}
+	if creds["token_type"] != "Bearer" || creds["expires_in"] != "21600" || creds["expired"] == "" {
+		t.Fatalf("Token 有效期元数据不完整: %#v", creds)
 	}
 }

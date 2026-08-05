@@ -84,11 +84,26 @@ func DefaultModelInfos(platform, planType string) []ModelInfo {
 	case "kimi":
 		list = cat.Kimi
 	case "xai":
-		list = cat.XAI
+		// CLIProxyAPI 会在静态 models.json 之外注入 xAI 媒体模型；这里同步
+		// 该行为，确保账号注册表能按 Grok Build 实际发送的模型名选中账号。
+		list = withXAIMediaBuiltins(cat.XAI)
 	default:
 		return nil
 	}
 	return cloneModelInfos(list)
+}
+
+// withXAIMediaBuiltins 注入 CLIProxyAPI 的 xAI 内建媒体模型。
+// 这些模型不在上游静态 models.json 中，不能依赖目录文件更新。
+func withXAIMediaBuiltins(models []ModelInfo) []ModelInfo {
+	out := append([]ModelInfo(nil), models...)
+	out = append(out,
+		ModelInfo{ID: "grok-imagine-image", DisplayName: "Grok Imagine 生图", OwnedBy: "xai", Type: "xai"},
+		ModelInfo{ID: "grok-imagine-image-quality", DisplayName: "Grok Imagine 高质量生图", OwnedBy: "xai", Type: "xai"},
+		ModelInfo{ID: "grok-imagine-video", DisplayName: "Grok Imagine 视频", OwnedBy: "xai", Type: "xai"},
+		ModelInfo{ID: "grok-imagine-video-1.5-preview", DisplayName: "Grok Imagine 视频 1.5 预览版", OwnedBy: "xai", Type: "xai"},
+	)
+	return out
 }
 
 // codexModelsByPlan 对齐 CPA sdk/cliproxy/service_models.go OAuth 分档。

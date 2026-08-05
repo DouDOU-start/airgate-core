@@ -350,6 +350,7 @@ func (s *Server) registerRoutes() {
 		relayGroup.POST("/messages/count_tokens", s.relay.HandleMessagesCountTokens)
 		// OpenAI 视频任务（openai_video 渠道，Sora 形态；异步任务子系统 relay/task）
 		relayGroup.POST("/videos", s.taskFlow.HandleVideoSubmit)
+		relayGroup.POST("/videos/generations", s.taskFlow.HandleXAIVideoSubmit)
 		relayGroup.GET("/videos/:task_id", s.taskFlow.HandleVideoGet)
 		relayGroup.GET("/videos/:task_id/content", s.taskFlow.HandleVideoContent)
 	}
@@ -364,6 +365,7 @@ func (s *Server) registerRoutes() {
 		noPrefixGroup.POST("/images/edits", s.relay.HandleImagesEdits)
 		noPrefixGroup.GET("/models", s.relay.HandleModels)
 		noPrefixGroup.POST("/videos", s.taskFlow.HandleVideoSubmit)
+		noPrefixGroup.POST("/videos/generations", s.taskFlow.HandleXAIVideoSubmit)
 		noPrefixGroup.GET("/videos/:task_id", s.taskFlow.HandleVideoGet)
 		noPrefixGroup.GET("/videos/:task_id/content", s.taskFlow.HandleVideoContent)
 	}

@@ -9,11 +9,27 @@ import { useSiteSettings } from '../../../app/providers/SiteSettingsProvider';
 import { apikeysApi } from '../../../shared/api/apikeys';
 import type { APIKeyResp } from '../../../shared/types';
 
+type UseKeyTab = 'claude' | 'codex' | 'desktop' | 'grok';
+type UseKeyShell = 'unix' | 'cmd' | 'powershell';
+
+function normalizeBaseUrl(baseUrl: string): string {
+  return baseUrl.trim().replace(/\/+$/, '');
+}
+
+function toResponsesBaseUrl(baseUrl: string): string {
+  const normalized = normalizeBaseUrl(baseUrl);
+  return /\/v1$/i.test(normalized) ? normalized : `${normalized}/v1`;
+}
+
+function toTomlString(value: string): string {
+  return JSON.stringify(value);
+}
+
 // 渠道化后任意入口协议均可用，配置内容只取决于客户端类型（tab），与分组无关。
 function getUseKeyConfig(
   baseUrl: string,
-  tab: 'claude' | 'codex' | 'desktop',
-  shell: 'unix' | 'cmd' | 'powershell',
+  tab: UseKeyTab,
+  shell: UseKeyShell,
   apiKey: string,
   siteName: string,
   t: (key: string) => string,
@@ -77,6 +93,39 @@ goals = true`;
     };
   }
 
+  if (tab === 'grok') {
+    // Grok Build 原生配置格式与 CC-Switch 的受管应用保持一致。
+    const configDir = shell === 'unix' ? '~/.grok' : '%USERPROFILE%\\.grok';
+    const configPath = shell === 'unix' ? `${configDir}/config.toml` : `${configDir}\\config.toml`;
+    const model = 'grok-4.5';
+    const configToml = `[models]
+default = ${toTomlString(model)}
+web_search = ${toTomlString(model)}
+
+[endpoints]
+xai_api_base_url = ${toTomlString(toResponsesBaseUrl(baseUrl))}
+
+[auth]
+preferred_method = "api_key"
+
+[model.${toTomlString(model)}]
+model = ${toTomlString(model)}
+base_url = ${toTomlString(toResponsesBaseUrl(baseUrl))}
+name = ${toTomlString(siteName || 'AirGate')}
+api_key = ${toTomlString(apiKey)}
+api_backend = "responses"
+context_window = 500000`;
+    return {
+      files: [
+        {
+          path: configPath,
+          content: configToml,
+          hint: t('user_keys.grok_config_toml_hint'),
+        },
+      ],
+    };
+  }
+
   // Claude Code — Anthropic 环境变量配置
   if (shell === 'unix') {
     return {
@@ -114,8 +163,8 @@ export function useUseKeyModal() {
 
   const [useKeyTarget, setUseKeyTarget] = useState<APIKeyResp | null>(null);
   const [useKeyValue, setUseKeyValue] = useState<string | null>(null);
-  const [useKeyTab, setUseKeyTab] = useState<'claude' | 'codex' | 'desktop'>('claude');
-  const [useKeyShell, setUseKeyShell] = useState<'unix' | 'cmd' | 'powershell'>('unix');
+  const [useKeyTab, setUseKeyTab] = useState<UseKeyTab>('claude');
+  const [useKeyShell, setUseKeyShell] = useState<UseKeyShell>('unix');
 
   const openUseKeyModal = useCallback(
     async (row: APIKeyResp) => {
@@ -161,10 +210,10 @@ export function UseKeyModal({
 }: {
   useKeyTarget: APIKeyResp | null;
   useKeyValue: string | null;
-  useKeyTab: 'claude' | 'codex' | 'desktop';
-  setUseKeyTab: (tab: 'claude' | 'codex' | 'desktop') => void;
-  useKeyShell: 'unix' | 'cmd' | 'powershell';
-  setUseKeyShell: (shell: 'unix' | 'cmd' | 'powershell') => void;
+  useKeyTab: UseKeyTab;
+  setUseKeyTab: (tab: UseKeyTab) => void;
+  useKeyShell: UseKeyShell;
+  setUseKeyShell: (shell: UseKeyShell) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -200,7 +249,7 @@ export function UseKeyModal({
             </p>
 
             {/* 客户端选择 Tab */}
-            <div className="flex gap-1">
+            <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
               <Button
                 fullWidth
                 size="sm"
@@ -225,6 +274,14 @@ export function UseKeyModal({
               >
                 Codex CLI
               </Button>
+              <Button
+                fullWidth
+                size="sm"
+                variant={useKeyTab === 'grok' ? 'primary' : 'secondary'}
+                onPress={() => setUseKeyTab('grok')}
+              >
+                Grok Build
+              </Button>
             </div>
 
             {/* OS/Shell Tab（Claude Desktop 不需要） */}
@@ -237,7 +294,7 @@ export function UseKeyModal({
               >
                 macOS / Linux
               </Button>
-              {useKeyTab === 'codex' ? (
+              {useKeyTab === 'codex' || useKeyTab === 'grok' ? (
                 <Button
                   fullWidth
                   size="sm"

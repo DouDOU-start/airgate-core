@@ -355,6 +355,20 @@ func (tc *TaskCreate) SetNillableChannelKeyID(i *int) *TaskCreate {
 	return tc
 }
 
+// SetAccountID sets the "account_id" field.
+func (tc *TaskCreate) SetAccountID(i int) *TaskCreate {
+	tc.mutation.SetAccountID(i)
+	return tc
+}
+
+// SetNillableAccountID sets the "account_id" field if the given value is not nil.
+func (tc *TaskCreate) SetNillableAccountID(i *int) *TaskCreate {
+	if i != nil {
+		tc.SetAccountID(*i)
+	}
+	return tc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (tc *TaskCreate) SetCreatedAt(t time.Time) *TaskCreate {
 	tc.mutation.SetCreatedAt(t)
@@ -502,6 +516,10 @@ func (tc *TaskCreate) defaults() {
 		v := task.DefaultChannelKeyID
 		tc.mutation.SetChannelKeyID(v)
 	}
+	if _, ok := tc.mutation.AccountID(); !ok {
+		v := task.DefaultAccountID
+		tc.mutation.SetAccountID(v)
+	}
 	if _, ok := tc.mutation.CreatedAt(); !ok {
 		v := task.DefaultCreatedAt()
 		tc.mutation.SetCreatedAt(v)
@@ -605,6 +623,9 @@ func (tc *TaskCreate) check() error {
 	}
 	if _, ok := tc.mutation.ChannelKeyID(); !ok {
 		return &ValidationError{Name: "channel_key_id", err: errors.New(`ent: missing required field "Task.channel_key_id"`)}
+	}
+	if _, ok := tc.mutation.AccountID(); !ok {
+		return &ValidationError{Name: "account_id", err: errors.New(`ent: missing required field "Task.account_id"`)}
 	}
 	if _, ok := tc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Task.created_at"`)}
@@ -742,6 +763,10 @@ func (tc *TaskCreate) createSpec() (*Task, *sqlgraph.CreateSpec) {
 	if value, ok := tc.mutation.ChannelKeyID(); ok {
 		_spec.SetField(task.FieldChannelKeyID, field.TypeInt, value)
 		_node.ChannelKeyID = value
+	}
+	if value, ok := tc.mutation.AccountID(); ok {
+		_spec.SetField(task.FieldAccountID, field.TypeInt, value)
+		_node.AccountID = value
 	}
 	if value, ok := tc.mutation.CreatedAt(); ok {
 		_spec.SetField(task.FieldCreatedAt, field.TypeTime, value)
@@ -1196,6 +1221,24 @@ func (u *TaskUpsert) UpdateChannelKeyID() *TaskUpsert {
 // AddChannelKeyID adds v to the "channel_key_id" field.
 func (u *TaskUpsert) AddChannelKeyID(v int) *TaskUpsert {
 	u.Add(task.FieldChannelKeyID, v)
+	return u
+}
+
+// SetAccountID sets the "account_id" field.
+func (u *TaskUpsert) SetAccountID(v int) *TaskUpsert {
+	u.Set(task.FieldAccountID, v)
+	return u
+}
+
+// UpdateAccountID sets the "account_id" field to the value that was provided on create.
+func (u *TaskUpsert) UpdateAccountID() *TaskUpsert {
+	u.SetExcluded(task.FieldAccountID)
+	return u
+}
+
+// AddAccountID adds v to the "account_id" field.
+func (u *TaskUpsert) AddAccountID(v int) *TaskUpsert {
+	u.Add(task.FieldAccountID, v)
 	return u
 }
 
@@ -1715,6 +1758,27 @@ func (u *TaskUpsertOne) AddChannelKeyID(v int) *TaskUpsertOne {
 func (u *TaskUpsertOne) UpdateChannelKeyID() *TaskUpsertOne {
 	return u.Update(func(s *TaskUpsert) {
 		s.UpdateChannelKeyID()
+	})
+}
+
+// SetAccountID sets the "account_id" field.
+func (u *TaskUpsertOne) SetAccountID(v int) *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.SetAccountID(v)
+	})
+}
+
+// AddAccountID adds v to the "account_id" field.
+func (u *TaskUpsertOne) AddAccountID(v int) *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.AddAccountID(v)
+	})
+}
+
+// UpdateAccountID sets the "account_id" field to the value that was provided on create.
+func (u *TaskUpsertOne) UpdateAccountID() *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.UpdateAccountID()
 	})
 }
 
@@ -2402,6 +2466,27 @@ func (u *TaskUpsertBulk) AddChannelKeyID(v int) *TaskUpsertBulk {
 func (u *TaskUpsertBulk) UpdateChannelKeyID() *TaskUpsertBulk {
 	return u.Update(func(s *TaskUpsert) {
 		s.UpdateChannelKeyID()
+	})
+}
+
+// SetAccountID sets the "account_id" field.
+func (u *TaskUpsertBulk) SetAccountID(v int) *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.SetAccountID(v)
+	})
+}
+
+// AddAccountID adds v to the "account_id" field.
+func (u *TaskUpsertBulk) AddAccountID(v int) *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.AddAccountID(v)
+	})
+}
+
+// UpdateAccountID sets the "account_id" field to the value that was provided on create.
+func (u *TaskUpsertBulk) UpdateAccountID() *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.UpdateAccountID()
 	})
 }
 

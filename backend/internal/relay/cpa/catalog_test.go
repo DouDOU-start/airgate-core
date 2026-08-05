@@ -73,3 +73,17 @@ func TestDefaultModelsNonEmptyForMainPlatforms(t *testing.T) {
 		}
 	}
 }
+
+func TestXAIDefaultModelsIncludeMediaBuiltins(t *testing.T) {
+	models := DefaultModels("xai")
+	for _, id := range []string{
+		"grok-imagine-image",
+		"grok-imagine-image-quality",
+		"grok-imagine-video",
+		"grok-imagine-video-1.5-preview",
+	} {
+		if !containsModelID(models, id) {
+			t.Errorf("xAI 默认模型目录缺少媒体模型 %s", id)
+		}
+	}
+}

@@ -17,7 +17,9 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/moderation"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/upstreamclient"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
 	"github.com/DouDOU-start/airgate-core/internal/relay/clientid"
+	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
 	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pipeline"
@@ -63,6 +65,11 @@ type SettingsSource interface {
 	Get(ctx context.Context) pipeline.GatewaySettings
 }
 
+// CPAForwarder xAI OAuth 账号转发窄接口（*cpa.Bridge 天然满足；测试可注入 fake）。
+type CPAForwarder interface {
+	Forward(ctx context.Context, c *gin.Context, req cpa.ForwardRequest) cpa.ForwardResult
+}
+
 // Options 任务子系统装配依赖（registry/pricing/限流/计费组件与 pipeline 同源）。
 type Options struct {
 	Registry    *registry.Registry
@@ -77,6 +84,9 @@ type Options struct {
 	Balance     BalanceOps
 	// Moderation 内容审核引擎（风控中心；nil 时全部放行）。
 	Moderation pipeline.ModerationChecker
+	// Accounts / CPA 为 xAI OAuth 视频账号路径依赖；nil 时原渠道任务不受影响。
+	Accounts *accountreg.Registry
+	CPA      CPAForwarder
 }
 
 // Flow 任务提交/查询流程。
@@ -92,6 +102,8 @@ type Flow struct {
 	store       Store
 	balance     BalanceOps
 	moderation  pipeline.ModerationChecker
+	accounts    *accountreg.Registry
+	cpa         CPAForwarder
 	client      *http.Client
 }
 
@@ -117,6 +129,8 @@ func NewFlow(opts Options) *Flow {
 		store:       opts.Store,
 		balance:     opts.Balance,
 		moderation:  opts.Moderation,
+		accounts:    opts.Accounts,
+		cpa:         opts.CPA,
 		client:      upstreamclient.NewClient(0),
 	}
 }
@@ -125,6 +139,13 @@ func NewFlow(opts Options) *Flow {
 func (f *Flow) HandleVideoSubmit(c *gin.Context) {
 	setEntryProtocol(c, registry.ProtocolOpenAI)
 	f.handleSubmit(c, PlatformOpenAIVideo, "")
+}
+
+// HandleXAIVideoSubmit POST /v1/videos/generations 入口 handler
+// （xAI 原生协议，经 OAuth 账号池和 CPA executor 提交）。
+func (f *Flow) HandleXAIVideoSubmit(c *gin.Context) {
+	setEntryProtocol(c, registry.ProtocolOpenAI)
+	f.handleSubmit(c, PlatformXAIVideo, "")
 }
 
 // HandleSunoSubmit POST /suno/submit/:action 入口 handler（Suno 音乐任务）。
@@ -156,6 +177,10 @@ func (f *Flow) handleSubmit(c *gin.Context, platform, action string) {
 	if !f.moderationCheck(c, keyInfo, platform, sub) {
 		return
 	}
+	if platform == PlatformXAIVideo {
+		f.submitXAIAccount(c, keyInfo, ad, sub)
+		return
+	}
 	f.submit(c, keyInfo, platform, ad, sub)
 }
 
@@ -167,7 +192,7 @@ func (f *Flow) moderationCheck(c *gin.Context, keyInfo *auth.APIKeyInfo, platfor
 	}
 	var protocol string
 	switch platform {
-	case PlatformOpenAIVideo:
+	case PlatformOpenAIVideo, PlatformXAIVideo:
 		protocol = moderation.ProtocolOpenAIVideo
 	case PlatformSuno:
 		protocol = moderation.ProtocolSuno

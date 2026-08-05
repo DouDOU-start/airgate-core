@@ -907,7 +907,17 @@ func pollXAIToken(ctx context.Context, deviceCode, tokenEndpoint, proxyURL strin
 	creds := map[string]string{
 		"access_token":      access,
 		"refresh_token":     refresh,
-		"credential_origin": "oauth",
+		"auth_kind":         TypeOAuth,
+		"credential_origin": TypeOAuth,
+		"token_endpoint":    tokenEndpoint,
+		"type":              "xai",
+	}
+	if tokenType, _ := body["token_type"].(string); strings.TrimSpace(tokenType) != "" {
+		creds["token_type"] = strings.TrimSpace(tokenType)
+	}
+	if expiresIn := anyToInt(body["expires_in"]); expiresIn > 0 {
+		creds["expires_in"] = fmt.Sprintf("%d", expiresIn)
+		creds["expired"] = time.Now().Add(time.Duration(expiresIn) * time.Second).UTC().Format(time.RFC3339)
 	}
 	if idt, _ := body["id_token"].(string); idt != "" {
 		creds["id_token"] = idt

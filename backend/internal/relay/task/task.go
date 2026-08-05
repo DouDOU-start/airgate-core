@@ -28,6 +28,7 @@ import (
 // 平台常量：值与渠道 Type、入口协议（registry.Protocol*）、task.platform 同值。
 const (
 	PlatformOpenAIVideo = registry.ProtocolOpenAIVideo
+	PlatformXAIVideo    = "xai_video"
 	PlatformSuno        = registry.ProtocolSuno
 )
 
@@ -80,6 +81,7 @@ type Task struct {
 	GroupID      int
 	ChannelID    int
 	ChannelKeyID int
+	AccountID    int
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

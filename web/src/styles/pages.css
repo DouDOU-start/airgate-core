@@ -171,6 +171,177 @@
   max-width: min(45rem, calc(100vw - 2rem)) !important;
 }
 
+/* CC-Switch 客户端选择：克制的命令面板风格，强调识别与快速选择。 */
+.ag-elevation-modal.ag-ccs-import-modal,
+.ag-elevation-modal.modal__dialog--lg.ag-ccs-import-modal {
+  width: min(48rem, calc(100vw - 2rem)) !important;
+  max-width: min(48rem, calc(100vw - 2rem)) !important;
+}
+
+.ag-ccs-import-modal__body {
+  padding-bottom: 0.75rem !important;
+}
+
+.ag-ccs-import-modal__content {
+  display: grid;
+  gap: 1rem;
+}
+
+.ag-ccs-import-modal__description {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.ag-ccs-client-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.ag-ccs-client-card.button {
+  --ag-ccs-client-tone: var(--foreground);
+  position: relative;
+  display: grid !important;
+  width: 100%;
+  min-width: 0;
+  min-height: 7.25rem !important;
+  height: 100% !important;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 1rem;
+  align-items: start !important;
+  justify-content: stretch !important;
+  gap: 0.75rem !important;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--border) 82%, transparent) !important;
+  border-radius: 0.625rem !important;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in oklab, var(--ag-ccs-client-tone) 5%, var(--surface-secondary)),
+      var(--surface-secondary) 70%
+    ) !important;
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--foreground) 4%, transparent) inset !important;
+  padding: 1rem !important;
+  color: var(--foreground) !important;
+  text-align: left !important;
+  white-space: normal !important;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease !important;
+}
+
+.ag-ccs-client-card.button[data-client="claude"] {
+  --ag-ccs-client-tone: var(--ag-info);
+}
+
+.ag-ccs-client-card.button[data-client="codex"] {
+  --ag-ccs-client-tone: var(--success);
+}
+
+.ag-ccs-client-card.button[data-client="grokbuild"] {
+  --ag-ccs-client-tone: var(--foreground);
+}
+
+.ag-ccs-client-card.button:hover,
+.ag-ccs-client-card.button[data-hovered="true"] {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--ag-ccs-client-tone) 38%, var(--border)) !important;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in oklab, var(--ag-ccs-client-tone) 10%, var(--surface-secondary)),
+      color-mix(in oklab, var(--surface-secondary) 96%, var(--surface)) 70%
+    ) !important;
+  box-shadow:
+    0 0.75rem 1.5rem -1.125rem color-mix(in oklab, var(--ag-ccs-client-tone) 42%, transparent),
+    0 1px 0 color-mix(in oklab, var(--foreground) 6%, transparent) inset !important;
+}
+
+.ag-ccs-client-card.button:active,
+.ag-ccs-client-card.button[data-pressed="true"] {
+  transform: translateY(0);
+}
+
+.ag-ccs-client-card__icon {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--ag-ccs-client-tone) 22%, var(--border));
+  border-radius: 0.5rem;
+  background: color-mix(in oklab, var(--ag-ccs-client-tone) 12%, var(--surface));
+  color: color-mix(in oklab, var(--ag-ccs-client-tone) 78%, var(--foreground));
+}
+
+.ag-ccs-client-card__icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.ag-ccs-client-card__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+}
+
+.ag-ccs-client-card__copy strong {
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1.25rem;
+}
+
+.ag-ccs-client-card__copy span {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.ag-ccs-client-card__arrow {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+  color: color-mix(in oklab, var(--ag-ccs-client-tone) 58%, var(--muted));
+  transition: transform 140ms ease, color 140ms ease;
+}
+
+.ag-ccs-client-card.button:hover .ag-ccs-client-card__arrow,
+.ag-ccs-client-card.button[data-hovered="true"] .ag-ccs-client-card__arrow {
+  transform: translate(1px, -1px);
+  color: var(--ag-ccs-client-tone);
+}
+
+.ag-ccs-import-modal__loading {
+  display: flex;
+  min-height: 8rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.ag-ccs-import-modal__footer {
+  border-top: 1px solid color-mix(in oklab, var(--border) 58%, transparent);
+}
+
+@media (max-width: 42rem) {
+  .ag-ccs-client-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ag-ccs-client-card.button {
+    min-height: 5.75rem !important;
+  }
+}
+
 /* Admin accounts: 添加凭证弹窗布局 */
 
 .ag-elevation-modal.ag-create-account-modal,

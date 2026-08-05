@@ -29,6 +29,7 @@ import (
 	// 任务平台适配器自注册（task.Register；同步协议适配器由 pipeline 包内注册）。
 	_ "github.com/DouDOU-start/airgate-core/internal/relay/task/openaivideo"
 	_ "github.com/DouDOU-start/airgate-core/internal/relay/task/suno"
+	_ "github.com/DouDOU-start/airgate-core/internal/relay/task/xaivideo"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 )
 
@@ -178,6 +179,8 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Store:       s.handlers.TaskStore,
 		Balance:     taskBalanceAdapter{svc: s.handlers.UserService},
 		Moderation:  s.handlers.ModerationEngine,
+		Accounts:    s.accountRegistry,
+		CPA:         s.cpaBridge,
 	}
 	s.taskFlow = task.NewFlow(taskOpts)
 	s.taskPoller = task.NewPoller(taskOpts)

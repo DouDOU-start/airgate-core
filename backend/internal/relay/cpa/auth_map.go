@@ -87,6 +87,15 @@ func MapAuth(in AccountAuthInput) (*coreauth.Auth, error) {
 	}
 	meta["type"] = authType
 
+	// xAI executor 通过 auth_kind 判断订阅 OAuth 应走 Grok Build
+	// cli-chat-proxy，不能仅依赖凭证里是否刚好带有该字段。账号类型是
+	// OAuth 时补齐标记，同时兼容修复前已落库的存量账号。
+	if provider == "xai" && strings.EqualFold(authType, "oauth") {
+		if strings.TrimSpace(metadataToString(meta["auth_kind"])) == "" {
+			meta["auth_kind"] = "oauth"
+		}
+	}
+
 	id := fmt.Sprintf("airgate-account-%d", in.AccountID)
 	label := strings.TrimSpace(in.Name)
 	if label == "" {

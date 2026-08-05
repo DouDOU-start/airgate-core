@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -17,6 +18,9 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
+	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
+	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pipeline"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
@@ -27,6 +31,7 @@ import (
 	// 平台适配器自注册。
 	_ "github.com/DouDOU-start/airgate-core/internal/relay/task/openaivideo"
 	_ "github.com/DouDOU-start/airgate-core/internal/relay/task/suno"
+	_ "github.com/DouDOU-start/airgate-core/internal/relay/task/xaivideo"
 )
 
 // ===== 测试替身 =====
@@ -269,6 +274,30 @@ func (f *fakePriceLoader) LoadAllPrices(context.Context) (map[string]pricing.Pri
 	return f.prices, nil
 }
 
+type fakeAccountLoader struct{ snaps []accountreg.Snapshot }
+
+func (f *fakeAccountLoader) LoadAllForAccountRegistry(context.Context) ([]accountreg.Snapshot, error) {
+	return f.snaps, nil
+}
+
+type fakeCPAForwarder struct {
+	mu       sync.Mutex
+	requests []cpa.ForwardRequest
+	results  []cpa.ForwardResult
+}
+
+func (f *fakeCPAForwarder) Forward(_ context.Context, _ *gin.Context, req cpa.ForwardRequest) cpa.ForwardResult {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.requests = append(f.requests, req)
+	if len(f.results) == 0 {
+		return cpa.ForwardResult{StatusCode: http.StatusBadGateway, Body: []byte(`{"error":{"message":"测试结果未配置"}}`)}
+	}
+	result := f.results[0]
+	f.results = f.results[1:]
+	return result
+}
+
 // ===== 测试装配 =====
 
 const (
@@ -451,6 +480,66 @@ func TestVideoSubmitSuccess(t *testing.T) {
 	}
 	if len(env.balance.opsOf("adjust")) != 0 {
 		t.Error("成功提交不应有退款/结算动账")
+	}
+}
+
+func TestXAIVideoSubmitUsesOAuthAccountAndPersistsBinding(t *testing.T) {
+	const model = "grok-imagine-video"
+	accounts := accountreg.New(&fakeAccountLoader{snaps: []accountreg.Snapshot{{
+		ID: 333, Name: "Grok OAuth", Platform: "xai", Type: "oauth",
+		Credentials: map[string]string{"access_token": "oauth-token"},
+		Priority:    50, Weight: 10, MaxConcurrency: 2, State: accountreg.StateActive,
+		Models: map[string]struct{}{model: {}}, GroupIDs: map[int]struct{}{7: {}},
+	}}}, nil)
+	if err := accounts.Reload(context.Background()); err != nil {
+		t.Fatalf("账号注册表加载失败: %v", err)
+	}
+	prices := pricing.NewCache(&fakePriceLoader{prices: map[string]pricing.Price{
+		model: {VideoPerSecond: 0.07, VideoResolutionPrices: map[string]float64{"720p": 0.07}},
+	}})
+	if err := prices.Reload(context.Background()); err != nil {
+		t.Fatalf("价目表加载失败: %v", err)
+	}
+	forwarder := &fakeCPAForwarder{results: []cpa.ForwardResult{{
+		StatusCode: http.StatusOK,
+		Headers:    http.Header{"Content-Type": []string{"application/json"}},
+		Body:       []byte(`{"request_id":"vid_oauth_123"}`),
+	}}}
+	store := newMemStore()
+	balance := newFakeBalance()
+	flow := task.NewFlow(task.Options{
+		Accounts: accounts, CPA: forwarder, Pricing: prices,
+		Concurrency: scheduler.NewConcurrencyManager(nil), RPM: scheduler.NewRPMCounter(nil),
+		Calculator: billing.NewCalculator(), Settings: pipeline.NewSettingsReader(nil),
+		Store: store, Balance: balance,
+	})
+	engine := gin.New()
+	injectKey := func(c *gin.Context) { c.Set(middleware.CtxKeyKeyInfo, testKeyInfo()) }
+	engine.POST("/v1/videos/generations", injectKey, flow.HandleXAIVideoSubmit)
+	engine.GET("/v1/videos/:task_id", injectKey, flow.HandleVideoGet)
+
+	w := doJSON(t, engine, http.MethodPost, "/v1/videos/generations",
+		`{"model":"grok-imagine-video","prompt":"海面日落","duration":6,"resolution":"720p"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("提交状态 = %d，响应 = %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"request_id":"vid_oauth_123"`) {
+		t.Fatalf("提交响应缺少 request_id: %s", w.Body.String())
+	}
+	row := store.get(t, 1)
+	if row.Platform != task.PlatformXAIVideo || row.AccountID != 333 || row.ChannelKeyID != 0 {
+		t.Fatalf("任务账号归属错误: %+v", row)
+	}
+	if math.Abs(row.EstTotal-0.42) > 1e-9 || math.Abs(row.HoldAmount-0.84) > 1e-9 {
+		t.Fatalf("视频预扣错误: est=%v hold=%v", row.EstTotal, row.HoldAmount)
+	}
+	if len(forwarder.requests) != 1 || forwarder.requests[0].Endpoint != adaptor.EndpointXAIVideosGenerations || forwarder.requests[0].Account.AccountID != 333 {
+		t.Fatalf("CPA 转发参数错误: %+v", forwarder.requests)
+	}
+
+	get := doJSON(t, engine, http.MethodGet, "/v1/videos/vid_oauth_123", "")
+	if get.Code != http.StatusOK || !strings.Contains(get.Body.String(), `"status":"pending"`) {
+		t.Fatalf("本地任务查询错误: status=%d body=%s", get.Code, get.Body.String())
 	}
 }
 

@@ -977,12 +977,16 @@ func init() {
 	taskDescChannelKeyID := taskFields[25].Descriptor()
 	// task.DefaultChannelKeyID holds the default value on creation for the channel_key_id field.
 	task.DefaultChannelKeyID = taskDescChannelKeyID.Default.(int)
+	// taskDescAccountID is the schema descriptor for account_id field.
+	taskDescAccountID := taskFields[26].Descriptor()
+	// task.DefaultAccountID holds the default value on creation for the account_id field.
+	task.DefaultAccountID = taskDescAccountID.Default.(int)
 	// taskDescCreatedAt is the schema descriptor for created_at field.
-	taskDescCreatedAt := taskFields[26].Descriptor()
+	taskDescCreatedAt := taskFields[27].Descriptor()
 	// task.DefaultCreatedAt holds the default value on creation for the created_at field.
 	task.DefaultCreatedAt = taskDescCreatedAt.Default.(func() time.Time)
 	// taskDescUpdatedAt is the schema descriptor for updated_at field.
-	taskDescUpdatedAt := taskFields[27].Descriptor()
+	taskDescUpdatedAt := taskFields[28].Descriptor()
 	// task.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	task.DefaultUpdatedAt = taskDescUpdatedAt.Default.(func() time.Time)
 	// task.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

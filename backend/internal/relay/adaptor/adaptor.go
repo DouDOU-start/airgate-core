@@ -41,6 +41,10 @@ const (
 	EndpointCountTokens = "count_tokens"
 	// EndpointAlphaSearch codex CLI 内置联网搜索（/v1/alpha/search，POST 非流式，按次计费）。
 	EndpointAlphaSearch = "alpha_search"
+	// EndpointXAIVideosGenerations xAI 原生异步视频提交（/v1/videos/generations）。
+	EndpointXAIVideosGenerations = "xai_videos_generations"
+	// EndpointXAIVideosRetrieve xAI 原生异步视频查询（/v1/videos/{request_id}）。
+	EndpointXAIVideosRetrieve = "xai_videos_retrieve"
 )
 
 // RelayInfo 单次上游调用的上下文（每个 failover attempt 独立构造）。

@@ -11,8 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
+	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
+	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pipeline"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
@@ -199,6 +204,25 @@ func (f *pollPriceLoader) LoadAllPrices(context.Context) (map[string]pricing.Pri
 	return f.prices, nil
 }
 
+type pollAccountLoader struct{ snaps []accountreg.Snapshot }
+
+func (f *pollAccountLoader) LoadAllForAccountRegistry(context.Context) ([]accountreg.Snapshot, error) {
+	return f.snaps, nil
+}
+
+type pollCPAForwarder struct {
+	mu       sync.Mutex
+	requests []cpa.ForwardRequest
+	result   cpa.ForwardResult
+}
+
+func (f *pollCPAForwarder) Forward(_ context.Context, _ *gin.Context, req cpa.ForwardRequest) cpa.ForwardResult {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.requests = append(f.requests, req)
+	return f.result
+}
+
 // fakePollAdaptor 轮询测试适配器：查询请求指向 httptest 上游，
 // 响应体为 {"status","progress","seconds"} 直解。
 type fakePollAdaptor struct{}
@@ -245,9 +269,38 @@ func (fakeBatchAdaptor) ParseBatchQueryResponse(body []byte) (map[string]*Status
 
 func (fakeBatchAdaptor) RenderTaskList([]*Task) []byte { return []byte(`{}`) }
 
+// fakeXAIVideoPollAdaptor 使用 xAI 原生轮询响应验证 Poller 的账号路径；
+// 原生协议的完整解析由 xaivideo 包单独覆盖。
+type fakeXAIVideoPollAdaptor struct{ fakePollAdaptor }
+
+func (fakeXAIVideoPollAdaptor) ParseQueryResponse(body []byte) (*Status, error) {
+	var raw struct {
+		Status   string `json:"status"`
+		Progress int    `json:"progress"`
+		Video    struct {
+			Duration int `json:"duration"`
+		} `json:"video"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, err
+	}
+	status := StatusInProgress
+	switch raw.Status {
+	case "done":
+		status = StatusSuccess
+	case "failed":
+		status = StatusFailure
+	}
+	return &Status{
+		Status: status, Progress: raw.Progress, Seconds: raw.Video.Duration,
+		Raw: body,
+	}, nil
+}
+
 func init() {
 	Register("pollplat", func() Adaptor { return fakePollAdaptor{} })
 	Register("pollbatch", func() Adaptor { return fakeBatchAdaptor{} })
+	Register(PlatformXAIVideo, func() Adaptor { return fakeXAIVideoPollAdaptor{} })
 }
 
 // newTestPoller 组装轮询器（渠道 Type=pollplat/pollbatch）。
@@ -359,6 +412,73 @@ func TestPollerSettleResolutionPrice(t *testing.T) {
 	rec := sink.records[0]
 	if rec.InputPrice != 0.25 || rec.TotalCost != 2.0 || rec.ActualCost != 4.0 || rec.VideoResolution != "1080p" {
 		t.Errorf("usage record = %+v", rec)
+	}
+}
+
+// TestPollerXAIVideoUsesBoundOAuthAccount 验证异步视频始终回到提交账号，
+// 并按上游返回的实际时长结算到账号用量。
+func TestPollerXAIVideoUsesBoundOAuthAccount(t *testing.T) {
+	const model = "grok-imagine-video"
+	accounts := accountreg.New(&pollAccountLoader{snaps: []accountreg.Snapshot{{
+		ID: 333, Name: "Grok OAuth", Platform: "xai", Type: "oauth",
+		Credentials: map[string]string{"access_token": "oauth-token"},
+		State:       accountreg.StateActive,
+	}}}, nil)
+	if err := accounts.Reload(context.Background()); err != nil {
+		t.Fatalf("账号注册表加载失败: %v", err)
+	}
+	cache := pricing.NewCache(&pollPriceLoader{prices: map[string]pricing.Price{
+		model: {VideoPerSecond: 0.07},
+	}})
+	if err := cache.Reload(context.Background()); err != nil {
+		t.Fatalf("价目表加载失败: %v", err)
+	}
+	forwarder := &pollCPAForwarder{result: cpa.ForwardResult{
+		StatusCode: http.StatusOK,
+		Headers:    http.Header{"Content-Type": []string{"application/json"}},
+		Body:       []byte(`{"status":"done","progress":100,"video":{"url":"https://example.com/video.mp4","duration":8}}`),
+	}}
+	store := newPollStore()
+	balance := newPollBalance()
+	sink := &pollSink{}
+	poller := NewPoller(Options{
+		Pricing: cache, Sink: sink, Settings: pipeline.NewSettingsReader(nil),
+		Store: store, Balance: balance, Accounts: accounts, CPA: forwarder,
+	})
+	poller.sleep = func(context.Context, time.Duration) {}
+	store.seed(&Task{
+		TaskID: "vid_oauth_123", Platform: PlatformXAIVideo, Status: StatusInProgress,
+		RequestModel: model, HoldAmount: 0.56, EstTotal: 0.28,
+		RateMultiplier: 2, AccountRateMultiplier: 1, Seconds: 4,
+		SubmitTime: time.Now(), UserID: 22, APIKeyID: 11, GroupID: 7, AccountID: 333,
+	})
+
+	poller.tick(context.Background())
+
+	row := store.get(t, 1)
+	if row.Status != StatusSuccess || !row.Settled || row.Seconds != 8 {
+		t.Fatalf("任务状态错误: %+v", row)
+	}
+	if len(forwarder.requests) != 1 {
+		t.Fatalf("CPA 请求数 = %d，期望 1", len(forwarder.requests))
+	}
+	req := forwarder.requests[0]
+	if req.Endpoint != adaptor.EndpointXAIVideosRetrieve || req.Account.AccountID != 333 || req.Model != model {
+		t.Fatalf("CPA 轮询参数错误: %+v", req)
+	}
+	if string(req.Payload) != `{"request_id":"vid_oauth_123"}` {
+		t.Fatalf("CPA 轮询请求体错误: %s", req.Payload)
+	}
+	if len(balance.ops) != 1 || balance.ops[0].amount != -0.56 {
+		t.Fatalf("视频差额动账错误: %+v", balance.ops)
+	}
+	if len(sink.records) != 1 {
+		t.Fatalf("用量记录数 = %d，期望 1", len(sink.records))
+	}
+	record := sink.records[0]
+	if record.AccountID != 333 || record.ChannelID != 0 || record.Calls != 8 ||
+		record.InputPrice != 0.07 || record.Endpoint != "/v1/videos/generations" {
+		t.Fatalf("xAI 视频用量记录错误: %+v", record)
 	}
 }
 

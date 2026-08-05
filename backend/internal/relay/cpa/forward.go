@@ -223,6 +223,36 @@ func (b *Bridge) relayStream(
 	if endpoint == adaptor.EndpointResponses {
 		extractUsage = dto.ExtractResponsesUsage
 	}
+	var responsesFramer *responsesSSEFramer
+	if endpoint == adaptor.EndpointResponses {
+		responsesFramer = &responsesSSEFramer{}
+	}
+
+	writePayload := func(payload []byte, ensureLineEnding bool) error {
+		// 旁路解析 usage / [DONE]。Responses 在分帧后解析，能够处理跨 chunk 的 JSON。
+		scanStreamPayload(payload, extractUsage, &usage, &done)
+		if firstTokenMs == 0 && looksLikeContent(payload) {
+			firstTokenMs = time.Since(start).Milliseconds()
+		}
+		if !written && !c.Writer.Written() {
+			writeStreamHeaders(w, stream.Headers)
+		}
+		if _, err := w.Write(payload); err != nil {
+			written = true
+			return err
+		}
+		if ensureLineEnding && !bytes.HasSuffix(payload, []byte("\n")) {
+			if _, err := w.Write([]byte("\n")); err != nil {
+				written = true
+				return err
+			}
+		}
+		written = true
+		if flusher != nil {
+			flusher.Flush()
+		}
+		return nil
+	}
 
 	for {
 		select {
@@ -235,6 +265,14 @@ func (b *Bridge) relayStream(
 			goto finish
 		case chunk, ok := <-stream.Chunks:
 			if !ok {
+				if responsesFramer != nil {
+					for _, frame := range responsesFramer.Flush() {
+						if err := writePayload(frame, false); err != nil {
+							streamErr = err
+							goto finish
+						}
+					}
+				}
 				goto finish
 			}
 			if chunk.Err != nil {
@@ -249,26 +287,18 @@ func (b *Bridge) relayStream(
 			if len(payload) == 0 {
 				continue
 			}
-			// 旁路解析 usage / [DONE]。
-			scanStreamPayload(payload, extractUsage, &usage, &done)
-			if firstTokenMs == 0 && looksLikeContent(payload) {
-				firstTokenMs = time.Since(start).Milliseconds()
+			if responsesFramer != nil {
+				for _, frame := range responsesFramer.WriteChunk(payload) {
+					if err := writePayload(frame, false); err != nil {
+						streamErr = err
+						goto finish
+					}
+				}
+				continue
 			}
-			if !written && !c.Writer.Written() {
-				writeStreamHeaders(w, stream.Headers)
-			}
-			if _, err := w.Write(payload); err != nil {
+			if err := writePayload(payload, true); err != nil {
 				streamErr = err
-				written = true
 				goto finish
-			}
-			// 确保 chunk 以换行结尾（部分 executor 已带）。
-			if !bytes.HasSuffix(payload, []byte("\n")) {
-				_, _ = w.Write([]byte("\n"))
-			}
-			written = true
-			if flusher != nil {
-				flusher.Flush()
 			}
 		}
 	}
@@ -340,7 +370,11 @@ func sourceFormatFor(endpoint, entryProtocol string) sdktranslator.Format {
 		return sdktranslator.FormatClaude
 	case adaptor.EndpointGenerateContent, adaptor.EndpointPredict, adaptor.EndpointCountTokens:
 		return sdktranslator.FormatGemini
-	case adaptor.EndpointChatCompletions, adaptor.EndpointImagesGenerations, adaptor.EndpointImagesEdits, adaptor.EndpointAlphaSearch:
+	case adaptor.EndpointImagesGenerations, adaptor.EndpointImagesEdits:
+		return sdktranslator.FromString("openai-image")
+	case adaptor.EndpointXAIVideosGenerations, adaptor.EndpointXAIVideosRetrieve:
+		return sdktranslator.FromString("openai-video")
+	case adaptor.EndpointChatCompletions, adaptor.EndpointAlphaSearch:
 		return sdktranslator.FormatOpenAI
 	}
 	// 回退：按入口协议。

@@ -22669,6 +22669,8 @@ type TaskMutation struct {
 	addchannel_id              *int
 	channel_key_id             *int
 	addchannel_key_id          *int
+	account_id                 *int
+	addaccount_id              *int
 	created_at                 *time.Time
 	updated_at                 *time.Time
 	clearedFields              map[string]struct{}
@@ -23993,6 +23995,62 @@ func (m *TaskMutation) ResetChannelKeyID() {
 	m.addchannel_key_id = nil
 }
 
+// SetAccountID sets the "account_id" field.
+func (m *TaskMutation) SetAccountID(i int) {
+	m.account_id = &i
+	m.addaccount_id = nil
+}
+
+// AccountID returns the value of the "account_id" field in the mutation.
+func (m *TaskMutation) AccountID() (r int, exists bool) {
+	v := m.account_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountID returns the old "account_id" field's value of the Task entity.
+// If the Task object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskMutation) OldAccountID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountID: %w", err)
+	}
+	return oldValue.AccountID, nil
+}
+
+// AddAccountID adds i to the "account_id" field.
+func (m *TaskMutation) AddAccountID(i int) {
+	if m.addaccount_id != nil {
+		*m.addaccount_id += i
+	} else {
+		m.addaccount_id = &i
+	}
+}
+
+// AddedAccountID returns the value that was added to the "account_id" field in this mutation.
+func (m *TaskMutation) AddedAccountID() (r int, exists bool) {
+	v := m.addaccount_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAccountID resets all changes to the "account_id" field.
+func (m *TaskMutation) ResetAccountID() {
+	m.account_id = nil
+	m.addaccount_id = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *TaskMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -24099,7 +24157,7 @@ func (m *TaskMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TaskMutation) Fields() []string {
-	fields := make([]string, 0, 28)
+	fields := make([]string, 0, 29)
 	if m.task_id != nil {
 		fields = append(fields, task.FieldTaskID)
 	}
@@ -24178,6 +24236,9 @@ func (m *TaskMutation) Fields() []string {
 	if m.channel_key_id != nil {
 		fields = append(fields, task.FieldChannelKeyID)
 	}
+	if m.account_id != nil {
+		fields = append(fields, task.FieldAccountID)
+	}
 	if m.created_at != nil {
 		fields = append(fields, task.FieldCreatedAt)
 	}
@@ -24244,6 +24305,8 @@ func (m *TaskMutation) Field(name string) (ent.Value, bool) {
 		return m.ChannelID()
 	case task.FieldChannelKeyID:
 		return m.ChannelKeyID()
+	case task.FieldAccountID:
+		return m.AccountID()
 	case task.FieldCreatedAt:
 		return m.CreatedAt()
 	case task.FieldUpdatedAt:
@@ -24309,6 +24372,8 @@ func (m *TaskMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldChannelID(ctx)
 	case task.FieldChannelKeyID:
 		return m.OldChannelKeyID(ctx)
+	case task.FieldAccountID:
+		return m.OldAccountID(ctx)
 	case task.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case task.FieldUpdatedAt:
@@ -24504,6 +24569,13 @@ func (m *TaskMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetChannelKeyID(v)
 		return nil
+	case task.FieldAccountID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountID(v)
+		return nil
 	case task.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -24562,6 +24634,9 @@ func (m *TaskMutation) AddedFields() []string {
 	if m.addchannel_key_id != nil {
 		fields = append(fields, task.FieldChannelKeyID)
 	}
+	if m.addaccount_id != nil {
+		fields = append(fields, task.FieldAccountID)
+	}
 	return fields
 }
 
@@ -24594,6 +24669,8 @@ func (m *TaskMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedChannelID()
 	case task.FieldChannelKeyID:
 		return m.AddedChannelKeyID()
+	case task.FieldAccountID:
+		return m.AddedAccountID()
 	}
 	return nil, false
 }
@@ -24686,6 +24763,13 @@ func (m *TaskMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddChannelKeyID(v)
+		return nil
+	case task.FieldAccountID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAccountID(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Task numeric field %s", name)
@@ -24806,6 +24890,9 @@ func (m *TaskMutation) ResetField(name string) error {
 		return nil
 	case task.FieldChannelKeyID:
 		m.ResetChannelKeyID()
+		return nil
+	case task.FieldAccountID:
+		m.ResetAccountID()
 		return nil
 	case task.FieldCreatedAt:
 		m.ResetCreatedAt()

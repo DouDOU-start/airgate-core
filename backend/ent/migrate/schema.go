@@ -685,6 +685,7 @@ var (
 		{Name: "group_id", Type: field.TypeInt, Default: 0},
 		{Name: "channel_id", Type: field.TypeInt, Default: 0},
 		{Name: "channel_key_id", Type: field.TypeInt, Default: 0},
+		{Name: "account_id", Type: field.TypeInt, Default: 0},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 	}
@@ -702,12 +703,12 @@ var (
 			{
 				Name:    "task_status_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[4], TasksColumns[28]},
+				Columns: []*schema.Column{TasksColumns[4], TasksColumns[29]},
 			},
 			{
 				Name:    "task_user_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[21], TasksColumns[27]},
+				Columns: []*schema.Column{TasksColumns[21], TasksColumns[28]},
 			},
 			{
 				Name:    "task_request_id",

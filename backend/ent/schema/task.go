@@ -72,6 +72,9 @@ func (Task) Fields() []ent.Field {
 		// channel_key_id 提交时选中的密钥端点 ID（轮询/成片代理须回到同一把 key）。
 		// 存量任务为 0，由 poller 回退到渠道任一可用 key 兜底。
 		field.Int("channel_key_id").Default(0),
+		// account_id 账号路径提交时选中的 OAuth 账号；与 channel_key_id 互斥。
+		// xAI 视频轮询必须回到同一账号，不能在账号池内重新随机选择。
+		field.Int("account_id").Default(0),
 		field.Time("created_at").Default(timeNow).Immutable(),
 		field.Time("updated_at").Default(timeNow).UpdateDefault(timeNow),
 	}

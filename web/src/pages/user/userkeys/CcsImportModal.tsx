@@ -1,24 +1,39 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, useOverlayState } from '@heroui/react';
+import { Button, Modal, Spinner, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
-import { Terminal } from 'lucide-react';
+import { ArrowUpRight, Braces, Sparkles, SquareTerminal } from 'lucide-react';
 import { useToast } from '../../../shared/ui';
 import { useSiteSettings } from '../../../app/providers/SiteSettingsProvider';
 import { apikeysApi } from '../../../shared/api/apikeys';
 import type { APIKeyResp } from '../../../shared/types';
 
+type CcsClientType = 'claude' | 'codex' | 'grokbuild';
+
+function normalizeBaseUrl(baseUrl: string): string {
+  return baseUrl.trim().replace(/\/+$/, '');
+}
+
+function toGatewayRoot(baseUrl: string): string {
+  return normalizeBaseUrl(baseUrl).replace(/\/v1$/i, '');
+}
+
+function toResponsesBaseUrl(baseUrl: string): string {
+  return `${toGatewayRoot(baseUrl)}/v1`;
+}
+
 function executeCcsImport(
   baseUrl: string,
   apiKey: string,
   siteName: string,
-  clientType: 'claude' | 'codex',
+  clientType: CcsClientType,
   toast: (type: 'success' | 'error', msg: string) => void,
   t: (key: string) => string,
 ) {
   // 渠道化后任意入口协议均可用，客户端类型只决定导入的 app 配置。
   const app: string = clientType;
-  const endpoint: string = baseUrl;
+  const gatewayRoot = toGatewayRoot(baseUrl);
+  const endpoint = app === 'grokbuild' ? toResponsesBaseUrl(baseUrl) : normalizeBaseUrl(baseUrl);
 
   const usageScript = `({
     request: {
@@ -41,12 +56,13 @@ function executeCcsImport(
     resource: 'provider',
     app,
     name: siteName,
-    homepage: baseUrl,
+    homepage: gatewayRoot,
     endpoint,
     apiKey,
     configFormat: 'json',
     usageEnabled: 'true',
     usageScript: btoa(usageScript),
+    usageBaseUrl: gatewayRoot,
     usageAutoInterval: '30',
   });
   if (app === 'codex') {
@@ -56,6 +72,11 @@ function executeCcsImport(
     params.set('disableResponseStorage', 'true');
     params.set('networkAccess', 'enabled');
     params.set('goals', 'true');
+  }
+  if (app === 'grokbuild') {
+    // CC-Switch 的 Grok Build 深链使用原生 Responses 配置。
+    params.set('model', 'grok-4.5');
+    params.set('icon', 'grok');
   }
 
   const deeplink = `ccswitch://v1/import?${params.toString()}`;
@@ -139,72 +160,86 @@ export function CcsImportModal({
   const { toast } = useToast();
   const site = useSiteSettings();
   const siteName = site.site_name || 'AirGate';
-  const baseUrl = window.location.origin;
+  const baseUrl = site.api_base_url || window.location.origin;
   const modalState = useOverlayState({
     isOpen: open,
     onOpenChange: (nextOpen) => {
       if (!nextOpen) onClose();
     },
   });
+  const clientOptions = [
+    {
+      type: 'claude' as const,
+      name: 'Claude Code',
+      description: t('user_keys.ccs_claude_desc'),
+      icon: Braces,
+    },
+    {
+      type: 'codex' as const,
+      name: 'Codex CLI',
+      description: t('user_keys.ccs_codex_desc'),
+      icon: SquareTerminal,
+    },
+    {
+      type: 'grokbuild' as const,
+      name: 'Grok Build',
+      description: t('user_keys.ccs_grok_desc'),
+      icon: Sparkles,
+    },
+  ];
 
   return (
     <Modal state={modalState}>
       <DialogTriggerShim />
       <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="inside" size="md">
-          <Modal.Dialog className="ag-elevation-modal">
+        <Modal.Container placement="center" scroll="inside" size="lg">
+          <Modal.Dialog className="ag-elevation-modal ag-ccs-import-modal">
             <Modal.Header>
               <Modal.Heading>{t('user_keys.ccs_select_client')}</Modal.Heading>
               <Modal.CloseTrigger />
             </Modal.Header>
-            <Modal.Body>
-      {ccsKeyValue ? (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              {/* Claude Code */}
-              <Button
-                variant="secondary"
-                className="h-auto flex-col gap-2 p-4"
-                onPress={() => {
-                  executeCcsImport(baseUrl, ccsKeyValue, siteName, 'claude', toast, t);
-                  onClose();
-                }}
-              >
-                <div className="w-10 h-10 rounded-lg bg-info-subtle flex items-center justify-center">
-                  <Terminal className="w-5 h-5 text-info" />
+            <Modal.Body className="ag-ccs-import-modal__body">
+              {ccsKeyValue ? (
+                <div className="ag-ccs-import-modal__content">
+                  <p className="ag-ccs-import-modal__description">
+                    {t('user_keys.ccs_select_client_desc')}
+                  </p>
+                  <div className="ag-ccs-client-grid">
+                    {clientOptions.map((client) => {
+                      const Icon = client.icon;
+                      return (
+                        <Button
+                          key={client.type}
+                          variant="secondary"
+                          className="ag-ccs-client-card"
+                          data-client={client.type}
+                          aria-label={`${client.name}：${client.description}`}
+                          onPress={() => {
+                            executeCcsImport(baseUrl, ccsKeyValue, siteName, client.type, toast, t);
+                            onClose();
+                          }}
+                        >
+                          <span className="ag-ccs-client-card__icon" aria-hidden="true">
+                            <Icon />
+                          </span>
+                          <span className="ag-ccs-client-card__copy">
+                            <strong>{client.name}</strong>
+                            <span>{client.description}</span>
+                          </span>
+                          <ArrowUpRight className="ag-ccs-client-card__arrow" aria-hidden="true" />
+                        </Button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <span className="text-sm font-medium text-text">Claude Code</span>
-                <span className="text-xs text-text-tertiary text-center">
-                  {t('user_keys.ccs_claude_desc')}
-                </span>
-              </Button>
-
-              {/* Codex CLI */}
-              <Button
-                variant="secondary"
-                className="h-auto flex-col gap-2 p-4"
-                onPress={() => {
-                  executeCcsImport(baseUrl, ccsKeyValue, siteName, 'codex', toast, t);
-                  onClose();
-                }}
-              >
-                <div className="w-10 h-10 rounded-lg bg-success-subtle flex items-center justify-center">
-                  <Terminal className="w-5 h-5 text-success" />
+              ) : (
+                <div className="ag-ccs-import-modal__loading">
+                  <Spinner size="sm" />
+                  <span>{t('common.loading')}</span>
                 </div>
-                <span className="text-sm font-medium text-text">Codex CLI</span>
-                <span className="text-xs text-text-tertiary text-center">
-                  {t('user_keys.ccs_codex_desc')}
-                </span>
-              </Button>
-            </div>
-          </div>
-      ) : (
-        <div className="flex items-center justify-center py-8 text-text-tertiary text-sm">
-          {t('common.loading')}
-        </div>
-      )}
+              )}
             </Modal.Body>
-            <Modal.Footer>
+            <Modal.Footer className="ag-ccs-import-modal__footer">
               <Button
                 variant="secondary"
                 onPress={onClose}

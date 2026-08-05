@@ -17,15 +17,46 @@ import (
 // maxBatchFetchIDs 批量查询单次 ID 数上限。
 const maxBatchFetchIDs = 100
 
-// HandleVideoGet GET /v1/videos/:task_id：读本地 task 快照重建 OpenAI video 对象。
-// 不穿透上游（轮询保鲜，最长滞后一个节拍）。
+// HandleVideoGet GET /v1/videos/:task_id：读本地 task 快照重建视频对象。
+// 同一路由兼容 xAI 原生视频与既有 OpenAI Video；优先查 xAI 任务，避免
+// Grok Build 的轮询被旧任务 handler 误判为不存在。
 func (f *Flow) HandleVideoGet(c *gin.Context) {
 	setEntryProtocol(c, registry.ProtocolOpenAI)
-	t, ad, ok := f.taskForRequest(c, PlatformOpenAIVideo)
+	t, ad, ok := f.videoTaskForRequest(c)
 	if !ok {
 		return
 	}
 	c.Data(http.StatusOK, "application/json", ad.RenderTask(t))
+}
+
+func (f *Flow) videoTaskForRequest(c *gin.Context) (*Task, Adaptor, bool) {
+	keyInfo, ok := requireKeyInfo(c)
+	if !ok {
+		return nil, nil, false
+	}
+	taskID := c.Param("task_id")
+	if taskID == "" {
+		writeError(c, http.StatusBadRequest, "invalid_request_error", "missing_task_id", "缺少任务 ID")
+		return nil, nil, false
+	}
+	for _, platform := range []string{PlatformXAIVideo, PlatformOpenAIVideo} {
+		t, err := f.store.GetForUser(c.Request.Context(), platform, taskID, keyInfo.UserID)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, "server_error", "internal_error", "任务查询失败")
+			return nil, nil, false
+		}
+		if t == nil {
+			continue
+		}
+		ad, err := GetAdaptor(platform)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, "server_error", "internal_error", err.Error())
+			return nil, nil, false
+		}
+		return t, ad, true
+	}
+	writeError(c, http.StatusNotFound, "invalid_request_error", "task_not_found", "任务不存在")
+	return nil, nil, false
 }
 
 // HandleVideoContent GET /v1/videos/:task_id/content：成片内容实时代理

@@ -2,17 +2,22 @@ package task
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"math"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/upstreamclient"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
+	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
+	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pipeline"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
@@ -46,6 +51,8 @@ type Poller struct {
 	errSink    ErrSink
 	settings   SettingsSource
 	balance    BalanceOps
+	accounts   *accountreg.Registry
+	cpa        CPAForwarder
 	client     *http.Client
 
 	// now / sleep 可注入以便测试。
@@ -72,6 +79,8 @@ func NewPoller(opts Options) *Poller {
 		errSink:    opts.ErrLog,
 		settings:   settings,
 		balance:    opts.Balance,
+		accounts:   opts.Accounts,
+		cpa:        opts.CPA,
 		client:     upstreamclient.NewClient(0),
 		now:        time.Now,
 		sleep:      sleepCtx,
@@ -112,22 +121,27 @@ func (p *Poller) tick(ctx context.Context) {
 	// 按密钥端点分组批量轮询（suno 合批需同一把 key）。存量任务无 channel_key_id
 	// （为 0）：退化为按渠道分组的 legacy 桶（groupKey 取 -channelID，与正常 keyID 空间隔离），
 	// pollChannel 内回退到该渠道任一可用 key。
-	groups := map[int][]*Task{}
+	channelGroups := map[int][]*Task{}
+	accountGroups := map[int][]*Task{}
 	for _, t := range tasks {
 		if p.now().Sub(t.SubmitTime) > timeout {
 			p.failTask(ctx, t, "任务超时（超过 "+timeout.String()+" 未完成）", errlog.PhaseTaskTimeout)
+			continue
+		}
+		if t.Platform == PlatformXAIVideo && t.AccountID > 0 {
+			accountGroups[t.AccountID] = append(accountGroups[t.AccountID], t)
 			continue
 		}
 		groupKey := t.ChannelKeyID
 		if groupKey == 0 {
 			groupKey = -t.ChannelID
 		}
-		groups[groupKey] = append(groups[groupKey], t)
+		channelGroups[groupKey] = append(channelGroups[groupKey], t)
 	}
 
 	sem := make(chan struct{}, pollChannelConcurrency)
 	var wg sync.WaitGroup
-	for groupKey, ts := range groups {
+	for groupKey, ts := range channelGroups {
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(groupKey int, ts []*Task) {
@@ -136,7 +150,93 @@ func (p *Poller) tick(ctx context.Context) {
 			p.pollChannel(ctx, groupKey, ts)
 		}(groupKey, ts)
 	}
+	for accountID, ts := range accountGroups {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(accountID int, ts []*Task) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			p.pollXAIAccount(ctx, accountID, ts)
+		}(accountID, ts)
+	}
 	wg.Wait()
+}
+
+// pollXAIAccount 使用任务提交时持久化的同一个 xAI OAuth 账号逐个轮询。
+func (p *Poller) pollXAIAccount(ctx context.Context, accountID int, tasks []*Task) {
+	if p.accounts == nil || p.cpa == nil {
+		for _, t := range tasks {
+			p.failTask(ctx, t, "xAI OAuth 账号轮询组件未配置", errlog.PhaseTaskFailed)
+		}
+		return
+	}
+	acc, ok := p.accounts.Snapshot(accountID)
+	if !ok || cpa.ResolveProvider(acc.Platform) != "xai" {
+		for _, t := range tasks {
+			p.failTask(ctx, t, "任务所属 xAI OAuth 账号已删除，无法跟踪", errlog.PhaseTaskFailed)
+		}
+		return
+	}
+	ad, err := GetAdaptor(PlatformXAIVideo)
+	if err != nil {
+		slog.Warn("xai_video_poll_adaptor_missing", "account_id", accountID, "error", err)
+		return
+	}
+
+	for i, t := range tasks {
+		if ctx.Err() != nil {
+			return
+		}
+		if i > 0 {
+			p.sleep(ctx, perTaskQueryGap)
+		}
+		payload, _ := json.Marshal(map[string]string{"request_id": t.TaskID})
+		model := strings.TrimSpace(t.UpstreamModel)
+		if model == "" {
+			model = t.RequestModel
+		}
+		reqCtx, cancel := context.WithTimeout(ctx, queryTimeout)
+		result := p.cpa.Forward(reqCtx, nil, cpa.ForwardRequest{
+			Account: cpa.AccountAuthInput{
+				AccountID: acc.ID, Name: acc.Name, Platform: acc.Platform, Type: acc.Type,
+				Credentials: acc.Credentials, ProxyURL: acc.ProxyURL,
+			},
+			Model: model, Endpoint: adaptor.EndpointXAIVideosRetrieve,
+			EntryProtocol: registry.ProtocolOpenAI, Payload: payload,
+			Headers: http.Header{"Content-Type": []string{"application/json"}},
+		})
+		cancel()
+		if len(result.RefreshedCredentials) > 0 {
+			p.accounts.UpdateCredentials(acc.ID, result.RefreshedCredentials)
+		}
+		o := outcome.Classify(result.StatusCode, result.Headers, result.Body, result.NetErr)
+		switch o.Verdict {
+		case outcome.Success:
+			st, parseErr := ad.ParseQueryResponse(result.Body)
+			if parseErr != nil {
+				slog.Warn("xai_video_poll_parse_failed", "task_id", t.TaskID, "account_id", accountID, "error", parseErr)
+				continue
+			}
+			p.accounts.MarkActive(accountID)
+			p.applyStatus(ctx, t, st)
+		case outcome.AuthFailed:
+			if p.settings.Get(ctx).AutoBanEnabled {
+				p.accounts.MarkDisabled(accountID, outcome.TruncateErrorMsg(o.Reason))
+			}
+			slog.Warn("xai_video_poll_auth_failed", "task_id", t.TaskID, "account_id", accountID)
+			return
+		case outcome.RateLimited:
+			retryUntil := time.Now().Add(o.RetryAfter)
+			if o.RetryAfter <= 0 {
+				retryUntil = time.Now().Add(time.Minute)
+			}
+			p.accounts.MarkRateLimited(accountID, retryUntil, o.Reason)
+			slog.Warn("xai_video_poll_rate_limited", "task_id", t.TaskID, "account_id", accountID)
+		default:
+			slog.Warn("xai_video_poll_failed", "task_id", t.TaskID, "account_id", accountID,
+				"reason", outcome.SanitizeKeyLeak(o.Reason, []string{accountCredentialHint(acc)}))
+		}
+	}
 }
 
 // pollChannel 单密钥端点组查询：suno 走批量接口，其余逐任务查询（组内限速）。
@@ -406,6 +506,7 @@ func (p *Poller) settleSuccess(ctx context.Context, t *Task, seconds int) {
 		APIKeyID:              t.APIKeyID,
 		ChannelID:             t.ChannelID,
 		ChannelKeyID:          t.ChannelKeyID,
+		AccountID:             t.AccountID,
 		GroupID:               t.GroupID,
 		Model:                 t.RequestModel,
 		Calls:                 calls,
@@ -453,6 +554,7 @@ func (p *Poller) refundFailure(ctx context.Context, t *Task, reason, phase strin
 			APIKeyID:  t.APIKeyID,
 			GroupID:   t.GroupID,
 			ChannelID: t.ChannelID,
+			AccountID: t.AccountID,
 		})
 	}
 }
@@ -472,6 +574,8 @@ func taskEndpoint(t *Task) string {
 	switch t.Platform {
 	case PlatformSuno:
 		return "/suno/submit/" + t.Action
+	case PlatformXAIVideo:
+		return "/v1/videos/generations"
 	default:
 		return "/v1/videos"
 	}
