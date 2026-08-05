@@ -139,6 +139,16 @@ func ChannelName(v string) predicate.UpstreamRequestLog {
 	return predicate.UpstreamRequestLog(sql.FieldEQ(FieldChannelName, v))
 }
 
+// AccountID applies equality check predicate on the "account_id" field. It's identical to AccountIDEQ.
+func AccountID(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldEQ(FieldAccountID, v))
+}
+
+// AccountName applies equality check predicate on the "account_name" field. It's identical to AccountNameEQ.
+func AccountName(v string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldEQ(FieldAccountName, v))
+}
+
 // IPAddress applies equality check predicate on the "ip_address" field. It's identical to IPAddressEQ.
 func IPAddress(v string) predicate.UpstreamRequestLog {
 	return predicate.UpstreamRequestLog(sql.FieldEQ(FieldIPAddress, v))
@@ -1037,6 +1047,111 @@ func ChannelNameEqualFold(v string) predicate.UpstreamRequestLog {
 // ChannelNameContainsFold applies the ContainsFold predicate on the "channel_name" field.
 func ChannelNameContainsFold(v string) predicate.UpstreamRequestLog {
 	return predicate.UpstreamRequestLog(sql.FieldContainsFold(FieldChannelName, v))
+}
+
+// AccountIDEQ applies the EQ predicate on the "account_id" field.
+func AccountIDEQ(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldEQ(FieldAccountID, v))
+}
+
+// AccountIDNEQ applies the NEQ predicate on the "account_id" field.
+func AccountIDNEQ(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldNEQ(FieldAccountID, v))
+}
+
+// AccountIDIn applies the In predicate on the "account_id" field.
+func AccountIDIn(vs ...int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldIn(FieldAccountID, vs...))
+}
+
+// AccountIDNotIn applies the NotIn predicate on the "account_id" field.
+func AccountIDNotIn(vs ...int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldNotIn(FieldAccountID, vs...))
+}
+
+// AccountIDGT applies the GT predicate on the "account_id" field.
+func AccountIDGT(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldGT(FieldAccountID, v))
+}
+
+// AccountIDGTE applies the GTE predicate on the "account_id" field.
+func AccountIDGTE(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldGTE(FieldAccountID, v))
+}
+
+// AccountIDLT applies the LT predicate on the "account_id" field.
+func AccountIDLT(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldLT(FieldAccountID, v))
+}
+
+// AccountIDLTE applies the LTE predicate on the "account_id" field.
+func AccountIDLTE(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldLTE(FieldAccountID, v))
+}
+
+// AccountNameEQ applies the EQ predicate on the "account_name" field.
+func AccountNameEQ(v string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldEQ(FieldAccountName, v))
+}
+
+// AccountNameNEQ applies the NEQ predicate on the "account_name" field.
+func AccountNameNEQ(v string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldNEQ(FieldAccountName, v))
+}
+
+// AccountNameIn applies the In predicate on the "account_name" field.
+func AccountNameIn(vs ...string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldIn(FieldAccountName, vs...))
+}
+
+// AccountNameNotIn applies the NotIn predicate on the "account_name" field.
+func AccountNameNotIn(vs ...string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldNotIn(FieldAccountName, vs...))
+}
+
+// AccountNameGT applies the GT predicate on the "account_name" field.
+func AccountNameGT(v string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldGT(FieldAccountName, v))
+}
+
+// AccountNameGTE applies the GTE predicate on the "account_name" field.
+func AccountNameGTE(v string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldGTE(FieldAccountName, v))
+}
+
+// AccountNameLT applies the LT predicate on the "account_name" field.
+func AccountNameLT(v string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldLT(FieldAccountName, v))
+}
+
+// AccountNameLTE applies the LTE predicate on the "account_name" field.
+func AccountNameLTE(v string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldLTE(FieldAccountName, v))
+}
+
+// AccountNameContains applies the Contains predicate on the "account_name" field.
+func AccountNameContains(v string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldContains(FieldAccountName, v))
+}
+
+// AccountNameHasPrefix applies the HasPrefix predicate on the "account_name" field.
+func AccountNameHasPrefix(v string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldHasPrefix(FieldAccountName, v))
+}
+
+// AccountNameHasSuffix applies the HasSuffix predicate on the "account_name" field.
+func AccountNameHasSuffix(v string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldHasSuffix(FieldAccountName, v))
+}
+
+// AccountNameEqualFold applies the EqualFold predicate on the "account_name" field.
+func AccountNameEqualFold(v string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldEqualFold(FieldAccountName, v))
+}
+
+// AccountNameContainsFold applies the ContainsFold predicate on the "account_name" field.
+func AccountNameContainsFold(v string) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldContainsFold(FieldAccountName, v))
 }
 
 // IPAddressEQ applies the EQ predicate on the "ip_address" field.

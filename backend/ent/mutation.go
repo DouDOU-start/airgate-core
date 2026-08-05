@@ -25731,6 +25731,9 @@ type UpstreamRequestLogMutation struct {
 	channel_id          *int
 	addchannel_id       *int
 	channel_name        *string
+	account_id          *int
+	addaccount_id       *int
+	account_name        *string
 	ip_address          *string
 	user_agent          *string
 	duration_ms         *int64
@@ -26675,6 +26678,98 @@ func (m *UpstreamRequestLogMutation) ResetChannelName() {
 	m.channel_name = nil
 }
 
+// SetAccountID sets the "account_id" field.
+func (m *UpstreamRequestLogMutation) SetAccountID(i int) {
+	m.account_id = &i
+	m.addaccount_id = nil
+}
+
+// AccountID returns the value of the "account_id" field in the mutation.
+func (m *UpstreamRequestLogMutation) AccountID() (r int, exists bool) {
+	v := m.account_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountID returns the old "account_id" field's value of the UpstreamRequestLog entity.
+// If the UpstreamRequestLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UpstreamRequestLogMutation) OldAccountID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountID: %w", err)
+	}
+	return oldValue.AccountID, nil
+}
+
+// AddAccountID adds i to the "account_id" field.
+func (m *UpstreamRequestLogMutation) AddAccountID(i int) {
+	if m.addaccount_id != nil {
+		*m.addaccount_id += i
+	} else {
+		m.addaccount_id = &i
+	}
+}
+
+// AddedAccountID returns the value that was added to the "account_id" field in this mutation.
+func (m *UpstreamRequestLogMutation) AddedAccountID() (r int, exists bool) {
+	v := m.addaccount_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAccountID resets all changes to the "account_id" field.
+func (m *UpstreamRequestLogMutation) ResetAccountID() {
+	m.account_id = nil
+	m.addaccount_id = nil
+}
+
+// SetAccountName sets the "account_name" field.
+func (m *UpstreamRequestLogMutation) SetAccountName(s string) {
+	m.account_name = &s
+}
+
+// AccountName returns the value of the "account_name" field in the mutation.
+func (m *UpstreamRequestLogMutation) AccountName() (r string, exists bool) {
+	v := m.account_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountName returns the old "account_name" field's value of the UpstreamRequestLog entity.
+// If the UpstreamRequestLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UpstreamRequestLogMutation) OldAccountName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountName: %w", err)
+	}
+	return oldValue.AccountName, nil
+}
+
+// ResetAccountName resets all changes to the "account_name" field.
+func (m *UpstreamRequestLogMutation) ResetAccountName() {
+	m.account_name = nil
+}
+
 // SetIPAddress sets the "ip_address" field.
 func (m *UpstreamRequestLogMutation) SetIPAddress(s string) {
 	m.ip_address = &s
@@ -26929,7 +27024,7 @@ func (m *UpstreamRequestLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UpstreamRequestLogMutation) Fields() []string {
-	fields := make([]string, 0, 24)
+	fields := make([]string, 0, 26)
 	if m.request_id != nil {
 		fields = append(fields, upstreamrequestlog.FieldRequestID)
 	}
@@ -26986,6 +27081,12 @@ func (m *UpstreamRequestLogMutation) Fields() []string {
 	}
 	if m.channel_name != nil {
 		fields = append(fields, upstreamrequestlog.FieldChannelName)
+	}
+	if m.account_id != nil {
+		fields = append(fields, upstreamrequestlog.FieldAccountID)
+	}
+	if m.account_name != nil {
+		fields = append(fields, upstreamrequestlog.FieldAccountName)
 	}
 	if m.ip_address != nil {
 		fields = append(fields, upstreamrequestlog.FieldIPAddress)
@@ -27048,6 +27149,10 @@ func (m *UpstreamRequestLogMutation) Field(name string) (ent.Value, bool) {
 		return m.ChannelID()
 	case upstreamrequestlog.FieldChannelName:
 		return m.ChannelName()
+	case upstreamrequestlog.FieldAccountID:
+		return m.AccountID()
+	case upstreamrequestlog.FieldAccountName:
+		return m.AccountName()
 	case upstreamrequestlog.FieldIPAddress:
 		return m.IPAddress()
 	case upstreamrequestlog.FieldUserAgent:
@@ -27105,6 +27210,10 @@ func (m *UpstreamRequestLogMutation) OldField(ctx context.Context, name string) 
 		return m.OldChannelID(ctx)
 	case upstreamrequestlog.FieldChannelName:
 		return m.OldChannelName(ctx)
+	case upstreamrequestlog.FieldAccountID:
+		return m.OldAccountID(ctx)
+	case upstreamrequestlog.FieldAccountName:
+		return m.OldAccountName(ctx)
 	case upstreamrequestlog.FieldIPAddress:
 		return m.OldIPAddress(ctx)
 	case upstreamrequestlog.FieldUserAgent:
@@ -27257,6 +27366,20 @@ func (m *UpstreamRequestLogMutation) SetField(name string, value ent.Value) erro
 		}
 		m.SetChannelName(v)
 		return nil
+	case upstreamrequestlog.FieldAccountID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountID(v)
+		return nil
+	case upstreamrequestlog.FieldAccountName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountName(v)
+		return nil
 	case upstreamrequestlog.FieldIPAddress:
 		v, ok := value.(string)
 		if !ok {
@@ -27318,6 +27441,9 @@ func (m *UpstreamRequestLogMutation) AddedFields() []string {
 	if m.addchannel_id != nil {
 		fields = append(fields, upstreamrequestlog.FieldChannelID)
 	}
+	if m.addaccount_id != nil {
+		fields = append(fields, upstreamrequestlog.FieldAccountID)
+	}
 	if m.addduration_ms != nil {
 		fields = append(fields, upstreamrequestlog.FieldDurationMs)
 	}
@@ -27344,6 +27470,8 @@ func (m *UpstreamRequestLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedGroupID()
 	case upstreamrequestlog.FieldChannelID:
 		return m.AddedChannelID()
+	case upstreamrequestlog.FieldAccountID:
+		return m.AddedAccountID()
 	case upstreamrequestlog.FieldDurationMs:
 		return m.AddedDurationMs()
 	case upstreamrequestlog.FieldRepeatCount:
@@ -27398,6 +27526,13 @@ func (m *UpstreamRequestLogMutation) AddField(name string, value ent.Value) erro
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddChannelID(v)
+		return nil
+	case upstreamrequestlog.FieldAccountID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAccountID(v)
 		return nil
 	case upstreamrequestlog.FieldDurationMs:
 		v, ok := value.(int64)
@@ -27505,6 +27640,12 @@ func (m *UpstreamRequestLogMutation) ResetField(name string) error {
 		return nil
 	case upstreamrequestlog.FieldChannelName:
 		m.ResetChannelName()
+		return nil
+	case upstreamrequestlog.FieldAccountID:
+		m.ResetAccountID()
+		return nil
+	case upstreamrequestlog.FieldAccountName:
+		m.ResetAccountName()
 		return nil
 	case upstreamrequestlog.FieldIPAddress:
 		m.ResetIPAddress()

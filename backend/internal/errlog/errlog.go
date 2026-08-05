@@ -351,7 +351,7 @@ func foldKey(e Entry) string {
 	return strings.Join([]string{
 		e.Source, e.Phase, strconv.Itoa(e.StatusCode), e.ErrorType, e.ErrorCode,
 		e.Model, e.Endpoint,
-		strconv.Itoa(e.ChannelID), strconv.Itoa(e.UserID), strconv.Itoa(e.APIKeyID),
+		strconv.Itoa(e.ChannelID), strconv.Itoa(e.AccountID), strconv.Itoa(e.UserID), strconv.Itoa(e.APIKeyID),
 	}, "\x1f")
 }
 
@@ -446,6 +446,8 @@ func (r *Recorder) entryCreate(e Entry, repeat int) *ent.UpstreamRequestLogCreat
 		SetGroupID(e.GroupID).
 		SetChannelID(e.ChannelID).
 		SetChannelName(e.ChannelName).
+		SetAccountID(e.AccountID).
+		SetAccountName(e.AccountName).
 		SetIPAddress(e.IPAddress).
 		SetUserAgent(Sanitize(e.UserAgent, 512)).
 		SetDurationMs(e.DurationMs).

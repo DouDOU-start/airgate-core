@@ -205,6 +205,8 @@ func toUpstreamLogResp(item appupstreamlog.Record) dto.UpstreamLogResp {
 		GroupID:      item.GroupID,
 		ChannelID:    item.ChannelID,
 		ChannelName:  item.ChannelName,
+		AccountID:    item.AccountID,
+		AccountName:  item.AccountName,
 		IPAddress:    item.IPAddress,
 		UserAgent:    item.UserAgent,
 		DurationMs:   item.DurationMs,

@@ -265,6 +265,34 @@ func (urlc *UpstreamRequestLogCreate) SetNillableChannelName(s *string) *Upstrea
 	return urlc
 }
 
+// SetAccountID sets the "account_id" field.
+func (urlc *UpstreamRequestLogCreate) SetAccountID(i int) *UpstreamRequestLogCreate {
+	urlc.mutation.SetAccountID(i)
+	return urlc
+}
+
+// SetNillableAccountID sets the "account_id" field if the given value is not nil.
+func (urlc *UpstreamRequestLogCreate) SetNillableAccountID(i *int) *UpstreamRequestLogCreate {
+	if i != nil {
+		urlc.SetAccountID(*i)
+	}
+	return urlc
+}
+
+// SetAccountName sets the "account_name" field.
+func (urlc *UpstreamRequestLogCreate) SetAccountName(s string) *UpstreamRequestLogCreate {
+	urlc.mutation.SetAccountName(s)
+	return urlc
+}
+
+// SetNillableAccountName sets the "account_name" field if the given value is not nil.
+func (urlc *UpstreamRequestLogCreate) SetNillableAccountName(s *string) *UpstreamRequestLogCreate {
+	if s != nil {
+		urlc.SetAccountName(*s)
+	}
+	return urlc
+}
+
 // SetIPAddress sets the "ip_address" field.
 func (urlc *UpstreamRequestLogCreate) SetIPAddress(s string) *UpstreamRequestLogCreate {
 	urlc.mutation.SetIPAddress(s)
@@ -434,6 +462,14 @@ func (urlc *UpstreamRequestLogCreate) defaults() {
 		v := upstreamrequestlog.DefaultChannelName
 		urlc.mutation.SetChannelName(v)
 	}
+	if _, ok := urlc.mutation.AccountID(); !ok {
+		v := upstreamrequestlog.DefaultAccountID
+		urlc.mutation.SetAccountID(v)
+	}
+	if _, ok := urlc.mutation.AccountName(); !ok {
+		v := upstreamrequestlog.DefaultAccountName
+		urlc.mutation.SetAccountName(v)
+	}
 	if _, ok := urlc.mutation.IPAddress(); !ok {
 		v := upstreamrequestlog.DefaultIPAddress
 		urlc.mutation.SetIPAddress(v)
@@ -521,6 +557,12 @@ func (urlc *UpstreamRequestLogCreate) check() error {
 	}
 	if _, ok := urlc.mutation.ChannelName(); !ok {
 		return &ValidationError{Name: "channel_name", err: errors.New(`ent: missing required field "UpstreamRequestLog.channel_name"`)}
+	}
+	if _, ok := urlc.mutation.AccountID(); !ok {
+		return &ValidationError{Name: "account_id", err: errors.New(`ent: missing required field "UpstreamRequestLog.account_id"`)}
+	}
+	if _, ok := urlc.mutation.AccountName(); !ok {
+		return &ValidationError{Name: "account_name", err: errors.New(`ent: missing required field "UpstreamRequestLog.account_name"`)}
 	}
 	if _, ok := urlc.mutation.IPAddress(); !ok {
 		return &ValidationError{Name: "ip_address", err: errors.New(`ent: missing required field "UpstreamRequestLog.ip_address"`)}
@@ -639,6 +681,14 @@ func (urlc *UpstreamRequestLogCreate) createSpec() (*UpstreamRequestLog, *sqlgra
 	if value, ok := urlc.mutation.ChannelName(); ok {
 		_spec.SetField(upstreamrequestlog.FieldChannelName, field.TypeString, value)
 		_node.ChannelName = value
+	}
+	if value, ok := urlc.mutation.AccountID(); ok {
+		_spec.SetField(upstreamrequestlog.FieldAccountID, field.TypeInt, value)
+		_node.AccountID = value
+	}
+	if value, ok := urlc.mutation.AccountName(); ok {
+		_spec.SetField(upstreamrequestlog.FieldAccountName, field.TypeString, value)
+		_node.AccountName = value
 	}
 	if value, ok := urlc.mutation.IPAddress(); ok {
 		_spec.SetField(upstreamrequestlog.FieldIPAddress, field.TypeString, value)
@@ -979,6 +1029,36 @@ func (u *UpstreamRequestLogUpsert) SetChannelName(v string) *UpstreamRequestLogU
 // UpdateChannelName sets the "channel_name" field to the value that was provided on create.
 func (u *UpstreamRequestLogUpsert) UpdateChannelName() *UpstreamRequestLogUpsert {
 	u.SetExcluded(upstreamrequestlog.FieldChannelName)
+	return u
+}
+
+// SetAccountID sets the "account_id" field.
+func (u *UpstreamRequestLogUpsert) SetAccountID(v int) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldAccountID, v)
+	return u
+}
+
+// UpdateAccountID sets the "account_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateAccountID() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldAccountID)
+	return u
+}
+
+// AddAccountID adds v to the "account_id" field.
+func (u *UpstreamRequestLogUpsert) AddAccountID(v int) *UpstreamRequestLogUpsert {
+	u.Add(upstreamrequestlog.FieldAccountID, v)
+	return u
+}
+
+// SetAccountName sets the "account_name" field.
+func (u *UpstreamRequestLogUpsert) SetAccountName(v string) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldAccountName, v)
+	return u
+}
+
+// UpdateAccountName sets the "account_name" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateAccountName() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldAccountName)
 	return u
 }
 
@@ -1399,6 +1479,41 @@ func (u *UpstreamRequestLogUpsertOne) SetChannelName(v string) *UpstreamRequestL
 func (u *UpstreamRequestLogUpsertOne) UpdateChannelName() *UpstreamRequestLogUpsertOne {
 	return u.Update(func(s *UpstreamRequestLogUpsert) {
 		s.UpdateChannelName()
+	})
+}
+
+// SetAccountID sets the "account_id" field.
+func (u *UpstreamRequestLogUpsertOne) SetAccountID(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetAccountID(v)
+	})
+}
+
+// AddAccountID adds v to the "account_id" field.
+func (u *UpstreamRequestLogUpsertOne) AddAccountID(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddAccountID(v)
+	})
+}
+
+// UpdateAccountID sets the "account_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateAccountID() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateAccountID()
+	})
+}
+
+// SetAccountName sets the "account_name" field.
+func (u *UpstreamRequestLogUpsertOne) SetAccountName(v string) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetAccountName(v)
+	})
+}
+
+// UpdateAccountName sets the "account_name" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateAccountName() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateAccountName()
 	})
 }
 
@@ -1995,6 +2110,41 @@ func (u *UpstreamRequestLogUpsertBulk) SetChannelName(v string) *UpstreamRequest
 func (u *UpstreamRequestLogUpsertBulk) UpdateChannelName() *UpstreamRequestLogUpsertBulk {
 	return u.Update(func(s *UpstreamRequestLogUpsert) {
 		s.UpdateChannelName()
+	})
+}
+
+// SetAccountID sets the "account_id" field.
+func (u *UpstreamRequestLogUpsertBulk) SetAccountID(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetAccountID(v)
+	})
+}
+
+// AddAccountID adds v to the "account_id" field.
+func (u *UpstreamRequestLogUpsertBulk) AddAccountID(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddAccountID(v)
+	})
+}
+
+// UpdateAccountID sets the "account_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateAccountID() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateAccountID()
+	})
+}
+
+// SetAccountName sets the "account_name" field.
+func (u *UpstreamRequestLogUpsertBulk) SetAccountName(v string) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetAccountName(v)
+	})
+}
+
+// UpdateAccountName sets the "account_name" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateAccountName() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateAccountName()
 	})
 }
 

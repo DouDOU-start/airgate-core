@@ -342,6 +342,41 @@ func (urlu *UpstreamRequestLogUpdate) SetNillableChannelName(s *string) *Upstrea
 	return urlu
 }
 
+// SetAccountID sets the "account_id" field.
+func (urlu *UpstreamRequestLogUpdate) SetAccountID(i int) *UpstreamRequestLogUpdate {
+	urlu.mutation.ResetAccountID()
+	urlu.mutation.SetAccountID(i)
+	return urlu
+}
+
+// SetNillableAccountID sets the "account_id" field if the given value is not nil.
+func (urlu *UpstreamRequestLogUpdate) SetNillableAccountID(i *int) *UpstreamRequestLogUpdate {
+	if i != nil {
+		urlu.SetAccountID(*i)
+	}
+	return urlu
+}
+
+// AddAccountID adds i to the "account_id" field.
+func (urlu *UpstreamRequestLogUpdate) AddAccountID(i int) *UpstreamRequestLogUpdate {
+	urlu.mutation.AddAccountID(i)
+	return urlu
+}
+
+// SetAccountName sets the "account_name" field.
+func (urlu *UpstreamRequestLogUpdate) SetAccountName(s string) *UpstreamRequestLogUpdate {
+	urlu.mutation.SetAccountName(s)
+	return urlu
+}
+
+// SetNillableAccountName sets the "account_name" field if the given value is not nil.
+func (urlu *UpstreamRequestLogUpdate) SetNillableAccountName(s *string) *UpstreamRequestLogUpdate {
+	if s != nil {
+		urlu.SetAccountName(*s)
+	}
+	return urlu
+}
+
 // SetIPAddress sets the "ip_address" field.
 func (urlu *UpstreamRequestLogUpdate) SetIPAddress(s string) *UpstreamRequestLogUpdate {
 	urlu.mutation.SetIPAddress(s)
@@ -559,6 +594,15 @@ func (urlu *UpstreamRequestLogUpdate) sqlSave(ctx context.Context) (n int, err e
 	}
 	if value, ok := urlu.mutation.ChannelName(); ok {
 		_spec.SetField(upstreamrequestlog.FieldChannelName, field.TypeString, value)
+	}
+	if value, ok := urlu.mutation.AccountID(); ok {
+		_spec.SetField(upstreamrequestlog.FieldAccountID, field.TypeInt, value)
+	}
+	if value, ok := urlu.mutation.AddedAccountID(); ok {
+		_spec.AddField(upstreamrequestlog.FieldAccountID, field.TypeInt, value)
+	}
+	if value, ok := urlu.mutation.AccountName(); ok {
+		_spec.SetField(upstreamrequestlog.FieldAccountName, field.TypeString, value)
 	}
 	if value, ok := urlu.mutation.IPAddress(); ok {
 		_spec.SetField(upstreamrequestlog.FieldIPAddress, field.TypeString, value)
@@ -912,6 +956,41 @@ func (urluo *UpstreamRequestLogUpdateOne) SetNillableChannelName(s *string) *Ups
 	return urluo
 }
 
+// SetAccountID sets the "account_id" field.
+func (urluo *UpstreamRequestLogUpdateOne) SetAccountID(i int) *UpstreamRequestLogUpdateOne {
+	urluo.mutation.ResetAccountID()
+	urluo.mutation.SetAccountID(i)
+	return urluo
+}
+
+// SetNillableAccountID sets the "account_id" field if the given value is not nil.
+func (urluo *UpstreamRequestLogUpdateOne) SetNillableAccountID(i *int) *UpstreamRequestLogUpdateOne {
+	if i != nil {
+		urluo.SetAccountID(*i)
+	}
+	return urluo
+}
+
+// AddAccountID adds i to the "account_id" field.
+func (urluo *UpstreamRequestLogUpdateOne) AddAccountID(i int) *UpstreamRequestLogUpdateOne {
+	urluo.mutation.AddAccountID(i)
+	return urluo
+}
+
+// SetAccountName sets the "account_name" field.
+func (urluo *UpstreamRequestLogUpdateOne) SetAccountName(s string) *UpstreamRequestLogUpdateOne {
+	urluo.mutation.SetAccountName(s)
+	return urluo
+}
+
+// SetNillableAccountName sets the "account_name" field if the given value is not nil.
+func (urluo *UpstreamRequestLogUpdateOne) SetNillableAccountName(s *string) *UpstreamRequestLogUpdateOne {
+	if s != nil {
+		urluo.SetAccountName(*s)
+	}
+	return urluo
+}
+
 // SetIPAddress sets the "ip_address" field.
 func (urluo *UpstreamRequestLogUpdateOne) SetIPAddress(s string) *UpstreamRequestLogUpdateOne {
 	urluo.mutation.SetIPAddress(s)
@@ -1159,6 +1238,15 @@ func (urluo *UpstreamRequestLogUpdateOne) sqlSave(ctx context.Context) (_node *U
 	}
 	if value, ok := urluo.mutation.ChannelName(); ok {
 		_spec.SetField(upstreamrequestlog.FieldChannelName, field.TypeString, value)
+	}
+	if value, ok := urluo.mutation.AccountID(); ok {
+		_spec.SetField(upstreamrequestlog.FieldAccountID, field.TypeInt, value)
+	}
+	if value, ok := urluo.mutation.AddedAccountID(); ok {
+		_spec.AddField(upstreamrequestlog.FieldAccountID, field.TypeInt, value)
+	}
+	if value, ok := urluo.mutation.AccountName(); ok {
+		_spec.SetField(upstreamrequestlog.FieldAccountName, field.TypeString, value)
 	}
 	if value, ok := urluo.mutation.IPAddress(); ok {
 		_spec.SetField(upstreamrequestlog.FieldIPAddress, field.TypeString, value)

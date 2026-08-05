@@ -58,9 +58,11 @@ func (UpstreamRequestLog) Fields() []ent.Field {
 		field.String("user_email_snapshot").Default(""),
 		field.Int("api_key_id").Default(0),
 		field.Int("group_id").Default(0),
-		// 末次尝试渠道快照；渠道测试行即目标渠道。
+		// 末次尝试路由快照：渠道与账号字段互斥；渠道测试行写目标渠道。
 		field.Int("channel_id").Default(0),
 		field.String("channel_name").Default(""),
+		field.Int("account_id").Default(0),
+		field.String("account_name").Default(""),
 		field.String("ip_address").Default(""),
 		field.String("user_agent").Default(""),
 		field.Int64("duration_ms").Default(0),

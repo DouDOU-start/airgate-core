@@ -73,7 +73,7 @@ export function UpstreamLogsTable({
           <CommonTable.Column id="status" style={{ width: 170 }}>{t('upstream_logs.outcome')}</CommonTable.Column>
           <CommonTable.Column id="model" style={{ width: 160 }}>{t('usage.model')}</CommonTable.Column>
           <CommonTable.Column id="user" style={{ width: 150 }}>{t('usage.user')}</CommonTable.Column>
-          <CommonTable.Column id="channel" style={{ width: 150 }}>{t('upstream_logs.channel')}</CommonTable.Column>
+          <CommonTable.Column id="channel" style={{ width: 150 }}>{t('usage.channel_or_account')}</CommonTable.Column>
           <CommonTable.Column id="client" style={{ width: 140 }}>{t('usage.client')}</CommonTable.Column>
           <CommonTable.Column id="message">{t('upstream_logs.message')}</CommonTable.Column>
           <CommonTable.Column id="duration" style={{ width: 80 }}>{t('usage.duration')}</CommonTable.Column>
@@ -213,18 +213,25 @@ function ClientCell({ row }: { row: UpstreamLogResp }) {
   );
 }
 
-// ChannelCell 渠道列：统一显示“渠道名称 · 密钥名称”，多跳时用箭头串联并支持展开明细。
+function hopRouteLabel(hop: UpstreamAttemptHop, t: ReturnType<typeof useTranslation>['t']) {
+  if (hop.account_id || hop.account_name) {
+    return hop.account_name || `#${hop.account_id}`;
+  }
+  const channelName = hop.channel_name || t('upstream_logs.channel_fallback', { id: hop.channel_id });
+  const keyName = hop.channel_key_name || t('channels.key_unnamed');
+  return `${channelName} · ${keyName}`;
+}
+
+// ChannelCell 路由列：按每一跳的实际类型展示渠道密钥或账号，多跳时用箭头串联并支持展开明细。
 function ChannelCell({ row }: { row: UpstreamLogResp }) {
   const { t } = useTranslation();
   const chain = row.attempt_chain ?? [];
-  const hopLabel = (hop: UpstreamAttemptHop) => {
-    const channelName = hop.channel_name || t('upstream_logs.channel_fallback', { id: hop.channel_id });
-    const keyName = hop.channel_key_name || t('channels.key_unnamed');
-    return `${channelName} · ${keyName}`;
-  };
   const label = chain.length > 0
-    ? chain.map(hopLabel).join(' → ')
-    : row.channel_name || (row.channel_id ? `#${row.channel_id}` : '-');
+    ? chain.map((hop) => hopRouteLabel(hop, t)).join(' → ')
+    : row.account_name
+      || (row.account_id ? `#${row.account_id}` : '')
+      || row.channel_name
+      || (row.channel_id ? `#${row.channel_id}` : '-');
 
   if (chain.length === 0) {
     return <span className="block truncate text-xs text-text-secondary" title={label}>{label}</span>;
@@ -250,9 +257,8 @@ function HopLine({ hop }: { hop: UpstreamAttemptHop }) {
   return (
     <div className="rounded-[var(--radius)] bg-bg-hover px-2 py-1 font-mono text-[11px] leading-relaxed">
       <span className="text-text">
-        #{hop.seq} {hop.channel_name || t('upstream_logs.channel_fallback', { id: hop.channel_id })}
-        {' · '}{hop.channel_key_name || t('channels.key_unnamed')}
-        {hop.key_hint ? ` (${hop.key_hint})` : ''}
+        #{hop.seq} {hopRouteLabel(hop, t)}
+        {!hop.account_id && !hop.account_name && hop.key_hint ? ` (${hop.key_hint})` : ''}
       </span>
       <span className="text-text-tertiary">
         {' '}· {hop.verdict}

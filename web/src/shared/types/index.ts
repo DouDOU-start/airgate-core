@@ -296,6 +296,8 @@ export interface UpstreamAttemptHop {
   channel_key_id?: number;
   channel_key_name?: string;
   key_hint?: string;
+  account_id?: number;
+  account_name?: string;
   upstream_status?: number;
   verdict: string; // rateLimited / authFailed / transient / networkError / clientError / streamAborted
   reason?: string;
@@ -328,6 +330,8 @@ export interface UpstreamLogResp {
   group_id?: number;
   channel_id?: number;
   channel_name?: string;
+  account_id?: number;
+  account_name?: string;
   ip_address?: string;
   user_agent?: string;
   duration_ms: number;

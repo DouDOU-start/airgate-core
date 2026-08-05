@@ -48,6 +48,8 @@ type Record struct {
 	GroupID      int
 	ChannelID    int
 	ChannelName  string
+	AccountID    int
+	AccountName  string
 	IPAddress    string
 	UserAgent    string
 	DurationMs   int64

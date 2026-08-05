@@ -24,6 +24,8 @@ type UpstreamLogResp struct {
 	GroupID      int             `json:"group_id,omitempty"`
 	ChannelID    int             `json:"channel_id,omitempty"`
 	ChannelName  string          `json:"channel_name,omitempty"`
+	AccountID    int             `json:"account_id,omitempty"`
+	AccountName  string          `json:"account_name,omitempty"`
 	IPAddress    string          `json:"ip_address,omitempty"`
 	UserAgent    string          `json:"user_agent,omitempty"`
 	DurationMs   int64           `json:"duration_ms"`

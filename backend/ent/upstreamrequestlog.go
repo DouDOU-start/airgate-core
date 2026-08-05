@@ -56,6 +56,10 @@ type UpstreamRequestLog struct {
 	ChannelID int `json:"channel_id,omitempty"`
 	// ChannelName holds the value of the "channel_name" field.
 	ChannelName string `json:"channel_name,omitempty"`
+	// AccountID holds the value of the "account_id" field.
+	AccountID int `json:"account_id,omitempty"`
+	// AccountName holds the value of the "account_name" field.
+	AccountName string `json:"account_name,omitempty"`
 	// IPAddress holds the value of the "ip_address" field.
 	IPAddress string `json:"ip_address,omitempty"`
 	// UserAgent holds the value of the "user_agent" field.
@@ -78,9 +82,9 @@ func (*UpstreamRequestLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case upstreamrequestlog.FieldBilled, upstreamrequestlog.FieldStream:
 			values[i] = new(sql.NullBool)
-		case upstreamrequestlog.FieldID, upstreamrequestlog.FieldStatusCode, upstreamrequestlog.FieldAttempts, upstreamrequestlog.FieldUserID, upstreamrequestlog.FieldAPIKeyID, upstreamrequestlog.FieldGroupID, upstreamrequestlog.FieldChannelID, upstreamrequestlog.FieldDurationMs, upstreamrequestlog.FieldRepeatCount:
+		case upstreamrequestlog.FieldID, upstreamrequestlog.FieldStatusCode, upstreamrequestlog.FieldAttempts, upstreamrequestlog.FieldUserID, upstreamrequestlog.FieldAPIKeyID, upstreamrequestlog.FieldGroupID, upstreamrequestlog.FieldChannelID, upstreamrequestlog.FieldAccountID, upstreamrequestlog.FieldDurationMs, upstreamrequestlog.FieldRepeatCount:
 			values[i] = new(sql.NullInt64)
-		case upstreamrequestlog.FieldRequestID, upstreamrequestlog.FieldSource, upstreamrequestlog.FieldPhase, upstreamrequestlog.FieldErrorType, upstreamrequestlog.FieldErrorCode, upstreamrequestlog.FieldMessage, upstreamrequestlog.FieldModel, upstreamrequestlog.FieldEndpoint, upstreamrequestlog.FieldUserEmailSnapshot, upstreamrequestlog.FieldChannelName, upstreamrequestlog.FieldIPAddress, upstreamrequestlog.FieldUserAgent:
+		case upstreamrequestlog.FieldRequestID, upstreamrequestlog.FieldSource, upstreamrequestlog.FieldPhase, upstreamrequestlog.FieldErrorType, upstreamrequestlog.FieldErrorCode, upstreamrequestlog.FieldMessage, upstreamrequestlog.FieldModel, upstreamrequestlog.FieldEndpoint, upstreamrequestlog.FieldUserEmailSnapshot, upstreamrequestlog.FieldChannelName, upstreamrequestlog.FieldAccountName, upstreamrequestlog.FieldIPAddress, upstreamrequestlog.FieldUserAgent:
 			values[i] = new(sql.NullString)
 		case upstreamrequestlog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -221,6 +225,18 @@ func (url *UpstreamRequestLog) assignValues(columns []string, values []any) erro
 			} else if value.Valid {
 				url.ChannelName = value.String
 			}
+		case upstreamrequestlog.FieldAccountID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field account_id", values[i])
+			} else if value.Valid {
+				url.AccountID = int(value.Int64)
+			}
+		case upstreamrequestlog.FieldAccountName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field account_name", values[i])
+			} else if value.Valid {
+				url.AccountName = value.String
+			}
 		case upstreamrequestlog.FieldIPAddress:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field ip_address", values[i])
@@ -343,6 +359,12 @@ func (url *UpstreamRequestLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("channel_name=")
 	builder.WriteString(url.ChannelName)
+	builder.WriteString(", ")
+	builder.WriteString("account_id=")
+	builder.WriteString(fmt.Sprintf("%v", url.AccountID))
+	builder.WriteString(", ")
+	builder.WriteString("account_name=")
+	builder.WriteString(url.AccountName)
 	builder.WriteString(", ")
 	builder.WriteString("ip_address=")
 	builder.WriteString(url.IPAddress)

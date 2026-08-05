@@ -52,6 +52,10 @@ const (
 	FieldChannelID = "channel_id"
 	// FieldChannelName holds the string denoting the channel_name field in the database.
 	FieldChannelName = "channel_name"
+	// FieldAccountID holds the string denoting the account_id field in the database.
+	FieldAccountID = "account_id"
+	// FieldAccountName holds the string denoting the account_name field in the database.
+	FieldAccountName = "account_name"
 	// FieldIPAddress holds the string denoting the ip_address field in the database.
 	FieldIPAddress = "ip_address"
 	// FieldUserAgent holds the string denoting the user_agent field in the database.
@@ -88,6 +92,8 @@ var Columns = []string{
 	FieldGroupID,
 	FieldChannelID,
 	FieldChannelName,
+	FieldAccountID,
+	FieldAccountName,
 	FieldIPAddress,
 	FieldUserAgent,
 	FieldDurationMs,
@@ -140,6 +146,10 @@ var (
 	DefaultChannelID int
 	// DefaultChannelName holds the default value on creation for the "channel_name" field.
 	DefaultChannelName string
+	// DefaultAccountID holds the default value on creation for the "account_id" field.
+	DefaultAccountID int
+	// DefaultAccountName holds the default value on creation for the "account_name" field.
+	DefaultAccountName string
 	// DefaultIPAddress holds the default value on creation for the "ip_address" field.
 	DefaultIPAddress string
 	// DefaultUserAgent holds the default value on creation for the "user_agent" field.
@@ -271,6 +281,16 @@ func ByChannelID(opts ...sql.OrderTermOption) OrderOption {
 // ByChannelName orders the results by the channel_name field.
 func ByChannelName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldChannelName, opts...).ToFunc()
+}
+
+// ByAccountID orders the results by the account_id field.
+func ByAccountID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAccountID, opts...).ToFunc()
+}
+
+// ByAccountName orders the results by the account_name field.
+func ByAccountName(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAccountName, opts...).ToFunc()
 }
 
 // ByIPAddress orders the results by the ip_address field.

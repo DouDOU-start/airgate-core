@@ -184,11 +184,31 @@ func TestFoldKeyExcludesBilled(t *testing.T) {
 	v.ChannelID = 9
 	variants["channel"] = v
 	v = base
+	v.AccountID = 9
+	variants["account"] = v
+	v = base
 	v.UserID = 9
 	variants["user"] = v
 	for dim, entry := range variants {
 		if foldKey(entry) == foldKey(base) {
 			t.Errorf("维度 %s 变化未改变折叠签名", dim)
 		}
+	}
+}
+
+func TestFlush保留账号路由快照(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() { _ = db.Close() }()
+	ctx := context.Background()
+	r := NewRecorder(db, nil)
+
+	entry := failureEntry("gpt-account", 0)
+	entry.AccountID = 42
+	entry.AccountName = "账号甲"
+	r.flush(ctx, []Entry{entry})
+
+	row := db.UpstreamRequestLog.Query().OnlyX(ctx)
+	if row.AccountID != entry.AccountID || row.AccountName != entry.AccountName {
+		t.Fatalf("账号路由快照 = (%d, %q)，期望 (%d, %q)", row.AccountID, row.AccountName, entry.AccountID, entry.AccountName)
 	}
 }
