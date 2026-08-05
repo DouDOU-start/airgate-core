@@ -48,6 +48,8 @@ type Task struct {
 	Settled bool `json:"settled,omitempty"`
 	// 视频时长参数（请求侧估价值；结算以上游实际值为准）；suno 恒 0
 	Seconds int `json:"seconds,omitempty"`
+	// 视频分辨率计费档位（如 480p/720p/1080p）；suno 恒空
+	Resolution string `json:"resolution,omitempty"`
 	// Data holds the value of the "data" field.
 	Data json.RawMessage `json:"data,omitempty"`
 	// 提交成功时刻（超时清扫基准）
@@ -88,7 +90,7 @@ func (*Task) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case task.FieldID, task.FieldProgress, task.FieldSeconds, task.FieldUserID, task.FieldAPIKeyID, task.FieldGroupID, task.FieldChannelID, task.FieldChannelKeyID:
 			values[i] = new(sql.NullInt64)
-		case task.FieldTaskID, task.FieldPlatform, task.FieldAction, task.FieldStatus, task.FieldFailReason, task.FieldRequestModel, task.FieldUpstreamModel, task.FieldRequestID, task.FieldUserEmailSnapshot:
+		case task.FieldTaskID, task.FieldPlatform, task.FieldAction, task.FieldStatus, task.FieldFailReason, task.FieldRequestModel, task.FieldUpstreamModel, task.FieldResolution, task.FieldRequestID, task.FieldUserEmailSnapshot:
 			values[i] = new(sql.NullString)
 		case task.FieldSubmitTime, task.FieldFinishTime, task.FieldCreatedAt, task.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -202,6 +204,12 @@ func (t *Task) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field seconds", values[i])
 			} else if value.Valid {
 				t.Seconds = int(value.Int64)
+			}
+		case task.FieldResolution:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field resolution", values[i])
+			} else if value.Valid {
+				t.Resolution = value.String
 			}
 		case task.FieldData:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -358,6 +366,9 @@ func (t *Task) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("seconds=")
 	builder.WriteString(fmt.Sprintf("%v", t.Seconds))
+	builder.WriteString(", ")
+	builder.WriteString("resolution=")
+	builder.WriteString(t.Resolution)
 	builder.WriteString(", ")
 	builder.WriteString("data=")
 	builder.WriteString(fmt.Sprintf("%v", t.Data))

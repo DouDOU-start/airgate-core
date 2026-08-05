@@ -12,34 +12,36 @@ import (
 
 // Client OAuth 客户端（第三方应用）领域对象。
 type Client struct {
-	ID           int
-	ClientID     string
-	SecretHash   string
-	SecretHint   string
-	Name         string
-	Description  string
-	RedirectURIs []string
-	FirstParty   bool
-	Enabled      bool
-	ShowInNav    bool
-	LaunchURL    string
-	Icon         string
-	SortOrder    int
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID            int
+	ClientID      string
+	SecretHash    string
+	SecretHint    string
+	Name          string
+	Description   string
+	RedirectURIs  []string
+	AllowedScopes []string
+	FirstParty    bool
+	Enabled       bool
+	ShowInNav     bool
+	LaunchURL     string
+	Icon          string
+	SortOrder     int
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // ClientMutation 创建/更新客户端的可写字段集合。
 type ClientMutation struct {
-	Name         string
-	Description  string
-	RedirectURIs []string
-	FirstParty   bool
-	Enabled      bool
-	ShowInNav    bool
-	LaunchURL    string
-	Icon         string
-	SortOrder    int
+	Name          string
+	Description   string
+	RedirectURIs  []string
+	AllowedScopes []string
+	FirstParty    bool
+	Enabled       bool
+	ShowInNav     bool
+	LaunchURL     string
+	Icon          string
+	SortOrder     int
 }
 
 // Repository 客户端持久化接口（由 infra/store 实现）。

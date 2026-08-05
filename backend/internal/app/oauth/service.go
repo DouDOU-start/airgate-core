@@ -64,7 +64,7 @@ func (s *Service) ListClients(ctx context.Context) ([]Client, error) {
 
 // CreateClient 创建客户端，返回明文 secret（仅此一次）。
 func (s *Service) CreateClient(ctx context.Context, m ClientMutation) (Client, string, error) {
-	if err := validateMutation(m); err != nil {
+	if err := validateMutation(&m); err != nil {
 		return Client{}, "", err
 	}
 	clientID, err := randomToken(clientIDPrefix, 12)
@@ -86,7 +86,7 @@ func (s *Service) CreateClient(ctx context.Context, m ClientMutation) (Client, s
 
 // UpdateClient 更新客户端（全量字段替换，client_id/secret 不变）。
 func (s *Service) UpdateClient(ctx context.Context, id int, m ClientMutation) (Client, error) {
-	if err := validateMutation(m); err != nil {
+	if err := validateMutation(&m); err != nil {
 		return Client{}, err
 	}
 	return s.repo.Update(ctx, id, m)
@@ -120,8 +120,16 @@ func (s *Service) NavApps(ctx context.Context) ([]Client, error) {
 
 // AuthorizeInfo 授权页信息：校验 client 与 redirect_uri，返回应用名称/图标/是否第一方。
 // SPA 据 FirstParty 决定静默通过还是展示确认页。
-func (s *Service) AuthorizeInfo(ctx context.Context, clientID, redirectURI string) (Client, error) {
-	return s.validateClientRedirect(ctx, clientID, redirectURI)
+func (s *Service) AuthorizeInfo(ctx context.Context, clientID, redirectURI, rawScope string) (Client, []string, error) {
+	client, err := s.validateClientRedirect(ctx, clientID, redirectURI)
+	if err != nil {
+		return Client{}, nil, err
+	}
+	scope, err := normalizeClientScope(rawScope, client.AllowedScopes)
+	if err != nil {
+		return Client{}, nil, err
+	}
+	return client, strings.Fields(scope), nil
 }
 
 // Authorize 为已登录用户签发授权码（PKCE S256 强制）。
@@ -133,7 +141,7 @@ func (s *Service) Authorize(ctx context.Context, userID int, input AuthorizeInpu
 	if input.CodeChallenge == "" || input.CodeChallengeMethod != "S256" {
 		return "", ErrPKCERequired
 	}
-	scope, err := normalizeScope(input.Scope)
+	scope, err := normalizeClientScope(input.Scope, client.AllowedScopes)
 	if err != nil {
 		return "", err
 	}
@@ -413,7 +421,10 @@ func (s *Service) validateClientRedirect(ctx context.Context, clientID, redirect
 }
 
 // validateMutation 校验回调地址与入口地址均为绝对 http/https URL。
-func validateMutation(m ClientMutation) error {
+func validateMutation(m *ClientMutation) error {
+	if m == nil {
+		return ErrInvalidRedirectURI
+	}
 	if len(m.RedirectURIs) == 0 {
 		return ErrInvalidRedirectURI
 	}
@@ -425,6 +436,11 @@ func validateMutation(m ClientMutation) error {
 	if m.LaunchURL != "" && !isAbsoluteHTTPURL(m.LaunchURL) {
 		return ErrInvalidRedirectURI
 	}
+	allowedScopes, err := normalizeAllowedScopes(m.AllowedScopes)
+	if err != nil {
+		return err
+	}
+	m.AllowedScopes = allowedScopes
 	return nil
 }
 
@@ -502,6 +518,15 @@ func randomToken(prefix string, n int) (string, error) {
 	return prefix + hex.EncodeToString(buf), nil
 }
 
+var supportedScopeOrder = []string{
+	"profile",
+	"wallet.read",
+	"wallet.debit",
+	"wallet.refund",
+	"payment.read",
+	"payment.create",
+}
+
 var supportedScopes = map[string]struct{}{
 	"profile":        {},
 	"wallet.read":    {},
@@ -509,6 +534,42 @@ var supportedScopes = map[string]struct{}{
 	"wallet.refund":  {},
 	"payment.read":   {},
 	"payment.create": {},
+}
+
+func allSupportedScopes() []string {
+	return append([]string(nil), supportedScopeOrder...)
+}
+
+func normalizeAllowedScopes(scopes []string) ([]string, error) {
+	if len(scopes) == 0 {
+		return []string{"profile"}, nil
+	}
+	normalized, err := normalizeScope(strings.Join(scopes, " "))
+	if err != nil {
+		return nil, err
+	}
+	return strings.Fields(normalized), nil
+}
+
+func normalizeClientScope(raw string, allowedScopes []string) (string, error) {
+	normalized, err := normalizeScope(raw)
+	if err != nil {
+		return "", err
+	}
+	allowed, err := normalizeAllowedScopes(allowedScopes)
+	if err != nil {
+		return "", err
+	}
+	allowedSet := make(map[string]struct{}, len(allowed))
+	for _, scope := range allowed {
+		allowedSet[scope] = struct{}{}
+	}
+	for _, scope := range strings.Fields(normalized) {
+		if _, ok := allowedSet[scope]; !ok {
+			return "", ErrInvalidScope
+		}
+	}
+	return normalized, nil
 }
 
 func normalizeScope(raw string) (string, error) {

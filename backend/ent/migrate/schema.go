@@ -72,6 +72,54 @@ var (
 			},
 		},
 	}
+	// AccountsColumns holds the columns for the "accounts" table.
+	AccountsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "platform", Type: field.TypeString},
+		{Name: "type", Type: field.TypeString, Nullable: true, Default: ""},
+		{Name: "credentials_enc", Type: field.TypeString, Default: ""},
+		{Name: "email", Type: field.TypeString, Default: ""},
+		{Name: "state", Type: field.TypeEnum, Enums: []string{"active", "rate_limited", "degraded", "disabled"}, Default: "active"},
+		{Name: "state_until", Type: field.TypeTime, Nullable: true},
+		{Name: "priority", Type: field.TypeInt, Default: 50},
+		{Name: "weight", Type: field.TypeInt, Default: 10},
+		{Name: "max_concurrency", Type: field.TypeInt, Default: 10},
+		{Name: "rate_multiplier", Type: field.TypeFloat64, Default: 1},
+		{Name: "error_msg", Type: field.TypeString, Default: ""},
+		{Name: "upstream_is_pool", Type: field.TypeBool, Default: false},
+		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
+		{Name: "extra", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "account_proxy", Type: field.TypeInt, Nullable: true},
+	}
+	// AccountsTable holds the schema information for the "accounts" table.
+	AccountsTable = &schema.Table{
+		Name:       "accounts",
+		Columns:    AccountsColumns,
+		PrimaryKey: []*schema.Column{AccountsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "accounts_proxies_proxy",
+				Columns:    []*schema.Column{AccountsColumns[18]},
+				RefColumns: []*schema.Column{ProxiesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "account_platform_state",
+				Unique:  false,
+				Columns: []*schema.Column{AccountsColumns[2], AccountsColumns[6]},
+			},
+			{
+				Name:    "account_email",
+				Unique:  false,
+				Columns: []*schema.Column{AccountsColumns[5]},
+			},
+		},
+	}
 	// AnnouncementsColumns holds the columns for the "announcements" table.
 	AnnouncementsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -461,6 +509,7 @@ var (
 		{Name: "name", Type: field.TypeString},
 		{Name: "description", Type: field.TypeString, Default: ""},
 		{Name: "redirect_uris", Type: field.TypeJSON},
+		{Name: "allowed_scopes", Type: field.TypeJSON},
 		{Name: "first_party", Type: field.TypeBool, Default: false},
 		{Name: "enabled", Type: field.TypeBool, Default: true},
 		{Name: "show_in_nav", Type: field.TypeBool, Default: false},
@@ -479,7 +528,7 @@ var (
 			{
 				Name:    "oauthclient_enabled_show_in_nav_sort_order",
 				Unique:  false,
-				Columns: []*schema.Column{OauthClientsColumns[8], OauthClientsColumns[9], OauthClientsColumns[12]},
+				Columns: []*schema.Column{OauthClientsColumns[9], OauthClientsColumns[10], OauthClientsColumns[13]},
 			},
 		},
 	}
@@ -540,6 +589,25 @@ var (
 		Name:       "payment_provider_configs",
 		Columns:    PaymentProviderConfigsColumns,
 		PrimaryKey: []*schema.Column{PaymentProviderConfigsColumns[0]},
+	}
+	// ProxiesColumns holds the columns for the "proxies" table.
+	ProxiesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "protocol", Type: field.TypeEnum, Enums: []string{"http", "socks5"}, Default: "http"},
+		{Name: "address", Type: field.TypeString},
+		{Name: "port", Type: field.TypeInt},
+		{Name: "username", Type: field.TypeString, Default: ""},
+		{Name: "password", Type: field.TypeString, Default: ""},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "disabled"}, Default: "active"},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// ProxiesTable holds the schema information for the "proxies" table.
+	ProxiesTable = &schema.Table{
+		Name:       "proxies",
+		Columns:    ProxiesColumns,
+		PrimaryKey: []*schema.Column{ProxiesColumns[0]},
 	}
 	// RedemptionCodesColumns holds the columns for the "redemption_codes" table.
 	RedemptionCodesColumns = []*schema.Column{
@@ -606,6 +674,7 @@ var (
 		{Name: "account_rate_multiplier", Type: field.TypeFloat64, Default: 1},
 		{Name: "settled", Type: field.TypeBool, Default: false},
 		{Name: "seconds", Type: field.TypeInt, Default: 0},
+		{Name: "resolution", Type: field.TypeString, Default: ""},
 		{Name: "data", Type: field.TypeJSON, Nullable: true},
 		{Name: "submit_time", Type: field.TypeTime},
 		{Name: "finish_time", Type: field.TypeTime, Nullable: true},
@@ -633,17 +702,17 @@ var (
 			{
 				Name:    "task_status_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[4], TasksColumns[27]},
+				Columns: []*schema.Column{TasksColumns[4], TasksColumns[28]},
 			},
 			{
 				Name:    "task_user_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[20], TasksColumns[26]},
+				Columns: []*schema.Column{TasksColumns[21], TasksColumns[27]},
 			},
 			{
 				Name:    "task_request_id",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[19]},
+				Columns: []*schema.Column{TasksColumns[20]},
 			},
 		},
 	}
@@ -759,6 +828,7 @@ var (
 		{Name: "reasoning_effort", Type: field.TypeString, Default: ""},
 		{Name: "image_size", Type: field.TypeString, Default: ""},
 		{Name: "image_quality", Type: field.TypeString, Default: ""},
+		{Name: "video_resolution", Type: field.TypeString, Default: ""},
 		{Name: "stream", Type: field.TypeBool, Default: false},
 		{Name: "duration_ms", Type: field.TypeInt64, Default: 0},
 		{Name: "first_token_ms", Type: field.TypeInt64, Default: 0},
@@ -771,6 +841,7 @@ var (
 		{Name: "user_email_snapshot", Type: field.TypeString, Default: ""},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "api_key_usage_logs", Type: field.TypeInt, Nullable: true},
+		{Name: "account_usage_logs", Type: field.TypeInt, Nullable: true},
 		{Name: "channel_usage_logs", Type: field.TypeInt, Nullable: true},
 		{Name: "channel_key_usage_logs", Type: field.TypeInt, Nullable: true},
 		{Name: "group_usage_logs", Type: field.TypeInt, Nullable: true},
@@ -784,31 +855,37 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "usage_logs_api_keys_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[39]},
+				Columns:    []*schema.Column{UsageLogsColumns[40]},
 				RefColumns: []*schema.Column{APIKeysColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
+				Symbol:     "usage_logs_accounts_usage_logs",
+				Columns:    []*schema.Column{UsageLogsColumns[41]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
 				Symbol:     "usage_logs_channels_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[40]},
+				Columns:    []*schema.Column{UsageLogsColumns[42]},
 				RefColumns: []*schema.Column{ChannelsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_channel_keys_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[41]},
+				Columns:    []*schema.Column{UsageLogsColumns[43]},
 				RefColumns: []*schema.Column{ChannelKeysColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_groups_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[42]},
+				Columns:    []*schema.Column{UsageLogsColumns[44]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_users_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[43]},
+				Columns:    []*schema.Column{UsageLogsColumns[45]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -817,62 +894,67 @@ var (
 			{
 				Name:    "usage_log_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[38]},
+				Columns: []*schema.Column{UsageLogsColumns[39]},
 			},
 			{
 				Name:    "usage_log_user_snapshot_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[36], UsageLogsColumns[38]},
+				Columns: []*schema.Column{UsageLogsColumns[37], UsageLogsColumns[39]},
 			},
 			{
 				Name:    "usage_log_model_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[1], UsageLogsColumns[38]},
+				Columns: []*schema.Column{UsageLogsColumns[1], UsageLogsColumns[39]},
 			},
 			{
 				Name:    "usage_log_user",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[43]},
+				Columns: []*schema.Column{UsageLogsColumns[45]},
 			},
 			{
 				Name:    "usage_log_api_key",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[39]},
+				Columns: []*schema.Column{UsageLogsColumns[40]},
 			},
 			{
 				Name:    "usage_log_channel",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[40]},
+				Columns: []*schema.Column{UsageLogsColumns[42]},
 			},
 			{
 				Name:    "usage_log_group",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[42]},
+				Columns: []*schema.Column{UsageLogsColumns[44]},
 			},
 			{
 				Name:    "usage_log_api_key_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[39], UsageLogsColumns[38]},
+				Columns: []*schema.Column{UsageLogsColumns[40], UsageLogsColumns[39]},
 			},
 			{
 				Name:    "usage_log_channel_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[40], UsageLogsColumns[38]},
+				Columns: []*schema.Column{UsageLogsColumns[42], UsageLogsColumns[39]},
 			},
 			{
 				Name:    "usage_log_channel_key_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[41], UsageLogsColumns[38]},
+				Columns: []*schema.Column{UsageLogsColumns[43], UsageLogsColumns[39]},
+			},
+			{
+				Name:    "usage_log_account_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[41], UsageLogsColumns[39]},
 			},
 			{
 				Name:    "usage_log_group_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[42], UsageLogsColumns[38]},
+				Columns: []*schema.Column{UsageLogsColumns[44], UsageLogsColumns[39]},
 			},
 			{
 				Name:    "usage_log_request_id",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[35]},
+				Columns: []*schema.Column{UsageLogsColumns[36]},
 			},
 		},
 	}
@@ -904,6 +986,31 @@ var (
 				Columns:    []*schema.Column{UsersColumns[13]},
 				RefColumns: []*schema.Column{TiersColumns[0]},
 				OnDelete:   schema.SetNull,
+			},
+		},
+	}
+	// AccountGroupsColumns holds the columns for the "account_groups" table.
+	AccountGroupsColumns = []*schema.Column{
+		{Name: "account_id", Type: field.TypeInt},
+		{Name: "group_id", Type: field.TypeInt},
+	}
+	// AccountGroupsTable holds the schema information for the "account_groups" table.
+	AccountGroupsTable = &schema.Table{
+		Name:       "account_groups",
+		Columns:    AccountGroupsColumns,
+		PrimaryKey: []*schema.Column{AccountGroupsColumns[0], AccountGroupsColumns[1]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "account_groups_account_id",
+				Columns:    []*schema.Column{AccountGroupsColumns[0]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "account_groups_group_id",
+				Columns:    []*schema.Column{AccountGroupsColumns[1]},
+				RefColumns: []*schema.Column{GroupsColumns[0]},
+				OnDelete:   schema.Cascade,
 			},
 		},
 	}
@@ -960,6 +1067,7 @@ var (
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		APIKeysTable,
+		AccountsTable,
 		AnnouncementsTable,
 		AnnouncementReadsTable,
 		BalanceLogsTable,
@@ -975,6 +1083,7 @@ var (
 		OauthClientsTable,
 		PaymentOrdersTable,
 		PaymentProviderConfigsTable,
+		ProxiesTable,
 		RedemptionCodesTable,
 		SettingsTable,
 		TasksTable,
@@ -982,6 +1091,7 @@ var (
 		UpstreamRequestLogsTable,
 		UsageLogsTable,
 		UsersTable,
+		AccountGroupsTable,
 		ChannelKeyGroupsTable,
 		UserAllowedGroupsTable,
 	}
@@ -990,15 +1100,19 @@ var (
 func init() {
 	APIKeysTable.ForeignKeys[0].RefTable = GroupsTable
 	APIKeysTable.ForeignKeys[1].RefTable = UsersTable
+	AccountsTable.ForeignKeys[0].RefTable = ProxiesTable
 	BalanceLogsTable.ForeignKeys[0].RefTable = UsersTable
 	ChannelKeysTable.ForeignKeys[0].RefTable = ChannelsTable
 	ModelPricesTable.ForeignKeys[0].RefTable = ModelTagsTable
 	UsageLogsTable.ForeignKeys[0].RefTable = APIKeysTable
-	UsageLogsTable.ForeignKeys[1].RefTable = ChannelsTable
-	UsageLogsTable.ForeignKeys[2].RefTable = ChannelKeysTable
-	UsageLogsTable.ForeignKeys[3].RefTable = GroupsTable
-	UsageLogsTable.ForeignKeys[4].RefTable = UsersTable
+	UsageLogsTable.ForeignKeys[1].RefTable = AccountsTable
+	UsageLogsTable.ForeignKeys[2].RefTable = ChannelsTable
+	UsageLogsTable.ForeignKeys[3].RefTable = ChannelKeysTable
+	UsageLogsTable.ForeignKeys[4].RefTable = GroupsTable
+	UsageLogsTable.ForeignKeys[5].RefTable = UsersTable
 	UsersTable.ForeignKeys[0].RefTable = TiersTable
+	AccountGroupsTable.ForeignKeys[0].RefTable = AccountsTable
+	AccountGroupsTable.ForeignKeys[1].RefTable = GroupsTable
 	ChannelKeyGroupsTable.ForeignKeys[0].RefTable = ChannelKeysTable
 	ChannelKeyGroupsTable.ForeignKeys[1].RefTable = GroupsTable
 	UserAllowedGroupsTable.ForeignKeys[0].RefTable = UsersTable

@@ -640,11 +640,18 @@ export default function UsagePage() {
         // 管理端列多需横向滚动，用户列吸附在最左侧保持可见。
         stickyLeft: true,
         render: (row) => {
-          // 渠道测试落账行：无用户归属，发起方标为「渠道测试」。
+          // 测试落账行：无用户归属，发起方标为「渠道/账号测试」。
           if (row.source === 'channel_test') {
             return (
               <Chip color="accent" size="sm" variant="soft">
                 {t('upstream_logs.source_channel_test')}
+              </Chip>
+            );
+          }
+          if (row.source === 'account_test') {
+            return (
+              <Chip color="accent" size="sm" variant="soft">
+                {t('usage.source_account_test')}
               </Chip>
             );
           }
@@ -696,10 +703,22 @@ export default function UsagePage() {
     };
     const channelColumn: UsageColumnConfig<UsageLogResp> = {
       key: 'channel_name',
-      title: t('usage.channel', '渠道'),
+      title: t('usage.channel_or_account'),
       width: '220px',
       hideOnMobile: true,
       render: (row) => {
+        // 账号路径（用户转发或账号测试）：展示账号名
+        if (row.account_id || row.account_name) {
+          const name = row.account_name
+            || (row.account_id ? `#${row.account_id}` : '-');
+          return (
+            <div className="flex w-full min-w-0 items-center justify-center text-center" title={name}>
+              <span className="block max-w-full truncate text-xs font-medium text-text-secondary">
+                {name}
+              </span>
+            </div>
+          );
+        }
         const channelName = row.channel_name || '-';
         const keyName = row.channel_key_name
           || (row.channel_key_id ? t('channels.key_unnamed') : t('usage.deleted_key'));

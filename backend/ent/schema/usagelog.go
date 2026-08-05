@@ -55,7 +55,7 @@ func (UsageLog) Fields() []ent.Field {
 		field.Float("sell_rate").Default(0).
 			Comment("快照：本次请求生效的 sell_rate；0 表示该 key 当时未启用 markup"),
 		field.Float("account_rate_multiplier").Default(1.0).
-			Comment("快照：本次请求生效的渠道成本倍率（channel.cost_ratio）。渠道成本 = total_cost × 本列，查询期现算不落列。"),
+			Comment("快照：成本倍率。渠道路径=channel cost_ratio/upstream_rate；账号路径=account.rate_multiplier。成本 = total_cost × 本列，查询期现算不落列。"),
 		field.String("service_tier").Default(""),
 		// 推理强度档位（low/medium/high/xhigh/max）：OpenAI reasoning_effort/
 		// Responses reasoning.effort，Anthropic output_config.effort，三协议统一后的扁平字符串。
@@ -64,6 +64,8 @@ func (UsageLog) Fields() []ent.Field {
 		// 分辨率价表计费的留痕依据，事后可还原该单按哪档、几张扣费；非图像端点恒空。
 		field.String("image_size").Default(""),
 		field.String("image_quality").Default(""),
+		field.String("video_resolution").Default("").
+			Comment("视频任务计费分辨率档位（如 480p/720p/1080p）；非视频任务恒空"),
 		field.Bool("stream").Default(false),
 		field.Int64("duration_ms").Default(0),
 		field.Int64("first_token_ms").Default(0),
@@ -89,6 +91,8 @@ func (UsageLog) Fields() []ent.Field {
 		field.Int("api_key_id").Optional().StorageKey("api_key_usage_logs"),
 		field.Int("channel_id").Optional().StorageKey("channel_usage_logs"),
 		field.Int("channel_key_id").Optional().StorageKey("channel_key_usage_logs"),
+		// account_id 订阅账号路径写入；与 channel_key_id 互斥填充。
+		field.Int("account_id").Optional().StorageKey("account_usage_logs"),
 		field.Int("group_id").Optional().StorageKey("group_usage_logs"),
 	}
 }
@@ -102,6 +106,8 @@ func (UsageLog) Edges() []ent.Edge {
 		edge.From("channel", Channel.Type).Ref("usage_logs").Unique().Field("channel_id"),
 		// channel_key FK 的 ON DELETE SET NULL 声明在 ChannelKey 侧 assoc 边。
 		edge.From("channel_key", ChannelKey.Type).Ref("usage_logs").Unique().Field("channel_key_id"),
+		// account FK 的 ON DELETE SET NULL 声明在 Account 侧 assoc 边。
+		edge.From("account", Account.Type).Ref("usage_logs").Unique().Field("account_id"),
 		edge.From("group", Group.Type).Ref("usage_logs").Unique().Field("group_id"),
 	}
 }
@@ -130,6 +136,8 @@ func (UsageLog) Indexes() []ent.Index {
 			StorageKey("usage_log_channel_created_at"),
 		index.Fields("channel_key_id", "created_at").
 			StorageKey("usage_log_channel_key_created_at"),
+		index.Fields("account_id", "created_at").
+			StorageKey("usage_log_account_created_at"),
 		index.Fields("group_id", "created_at").
 			StorageKey("usage_log_group_created_at"),
 		// request_id 互查：从失败留痕跳查计费行，无索引则大表全扫。

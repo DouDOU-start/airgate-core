@@ -9,6 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
@@ -66,7 +67,7 @@ type UsageLog struct {
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
 	// 快照：本次请求生效的 sell_rate；0 表示该 key 当时未启用 markup
 	SellRate float64 `json:"sell_rate,omitempty"`
-	// 快照：本次请求生效的渠道成本倍率（channel.cost_ratio）。渠道成本 = total_cost × 本列，查询期现算不落列。
+	// 快照：成本倍率。渠道路径=channel cost_ratio/upstream_rate；账号路径=account.rate_multiplier。成本 = total_cost × 本列，查询期现算不落列。
 	AccountRateMultiplier float64 `json:"account_rate_multiplier,omitempty"`
 	// ServiceTier holds the value of the "service_tier" field.
 	ServiceTier string `json:"service_tier,omitempty"`
@@ -76,6 +77,8 @@ type UsageLog struct {
 	ImageSize string `json:"image_size,omitempty"`
 	// ImageQuality holds the value of the "image_quality" field.
 	ImageQuality string `json:"image_quality,omitempty"`
+	// 视频任务计费分辨率档位（如 480p/720p/1080p）；非视频任务恒空
+	VideoResolution string `json:"video_resolution,omitempty"`
 	// Stream holds the value of the "stream" field.
 	Stream bool `json:"stream,omitempty"`
 	// DurationMs holds the value of the "duration_ms" field.
@@ -106,6 +109,8 @@ type UsageLog struct {
 	ChannelID int `json:"channel_id,omitempty"`
 	// ChannelKeyID holds the value of the "channel_key_id" field.
 	ChannelKeyID int `json:"channel_key_id,omitempty"`
+	// AccountID holds the value of the "account_id" field.
+	AccountID int `json:"account_id,omitempty"`
 	// GroupID holds the value of the "group_id" field.
 	GroupID int `json:"group_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -124,11 +129,13 @@ type UsageLogEdges struct {
 	Channel *Channel `json:"channel,omitempty"`
 	// ChannelKey holds the value of the channel_key edge.
 	ChannelKey *ChannelKey `json:"channel_key,omitempty"`
+	// Account holds the value of the account edge.
+	Account *Account `json:"account,omitempty"`
 	// Group holds the value of the group edge.
 	Group *Group `json:"group,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [6]bool
 }
 
 // UserOrErr returns the User value or an error if the edge
@@ -175,12 +182,23 @@ func (e UsageLogEdges) ChannelKeyOrErr() (*ChannelKey, error) {
 	return nil, &NotLoadedError{edge: "channel_key"}
 }
 
+// AccountOrErr returns the Account value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e UsageLogEdges) AccountOrErr() (*Account, error) {
+	if e.Account != nil {
+		return e.Account, nil
+	} else if e.loadedTypes[4] {
+		return nil, &NotFoundError{label: account.Label}
+	}
+	return nil, &NotLoadedError{edge: "account"}
+}
+
 // GroupOrErr returns the Group value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e UsageLogEdges) GroupOrErr() (*Group, error) {
 	if e.Group != nil {
 		return e.Group, nil
-	} else if e.loadedTypes[4] {
+	} else if e.loadedTypes[5] {
 		return nil, &NotFoundError{label: group.Label}
 	}
 	return nil, &NotLoadedError{edge: "group"}
@@ -195,9 +213,9 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case usagelog.FieldInputPrice, usagelog.FieldOutputPrice, usagelog.FieldCachedInputPrice, usagelog.FieldCacheCreationPrice, usagelog.FieldCacheCreation1hPrice, usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCachedInputCost, usagelog.FieldCacheCreationCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldBilledCost, usagelog.FieldRateMultiplier, usagelog.FieldSellRate, usagelog.FieldAccountRateMultiplier:
 			values[i] = new(sql.NullFloat64)
-		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldCalls, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldUserIDSnapshot, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldChannelID, usagelog.FieldChannelKeyID, usagelog.FieldGroupID:
+		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldCalls, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldUserIDSnapshot, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldChannelID, usagelog.FieldChannelKeyID, usagelog.FieldAccountID, usagelog.FieldGroupID:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldReasoningEffort, usagelog.FieldImageSize, usagelog.FieldImageQuality, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldSource, usagelog.FieldRequestID, usagelog.FieldUserEmailSnapshot:
+		case usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldReasoningEffort, usagelog.FieldImageSize, usagelog.FieldImageQuality, usagelog.FieldVideoResolution, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldSource, usagelog.FieldRequestID, usagelog.FieldUserEmailSnapshot:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -384,6 +402,12 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.ImageQuality = value.String
 			}
+		case usagelog.FieldVideoResolution:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field video_resolution", values[i])
+			} else if value.Valid {
+				ul.VideoResolution = value.String
+			}
 		case usagelog.FieldStream:
 			if value, ok := values[i].(*sql.NullBool); !ok {
 				return fmt.Errorf("unexpected type %T for field stream", values[i])
@@ -474,6 +498,12 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ul.ChannelKeyID = int(value.Int64)
 			}
+		case usagelog.FieldAccountID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field account_id", values[i])
+			} else if value.Valid {
+				ul.AccountID = int(value.Int64)
+			}
 		case usagelog.FieldGroupID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field group_id", values[i])
@@ -511,6 +541,11 @@ func (ul *UsageLog) QueryChannel() *ChannelQuery {
 // QueryChannelKey queries the "channel_key" edge of the UsageLog entity.
 func (ul *UsageLog) QueryChannelKey() *ChannelKeyQuery {
 	return NewUsageLogClient(ul.config).QueryChannelKey(ul)
+}
+
+// QueryAccount queries the "account" edge of the UsageLog entity.
+func (ul *UsageLog) QueryAccount() *AccountQuery {
+	return NewUsageLogClient(ul.config).QueryAccount(ul)
 }
 
 // QueryGroup queries the "group" edge of the UsageLog entity.
@@ -622,6 +657,9 @@ func (ul *UsageLog) String() string {
 	builder.WriteString("image_quality=")
 	builder.WriteString(ul.ImageQuality)
 	builder.WriteString(", ")
+	builder.WriteString("video_resolution=")
+	builder.WriteString(ul.VideoResolution)
+	builder.WriteString(", ")
 	builder.WriteString("stream=")
 	builder.WriteString(fmt.Sprintf("%v", ul.Stream))
 	builder.WriteString(", ")
@@ -666,6 +704,9 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("channel_key_id=")
 	builder.WriteString(fmt.Sprintf("%v", ul.ChannelKeyID))
+	builder.WriteString(", ")
+	builder.WriteString("account_id=")
+	builder.WriteString(fmt.Sprintf("%v", ul.AccountID))
 	builder.WriteString(", ")
 	builder.WriteString("group_id=")
 	builder.WriteString(fmt.Sprintf("%v", ul.GroupID))

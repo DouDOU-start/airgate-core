@@ -30,6 +30,8 @@ type OAuthClient struct {
 	Description string `json:"description,omitempty"`
 	// 允许的回调地址白名单，授权时精确匹配
 	RedirectUris []string `json:"redirect_uris,omitempty"`
+	// 该客户端允许申请的 OAuth scope 白名单
+	AllowedScopes []string `json:"allowed_scopes,omitempty"`
 	// 第一方应用：授权时跳过确认页，静默签发授权码
 	FirstParty bool `json:"first_party,omitempty"`
 	// Enabled holds the value of the "enabled" field.
@@ -54,7 +56,7 @@ func (*OAuthClient) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case oauthclient.FieldRedirectUris:
+		case oauthclient.FieldRedirectUris, oauthclient.FieldAllowedScopes:
 			values[i] = new([]byte)
 		case oauthclient.FieldFirstParty, oauthclient.FieldEnabled, oauthclient.FieldShowInNav:
 			values[i] = new(sql.NullBool)
@@ -121,6 +123,14 @@ func (oc *OAuthClient) assignValues(columns []string, values []any) error {
 			} else if value != nil && len(*value) > 0 {
 				if err := json.Unmarshal(*value, &oc.RedirectUris); err != nil {
 					return fmt.Errorf("unmarshal field redirect_uris: %w", err)
+				}
+			}
+		case oauthclient.FieldAllowedScopes:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field allowed_scopes", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &oc.AllowedScopes); err != nil {
+					return fmt.Errorf("unmarshal field allowed_scopes: %w", err)
 				}
 			}
 		case oauthclient.FieldFirstParty:
@@ -224,6 +234,9 @@ func (oc *OAuthClient) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("redirect_uris=")
 	builder.WriteString(fmt.Sprintf("%v", oc.RedirectUris))
+	builder.WriteString(", ")
+	builder.WriteString("allowed_scopes=")
+	builder.WriteString(fmt.Sprintf("%v", oc.AllowedScopes))
 	builder.WriteString(", ")
 	builder.WriteString("first_party=")
 	builder.WriteString(fmt.Sprintf("%v", oc.FirstParty))

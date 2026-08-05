@@ -88,6 +88,8 @@ type AttemptHop struct {
 	KeyID        int    `json:"channel_key_id,omitempty"` // 本跳选中的密钥端点 ID
 	KeyName      string `json:"channel_key_name,omitempty"`
 	KeyHint      string `json:"key_hint,omitempty"` // 渠道密钥尾 4 位提示
+	AccountID    int    `json:"account_id,omitempty"`
+	AccountName  string `json:"account_name,omitempty"`
 	UpstreamStat int    `json:"upstream_status,omitempty"`
 	Verdict      string `json:"verdict"` // rateLimited / authFailed / transient / clientError / networkError / streamAborted
 	Reason       string `json:"reason,omitempty"`
@@ -117,6 +119,8 @@ type Entry struct {
 	GroupID     int
 	ChannelID   int
 	ChannelName string
+	AccountID   int
+	AccountName string
 	IPAddress   string
 	UserAgent   string
 	DurationMs  int64

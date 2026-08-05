@@ -172,6 +172,7 @@ const perRequestModel = "flat-model"
 // imgPerReqModel / imagenModel 图像按次计费测试模型（openai 生图 / gemini Imagen）。
 const (
 	imgPerReqModel = "img-flat"
+	imgSizeModel   = "img-size"
 	imagenModel    = "imagen-t"
 )
 
@@ -217,7 +218,11 @@ func newTestEnv(t *testing.T, snaps ...registry.ChannelKeySnapshot) *testEnv {
 		gemModel:        testPrice,
 		perRequestModel: {PerRequest: 0.02},
 		imgPerReqModel:  {PerRequest: 0.04},
-		imagenModel:     {PerRequest: 0.03},
+		imgSizeModel: {
+			PerRequest:      0.05,
+			ImageSizePrices: map[string]float64{"1k": 0.05, "2k": 0.07},
+		},
+		imagenModel: {PerRequest: 0.03},
 	}})
 	if err := cache.Reload(context.Background()); err != nil {
 		t.Fatalf("价目表加载失败: %v", err)
@@ -1908,13 +1913,41 @@ func (e *testEnv) doImagesEdits(t *testing.T, body []byte, contentType string) *
 // imgSnap 构造服务图像模型的 openai_compatible 渠道快照。
 func imgSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapshot)) registry.ChannelKeySnapshot {
 	s := testSnap(id, baseURL, func(s *registry.ChannelKeySnapshot) {
-		s.Models = map[string]struct{}{imgPerReqModel: {}, testModel: {}}
-		s.ModelMapping = map[string]string{imgPerReqModel: "gpt-image-upstream", testModel: "gpt-4o-upstream"}
+		s.Models = map[string]struct{}{imgPerReqModel: {}, imgSizeModel: {}, testModel: {}}
+		s.ModelMapping = map[string]string{
+			imgPerReqModel: "gpt-image-upstream",
+			imgSizeModel:   "grok-imagine-image-quality",
+			testModel:      "gpt-4o-upstream",
+		}
 	})
 	for _, m := range mutate {
 		m(&s)
 	}
 	return s
+}
+
+// TestForwardImagesGenerationsResolutionBilling 核对 xAI Images 形态：响应只含 data，
+// 分辨率从请求 resolution 回退，张数仍以响应 data 实际产出为准。
+func TestForwardImagesGenerationsResolutionBilling(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"data":[{"url":"https://img/1"},{"url":"https://img/2"}]}`)
+	}))
+	defer upstream.Close()
+
+	env := newTestEnv(t, imgSnap(1, upstream.URL))
+	w := env.doImagesGenerations(t, `{"model":"`+imgSizeModel+`","prompt":"city","resolution":"2K","n":3}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	rec := env.sink.last(t)
+	if !almostEqual(rec.TotalCost, 0.14) {
+		t.Errorf("TotalCost = %v, want 0.14（2K $0.07 × 实际 2 张）", rec.TotalCost)
+	}
+	if rec.Calls != 2 || rec.ImageSize != "2K" || !almostEqual(rec.InputPrice, 0.07) {
+		t.Errorf("媒体计费快照异常: %+v", rec)
+	}
 }
 
 // TestForwardImagesGenerationsPerImageBilling 生图非流式 + 按次计费：

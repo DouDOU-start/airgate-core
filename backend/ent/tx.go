@@ -14,6 +14,8 @@ type Tx struct {
 	config
 	// APIKey is the client for interacting with the APIKey builders.
 	APIKey *APIKeyClient
+	// Account is the client for interacting with the Account builders.
+	Account *AccountClient
 	// Announcement is the client for interacting with the Announcement builders.
 	Announcement *AnnouncementClient
 	// AnnouncementRead is the client for interacting with the AnnouncementRead builders.
@@ -44,6 +46,8 @@ type Tx struct {
 	PaymentOrder *PaymentOrderClient
 	// PaymentProviderConfig is the client for interacting with the PaymentProviderConfig builders.
 	PaymentProviderConfig *PaymentProviderConfigClient
+	// Proxy is the client for interacting with the Proxy builders.
+	Proxy *ProxyClient
 	// RedemptionCode is the client for interacting with the RedemptionCode builders.
 	RedemptionCode *RedemptionCodeClient
 	// Setting is the client for interacting with the Setting builders.
@@ -190,6 +194,7 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.APIKey = NewAPIKeyClient(tx.config)
+	tx.Account = NewAccountClient(tx.config)
 	tx.Announcement = NewAnnouncementClient(tx.config)
 	tx.AnnouncementRead = NewAnnouncementReadClient(tx.config)
 	tx.BalanceLog = NewBalanceLogClient(tx.config)
@@ -205,6 +210,7 @@ func (tx *Tx) init() {
 	tx.OAuthClient = NewOAuthClientClient(tx.config)
 	tx.PaymentOrder = NewPaymentOrderClient(tx.config)
 	tx.PaymentProviderConfig = NewPaymentProviderConfigClient(tx.config)
+	tx.Proxy = NewProxyClient(tx.config)
 	tx.RedemptionCode = NewRedemptionCodeClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
 	tx.Task = NewTaskClient(tx.config)

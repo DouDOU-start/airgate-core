@@ -113,6 +113,29 @@ function imageSizePricesLine(row: ModelMarketItemResp, t: Translate): ReactNode 
   );
 }
 
+// videoResolutionPricesLine 视频分辨率秒价表：有分档时逐档展示，只有基础秒价时展示回退价。
+function videoResolutionPricesLine(row: ModelMarketItemResp, t: Translate): ReactNode {
+  const entries = Object.entries(row.video_resolution_prices ?? {})
+    .filter(([, price]) => Number.isFinite(price) && price > 0)
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
+  if (entries.length === 0 && (!row.video_per_second || row.video_per_second <= 0)) return null;
+  const prices = entries.length > 0 ? entries : [['default', row.video_per_second ?? 0] as [string, number]];
+  return (
+    <div className="flex flex-wrap gap-x-1" title={t('model_market.video_resolution_prices_hint')}>
+      <span className="whitespace-nowrap text-text-tertiary">{t('model_market.price_short_per_second')}：</span>
+      {prices.map(([resolution, price], i) => (
+        <span className="contents" key={resolution}>
+          {i > 0 ? <span className="text-text-tertiary/60"> · </span> : null}
+          <span className="whitespace-nowrap">
+            <span className="text-text-tertiary">{resolution === 'default' ? t('model_market.default_tier') : resolution} </span>
+            <span className="font-medium text-warning">{fmtPrice(price)}</span>
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // cacheLine 缓存单价行，逻辑与管理端模型卡片一致。
 function cacheLine(row: ModelMarketItemResp, t: Translate): ReactNode {
   const parts: ReactNode[] = [];
@@ -137,6 +160,7 @@ function MarketPriceCard({ row, t }: { row: ModelMarketItemResp; t: Translate })
   const tiers = serviceTiersLine(row, t);
   const longContext = longContextLine(row, t);
   const imagePrices = imageSizePricesLine(row, t);
+  const videoPrices = videoResolutionPricesLine(row, t);
   return (
     <div className="flex flex-col rounded-[var(--ag-radius-lg)] border border-border bg-surface p-5 transition-colors hover:border-text-tertiary/50">
       <div className="flex items-start justify-between gap-2">
@@ -171,10 +195,10 @@ function MarketPriceCard({ row, t }: { row: ModelMarketItemResp; t: Translate })
           </div>
         </div>
       </div>
-      {(cache || row.per_request_price > 0 || tiers || longContext || imagePrices) ? (
+      {(cache || row.per_request_price > 0 || tiers || longContext || imagePrices || videoPrices) ? (
         <div className="mt-3 space-y-1 font-mono text-xs tabular-nums text-text-secondary">
           {cache ? <div className="flex flex-wrap gap-x-1">{cache}</div> : null}
-          {row.per_request_price > 0 ? (
+          {row.per_request_price > 0 && !imagePrices ? (
             <div className="flex flex-wrap gap-x-1">
               <span className="whitespace-nowrap font-medium text-warning">
                 {t('model_market.price_short_per_request')} {fmtPrice(row.per_request_price)}
@@ -182,6 +206,7 @@ function MarketPriceCard({ row, t }: { row: ModelMarketItemResp; t: Translate })
             </div>
           ) : null}
           {imagePrices}
+          {videoPrices}
           {tiers ? <div className="flex flex-wrap gap-x-1">{tiers}</div> : null}
           {longContext}
         </div>

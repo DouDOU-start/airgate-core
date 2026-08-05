@@ -50,6 +50,8 @@ export const OAuthAuthorizePage = lazyWithPreload(() => import('../pages/OAuthAu
 export const OAuthClientsPage = lazyWithPreload(() => import('../pages/admin/OAuthClientsPage'));
 export const RiskControlPage = lazyWithPreload(() => import('../pages/admin/RiskControlPage'));
 export const BookmarksPage = lazyWithPreload(() => import('../pages/admin/BookmarksPage'));
+export const AccountsPage = lazyWithPreload(() => import('../pages/admin/AccountsPage'));
+export const ProxiesPage = lazyWithPreload(() => import('../pages/admin/ProxiesPage'));
 
 export const ADMIN_IDLE_PRELOADS = [
   DashboardPage,

@@ -29,6 +29,9 @@ func (OAuthClient) Fields() []ent.Field {
 		field.String("description").Default(""),
 		field.JSON("redirect_uris", []string{}).
 			Comment("允许的回调地址白名单，授权时精确匹配"),
+		field.JSON("allowed_scopes", []string{}).
+			Default([]string{"profile", "wallet.read", "wallet.debit", "wallet.refund", "payment.read", "payment.create"}).
+			Comment("该客户端允许申请的 OAuth scope 白名单"),
 		field.Bool("first_party").Default(false).
 			Comment("第一方应用：授权时跳过确认页，静默签发授权码"),
 		field.Bool("enabled").Default(true),

@@ -11,10 +11,13 @@ type UsageLogResp struct {
 	APIKeyHint    string `json:"api_key_hint,omitempty"`
 	APIKeyDeleted bool   `json:"api_key_deleted"`
 	// 渠道字段仅管理端出值；用户视角在 handler 层清零（用户只能看到分组，见 UserUsage）。
-	ChannelID             int64   `json:"channel_id,omitempty"`
-	ChannelName           string  `json:"channel_name,omitempty"`
-	ChannelKeyID          int64   `json:"channel_key_id,omitempty"`
-	ChannelKeyName        string  `json:"channel_key_name,omitempty"`
+	ChannelID      int64  `json:"channel_id,omitempty"`
+	ChannelName    string `json:"channel_name,omitempty"`
+	ChannelKeyID   int64  `json:"channel_key_id,omitempty"`
+	ChannelKeyName string `json:"channel_key_name,omitempty"`
+	// 账号路径字段（管理端）：与 channel_* 互斥填充。
+	AccountID             int64   `json:"account_id,omitempty"`
+	AccountName           string  `json:"account_name,omitempty"`
 	GroupID               int64   `json:"group_id"`
 	Model                 string  `json:"model"`
 	InputTokens           int     `json:"input_tokens"`
@@ -41,15 +44,16 @@ type UsageLogResp struct {
 	AccountRateMultiplier float64 `json:"account_rate_multiplier,omitempty"` // 渠道成本倍率快照（仅管理端出值，用户视角清零后不序列化）
 	ServiceTier           string  `json:"service_tier,omitempty"`
 	ReasoningEffort       string  `json:"reasoning_effort,omitempty"`
-	ImageSize             string  `json:"image_size,omitempty"`    // 图像端点实际产出分辨率
-	ImageQuality          string  `json:"image_quality,omitempty"` // 图像端点实际产出质量档
+	ImageSize             string  `json:"image_size,omitempty"`       // 图像端点实际产出分辨率
+	ImageQuality          string  `json:"image_quality,omitempty"`    // 图像端点实际产出质量档
+	VideoResolution       string  `json:"video_resolution,omitempty"` // 视频任务计费分辨率档位
 	Stream                bool    `json:"stream"`
 	DurationMs            int64   `json:"duration_ms"`
 	FirstTokenMs          int64   `json:"first_token_ms"`
 	UserAgent             string  `json:"user_agent,omitempty"`
 	IPAddress             string  `json:"ip_address,omitempty"`
 	Endpoint              string  `json:"endpoint,omitempty"`
-	Source                string  `json:"source"` // 记账来源：relay 用户转发 / channel_test 渠道测试
+	Source                string  `json:"source"` // relay / channel_test / account_test / task
 	RequestID             string  `json:"request_id,omitempty"`
 	CreatedAt             string  `json:"created_at"`
 }
@@ -72,8 +76,9 @@ type CustomerUsageLogResp struct {
 	BilledCost            float64 `json:"cost"`  // 客户视角："本次消耗 = X 美元"
 	ServiceTier           string  `json:"service_tier,omitempty"`
 	ReasoningEffort       string  `json:"reasoning_effort,omitempty"`
-	ImageSize             string  `json:"image_size,omitempty"`    // 图像端点实际产出分辨率
-	ImageQuality          string  `json:"image_quality,omitempty"` // 图像端点实际产出质量档
+	ImageSize             string  `json:"image_size,omitempty"`       // 图像端点实际产出分辨率
+	ImageQuality          string  `json:"image_quality,omitempty"`    // 图像端点实际产出质量档
+	VideoResolution       string  `json:"video_resolution,omitempty"` // 视频任务计费分辨率档位
 	Stream                bool    `json:"stream"`
 	DurationMs            int64   `json:"duration_ms"`
 	FirstTokenMs          int64   `json:"first_token_ms"`

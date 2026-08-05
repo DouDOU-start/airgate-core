@@ -52,6 +52,8 @@ type Group struct {
 type GroupEdges struct {
 	// ChannelKeys holds the value of the channel_keys edge.
 	ChannelKeys []*ChannelKey `json:"channel_keys,omitempty"`
+	// Accounts holds the value of the accounts edge.
+	Accounts []*Account `json:"accounts,omitempty"`
 	// AllowedUsers holds the value of the allowed_users edge.
 	AllowedUsers []*User `json:"allowed_users,omitempty"`
 	// APIKeys holds the value of the api_keys edge.
@@ -60,7 +62,7 @@ type GroupEdges struct {
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [5]bool
 }
 
 // ChannelKeysOrErr returns the ChannelKeys value or an error if the edge
@@ -72,10 +74,19 @@ func (e GroupEdges) ChannelKeysOrErr() ([]*ChannelKey, error) {
 	return nil, &NotLoadedError{edge: "channel_keys"}
 }
 
+// AccountsOrErr returns the Accounts value or an error if the edge
+// was not loaded in eager-loading.
+func (e GroupEdges) AccountsOrErr() ([]*Account, error) {
+	if e.loadedTypes[1] {
+		return e.Accounts, nil
+	}
+	return nil, &NotLoadedError{edge: "accounts"}
+}
+
 // AllowedUsersOrErr returns the AllowedUsers value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) AllowedUsersOrErr() ([]*User, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.AllowedUsers, nil
 	}
 	return nil, &NotLoadedError{edge: "allowed_users"}
@@ -84,7 +95,7 @@ func (e GroupEdges) AllowedUsersOrErr() ([]*User, error) {
 // APIKeysOrErr returns the APIKeys value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) APIKeysOrErr() ([]*APIKey, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[3] {
 		return e.APIKeys, nil
 	}
 	return nil, &NotLoadedError{edge: "api_keys"}
@@ -93,7 +104,7 @@ func (e GroupEdges) APIKeysOrErr() ([]*APIKey, error) {
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[4] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
@@ -229,6 +240,11 @@ func (gr *Group) Value(name string) (ent.Value, error) {
 // QueryChannelKeys queries the "channel_keys" edge of the Group entity.
 func (gr *Group) QueryChannelKeys() *ChannelKeyQuery {
 	return NewGroupClient(gr.config).QueryChannelKeys(gr)
+}
+
+// QueryAccounts queries the "accounts" edge of the Group entity.
+func (gr *Group) QueryAccounts() *AccountQuery {
+	return NewGroupClient(gr.config).QueryAccounts(gr)
 }
 
 // QueryAllowedUsers queries the "allowed_users" edge of the Group entity.

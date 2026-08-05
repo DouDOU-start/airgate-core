@@ -192,6 +192,351 @@
   flex-shrink: 0;
 }
 
+/* 账号编辑弹窗：正文按内容收缩，内容过长时才滚动，避免分组下方出现空白。 */
+.ag-elevation-modal.ag-account-form-modal,
+.ag-elevation-modal.modal__dialog--lg.ag-account-form-modal {
+  width: min(40rem, calc(100vw - 2rem)) !important;
+  max-width: min(40rem, calc(100vw - 2rem)) !important;
+  max-height: min(88dvh, 58rem) !important;
+}
+
+.ag-account-form-modal__body {
+  flex: 0 1 auto !important;
+  max-height: min(calc(88dvh - 8.5rem), 50rem);
+  overflow-y: auto !important;
+}
+
+.ag-account-form-modal .modal__footer {
+  flex-shrink: 0;
+}
+
+/* 编辑账号弹窗：紧凑的运维表单层级。 */
+.ag-elevation-modal.ag-account-form-modal,
+.ag-elevation-modal.modal__dialog--lg.ag-account-form-modal {
+  width: min(44rem, calc(100vw - 2rem)) !important;
+  max-width: min(44rem, calc(100vw - 2rem)) !important;
+  max-height: min(90dvh, 60rem) !important;
+}
+
+.ag-account-form-modal__header {
+  padding-bottom: 0.25rem;
+}
+
+.ag-account-form-modal__header .modal__heading {
+  font-size: 1.125rem;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+
+.ag-account-form-modal__body {
+  padding-inline: 0 !important;
+}
+
+.ag-account-form-modal__content {
+  display: grid;
+  min-width: 0;
+  gap: 0;
+  padding-inline: 0.25rem;
+}
+
+.ag-account-form-section {
+  min-width: 0;
+  border-top: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  padding: 1rem 0;
+}
+
+.ag-account-form-section--identity {
+  border-top: 0;
+  padding-top: 0.125rem;
+}
+
+.ag-account-form-section--groups {
+  padding-bottom: 0.25rem;
+}
+
+.ag-account-form-identity {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.ag-account-form-identity__icon {
+  display: inline-flex;
+  width: 2.375rem;
+  height: 2.375rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--accent) 28%, var(--border));
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--accent) 9%, var(--surface-secondary));
+  box-shadow: 0 0.25rem 0.75rem -0.625rem color-mix(in oklab, var(--accent) 55%, transparent);
+  color: var(--accent);
+}
+
+.ag-account-form-identity__field {
+  min-width: 0;
+}
+
+.ag-account-form-identity__meta {
+  display: inline-flex;
+  min-width: 0;
+  grid-column: 2;
+  align-items: center;
+  gap: 0.4375rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  line-height: 1rem;
+  margin-top: -0.375rem;
+}
+
+.ag-account-form-identity__meta i {
+  width: 0.1875rem;
+  height: 0.1875rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--muted) 58%, transparent);
+}
+
+.ag-account-form-platform-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.875rem;
+}
+
+.ag-account-form-section__header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ag-account-form-section__heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.ag-account-form-section__icon {
+  display: inline-flex;
+  width: 1.875rem;
+  height: 1.875rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--border) 76%, transparent);
+  border-radius: 0.625rem;
+  background: color-mix(in oklab, var(--surface-secondary) 84%, var(--surface));
+  color: color-mix(in oklab, var(--accent) 70%, var(--foreground));
+}
+
+.ag-account-form-section__heading-copy {
+  min-width: 0;
+}
+
+.ag-account-form-section__heading-copy h3 {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 680;
+  letter-spacing: -0.008em;
+  line-height: 1.125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-form-section__heading-copy p {
+  max-width: 30rem;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.625rem;
+  line-height: 0.9375rem;
+  margin-top: 0.125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-form-section__content {
+  min-width: 0;
+  margin-top: 0.875rem;
+}
+
+.ag-account-form-segmented {
+  display: inline-flex;
+  max-width: 100%;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 0.125rem;
+  overflow-x: auto;
+  border: 1px solid color-mix(in oklab, var(--border) 86%, transparent);
+  border-radius: 0.625rem;
+  background: color-mix(in oklab, var(--surface-secondary) 72%, var(--surface));
+  padding: 0.1875rem;
+  scrollbar-width: none;
+}
+
+.ag-account-form-segmented::-webkit-scrollbar {
+  display: none;
+}
+
+.ag-account-form-segmented button {
+  height: 1.75rem;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 0.4375rem;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.6875rem;
+  font-weight: 620;
+  line-height: 1;
+  padding-inline: 0.625rem;
+  transition: background-color var(--ag-transition), color var(--ag-transition), box-shadow var(--ag-transition);
+  white-space: nowrap;
+}
+
+.ag-account-form-segmented button:hover {
+  color: var(--foreground);
+}
+
+.ag-account-form-segmented button[data-active="true"] {
+  background: var(--accent);
+  box-shadow: 0 0.1875rem 0.5rem -0.375rem color-mix(in oklab, var(--accent) 72%, transparent);
+  color: var(--accent-foreground);
+}
+
+.ag-account-form-credentials-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.ag-account-form-credential-field {
+  min-width: 0;
+}
+
+.ag-account-form-credential-field--wide,
+.ag-account-form-credentials-error {
+  grid-column: 1 / -1;
+}
+
+.ag-account-form-credentials-error {
+  line-height: 1.125rem;
+}
+
+.ag-account-form-metric-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+
+.ag-account-form-metric-grid .textfield {
+  min-width: 0;
+}
+
+.ag-account-form-proxy-field {
+  min-width: 0;
+  margin-top: 0.875rem;
+}
+
+.ag-account-form-group-list {
+  display: grid;
+  max-height: 10.5rem;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  overflow-y: auto;
+  padding: 0.125rem;
+  scrollbar-color: color-mix(in oklab, var(--muted) 45%, transparent) transparent;
+}
+
+.ag-account-form-group-item {
+  min-width: 0;
+  border: 1px solid color-mix(in oklab, var(--border) 76%, transparent);
+  border-radius: 0.625rem;
+  background: color-mix(in oklab, var(--surface-secondary) 54%, var(--surface));
+  transition: background-color var(--ag-transition), border-color var(--ag-transition), box-shadow var(--ag-transition);
+}
+
+.ag-account-form-group-item:hover {
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border));
+  background: color-mix(in oklab, var(--accent) 5%, var(--surface-secondary));
+}
+
+.ag-account-form-group-item[data-selected="true"] {
+  border-color: color-mix(in oklab, var(--accent) 62%, var(--border));
+  background: color-mix(in oklab, var(--accent) 9%, var(--surface-secondary));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 8%, transparent) inset;
+}
+
+.ag-account-form-group-item .checkbox {
+  width: 100%;
+  min-width: 0;
+  padding: 0.5625rem 0.625rem;
+}
+
+.ag-account-form-group-item [data-slot="checkbox-content"] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-form-groups-empty {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+}
+
+.ag-account-form-modal__footer {
+  border-top: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  margin-top: 0 !important;
+  padding-top: 0.875rem;
+}
+
+@media (max-width: 42rem) {
+  .ag-account-form-section__header {
+    flex-wrap: wrap;
+  }
+
+  .ag-account-form-segmented {
+    width: 100%;
+  }
+
+  .ag-account-form-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 32rem) {
+  .ag-account-form-platform-grid,
+  .ag-account-form-credentials-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ag-account-form-group-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ag-account-form-credential-field--wide,
+  .ag-account-form-credentials-error {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 22rem) {
+  .ag-account-form-metric-grid,
+  .ag-account-form-group-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .ag-create-account-form {
   display: flex;
   flex-direction: column;
@@ -244,6 +589,871 @@
 .ag-create-account-group-item[data-selected="true"] {
   border-color: color-mix(in oklab, var(--accent) 72%, var(--border));
   background: color-mix(in oklab, var(--accent) 8%, var(--field-background));
+}
+
+/* 账号管理：账号身份与用量信息 */
+
+.ag-account-plan-badge {
+  --ag-plan-tone: var(--ag-tone-blue);
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 1.125rem;
+  align-items: center;
+  gap: 0.3125rem;
+  border: 1px solid color-mix(in oklab, var(--ag-plan-tone) 24%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--ag-plan-tone) 9%, var(--surface-secondary));
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--ag-plan-tone) 8%, transparent) inset;
+  color: color-mix(in oklab, var(--ag-plan-tone) 78%, var(--foreground));
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 650;
+  letter-spacing: 0.015em;
+  line-height: 1;
+  padding: 0.1875rem 0.4375rem;
+  white-space: nowrap;
+}
+
+.ag-account-plan-badge__dot {
+  width: 0.25rem;
+  height: 0.25rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--ag-plan-tone);
+  box-shadow: 0 0 0 0.125rem color-mix(in oklab, var(--ag-plan-tone) 12%, transparent);
+}
+
+.ag-account-plan-badge--pro-lite,
+.ag-account-plan-badge--enterprise {
+  --ag-plan-tone: var(--ag-tone-amber);
+}
+
+.ag-account-plan-badge--pro {
+  --ag-plan-tone: var(--ag-tone-indigo);
+}
+
+.ag-account-plan-badge--plus,
+.ag-account-plan-badge--default {
+  --ag-plan-tone: var(--ag-tone-blue);
+}
+
+.ag-account-plan-badge--team {
+  --ag-plan-tone: var(--ag-tone-emerald);
+}
+
+.ag-account-plan-badge--free {
+  --ag-plan-tone: var(--muted);
+}
+
+.ag-account-summary {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  border-radius: 0.875rem;
+  background:
+    radial-gradient(
+      circle at 1.75rem 50%,
+      color-mix(in oklab, var(--accent) 9%, transparent),
+      transparent 7rem
+    ),
+    color-mix(in oklab, var(--surface-secondary) 88%, var(--surface));
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--foreground) 4%, transparent) inset,
+    0 0.375rem 1rem -0.875rem color-mix(in oklab, var(--foreground) 26%, transparent);
+  padding: 0.75rem;
+}
+
+.ag-account-summary__icon {
+  box-shadow: 0 0 0 0.1875rem color-mix(in oklab, var(--accent) 7%, transparent);
+}
+
+.ag-account-summary__identity {
+  min-width: 0;
+}
+
+.ag-account-summary__title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ag-account-summary__name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 650;
+  letter-spacing: -0.008em;
+  line-height: 1.25rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-summary__meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4375rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  line-height: 1rem;
+  margin-top: 0.125rem;
+}
+
+.ag-account-summary__separator {
+  width: 0.1875rem;
+  height: 0.1875rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--muted) 58%, transparent);
+}
+
+.ag-account-summary__email {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-summary__context {
+  color: color-mix(in oklab, var(--accent) 68%, var(--foreground));
+  font-weight: 650;
+}
+
+.ag-account-summary__state {
+  --ag-account-test-state-tone: var(--muted);
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid color-mix(in oklab, var(--ag-account-test-state-tone) 22%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--ag-account-test-state-tone) 8%, var(--surface));
+  color: color-mix(in oklab, var(--ag-account-test-state-tone) 72%, var(--foreground));
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.3125rem 0.5625rem;
+  white-space: nowrap;
+}
+
+.ag-account-summary__state[data-state="active"] {
+  --ag-account-test-state-tone: var(--success);
+}
+
+.ag-account-summary__state[data-state="rate_limited"],
+.ag-account-summary__state[data-state="degraded"] {
+  --ag-account-test-state-tone: var(--warning);
+}
+
+.ag-account-summary__state[data-state="disabled"] {
+  --ag-account-test-state-tone: var(--muted);
+}
+
+.ag-account-summary__state-dot {
+  width: 0.3125rem;
+  height: 0.3125rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--ag-account-test-state-tone);
+  box-shadow: 0 0 0 0.15625rem color-mix(in oklab, var(--ag-account-test-state-tone) 13%, transparent);
+}
+
+@media (max-width: 40rem) {
+  .ag-account-summary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .ag-account-summary__state {
+    grid-column: 2;
+    width: max-content;
+  }
+}
+
+/* 账号管理：使用统计弹窗 */
+
+.ag-elevation-modal.ag-account-stats-modal,
+.ag-elevation-modal.modal__dialog--lg.ag-account-stats-modal {
+  width: min(50rem, calc(100vw - 2rem)) !important;
+  max-width: min(50rem, calc(100vw - 2rem)) !important;
+}
+
+.ag-account-stats-modal__body {
+  display: flex;
+  max-height: min(72dvh, 46rem);
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+}
+
+.ag-account-stats-state {
+  display: flex;
+  min-height: 11rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.ag-account-stats-state[data-status="error"] {
+  color: var(--danger);
+}
+
+.ag-account-stats-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+
+.ag-account-stats-kpi {
+  --ag-stats-tone: var(--ag-tone-blue);
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--ag-stats-tone) 18%, var(--border));
+  border-radius: 0.875rem;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in oklab, var(--ag-stats-tone) 7%, var(--surface-secondary)),
+      color-mix(in oklab, var(--surface-secondary) 94%, transparent)
+    );
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--foreground) 3%, transparent) inset;
+  padding: 0.75rem;
+}
+
+.ag-account-stats-kpi::after {
+  position: absolute;
+  right: -1.25rem;
+  bottom: -1.75rem;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--ag-stats-tone) 6%, transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.ag-account-stats-kpi[data-tone="emerald"] {
+  --ag-stats-tone: var(--ag-tone-emerald);
+}
+
+.ag-account-stats-kpi[data-tone="amber"] {
+  --ag-stats-tone: var(--ag-tone-amber);
+}
+
+.ag-account-stats-kpi[data-tone="indigo"] {
+  --ag-stats-tone: var(--ag-tone-indigo);
+}
+
+.ag-account-stats-kpi__header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4375rem;
+  color: var(--muted);
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1rem;
+}
+
+.ag-account-stats-kpi__header > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-stats-kpi__icon {
+  display: inline-flex;
+  width: 1.625rem;
+  height: 1.625rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: color-mix(in oklab, var(--ag-stats-tone) 11%, var(--surface));
+  color: color-mix(in oklab, var(--ag-stats-tone) 76%, var(--foreground));
+}
+
+.ag-account-stats-kpi > strong {
+  position: relative;
+  z-index: 1;
+  display: block;
+  overflow: hidden;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.5rem;
+  margin-top: 0.5rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-stats-kpi > small {
+  position: relative;
+  z-index: 1;
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.5625rem;
+  line-height: 0.875rem;
+  margin-top: 0.125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-stats-insights {
+  display: grid;
+  overflow: hidden;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid color-mix(in oklab, var(--border) 68%, transparent);
+  border-radius: 0.875rem;
+  background: color-mix(in oklab, var(--surface-secondary) 72%, var(--surface));
+}
+
+.ag-account-stats-insight {
+  min-width: 0;
+  padding: 0.75rem 0.875rem;
+}
+
+.ag-account-stats-insight + .ag-account-stats-insight {
+  border-left: 1px solid color-mix(in oklab, var(--border) 58%, transparent);
+}
+
+.ag-account-stats-insight h3 {
+  color: var(--foreground);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: -0.006em;
+  line-height: 1rem;
+  margin-bottom: 0.625rem;
+}
+
+.ag-account-stats-insight > div {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.ag-account-stats-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.6875rem;
+  line-height: 1rem;
+}
+
+.ag-account-stats-row > span {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-stats-row > strong {
+  flex: 0 0 auto;
+  color: color-mix(in oklab, var(--foreground) 84%, var(--muted));
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.ag-account-stats-visuals {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(17rem, 0.7fr);
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.ag-account-stats-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--border) 68%, transparent);
+  border-radius: 0.875rem;
+  background: color-mix(in oklab, var(--surface-secondary) 66%, var(--surface));
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--foreground) 3%, transparent) inset;
+}
+
+.ag-account-stats-panel__header {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
+  padding: 0.625rem 0.75rem;
+}
+
+.ag-account-stats-panel__title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ag-account-stats-panel__title h3 {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-stats-panel__icon {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: color-mix(in oklab, var(--ag-tone-blue) 10%, var(--surface));
+  color: var(--ag-tone-blue);
+}
+
+.ag-account-stats-panel__icon[data-tone="amber"] {
+  background: color-mix(in oklab, var(--ag-tone-amber) 10%, var(--surface));
+  color: var(--ag-tone-amber);
+}
+
+.ag-account-stats-legend {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.625rem;
+  color: var(--muted);
+  font-size: 0.5625rem;
+}
+
+.ag-account-stats-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.ag-account-stats-legend i {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: var(--ag-tone-blue);
+}
+
+.ag-account-stats-legend i[data-tone="request"] {
+  background: var(--ag-tone-amber);
+}
+
+.ag-account-stats-empty {
+  display: flex;
+  min-height: 8.75rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  padding: 1rem;
+  text-align: center;
+}
+
+.ag-account-stats-empty > span {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--border) 62%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--surface) 78%, transparent);
+}
+
+.ag-account-stats-empty p {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+}
+
+.ag-account-stats-trend-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0.75rem;
+}
+
+.ag-account-stats-trend {
+  display: flex;
+  min-width: 26rem;
+  height: 9.5rem;
+  align-items: flex-end;
+  gap: 0.1875rem;
+}
+
+.ag-account-stats-trend__day {
+  display: flex;
+  min-width: 0.75rem;
+  height: 100%;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.ag-account-stats-trend__bars {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 54%, transparent);
+}
+
+.ag-account-stats-trend__bars i {
+  width: 42%;
+  min-height: 0;
+  border-radius: 0.1875rem 0.1875rem 0 0;
+  background: var(--ag-tone-blue);
+  opacity: 0.8;
+}
+
+.ag-account-stats-trend__bars i[data-tone="request"] {
+  background: var(--ag-tone-amber);
+}
+
+.ag-account-stats-trend__day > span {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 0.75rem;
+  white-space: nowrap;
+}
+
+.ag-account-stats-models {
+  display: grid;
+  gap: 0.625rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  padding: 0.75rem;
+}
+
+.ag-account-stats-model {
+  display: grid;
+  min-width: 0;
+  gap: 0.3125rem;
+}
+
+.ag-account-stats-model__header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.625rem;
+  line-height: 0.875rem;
+}
+
+.ag-account-stats-model__header > span {
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in oklab, var(--foreground) 84%, var(--muted));
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-stats-model__header > strong {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.ag-account-stats-model__track {
+  height: 0.3125rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--border) 46%, var(--surface));
+}
+
+.ag-account-stats-model__track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ag-tone-indigo);
+}
+
+@media (max-width: 48rem) {
+  .ag-account-stats-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ag-account-stats-insights,
+  .ag-account-stats-visuals {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ag-account-stats-insight + .ag-account-stats-insight {
+    border-top: 1px solid color-mix(in oklab, var(--border) 58%, transparent);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 30rem) {
+  .ag-account-stats-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ag-accounts-table :where([data-slot="th"][id="usage"], [data-slot="td"]:nth-child(4)) {
+  padding-inline: 0.625rem !important;
+}
+
+/* 账号表信息密度较高：身份左对齐便于扫读，并为状态与行操作保留稳定列宽。 */
+.ag-accounts-table :where([data-slot="th"][id="account"], [data-slot="td"]:nth-child(2)) {
+  text-align: left !important;
+}
+
+.ag-accounts-table :where([data-slot="th"][id="account"], [data-slot="td"]:nth-child(2)) > * {
+  justify-content: flex-start !important;
+  margin-inline: 0 !important;
+  text-align: left !important;
+}
+
+.ag-accounts-table :where([data-slot="th"][id="state"], [data-slot="td"]:nth-child(3)) {
+  white-space: nowrap;
+}
+
+/* 分页与数据区组成一个连续表面，减少少量数据时上下脱节的空隙。 */
+.ag-accounts-table > .ag-resource-table-scroll {
+  border-bottom-right-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+
+.ag-accounts-table > [data-slot="table-footer"] {
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  border-top: 0;
+  border-radius: 0 0 calc(var(--radius) * 1.5) calc(var(--radius) * 1.5);
+  background: color-mix(in oklab, var(--surface) 92%, var(--surface-secondary));
+}
+
+/* 横向滚动时保留操作入口，避免需要滚到最右侧才能管理账号。 */
+.ag-accounts-table [data-slot="th"][id="actions"],
+.ag-accounts-table [data-slot="td"]:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: var(--surface-secondary) !important;
+  box-shadow: -0.375rem 0 0.625rem -0.5rem color-mix(in oklab, var(--foreground) 18%, transparent);
+}
+
+.ag-accounts-table [data-slot="tbody"] [data-slot="td"]:last-child {
+  background: var(--surface) !important;
+}
+
+.ag-accounts-table [data-slot="tbody"] [data-slot="tr"]:hover [data-slot="td"]:last-child {
+  background: color-mix(in oklab, var(--default) 82%, var(--background) 18%) !important;
+}
+
+.ag-account-usage {
+  min-width: 18.75rem;
+  max-width: 21.25rem;
+  border: 1px solid color-mix(in oklab, var(--border) 62%, transparent);
+  border-radius: 0.75rem;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--surface-secondary) 88%, var(--accent) 2%),
+      color-mix(in oklab, var(--surface-secondary) 96%, transparent)
+    );
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--foreground) 3%, transparent) inset;
+  padding: 0.4375rem 0.5625rem 0.375rem;
+}
+
+.ag-account-usage__windows {
+  display: grid;
+  gap: 0.3125rem;
+}
+
+.ag-account-usage__window {
+  --ag-usage-tone: var(--success);
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 2.625rem minmax(5.5rem, 1fr) 2.625rem 2.875rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ag-account-usage__window[data-tone="warning"] {
+  --ag-usage-tone: var(--warning);
+}
+
+.ag-account-usage__window[data-tone="critical"] {
+  --ag-usage-tone: var(--danger);
+}
+
+.ag-account-usage__label {
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--border) 62%, transparent);
+  border-radius: 0.375rem;
+  background: color-mix(in oklab, var(--surface) 76%, transparent);
+  color: var(--text-secondary, var(--ag-text-secondary));
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  line-height: 1rem;
+  padding-inline: 0.3125rem;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-account-usage__label[data-supplementary="true"] {
+  border-color: color-mix(in oklab, var(--ag-tone-amber) 22%, var(--border));
+  background: color-mix(in oklab, var(--ag-tone-amber) 7%, var(--surface));
+  color: color-mix(in oklab, var(--ag-tone-amber) 70%, var(--foreground));
+}
+
+.ag-account-usage__track {
+  position: relative;
+  height: 0.375rem;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--border) 46%, var(--surface));
+  box-shadow: 0 1px 1px color-mix(in oklab, var(--background) 45%, transparent) inset;
+}
+
+.ag-account-usage__fill {
+  height: 100%;
+  min-width: 0.1875rem;
+  border-radius: inherit;
+  background: var(--ag-usage-tone);
+  box-shadow: 0 0 0.5rem color-mix(in oklab, var(--ag-usage-tone) 22%, transparent);
+  transition: width var(--ag-transition), background-color var(--ag-transition);
+}
+
+.ag-account-usage__percent,
+.ag-account-usage__reset-time {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ag-account-usage__percent {
+  color: var(--ag-usage-tone);
+  font-weight: 700;
+  text-align: right;
+}
+
+.ag-account-usage__reset-time {
+  color: var(--muted);
+  text-align: right;
+}
+
+.ag-account-usage__empty {
+  display: flex;
+  min-height: 1.625rem;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  text-align: center;
+}
+
+.ag-account-usage__footer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-top: 1px solid color-mix(in oklab, var(--border) 48%, transparent);
+  margin-top: 0.375rem;
+  padding-top: 0.3125rem;
+}
+
+.ag-account-usage__meta {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3125rem;
+}
+
+.ag-account-usage__meta-item {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface) 72%, transparent);
+  color: var(--muted);
+  font-size: 0.59375rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  padding: 0.1875rem 0.375rem;
+  white-space: nowrap;
+}
+
+.ag-account-usage__meta-item[data-available="true"] {
+  background: color-mix(in oklab, var(--accent) 9%, var(--surface));
+  color: color-mix(in oklab, var(--accent) 70%, var(--foreground));
+}
+
+.ag-account-usage__meta-item[data-stale="true"] {
+  background: color-mix(in oklab, var(--warning) 10%, var(--surface));
+  color: var(--warning);
+}
+
+.ag-account-usage__actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.ag-account-usage__reset-button.button {
+  height: 1.375rem !important;
+  min-height: 1.375rem !important;
+  gap: 0.25rem !important;
+  border-color: color-mix(in oklab, var(--accent) 24%, var(--border)) !important;
+  border-radius: 0.4375rem !important;
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface)) !important;
+  color: color-mix(in oklab, var(--accent) 76%, var(--foreground)) !important;
+  font-size: 0.59375rem !important;
+  padding-inline: 0.4375rem !important;
+}
+
+.ag-account-usage__refresh-button.button {
+  width: 1.375rem !important;
+  min-width: 1.375rem !important;
+  height: 1.375rem !important;
+  min-height: 1.375rem !important;
+  border-radius: 0.4375rem !important;
+  color: var(--muted) !important;
+  padding: 0 !important;
+}
+
+.ag-account-usage__refresh-button.button:hover,
+.ag-account-usage__refresh-button.button[data-hovered="true"] {
+  background: color-mix(in oklab, var(--accent) 9%, transparent) !important;
+  color: var(--accent) !important;
 }
 
 .ag-create-account-group-item [data-slot="checkbox-content"] {

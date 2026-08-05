@@ -13,6 +13,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 
 	"github.com/DouDOU-start/airgate-core/ent"
+	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"
 	appannouncement "github.com/DouDOU-start/airgate-core/internal/app/announcement"
 	appapikey "github.com/DouDOU-start/airgate-core/internal/app/apikey"
 	appauth "github.com/DouDOU-start/airgate-core/internal/app/auth"
@@ -24,6 +25,7 @@ import (
 	appmodelprice "github.com/DouDOU-start/airgate-core/internal/app/modelprice"
 	appoauth "github.com/DouDOU-start/airgate-core/internal/app/oauth"
 	apppayment "github.com/DouDOU-start/airgate-core/internal/app/payment"
+	appproxy "github.com/DouDOU-start/airgate-core/internal/app/proxy"
 	appredemption "github.com/DouDOU-start/airgate-core/internal/app/redemption"
 	appriskcontrol "github.com/DouDOU-start/airgate-core/internal/app/riskcontrol"
 	appsettings "github.com/DouDOU-start/airgate-core/internal/app/settings"
@@ -72,6 +74,8 @@ type HTTPHandlers struct {
 	OAuth        *handler.OAuthHandler
 	RiskControl  *handler.RiskControlHandler
 	Bookmark     *handler.BookmarkHandler
+	Account      *handler.AccountHandler
+	Proxy        *handler.ProxyHandler
 
 	// ChannelService / ModelPriceService / SettingsService 暴露给 server.go：
 	// ChannelService 充当渠道注册表的 Loader/Persister 并接收 Reloader/Tester 注入，
@@ -93,6 +97,10 @@ type HTTPHandlers struct {
 	ModerationEngine *moderation.Engine
 	// ChannelStore 暴露给 server.go：探针引擎的健康状态持久化与余额同步目标查询。
 	ChannelStore *store.ChannelStore
+	// AccountService 暴露给 server.go：注入账号注册表 Reloader。
+	AccountService *appaccount.Service
+	// ProxyService 暴露给 server.go：代理变更后重载账号注册表。
+	ProxyService *appproxy.Service
 	// ChannelHealthNotifier 接收探针状态变化并按设置发送微信公众号提醒。
 	ChannelHealthNotifier probe.Notifier
 }
@@ -186,6 +194,15 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	bookmarkStore := store.NewBookmarkStore(dep.DB)
 	bookmarkService := appbookmark.NewService(bookmarkStore)
 
+	proxyStore := store.NewProxyStore(dep.DB, dep.Config.APIKeySecret())
+	proxyService := appproxy.NewService(proxyStore)
+	accountStore := store.NewAccountStore(dep.DB)
+	accountService := appaccount.NewService(accountStore, dep.Config.APIKeySecret())
+	// 账号统计复用 usage 仓储（usage_logs.account_id 聚合）
+	accountService.SetUsageStatsRepo(usageStore)
+	// 账号列表实时并发 / RPM：与 relay 账号闸门共用 Redis key
+	accountService.SetRuntimeStatsReaders(dep.Concurrency, rpmCounter)
+
 	// OAuth 应用接入：客户端仓储兼任 UserReader，授权码/令牌走 Redis，
 	// provision-key 复用 apikey 服务的 get-or-create，可用分组适配 group 服务。
 	oauthClientStore := store.NewOAuthClientStore(dep.DB)
@@ -216,8 +233,12 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		OAuth:        handler.NewOAuthHandler(oauthService),
 		RiskControl:  handler.NewRiskControlHandler(riskControlService),
 		Bookmark:     handler.NewBookmarkHandler(bookmarkService),
+		Account:      handler.NewAccountHandler(accountService),
+		Proxy:        handler.NewProxyHandler(proxyService),
 
 		ChannelService:        channelService,
+		AccountService:        accountService,
+		ProxyService:          proxyService,
 		ModelPriceService:     modelPriceService,
 		SettingsService:       settingsService,
 		UpstreamLogService:    upstreamLogService,

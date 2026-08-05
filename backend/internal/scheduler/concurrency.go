@@ -93,6 +93,11 @@ func groupConcurrencyKey(groupID int) string {
 	return fmt.Sprintf("concurrency:v2:group:%d", groupID)
 }
 
+// accountConcurrencyKey 账号级并发槽 Redis Key。
+func accountConcurrencyKey(accountID int) string {
+	return fmt.Sprintf("concurrency:v2:account:%d", accountID)
+}
+
 // acquireSlotByKey 通用并发槽获取：给定 Redis key 和上限，原子性的
 // 清理僵尸 slot + 检查上限 + ZADD 加入新 slot（score = 过期时刻）。
 // maxConcurrency <= 0 时视为不限制，直接放行（不记录，热路径零 Redis 开销）。
@@ -257,6 +262,44 @@ func (cm *ConcurrencyManager) GetGroupCurrentCounts(ctx context.Context, groupID
 	cmds := make(map[int]*redis.IntCmd, len(groupIDs))
 	for _, id := range groupIDs {
 		cmds[id] = pipe.ZCount(ctx, groupConcurrencyKey(id), min, "+inf")
+	}
+	_, _ = pipe.Exec(ctx)
+	for id, cmd := range cmds {
+		if n, err := cmd.Result(); err == nil {
+			result[id] = int(n)
+		}
+	}
+	return result
+}
+
+// AcquireAccountSlot 获取账号级并发槽位（语义同 AcquireKeySlot）。
+func (cm *ConcurrencyManager) AcquireAccountSlot(ctx context.Context, accountID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
+	if cm.rdb == nil {
+		return nil
+	}
+	return cm.runAcquireSlot(ctx, accountConcurrencyKey(accountID), requestID, maxConcurrency, slotTTL)
+}
+
+// ReleaseAccountSlot 释放账号级并发槽位。
+func (cm *ConcurrencyManager) ReleaseAccountSlot(ctx context.Context, accountID int, requestID string) {
+	if cm.rdb == nil {
+		return
+	}
+	cm.rdb.ZRem(ctx, accountConcurrencyKey(accountID), requestID)
+}
+
+// GetAccountCurrentCounts 批量获取多个账号的当前在途并发数（管理端观测用）。
+// 与 GetKeyCurrentCounts 同口径：只统计未过期的 slot。
+func (cm *ConcurrencyManager) GetAccountCurrentCounts(ctx context.Context, accountIDs []int) map[int]int {
+	result := make(map[int]int, len(accountIDs))
+	if cm.rdb == nil {
+		return result
+	}
+	min := "(" + strconv.FormatInt(time.Now().Unix(), 10)
+	pipe := cm.rdb.Pipeline()
+	cmds := make(map[int]*redis.IntCmd, len(accountIDs))
+	for _, id := range accountIDs {
+		cmds[id] = pipe.ZCount(ctx, accountConcurrencyKey(id), min, "+inf")
 	}
 	_, _ = pipe.Exec(ctx)
 	for id, cmd := range cmds {

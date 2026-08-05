@@ -7,18 +7,19 @@ import (
 
 func toOAuthClientResp(item appoauth.Client) dto.OAuthClientResp {
 	resp := dto.OAuthClientResp{
-		ID:           item.ID,
-		ClientID:     item.ClientID,
-		SecretHint:   item.SecretHint,
-		Name:         item.Name,
-		Description:  item.Description,
-		RedirectURIs: item.RedirectURIs,
-		FirstParty:   item.FirstParty,
-		Enabled:      item.Enabled,
-		ShowInNav:    item.ShowInNav,
-		LaunchURL:    item.LaunchURL,
-		Icon:         item.Icon,
-		SortOrder:    item.SortOrder,
+		ID:            item.ID,
+		ClientID:      item.ClientID,
+		SecretHint:    item.SecretHint,
+		Name:          item.Name,
+		Description:   item.Description,
+		RedirectURIs:  item.RedirectURIs,
+		AllowedScopes: item.AllowedScopes,
+		FirstParty:    item.FirstParty,
+		Enabled:       item.Enabled,
+		ShowInNav:     item.ShowInNav,
+		LaunchURL:     item.LaunchURL,
+		Icon:          item.Icon,
+		SortOrder:     item.SortOrder,
 	}
 	resp.CreatedAt = item.CreatedAt
 	resp.UpdatedAt = item.UpdatedAt
@@ -41,17 +42,18 @@ func toAppEntryResp(item appoauth.Client) dto.AppEntryResp {
 	}
 }
 
-func toOAuthClientMutation(name, description string, redirectURIs []string, firstParty, enabled, showInNav bool, launchURL, icon string, sortOrder int) appoauth.ClientMutation {
+func toOAuthClientMutation(name, description string, redirectURIs, allowedScopes []string, firstParty, enabled, showInNav bool, launchURL, icon string, sortOrder int) appoauth.ClientMutation {
 	return appoauth.ClientMutation{
-		Name:         name,
-		Description:  description,
-		RedirectURIs: redirectURIs,
-		FirstParty:   firstParty,
-		Enabled:      enabled,
-		ShowInNav:    showInNav,
-		LaunchURL:    launchURL,
-		Icon:         icon,
-		SortOrder:    sortOrder,
+		Name:          name,
+		Description:   description,
+		RedirectURIs:  redirectURIs,
+		AllowedScopes: allowedScopes,
+		FirstParty:    firstParty,
+		Enabled:       enabled,
+		ShowInNav:     showInNav,
+		LaunchURL:     launchURL,
+		Icon:          icon,
+		SortOrder:     sortOrder,
 	}
 }
 

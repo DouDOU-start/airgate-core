@@ -44,6 +44,8 @@ const (
 	FieldSettled = "settled"
 	// FieldSeconds holds the string denoting the seconds field in the database.
 	FieldSeconds = "seconds"
+	// FieldResolution holds the string denoting the resolution field in the database.
+	FieldResolution = "resolution"
 	// FieldData holds the string denoting the data field in the database.
 	FieldData = "data"
 	// FieldSubmitTime holds the string denoting the submit_time field in the database.
@@ -90,6 +92,7 @@ var Columns = []string{
 	FieldAccountRateMultiplier,
 	FieldSettled,
 	FieldSeconds,
+	FieldResolution,
 	FieldData,
 	FieldSubmitTime,
 	FieldFinishTime,
@@ -143,6 +146,8 @@ var (
 	DefaultSettled bool
 	// DefaultSeconds holds the default value on creation for the "seconds" field.
 	DefaultSeconds int
+	// DefaultResolution holds the default value on creation for the "resolution" field.
+	DefaultResolution string
 	// DefaultSubmitTime holds the default value on creation for the "submit_time" field.
 	DefaultSubmitTime func() time.Time
 	// DefaultRequestID holds the default value on creation for the "request_id" field.
@@ -277,6 +282,11 @@ func BySettled(opts ...sql.OrderTermOption) OrderOption {
 // BySeconds orders the results by the seconds field.
 func BySeconds(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSeconds, opts...).ToFunc()
+}
+
+// ByResolution orders the results by the resolution field.
+func ByResolution(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResolution, opts...).ToFunc()
 }
 
 // BySubmitTime orders the results by the submit_time field.

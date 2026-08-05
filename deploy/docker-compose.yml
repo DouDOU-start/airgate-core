@@ -108,6 +108,8 @@ services:
       # ---- 安全 ----
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       API_KEY_SECRET: ${API_KEY_SECRET:-}
+      ANTIGRAVITY_OAUTH_CLIENT_ID: ${ANTIGRAVITY_OAUTH_CLIENT_ID:-}
+      ANTIGRAVITY_OAUTH_CLIENT_SECRET: ${ANTIGRAVITY_OAUTH_CLIENT_SECRET:-}
       # ---- 运行时 ----
       GIN_MODE: release
       LOG_LEVEL: info

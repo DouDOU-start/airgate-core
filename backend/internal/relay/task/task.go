@@ -67,6 +67,7 @@ type Task struct {
 	AccountRateMultiplier float64
 	Settled               bool
 	Seconds               int
+	Resolution            string
 
 	Data       json.RawMessage
 	SubmitTime time.Time

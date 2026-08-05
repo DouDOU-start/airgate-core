@@ -66,3 +66,42 @@ func TestParseImageSizePrices(t *testing.T) {
 		})
 	}
 }
+
+func TestParseVideoResolutionPrices(t *testing.T) {
+	cases := []struct {
+		name  string
+		extra map[string]interface{}
+		want  map[string]float64
+	}{
+		{
+			name: "解析并规范化分辨率键",
+			extra: map[string]interface{}{
+				"video": map[string]interface{}{
+					"resolution_prices": map[string]interface{}{
+						" 480P ": 0.05,
+						"720p":   0.07,
+					},
+				},
+			},
+			want: map[string]float64{"480p": 0.05, "720p": 0.07},
+		},
+		{
+			name: "非法和非正价格被丢弃",
+			extra: map[string]interface{}{
+				"video": map[string]interface{}{
+					"resolution_prices": map[string]interface{}{"480p": 0, "720p": "bad"},
+				},
+			},
+			want: nil,
+		},
+		{name: "缺少视频扩展", extra: nil, want: nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ParseVideoResolutionPrices("video-model", tc.extra)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("ParseVideoResolutionPrices() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

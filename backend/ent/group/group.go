@@ -40,6 +40,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeChannelKeys holds the string denoting the channel_keys edge name in mutations.
 	EdgeChannelKeys = "channel_keys"
+	// EdgeAccounts holds the string denoting the accounts edge name in mutations.
+	EdgeAccounts = "accounts"
 	// EdgeAllowedUsers holds the string denoting the allowed_users edge name in mutations.
 	EdgeAllowedUsers = "allowed_users"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
@@ -53,6 +55,11 @@ const (
 	// ChannelKeysInverseTable is the table name for the ChannelKey entity.
 	// It exists in this package in order to avoid circular dependency with the "channelkey" package.
 	ChannelKeysInverseTable = "channel_keys"
+	// AccountsTable is the table that holds the accounts relation/edge. The primary key declared below.
+	AccountsTable = "account_groups"
+	// AccountsInverseTable is the table name for the Account entity.
+	// It exists in this package in order to avoid circular dependency with the "account" package.
+	AccountsInverseTable = "accounts"
 	// AllowedUsersTable is the table that holds the allowed_users relation/edge. The primary key declared below.
 	AllowedUsersTable = "user_allowed_groups"
 	// AllowedUsersInverseTable is the table name for the User entity.
@@ -95,6 +102,9 @@ var (
 	// ChannelKeysPrimaryKey and ChannelKeysColumn2 are the table columns denoting the
 	// primary key for the channel_keys relation (M2M).
 	ChannelKeysPrimaryKey = []string{"channel_key_id", "group_id"}
+	// AccountsPrimaryKey and AccountsColumn2 are the table columns denoting the
+	// primary key for the accounts relation (M2M).
+	AccountsPrimaryKey = []string{"account_id", "group_id"}
 	// AllowedUsersPrimaryKey and AllowedUsersColumn2 are the table columns denoting the
 	// primary key for the allowed_users relation (M2M).
 	AllowedUsersPrimaryKey = []string{"user_id", "group_id"}
@@ -210,6 +220,20 @@ func ByChannelKeys(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByAccountsCount orders the results by accounts count.
+func ByAccountsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newAccountsStep(), opts...)
+	}
+}
+
+// ByAccounts orders the results by accounts terms.
+func ByAccounts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newAccountsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByAllowedUsersCount orders the results by allowed_users count.
 func ByAllowedUsersCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -256,6 +280,13 @@ func newChannelKeysStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ChannelKeysInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2M, true, ChannelKeysTable, ChannelKeysPrimaryKey...),
+	)
+}
+func newAccountsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(AccountsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2M, true, AccountsTable, AccountsPrimaryKey...),
 	)
 }
 func newAllowedUsersStep() *sqlgraph.Step {

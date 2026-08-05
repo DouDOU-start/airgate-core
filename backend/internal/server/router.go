@@ -227,6 +227,38 @@ func (s *Server) registerRoutes() {
 		adminGroup.DELETE("/risk-control/hashes", handlers.RiskControl.DeleteHash)
 		adminGroup.DELETE("/risk-control/hashes/all", handlers.RiskControl.ClearHashes)
 
+		// 代理管理
+		adminGroup.GET("/proxies", handlers.Proxy.ListProxies)
+		adminGroup.POST("/proxies", handlers.Proxy.CreateProxy)
+		adminGroup.PUT("/proxies/:id", handlers.Proxy.UpdateProxy)
+		adminGroup.DELETE("/proxies/:id", handlers.Proxy.DeleteProxy)
+		adminGroup.POST("/proxies/:id/test", handlers.Proxy.TestProxy)
+
+		// 上游账号管理（静态段先于 :id）
+		adminGroup.GET("/accounts", handlers.Account.ListAccounts)
+		adminGroup.GET("/accounts/platforms", handlers.Account.ListAccountPlatforms)
+		adminGroup.GET("/accounts/export", handlers.Account.ExportAccounts)
+		adminGroup.POST("/accounts/import", handlers.Account.ImportAccounts)
+		adminGroup.POST("/accounts/bulk-update", handlers.Account.BulkUpdateAccounts)
+		adminGroup.POST("/accounts/bulk-delete", handlers.Account.BulkDeleteAccounts)
+		adminGroup.GET("/accounts/credentials-schema/:platform", handlers.Account.GetCredentialsSchema)
+		adminGroup.GET("/accounts/oauth/:platform/hints", handlers.Account.GetOAuthHints)
+		adminGroup.POST("/accounts/oauth/:platform/start", handlers.Account.StartOAuth)
+		adminGroup.GET("/accounts/oauth/sessions/:sessionId", handlers.Account.GetOAuthSession)
+		adminGroup.POST("/accounts/oauth/sessions/:sessionId/complete", handlers.Account.CompleteOAuth)
+		// Codex 专用导入：RT / Session（浏览器授权走 oauth/:platform/start）
+		adminGroup.POST("/accounts/oauth/codex/import-refresh", handlers.Account.ImportCodexRefresh)
+		adminGroup.POST("/accounts/oauth/codex/import-session", handlers.Account.ImportCodexSession)
+		adminGroup.POST("/accounts", handlers.Account.CreateAccount)
+		adminGroup.PUT("/accounts/:id", handlers.Account.UpdateAccount)
+		adminGroup.DELETE("/accounts/:id", handlers.Account.DeleteAccount)
+		adminGroup.PATCH("/accounts/:id/toggle", handlers.Account.ToggleScheduling)
+		adminGroup.POST("/accounts/:id/usage/refresh", handlers.Account.RefreshAccountUsage)
+		adminGroup.POST("/accounts/:id/usage/reset", handlers.Account.ConsumeAccountUsageReset)
+		adminGroup.GET("/accounts/:id/stats", handlers.Account.GetAccountUsageStats)
+		adminGroup.GET("/accounts/:id/models", handlers.Account.ListAccountTestModels)
+		adminGroup.POST("/accounts/:id/test", handlers.Account.TestAccountConnection)
+
 		// 备忘录
 		adminGroup.GET("/bookmarks", handlers.Bookmark.ListBookmarks)
 		adminGroup.POST("/bookmarks", handlers.Bookmark.CreateBookmark)

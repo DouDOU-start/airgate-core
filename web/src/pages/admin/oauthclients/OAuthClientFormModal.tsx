@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  Checkbox,
   Description,
   Input,
   Label,
@@ -17,6 +18,14 @@ import { AppWindow, ChevronDown, Link2, ShieldCheck } from 'lucide-react';
 import type { OAuthClientResp, UpdateOAuthClientReq } from '../../../shared/types';
 
 const DEFAULT_CALLBACK_PATH = '/api/v1/auth/callback';
+const OAUTH_SCOPES = [
+  'profile',
+  'wallet.read',
+  'wallet.debit',
+  'wallet.refund',
+  'payment.read',
+  'payment.create',
+] as const;
 
 // redirect_uris 表单里一行一个，提交时拆分过滤空行
 function splitLines(value: string): string[] {
@@ -70,6 +79,7 @@ export function OAuthClientFormModal({
     name: client?.name ?? '',
     description: client?.description ?? '',
     redirect_uris: (client?.redirect_uris ?? []).join('\n'),
+    allowed_scopes: client?.allowed_scopes ?? ['profile'],
     launch_url: client?.launch_url ?? '',
     icon: client?.icon ?? '',
     sort_order: String(client?.sort_order ?? 0),
@@ -93,7 +103,12 @@ export function OAuthClientFormModal({
     onSubmit({
       name: form.name.trim(),
       description: form.description.trim(),
-      redirect_uris: form.advanced_redirects ? splitLines(form.redirect_uris) : defaultRedirectURI ? [defaultRedirectURI] : [],
+      redirect_uris: form.advanced_redirects
+        ? splitLines(form.redirect_uris)
+        : defaultRedirectURI
+          ? [defaultRedirectURI]
+          : [],
+      allowed_scopes: form.allowed_scopes,
       launch_url: form.launch_url.trim(),
       icon: form.icon.trim(),
       sort_order: Number(form.sort_order) || 0,
@@ -104,8 +119,23 @@ export function OAuthClientFormModal({
   };
 
   const defaultRedirectURI = buildDefaultRedirectURI(form.launch_url);
-  const redirectURIs = form.advanced_redirects ? splitLines(form.redirect_uris) : defaultRedirectURI ? [defaultRedirectURI] : [];
-  const canSubmit = form.name.trim() !== '' && redirectURIs.length > 0 && (!form.show_in_nav || form.launch_url.trim() !== '');
+  const redirectURIs = form.advanced_redirects
+    ? splitLines(form.redirect_uris)
+    : defaultRedirectURI
+      ? [defaultRedirectURI]
+      : [];
+  const canSubmit =
+    form.name.trim() !== '' &&
+    redirectURIs.length > 0 &&
+    form.allowed_scopes.length > 0 &&
+    (!form.show_in_nav || form.launch_url.trim() !== '');
+
+  const toggleScope = (scope: string, selected: boolean) => {
+    const next = selected
+      ? [...new Set([...form.allowed_scopes, scope])]
+      : form.allowed_scopes.filter((item) => item !== scope);
+    setForm({ ...form, allowed_scopes: next });
+  };
 
   const modalState = useOverlayState({
     isOpen: open,
@@ -150,6 +180,31 @@ export function OAuthClientFormModal({
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                   />
                 </HeroTextField>
+
+                <div>
+                  <div className="mb-2 text-sm font-medium text-text">
+                    {t('oauth_clients.form_allowed_scopes')}
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {OAUTH_SCOPES.map((scope) => (
+                      <Checkbox
+                        key={scope}
+                        isSelected={form.allowed_scopes.includes(scope)}
+                        onChange={(selected) => toggleScope(scope, selected)}
+                      >
+                        <Checkbox.Control>
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                        <span className="text-sm text-text">
+                          {t(`oauth_clients.scope_${scope.replace('.', '_')}`)}
+                        </span>
+                      </Checkbox>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-text-tertiary">
+                    {t('oauth_clients.form_allowed_scopes_hint')}
+                  </p>
+                </div>
 
                 <HeroTextField fullWidth isRequired={form.show_in_nav}>
                   <Label>{t('oauth_clients.form_launch_url')}</Label>

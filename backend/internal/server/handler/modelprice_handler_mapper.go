@@ -77,5 +77,9 @@ func toModelMarketItemRespFromDomain(item appmodelprice.ModelPrice) dto.ModelMar
 	if prices := appmodelprice.ParseImageSizePrices(item.Model, item.PricingExtra); len(prices) > 0 {
 		resp.ImageSizePrices = prices
 	}
+	resp.VideoPerSecond = appmodelprice.ParseVideoPerSecond(item.Model, item.PricingExtra)
+	if prices := appmodelprice.ParseVideoResolutionPrices(item.Model, item.PricingExtra); len(prices) > 0 {
+		resp.VideoResolutionPrices = prices
+	}
 	return resp
 }

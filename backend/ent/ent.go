@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/announcement"
 	"github.com/DouDOU-start/airgate-core/ent/announcementread"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
@@ -28,6 +29,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/oauthclient"
 	"github.com/DouDOU-start/airgate-core/ent/paymentorder"
 	"github.com/DouDOU-start/airgate-core/ent/paymentproviderconfig"
+	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/ent/task"
@@ -96,6 +98,7 @@ func checkColumn(table, column string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			apikey.Table:                apikey.ValidColumn,
+			account.Table:               account.ValidColumn,
 			announcement.Table:          announcement.ValidColumn,
 			announcementread.Table:      announcementread.ValidColumn,
 			balancelog.Table:            balancelog.ValidColumn,
@@ -111,6 +114,7 @@ func checkColumn(table, column string) error {
 			oauthclient.Table:           oauthclient.ValidColumn,
 			paymentorder.Table:          paymentorder.ValidColumn,
 			paymentproviderconfig.Table: paymentproviderconfig.ValidColumn,
+			proxy.Table:                 proxy.ValidColumn,
 			redemptioncode.Table:        redemptioncode.ValidColumn,
 			setting.Table:               setting.ValidColumn,
 			task.Table:                  task.ValidColumn,

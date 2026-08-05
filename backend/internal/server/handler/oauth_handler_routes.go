@@ -44,7 +44,7 @@ func (h *OAuthHandler) CreateOAuthClient(c *gin.Context) {
 		enabled = *req.Enabled
 	}
 	item, secret, err := h.service.CreateClient(c.Request.Context(), toOAuthClientMutation(
-		req.Name, req.Description, req.RedirectURIs, req.FirstParty, enabled,
+		req.Name, req.Description, req.RedirectURIs, req.AllowedScopes, req.FirstParty, enabled,
 		req.ShowInNav, req.LaunchURL, req.Icon, req.SortOrder,
 	))
 	if err != nil {
@@ -68,7 +68,7 @@ func (h *OAuthHandler) UpdateOAuthClient(c *gin.Context) {
 		return
 	}
 	item, err := h.service.UpdateClient(c.Request.Context(), id, toOAuthClientMutation(
-		req.Name, req.Description, req.RedirectURIs, req.FirstParty, req.Enabled,
+		req.Name, req.Description, req.RedirectURIs, req.AllowedScopes, req.FirstParty, req.Enabled,
 		req.ShowInNav, req.LaunchURL, req.Icon, req.SortOrder,
 	))
 	if err != nil {
@@ -119,7 +119,7 @@ func (h *OAuthHandler) GetAuthorizeInfo(c *gin.Context) {
 		response.BindError(c, err)
 		return
 	}
-	client, err := h.service.AuthorizeInfo(c.Request.Context(), query.ClientID, query.RedirectURI)
+	client, scopes, err := h.service.AuthorizeInfo(c.Request.Context(), query.ClientID, query.RedirectURI, query.Scope)
 	if err != nil {
 		httpCode, message := h.handleError("oauth_authorize_info_failed", "查询授权信息失败", err)
 		response.Error(c, httpCode, httpCode, message)
@@ -130,6 +130,7 @@ func (h *OAuthHandler) GetAuthorizeInfo(c *gin.Context) {
 		Description: client.Description,
 		Icon:        client.Icon,
 		FirstParty:  client.FirstParty,
+		Scopes:      scopes,
 	})
 }
 

@@ -56,4 +56,6 @@ export const queryKeys = {
   riskControlStatus: () => ['risk-control-status'] as const,
   riskControlLogs: (...args: unknown[]) => ['risk-control-logs', ...args] as const,
   bookmarks: (...args: unknown[]) => ['bookmarks', ...args] as const,
+  accounts: (...args: unknown[]) => ['accounts', ...args] as const,
+  proxies: (...args: unknown[]) => ['proxies', ...args] as const,
 } as const;

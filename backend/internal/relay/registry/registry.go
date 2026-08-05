@@ -217,6 +217,41 @@ func (r *Registry) ensureLoaded() {
 	}
 }
 
+// ListCandidates 返回可调度 key 候选（已过滤 status/type/group/model/exclude）。
+// 供与账号路径统一混合选路；返回切片内指针只读。
+func (r *Registry) ListCandidates(groupID int, model, protocol string, exclude []int) []*ChannelKeySnapshot {
+	r.ensureLoaded()
+	excluded := make(map[int]struct{}, len(exclude))
+	for _, id := range exclude {
+		excluded[id] = struct{}{}
+	}
+	allowedTypes := keyTypesForProtocol(protocol)
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	out := make([]*ChannelKeySnapshot, 0, 8)
+	for _, k := range r.keys {
+		if _, skip := excluded[k.KeyID]; skip {
+			continue
+		}
+		if _, ok := allowedTypes[k.Type]; !ok {
+			continue
+		}
+		if k.Status != StatusEnabled {
+			continue
+		}
+		if _, ok := k.Models[model]; !ok {
+			continue
+		}
+		if _, ok := k.GroupIDs[groupID]; !ok {
+			continue
+		}
+		out = append(out, k)
+	}
+	return out
+}
+
 // Pick 为指定分组、模型与入口协议选择一把 key 端点：
 //
 //	候选 = status==enabled 且模型命中

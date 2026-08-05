@@ -10,6 +10,8 @@ import (
 	"io"
 )
 
+const encryptedSecretPrefix = "enc:v1:"
+
 // deriveAESKey 从 hex 编码的 secret 中取前 32 字节作为 AES-256 密钥
 func deriveAESKey(secret string) ([]byte, error) {
 	raw, err := hex.DecodeString(secret)
@@ -85,4 +87,32 @@ func DecryptAPIKey(encrypted, secret string) (string, error) {
 	}
 
 	return string(plaintext), nil
+}
+
+// EncryptSecretValue 加密通用敏感配置，并附加版本前缀供迁移和密钥错误识别。
+func EncryptSecretValue(plain, secret string) (string, error) {
+	if plain == "" {
+		return "", nil
+	}
+	encrypted, err := EncryptAPIKey(plain, secret)
+	if err != nil {
+		return "", err
+	}
+	return encryptedSecretPrefix + encrypted, nil
+}
+
+// DecryptSecretValue 解密由 EncryptSecretValue 生成的敏感配置。
+func DecryptSecretValue(encrypted, secret string) (string, error) {
+	if encrypted == "" {
+		return "", nil
+	}
+	if !IsEncryptedSecretValue(encrypted) {
+		return "", fmt.Errorf("敏感配置不是受支持的加密格式")
+	}
+	return DecryptAPIKey(encrypted[len(encryptedSecretPrefix):], secret)
+}
+
+// IsEncryptedSecretValue 判断值是否带有受支持的密文版本前缀。
+func IsEncryptedSecretValue(value string) bool {
+	return len(value) > len(encryptedSecretPrefix) && value[:len(encryptedSecretPrefix)] == encryptedSecretPrefix
 }

@@ -156,7 +156,7 @@ func (p *Pipeline) HandleImagesEdits(c *gin.Context) {
 		return
 	}
 	contentType := c.GetHeader("Content-Type")
-	fields, err := multipartform.ExtractFields(body, contentType, "model", "stream")
+	fields, err := multipartform.ExtractFields(body, contentType, "model", "stream", "n", "size", "resolution", "quality")
 	if err != nil {
 		writeError(c, http.StatusBadRequest, "invalid_request_error", "invalid_multipart",
 			"multipart 请求体解析失败: "+err.Error())
@@ -175,6 +175,11 @@ func (p *Pipeline) HandleImagesEdits(c *gin.Context) {
 	}
 	req.Model = fields["model"]
 	req.Stream = fields["stream"] == "true"
+	for _, key := range []string{"n", "size", "resolution", "quality"} {
+		if fields[key] != "" {
+			_ = req.Set(key, fields[key])
+		}
+	}
 	p.forwardOpt(c, keyInfo, req, adaptor.EndpointImagesEdits, forwardOptions{
 		rawBody:        body,
 		rawContentType: contentType,

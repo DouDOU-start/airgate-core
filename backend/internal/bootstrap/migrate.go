@@ -1,12 +1,17 @@
 package bootstrap
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/migrate"
+	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 )
 
@@ -14,9 +19,10 @@ import (
 //  1. 迁移前定点修复清单（幂等 SQL）：会让 ent 自动迁移本身失败的旧结构在此先行处理；
 //  2. ent 自动迁移建齐缺失表与字段（非破坏性：不删列不删索引，存量库大变更由生产手动迁移）；
 //  3. 存量库定点修复清单（幂等 SQL）：被新 schema 取代且会引发运行时冲突的旧结构在此登记清理。
+//  4. 使用应用加密密钥执行敏感数据回填；失败会中止启动，避免静默丢失凭证。
 //
-// 修复项执行失败只 Warn 不中断启动（全新库本就没有旧结构，条件判断幂等空转）。
-func Migrate(ctx context.Context, db *ent.Client, sqlDB *sql.DB) error {
+// 两份定点 SQL 清单执行失败只 Warn（全新库可能没有旧结构）；敏感数据迁移失败会中断启动。
+func Migrate(ctx context.Context, db *ent.Client, sqlDB *sql.DB, encryptionSecret string) error {
 	for _, stmt := range preMigrationFixups {
 		if _, err := sqlDB.ExecContext(ctx, stmt); err != nil {
 			slog.Warn("db_pre_migration_fixup_failed", "stmt", stmt, logx.LogFieldError, err)
@@ -30,11 +36,242 @@ func Migrate(ctx context.Context, db *ent.Client, sqlDB *sql.DB) error {
 			slog.Warn("db_legacy_fixup_failed", "stmt", stmt, logx.LogFieldError, err)
 		}
 	}
+	return migrateLegacySensitiveData(ctx, sqlDB, encryptionSecret)
+}
+
+type legacyAccountCredential struct {
+	id        int
+	raw       string
+	encrypted string
+}
+
+type legacyProxyPassword struct {
+	id       int
+	password string
+}
+
+func migrateLegacySensitiveData(ctx context.Context, db *sql.DB, secret string) error {
+	if err := migrateLegacyAccountCredentials(ctx, db, secret); err != nil {
+		return fmt.Errorf("迁移旧账号凭证失败: %w", err)
+	}
+	if err := migrateLegacyProxyPasswords(ctx, db, secret); err != nil {
+		return fmt.Errorf("迁移旧代理密码失败: %w", err)
+	}
 	return nil
+}
+
+func migrateLegacyAccountCredentials(ctx context.Context, db *sql.DB, secret string) error {
+	dataType, hasLegacyColumn, err := columnDataType(ctx, db, "accounts", "credentials")
+	if err != nil {
+		return err
+	}
+	_, hasEncryptedColumn, err := columnDataType(ctx, db, "accounts", "credentials_enc")
+	if err != nil {
+		return err
+	}
+	if !hasEncryptedColumn {
+		return fmt.Errorf("accounts.credentials_enc 字段不存在")
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	querySQL := `
+SELECT id, '', COALESCE(credentials_enc, '')
+FROM accounts
+WHERE credentials_enc <> ''`
+	if hasLegacyColumn {
+		querySQL = `
+SELECT id, COALESCE(credentials::text, ''), COALESCE(credentials_enc, '')
+FROM accounts
+WHERE credentials IS NOT NULL OR credentials_enc <> ''`
+	}
+	rows, err := tx.QueryContext(ctx, querySQL)
+	if err != nil {
+		return err
+	}
+	items := make([]legacyAccountCredential, 0)
+	for rows.Next() {
+		var item legacyAccountCredential
+		if err := rows.Scan(&item.id, &item.raw, &item.encrypted); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+
+	updateSQL := ""
+	if hasLegacyColumn {
+		emptyValue, err := emptyLegacyCredentialSQL(dataType)
+		if err != nil {
+			return err
+		}
+		updateSQL = `UPDATE accounts
+SET credentials_enc = $1,
+    email = CASE WHEN $2 <> '' THEN $2 ELSE email END,
+    credentials = ` + emptyValue + `
+WHERE id = $3`
+	}
+	for _, item := range items {
+		encrypted, email, shouldMigrate, err := prepareLegacyAccountCredential(item, secret)
+		if err != nil {
+			return err
+		}
+		if !shouldMigrate {
+			continue
+		}
+		if !hasLegacyColumn {
+			return fmt.Errorf("账号 %d 缺少旧凭证列却需要迁移", item.id)
+		}
+		if _, err := tx.ExecContext(ctx, updateSQL, encrypted, email, item.id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func prepareLegacyAccountCredential(item legacyAccountCredential, secret string) (string, string, bool, error) {
+	var encryptedCredentials map[string]string
+	var encryptedNormalized []byte
+	if item.encrypted != "" {
+		plain, err := auth.DecryptAPIKey(item.encrypted, secret)
+		if err != nil {
+			return "", "", false, fmt.Errorf("账号 %d 的现有密文无法解密: %w", item.id, err)
+		}
+		if err := json.Unmarshal([]byte(plain), &encryptedCredentials); err != nil {
+			return "", "", false, fmt.Errorf("账号 %d 的现有密文不是合法凭证 JSON: %w", item.id, err)
+		}
+		encryptedNormalized, err = json.Marshal(encryptedCredentials)
+		if err != nil {
+			return "", "", false, fmt.Errorf("序列化账号 %d 的现有密文失败: %w", item.id, err)
+		}
+	}
+
+	raw := strings.TrimSpace(item.raw)
+	if raw == "" || raw == "{}" || raw == "null" {
+		return "", "", false, nil
+	}
+	var credentials map[string]string
+	if err := json.Unmarshal([]byte(raw), &credentials); err != nil {
+		return "", "", false, fmt.Errorf("账号 %d 的旧凭证不是合法 JSON: %w", item.id, err)
+	}
+	normalized, err := json.Marshal(credentials)
+	if err != nil {
+		return "", "", false, fmt.Errorf("序列化账号 %d 的旧凭证失败: %w", item.id, err)
+	}
+	encrypted := item.encrypted
+	if encrypted == "" {
+		encrypted, err = auth.EncryptAPIKey(string(normalized), secret)
+		if err != nil {
+			return "", "", false, err
+		}
+	} else if !bytes.Equal(normalized, encryptedNormalized) {
+		return "", "", false, fmt.Errorf("账号 %d 的旧明文凭证与现有密文不一致", item.id)
+	}
+	email := credentials["email"]
+	if encryptedEmail := encryptedCredentials["email"]; encryptedEmail != "" {
+		email = encryptedEmail
+	}
+	return encrypted, email, true, nil
+}
+
+func migrateLegacyProxyPasswords(ctx context.Context, db *sql.DB, secret string) error {
+	_, exists, err := columnDataType(ctx, db, "proxies", "password")
+	if err != nil || !exists {
+		return err
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.QueryContext(ctx, `SELECT id, password FROM proxies WHERE password <> ''`)
+	if err != nil {
+		return err
+	}
+	items := make([]legacyProxyPassword, 0)
+	for rows.Next() {
+		var item legacyProxyPassword
+		if err := rows.Scan(&item.id, &item.password); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+
+	for _, item := range items {
+		if auth.IsEncryptedSecretValue(item.password) {
+			if _, err := auth.DecryptSecretValue(item.password, secret); err != nil {
+				return fmt.Errorf("代理 %d 的现有密文无法解密: %w", item.id, err)
+			}
+			continue
+		}
+		encrypted, err := auth.EncryptSecretValue(item.password, secret)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE proxies SET password = $1 WHERE id = $2`, encrypted, item.id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func columnDataType(ctx context.Context, db *sql.DB, table, column string) (string, bool, error) {
+	var dataType string
+	err := db.QueryRowContext(ctx, `
+SELECT data_type
+FROM information_schema.columns
+WHERE table_schema = current_schema() AND table_name = $1 AND column_name = $2`, table, column).Scan(&dataType)
+	if err == sql.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return dataType, true, nil
+}
+
+func emptyLegacyCredentialSQL(dataType string) (string, error) {
+	switch dataType {
+	case "jsonb":
+		return `'{}'::jsonb`, nil
+	case "json":
+		return `'{}'::json`, nil
+	case "text", "character varying":
+		return `''`, nil
+	default:
+		return "", fmt.Errorf("不支持的旧 credentials 类型: %s", dataType)
+	}
 }
 
 // preMigrationFixups 在 ent 自动迁移之前执行的定点修复清单（幂等；按时间序追加，勿改历史条目）。
 var preMigrationFixups = []string{
+	// 2026-08：OAuth 客户端增加 scope 白名单。Ent 的 JSON 默认值只在 Go 创建器生效，
+	// 对存量表直接增加 NOT NULL JSON 列会因旧行无值而失败，因此在自动迁移前带默认值补列。
+	`ALTER TABLE IF EXISTS oauth_clients
+ADD COLUMN IF NOT EXISTS allowed_scopes jsonb NOT NULL
+DEFAULT '["profile","wallet.read","wallet.debit","wallet.refund","payment.read","payment.create"]'::jsonb`,
+
 	// 2026-07：master 插件线的旧 tasks 表与本分支异步任务 tasks 表同名不同构
 	// （旧表无 task_id 列且有存量行，ent 给它补 NOT NULL 列必然失败）。
 	// 处理：改名归档为 tasks_legacy（数据保留不删），并把序列/约束/索引一并改名，
@@ -141,6 +378,38 @@ BEGIN
           AND column_name = 'platform' AND is_nullable = 'NO'
     ) THEN
         ALTER TABLE usage_logs ALTER COLUMN platform DROP NOT NULL;
+    END IF;
+END $$`,
+
+	// 2026-08：账号凭证改走 credentials_enc（AES-GCM），schema 已无明文 credentials 字段。
+	// 自动迁移不删列，存量库若仍留 credentials（jsonb）且 NOT NULL，Create 只写 credentials_enc
+	// 会撞 not-null（import-refresh / OAuth 建号均复现）。去掉 NOT NULL、补默认空对象；保留列供回滚。
+	`DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'accounts'
+          AND column_name = 'credentials'
+    ) THEN
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = current_schema() AND table_name = 'accounts'
+              AND column_name = 'credentials' AND is_nullable = 'NO'
+        ) THEN
+            ALTER TABLE accounts ALTER COLUMN credentials DROP NOT NULL;
+        END IF;
+        -- 类型可能是 jsonb 或 text；按 data_type 设兼容默认值
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = current_schema() AND table_name = 'accounts'
+              AND column_name = 'credentials' AND data_type = 'jsonb'
+        ) THEN
+            ALTER TABLE accounts ALTER COLUMN credentials SET DEFAULT '{}'::jsonb;
+            UPDATE accounts SET credentials = '{}'::jsonb WHERE credentials IS NULL;
+        ELSE
+            ALTER TABLE accounts ALTER COLUMN credentials SET DEFAULT '';
+            UPDATE accounts SET credentials = '' WHERE credentials IS NULL;
+        END IF;
     END IF;
 END $$`,
 }

@@ -89,6 +89,10 @@ type ModelMarketItemResp struct {
 	LongContext *ModelMarketLongContext `json:"long_context,omitempty"`
 	// ImageSizePrices 图像分辨率价表（USD/张，键 "quality:size" 或裸 "size"），未配置时省略。
 	ImageSizePrices map[string]float64 `json:"image_size_prices,omitempty"`
+	// VideoPerSecond 视频未命中分辨率表时的基础秒价，未配置时省略。
+	VideoPerSecond float64 `json:"video_per_second,omitempty"`
+	// VideoResolutionPrices 视频分辨率秒价表（USD/秒，键如 480p/720p/1080p），未配置时省略。
+	VideoResolutionPrices map[string]float64 `json:"video_resolution_prices,omitempty"`
 }
 
 // ModelMarketLongContext 长上下文阶梯：完整 prompt 超过阈值时各维度单价按对应倍率放大。

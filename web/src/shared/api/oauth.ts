@@ -12,10 +12,11 @@ import type {
 
 export const oauthApi = {
   // 用户接口：授权页 + 应用导航
-  authorizeInfo: (clientId: string, redirectUri: string) =>
+  authorizeInfo: (clientId: string, redirectUri: string, scope: string) =>
     get<AuthorizeInfoResp>('/api/v1/oauth/authorize-info', {
       client_id: clientId,
       redirect_uri: redirectUri,
+      scope,
     }),
   authorize: (data: AuthorizeReq) => post<AuthorizeResp>('/api/v1/oauth/authorize', data),
   listApps: () => get<AppEntryResp[]>('/api/v1/apps'),

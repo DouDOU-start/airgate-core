@@ -44,6 +44,8 @@ func (Group) Edges() []ent.Edge {
 	return []ent.Edge{
 		// 分组关联的渠道密钥端点（多对多反向）
 		edge.From("channel_keys", ChannelKey.Type).Ref("groups"),
+		// 分组关联的订阅账号（多对多反向）；与 channel_keys 并列参与统一调度。
+		edge.From("accounts", Account.Type).Ref("groups"),
 		// 允许访问此专属分组的用户（多对多反向）
 		edge.From("allowed_users", User.Type).Ref("allowed_groups"),
 		edge.To("api_keys", APIKey.Type),

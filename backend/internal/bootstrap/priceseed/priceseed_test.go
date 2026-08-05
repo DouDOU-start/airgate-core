@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	appmodelprice "github.com/DouDOU-start/airgate-core/internal/app/modelprice"
@@ -152,10 +153,15 @@ func TestParseEmbeddedSeed(t *testing.T) {
 	for _, it := range items {
 		byModel[it.Model] = it
 	}
+	if len(byModel) != len(items) {
+		t.Fatalf("seed contains duplicate model names: items=%d unique=%d", len(items), len(byModel))
+	}
 
-	// 覆盖总数：15 claude（含 5 别名）+ 8 openai（含 gpt-image-2）+ 7 gemini + 6 grok = 36。
-	if len(items) != 36 {
-		t.Errorf("seed model count = %d, want 36", len(items))
+	// 覆盖总数：15 claude（含 5 别名）+ 8 openai（含 gpt-image-2）+ 7 gemini
+	// + 54 grok（6 个现役文本规范模型、36 个文本别名、2 个历史兼容文本模型、
+	// 4 个媒体规范模型、6 个媒体别名）= 84。
+	if len(items) != 84 {
+		t.Errorf("seed model count = %d, want 84", len(items))
 	}
 
 	// 抽样核对（claude/openai 值来自 airgate-claude/models.go 与 airgate-openai/registry.go，
@@ -175,8 +181,11 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		{"gemini-2.5-pro", 1.25, 10.0, 0.31, 0},
 		{"gemini-3.1-pro-preview", 2.0, 12.0, 0.2, 0},
 		{"gemini-3.5-flash", 1.5, 9.0, 0.15, 0},
-		{"grok-4.3", 1.25, 2.5, 1.25, 0},
-		{"grok-build-0.1", 1.0, 2.0, 1.0, 0},
+		{"grok-4.3", 1.25, 2.5, 0.2, 0},
+		{"grok-4.5", 2.0, 6.0, 0.3, 0},
+		{"grok-build-0.1", 1.0, 2.0, 0.2, 0},
+		{"grok-3-mini", 0.3, 0.5, 0.075, 0},
+		{"grok-3-mini-fast", 0.6, 4.0, 0.15, 0},
 	}
 	for _, c := range cases {
 		got, ok := byModel[c.model]
@@ -214,6 +223,73 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		}
 	}
 
+	// xAI Imagine 生图：按官方 1K/2K 输出图片价计费；响应不带分辨率时
+	// per_request 使用默认 1K 价兜底，避免逆向渠道零价放行。
+	for _, tc := range []struct {
+		model            string
+		perRequest, oneK float64
+		twoK, inputImage float64
+	}{
+		{"grok-imagine-image", 0.02, 0.02, 0.02, 0.002},
+		{"grok-imagine-image-quality", 0.05, 0.05, 0.07, 0.01},
+	} {
+		img, ok := byModel[tc.model]
+		if !ok {
+			t.Errorf("model %q missing from seed", tc.model)
+			continue
+		}
+		if img.PerRequestPrice != tc.perRequest {
+			t.Errorf("model %q per_request = %v, want %v", tc.model, img.PerRequestPrice, tc.perRequest)
+		}
+		prices := appmodelprice.ParseImageSizePrices(img.Model, img.PricingExtra)
+		if len(prices) != 2 || prices["1k"] != tc.oneK || prices["2k"] != tc.twoK {
+			t.Errorf("model %q size_prices = %#v, want 1k=%v/2k=%v", tc.model, prices, tc.oneK, tc.twoK)
+		}
+		imageExtra, _ := img.PricingExtra["image"].(map[string]interface{})
+		if got, _ := imageExtra["input_image_price"].(float64); got != tc.inputImage {
+			t.Errorf("model %q input_image_price = %v, want %v", tc.model, got, tc.inputImage)
+		}
+	}
+
+	// xAI Imagine 视频：默认 720p 秒价写入 per_second，完整分辨率表保留在
+	// resolution_prices；旧版还记录输入视频秒价。
+	videoCases := []struct {
+		model       string
+		perSecond   float64
+		resolutions map[string]float64
+	}{
+		{"grok-imagine-video", 0.07, map[string]float64{"480p": 0.05, "720p": 0.07}},
+		{"grok-imagine-video-1.5", 0.14, map[string]float64{"480p": 0.08, "720p": 0.14, "1080p": 0.25}},
+	}
+	for _, tc := range videoCases {
+		video, ok := byModel[tc.model]
+		if !ok {
+			t.Errorf("model %q missing from seed", tc.model)
+			continue
+		}
+		videoExtra, ok := video.PricingExtra["video"].(map[string]interface{})
+		if !ok {
+			t.Errorf("model %q video pricing_extra missing: %#v", tc.model, video.PricingExtra)
+			continue
+		}
+		if got, _ := videoExtra["per_second"].(float64); got != tc.perSecond {
+			t.Errorf("model %q per_second = %v, want %v", tc.model, got, tc.perSecond)
+		}
+		resolutionRaw, ok := videoExtra["resolution_prices"].(map[string]interface{})
+		if !ok {
+			t.Errorf("model %q resolution_prices missing: %#v", tc.model, videoExtra)
+			continue
+		}
+		for resolution, want := range tc.resolutions {
+			if got, _ := resolutionRaw[resolution].(float64); got != want {
+				t.Errorf("model %q resolution %q = %v, want %v", tc.model, resolution, got, want)
+			}
+		}
+		if len(resolutionRaw) != len(tc.resolutions) {
+			t.Errorf("model %q resolution_prices count = %d, want %d", tc.model, len(resolutionRaw), len(tc.resolutions))
+		}
+	}
+
 	// 标签归类抽样：四个家族各取一个。
 	tagCases := map[string]string{
 		"claude-fable-5":   "claude",
@@ -227,7 +303,7 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		}
 	}
 
-	// 别名与其规范模型同价。
+	// Claude 别名与其规范模型同价。
 	aliasPairs := [][2]string{
 		{"claude-sonnet-4-5", "claude-sonnet-4-5-20250929"},
 		{"claude-opus-4-5", "claude-opus-4-5-20251101"},
@@ -243,6 +319,68 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		if a.InputPrice != b.InputPrice || a.OutputPrice != b.OutputPrice ||
 			a.CachedInputPrice != b.CachedInputPrice || a.CacheCreationPrice != b.CacheCreationPrice {
 			t.Errorf("alias %q price != canonical %q price", pair[0], pair[1])
+		}
+	}
+
+	// Grok 当前官方别名全部独立落种子，并与规范模型的基础价和 pricing_extra 完全一致。
+	grokAliasGroups := map[string][]string{
+		"grok-4.3": {
+			"grok-4.3-latest", "grok-latest",
+		},
+		"grok-build-0.1": {
+			"grok-code-fast-1", "grok-code-fast", "grok-code-fast-1-0825",
+		},
+		"grok-4.5": {
+			"grok-4.5-latest", "grok-build-latest",
+		},
+		"grok-4.20-0309-reasoning": {
+			"grok-4.20-reasoning-latest", "grok-4.20", "grok-4.20-reasoning", "grok-4.20-0309",
+			"grok-4.20-beta-0309-reasoning", "grok-4.20-beta", "grok-4.20-beta-0309",
+			"grok-4.20-beta-latest", "grok-4.20-beta-latest-reasoning", "grok-4.20-beta-reasoning",
+			"grok-4.20-experimental-beta-0304-reasoning", "grok-4.20-experimental-beta-0304",
+			"grok-4.20-experimental-beta-reasoning-latest", "grok-4.20-experimental-beta-latest",
+			"grok-4.20-reasoning-gv2",
+		},
+		"grok-4.20-0309-non-reasoning": {
+			"grok-4.20-non-reasoning", "grok-4.20-non-reasoning-latest",
+			"grok-4.20-beta-non-reasoning", "grok-4.20-beta-latest-non-reasoning",
+			"grok-4.20-experimental-beta-0304-non-reasoning",
+			"grok-4.20-experimental-beta-non-reasoning-latest",
+			"grok-4.20-beta-0309-non-reasoning", "grok-4.20-non-reasoning-gv2",
+		},
+		"grok-4.20-multi-agent-0309": {
+			"grok-4.20-multi-agent", "grok-4.20-multi-agent-latest",
+			"grok-4.20-multi-agent-beta-latest", "grok-4.20-multi-agent-experimental-beta-0304",
+			"grok-4.20-multi-agent-experimental-beta-latest", "grok-4.20-multi-agent-beta-0309",
+		},
+		"grok-imagine-image": {
+			"grok-imagine-image-2026-03-02",
+		},
+		"grok-imagine-image-quality": {
+			"grok-imagine-image-quality-20260403", "grok-imagine-image-quality-latest", "grok-imagine-image-pro",
+		},
+		"grok-imagine-video-1.5": {
+			"grok-imagine-video-1.5-preview", "grok-imagine-video-1.5-2026-05-30",
+		},
+	}
+	for canonical, aliases := range grokAliasGroups {
+		want, ok := byModel[canonical]
+		if !ok {
+			t.Errorf("canonical model %q missing from seed", canonical)
+			continue
+		}
+		for _, alias := range aliases {
+			got, ok := byModel[alias]
+			if !ok {
+				t.Errorf("grok alias %q missing from seed", alias)
+				continue
+			}
+			if got.TagName != want.TagName || got.InputPrice != want.InputPrice || got.OutputPrice != want.OutputPrice ||
+				got.CachedInputPrice != want.CachedInputPrice || got.CacheCreationPrice != want.CacheCreationPrice ||
+				got.CacheCreation1hPrice != want.CacheCreation1hPrice || got.PerRequestPrice != want.PerRequestPrice ||
+				!reflect.DeepEqual(got.PricingExtra, want.PricingExtra) {
+				t.Errorf("grok alias %q price != canonical %q price", alias, canonical)
+			}
 		}
 	}
 
@@ -276,7 +414,7 @@ func TestParseEmbeddedSeed(t *testing.T) {
 	}
 }
 
-// TestSeedPricingExtra 核对 openai 服务档倍率与 gpt-5.4 长上下文阶梯（值来自 airgate-openai/registry.go）。
+// TestSeedPricingExtra 核对 OpenAI 与 Grok 的服务档倍率、长上下文阶梯。
 func TestSeedPricingExtra(t *testing.T) {
 	items, err := Parse(embeddedSeed)
 	if err != nil {
@@ -327,6 +465,29 @@ func TestSeedPricingExtra(t *testing.T) {
 	}
 	if f := num(st55["flex"]); f != 0.5 {
 		t.Errorf("gpt-5.5 flex = %v, want 0.5", f)
+	}
+
+	// Grok 现役文本模型：priority=2×，且全部在 200K 后 input/output/cached 均为 2×。
+	for _, m := range []string{
+		"grok-4.3", "grok-build-0.1", "grok-4.5",
+		"grok-4.20-0309-reasoning", "grok-4.20-0309-non-reasoning", "grok-4.20-multi-agent-0309",
+	} {
+		st := serviceTiers(m)
+		if p := num(st["priority"]); p != 2.0 {
+			t.Errorf("%s priority = %v, want 2.0", m, p)
+		}
+		if _, ok := st["flex"]; ok {
+			t.Errorf("%s should not carry flex service tier", m)
+		}
+		_, lc := appmodelprice.ParsePricingExtra(m, byModel[m].PricingExtra)
+		if lc == nil {
+			t.Errorf("%s long_context missing", m)
+			continue
+		}
+		if lc.ThresholdTokens != 200000 || lc.InputMultiplier != 2.0 ||
+			lc.OutputMultiplier != 2.0 || lc.CachedMultiplier != 2.0 {
+			t.Errorf("%s long_context = %#v, want threshold=200000 and all multipliers=2", m, lc)
+		}
 	}
 
 	// gpt-5.4 长上下文阶梯：阈值 272000，input×2 / output×1.5 / cached×2。

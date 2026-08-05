@@ -47,6 +47,10 @@ func groupMinuteKey(groupID int, minute int64) string {
 	return fmt.Sprintf("rpm:group:%d:%d", groupID, minute)
 }
 
+func accountMinuteKey(accountID int, minute int64) string {
+	return fmt.Sprintf("rpm:account:%d:%d", accountID, minute)
+}
+
 // incrementByKey 原子递增指定 key 的计数并续期，返回递增后的值。
 func (r *RPMCounter) incrementByKey(ctx context.Context, key string) (int, error) {
 	pipe := r.rdb.TxPipeline()
@@ -141,6 +145,27 @@ func (r *RPMCounter) GetKeyRPMs(ctx context.Context, channelKeyIDs []int) map[in
 	return result
 }
 
+// GetAccountRPMs 批量获取多个账号当前分钟的请求计数（管理端观测用）。
+func (r *RPMCounter) GetAccountRPMs(ctx context.Context, accountIDs []int) map[int]int {
+	result := make(map[int]int, len(accountIDs))
+	if r.rdb == nil {
+		return result
+	}
+	minute := currentMinute()
+	pipe := r.rdb.Pipeline()
+	cmds := make(map[int]*redis.StringCmd, len(accountIDs))
+	for _, id := range accountIDs {
+		cmds[id] = pipe.Get(ctx, accountMinuteKey(id, minute))
+	}
+	_, _ = pipe.Exec(ctx)
+	for id, cmd := range cmds {
+		if n, err := cmd.Int(); err == nil {
+			result[id] = n
+		}
+	}
+	return result
+}
+
 // decrementRPMScript 仅当 key 存在时递减，避免创建无 TTL 的 key
 var decrementRPMScript = redis.NewScript(`
 	if redis.call('EXISTS', KEYS[1]) == 1 then
@@ -212,4 +237,22 @@ func (r *RPMCounter) TryIncrementKeyRPM(ctx context.Context, channelKeyID int, m
 	}
 	ok, err := r.tryIncrementByKey(ctx, keyMinuteKey(channelKeyID, minute), maxRPM)
 	return ok, minute, err
+}
+
+// TryIncrementAccountRPM 账号维度 RPM 闸门。
+func (r *RPMCounter) TryIncrementAccountRPM(ctx context.Context, accountID int, maxRPM int) (bool, int64, error) {
+	minute := currentMinute()
+	if r.rdb == nil {
+		return true, minute, nil
+	}
+	ok, err := r.tryIncrementByKey(ctx, accountMinuteKey(accountID, minute), maxRPM)
+	return ok, minute, err
+}
+
+// DecrementAccountRPM 回退账号 RPM 预递增。
+func (r *RPMCounter) DecrementAccountRPM(ctx context.Context, accountID int, minute int64) {
+	if r.rdb == nil {
+		return
+	}
+	decrementRPMScript.Run(ctx, r.rdb, []string{accountMinuteKey(accountID, minute)})
 }

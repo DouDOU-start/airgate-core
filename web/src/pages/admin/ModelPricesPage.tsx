@@ -218,7 +218,10 @@ function cacheLine(row: ModelPriceResp, t: Translate): ReactNode {
 // specialLine 特殊计费行：按次价（warning）/ 服务档倍率；长上下文阶梯独立成行（longContextLine）。
 function specialLine(row: ModelPriceResp, t: Translate): ReactNode {
   const parts: ReactNode[] = [];
-  if (row.per_request_price > 0) {
+  const sizePrices = asRecord(asRecord(row.pricing_extra?.image).size_prices);
+  const imagePrices = Object.values(sizePrices).map(Number).filter((n) => Number.isFinite(n) && n > 0);
+  // 图像分辨率表存在时 per_request 只是响应缺档位的兜底价，不作为并列计费方式展示。
+  if (row.per_request_price > 0 && imagePrices.length === 0) {
     parts.push(
       <span className="whitespace-nowrap font-medium text-warning" key="pr">
         {t('model_prices.price_short_per_request')} {fmtPrice(row.per_request_price)}
@@ -227,18 +230,31 @@ function specialLine(row: ModelPriceResp, t: Translate): ReactNode {
   }
   const video = row.pricing_extra?.video;
   if (video && typeof video === 'object' && !Array.isArray(video)) {
-    const perSecond = Number((video as Record<string, unknown>).per_second);
-    if (Number.isFinite(perSecond) && perSecond > 0) {
-      parts.push(
-        <span className="whitespace-nowrap font-medium text-warning" key="vps">
-          {t('model_prices.price_short_per_second')} {fmtPrice(perSecond)}
-        </span>,
-      );
+    const videoRecord = video as Record<string, unknown>;
+    const resolutionPrices = Object.entries(asRecord(videoRecord.resolution_prices))
+      .map(([resolution, price]) => [resolution, Number(price)] as const)
+      .filter(([, price]) => Number.isFinite(price) && price > 0)
+      .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
+    if (resolutionPrices.length > 0) {
+      for (const [resolution, price] of resolutionPrices) {
+        parts.push(
+          <span className="whitespace-nowrap font-medium text-warning" key={`vps-${resolution}`}>
+            {resolution} {fmtPrice(price)}/{t('model_prices.unit_second_short')}
+          </span>,
+        );
+      }
+    } else {
+      const perSecond = Number(videoRecord.per_second);
+      if (Number.isFinite(perSecond) && perSecond > 0) {
+        parts.push(
+          <span className="whitespace-nowrap font-medium text-warning" key="vps">
+            {t('model_prices.price_short_per_second')} {fmtPrice(perSecond)}
+          </span>,
+        );
+      }
     }
   }
   // 图像分辨率价表：卡片只给价格区间 + 档数概览，明细进编辑弹窗看。
-  const sizePrices = asRecord(asRecord(row.pricing_extra?.image).size_prices);
-  const imagePrices = Object.values(sizePrices).map(Number).filter((n) => Number.isFinite(n) && n > 0);
   if (imagePrices.length > 0) {
     const min = Math.min(...imagePrices);
     const max = Math.max(...imagePrices);
@@ -356,6 +372,8 @@ export default function ModelPricesPage() {
   // 图像分辨率价表编辑行 + image 段中 size_prices 之外的键（保存时原样拼回）。
   const [imageRows, setImageRows] = useState<ImagePriceRow[]>([]);
   const [imageRest, setImageRest] = useState<Record<string, unknown>>({});
+  // 视频段中 per_second 之外的分辨率价表/输入媒体价格，编辑基础秒价时原样保留。
+  const [videoRest, setVideoRest] = useState<Record<string, unknown>>({});
   // 表单选中的标签 ID（0 = 无标签）。
   const [formTagID, setFormTagID] = useState(0);
   // 标签管理块的交互状态：新建输入 / 行内重命名 / 删除确认目标。
@@ -472,6 +490,7 @@ export default function ModelPricesPage() {
     setTiersRest({});
     setImageRows([]);
     setImageRest({});
+    setVideoRest({});
     setTiersEnabled(false);
     setLcEnabled(false);
     setBillingMode('token');
@@ -484,7 +503,8 @@ export default function ModelPricesPage() {
     const { image: imageRaw, long_context: lcRaw, service_tiers: tiersRaw, video: videoRaw, ...restExtra } = extra;
     const { flex, priority, ...restTiers } = asRecord(tiersRaw);
     const lc = asRecord(lcRaw);
-    const videoPerSecond = numToField(asRecord(videoRaw).per_second);
+    const { per_second: videoPerSecondRaw, ...restVideo } = asRecord(videoRaw);
+    const videoPerSecond = numToField(videoPerSecondRaw);
     const { size_prices: sizePricesRaw, ...restImage } = asRecord(imageRaw);
     const rows = imageRowsFromExtra(asRecord(sizePricesRaw));
 
@@ -493,6 +513,7 @@ export default function ModelPricesPage() {
     setTiersRest(restTiers);
     setImageRows(rows);
     setImageRest(restImage);
+    setVideoRest(restVideo);
     setTiersEnabled(
       Object.keys(restTiers).length > 0
       || numToField(priority) !== ''
@@ -579,7 +600,7 @@ export default function ModelPricesPage() {
       }
       payload.per_request_price = 0;
       for (const field of TOKEN_PRICE_FIELDS) payload[field] = 0;
-      payload.pricing_extra = { ...baseExtra(), video: { per_second: num } };
+      payload.pricing_extra = { ...baseExtra(), video: { ...videoRest, per_second: num } };
       payload.tag_id = formTagID;
       if (editingPrice) {
         updateMutation.mutate({ id: editingPrice.id, payload });

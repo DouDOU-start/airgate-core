@@ -10,6 +10,7 @@ package pricing
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 )
@@ -29,6 +30,9 @@ type Price struct {
 	// 仅异步任务子系统估价/结算使用（total = per_second × 时长），
 	// 同步转发不读该字段；PerRequest>0 时按次价优先。
 	VideoPerSecond float64
+	// VideoResolutionPrices 视频分辨率秒价表（USD/秒，pricing_extra.video.resolution_prices）：
+	// 键如 "480p"/"720p"/"1080p"；命中时优先于 VideoPerSecond，未命中回退基础秒价。
+	VideoResolutionPrices map[string]float64
 	// ImageSizePrices 图像分辨率价表（USD/张，pricing_extra.image.size_prices）：
 	// 键为 "quality:size"（如 "high:1024x1024"）或裸 "size"（不分质量档的模型）。
 	// 命中时按表价 × 张数整单计费，优先级高于 PerRequest；未命中落回 PerRequest/token。
@@ -266,6 +270,8 @@ func ImagePriceFor(p Price, quality, size string) (float64, bool) {
 	if len(p.ImageSizePrices) == 0 || size == "" {
 		return 0, false
 	}
+	quality = strings.ToLower(strings.TrimSpace(quality))
+	size = strings.ToLower(strings.TrimSpace(size))
 	if quality != "" {
 		if v, ok := p.ImageSizePrices[quality+":"+size]; ok && v > 0 {
 			return v, true
@@ -273,6 +279,21 @@ func ImagePriceFor(p Price, quality, size string) (float64, bool) {
 	}
 	if v, ok := p.ImageSizePrices[size]; ok && v > 0 {
 		return v, true
+	}
+	return 0, false
+}
+
+// VideoPriceFor 查视频分辨率秒价：先匹配 resolution_prices，再回退 per_second。
+// 分辨率大小写与首尾空白不敏感；两者都未配置时返回 false。
+func VideoPriceFor(p Price, resolution string) (float64, bool) {
+	resolution = strings.ToLower(strings.TrimSpace(resolution))
+	if resolution != "" {
+		if v, ok := p.VideoResolutionPrices[resolution]; ok && v > 0 {
+			return v, true
+		}
+	}
+	if p.VideoPerSecond > 0 {
+		return p.VideoPerSecond, true
 	}
 	return 0, false
 }

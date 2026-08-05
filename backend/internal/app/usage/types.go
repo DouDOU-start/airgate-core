@@ -56,6 +56,8 @@ type LogRecord struct {
 	ChannelName           string
 	ChannelKeyID          int64
 	ChannelKeyName        string
+	AccountID             int64
+	AccountName           string
 	GroupID               int64
 	Model                 string
 	InputTokens           int
@@ -84,13 +86,14 @@ type LogRecord struct {
 	ReasoningEffort       string
 	ImageSize             string // 图像端点实际产出分辨率；非图像端点恒空
 	ImageQuality          string // 图像端点实际产出质量档；非图像端点恒空
+	VideoResolution       string // 视频任务计费分辨率档位；非视频任务恒空
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64
 	UserAgent             string
 	IPAddress             string
 	Endpoint              string
-	Source                string // 记账来源：relay 用户转发 / channel_test 渠道测试
+	Source                string // 记账来源：relay / channel_test / account_test / task
 	RequestID             string
 	CreatedAt             string
 }

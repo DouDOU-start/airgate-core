@@ -74,6 +74,12 @@ func (occ *OAuthClientCreate) SetRedirectUris(s []string) *OAuthClientCreate {
 	return occ
 }
 
+// SetAllowedScopes sets the "allowed_scopes" field.
+func (occ *OAuthClientCreate) SetAllowedScopes(s []string) *OAuthClientCreate {
+	occ.mutation.SetAllowedScopes(s)
+	return occ
+}
+
 // SetFirstParty sets the "first_party" field.
 func (occ *OAuthClientCreate) SetFirstParty(b bool) *OAuthClientCreate {
 	occ.mutation.SetFirstParty(b)
@@ -229,6 +235,10 @@ func (occ *OAuthClientCreate) defaults() {
 		v := oauthclient.DefaultDescription
 		occ.mutation.SetDescription(v)
 	}
+	if _, ok := occ.mutation.AllowedScopes(); !ok {
+		v := oauthclient.DefaultAllowedScopes
+		occ.mutation.SetAllowedScopes(v)
+	}
 	if _, ok := occ.mutation.FirstParty(); !ok {
 		v := oauthclient.DefaultFirstParty
 		occ.mutation.SetFirstParty(v)
@@ -297,6 +307,9 @@ func (occ *OAuthClientCreate) check() error {
 	}
 	if _, ok := occ.mutation.RedirectUris(); !ok {
 		return &ValidationError{Name: "redirect_uris", err: errors.New(`ent: missing required field "OAuthClient.redirect_uris"`)}
+	}
+	if _, ok := occ.mutation.AllowedScopes(); !ok {
+		return &ValidationError{Name: "allowed_scopes", err: errors.New(`ent: missing required field "OAuthClient.allowed_scopes"`)}
 	}
 	if _, ok := occ.mutation.FirstParty(); !ok {
 		return &ValidationError{Name: "first_party", err: errors.New(`ent: missing required field "OAuthClient.first_party"`)}
@@ -372,6 +385,10 @@ func (occ *OAuthClientCreate) createSpec() (*OAuthClient, *sqlgraph.CreateSpec) 
 	if value, ok := occ.mutation.RedirectUris(); ok {
 		_spec.SetField(oauthclient.FieldRedirectUris, field.TypeJSON, value)
 		_node.RedirectUris = value
+	}
+	if value, ok := occ.mutation.AllowedScopes(); ok {
+		_spec.SetField(oauthclient.FieldAllowedScopes, field.TypeJSON, value)
+		_node.AllowedScopes = value
 	}
 	if value, ok := occ.mutation.FirstParty(); ok {
 		_spec.SetField(oauthclient.FieldFirstParty, field.TypeBool, value)
@@ -514,6 +531,18 @@ func (u *OAuthClientUpsert) SetRedirectUris(v []string) *OAuthClientUpsert {
 // UpdateRedirectUris sets the "redirect_uris" field to the value that was provided on create.
 func (u *OAuthClientUpsert) UpdateRedirectUris() *OAuthClientUpsert {
 	u.SetExcluded(oauthclient.FieldRedirectUris)
+	return u
+}
+
+// SetAllowedScopes sets the "allowed_scopes" field.
+func (u *OAuthClientUpsert) SetAllowedScopes(v []string) *OAuthClientUpsert {
+	u.Set(oauthclient.FieldAllowedScopes, v)
+	return u
+}
+
+// UpdateAllowedScopes sets the "allowed_scopes" field to the value that was provided on create.
+func (u *OAuthClientUpsert) UpdateAllowedScopes() *OAuthClientUpsert {
+	u.SetExcluded(oauthclient.FieldAllowedScopes)
 	return u
 }
 
@@ -722,6 +751,20 @@ func (u *OAuthClientUpsertOne) SetRedirectUris(v []string) *OAuthClientUpsertOne
 func (u *OAuthClientUpsertOne) UpdateRedirectUris() *OAuthClientUpsertOne {
 	return u.Update(func(s *OAuthClientUpsert) {
 		s.UpdateRedirectUris()
+	})
+}
+
+// SetAllowedScopes sets the "allowed_scopes" field.
+func (u *OAuthClientUpsertOne) SetAllowedScopes(v []string) *OAuthClientUpsertOne {
+	return u.Update(func(s *OAuthClientUpsert) {
+		s.SetAllowedScopes(v)
+	})
+}
+
+// UpdateAllowedScopes sets the "allowed_scopes" field to the value that was provided on create.
+func (u *OAuthClientUpsertOne) UpdateAllowedScopes() *OAuthClientUpsertOne {
+	return u.Update(func(s *OAuthClientUpsert) {
+		s.UpdateAllowedScopes()
 	})
 }
 
@@ -1111,6 +1154,20 @@ func (u *OAuthClientUpsertBulk) SetRedirectUris(v []string) *OAuthClientUpsertBu
 func (u *OAuthClientUpsertBulk) UpdateRedirectUris() *OAuthClientUpsertBulk {
 	return u.Update(func(s *OAuthClientUpsert) {
 		s.UpdateRedirectUris()
+	})
+}
+
+// SetAllowedScopes sets the "allowed_scopes" field.
+func (u *OAuthClientUpsertBulk) SetAllowedScopes(v []string) *OAuthClientUpsertBulk {
+	return u.Update(func(s *OAuthClientUpsert) {
+		s.SetAllowedScopes(v)
+	})
+}
+
+// UpdateAllowedScopes sets the "allowed_scopes" field to the value that was provided on create.
+func (u *OAuthClientUpsertBulk) UpdateAllowedScopes() *OAuthClientUpsertBulk {
+	return u.Update(func(s *OAuthClientUpsert) {
+		s.UpdateAllowedScopes()
 	})
 }
 

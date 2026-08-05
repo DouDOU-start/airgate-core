@@ -306,7 +306,10 @@ func newTestEnv(t *testing.T, snaps ...registry.ChannelKeySnapshot) *testEnv {
 		t.Fatalf("注册表加载失败: %v", err)
 	}
 	cache := pricing.NewCache(&fakePriceLoader{prices: map[string]pricing.Price{
-		videoModel:     {VideoPerSecond: 0.1},
+		videoModel: {
+			VideoPerSecond:        0.1,
+			VideoResolutionPrices: map[string]float64{"480p": 0.08, "720p": 0.1, "1080p": 0.25},
+		},
 		videoFlatModel: {PerRequest: 0.5},
 		"suno_music":   {PerRequest: 0.2},
 		"suno_lyrics":  {PerRequest: 0.05},
@@ -448,6 +451,30 @@ func TestVideoSubmitSuccess(t *testing.T) {
 	}
 	if len(env.balance.opsOf("adjust")) != 0 {
 		t.Error("成功提交不应有退款/结算动账")
+	}
+}
+
+func TestVideoSubmitResolutionPrice(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"video_hd","object":"video","status":"queued","progress":0}`))
+	}))
+	defer upstream.Close()
+
+	env := newTestEnv(t, videoSnap(1, upstream.URL))
+	w := doJSON(t, env.engine, http.MethodPost, "/v1/videos",
+		`{"model":"sora-2","prompt":"a cat","duration":8,"resolution":"1080P"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	// 1080p：0.25 × 8 秒 = 2.0；billing rate 2×，预扣 4.0。
+	holds := env.balance.opsOf("hold")
+	if len(holds) != 1 || holds[0].amount != 4.0 {
+		t.Fatalf("holds = %+v", holds)
+	}
+	row := env.store.get(t, 1)
+	if row.EstTotal != 2.0 || row.Seconds != 8 || row.Resolution != "1080p" {
+		t.Errorf("row = %+v", row)
 	}
 }
 

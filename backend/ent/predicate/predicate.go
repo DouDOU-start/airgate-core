@@ -9,6 +9,9 @@ import (
 // APIKey is the predicate function for apikey builders.
 type APIKey func(*sql.Selector)
 
+// Account is the predicate function for account builders.
+type Account func(*sql.Selector)
+
 // Announcement is the predicate function for announcement builders.
 type Announcement func(*sql.Selector)
 
@@ -53,6 +56,9 @@ type PaymentOrder func(*sql.Selector)
 
 // PaymentProviderConfig is the predicate function for paymentproviderconfig builders.
 type PaymentProviderConfig func(*sql.Selector)
+
+// Proxy is the predicate function for proxy builders.
+type Proxy func(*sql.Selector)
 
 // RedemptionCode is the predicate function for redemptioncode builders.
 type RedemptionCode func(*sql.Selector)

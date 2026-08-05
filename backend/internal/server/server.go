@@ -18,6 +18,8 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/probe"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
+	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pipeline"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
@@ -45,6 +47,8 @@ type Server struct {
 	errRecorder     *errlog.Recorder
 	handlers        *bootstrap.HTTPHandlers
 	channelRegistry *registry.Registry
+	accountRegistry *accountreg.Registry
+	cpaBridge       *cpa.Bridge
 	pricingCache    *pricing.Cache
 	relay           *pipeline.Pipeline
 	taskFlow        *task.Flow
@@ -111,6 +115,18 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	// modelprice service 同理充当 pricing 缓存的 Loader，缓存作为其写后失效器。
 	s.channelRegistry = registry.New(s.handlers.ChannelService, s.handlers.ChannelService)
 	s.handlers.ChannelService.SetReloader(s.channelRegistry)
+
+	// 账号注册表 + CPA 桥接：账号路径走 CLIProxyAPI executor/translator。
+	accountAdapter := &accountRegistryAdapter{db: db, secret: cfg.APIKeySecret()}
+	s.accountRegistry = accountreg.New(accountAdapter, accountAdapter)
+	s.accountRegistry.SetCredentialPersister(accountAdapter)
+	if s.handlers.AccountService != nil {
+		s.handlers.AccountService.SetReloader(s.accountRegistry)
+		if s.handlers.ProxyService != nil {
+			s.handlers.ProxyService.SetReloader(s.accountRegistry)
+		}
+	}
+	s.cpaBridge = cpa.NewBridge(nil)
 	s.pricingCache = pricing.NewCache(s.handlers.ModelPriceService)
 	s.handlers.ModelPriceService.SetInvalidator(s.pricingCache)
 
@@ -136,6 +152,8 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	rpmCounter := scheduler.NewRPMCounter(rdb)
 	s.relay = pipeline.New(pipeline.Options{
 		Registry:      s.channelRegistry,
+		Accounts:      s.accountRegistry,
+		CPA:           s.cpaBridge,
 		Pricing:       s.pricingCache,
 		Concurrency:   concurrency,
 		RPM:           rpmCounter,
@@ -164,6 +182,10 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	s.taskFlow = task.NewFlow(taskOpts)
 	s.taskPoller = task.NewPoller(taskOpts)
 	s.handlers.ChannelService.SetTester(&channelTester{pipe: s.relay, secret: cfg.APIKeySecret()})
+	// 账号测试落账：成功写 usage_log（source=account_test），与渠道测试对称。
+	if s.handlers.AccountService != nil {
+		s.handlers.AccountService.SetTestUsageDeps(recorder, s.pricingCache, billing.NewCalculator())
+	}
 	// 渠道失败计数读取（渠道页监控列，读 errlog 分钟桶）。
 	s.handlers.UpstreamLogService.SetFailureCounter(errRecorder)
 
@@ -203,6 +225,12 @@ func (s *Server) StartBackground(ctx context.Context) {
 	if err := s.channelRegistry.Reload(ctx); err != nil {
 		slog.Warn("channel_registry_initial_load_failed", "error", err)
 		go retryReload(backgroundCtx, s.channelRegistry, "channel_registry", time.Second)
+	}
+	if s.accountRegistry != nil {
+		if err := s.accountRegistry.Reload(ctx); err != nil {
+			slog.Warn("account_registry_initial_load_failed", "error", err)
+			go retryReload(backgroundCtx, s.accountRegistry, "account_registry", time.Second)
+		}
 	}
 	if err := s.pricingCache.Reload(ctx); err != nil {
 		slog.Warn("model_price_cache_warmup_failed", "error", err)

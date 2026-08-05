@@ -15,6 +15,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/pkg/upstreamclient"
 	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pipeline"
+	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 )
 
@@ -374,9 +375,9 @@ func (p *Poller) settleSuccess(ctx context.Context, t *Task, seconds int) {
 		if price.PerRequest > 0 {
 			finalTotal = price.PerRequest
 			perUnitPrice = price.PerRequest
-		} else if price.VideoPerSecond > 0 && seconds > 0 {
-			finalTotal = price.VideoPerSecond * float64(seconds)
-			perUnitPrice = price.VideoPerSecond
+		} else if perSecond, ok := pricing.VideoPriceFor(price, t.Resolution); ok && seconds > 0 {
+			finalTotal = perSecond * float64(seconds)
+			perUnitPrice = perSecond
 			calls = seconds
 		}
 	}
@@ -416,6 +417,7 @@ func (p *Poller) settleSuccess(ctx context.Context, t *Task, seconds int) {
 		RateMultiplier:        calc.RateMultiplier,
 		SellRate:              calc.SellRate,
 		AccountRateMultiplier: calc.AccountRateMultiplier,
+		VideoResolution:       t.Resolution,
 		DurationMs:            durationMs,
 		Endpoint:              taskEndpoint(t),
 		Source:                billing.SourceTask,

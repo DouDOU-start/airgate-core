@@ -30,6 +30,7 @@ type UsageRecord struct {
 	APIKeyID              int
 	ChannelID             int
 	ChannelKeyID          int
+	AccountID             int // 账号路径写入；与 ChannelKeyID 互斥
 	GroupID               int
 	Model                 string
 	InputTokens           int
@@ -58,6 +59,7 @@ type UsageRecord struct {
 	ReasoningEffort       string
 	ImageSize             string // 图像端点实际产出分辨率（响应为准）；非图像端点恒空
 	ImageQuality          string // 图像端点实际产出质量档（响应为准）；非图像端点恒空
+	VideoResolution       string // 视频任务计费分辨率档位；非视频任务恒空
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64
@@ -76,6 +78,7 @@ type UsageRecord struct {
 const (
 	SourceRelay       = "relay"        // 用户转发流量
 	SourceChannelTest = "channel_test" // 渠道测试（管理员操作，无用户归属）
+	SourceAccountTest = "account_test" // 账号连通性测试（管理员操作，无用户归属）
 	SourceTask        = "task"         // 异步任务（视频/音乐）终态结算
 )
 
@@ -362,6 +365,7 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord, withChannel bool) *ent.UsageLog
 		SetReasoningEffort(rec.ReasoningEffort).
 		SetImageSize(rec.ImageSize).
 		SetImageQuality(rec.ImageQuality).
+		SetVideoResolution(rec.VideoResolution).
 		SetStream(rec.Stream).
 		SetDurationMs(rec.DurationMs).
 		SetFirstTokenMs(rec.FirstTokenMs).
@@ -385,6 +389,9 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord, withChannel bool) *ent.UsageLog
 	}
 	if withChannel && rec.ChannelKeyID > 0 {
 		b.SetChannelKeyID(rec.ChannelKeyID)
+	}
+	if rec.AccountID > 0 {
+		b.SetAccountID(rec.AccountID)
 	}
 	if rec.APIKeyID > 0 {
 		b.SetAPIKeyID(rec.APIKeyID)

@@ -30,6 +30,8 @@ type SubmitRequest struct {
 	Action string
 	// Seconds 视频时长参数（估价用；无则 0，估价按平台默认值兜底）。
 	Seconds int
+	// Resolution 视频分辨率档位（如 480p/720p/1080p）；用于按档秒价估价与结算。
+	Resolution string
 	// Body 原始请求体（JSON 或 multipart，原样直发上游，仅定点重写 model）。
 	Body []byte
 	// ContentType 原始 Content-Type（multipart 含 boundary，原样转发）。

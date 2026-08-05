@@ -25,27 +25,37 @@ func init() {
 // Adaptor openai_video 平台适配器（无状态）。
 type Adaptor struct{}
 
-// ParseSubmit 从提交请求提取 model / seconds（JSON 顶层字段或 multipart 普通字段）。
+// ParseSubmit 从提交请求提取 model / seconds(duration) / resolution(size)
+// （JSON 顶层字段或 multipart 普通字段）。
 func (Adaptor) ParseSubmit(_ string, contentType string, body []byte) (*task.SubmitRequest, error) {
 	var model string
 	var seconds int
+	var resolution string
 	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "multipart/") {
-		fields, err := multipartform.ExtractFields(body, contentType, "model", "seconds")
+		fields, err := multipartform.ExtractFields(body, contentType, "model", "seconds", "duration", "resolution", "size")
 		if err != nil {
 			return nil, fmt.Errorf("multipart 请求体解析失败: %w", err)
 		}
 		model = fields["model"]
-		seconds = parseSecondsString(fields["seconds"])
+		seconds = parseSecondsString(firstNonEmpty(fields["seconds"], fields["duration"]))
+		resolution = firstNonEmpty(fields["resolution"], fields["size"])
 	} else {
 		var probe struct {
-			Model   string          `json:"model"`
-			Seconds json.RawMessage `json:"seconds"`
+			Model      string          `json:"model"`
+			Seconds    json.RawMessage `json:"seconds"`
+			Duration   json.RawMessage `json:"duration"`
+			Resolution string          `json:"resolution"`
+			Size       string          `json:"size"`
 		}
 		if err := json.Unmarshal(body, &probe); err != nil {
 			return nil, errors.New("请求体必须是 JSON 对象")
 		}
 		model = probe.Model
 		seconds = parseSecondsRaw(probe.Seconds)
+		if seconds <= 0 {
+			seconds = parseSecondsRaw(probe.Duration)
+		}
+		resolution = firstNonEmpty(probe.Resolution, probe.Size)
 	}
 	if model == "" {
 		return nil, errors.New("缺少 model 字段")
@@ -57,6 +67,7 @@ func (Adaptor) ParseSubmit(_ string, contentType string, body []byte) (*task.Sub
 		Model:       model,
 		Action:      "generate",
 		Seconds:     seconds,
+		Resolution:  strings.ToLower(strings.TrimSpace(resolution)),
 		Body:        body,
 		ContentType: contentType,
 	}, nil
@@ -153,6 +164,9 @@ func (Adaptor) RenderTask(t *task.Task) []byte {
 	if _, ok := fields["seconds"]; !ok && t.Seconds > 0 {
 		setJSON("seconds", strconv.Itoa(t.Seconds))
 	}
+	if _, ok := fields["resolution"]; !ok && t.Resolution != "" {
+		setJSON("resolution", t.Resolution)
+	}
 	setJSON("model", t.RequestModel)
 	setJSON("status", upstreamStatusName(t.Status))
 	setJSON("progress", t.Progress)
@@ -166,6 +180,15 @@ func (Adaptor) RenderTask(t *task.Task) []byte {
 		return []byte(`{"id":"` + t.TaskID + `","object":"video"}`)
 	}
 	return out
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // parseVideoObject 解析 OpenAI video 对象为归一化状态与任务 ID。

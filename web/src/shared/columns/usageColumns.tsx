@@ -294,8 +294,11 @@ function GenericMetricDetail({ row, t }: { row: UsageRow; t: TFunction }) {
         />
       ))}
       {calls > 0 && (
-        // 图像端点的产出张数（按次计费的计次数）；token 端点恒 0 不显示。
-        <TooltipRow label={t('usage.calls', '产出张数')} value={`×${calls}`} tone="accent" />
+        <TooltipRow
+          label={row.video_resolution ? t('usage.video_seconds', '视频时长') : t('usage.calls', '产出张数')}
+          value={row.video_resolution ? `${calls} ${t('usage.seconds', '秒')}` : `×${calls}`}
+          tone="accent"
+        />
       )}
       <TooltipDivider />
       <TooltipRow label={t('usage.total_tokens')} value={tokenTotal.toLocaleString()} tone="strong" />
@@ -326,7 +329,9 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 {perUnit ? (
                   <TooltipRow
                     label={t('usage.unit_price', '单价')}
-                    value={`$${row.input_price.toFixed(4)} ${row.image_size ? t('usage.per_image', '/ 张') : t('usage.per_call', '/ 次')}`}
+                    value={`$${row.input_price.toFixed(4)} ${row.video_resolution
+                      ? t('usage.per_second', '/ 秒')
+                      : row.image_size ? t('usage.per_image', '/ 张') : t('usage.per_call', '/ 次')}`}
                   />
                 ) : (
                   <>
@@ -343,7 +348,10 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                 )}
                 {(row.calls ?? 0) > 0 && (
                   // 图像端点产出张数；按次计费时成本 = input_price × 张数。
-                  <TooltipRow label={t('usage.calls', '产出张数')} value={`×${row.calls}`} />
+                  <TooltipRow
+                    label={row.video_resolution ? t('usage.video_seconds', '视频时长') : t('usage.calls', '产出张数')}
+                    value={row.video_resolution ? `${row.calls} ${t('usage.seconds', '秒')}` : `×${row.calls}`}
+                  />
                 )}
                 <TooltipDivider />
                 {row.service_tier && (
@@ -358,6 +366,9 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                     label={t('usage.image_size', '产出档位')}
                     value={row.image_quality ? `${row.image_quality} · ${row.image_size}` : row.image_size}
                   />
+                )}
+                {row.video_resolution && (
+                  <TooltipRow label={t('usage.video_resolution', '视频分辨率')} value={row.video_resolution} />
                 )}
                 <TooltipRow label={t('usage.rate_multiplier')} value={fmtRate(row.rate_multiplier)} />
                 {adminView && row.account_rate_multiplier > 0 && (
@@ -383,10 +394,14 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
           )}
         >
           <div className="flex w-full flex-col items-center font-mono text-center text-xs">
-            {adminView && row.source === 'channel_test' ? (
-              // 渠道测试不计用户扣费（恒为 0），费用列直接展示渠道成本（红 $ 区分口径）
+            {adminView && (row.source === 'channel_test' || row.source === 'account_test') ? (
+              // 测试不计用户扣费（恒为 0），费用列直接展示上游成本口径（total × 成本倍率）
               <div className="text-[15px] font-semibold leading-none text-text">
-                <CostValue value={row.total_cost * row.account_rate_multiplier} decimals={6} tone="channel" />
+                <CostValue
+                  value={row.total_cost * (row.account_rate_multiplier || 1)}
+                  decimals={6}
+                  tone="channel"
+                />
               </div>
             ) : row.sell_rate > 0 && row.billed_cost !== row.actual_cost ? (
               <div className="text-[15px] font-semibold leading-none text-text">
@@ -482,6 +497,7 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
         // 图像端点产出档位 chip：图像请求没有服务档/推理强度，独占 meta 槽位。
         const imageSize = (row.image_size ?? '').trim();
         const imageQuality = (row.image_quality ?? '').trim();
+        const videoResolution = (row.video_resolution ?? '').trim();
         const bothPresent = !!serviceTier && !!reasoningEffort;
         const metaChips = [
           serviceTier ? (
@@ -505,6 +521,12 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
               key="image"
               color={META_CHIP_IMAGE_COLOR}
               label={imageQuality ? `${imageQuality} ${imageSize}` : imageSize}
+            />
+          ) : !serviceTier && !reasoningEffort && videoResolution ? (
+            <MetaChip
+              key="video"
+              color={META_CHIP_IMAGE_COLOR}
+              label={videoResolution}
             />
           ) : null,
         ].filter(Boolean);

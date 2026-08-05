@@ -40,6 +40,23 @@ func TestDecryptAPIKeyRejectsInvalidCiphertext(t *testing.T) {
 	}
 }
 
+func TestEncryptSecretValueUsesVersionedCiphertext(t *testing.T) {
+	encrypted, err := EncryptSecretValue("代理密码", testAESSecret)
+	if err != nil {
+		t.Fatalf("加密敏感配置失败: %v", err)
+	}
+	if !IsEncryptedSecretValue(encrypted) || encrypted == "代理密码" {
+		t.Fatalf("未生成带版本前缀的密文: %q", encrypted)
+	}
+	plain, err := DecryptSecretValue(encrypted, testAESSecret)
+	if err != nil || plain != "代理密码" {
+		t.Fatalf("解密敏感配置 = %q, %v", plain, err)
+	}
+	if _, err := DecryptSecretValue("旧明文", testAESSecret); err == nil {
+		t.Fatal("旧明文不应被当作密文接受")
+	}
+}
+
 func TestJWTGenerateParseAndRefresh(t *testing.T) {
 	mgr := NewJWTManager("jwt-secret", 1)
 	token, err := mgr.GenerateAPIKeyToken(7, "user", "u@example.com", 11)

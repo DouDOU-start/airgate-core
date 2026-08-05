@@ -32,13 +32,14 @@ func TestParseSubmit(t *testing.T) {
 		body        string
 		wantModel   string
 		wantSeconds int
+		wantRes     string
 		wantErr     bool
 	}{
-		{"JSON 数字秒数", "application/json", `{"model":"sora-2","seconds":8}`, "sora-2", 8, false},
-		{"JSON 字符串秒数", "application/json", `{"model":"sora-2","seconds":"12"}`, "sora-2", 12, false},
-		{"缺秒数按 0", "application/json", `{"model":"sora-2"}`, "sora-2", 0, false},
-		{"缺 model 报错", "application/json", `{"seconds":4}`, "", 0, true},
-		{"非 JSON 报错", "application/json", `hello`, "", 0, true},
+		{"JSON 数字秒数", "application/json", `{"model":"sora-2","seconds":8,"size":"720p"}`, "sora-2", 8, "720p", false},
+		{"JSON 字符串时长", "application/json", `{"model":"sora-2","duration":"12","resolution":"1080P"}`, "sora-2", 12, "1080p", false},
+		{"缺秒数按 0", "application/json", `{"model":"sora-2"}`, "sora-2", 0, "", false},
+		{"缺 model 报错", "application/json", `{"seconds":4}`, "", 0, "", true},
+		{"非 JSON 报错", "application/json", `hello`, "", 0, "", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -52,7 +53,7 @@ func TestParseSubmit(t *testing.T) {
 			if err != nil {
 				t.Fatalf("err = %v", err)
 			}
-			if sub.Model != tc.wantModel || sub.Seconds != tc.wantSeconds {
+			if sub.Model != tc.wantModel || sub.Seconds != tc.wantSeconds || sub.Resolution != tc.wantRes {
 				t.Errorf("sub = %+v", sub)
 			}
 		})
@@ -111,8 +112,8 @@ func TestRenderTask(t *testing.T) {
 	t.Run("有快照时覆盖 model/status", func(t *testing.T) {
 		out := (Adaptor{}).RenderTask(&task.Task{
 			TaskID: "v1", RequestModel: "sora-2", Status: task.StatusSuccess, Progress: 100,
-			SubmitTime: now,
-			Data:       []byte(`{"id":"v1","object":"video","model":"sora-2-upstream","status":"in_progress","progress":40,"size":"720x1280"}`),
+			SubmitTime: now, Resolution: "720p",
+			Data: []byte(`{"id":"v1","object":"video","model":"sora-2-upstream","status":"in_progress","progress":40,"size":"720x1280"}`),
 		})
 		var m map[string]any
 		if err := json.Unmarshal(out, &m); err != nil {
@@ -123,6 +124,9 @@ func TestRenderTask(t *testing.T) {
 		}
 		if m["size"] != "720x1280" {
 			t.Error("上游快照其余字段应保留")
+		}
+		if m["resolution"] != "720p" {
+			t.Errorf("resolution = %v", m["resolution"])
 		}
 	})
 	t.Run("无快照最小重建", func(t *testing.T) {

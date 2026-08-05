@@ -1,7 +1,7 @@
 # AirGate 默认模型价目表种子。
 # 单位：USD / 1,000,000 tokens。per_request 为 USD/次（按次计费模型用，token 计费模型填 0）。
 # 来源：claude/openai 取自 airgate-openai registry.go + airgate-claude models.go（standalone-gateway 分支提取）；
-#   gemini/grok 取自 Google AI / xAI 官方价目（2026-01 快照，调价后可直接改本文件或用后台价目表页）。
+#   gemini/grok 取自 Google AI / xAI 官方价目（2026-08 快照，调价后可直接改本文件或用后台价目表页）。
 # 字段映射：input←InputPrice，output←OutputPrice，cached_input←CachedPrice/CachedInputPrice，
 #   cache_creation←claude 的 CacheCreationPrice(5m 缓存写入档，openai 无此档填 0)，
 #   cache_creation_1h←claude 的 CacheCreation1hPrice(1h 缓存写入档)，per_request←0。
@@ -310,48 +310,276 @@ models:
     cached_input: 0.025
     cache_creation: 0
     per_request: 0
-  # ── grok（docs.x.ai 官方价 2026-07 核实；grok-4/4-fast/4.1/4.1-fast/code-fast-1/3
-  #    已于 2026-05-15 退役不收录。官方缓存无折扣（缓存 token 按标准输入价计），
-  #    故 cached_input = input，避免缓存段少计费。──
-  - model: grok-4.3
+  # ── grok（docs.x.ai 官方价 2026-08 核实，含当前官方别名与 Imagine 媒体模型）──
+  # 文本模型：单位 USD / 1M tokens；所有现役模型在完整 prompt 超过 200K tokens 后
+  # 输入、输出、缓存读取均为标准价 2 倍，Priority Processing 为标准价 2 倍。
+  # YAML 锚点只用于减少同价别名的重复字段；解析后每个别名仍会作为独立价格条目导入。
+  - &grok_43_price
+    model: grok-4.3
     tag: grok
     input: 1.25
     output: 2.5
-    cached_input: 1.25
+    cached_input: 0.2
     cache_creation: 0
     per_request: 0
-  - model: grok-4.20-0309-reasoning
-    tag: grok
-    input: 1.25
-    output: 2.5
-    cached_input: 1.25
-    cache_creation: 0
-    per_request: 0
-  - model: grok-4.20-0309-non-reasoning
-    tag: grok
-    input: 1.25
-    output: 2.5
-    cached_input: 1.25
-    cache_creation: 0
-    per_request: 0
-  - model: grok-4.20-multi-agent-0309
-    tag: grok
-    input: 1.25
-    output: 2.5
-    cached_input: 1.25
-    cache_creation: 0
-    per_request: 0
-  - model: grok-4.5
-    tag: grok
-    input: 2.0
-    output: 6.0
-    cached_input: 2.0
-    cache_creation: 0
-    per_request: 0
-  - model: grok-build-0.1
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+      long_context:
+        threshold_tokens: 200000
+        input_multiplier: 2.0
+        output_multiplier: 2.0
+        cached_multiplier: 2.0
+  - <<: *grok_43_price
+    model: grok-4.3-latest
+  - <<: *grok_43_price
+    model: grok-latest
+
+  - &grok_build_price
+    model: grok-build-0.1
     tag: grok
     input: 1.0
     output: 2.0
-    cached_input: 1.0
+    cached_input: 0.2
     cache_creation: 0
     per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+      long_context:
+        threshold_tokens: 200000
+        input_multiplier: 2.0
+        output_multiplier: 2.0
+        cached_multiplier: 2.0
+  - <<: *grok_build_price
+    model: grok-code-fast-1
+  - <<: *grok_build_price
+    model: grok-code-fast
+  - <<: *grok_build_price
+    model: grok-code-fast-1-0825
+
+  # CPA OAuth 模型目录仍可能返回的 Grok 3 Mini 家族；当前官方价表已下线，
+  # 这里保留 xAI 2025-08 官方模型快照中的最后公开价格，不附加现役模型的长上下文/服务档规则。
+  - model: grok-3-mini
+    tag: grok
+    input: 0.3
+    output: 0.5
+    cached_input: 0.075
+    cache_creation: 0
+    per_request: 0
+  - model: grok-3-mini-fast
+    tag: grok
+    input: 0.6
+    output: 4.0
+    cached_input: 0.15
+    cache_creation: 0
+    per_request: 0
+
+  - &grok_45_price
+    model: grok-4.5
+    tag: grok
+    input: 2.0
+    output: 6.0
+    cached_input: 0.3
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+      long_context:
+        threshold_tokens: 200000
+        input_multiplier: 2.0
+        output_multiplier: 2.0
+        cached_multiplier: 2.0
+  - <<: *grok_45_price
+    model: grok-4.5-latest
+  - <<: *grok_45_price
+    model: grok-build-latest
+
+  - &grok_420_reasoning_price
+    model: grok-4.20-0309-reasoning
+    tag: grok
+    input: 1.25
+    output: 2.5
+    cached_input: 0.2
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+      long_context:
+        threshold_tokens: 200000
+        input_multiplier: 2.0
+        output_multiplier: 2.0
+        cached_multiplier: 2.0
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-reasoning-latest
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-reasoning
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-0309
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-beta-0309-reasoning
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-beta
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-beta-0309
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-beta-latest
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-beta-latest-reasoning
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-beta-reasoning
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-experimental-beta-0304-reasoning
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-experimental-beta-0304
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-experimental-beta-reasoning-latest
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-experimental-beta-latest
+  - <<: *grok_420_reasoning_price
+    model: grok-4.20-reasoning-gv2
+
+  - &grok_420_non_reasoning_price
+    model: grok-4.20-0309-non-reasoning
+    tag: grok
+    input: 1.25
+    output: 2.5
+    cached_input: 0.2
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+      long_context:
+        threshold_tokens: 200000
+        input_multiplier: 2.0
+        output_multiplier: 2.0
+        cached_multiplier: 2.0
+  - <<: *grok_420_non_reasoning_price
+    model: grok-4.20-non-reasoning
+  - <<: *grok_420_non_reasoning_price
+    model: grok-4.20-non-reasoning-latest
+  - <<: *grok_420_non_reasoning_price
+    model: grok-4.20-beta-non-reasoning
+  - <<: *grok_420_non_reasoning_price
+    model: grok-4.20-beta-latest-non-reasoning
+  - <<: *grok_420_non_reasoning_price
+    model: grok-4.20-experimental-beta-0304-non-reasoning
+  - <<: *grok_420_non_reasoning_price
+    model: grok-4.20-experimental-beta-non-reasoning-latest
+  - <<: *grok_420_non_reasoning_price
+    model: grok-4.20-beta-0309-non-reasoning
+  - <<: *grok_420_non_reasoning_price
+    model: grok-4.20-non-reasoning-gv2
+
+  - &grok_420_multi_agent_price
+    model: grok-4.20-multi-agent-0309
+    tag: grok
+    input: 1.25
+    output: 2.5
+    cached_input: 0.2
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+      long_context:
+        threshold_tokens: 200000
+        input_multiplier: 2.0
+        output_multiplier: 2.0
+        cached_multiplier: 2.0
+  - <<: *grok_420_multi_agent_price
+    model: grok-4.20-multi-agent
+  - <<: *grok_420_multi_agent_price
+    model: grok-4.20-multi-agent-latest
+  - <<: *grok_420_multi_agent_price
+    model: grok-4.20-multi-agent-beta-latest
+  - <<: *grok_420_multi_agent_price
+    model: grok-4.20-multi-agent-experimental-beta-0304
+  - <<: *grok_420_multi_agent_price
+    model: grok-4.20-multi-agent-experimental-beta-latest
+  - <<: *grok_420_multi_agent_price
+    model: grok-4.20-multi-agent-beta-0309
+
+  # 生图模型：size_prices 为输出图片价（USD/张）；per_request 是响应未返回分辨率时
+  # 按默认 1K 价格兜底。input_image_price 记录图片编辑的输入图片价，当前仅作价目元数据。
+  - &grok_imagine_image_price
+    model: grok-imagine-image
+    tag: grok
+    input: 0
+    output: 0
+    cached_input: 0
+    cache_creation: 0
+    per_request: 0.02
+    pricing_extra:
+      image:
+        input_image_price: 0.002
+        size_prices:
+          "1k": 0.02
+          "2k": 0.02
+  - <<: *grok_imagine_image_price
+    model: grok-imagine-image-2026-03-02
+
+  - &grok_imagine_image_quality_price
+    model: grok-imagine-image-quality
+    tag: grok
+    input: 0
+    output: 0
+    cached_input: 0
+    cache_creation: 0
+    per_request: 0.05
+    pricing_extra:
+      image:
+        input_image_price: 0.01
+        size_prices:
+          "1k": 0.05
+          "2k": 0.07
+  - <<: *grok_imagine_image_quality_price
+    model: grok-imagine-image-quality-20260403
+  - <<: *grok_imagine_image_quality_price
+    model: grok-imagine-image-quality-latest
+  - <<: *grok_imagine_image_quality_price
+    model: grok-imagine-image-pro
+
+  # 视频模型：per_second 为默认 720p 秒价；resolution_prices 保存官方完整分辨率价表。
+  # 输入图片/视频价格当前仅作价目元数据，视频任务计费仍使用 per_second。
+  - &grok_imagine_video_15_price
+    model: grok-imagine-video-1.5
+    tag: grok
+    input: 0
+    output: 0
+    cached_input: 0
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      video:
+        per_second: 0.14
+        input_image_price: 0.01
+        resolution_prices:
+          "480p": 0.08
+          "720p": 0.14
+          "1080p": 0.25
+  - <<: *grok_imagine_video_15_price
+    model: grok-imagine-video-1.5-preview
+  - <<: *grok_imagine_video_15_price
+    model: grok-imagine-video-1.5-2026-05-30
+
+  - model: grok-imagine-video
+    tag: grok
+    input: 0
+    output: 0
+    cached_input: 0
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      video:
+        per_second: 0.07
+        input_image_price: 0.002
+        input_video_per_second: 0.01
+        resolution_prices:
+          "480p": 0.05
+          "720p": 0.07

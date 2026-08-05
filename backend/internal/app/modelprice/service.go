@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strings"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
@@ -144,19 +145,54 @@ func (s *Service) LoadAllPrices(ctx context.Context) (map[string]pricing.Price, 
 	for _, item := range items {
 		tiers, longCtx := ParsePricingExtra(item.Model, item.PricingExtra)
 		prices[item.Model] = pricing.Price{
-			Input:           item.InputPrice,
-			Output:          item.OutputPrice,
-			CachedInput:     item.CachedInputPrice,
-			CacheCreation5m: item.CacheCreationPrice,
-			CacheCreation1h: item.CacheCreation1hPrice,
-			PerRequest:      item.PerRequestPrice,
-			VideoPerSecond:  parseVideoPerSecond(item.Model, item.PricingExtra),
-			ImageSizePrices: ParseImageSizePrices(item.Model, item.PricingExtra),
-			ServiceTiers:    tiers,
-			LongContext:     toPricingLongContextRule(longCtx),
+			Input:                 item.InputPrice,
+			Output:                item.OutputPrice,
+			CachedInput:           item.CachedInputPrice,
+			CacheCreation5m:       item.CacheCreationPrice,
+			CacheCreation1h:       item.CacheCreation1hPrice,
+			PerRequest:            item.PerRequestPrice,
+			VideoPerSecond:        ParseVideoPerSecond(item.Model, item.PricingExtra),
+			VideoResolutionPrices: ParseVideoResolutionPrices(item.Model, item.PricingExtra),
+			ImageSizePrices:       ParseImageSizePrices(item.Model, item.PricingExtra),
+			ServiceTiers:          tiers,
+			LongContext:           toPricingLongContextRule(longCtx),
 		}
 	}
 	return prices, nil
+}
+
+// ParseVideoResolutionPrices 解析 pricing_extra.video.resolution_prices（视频分辨率秒价表，USD/秒）。
+// 键统一转成小写并去除首尾空白，值 <=0 的条目丢弃；字段缺失返回 nil。
+func ParseVideoResolutionPrices(model string, extra map[string]interface{}) map[string]float64 {
+	raw, ok := extra["video"]
+	if !ok {
+		return nil
+	}
+	m, ok := raw.(map[string]interface{})
+	if !ok {
+		slog.Warn("model_price_pricing_extra_invalid", "model", model, "field", "video")
+		return nil
+	}
+	rawPrices, ok := m["resolution_prices"]
+	if !ok {
+		return nil
+	}
+	pm, ok := rawPrices.(map[string]interface{})
+	if !ok {
+		slog.Warn("model_price_pricing_extra_invalid", "model", model, "field", "video.resolution_prices")
+		return nil
+	}
+	prices := make(map[string]float64, len(pm))
+	for key, v := range pm {
+		key = strings.ToLower(strings.TrimSpace(key))
+		if f, ok := toFloat(v); ok && f > 0 && key != "" {
+			prices[key] = f
+		}
+	}
+	if len(prices) == 0 {
+		return nil
+	}
+	return prices
 }
 
 // toPricingLongContextRule 把 app 层的 LongContextRule 转成 relay/pricing 包的等价类型
@@ -173,9 +209,9 @@ func toPricingLongContextRule(rule *LongContextRule) *pricing.LongContextRule {
 	}
 }
 
-// parseVideoPerSecond 解析 pricing_extra.video.per_second（视频按秒单价，任务子系统用）。
+// ParseVideoPerSecond 解析 pricing_extra.video.per_second（视频按秒基础价，任务子系统用）。
 // 字段缺失返回 0；形态非法记 warn 不阻断加载。
-func parseVideoPerSecond(model string, extra map[string]interface{}) float64 {
+func ParseVideoPerSecond(model string, extra map[string]interface{}) float64 {
 	raw, ok := extra["video"]
 	if !ok {
 		return 0
@@ -216,7 +252,8 @@ func ParseImageSizePrices(model string, extra map[string]interface{}) map[string
 	}
 	prices := make(map[string]float64, len(pm))
 	for key, v := range pm {
-		if f, ok := toFloat(v); ok && f > 0 {
+		key = strings.ToLower(strings.TrimSpace(key))
+		if f, ok := toFloat(v); ok && f > 0 && key != "" {
 			prices[key] = f
 		}
 	}

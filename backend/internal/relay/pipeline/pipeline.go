@@ -11,6 +11,8 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/upstreamclient"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
+	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
@@ -55,6 +57,10 @@ type Options struct {
 	Moderation ModerationChecker
 	// HealthTracker 健康信号接收器（探针引擎；nil 时静默跳过）。
 	HealthTracker HealthTracker
+	// Accounts 账号注册表（nil 时仅渠道路径）。
+	Accounts *accountreg.Registry
+	// CPA CLIProxyAPI 桥接层（账号路径转发；nil 时账号候选不执行）。
+	CPA *cpa.Bridge
 }
 
 // Pipeline relay 转发管线。
@@ -69,6 +75,9 @@ type Pipeline struct {
 	settings      *SettingsReader
 	moderation    ModerationChecker
 	healthTracker HealthTracker
+	accounts      *accountreg.Registry
+	cpa           *cpa.Bridge
+	randFn        func(n int) int
 	// client 出口 HTTP 客户端：不设总超时（流式无总超时），仅设连接/TLS 层超时；
 	// 非流式的总超时由调用方经 context 施加。重定向不跟随
 	//（upstreamclient.NewClient 统一设 ErrUseLastResponse），
@@ -100,6 +109,8 @@ func New(opts Options) *Pipeline {
 		settings:      settings,
 		moderation:    opts.Moderation,
 		healthTracker: opts.HealthTracker,
+		accounts:      opts.Accounts,
+		cpa:           opts.CPA,
 		client:        upstreamclient.NewClient(0),
 	}
 }

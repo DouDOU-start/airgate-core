@@ -98,6 +98,18 @@ func (ocu *OAuthClientUpdate) AppendRedirectUris(s []string) *OAuthClientUpdate 
 	return ocu
 }
 
+// SetAllowedScopes sets the "allowed_scopes" field.
+func (ocu *OAuthClientUpdate) SetAllowedScopes(s []string) *OAuthClientUpdate {
+	ocu.mutation.SetAllowedScopes(s)
+	return ocu
+}
+
+// AppendAllowedScopes appends s to the "allowed_scopes" field.
+func (ocu *OAuthClientUpdate) AppendAllowedScopes(s []string) *OAuthClientUpdate {
+	ocu.mutation.AppendAllowedScopes(s)
+	return ocu
+}
+
 // SetFirstParty sets the "first_party" field.
 func (ocu *OAuthClientUpdate) SetFirstParty(b bool) *OAuthClientUpdate {
 	ocu.mutation.SetFirstParty(b)
@@ -289,6 +301,14 @@ func (ocu *OAuthClientUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			sqljson.Append(u, oauthclient.FieldRedirectUris, value)
 		})
 	}
+	if value, ok := ocu.mutation.AllowedScopes(); ok {
+		_spec.SetField(oauthclient.FieldAllowedScopes, field.TypeJSON, value)
+	}
+	if value, ok := ocu.mutation.AppendedAllowedScopes(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, oauthclient.FieldAllowedScopes, value)
+		})
+	}
 	if value, ok := ocu.mutation.FirstParty(); ok {
 		_spec.SetField(oauthclient.FieldFirstParty, field.TypeBool, value)
 	}
@@ -400,6 +420,18 @@ func (ocuo *OAuthClientUpdateOne) SetRedirectUris(s []string) *OAuthClientUpdate
 // AppendRedirectUris appends s to the "redirect_uris" field.
 func (ocuo *OAuthClientUpdateOne) AppendRedirectUris(s []string) *OAuthClientUpdateOne {
 	ocuo.mutation.AppendRedirectUris(s)
+	return ocuo
+}
+
+// SetAllowedScopes sets the "allowed_scopes" field.
+func (ocuo *OAuthClientUpdateOne) SetAllowedScopes(s []string) *OAuthClientUpdateOne {
+	ocuo.mutation.SetAllowedScopes(s)
+	return ocuo
+}
+
+// AppendAllowedScopes appends s to the "allowed_scopes" field.
+func (ocuo *OAuthClientUpdateOne) AppendAllowedScopes(s []string) *OAuthClientUpdateOne {
+	ocuo.mutation.AppendAllowedScopes(s)
 	return ocuo
 }
 
@@ -622,6 +654,14 @@ func (ocuo *OAuthClientUpdateOne) sqlSave(ctx context.Context) (_node *OAuthClie
 	if value, ok := ocuo.mutation.AppendedRedirectUris(); ok {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, oauthclient.FieldRedirectUris, value)
+		})
+	}
+	if value, ok := ocuo.mutation.AllowedScopes(); ok {
+		_spec.SetField(oauthclient.FieldAllowedScopes, field.TypeJSON, value)
+	}
+	if value, ok := ocuo.mutation.AppendedAllowedScopes(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, oauthclient.FieldAllowedScopes, value)
 		})
 	}
 	if value, ok := ocuo.mutation.FirstParty(); ok {

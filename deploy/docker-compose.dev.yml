@@ -69,6 +69,8 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: airgate-dev
       JWT_SECRET: airgate-dev-secret
+      ANTIGRAVITY_OAUTH_CLIENT_ID: ${ANTIGRAVITY_OAUTH_CLIENT_ID:-}
+      ANTIGRAVITY_OAUTH_CLIENT_SECRET: ${ANTIGRAVITY_OAUTH_CLIENT_SECRET:-}
       GIN_MODE: debug
     volumes:
       - ..:/workspace

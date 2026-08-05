@@ -43,6 +43,7 @@ func (s *TaskStore) Insert(ctx context.Context, t *relaytask.Task) (int, error) 
 		SetSellRate(t.SellRate).
 		SetAccountRateMultiplier(t.AccountRateMultiplier).
 		SetSeconds(t.Seconds).
+		SetResolution(t.Resolution).
 		SetSubmitTime(t.SubmitTime).
 		SetRequestID(t.RequestID).
 		SetUserID(t.UserID).
@@ -177,6 +178,7 @@ func mapTask(item *ent.Task) *relaytask.Task {
 		AccountRateMultiplier: item.AccountRateMultiplier,
 		Settled:               item.Settled,
 		Seconds:               item.Seconds,
+		Resolution:            item.Resolution,
 		Data:                  item.Data,
 		SubmitTime:            item.SubmitTime,
 		FinishTime:            item.FinishTime,

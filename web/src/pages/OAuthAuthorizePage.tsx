@@ -53,7 +53,7 @@ function AppIcon({ icon }: { icon: string }) {
 
 export default function OAuthAuthorizePage() {
   const { t } = useTranslation();
-  const { site_name: siteName, site_logo: siteLogo } = useSiteSettings();
+  const { site_logo: siteLogo } = useSiteSettings();
   const params = useMemo(parseParams, []);
   const [denied, setDenied] = useState(false);
   const autoFired = useRef(false);
@@ -74,8 +74,8 @@ export default function OAuthAuthorizePage() {
   }, [hasToken]);
 
   const infoQuery = useQuery({
-    queryKey: queryKeys.oauthAuthorizeInfo(params.clientId, params.redirectUri),
-    queryFn: () => oauthApi.authorizeInfo(params.clientId, params.redirectUri),
+    queryKey: queryKeys.oauthAuthorizeInfo(params.clientId, params.redirectUri, params.scope),
+    queryFn: () => oauthApi.authorizeInfo(params.clientId, params.redirectUri, params.scope),
     enabled: hasToken && paramsValid,
     retry: false,
   });
@@ -164,9 +164,16 @@ export default function OAuthAuthorizePage() {
                   ) : null}
                 </div>
                 <div className="w-full rounded-lg bg-surface-secondary p-3 text-left">
-                  <div className="flex items-center gap-2 text-xs text-text-secondary">
-                    <ShieldCheck className="h-4 w-4 shrink-0 text-success" />
-                    {t('oauth_authorize.scope_hint', { site: siteName || 'AirGate' })}
+                  <div className="mb-2 text-xs font-medium text-text-secondary">
+                    {t('oauth_authorize.scope_title')}
+                  </div>
+                  <div className="space-y-2">
+                    {info.scopes.map((scope) => (
+                      <div key={scope} className="flex items-center gap-2 text-xs text-text-secondary">
+                        <ShieldCheck className="h-4 w-4 shrink-0 text-success" />
+                        {t(scopeTranslationKey(scope))}
+                      </div>
+                    ))}
                   </div>
                 </div>
                 <div className="flex w-full gap-3">
@@ -188,4 +195,16 @@ export default function OAuthAuthorizePage() {
       </Card>
     </div>
   );
+}
+
+function scopeTranslationKey(scope: string): string {
+  const keys: Record<string, string> = {
+    profile: 'oauth_authorize.scope_profile',
+    'wallet.read': 'oauth_authorize.scope_wallet_read',
+    'wallet.debit': 'oauth_authorize.scope_wallet_debit',
+    'wallet.refund': 'oauth_authorize.scope_wallet_refund',
+    'payment.read': 'oauth_authorize.scope_payment_read',
+    'payment.create': 'oauth_authorize.scope_payment_create',
+  };
+  return keys[scope] ?? scope;
 }

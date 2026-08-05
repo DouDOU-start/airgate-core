@@ -124,6 +124,11 @@ func Seconds(v int) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldSeconds, v))
 }
 
+// Resolution applies equality check predicate on the "resolution" field. It's identical to ResolutionEQ.
+func Resolution(v string) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldResolution, v))
+}
+
 // SubmitTime applies equality check predicate on the "submit_time" field. It's identical to SubmitTimeEQ.
 func SubmitTime(v time.Time) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldSubmitTime, v))
@@ -877,6 +882,71 @@ func SecondsLT(v int) predicate.Task {
 // SecondsLTE applies the LTE predicate on the "seconds" field.
 func SecondsLTE(v int) predicate.Task {
 	return predicate.Task(sql.FieldLTE(FieldSeconds, v))
+}
+
+// ResolutionEQ applies the EQ predicate on the "resolution" field.
+func ResolutionEQ(v string) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldResolution, v))
+}
+
+// ResolutionNEQ applies the NEQ predicate on the "resolution" field.
+func ResolutionNEQ(v string) predicate.Task {
+	return predicate.Task(sql.FieldNEQ(FieldResolution, v))
+}
+
+// ResolutionIn applies the In predicate on the "resolution" field.
+func ResolutionIn(vs ...string) predicate.Task {
+	return predicate.Task(sql.FieldIn(FieldResolution, vs...))
+}
+
+// ResolutionNotIn applies the NotIn predicate on the "resolution" field.
+func ResolutionNotIn(vs ...string) predicate.Task {
+	return predicate.Task(sql.FieldNotIn(FieldResolution, vs...))
+}
+
+// ResolutionGT applies the GT predicate on the "resolution" field.
+func ResolutionGT(v string) predicate.Task {
+	return predicate.Task(sql.FieldGT(FieldResolution, v))
+}
+
+// ResolutionGTE applies the GTE predicate on the "resolution" field.
+func ResolutionGTE(v string) predicate.Task {
+	return predicate.Task(sql.FieldGTE(FieldResolution, v))
+}
+
+// ResolutionLT applies the LT predicate on the "resolution" field.
+func ResolutionLT(v string) predicate.Task {
+	return predicate.Task(sql.FieldLT(FieldResolution, v))
+}
+
+// ResolutionLTE applies the LTE predicate on the "resolution" field.
+func ResolutionLTE(v string) predicate.Task {
+	return predicate.Task(sql.FieldLTE(FieldResolution, v))
+}
+
+// ResolutionContains applies the Contains predicate on the "resolution" field.
+func ResolutionContains(v string) predicate.Task {
+	return predicate.Task(sql.FieldContains(FieldResolution, v))
+}
+
+// ResolutionHasPrefix applies the HasPrefix predicate on the "resolution" field.
+func ResolutionHasPrefix(v string) predicate.Task {
+	return predicate.Task(sql.FieldHasPrefix(FieldResolution, v))
+}
+
+// ResolutionHasSuffix applies the HasSuffix predicate on the "resolution" field.
+func ResolutionHasSuffix(v string) predicate.Task {
+	return predicate.Task(sql.FieldHasSuffix(FieldResolution, v))
+}
+
+// ResolutionEqualFold applies the EqualFold predicate on the "resolution" field.
+func ResolutionEqualFold(v string) predicate.Task {
+	return predicate.Task(sql.FieldEqualFold(FieldResolution, v))
+}
+
+// ResolutionContainsFold applies the ContainsFold predicate on the "resolution" field.
+func ResolutionContainsFold(v string) predicate.Task {
+	return predicate.Task(sql.FieldContainsFold(FieldResolution, v))
 }
 
 // DataIsNil applies the IsNil predicate on the "data" field.

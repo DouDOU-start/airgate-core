@@ -16,6 +16,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	entusagelog "github.com/DouDOU-start/airgate-core/ent/usagelog"
 	entuser "github.com/DouDOU-start/airgate-core/ent/user"
+	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"
 	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
 )
@@ -582,6 +583,7 @@ func (s *UsageStore) pageUsageLogs(ctx context.Context, query *ent.UsageLogQuery
 		WithAPIKey().
 		WithChannel().
 		WithChannelKey().
+		WithAccount().
 		WithGroup().
 		Order(ent.Desc(entusagelog.FieldCreatedAt), ent.Desc(entusagelog.FieldID)).
 		All(ctx)
@@ -733,6 +735,7 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		ReasoningEffort:       item.ReasoningEffort,
 		ImageSize:             item.ImageSize,
 		ImageQuality:          item.ImageQuality,
+		VideoResolution:       item.VideoResolution,
 		Stream:                item.Stream,
 		DurationMs:            item.DurationMs,
 		FirstTokenMs:          item.FirstTokenMs,
@@ -768,6 +771,13 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		record.ChannelKeyID = int64(item.Edges.ChannelKey.ID)
 		record.ChannelKeyName = item.Edges.ChannelKey.Name
 	}
+	if item.Edges.Account != nil {
+		record.AccountID = int64(item.Edges.Account.ID)
+		record.AccountName = item.Edges.Account.Name
+	} else if item.AccountID != 0 {
+		// 账号已删除：仍保留 FK 快照 id（边为空）
+		record.AccountID = int64(item.AccountID)
+	}
 	if item.Edges.Group != nil {
 		record.GroupID = int64(item.Edges.Group.ID)
 	}
@@ -776,3 +786,281 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 }
 
 var _ appusage.Repository = (*UsageStore)(nil)
+
+// GetAccountMoneyStats 按账号聚合金额（实现 appaccount.UsageStatsRepository）：
+// 成本 = Σ(total_cost × account_rate_multiplier)，收益 = Σ(actual_cost)；累计与今日两次分组。
+func (s *UsageStore) GetAccountMoneyStats(ctx context.Context, accountIDs []int, todayStart time.Time) (map[int]appaccount.MoneyStats, error) {
+	result := make(map[int]appaccount.MoneyStats, len(accountIDs))
+	if len(accountIDs) == 0 {
+		return result, nil
+	}
+	total, err := s.sumAccountMoney(ctx, accountIDs)
+	if err != nil {
+		return nil, err
+	}
+	today, err := s.sumAccountMoney(ctx, accountIDs, entusagelog.CreatedAtGTE(todayStart))
+	if err != nil {
+		return nil, err
+	}
+	for id, item := range total {
+		result[id] = appaccount.MoneyStats{
+			Cost:         item.Cost,
+			Revenue:      item.Revenue,
+			TodayCost:    today[id].Cost,
+			TodayRevenue: today[id].Revenue,
+		}
+	}
+	// 仅有今日、尚无更早记录的账号也要带上
+	for id, item := range today {
+		if _, ok := result[id]; ok {
+			continue
+		}
+		result[id] = appaccount.MoneyStats{
+			Cost:         item.Cost,
+			Revenue:      item.Revenue,
+			TodayCost:    item.Cost,
+			TodayRevenue: item.Revenue,
+		}
+	}
+	return result, nil
+}
+
+type accountMoneyRow struct {
+	AccountID int     `json:"account_usage_logs"`
+	Cost      float64 `json:"cost"`
+	Revenue   float64 `json:"revenue"`
+}
+
+func (s *UsageStore) sumAccountMoney(ctx context.Context, accountIDs []int, extra ...predicate.UsageLog) (map[int]accountMoneyRow, error) {
+	var rows []accountMoneyRow
+	preds := append([]predicate.UsageLog{entusagelog.AccountIDIn(accountIDs...)}, extra...)
+	err := s.db.UsageLog.Query().
+		Where(preds...).
+		GroupBy(entusagelog.AccountColumn).
+		Aggregate(
+			ent.As(func(sel *entsql.Selector) string {
+				return "COALESCE(SUM(" + sel.C(entusagelog.FieldTotalCost) + " * " + sel.C(entusagelog.FieldAccountRateMultiplier) + "), 0)"
+			}, "cost"),
+			ent.As(func(sel *entsql.Selector) string {
+				return "COALESCE(SUM(" + sel.C(entusagelog.FieldActualCost) + "), 0)"
+			}, "revenue"),
+		).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[int]accountMoneyRow, len(rows))
+	for _, row := range rows {
+		result[row.AccountID] = row
+	}
+	return result, nil
+}
+
+// GetAccountUsageStats 聚合指定账号在时间窗内的日用量 / 模型分布（对齐 sub2api）。
+// 实现 appaccount.UsageStatsRepository。
+func (s *UsageStore) GetAccountUsageStats(ctx context.Context, accountID int, start, end time.Time) (appaccount.AccountUsageStats, error) {
+	logs, err := s.db.UsageLog.Query().
+		Where(
+			entusagelog.AccountIDEQ(accountID),
+			entusagelog.CreatedAtGTE(start),
+			entusagelog.CreatedAtLT(end),
+		).
+		Select(
+			entusagelog.FieldModel,
+			entusagelog.FieldInputTokens,
+			entusagelog.FieldOutputTokens,
+			entusagelog.FieldCachedInputTokens,
+			entusagelog.FieldCacheCreationTokens,
+			entusagelog.FieldTotalCost,
+			entusagelog.FieldActualCost,
+			entusagelog.FieldAccountRateMultiplier,
+			entusagelog.FieldDurationMs,
+			entusagelog.FieldCreatedAt,
+		).
+		All(ctx)
+	if err != nil {
+		return appaccount.AccountUsageStats{}, err
+	}
+
+	type dayAgg struct {
+		requests   int64
+		tokens     int64
+		cost       float64
+		actualCost float64
+		userCost   float64
+	}
+	type modelAgg struct {
+		requests   int64
+		tokens     int64
+		totalCost  float64
+		actualCost float64
+	}
+
+	byDay := map[string]*dayAgg{}
+	byModel := map[string]*modelAgg{}
+	var totalDuration float64
+	var durationCount int64
+
+	for _, item := range logs {
+		date := item.CreatedAt.In(start.Location()).Format("2006-01-02")
+		tokens := int64(item.InputTokens + item.OutputTokens + item.CachedInputTokens + item.CacheCreationTokens)
+		mult := item.AccountRateMultiplier
+		if mult <= 0 {
+			mult = 1
+		}
+		accountCost := item.TotalCost * mult
+		userCost := item.ActualCost
+
+		d := byDay[date]
+		if d == nil {
+			d = &dayAgg{}
+			byDay[date] = d
+		}
+		d.requests++
+		d.tokens += tokens
+		d.cost += item.TotalCost
+		d.actualCost += accountCost
+		d.userCost += userCost
+
+		model := item.Model
+		if model == "" {
+			model = "unknown"
+		}
+		m := byModel[model]
+		if m == nil {
+			m = &modelAgg{}
+			byModel[model] = m
+		}
+		m.requests++
+		m.tokens += tokens
+		m.totalCost += item.TotalCost
+		m.actualCost += accountCost
+
+		if item.DurationMs > 0 {
+			totalDuration += float64(item.DurationMs)
+			durationCount++
+		}
+	}
+
+	// 按日期升序
+	dates := make([]string, 0, len(byDay))
+	for d := range byDay {
+		dates = append(dates, d)
+	}
+	sort.Strings(dates)
+
+	history := make([]appaccount.AccountDayHistory, 0, len(dates))
+	var totalAccountCost, totalUserCost, totalStandardCost float64
+	var totalRequests, totalTokens int64
+	var highestCostDay, highestRequestDay *appaccount.AccountDayHistory
+
+	for _, date := range dates {
+		d := byDay[date]
+		t, _ := time.ParseInLocation("2006-01-02", date, start.Location())
+		h := appaccount.AccountDayHistory{
+			Date:       date,
+			Label:      t.Format("01/02"),
+			Requests:   d.requests,
+			Tokens:     d.tokens,
+			Cost:       d.cost,
+			ActualCost: d.actualCost,
+			UserCost:   d.userCost,
+		}
+		history = append(history, h)
+		totalAccountCost += d.actualCost
+		totalUserCost += d.userCost
+		totalStandardCost += d.cost
+		totalRequests += d.requests
+		totalTokens += d.tokens
+
+		if highestCostDay == nil || h.ActualCost > highestCostDay.ActualCost {
+			cp := h
+			highestCostDay = &cp
+		}
+		if highestRequestDay == nil || h.Requests > highestRequestDay.Requests {
+			cp := h
+			highestRequestDay = &cp
+		}
+	}
+
+	actualDays := len(history)
+	if actualDays == 0 {
+		actualDays = 1
+	}
+	avgDuration := 0.0
+	if durationCount > 0 {
+		avgDuration = totalDuration / float64(durationCount)
+	}
+
+	summary := appaccount.AccountUsageSummary{
+		ActualDaysUsed:    len(history),
+		TotalCost:         totalAccountCost,
+		TotalUserCost:     totalUserCost,
+		TotalStandardCost: totalStandardCost,
+		TotalRequests:     totalRequests,
+		TotalTokens:       totalTokens,
+		AvgDailyCost:      totalAccountCost / float64(actualDays),
+		AvgDailyUserCost:  totalUserCost / float64(actualDays),
+		AvgDailyRequests:  float64(totalRequests) / float64(actualDays),
+		AvgDailyTokens:    float64(totalTokens) / float64(actualDays),
+		AvgDurationMs:     avgDuration,
+	}
+
+	todayStr := time.Now().In(start.Location()).Format("2006-01-02")
+	for i := range history {
+		if history[i].Date == todayStr {
+			summary.Today = &appaccount.AccountDayHighlight{
+				Date:     history[i].Date,
+				Label:    history[i].Label,
+				Cost:     history[i].ActualCost,
+				UserCost: history[i].UserCost,
+				Requests: history[i].Requests,
+				Tokens:   history[i].Tokens,
+			}
+			break
+		}
+	}
+	if highestCostDay != nil {
+		summary.HighestCostDay = &appaccount.AccountDayHighlight{
+			Date:     highestCostDay.Date,
+			Label:    highestCostDay.Label,
+			Cost:     highestCostDay.ActualCost,
+			UserCost: highestCostDay.UserCost,
+			Requests: highestCostDay.Requests,
+		}
+	}
+	if highestRequestDay != nil {
+		summary.HighestRequestDay = &appaccount.AccountDayHighlight{
+			Date:     highestRequestDay.Date,
+			Label:    highestRequestDay.Label,
+			Cost:     highestRequestDay.ActualCost,
+			UserCost: highestRequestDay.UserCost,
+			Requests: highestRequestDay.Requests,
+		}
+	}
+
+	models := make([]appaccount.AccountModelStat, 0, len(byModel))
+	for model, m := range byModel {
+		models = append(models, appaccount.AccountModelStat{
+			Model:      model,
+			Requests:   m.requests,
+			Tokens:     m.tokens,
+			TotalCost:  m.totalCost,
+			ActualCost: m.actualCost,
+		})
+	}
+	sort.Slice(models, func(i, j int) bool {
+		if models[i].Requests == models[j].Requests {
+			return models[i].Model < models[j].Model
+		}
+		return models[i].Requests > models[j].Requests
+	})
+
+	return appaccount.AccountUsageStats{
+		History: history,
+		Summary: summary,
+		Models:  models,
+	}, nil
+}
+
+var _ appaccount.UsageStatsRepository = (*UsageStore)(nil)

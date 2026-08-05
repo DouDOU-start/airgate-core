@@ -25,6 +25,8 @@ const (
 	FieldDescription = "description"
 	// FieldRedirectUris holds the string denoting the redirect_uris field in the database.
 	FieldRedirectUris = "redirect_uris"
+	// FieldAllowedScopes holds the string denoting the allowed_scopes field in the database.
+	FieldAllowedScopes = "allowed_scopes"
 	// FieldFirstParty holds the string denoting the first_party field in the database.
 	FieldFirstParty = "first_party"
 	// FieldEnabled holds the string denoting the enabled field in the database.
@@ -54,6 +56,7 @@ var Columns = []string{
 	FieldName,
 	FieldDescription,
 	FieldRedirectUris,
+	FieldAllowedScopes,
 	FieldFirstParty,
 	FieldEnabled,
 	FieldShowInNav,
@@ -85,6 +88,8 @@ var (
 	NameValidator func(string) error
 	// DefaultDescription holds the default value on creation for the "description" field.
 	DefaultDescription string
+	// DefaultAllowedScopes holds the default value on creation for the "allowed_scopes" field.
+	DefaultAllowedScopes []string
 	// DefaultFirstParty holds the default value on creation for the "first_party" field.
 	DefaultFirstParty bool
 	// DefaultEnabled holds the default value on creation for the "enabled" field.

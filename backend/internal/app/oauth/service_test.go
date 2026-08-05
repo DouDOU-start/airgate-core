@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -25,7 +26,7 @@ func (s *stubRepo) FindByClientID(_ context.Context, clientID string) (Client, e
 	return Client{}, ErrClientNotFound
 }
 func (s *stubRepo) Create(_ context.Context, clientID, secretHash, secretHint string, m ClientMutation) (Client, error) {
-	c := Client{ClientID: clientID, SecretHash: secretHash, SecretHint: secretHint, Name: m.Name, RedirectURIs: m.RedirectURIs, FirstParty: m.FirstParty, Enabled: m.Enabled}
+	c := Client{ClientID: clientID, SecretHash: secretHash, SecretHint: secretHint, Name: m.Name, RedirectURIs: m.RedirectURIs, AllowedScopes: m.AllowedScopes, FirstParty: m.FirstParty, Enabled: m.Enabled}
 	s.clients[clientID] = c
 	return c, nil
 }
@@ -264,12 +265,13 @@ func TestNormalizePaymentScopes(t *testing.T) {
 
 func testClient(secret string) Client {
 	return Client{
-		ClientID:     "ac_test",
-		SecretHash:   hashSecret(secret),
-		Name:         "对话",
-		RedirectURIs: []string{"https://chat.example.com/callback"},
-		FirstParty:   true,
-		Enabled:      true,
+		ClientID:      "ac_test",
+		SecretHash:    hashSecret(secret),
+		Name:          "对话",
+		RedirectURIs:  []string{"https://chat.example.com/callback"},
+		AllowedScopes: allSupportedScopes(),
+		FirstParty:    true,
+		Enabled:       true,
 	}
 }
 
@@ -350,6 +352,43 @@ func TestAuthorizeDisabledClient(t *testing.T) {
 	})
 	if !errors.Is(err, ErrClientDisabled) {
 		t.Fatalf("err = %v, 期望 ErrClientDisabled", err)
+	}
+}
+
+func TestAuthorizeRejectsScopeOutsideClientAllowlist(t *testing.T) {
+	client := testClient("secret")
+	client.AllowedScopes = []string{"profile", "payment.read"}
+	svc, _, _ := newTestService(client)
+	input := AuthorizeInput{
+		ClientID:            "ac_test",
+		RedirectURI:         "https://chat.example.com/callback",
+		Scope:               "profile payment.create",
+		CodeChallenge:       s256("v"),
+		CodeChallengeMethod: "S256",
+	}
+
+	if _, err := svc.Authorize(context.Background(), 1, input); !errors.Is(err, ErrInvalidScope) {
+		t.Fatalf("超出客户端白名单的 scope 应被拒绝：%v", err)
+	}
+	if _, _, err := svc.AuthorizeInfo(context.Background(), input.ClientID, input.RedirectURI, input.Scope); !errors.Is(err, ErrInvalidScope) {
+		t.Fatalf("授权信息接口应提前拒绝越权 scope：%v", err)
+	}
+}
+
+func TestAuthorizeInfoReturnsNormalizedScopes(t *testing.T) {
+	svc, _, _ := newTestService(testClient("secret"))
+	_, scopes, err := svc.AuthorizeInfo(
+		context.Background(),
+		"ac_test",
+		"https://chat.example.com/callback",
+		"payment.read profile payment.read",
+	)
+	if err != nil {
+		t.Fatalf("AuthorizeInfo 失败: %v", err)
+	}
+	want := []string{"payment.read", "profile"}
+	if !reflect.DeepEqual(scopes, want) {
+		t.Fatalf("scopes = %v，期望 %v", scopes, want)
 	}
 }
 

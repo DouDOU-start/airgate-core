@@ -57,6 +57,7 @@ func (s *OAuthClientStore) Create(ctx context.Context, clientID, secretHash, sec
 		SetName(m.Name).
 		SetDescription(m.Description).
 		SetRedirectUris(m.RedirectURIs).
+		SetAllowedScopes(m.AllowedScopes).
 		SetFirstParty(m.FirstParty).
 		SetEnabled(m.Enabled).
 		SetShowInNav(m.ShowInNav).
@@ -76,6 +77,7 @@ func (s *OAuthClientStore) Update(ctx context.Context, id int, m appoauth.Client
 		SetName(m.Name).
 		SetDescription(m.Description).
 		SetRedirectUris(m.RedirectURIs).
+		SetAllowedScopes(m.AllowedScopes).
 		SetFirstParty(m.FirstParty).
 		SetEnabled(m.Enabled).
 		SetShowInNav(m.ShowInNav).
@@ -153,21 +155,22 @@ func (s *OAuthClientStore) BasicInfo(ctx context.Context, id int) (appoauth.User
 
 func mapOAuthClient(item *ent.OAuthClient) appoauth.Client {
 	return appoauth.Client{
-		ID:           item.ID,
-		ClientID:     item.ClientID,
-		SecretHash:   item.SecretHash,
-		SecretHint:   item.SecretHint,
-		Name:         item.Name,
-		Description:  item.Description,
-		RedirectURIs: cloneStringSlice(item.RedirectUris),
-		FirstParty:   item.FirstParty,
-		Enabled:      item.Enabled,
-		ShowInNav:    item.ShowInNav,
-		LaunchURL:    item.LaunchURL,
-		Icon:         item.Icon,
-		SortOrder:    item.SortOrder,
-		CreatedAt:    item.CreatedAt,
-		UpdatedAt:    item.UpdatedAt,
+		ID:            item.ID,
+		ClientID:      item.ClientID,
+		SecretHash:    item.SecretHash,
+		SecretHint:    item.SecretHint,
+		Name:          item.Name,
+		Description:   item.Description,
+		RedirectURIs:  cloneStringSlice(item.RedirectUris),
+		AllowedScopes: cloneStringSlice(item.AllowedScopes),
+		FirstParty:    item.FirstParty,
+		Enabled:       item.Enabled,
+		ShowInNav:     item.ShowInNav,
+		LaunchURL:     item.LaunchURL,
+		Icon:          item.Icon,
+		SortOrder:     item.SortOrder,
+		CreatedAt:     item.CreatedAt,
+		UpdatedAt:     item.UpdatedAt,
 	}
 }
 

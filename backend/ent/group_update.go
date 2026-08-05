@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
+	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
@@ -239,6 +240,21 @@ func (gu *GroupUpdate) AddChannelKeys(c ...*ChannelKey) *GroupUpdate {
 	return gu.AddChannelKeyIDs(ids...)
 }
 
+// AddAccountIDs adds the "accounts" edge to the Account entity by IDs.
+func (gu *GroupUpdate) AddAccountIDs(ids ...int) *GroupUpdate {
+	gu.mutation.AddAccountIDs(ids...)
+	return gu
+}
+
+// AddAccounts adds the "accounts" edges to the Account entity.
+func (gu *GroupUpdate) AddAccounts(a ...*Account) *GroupUpdate {
+	ids := make([]int, len(a))
+	for i := range a {
+		ids[i] = a[i].ID
+	}
+	return gu.AddAccountIDs(ids...)
+}
+
 // AddAllowedUserIDs adds the "allowed_users" edge to the User entity by IDs.
 func (gu *GroupUpdate) AddAllowedUserIDs(ids ...int) *GroupUpdate {
 	gu.mutation.AddAllowedUserIDs(ids...)
@@ -308,6 +324,27 @@ func (gu *GroupUpdate) RemoveChannelKeys(c ...*ChannelKey) *GroupUpdate {
 		ids[i] = c[i].ID
 	}
 	return gu.RemoveChannelKeyIDs(ids...)
+}
+
+// ClearAccounts clears all "accounts" edges to the Account entity.
+func (gu *GroupUpdate) ClearAccounts() *GroupUpdate {
+	gu.mutation.ClearAccounts()
+	return gu
+}
+
+// RemoveAccountIDs removes the "accounts" edge to Account entities by IDs.
+func (gu *GroupUpdate) RemoveAccountIDs(ids ...int) *GroupUpdate {
+	gu.mutation.RemoveAccountIDs(ids...)
+	return gu
+}
+
+// RemoveAccounts removes "accounts" edges to Account entities.
+func (gu *GroupUpdate) RemoveAccounts(a ...*Account) *GroupUpdate {
+	ids := make([]int, len(a))
+	for i := range a {
+		ids[i] = a[i].ID
+	}
+	return gu.RemoveAccountIDs(ids...)
 }
 
 // ClearAllowedUsers clears all "allowed_users" edges to the User entity.
@@ -534,6 +571,51 @@ func (gu *GroupUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if gu.mutation.AccountsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   group.AccountsTable,
+			Columns: group.AccountsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := gu.mutation.RemovedAccountsIDs(); len(nodes) > 0 && !gu.mutation.AccountsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   group.AccountsTable,
+			Columns: group.AccountsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := gu.mutation.AccountsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   group.AccountsTable,
+			Columns: group.AccountsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -903,6 +985,21 @@ func (guo *GroupUpdateOne) AddChannelKeys(c ...*ChannelKey) *GroupUpdateOne {
 	return guo.AddChannelKeyIDs(ids...)
 }
 
+// AddAccountIDs adds the "accounts" edge to the Account entity by IDs.
+func (guo *GroupUpdateOne) AddAccountIDs(ids ...int) *GroupUpdateOne {
+	guo.mutation.AddAccountIDs(ids...)
+	return guo
+}
+
+// AddAccounts adds the "accounts" edges to the Account entity.
+func (guo *GroupUpdateOne) AddAccounts(a ...*Account) *GroupUpdateOne {
+	ids := make([]int, len(a))
+	for i := range a {
+		ids[i] = a[i].ID
+	}
+	return guo.AddAccountIDs(ids...)
+}
+
 // AddAllowedUserIDs adds the "allowed_users" edge to the User entity by IDs.
 func (guo *GroupUpdateOne) AddAllowedUserIDs(ids ...int) *GroupUpdateOne {
 	guo.mutation.AddAllowedUserIDs(ids...)
@@ -972,6 +1069,27 @@ func (guo *GroupUpdateOne) RemoveChannelKeys(c ...*ChannelKey) *GroupUpdateOne {
 		ids[i] = c[i].ID
 	}
 	return guo.RemoveChannelKeyIDs(ids...)
+}
+
+// ClearAccounts clears all "accounts" edges to the Account entity.
+func (guo *GroupUpdateOne) ClearAccounts() *GroupUpdateOne {
+	guo.mutation.ClearAccounts()
+	return guo
+}
+
+// RemoveAccountIDs removes the "accounts" edge to Account entities by IDs.
+func (guo *GroupUpdateOne) RemoveAccountIDs(ids ...int) *GroupUpdateOne {
+	guo.mutation.RemoveAccountIDs(ids...)
+	return guo
+}
+
+// RemoveAccounts removes "accounts" edges to Account entities.
+func (guo *GroupUpdateOne) RemoveAccounts(a ...*Account) *GroupUpdateOne {
+	ids := make([]int, len(a))
+	for i := range a {
+		ids[i] = a[i].ID
+	}
+	return guo.RemoveAccountIDs(ids...)
 }
 
 // ClearAllowedUsers clears all "allowed_users" edges to the User entity.
@@ -1228,6 +1346,51 @@ func (guo *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if guo.mutation.AccountsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   group.AccountsTable,
+			Columns: group.AccountsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := guo.mutation.RemovedAccountsIDs(); len(nodes) > 0 && !guo.mutation.AccountsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   group.AccountsTable,
+			Columns: group.AccountsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := guo.mutation.AccountsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   group.AccountsTable,
+			Columns: group.AccountsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

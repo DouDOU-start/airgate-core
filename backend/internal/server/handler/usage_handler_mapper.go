@@ -20,6 +20,8 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 		ChannelName:           record.ChannelName,
 		ChannelKeyID:          record.ChannelKeyID,
 		ChannelKeyName:        record.ChannelKeyName,
+		AccountID:             record.AccountID,
+		AccountName:           record.AccountName,
 		GroupID:               record.GroupID,
 		Model:                 record.Model,
 		InputTokens:           record.InputTokens,
@@ -48,6 +50,7 @@ func toUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 		ReasoningEffort:       record.ReasoningEffort,
 		ImageSize:             record.ImageSize,
 		ImageQuality:          record.ImageQuality,
+		VideoResolution:       record.VideoResolution,
 		Stream:                record.Stream,
 		DurationMs:            record.DurationMs,
 		FirstTokenMs:          record.FirstTokenMs,
@@ -70,6 +73,9 @@ func toUserUsageLogResp(record appusage.LogRecord) dto.UsageLogResp {
 	resp.ChannelName = ""
 	resp.ChannelKeyID = 0
 	resp.ChannelKeyName = ""
+	// 用户视角不暴露账号拓扑细节（与渠道字段同策略）
+	resp.AccountID = 0
+	resp.AccountName = ""
 	return resp
 }
 
@@ -93,6 +99,7 @@ func toCustomerUsageLogResp(record appusage.LogRecord) dto.CustomerUsageLogResp 
 		ReasoningEffort:       record.ReasoningEffort,
 		ImageSize:             record.ImageSize,
 		ImageQuality:          record.ImageQuality,
+		VideoResolution:       record.VideoResolution,
 		Stream:                record.Stream,
 		DurationMs:            record.DurationMs,
 		FirstTokenMs:          record.FirstTokenMs,

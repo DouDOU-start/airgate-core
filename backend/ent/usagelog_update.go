@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
@@ -565,6 +566,20 @@ func (ulu *UsageLogUpdate) SetNillableImageQuality(s *string) *UsageLogUpdate {
 	return ulu
 }
 
+// SetVideoResolution sets the "video_resolution" field.
+func (ulu *UsageLogUpdate) SetVideoResolution(s string) *UsageLogUpdate {
+	ulu.mutation.SetVideoResolution(s)
+	return ulu
+}
+
+// SetNillableVideoResolution sets the "video_resolution" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableVideoResolution(s *string) *UsageLogUpdate {
+	if s != nil {
+		ulu.SetVideoResolution(*s)
+	}
+	return ulu
+}
+
 // SetStream sets the "stream" field.
 func (ulu *UsageLogUpdate) SetStream(b bool) *UsageLogUpdate {
 	ulu.mutation.SetStream(b)
@@ -806,6 +821,26 @@ func (ulu *UsageLogUpdate) ClearChannelKeyID() *UsageLogUpdate {
 	return ulu
 }
 
+// SetAccountID sets the "account_id" field.
+func (ulu *UsageLogUpdate) SetAccountID(i int) *UsageLogUpdate {
+	ulu.mutation.SetAccountID(i)
+	return ulu
+}
+
+// SetNillableAccountID sets the "account_id" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableAccountID(i *int) *UsageLogUpdate {
+	if i != nil {
+		ulu.SetAccountID(*i)
+	}
+	return ulu
+}
+
+// ClearAccountID clears the value of the "account_id" field.
+func (ulu *UsageLogUpdate) ClearAccountID() *UsageLogUpdate {
+	ulu.mutation.ClearAccountID()
+	return ulu
+}
+
 // SetGroupID sets the "group_id" field.
 func (ulu *UsageLogUpdate) SetGroupID(i int) *UsageLogUpdate {
 	ulu.mutation.SetGroupID(i)
@@ -846,6 +881,11 @@ func (ulu *UsageLogUpdate) SetChannelKey(c *ChannelKey) *UsageLogUpdate {
 	return ulu.SetChannelKeyID(c.ID)
 }
 
+// SetAccount sets the "account" edge to the Account entity.
+func (ulu *UsageLogUpdate) SetAccount(a *Account) *UsageLogUpdate {
+	return ulu.SetAccountID(a.ID)
+}
+
 // SetGroup sets the "group" edge to the Group entity.
 func (ulu *UsageLogUpdate) SetGroup(g *Group) *UsageLogUpdate {
 	return ulu.SetGroupID(g.ID)
@@ -877,6 +917,12 @@ func (ulu *UsageLogUpdate) ClearChannel() *UsageLogUpdate {
 // ClearChannelKey clears the "channel_key" edge to the ChannelKey entity.
 func (ulu *UsageLogUpdate) ClearChannelKey() *UsageLogUpdate {
 	ulu.mutation.ClearChannelKey()
+	return ulu
+}
+
+// ClearAccount clears the "account" edge to the Account entity.
+func (ulu *UsageLogUpdate) ClearAccount() *UsageLogUpdate {
+	ulu.mutation.ClearAccount()
 	return ulu
 }
 
@@ -1088,6 +1134,9 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ulu.mutation.ImageQuality(); ok {
 		_spec.SetField(usagelog.FieldImageQuality, field.TypeString, value)
 	}
+	if value, ok := ulu.mutation.VideoResolution(); ok {
+		_spec.SetField(usagelog.FieldVideoResolution, field.TypeString, value)
+	}
 	if value, ok := ulu.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
 	}
@@ -1236,6 +1285,35 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if ulu.mutation.AccountCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.AccountTable,
+			Columns: []string{usagelog.AccountColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := ulu.mutation.AccountIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.AccountTable,
+			Columns: []string{usagelog.AccountColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1826,6 +1904,20 @@ func (uluo *UsageLogUpdateOne) SetNillableImageQuality(s *string) *UsageLogUpdat
 	return uluo
 }
 
+// SetVideoResolution sets the "video_resolution" field.
+func (uluo *UsageLogUpdateOne) SetVideoResolution(s string) *UsageLogUpdateOne {
+	uluo.mutation.SetVideoResolution(s)
+	return uluo
+}
+
+// SetNillableVideoResolution sets the "video_resolution" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableVideoResolution(s *string) *UsageLogUpdateOne {
+	if s != nil {
+		uluo.SetVideoResolution(*s)
+	}
+	return uluo
+}
+
 // SetStream sets the "stream" field.
 func (uluo *UsageLogUpdateOne) SetStream(b bool) *UsageLogUpdateOne {
 	uluo.mutation.SetStream(b)
@@ -2067,6 +2159,26 @@ func (uluo *UsageLogUpdateOne) ClearChannelKeyID() *UsageLogUpdateOne {
 	return uluo
 }
 
+// SetAccountID sets the "account_id" field.
+func (uluo *UsageLogUpdateOne) SetAccountID(i int) *UsageLogUpdateOne {
+	uluo.mutation.SetAccountID(i)
+	return uluo
+}
+
+// SetNillableAccountID sets the "account_id" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableAccountID(i *int) *UsageLogUpdateOne {
+	if i != nil {
+		uluo.SetAccountID(*i)
+	}
+	return uluo
+}
+
+// ClearAccountID clears the value of the "account_id" field.
+func (uluo *UsageLogUpdateOne) ClearAccountID() *UsageLogUpdateOne {
+	uluo.mutation.ClearAccountID()
+	return uluo
+}
+
 // SetGroupID sets the "group_id" field.
 func (uluo *UsageLogUpdateOne) SetGroupID(i int) *UsageLogUpdateOne {
 	uluo.mutation.SetGroupID(i)
@@ -2107,6 +2219,11 @@ func (uluo *UsageLogUpdateOne) SetChannelKey(c *ChannelKey) *UsageLogUpdateOne {
 	return uluo.SetChannelKeyID(c.ID)
 }
 
+// SetAccount sets the "account" edge to the Account entity.
+func (uluo *UsageLogUpdateOne) SetAccount(a *Account) *UsageLogUpdateOne {
+	return uluo.SetAccountID(a.ID)
+}
+
 // SetGroup sets the "group" edge to the Group entity.
 func (uluo *UsageLogUpdateOne) SetGroup(g *Group) *UsageLogUpdateOne {
 	return uluo.SetGroupID(g.ID)
@@ -2138,6 +2255,12 @@ func (uluo *UsageLogUpdateOne) ClearChannel() *UsageLogUpdateOne {
 // ClearChannelKey clears the "channel_key" edge to the ChannelKey entity.
 func (uluo *UsageLogUpdateOne) ClearChannelKey() *UsageLogUpdateOne {
 	uluo.mutation.ClearChannelKey()
+	return uluo
+}
+
+// ClearAccount clears the "account" edge to the Account entity.
+func (uluo *UsageLogUpdateOne) ClearAccount() *UsageLogUpdateOne {
+	uluo.mutation.ClearAccount()
 	return uluo
 }
 
@@ -2379,6 +2502,9 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	if value, ok := uluo.mutation.ImageQuality(); ok {
 		_spec.SetField(usagelog.FieldImageQuality, field.TypeString, value)
 	}
+	if value, ok := uluo.mutation.VideoResolution(); ok {
+		_spec.SetField(usagelog.FieldVideoResolution, field.TypeString, value)
+	}
 	if value, ok := uluo.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
 	}
@@ -2527,6 +2653,35 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(channelkey.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if uluo.mutation.AccountCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.AccountTable,
+			Columns: []string{usagelog.AccountColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uluo.mutation.AccountIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.AccountTable,
+			Columns: []string{usagelog.AccountColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

@@ -290,6 +290,20 @@ func (tu *TaskUpdate) AddSeconds(i int) *TaskUpdate {
 	return tu
 }
 
+// SetResolution sets the "resolution" field.
+func (tu *TaskUpdate) SetResolution(s string) *TaskUpdate {
+	tu.mutation.SetResolution(s)
+	return tu
+}
+
+// SetNillableResolution sets the "resolution" field if the given value is not nil.
+func (tu *TaskUpdate) SetNillableResolution(s *string) *TaskUpdate {
+	if s != nil {
+		tu.SetResolution(*s)
+	}
+	return tu
+}
+
 // SetData sets the "data" field.
 func (tu *TaskUpdate) SetData(jm json.RawMessage) *TaskUpdate {
 	tu.mutation.SetData(jm)
@@ -631,6 +645,9 @@ func (tu *TaskUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tu.mutation.AddedSeconds(); ok {
 		_spec.AddField(task.FieldSeconds, field.TypeInt, value)
 	}
+	if value, ok := tu.mutation.Resolution(); ok {
+		_spec.SetField(task.FieldResolution, field.TypeString, value)
+	}
 	if value, ok := tu.mutation.Data(); ok {
 		_spec.SetField(task.FieldData, field.TypeJSON, value)
 	}
@@ -968,6 +985,20 @@ func (tuo *TaskUpdateOne) SetNillableSeconds(i *int) *TaskUpdateOne {
 // AddSeconds adds i to the "seconds" field.
 func (tuo *TaskUpdateOne) AddSeconds(i int) *TaskUpdateOne {
 	tuo.mutation.AddSeconds(i)
+	return tuo
+}
+
+// SetResolution sets the "resolution" field.
+func (tuo *TaskUpdateOne) SetResolution(s string) *TaskUpdateOne {
+	tuo.mutation.SetResolution(s)
+	return tuo
+}
+
+// SetNillableResolution sets the "resolution" field if the given value is not nil.
+func (tuo *TaskUpdateOne) SetNillableResolution(s *string) *TaskUpdateOne {
+	if s != nil {
+		tuo.SetResolution(*s)
+	}
 	return tuo
 }
 
@@ -1341,6 +1372,9 @@ func (tuo *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) 
 	}
 	if value, ok := tuo.mutation.AddedSeconds(); ok {
 		_spec.AddField(task.FieldSeconds, field.TypeInt, value)
+	}
+	if value, ok := tuo.mutation.Resolution(); ok {
+		_spec.SetField(task.FieldResolution, field.TypeString, value)
 	}
 	if value, ok := tuo.mutation.Data(); ok {
 		_spec.SetField(task.FieldData, field.TypeJSON, value)

@@ -209,6 +209,20 @@ func (tc *TaskCreate) SetNillableSeconds(i *int) *TaskCreate {
 	return tc
 }
 
+// SetResolution sets the "resolution" field.
+func (tc *TaskCreate) SetResolution(s string) *TaskCreate {
+	tc.mutation.SetResolution(s)
+	return tc
+}
+
+// SetNillableResolution sets the "resolution" field if the given value is not nil.
+func (tc *TaskCreate) SetNillableResolution(s *string) *TaskCreate {
+	if s != nil {
+		tc.SetResolution(*s)
+	}
+	return tc
+}
+
 // SetData sets the "data" field.
 func (tc *TaskCreate) SetData(jm json.RawMessage) *TaskCreate {
 	tc.mutation.SetData(jm)
@@ -452,6 +466,10 @@ func (tc *TaskCreate) defaults() {
 		v := task.DefaultSeconds
 		tc.mutation.SetSeconds(v)
 	}
+	if _, ok := tc.mutation.Resolution(); !ok {
+		v := task.DefaultResolution
+		tc.mutation.SetResolution(v)
+	}
 	if _, ok := tc.mutation.SubmitTime(); !ok {
 		v := task.DefaultSubmitTime()
 		tc.mutation.SetSubmitTime(v)
@@ -560,6 +578,9 @@ func (tc *TaskCreate) check() error {
 	}
 	if _, ok := tc.mutation.Seconds(); !ok {
 		return &ValidationError{Name: "seconds", err: errors.New(`ent: missing required field "Task.seconds"`)}
+	}
+	if _, ok := tc.mutation.Resolution(); !ok {
+		return &ValidationError{Name: "resolution", err: errors.New(`ent: missing required field "Task.resolution"`)}
 	}
 	if _, ok := tc.mutation.SubmitTime(); !ok {
 		return &ValidationError{Name: "submit_time", err: errors.New(`ent: missing required field "Task.submit_time"`)}
@@ -677,6 +698,10 @@ func (tc *TaskCreate) createSpec() (*Task, *sqlgraph.CreateSpec) {
 	if value, ok := tc.mutation.Seconds(); ok {
 		_spec.SetField(task.FieldSeconds, field.TypeInt, value)
 		_node.Seconds = value
+	}
+	if value, ok := tc.mutation.Resolution(); ok {
+		_spec.SetField(task.FieldResolution, field.TypeString, value)
+		_node.Resolution = value
 	}
 	if value, ok := tc.mutation.Data(); ok {
 		_spec.SetField(task.FieldData, field.TypeJSON, value)
@@ -997,6 +1022,18 @@ func (u *TaskUpsert) UpdateSeconds() *TaskUpsert {
 // AddSeconds adds v to the "seconds" field.
 func (u *TaskUpsert) AddSeconds(v int) *TaskUpsert {
 	u.Add(task.FieldSeconds, v)
+	return u
+}
+
+// SetResolution sets the "resolution" field.
+func (u *TaskUpsert) SetResolution(v string) *TaskUpsert {
+	u.Set(task.FieldResolution, v)
+	return u
+}
+
+// UpdateResolution sets the "resolution" field to the value that was provided on create.
+func (u *TaskUpsert) UpdateResolution() *TaskUpsert {
+	u.SetExcluded(task.FieldResolution)
 	return u
 }
 
@@ -1475,6 +1512,20 @@ func (u *TaskUpsertOne) AddSeconds(v int) *TaskUpsertOne {
 func (u *TaskUpsertOne) UpdateSeconds() *TaskUpsertOne {
 	return u.Update(func(s *TaskUpsert) {
 		s.UpdateSeconds()
+	})
+}
+
+// SetResolution sets the "resolution" field.
+func (u *TaskUpsertOne) SetResolution(v string) *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.SetResolution(v)
+	})
+}
+
+// UpdateResolution sets the "resolution" field to the value that was provided on create.
+func (u *TaskUpsertOne) UpdateResolution() *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.UpdateResolution()
 	})
 }
 
@@ -2148,6 +2199,20 @@ func (u *TaskUpsertBulk) AddSeconds(v int) *TaskUpsertBulk {
 func (u *TaskUpsertBulk) UpdateSeconds() *TaskUpsertBulk {
 	return u.Update(func(s *TaskUpsert) {
 		s.UpdateSeconds()
+	})
+}
+
+// SetResolution sets the "resolution" field.
+func (u *TaskUpsertBulk) SetResolution(v string) *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.SetResolution(v)
+	})
+}
+
+// UpdateResolution sets the "resolution" field to the value that was provided on create.
+func (u *TaskUpsertBulk) UpdateResolution() *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.UpdateResolution()
 	})
 }
 

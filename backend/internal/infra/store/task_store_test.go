@@ -19,6 +19,7 @@ func newTaskRow(taskID string, userID int) *relaytask.Task {
 		HoldAmount:     0.8,
 		EstTotal:       0.4,
 		RateMultiplier: 2.0,
+		Resolution:     "1080p",
 		SubmitTime:     time.Now(),
 		UserID:         userID,
 		ChannelID:      1,
@@ -38,7 +39,7 @@ func TestTaskStoreCRUDAndCAS(t *testing.T) {
 
 	t.Run("GetForUser 命中与归属隔离", func(t *testing.T) {
 		got, err := s.GetForUser(ctx, relaytask.PlatformOpenAIVideo, "video_1", 22)
-		if err != nil || got == nil || got.ID != id || got.HoldAmount != 0.8 {
+		if err != nil || got == nil || got.ID != id || got.HoldAmount != 0.8 || got.Resolution != "1080p" {
 			t.Fatalf("got = %+v, err = %v", got, err)
 		}
 		// 非本人 / 非本平台 → nil

@@ -142,7 +142,7 @@ func startMainServer(cfg *config.Config) {
 	}()
 
 	// 结构迁移：ent 非破坏性建表建列 + 存量库定点修复（见 bootstrap.Migrate）。
-	if err := bootstrap.Migrate(context.Background(), db, drv.DB()); err != nil {
+	if err := bootstrap.Migrate(context.Background(), db, drv.DB(), cfg.APIKeySecret()); err != nil {
 		slog.Error("db_migration_failed", logx.LogFieldError, err)
 		os.Exit(1)
 	}

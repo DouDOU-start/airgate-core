@@ -6,18 +6,19 @@ import "time"
 
 // OAuthClientResp OAuth 客户端响应（管理面）。secret 只出 hint。
 type OAuthClientResp struct {
-	ID           int      `json:"id"`
-	ClientID     string   `json:"client_id"`
-	SecretHint   string   `json:"secret_hint"`
-	Name         string   `json:"name"`
-	Description  string   `json:"description"`
-	RedirectURIs []string `json:"redirect_uris"`
-	FirstParty   bool     `json:"first_party"`
-	Enabled      bool     `json:"enabled"`
-	ShowInNav    bool     `json:"show_in_nav"`
-	LaunchURL    string   `json:"launch_url"`
-	Icon         string   `json:"icon"`
-	SortOrder    int      `json:"sort_order"`
+	ID            int      `json:"id"`
+	ClientID      string   `json:"client_id"`
+	SecretHint    string   `json:"secret_hint"`
+	Name          string   `json:"name"`
+	Description   string   `json:"description"`
+	RedirectURIs  []string `json:"redirect_uris"`
+	AllowedScopes []string `json:"allowed_scopes"`
+	FirstParty    bool     `json:"first_party"`
+	Enabled       bool     `json:"enabled"`
+	ShowInNav     bool     `json:"show_in_nav"`
+	LaunchURL     string   `json:"launch_url"`
+	Icon          string   `json:"icon"`
+	SortOrder     int      `json:"sort_order"`
 
 	TimeMixin
 }
@@ -30,28 +31,30 @@ type OAuthClientSecretResp struct {
 
 // CreateOAuthClientReq 创建 OAuth 客户端请求。
 type CreateOAuthClientReq struct {
-	Name         string   `json:"name" binding:"required"`
-	Description  string   `json:"description"`
-	RedirectURIs []string `json:"redirect_uris" binding:"required,min=1"`
-	FirstParty   bool     `json:"first_party"`
-	Enabled      *bool    `json:"enabled"`
-	ShowInNav    bool     `json:"show_in_nav"`
-	LaunchURL    string   `json:"launch_url"`
-	Icon         string   `json:"icon"`
-	SortOrder    int      `json:"sort_order"`
+	Name          string   `json:"name" binding:"required"`
+	Description   string   `json:"description"`
+	RedirectURIs  []string `json:"redirect_uris" binding:"required,min=1"`
+	AllowedScopes []string `json:"allowed_scopes"`
+	FirstParty    bool     `json:"first_party"`
+	Enabled       *bool    `json:"enabled"`
+	ShowInNav     bool     `json:"show_in_nav"`
+	LaunchURL     string   `json:"launch_url"`
+	Icon          string   `json:"icon"`
+	SortOrder     int      `json:"sort_order"`
 }
 
 // UpdateOAuthClientReq 更新 OAuth 客户端请求（全量替换可写字段）。
 type UpdateOAuthClientReq struct {
-	Name         string   `json:"name" binding:"required"`
-	Description  string   `json:"description"`
-	RedirectURIs []string `json:"redirect_uris" binding:"required,min=1"`
-	FirstParty   bool     `json:"first_party"`
-	Enabled      bool     `json:"enabled"`
-	ShowInNav    bool     `json:"show_in_nav"`
-	LaunchURL    string   `json:"launch_url"`
-	Icon         string   `json:"icon"`
-	SortOrder    int      `json:"sort_order"`
+	Name          string   `json:"name" binding:"required"`
+	Description   string   `json:"description"`
+	RedirectURIs  []string `json:"redirect_uris" binding:"required,min=1"`
+	AllowedScopes []string `json:"allowed_scopes"`
+	FirstParty    bool     `json:"first_party"`
+	Enabled       bool     `json:"enabled"`
+	ShowInNav     bool     `json:"show_in_nav"`
+	LaunchURL     string   `json:"launch_url"`
+	Icon          string   `json:"icon"`
+	SortOrder     int      `json:"sort_order"`
 }
 
 // ==================== 用户端：授权与应用导航 ====================
@@ -60,14 +63,16 @@ type UpdateOAuthClientReq struct {
 type AuthorizeInfoQuery struct {
 	ClientID    string `form:"client_id" binding:"required"`
 	RedirectURI string `form:"redirect_uri" binding:"required"`
+	Scope       string `form:"scope"`
 }
 
 // AuthorizeInfoResp 授权页展示信息。
 type AuthorizeInfoResp struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Icon        string `json:"icon"`
-	FirstParty  bool   `json:"first_party"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Icon        string   `json:"icon"`
+	FirstParty  bool     `json:"first_party"`
+	Scopes      []string `json:"scopes"`
 }
 
 // AuthorizeReq 签发授权码请求（SPA 授权页转发，PKCE S256 强制）。

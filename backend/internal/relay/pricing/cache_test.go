@@ -264,6 +264,39 @@ func TestImagePriceFor(t *testing.T) {
 	}
 }
 
+func TestVideoPriceFor(t *testing.T) {
+	price := Price{
+		VideoPerSecond: 0.07,
+		VideoResolutionPrices: map[string]float64{
+			"480p":  0.05,
+			"720p":  0.07,
+			"1080p": 0.25,
+		},
+	}
+	cases := []struct {
+		name       string
+		resolution string
+		want       float64
+		wantOK     bool
+	}{
+		{name: "精确命中", resolution: "480p", want: 0.05, wantOK: true},
+		{name: "大小写和空白不敏感", resolution: " 1080P ", want: 0.25, wantOK: true},
+		{name: "未知分辨率回退基础秒价", resolution: "4k", want: 0.07, wantOK: true},
+		{name: "空分辨率回退基础秒价", resolution: "", want: 0.07, wantOK: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := VideoPriceFor(price, tc.resolution)
+			if got != tc.want || ok != tc.wantOK {
+				t.Errorf("VideoPriceFor() = (%v,%v), want (%v,%v)", got, ok, tc.want, tc.wantOK)
+			}
+		})
+	}
+	if got, ok := VideoPriceFor(Price{}, "720p"); got != 0 || ok {
+		t.Errorf("空价格 = (%v,%v), want (0,false)", got, ok)
+	}
+}
+
 func TestCacheGetAndInvalidate(t *testing.T) {
 	loader := &fakePriceLoader{prices: map[string]Price{
 		"gpt-4o": {Input: 2.5, Output: 10},

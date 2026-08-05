@@ -258,7 +258,10 @@ func newTestPoller(t *testing.T, snaps ...registry.ChannelKeySnapshot) (*Poller,
 		t.Fatalf("注册表加载失败: %v", err)
 	}
 	cache := pricing.NewCache(&pollPriceLoader{prices: map[string]pricing.Price{
-		"pv-model":   {VideoPerSecond: 0.1},
+		"pv-model": {
+			VideoPerSecond:        0.1,
+			VideoResolutionPrices: map[string]float64{"1080p": 0.25},
+		},
 		"flat-model": {PerRequest: 0.5},
 	}})
 	if err := cache.Reload(context.Background()); err != nil {
@@ -329,6 +332,33 @@ func TestPollerSettlePerSecond(t *testing.T) {
 		rec.Calls != 8 || rec.InputPrice != 0.1 ||
 		rec.ActualCost != 1.6 || rec.TotalCost != 0.8 {
 		t.Errorf("rec = %+v", rec)
+	}
+}
+
+func TestPollerSettleResolutionPrice(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"Status":"success","Progress":100,"Seconds":8}`))
+	}))
+	defer upstream.Close()
+
+	p, st, bal, sink, _ := newTestPoller(t, pollSnap(1, "pollplat", upstream.URL))
+	seedTask(st, 1, func(t *Task) {
+		t.Resolution = "1080p"
+		t.EstTotal = 1.0
+		t.HoldAmount = 2.0
+	})
+	p.tick(context.Background())
+
+	// 1080p：0.25 × 8 秒 = 2.0；倍率 2× 后 actual=4.0，原预扣 2.0，补扣 2.0。
+	if len(bal.ops) != 1 || bal.ops[0].amount != -2.0 {
+		t.Fatalf("动账 = %+v", bal.ops)
+	}
+	if len(sink.records) != 1 {
+		t.Fatalf("usage records = %d", len(sink.records))
+	}
+	rec := sink.records[0]
+	if rec.InputPrice != 0.25 || rec.TotalCost != 2.0 || rec.ActualCost != 4.0 || rec.VideoResolution != "1080p" {
+		t.Errorf("usage record = %+v", rec)
 	}
 }
 

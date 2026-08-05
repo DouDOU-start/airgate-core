@@ -15,6 +15,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/announcement"
 	"github.com/DouDOU-start/airgate-core/ent/announcementread"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
@@ -31,6 +32,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/oauthclient"
 	"github.com/DouDOU-start/airgate-core/ent/paymentorder"
 	"github.com/DouDOU-start/airgate-core/ent/paymentproviderconfig"
+	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/ent/task"
@@ -47,6 +49,8 @@ type Client struct {
 	Schema *migrate.Schema
 	// APIKey is the client for interacting with the APIKey builders.
 	APIKey *APIKeyClient
+	// Account is the client for interacting with the Account builders.
+	Account *AccountClient
 	// Announcement is the client for interacting with the Announcement builders.
 	Announcement *AnnouncementClient
 	// AnnouncementRead is the client for interacting with the AnnouncementRead builders.
@@ -77,6 +81,8 @@ type Client struct {
 	PaymentOrder *PaymentOrderClient
 	// PaymentProviderConfig is the client for interacting with the PaymentProviderConfig builders.
 	PaymentProviderConfig *PaymentProviderConfigClient
+	// Proxy is the client for interacting with the Proxy builders.
+	Proxy *ProxyClient
 	// RedemptionCode is the client for interacting with the RedemptionCode builders.
 	RedemptionCode *RedemptionCodeClient
 	// Setting is the client for interacting with the Setting builders.
@@ -103,6 +109,7 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.APIKey = NewAPIKeyClient(c.config)
+	c.Account = NewAccountClient(c.config)
 	c.Announcement = NewAnnouncementClient(c.config)
 	c.AnnouncementRead = NewAnnouncementReadClient(c.config)
 	c.BalanceLog = NewBalanceLogClient(c.config)
@@ -118,6 +125,7 @@ func (c *Client) init() {
 	c.OAuthClient = NewOAuthClientClient(c.config)
 	c.PaymentOrder = NewPaymentOrderClient(c.config)
 	c.PaymentProviderConfig = NewPaymentProviderConfigClient(c.config)
+	c.Proxy = NewProxyClient(c.config)
 	c.RedemptionCode = NewRedemptionCodeClient(c.config)
 	c.Setting = NewSettingClient(c.config)
 	c.Task = NewTaskClient(c.config)
@@ -218,6 +226,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ctx:                   ctx,
 		config:                cfg,
 		APIKey:                NewAPIKeyClient(cfg),
+		Account:               NewAccountClient(cfg),
 		Announcement:          NewAnnouncementClient(cfg),
 		AnnouncementRead:      NewAnnouncementReadClient(cfg),
 		BalanceLog:            NewBalanceLogClient(cfg),
@@ -233,6 +242,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		OAuthClient:           NewOAuthClientClient(cfg),
 		PaymentOrder:          NewPaymentOrderClient(cfg),
 		PaymentProviderConfig: NewPaymentProviderConfigClient(cfg),
+		Proxy:                 NewProxyClient(cfg),
 		RedemptionCode:        NewRedemptionCodeClient(cfg),
 		Setting:               NewSettingClient(cfg),
 		Task:                  NewTaskClient(cfg),
@@ -260,6 +270,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ctx:                   ctx,
 		config:                cfg,
 		APIKey:                NewAPIKeyClient(cfg),
+		Account:               NewAccountClient(cfg),
 		Announcement:          NewAnnouncementClient(cfg),
 		AnnouncementRead:      NewAnnouncementReadClient(cfg),
 		BalanceLog:            NewBalanceLogClient(cfg),
@@ -275,6 +286,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		OAuthClient:           NewOAuthClientClient(cfg),
 		PaymentOrder:          NewPaymentOrderClient(cfg),
 		PaymentProviderConfig: NewPaymentProviderConfigClient(cfg),
+		Proxy:                 NewProxyClient(cfg),
 		RedemptionCode:        NewRedemptionCodeClient(cfg),
 		Setting:               NewSettingClient(cfg),
 		Task:                  NewTaskClient(cfg),
@@ -311,11 +323,11 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Bookmark,
-		c.Channel, c.ChannelKey, c.Group, c.InviteProfile, c.InviteRebateLog,
-		c.ModelPrice, c.ModelTag, c.ModerationLog, c.OAuthClient, c.PaymentOrder,
-		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task, c.Tier,
-		c.UpstreamRequestLog, c.UsageLog, c.User,
+		c.APIKey, c.Account, c.Announcement, c.AnnouncementRead, c.BalanceLog,
+		c.Bookmark, c.Channel, c.ChannelKey, c.Group, c.InviteProfile,
+		c.InviteRebateLog, c.ModelPrice, c.ModelTag, c.ModerationLog, c.OAuthClient,
+		c.PaymentOrder, c.PaymentProviderConfig, c.Proxy, c.RedemptionCode, c.Setting,
+		c.Task, c.Tier, c.UpstreamRequestLog, c.UsageLog, c.User,
 	} {
 		n.Use(hooks...)
 	}
@@ -325,11 +337,11 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.APIKey, c.Announcement, c.AnnouncementRead, c.BalanceLog, c.Bookmark,
-		c.Channel, c.ChannelKey, c.Group, c.InviteProfile, c.InviteRebateLog,
-		c.ModelPrice, c.ModelTag, c.ModerationLog, c.OAuthClient, c.PaymentOrder,
-		c.PaymentProviderConfig, c.RedemptionCode, c.Setting, c.Task, c.Tier,
-		c.UpstreamRequestLog, c.UsageLog, c.User,
+		c.APIKey, c.Account, c.Announcement, c.AnnouncementRead, c.BalanceLog,
+		c.Bookmark, c.Channel, c.ChannelKey, c.Group, c.InviteProfile,
+		c.InviteRebateLog, c.ModelPrice, c.ModelTag, c.ModerationLog, c.OAuthClient,
+		c.PaymentOrder, c.PaymentProviderConfig, c.Proxy, c.RedemptionCode, c.Setting,
+		c.Task, c.Tier, c.UpstreamRequestLog, c.UsageLog, c.User,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -340,6 +352,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *APIKeyMutation:
 		return c.APIKey.mutate(ctx, m)
+	case *AccountMutation:
+		return c.Account.mutate(ctx, m)
 	case *AnnouncementMutation:
 		return c.Announcement.mutate(ctx, m)
 	case *AnnouncementReadMutation:
@@ -370,6 +384,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PaymentOrder.mutate(ctx, m)
 	case *PaymentProviderConfigMutation:
 		return c.PaymentProviderConfig.mutate(ctx, m)
+	case *ProxyMutation:
+		return c.Proxy.mutate(ctx, m)
 	case *RedemptionCodeMutation:
 		return c.RedemptionCode.mutate(ctx, m)
 	case *SettingMutation:
@@ -567,6 +583,187 @@ func (c *APIKeyClient) mutate(ctx context.Context, m *APIKeyMutation) (Value, er
 		return (&APIKeyDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown APIKey mutation op: %q", m.Op())
+	}
+}
+
+// AccountClient is a client for the Account schema.
+type AccountClient struct {
+	config
+}
+
+// NewAccountClient returns a client for the Account from the given config.
+func NewAccountClient(c config) *AccountClient {
+	return &AccountClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `account.Hooks(f(g(h())))`.
+func (c *AccountClient) Use(hooks ...Hook) {
+	c.hooks.Account = append(c.hooks.Account, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `account.Intercept(f(g(h())))`.
+func (c *AccountClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Account = append(c.inters.Account, interceptors...)
+}
+
+// Create returns a builder for creating a Account entity.
+func (c *AccountClient) Create() *AccountCreate {
+	mutation := newAccountMutation(c.config, OpCreate)
+	return &AccountCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Account entities.
+func (c *AccountClient) CreateBulk(builders ...*AccountCreate) *AccountCreateBulk {
+	return &AccountCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AccountClient) MapCreateBulk(slice any, setFunc func(*AccountCreate, int)) *AccountCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AccountCreateBulk{err: fmt.Errorf("calling to AccountClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AccountCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AccountCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Account.
+func (c *AccountClient) Update() *AccountUpdate {
+	mutation := newAccountMutation(c.config, OpUpdate)
+	return &AccountUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AccountClient) UpdateOne(a *Account) *AccountUpdateOne {
+	mutation := newAccountMutation(c.config, OpUpdateOne, withAccount(a))
+	return &AccountUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AccountClient) UpdateOneID(id int) *AccountUpdateOne {
+	mutation := newAccountMutation(c.config, OpUpdateOne, withAccountID(id))
+	return &AccountUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Account.
+func (c *AccountClient) Delete() *AccountDelete {
+	mutation := newAccountMutation(c.config, OpDelete)
+	return &AccountDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AccountClient) DeleteOne(a *Account) *AccountDeleteOne {
+	return c.DeleteOneID(a.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AccountClient) DeleteOneID(id int) *AccountDeleteOne {
+	builder := c.Delete().Where(account.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AccountDeleteOne{builder}
+}
+
+// Query returns a query builder for Account.
+func (c *AccountClient) Query() *AccountQuery {
+	return &AccountQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAccount},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Account entity by its id.
+func (c *AccountClient) Get(ctx context.Context, id int) (*Account, error) {
+	return c.Query().Where(account.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AccountClient) GetX(ctx context.Context, id int) *Account {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryGroups queries the groups edge of a Account.
+func (c *AccountClient) QueryGroups(a *Account) *GroupQuery {
+	query := (&GroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := a.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, id),
+			sqlgraph.To(group.Table, group.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, account.GroupsTable, account.GroupsPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(a.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProxy queries the proxy edge of a Account.
+func (c *AccountClient) QueryProxy(a *Account) *ProxyQuery {
+	query := (&ProxyClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := a.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, id),
+			sqlgraph.To(proxy.Table, proxy.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, account.ProxyTable, account.ProxyColumn),
+		)
+		fromV = sqlgraph.Neighbors(a.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUsageLogs queries the usage_logs edge of a Account.
+func (c *AccountClient) QueryUsageLogs(a *Account) *UsageLogQuery {
+	query := (&UsageLogClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := a.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, id),
+			sqlgraph.To(usagelog.Table, usagelog.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, account.UsageLogsTable, account.UsageLogsColumn),
+		)
+		fromV = sqlgraph.Neighbors(a.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *AccountClient) Hooks() []Hook {
+	return c.hooks.Account
+}
+
+// Interceptors returns the client interceptors.
+func (c *AccountClient) Interceptors() []Interceptor {
+	return c.inters.Account
+}
+
+func (c *AccountClient) mutate(ctx context.Context, m *AccountMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AccountCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AccountUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AccountUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AccountDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Account mutation op: %q", m.Op())
 	}
 }
 
@@ -1581,6 +1778,22 @@ func (c *GroupClient) QueryChannelKeys(gr *Group) *ChannelKeyQuery {
 			sqlgraph.From(group.Table, group.FieldID, id),
 			sqlgraph.To(channelkey.Table, channelkey.FieldID),
 			sqlgraph.Edge(sqlgraph.M2M, true, group.ChannelKeysTable, group.ChannelKeysPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(gr.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryAccounts queries the accounts edge of a Group.
+func (c *GroupClient) QueryAccounts(gr *Group) *AccountQuery {
+	query := (&AccountClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := gr.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, id),
+			sqlgraph.To(account.Table, account.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, group.AccountsTable, group.AccountsPrimaryKey...),
 		)
 		fromV = sqlgraph.Neighbors(gr.driver.Dialect(), step)
 		return fromV, nil
@@ -2757,6 +2970,155 @@ func (c *PaymentProviderConfigClient) mutate(ctx context.Context, m *PaymentProv
 	}
 }
 
+// ProxyClient is a client for the Proxy schema.
+type ProxyClient struct {
+	config
+}
+
+// NewProxyClient returns a client for the Proxy from the given config.
+func NewProxyClient(c config) *ProxyClient {
+	return &ProxyClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `proxy.Hooks(f(g(h())))`.
+func (c *ProxyClient) Use(hooks ...Hook) {
+	c.hooks.Proxy = append(c.hooks.Proxy, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `proxy.Intercept(f(g(h())))`.
+func (c *ProxyClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Proxy = append(c.inters.Proxy, interceptors...)
+}
+
+// Create returns a builder for creating a Proxy entity.
+func (c *ProxyClient) Create() *ProxyCreate {
+	mutation := newProxyMutation(c.config, OpCreate)
+	return &ProxyCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Proxy entities.
+func (c *ProxyClient) CreateBulk(builders ...*ProxyCreate) *ProxyCreateBulk {
+	return &ProxyCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProxyClient) MapCreateBulk(slice any, setFunc func(*ProxyCreate, int)) *ProxyCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProxyCreateBulk{err: fmt.Errorf("calling to ProxyClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProxyCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProxyCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Proxy.
+func (c *ProxyClient) Update() *ProxyUpdate {
+	mutation := newProxyMutation(c.config, OpUpdate)
+	return &ProxyUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProxyClient) UpdateOne(pr *Proxy) *ProxyUpdateOne {
+	mutation := newProxyMutation(c.config, OpUpdateOne, withProxy(pr))
+	return &ProxyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProxyClient) UpdateOneID(id int) *ProxyUpdateOne {
+	mutation := newProxyMutation(c.config, OpUpdateOne, withProxyID(id))
+	return &ProxyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Proxy.
+func (c *ProxyClient) Delete() *ProxyDelete {
+	mutation := newProxyMutation(c.config, OpDelete)
+	return &ProxyDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProxyClient) DeleteOne(pr *Proxy) *ProxyDeleteOne {
+	return c.DeleteOneID(pr.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProxyClient) DeleteOneID(id int) *ProxyDeleteOne {
+	builder := c.Delete().Where(proxy.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProxyDeleteOne{builder}
+}
+
+// Query returns a query builder for Proxy.
+func (c *ProxyClient) Query() *ProxyQuery {
+	return &ProxyQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProxy},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Proxy entity by its id.
+func (c *ProxyClient) Get(ctx context.Context, id int) (*Proxy, error) {
+	return c.Query().Where(proxy.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProxyClient) GetX(ctx context.Context, id int) *Proxy {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryAccounts queries the accounts edge of a Proxy.
+func (c *ProxyClient) QueryAccounts(pr *Proxy) *AccountQuery {
+	query := (&AccountClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := pr.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(proxy.Table, proxy.FieldID, id),
+			sqlgraph.To(account.Table, account.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, proxy.AccountsTable, proxy.AccountsColumn),
+		)
+		fromV = sqlgraph.Neighbors(pr.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProxyClient) Hooks() []Hook {
+	return c.hooks.Proxy
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProxyClient) Interceptors() []Interceptor {
+	return c.inters.Proxy
+}
+
+func (c *ProxyClient) mutate(ctx context.Context, m *ProxyMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProxyCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProxyUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProxyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProxyDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Proxy mutation op: %q", m.Op())
+	}
+}
+
 // RedemptionCodeClient is a client for the RedemptionCode schema.
 type RedemptionCodeClient struct {
 	config
@@ -3610,6 +3972,22 @@ func (c *UsageLogClient) QueryChannelKey(ul *UsageLog) *ChannelKeyQuery {
 	return query
 }
 
+// QueryAccount queries the account edge of a UsageLog.
+func (c *UsageLogClient) QueryAccount(ul *UsageLog) *AccountQuery {
+	query := (&AccountClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ul.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(usagelog.Table, usagelog.FieldID, id),
+			sqlgraph.To(account.Table, account.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, usagelog.AccountTable, usagelog.AccountColumn),
+		)
+		fromV = sqlgraph.Neighbors(ul.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryGroup queries the group edge of a UsageLog.
 func (c *UsageLogClient) QueryGroup(ul *UsageLog) *GroupQuery {
 	query := (&GroupClient{config: c.config}).Query()
@@ -3867,16 +4245,16 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, Announcement, AnnouncementRead, BalanceLog, Bookmark, Channel,
+		APIKey, Account, Announcement, AnnouncementRead, BalanceLog, Bookmark, Channel,
 		ChannelKey, Group, InviteProfile, InviteRebateLog, ModelPrice, ModelTag,
-		ModerationLog, OAuthClient, PaymentOrder, PaymentProviderConfig,
+		ModerationLog, OAuthClient, PaymentOrder, PaymentProviderConfig, Proxy,
 		RedemptionCode, Setting, Task, Tier, UpstreamRequestLog, UsageLog,
 		User []ent.Hook
 	}
 	inters struct {
-		APIKey, Announcement, AnnouncementRead, BalanceLog, Bookmark, Channel,
+		APIKey, Account, Announcement, AnnouncementRead, BalanceLog, Bookmark, Channel,
 		ChannelKey, Group, InviteProfile, InviteRebateLog, ModelPrice, ModelTag,
-		ModerationLog, OAuthClient, PaymentOrder, PaymentProviderConfig,
+		ModerationLog, OAuthClient, PaymentOrder, PaymentProviderConfig, Proxy,
 		RedemptionCode, Setting, Task, Tier, UpstreamRequestLog, UsageLog,
 		User []ent.Interceptor
 	}

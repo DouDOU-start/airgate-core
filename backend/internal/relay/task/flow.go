@@ -224,18 +224,18 @@ func readSubmitBody(c *gin.Context) ([]byte, bool) {
 	return body, true
 }
 
-// estimate 提交前估价：按次价（per_request_price）优先，其次视频按秒价。
+// estimate 提交前估价：按次价（per_request_price）优先，其次视频按分辨率秒价。
 // 返回 (估价 total, 估价用时长秒数)；两者皆未配置返回 (0, 0)。
 func estimate(price pricing.Price, sub *SubmitRequest) (float64, int) {
 	if price.PerRequest > 0 {
 		return price.PerRequest, sub.Seconds
 	}
-	if price.VideoPerSecond > 0 {
+	if perSecond, ok := pricing.VideoPriceFor(price, sub.Resolution); ok {
 		seconds := sub.Seconds
 		if seconds <= 0 {
 			seconds = defaultVideoSeconds
 		}
-		return price.VideoPerSecond * float64(seconds), seconds
+		return perSecond * float64(seconds), seconds
 	}
 	return 0, 0
 }
@@ -287,7 +287,7 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 		estTotal, estSeconds = estimate(price, sub)
 	}
 	if !priced || estTotal <= 0 {
-		msg := "模型 " + sub.Model + " 未配置任务计价（per_request_price 或 pricing_extra.video.per_second）"
+		msg := "模型 " + sub.Model + " 未配置任务计价（per_request_price 或 pricing_extra.video 秒价）"
 		writeError(c, http.StatusBadRequest, "invalid_request_error", "model_price_not_configured", msg)
 		f.recordFailure(c, keyInfo, sub.Model, start, errlog.Entry{
 			Phase: errlog.PhasePrecheckPrice, StatusCode: http.StatusBadRequest,
@@ -527,6 +527,7 @@ func (f *Flow) newTask(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string
 		SellRate:              keyInfo.SellRate,
 		AccountRateMultiplier: ch.EffectiveCostRatio(),
 		Seconds:               sub.Seconds,
+		Resolution:            sub.Resolution,
 		SubmitTime:            now,
 		RequestID:             requestIDOf(c),
 		UserID:                keyInfo.UserID,

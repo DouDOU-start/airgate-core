@@ -22,20 +22,26 @@ description: airgate-core（standalone-gateway 分支）开发指南：架构、
 
 ## 架构
 
-管理员配置**渠道**（channel = 协议类型 + base_url + api_keys + 模型列表），用户拿 sk- key 按协议调对应端点，core 内置 adaptor **纯透传直发**上游（零翻译）、按**模型价目表**计费。入站端点按协议分树，只路由到同协议渠道：
+**双路径转发**（渠道 + 订阅账号池统一调度）：
+
+| 路径 | 单元 | 协议 | 说明 |
+|---|---|---|---|
+| A 渠道 | ChannelKey | 零翻译透传 | API Key 上游；adaptor 只做 URL/认证/model 重写 |
+| B 账号 | Account | **允许翻译** | OAuth/订阅账号（Codex/Claude/Antigravity/Kimi/xAI/Gemini…）；经 CLIProxyAPI 公开 SDK executor + translator |
+
+管理员配置**渠道**和/或**账号**（均有 priority+weight，绑分组后混合选路）。用户 sk- key 按协议调对应端点，按**模型价目表**计费。
 
 ```
 请求（middleware.APIKeyAuth 鉴权，入站按协议分树：
-      openai    → POST /v1/chat/completions、/v1/responses、/v1/alpha/search※、/v1/images/{generations|edits}（openai_compatible/custom 渠道）
-      anthropic → POST /v1/messages、/v1/messages/count_tokens※（anthropic 渠道）
-      gemini    → POST /v1beta/models/{model}:generateContent|:streamGenerateContent|:predict|:countTokens※（gemini 渠道）
-      ※ countTokens 两端点零计费；images/predict 在 per_request_price>0 时按次×产出张数计费；
-        alpha/search（codex 内置联网搜索）按次计价，单价取「分组覆盖价 Group.alpha_search_price ?? 全局设置 gateway.alpha_search_price（默认 0.01）」，
-        与模型价目表解耦、实际扣费叠加分组倍率、仅 2xx 成功计费）
-  → internal/relay/pipeline：余额预检 → 内容审核预检（moderation，可选拦截）→ user/key 并发闸门 → failover≤3
-      { registry.Pick(分组,模型,协议)（协议过滤 + priority 分档 + weight+10 加权随机 + 多 key 轮询）
-        → adaptor 透传直发 HTTP → outcome 判定（429 换渠道 / 401·403 自动禁用 / 5xx 换渠道）}
-  → relay/pricing（token×价目表）→ billing.Calculate 三管道 → recorder → usage_log
+      openai    → POST /v1/chat/completions、/v1/responses、/v1/alpha/search※、/v1/images/{generations|edits}
+      anthropic → POST /v1/messages、/v1/messages/count_tokens※
+      gemini    → POST /v1beta/models/{model}:generateContent|...
+  → pipeline：余额预检 → moderation → 并发闸门 → failover≤3
+      { 统一选路：ChannelKey 候选 ∪ Account 候选
+        → priority 分档 + weight 加权随机
+        → 渠道：adaptor 透传 | 账号：cpa.Forward（CPA 翻译+executor）
+        → outcome 判定 }
+  → pricing → billing → usage_log（channel_key_id 或 account_id）
 
 异步任务分树（internal/relay/task，与 pipeline 并列的独立子系统）：
       openai_video → POST /v1/videos、GET /v1/videos/{id}、GET /v1/videos/{id}/content（openai_video 渠道）
@@ -49,9 +55,12 @@ description: airgate-core（standalone-gateway 分支）开发指南：架构、
 
 ## 子系统边界
 
-- `internal/relay/registry` — 渠道内存快照与调度（Pick/NextKey/Mark*，Pick 按入口协议过滤渠道 Type）；禁止 import ent 与 app 包，经 Loader/Persister 接口（由 channel service 实现）取数落库。
-- `internal/relay/adaptor` — 协议适配（openai_compatible/anthropic/gemini/custom），**零翻译纯透传**：只做上游 URL 拼接、认证头、渠道模型名重写、param_override、各协议响应的 usage 提取归一化（计量不是翻译，须精确保留）；请求/响应体原样透传，不做任何跨协议翻译；调度/重试/禁用/计费一律在 pipeline。
-- `internal/relay/pipeline` — 转发主循环、outcome 判定、SSE 透传（原生协议流经透传型 usage 观察器旁路计量）、错误体（按入口协议原生形态，errfmt 分发）、gateway settings 读取。
+- `internal/relay/registry` — 渠道密钥端点内存快照与调度；禁止 import ent 与 app 包。
+- `internal/relay/accountreg` — 订阅账号内存快照、状态机、与渠道混合候选；禁止 import ent。
+- `internal/relay/cpa` — CLIProxyAPI 桥接（固定模块 `github.com/router-for-me/CLIProxyAPI/v7`，**禁止 go.mod replace 本地路径**）；仅用公开 SDK 做转发；账号 OAuth 登录在 `app/account` 交互式实现（不走 `sdk/auth` 阻塞 Login）。
+- `internal/relay/adaptor` — 渠道路径协议适配，**零翻译纯透传**。
+- `internal/relay/pipeline` — 转发主循环、双路径选路、outcome、SSE、errfmt。
+- `app/account` / `app/proxy` — 账号/代理管理面；凭证 AES-GCM；导出明文；账号类型仅 **oauth / api_key**；用量窗口（Codex `/wham/usage`、Claude `/api/oauth/usage`，快照存 `extra.usage`，`POST /accounts/:id/usage/refresh`）；OAuth 交互式授权 + Codex 三路导入（浏览器授权 / RT / Session，**无设备码**）；**重新授权**（`account_id` 写入已有账号凭证，保留 ID/分组/调度）；**可服务模型白名单**（`extra.models` / `models` 字段，空=平台默认；支持单账号与 bulk 覆盖）。
 - `internal/relay/task` — 异步任务子系统（视频/音乐「提交-轮询」型转发）：flow 提交主循环、poller 后台轮询与结算、平台 adaptor（openaivideo/suno）。**与零翻译红线的边界**：提交体仍透传（入口协议=渠道协议，adaptor 只做 URL/认证/模型重写）；查询响应不透传——读本地 task 表快照、adaptor 做状态归一化后按入口协议重建（计量与状态提取，口径同 errfmt 的「语义保留、载体重建」）。禁止 import ent 与 app 包：落库经 Store、余额动账经 BalanceOps 窄接口注入（server 层适配 app/user）。
 - `internal/relay/outcome` — 上游 attempt 判定表与出口脱敏（429/401·403/5xx → 换渠道/禁用），pipeline 与 task 共用的唯一事实源。
 - `internal/relay/errfmt` — 错误体的协议形态渲染（openai/anthropic/gemini/suno），pipeline、task 与鉴权中间件共用。网关自产错误与**上游错误**都经此包渲染：上游错误解析出语义（message/type/code）后按入口协议重建（语义保留、载体重建，非字节透传），HTTP 状态码保留上游原值。

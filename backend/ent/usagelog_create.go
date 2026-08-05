@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/DouDOU-start/airgate-core/ent/account"
 	"github.com/DouDOU-start/airgate-core/ent/apikey"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
@@ -397,6 +398,20 @@ func (ulc *UsageLogCreate) SetNillableImageQuality(s *string) *UsageLogCreate {
 	return ulc
 }
 
+// SetVideoResolution sets the "video_resolution" field.
+func (ulc *UsageLogCreate) SetVideoResolution(s string) *UsageLogCreate {
+	ulc.mutation.SetVideoResolution(s)
+	return ulc
+}
+
+// SetNillableVideoResolution sets the "video_resolution" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableVideoResolution(s *string) *UsageLogCreate {
+	if s != nil {
+		ulc.SetVideoResolution(*s)
+	}
+	return ulc
+}
+
 // SetStream sets the "stream" field.
 func (ulc *UsageLogCreate) SetStream(b bool) *UsageLogCreate {
 	ulc.mutation.SetStream(b)
@@ -607,6 +622,20 @@ func (ulc *UsageLogCreate) SetNillableChannelKeyID(i *int) *UsageLogCreate {
 	return ulc
 }
 
+// SetAccountID sets the "account_id" field.
+func (ulc *UsageLogCreate) SetAccountID(i int) *UsageLogCreate {
+	ulc.mutation.SetAccountID(i)
+	return ulc
+}
+
+// SetNillableAccountID sets the "account_id" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableAccountID(i *int) *UsageLogCreate {
+	if i != nil {
+		ulc.SetAccountID(*i)
+	}
+	return ulc
+}
+
 // SetGroupID sets the "group_id" field.
 func (ulc *UsageLogCreate) SetGroupID(i int) *UsageLogCreate {
 	ulc.mutation.SetGroupID(i)
@@ -639,6 +668,11 @@ func (ulc *UsageLogCreate) SetChannel(c *Channel) *UsageLogCreate {
 // SetChannelKey sets the "channel_key" edge to the ChannelKey entity.
 func (ulc *UsageLogCreate) SetChannelKey(c *ChannelKey) *UsageLogCreate {
 	return ulc.SetChannelKeyID(c.ID)
+}
+
+// SetAccount sets the "account" edge to the Account entity.
+func (ulc *UsageLogCreate) SetAccount(a *Account) *UsageLogCreate {
+	return ulc.SetAccountID(a.ID)
 }
 
 // SetGroup sets the "group" edge to the Group entity.
@@ -785,6 +819,10 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultImageQuality
 		ulc.mutation.SetImageQuality(v)
 	}
+	if _, ok := ulc.mutation.VideoResolution(); !ok {
+		v := usagelog.DefaultVideoResolution
+		ulc.mutation.SetVideoResolution(v)
+	}
 	if _, ok := ulc.mutation.Stream(); !ok {
 		v := usagelog.DefaultStream
 		ulc.mutation.SetStream(v)
@@ -918,6 +956,9 @@ func (ulc *UsageLogCreate) check() error {
 	}
 	if _, ok := ulc.mutation.ImageQuality(); !ok {
 		return &ValidationError{Name: "image_quality", err: errors.New(`ent: missing required field "UsageLog.image_quality"`)}
+	}
+	if _, ok := ulc.mutation.VideoResolution(); !ok {
+		return &ValidationError{Name: "video_resolution", err: errors.New(`ent: missing required field "UsageLog.video_resolution"`)}
 	}
 	if _, ok := ulc.mutation.Stream(); !ok {
 		return &ValidationError{Name: "stream", err: errors.New(`ent: missing required field "UsageLog.stream"`)}
@@ -1087,6 +1128,10 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_spec.SetField(usagelog.FieldImageQuality, field.TypeString, value)
 		_node.ImageQuality = value
 	}
+	if value, ok := ulc.mutation.VideoResolution(); ok {
+		_spec.SetField(usagelog.FieldVideoResolution, field.TypeString, value)
+		_node.VideoResolution = value
+	}
 	if value, ok := ulc.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
 		_node.Stream = value
@@ -1197,6 +1242,23 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.ChannelKeyID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := ulc.mutation.AccountIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.AccountTable,
+			Columns: []string{usagelog.AccountColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.AccountID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := ulc.mutation.GroupIDs(); len(nodes) > 0 {
@@ -1724,6 +1786,18 @@ func (u *UsageLogUpsert) UpdateImageQuality() *UsageLogUpsert {
 	return u
 }
 
+// SetVideoResolution sets the "video_resolution" field.
+func (u *UsageLogUpsert) SetVideoResolution(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldVideoResolution, v)
+	return u
+}
+
+// UpdateVideoResolution sets the "video_resolution" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateVideoResolution() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldVideoResolution)
+	return u
+}
+
 // SetStream sets the "stream" field.
 func (u *UsageLogUpsert) SetStream(v bool) *UsageLogUpsert {
 	u.Set(usagelog.FieldStream, v)
@@ -1931,6 +2005,24 @@ func (u *UsageLogUpsert) UpdateChannelKeyID() *UsageLogUpsert {
 // ClearChannelKeyID clears the value of the "channel_key_id" field.
 func (u *UsageLogUpsert) ClearChannelKeyID() *UsageLogUpsert {
 	u.SetNull(usagelog.FieldChannelKeyID)
+	return u
+}
+
+// SetAccountID sets the "account_id" field.
+func (u *UsageLogUpsert) SetAccountID(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldAccountID, v)
+	return u
+}
+
+// UpdateAccountID sets the "account_id" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateAccountID() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldAccountID)
+	return u
+}
+
+// ClearAccountID clears the value of the "account_id" field.
+func (u *UsageLogUpsert) ClearAccountID() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldAccountID)
 	return u
 }
 
@@ -2529,6 +2621,20 @@ func (u *UsageLogUpsertOne) UpdateImageQuality() *UsageLogUpsertOne {
 	})
 }
 
+// SetVideoResolution sets the "video_resolution" field.
+func (u *UsageLogUpsertOne) SetVideoResolution(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetVideoResolution(v)
+	})
+}
+
+// UpdateVideoResolution sets the "video_resolution" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateVideoResolution() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateVideoResolution()
+	})
+}
+
 // SetStream sets the "stream" field.
 func (u *UsageLogUpsertOne) SetStream(v bool) *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
@@ -2771,6 +2877,27 @@ func (u *UsageLogUpsertOne) UpdateChannelKeyID() *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) ClearChannelKeyID() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.ClearChannelKeyID()
+	})
+}
+
+// SetAccountID sets the "account_id" field.
+func (u *UsageLogUpsertOne) SetAccountID(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetAccountID(v)
+	})
+}
+
+// UpdateAccountID sets the "account_id" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateAccountID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateAccountID()
+	})
+}
+
+// ClearAccountID clears the value of the "account_id" field.
+func (u *UsageLogUpsertOne) ClearAccountID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearAccountID()
 	})
 }
 
@@ -3538,6 +3665,20 @@ func (u *UsageLogUpsertBulk) UpdateImageQuality() *UsageLogUpsertBulk {
 	})
 }
 
+// SetVideoResolution sets the "video_resolution" field.
+func (u *UsageLogUpsertBulk) SetVideoResolution(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetVideoResolution(v)
+	})
+}
+
+// UpdateVideoResolution sets the "video_resolution" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateVideoResolution() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateVideoResolution()
+	})
+}
+
 // SetStream sets the "stream" field.
 func (u *UsageLogUpsertBulk) SetStream(v bool) *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
@@ -3780,6 +3921,27 @@ func (u *UsageLogUpsertBulk) UpdateChannelKeyID() *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) ClearChannelKeyID() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.ClearChannelKeyID()
+	})
+}
+
+// SetAccountID sets the "account_id" field.
+func (u *UsageLogUpsertBulk) SetAccountID(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetAccountID(v)
+	})
+}
+
+// UpdateAccountID sets the "account_id" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateAccountID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateAccountID()
+	})
+}
+
+// ClearAccountID clears the value of the "account_id" field.
+func (u *UsageLogUpsertBulk) ClearAccountID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearAccountID()
 	})
 }
 

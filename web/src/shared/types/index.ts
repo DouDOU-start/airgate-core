@@ -397,6 +397,9 @@ export interface UsageLogResp {
   channel_name?: string;
   channel_key_id?: number;
   channel_key_name?: string;
+  /** 账号路径：与 channel_* 互斥 */
+  account_id?: number;
+  account_name?: string;
   group_id: number;
   model: string;
   input_tokens: number;
@@ -435,6 +438,8 @@ export interface UsageLogResp {
   image_size?: string;
   /** 图像端点实际产出质量档（如 high）；非图像端点缺省 */
   image_quality?: string;
+  /** 视频任务计费分辨率档位（如 720p）；非视频任务缺省 */
+  video_resolution?: string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;
@@ -442,8 +447,8 @@ export interface UsageLogResp {
   ip_address?: string;
   /** 请求端点 */
   endpoint?: string;
-  /** 记账来源：relay 用户转发 / channel_test 渠道测试 */
-  source: 'relay' | 'channel_test';
+  /** 记账来源：relay / channel_test / account_test / task */
+  source: 'relay' | 'channel_test' | 'account_test' | 'task' | string;
   /** 请求 ID（X-Request-ID）：与失败请求留痕互查 */
   request_id?: string;
   created_at: string;
@@ -478,6 +483,8 @@ export interface CustomerUsageLogResp {
   image_size?: string;
   /** 图像端点实际产出质量档（如 high）；非图像端点缺省 */
   image_quality?: string;
+  /** 视频任务计费分辨率档位（如 720p）；非视频任务缺省 */
+  video_resolution?: string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;
@@ -878,6 +885,10 @@ export interface ModelMarketItemResp {
   long_context?: ModelMarketLongContext;
   /** 图像分辨率价表（USD/张，键 "quality:size" 或裸 "size"），未配置时省略 */
   image_size_prices?: Record<string, number>;
+  /** 视频未命中分辨率表时的基础秒价（USD/秒） */
+  video_per_second?: number;
+  /** 视频分辨率秒价表（USD/秒，键如 480p/720p/1080p） */
+  video_resolution_prices?: Record<string, number>;
 }
 
 export interface ModelMarketMultiplierRange {
@@ -1224,6 +1235,7 @@ export interface OAuthClientResp {
   name: string;
   description: string;
   redirect_uris: string[];
+  allowed_scopes: string[];
   first_party: boolean;
   enabled: boolean;
   show_in_nav: boolean;
@@ -1243,6 +1255,7 @@ export interface CreateOAuthClientReq {
   name: string;
   description?: string;
   redirect_uris: string[];
+  allowed_scopes?: string[];
   first_party?: boolean;
   enabled?: boolean;
   show_in_nav?: boolean;
@@ -1255,6 +1268,7 @@ export interface UpdateOAuthClientReq {
   name: string;
   description: string;
   redirect_uris: string[];
+  allowed_scopes: string[];
   first_party: boolean;
   enabled: boolean;
   show_in_nav: boolean;
@@ -1269,6 +1283,7 @@ export interface AuthorizeInfoResp {
   description: string;
   icon: string;
   first_party: boolean;
+  scopes: string[];
 }
 
 export interface AuthorizeReq {
@@ -1455,4 +1470,296 @@ export interface UpdateBookmarkReq {
   name?: string;
   base_url?: string;
   remark?: string;
+}
+
+// ======================== 出站代理 ========================
+
+export type ProxyProtocol = 'http' | 'socks5';
+export type ProxyStatus = 'active' | 'disabled';
+
+export interface ProxyResp {
+  id: number;
+  name: string;
+  protocol: ProxyProtocol;
+  address: string;
+  port: number;
+  username?: string;
+  /** 列表/详情通常不回显明文；编辑时留空表示不修改 */
+  password?: string;
+  status: ProxyStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateProxyReq {
+  name: string;
+  protocol: ProxyProtocol;
+  address: string;
+  port: number;
+  username?: string;
+  password?: string;
+}
+
+export interface UpdateProxyReq {
+  name?: string;
+  protocol?: ProxyProtocol;
+  address?: string;
+  port?: number;
+  username?: string;
+  password?: string;
+  status?: ProxyStatus;
+}
+
+export interface ProxyTestResult {
+  success: boolean;
+  latency_ms: number;
+  error_msg?: string;
+  ip_address?: string;
+  country?: string;
+  country_code?: string;
+  city?: string;
+}
+
+export interface ProxyListQuery extends PageReq {
+  keyword?: string;
+  status?: ProxyStatus | string;
+}
+
+// ======================== 上游账号 ========================
+
+export type AccountPlatform =
+  | 'codex'
+  | 'claude'
+  | 'antigravity'
+  | 'kimi'
+  | 'xai'
+  | 'gemini'
+  | 'aistudio'
+  | 'vertex'
+  | string;
+export type AccountState = 'active' | 'rate_limited' | 'degraded' | 'disabled';
+/** 账号类型仅 OAuth / API Key；RT 导入等归入 oauth。 */
+export type AccountType = 'oauth' | 'api_key';
+
+export interface AccountUsageWindow {
+  key: string;
+  label?: string;
+  used_percent: number;
+  window_minutes?: number;
+  resets_at?: string | null;
+  limit_id?: string;
+  limit_name?: string;
+}
+
+export interface AccountUsageCredits {
+  has_credits: boolean;
+  unlimited: boolean;
+  balance?: string;
+}
+
+/** 用量窗口快照（Codex / Claude OAuth 等）。 */
+export interface AccountUsage {
+  captured_at: string;
+  stale: boolean;
+  plan_type?: string;
+  platform?: string;
+  windows: AccountUsageWindow[];
+  credits?: AccountUsageCredits | null;
+  reset_credits_available?: number;
+  error?: string;
+}
+
+export interface AccountResp {
+  id: number;
+  name: string;
+  platform: AccountPlatform;
+  type: AccountType;
+  email: string;
+  state: AccountState;
+  state_until?: string | null;
+  /** 订阅档位：plus / pro / team / free / max … */
+  plan_type?: string;
+  /** 订阅有效期（RFC3339 / ISO）；有则展示 */
+  subscription_active_until?: string;
+  priority: number;
+  weight: number;
+  max_concurrency: number;
+  /** 当前在途并发（运行时） */
+  current_concurrency?: number;
+  /** 当前分钟 RPM（运行时） */
+  current_rpm?: number;
+  /** RPM 上限（extra.max_rpm）；0 表示不限制 */
+  max_rpm?: number;
+  rate_multiplier: number;
+  error_msg?: string;
+  proxy_id?: number | null;
+  proxy_name?: string;
+  group_ids?: number[];
+  group_count?: number;
+  last_used_at?: string | null;
+  extra?: Record<string, unknown>;
+  /** 可服务模型白名单（extra.models）；空=平台默认 */
+  models?: string[];
+  /** 累计成本 / 收益（列表聚合） */
+  total_cost?: number;
+  total_revenue?: number;
+  /** 今日成本 / 收益 */
+  today_cost?: number;
+  today_revenue?: number;
+  usage?: AccountUsage | null;
+  /** 列表/详情通常不回显完整凭证 */
+  credentials?: Record<string, string>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateAccountReq {
+  name: string;
+  platform: AccountPlatform;
+  type: AccountType;
+  credentials: Record<string, string>;
+  priority?: number;
+  weight?: number;
+  max_concurrency?: number;
+  proxy_id?: number | null;
+  rate_multiplier?: number;
+  group_ids?: number[];
+  extra?: Record<string, unknown>;
+}
+
+export interface UpdateAccountReq {
+  name?: string;
+  platform?: AccountPlatform;
+  type?: AccountType;
+  credentials?: Record<string, string>;
+  priority?: number;
+  weight?: number;
+  max_concurrency?: number;
+  proxy_id?: number | null;
+  rate_multiplier?: number;
+  group_ids?: number[];
+  extra?: Record<string, unknown>;
+  state?: AccountState;
+  /** 可服务模型白名单；传空数组清除（回退平台默认） */
+  models?: string[];
+}
+
+/** 账号列表排序字段（concurrency/rpm 为运行时 Redis 指标）。 */
+export type AccountSortBy = 'priority' | 'weight' | 'concurrency' | 'rpm' | 'created_at';
+
+export interface AccountListQuery extends PageReq {
+  keyword?: string;
+  platform?: string;
+  state?: AccountState | string;
+  account_type?: string;
+  group_id?: number;
+  ungrouped?: boolean;
+  proxy_id?: number;
+  sort_by?: AccountSortBy;
+  sort_order?: SortOrder;
+}
+
+export interface AccountExportItem {
+  name: string;
+  platform: AccountPlatform;
+  type: AccountType;
+  /** 明文凭证（导出含 token，导入时同样使用） */
+  credentials: Record<string, string>;
+  priority?: number;
+  weight?: number;
+  max_concurrency?: number;
+  rate_multiplier?: number;
+  proxy_id?: number | null;
+  group_ids?: number[];
+  extra?: Record<string, unknown>;
+}
+
+export interface AccountExportResp {
+  version: number | string;
+  exported_at: string;
+  count: number;
+  accounts: AccountExportItem[];
+}
+
+export interface AccountImportReq {
+  accounts: AccountExportItem[];
+}
+
+export interface AccountImportResp {
+  imported: number;
+  failed: number;
+  errors?: string[];
+}
+
+export interface AccountToggleResp {
+  id: number;
+  state: AccountState;
+}
+
+export interface BulkDeleteAccountsReq {
+  account_ids: number[];
+}
+
+export interface BulkUpdateAccountsReq {
+  account_ids: number[];
+  state?: 'active' | 'disabled';
+  priority?: number;
+  weight?: number;
+  max_concurrency?: number;
+  rate_multiplier?: number;
+  group_ids?: number[];
+  proxy_id?: number | null;
+  /** 批量覆盖模型白名单；空数组清除 */
+  models?: string[];
+}
+
+export interface BulkOpItemResp {
+  id: number;
+  success: boolean;
+  error?: string;
+}
+
+export interface BulkOpResp {
+  success: number;
+  failed: number;
+  success_ids: number[];
+  failed_ids: number[];
+  results: BulkOpItemResp[];
+}
+
+
+export interface StartOAuthReq {
+  name?: string;
+  proxy_url?: string;
+  proxy_id?: number | null;
+  group_ids?: number[];
+  priority?: number;
+  weight?: number;
+  max_concurrency?: number;
+  rate_multiplier?: number;
+  project_id?: string;
+  /** browser（默认）。Codex 已不再支持 device */
+  mode?: 'browser' | string;
+  /** 重新授权目标账号 ID；有值时更新该账号凭证，不新建 */
+  account_id?: number;
+}
+
+export interface OAuthSessionResp {
+  id: string;
+  platform: string;
+  status: 'pending' | 'completed' | 'failed' | string;
+  flow: 'paste_code' | 'device' | string;
+  message?: string;
+  error?: string;
+  authorize_url?: string;
+  user_code?: string;
+  verification_uri?: string;
+  verification_uri_complete?: string;
+  account_id?: number;
+  account_name?: string;
+  created_at: string;
+}
+
+export interface CompleteOAuthReq {
+  code: string;
 }

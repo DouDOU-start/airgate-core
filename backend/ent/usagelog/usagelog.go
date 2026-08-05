@@ -68,6 +68,8 @@ const (
 	FieldImageSize = "image_size"
 	// FieldImageQuality holds the string denoting the image_quality field in the database.
 	FieldImageQuality = "image_quality"
+	// FieldVideoResolution holds the string denoting the video_resolution field in the database.
+	FieldVideoResolution = "video_resolution"
 	// FieldStream holds the string denoting the stream field in the database.
 	FieldStream = "stream"
 	// FieldDurationMs holds the string denoting the duration_ms field in the database.
@@ -98,6 +100,8 @@ const (
 	FieldChannelID = "channel_usage_logs"
 	// FieldChannelKeyID holds the string denoting the channel_key_id field in the database.
 	FieldChannelKeyID = "channel_key_usage_logs"
+	// FieldAccountID holds the string denoting the account_id field in the database.
+	FieldAccountID = "account_usage_logs"
 	// FieldGroupID holds the string denoting the group_id field in the database.
 	FieldGroupID = "group_usage_logs"
 	// EdgeUser holds the string denoting the user edge name in mutations.
@@ -108,6 +112,8 @@ const (
 	EdgeChannel = "channel"
 	// EdgeChannelKey holds the string denoting the channel_key edge name in mutations.
 	EdgeChannelKey = "channel_key"
+	// EdgeAccount holds the string denoting the account edge name in mutations.
+	EdgeAccount = "account"
 	// EdgeGroup holds the string denoting the group edge name in mutations.
 	EdgeGroup = "group"
 	// Table holds the table name of the usagelog in the database.
@@ -140,6 +146,13 @@ const (
 	ChannelKeyInverseTable = "channel_keys"
 	// ChannelKeyColumn is the table column denoting the channel_key relation/edge.
 	ChannelKeyColumn = "channel_key_usage_logs"
+	// AccountTable is the table that holds the account relation/edge.
+	AccountTable = "usage_logs"
+	// AccountInverseTable is the table name for the Account entity.
+	// It exists in this package in order to avoid circular dependency with the "account" package.
+	AccountInverseTable = "accounts"
+	// AccountColumn is the table column denoting the account relation/edge.
+	AccountColumn = "account_usage_logs"
 	// GroupTable is the table that holds the group relation/edge.
 	GroupTable = "usage_logs"
 	// GroupInverseTable is the table name for the Group entity.
@@ -179,6 +192,7 @@ var Columns = []string{
 	FieldReasoningEffort,
 	FieldImageSize,
 	FieldImageQuality,
+	FieldVideoResolution,
 	FieldStream,
 	FieldDurationMs,
 	FieldFirstTokenMs,
@@ -194,6 +208,7 @@ var Columns = []string{
 	FieldAPIKeyID,
 	FieldChannelID,
 	FieldChannelKeyID,
+	FieldAccountID,
 	FieldGroupID,
 }
 
@@ -262,6 +277,8 @@ var (
 	DefaultImageSize string
 	// DefaultImageQuality holds the default value on creation for the "image_quality" field.
 	DefaultImageQuality string
+	// DefaultVideoResolution holds the default value on creation for the "video_resolution" field.
+	DefaultVideoResolution string
 	// DefaultStream holds the default value on creation for the "stream" field.
 	DefaultStream bool
 	// DefaultDurationMs holds the default value on creation for the "duration_ms" field.
@@ -429,6 +446,11 @@ func ByImageQuality(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldImageQuality, opts...).ToFunc()
 }
 
+// ByVideoResolution orders the results by the video_resolution field.
+func ByVideoResolution(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVideoResolution, opts...).ToFunc()
+}
+
 // ByStream orders the results by the stream field.
 func ByStream(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStream, opts...).ToFunc()
@@ -504,6 +526,11 @@ func ByChannelKeyID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldChannelKeyID, opts...).ToFunc()
 }
 
+// ByAccountID orders the results by the account_id field.
+func ByAccountID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAccountID, opts...).ToFunc()
+}
+
 // ByGroupID orders the results by the group_id field.
 func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
@@ -534,6 +561,13 @@ func ByChannelField(field string, opts ...sql.OrderTermOption) OrderOption {
 func ByChannelKeyField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newChannelKeyStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByAccountField orders the results by account field.
+func ByAccountField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newAccountStep(), sql.OrderByField(field, opts...))
 	}
 }
 
@@ -569,6 +603,13 @@ func newChannelKeyStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ChannelKeyInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, ChannelKeyTable, ChannelKeyColumn),
+	)
+}
+func newAccountStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(AccountInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, AccountTable, AccountColumn),
 	)
 }
 func newGroupStep() *sqlgraph.Step {

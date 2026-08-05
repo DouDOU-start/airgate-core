@@ -225,7 +225,8 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	// 6. failover 主循环：
 	//    hardExclude 跨循环持久（429 限流 / 认证失败 / 配置故障，仅本次请求内生效），
 	//    softExclude 容量满（RPM/并发）——排队退避时清空重新竞争。
-	var hardExclude, softExclude []int
+	var hardExcludeKeys, softExcludeKeys []int
+	var hardExcludeAccounts, softExcludeAccounts []int
 	summary := failureSummary{}
 	// responsesNotFound 记住 Responses 端点上游 404 的语义（已解析脱敏）：
 	// 部分 openai_compatible 上游只实现 /v1/chat/completions，对 /v1/responses 回 404，
@@ -251,20 +252,24 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			return
 		}
 
-		exclude := make([]int, 0, len(hardExclude)+len(softExclude))
-		exclude = append(exclude, hardExclude...)
-		exclude = append(exclude, softExclude...)
-		ch, err := p.registry.Pick(keyInfo.GroupID, req.Model, protocol, exclude)
-		if err != nil {
-			// 排队退避：有渠道只是"暂时满"（软排除）且未超排队上限 → 清空软排除重新竞争。
-			if len(softExclude) > 0 && time.Now().Before(queueDeadline) {
-				// 全局排队上限：超限不再等待，按容量满语义快速失败泄压。
+		excludeKeys := make([]int, 0, len(hardExcludeKeys)+len(softExcludeKeys))
+		excludeKeys = append(excludeKeys, hardExcludeKeys...)
+		excludeKeys = append(excludeKeys, softExcludeKeys...)
+		excludeAccounts := make([]int, 0, len(hardExcludeAccounts)+len(softExcludeAccounts))
+		excludeAccounts = append(excludeAccounts, hardExcludeAccounts...)
+		excludeAccounts = append(excludeAccounts, softExcludeAccounts...)
+
+		target, ok := p.pickRoute(keyInfo.GroupID, req.Model, protocol, excludeKeys, excludeAccounts)
+		if !ok {
+			// 排队退避：有目标只是"暂时满"（软排除）且未超排队上限 → 清空软排除重新竞争。
+			if (len(softExcludeKeys) > 0 || len(softExcludeAccounts) > 0) && time.Now().Before(queueDeadline) {
 				if p.queueWaiters.Add(1) > maxQueueWaiters {
 					p.queueWaiters.Add(-1)
 					summary.localCapacity = true
 					break
 				}
-				softExclude = softExclude[:0]
+				softExcludeKeys = softExcludeKeys[:0]
+				softExcludeAccounts = softExcludeAccounts[:0]
 				waited := sleepOrCancel(ctx, pollDelay, queueDeadline)
 				p.queueWaiters.Add(-1)
 				if !waited {
@@ -278,17 +283,62 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			break
 		}
 
+		// ---------- 账号路径（CPA）----------
+		if target.kind == routeAccount {
+			acc := target.account
+			if p.cpa == nil {
+				slog.Warn("relay_account_cpa_unavailable", "account_id", acc.ID)
+				hardExcludeAccounts = append(hardExcludeAccounts, acc.ID)
+				continue
+			}
+			requestID, rpmMinute, soft, slotOK := p.acquireAccountSlots(ctx, acc, req.Stream)
+			if !slotOK {
+				summary.localCapacity = true
+				if soft {
+					softExcludeAccounts = append(softExcludeAccounts, acc.ID)
+				} else {
+					hardExcludeAccounts = append(hardExcludeAccounts, acc.ID)
+				}
+				continue
+			}
+			pollDelay = queuePollInterval
+			payload, perr := prepareAccountPayload(req, opts)
+			if perr != nil {
+				p.concurrency.ReleaseAccountSlot(context.Background(), acc.ID, requestID)
+				p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
+				writeError(c, http.StatusBadRequest, "invalid_request_error", "bad_request", "序列化请求体失败")
+				p.recordFailure(c, keyInfo, req, start, errlog.Entry{
+					Phase: errlog.PhaseBadRequest, StatusCode: http.StatusBadRequest,
+					ErrorType: "invalid_request_error", ErrorCode: "bad_request",
+					Message: perr.Error(), Attempts: attempts,
+					AccountID: acc.ID, AccountName: acc.Name,
+				})
+				return
+			}
+			attemptStart := time.Now()
+			result := p.executeAccountAttempt(c, acc, req, endpoint, protocol, payload, start, requestID, rpmMinute)
+			attemptLatency := time.Since(attemptStart).Milliseconds()
+			attempts++
+			if p.handleAccountOutcome(c, keyInfo, acc, req, result, start, price, settings, opts,
+				rpmMinute, attempts, &hops, &summary, &hardExcludeAccounts, &softExcludeAccounts, attemptLatency) {
+				return
+			}
+			continue
+		}
+
+		// ---------- 渠道 key 路径（零翻译透传）----------
+		ch := target.channel
 		// key 级配置检查：适配器 / 密钥，任一缺失即硬排除（不消耗 attempt）。
 		ad, err := adaptor.GetAdaptor(ch.Type)
 		if err != nil {
 			slog.Warn("relay_channel_key_type_unsupported", "channel_key_id", ch.KeyID, "type", ch.Type)
-			hardExclude = append(hardExclude, ch.KeyID)
+			hardExcludeKeys = append(hardExcludeKeys, ch.KeyID)
 			continue
 		}
 		apiKey := ch.APIKey
 		if apiKey == "" {
 			slog.Warn("relay_channel_key_no_api_key", "channel_key_id", ch.KeyID)
-			hardExclude = append(hardExclude, ch.KeyID)
+			hardExcludeKeys = append(hardExcludeKeys, ch.KeyID)
 			continue
 		}
 
@@ -298,14 +348,14 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		rpmOK, rpmMinute, _ := p.rpm.TryIncrementKeyRPM(ctx, ch.KeyID, ch.MaxRPM)
 		if !rpmOK {
 			summary.localCapacity = true
-			softExclude = append(softExclude, ch.KeyID)
+			softExcludeKeys = append(softExcludeKeys, ch.KeyID)
 			continue
 		}
 		requestID := uuid.New().String()
 		if err := p.concurrency.AcquireKeySlot(ctx, ch.KeyID, requestID, ch.MaxConcurrency, channelSlotTTL(req.Stream)); err != nil {
 			p.rpm.DecrementKeyRPM(ctx, ch.KeyID, rpmMinute)
 			summary.localCapacity = true
-			softExclude = append(softExclude, ch.KeyID)
+			softExcludeKeys = append(softExcludeKeys, ch.KeyID)
 			continue
 		}
 		pollDelay = queuePollInterval // 抢到槽位即重置退避
@@ -435,7 +485,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			if p.healthTracker != nil {
 				p.healthTracker.RecordFailure(ch.KeyID)
 			}
-			hardExclude = append(hardExclude, ch.KeyID)
+			hardExcludeKeys = append(hardExcludeKeys, ch.KeyID)
 			summary.rateLimited = true
 			summary.observeRetryAfter(o.RetryAfter)
 			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "rateLimited", o.Reason, o.RetryAfter.Milliseconds(), attemptLatency, false))
@@ -454,7 +504,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			if settings.AutoBanEnabled {
 				p.registry.MarkAutoDisabled(ch.KeyID, outcome.TruncateErrorMsg(o.Reason))
 			}
-			hardExclude = append(hardExclude, ch.KeyID)
+			hardExcludeKeys = append(hardExcludeKeys, ch.KeyID)
 			summary.authFailed = true
 			hops = append(hops, attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "authFailed", o.Reason, 0, attemptLatency, settings.AutoBanEnabled))
 			if p.errSink != nil {
@@ -470,7 +520,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			if p.healthTracker != nil {
 				p.healthTracker.RecordFailure(ch.KeyID)
 			}
-			softExclude = append(softExclude, ch.KeyID)
+			softExcludeKeys = append(softExcludeKeys, ch.KeyID)
 			summary.transient = true
 			verdictName := "transient"
 			if result.netErr != nil {
@@ -760,6 +810,7 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 	if result.usage != nil {
 		usage = *result.usage
 	}
+	usage = enrichImageBillingUsage(c.Request.URL.Path, req, result.body, usage)
 	tier := serviceTierOf(req)
 	reasoningEffort := reasoningEffortOf(c, req)
 	costs := pricing.ComputeCosts(price, pricing.Usage{

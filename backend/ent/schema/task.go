@@ -56,6 +56,8 @@ func (Task) Fields() []ent.Field {
 			Comment("结算幂等闸：终态后只结算一次（CAS 置位）"),
 		field.Int("seconds").Default(0).
 			Comment("视频时长参数（请求侧估价值；结算以上游实际值为准）；suno 恒 0"),
+		field.String("resolution").Default("").
+			Comment("视频分辨率计费档位（如 480p/720p/1080p）；suno 恒空"),
 		// data 上游最新原始响应快照（查询端点据此重建响应）；写入侧截断（超限不存）。
 		field.JSON("data", json.RawMessage{}).Optional(),
 		field.Time("submit_time").Default(timeNow).
