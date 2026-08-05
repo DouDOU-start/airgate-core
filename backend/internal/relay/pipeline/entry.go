@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -304,8 +305,8 @@ type modelList struct {
 	Data   []modelItem `json:"data"`
 }
 
-// HandleModels GET /v1/models：按 keyInfo 分组聚合可用渠道的模型并集（全协议全量列出，
-// 每条带 protocols 协议集合）。
+// HandleModels GET /v1/models：按 keyInfo 分组聚合「渠道 + 账号池」可用模型并集
+// （全协议全量列出，每条带 protocols 协议集合）。
 func (p *Pipeline) HandleModels(c *gin.Context) {
 	setEntryProtocol(c, registry.ProtocolOpenAI)
 	keyInfo, ok := requireKeyInfo(c)
@@ -313,7 +314,7 @@ func (p *Pipeline) HandleModels(c *gin.Context) {
 		return
 	}
 
-	entries := p.registry.ModelEntriesForGroup(keyInfo.GroupID)
+	entries := p.modelEntriesForGroup(keyInfo.GroupID)
 	items := make([]modelItem, 0, len(entries))
 	for _, e := range entries {
 		items = append(items, modelItem{ID: e.Name, Object: "model", Created: 0, OwnedBy: "airgate", Protocols: e.Protocols})
@@ -336,6 +337,7 @@ type geminiModelList struct {
 // HandleGeminiModels GET /v1beta/models：仅列出可经 gemini 协议调用的模型
 // （原生 SDK 用户拿到的目录必须都能在本入口调通），渲染为 Gemini 原生
 // {"models":[{"name":"models/<id>",...}]} 最小合法形态。
+// 口径与 /v1/models 相同：渠道 + 账号池按分组并集，再滤 protocols 含 gemini。
 func (p *Pipeline) HandleGeminiModels(c *gin.Context) {
 	setEntryProtocol(c, registry.ProtocolGemini)
 	keyInfo, ok := requireKeyInfo(c)
@@ -343,7 +345,7 @@ func (p *Pipeline) HandleGeminiModels(c *gin.Context) {
 		return
 	}
 
-	entries := p.registry.ModelEntriesForGroup(keyInfo.GroupID)
+	entries := p.modelEntriesForGroup(keyInfo.GroupID)
 	items := make([]geminiModelItem, 0, len(entries))
 	for _, e := range entries {
 		if !slices.Contains(e.Protocols, registry.ProtocolGemini) {
@@ -356,6 +358,66 @@ func (p *Pipeline) HandleGeminiModels(c *gin.Context) {
 		})
 	}
 	c.JSON(http.StatusOK, geminiModelList{Models: items})
+}
+
+// accountModelProtocols 账号路径经 CPA 翻译，可经下列入口协议调用。
+var accountModelProtocols = []string{
+	registry.ProtocolOpenAI,
+	registry.ProtocolAnthropic,
+	registry.ProtocolGemini,
+}
+
+// modelEntriesForGroup 聚合渠道注册表与账号池在指定分组下的模型目录。
+// 同名模型合并 protocols 并集；结果按模型名字典序。
+//
+// 未在价目表标价的模型一律剔除：与 forward/task 缺价预检 fail-closed 一致，
+// 目录里出现的模型必须可被下游实际调用（渠道与账号路径相同）。
+func (p *Pipeline) modelEntriesForGroup(groupID int) []registry.ModelEntry {
+	// 无价目表时 fail-closed：不暴露任何模型（避免缺价预检侧 panic/漏拦时目录仍放行）。
+	if p.pricing == nil {
+		return nil
+	}
+
+	set := map[string]map[string]struct{}{}
+	merge := func(name string, protos []string) {
+		if name == "" {
+			return
+		}
+		if _, priced := p.pricing.Get(name); !priced {
+			return
+		}
+		if set[name] == nil {
+			set[name] = map[string]struct{}{}
+		}
+		for _, proto := range protos {
+			if proto != "" {
+				set[name][proto] = struct{}{}
+			}
+		}
+	}
+
+	if p.registry != nil {
+		for _, e := range p.registry.ModelEntriesForGroup(groupID) {
+			merge(e.Name, e.Protocols)
+		}
+	}
+	if p.accounts != nil {
+		for _, name := range p.accounts.ModelsForGroup(groupID) {
+			merge(name, accountModelProtocols)
+		}
+	}
+
+	entries := make([]registry.ModelEntry, 0, len(set))
+	for name, protos := range set {
+		ps := make([]string, 0, len(protos))
+		for proto := range protos {
+			ps = append(ps, proto)
+		}
+		sort.Strings(ps)
+		entries = append(entries, registry.ModelEntry{Name: name, Protocols: ps})
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
+	return entries
 }
 
 // requireKeyInfo 从 gin ctx 取 APIKeyAuth 写入的 keyInfo；缺失（装配错误）写 401。

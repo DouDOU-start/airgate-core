@@ -21,6 +21,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	openaiadaptor "github.com/DouDOU-start/airgate-core/internal/relay/adaptor/openai"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
@@ -98,6 +99,13 @@ func (f *fakeErrSink) entryCount() int {
 
 // fakeChannelLoader 固定渠道快照。
 type fakeChannelLoader struct{ snaps []registry.ChannelKeySnapshot }
+
+// fakeAccountLoader 固定账号快照。
+type fakeAccountLoader struct{ snaps []accountreg.Snapshot }
+
+func (f *fakeAccountLoader) LoadAllForAccountRegistry(context.Context) ([]accountreg.Snapshot, error) {
+	return f.snaps, nil
+}
 
 func (f *fakeChannelLoader) LoadAllForRegistry(context.Context) ([]registry.ChannelKeySnapshot, error) {
 	return f.snaps, nil
@@ -214,6 +222,8 @@ func newTestEnv(t *testing.T, snaps ...registry.ChannelKeySnapshot) *testEnv {
 
 	cache := pricing.NewCache(&fakePriceLoader{prices: map[string]pricing.Price{
 		testModel:       testPrice,
+		"gpt-4o-mini":   testPrice, // HandleModels 目录并集用例
+		"grok-3":        testPrice, // 账号池目录用例
 		anthModel:       testPrice,
 		gemModel:        testPrice,
 		perRequestModel: {PerRequest: 0.02},
@@ -609,11 +619,12 @@ func TestUnpricedModelRejected(t *testing.T) {
 	}
 }
 
-// TestHandleModels /v1/models 按分组返回模型并集。
+// TestHandleModels /v1/models 按分组返回模型并集（仅标价模型）。
 func TestHandleModels(t *testing.T) {
 	env := newTestEnv(t,
 		testSnap(1, "http://u1", func(s *registry.ChannelKeySnapshot) {
-			s.Models = map[string]struct{}{"gpt-4o": {}, "gpt-4o-mini": {}}
+			// unpriced-channel-model 已挂渠道但未标价，不得出现在目录。
+			s.Models = map[string]struct{}{"gpt-4o": {}, "gpt-4o-mini": {}, "unpriced-channel-model": {}}
 		}),
 		testSnap(2, "http://u2", func(s *registry.ChannelKeySnapshot) {
 			s.Models = map[string]struct{}{"claude-x": {}}
@@ -644,6 +655,105 @@ func TestHandleModels(t *testing.T) {
 	}
 	if resp.Object != "list" {
 		t.Errorf("object = %q", resp.Object)
+	}
+}
+
+// TestHandleModelsIncludesAccounts /v1/models 须并入账号池模型
+// （仅账号、无渠道时目录仍非空；与渠道同名时合并 protocols；未标价剔除）。
+func TestHandleModelsIncludesAccounts(t *testing.T) {
+	env := newTestEnv(t,
+		testSnap(1, "http://u1", func(s *registry.ChannelKeySnapshot) {
+			s.Models = map[string]struct{}{"gpt-4o": {}}
+		}),
+	)
+	accReg := accountreg.New(&fakeAccountLoader{snaps: []accountreg.Snapshot{
+		{
+			ID: 11, Name: "xai-1", Platform: "xai", State: accountreg.StateActive,
+			// grok-3 已标价；unpriced-account-model 未标价不得出现。
+			Models:   map[string]struct{}{"grok-3": {}, "gpt-4o": {}, "unpriced-account-model": {}},
+			GroupIDs: map[int]struct{}{7: {}},
+		},
+		{
+			ID: 12, Name: "xai-other", Platform: "xai", State: accountreg.StateActive,
+			Models:   map[string]struct{}{"grok-other-group": {}},
+			GroupIDs: map[int]struct{}{99: {}},
+		},
+		{
+			ID: 13, Name: "xai-disabled", Platform: "xai", State: accountreg.StateDisabled,
+			Models:   map[string]struct{}{"grok-disabled": {}},
+			GroupIDs: map[int]struct{}{7: {}},
+		},
+	}}, nil)
+	if err := accReg.Reload(context.Background()); err != nil {
+		t.Fatalf("账号注册表加载失败: %v", err)
+	}
+	env.pipe.accounts = accReg
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	w := httptest.NewRecorder()
+	env.engine.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d; body = %s", w.Code, w.Body.String())
+	}
+	var resp modelList
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("响应非 JSON: %v", err)
+	}
+	byID := map[string][]string{}
+	for _, item := range resp.Data {
+		byID[item.ID] = item.Protocols
+	}
+	if _, ok := byID["grok-3"]; !ok {
+		t.Fatalf("缺少账号池模型 grok-3: %v", byID)
+	}
+	if _, ok := byID["gpt-4o"]; !ok {
+		t.Fatalf("缺少渠道模型 gpt-4o: %v", byID)
+	}
+	if _, ok := byID["unpriced-account-model"]; ok {
+		t.Fatalf("未标价账号模型不应出现: %v", byID)
+	}
+	if _, ok := byID["grok-other-group"]; ok {
+		t.Fatalf("其它分组账号模型不应出现: %v", byID)
+	}
+	if _, ok := byID["grok-disabled"]; ok {
+		t.Fatalf("disabled 账号模型不应出现: %v", byID)
+	}
+	// 账号模型可经 openai/anthropic/gemini；与渠道 openai 重叠时并集。
+	wantGrok := []string{registry.ProtocolAnthropic, registry.ProtocolGemini, registry.ProtocolOpenAI}
+	if fmt.Sprint(byID["grok-3"]) != fmt.Sprint(wantGrok) {
+		t.Errorf("grok-3 protocols = %v, want %v", byID["grok-3"], wantGrok)
+	}
+	wantGPT := []string{registry.ProtocolAnthropic, registry.ProtocolGemini, registry.ProtocolOpenAI}
+	if fmt.Sprint(byID["gpt-4o"]) != fmt.Sprint(wantGPT) {
+		t.Errorf("gpt-4o protocols = %v, want %v（渠道 openai ∪ 账号三协议）", byID["gpt-4o"], wantGPT)
+	}
+}
+
+// TestHandleModelsAccountsOnly 仅账号池时 /v1/models 仍返回模型。
+func TestHandleModelsAccountsOnly(t *testing.T) {
+	env := newTestEnv(t) // 无渠道快照
+	accReg := accountreg.New(&fakeAccountLoader{snaps: []accountreg.Snapshot{{
+		ID: 1, Name: "xai", Platform: "xai", State: accountreg.StateActive,
+		Models:   map[string]struct{}{"grok-3": {}},
+		GroupIDs: map[int]struct{}{7: {}},
+	}}}, nil)
+	if err := accReg.Reload(context.Background()); err != nil {
+		t.Fatalf("账号注册表加载失败: %v", err)
+	}
+	env.pipe.accounts = accReg
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	w := httptest.NewRecorder()
+	env.engine.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d; body = %s", w.Code, w.Body.String())
+	}
+	var resp modelList
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("响应非 JSON: %v", err)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].ID != "grok-3" {
+		t.Fatalf("models = %+v, want [grok-3]", resp.Data)
 	}
 }
 

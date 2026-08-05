@@ -259,6 +259,43 @@ func (r *Registry) ListCandidates(groupID int, model string, exclude []int) []*S
 	return out
 }
 
+// ModelsForGroup 返回指定分组下账号可服务的模型名并集（字典序）。
+//
+// 口径对齐调度可见性：绑定该分组、非 disabled、Models 非空。
+// rate_limited / degraded 仍列入目录——临时状态不掩盖「分组下有哪些模型」；
+// 真正能否立刻调度由 ListCandidates / IsSchedulable 另行判定。
+func (r *Registry) ModelsForGroup(groupID int) []string {
+	if r == nil {
+		return nil
+	}
+	r.ensureLoaded()
+
+	r.mu.RLock()
+	set := map[string]struct{}{}
+	for _, a := range r.accounts {
+		if a.State == StateDisabled {
+			continue
+		}
+		if _, ok := a.GroupIDs[groupID]; !ok {
+			continue
+		}
+		if len(a.Models) == 0 {
+			continue
+		}
+		for m := range a.Models {
+			set[m] = struct{}{}
+		}
+	}
+	r.mu.RUnlock()
+
+	out := make([]string, 0, len(set))
+	for m := range set {
+		out = append(out, m)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // Pick 单独从账号池选一个（测试/兼容用）；统一调度请用 pipeline 混合选路。
 func (r *Registry) Pick(groupID int, model string, exclude []int) (*Snapshot, error) {
 	cands := r.ListCandidates(groupID, model, exclude)

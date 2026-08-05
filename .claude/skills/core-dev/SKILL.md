@@ -56,10 +56,10 @@ description: airgate-core（standalone-gateway 分支）开发指南：架构、
 ## 子系统边界
 
 - `internal/relay/registry` — 渠道密钥端点内存快照与调度；禁止 import ent 与 app 包。
-- `internal/relay/accountreg` — 订阅账号内存快照、状态机、与渠道混合候选；禁止 import ent。
+- `internal/relay/accountreg` — 订阅账号内存快照、状态机、与渠道混合候选；禁止 import ent。`ModelsForGroup` 供模型目录聚合。
 - `internal/relay/cpa` — CLIProxyAPI 桥接（固定模块 `github.com/router-for-me/CLIProxyAPI/v7`，**禁止 go.mod replace 本地路径**）；仅用公开 SDK 做转发；账号 OAuth 登录在 `app/account` 交互式实现（不走 `sdk/auth` 阻塞 Login）。
 - `internal/relay/adaptor` — 渠道路径协议适配，**零翻译纯透传**。
-- `internal/relay/pipeline` — 转发主循环、双路径选路、outcome、SSE、errfmt。
+- `internal/relay/pipeline` — 转发主循环、双路径选路、outcome、SSE、errfmt；`GET /v1/models` / `/v1beta/models` 按分组聚合 **渠道 models ∪ 账号池 models**（账号路径经 CPA 翻译，protocols 标 openai/anthropic/gemini）；**未标价模型不进目录**，与 forward/task 缺价预检 fail-closed 一致（渠道与账号均不可调用未标价模型）。
 - `app/account` / `app/proxy` — 账号/代理管理面；凭证 AES-GCM；导出明文；账号类型仅 **oauth / api_key**；用量窗口（Codex `/wham/usage`、Claude `/api/oauth/usage`，快照存 `extra.usage`，`POST /accounts/:id/usage/refresh`）；OAuth 交互式授权 + Codex 三路导入（浏览器授权 / RT / Session，**无设备码**）；**重新授权**（`account_id` 写入已有账号凭证，保留 ID/分组/调度）；**可服务模型白名单**（`extra.models` / `models` 字段，空=平台默认；支持单账号与 bulk 覆盖）。
 - `internal/relay/task` — 异步任务子系统（视频/音乐「提交-轮询」型转发）：flow 提交主循环、poller 后台轮询与结算、平台 adaptor（openaivideo/suno）。**与零翻译红线的边界**：提交体仍透传（入口协议=渠道协议，adaptor 只做 URL/认证/模型重写）；查询响应不透传——读本地 task 表快照、adaptor 做状态归一化后按入口协议重建（计量与状态提取，口径同 errfmt 的「语义保留、载体重建」）。禁止 import ent 与 app 包：落库经 Store、余额动账经 BalanceOps 窄接口注入（server 层适配 app/user）。
 - `internal/relay/outcome` — 上游 attempt 判定表与出口脱敏（429/401·403/5xx → 换渠道/禁用），pipeline 与 task 共用的唯一事实源。
