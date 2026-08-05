@@ -675,7 +675,17 @@ func fetchXAIUsage(ctx context.Context, creds map[string]string, proxyURL string
 
 	weekly, weeklyErr := xaiRequestBilling(ctx, accessToken, proxyURL, userID, xaiBillingWeeklyURL)
 	monthly, monthlyErr := xaiRequestBilling(ctx, accessToken, proxyURL, userID, xaiBillingMonthlyURL)
+	return resolveXAIBillingUsage(snap, now, weekly, monthly, weeklyErr, monthlyErr)
+}
 
+// resolveXAIBillingUsage 汇总两个 billing 响应。只有拿到可展示窗口才算刷新成功，
+// 避免上游暂时失败时用仅含订阅档位的空快照覆盖数据库中的旧用量。
+func resolveXAIBillingUsage(
+	snap UsageSnapshot,
+	now time.Time,
+	weekly, monthly *xaiBillingSummary,
+	weeklyErr, monthlyErr error,
+) (UsageSnapshot, error) {
 	// 优先合并两边的 config；任一侧成功即可出条
 	var summary *xaiBillingSummary
 	if weekly != nil {
@@ -689,7 +699,9 @@ func fetchXAIUsage(ctx context.Context, creds map[string]string, proxyURL string
 		if plan := planTypeFromXAIMonthlyLimit(summary.MonthlyLimitCents); plan != "" {
 			snap.PlanType = plan
 		}
-		return snap, nil
+		if len(snap.Windows) > 0 {
+			return snap, nil
+		}
 	}
 
 	// billing 全失败：尝试从错误体解析 free-usage 窗口
@@ -706,10 +718,7 @@ func fetchXAIUsage(ctx context.Context, creds map[string]string, proxyURL string
 		}
 	}
 
-	// 有 plan 仍返回（列表可显示订阅类型）；否则把上游错误透出
-	if snap.PlanType != "" {
-		return snap, nil
-	}
+	// 订阅档位不能代替用量窗口；失败时返回错误，由调用方保留旧快照。
 	if weeklyErr != nil {
 		return UsageSnapshot{}, weeklyErr
 	}

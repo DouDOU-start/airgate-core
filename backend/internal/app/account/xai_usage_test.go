@@ -1,6 +1,7 @@
 package account
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -179,5 +180,67 @@ func TestMergeXAIBillingSummary(t *testing.T) {
 	}
 	if len(merged.ProductUsage) != 1 {
 		t.Fatalf("products=%v", merged.ProductUsage)
+	}
+}
+
+func TestResolveXAIBillingUsageRejectsPlanOnlySnapshot(t *testing.T) {
+	now := time.Date(2026, 8, 5, 8, 0, 0, 0, time.UTC)
+	weeklyErr := errors.New("周额度请求失败")
+	monthlyErr := errors.New("月额度请求失败")
+
+	got, err := resolveXAIBillingUsage(
+		UsageSnapshot{CapturedAt: now, PlanType: "super_heavy", Windows: []UsageWindow{}},
+		now,
+		nil,
+		nil,
+		weeklyErr,
+		monthlyErr,
+	)
+	if !errors.Is(err, weeklyErr) {
+		t.Fatalf("应返回上游错误，实际错误：%v", err)
+	}
+	if len(got.Windows) != 0 || !got.CapturedAt.IsZero() {
+		t.Fatalf("失败时不应返回可持久化快照：%+v", got)
+	}
+}
+
+func TestResolveXAIBillingUsageRejectsSummaryWithoutWindows(t *testing.T) {
+	now := time.Date(2026, 8, 5, 8, 0, 0, 0, time.UTC)
+	weekly := &xaiBillingSummary{HasWeeklyData: true, PeriodEnd: "2026-08-12T08:00:00Z"}
+
+	got, err := resolveXAIBillingUsage(
+		UsageSnapshot{CapturedAt: now, PlanType: "super", Windows: []UsageWindow{}},
+		now,
+		weekly,
+		nil,
+		nil,
+		nil,
+	)
+	if err == nil || !strings.Contains(err.Error(), "未返回可用用量数据") {
+		t.Fatalf("无窗口汇总应返回明确错误，实际错误：%v", err)
+	}
+	if len(got.Windows) != 0 || !got.CapturedAt.IsZero() {
+		t.Fatalf("无窗口时不应返回可持久化快照：%+v", got)
+	}
+}
+
+func TestResolveXAIBillingUsageAcceptsPartialSuccess(t *testing.T) {
+	now := time.Date(2026, 8, 5, 8, 0, 0, 0, time.UTC)
+	weeklyPercent := 12.0
+	weekly := &xaiBillingSummary{HasWeeklyData: true, UsagePercent: &weeklyPercent}
+
+	got, err := resolveXAIBillingUsage(
+		UsageSnapshot{CapturedAt: now, PlanType: "super_heavy", Windows: []UsageWindow{}},
+		now,
+		weekly,
+		nil,
+		nil,
+		errors.New("月额度请求失败"),
+	)
+	if err != nil {
+		t.Fatalf("任一 billing 返回有效窗口时应刷新成功：%v", err)
+	}
+	if len(got.Windows) != 1 || got.Windows[0].Key != "weekly" || got.Windows[0].UsedPercent != 12 {
+		t.Fatalf("周额度窗口解析错误：%+v", got.Windows)
 	}
 }
