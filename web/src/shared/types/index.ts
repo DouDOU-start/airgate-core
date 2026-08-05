@@ -1669,7 +1669,9 @@ export interface AccountExportItem {
   weight?: number;
   max_concurrency?: number;
   rate_multiplier?: number;
+  /** 仅兼容旧版导出文件，导入时忽略 */
   proxy_id?: number | null;
+  /** 仅兼容旧版导出文件，导入时忽略 */
   group_ids?: number[];
   extra?: Record<string, unknown>;
 }

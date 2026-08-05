@@ -202,19 +202,7 @@ func (h *AccountHandler) ImportAccounts(c *gin.Context) {
 
 	inputs := make([]appaccount.CreateInput, 0, len(req.Accounts))
 	for _, item := range req.Accounts {
-		inputs = append(inputs, appaccount.CreateInput{
-			Name:           item.Name,
-			Platform:       item.Platform,
-			Type:           item.Type,
-			Credentials:    item.Credentials,
-			Priority:       item.Priority,
-			Weight:         item.Weight,
-			MaxConcurrency: item.MaxConcurrency,
-			RateMultiplier: item.RateMultiplier,
-			ProxyID:        item.ProxyID,
-			GroupIDs:       intSliceToInt64(item.GroupIDs),
-			Extra:          item.Extra,
-		})
+		inputs = append(inputs, toAccountImportInput(item))
 	}
 
 	summary := h.service.Import(c.Request.Context(), inputs)

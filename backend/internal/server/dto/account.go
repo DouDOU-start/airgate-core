@@ -197,6 +197,7 @@ type UpdateAccountReq struct {
 }
 
 // AccountExportItem 导出文件中的单条账号（明文 credentials）。
+// GroupIDs 和 ProxyID 仅用于兼容读取旧版导出文件，导入时会忽略。
 type AccountExportItem struct {
 	Name           string            `json:"name"`
 	Platform       string            `json:"platform"`

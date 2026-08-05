@@ -179,7 +179,7 @@ func toAccountExportItem(account appaccount.Account) dto.AccountExportItem {
 	if creds == nil {
 		creds = map[string]string{}
 	}
-	item := dto.AccountExportItem{
+	return dto.AccountExportItem{
 		Name:           account.Name,
 		Platform:       account.Platform,
 		Type:           account.Type,
@@ -188,14 +188,24 @@ func toAccountExportItem(account appaccount.Account) dto.AccountExportItem {
 		Weight:         account.Weight,
 		MaxConcurrency: account.MaxConcurrency,
 		RateMultiplier: account.RateMultiplier,
-		GroupIDs:       int64SliceToInt(account.GroupIDs),
 		Extra:          account.Extra,
 	}
-	if account.Proxy != nil {
-		proxyID := int64(account.Proxy.ID)
-		item.ProxyID = &proxyID
+}
+
+// toAccountImportInput 将导出项转换为新账号。
+// 分组和代理均为服务本地资源，跨服务导入时不得沿用旧 ID。
+func toAccountImportInput(item dto.AccountExportItem) appaccount.CreateInput {
+	return appaccount.CreateInput{
+		Name:           item.Name,
+		Platform:       item.Platform,
+		Type:           item.Type,
+		Credentials:    item.Credentials,
+		Priority:       item.Priority,
+		Weight:         item.Weight,
+		MaxConcurrency: item.MaxConcurrency,
+		RateMultiplier: item.RateMultiplier,
+		Extra:          item.Extra,
 	}
-	return item
 }
 
 func toBulkOpResp(r appaccount.BulkResult) dto.BulkOpResp {

@@ -586,11 +586,14 @@ func (s *Service) ExportAll(ctx context.Context, filter ListFilter) ([]Account, 
 	return list, nil
 }
 
-// Import 批量导入：逐条 Create，允许部分成功；保留导出文件中的分组和代理绑定。
+// Import 批量导入：逐条 Create，允许部分成功；不保留旧服务的分组和代理绑定。
 // Create 内部已 reload；此处不再额外 reload。
 func (s *Service) Import(ctx context.Context, items []CreateInput) ImportResult {
 	result := ImportResult{}
 	for index, input := range items {
+		// 分组 ID 和代理 ID 都是服务本地资源，跨服务导入时必须清空。
+		input.GroupIDs = nil
+		input.ProxyID = nil
 		if _, err := s.Create(ctx, input); err != nil {
 			result.Failed++
 			result.Errors = append(result.Errors, ImportItemError{
