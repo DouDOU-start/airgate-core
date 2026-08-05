@@ -330,31 +330,38 @@ func (s *Service) ImportCodexSession(ctx context.Context, input OAuthStartInput,
 }
 
 func (s *Service) createFromCodexImport(ctx context.Context, input OAuthStartInput, creds map[string]string, fallbackName string) (Account, error) {
+	var item Account
+	var err error
 	if input.AccountID > 0 {
-		return s.applyOAuthCredentials(ctx, input, "codex", creds)
-	}
-	name := strings.TrimSpace(input.Name)
-	if name == "" {
-		if e := creds["email"]; e != "" {
-			name = e
-		} else if fallbackName != "" {
-			name = fallbackName
-		} else {
-			name = "codex-" + time.Now().Format("0102-1504")
+		item, err = s.applyOAuthCredentials(ctx, input, "codex", creds)
+	} else {
+		name := strings.TrimSpace(input.Name)
+		if name == "" {
+			if e := creds["email"]; e != "" {
+				name = e
+			} else if fallbackName != "" {
+				name = fallbackName
+			} else {
+				name = "codex-" + time.Now().Format("0102-1504")
+			}
 		}
+		item, err = s.Create(ctx, CreateInput{
+			Name:           name,
+			Platform:       "codex",
+			Type:           TypeOAuth,
+			Credentials:    creds,
+			Priority:       input.Priority,
+			Weight:         input.Weight,
+			MaxConcurrency: input.MaxConcurrency,
+			ProxyID:        input.ProxyID,
+			RateMultiplier: input.RateMultiplier,
+			GroupIDs:       input.GroupIDs,
+		})
 	}
-	return s.Create(ctx, CreateInput{
-		Name:           name,
-		Platform:       "codex",
-		Type:           TypeOAuth,
-		Credentials:    creds,
-		Priority:       input.Priority,
-		Weight:         input.Weight,
-		MaxConcurrency: input.MaxConcurrency,
-		ProxyID:        input.ProxyID,
-		RateMultiplier: input.RateMultiplier,
-		GroupIDs:       input.GroupIDs,
-	})
+	if err != nil {
+		return Account{}, err
+	}
+	return s.refreshUsageAfterImport(ctx, item), nil
 }
 
 // ---------- Claude (paste code) ----------

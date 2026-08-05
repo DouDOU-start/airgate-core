@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 )
 
 // 用量快照约定（对齐 airgate-openai UsageView + airgate-claude windows）：
@@ -28,10 +30,11 @@ const (
 	// weekly  → GET cli-chat-proxy.grok.com/v1/billing?format=credits
 	// monthly → GET cli-chat-proxy.grok.com/v1/billing
 	// free-usage-exhausted 仅作为 billing 失败时的补充证据。
-	xaiBillingWeeklyURL  = "https://cli-chat-proxy.grok.com/v1/billing?format=credits"
-	xaiBillingMonthlyURL = "https://cli-chat-proxy.grok.com/v1/billing"
-	xaiGrokClientVersion = "0.2.101"
-	xaiGrokUserAgent     = "grok-pager/0.2.101 grok-shell/0.2.101 (macos; aarch64)"
+	xaiBillingWeeklyURL        = "https://cli-chat-proxy.grok.com/v1/billing?format=credits"
+	xaiBillingMonthlyURL       = "https://cli-chat-proxy.grok.com/v1/billing"
+	xaiGrokClientVersion       = "0.2.101"
+	xaiGrokUserAgent           = "grok-pager/0.2.101 grok-shell/0.2.101 (macos; aarch64)"
+	initialUsageRefreshTimeout = 20 * time.Second
 	// SuperGrok 月额度（美分）：$150 / $1500，对齐 CPA resolveXaiPlan。
 	xaiSuperGrokLimitCents      = 15_000.0
 	xaiSuperGrokHeavyLimitCents = 150_000.0
@@ -86,7 +89,11 @@ func (s *Service) RefreshUsage(ctx context.Context, id int) (UsageSnapshot, Acco
 		return UsageSnapshot{}, Account{}, err
 	}
 	proxyURL := proxyURLFromRef(item.Proxy)
-	snap, err := fetchUsageByPlatform(ctx, item.Platform, item.Type, item.Credentials, proxyURL)
+	fetcher := s.usageFetcher
+	if fetcher == nil {
+		fetcher = fetchUsageByPlatform
+	}
+	snap, err := fetcher(ctx, item.Platform, item.Type, item.Credentials, proxyURL)
 	if err != nil {
 		return UsageSnapshot{}, item, err
 	}
@@ -140,6 +147,37 @@ func (s *Service) RefreshUsage(ctx context.Context, id int) (UsageSnapshot, Acco
 	updated.PlanType = resolvePlanType(updated)
 	updated.SubscriptionActiveUntil = resolveSubscriptionActiveUntil(updated)
 	return snap, updated, nil
+}
+
+// refreshUsageAfterImport 在账号落库后尝试获取首次用量。
+// 查询失败不回滚账号导入，后续仍可通过列表中的刷新按钮重试。
+func (s *Service) refreshUsageAfterImport(ctx context.Context, item Account) Account {
+	if !accountSupportsUsageRefresh(item) {
+		return item
+	}
+	refreshCtx, cancel := context.WithTimeout(ctx, initialUsageRefreshTimeout)
+	defer cancel()
+	_, updated, err := s.RefreshUsage(refreshCtx, item.ID)
+	if err != nil {
+		logx.LoggerFromContext(ctx).Warn("account_initial_usage_refresh_failed",
+			logx.LogFieldAccountID, item.ID,
+			logx.LogFieldPlatform, item.Platform,
+			logx.LogFieldError, err)
+		return item
+	}
+	return updated
+}
+
+func accountSupportsUsageRefresh(item Account) bool {
+	if NormalizeAccountType(item.Type) != TypeOAuth || strings.TrimSpace(item.Credentials["access_token"]) == "" {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(item.Platform)) {
+	case "codex", "claude", "xai", "grok":
+		return true
+	default:
+		return false
+	}
 }
 
 // ConsumeUsageReset 消费一枚 Codex「限额重置积分」以重置用量窗口，成功后刷新快照。

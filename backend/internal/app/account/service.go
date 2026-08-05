@@ -49,6 +49,8 @@ type PriceLookup interface {
 	Get(model string) (pricing.Price, bool)
 }
 
+type usageFetcher func(context.Context, string, string, map[string]string, string) (UsageSnapshot, error)
+
 // Service 提供账号域用例编排。
 // 加解密在 service；store 只存/取 credentials_enc + email。
 type Service struct {
@@ -59,14 +61,15 @@ type Service struct {
 	concurrency ConcurrencyReader
 	rpm         RPMReader
 	// 账号测试落账（可选：未注入则测试不写 usage_log）
-	usageSink   UsageSink
-	priceLookup PriceLookup
-	calculator  *billing.Calculator
+	usageSink    UsageSink
+	priceLookup  PriceLookup
+	calculator   *billing.Calculator
+	usageFetcher usageFetcher
 }
 
 // NewService 创建账号服务。secret 与渠道相同（APIKeySecret）。
 func NewService(repo Repository, secret string) *Service {
-	return &Service{repo: repo, secret: secret}
+	return &Service{repo: repo, secret: secret, usageFetcher: fetchUsageByPlatform}
 }
 
 // SetReloader 注入账号注册表重载器（server 装配阶段；nil 安全）。
@@ -594,7 +597,8 @@ func (s *Service) Import(ctx context.Context, items []CreateInput) ImportResult 
 		// 分组 ID 和代理 ID 都是服务本地资源，跨服务导入时必须清空。
 		input.GroupIDs = nil
 		input.ProxyID = nil
-		if _, err := s.Create(ctx, input); err != nil {
+		created, err := s.Create(ctx, input)
+		if err != nil {
 			result.Failed++
 			result.Errors = append(result.Errors, ImportItemError{
 				Index:   index,
@@ -603,6 +607,7 @@ func (s *Service) Import(ctx context.Context, items []CreateInput) ImportResult 
 			})
 			continue
 		}
+		_ = s.refreshUsageAfterImport(ctx, created)
 		result.Imported++
 	}
 	return result
