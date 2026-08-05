@@ -47,7 +47,7 @@ services:
     restart: "no"
 
   core:
-    image: golang:1.25-bookworm
+    image: golang:1.26-bookworm
     working_dir: /workspace/backend
     restart: unless-stopped
     depends_on:
