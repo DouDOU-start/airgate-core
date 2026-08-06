@@ -4,11 +4,13 @@
 package xaivideo
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -59,9 +61,33 @@ func (Adaptor) ParseSubmit(_ string, contentType string, body []byte) (*task.Sub
 	}, nil
 }
 
-// BuildSubmitRequest 不应被账号路径调用；HTTP 请求统一交给 CPA 构建。
-func (Adaptor) BuildSubmitRequest(context.Context, *task.Info, *task.SubmitRequest) (*http.Request, error) {
-	return nil, errors.New("xAI 视频账号请求必须通过 CPA 转发")
+// BuildSubmitRequest 构建 xAI 原生视频渠道请求。账号路径仍由 CPA 构建，
+// 此方法只用于当前 AirGate 没有本地账号、需要级联到上游渠道的场景。
+func (Adaptor) BuildSubmitRequest(ctx context.Context, info *task.Info, req *task.SubmitRequest) (*http.Request, error) {
+	body := req.Body
+	if info.UpstreamModel != "" && info.UpstreamModel != info.RequestModel {
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(body, &fields); err != nil || fields == nil {
+			return nil, errors.New("请求体必须是 JSON 对象")
+		}
+		model, err := json.Marshal(info.UpstreamModel)
+		if err != nil {
+			return nil, err
+		}
+		fields["model"] = model
+		body, err = json.Marshal(fields)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, videosURL(info.ChannelKey.BaseURL)+"/generations", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", req.ContentType)
+	setAuthHeaders(httpReq, info)
+	return httpReq, nil
 }
 
 // ParseSubmitResponse 提取 xAI 提交响应中的 request_id。
@@ -76,9 +102,14 @@ func (Adaptor) ParseSubmitResponse(body []byte) (string, *task.Status, error) {
 	return requestID, st, nil
 }
 
-// BuildQueryRequest 不应被账号路径调用；轮询统一交给 CPA 构建。
-func (Adaptor) BuildQueryRequest(context.Context, *task.Info, string) (*http.Request, error) {
-	return nil, errors.New("xAI 视频账号查询必须通过 CPA 转发")
+// BuildQueryRequest 构建 xAI 原生视频渠道查询请求。
+func (Adaptor) BuildQueryRequest(ctx context.Context, info *task.Info, taskID string) (*http.Request, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, videosURL(info.ChannelKey.BaseURL)+"/"+url.PathEscape(taskID), nil)
+	if err != nil {
+		return nil, err
+	}
+	setAuthHeaders(httpReq, info)
+	return httpReq, nil
 }
 
 // ParseQueryResponse 归一化 xAI 原生轮询响应。
@@ -229,4 +260,21 @@ func parseErrorMessage(raw json.RawMessage) string {
 		return strings.TrimSpace(detail.Message)
 	}
 	return ""
+}
+
+// setAuthHeaders 设置级联渠道认证头与管理员配置的覆盖头。
+func setAuthHeaders(req *http.Request, info *task.Info) {
+	req.Header.Set("Authorization", "Bearer "+info.APIKey)
+	for key, value := range info.ChannelKey.HeaderOverride {
+		req.Header.Set(key, value)
+	}
+}
+
+// videosURL 拼接 xAI 原生视频端点根路径，避免 base_url 已含 /v1 时重复追加。
+func videosURL(baseURL string) string {
+	base := strings.TrimRight(baseURL, "/")
+	if !strings.HasSuffix(base, "/v1") {
+		base += "/v1"
+	}
+	return base + "/videos"
 }

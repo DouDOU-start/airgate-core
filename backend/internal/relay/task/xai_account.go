@@ -228,6 +228,20 @@ func (f *Flow) submitXAIAccount(c *gin.Context, keyInfo *auth.APIKeyInfo, ad Ada
 	})
 }
 
+// hasXAIVideoAccount 判断当前分组和模型是否存在真正可调度的 xAI 账号。
+// 本机没有账号或 CPA 未装配时返回 false，由调用方改走普通渠道级联。
+func (f *Flow) hasXAIVideoAccount(groupID int, model string) bool {
+	if f.accounts == nil || f.cpa == nil {
+		return false
+	}
+	for _, acc := range f.accounts.ListCandidates(groupID, model, nil) {
+		if cpa.ResolveProvider(acc.Platform) == "xai" {
+			return true
+		}
+	}
+	return false
+}
+
 func (f *Flow) applyTaskClientRestriction(c *gin.Context, keyInfo *auth.APIKeyInfo, sub *SubmitRequest, start time.Time) bool {
 	clientid.Detect(c)
 	if len(keyInfo.GroupAllowedClients) == 0 {

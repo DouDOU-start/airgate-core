@@ -1,10 +1,14 @@
 package xaivideo
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"net/http"
 	"testing"
 	"time"
 
+	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 	"github.com/DouDOU-start/airgate-core/internal/relay/task"
 )
 
@@ -89,5 +93,53 @@ func TestParseFailedResponse(t *testing.T) {
 	}
 	if st.Status != task.StatusFailure || st.FailReason != "内容审核未通过" {
 		t.Fatalf("失败状态解析错误: %+v", st)
+	}
+}
+
+func TestBuildChannelRequestsKeepXAIVideoPaths(t *testing.T) {
+	ad := Adaptor{}
+	info := &task.Info{
+		ChannelKey: &registry.ChannelKeySnapshot{
+			BaseURL: "https://upstream.example/v1",
+			APIKey:  "sk-upstream",
+			HeaderOverride: map[string]string{
+				"X-Upstream": "cascade",
+			},
+		},
+		APIKey:        "sk-upstream",
+		RequestModel:  "grok-video",
+		UpstreamModel: "grok-video-upstream",
+	}
+	sub := &task.SubmitRequest{
+		Model:       "grok-video",
+		Body:        []byte(`{"model":"grok-video","prompt":"海面日落"}`),
+		ContentType: "application/json",
+	}
+
+	submit, err := ad.BuildSubmitRequest(context.Background(), info, sub)
+	if err != nil {
+		t.Fatalf("构建提交请求失败: %v", err)
+	}
+	if submit.Method != http.MethodPost || submit.URL.Path != "/v1/videos/generations" {
+		t.Fatalf("提交请求 = %s %s", submit.Method, submit.URL.Path)
+	}
+	if submit.Header.Get("Authorization") != "Bearer sk-upstream" || submit.Header.Get("X-Upstream") != "cascade" {
+		t.Fatalf("提交请求头错误: %+v", submit.Header)
+	}
+	body, err := io.ReadAll(submit.Body)
+	if err != nil {
+		t.Fatalf("读取提交请求体失败: %v", err)
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(body, &fields); err != nil || fields["model"] != "grok-video-upstream" || fields["prompt"] != "海面日落" {
+		t.Fatalf("提交请求体未保持语义: %s", body)
+	}
+
+	query, err := ad.BuildQueryRequest(context.Background(), info, "vid_123")
+	if err != nil {
+		t.Fatalf("构建查询请求失败: %v", err)
+	}
+	if query.Method != http.MethodGet || query.URL.Path != "/v1/videos/vid_123" {
+		t.Fatalf("查询请求 = %s %s", query.Method, query.URL.Path)
 	}
 }

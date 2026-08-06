@@ -303,6 +303,7 @@ func (f *fakeCPAForwarder) Forward(_ context.Context, _ *gin.Context, req cpa.Fo
 const (
 	videoModel     = "sora-2"    // 按秒计价：0.1 USD/s
 	videoFlatModel = "sora-flat" // 按次计价：0.5 USD/次
+	xaiVideoModel  = "grok-imagine-video-1.5-preview"
 )
 
 func testKeyInfo() *auth.APIKeyInfo {
@@ -323,6 +324,7 @@ type testEnv struct {
 	balance  *fakeBalance
 	sink     *fakeSink
 	errSink  *fakeErrSink
+	cpa      *fakeCPAForwarder
 	registry *registry.Registry
 }
 
@@ -342,7 +344,11 @@ func newTestEnv(t *testing.T, snaps ...registry.ChannelKeySnapshot) *testEnv {
 		videoFlatModel: {PerRequest: 0.5},
 		"suno_music":   {PerRequest: 0.2},
 		"suno_lyrics":  {PerRequest: 0.05},
-		"token-model":  {Input: 10, Output: 30}, // 无任务计价：提交应被拒
+		xaiVideoModel: {
+			VideoPerSecond:        0.07,
+			VideoResolutionPrices: map[string]float64{"720p": 0.07},
+		},
+		"token-model": {Input: 10, Output: 30}, // 无任务计价：提交应被拒
 	}})
 	if err := cache.Reload(context.Background()); err != nil {
 		t.Fatalf("价目表加载失败: %v", err)
@@ -352,6 +358,7 @@ func newTestEnv(t *testing.T, snaps ...registry.ChannelKeySnapshot) *testEnv {
 	bal := newFakeBalance()
 	sink := &fakeSink{}
 	errSink := &fakeErrSink{}
+	forwarder := &fakeCPAForwarder{}
 	flow := task.NewFlow(task.Options{
 		Registry:    reg,
 		Pricing:     cache,
@@ -363,18 +370,20 @@ func newTestEnv(t *testing.T, snaps ...registry.ChannelKeySnapshot) *testEnv {
 		Settings:    pipeline.NewSettingsReader(nil),
 		Store:       st,
 		Balance:     bal,
+		CPA:         forwarder,
 	})
 
 	engine := gin.New()
 	injectKey := func(c *gin.Context) { c.Set(middleware.CtxKeyKeyInfo, testKeyInfo()) }
 	engine.POST("/v1/videos", injectKey, flow.HandleVideoSubmit)
+	engine.POST("/v1/videos/generations", injectKey, flow.HandleXAIVideoSubmit)
 	engine.GET("/v1/videos/:task_id", injectKey, flow.HandleVideoGet)
 	engine.GET("/v1/videos/:task_id/content", injectKey, flow.HandleVideoContent)
 	engine.POST("/suno/submit/:action", injectKey, flow.HandleSunoSubmit)
 	engine.POST("/suno/fetch", injectKey, flow.HandleSunoFetch)
 	engine.GET("/suno/fetch/:task_id", injectKey, flow.HandleSunoFetchByID)
 
-	return &testEnv{flow: flow, engine: engine, store: st, balance: bal, sink: sink, errSink: errSink, registry: reg}
+	return &testEnv{flow: flow, engine: engine, store: st, balance: bal, sink: sink, errSink: errSink, cpa: forwarder, registry: reg}
 }
 
 // videoSnap 构造视频渠道快照。
@@ -400,6 +409,24 @@ func videoSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapsh
 		m(&s)
 	}
 	return s
+}
+
+// xaiVideoChannelSnap 构造级联 xAI 视频的 OpenAI 兼容渠道快照。
+func xaiVideoChannelSnap(id int, baseURL string) registry.ChannelKeySnapshot {
+	return registry.ChannelKeySnapshot{
+		KeyID:       id,
+		ChannelID:   id,
+		ChannelName: fmt.Sprintf("xai-video-%d", id),
+		Type:        "openai_compatible",
+		BaseURL:     baseURL,
+		APIKey:      fmt.Sprintf("sk-upstream-%d", id),
+		Models:      map[string]struct{}{xaiVideoModel: {}},
+		Priority:    50,
+		Weight:      10,
+		Status:      registry.StatusEnabled,
+		CostRatio:   1.0,
+		GroupIDs:    map[int]struct{}{7: {}},
+	}
 }
 
 // sunoSnap 构造 suno 渠道快照，默认绑定分组 7（与测试 keyInfo 的 GroupID 对应）。
@@ -540,6 +567,52 @@ func TestXAIVideoSubmitUsesOAuthAccountAndPersistsBinding(t *testing.T) {
 	get := doJSON(t, engine, http.MethodGet, "/v1/videos/vid_oauth_123", "")
 	if get.Code != http.StatusOK || !strings.Contains(get.Body.String(), `"status":"pending"`) {
 		t.Fatalf("本地任务查询错误: status=%d body=%s", get.Code, get.Body.String())
+	}
+}
+
+func TestXAIVideoSubmitWithoutLocalAccountUsesChannelDirectly(t *testing.T) {
+	var gotMethod, gotPath, gotAuth, gotModel string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("Authorization")
+		var body struct {
+			Model string `json:"model"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("上游请求体解析失败: %v", err)
+		}
+		gotModel = body.Model
+		if r.URL.Path == "/v1/responses" || r.URL.Path == "/responses" {
+			http.Error(w, "视频渠道请求不应转为 Responses", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"request_id":"vid_channel_123","status":"pending"}`))
+	}))
+	defer upstream.Close()
+
+	env := newTestEnv(t, xaiVideoChannelSnap(9, upstream.URL))
+	w := doJSON(t, env.engine, http.MethodPost, "/v1/videos/generations",
+		`{"model":"grok-imagine-video-1.5-preview","prompt":"海面日落","duration":6,"resolution":"720p"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("提交状态 = %d，响应 = %s", w.Code, w.Body.String())
+	}
+	if gotMethod != http.MethodPost || gotPath != "/v1/videos/generations" {
+		t.Fatalf("上游请求 = %s %s，期望 POST /v1/videos/generations", gotMethod, gotPath)
+	}
+	if gotAuth != "Bearer sk-upstream-9" {
+		t.Fatalf("上游认证头 = %q", gotAuth)
+	}
+	if gotModel != xaiVideoModel {
+		t.Fatalf("上游模型 = %q，期望 %q", gotModel, xaiVideoModel)
+	}
+	if len(env.cpa.requests) != 0 {
+		t.Fatalf("渠道转发不应调用 CPA，实际调用 %d 次", len(env.cpa.requests))
+	}
+	row := env.store.get(t, 1)
+	if row.Platform != task.PlatformXAIVideo || row.ChannelKeyID != 9 || row.AccountID != 0 {
+		t.Fatalf("任务渠道归属错误: %+v", row)
 	}
 }
 

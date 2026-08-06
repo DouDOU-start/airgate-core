@@ -482,6 +482,30 @@ func TestPollerXAIVideoUsesBoundOAuthAccount(t *testing.T) {
 	}
 }
 
+func TestPollerXAIVideoChannelUsesTaskPlatformAdaptor(t *testing.T) {
+	var gotPath string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		_, _ = w.Write([]byte(`{"status":"done","progress":100,"video":{"duration":8}}`))
+	}))
+	defer upstream.Close()
+
+	poller, store, _, _, _ := newTestPoller(t, pollSnap(1, "openai_compatible", upstream.URL))
+	seedTask(store, 1, func(item *Task) {
+		item.Platform = PlatformXAIVideo
+	})
+
+	poller.tick(context.Background())
+
+	if gotPath != "/v1/videos/tk-1" {
+		t.Fatalf("级联 xAI 视频查询路径 = %q，期望 /v1/videos/tk-1", gotPath)
+	}
+	row := store.get(t, 1)
+	if row.Status != StatusSuccess || row.Seconds != 8 {
+		t.Fatalf("级联 xAI 视频轮询结果错误: %+v", row)
+	}
+}
+
 // TestPollerRefundOnFailure 上游报失败：全额退 hold，不落 usage_log。
 func TestPollerRefundOnFailure(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

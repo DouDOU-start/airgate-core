@@ -141,8 +141,8 @@ func (f *Flow) HandleVideoSubmit(c *gin.Context) {
 	f.handleSubmit(c, PlatformOpenAIVideo, "")
 }
 
-// HandleXAIVideoSubmit POST /v1/videos/generations 入口 handler
-// （xAI 原生协议，经 OAuth 账号池和 CPA executor 提交）。
+// HandleXAIVideoSubmit POST /v1/videos/generations 入口 handler。
+// 有可用 xAI OAuth 账号时走 CPA；否则走 OpenAI 兼容渠道级联转发。
 func (f *Flow) HandleXAIVideoSubmit(c *gin.Context) {
 	setEntryProtocol(c, registry.ProtocolOpenAI)
 	f.handleSubmit(c, PlatformXAIVideo, "")
@@ -177,7 +177,7 @@ func (f *Flow) handleSubmit(c *gin.Context, platform, action string) {
 	if !f.moderationCheck(c, keyInfo, platform, sub) {
 		return
 	}
-	if platform == PlatformXAIVideo {
+	if platform == PlatformXAIVideo && f.hasXAIVideoAccount(keyInfo.GroupID, sub.Model) {
 		f.submitXAIAccount(c, keyInfo, ad, sub)
 		return
 	}
@@ -390,7 +390,14 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 		exclude := make([]int, 0, len(hardExclude)+len(softExclude))
 		exclude = append(exclude, hardExclude...)
 		exclude = append(exclude, softExclude...)
-		ch, err := f.registry.Pick(keyInfo.GroupID, sub.Model, platform, exclude)
+		protocol := platform
+		if platform == PlatformXAIVideo {
+			// xAI 原生视频端点属于 OpenAI 兼容渠道的扩展能力。这里仅复用
+			// 渠道选择，不进入同步 Responses 管线；实际 URL 由 xaivideo
+			// 适配器固定构造为 /v1/videos/generations。
+			protocol = registry.ProtocolOpenAI
+		}
+		ch, err := f.registry.Pick(keyInfo.GroupID, sub.Model, protocol, exclude)
 		if err != nil {
 			break
 		}

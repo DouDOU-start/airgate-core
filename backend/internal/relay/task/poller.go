@@ -250,9 +250,14 @@ func (p *Poller) pollChannel(ctx context.Context, groupKey int, tasks []*Task) {
 		}
 		return
 	}
-	ad, err := GetAdaptor(ch.Type)
+	if len(tasks) == 0 {
+		return
+	}
+	// 适配器由任务入口协议决定。级联 xAI 视频使用 openai_compatible 渠道，
+	// 但查询路径仍必须是 /v1/videos/{request_id}，不能按渠道类型选普通 OpenAI 适配器。
+	ad, err := GetAdaptor(tasks[0].Platform)
 	if err != nil {
-		slog.Warn("task_poll_adaptor_missing", "channel_key_id", ch.KeyID, "type", ch.Type)
+		slog.Warn("task_poll_adaptor_missing", "channel_key_id", ch.KeyID, "platform", tasks[0].Platform)
 		return
 	}
 	apiKey := ch.APIKey
