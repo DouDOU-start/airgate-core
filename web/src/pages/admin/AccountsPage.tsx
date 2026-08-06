@@ -346,13 +346,10 @@ export default function AccountsPage() {
   }
 
   async function handleExportConfirm() {
+    if (selectedIds.length === 0) return;
     setExporting(true);
     try {
-      const resp = await accountsApi.export({
-        keyword: debouncedKeyword || undefined,
-        platform: platformFilter || undefined,
-        state: stateFilter || undefined,
-      });
+      const resp = await accountsApi.export({ ids: selectedIds });
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
       downloadJson(`accounts-export-${stamp}.json`, resp);
       toast('success', t('accounts.export_success', { count: resp.count ?? resp.accounts?.length ?? 0 }));
@@ -483,14 +480,6 @@ export default function AccountsPage() {
 
         <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
           <Button
-            isDisabled={exporting}
-            variant="secondary"
-            onPress={() => setExportConfirmOpen(true)}
-          >
-            {exporting ? <Spinner size="sm" /> : <Download className="h-4 w-4" />}
-            {t('accounts.export')}
-          </Button>
-          <Button
             isDisabled={importing}
             variant="secondary"
             onPress={() => fileInputRef.current?.click()}
@@ -576,6 +565,15 @@ export default function AccountsPage() {
           >
             <Boxes className="h-3.5 w-3.5" />
             {t('accounts.bulk_set_models')}
+          </Button>
+          <Button
+            isDisabled={exporting}
+            size="sm"
+            variant="secondary"
+            onPress={() => setExportConfirmOpen(true)}
+          >
+            {exporting ? <Spinner size="sm" /> : <Download className="h-3.5 w-3.5" />}
+            {t('accounts.export_selected')}
           </Button>
           <Button
             className="text-danger"
@@ -943,8 +941,8 @@ export default function AccountsPage() {
         onOpenChange={(open) => {
           if (!open && !exporting) setExportConfirmOpen(false);
         }}
-        title={t('accounts.export')}
-        description={t('accounts.export_confirm')}
+        title={t('accounts.export_selected')}
+        description={t('accounts.export_selected_confirm', { count: selectedIds.length })}
         loading={exporting}
         status="warning"
         confirmVariant="primary"

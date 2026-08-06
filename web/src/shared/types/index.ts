@@ -1664,6 +1664,8 @@ export interface UpdateAccountReq {
 export type AccountSortBy = 'priority' | 'weight' | 'concurrency' | 'rpm' | 'created_at';
 
 export interface AccountListQuery extends PageReq {
+  /** 限定账号 ID；导出已选账号时使用，序列化为逗号分隔列表。 */
+  ids?: number[];
   keyword?: string;
   platform?: string;
   state?: AccountState | string;
