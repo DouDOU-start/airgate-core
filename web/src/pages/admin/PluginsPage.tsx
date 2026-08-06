@@ -130,22 +130,11 @@ export default function PluginsPage() {
                 data-state={plugin.running ? 'running' : plugin.enabled ? 'enabled' : 'disabled'}
                 key={plugin.id}
               >
-                <div className="flex items-start gap-3">
+                <header className="ag-plugin-card__header">
                   <div className="ag-plugin-card__icon">
-                    <PlugZap className="h-4 w-4" />
+                    <PlugZap className="h-[1.125rem] w-[1.125rem]" />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                      <h2 className="truncate text-sm font-semibold text-text">{plugin.name || plugin.id}</h2>
-                      <span className="font-mono text-[10px] text-text-tertiary">{plugin.id}</span>
-                    </div>
-                    {plugin.description ? (
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-text-secondary" title={plugin.description}>
-                        {plugin.description}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="ag-plugin-card__runtime">
                     {isToggling ? <Spinner size="sm" /> : (
                       <Chip color={plugin.running ? 'success' : plugin.enabled ? 'warning' : 'default'} size="sm" variant="soft">
                         {plugin.running
@@ -162,95 +151,111 @@ export default function PluginsPage() {
                       onChange={(enabled) => handleToggle(plugin, enabled)}
                     />
                   </div>
+                </header>
+
+                <div className="ag-plugin-card__identity">
+                  <h2 className="ag-plugin-card__title" title={plugin.name || plugin.id}>
+                    {plugin.name || plugin.id}
+                  </h2>
+                  <span className="ag-plugin-card__id" title={plugin.id}>{plugin.id}</span>
+                  {plugin.description ? (
+                    <p className="ag-plugin-card__description" title={plugin.description}>
+                      {plugin.description}
+                    </p>
+                  ) : null}
                 </div>
 
                 {plugin.error ? (
-                  <div className="mt-3 border-l-2 border-danger bg-danger/5 px-3 py-2 text-xs text-danger" title={plugin.error}>
+                  <div className="ag-plugin-card__error" title={plugin.error}>
                     <div className="line-clamp-2">{plugin.error}</div>
                   </div>
                 ) : null}
 
                 <div className="ag-plugin-card__meta">
-                  <div className="min-w-0">
-                    <div className="text-[10px] text-text-tertiary">{t('plugins.type')}</div>
-                    <div className="mt-1 flex min-w-0 items-center gap-2">
+                  <div className="ag-plugin-card__meta-item">
+                    <div className="ag-plugin-card__meta-label">{t('plugins.type')}</div>
+                    <div className="ag-plugin-card__meta-value ag-plugin-card__meta-value--inline">
                       <Chip size="sm" variant="soft">{plugin.type || t('plugins.type_unknown')}</Chip>
-                      <span className="font-mono text-[10px] text-text-tertiary" title={t('plugins.priority')}>
+                      <span className="ag-plugin-card__priority" title={t('plugins.priority')}>
                         P{plugin.priority}
                       </span>
                     </div>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] text-text-tertiary">{t('plugins.version')}</div>
-                    <div className="mt-1 truncate font-mono text-xs text-text">
+                  <div className="ag-plugin-card__meta-item">
+                    <div className="ag-plugin-card__meta-label">{t('plugins.version')}</div>
+                    <div className="ag-plugin-card__meta-value ag-plugin-card__version">
                       {plugin.version || '—'}
                       {plugin.protocol_version ? (
-                        <span className="ml-2 text-[10px] text-text-tertiary">
+                        <span className="ag-plugin-card__protocol-version">
                           {t('plugins.protocol_version', { version: plugin.protocol_version })}
                         </span>
                       ) : null}
                     </div>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] text-text-tertiary">{t('plugins.source')}</div>
-                    <div className="mt-1 truncate text-xs text-text" title={plugin.source}>
-                      {formatSource(plugin.source, t)}
-                      <span className="ml-2 font-mono text-[10px] text-text-tertiary">{formatBytes(plugin.binary_size)}</span>
+                  <div className="ag-plugin-card__meta-item ag-plugin-card__meta-item--wide">
+                    <div className="ag-plugin-card__meta-label">{t('plugins.source')}</div>
+                    <div className="ag-plugin-card__meta-value ag-plugin-card__source" title={plugin.source}>
+                      <span className="truncate">{formatSource(plugin.source, t)}</span>
+                      <span className="ag-plugin-card__binary-size">{formatBytes(plugin.binary_size)}</span>
                     </div>
                   </div>
-                  <div className="col-span-2 min-w-0 sm:col-span-3">
-                    <div className="text-[10px] text-text-tertiary">{t('plugins.capabilities')}</div>
-                    <div className="mt-1 flex min-h-5 flex-wrap gap-1">
+                  <div className="ag-plugin-card__meta-item ag-plugin-card__meta-item--capabilities">
+                    <div className="ag-plugin-card__meta-label">{t('plugins.capabilities')}</div>
+                    <div className="ag-plugin-card__capabilities">
                       {(plugin.capabilities ?? []).length > 0 ? plugin.capabilities.map((capability) => (
                         <span
-                          className="max-w-full truncate rounded-[var(--radius-sm)] border border-border px-1.5 py-0.5 font-mono text-[10px] text-text-secondary"
+                          className="ag-plugin-card__capability"
                           key={capability}
                           title={capability}
                         >
                           {capability}
                         </span>
                       )) : (
-                        <span className="text-[10px] text-text-tertiary">{t('plugins.capabilities_none')}</span>
+                        <span className="ag-plugin-card__capabilities-empty">{t('plugins.capabilities_none')}</span>
                       )}
                     </div>
                   </div>
                 </div>
 
                 <div className="ag-plugin-card__footer">
-                  <span className="mr-auto text-[10px] text-text-tertiary">
+                  <span className="ag-plugin-card__updated-at">
                     {t('plugins.updated_at')} {formatDateTime(plugin.updated_at)}
                   </span>
-                  <Button
-                    isDisabled={!plugin.config_schema?.fields.length}
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => {
-                      setEnableAfterConfig(false);
-                      setConfigTarget(plugin);
-                    }}
-                  >
-                    <FileSliders className="h-3.5 w-3.5" />
-                    {t('plugins.configure')}
-                  </Button>
-                  <Button
-                    isDisabled={!plugin.enabled || reloadMutation.isPending}
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => reloadMutation.mutate(plugin.id)}
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${isReloading ? 'animate-spin' : ''}`} />
-                    {t('plugins.reload')}
-                  </Button>
-                  <Button
-                    isIconOnly
-                    aria-label={t('plugins.uninstall')}
-                    className="text-danger"
-                    size="sm"
-                    variant="danger-soft"
-                    onPress={() => setUninstallTarget(plugin)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  <div className="ag-plugin-card__actions">
+                    <Button
+                      className="ag-plugin-card__action"
+                      isDisabled={!plugin.config_schema?.fields.length}
+                      size="sm"
+                      variant="secondary"
+                      onPress={() => {
+                        setEnableAfterConfig(false);
+                        setConfigTarget(plugin);
+                      }}
+                    >
+                      <FileSliders className="h-3.5 w-3.5" />
+                      {t('plugins.configure')}
+                    </Button>
+                    <Button
+                      className="ag-plugin-card__action"
+                      isDisabled={!plugin.enabled || reloadMutation.isPending}
+                      size="sm"
+                      variant="secondary"
+                      onPress={() => reloadMutation.mutate(plugin.id)}
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isReloading ? 'animate-spin' : ''}`} />
+                      {t('plugins.reload')}
+                    </Button>
+                    <Button
+                      isIconOnly
+                      aria-label={t('plugins.uninstall')}
+                      className="ag-plugin-card__delete text-danger"
+                      size="sm"
+                      variant="danger-soft"
+                      onPress={() => setUninstallTarget(plugin)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </article>
             );
