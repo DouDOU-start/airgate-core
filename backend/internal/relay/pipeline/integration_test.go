@@ -993,10 +993,13 @@ func (panicAdaptor) ParseNonStreamResponse(*adaptor.RelayInfo, []byte) ([]byte, 
 
 // TestExecutePanicRecovered execute 内 panic：渠道槽/RPM 释放路径不被跳过，
 // panic 继续向上由 Recovery 中间件转 500，进程与后续请求不受影响。
-// Pick 有协议过滤，借用 openai 协议组内的 custom 类型注册 panic 适配器（测后还原）。
+// 临时替换 openai_compatible 适配器，测试结束后恢复。
 func TestExecutePanicRecovered(t *testing.T) {
-	adaptor.Register("custom", func() adaptor.Adaptor { return panicAdaptor{} })
-	defer adaptor.Register("custom", func() adaptor.Adaptor { return openaiadaptor.Adaptor{} })
+	restoreAdaptor := func() {
+		adaptor.Register("openai_compatible", func() adaptor.Adaptor { return openaiadaptor.Adaptor{} })
+	}
+	adaptor.Register("openai_compatible", func() adaptor.Adaptor { return panicAdaptor{} })
+	defer restoreAdaptor()
 
 	var hits atomic.Int32
 	var lastBody atomic.Value
@@ -1004,7 +1007,7 @@ func TestExecutePanicRecovered(t *testing.T) {
 	defer good.Close()
 
 	env := newTestEnv(t,
-		testSnap(1, "http://ignored.invalid", func(s *registry.ChannelKeySnapshot) { s.Type = "custom" }),
+		testSnap(1, "http://ignored.invalid"),
 	)
 	engine := gin.New()
 	engine.Use(gin.Recovery())
@@ -1018,6 +1021,7 @@ func TestExecutePanicRecovered(t *testing.T) {
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("panic 应被 Recovery 转 500, got %d", w.Code)
 	}
+	restoreAdaptor()
 
 	// 进程存活、管线可继续服务其他渠道。
 	env2 := newTestEnv(t, testSnap(2, good.URL))

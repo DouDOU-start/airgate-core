@@ -303,7 +303,7 @@ var (
 	ChannelKeysColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "name", Type: field.TypeString, Default: ""},
-		{Name: "type", Type: field.TypeEnum, Enums: []string{"openai_compatible", "anthropic", "gemini", "custom", "openai_video", "suno"}},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"openai_compatible", "anthropic", "gemini", "openai_video", "suno"}},
 		{Name: "api_key", Type: field.TypeString, Default: ""},
 		{Name: "models", Type: field.TypeJSON},
 		{Name: "model_mapping", Type: field.TypeJSON, Nullable: true},

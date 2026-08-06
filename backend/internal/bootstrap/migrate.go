@@ -510,6 +510,24 @@ BEGIN
         END LOOP;
     END IF;
 END $$`,
+
+	// 2026-08：custom 渠道与 openai_compatible 始终共用同一适配器和协议语义，
+	// 移除冗余类型前先把存量端点及更早版本 channels.type 统一归并，避免升级后旧数据失效。
+	`DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'channel_keys' AND column_name = 'type'
+    ) THEN
+        UPDATE channel_keys SET type = 'openai_compatible' WHERE type = 'custom';
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'channels' AND column_name = 'type'
+    ) THEN
+        UPDATE channels SET type = 'openai_compatible' WHERE type = 'custom';
+    END IF;
+END $$`,
 }
 
 // legacyFixups 存量库定点修复清单（幂等；按时间序追加，勿改历史条目）。

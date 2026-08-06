@@ -761,7 +761,6 @@ func validateProtocolSet(key *KeyInput) error {
 		"openai_compatible": {},
 		"anthropic":         {},
 		"gemini":            {},
-		"custom":            {},
 		"openai_video":      {},
 		"suno":              {},
 	}

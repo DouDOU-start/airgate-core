@@ -31,7 +31,7 @@ func (ChannelKey) Fields() []ent.Field {
 		// 兼容列：新业务以 ChannelCredential.name 为准。
 		field.String("name").Default(""),
 		// 类型枚举与旧 Channel.type、adaptor、入口协议常量同值。
-		field.Enum("type").Values("openai_compatible", "anthropic", "gemini", "custom", "openai_video", "suno"),
+		field.Enum("type").Values("openai_compatible", "anthropic", "gemini", "openai_video", "suno"),
 		// 兼容列：新端点固定留空，真实密文只存 ChannelCredential.api_key。
 		field.String("api_key").Default("").Sensitive(),
 		field.JSON("models", []string{}).Default([]string{}),

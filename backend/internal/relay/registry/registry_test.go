@@ -286,15 +286,6 @@ func TestRegistryPick(t *testing.T) {
 			wantID:   2,
 		},
 		{
-			name: "custom key 归 openai 协议组",
-			snaps: []ChannelKeySnapshot{
-				snap(1, func(s *ChannelKeySnapshot) { s.Type = "custom" }),
-			},
-			model:    "gpt-4o",
-			protocol: ProtocolOpenAI,
-			wantID:   1,
-		},
-		{
 			name: "协议无匹配 key 类型时无可用 key",
 			snaps: []ChannelKeySnapshot{
 				snap(1), // openai_compatible

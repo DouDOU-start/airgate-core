@@ -1,4 +1,4 @@
-// Package openai 实现 openai_compatible / custom 渠道适配器：
+// Package openai 实现 openai_compatible 渠道适配器：
 // OpenAI chat completions / responses / images 协议直发
 // （URL 拼接、Bearer 认证、定点改写、usage/张数提取），本就纯透传。
 package openai
@@ -21,9 +21,6 @@ import (
 
 func init() {
 	adaptor.Register("openai_compatible", func() adaptor.Adaptor { return Adaptor{} })
-	// custom = OpenAI 兼容自定义渠道，与 openai_compatible 同协议同适配器
-	//（归 openai 协议组，见 registry 协议过滤表）。
-	adaptor.Register("custom", func() adaptor.Adaptor { return Adaptor{} })
 }
 
 // Adaptor openai_compatible 协议适配器（无状态）。

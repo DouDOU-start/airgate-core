@@ -12,13 +12,12 @@ import type {
   ChannelResp, ChannelType, CreateChannelReq, UpdateChannelReq,
 } from '../../../shared/types';
 
-// 渠道类型选项（值与后端 oneof 校验一致）；custom 也纳入（每把 key 可独立选类型）。
+// 渠道类型选项，值与后端 oneof 校验一致。
 // 定义在此供渠道列表页与 KeyFormModal 复用。
 export const CHANNEL_TYPE_OPTIONS: Array<{ id: ChannelType; label: string }> = [
   { id: 'openai_compatible', label: 'OpenAI Compatible' },
   { id: 'anthropic', label: 'Anthropic' },
   { id: 'gemini', label: 'Gemini' },
-  { id: 'custom', label: 'Custom' },
   // 任务类渠道（异步任务子系统）：视频（Sora 形态 /v1/videos）与 Suno 音乐
   { id: 'openai_video', label: 'OpenAI Video' },
   { id: 'suno', label: 'Suno Music' },

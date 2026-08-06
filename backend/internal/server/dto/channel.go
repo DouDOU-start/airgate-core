@@ -14,7 +14,7 @@ type ChannelKeyResp struct {
 	ChannelName    string            `json:"channel_name"`
 	BaseURL        string            `json:"base_url"`
 	Name           string            `json:"name"`
-	Type           string            `json:"type"` // openai_compatible / anthropic / gemini / custom / openai_video / suno
+	Type           string            `json:"type"` // openai_compatible / anthropic / gemini / openai_video / suno
 	APIKeyHint     string            `json:"api_key_hint"`
 	Models         []string          `json:"models"`
 	ModelMapping   map[string]string `json:"model_mapping"`
@@ -98,8 +98,8 @@ type UpdateChannelReq struct {
 // type/types 留空 = 不调整当前凭证支持的协议端点。
 type ChannelKeyReq struct {
 	Name             *string           `json:"name"`
-	Type             string            `json:"type" binding:"omitempty,oneof=openai_compatible anthropic gemini custom openai_video suno"`
-	Types            []string          `json:"types" binding:"omitempty,min=1,dive,oneof=openai_compatible anthropic gemini custom openai_video suno"`
+	Type             string            `json:"type" binding:"omitempty,oneof=openai_compatible anthropic gemini openai_video suno"`
+	Types            []string          `json:"types" binding:"omitempty,min=1,dive,oneof=openai_compatible anthropic gemini openai_video suno"`
 	APIKey           string            `json:"api_key"`
 	Models           []string          `json:"models"`
 	ModelMapping     map[string]string `json:"model_mapping"`
@@ -152,7 +152,7 @@ type RefreshChannelBalanceResp struct {
 
 // FetchChannelModelsPreviewReq 预览拉取模型请求（key 未保存，直接给连接参数）。
 type FetchChannelModelsPreviewReq struct {
-	Type    string `json:"type" binding:"required,oneof=openai_compatible anthropic gemini custom openai_video suno"`
+	Type    string `json:"type" binding:"required,oneof=openai_compatible anthropic gemini openai_video suno"`
 	BaseURL string `json:"base_url" binding:"required"`
 	APIKey  string `json:"api_key" binding:"required"`
 }
@@ -217,8 +217,8 @@ type ImportChannelItem struct {
 // ImportChannelKeyItem 导入的单把密钥。api_key 为空时该 key 跳过不创建。
 type ImportChannelKeyItem struct {
 	Name                   string            `json:"name"`
-	Type                   string            `json:"type" binding:"omitempty,oneof=openai_compatible anthropic gemini custom openai_video suno"`
-	Types                  []string          `json:"types" binding:"omitempty,min=1,dive,oneof=openai_compatible anthropic gemini custom openai_video suno"`
+	Type                   string            `json:"type" binding:"omitempty,oneof=openai_compatible anthropic gemini openai_video suno"`
+	Types                  []string          `json:"types" binding:"omitempty,min=1,dive,oneof=openai_compatible anthropic gemini openai_video suno"`
 	APIKey                 string            `json:"api_key"`
 	Models                 []string          `json:"models"`
 	ModelMapping           map[string]string `json:"model_mapping"`

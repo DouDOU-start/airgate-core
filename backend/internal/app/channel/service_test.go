@@ -331,6 +331,15 @@ func TestAddKeyRequiresProtocol(t *testing.T) {
 	}
 }
 
+// TestAddKeyRejectsRemovedCustomProtocol 确保已移除的 custom 类型不能通过服务层旧接口继续写入。
+func TestAddKeyRejectsRemovedCustomProtocol(t *testing.T) {
+	svc := NewService(&stubRepo{}, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+
+	if _, err := svc.AddKey(context.Background(), 1, KeyInput{Type: "custom", APIKey: "sk-1"}); !errors.Is(err, ErrInvalidProtocolSet) {
+		t.Fatalf("err = %v，期望 ErrInvalidProtocolSet", err)
+	}
+}
+
 // TestUpdateKeyAllowsEmptyGroups 更新 key 时：GroupIDs 显式传空（解绑全部分组）与 nil（不改动分组）均放行。
 func TestUpdateKeyAllowsEmptyGroups(t *testing.T) {
 	svc := NewService(&stubRepo{}, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")

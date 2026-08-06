@@ -13,7 +13,6 @@ export const TYPE_CHIP_COLORS: Record<ChannelType, 'accent' | 'warning' | 'succe
   openai_compatible: 'accent',
   anthropic: 'warning',
   gemini: 'success',
-  custom: 'default',
   openai_video: 'accent',
   suno: 'warning',
 };

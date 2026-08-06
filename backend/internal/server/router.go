@@ -335,7 +335,7 @@ func (s *Server) registerRoutes() {
 	// 显式静态注册（先于 NoRoute），错误体按入口协议出原生形态（errfmt 按 EntryProtocol 分发）。
 	relayGroup := r.Group("/v1", middleware.APIKeyAuth(s.db))
 	{
-		// OpenAI 协议（openai_compatible / custom 渠道）
+		// OpenAI 协议（openai_compatible 渠道）
 		relayGroup.POST("/chat/completions", s.relay.HandleChatCompletions)
 		relayGroup.POST("/responses", s.relay.HandleResponses)
 		// codex CLI 内置联网搜索（openai 协议，POST 非流式，按次计费）

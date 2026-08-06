@@ -40,9 +40,8 @@ const (
 )
 
 // protocolKeyTypes 入口协议 → 可路由 key Type 集合。
-// custom 语义为「OpenAI 兼容自定义端点」，归 openai 协议组。
 var protocolKeyTypes = map[string]map[string]struct{}{
-	ProtocolOpenAI:      {"openai_compatible": {}, "custom": {}},
+	ProtocolOpenAI:      {"openai_compatible": {}},
 	ProtocolAnthropic:   {"anthropic": {}},
 	ProtocolGemini:      {"gemini": {}},
 	ProtocolOpenAIVideo: {"openai_video": {}},
