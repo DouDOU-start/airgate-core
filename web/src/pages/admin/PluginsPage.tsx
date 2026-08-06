@@ -32,7 +32,6 @@ import { RefreshButton } from '../../shared/components/RefreshButton';
 import { formatDateTime } from '../../shared/utils/format';
 
 const MAX_PLUGIN_SIZE = 500 * 1024 * 1024;
-const PLUGIN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 export default function PluginsPage() {
   const { t } = useTranslation();
@@ -309,23 +308,19 @@ function InstallPluginModal({
   const [mode, setMode] = useState<'upload' | 'url'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [url, setURL] = useState('');
-  const [id, setID] = useState('');
-  const [config, setConfig] = useState('');
 
   useEffect(() => {
     if (!open) {
       setMode('upload');
       setFile(null);
       setURL('');
-      setID('');
-      setConfig('');
     }
   }, [open]);
 
   const installMutation = useMutation({
     mutationFn: () => mode === 'upload'
-      ? pluginsApi.upload(file!, config, id.trim() || undefined)
-      : pluginsApi.installURL({ url: url.trim(), id: id.trim() || undefined, config }),
+      ? pluginsApi.upload(file!)
+      : pluginsApi.installURL({ url: url.trim() }),
     onSuccess: () => {
       toast('success', t('plugins.install_success'));
       onInstalled();
@@ -341,10 +336,6 @@ function InstallPluginModal({
   });
 
   const handleInstall = () => {
-    if (id.trim() && !PLUGIN_ID_PATTERN.test(id.trim())) {
-      toast('error', t('plugins.invalid_id'));
-      return;
-    }
     if (mode === 'upload') {
       if (!file) {
         toast('error', t('plugins.select_file'));
@@ -365,8 +356,8 @@ function InstallPluginModal({
     <Modal state={modalState}>
       <DialogTriggerShim />
       <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="inside" size="lg">
-          <Modal.Dialog className="ag-elevation-modal" style={{ maxWidth: '720px', width: 'min(100%, calc(100vw - 2rem))' }}>
+        <Modal.Container placement="center" scroll="inside" size="sm">
+          <Modal.Dialog className="ag-elevation-modal ag-plugin-install-modal">
             <Modal.Header>
               <Modal.Heading>{t('plugins.install_title')}</Modal.Heading>
               <Modal.CloseTrigger />
@@ -419,32 +410,6 @@ function InstallPluginModal({
                   </HeroTextField>
                 )}
 
-                <HeroTextField fullWidth>
-                  <Label>{t('plugins.requested_id')}</Label>
-                  <Input
-                    className="font-mono"
-                    placeholder="airgate-overage"
-                    value={id}
-                    onChange={(event) => setID(event.target.value)}
-                  />
-                  <div className="mt-1 text-xs text-text-tertiary">{t('plugins.requested_id_hint')}</div>
-                </HeroTextField>
-
-                <HeroTextField fullWidth>
-                  <Label>{t('plugins.initial_config')}</Label>
-                  <TextArea
-                    className="font-mono text-xs leading-5"
-                    placeholder={'enabled: false\n'}
-                    rows={12}
-                    value={config}
-                    onChange={(event) => setConfig(event.target.value)}
-                  />
-                </HeroTextField>
-
-                <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                  <span className="h-2 w-2 rounded-full bg-warning" />
-                  {t('plugins.install_disabled_hint')}
-                </div>
               </div>
             </Modal.Body>
             <Modal.Footer>

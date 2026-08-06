@@ -1678,6 +1678,13 @@
   min-width: 0;
 }
 
+/* 插件安装仅包含单列输入，使用紧凑弹窗宽度。 */
+.ag-elevation-modal.ag-plugin-install-modal,
+.ag-elevation-modal.modal__dialog--sm.ag-plugin-install-modal {
+  width: min(28.75rem, calc(100vw - 2rem)) !important;
+  max-width: min(28.75rem, calc(100vw - 2rem)) !important;
+}
+
 /* 插件管理：轻量运行控制台，空状态始终相对剩余内容区居中。 */
 .ag-plugins-page {
   min-height: calc(100dvh - 5rem);

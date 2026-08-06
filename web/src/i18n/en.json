@@ -1699,7 +1699,6 @@
     "install_upload": "Upload",
     "install_url": "Install from URL",
     "install_success": "Plugin installed",
-    "install_disabled_hint": "State after install: disabled",
     "empty": "No plugins installed",
     "type": "Type",
     "capabilities": "Capabilities",
@@ -1731,10 +1730,6 @@
     "choose_binary": "Choose plugin binary",
     "binary_limit": "Up to 500MB and compatible with this system",
     "download_url": "Binary download URL",
-    "requested_id": "Plugin ID (optional)",
-    "requested_id_hint": "When provided, it must match the ID declared by the plugin",
-    "initial_config": "Initial config.yaml (optional)",
-    "invalid_id": "Invalid plugin ID",
     "select_file": "Choose a plugin binary",
     "file_too_large": "Plugin binary must not exceed 500MB",
     "enter_url": "Enter a plugin download URL"

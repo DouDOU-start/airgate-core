@@ -23,17 +23,13 @@ export interface PluginStatus {
 
 export interface InstallPluginURLRequest {
   url: string;
-  id?: string;
-  config: string;
 }
 
 export const pluginsApi = {
   list: () => get<PluginStatus[]>('/api/v1/admin/plugins'),
-  upload: (file: File, config: string, id?: string) => {
+  upload: (file: File) => {
     const form = new FormData();
     form.append('file', file);
-    form.append('config', config);
-    if (id) form.append('id', id);
     return uploadForm<PluginStatus>('/api/v1/admin/plugins/upload', form);
   },
   installURL: (data: InstallPluginURLRequest) =>

@@ -1699,7 +1699,6 @@
     "install_upload": "本地上传",
     "install_url": "地址安装",
     "install_success": "插件已安装",
-    "install_disabled_hint": "安装后状态：停用",
     "empty": "暂无已安装插件",
     "type": "类型",
     "capabilities": "能力",
@@ -1731,10 +1730,6 @@
     "choose_binary": "选择插件二进制",
     "binary_limit": "最大 500MB，需与当前系统兼容",
     "download_url": "二进制下载地址",
-    "requested_id": "插件 ID（可选）",
-    "requested_id_hint": "填写后必须与插件声明的 ID 一致",
-    "initial_config": "初始 config.yaml（可选）",
-    "invalid_id": "插件 ID 格式无效",
     "select_file": "请选择插件二进制文件",
     "file_too_large": "插件二进制不能超过 500MB",
     "enter_url": "请输入插件下载地址"
