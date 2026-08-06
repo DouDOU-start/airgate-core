@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelcredential"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -23,6 +24,20 @@ type ChannelKeyCreate struct {
 	mutation *ChannelKeyMutation
 	hooks    []Hook
 	conflict []sql.ConflictOption
+}
+
+// SetCredentialID sets the "credential_id" field.
+func (ckc *ChannelKeyCreate) SetCredentialID(i int) *ChannelKeyCreate {
+	ckc.mutation.SetCredentialID(i)
+	return ckc
+}
+
+// SetNillableCredentialID sets the "credential_id" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableCredentialID(i *int) *ChannelKeyCreate {
+	if i != nil {
+		ckc.SetCredentialID(*i)
+	}
+	return ckc
 }
 
 // SetName sets the "name" field.
@@ -48,6 +63,14 @@ func (ckc *ChannelKeyCreate) SetType(c channelkey.Type) *ChannelKeyCreate {
 // SetAPIKey sets the "api_key" field.
 func (ckc *ChannelKeyCreate) SetAPIKey(s string) *ChannelKeyCreate {
 	ckc.mutation.SetAPIKey(s)
+	return ckc
+}
+
+// SetNillableAPIKey sets the "api_key" field if the given value is not nil.
+func (ckc *ChannelKeyCreate) SetNillableAPIKey(s *string) *ChannelKeyCreate {
+	if s != nil {
+		ckc.SetAPIKey(*s)
+	}
 	return ckc
 }
 
@@ -459,6 +482,11 @@ func (ckc *ChannelKeyCreate) SetNillableUpdatedAt(t *time.Time) *ChannelKeyCreat
 	return ckc
 }
 
+// SetCredential sets the "credential" edge to the ChannelCredential entity.
+func (ckc *ChannelKeyCreate) SetCredential(c *ChannelCredential) *ChannelKeyCreate {
+	return ckc.SetCredentialID(c.ID)
+}
+
 // SetChannelID sets the "channel" edge to the Channel entity by ID.
 func (ckc *ChannelKeyCreate) SetChannelID(id int) *ChannelKeyCreate {
 	ckc.mutation.SetChannelID(id)
@@ -538,6 +566,10 @@ func (ckc *ChannelKeyCreate) defaults() {
 	if _, ok := ckc.mutation.Name(); !ok {
 		v := channelkey.DefaultName
 		ckc.mutation.SetName(v)
+	}
+	if _, ok := ckc.mutation.APIKey(); !ok {
+		v := channelkey.DefaultAPIKey
+		ckc.mutation.SetAPIKey(v)
 	}
 	if _, ok := ckc.mutation.Models(); !ok {
 		v := channelkey.DefaultModels
@@ -648,11 +680,6 @@ func (ckc *ChannelKeyCreate) check() error {
 	}
 	if _, ok := ckc.mutation.APIKey(); !ok {
 		return &ValidationError{Name: "api_key", err: errors.New(`ent: missing required field "ChannelKey.api_key"`)}
-	}
-	if v, ok := ckc.mutation.APIKey(); ok {
-		if err := channelkey.APIKeyValidator(v); err != nil {
-			return &ValidationError{Name: "api_key", err: fmt.Errorf(`ent: validator failed for field "ChannelKey.api_key": %w`, err)}
-		}
 	}
 	if _, ok := ckc.mutation.Models(); !ok {
 		return &ValidationError{Name: "models", err: errors.New(`ent: missing required field "ChannelKey.models"`)}
@@ -913,6 +940,23 @@ func (ckc *ChannelKeyCreate) createSpec() (*ChannelKey, *sqlgraph.CreateSpec) {
 		_spec.SetField(channelkey.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
 	}
+	if nodes := ckc.mutation.CredentialIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   channelkey.CredentialTable,
+			Columns: []string{channelkey.CredentialColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelcredential.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.CredentialID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
 	if nodes := ckc.mutation.ChannelIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -969,7 +1013,7 @@ func (ckc *ChannelKeyCreate) createSpec() (*ChannelKey, *sqlgraph.CreateSpec) {
 // of the `INSERT` statement. For example:
 //
 //	client.ChannelKey.Create().
-//		SetName(v).
+//		SetCredentialID(v).
 //		OnConflict(
 //			// Update the row with the new values
 //			// the was proposed for insertion.
@@ -978,7 +1022,7 @@ func (ckc *ChannelKeyCreate) createSpec() (*ChannelKey, *sqlgraph.CreateSpec) {
 //		// Override some of the fields with custom
 //		// update values.
 //		Update(func(u *ent.ChannelKeyUpsert) {
-//			SetName(v+v).
+//			SetCredentialID(v+v).
 //		}).
 //		Exec(ctx)
 func (ckc *ChannelKeyCreate) OnConflict(opts ...sql.ConflictOption) *ChannelKeyUpsertOne {
@@ -1013,6 +1057,24 @@ type (
 		*sql.UpdateSet
 	}
 )
+
+// SetCredentialID sets the "credential_id" field.
+func (u *ChannelKeyUpsert) SetCredentialID(v int) *ChannelKeyUpsert {
+	u.Set(channelkey.FieldCredentialID, v)
+	return u
+}
+
+// UpdateCredentialID sets the "credential_id" field to the value that was provided on create.
+func (u *ChannelKeyUpsert) UpdateCredentialID() *ChannelKeyUpsert {
+	u.SetExcluded(channelkey.FieldCredentialID)
+	return u
+}
+
+// ClearCredentialID clears the value of the "credential_id" field.
+func (u *ChannelKeyUpsert) ClearCredentialID() *ChannelKeyUpsert {
+	u.SetNull(channelkey.FieldCredentialID)
+	return u
+}
 
 // SetName sets the "name" field.
 func (u *ChannelKeyUpsert) SetName(v string) *ChannelKeyUpsert {
@@ -1579,6 +1641,27 @@ func (u *ChannelKeyUpsertOne) Update(set func(*ChannelKeyUpsert)) *ChannelKeyUps
 		set(&ChannelKeyUpsert{UpdateSet: update})
 	}))
 	return u
+}
+
+// SetCredentialID sets the "credential_id" field.
+func (u *ChannelKeyUpsertOne) SetCredentialID(v int) *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetCredentialID(v)
+	})
+}
+
+// UpdateCredentialID sets the "credential_id" field to the value that was provided on create.
+func (u *ChannelKeyUpsertOne) UpdateCredentialID() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateCredentialID()
+	})
+}
+
+// ClearCredentialID clears the value of the "credential_id" field.
+func (u *ChannelKeyUpsertOne) ClearCredentialID() *ChannelKeyUpsertOne {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.ClearCredentialID()
+	})
 }
 
 // SetName sets the "name" field.
@@ -2325,7 +2408,7 @@ func (ckcb *ChannelKeyCreateBulk) ExecX(ctx context.Context) {
 //		// Override some of the fields with custom
 //		// update values.
 //		Update(func(u *ent.ChannelKeyUpsert) {
-//			SetName(v+v).
+//			SetCredentialID(v+v).
 //		}).
 //		Exec(ctx)
 func (ckcb *ChannelKeyCreateBulk) OnConflict(opts ...sql.ConflictOption) *ChannelKeyUpsertBulk {
@@ -2399,6 +2482,27 @@ func (u *ChannelKeyUpsertBulk) Update(set func(*ChannelKeyUpsert)) *ChannelKeyUp
 		set(&ChannelKeyUpsert{UpdateSet: update})
 	}))
 	return u
+}
+
+// SetCredentialID sets the "credential_id" field.
+func (u *ChannelKeyUpsertBulk) SetCredentialID(v int) *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.SetCredentialID(v)
+	})
+}
+
+// UpdateCredentialID sets the "credential_id" field to the value that was provided on create.
+func (u *ChannelKeyUpsertBulk) UpdateCredentialID() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.UpdateCredentialID()
+	})
+}
+
+// ClearCredentialID clears the value of the "credential_id" field.
+func (u *ChannelKeyUpsertBulk) ClearCredentialID() *ChannelKeyUpsertBulk {
+	return u.Update(func(s *ChannelKeyUpsert) {
+		s.ClearCredentialID()
+	})
 }
 
 // SetName sets the "name" field.

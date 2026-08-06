@@ -59,17 +59,19 @@ type Repository interface {
 
 	// FindKeyByID 按密钥端点 ID 查单把 key（含所属渠道 base_url 与 groups 边）。
 	FindKeyByID(ctx context.Context, keyID int) (ChannelKey, error)
-	// CreateKey 在指定渠道下新增一把 key。
+	// CreateKey 在指定渠道下新增一条物理凭证及其协议端点。
 	CreateKey(ctx context.Context, channelID int, key KeyInput) (ChannelKey, error)
-	// UpdateKey 单把密钥端点 partial 更新（模型弹窗等按 key 编辑用）。
+	// UpdateKey 更新物理凭证共享配置和当前协议端点；可同步整套协议端点。
 	UpdateKey(ctx context.Context, keyID int, key KeyInput) (ChannelKey, error)
 	// DeleteKey 删除一把 key。
 	DeleteKey(ctx context.Context, keyID int) error
 	// UpdateKeyState 更新密钥端点调度状态（注册表异步落库与测试恢复共用）。
 	UpdateKeyState(ctx context.Context, keyID int, status string, errMsg string) error
+	// UpdateCredentialState 更新物理凭证整体状态；401 时用于同时停止其下全部协议端点。
+	UpdateCredentialState(ctx context.Context, credentialID int, status string, errMsg string) error
 	// UpdateKeyTestResult 记录密钥端点测试结果。
 	UpdateKeyTestResult(ctx context.Context, keyID int, responseTimeMs int, testedAt time.Time) error
-	// UpdateKeyBalance 记录密钥端点余额刷新结果（key 级）。
+	// UpdateKeyBalance 通过协议端点记录物理凭证共享余额。
 	UpdateKeyBalance(ctx context.Context, keyID int, balance float64, updatedAt time.Time) error
 
 	// ---- 健康探针 ----
@@ -79,13 +81,13 @@ type Repository interface {
 	UpdateKeyProbeTime(ctx context.Context, keyID int, at time.Time) error
 	// ListProbeEnabledKeys 查询所有 probe_enabled=true 的 key 的健康快照。
 	ListProbeEnabledKeys(ctx context.Context) ([]KeyHealthSnapshot, error)
-	// ListBalanceSyncTargets 查询 balance_check_enabled=true 且余额过期的已启用 key ID。
+	// ListBalanceSyncTargets 查询余额过期的已启用凭证，并为每条凭证返回一个协议端点 ID。
 	ListBalanceSyncTargets(ctx context.Context, staleBefore time.Time) ([]int, error)
 
 	// ---- 上游倍率探测 ----
-	// ListUpstreamRateTargets 查询 upstream_rate_enabled=true 的 key（含 base_url + 解密 API key）。
+	// ListUpstreamRateTargets 查询启用倍率探测的物理凭证，每条凭证只返回一个协议端点。
 	ListUpstreamRateTargets(ctx context.Context) ([]UpstreamRateTarget, error)
-	// UpdateUpstreamRate 更新密钥端点的上游倍率探测结果。
+	// UpdateUpstreamRate 通过协议端点更新物理凭证共享倍率。
 	UpdateUpstreamRate(ctx context.Context, keyID int, rate float64, at time.Time) error
 }
 
@@ -129,32 +131,36 @@ type Channel struct {
 // ChannelKey 渠道下的一把密钥端点领域对象。APIKey 存密文（AES-GCM base64），
 // APIKeyHint 由 service 解密生成（尾 4 位提示），不落库；BaseURL 由所属渠道反规范化填充。
 type ChannelKey struct {
-	ID               int
-	ChannelID        int
-	ChannelName      string
-	BaseURL          string
-	Name             string
-	Type             string
-	APIKey           string
-	APIKeyHint       string
-	Models           []string
-	ModelMapping     map[string]string
-	ParamOverride    map[string]any
-	HeaderOverride   map[string]string
-	Status           string
-	ErrorMsg         string
-	Priority         int
-	Weight           int
-	MaxConcurrency   int
-	MaxRPM           int
-	CostRatio        float64
-	Tags             []string
-	TestModel        string
-	ResponseTimeMs   int
-	TestedAt         *time.Time
-	LastUsedAt       *time.Time
-	Balance          float64
-	BalanceUpdatedAt *time.Time
+	ID                  int
+	CredentialID        int
+	CredentialStatus    string
+	CredentialErrorMsg  string
+	CredentialProtocols []string
+	ChannelID           int
+	ChannelName         string
+	BaseURL             string
+	Name                string
+	Type                string
+	APIKey              string
+	APIKeyHint          string
+	Models              []string
+	ModelMapping        map[string]string
+	ParamOverride       map[string]any
+	HeaderOverride      map[string]string
+	Status              string
+	ErrorMsg            string
+	Priority            int
+	Weight              int
+	MaxConcurrency      int
+	MaxRPM              int
+	CostRatio           float64
+	Tags                []string
+	TestModel           string
+	ResponseTimeMs      int
+	TestedAt            *time.Time
+	LastUsedAt          *time.Time
+	Balance             float64
+	BalanceUpdatedAt    *time.Time
 	// BalanceCheckEnabled 是否参与主动余额刷新（自动/批量）；关闭后手动单把查询仍可用。
 	BalanceCheckEnabled bool
 
@@ -237,27 +243,31 @@ type KeyListResult struct {
 	PageSize int
 }
 
-// KeyInput 单把密钥端点的写入输入（新增/更新共用）。
+// KeyInput 物理凭证及协议端点的写入输入（新增/更新共用）。
 //   - APIKey 传明文；更新既有 key 时空串 = 保持原密钥不变。
 //   - 指针标量 nil = 新增取默认 / 更新不改。
 //   - Models/ModelMapping/ParamOverride/HeaderOverride/Tags/GroupIDs
 //     非 nil = 整组替换；更新既有 key 时 nil = 不改。
 type KeyInput struct {
-	Name           string
-	Type           string
+	Name string
+	Type string
+	// Types 非 nil 时表示同一物理凭证启用的完整协议集合；为空时兼容旧的单 Type 写法。
+	Types          []string
 	APIKey         string
 	Models         []string
 	ModelMapping   map[string]string
 	ParamOverride  map[string]any
 	HeaderOverride map[string]string
 	Status         *string
-	Priority       *int
-	Weight         *int
-	MaxConcurrency *int
-	MaxRPM         *int
-	CostRatio      *float64
-	Tags           []string
-	TestModel      *string
+	// CredentialStatus 单独控制物理凭证整体状态；省略时不修改。
+	CredentialStatus *string
+	Priority         *int
+	Weight           *int
+	MaxConcurrency   *int
+	MaxRPM           *int
+	CostRatio        *float64
+	Tags             []string
+	TestModel        *string
 	// BalanceCheckEnabled nil = 新增取默认 true / 更新不改。
 	BalanceCheckEnabled *bool
 	// ProbeEnabled nil = 新增取默认 false / 更新不改。

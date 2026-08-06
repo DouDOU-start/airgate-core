@@ -19,6 +19,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/bookmark"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelcredential"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/inviteprofile"
@@ -104,6 +105,7 @@ func checkColumn(table, column string) error {
 			balancelog.Table:            balancelog.ValidColumn,
 			bookmark.Table:              bookmark.ValidColumn,
 			channel.Table:               channel.ValidColumn,
+			channelcredential.Table:     channelcredential.ValidColumn,
 			channelkey.Table:            channelkey.ValidColumn,
 			group.Table:                 group.ValidColumn,
 			inviteprofile.Table:         inviteprofile.ValidColumn,

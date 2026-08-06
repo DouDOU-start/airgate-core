@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelcredential"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 )
 
@@ -19,6 +20,8 @@ type ChannelKey struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
+	// CredentialID holds the value of the "credential_id" field.
+	CredentialID *int `json:"credential_id,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
 	// Type holds the value of the "type" field.
@@ -98,6 +101,8 @@ type ChannelKey struct {
 
 // ChannelKeyEdges holds the relations/edges for other nodes in the graph.
 type ChannelKeyEdges struct {
+	// Credential holds the value of the credential edge.
+	Credential *ChannelCredential `json:"credential,omitempty"`
 	// Channel holds the value of the channel edge.
 	Channel *Channel `json:"channel,omitempty"`
 	// Groups holds the value of the groups edge.
@@ -106,7 +111,18 @@ type ChannelKeyEdges struct {
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [4]bool
+}
+
+// CredentialOrErr returns the Credential value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e ChannelKeyEdges) CredentialOrErr() (*ChannelCredential, error) {
+	if e.Credential != nil {
+		return e.Credential, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: channelcredential.Label}
+	}
+	return nil, &NotLoadedError{edge: "credential"}
 }
 
 // ChannelOrErr returns the Channel value or an error if the edge
@@ -114,7 +130,7 @@ type ChannelKeyEdges struct {
 func (e ChannelKeyEdges) ChannelOrErr() (*Channel, error) {
 	if e.Channel != nil {
 		return e.Channel, nil
-	} else if e.loadedTypes[0] {
+	} else if e.loadedTypes[1] {
 		return nil, &NotFoundError{label: channel.Label}
 	}
 	return nil, &NotLoadedError{edge: "channel"}
@@ -123,7 +139,7 @@ func (e ChannelKeyEdges) ChannelOrErr() (*Channel, error) {
 // GroupsOrErr returns the Groups value or an error if the edge
 // was not loaded in eager-loading.
 func (e ChannelKeyEdges) GroupsOrErr() ([]*Group, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.Groups, nil
 	}
 	return nil, &NotLoadedError{edge: "groups"}
@@ -132,7 +148,7 @@ func (e ChannelKeyEdges) GroupsOrErr() ([]*Group, error) {
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e ChannelKeyEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[3] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
@@ -149,7 +165,7 @@ func (*ChannelKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case channelkey.FieldCostRatio, channelkey.FieldBalance, channelkey.FieldUpstreamRate:
 			values[i] = new(sql.NullFloat64)
-		case channelkey.FieldID, channelkey.FieldPriority, channelkey.FieldWeight, channelkey.FieldMaxConcurrency, channelkey.FieldMaxRpm, channelkey.FieldResponseTimeMs, channelkey.FieldConsecutiveFailures, channelkey.FieldConsecutiveSuccesses:
+		case channelkey.FieldID, channelkey.FieldCredentialID, channelkey.FieldPriority, channelkey.FieldWeight, channelkey.FieldMaxConcurrency, channelkey.FieldMaxRpm, channelkey.FieldResponseTimeMs, channelkey.FieldConsecutiveFailures, channelkey.FieldConsecutiveSuccesses:
 			values[i] = new(sql.NullInt64)
 		case channelkey.FieldName, channelkey.FieldType, channelkey.FieldAPIKey, channelkey.FieldStatus, channelkey.FieldErrorMsg, channelkey.FieldTestModel, channelkey.FieldProbeModel, channelkey.FieldHealthStatus, channelkey.FieldUpstreamRatePath:
 			values[i] = new(sql.NullString)
@@ -178,6 +194,13 @@ func (ck *ChannelKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			ck.ID = int(value.Int64)
+		case channelkey.FieldCredentialID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field credential_id", values[i])
+			} else if value.Valid {
+				ck.CredentialID = new(int)
+				*ck.CredentialID = int(value.Int64)
+			}
 		case channelkey.FieldName:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field name", values[i])
@@ -423,6 +446,11 @@ func (ck *ChannelKey) Value(name string) (ent.Value, error) {
 	return ck.selectValues.Get(name)
 }
 
+// QueryCredential queries the "credential" edge of the ChannelKey entity.
+func (ck *ChannelKey) QueryCredential() *ChannelCredentialQuery {
+	return NewChannelKeyClient(ck.config).QueryCredential(ck)
+}
+
 // QueryChannel queries the "channel" edge of the ChannelKey entity.
 func (ck *ChannelKey) QueryChannel() *ChannelQuery {
 	return NewChannelKeyClient(ck.config).QueryChannel(ck)
@@ -461,6 +489,11 @@ func (ck *ChannelKey) String() string {
 	var builder strings.Builder
 	builder.WriteString("ChannelKey(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", ck.ID))
+	if v := ck.CredentialID; v != nil {
+		builder.WriteString("credential_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	builder.WriteString("name=")
 	builder.WriteString(ck.Name)
 	builder.WriteString(", ")

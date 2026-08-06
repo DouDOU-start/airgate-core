@@ -341,19 +341,23 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			hardExcludeKeys = append(hardExcludeKeys, ch.KeyID)
 			continue
 		}
+		capacityID := ch.CredentialID
+		if capacityID <= 0 {
+			capacityID = ch.KeyID
+		}
 
-		// key RPM + 并发闸门：满则软排除（可排队重竞争），不消耗 attempt。
+		// 物理凭证 RPM + 并发闸门：同一 API Key 的多个协议端点共享限额。
 		// rpmMinute 为预递增所用的分钟窗口，失败回退时对同一窗口 decrement
 		//（不重取当前时间，防跨分钟边界扣穿新窗口）。
-		rpmOK, rpmMinute, _ := p.rpm.TryIncrementKeyRPM(ctx, ch.KeyID, ch.MaxRPM)
+		rpmOK, rpmMinute, _ := p.rpm.TryIncrementKeyRPM(ctx, capacityID, ch.MaxRPM)
 		if !rpmOK {
 			summary.localCapacity = true
 			softExcludeKeys = append(softExcludeKeys, ch.KeyID)
 			continue
 		}
 		requestID := uuid.New().String()
-		if err := p.concurrency.AcquireKeySlot(ctx, ch.KeyID, requestID, ch.MaxConcurrency, channelSlotTTL(req.Stream)); err != nil {
-			p.rpm.DecrementKeyRPM(ctx, ch.KeyID, rpmMinute)
+		if err := p.concurrency.AcquireKeySlot(ctx, capacityID, requestID, ch.MaxConcurrency, channelSlotTTL(req.Stream)); err != nil {
+			p.rpm.DecrementKeyRPM(ctx, capacityID, rpmMinute)
 			summary.localCapacity = true
 			softExcludeKeys = append(softExcludeKeys, ch.KeyID)
 			continue
@@ -372,14 +376,14 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			Client:         p.client,
 		}
 		attemptStart := time.Now()
-		result := p.executeAttempt(c, ad, info, req, start, ch.KeyID, requestID, rpmMinute)
+		result := p.executeAttempt(c, ad, info, req, start, capacityID, requestID, rpmMinute)
 		attemptLatency := time.Since(attemptStart).Milliseconds()
 		attempts++
 
 		// 构建上游请求即失败（坏请求体/不支持端点/翻译失败）：客户端/配置问题，
 		// 一次性 400 终止，不 failover、不计渠道健康信号。
 		if result.buildErr != nil {
-			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			p.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
 			// 用户可见消息额外抹掉上游渠道身份（base_url/主机/IP）；管理端留痕保留渠道细节。
 			adminMsg := outcome.SanitizeKeyLeak(result.buildErr.Error(), []string{apiKey})
 			userMsg := outcome.SanitizeUpstreamLeak(result.buildErr.Error(), []string{apiKey}, ch.BaseURL)
@@ -395,7 +399,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 
 		// 客户端已取消且未写出任何字节：直接终止（不迁怒 key）。
 		if ctx.Err() != nil && !result.written {
-			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			p.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
 			markCanceled(c)
 			recordCanceled()
 			return
@@ -481,7 +485,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 
 		case outcome.RateLimited:
 			// 仅本次请求内硬排除换 key 重试；不设冷却状态，下次请求照常调度。
-			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			p.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
 			if p.healthTracker != nil {
 				p.healthTracker.RecordFailure(ch.KeyID)
 			}
@@ -497,12 +501,16 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			continue
 
 		case outcome.AuthFailed:
-			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			p.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
 			if p.healthTracker != nil {
 				p.healthTracker.RecordAuthFailure(ch.KeyID)
 			}
 			if settings.AutoBanEnabled {
-				p.registry.MarkAutoDisabled(ch.KeyID, outcome.TruncateErrorMsg(o.Reason))
+				if result.statusCode == http.StatusUnauthorized {
+					p.registry.MarkCredentialAutoDisabled(ch.KeyID, outcome.TruncateErrorMsg(o.Reason))
+				} else {
+					p.registry.MarkAutoDisabled(ch.KeyID, outcome.TruncateErrorMsg(o.Reason))
+				}
 			}
 			hardExcludeKeys = append(hardExcludeKeys, ch.KeyID)
 			summary.authFailed = true
@@ -516,7 +524,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			continue
 
 		case outcome.Transient:
-			p.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			p.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
 			if p.healthTracker != nil {
 				p.healthTracker.RecordFailure(ch.KeyID)
 			}

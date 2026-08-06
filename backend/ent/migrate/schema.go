@@ -255,12 +255,56 @@ var (
 		Columns:    ChannelsColumns,
 		PrimaryKey: []*schema.Column{ChannelsColumns[0]},
 	}
+	// ChannelCredentialsColumns holds the columns for the "channel_credentials" table.
+	ChannelCredentialsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "name", Type: field.TypeString, Default: ""},
+		{Name: "api_key", Type: field.TypeString},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"enabled", "disabled_manual", "disabled_auto"}, Default: "enabled"},
+		{Name: "error_msg", Type: field.TypeString, Default: ""},
+		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
+		{Name: "max_rpm", Type: field.TypeInt, Default: 0},
+		{Name: "cost_ratio", Type: field.TypeFloat64, Default: 1},
+		{Name: "tags", Type: field.TypeJSON, Nullable: true},
+		{Name: "balance", Type: field.TypeFloat64, Default: 0},
+		{Name: "balance_updated_at", Type: field.TypeTime, Nullable: true},
+		{Name: "balance_check_enabled", Type: field.TypeBool, Default: true},
+		{Name: "upstream_rate_enabled", Type: field.TypeBool, Default: false},
+		{Name: "upstream_rate_path", Type: field.TypeString, Default: ""},
+		{Name: "use_upstream_rate_for_cost", Type: field.TypeBool, Default: false},
+		{Name: "upstream_rate", Type: field.TypeFloat64, Default: 0},
+		{Name: "upstream_rate_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "channel_id", Type: field.TypeInt},
+	}
+	// ChannelCredentialsTable holds the schema information for the "channel_credentials" table.
+	ChannelCredentialsTable = &schema.Table{
+		Name:       "channel_credentials",
+		Columns:    ChannelCredentialsColumns,
+		PrimaryKey: []*schema.Column{ChannelCredentialsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "channel_credentials_channels_credentials",
+				Columns:    []*schema.Column{ChannelCredentialsColumns[19]},
+				RefColumns: []*schema.Column{ChannelsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "channelcredential_channel_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{ChannelCredentialsColumns[19], ChannelCredentialsColumns[3]},
+			},
+		},
+	}
 	// ChannelKeysColumns holds the columns for the "channel_keys" table.
 	ChannelKeysColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "name", Type: field.TypeString, Default: ""},
 		{Name: "type", Type: field.TypeEnum, Enums: []string{"openai_compatible", "anthropic", "gemini", "custom", "openai_video", "suno"}},
-		{Name: "api_key", Type: field.TypeString},
+		{Name: "api_key", Type: field.TypeString, Default: ""},
 		{Name: "models", Type: field.TypeJSON},
 		{Name: "model_mapping", Type: field.TypeJSON, Nullable: true},
 		{Name: "param_override", Type: field.TypeJSON, Nullable: true},
@@ -294,6 +338,7 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "channel_keys", Type: field.TypeInt},
+		{Name: "credential_id", Type: field.TypeInt, Nullable: true},
 	}
 	// ChannelKeysTable holds the schema information for the "channel_keys" table.
 	ChannelKeysTable = &schema.Table{
@@ -307,12 +352,23 @@ var (
 				RefColumns: []*schema.Column{ChannelsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
+			{
+				Symbol:     "channel_keys_channel_credentials_keys",
+				Columns:    []*schema.Column{ChannelKeysColumns[37]},
+				RefColumns: []*schema.Column{ChannelCredentialsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
 		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "channelkey_type_status",
 				Unique:  false,
 				Columns: []*schema.Column{ChannelKeysColumns[2], ChannelKeysColumns[8]},
+			},
+			{
+				Name:    "channelkey_credential_id_type",
+				Unique:  false,
+				Columns: []*schema.Column{ChannelKeysColumns[37], ChannelKeysColumns[2]},
 			},
 		},
 	}
@@ -1076,6 +1132,7 @@ var (
 		BalanceLogsTable,
 		BookmarksTable,
 		ChannelsTable,
+		ChannelCredentialsTable,
 		ChannelKeysTable,
 		GroupsTable,
 		InviteProfilesTable,
@@ -1105,7 +1162,9 @@ func init() {
 	APIKeysTable.ForeignKeys[1].RefTable = UsersTable
 	AccountsTable.ForeignKeys[0].RefTable = ProxiesTable
 	BalanceLogsTable.ForeignKeys[0].RefTable = UsersTable
+	ChannelCredentialsTable.ForeignKeys[0].RefTable = ChannelsTable
 	ChannelKeysTable.ForeignKeys[0].RefTable = ChannelsTable
+	ChannelKeysTable.ForeignKeys[1].RefTable = ChannelCredentialsTable
 	ModelPricesTable.ForeignKeys[0].RefTable = ModelTagsTable
 	UsageLogsTable.ForeignKeys[0].RefTable = APIKeysTable
 	UsageLogsTable.ForeignKeys[1].RefTable = AccountsTable

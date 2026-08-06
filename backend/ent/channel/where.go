@@ -285,6 +285,29 @@ func UpdatedAtLTE(v time.Time) predicate.Channel {
 	return predicate.Channel(sql.FieldLTE(FieldUpdatedAt, v))
 }
 
+// HasCredentials applies the HasEdge predicate on the "credentials" edge.
+func HasCredentials() predicate.Channel {
+	return predicate.Channel(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, CredentialsTable, CredentialsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasCredentialsWith applies the HasEdge predicate on the "credentials" edge with a given conditions (other predicates).
+func HasCredentialsWith(preds ...predicate.ChannelCredential) predicate.Channel {
+	return predicate.Channel(func(s *sql.Selector) {
+		step := newCredentialsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasKeys applies the HasEdge predicate on the "keys" edge.
 func HasKeys() predicate.Channel {
 	return predicate.Channel(func(s *sql.Selector) {

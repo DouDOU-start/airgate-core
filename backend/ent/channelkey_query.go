@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelcredential"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
@@ -21,15 +22,16 @@ import (
 // ChannelKeyQuery is the builder for querying ChannelKey entities.
 type ChannelKeyQuery struct {
 	config
-	ctx           *QueryContext
-	order         []channelkey.OrderOption
-	inters        []Interceptor
-	predicates    []predicate.ChannelKey
-	withChannel   *ChannelQuery
-	withGroups    *GroupQuery
-	withUsageLogs *UsageLogQuery
-	withFKs       bool
-	modifiers     []func(*sql.Selector)
+	ctx            *QueryContext
+	order          []channelkey.OrderOption
+	inters         []Interceptor
+	predicates     []predicate.ChannelKey
+	withCredential *ChannelCredentialQuery
+	withChannel    *ChannelQuery
+	withGroups     *GroupQuery
+	withUsageLogs  *UsageLogQuery
+	withFKs        bool
+	modifiers      []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -64,6 +66,28 @@ func (ckq *ChannelKeyQuery) Unique(unique bool) *ChannelKeyQuery {
 func (ckq *ChannelKeyQuery) Order(o ...channelkey.OrderOption) *ChannelKeyQuery {
 	ckq.order = append(ckq.order, o...)
 	return ckq
+}
+
+// QueryCredential chains the current query on the "credential" edge.
+func (ckq *ChannelKeyQuery) QueryCredential() *ChannelCredentialQuery {
+	query := (&ChannelCredentialClient{config: ckq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := ckq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := ckq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(channelkey.Table, channelkey.FieldID, selector),
+			sqlgraph.To(channelcredential.Table, channelcredential.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, channelkey.CredentialTable, channelkey.CredentialColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(ckq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // QueryChannel chains the current query on the "channel" edge.
@@ -319,18 +343,30 @@ func (ckq *ChannelKeyQuery) Clone() *ChannelKeyQuery {
 		return nil
 	}
 	return &ChannelKeyQuery{
-		config:        ckq.config,
-		ctx:           ckq.ctx.Clone(),
-		order:         append([]channelkey.OrderOption{}, ckq.order...),
-		inters:        append([]Interceptor{}, ckq.inters...),
-		predicates:    append([]predicate.ChannelKey{}, ckq.predicates...),
-		withChannel:   ckq.withChannel.Clone(),
-		withGroups:    ckq.withGroups.Clone(),
-		withUsageLogs: ckq.withUsageLogs.Clone(),
+		config:         ckq.config,
+		ctx:            ckq.ctx.Clone(),
+		order:          append([]channelkey.OrderOption{}, ckq.order...),
+		inters:         append([]Interceptor{}, ckq.inters...),
+		predicates:     append([]predicate.ChannelKey{}, ckq.predicates...),
+		withCredential: ckq.withCredential.Clone(),
+		withChannel:    ckq.withChannel.Clone(),
+		withGroups:     ckq.withGroups.Clone(),
+		withUsageLogs:  ckq.withUsageLogs.Clone(),
 		// clone intermediate query.
 		sql:  ckq.sql.Clone(),
 		path: ckq.path,
 	}
+}
+
+// WithCredential tells the query-builder to eager-load the nodes that are connected to
+// the "credential" edge. The optional arguments are used to configure the query builder of the edge.
+func (ckq *ChannelKeyQuery) WithCredential(opts ...func(*ChannelCredentialQuery)) *ChannelKeyQuery {
+	query := (&ChannelCredentialClient{config: ckq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	ckq.withCredential = query
+	return ckq
 }
 
 // WithChannel tells the query-builder to eager-load the nodes that are connected to
@@ -372,12 +408,12 @@ func (ckq *ChannelKeyQuery) WithUsageLogs(opts ...func(*UsageLogQuery)) *Channel
 // Example:
 //
 //	var v []struct {
-//		Name string `json:"name,omitempty"`
+//		CredentialID int `json:"credential_id,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.ChannelKey.Query().
-//		GroupBy(channelkey.FieldName).
+//		GroupBy(channelkey.FieldCredentialID).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (ckq *ChannelKeyQuery) GroupBy(field string, fields ...string) *ChannelKeyGroupBy {
@@ -395,11 +431,11 @@ func (ckq *ChannelKeyQuery) GroupBy(field string, fields ...string) *ChannelKeyG
 // Example:
 //
 //	var v []struct {
-//		Name string `json:"name,omitempty"`
+//		CredentialID int `json:"credential_id,omitempty"`
 //	}
 //
 //	client.ChannelKey.Query().
-//		Select(channelkey.FieldName).
+//		Select(channelkey.FieldCredentialID).
 //		Scan(ctx, &v)
 func (ckq *ChannelKeyQuery) Select(fields ...string) *ChannelKeySelect {
 	ckq.ctx.Fields = append(ckq.ctx.Fields, fields...)
@@ -445,7 +481,8 @@ func (ckq *ChannelKeyQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*
 		nodes       = []*ChannelKey{}
 		withFKs     = ckq.withFKs
 		_spec       = ckq.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [4]bool{
+			ckq.withCredential != nil,
 			ckq.withChannel != nil,
 			ckq.withGroups != nil,
 			ckq.withUsageLogs != nil,
@@ -478,6 +515,12 @@ func (ckq *ChannelKeyQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := ckq.withCredential; query != nil {
+		if err := ckq.loadCredential(ctx, query, nodes, nil,
+			func(n *ChannelKey, e *ChannelCredential) { n.Edges.Credential = e }); err != nil {
+			return nil, err
+		}
+	}
 	if query := ckq.withChannel; query != nil {
 		if err := ckq.loadChannel(ctx, query, nodes, nil,
 			func(n *ChannelKey, e *Channel) { n.Edges.Channel = e }); err != nil {
@@ -501,6 +544,38 @@ func (ckq *ChannelKeyQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*
 	return nodes, nil
 }
 
+func (ckq *ChannelKeyQuery) loadCredential(ctx context.Context, query *ChannelCredentialQuery, nodes []*ChannelKey, init func(*ChannelKey), assign func(*ChannelKey, *ChannelCredential)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*ChannelKey)
+	for i := range nodes {
+		if nodes[i].CredentialID == nil {
+			continue
+		}
+		fk := *nodes[i].CredentialID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(channelcredential.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "credential_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 func (ckq *ChannelKeyQuery) loadChannel(ctx context.Context, query *ChannelQuery, nodes []*ChannelKey, init func(*ChannelKey), assign func(*ChannelKey, *Channel)) error {
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*ChannelKey)
@@ -652,6 +727,9 @@ func (ckq *ChannelKeyQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != channelkey.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if ckq.withCredential != nil {
+			_spec.Node.AddColumnOnce(channelkey.FieldCredentialID)
 		}
 	}
 	if ps := ckq.predicates; len(ps) > 0 {

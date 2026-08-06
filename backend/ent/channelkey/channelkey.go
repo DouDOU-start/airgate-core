@@ -15,6 +15,8 @@ const (
 	Label = "channel_key"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldCredentialID holds the string denoting the credential_id field in the database.
+	FieldCredentialID = "credential_id"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
 	// FieldType holds the string denoting the type field in the database.
@@ -85,6 +87,8 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgeCredential holds the string denoting the credential edge name in mutations.
+	EdgeCredential = "credential"
 	// EdgeChannel holds the string denoting the channel edge name in mutations.
 	EdgeChannel = "channel"
 	// EdgeGroups holds the string denoting the groups edge name in mutations.
@@ -93,6 +97,13 @@ const (
 	EdgeUsageLogs = "usage_logs"
 	// Table holds the table name of the channelkey in the database.
 	Table = "channel_keys"
+	// CredentialTable is the table that holds the credential relation/edge.
+	CredentialTable = "channel_keys"
+	// CredentialInverseTable is the table name for the ChannelCredential entity.
+	// It exists in this package in order to avoid circular dependency with the "channelcredential" package.
+	CredentialInverseTable = "channel_credentials"
+	// CredentialColumn is the table column denoting the credential relation/edge.
+	CredentialColumn = "credential_id"
 	// ChannelTable is the table that holds the channel relation/edge.
 	ChannelTable = "channel_keys"
 	// ChannelInverseTable is the table name for the Channel entity.
@@ -117,6 +128,7 @@ const (
 // Columns holds all SQL columns for channelkey fields.
 var Columns = []string{
 	FieldID,
+	FieldCredentialID,
 	FieldName,
 	FieldType,
 	FieldAPIKey,
@@ -184,8 +196,8 @@ func ValidColumn(column string) bool {
 var (
 	// DefaultName holds the default value on creation for the "name" field.
 	DefaultName string
-	// APIKeyValidator is a validator for the "api_key" field. It is called by the builders before save.
-	APIKeyValidator func(string) error
+	// DefaultAPIKey holds the default value on creation for the "api_key" field.
+	DefaultAPIKey string
 	// DefaultModels holds the default value on creation for the "models" field.
 	DefaultModels []string
 	// DefaultErrorMsg holds the default value on creation for the "error_msg" field.
@@ -324,6 +336,11 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
+}
+
+// ByCredentialID orders the results by the credential_id field.
+func ByCredentialID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCredentialID, opts...).ToFunc()
 }
 
 // ByName orders the results by the name field.
@@ -476,6 +493,13 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
+// ByCredentialField orders the results by credential field.
+func ByCredentialField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newCredentialStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByChannelField orders the results by channel field.
 func ByChannelField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -509,6 +533,13 @@ func ByUsageLogs(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newUsageLogsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
+}
+func newCredentialStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(CredentialInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, CredentialTable, CredentialColumn),
+	)
 }
 func newChannelStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(

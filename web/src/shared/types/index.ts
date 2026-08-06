@@ -599,6 +599,14 @@ export type HealthStatus = 'healthy' | 'degraded' | 'suspended' | 'recovering';
 // 类型 / 模型 / 映射 / 覆写 / 分组 / 优先级权重并发限流 / 成本倍率 / 标签 / 启停状态。
 export interface ChannelKeyResp {
   id: number;
+  /** 同一物理 API Key 的共享凭证 ID */
+  credential_id: number;
+  /** 凭证整体状态；401 会自动禁用整条凭证 */
+  credential_status: ChannelStatus;
+  /** 凭证整体错误原因 */
+  credential_error_msg: string;
+  /** 该物理凭证当前启用的全部协议 */
+  credential_protocols: ChannelType[];
   channel_id: number;
   /** 所属渠道名 / base_url —— 密钥视图（跨渠道平铺）展示用；渠道视图下与父渠道重复 */
   channel_name: string;
@@ -698,14 +706,18 @@ export interface ChannelResp {
 // - models/model_mapping 由列表页「模型」弹窗维护，表单不携带。
 export interface ChannelKeyReq {
   name?: string;
-  // 新增时必填；更新（模型弹窗、单 key 编辑）时可省：type 省=不改、api_key 省/空=保持原密钥。
+  // 新增时 type/types 至少提供一个；更新时均省略表示不调整协议，api_key 省略或留空表示保持原密钥。
   type?: ChannelType;
+  /** 同一物理凭证启用的完整协议集合；提供后后端会同步新增或移除协议端点 */
+  types?: ChannelType[];
   api_key?: string;
   models?: string[];
   model_mapping?: Record<string, string>;
   param_override?: Record<string, unknown>;
   header_override?: Record<string, string>;
   status?: 'enabled' | 'disabled_manual';
+  /** 物理凭证整体状态，与单协议端点状态分离 */
+  credential_status?: 'enabled' | 'disabled_manual';
   priority?: number;
   weight?: number;
   max_concurrency?: number;

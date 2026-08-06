@@ -22,6 +22,36 @@ export function typeLabel(type: string): string {
   return CHANNEL_TYPE_OPTIONS.find((item) => item.id === type)?.label ?? type;
 }
 
+export function CredentialProtocolChips({ channelKey }: { channelKey: ChannelKeyResp }) {
+  const protocols = channelKey.credential_protocols?.length > 0
+    ? channelKey.credential_protocols
+    : [channelKey.type];
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {protocols.map((protocol) => (
+        <Chip
+          color={TYPE_CHIP_COLORS[protocol] ?? 'default'}
+          key={protocol}
+          size="sm"
+          variant={protocol === channelKey.type ? 'soft' : 'secondary'}
+        >
+          {typeLabel(protocol)}
+        </Chip>
+      ))}
+    </span>
+  );
+}
+
+export function effectiveKeyStatus(channelKey: ChannelKeyResp): { status: ChannelStatus; errorMsg: string } {
+  if (channelKey.credential_status && channelKey.credential_status !== 'enabled') {
+    return {
+      status: channelKey.credential_status,
+      errorMsg: channelKey.credential_error_msg || channelKey.error_msg,
+    };
+  }
+  return { status: channelKey.status, errorMsg: channelKey.error_msg };
+}
+
 const HEALTH_CHIP_COLORS: Record<HealthStatus, 'success' | 'warning' | 'danger' | 'accent'> = {
   healthy: 'success',
   degraded: 'warning',
@@ -86,6 +116,157 @@ export function Metric({ label, children }: { label: string; children: ReactNode
 // 指标分组之间的竖向分隔线。
 export function MetricDivider() {
   return <span className="hidden h-7 w-px self-center bg-border sm:block" />;
+}
+
+function formatUSD(value: number): string {
+  return `$${value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+// 密钥视图的配置摘要：把模型与倍率收在同一列，避免和运行、财务指标混排。
+export function KeyConfigurationSummary({
+  channelKey,
+  onRefreshUpstreamRate,
+  refreshingUpstreamRate,
+}: {
+  channelKey: ChannelKeyResp;
+  onRefreshUpstreamRate?: () => void;
+  refreshingUpstreamRate?: boolean;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="ag-key-config-summary">
+      <div className="ag-key-summary-line">
+        <span className="ag-key-summary-label">{t('channels.models')}</span>
+        {channelKey.models.length > 0 ? (
+          <Tooltip>
+            <Tooltip.Trigger className="inline-flex cursor-help">
+              <span className="ag-key-summary-value">{channelKey.models.length}</span>
+            </Tooltip.Trigger>
+            <Tooltip.Content className="max-w-sm">
+              <div className="max-h-56 overflow-y-auto font-mono text-xs leading-5">
+                {channelKey.models.map((model) => (
+                  <div key={model}>{model}</div>
+                ))}
+              </div>
+            </Tooltip.Content>
+          </Tooltip>
+        ) : (
+          <span className="ag-key-summary-value text-text-tertiary">-</span>
+        )}
+      </div>
+
+      <div className="ag-key-summary-line">
+        <span className="ag-key-summary-label">{t('channels.cost_ratio')}</span>
+        <span className="ag-key-summary-value ag-key-rate-value">
+          <span>×{channelKey.cost_ratio}</span>
+          {channelKey.upstream_rate_enabled ? (
+            <>
+              <Tooltip>
+                <Tooltip.Trigger className="inline-flex cursor-help">
+                  <span className="ag-key-upstream-rate">
+                    {channelKey.upstream_rate_at
+                      ? `↑×${channelKey.upstream_rate}`
+                      : `↑${t('channels.upstream_rate_never')}`}
+                  </span>
+                </Tooltip.Trigger>
+                <Tooltip.Content className="max-w-xs">{t('channels.upstream_rate')}</Tooltip.Content>
+              </Tooltip>
+              {onRefreshUpstreamRate ? (
+                <Button
+                  isIconOnly
+                  aria-label={t('channels.upstream_rate')}
+                  className="ag-key-inline-refresh"
+                  isDisabled={refreshingUpstreamRate}
+                  size="sm"
+                  variant="ghost"
+                  onPress={onRefreshUpstreamRate}
+                >
+                  {refreshingUpstreamRate ? <Spinner size="sm" /> : <RefreshCw className="h-3 w-3" />}
+                </Button>
+              ) : null}
+            </>
+          ) : null}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// 密钥视图的运行摘要：三个同尺度指标横向排列，便于逐行比较异常值。
+export function KeyRuntimeSummary({ channelKey }: { channelKey: ChannelKeyResp }) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="ag-key-runtime-summary">
+      <Metric label={t('channels.concurrency_label')}>
+        {channelKey.current_concurrency}/{channelKey.max_concurrency > 0 ? channelKey.max_concurrency : '∞'}
+      </Metric>
+      <Metric label="RPM">{channelKey.current_rpm}</Metric>
+      <Tooltip>
+        <Tooltip.Trigger className="inline-flex cursor-help">
+          <Metric label={t('channels.avg_first_token_ms')}>
+            {channelKey.avg_first_token_ms > 0 ? `${Math.round(channelKey.avg_first_token_ms)}ms` : '-'}
+          </Metric>
+        </Tooltip.Trigger>
+        <Tooltip.Content className="max-w-xs">{t('channels.avg_first_token_ms_hint')}</Tooltip.Content>
+      </Tooltip>
+    </div>
+  );
+}
+
+// 密钥视图的财务摘要：固定为标签、成本、收益三列，余额单独占一行。
+export function KeyFinancialSummary({
+  channelKey,
+  onRefreshBalance,
+  refreshingBalance,
+}: {
+  channelKey: ChannelKeyResp;
+  onRefreshBalance: () => void;
+  refreshingBalance: boolean;
+}) {
+  const { t } = useTranslation();
+  const balanceUpdated = channelKey.balance_updated_at ? new Date(channelKey.balance_updated_at) : null;
+
+  return (
+    <div className="ag-key-finance-summary">
+      <div className="ag-key-finance-head" aria-hidden="true">
+        <span />
+        <span>{t('channels.stats_cost')}</span>
+        <span>{t('channels.stats_revenue')}</span>
+      </div>
+      <div className="ag-key-finance-row">
+        <span className="ag-key-finance-label">{t('channels.stats_today')}</span>
+        <span className="ag-key-finance-cost">{formatUSD(channelKey.today_cost)}</span>
+        <span className="ag-key-finance-revenue">{formatUSD(channelKey.today_revenue)}</span>
+      </div>
+      <div className="ag-key-finance-row">
+        <span className="ag-key-finance-label">{t('channels.stats_total')}</span>
+        <span className="ag-key-finance-cost">{formatUSD(channelKey.total_cost)}</span>
+        <span className="ag-key-finance-revenue">{formatUSD(channelKey.total_revenue)}</span>
+      </div>
+      <div className="ag-key-balance-row">
+        <span className="ag-key-finance-label">{t('channels.balance')}</span>
+        <span className="ag-key-balance-value">
+          {balanceUpdated ? formatUSD(channelKey.balance) : t('channels.balance_never')}
+        </span>
+        <Button
+          isIconOnly
+          aria-label={t('channels.refresh_balance')}
+          className="ag-key-inline-refresh"
+          isDisabled={refreshingBalance}
+          size="sm"
+          variant="ghost"
+          onPress={onRefreshBalance}
+        >
+          {refreshingBalance ? <Spinner size="sm" /> : <RefreshCw className="h-3 w-3" />}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 // 一把 key 的指标行：配置组（模型/优先级权重/成本倍率）| 运行时组（并发/RPM）| 金额组 | 标签，

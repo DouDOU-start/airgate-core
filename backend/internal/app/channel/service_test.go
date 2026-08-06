@@ -2,6 +2,7 @@ package channel
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -56,6 +57,9 @@ func (s *stubRepo) UpdateKeyState(ctx context.Context, keyID int, status string,
 		return nil
 	}
 	return s.updateKeyState(ctx, keyID, status, errMsg)
+}
+func (s *stubRepo) UpdateCredentialState(context.Context, int, string, string) error {
+	return nil
 }
 func (s *stubRepo) UpdateKeyTestResult(ctx context.Context, keyID int, responseTimeMs int, testedAt time.Time) error {
 	if s.updateKeyTestResult == nil {
@@ -307,14 +311,23 @@ func TestLoadAllForRegistryRequiresBothRateSwitches(t *testing.T) {
 func TestAddKeyAllowsEmptyGroups(t *testing.T) {
 	svc := NewService(&stubRepo{}, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 
-	if _, err := svc.AddKey(context.Background(), 1, KeyInput{APIKey: "sk-1", GroupIDs: nil}); err != nil {
+	if _, err := svc.AddKey(context.Background(), 1, KeyInput{Type: "openai_compatible", APIKey: "sk-1", GroupIDs: nil}); err != nil {
 		t.Errorf("GroupIDs=nil: err = %v, want nil", err)
 	}
-	if _, err := svc.AddKey(context.Background(), 1, KeyInput{APIKey: "sk-1", GroupIDs: []int{}}); err != nil {
+	if _, err := svc.AddKey(context.Background(), 1, KeyInput{Type: "openai_compatible", APIKey: "sk-1", GroupIDs: []int{}}); err != nil {
 		t.Errorf("GroupIDs=[]: err = %v, want nil", err)
 	}
-	if _, err := svc.AddKey(context.Background(), 1, KeyInput{APIKey: "sk-1", GroupIDs: []int{1}}); err != nil {
+	if _, err := svc.AddKey(context.Background(), 1, KeyInput{Type: "openai_compatible", APIKey: "sk-1", GroupIDs: []int{1}}); err != nil {
 		t.Errorf("GroupIDs=[1]: err = %v, want nil", err)
+	}
+}
+
+// TestAddKeyRequiresProtocol 确保绕过 HTTP 层调用服务时也不会创建无协议端点的孤儿凭证。
+func TestAddKeyRequiresProtocol(t *testing.T) {
+	svc := NewService(&stubRepo{}, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+
+	if _, err := svc.AddKey(context.Background(), 1, KeyInput{APIKey: "sk-1"}); !errors.Is(err, ErrInvalidProtocolSet) {
+		t.Fatalf("err = %v，期望 ErrInvalidProtocolSet", err)
 	}
 }
 

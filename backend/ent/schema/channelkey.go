@@ -8,27 +8,32 @@ import (
 	"entgo.io/ent/schema/index"
 )
 
-// ChannelKey 渠道下的一把上游密钥端点：路由/调度/限流/故障隔离的最小单元。
+// ChannelKey 渠道凭证下的协议端点：路由、模型、协议配置与故障隔离的最小单元。
 //
-// 每把 key 独立携带协议类型、上游密钥、模型清单与全部转发配置；
-// 所属渠道（Channel）仅提供供应商级共享字段（base_url、上游余额）。
+// 真实 API Key、共享限额、余额与成本配置由 ChannelCredential 保存；本实体继续
+// 保留旧共享列仅用于存量数据库和旧测试代码兼容，新业务不再读写其中的真实密钥。
 // 状态语义与旧 Channel 一致：
 //
 //	enabled          可调度
 //	disabled_manual  手动禁用，永不被自动恢复
-//	disabled_auto    自动禁用（上游 401/403），key 测试通过或转发成功可恢复
+//	disabled_auto    协议端点自动禁用（上游 403），端点测试通过或转发成功可恢复
+//
+// 上游 401 属物理凭证整体失效，由 ChannelCredential.status 承载。
 type ChannelKey struct {
 	ent.Schema
 }
 
 func (ChannelKey) Fields() []ent.Field {
 	return []ent.Field{
+		// credential_id 在自动迁移阶段保持可空，旧数据随后由敏感数据迁移回填。
+		field.Int("credential_id").Optional().Nillable(),
 		// name key 的可选标签（如「claude」「gemini」），仅用于 UI 区分。
+		// 兼容列：新业务以 ChannelCredential.name 为准。
 		field.String("name").Default(""),
 		// 类型枚举与旧 Channel.type、adaptor、入口协议常量同值。
 		field.Enum("type").Values("openai_compatible", "anthropic", "gemini", "custom", "openai_video", "suno"),
-		// api_key 单把密钥的 AES-GCM 密文（base64），加解密由 service 层负责。
-		field.String("api_key").NotEmpty().Sensitive(),
+		// 兼容列：新端点固定留空，真实密文只存 ChannelCredential.api_key。
+		field.String("api_key").Default("").Sensitive(),
 		field.JSON("models", []string{}).Default([]string{}),
 		// model_mapping 对外模型名 → 上游模型名。
 		field.JSON("model_mapping", map[string]string{}).Optional(),
@@ -99,11 +104,18 @@ func (ChannelKey) Fields() []ent.Field {
 func (ChannelKey) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("type", "status"),
+		index.Fields("credential_id", "type"),
 	}
 }
 
 func (ChannelKey) Edges() []ent.Edge {
 	return []ent.Edge{
+		// 所属物理凭证（多对一）。迁移期间允许旧端点暂时没有凭证。
+		edge.From("credential", ChannelCredential.Type).
+			Ref("keys").
+			Field("credential_id").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.Cascade)),
 		// 所属渠道（多对一）：删渠道级联删 key。
 		edge.From("channel", Channel.Type).
 			Ref("keys").

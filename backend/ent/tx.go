@@ -26,6 +26,8 @@ type Tx struct {
 	Bookmark *BookmarkClient
 	// Channel is the client for interacting with the Channel builders.
 	Channel *ChannelClient
+	// ChannelCredential is the client for interacting with the ChannelCredential builders.
+	ChannelCredential *ChannelCredentialClient
 	// ChannelKey is the client for interacting with the ChannelKey builders.
 	ChannelKey *ChannelKeyClient
 	// Group is the client for interacting with the Group builders.
@@ -200,6 +202,7 @@ func (tx *Tx) init() {
 	tx.BalanceLog = NewBalanceLogClient(tx.config)
 	tx.Bookmark = NewBookmarkClient(tx.config)
 	tx.Channel = NewChannelClient(tx.config)
+	tx.ChannelCredential = NewChannelCredentialClient(tx.config)
 	tx.ChannelKey = NewChannelKeyClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
 	tx.InviteProfile = NewInviteProfileClient(tx.config)

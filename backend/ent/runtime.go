@@ -12,6 +12,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/balancelog"
 	"github.com/DouDOU-start/airgate-core/ent/bookmark"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelcredential"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/inviteprofile"
@@ -293,26 +294,90 @@ func init() {
 	channel.DefaultUpdatedAt = channelDescUpdatedAt.Default.(func() time.Time)
 	// channel.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	channel.UpdateDefaultUpdatedAt = channelDescUpdatedAt.UpdateDefault.(func() time.Time)
+	channelcredentialFields := schema.ChannelCredential{}.Fields()
+	_ = channelcredentialFields
+	// channelcredentialDescChannelID is the schema descriptor for channel_id field.
+	channelcredentialDescChannelID := channelcredentialFields[0].Descriptor()
+	// channelcredential.ChannelIDValidator is a validator for the "channel_id" field. It is called by the builders before save.
+	channelcredential.ChannelIDValidator = channelcredentialDescChannelID.Validators[0].(func(int) error)
+	// channelcredentialDescName is the schema descriptor for name field.
+	channelcredentialDescName := channelcredentialFields[1].Descriptor()
+	// channelcredential.DefaultName holds the default value on creation for the name field.
+	channelcredential.DefaultName = channelcredentialDescName.Default.(string)
+	// channelcredentialDescAPIKey is the schema descriptor for api_key field.
+	channelcredentialDescAPIKey := channelcredentialFields[2].Descriptor()
+	// channelcredential.APIKeyValidator is a validator for the "api_key" field. It is called by the builders before save.
+	channelcredential.APIKeyValidator = channelcredentialDescAPIKey.Validators[0].(func(string) error)
+	// channelcredentialDescErrorMsg is the schema descriptor for error_msg field.
+	channelcredentialDescErrorMsg := channelcredentialFields[4].Descriptor()
+	// channelcredential.DefaultErrorMsg holds the default value on creation for the error_msg field.
+	channelcredential.DefaultErrorMsg = channelcredentialDescErrorMsg.Default.(string)
+	// channelcredentialDescMaxConcurrency is the schema descriptor for max_concurrency field.
+	channelcredentialDescMaxConcurrency := channelcredentialFields[5].Descriptor()
+	// channelcredential.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
+	channelcredential.DefaultMaxConcurrency = channelcredentialDescMaxConcurrency.Default.(int)
+	// channelcredentialDescMaxRpm is the schema descriptor for max_rpm field.
+	channelcredentialDescMaxRpm := channelcredentialFields[6].Descriptor()
+	// channelcredential.DefaultMaxRpm holds the default value on creation for the max_rpm field.
+	channelcredential.DefaultMaxRpm = channelcredentialDescMaxRpm.Default.(int)
+	// channelcredentialDescCostRatio is the schema descriptor for cost_ratio field.
+	channelcredentialDescCostRatio := channelcredentialFields[7].Descriptor()
+	// channelcredential.DefaultCostRatio holds the default value on creation for the cost_ratio field.
+	channelcredential.DefaultCostRatio = channelcredentialDescCostRatio.Default.(float64)
+	// channelcredentialDescBalance is the schema descriptor for balance field.
+	channelcredentialDescBalance := channelcredentialFields[9].Descriptor()
+	// channelcredential.DefaultBalance holds the default value on creation for the balance field.
+	channelcredential.DefaultBalance = channelcredentialDescBalance.Default.(float64)
+	// channelcredentialDescBalanceCheckEnabled is the schema descriptor for balance_check_enabled field.
+	channelcredentialDescBalanceCheckEnabled := channelcredentialFields[11].Descriptor()
+	// channelcredential.DefaultBalanceCheckEnabled holds the default value on creation for the balance_check_enabled field.
+	channelcredential.DefaultBalanceCheckEnabled = channelcredentialDescBalanceCheckEnabled.Default.(bool)
+	// channelcredentialDescUpstreamRateEnabled is the schema descriptor for upstream_rate_enabled field.
+	channelcredentialDescUpstreamRateEnabled := channelcredentialFields[12].Descriptor()
+	// channelcredential.DefaultUpstreamRateEnabled holds the default value on creation for the upstream_rate_enabled field.
+	channelcredential.DefaultUpstreamRateEnabled = channelcredentialDescUpstreamRateEnabled.Default.(bool)
+	// channelcredentialDescUpstreamRatePath is the schema descriptor for upstream_rate_path field.
+	channelcredentialDescUpstreamRatePath := channelcredentialFields[13].Descriptor()
+	// channelcredential.DefaultUpstreamRatePath holds the default value on creation for the upstream_rate_path field.
+	channelcredential.DefaultUpstreamRatePath = channelcredentialDescUpstreamRatePath.Default.(string)
+	// channelcredentialDescUseUpstreamRateForCost is the schema descriptor for use_upstream_rate_for_cost field.
+	channelcredentialDescUseUpstreamRateForCost := channelcredentialFields[14].Descriptor()
+	// channelcredential.DefaultUseUpstreamRateForCost holds the default value on creation for the use_upstream_rate_for_cost field.
+	channelcredential.DefaultUseUpstreamRateForCost = channelcredentialDescUseUpstreamRateForCost.Default.(bool)
+	// channelcredentialDescUpstreamRate is the schema descriptor for upstream_rate field.
+	channelcredentialDescUpstreamRate := channelcredentialFields[15].Descriptor()
+	// channelcredential.DefaultUpstreamRate holds the default value on creation for the upstream_rate field.
+	channelcredential.DefaultUpstreamRate = channelcredentialDescUpstreamRate.Default.(float64)
+	// channelcredentialDescCreatedAt is the schema descriptor for created_at field.
+	channelcredentialDescCreatedAt := channelcredentialFields[17].Descriptor()
+	// channelcredential.DefaultCreatedAt holds the default value on creation for the created_at field.
+	channelcredential.DefaultCreatedAt = channelcredentialDescCreatedAt.Default.(func() time.Time)
+	// channelcredentialDescUpdatedAt is the schema descriptor for updated_at field.
+	channelcredentialDescUpdatedAt := channelcredentialFields[18].Descriptor()
+	// channelcredential.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	channelcredential.DefaultUpdatedAt = channelcredentialDescUpdatedAt.Default.(func() time.Time)
+	// channelcredential.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	channelcredential.UpdateDefaultUpdatedAt = channelcredentialDescUpdatedAt.UpdateDefault.(func() time.Time)
 	channelkeyFields := schema.ChannelKey{}.Fields()
 	_ = channelkeyFields
 	// channelkeyDescName is the schema descriptor for name field.
-	channelkeyDescName := channelkeyFields[0].Descriptor()
+	channelkeyDescName := channelkeyFields[1].Descriptor()
 	// channelkey.DefaultName holds the default value on creation for the name field.
 	channelkey.DefaultName = channelkeyDescName.Default.(string)
 	// channelkeyDescAPIKey is the schema descriptor for api_key field.
-	channelkeyDescAPIKey := channelkeyFields[2].Descriptor()
-	// channelkey.APIKeyValidator is a validator for the "api_key" field. It is called by the builders before save.
-	channelkey.APIKeyValidator = channelkeyDescAPIKey.Validators[0].(func(string) error)
+	channelkeyDescAPIKey := channelkeyFields[3].Descriptor()
+	// channelkey.DefaultAPIKey holds the default value on creation for the api_key field.
+	channelkey.DefaultAPIKey = channelkeyDescAPIKey.Default.(string)
 	// channelkeyDescModels is the schema descriptor for models field.
-	channelkeyDescModels := channelkeyFields[3].Descriptor()
+	channelkeyDescModels := channelkeyFields[4].Descriptor()
 	// channelkey.DefaultModels holds the default value on creation for the models field.
 	channelkey.DefaultModels = channelkeyDescModels.Default.([]string)
 	// channelkeyDescErrorMsg is the schema descriptor for error_msg field.
-	channelkeyDescErrorMsg := channelkeyFields[8].Descriptor()
+	channelkeyDescErrorMsg := channelkeyFields[9].Descriptor()
 	// channelkey.DefaultErrorMsg holds the default value on creation for the error_msg field.
 	channelkey.DefaultErrorMsg = channelkeyDescErrorMsg.Default.(string)
 	// channelkeyDescPriority is the schema descriptor for priority field.
-	channelkeyDescPriority := channelkeyFields[9].Descriptor()
+	channelkeyDescPriority := channelkeyFields[10].Descriptor()
 	// channelkey.DefaultPriority holds the default value on creation for the priority field.
 	channelkey.DefaultPriority = channelkeyDescPriority.Default.(int)
 	// channelkey.PriorityValidator is a validator for the "priority" field. It is called by the builders before save.
@@ -332,77 +397,77 @@ func init() {
 		}
 	}()
 	// channelkeyDescWeight is the schema descriptor for weight field.
-	channelkeyDescWeight := channelkeyFields[10].Descriptor()
+	channelkeyDescWeight := channelkeyFields[11].Descriptor()
 	// channelkey.DefaultWeight holds the default value on creation for the weight field.
 	channelkey.DefaultWeight = channelkeyDescWeight.Default.(int)
 	// channelkey.WeightValidator is a validator for the "weight" field. It is called by the builders before save.
 	channelkey.WeightValidator = channelkeyDescWeight.Validators[0].(func(int) error)
 	// channelkeyDescMaxConcurrency is the schema descriptor for max_concurrency field.
-	channelkeyDescMaxConcurrency := channelkeyFields[11].Descriptor()
+	channelkeyDescMaxConcurrency := channelkeyFields[12].Descriptor()
 	// channelkey.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
 	channelkey.DefaultMaxConcurrency = channelkeyDescMaxConcurrency.Default.(int)
 	// channelkeyDescMaxRpm is the schema descriptor for max_rpm field.
-	channelkeyDescMaxRpm := channelkeyFields[12].Descriptor()
+	channelkeyDescMaxRpm := channelkeyFields[13].Descriptor()
 	// channelkey.DefaultMaxRpm holds the default value on creation for the max_rpm field.
 	channelkey.DefaultMaxRpm = channelkeyDescMaxRpm.Default.(int)
 	// channelkeyDescCostRatio is the schema descriptor for cost_ratio field.
-	channelkeyDescCostRatio := channelkeyFields[13].Descriptor()
+	channelkeyDescCostRatio := channelkeyFields[14].Descriptor()
 	// channelkey.DefaultCostRatio holds the default value on creation for the cost_ratio field.
 	channelkey.DefaultCostRatio = channelkeyDescCostRatio.Default.(float64)
 	// channelkeyDescTestModel is the schema descriptor for test_model field.
-	channelkeyDescTestModel := channelkeyFields[15].Descriptor()
+	channelkeyDescTestModel := channelkeyFields[16].Descriptor()
 	// channelkey.DefaultTestModel holds the default value on creation for the test_model field.
 	channelkey.DefaultTestModel = channelkeyDescTestModel.Default.(string)
 	// channelkeyDescResponseTimeMs is the schema descriptor for response_time_ms field.
-	channelkeyDescResponseTimeMs := channelkeyFields[16].Descriptor()
+	channelkeyDescResponseTimeMs := channelkeyFields[17].Descriptor()
 	// channelkey.DefaultResponseTimeMs holds the default value on creation for the response_time_ms field.
 	channelkey.DefaultResponseTimeMs = channelkeyDescResponseTimeMs.Default.(int)
 	// channelkeyDescBalance is the schema descriptor for balance field.
-	channelkeyDescBalance := channelkeyFields[19].Descriptor()
+	channelkeyDescBalance := channelkeyFields[20].Descriptor()
 	// channelkey.DefaultBalance holds the default value on creation for the balance field.
 	channelkey.DefaultBalance = channelkeyDescBalance.Default.(float64)
 	// channelkeyDescBalanceCheckEnabled is the schema descriptor for balance_check_enabled field.
-	channelkeyDescBalanceCheckEnabled := channelkeyFields[21].Descriptor()
+	channelkeyDescBalanceCheckEnabled := channelkeyFields[22].Descriptor()
 	// channelkey.DefaultBalanceCheckEnabled holds the default value on creation for the balance_check_enabled field.
 	channelkey.DefaultBalanceCheckEnabled = channelkeyDescBalanceCheckEnabled.Default.(bool)
 	// channelkeyDescProbeEnabled is the schema descriptor for probe_enabled field.
-	channelkeyDescProbeEnabled := channelkeyFields[22].Descriptor()
+	channelkeyDescProbeEnabled := channelkeyFields[23].Descriptor()
 	// channelkey.DefaultProbeEnabled holds the default value on creation for the probe_enabled field.
 	channelkey.DefaultProbeEnabled = channelkeyDescProbeEnabled.Default.(bool)
 	// channelkeyDescProbeModel is the schema descriptor for probe_model field.
-	channelkeyDescProbeModel := channelkeyFields[23].Descriptor()
+	channelkeyDescProbeModel := channelkeyFields[24].Descriptor()
 	// channelkey.DefaultProbeModel holds the default value on creation for the probe_model field.
 	channelkey.DefaultProbeModel = channelkeyDescProbeModel.Default.(string)
 	// channelkeyDescConsecutiveFailures is the schema descriptor for consecutive_failures field.
-	channelkeyDescConsecutiveFailures := channelkeyFields[25].Descriptor()
+	channelkeyDescConsecutiveFailures := channelkeyFields[26].Descriptor()
 	// channelkey.DefaultConsecutiveFailures holds the default value on creation for the consecutive_failures field.
 	channelkey.DefaultConsecutiveFailures = channelkeyDescConsecutiveFailures.Default.(int)
 	// channelkeyDescConsecutiveSuccesses is the schema descriptor for consecutive_successes field.
-	channelkeyDescConsecutiveSuccesses := channelkeyFields[26].Descriptor()
+	channelkeyDescConsecutiveSuccesses := channelkeyFields[27].Descriptor()
 	// channelkey.DefaultConsecutiveSuccesses holds the default value on creation for the consecutive_successes field.
 	channelkey.DefaultConsecutiveSuccesses = channelkeyDescConsecutiveSuccesses.Default.(int)
 	// channelkeyDescUpstreamRateEnabled is the schema descriptor for upstream_rate_enabled field.
-	channelkeyDescUpstreamRateEnabled := channelkeyFields[28].Descriptor()
+	channelkeyDescUpstreamRateEnabled := channelkeyFields[29].Descriptor()
 	// channelkey.DefaultUpstreamRateEnabled holds the default value on creation for the upstream_rate_enabled field.
 	channelkey.DefaultUpstreamRateEnabled = channelkeyDescUpstreamRateEnabled.Default.(bool)
 	// channelkeyDescUpstreamRatePath is the schema descriptor for upstream_rate_path field.
-	channelkeyDescUpstreamRatePath := channelkeyFields[29].Descriptor()
+	channelkeyDescUpstreamRatePath := channelkeyFields[30].Descriptor()
 	// channelkey.DefaultUpstreamRatePath holds the default value on creation for the upstream_rate_path field.
 	channelkey.DefaultUpstreamRatePath = channelkeyDescUpstreamRatePath.Default.(string)
 	// channelkeyDescUseUpstreamRateForCost is the schema descriptor for use_upstream_rate_for_cost field.
-	channelkeyDescUseUpstreamRateForCost := channelkeyFields[30].Descriptor()
+	channelkeyDescUseUpstreamRateForCost := channelkeyFields[31].Descriptor()
 	// channelkey.DefaultUseUpstreamRateForCost holds the default value on creation for the use_upstream_rate_for_cost field.
 	channelkey.DefaultUseUpstreamRateForCost = channelkeyDescUseUpstreamRateForCost.Default.(bool)
 	// channelkeyDescUpstreamRate is the schema descriptor for upstream_rate field.
-	channelkeyDescUpstreamRate := channelkeyFields[31].Descriptor()
+	channelkeyDescUpstreamRate := channelkeyFields[32].Descriptor()
 	// channelkey.DefaultUpstreamRate holds the default value on creation for the upstream_rate field.
 	channelkey.DefaultUpstreamRate = channelkeyDescUpstreamRate.Default.(float64)
 	// channelkeyDescCreatedAt is the schema descriptor for created_at field.
-	channelkeyDescCreatedAt := channelkeyFields[33].Descriptor()
+	channelkeyDescCreatedAt := channelkeyFields[34].Descriptor()
 	// channelkey.DefaultCreatedAt holds the default value on creation for the created_at field.
 	channelkey.DefaultCreatedAt = channelkeyDescCreatedAt.Default.(func() time.Time)
 	// channelkeyDescUpdatedAt is the schema descriptor for updated_at field.
-	channelkeyDescUpdatedAt := channelkeyFields[34].Descriptor()
+	channelkeyDescUpdatedAt := channelkeyFields[35].Descriptor()
 	// channelkey.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	channelkey.DefaultUpdatedAt = channelkeyDescUpdatedAt.Default.(func() time.Time)
 	// channelkey.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

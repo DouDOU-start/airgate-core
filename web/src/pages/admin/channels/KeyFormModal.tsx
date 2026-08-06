@@ -39,7 +39,7 @@ function parseParamValue(raw: string): unknown {
 
 interface KeyForm {
   name: string;
-  type: ChannelType;
+  types: ChannelType[];
   apiKey: string;
   paramSetRows: KVRow[];
   paramRemoveKeys: string[];
@@ -69,7 +69,7 @@ const UPSTREAM_RATE_PLATFORM_PRESETS = [
 
 const emptyForm: KeyForm = {
   name: '',
-  type: 'openai_compatible',
+  types: ['openai_compatible'],
   apiKey: '',
   paramSetRows: [],
   paramRemoveKeys: [],
@@ -96,7 +96,7 @@ function formFromKey(key: ChannelKeyResp): KeyForm {
   const remove = (override.remove ?? []) as string[];
   return {
     name: key.name,
-    type: key.type,
+    types: key.credential_protocols?.length > 0 ? key.credential_protocols : [key.type],
     apiKey: '', // 明文不回显，留空 = 保持原密钥
     paramSetRows: recordToKVRows(set),
     paramRemoveKeys: Array.isArray(remove) ? remove : [],
@@ -108,7 +108,7 @@ function formFromKey(key: ChannelKeyResp): KeyForm {
     maxRpm: String(key.max_rpm),
     costRatio: String(key.cost_ratio),
     tags: key.tags ?? [],
-    enabled: key.status !== 'disabled_manual',
+    enabled: key.credential_status === 'enabled',
     balanceCheckEnabled: key.balance_check_enabled,
     probeEnabled: key.probe_enabled,
     probeModel: key.probe_model ?? '',
@@ -166,10 +166,28 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
     }));
   }
 
+  function toggleProtocol(type: ChannelType, selected: boolean) {
+    setForm((prev) => {
+      if (!selected) {
+        return { ...prev, types: prev.types.filter((item) => item !== type) };
+      }
+      // 异步任务协议生命周期独立，保持单选；同步协议之间可任意组合。
+      if (type === 'openai_video' || type === 'suno') {
+        return { ...prev, types: [type] };
+      }
+      const withoutTaskProtocols = prev.types.filter((item) => item !== 'openai_video' && item !== 'suno');
+      return { ...prev, types: [...new Set([...withoutTaskProtocols, type])] };
+    });
+  }
+
   function handleSubmit() {
     const apiKey = form.apiKey.trim();
     if (!isEdit && !apiKey) {
       toast('error', t('channels.api_key_required'));
+      return;
+    }
+    if (form.types.length === 0) {
+      toast('error', t('channels.protocol_required'));
       return;
     }
 
@@ -181,12 +199,12 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
 
     const payload: ChannelKeyReq = {
       name: form.name.trim(),
-      type: form.type,
+      types: form.types,
       api_key: apiKey, // 编辑时留空 = 保持原密钥
       param_override: paramOverride,
       header_override: kvRowsToRecord(form.headerRows) as Record<string, string>,
       group_ids: form.groupIds,
-      status: form.enabled ? 'enabled' : 'disabled_manual',
+      credential_status: form.enabled ? 'enabled' : 'disabled_manual',
       priority: Number(form.priority) || 0,
       weight: Number(form.weight) || 0,
       max_concurrency: Number(form.maxConcurrency) || 0,
@@ -215,7 +233,6 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
       if (!nextOpen) onClose();
     },
   });
-  const selectedTypeLabel = CHANNEL_TYPE_OPTIONS.find((item) => item.id === form.type)?.label ?? form.type;
   const upstreamRatePlatformOptions: Array<{ id: string; label: string }> = UPSTREAM_RATE_PLATFORM_PRESETS.map((item) => ({
     id: item.id,
     label: t(item.labelKey),
@@ -251,28 +268,25 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                       onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
                     />
                   </HeroTextField>
-                  <div>
-                    <Label className="mb-1.5 block text-sm">{t('common.type')}</Label>
-                    <Select
-                      aria-label={t('common.type')}
-                      fullWidth
-                      selectedKey={form.type}
-                      onSelectionChange={(key) => setForm((prev) => ({ ...prev, type: String(key) as ChannelType }))}
-                    >
-                      <Select.Trigger>
-                        <Select.Value>{selectedTypeLabel}</Select.Value>
-                        <Select.Indicator />
-                      </Select.Trigger>
-                      <Select.Popover>
-                        <ListBox items={CHANNEL_TYPE_OPTIONS}>
-                          {(item) => (
-                            <ListBox.Item id={item.id} textValue={item.label}>
-                              {item.label}
-                            </ListBox.Item>
-                          )}
-                        </ListBox>
-                      </Select.Popover>
-                    </Select>
+                  <div className="rounded-xl border border-border bg-surface-subtle px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label className="text-sm">{t('channels.supported_protocols')}</Label>
+                      <span className="text-[11px] text-text-tertiary">{t('channels.protocol_shared_hint')}</span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
+                      {CHANNEL_TYPE_OPTIONS.map((item) => (
+                        <Checkbox
+                          key={item.id}
+                          isSelected={form.types.includes(item.id)}
+                          onChange={(selected) => toggleProtocol(item.id, selected)}
+                        >
+                          <Checkbox.Control>
+                            <Checkbox.Indicator />
+                          </Checkbox.Control>
+                          <span className="text-xs">{item.label}</span>
+                        </Checkbox>
+                      ))}
+                    </div>
                   </div>
                 </div>
 

@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelcredential"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -20,13 +21,14 @@ import (
 // ChannelQuery is the builder for querying Channel entities.
 type ChannelQuery struct {
 	config
-	ctx           *QueryContext
-	order         []channel.OrderOption
-	inters        []Interceptor
-	predicates    []predicate.Channel
-	withKeys      *ChannelKeyQuery
-	withUsageLogs *UsageLogQuery
-	modifiers     []func(*sql.Selector)
+	ctx             *QueryContext
+	order           []channel.OrderOption
+	inters          []Interceptor
+	predicates      []predicate.Channel
+	withCredentials *ChannelCredentialQuery
+	withKeys        *ChannelKeyQuery
+	withUsageLogs   *UsageLogQuery
+	modifiers       []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -61,6 +63,28 @@ func (cq *ChannelQuery) Unique(unique bool) *ChannelQuery {
 func (cq *ChannelQuery) Order(o ...channel.OrderOption) *ChannelQuery {
 	cq.order = append(cq.order, o...)
 	return cq
+}
+
+// QueryCredentials chains the current query on the "credentials" edge.
+func (cq *ChannelQuery) QueryCredentials() *ChannelCredentialQuery {
+	query := (&ChannelCredentialClient{config: cq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := cq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := cq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(channel.Table, channel.FieldID, selector),
+			sqlgraph.To(channelcredential.Table, channelcredential.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, channel.CredentialsTable, channel.CredentialsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(cq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // QueryKeys chains the current query on the "keys" edge.
@@ -294,17 +318,29 @@ func (cq *ChannelQuery) Clone() *ChannelQuery {
 		return nil
 	}
 	return &ChannelQuery{
-		config:        cq.config,
-		ctx:           cq.ctx.Clone(),
-		order:         append([]channel.OrderOption{}, cq.order...),
-		inters:        append([]Interceptor{}, cq.inters...),
-		predicates:    append([]predicate.Channel{}, cq.predicates...),
-		withKeys:      cq.withKeys.Clone(),
-		withUsageLogs: cq.withUsageLogs.Clone(),
+		config:          cq.config,
+		ctx:             cq.ctx.Clone(),
+		order:           append([]channel.OrderOption{}, cq.order...),
+		inters:          append([]Interceptor{}, cq.inters...),
+		predicates:      append([]predicate.Channel{}, cq.predicates...),
+		withCredentials: cq.withCredentials.Clone(),
+		withKeys:        cq.withKeys.Clone(),
+		withUsageLogs:   cq.withUsageLogs.Clone(),
 		// clone intermediate query.
 		sql:  cq.sql.Clone(),
 		path: cq.path,
 	}
+}
+
+// WithCredentials tells the query-builder to eager-load the nodes that are connected to
+// the "credentials" edge. The optional arguments are used to configure the query builder of the edge.
+func (cq *ChannelQuery) WithCredentials(opts ...func(*ChannelCredentialQuery)) *ChannelQuery {
+	query := (&ChannelCredentialClient{config: cq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	cq.withCredentials = query
+	return cq
 }
 
 // WithKeys tells the query-builder to eager-load the nodes that are connected to
@@ -407,7 +443,8 @@ func (cq *ChannelQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Chan
 	var (
 		nodes       = []*Channel{}
 		_spec       = cq.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [3]bool{
+			cq.withCredentials != nil,
 			cq.withKeys != nil,
 			cq.withUsageLogs != nil,
 		}
@@ -433,6 +470,13 @@ func (cq *ChannelQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Chan
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := cq.withCredentials; query != nil {
+		if err := cq.loadCredentials(ctx, query, nodes,
+			func(n *Channel) { n.Edges.Credentials = []*ChannelCredential{} },
+			func(n *Channel, e *ChannelCredential) { n.Edges.Credentials = append(n.Edges.Credentials, e) }); err != nil {
+			return nil, err
+		}
+	}
 	if query := cq.withKeys; query != nil {
 		if err := cq.loadKeys(ctx, query, nodes,
 			func(n *Channel) { n.Edges.Keys = []*ChannelKey{} },
@@ -450,6 +494,36 @@ func (cq *ChannelQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Chan
 	return nodes, nil
 }
 
+func (cq *ChannelQuery) loadCredentials(ctx context.Context, query *ChannelCredentialQuery, nodes []*Channel, init func(*Channel), assign func(*Channel, *ChannelCredential)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Channel)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(channelcredential.FieldChannelID)
+	}
+	query.Where(predicate.ChannelCredential(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(channel.CredentialsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ChannelID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "channel_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
 func (cq *ChannelQuery) loadKeys(ctx context.Context, query *ChannelKeyQuery, nodes []*Channel, init func(*Channel), assign func(*Channel, *ChannelKey)) error {
 	fks := make([]driver.Value, 0, len(nodes))
 	nodeids := make(map[int]*Channel)

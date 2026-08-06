@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/DouDOU-start/airgate-core/ent"
@@ -51,6 +53,9 @@ type legacyProxyPassword struct {
 }
 
 func migrateLegacySensitiveData(ctx context.Context, db *sql.DB, secret string) error {
+	if err := migrateLegacyChannelCredentials(ctx, db, secret); err != nil {
+		return fmt.Errorf("迁移旧渠道凭证失败: %w", err)
+	}
 	if err := migrateLegacyAccountCredentials(ctx, db, secret); err != nil {
 		return fmt.Errorf("迁移旧账号凭证失败: %w", err)
 	}
@@ -58,6 +63,214 @@ func migrateLegacySensitiveData(ctx context.Context, db *sql.DB, secret string) 
 		return fmt.Errorf("迁移旧代理密码失败: %w", err)
 	}
 	return nil
+}
+
+type legacyChannelKey struct {
+	id                     int
+	channelID              int
+	name                   string
+	apiKey                 string
+	maxConcurrency         int
+	maxRPM                 int
+	costRatio              float64
+	tags                   []string
+	balance                float64
+	balanceUpdatedAt       sql.NullTime
+	balanceCheckEnabled    bool
+	upstreamRateEnabled    bool
+	upstreamRatePath       string
+	useUpstreamRateForCost bool
+	upstreamRate           float64
+	upstreamRateAt         sql.NullTime
+}
+
+type channelCredentialGroup struct {
+	plain string
+	keys  []legacyChannelKey
+}
+
+// migrateLegacyChannelCredentials 把旧 channel_keys 中重复保存的真实密钥归并到
+// channel_credentials。AES-GCM 密文带随机 nonce，必须先解密后才能判断同一渠道下
+// 是否为同一把物理凭证，因此该迁移不能只靠 SQL 完成。
+func migrateLegacyChannelCredentials(ctx context.Context, db *sql.DB, secret string) error {
+	_, hasCredentialID, err := columnDataType(ctx, db, "channel_keys", "credential_id")
+	if err != nil || !hasCredentialID {
+		return err
+	}
+	_, hasCredentialTable, err := columnDataType(ctx, db, "channel_credentials", "api_key")
+	if err != nil || !hasCredentialTable {
+		return err
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.QueryContext(ctx, `
+SELECT id, channel_keys, COALESCE(name, ''), COALESCE(api_key, ''),
+       COALESCE(max_concurrency, 0), COALESCE(max_rpm, 0), COALESCE(cost_ratio, 1),
+       COALESCE(tags::text, '[]'), COALESCE(balance, 0), balance_updated_at,
+       COALESCE(balance_check_enabled, true), COALESCE(upstream_rate_enabled, false),
+       COALESCE(upstream_rate_path, ''), COALESCE(use_upstream_rate_for_cost, false),
+       COALESCE(upstream_rate, 0), upstream_rate_at
+FROM channel_keys
+WHERE credential_id IS NULL
+ORDER BY id`)
+	if err != nil {
+		return err
+	}
+	groups := map[string]*channelCredentialGroup{}
+	for rows.Next() {
+		var item legacyChannelKey
+		var tagsRaw string
+		if err := rows.Scan(
+			&item.id, &item.channelID, &item.name, &item.apiKey,
+			&item.maxConcurrency, &item.maxRPM, &item.costRatio, &tagsRaw,
+			&item.balance, &item.balanceUpdatedAt, &item.balanceCheckEnabled,
+			&item.upstreamRateEnabled, &item.upstreamRatePath,
+			&item.useUpstreamRateForCost, &item.upstreamRate, &item.upstreamRateAt,
+		); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if err := json.Unmarshal([]byte(tagsRaw), &item.tags); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("渠道端点 %d 的标签不是合法 JSON: %w", item.id, err)
+		}
+		if item.apiKey == "" {
+			_ = rows.Close()
+			return fmt.Errorf("渠道端点 %d 缺少旧 API Key", item.id)
+		}
+		plain, err := auth.DecryptAPIKey(item.apiKey, secret)
+		if err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("渠道端点 %d 的现有密文无法解密: %w", item.id, err)
+		}
+		groupKey := strconv.Itoa(item.channelID) + "\x00" + plain
+		group := groups[groupKey]
+		if group == nil {
+			group = &channelCredentialGroup{plain: plain}
+			groups[groupKey] = group
+		}
+		group.keys = append(group.keys, item)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+
+	ordered := make([]string, 0, len(groups))
+	for key := range groups {
+		ordered = append(ordered, key)
+	}
+	sort.Strings(ordered)
+	for _, groupKey := range ordered {
+		group := groups[groupKey]
+		merged := mergeLegacyChannelCredential(group.keys)
+		tagsJSON, err := json.Marshal(merged.tags)
+		if err != nil {
+			return err
+		}
+		var credentialID int
+		err = tx.QueryRowContext(ctx, `
+INSERT INTO channel_credentials (
+    channel_id, name, api_key, status, error_msg, max_concurrency, max_rpm,
+    cost_ratio, tags, balance, balance_updated_at, balance_check_enabled,
+    upstream_rate_enabled, upstream_rate_path, use_upstream_rate_for_cost,
+    upstream_rate, upstream_rate_at, created_at, updated_at
+) VALUES (
+    $1, $2, $3, 'enabled', '', $4, $5, $6, $7::jsonb, $8, $9, $10,
+    $11, $12, $13, $14, $15, now(), now()
+) RETURNING id`,
+			merged.channelID, merged.name, merged.apiKey, merged.maxConcurrency,
+			merged.maxRPM, merged.costRatio, string(tagsJSON), merged.balance,
+			nullTimeValue(merged.balanceUpdatedAt), merged.balanceCheckEnabled,
+			merged.upstreamRateEnabled, merged.upstreamRatePath,
+			merged.useUpstreamRateForCost, merged.upstreamRate,
+			nullTimeValue(merged.upstreamRateAt),
+		).Scan(&credentialID)
+		if err != nil {
+			return err
+		}
+		for _, item := range group.keys {
+			if _, err := tx.ExecContext(ctx,
+				`UPDATE channel_keys SET credential_id = $1, api_key = '', name = $3 WHERE id = $2`,
+				credentialID, item.id, merged.name,
+			); err != nil {
+				return err
+			}
+		}
+		if len(group.keys) > 1 {
+			slog.Info("channel_credentials_merged",
+				"channel_id", merged.channelID,
+				"credential_id", credentialID,
+				"protocol_endpoints", len(group.keys))
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `ALTER TABLE channel_keys ALTER COLUMN credential_id SET NOT NULL`); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func mergeLegacyChannelCredential(items []legacyChannelKey) legacyChannelKey {
+	merged := items[0]
+	tags := map[string]struct{}{}
+	for _, item := range items {
+		if merged.name == "" && item.name != "" {
+			merged.name = item.name
+		}
+		merged.maxConcurrency = conservativePositiveLimit(merged.maxConcurrency, item.maxConcurrency)
+		merged.maxRPM = conservativePositiveLimit(merged.maxRPM, item.maxRPM)
+		if item.costRatio > merged.costRatio {
+			merged.costRatio = item.costRatio
+		}
+		for _, tag := range item.tags {
+			tags[tag] = struct{}{}
+		}
+		if item.balanceUpdatedAt.Valid && (!merged.balanceUpdatedAt.Valid || item.balanceUpdatedAt.Time.After(merged.balanceUpdatedAt.Time)) {
+			merged.balance = item.balance
+			merged.balanceUpdatedAt = item.balanceUpdatedAt
+		}
+		merged.balanceCheckEnabled = merged.balanceCheckEnabled || item.balanceCheckEnabled
+		merged.upstreamRateEnabled = merged.upstreamRateEnabled || item.upstreamRateEnabled
+		merged.useUpstreamRateForCost = merged.useUpstreamRateForCost || item.useUpstreamRateForCost
+		if merged.upstreamRatePath == "" && item.upstreamRatePath != "" {
+			merged.upstreamRatePath = item.upstreamRatePath
+		}
+		if item.upstreamRateAt.Valid && (!merged.upstreamRateAt.Valid || item.upstreamRateAt.Time.After(merged.upstreamRateAt.Time)) {
+			merged.upstreamRate = item.upstreamRate
+			merged.upstreamRateAt = item.upstreamRateAt
+		}
+	}
+	merged.tags = make([]string, 0, len(tags))
+	for tag := range tags {
+		merged.tags = append(merged.tags, tag)
+	}
+	sort.Strings(merged.tags)
+	return merged
+}
+
+func conservativePositiveLimit(current, candidate int) int {
+	if current <= 0 {
+		return candidate
+	}
+	if candidate <= 0 || current <= candidate {
+		return current
+	}
+	return candidate
+}
+
+func nullTimeValue(value sql.NullTime) any {
+	if !value.Valid {
+		return nil
+	}
+	return value.Time
 }
 
 func migrateLegacyAccountCredentials(ctx context.Context, db *sql.DB, secret string) error {

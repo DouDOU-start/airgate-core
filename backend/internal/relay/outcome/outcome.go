@@ -20,7 +20,7 @@ const (
 	// RateLimited 429：本次请求硬排除换渠道重试；
 	// 不设冷却状态，下次请求该渠道照常参与调度。
 	RateLimited
-	// AuthFailed 401/403：channel_auto_ban_enabled 时 MarkAutoDisabled；恒硬排除重试。
+	// AuthFailed 401/403：调用方按 401 凭证级、403 协议端点级自动禁用；恒硬排除重试。
 	AuthFailed
 	// Transient 5xx / 网络错误：软排除重试。
 	Transient

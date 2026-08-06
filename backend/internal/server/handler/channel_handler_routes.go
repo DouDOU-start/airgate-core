@@ -141,7 +141,7 @@ func (h *ChannelHandler) AddChannelKey(c *gin.Context) {
 		response.BindError(c, err)
 		return
 	}
-	if req.Type == "" {
+	if req.Type == "" && len(req.Types) == 0 {
 		response.BadRequest(c, "缺少密钥类型")
 		return
 	}
@@ -399,6 +399,7 @@ func (h *ChannelHandler) ImportChannels(c *gin.Context) {
 			keys = append(keys, appchannel.KeyInput{
 				Name:                   k.Name,
 				Type:                   k.Type,
+				Types:                  k.Types,
 				APIKey:                 k.APIKey,
 				Models:                 k.Models,
 				ModelMapping:           k.ModelMapping,

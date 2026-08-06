@@ -26,6 +26,8 @@ func (Channel) Fields() []ent.Field {
 
 func (Channel) Edges() []ent.Edge {
 	return []ent.Edge{
+		// 渠道下的物理凭证；一条凭证可挂多个协议端点。
+		edge.To("credentials", ChannelCredential.Type),
 		// 渠道下的密钥端点（一对多）：删渠道级联删 key（OnDelete 声明在 ChannelKey 侧的 assoc 边）。
 		edge.To("keys", ChannelKey.Type),
 		// 渠道硬删除时置空存量 usage_log 的渠道外键（显式声明，与 ent 对可空 FK 的

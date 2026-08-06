@@ -34,12 +34,12 @@ type ModelFetcher interface {
 	FetchBalance(ctx context.Context, channelType, baseURL, apiKey string) (float64, error)
 }
 
-// ConcurrencyReader 密钥端点在途并发数批量读取（由 scheduler.ConcurrencyManager 实现）。
+// ConcurrencyReader 物理凭证在途并发数批量读取（由 scheduler.ConcurrencyManager 实现）。
 type ConcurrencyReader interface {
 	GetKeyCurrentCounts(ctx context.Context, channelKeyIDs []int) map[int]int
 }
 
-// RPMReader 密钥端点当前分钟 RPM 批量读取（由 scheduler.RPMCounter 实现）。
+// RPMReader 物理凭证当前分钟 RPM 批量读取（由 scheduler.RPMCounter 实现）。
 type RPMReader interface {
 	GetKeyRPMs(ctx context.Context, channelKeyIDs []int) map[int]int
 }
@@ -140,6 +140,9 @@ func (s *Service) ImportChannels(ctx context.Context, items []ImportChannelInput
 		for _, k := range item.Keys {
 			if strings.TrimSpace(k.APIKey) == "" {
 				continue
+			}
+			if err := validateProtocolSet(&k); err != nil {
+				return result, fmt.Errorf("渠道 %q 的协议组合无效: %w", item.Name, err)
 			}
 			cipher, err := s.encryptPlainKey(k.APIKey, true)
 			if err != nil {
@@ -261,8 +264,13 @@ func (s *Service) rollupBalance(list []Channel) {
 	for i := range list {
 		var total float64
 		var latest *time.Time
+		seenCredentials := map[int]struct{}{}
 		for j := range list[i].Keys {
 			k := list[i].Keys[j]
+			if _, seen := seenCredentials[k.CredentialID]; seen {
+				continue
+			}
+			seenCredentials[k.CredentialID] = struct{}{}
 			total += k.Balance
 			if k.BalanceUpdatedAt != nil && (latest == nil || k.BalanceUpdatedAt.After(*latest)) {
 				latest = k.BalanceUpdatedAt
@@ -276,16 +284,16 @@ func (s *Service) rollupBalance(list []Channel) {
 // attachRuntimeStats 为列表页各 key 批量填充运行时观测指标（在途并发 / 当前分钟 RPM）。
 // 读取器未注入或 Redis 不可用时保持 0 值，不影响列表主流程。
 func (s *Service) attachRuntimeStats(ctx context.Context, list []Channel) {
-	var keyIDs []int
+	var credentialIDs []int
 	for i := range list {
 		for j := range list[i].Keys {
-			keyIDs = append(keyIDs, list[i].Keys[j].ID)
+			credentialIDs = append(credentialIDs, list[i].Keys[j].CredentialID)
 		}
 	}
-	counts, rpms := s.fetchRuntimeStats(ctx, keyIDs)
+	counts, rpms := s.fetchRuntimeStats(ctx, credentialIDs)
 	for i := range list {
 		for j := range list[i].Keys {
-			id := list[i].Keys[j].ID
+			id := list[i].Keys[j].CredentialID
 			list[i].Keys[j].CurrentConcurrency = counts[id]
 			list[i].Keys[j].CurrentRPM = rpms[id]
 		}
@@ -294,18 +302,18 @@ func (s *Service) attachRuntimeStats(ctx context.Context, list []Channel) {
 
 // attachRuntimeStatsToKeys 密钥视图：为平铺 key 列表批量填充运行时观测指标。
 func (s *Service) attachRuntimeStatsToKeys(ctx context.Context, keys []ChannelKey) {
-	keyIDs := make([]int, len(keys))
+	credentialIDs := make([]int, len(keys))
 	for i := range keys {
-		keyIDs[i] = keys[i].ID
+		credentialIDs[i] = keys[i].CredentialID
 	}
-	counts, rpms := s.fetchRuntimeStats(ctx, keyIDs)
+	counts, rpms := s.fetchRuntimeStats(ctx, credentialIDs)
 	for i := range keys {
-		keys[i].CurrentConcurrency = counts[keys[i].ID]
-		keys[i].CurrentRPM = rpms[keys[i].ID]
+		keys[i].CurrentConcurrency = counts[keys[i].CredentialID]
+		keys[i].CurrentRPM = rpms[keys[i].CredentialID]
 	}
 }
 
-// fetchRuntimeStats 按 key ID 批量拉取运行时观测指标（在途并发 / 当前分钟 RPM）；
+// fetchRuntimeStats 按 credential_id 批量拉取运行时观测指标（在途并发 / 当前分钟 RPM）；
 // 读取器未注入或 Redis 不可用时返回 nil map，读取仍安全（零值）。
 func (s *Service) fetchRuntimeStats(ctx context.Context, keyIDs []int) (map[int]int, map[int]int) {
 	if len(keyIDs) == 0 {
@@ -352,10 +360,13 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Channe
 	return item, nil
 }
 
-// AddKey 在指定渠道下新增一把 key（明文密钥在本层加密）。
-// 允许不绑定分组：未绑定分组的 key 不会被任何分组调度到（registry.Pick 按分组过滤，空集合天然不命中）。
+// AddKey 在指定渠道下新增一条物理凭证及其协议端点（明文密钥在本层加密）。
+// 允许不绑定分组：未绑定分组的端点不会被任何分组调度到（registry.Pick 按分组过滤，空集合天然不命中）。
 func (s *Service) AddKey(ctx context.Context, channelID int, key KeyInput) (ChannelKey, error) {
 	logger := logx.LoggerFromContext(ctx)
+	if err := validateProtocolSet(&key); err != nil {
+		return ChannelKey{}, err
+	}
 
 	cipher, err := s.encryptPlainKey(key.APIKey, true)
 	if err != nil {
@@ -375,11 +386,16 @@ func (s *Service) AddKey(ctx context.Context, channelID int, key KeyInput) (Chan
 	return item, nil
 }
 
-// UpdateKey 单把密钥端点 partial 更新（模型/映射弹窗、单 key 编辑用）。
+// UpdateKey 更新物理凭证共享配置和当前协议端点；Types 非 nil 时同步完整协议集合。
 // APIKey 提供即加密替换（空串保持原密钥）；GroupIDs 非 nil 即整组替换（允许显式传空，
 // 即解绑全部分组，未绑定分组的 key 不会被任何分组调度到），nil 表示不改动分组。
 func (s *Service) UpdateKey(ctx context.Context, keyID int, key KeyInput) (ChannelKey, error) {
 	logger := logx.LoggerFromContext(ctx)
+	if key.Types != nil {
+		if err := validateProtocolSet(&key); err != nil {
+			return ChannelKey{}, err
+		}
+	}
 
 	cipher, err := s.encryptPlainKey(key.APIKey, false)
 	if err != nil {
@@ -493,6 +509,14 @@ func (s *Service) Test(ctx context.Context, keyID int, model, endpoint string) (
 			}
 		}
 	}
+	if key.CredentialStatus == StatusDisabledAuto {
+		current, err := s.repo.FindKeyByID(ctx, keyID)
+		if err == nil && current.CredentialStatus == StatusDisabledAuto {
+			if err := s.repo.UpdateCredentialState(ctx, current.CredentialID, StatusEnabled, ""); err != nil {
+				logger.Warn("channel_persist_failed", "op", "test_recover_credential", "credential_id", current.CredentialID, logx.LogFieldError, err)
+			}
+		}
+	}
 
 	s.reloadRegistry(ctx)
 	return latency, nil
@@ -596,6 +620,7 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelKey
 
 			snaps = append(snaps, registry.ChannelKeySnapshot{
 				KeyID:                  key.ID,
+				CredentialID:           key.CredentialID,
 				KeyName:                key.Name,
 				ChannelID:              ch.ID,
 				ChannelName:            ch.Name,
@@ -614,6 +639,7 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelKey
 				UpstreamRate:           key.UpstreamRate,
 				UseUpstreamRateForCost: key.UpstreamRateEnabled && key.UseUpstreamRateForCost,
 				Status:                 key.Status,
+				CredentialStatus:       key.CredentialStatus,
 				GroupIDs:               groups,
 				TestModel:              key.TestModel,
 				HealthStatus:           key.HealthStatus,
@@ -626,6 +652,11 @@ func (s *Service) LoadAllForRegistry(ctx context.Context) ([]registry.ChannelKey
 // PersistState 实现 registry.Persister：密钥端点调度状态异步落库。
 func (s *Service) PersistState(ctx context.Context, keyID int, status string, errMsg string) error {
 	return s.repo.UpdateKeyState(ctx, keyID, status, errMsg)
+}
+
+// PersistCredentialState 实现 registry 的可选凭证状态持久化接口。
+func (s *Service) PersistCredentialState(ctx context.Context, credentialID int, status string, errMsg string) error {
+	return s.repo.UpdateCredentialState(ctx, credentialID, status, errMsg)
 }
 
 // ---- 探针引擎适配器 ----
@@ -717,6 +748,51 @@ func (s *Service) ProbeKeyBilling(ctx context.Context, keyID int) (float64, erro
 		return *result.EffectiveRateMultiplier, nil
 	}
 	return result.RateMultiplier, nil
+}
+
+// validateProtocolSet 校验并去重同一物理凭证的协议集合。视频和音乐任务协议
+// 生命周期与同步协议不同，暂不允许和其他协议共享同一凭证。
+func validateProtocolSet(key *KeyInput) error {
+	types := key.Types
+	if types == nil {
+		types = []string{key.Type}
+	}
+	allowed := map[string]struct{}{
+		"openai_compatible": {},
+		"anthropic":         {},
+		"gemini":            {},
+		"custom":            {},
+		"openai_video":      {},
+		"suno":              {},
+	}
+	seen := make(map[string]struct{}, len(types))
+	normalized := make([]string, 0, len(types))
+	for _, channelType := range types {
+		channelType = strings.TrimSpace(channelType)
+		if _, ok := allowed[channelType]; !ok {
+			return ErrInvalidProtocolSet
+		}
+		if _, ok := seen[channelType]; ok {
+			continue
+		}
+		seen[channelType] = struct{}{}
+		normalized = append(normalized, channelType)
+	}
+	if len(normalized) == 0 {
+		return ErrInvalidProtocolSet
+	}
+	if len(normalized) > 1 {
+		if _, ok := seen["openai_video"]; ok {
+			return ErrInvalidProtocolSet
+		}
+		if _, ok := seen["suno"]; ok {
+			return ErrInvalidProtocolSet
+		}
+	}
+	if key.Types != nil {
+		key.Types = normalized
+	}
+	return nil
 }
 
 // encryptPlainKey 加密明文密钥；requireKey=true（新增）时必须非空，

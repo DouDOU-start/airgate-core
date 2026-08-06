@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelcredential"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
 )
@@ -62,6 +63,21 @@ func (cc *ChannelCreate) SetNillableUpdatedAt(t *time.Time) *ChannelCreate {
 		cc.SetUpdatedAt(*t)
 	}
 	return cc
+}
+
+// AddCredentialIDs adds the "credentials" edge to the ChannelCredential entity by IDs.
+func (cc *ChannelCreate) AddCredentialIDs(ids ...int) *ChannelCreate {
+	cc.mutation.AddCredentialIDs(ids...)
+	return cc
+}
+
+// AddCredentials adds the "credentials" edges to the ChannelCredential entity.
+func (cc *ChannelCreate) AddCredentials(c ...*ChannelCredential) *ChannelCreate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
+	}
+	return cc.AddCredentialIDs(ids...)
 }
 
 // AddKeyIDs adds the "keys" edge to the ChannelKey entity by IDs.
@@ -205,6 +221,22 @@ func (cc *ChannelCreate) createSpec() (*Channel, *sqlgraph.CreateSpec) {
 	if value, ok := cc.mutation.UpdatedAt(); ok {
 		_spec.SetField(channel.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
+	}
+	if nodes := cc.mutation.CredentialsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   channel.CredentialsTable,
+			Columns: []string{channel.CredentialsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelcredential.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := cc.mutation.KeysIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

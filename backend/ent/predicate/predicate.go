@@ -27,6 +27,9 @@ type Bookmark func(*sql.Selector)
 // Channel is the predicate function for channel builders.
 type Channel func(*sql.Selector)
 
+// ChannelCredential is the predicate function for channelcredential builders.
+type ChannelCredential func(*sql.Selector)
+
 // ChannelKey is the predicate function for channelkey builders.
 type ChannelKey func(*sql.Selector)
 

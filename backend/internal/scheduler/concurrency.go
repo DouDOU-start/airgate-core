@@ -36,9 +36,8 @@ const (
 //	ARGV[3] = requestID
 //	ARGV[4] = slotTTL 秒（单个 slot 的存活上限；整 key 的兜底 TTL 取历次 acquire 的最大值）
 //
-// 注：各类槽用不同前缀的 key 隔离（concurrency:v2:apikey:<id> / concurrency:v2:user:<id> /
-// concurrency:v2:channel:<id> / concurrency:v2:group:<id>），同一个脚本服务各方互不干扰；
-// v2 为 key 命名的版本段（当前唯一在用格式），实现变更时递增以隔离新旧数据结构。
+// 注：各类槽用不同前缀的 key 隔离；上游凭证使用
+// concurrency:v3:credential:<id>，与旧端点级 v2 计数彻底隔离。
 var acquireSlotScript = redis.NewScript(`
 	local now = tonumber(ARGV[1])
 	local max = tonumber(ARGV[2])
@@ -83,9 +82,10 @@ func userConcurrencyKey(userID int) string {
 	return fmt.Sprintf("concurrency:v2:user:%d", userID)
 }
 
-// keyConcurrencyKey 生成密钥端点级 Redis Key（relay 管线 key 并发闸门）。
-func keyConcurrencyKey(channelKeyID int) string {
-	return fmt.Sprintf("concurrency:v2:chkey:%d", channelKeyID)
+// keyConcurrencyKey 生成上游物理凭证级 Redis Key。函数名保留以兼容现有调用接口，
+// 入参已改为 credential_id，同一 API Key 的多协议端点共享一个槽位集合。
+func keyConcurrencyKey(credentialID int) string {
+	return fmt.Sprintf("concurrency:v3:credential:%d", credentialID)
 }
 
 // groupConcurrencyKey 生成分组级 Redis Key（纯管理端观测，无限流语义）。
@@ -155,7 +155,7 @@ func (cm *ConcurrencyManager) ReleaseAPIKeySlot(ctx context.Context, keyID int, 
 	cm.rdb.ZRem(ctx, apiKeyConcurrencyKey(keyID), requestID)
 }
 
-// AcquireKeySlot 获取密钥端点级并发槽位。
+// AcquireKeySlot 获取上游物理凭证级并发槽位。
 // maxConcurrency <= 0 时不限制但仍记录 slot（管理端实时并发观测口径）；
 // 释放侧 ReleaseKeySlot 由 pipeline 无条件 defer 执行，两侧恒配对。
 func (cm *ConcurrencyManager) AcquireKeySlot(ctx context.Context, channelKeyID int, requestID string, maxConcurrency int, slotTTL time.Duration) error {
@@ -228,7 +228,7 @@ func (cm *ConcurrencyManager) GetUserCurrentCounts(ctx context.Context, userIDs 
 	return result
 }
 
-// GetKeyCurrentCounts 批量获取多个密钥端点的当前在途并发数（管理端观测用）。
+// GetKeyCurrentCounts 批量获取多个上游物理凭证的当前在途并发数（管理端观测用）。
 // 与 GetUserCurrentCounts 同口径：只统计未过期的 slot，僵尸 slot 不计入。
 func (cm *ConcurrencyManager) GetKeyCurrentCounts(ctx context.Context, channelKeyIDs []int) map[int]int {
 	result := make(map[int]int, len(channelKeyIDs))

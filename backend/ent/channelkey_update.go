@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelcredential"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/group"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
@@ -30,6 +31,26 @@ type ChannelKeyUpdate struct {
 // Where appends a list predicates to the ChannelKeyUpdate builder.
 func (cku *ChannelKeyUpdate) Where(ps ...predicate.ChannelKey) *ChannelKeyUpdate {
 	cku.mutation.Where(ps...)
+	return cku
+}
+
+// SetCredentialID sets the "credential_id" field.
+func (cku *ChannelKeyUpdate) SetCredentialID(i int) *ChannelKeyUpdate {
+	cku.mutation.SetCredentialID(i)
+	return cku
+}
+
+// SetNillableCredentialID sets the "credential_id" field if the given value is not nil.
+func (cku *ChannelKeyUpdate) SetNillableCredentialID(i *int) *ChannelKeyUpdate {
+	if i != nil {
+		cku.SetCredentialID(*i)
+	}
+	return cku
+}
+
+// ClearCredentialID clears the value of the "credential_id" field.
+func (cku *ChannelKeyUpdate) ClearCredentialID() *ChannelKeyUpdate {
+	cku.mutation.ClearCredentialID()
 	return cku
 }
 
@@ -597,6 +618,11 @@ func (cku *ChannelKeyUpdate) SetUpdatedAt(t time.Time) *ChannelKeyUpdate {
 	return cku
 }
 
+// SetCredential sets the "credential" edge to the ChannelCredential entity.
+func (cku *ChannelKeyUpdate) SetCredential(c *ChannelCredential) *ChannelKeyUpdate {
+	return cku.SetCredentialID(c.ID)
+}
+
 // SetChannelID sets the "channel" edge to the Channel entity by ID.
 func (cku *ChannelKeyUpdate) SetChannelID(id int) *ChannelKeyUpdate {
 	cku.mutation.SetChannelID(id)
@@ -641,6 +667,12 @@ func (cku *ChannelKeyUpdate) AddUsageLogs(u ...*UsageLog) *ChannelKeyUpdate {
 // Mutation returns the ChannelKeyMutation object of the builder.
 func (cku *ChannelKeyUpdate) Mutation() *ChannelKeyMutation {
 	return cku.mutation
+}
+
+// ClearCredential clears the "credential" edge to the ChannelCredential entity.
+func (cku *ChannelKeyUpdate) ClearCredential() *ChannelKeyUpdate {
+	cku.mutation.ClearCredential()
+	return cku
 }
 
 // ClearChannel clears the "channel" edge to the Channel entity.
@@ -732,11 +764,6 @@ func (cku *ChannelKeyUpdate) check() error {
 	if v, ok := cku.mutation.GetType(); ok {
 		if err := channelkey.TypeValidator(v); err != nil {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "ChannelKey.type": %w`, err)}
-		}
-	}
-	if v, ok := cku.mutation.APIKey(); ok {
-		if err := channelkey.APIKeyValidator(v); err != nil {
-			return &ValidationError{Name: "api_key", err: fmt.Errorf(`ent: validator failed for field "ChannelKey.api_key": %w`, err)}
 		}
 	}
 	if v, ok := cku.mutation.Status(); ok {
@@ -952,6 +979,35 @@ func (cku *ChannelKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := cku.mutation.UpdatedAt(); ok {
 		_spec.SetField(channelkey.FieldUpdatedAt, field.TypeTime, value)
 	}
+	if cku.mutation.CredentialCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   channelkey.CredentialTable,
+			Columns: []string{channelkey.CredentialColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelcredential.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := cku.mutation.CredentialIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   channelkey.CredentialTable,
+			Columns: []string{channelkey.CredentialColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelcredential.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if cku.mutation.ChannelCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -1091,6 +1147,26 @@ type ChannelKeyUpdateOne struct {
 	hooks     []Hook
 	mutation  *ChannelKeyMutation
 	modifiers []func(*sql.UpdateBuilder)
+}
+
+// SetCredentialID sets the "credential_id" field.
+func (ckuo *ChannelKeyUpdateOne) SetCredentialID(i int) *ChannelKeyUpdateOne {
+	ckuo.mutation.SetCredentialID(i)
+	return ckuo
+}
+
+// SetNillableCredentialID sets the "credential_id" field if the given value is not nil.
+func (ckuo *ChannelKeyUpdateOne) SetNillableCredentialID(i *int) *ChannelKeyUpdateOne {
+	if i != nil {
+		ckuo.SetCredentialID(*i)
+	}
+	return ckuo
+}
+
+// ClearCredentialID clears the value of the "credential_id" field.
+func (ckuo *ChannelKeyUpdateOne) ClearCredentialID() *ChannelKeyUpdateOne {
+	ckuo.mutation.ClearCredentialID()
+	return ckuo
 }
 
 // SetName sets the "name" field.
@@ -1657,6 +1733,11 @@ func (ckuo *ChannelKeyUpdateOne) SetUpdatedAt(t time.Time) *ChannelKeyUpdateOne 
 	return ckuo
 }
 
+// SetCredential sets the "credential" edge to the ChannelCredential entity.
+func (ckuo *ChannelKeyUpdateOne) SetCredential(c *ChannelCredential) *ChannelKeyUpdateOne {
+	return ckuo.SetCredentialID(c.ID)
+}
+
 // SetChannelID sets the "channel" edge to the Channel entity by ID.
 func (ckuo *ChannelKeyUpdateOne) SetChannelID(id int) *ChannelKeyUpdateOne {
 	ckuo.mutation.SetChannelID(id)
@@ -1701,6 +1782,12 @@ func (ckuo *ChannelKeyUpdateOne) AddUsageLogs(u ...*UsageLog) *ChannelKeyUpdateO
 // Mutation returns the ChannelKeyMutation object of the builder.
 func (ckuo *ChannelKeyUpdateOne) Mutation() *ChannelKeyMutation {
 	return ckuo.mutation
+}
+
+// ClearCredential clears the "credential" edge to the ChannelCredential entity.
+func (ckuo *ChannelKeyUpdateOne) ClearCredential() *ChannelKeyUpdateOne {
+	ckuo.mutation.ClearCredential()
+	return ckuo
 }
 
 // ClearChannel clears the "channel" edge to the Channel entity.
@@ -1805,11 +1892,6 @@ func (ckuo *ChannelKeyUpdateOne) check() error {
 	if v, ok := ckuo.mutation.GetType(); ok {
 		if err := channelkey.TypeValidator(v); err != nil {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "ChannelKey.type": %w`, err)}
-		}
-	}
-	if v, ok := ckuo.mutation.APIKey(); ok {
-		if err := channelkey.APIKeyValidator(v); err != nil {
-			return &ValidationError{Name: "api_key", err: fmt.Errorf(`ent: validator failed for field "ChannelKey.api_key": %w`, err)}
 		}
 	}
 	if v, ok := ckuo.mutation.Status(); ok {
@@ -2041,6 +2123,35 @@ func (ckuo *ChannelKeyUpdateOne) sqlSave(ctx context.Context) (_node *ChannelKey
 	}
 	if value, ok := ckuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(channelkey.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if ckuo.mutation.CredentialCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   channelkey.CredentialTable,
+			Columns: []string{channelkey.CredentialColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelcredential.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := ckuo.mutation.CredentialIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   channelkey.CredentialTable,
+			Columns: []string{channelkey.CredentialColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelcredential.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if ckuo.mutation.ChannelCleared() {
 		edge := &sqlgraph.EdgeSpec{

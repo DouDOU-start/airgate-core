@@ -407,17 +407,21 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 			hardExclude = append(hardExclude, ch.KeyID)
 			continue
 		}
+		capacityID := ch.CredentialID
+		if capacityID <= 0 {
+			capacityID = ch.KeyID
+		}
 
-		// key RPM + 并发闸门：满则软排除（任务提交不排队，客户端重试成本低）。
-		rpmOK, rpmMinute, _ := f.rpm.TryIncrementKeyRPM(ctx, ch.KeyID, ch.MaxRPM)
+		// 物理凭证 RPM + 并发闸门：同一 API Key 的协议端点共享限额。
+		rpmOK, rpmMinute, _ := f.rpm.TryIncrementKeyRPM(ctx, capacityID, ch.MaxRPM)
 		if !rpmOK {
 			summary.localCapacity = true
 			softExclude = append(softExclude, ch.KeyID)
 			continue
 		}
 		slotID := uuid.New().String()
-		if err := f.concurrency.AcquireKeySlot(ctx, ch.KeyID, slotID, ch.MaxConcurrency, 0); err != nil {
-			f.rpm.DecrementKeyRPM(ctx, ch.KeyID, rpmMinute)
+		if err := f.concurrency.AcquireKeySlot(ctx, capacityID, slotID, ch.MaxConcurrency, 0); err != nil {
+			f.rpm.DecrementKeyRPM(ctx, capacityID, rpmMinute)
 			summary.localCapacity = true
 			softExclude = append(softExclude, ch.KeyID)
 			continue
@@ -432,13 +436,13 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 		}
 		attemptStart := time.Now()
 		result := f.executeSubmit(ctx, ad, info, sub)
-		f.concurrency.ReleaseKeySlot(context.Background(), ch.KeyID, slotID)
+		f.concurrency.ReleaseKeySlot(context.Background(), capacityID, slotID)
 		attemptLatency := time.Since(attemptStart).Milliseconds()
 		attempts++
 
 		// 构建上游请求即失败：客户端/配置问题，一次性 400 终止（不计渠道健康）。
 		if result.buildErr != nil {
-			f.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			f.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
 			refund("构建上游请求失败")
 			// 用户可见消息额外抹掉上游渠道身份；管理端留痕保留渠道细节。
 			adminMsg := outcome.SanitizeKeyLeak(result.buildErr.Error(), []string{apiKey})
@@ -486,7 +490,7 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 
 		switch o.Verdict {
 		case outcome.RateLimited:
-			f.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			f.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
 			hardExclude = append(hardExclude, ch.KeyID)
 			summary.rateLimited = true
 			summary.observeRetryAfter(o.RetryAfter)
@@ -495,9 +499,13 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 			continue
 
 		case outcome.AuthFailed:
-			f.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			f.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
 			if settings.AutoBanEnabled {
-				f.registry.MarkAutoDisabled(ch.KeyID, outcome.TruncateErrorMsg(o.Reason))
+				if result.statusCode == http.StatusUnauthorized {
+					f.registry.MarkCredentialAutoDisabled(ch.KeyID, outcome.TruncateErrorMsg(o.Reason))
+				} else {
+					f.registry.MarkAutoDisabled(ch.KeyID, outcome.TruncateErrorMsg(o.Reason))
+				}
 			}
 			hardExclude = append(hardExclude, ch.KeyID)
 			summary.authFailed = true
@@ -506,7 +514,7 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 			continue
 
 		case outcome.Transient:
-			f.rpm.DecrementKeyRPM(context.Background(), ch.KeyID, rpmMinute)
+			f.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
 			softExclude = append(softExclude, ch.KeyID)
 			summary.transient = true
 			verdictName := "transient"

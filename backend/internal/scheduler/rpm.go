@@ -30,10 +30,10 @@ func currentMinute() int64 {
 	return time.Now().Unix() / 60
 }
 
-// keyMinuteKey 生成密钥端点维度指定分钟窗口的 Redis key。
-// 前缀带 chkey: 段，与用户/分组/渠道维度 key 的 ID 空间隔离。
-func keyMinuteKey(channelKeyID int, minute int64) string {
-	return fmt.Sprintf("rpm:chkey:%d:%d", channelKeyID, minute)
+// keyMinuteKey 生成上游物理凭证维度指定分钟窗口的 Redis key。
+// 函数名保留以兼容现有调用接口，入参已改为 credential_id。
+func keyMinuteKey(credentialID int, minute int64) string {
+	return fmt.Sprintf("rpm:credential:%d:%d", credentialID, minute)
 }
 
 // userMinuteKey 生成用户维度指定分钟窗口的 Redis key。
@@ -124,7 +124,7 @@ func (r *RPMCounter) GetUserRPMs(ctx context.Context, userIDs []int) map[int]int
 	return result
 }
 
-// GetKeyRPMs 批量获取多个密钥端点当前分钟的请求计数（管理端观测用）。
+// GetKeyRPMs 批量获取多个上游物理凭证当前分钟的请求计数（管理端观测用）。
 func (r *RPMCounter) GetKeyRPMs(ctx context.Context, channelKeyIDs []int) map[int]int {
 	result := make(map[int]int, len(channelKeyIDs))
 	if r.rdb == nil {
@@ -228,7 +228,7 @@ func (r *RPMCounter) tryIncrementByKey(ctx context.Context, key string, maxRPM i
 	return result >= 0, nil
 }
 
-// TryIncrementKeyRPM 原子检查密钥端点维度 RPM 限制并递增。
+// TryIncrementKeyRPM 原子检查上游物理凭证维度 RPM 限制并递增。
 // 返回本次计数所用的分钟窗口，供失败回退 DecrementKeyRPM 对同一窗口撤销。
 func (r *RPMCounter) TryIncrementKeyRPM(ctx context.Context, channelKeyID int, maxRPM int) (bool, int64, error) {
 	minute := currentMinute()

@@ -15,9 +15,9 @@ func TestChannelMinuteKey(t *testing.T) {
 		minute    int64
 		want      string
 	}{
-		{"常规窗口", 5, 100, "rpm:chkey:5:100"},
-		{"跨分钟边界仍用原窗口", 5, 99, "rpm:chkey:5:99"},
-		{"不同渠道隔离", 7, 100, "rpm:chkey:7:100"},
+		{"常规窗口", 5, 100, "rpm:credential:5:100"},
+		{"跨分钟边界仍用原窗口", 5, 99, "rpm:credential:5:99"},
+		{"不同凭证隔离", 7, 100, "rpm:credential:7:100"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -4,8 +4,12 @@ import "time"
 
 // ChannelKeyResp 渠道下的一把密钥端点响应。明文密钥永不出现，仅回 api_key_hint（尾 4 位）。
 type ChannelKeyResp struct {
-	ID        int64 `json:"id"`
-	ChannelID int64 `json:"channel_id"`
+	ID                  int64    `json:"id"`
+	CredentialID        int64    `json:"credential_id"`
+	CredentialStatus    string   `json:"credential_status"`
+	CredentialErrorMsg  string   `json:"credential_error_msg"`
+	CredentialProtocols []string `json:"credential_protocols"`
+	ChannelID           int64    `json:"channel_id"`
 	// ChannelName / BaseURL 所属渠道的冗余展示字段，密钥视图（跨渠道平铺）用；渠道视图下与父渠道重复但无害。
 	ChannelName    string            `json:"channel_name"`
 	BaseURL        string            `json:"base_url"`
@@ -90,23 +94,26 @@ type UpdateChannelReq struct {
 }
 
 // ChannelKeyReq 密钥端点写入请求（新增 POST /channels/:id/keys 与更新 PUT /channels/keys/:id 共用）。
-// 新增时 type/api_key 必填；更新时 api_key 留空 = 保持原密钥不变、type 留空 = 不改。
+// 新增时 type 或 types 至少提供一个且 api_key 必填；更新时 api_key 留空 = 保持原密钥不变，
+// type/types 留空 = 不调整当前凭证支持的协议端点。
 type ChannelKeyReq struct {
-	Name           *string           `json:"name"`
-	Type           string            `json:"type" binding:"omitempty,oneof=openai_compatible anthropic gemini custom openai_video suno"`
-	APIKey         string            `json:"api_key"`
-	Models         []string          `json:"models"`
-	ModelMapping   map[string]string `json:"model_mapping"`
-	ParamOverride  map[string]any    `json:"param_override"`
-	HeaderOverride map[string]string `json:"header_override"`
-	Status         *string           `json:"status" binding:"omitempty,oneof=enabled disabled_manual"`
-	Priority       *int              `json:"priority" binding:"omitempty,min=0,max=999"`
-	Weight         *int              `json:"weight" binding:"omitempty,min=0"`
-	MaxConcurrency *int              `json:"max_concurrency" binding:"omitempty,min=0"`
-	MaxRPM         *int              `json:"max_rpm" binding:"omitempty,min=0"`
-	CostRatio      *float64          `json:"cost_ratio" binding:"omitempty,gte=0"`
-	Tags           []string          `json:"tags"`
-	TestModel      *string           `json:"test_model"`
+	Name             *string           `json:"name"`
+	Type             string            `json:"type" binding:"omitempty,oneof=openai_compatible anthropic gemini custom openai_video suno"`
+	Types            []string          `json:"types" binding:"omitempty,min=1,dive,oneof=openai_compatible anthropic gemini custom openai_video suno"`
+	APIKey           string            `json:"api_key"`
+	Models           []string          `json:"models"`
+	ModelMapping     map[string]string `json:"model_mapping"`
+	ParamOverride    map[string]any    `json:"param_override"`
+	HeaderOverride   map[string]string `json:"header_override"`
+	Status           *string           `json:"status" binding:"omitempty,oneof=enabled disabled_manual"`
+	CredentialStatus *string           `json:"credential_status" binding:"omitempty,oneof=enabled disabled_manual"`
+	Priority         *int              `json:"priority" binding:"omitempty,min=0,max=999"`
+	Weight           *int              `json:"weight" binding:"omitempty,min=0"`
+	MaxConcurrency   *int              `json:"max_concurrency" binding:"omitempty,min=0"`
+	MaxRPM           *int              `json:"max_rpm" binding:"omitempty,min=0"`
+	CostRatio        *float64          `json:"cost_ratio" binding:"omitempty,gte=0"`
+	Tags             []string          `json:"tags"`
+	TestModel        *string           `json:"test_model"`
 	// BalanceCheckEnabled 省略 = 新增取默认 true / 更新不改。
 	BalanceCheckEnabled *bool `json:"balance_check_enabled"`
 	// ProbeEnabled 省略 = 新增取默认 false / 更新不改。
@@ -173,6 +180,7 @@ type ChannelExportItem struct {
 type ChannelKeyExportItem struct {
 	Name                   string            `json:"name"`
 	Type                   string            `json:"type"`
+	Types                  []string          `json:"types,omitempty"`
 	APIKey                 string            `json:"api_key"`
 	APIKeyHint             string            `json:"api_key_hint,omitempty"`
 	Models                 []string          `json:"models"`
@@ -209,7 +217,8 @@ type ImportChannelItem struct {
 // ImportChannelKeyItem 导入的单把密钥。api_key 为空时该 key 跳过不创建。
 type ImportChannelKeyItem struct {
 	Name                   string            `json:"name"`
-	Type                   string            `json:"type" binding:"required,oneof=openai_compatible anthropic gemini custom openai_video suno"`
+	Type                   string            `json:"type" binding:"omitempty,oneof=openai_compatible anthropic gemini custom openai_video suno"`
+	Types                  []string          `json:"types" binding:"omitempty,min=1,dive,oneof=openai_compatible anthropic gemini custom openai_video suno"`
 	APIKey                 string            `json:"api_key"`
 	Models                 []string          `json:"models"`
 	ModelMapping           map[string]string `json:"model_mapping"`

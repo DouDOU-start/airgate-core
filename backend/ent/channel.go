@@ -33,19 +33,30 @@ type Channel struct {
 
 // ChannelEdges holds the relations/edges for other nodes in the graph.
 type ChannelEdges struct {
+	// Credentials holds the value of the credentials edge.
+	Credentials []*ChannelCredential `json:"credentials,omitempty"`
 	// Keys holds the value of the keys edge.
 	Keys []*ChannelKey `json:"keys,omitempty"`
 	// UsageLogs holds the value of the usage_logs edge.
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
+}
+
+// CredentialsOrErr returns the Credentials value or an error if the edge
+// was not loaded in eager-loading.
+func (e ChannelEdges) CredentialsOrErr() ([]*ChannelCredential, error) {
+	if e.loadedTypes[0] {
+		return e.Credentials, nil
+	}
+	return nil, &NotLoadedError{edge: "credentials"}
 }
 
 // KeysOrErr returns the Keys value or an error if the edge
 // was not loaded in eager-loading.
 func (e ChannelEdges) KeysOrErr() ([]*ChannelKey, error) {
-	if e.loadedTypes[0] {
+	if e.loadedTypes[1] {
 		return e.Keys, nil
 	}
 	return nil, &NotLoadedError{edge: "keys"}
@@ -54,7 +65,7 @@ func (e ChannelEdges) KeysOrErr() ([]*ChannelKey, error) {
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e ChannelEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
@@ -127,6 +138,11 @@ func (c *Channel) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (c *Channel) Value(name string) (ent.Value, error) {
 	return c.selectValues.Get(name)
+}
+
+// QueryCredentials queries the "credentials" edge of the Channel entity.
+func (c *Channel) QueryCredentials() *ChannelCredentialQuery {
+	return NewChannelClient(c.config).QueryCredentials(c)
 }
 
 // QueryKeys queries the "keys" edge of the Channel entity.

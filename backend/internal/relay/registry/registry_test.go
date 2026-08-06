@@ -44,6 +44,14 @@ func (f *fakePersister) PersistState(_ context.Context, id int, status string, e
 	return nil
 }
 
+func (f *fakePersister) PersistCredentialState(_ context.Context, id int, status string, errMsg string) error {
+	f.mu.Lock()
+	f.calls = append(f.calls, persistCall{id: id, status: status, errMsg: errMsg})
+	f.mu.Unlock()
+	f.done <- struct{}{}
+	return nil
+}
+
 func (f *fakePersister) waitOne(t *testing.T) persistCall {
 	t.Helper()
 	select {
@@ -86,6 +94,41 @@ func newTestRegistry(t *testing.T, persister Persister, snaps ...ChannelKeySnaps
 		t.Fatalf("Reload 失败: %v", err)
 	}
 	return r
+}
+
+// TestMarkCredentialAutoDisabledStopsAllProtocols 验证 401 凭证级禁用会同时移除
+// 同一 API Key 的全部协议端点，而不是只打掉当前协议。
+func TestMarkCredentialAutoDisabledStopsAllProtocols(t *testing.T) {
+	persister := newFakePersister()
+	r := newTestRegistry(t, persister,
+		snap(1, func(s *ChannelKeySnapshot) {
+			s.CredentialID = 99
+			s.CredentialStatus = StatusEnabled
+		}),
+		snap(2, func(s *ChannelKeySnapshot) {
+			s.CredentialID = 99
+			s.CredentialStatus = StatusEnabled
+			s.Type = "anthropic"
+		}),
+	)
+
+	r.MarkCredentialAutoDisabled(1, "HTTP 401")
+	call := persister.waitOne(t)
+	if call.id != 99 || call.status != StatusDisabledAuto || call.errMsg != "HTTP 401" {
+		t.Fatalf("凭证状态落库 = %+v", call)
+	}
+	for _, keyID := range []int{1, 2} {
+		snapshot, ok := r.Snapshot(keyID)
+		if !ok || snapshot.CredentialStatus != StatusDisabledAuto {
+			t.Fatalf("端点 %d 未继承凭证禁用状态: %+v", keyID, snapshot)
+		}
+	}
+	if _, err := r.Pick(0, "gpt-4o", ProtocolOpenAI, nil); !errors.Is(err, ErrNoAvailableChannel) {
+		t.Fatalf("OpenAI 协议仍可调度: %v", err)
+	}
+	if _, err := r.Pick(0, "gpt-4o", ProtocolAnthropic, nil); !errors.Is(err, ErrNoAvailableChannel) {
+		t.Fatalf("Anthropic 协议仍可调度: %v", err)
+	}
 }
 
 func TestChannelKeySnapshotEffectiveCostRatio(t *testing.T) {

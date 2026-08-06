@@ -28,7 +28,7 @@ import { ChannelStatsModal } from './channels/ChannelStatsModal';
 import { ChannelTestModal } from './channels/ChannelTestModal';
 import { ChannelKeysTable } from './channels/ChannelKeysTable';
 import {
-  HealthStatusChip, KeyMetricsRow, KeyStatusChip, TYPE_CHIP_COLORS, typeLabel,
+  CredentialProtocolChips, effectiveKeyStatus, HealthStatusChip, KeyMetricsRow, KeyStatusChip,
 } from './channels/keyShared';
 import { formatDate, formatDateTime } from '../../shared/utils/format';
 import type {
@@ -77,6 +77,7 @@ function KeyRow({
   toggling: boolean;
 }) {
   const { t } = useTranslation();
+  const effectiveStatus = effectiveKeyStatus(channelKey);
 
   return (
     <div className="border-b border-border px-4 py-3 last:border-b-0">
@@ -85,9 +86,7 @@ function KeyRow({
         <span className="max-w-[200px] truncate font-medium text-text" title={channelKey.name}>
           {channelKey.name || t('channels.key_unnamed')}
         </span>
-        <Chip color={TYPE_CHIP_COLORS[channelKey.type] ?? 'default'} size="sm" variant="soft">
-          {typeLabel(channelKey.type)}
-        </Chip>
+        <CredentialProtocolChips channelKey={channelKey} />
         {/* 直接点击启停：on=enabled，off=手动禁用 */}
         <NativeSwitch
           ariaLabel={t('channels.status_enabled')}
@@ -95,8 +94,8 @@ function KeyRow({
           isSelected={channelKey.status === 'enabled'}
           onChange={onToggleEnabled}
         />
-        {channelKey.status === 'disabled_auto' ? (
-          <KeyStatusChip errorMsg={channelKey.error_msg} status={channelKey.status} />
+        {effectiveStatus.status === 'disabled_auto' ? (
+          <KeyStatusChip errorMsg={effectiveStatus.errorMsg} status={effectiveStatus.status} />
         ) : null}
         {channelKey.health_status && channelKey.health_status !== 'healthy' ? (
           <HealthStatusChip status={channelKey.health_status} />
@@ -354,11 +353,16 @@ export default function ChannelsPage() {
   // 进入渠道页 / 翻页时自动刷新可见渠道下陈旧的 key 余额（后台、串行、只刷陈旧的、每 key 每次挂载只刷一次）。
   const autoRefreshedRef = useRef<Set<number>>(new Set());
   useEffect(() => {
+    const visibleCredentials = new Set<number>();
     const stale = rows
       .flatMap((ch) => ch.keys)
-      .filter((k) => isKeyBalanceStale(k) && !autoRefreshedRef.current.has(k.id));
+      .filter((k) => {
+        if (visibleCredentials.has(k.credential_id)) return false;
+        visibleCredentials.add(k.credential_id);
+        return isKeyBalanceStale(k) && !autoRefreshedRef.current.has(k.credential_id);
+      });
     if (stale.length === 0) return;
-    stale.forEach((k) => autoRefreshedRef.current.add(k.id));
+    stale.forEach((k) => autoRefreshedRef.current.add(k.credential_id));
 
     let cancelled = false;
     void (async () => {

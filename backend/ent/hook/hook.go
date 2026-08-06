@@ -93,6 +93,18 @@ func (f ChannelFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, err
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ChannelMutation", m)
 }
 
+// The ChannelCredentialFunc type is an adapter to allow the use of ordinary
+// function as ChannelCredential mutator.
+type ChannelCredentialFunc func(context.Context, *ent.ChannelCredentialMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ChannelCredentialFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ChannelCredentialMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ChannelCredentialMutation", m)
+}
+
 // The ChannelKeyFunc type is an adapter to allow the use of ordinary
 // function as ChannelKey mutator.
 type ChannelKeyFunc func(context.Context, *ent.ChannelKeyMutation) (ent.Value, error)

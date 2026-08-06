@@ -77,6 +77,9 @@ type ChannelKeySnapshot struct {
 	// KeyID / KeyName 密钥端点标识：调度、故障隔离与管理端留痕展示使用。
 	KeyID   int
 	KeyName string
+	// CredentialID 物理凭证标识：同一 API Key 的多协议端点共享并发、RPM 和整体状态。
+	CredentialID     int
+	CredentialStatus string
 	// ChannelID / ChannelName 所属渠道（供应商）标识，供计费聚合与留痕。
 	ChannelID   int
 	ChannelName string
@@ -130,6 +133,11 @@ type Loader interface {
 // Persister 密钥端点状态异步落库（由 channel service 实现）。
 type Persister interface {
 	PersistState(ctx context.Context, keyID int, status string, errMsg string) error
+}
+
+// credentialPersister 是可选的物理凭证状态落库能力；保留 Persister 原接口以兼容旧实现。
+type credentialPersister interface {
+	PersistCredentialState(ctx context.Context, credentialID int, status string, errMsg string) error
 }
 
 // 惰性兜底加载参数：注册表从未成功加载过（如启动时 DB 瞬断）时，
@@ -238,7 +246,7 @@ func (r *Registry) ListCandidates(groupID int, model, protocol string, exclude [
 		if _, ok := allowedTypes[k.Type]; !ok {
 			continue
 		}
-		if k.Status != StatusEnabled {
+		if k.Status != StatusEnabled || !credentialEnabled(k) {
 			continue
 		}
 		if _, ok := k.Models[model]; !ok {
@@ -282,7 +290,7 @@ func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*Ch
 		if _, ok := allowedTypes[k.Type]; !ok {
 			continue
 		}
-		if k.Status != StatusEnabled {
+		if k.Status != StatusEnabled || !credentialEnabled(k) {
 			continue
 		}
 		if _, ok := k.Models[model]; !ok {
@@ -340,7 +348,7 @@ func (r *Registry) ModelEntriesForGroup(groupID int) []ModelEntry {
 	r.mu.RLock()
 	set := map[string]map[string]struct{}{}
 	for _, k := range r.keys {
-		if k.Status != StatusEnabled {
+		if k.Status != StatusEnabled || !credentialEnabled(k) {
 			continue
 		}
 		if _, ok := k.GroupIDs[groupID]; !ok {
@@ -389,7 +397,7 @@ func (r *Registry) AnyKeyForChannel(channelID int) (*ChannelKeySnapshot, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	for _, k := range r.keys {
-		if k.ChannelID == channelID && k.Status == StatusEnabled {
+		if k.ChannelID == channelID && k.Status == StatusEnabled && credentialEnabled(k) {
 			return k, true
 		}
 	}
@@ -407,20 +415,58 @@ func (r *Registry) MarkAutoDisabled(keyID int, reason string) {
 	r.persistAsync(keyID, StatusDisabledAuto, reason)
 }
 
+// MarkCredentialAutoDisabled 自动禁用整条物理凭证（上游 401）：其下全部协议端点
+// 在内存中即时停止调度，并异步落库凭证级错误原因。
+func (r *Registry) MarkCredentialAutoDisabled(keyID int, reason string) {
+	r.mu.Lock()
+	current, ok := r.keys[keyID]
+	if !ok {
+		r.mu.Unlock()
+		return
+	}
+	credentialID := current.CredentialID
+	if credentialID == 0 {
+		credentialID = current.KeyID
+	}
+	for id, old := range r.keys {
+		if effectiveCredentialID(old) != credentialID {
+			continue
+		}
+		next := *old
+		next.CredentialStatus = StatusDisabledAuto
+		r.keys[id] = &next
+	}
+	r.mu.Unlock()
+	r.persistCredentialAsync(credentialID, StatusDisabledAuto, reason)
+}
+
 // MarkRecovered 将 disabled_auto 的 key 恢复为 enabled；其余状态不动（手动禁用不自动恢复）。
 func (r *Registry) MarkRecovered(keyID int) {
 	recovered := false
+	credentialRecovered := false
+	credentialID := 0
 	snap := r.mutate(keyID, func(k *ChannelKeySnapshot) {
+		credentialID = effectiveCredentialID(k)
+		if k.CredentialStatus == StatusDisabledAuto {
+			k.CredentialStatus = StatusEnabled
+			credentialRecovered = true
+		}
 		if k.Status != StatusDisabledAuto {
 			return
 		}
 		k.Status = StatusEnabled
 		recovered = true
 	})
-	if snap == nil || !recovered {
+	if snap == nil {
 		return
 	}
-	r.persistAsync(keyID, StatusEnabled, "")
+	if recovered {
+		r.persistAsync(keyID, StatusEnabled, "")
+	}
+	if credentialRecovered {
+		r.mutateCredentialStatus(credentialID, StatusEnabled)
+		r.persistCredentialAsync(credentialID, StatusEnabled, "")
+	}
 }
 
 // UpdateHealth 更新 key 的健康状态（内存即时生效，不落库——由探针引擎负责落库）。
@@ -435,9 +481,21 @@ func (r *Registry) UpdateUpstreamRate(keyID int, rate float64) {
 	if rate <= 0 {
 		return
 	}
-	r.mutate(keyID, func(k *ChannelKeySnapshot) {
-		k.UpstreamRate = rate
-	})
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	current, ok := r.keys[keyID]
+	if !ok {
+		return
+	}
+	credentialID := effectiveCredentialID(current)
+	for id, old := range r.keys {
+		if effectiveCredentialID(old) != credentialID {
+			continue
+		}
+		next := *old
+		next.UpstreamRate = rate
+		r.keys[id] = &next
+	}
 }
 
 // mutate 以 copy-on-write 方式更新指定 key 快照，返回更新后的快照；key 不存在返回 nil。
@@ -467,6 +525,49 @@ func (r *Registry) persistAsync(keyID int, status string, errMsg string) {
 		if err := r.persister.PersistState(ctx, keyID, status, errMsg); err != nil {
 			slog.Error("channel_key_state_persist_failed",
 				"channel_key_id", keyID,
+				"status", status,
+				"error", err)
+		}
+	}()
+}
+
+func credentialEnabled(k *ChannelKeySnapshot) bool {
+	return k.CredentialStatus == "" || k.CredentialStatus == StatusEnabled
+}
+
+func effectiveCredentialID(k *ChannelKeySnapshot) int {
+	if k.CredentialID > 0 {
+		return k.CredentialID
+	}
+	return k.KeyID
+}
+
+func (r *Registry) mutateCredentialStatus(credentialID int, status string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for id, old := range r.keys {
+		if effectiveCredentialID(old) != credentialID {
+			continue
+		}
+		next := *old
+		next.CredentialStatus = status
+		r.keys[id] = &next
+	}
+}
+
+func (r *Registry) persistCredentialAsync(credentialID int, status string, errMsg string) {
+	persister, ok := r.persister.(credentialPersister)
+	if !ok {
+		// 兼容旧 Persister 和未迁移快照：凭证 ID 回退为端点 ID 时仍按旧接口落库。
+		r.persistAsync(credentialID, status, errMsg)
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), r.persistTimeout)
+		defer cancel()
+		if err := persister.PersistCredentialState(ctx, credentialID, status, errMsg); err != nil {
+			slog.Error("channel_credential_state_persist_failed",
+				"credential_id", credentialID,
 				"status", status,
 				"error", err)
 		}

@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/DouDOU-start/airgate-core/ent/channel"
+	"github.com/DouDOU-start/airgate-core/ent/channelcredential"
 	"github.com/DouDOU-start/airgate-core/ent/channelkey"
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/usagelog"
@@ -65,6 +66,21 @@ func (cu *ChannelUpdate) SetUpdatedAt(t time.Time) *ChannelUpdate {
 	return cu
 }
 
+// AddCredentialIDs adds the "credentials" edge to the ChannelCredential entity by IDs.
+func (cu *ChannelUpdate) AddCredentialIDs(ids ...int) *ChannelUpdate {
+	cu.mutation.AddCredentialIDs(ids...)
+	return cu
+}
+
+// AddCredentials adds the "credentials" edges to the ChannelCredential entity.
+func (cu *ChannelUpdate) AddCredentials(c ...*ChannelCredential) *ChannelUpdate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
+	}
+	return cu.AddCredentialIDs(ids...)
+}
+
 // AddKeyIDs adds the "keys" edge to the ChannelKey entity by IDs.
 func (cu *ChannelUpdate) AddKeyIDs(ids ...int) *ChannelUpdate {
 	cu.mutation.AddKeyIDs(ids...)
@@ -98,6 +114,27 @@ func (cu *ChannelUpdate) AddUsageLogs(u ...*UsageLog) *ChannelUpdate {
 // Mutation returns the ChannelMutation object of the builder.
 func (cu *ChannelUpdate) Mutation() *ChannelMutation {
 	return cu.mutation
+}
+
+// ClearCredentials clears all "credentials" edges to the ChannelCredential entity.
+func (cu *ChannelUpdate) ClearCredentials() *ChannelUpdate {
+	cu.mutation.ClearCredentials()
+	return cu
+}
+
+// RemoveCredentialIDs removes the "credentials" edge to ChannelCredential entities by IDs.
+func (cu *ChannelUpdate) RemoveCredentialIDs(ids ...int) *ChannelUpdate {
+	cu.mutation.RemoveCredentialIDs(ids...)
+	return cu
+}
+
+// RemoveCredentials removes "credentials" edges to ChannelCredential entities.
+func (cu *ChannelUpdate) RemoveCredentials(c ...*ChannelCredential) *ChannelUpdate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
+	}
+	return cu.RemoveCredentialIDs(ids...)
 }
 
 // ClearKeys clears all "keys" edges to the ChannelKey entity.
@@ -219,6 +256,51 @@ func (cu *ChannelUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := cu.mutation.UpdatedAt(); ok {
 		_spec.SetField(channel.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if cu.mutation.CredentialsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   channel.CredentialsTable,
+			Columns: []string{channel.CredentialsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelcredential.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := cu.mutation.RemovedCredentialsIDs(); len(nodes) > 0 && !cu.mutation.CredentialsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   channel.CredentialsTable,
+			Columns: []string{channel.CredentialsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelcredential.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := cu.mutation.CredentialsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   channel.CredentialsTable,
+			Columns: []string{channel.CredentialsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelcredential.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if cu.mutation.KeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -366,6 +448,21 @@ func (cuo *ChannelUpdateOne) SetUpdatedAt(t time.Time) *ChannelUpdateOne {
 	return cuo
 }
 
+// AddCredentialIDs adds the "credentials" edge to the ChannelCredential entity by IDs.
+func (cuo *ChannelUpdateOne) AddCredentialIDs(ids ...int) *ChannelUpdateOne {
+	cuo.mutation.AddCredentialIDs(ids...)
+	return cuo
+}
+
+// AddCredentials adds the "credentials" edges to the ChannelCredential entity.
+func (cuo *ChannelUpdateOne) AddCredentials(c ...*ChannelCredential) *ChannelUpdateOne {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
+	}
+	return cuo.AddCredentialIDs(ids...)
+}
+
 // AddKeyIDs adds the "keys" edge to the ChannelKey entity by IDs.
 func (cuo *ChannelUpdateOne) AddKeyIDs(ids ...int) *ChannelUpdateOne {
 	cuo.mutation.AddKeyIDs(ids...)
@@ -399,6 +496,27 @@ func (cuo *ChannelUpdateOne) AddUsageLogs(u ...*UsageLog) *ChannelUpdateOne {
 // Mutation returns the ChannelMutation object of the builder.
 func (cuo *ChannelUpdateOne) Mutation() *ChannelMutation {
 	return cuo.mutation
+}
+
+// ClearCredentials clears all "credentials" edges to the ChannelCredential entity.
+func (cuo *ChannelUpdateOne) ClearCredentials() *ChannelUpdateOne {
+	cuo.mutation.ClearCredentials()
+	return cuo
+}
+
+// RemoveCredentialIDs removes the "credentials" edge to ChannelCredential entities by IDs.
+func (cuo *ChannelUpdateOne) RemoveCredentialIDs(ids ...int) *ChannelUpdateOne {
+	cuo.mutation.RemoveCredentialIDs(ids...)
+	return cuo
+}
+
+// RemoveCredentials removes "credentials" edges to ChannelCredential entities.
+func (cuo *ChannelUpdateOne) RemoveCredentials(c ...*ChannelCredential) *ChannelUpdateOne {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
+	}
+	return cuo.RemoveCredentialIDs(ids...)
 }
 
 // ClearKeys clears all "keys" edges to the ChannelKey entity.
@@ -550,6 +668,51 @@ func (cuo *ChannelUpdateOne) sqlSave(ctx context.Context) (_node *Channel, err e
 	}
 	if value, ok := cuo.mutation.UpdatedAt(); ok {
 		_spec.SetField(channel.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if cuo.mutation.CredentialsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   channel.CredentialsTable,
+			Columns: []string{channel.CredentialsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelcredential.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := cuo.mutation.RemovedCredentialsIDs(); len(nodes) > 0 && !cuo.mutation.CredentialsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   channel.CredentialsTable,
+			Columns: []string{channel.CredentialsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelcredential.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := cuo.mutation.CredentialsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   channel.CredentialsTable,
+			Columns: []string{channel.CredentialsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(channelcredential.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if cuo.mutation.KeysCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -55,6 +55,11 @@ func IDLTE(id int) predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldLTE(FieldID, id))
 }
 
+// CredentialID applies equality check predicate on the "credential_id" field. It's identical to CredentialIDEQ.
+func CredentialID(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldCredentialID, v))
+}
+
 // Name applies equality check predicate on the "name" field. It's identical to NameEQ.
 func Name(v string) predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldEQ(FieldName, v))
@@ -188,6 +193,36 @@ func CreatedAt(v time.Time) predicate.ChannelKey {
 // UpdatedAt applies equality check predicate on the "updated_at" field. It's identical to UpdatedAtEQ.
 func UpdatedAt(v time.Time) predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldEQ(FieldUpdatedAt, v))
+}
+
+// CredentialIDEQ applies the EQ predicate on the "credential_id" field.
+func CredentialIDEQ(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldEQ(FieldCredentialID, v))
+}
+
+// CredentialIDNEQ applies the NEQ predicate on the "credential_id" field.
+func CredentialIDNEQ(v int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNEQ(FieldCredentialID, v))
+}
+
+// CredentialIDIn applies the In predicate on the "credential_id" field.
+func CredentialIDIn(vs ...int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldIn(FieldCredentialID, vs...))
+}
+
+// CredentialIDNotIn applies the NotIn predicate on the "credential_id" field.
+func CredentialIDNotIn(vs ...int) predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNotIn(FieldCredentialID, vs...))
+}
+
+// CredentialIDIsNil applies the IsNil predicate on the "credential_id" field.
+func CredentialIDIsNil() predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldIsNull(FieldCredentialID))
+}
+
+// CredentialIDNotNil applies the NotNil predicate on the "credential_id" field.
+func CredentialIDNotNil() predicate.ChannelKey {
+	return predicate.ChannelKey(sql.FieldNotNull(FieldCredentialID))
 }
 
 // NameEQ applies the EQ predicate on the "name" field.
@@ -1448,6 +1483,29 @@ func UpdatedAtLT(v time.Time) predicate.ChannelKey {
 // UpdatedAtLTE applies the LTE predicate on the "updated_at" field.
 func UpdatedAtLTE(v time.Time) predicate.ChannelKey {
 	return predicate.ChannelKey(sql.FieldLTE(FieldUpdatedAt, v))
+}
+
+// HasCredential applies the HasEdge predicate on the "credential" edge.
+func HasCredential() predicate.ChannelKey {
+	return predicate.ChannelKey(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, CredentialTable, CredentialColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasCredentialWith applies the HasEdge predicate on the "credential" edge with a given conditions (other predicates).
+func HasCredentialWith(preds ...predicate.ChannelCredential) predicate.ChannelKey {
+	return predicate.ChannelKey(func(s *sql.Selector) {
+		step := newCredentialStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // HasChannel applies the HasEdge predicate on the "channel" edge.
