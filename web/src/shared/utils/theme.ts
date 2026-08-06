@@ -1,6 +1,6 @@
-// 主题辅助（自 airgate-sdk 的 @doudou-start/airgate-theme v0.2.1 内嵌）。
+// 主题辅助沿用项目既有的主题变量约定。
 // CSS 变量本体见 src/styles/theme-vars.css；存储键与 data-theme 属性
-// 沿用原 SDK 约定，保证既有用户的主题偏好不丢失。
+// 保留既有存储键，保证用户的主题偏好不丢失。
 
 export type ThemeName = 'dark' | 'light';
 

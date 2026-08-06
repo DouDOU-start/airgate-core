@@ -265,6 +265,16 @@ func (s *Server) registerRoutes() {
 		adminGroup.PUT("/bookmarks/:id", handlers.Bookmark.UpdateBookmark)
 		adminGroup.DELETE("/bookmarks/:id", handlers.Bookmark.DeleteBookmark)
 
+		// 插件管理（文件系统安装 + 多实例独立进程运行，不接入业务数据库）
+		adminGroup.GET("/plugins", s.pluginHandler.ListPlugins)
+		adminGroup.POST("/plugins/upload", s.pluginHandler.UploadPlugin)
+		adminGroup.POST("/plugins/install-url", s.pluginHandler.InstallPluginFromURL)
+		adminGroup.GET("/plugins/:id/config", s.pluginHandler.GetPluginConfig)
+		adminGroup.PUT("/plugins/:id/config", s.pluginHandler.UpdatePluginConfig)
+		adminGroup.PATCH("/plugins/:id/enabled", s.pluginHandler.SetPluginEnabled)
+		adminGroup.POST("/plugins/:id/reload", s.pluginHandler.ReloadPlugin)
+		adminGroup.DELETE("/plugins/:id", s.pluginHandler.UninstallPlugin)
+
 		// 系统设置
 		adminGroup.GET("/settings", handlers.Settings.GetSettings)
 		adminGroup.PUT("/settings", handlers.Settings.UpdateSettings)

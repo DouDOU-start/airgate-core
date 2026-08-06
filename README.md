@@ -55,6 +55,7 @@ Suno 的计费模型名由动作合成（`suno_music` / `suno_lyrics`），渠�
 - **运维**：管理仪表盘、上游请求留痕、公告系统、后台一键自更新（systemd/Docker 感知）
 - **限流**：用户/密钥/渠道三级并发闸门 + RPM 限速（Redis 原语）
 - **风控中心**：转发前内容审核（关键词 Aho-Corasick 拦截 + 外部审核 API 多 key 轮询熔断 + 命中哈希缓存），observe/pre_block 双模式，采样率/分组/模型过滤，滑窗违规计数自动封禁（管理员豁免）+ 邮件通知，审核日志双保留期 TTL 清理
+- **可插拔插件运行时**：基于 `hashicorp/go-plugin + gRPC` 的多实例独立进程；插件以类型和能力声明接入点，管理后台支持上传或 URL 安装、YAML 配置、独立启停、重载与卸载
 
 ## 快速开始
 
@@ -99,6 +100,8 @@ make dev       # 前后端热重载
 | `PORT` / `HOST` | 监听端口 / 地址 | `9517` / `0.0.0.0` |
 | `GIN_MODE` | `release` / `debug` | `debug` |
 | `LOG_LEVEL` / `LOG_FORMAT` | 日志级别 / 格式（`text`/`json`） | `info` / `text` |
+| `PLUGINS_ENABLED` | 没有 `runtime.yaml` 的手工安装插件的兼容默认开关 | `false` |
+| `PLUGINS_DIR` / `PLUGINS_HOOK_TIMEOUT_MS` | 插件目录 / Relay Hook 执行链总超时毫秒数 | `data/plugins` / `50` |
 
 配置文件不存在时，连接信息可完全由环境变量提供（docker compose 场景）。首次启动后注册的第一个账号会自动成为系统管理员。
 
@@ -127,6 +130,7 @@ airgate-core/
 │       ├── infra/store/     # 数据访问（唯一 import ent 的层）
 │       ├── auth/            # API Key 鉴权与加密
 │       ├── moderation/      # 风控判定核心（输入抽取 / 关键词 / 审核 API 熔断 / worker 池 / 封禁副作用）
+│       ├── pluginruntime/   # 多实例插件协议、能力驱动与文件系统管理
 │       └── errlog/          # 上游失败留痕
 ├── web/                     # React 19 + Vite + TanStack Query + Tailwind
 └── deploy/                  # Dockerfile / compose / install.sh / systemd unit

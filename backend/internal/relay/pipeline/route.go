@@ -7,6 +7,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
+	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
 )
 
 // routeKind 路由目标类型。
@@ -38,6 +39,7 @@ func (p *Pipeline) pickRoute(
 	groupID int,
 	model, protocol string,
 	excludeKeys, excludeAccounts []int,
+	plan *relayhook.RoutePlan,
 ) (*routeTarget, bool) {
 	var cands []routeTarget
 	now := time.Now()
@@ -71,6 +73,28 @@ func (p *Pipeline) pickRoute(
 	}
 	if len(cands) == 0 {
 		return nil, false
+	}
+
+	// 插件有序账号只改变本次请求的首选顺序。候选仍由 Core 注册表生成，因此
+	// 状态、分组、模型与 exclude 过滤不会被绕过；账号容量满后下一轮自然选择
+	// AccountIDs 中的下一项。
+	if plan != nil {
+		accounts := make(map[int]routeTarget, len(cands))
+		for _, candidate := range cands {
+			if candidate.kind == routeAccount && candidate.account != nil {
+				accounts[candidate.account.ID] = candidate
+			}
+		}
+		for _, accountID := range plan.AccountIDs {
+			if candidate, ok := accounts[accountID]; ok {
+				selected := candidate
+				return &selected, true
+			}
+		}
+		// v1 只接受 core fallback；Pipeline 在接收决策时已校验。这里保留防御性判断。
+		if plan.Fallback != relayhook.FallbackCore {
+			return nil, false
+		}
 	}
 
 	best := cands[0].priority

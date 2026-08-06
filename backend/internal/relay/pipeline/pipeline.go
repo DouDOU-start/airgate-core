@@ -15,6 +15,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
+	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 
 	// 各协议适配器自注册（adaptor.Register）。
@@ -61,6 +62,8 @@ type Options struct {
 	Accounts *accountreg.Registry
 	// CPA CLIProxyAPI 桥接层（账号路径转发；nil 时账号候选不执行）。
 	CPA *cpa.Bridge
+	// RelayHook 外部请求改写与本次请求路由扩展点（nil 时完全保持原路径）。
+	RelayHook relayhook.Hook
 }
 
 // Pipeline relay 转发管线。
@@ -77,6 +80,7 @@ type Pipeline struct {
 	healthTracker HealthTracker
 	accounts      *accountreg.Registry
 	cpa           *cpa.Bridge
+	relayHook     relayhook.Hook
 	randFn        func(n int) int
 	// client 出口 HTTP 客户端：不设总超时（流式无总超时），仅设连接/TLS 层超时；
 	// 非流式的总超时由调用方经 context 施加。重定向不跟随
@@ -111,6 +115,7 @@ func New(opts Options) *Pipeline {
 		healthTracker: opts.HealthTracker,
 		accounts:      opts.Accounts,
 		cpa:           opts.CPA,
+		relayHook:     opts.RelayHook,
 		client:        upstreamclient.NewClient(0),
 	}
 }

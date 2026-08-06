@@ -58,4 +58,6 @@ export const queryKeys = {
   bookmarks: (...args: unknown[]) => ['bookmarks', ...args] as const,
   accounts: (...args: unknown[]) => ['accounts', ...args] as const,
   proxies: (...args: unknown[]) => ['proxies', ...args] as const,
+  plugins: (...args: unknown[]) => ['plugins', ...args] as const,
+  pluginConfig: (id: string) => ['plugins', id, 'config'] as const,
 } as const;

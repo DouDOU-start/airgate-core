@@ -51,6 +51,7 @@ import type {
 
 /** 分组列最多展示条数，超出显示 +N */
 const GROUP_DISPLAY_LIMIT = 3;
+const UNGROUPED_FILTER = '__ungrouped__';
 
 const COLUMN_COUNT = 10;
 
@@ -113,6 +114,7 @@ export default function AccountsPage() {
   const debouncedKeyword = useDebouncedValue(keyword, 300);
   const [platformFilter, setPlatformFilter] = useState('');
   const [stateFilter, setStateFilter] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
   const [sort, setSort] = useState<{ by?: AccountSortBy; order: SortOrder }>({ order: 'desc' });
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
@@ -150,6 +152,8 @@ export default function AccountsPage() {
     keyword: debouncedKeyword || undefined,
     platform: platformFilter || undefined,
     state: stateFilter || undefined,
+    group_id: groupFilter && groupFilter !== UNGROUPED_FILTER ? Number(groupFilter) : undefined,
+    ungrouped: groupFilter === UNGROUPED_FILTER || undefined,
     sort_by: sort.by,
     sort_order: sort.by ? sort.order : undefined,
   };
@@ -320,10 +324,20 @@ export default function AccountsPage() {
     { id: 'degraded', label: t('accounts.state_degraded') },
     { id: 'disabled', label: t('accounts.state_disabled') },
   ];
+  const groupFilterOptions = [
+    { id: '', label: t('accounts.group_filter_all') },
+    { id: UNGROUPED_FILTER, label: t('accounts.group_filter_ungrouped') },
+    ...(groupsData?.list ?? []).map((group) => ({
+      id: String(group.id),
+      label: group.name || `#${group.id}`,
+    })),
+  ];
   const selectedPlatformLabel =
     platformFilterOptions.find((item) => item.id === platformFilter)?.label ?? t('common.all');
   const selectedStateLabel =
     stateFilterOptions.find((item) => item.id === stateFilter)?.label ?? t('common.all');
+  const selectedGroupLabel =
+    groupFilterOptions.find((item) => item.id === groupFilter)?.label ?? t('accounts.group_filter_all');
 
   const priorityDialogState = useOverlayState({
     isOpen: priorityModalOpen,
@@ -468,6 +482,32 @@ export default function AccountsPage() {
             </Select.Trigger>
             <Select.Popover>
               <ListBox items={stateFilterOptions}>
+                {(item) => (
+                  <ListBox.Item id={item.id} textValue={item.label}>
+                    {item.label}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+        </div>
+
+        <div className="w-full sm:w-44">
+          <Select
+            aria-label={t('accounts.groups')}
+            fullWidth
+            selectedKey={groupFilter}
+            onSelectionChange={(key) => {
+              setGroupFilter(key == null ? '' : String(key));
+              resetToFirstPage();
+            }}
+          >
+            <Select.Trigger>
+              <Select.Value>{selectedGroupLabel}</Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={groupFilterOptions}>
                 {(item) => (
                   <ListBox.Item id={item.id} textValue={item.label}>
                     {item.label}

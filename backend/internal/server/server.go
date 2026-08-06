@@ -17,6 +17,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/bootstrap"
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
+	"github.com/DouDOU-start/airgate-core/internal/pluginruntime"
 	"github.com/DouDOU-start/airgate-core/internal/probe"
 	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
 	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
@@ -25,6 +26,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 	"github.com/DouDOU-start/airgate-core/internal/relay/task"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
+	"github.com/DouDOU-start/airgate-core/internal/server/handler"
 
 	// 任务平台适配器自注册（task.Register；同步协议适配器由 pipeline 包内注册）。
 	_ "github.com/DouDOU-start/airgate-core/internal/relay/task/openaivideo"
@@ -55,6 +57,8 @@ type Server struct {
 	taskFlow        *task.Flow
 	taskPoller      *task.Poller
 	probeEngine     *probe.Engine
+	pluginRuntime   *pluginruntime.Manager
+	pluginHandler   *handler.PluginHandler
 
 	// 中间件组件（需 Shutdown 时释放）
 	ipRateLimiter *middleware.IPRateLimiter
@@ -130,6 +134,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	s.cpaBridge = cpa.NewBridge(nil)
 	s.pricingCache = pricing.NewCache(s.handlers.ModelPriceService)
 	s.handlers.ModelPriceService.SetInvalidator(s.pricingCache)
+	// 管理器始终存在，便于 Web 安装和配置；默认配置不会启动任何插件进程。
+	s.pluginRuntime = pluginruntime.New(cfg.Plugins, cfg.Log.Level)
+	s.pluginHandler = handler.NewPluginHandler(s.pluginRuntime)
 
 	// 健康探针引擎：主动探测 + 分级恢复 + 定时余额同步。
 	channelSvc := s.handlers.ChannelService
@@ -164,6 +171,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Settings:      settingsReader,
 		Moderation:    s.handlers.ModerationEngine,
 		HealthTracker: s.probeEngine,
+		RelayHook:     s.pluginRuntime,
 	})
 
 	// 异步任务子系统（视频/音乐）：与同步管线同源组件 + task 持久化 + 余额动账适配器。
@@ -221,6 +229,11 @@ func (s *Server) StartBackground(ctx context.Context) {
 
 	backgroundCtx, cancel := context.WithCancel(ctx)
 	s.backgroundCancel = cancel
+	if s.pluginRuntime != nil {
+		if err := s.pluginRuntime.LoadAll(backgroundCtx); err != nil {
+			slog.Warn("插件运行器启动失败，转发将沿用原逻辑", "error", err)
+		}
+	}
 
 	// 渠道注册表初次加载与价目表预热；失败不阻塞启动：
 	// 注册表起后台指数退避重试（成功即停，Pick 另有惰性兜底），
@@ -308,6 +321,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// 先排空 HTTP 在途请求，再停两个 recorder：在途请求收尾时仍会调 Record，
 	// 先停 recorder 会把关停窗口内的计费/留痕全部丢弃。
 	err := s.srv.Shutdown(ctx)
+	if s.pluginRuntime != nil {
+		s.pluginRuntime.StopAll(ctx)
+	}
 	s.recorder.Stop()
 	s.errRecorder.Stop()
 	return err

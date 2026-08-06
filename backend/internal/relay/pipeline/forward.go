@@ -23,6 +23,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
+	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
 )
 
 const (
@@ -206,12 +207,19 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		return
 	}
 
-	// 4. 内容审核预检（风控中心）：触网前判定，被拦截的请求不占并发槽。
+	// 4. 外部 Relay Hook：只处理 JSON 请求。插件可返回完整替换体和本次请求的
+	// 有序账号计划；Core 会校验 model/stream 与候选账号，失败时沿用原逻辑。
+	var routePlan *relayhook.RoutePlan
+	if opts.rawBody == nil {
+		req, routePlan = p.applyRelayHook(c, keyInfo, req, endpoint, protocol)
+	}
+
+	// 5. 内容审核预检（风控中心）：触网前判定，被拦截的请求不占并发槽。
 	if !p.moderationCheck(c, keyInfo, req, endpoint, opts, start) {
 		return
 	}
 
-	// 5. user / key 并发闸门。
+	// 6. user / key 并发闸门。
 	releaseClient, limitCode := p.acquireClientSlots(c, keyInfo)
 	if limitCode != "" {
 		p.recordFailure(c, keyInfo, req, start, errlog.Entry{
@@ -222,7 +230,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	}
 	defer releaseClient()
 
-	// 6. failover 主循环：
+	// 7. failover 主循环：
 	//    hardExclude 跨循环持久（429 限流 / 认证失败 / 配置故障，仅本次请求内生效），
 	//    softExclude 容量满（RPM/并发）——排队退避时清空重新竞争。
 	var hardExcludeKeys, softExcludeKeys []int
@@ -259,7 +267,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		excludeAccounts = append(excludeAccounts, hardExcludeAccounts...)
 		excludeAccounts = append(excludeAccounts, softExcludeAccounts...)
 
-		target, ok := p.pickRoute(keyInfo.GroupID, req.Model, protocol, excludeKeys, excludeAccounts)
+		target, ok := p.pickRoute(keyInfo.GroupID, req.Model, protocol, excludeKeys, excludeAccounts, routePlan)
 		if !ok {
 			// 排队退避：有目标只是"暂时满"（软排除）且未超排队上限 → 清空软排除重新竞争。
 			if (len(softExcludeKeys) > 0 || len(softExcludeAccounts) > 0) && time.Now().Before(queueDeadline) {

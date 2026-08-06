@@ -293,6 +293,11 @@ export function patch<T>(path: string, body?: unknown): Promise<T> {
 export async function uploadFile<T>(path: string, file: File): Promise<T> {
   const form = new FormData();
   form.append('file', file);
+  return uploadForm<T>(path, form);
+}
+
+// 通用表单上传，供需要同时提交文件和配置字段的管理接口使用。
+export async function uploadForm<T>(path: string, form: FormData): Promise<T> {
   const url = new URL(`${BASE_URL}${path}`, window.location.origin);
   const res = await doFetch(url.toString(), {
     method: 'POST',
@@ -301,4 +306,3 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
   });
   return handleResponse<T>(res);
 }
-

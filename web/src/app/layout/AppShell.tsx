@@ -49,6 +49,7 @@ import {
   AppWindow,
   Gift,
   Sparkles,
+  Plug,
 } from 'lucide-react';
 import { oauthApi } from '../../shared/api/oauth';
 import { queryKeys } from '../../shared/queryKeys';
@@ -80,7 +81,8 @@ const adminMenuItems: MenuItem[] = [
   { path: '/admin/oauth-clients', labelKey: 'nav.oauth_clients', icon: <AppWindow className="h-5 w-5" /> },
   { path: '/admin/risk-control', labelKey: 'nav.risk_control', icon: <ShieldAlert className="h-5 w-5" /> },
   { path: '/admin/bookmarks', labelKey: 'nav.bookmarks', icon: <BookmarkIcon className="h-5 w-5" /> },
-  { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="h-5 w-5" />, sectionKey: 'nav.system' },
+  { path: '/admin/plugins', labelKey: 'nav.plugins', icon: <Plug className="h-5 w-5" />, sectionKey: 'nav.system' },
+  { path: '/admin/settings', labelKey: 'nav.settings', icon: <Settings className="h-5 w-5" /> },
 ];
 
 const userMenuItems: MenuItem[] = [

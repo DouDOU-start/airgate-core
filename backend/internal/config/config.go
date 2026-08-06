@@ -44,6 +44,28 @@ type Config struct {
 	JWT      JWTConfig      `yaml:"jwt"`
 	Security SecurityConfig `yaml:"security"`
 	Log      LogConfig      `yaml:"log"`
+	Plugins  PluginsConfig  `yaml:"plugins"`
+}
+
+// PluginsConfig 独立进程插件运行配置。
+//
+// 插件进程默认关闭。Web 安装的插件通过各自 runtime.yaml 持久化启停状态；
+// Enabled 仅作为没有 runtime.yaml 的手工安装插件的兼容默认值。Type 只负责
+// 分类展示，Core 根据插件声明的 capabilities 把实例接入相应能力驱动器。
+type PluginsConfig struct {
+	Enabled       bool        `yaml:"enabled"`
+	Dir           string      `yaml:"dir"`
+	HookTimeoutMS int         `yaml:"hook_timeout_ms"`
+	Dev           []DevPlugin `yaml:"dev"`
+}
+
+// DevPlugin 开发模式插件。Enabled 默认 false，避免历史 dev 配置在开启新运行器后
+// 被意外启动；Config 为空时默认读取源码目录下的 config.yaml。
+type DevPlugin struct {
+	Name    string `yaml:"name"`
+	Path    string `yaml:"path"`
+	Enabled bool   `yaml:"enabled"`
+	Config  string `yaml:"config"`
 }
 
 // LogConfig 日志配置
@@ -144,8 +166,9 @@ func (d DatabaseConfig) DSN() string {
 // 支持 docker compose 纯环境变量启动（DB_*/REDIS_*/JWT_SECRET 等）。
 func Load(path string) (*Config, error) {
 	cfg := &Config{
-		Server: ServerConfig{Host: DefaultHost, Port: DefaultPort, Mode: "release"},
-		JWT:    JWTConfig{ExpireHour: 24},
+		Server:  ServerConfig{Host: DefaultHost, Port: DefaultPort, Mode: "release"},
+		JWT:     JWTConfig{ExpireHour: 24},
+		Plugins: PluginsConfig{Dir: "data/plugins", HookTimeoutMS: 50},
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -162,6 +185,12 @@ func Load(path string) (*Config, error) {
 	// 旧 config.yaml 没有 host 字段时，YAML unmarshal 会把 Host 置空，这里补回默认值
 	if cfg.Server.Host == "" {
 		cfg.Server.Host = DefaultHost
+	}
+	if cfg.Plugins.Dir == "" {
+		cfg.Plugins.Dir = "data/plugins"
+	}
+	if cfg.Plugins.HookTimeoutMS <= 0 {
+		cfg.Plugins.HookTimeoutMS = 50
 	}
 	applyEnvOverrides(cfg)
 	return cfg, nil
@@ -200,6 +229,11 @@ func applyEnvOverrides(cfg *Config) {
 
 	// 安全
 	envStr("API_KEY_SECRET", &cfg.Security.APIKeySecret)
+
+	// 独立进程插件
+	envBool("PLUGINS_ENABLED", &cfg.Plugins.Enabled)
+	envStr("PLUGINS_DIR", &cfg.Plugins.Dir)
+	envInt("PLUGINS_HOOK_TIMEOUT_MS", &cfg.Plugins.HookTimeoutMS)
 }
 
 // envStr 如果环境变量存在，覆盖目标字符串

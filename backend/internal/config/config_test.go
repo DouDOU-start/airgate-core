@@ -62,6 +62,9 @@ log:
 	t.Setenv("DB_HOST", "db.env")
 	t.Setenv("DB_PORT", "15432")
 	t.Setenv("LOG_LEVEL", "debug")
+	t.Setenv("PLUGINS_ENABLED", "true")
+	t.Setenv("PLUGINS_DIR", "/tmp/relay-hooks")
+	t.Setenv("PLUGINS_HOOK_TIMEOUT_MS", "75")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -76,6 +79,23 @@ log:
 	}
 	if cfg.Log.Level != "debug" {
 		t.Fatalf("日志配置未被环境变量覆盖: log=%+v", cfg.Log)
+	}
+	if !cfg.Plugins.Enabled || cfg.Plugins.Dir != "/tmp/relay-hooks" || cfg.Plugins.HookTimeoutMS != 75 {
+		t.Fatalf("插件配置未被环境变量覆盖: plugins=%+v", cfg.Plugins)
+	}
+}
+
+func TestLoadDefaultsPluginsToDisabled(t *testing.T) {
+	clearConfigEnv(t)
+	cfg, err := Load(filepath.Join(t.TempDir(), "不存在.yaml"))
+	if err != nil {
+		t.Fatalf("无配置文件加载失败: %v", err)
+	}
+	if cfg.Plugins.Enabled {
+		t.Fatal("插件进程默认不应开启")
+	}
+	if cfg.Plugins.Dir != "data/plugins" || cfg.Plugins.HookTimeoutMS != 50 {
+		t.Fatalf("插件默认配置异常: %+v", cfg.Plugins)
 	}
 }
 
@@ -123,6 +143,7 @@ func clearConfigEnv(t *testing.T) {
 		"JWT_SECRET", "JWT_EXPIRE_HOUR",
 		"LOG_LEVEL", "LOG_FORMAT",
 		"API_KEY_SECRET",
+		"PLUGINS_ENABLED", "PLUGINS_DIR", "PLUGINS_HOOK_TIMEOUT_MS",
 	}
 	for _, key := range keys {
 		t.Setenv(key, "")
