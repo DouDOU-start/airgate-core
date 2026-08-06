@@ -35,6 +35,9 @@ func readRawBody(c *gin.Context) ([]byte, bool) {
 		writeError(c, http.StatusBadRequest, "invalid_request_error", "invalid_body", "读取请求体失败")
 		return nil, false
 	}
+	// 保留客户端发送的原始字节，供极窄范围的 Codex 限流竞态诊断使用。
+	// 这里只增加切片引用，不复制请求体；生命周期仍限定在当前请求内。
+	c.Set(ctxKeyRelayInboundRequestBody, body)
 	return body, true
 }
 

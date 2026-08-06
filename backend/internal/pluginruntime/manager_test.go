@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/pluginruntime/protocol"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accounttesthook"
 	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
 )
 
@@ -58,6 +60,87 @@ func testInstance(id string, priority int32, plugin *fakePlugin) *instance {
 		Capabilities:    []string{protocol.CapabilityRelayHookV1},
 	}
 	return &instance{id: id, name: id, info: plugin.info, plugin: plugin}
+}
+
+func testAccountTransformInstance(id string, priority int32, plugin *fakePlugin) *instance {
+	plugin.info = protocol.PluginInfo{
+		ID:              id,
+		Name:            id,
+		ProtocolVersion: protocol.ProtocolVersion,
+		Priority:        priority,
+		Capabilities:    []string{protocol.CapabilityAccountTestTransformV1},
+	}
+	return &instance{id: id, name: id, info: plugin.info, plugin: plugin}
+}
+
+func TestTransformAccountTestAppliesPluginResult(t *testing.T) {
+	plugin := &fakePlugin{handler: func(_ context.Context, request protocol.Request) (protocol.Response, error) {
+		if request.Path != accounttesthook.TransformPath {
+			return protocol.Response{}, fmt.Errorf("调用路径异常: %s", request.Path)
+		}
+		var transformRequest accounttesthook.Request
+		if err := json.Unmarshal(request.Body, &transformRequest); err != nil {
+			return protocol.Response{}, err
+		}
+		if transformRequest.Mode != "overage" {
+			return protocol.Response{}, fmt.Errorf("测试模式异常: %s", transformRequest.Mode)
+		}
+		var body map[string]any
+		if err := json.Unmarshal(transformRequest.Body, &body); err != nil {
+			return protocol.Response{}, err
+		}
+		body["transformed"] = true
+		replaced, _ := json.Marshal(body)
+		decision, _ := json.Marshal(accounttesthook.Decision{
+			Version:     accounttesthook.VersionV1,
+			RequestBody: replaced,
+		})
+		return protocol.Response{StatusCode: http.StatusOK, Body: decision}, nil
+	}}
+	manager := &Manager{
+		instances:  map[string]*instance{"overage": testAccountTransformInstance("overage", 10, plugin)},
+		lastErrors: make(map[string]string),
+	}
+	decision, err := manager.TransformAccountTest(context.Background(), accounttesthook.Request{
+		Version: accounttesthook.VersionV1,
+		Mode:    "overage", Platform: "codex", Endpoint: "responses", Model: "gpt-test",
+		Body: json.RawMessage(`{"model":"gpt-test","stream":true,"input":"你好"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(decision.RequestBody, &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["transformed"] != true {
+		t.Fatalf("插件变换结果未生效: %s", decision.RequestBody)
+	}
+}
+
+func TestTransformAccountTestRequiresAvailablePlugin(t *testing.T) {
+	manager := &Manager{instances: map[string]*instance{}, lastErrors: make(map[string]string)}
+	_, err := manager.TransformAccountTest(context.Background(), accounttesthook.Request{})
+	if !errors.Is(err, accounttesthook.ErrUnavailable) {
+		t.Fatalf("无插件时错误 = %v，期望 ErrUnavailable", err)
+	}
+}
+
+func TestTransformAccountTestRejectsModelChange(t *testing.T) {
+	plugin := &fakePlugin{handler: func(context.Context, protocol.Request) (protocol.Response, error) {
+		return protocol.Response{StatusCode: http.StatusOK, Body: []byte(`{"version":"v1","request_body":{"model":"changed","stream":true,"input":"你好"}}`)}, nil
+	}}
+	manager := &Manager{
+		instances:  map[string]*instance{"invalid": testAccountTransformInstance("invalid", 10, plugin)},
+		lastErrors: make(map[string]string),
+	}
+	_, err := manager.TransformAccountTest(context.Background(), accounttesthook.Request{
+		Version: accounttesthook.VersionV1, Mode: "overage", Model: "gpt-test",
+		Body: json.RawMessage(`{"model":"gpt-test","stream":true,"input":"你好"}`),
+	})
+	if err == nil || !strings.Contains(err.Error(), "不得修改 model") {
+		t.Fatalf("非法 model 变换错误 = %v", err)
+	}
 }
 
 func TestBeforeDispatchDecodesDecision(t *testing.T) {

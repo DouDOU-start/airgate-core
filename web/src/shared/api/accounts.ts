@@ -124,6 +124,7 @@ export const accountsApi = {
     body: {
       model_id?: string;
       prompt?: string;
+      test_mode?: 'normal' | 'overage';
       duration?: number;
       aspect_ratio?: string;
       resolution?: string;

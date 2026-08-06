@@ -153,6 +153,71 @@ func TestUsageStoreListAdminFiltersByChannelAndKey(t *testing.T) {
 	})
 }
 
+func TestUsageStoreListAdminFiltersByAccount(t *testing.T) {
+	db := enttestOpen(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("关闭数据库失败：%v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	user := createTestUser(t, db, "usage-account-filter@example.com")
+	accountA, err := db.Account.Create().
+		SetName("Codex 主账号").
+		SetPlatform("codex").
+		SetType("oauth").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("创建账号 A 失败：%v", err)
+	}
+	accountB, err := db.Account.Create().
+		SetName("Codex 备用账号").
+		SetPlatform("codex").
+		SetType("oauth").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("创建账号 B 失败：%v", err)
+	}
+
+	createdAt := time.Date(2026, 5, 23, 10, 0, 0, 0, time.UTC)
+	for _, accountID := range []int{accountA.ID, accountA.ID, accountB.ID} {
+		if _, err := db.UsageLog.Create().
+			SetModel("gpt-5").
+			SetUserID(user.ID).
+			SetUserIDSnapshot(user.ID).
+			SetUserEmailSnapshot(user.Email).
+			SetAccountID(accountID).
+			SetCreatedAt(createdAt).
+			Save(ctx); err != nil {
+			t.Fatalf("创建账号使用记录失败：%v", err)
+		}
+	}
+
+	store := NewUsageStore(db)
+	accountID := int64(accountA.ID)
+	total, err := store.CountAdmin(ctx, appusage.ListFilter{AccountID: &accountID})
+	if err != nil {
+		t.Fatalf("按账号统计使用记录失败：%v", err)
+	}
+	if total != 2 {
+		t.Fatalf("按账号统计使用记录 = %d，期望 2", total)
+	}
+
+	items, err := store.ListAdmin(ctx, appusage.ListFilter{Page: 1, PageSize: 20, AccountID: &accountID})
+	if err != nil {
+		t.Fatalf("按账号查询使用记录失败：%v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("按账号查询使用记录条数 = %d，期望 2", len(items))
+	}
+	for _, item := range items {
+		if item.AccountID != accountID || item.AccountName != accountA.Name {
+			t.Fatalf("账号信息映射异常：%+v", item)
+		}
+	}
+}
+
 func assertLogIDs(t *testing.T, got []appusage.LogRecord, want ...int64) {
 	t.Helper()
 	if len(got) != len(want) {

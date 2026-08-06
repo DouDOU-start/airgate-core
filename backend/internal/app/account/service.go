@@ -14,6 +14,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accounttesthook"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 )
 
@@ -65,6 +66,16 @@ type Service struct {
 	priceLookup  PriceLookup
 	calculator   *billing.Calculator
 	usageFetcher usageFetcher
+	// 账号测试请求变换器（可选，由插件运行器实现）。
+	testTransformer accounttesthook.Transformer
+}
+
+// SetTestRequestTransformer 注入账号测试请求变换器（server 装配阶段；nil 安全）。
+func (s *Service) SetTestRequestTransformer(transformer accounttesthook.Transformer) {
+	if s == nil {
+		return
+	}
+	s.testTransformer = transformer
 }
 
 // NewService 创建账号服务。secret 与渠道相同（APIKeySecret）。

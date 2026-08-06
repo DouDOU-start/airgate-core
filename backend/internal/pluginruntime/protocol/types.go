@@ -14,6 +14,8 @@ const (
 	PluginKey = "plugin"
 	// CapabilityRelayHookV1 表示插件实现 Relay Hook v1 请求处理能力。
 	CapabilityRelayHookV1 = "relay_hook.v1"
+	// CapabilityAccountTestTransformV1 表示插件可按测试模式改写账号连接测试请求。
+	CapabilityAccountTestTransformV1 = "account_test_transform.v1"
 	// ConfigKeyLogLevel 是 Core 传给插件的日志级别配置键。
 	ConfigKeyLogLevel = "log_level"
 	// MaxMessageBytes 限制单次插件 RPC 消息大小。

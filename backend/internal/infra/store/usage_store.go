@@ -630,6 +630,9 @@ func applyUsageListFilter(query *ent.UsageLogQuery, filter appusage.ListFilter) 
 	if filter.ChannelKeyID != nil {
 		query = query.Where(entusagelog.ChannelKeyIDEQ(int(*filter.ChannelKeyID)))
 	}
+	if filter.AccountID != nil {
+		query = query.Where(entusagelog.AccountIDEQ(int(*filter.AccountID)))
+	}
 	if filter.GroupID != nil {
 		query = query.Where(entusagelog.GroupIDEQ(int(*filter.GroupID)))
 	}

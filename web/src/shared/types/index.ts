@@ -504,6 +504,7 @@ export interface UsageQuery extends PageReq {
   api_key_id?: number;
   channel_id?: number;
   channel_key_id?: number;
+  account_id?: number;
   group_id?: number;
   model?: string;
   start_date?: string;

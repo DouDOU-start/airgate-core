@@ -464,10 +464,13 @@ func (h *AccountHandler) TestAccountConnection(c *gin.Context) {
 			f.Flush()
 		}
 	}
-	_ = h.service.TestConnection(c.Request.Context(), id, req.ModelID, req.Prompt, appaccount.TestMediaOptions{
-		Duration:    req.Duration,
-		AspectRatio: req.AspectRatio,
-		Resolution:  req.Resolution,
+	_ = h.service.TestConnection(c.Request.Context(), id, req.ModelID, req.Prompt, appaccount.TestOptions{
+		Mode: appaccount.TestMode(req.TestMode),
+		Media: appaccount.TestMediaOptions{
+			Duration:    req.Duration,
+			AspectRatio: req.AspectRatio,
+			Resolution:  req.Resolution,
+		},
 	}, emit)
 }
 

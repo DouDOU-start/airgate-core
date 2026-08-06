@@ -21,6 +21,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/pluginruntime/protocol"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accounttesthook"
 	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
 )
 
@@ -30,6 +31,7 @@ const (
 	circuitFailureLimit = 3
 	circuitOpenDuration = 30 * time.Second
 	defaultHookTimeout  = 50 * time.Millisecond
+	accountTestTimeout  = 2 * time.Second
 	maxHookBodyBytes    = 32 << 20
 )
 
@@ -65,6 +67,7 @@ type Manager struct {
 }
 
 var _ relayhook.Hook = (*Manager)(nil)
+var _ accounttesthook.Transformer = (*Manager)(nil)
 
 // New 创建插件运行器。调用 LoadAll 前不会启动任何外部进程。
 func New(cfg config.PluginsConfig, logLevel string) *Manager {
@@ -468,6 +471,139 @@ func normalizeRelayDecision(request relayhook.Request, decision relayhook.Decisi
 		}
 	}
 	return result, nil
+}
+
+// TransformAccountTest 按 priority 升序、ID 升序执行全部账号测试请求变换插件。
+// 显式插件测试采用失败关闭：没有插件处理、插件报错、超时或返回非法结果都会终止测试。
+func (m *Manager) TransformAccountTest(ctx context.Context, request accounttesthook.Request) (accounttesthook.Decision, error) {
+	instances := m.instancesFor(protocol.CapabilityAccountTestTransformV1)
+	if len(instances) == 0 {
+		return accounttesthook.Decision{}, accounttesthook.ErrUnavailable
+	}
+	chainCtx, cancel := context.WithTimeout(ctx, accountTestTimeout)
+	defer cancel()
+
+	current := request
+	applied := false
+	for _, inst := range instances {
+		if err := chainCtx.Err(); err != nil {
+			return accounttesthook.Decision{}, fmt.Errorf("账号测试请求变换超时: %w", err)
+		}
+		decision, called, err := m.callAccountTestTransform(chainCtx, inst, current)
+		if !called {
+			continue
+		}
+		if err != nil {
+			m.setLastError(inst.id, err)
+			return accounttesthook.Decision{}, err
+		}
+		m.clearLastError(inst.id)
+		normalized, err := normalizeAccountTestDecision(current, decision)
+		if err != nil {
+			err = m.recordFailure(inst, err)
+			m.setLastError(inst.id, err)
+			return accounttesthook.Decision{}, err
+		}
+		if len(normalized.RequestBody) == 0 {
+			continue
+		}
+		current.Body = append(json.RawMessage(nil), normalized.RequestBody...)
+		applied = true
+	}
+	if !applied {
+		return accounttesthook.Decision{}, accounttesthook.ErrUnavailable
+	}
+	return accounttesthook.Decision{
+		Version:     accounttesthook.VersionV1,
+		RequestBody: append(json.RawMessage(nil), current.Body...),
+	}, nil
+}
+
+func (m *Manager) callAccountTestTransform(ctx context.Context, inst *instance, request accounttesthook.Request) (accounttesthook.Decision, bool, error) {
+	if !inst.acquireCall(time.Now()) {
+		return accounttesthook.Decision{}, false, nil
+	}
+	defer inst.calls.Done()
+
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return accounttesthook.Decision{}, true, fmt.Errorf("序列化账号测试变换请求失败: %w", err)
+	}
+	response, callErr := inst.plugin.Handle(ctx, protocol.Request{
+		Method: http.MethodPost,
+		Path:   accounttesthook.TransformPath,
+		Header: map[string][]string{"Content-Type": {"application/json"}},
+		Body:   payload,
+	})
+	if callErr != nil {
+		return accounttesthook.Decision{}, true, m.recordFailure(inst, fmt.Errorf("调用账号测试变换插件 %s 失败: %w", inst.id, callErr))
+	}
+	if response.StatusCode == http.StatusNoContent || len(response.Body) == 0 {
+		inst.recordSuccess()
+		return accounttesthook.Decision{}, true, nil
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		message := strings.TrimSpace(string(response.Body))
+		if len(message) > 1024 {
+			message = message[:1024]
+		}
+		if message == "" {
+			message = http.StatusText(response.StatusCode)
+		}
+		return accounttesthook.Decision{}, true, m.recordFailure(inst, fmt.Errorf("账号测试变换插件 %s 返回状态码 %d: %s", inst.id, response.StatusCode, message))
+	}
+
+	var decision accounttesthook.Decision
+	if err := json.Unmarshal(response.Body, &decision); err != nil {
+		return accounttesthook.Decision{}, true, m.recordFailure(inst, fmt.Errorf("解析账号测试变换结果失败: %w", err))
+	}
+	inst.recordSuccess()
+	return decision, true, nil
+}
+
+func normalizeAccountTestDecision(request accounttesthook.Request, decision accounttesthook.Decision) (accounttesthook.Decision, error) {
+	if decision.Version == "" && len(decision.RequestBody) == 0 {
+		return accounttesthook.Decision{}, nil
+	}
+	if decision.Version != accounttesthook.VersionV1 {
+		return accounttesthook.Decision{}, fmt.Errorf("账号测试变换结果版本为 %q，期望 %q", decision.Version, accounttesthook.VersionV1)
+	}
+	if len(decision.RequestBody) == 0 {
+		return accounttesthook.Decision{}, fmt.Errorf("账号测试变换结果缺少请求体")
+	}
+	if len(decision.RequestBody) > maxHookBodyBytes {
+		return accounttesthook.Decision{}, fmt.Errorf("账号测试变换请求体超过 %d 字节限制", maxHookBodyBytes)
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(decision.RequestBody, &object); err != nil || object == nil {
+		return accounttesthook.Decision{}, fmt.Errorf("账号测试变换请求体不是 JSON 对象")
+	}
+	var model string
+	if err := json.Unmarshal(object["model"], &model); err != nil || model != request.Model {
+		return accounttesthook.Decision{}, fmt.Errorf("账号测试变换插件不得修改 model")
+	}
+	var original map[string]json.RawMessage
+	if err := json.Unmarshal(request.Body, &original); err != nil || original == nil {
+		return accounttesthook.Decision{}, fmt.Errorf("账号测试原始请求体不是 JSON 对象")
+	}
+	var originalStream, replacedStream bool
+	if raw, exists := original["stream"]; exists {
+		if err := json.Unmarshal(raw, &originalStream); err != nil {
+			return accounttesthook.Decision{}, fmt.Errorf("账号测试原始请求体的 stream 无效")
+		}
+	}
+	if raw, exists := object["stream"]; exists {
+		if err := json.Unmarshal(raw, &replacedStream); err != nil {
+			return accounttesthook.Decision{}, fmt.Errorf("账号测试变换请求体的 stream 无效")
+		}
+	}
+	if replacedStream != originalStream {
+		return accounttesthook.Decision{}, fmt.Errorf("账号测试变换插件不得修改 stream")
+	}
+	return accounttesthook.Decision{
+		Version:     accounttesthook.VersionV1,
+		RequestBody: append(json.RawMessage(nil), decision.RequestBody...),
+	}, nil
 }
 
 func (m *Manager) recordFailure(inst *instance, err error) error {

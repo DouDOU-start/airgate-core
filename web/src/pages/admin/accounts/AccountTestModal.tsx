@@ -7,17 +7,20 @@ import {
   Modal,
   Select,
   Spinner,
+  Tabs,
   TextArea,
   TextField as HeroTextField,
   useOverlayState,
 } from '@heroui/react';
 import { Play, RotateCcw } from 'lucide-react';
 import { accountsApi, type AccountTestEvent, type AccountTestModel } from '../../../shared/api/accounts';
+import { pluginsApi } from '../../../shared/api/plugins';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import type { AccountResp } from '../../../shared/types';
 import { AccountSummaryCard } from './AccountSummaryCard';
 
 type Status = 'idle' | 'connecting' | 'success' | 'error';
+type AccountTestMode = 'normal' | 'overage';
 
 type Line = { text: string; cls: string };
 
@@ -28,6 +31,7 @@ type MediaItem = {
 
 const videoDurations = Array.from({ length: 15 }, (_, index) => String(index + 1));
 const videoAspectRatios = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
+const accountTestTransformCapability = 'account_test_transform.v1';
 
 function supports1080pVideo(modelId: string) {
   const base = modelId.trim().toLowerCase().split('/').pop();
@@ -57,6 +61,7 @@ export function AccountTestModal({
 }) {
   const { t } = useTranslation();
   const open = !!account;
+  const isCodexAccount = account?.platform.toLowerCase() === 'codex';
   const [models, setModels] = useState<AccountTestModel[]>([]);
   const [modelId, setModelId] = useState('');
   const [prompt, setPrompt] = useState('');
@@ -70,6 +75,8 @@ export function AccountTestModal({
   const [errorMsg, setErrorMsg] = useState('');
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [mediaStatus, setMediaStatus] = useState('');
+  const [testMode, setTestMode] = useState<AccountTestMode>('normal');
+  const [overageAvailable, setOverageAvailable] = useState(false);
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const statusRef = useRef<Status>('idle');
@@ -101,6 +108,8 @@ export function AccountTestModal({
       setErrorMsg('');
       setMediaItems([]);
       setMediaStatus('');
+      setTestMode('normal');
+      setOverageAvailable(false);
       abortRef.current?.abort();
       return;
     }
@@ -112,9 +121,24 @@ export function AccountTestModal({
     setErrorMsg('');
     setMediaItems([]);
     setMediaStatus('');
+    setTestMode('normal');
+    setOverageAvailable(false);
     setVideoDuration('1');
     setVideoAspectRatio('16:9');
     setVideoResolution('720p');
+    if (account.platform.toLowerCase() === 'codex') {
+      void pluginsApi
+        .list()
+        .then((plugins) => {
+          if (cancelled) return;
+          setOverageAvailable(plugins.some((plugin) => (
+            plugin.running && plugin.capabilities.includes(accountTestTransformCapability)
+          )));
+        })
+        .catch(() => {
+          if (!cancelled) setOverageAvailable(false);
+        });
+    }
     void accountsApi
       .testModels(account.id)
       .then((list) => {
@@ -217,6 +241,11 @@ export function AccountTestModal({
     setMediaStatus('');
     addLine(t('accounts.test_starting', { name: account.name }), 'text-blue-400');
     addLine(t('accounts.test_account_type', { type: account.type }), 'text-gray-400');
+    if (isCodexAccount && overageAvailable) {
+      addLine(t('accounts.test_using_mode', {
+        mode: t(`accounts.test_mode_${testMode}`),
+      }), 'text-gray-400');
+    }
     addLine(t('accounts.test_using_prompt', { prompt: effectivePrompt }), 'text-gray-400 whitespace-pre-wrap break-all');
     if (isVideoTest) {
       addLine(t('accounts.test_video_settings', {
@@ -233,6 +262,7 @@ export function AccountTestModal({
         {
           model_id: modelId,
           prompt: effectivePrompt,
+          test_mode: isCodexAccount && overageAvailable ? testMode : 'normal',
           ...(isVideoTest ? {
             duration: Number(videoDuration),
             aspect_ratio: videoAspectRatio,
@@ -295,6 +325,42 @@ export function AccountTestModal({
             <Modal.Body className="space-y-4">
               {account ? (
                 <AccountSummaryCard account={account} />
+              ) : null}
+
+              {isCodexAccount && overageAvailable ? (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-default-200 bg-default-50 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <Label>{t('accounts.test_mode')}</Label>
+                    <p className="mt-0.5 text-xs text-text-tertiary">
+                      {t('accounts.test_mode_hint')}
+                    </p>
+                  </div>
+                  <Tabs
+                    className="ag-segmented-tabs ag-segmented-tabs-compact shrink-0"
+                    selectedKey={testMode}
+                    onSelectionChange={(key) => {
+                      setTestMode(key as AccountTestMode);
+                      setStatus('idle');
+                      setLines([]);
+                      setStreamText('');
+                      setErrorMsg('');
+                      setMediaItems([]);
+                      setMediaStatus('');
+                    }}
+                  >
+                    <Tabs.List>
+                      <Tabs.Tab id="normal" isDisabled={status === 'connecting'}>
+                        <Tabs.Indicator />
+                        <span>{t('accounts.test_mode_normal')}</span>
+                      </Tabs.Tab>
+                      <Tabs.Tab id="overage" isDisabled={status === 'connecting'}>
+                        <Tabs.Separator />
+                        <Tabs.Indicator />
+                        <span>{t('accounts.test_mode_overage')}</span>
+                      </Tabs.Tab>
+                    </Tabs.List>
+                  </Tabs>
+                </div>
               ) : null}
 
               <div className="space-y-1.5">

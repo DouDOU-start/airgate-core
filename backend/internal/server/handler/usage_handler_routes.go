@@ -223,6 +223,7 @@ func (h *UsageHandler) AdminUsage(c *gin.Context) {
 		APIKeyID:     query.APIKeyID,
 		ChannelID:    query.ChannelID,
 		ChannelKeyID: query.ChannelKeyID,
+		AccountID:    query.AccountID,
 		GroupID:      query.GroupID,
 		Model:        query.Model,
 		RequestID:    query.RequestID,

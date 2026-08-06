@@ -1770,14 +1770,16 @@
 
 .ag-plugins-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 28rem));
   align-content: start;
+  justify-content: start;
   gap: 1rem;
 }
 
 .ag-plugin-card {
   position: relative;
   display: flex;
+  aspect-ratio: 4 / 3;
   min-height: 17rem;
   min-width: 0;
   flex-direction: column;
@@ -1876,12 +1878,6 @@
 @media (min-width: 1536px) {
   .ag-plugins-page {
     min-height: calc(100dvh - 7rem);
-  }
-}
-
-@media (max-width: 760px) {
-  .ag-plugins-grid {
-    grid-template-columns: 1fr;
   }
 }
 

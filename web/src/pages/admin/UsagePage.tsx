@@ -6,6 +6,7 @@ import { usageApi } from '../../shared/api/usage';
 import { usersApi } from '../../shared/api/users';
 import { apikeysApi } from '../../shared/api/apikeys';
 import { channelsApi } from '../../shared/api/channels';
+import { accountsApi } from '../../shared/api/accounts';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { useDeferredActivation } from '../../shared/hooks/useDeferredActivation';
@@ -437,30 +438,66 @@ export default function UsagePage() {
     ];
   })();
 
-  // 渠道 + 渠道下 Key 级联筛选（可输入搜索）：渠道一次拉全，keys 内嵌于渠道响应，无需二次请求。
+  // 渠道 / 账号共用一个搜索框；渠道选中后仍可继续级联筛选渠道 Key。
+  const [routeKeyword, setRouteKeyword] = useState('');
+  const [selectedRouteLabel, setSelectedRouteLabel] = useState('');
+  const trimmedRouteKeyword = routeKeyword.trim();
+  const routeSearchActive = trimmedRouteKeyword.length > 0
+    && trimmedRouteKeyword !== selectedRouteLabel.trim();
+  const debouncedRouteKeyword = useDebouncedValue(routeSearchActive ? trimmedRouteKeyword : '', 250);
+
+  // 渠道一次拉全，keys 内嵌于渠道响应，无需二次请求。
   const { data: channelsData } = useQuery({
     queryKey: queryKeys.channels('usage-filter'),
     queryFn: () => channelsApi.list({ page: 1, page_size: 100 }),
     enabled: pageActive,
   });
+  // 账号数量可能较多：无关键词时展示首批候选，输入时交给服务端按名称/邮箱搜索。
+  const { data: accountsData } = useQuery({
+    queryKey: queryKeys.accounts('usage-filter', debouncedRouteKeyword),
+    queryFn: () => accountsApi.list({
+      page: 1,
+      page_size: 100,
+      keyword: debouncedRouteKeyword || undefined,
+    }),
+    enabled: pageActive,
+  });
   const channelList = channelsData?.list ?? [];
   const selectedChannel = channelList.find((ch) => ch.id === filters.channel_id);
-
-  // 渠道搜索：客户端按名称过滤（渠道数量有限，无需服务端搜索）。
-  // 关键：输入框既显示已选渠道名、又当搜索词用。当输入等于已选渠道名时视为「仅展示选中项」
-  // 而非搜索，返回全量列表——否则选中后重新展开只剩当前渠道，无法切换到其它渠道。
-  const [channelKeyword, setChannelKeyword] = useState('');
   const channelOptions = channelList.map((ch) => ({
-    id: String(ch.id),
+    id: `channel:${ch.id}`,
+    kind: 'channel' as const,
     label: ch.name,
-    textValue: ch.name,
+    description: `${t('usage.channel')} · #${ch.id}`,
+    textValue: `${ch.name} ${ch.id}`,
   }));
-  const trimmedChannelKeyword = channelKeyword.trim();
-  const channelSearchActive = trimmedChannelKeyword.length > 0
-    && trimmedChannelKeyword !== (selectedChannel?.name ?? '').trim();
-  const visibleChannelOptions = channelSearchActive
-    ? channelOptions.filter((o) => o.label.toLowerCase().includes(trimmedChannelKeyword.toLowerCase()))
-    : channelOptions;
+  const accountOptions = (accountsData?.list ?? []).map((account) => ({
+    id: `account:${account.id}`,
+    kind: 'account' as const,
+    label: account.name,
+    description: `${t('usage.account_route')} · ${account.platform} · #${account.id}`,
+    textValue: `${account.name} ${account.email || ''} ${account.platform} ${account.id}`,
+  }));
+  const selectedRouteKey = filters.account_id
+    ? `account:${filters.account_id}`
+    : (filters.channel_id ? `channel:${filters.channel_id}` : null);
+  const normalizedRouteKeyword = trimmedRouteKeyword.toLowerCase();
+  const matchingRouteOptions = routeSearchActive
+    ? [...channelOptions, ...accountOptions].filter((option) => (
+      option.textValue.toLowerCase().includes(normalizedRouteKeyword)
+    ))
+    : [...channelOptions, ...accountOptions];
+  const visibleRouteOptions = selectedRouteKey
+    && selectedRouteLabel
+    && !matchingRouteOptions.some((option) => option.id === selectedRouteKey)
+    ? [{
+        id: selectedRouteKey,
+        kind: filters.account_id ? 'account' as const : 'channel' as const,
+        label: selectedRouteLabel,
+        description: filters.account_id ? t('usage.account_route') : t('usage.channel'),
+        textValue: selectedRouteLabel,
+      }, ...matchingRouteOptions]
+    : matchingRouteOptions;
 
   // 渠道下 Key 搜索：选项级联自选中渠道的内嵌 keys；名称为空时用尾 4 位 hint 兜底。
   const [channelKeyKeyword, setChannelKeyKeyword] = useState('');
@@ -479,24 +516,42 @@ export default function UsagePage() {
     ? channelKeyOptions.filter((o) => o.label.toLowerCase().includes(trimmedChannelKeyKeyword.toLowerCase()))
     : channelKeyOptions;
 
-  // 清空渠道筛选（连带清空 Key 筛选与两处搜索词）。
-  function clearChannelFilter() {
-    setChannelKeyword('');
+  // 清空路由筛选（连带清空渠道 Key 与两处搜索词）。
+  function clearRouteFilter() {
+    setRouteKeyword('');
+    setSelectedRouteLabel('');
     setChannelKeyKeyword('');
-    setFilters((prev) => ({ ...prev, channel_id: undefined, channel_key_id: undefined }));
+    setFilters((prev) => ({
+      ...prev,
+      channel_id: undefined,
+      channel_key_id: undefined,
+      account_id: undefined,
+    }));
     setPage(1);
   }
 
-  // 选中渠道：写 channel_id 并清空已选 Key（避免残留跨渠道 key 过滤）。
-  function handleChannelSelect(key: Key | null) {
+  // 渠道与账号是两条互斥路由；切换时清空另一条路由及渠道 Key。
+  function handleRouteSelect(key: Key | null) {
     const value = key == null ? '' : String(key);
     if (!value) {
-      clearChannelFilter();
+      clearRouteFilter();
       return;
     }
-    setChannelKeyword(channelOptions.find((o) => o.id === value)?.label ?? '');
+    const option = visibleRouteOptions.find((item) => item.id === value);
+    const [kind, rawID] = value.split(':', 2);
+    const id = Number(rawID);
+    if (!option || !Number.isFinite(id) || (kind !== 'channel' && kind !== 'account')) {
+      return;
+    }
+    setRouteKeyword(option.label);
+    setSelectedRouteLabel(option.label);
     setChannelKeyKeyword('');
-    setFilters((prev) => ({ ...prev, channel_id: Number(value), channel_key_id: undefined }));
+    setFilters((prev) => ({
+      ...prev,
+      channel_id: kind === 'channel' ? id : undefined,
+      channel_key_id: undefined,
+      account_id: kind === 'account' ? id : undefined,
+    }));
     setPage(1);
   }
 
@@ -957,39 +1012,42 @@ export default function UsagePage() {
             </ComboBox.Popover>
           </ComboBox>
         </div>
-        <div className="w-full sm:w-44">
+        <div className="w-full sm:w-52">
           <ComboBox
-            aria-label={t('usage.search_channel')}
+            aria-label={t('usage.search_channel_or_account')}
             allowsEmptyCollection
             fullWidth
-            inputValue={channelKeyword}
-            items={visibleChannelOptions}
+            inputValue={routeKeyword}
+            items={visibleRouteOptions}
             menuTrigger="focus"
-            selectedKey={filters.channel_id ? String(filters.channel_id) : null}
+            selectedKey={selectedRouteKey}
             onInputChange={(value) => {
-              setChannelKeyword(value);
+              setRouteKeyword(value);
               if (!value) {
-                clearChannelFilter();
+                clearRouteFilter();
               }
             }}
-            onSelectionChange={handleChannelSelect}
+            onSelectionChange={handleRouteSelect}
           >
             <ComboBox.InputGroup className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-              <Input className="pl-9" placeholder={t('usage.search_channel')} />
+              <Input className="pl-9" placeholder={t('usage.search_channel_or_account')} />
             </ComboBox.InputGroup>
             <ComboBox.Popover>
               <ListBox
-                items={visibleChannelOptions}
+                items={visibleRouteOptions}
                 renderEmptyState={() => (
                   <div className="px-3 py-6 text-center text-xs text-text-tertiary">
-                    {channelList.length === 0 ? t('common.no_data') : t('usage.search_channel')}
+                    {t('common.no_data')}
                   </div>
                 )}
               >
                 {(item) => (
                   <ListBox.Item id={item.id} textValue={item.textValue}>
-                    {item.label}
+                    <div className="min-w-0">
+                      <div className="truncate">{item.label}</div>
+                      <div className="truncate text-xs text-text-tertiary">{item.description}</div>
+                    </div>
                   </ListBox.Item>
                 )}
               </ListBox>

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/DouDOU-start/airgate-core/internal/billing"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accounttesthook"
 	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 )
@@ -65,6 +67,22 @@ type TestMediaOptions struct {
 	Duration    int
 	AspectRatio string
 	Resolution  string
+}
+
+// TestMode 指定账号连接测试的请求处理模式。
+type TestMode string
+
+const (
+	// TestModeNormal 直接发送 Core 构造的普通探测请求。
+	TestModeNormal TestMode = "normal"
+	// TestModeOverage 先交给插件执行超额请求变换，再发送给当前账号。
+	TestModeOverage TestMode = "overage"
+)
+
+// TestOptions 汇总账号连接测试选项。
+type TestOptions struct {
+	Mode  TestMode
+	Media TestMediaOptions
 }
 
 const (
@@ -284,9 +302,14 @@ type testStreamUsage struct {
 
 // TestConnection 对账号发一条最小探测请求，经 emit 推送 SSE 事件。
 // 成功时落 usage_log（source=account_test），对齐渠道测试不扣用户余额。
-func (s *Service) TestConnection(ctx context.Context, id int, modelID, prompt string, mediaOptions TestMediaOptions, emit func(TestEvent)) error {
+func (s *Service) TestConnection(ctx context.Context, id int, modelID, prompt string, options TestOptions, emit func(TestEvent)) error {
 	if emit == nil {
 		emit = func(TestEvent) {}
+	}
+	testMode, err := normalizeTestMode(options.Mode)
+	if err != nil {
+		emit(TestEvent{Type: "error", Error: err.Error()})
+		return err
 	}
 	item, err := s.FindByID(ctx, id, LoadOptions{WithProxy: true})
 	if err != nil {
@@ -295,6 +318,9 @@ func (s *Service) TestConnection(ctx context.Context, id int, modelID, prompt st
 	}
 	proxyURL := proxyURLFromRef(item.Proxy)
 	platform := strings.ToLower(strings.TrimSpace(item.Platform))
+	if testMode == TestModeOverage && platform != "codex" {
+		return emitErr(emit, "超额测试仅支持 Codex 账号")
+	}
 	start := time.Now()
 
 	var (
@@ -305,13 +331,13 @@ func (s *Service) TestConnection(ctx context.Context, id int, modelID, prompt st
 	)
 	switch platform {
 	case "codex", "openai":
-		model, usage, testErr = s.testCodex(ctx, item, modelID, prompt, proxyURL, emit)
+		model, usage, testErr = s.testCodex(ctx, item, modelID, prompt, testMode, proxyURL, emit)
 		endpoint = "/backend-api/codex/responses"
 	case "claude", "anthropic":
 		model, usage, testErr = s.testClaude(ctx, item, modelID, prompt, proxyURL, emit)
 		endpoint = "/v1/messages"
 	case "xai", "grok":
-		model, usage, testErr = s.testXAI(ctx, item, modelID, prompt, mediaOptions, proxyURL, emit)
+		model, usage, testErr = s.testXAI(ctx, item, modelID, prompt, options.Media, proxyURL, emit)
 		endpoint = xaiTestEndpoint(model)
 	default:
 		msg := fmt.Sprintf("平台 %s 暂不支持连通性测试（当前支持 Codex / Claude / xAI）", item.Platform)
@@ -323,6 +349,17 @@ func (s *Service) TestConnection(ctx context.Context, id int, modelID, prompt st
 	}
 	s.recordAccountTestUsage(item, model, endpoint, usage, time.Since(start).Milliseconds())
 	return nil
+}
+
+func normalizeTestMode(mode TestMode) (TestMode, error) {
+	switch TestMode(strings.ToLower(strings.TrimSpace(string(mode)))) {
+	case "", TestModeNormal:
+		return TestModeNormal, nil
+	case TestModeOverage:
+		return TestModeOverage, nil
+	default:
+		return "", fmt.Errorf("不支持的账号测试模式 %q", mode)
+	}
 }
 
 // recordAccountTestUsage 账号测试成功落消费记录：无用户/Key 归属，不扣任何人余额；
@@ -410,7 +447,7 @@ func (s *Service) recordAccountTestUsage(item Account, model, endpoint string, u
 	})
 }
 
-func (s *Service) testCodex(ctx context.Context, item Account, modelID, prompt, proxyURL string, emit func(TestEvent)) (string, testStreamUsage, error) {
+func (s *Service) testCodex(ctx context.Context, item Account, modelID, prompt string, mode TestMode, proxyURL string, emit func(TestEvent)) (string, testStreamUsage, error) {
 	model := pickDefaultTestModel(item.Platform, resolvePlanType(item), modelID)
 	if model == "" {
 		return "", testStreamUsage{}, emitErr(emit, "无可测模型")
@@ -454,6 +491,16 @@ func (s *Service) testCodex(ctx context.Context, item Account, modelID, prompt, 
 		payload["store"] = false
 	}
 	raw, _ := json.Marshal(payload)
+	if mode == TestModeOverage {
+		transformed, transformErr := s.transformAccountTestRequest(ctx, mode, model, raw)
+		if transformErr != nil {
+			if errors.Is(transformErr, accounttesthook.ErrUnavailable) {
+				return model, testStreamUsage{}, emitErr(emit, "超额测试插件不可用，请先安装并启用支持该模式的插件")
+			}
+			return model, testStreamUsage{}, emitErr(emit, "超额测试请求处理失败: "+transformErr.Error())
+		}
+		raw = transformed
+	}
 
 	emit(TestEvent{Type: "test_start", Model: model})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(raw))
@@ -483,6 +530,27 @@ func (s *Service) testCodex(ctx context.Context, item Account, modelID, prompt, 
 	}
 	usage, err := processOpenAIResponsesStream(resp.Body, emit)
 	return model, usage, err
+}
+
+func (s *Service) transformAccountTestRequest(ctx context.Context, mode TestMode, model string, body json.RawMessage) (json.RawMessage, error) {
+	if s == nil || s.testTransformer == nil {
+		return nil, accounttesthook.ErrUnavailable
+	}
+	decision, err := s.testTransformer.TransformAccountTest(ctx, accounttesthook.Request{
+		Version:  accounttesthook.VersionV1,
+		Mode:     string(mode),
+		Platform: "codex",
+		Endpoint: "responses",
+		Model:    model,
+		Body:     append(json.RawMessage(nil), body...),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if decision.Version != accounttesthook.VersionV1 || len(decision.RequestBody) == 0 {
+		return nil, fmt.Errorf("插件未返回有效的账号测试请求体")
+	}
+	return append(json.RawMessage(nil), decision.RequestBody...), nil
 }
 
 func (s *Service) testClaude(ctx context.Context, item Account, modelID, prompt, proxyURL string, emit func(TestEvent)) (string, testStreamUsage, error) {

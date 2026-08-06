@@ -689,7 +689,7 @@ func applyPluginInfo(status *PluginStatus, info protocol.PluginInfo) {
 
 func supportsAnyCapability(capabilities []string) bool {
 	for _, capability := range capabilities {
-		if capability == protocol.CapabilityRelayHookV1 {
+		if capability == protocol.CapabilityRelayHookV1 || capability == protocol.CapabilityAccountTestTransformV1 {
 			return true
 		}
 	}

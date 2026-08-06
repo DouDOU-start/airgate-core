@@ -12,6 +12,7 @@ type ListFilter struct {
 	APIKeyID     *int64
 	ChannelID    *int64
 	ChannelKeyID *int64
+	AccountID    *int64
 	GroupID      *int64
 	Model        string
 	RequestID    string // 精确互查：从失败留痕跳查同一请求的计费行

@@ -94,6 +94,7 @@ type UsageQuery struct {
 	APIKeyID     *int64 `form:"api_key_id"`
 	ChannelID    *int64 `form:"channel_id"`
 	ChannelKeyID *int64 `form:"channel_key_id"`
+	AccountID    *int64 `form:"account_id"`
 	GroupID      *int64 `form:"group_id"`
 	Model        string `form:"model"`
 	RequestID    string `form:"request_id"`

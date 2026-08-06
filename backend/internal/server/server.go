@@ -137,6 +137,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	// 管理器始终存在，便于 Web 安装和配置；默认配置不会启动任何插件进程。
 	s.pluginRuntime = pluginruntime.New(cfg.Plugins, cfg.Log.Level)
 	s.pluginHandler = handler.NewPluginHandler(s.pluginRuntime)
+	if s.handlers.AccountService != nil {
+		s.handlers.AccountService.SetTestRequestTransformer(s.pluginRuntime)
+	}
 
 	// 健康探针引擎：主动探测 + 分级恢复 + 定时余额同步。
 	channelSvc := s.handlers.ChannelService

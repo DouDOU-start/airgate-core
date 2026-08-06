@@ -93,6 +93,7 @@ type ConsumeUsageResetResp struct {
 type AccountTestReq struct {
 	ModelID     string `json:"model_id"`
 	Prompt      string `json:"prompt"`
+	TestMode    string `json:"test_mode"`
 	Duration    int    `json:"duration"`
 	AspectRatio string `json:"aspect_ratio"`
 	Resolution  string `json:"resolution"`
