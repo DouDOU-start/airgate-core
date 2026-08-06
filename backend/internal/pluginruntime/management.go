@@ -26,33 +26,37 @@ const (
 )
 
 var (
-	ErrPluginNotFound  = errors.New("插件不存在")
-	ErrPluginExists    = errors.New("插件已安装")
-	ErrPluginDisabled  = errors.New("插件尚未启用")
-	ErrInvalidPluginID = errors.New("插件 ID 无效")
-	pluginIDPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
+	ErrPluginNotFound          = errors.New("插件不存在")
+	ErrPluginExists            = errors.New("插件已安装")
+	ErrPluginDisabled          = errors.New("插件尚未启用")
+	ErrPluginConfigUnsupported = errors.New("插件未声明可视化配置")
+	ErrPluginConfigIncomplete  = errors.New("插件配置未完成")
+	ErrInvalidPluginID         = errors.New("插件 ID 无效")
+	pluginIDPattern            = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 )
 
 // PluginStatus 是管理 API 展示的已安装插件状态。
 type PluginStatus struct {
-	ID              string    `json:"id"`
-	Name            string    `json:"name"`
-	Version         string    `json:"version"`
-	ProtocolVersion string    `json:"protocol_version"`
-	Description     string    `json:"description"`
-	Author          string    `json:"author"`
-	Type            string    `json:"type"`
-	Priority        int32     `json:"priority"`
-	Capabilities    []string  `json:"capabilities"`
-	Supported       bool      `json:"supported"`
-	Enabled         bool      `json:"enabled"`
-	Running         bool      `json:"running"`
-	Source          string    `json:"source"`
-	InstalledAt     time.Time `json:"installed_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
-	BinarySize      int64     `json:"binary_size"`
-	HasConfig       bool      `json:"has_config"`
-	Error           string    `json:"error,omitempty"`
+	ID              string                 `json:"id"`
+	Name            string                 `json:"name"`
+	Version         string                 `json:"version"`
+	ProtocolVersion string                 `json:"protocol_version"`
+	Description     string                 `json:"description"`
+	Author          string                 `json:"author"`
+	Type            string                 `json:"type"`
+	Priority        int32                  `json:"priority"`
+	Capabilities    []string               `json:"capabilities"`
+	ConfigSchema    *protocol.ConfigSchema `json:"config_schema,omitempty"`
+	Supported       bool                   `json:"supported"`
+	Enabled         bool                   `json:"enabled"`
+	Running         bool                   `json:"running"`
+	Source          string                 `json:"source"`
+	InstalledAt     time.Time              `json:"installed_at"`
+	UpdatedAt       time.Time              `json:"updated_at"`
+	BinarySize      int64                  `json:"binary_size"`
+	HasConfig       bool                   `json:"has_config"`
+	ConfigReady     bool                   `json:"config_ready"`
+	Error           string                 `json:"error,omitempty"`
 }
 
 type runtimeState struct {
@@ -63,15 +67,22 @@ type runtimeState struct {
 }
 
 type pluginManifest struct {
-	ID              string   `yaml:"id"`
-	Name            string   `yaml:"name"`
-	Version         string   `yaml:"version"`
-	ProtocolVersion string   `yaml:"protocol_version"`
-	Description     string   `yaml:"description"`
-	Author          string   `yaml:"author"`
-	Type            string   `yaml:"type"`
-	Priority        int32    `yaml:"priority"`
-	Capabilities    []string `yaml:"capabilities"`
+	ID              string                 `yaml:"id"`
+	Name            string                 `yaml:"name"`
+	Version         string                 `yaml:"version"`
+	ProtocolVersion string                 `yaml:"protocol_version"`
+	Description     string                 `yaml:"description"`
+	Author          string                 `yaml:"author"`
+	Type            string                 `yaml:"type"`
+	Priority        int32                  `yaml:"priority"`
+	Capabilities    []string               `yaml:"capabilities"`
+	ConfigSchema    *protocol.ConfigSchema `yaml:"config_schema,omitempty"`
+}
+
+// PluginConfigForm 是管理页渲染动态配置表单所需的结构和值。
+type PluginConfigForm struct {
+	Schema *protocol.ConfigSchema `json:"schema"`
+	Values map[string]any         `json:"values"`
 }
 
 // ValidatePluginID 限制目录名只使用不可逃逸的短 ID。
@@ -122,6 +133,7 @@ func (m *Manager) ListInstalled() ([]PluginStatus, error) {
 		}
 		if manifestErr == nil {
 			applyManifest(&status, manifest)
+			status.ConfigReady = m.configReady(id, manifest.ConfigSchema)
 		}
 		if active := m.instanceByID(id); active != nil {
 			status.Running = true
@@ -191,8 +203,8 @@ func (m *Manager) InstallBinary(ctx context.Context, requestedID, source string,
 	if err := atomicWriteFile(tempConfig, []byte(configText), 0o600); err != nil {
 		return PluginStatus{}, fmt.Errorf("写入插件配置失败: %w", err)
 	}
-	// 安装阶段只做握手、协议和配置校验，不调用 Start，确保默认停用的插件不会产生运行副作用。
-	inst, err := m.launchPlugin(ctx, requestedID, exec.Command(tempBinary), tempConfig, false)
+	// 安装阶段只做握手和协议校验，不调用 Init/Start，允许需要先配置的插件保持停用安装。
+	inst, err := m.launchPlugin(ctx, requestedID, exec.Command(tempBinary), tempConfig, false, false)
 	if err != nil {
 		return PluginStatus{}, fmt.Errorf("校验插件失败: %w", err)
 	}
@@ -243,6 +255,7 @@ func (m *Manager) InstallBinary(ctx context.Context, requestedID, source string,
 	status := PluginStatus{
 		ID: id, Enabled: false, Running: false, Source: state.Source,
 		InstalledAt: now, UpdatedAt: now, BinarySize: written, HasConfig: true,
+		ConfigReady: configTextReady(configText, inst.info.ConfigSchema),
 	}
 	applyPluginInfo(&status, inst.info)
 	return status, nil
@@ -266,6 +279,126 @@ func (m *Manager) GetConfig(id string) (string, error) {
 		return "", fmt.Errorf("插件配置超过 1MB，无法在线编辑")
 	}
 	return string(data), nil
+}
+
+// GetConfigForm 返回插件声明的表单结构和当前配置值，不向用户暴露底层 YAML。
+func (m *Manager) GetConfigForm(id string) (PluginConfigForm, error) {
+	configText, err := m.GetConfig(id)
+	if err != nil {
+		return PluginConfigForm{}, err
+	}
+	manifest, err := m.readManifest(id)
+	if err != nil {
+		return PluginConfigForm{}, fmt.Errorf("读取插件配置结构失败: %w", err)
+	}
+	if manifest.ConfigSchema == nil || len(manifest.ConfigSchema.Fields) == 0 {
+		return PluginConfigForm{}, ErrPluginConfigUnsupported
+	}
+	stored := make(map[string]any)
+	if strings.TrimSpace(configText) != "" {
+		if err := yaml.Unmarshal([]byte(configText), &stored); err != nil {
+			return PluginConfigForm{}, fmt.Errorf("解析插件配置失败: %w", err)
+		}
+	}
+	values := make(map[string]any, len(manifest.ConfigSchema.Fields))
+	for _, field := range manifest.ConfigSchema.Fields {
+		if value, exists := stored[field.Key]; exists {
+			values[field.Key] = value
+		} else if field.Default != nil {
+			values[field.Key] = field.Default
+		}
+	}
+	return PluginConfigForm{Schema: manifest.ConfigSchema, Values: values}, nil
+}
+
+// UpdateConfigForm 校验插件声明字段后保存配置；底层仍可使用 YAML 持久化，但不暴露给管理页。
+func (m *Manager) UpdateConfigForm(ctx context.Context, id string, values map[string]any) error {
+	manifest, err := m.readManifest(id)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ErrPluginNotFound
+		}
+		return fmt.Errorf("读取插件配置结构失败: %w", err)
+	}
+	if manifest.ConfigSchema == nil || len(manifest.ConfigSchema.Fields) == 0 {
+		return ErrPluginConfigUnsupported
+	}
+	normalized := make(map[string]any, len(manifest.ConfigSchema.Fields))
+	for _, field := range manifest.ConfigSchema.Fields {
+		value, exists := values[field.Key]
+		if !exists && field.Default != nil {
+			value, exists = field.Default, true
+		}
+		if field.Required && (!exists || emptyConfigValue(value)) {
+			return fmt.Errorf("%s不能为空", field.Label)
+		}
+		if exists {
+			normalized[field.Key] = value
+		}
+	}
+	data, err := yaml.Marshal(normalized)
+	if err != nil {
+		return fmt.Errorf("编码插件配置失败: %w", err)
+	}
+	return m.UpdateConfig(ctx, id, string(data))
+}
+
+func emptyConfigValue(value any) bool {
+	switch typed := value.(type) {
+	case nil:
+		return true
+	case string:
+		return strings.TrimSpace(typed) == ""
+	case []any:
+		return len(typed) == 0
+	case []string:
+		return len(typed) == 0
+	case []int:
+		return len(typed) == 0
+	default:
+		return false
+	}
+}
+
+func (m *Manager) configReady(id string, schema *protocol.ConfigSchema) bool {
+	data, err := os.ReadFile(filepath.Join(m.pluginDir, id, "config.yaml"))
+	if err != nil {
+		return schema == nil || len(schema.Fields) == 0
+	}
+	return configTextReady(string(data), schema)
+}
+
+func configTextReady(configText string, schema *protocol.ConfigSchema) bool {
+	if schema == nil || len(schema.Fields) == 0 {
+		return true
+	}
+	values := make(map[string]any)
+	if strings.TrimSpace(configText) != "" {
+		if err := yaml.Unmarshal([]byte(configText), &values); err != nil {
+			return false
+		}
+	}
+	for _, field := range schema.Fields {
+		value, exists := values[field.Key]
+		if !exists && field.Default != nil {
+			value, exists = field.Default, true
+		}
+		if field.Required && (!exists || emptyConfigValue(value)) {
+			return false
+		}
+	}
+	return true
+}
+
+func (m *Manager) ensureConfigReady(id string) error {
+	manifest, err := m.readManifest(id)
+	if err != nil {
+		return fmt.Errorf("读取插件配置结构失败: %w", err)
+	}
+	if m.configReady(id, manifest.ConfigSchema) {
+		return nil
+	}
+	return fmt.Errorf("%w，请先完成必填配置", ErrPluginConfigIncomplete)
 }
 
 // UpdateConfig 原子保存 YAML；运行中的插件会先启动新实例，成功后再切换。
@@ -297,6 +430,7 @@ func (m *Manager) UpdateConfig(ctx context.Context, id, configText string) error
 	}
 	state.UpdatedAt = time.Now().UTC()
 	if !state.Enabled {
+		m.clearLastError(id)
 		return m.writeRuntimeState(id, state)
 	}
 	if err := m.reloadLocked(ctx, id); err != nil {
@@ -327,6 +461,10 @@ func (m *Manager) SetEnabled(ctx context.Context, id string, enabled bool) error
 		return err
 	}
 	if enabled {
+		if err := m.ensureConfigReady(id); err != nil {
+			m.setLastError(id, err)
+			return err
+		}
 		started := false
 		if m.instanceByID(id) == nil {
 			inst, startErr := m.launchInstalled(ctx, id)
@@ -412,7 +550,7 @@ func (m *Manager) reloadLocked(ctx context.Context, id string) error {
 
 func (m *Manager) launchInstalled(ctx context.Context, id string) (*instance, error) {
 	dir := filepath.Join(m.pluginDir, id)
-	return m.launchPlugin(ctx, id, exec.Command(filepath.Join(dir, pluginBinaryName(id))), filepath.Join(dir, "config.yaml"), true)
+	return m.launchPlugin(ctx, id, exec.Command(filepath.Join(dir, pluginBinaryName(id))), filepath.Join(dir, "config.yaml"), true, true)
 }
 
 func (m *Manager) detachAndStop(id string, ctx context.Context) {
@@ -525,6 +663,7 @@ func manifestFromInfo(info protocol.PluginInfo) pluginManifest {
 		ID: info.ID, Name: info.Name, Version: info.Version, ProtocolVersion: info.ProtocolVersion,
 		Description: info.Description, Author: info.Author, Type: info.Type, Priority: info.Priority,
 		Capabilities: append([]string(nil), info.Capabilities...),
+		ConfigSchema: info.ConfigSchema,
 	}
 }
 
@@ -537,6 +676,7 @@ func applyManifest(status *PluginStatus, manifest pluginManifest) {
 	status.Type = manifest.Type
 	status.Priority = manifest.Priority
 	status.Capabilities = append([]string{}, manifest.Capabilities...)
+	status.ConfigSchema = manifest.ConfigSchema
 	status.Supported = supportsAnyCapability(status.Capabilities)
 	if status.Name == "" {
 		status.Name = status.ID

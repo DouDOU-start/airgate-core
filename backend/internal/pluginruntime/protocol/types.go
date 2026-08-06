@@ -40,6 +40,25 @@ type PluginInfo struct {
 	Priority        int32             `json:"priority"`
 	Capabilities    []string          `json:"capabilities"`
 	Metadata        map[string]string `json:"metadata,omitempty"`
+	ConfigSchema    *ConfigSchema     `json:"config_schema,omitempty"`
+}
+
+// ConfigSchema 描述管理页可动态渲染的插件配置表单。
+type ConfigSchema struct {
+	Version string        `json:"version" yaml:"version"`
+	Fields  []ConfigField `json:"fields" yaml:"fields"`
+}
+
+// ConfigField 是一个通用配置字段。Widget 决定前端控件，DataSource 决定选项来源。
+type ConfigField struct {
+	Key         string            `json:"key" yaml:"key"`
+	Label       string            `json:"label" yaml:"label"`
+	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Widget      string            `json:"widget" yaml:"widget"`
+	DataSource  string            `json:"data_source,omitempty" yaml:"data_source,omitempty"`
+	Required    bool              `json:"required,omitempty" yaml:"required,omitempty"`
+	Default     any               `json:"default,omitempty" yaml:"default,omitempty"`
+	Filter      map[string]string `json:"filter,omitempty" yaml:"filter,omitempty"`
 }
 
 // Request 是能力驱动器发给插件的通用请求。

@@ -22,6 +22,12 @@ func (fixturePlugin) Info() protocol.PluginInfo {
 		Type:            "middleware",
 		Priority:        100,
 		Capabilities:    []string{protocol.CapabilityRelayHookV1},
+		ConfigSchema: &protocol.ConfigSchema{
+			Version: "1",
+			Fields: []protocol.ConfigField{
+				{Key: "group_ids", Label: "生效分组", Widget: "multi_select", DataSource: "groups", Required: true},
+			},
+		},
 	}
 }
 

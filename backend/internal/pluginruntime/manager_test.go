@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -272,6 +273,12 @@ func TestManagerWebManagementLifecycle(t *testing.T) {
 	if installed.ProtocolVersion != protocol.ProtocolVersion || !installed.Supported {
 		t.Fatalf("插件协议或能力状态异常: %+v", installed)
 	}
+	if installed.ConfigSchema == nil || len(installed.ConfigSchema.Fields) != 1 {
+		t.Fatalf("插件配置结构未写入安装状态: %+v", installed.ConfigSchema)
+	}
+	if installed.ConfigReady {
+		t.Fatal("缺少必填分组时不应标记为可启用")
+	}
 
 	items, err := manager.ListInstalled()
 	if err != nil || len(items) != 1 || items[0].Name != "测试 Relay Hook" {
@@ -280,6 +287,29 @@ func TestManagerWebManagementLifecycle(t *testing.T) {
 	configText, err := manager.GetConfig("fixture-hook")
 	if err != nil || configText != "enabled: false\n" {
 		t.Fatalf("读取配置异常: %q, %v", configText, err)
+	}
+	form, err := manager.GetConfigForm("fixture-hook")
+	if err != nil || form.Schema == nil || len(form.Schema.Fields) != 1 {
+		t.Fatalf("读取动态配置表单异常: form=%+v err=%v", form, err)
+	}
+	if _, leaked := form.Values["enabled"]; leaked {
+		t.Fatalf("动态表单不应返回插件未声明字段: %+v", form.Values)
+	}
+	if err := manager.SetEnabled(context.Background(), "fixture-hook", true); !errors.Is(err, ErrPluginConfigIncomplete) {
+		t.Fatalf("配置未完成时启用错误 = %v，期望 ErrPluginConfigIncomplete", err)
+	}
+	if err := manager.UpdateConfigForm(context.Background(), "fixture-hook", map[string]any{}); err == nil {
+		t.Fatal("必填分组为空时应拒绝保存")
+	}
+	if err := manager.UpdateConfigForm(context.Background(), "fixture-hook", map[string]any{
+		"group_ids": []any{12, 15},
+		"ignored":   "不会保存",
+	}); err != nil {
+		t.Fatalf("保存动态配置表单失败: %v", err)
+	}
+	configText, err = manager.GetConfig("fixture-hook")
+	if err != nil || !strings.Contains(configText, "group_ids:") || strings.Contains(configText, "ignored") {
+		t.Fatalf("结构化配置持久化异常: %q, %v", configText, err)
 	}
 
 	if err := manager.SetEnabled(context.Background(), "fixture-hook", true); err != nil {
@@ -335,7 +365,7 @@ func TestManagerRunsMultipleInstalledPlugins(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, installErr := manager.InstallBinary(context.Background(), "", "test", file, "enabled: true\n")
+		_, installErr := manager.InstallBinary(context.Background(), "", "test", file, "group_ids: [7]\n")
 		_ = file.Close()
 		if installErr != nil {
 			t.Fatalf("安装插件 %s 失败: %v", id, installErr)

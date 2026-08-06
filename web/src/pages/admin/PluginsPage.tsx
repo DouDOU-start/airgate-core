@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
+  Checkbox,
   Chip,
   Input,
   Label,
   Modal,
   Spinner,
-  TextArea,
   TextField as HeroTextField,
   useOverlayState,
 } from '@heroui/react';
@@ -23,6 +23,8 @@ import {
   Upload,
 } from 'lucide-react';
 import { pluginsApi, type PluginStatus } from '../../shared/api/plugins';
+import { groupsApi } from '../../shared/api/groups';
+import { FETCH_ALL_PARAMS } from '../../shared/constants';
 import { queryKeys } from '../../shared/queryKeys';
 import { useToast } from '../../shared/ui';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
@@ -39,6 +41,7 @@ export default function PluginsPage() {
   const queryClient = useQueryClient();
   const [installOpen, setInstallOpen] = useState(false);
   const [configTarget, setConfigTarget] = useState<PluginStatus | null>(null);
+  const [enableAfterConfig, setEnableAfterConfig] = useState(false);
   const [uninstallTarget, setUninstallTarget] = useState<PluginStatus | null>(null);
 
   const { data = [], isFetching, isLoading, refetch } = useQuery({
@@ -76,44 +79,28 @@ export default function PluginsPage() {
     onError: (error: Error) => toast('error', error.message),
   });
 
-  const enabledCount = data.filter((plugin) => plugin.enabled).length;
-  const runningPlugin = data.find((plugin) => plugin.running);
+  const handleToggle = (plugin: PluginStatus, enabled: boolean) => {
+    if (enabled && plugin.config_schema?.fields.length && !plugin.config_ready) {
+      setEnableAfterConfig(true);
+      setConfigTarget(plugin);
+      return;
+    }
+    toggleMutation.mutate({ id: plugin.id, enabled });
+  };
 
   return (
     <div className="ag-page-body ag-plugins-page">
-      <header className="ag-plugins-overview">
-        <div className="ag-plugins-overview__side">
-          <dl className="ag-plugins-overview__stats">
-            <div>
-              <dt>{t('plugins.installed_label')}</dt>
-              <dd>{data.length}</dd>
-            </div>
-            <div>
-              <dt>{t('plugins.enabled_label')}</dt>
-              <dd>{enabledCount}</dd>
-            </div>
-            <div className="ag-plugins-overview__runtime" data-running={runningPlugin ? 'true' : 'false'}>
-              <dt>{t('plugins.runtime_label')}</dt>
-              <dd>
-                <span />
-                {runningPlugin ? t('plugins.status_running') : t('plugins.runtime_idle')}
-              </dd>
-            </div>
-          </dl>
-
-          <div className="ag-plugins-overview__actions">
-            <RefreshButton
-              ariaLabel={t('common.refresh')}
-              isRefreshing={isFetching}
-              onRefresh={refetch}
-            />
-            <Button variant="primary" onPress={() => setInstallOpen(true)}>
-              <PackagePlus className="h-4 w-4" />
-              {t('plugins.install')}
-            </Button>
-          </div>
-        </div>
-      </header>
+      <div className="ag-plugins-toolbar">
+        <RefreshButton
+          ariaLabel={t('common.refresh')}
+          isRefreshing={isFetching}
+          onRefresh={refetch}
+        />
+        <Button variant="primary" onPress={() => setInstallOpen(true)}>
+          <PackagePlus className="h-4 w-4" />
+          {t('plugins.install')}
+        </Button>
+      </div>
 
       {isLoading ? (
         <div className="ag-plugins-loading" role="status">
@@ -172,7 +159,7 @@ export default function PluginsPage() {
                       ariaLabel={plugin.enabled ? t('common.disable') : t('common.enable')}
                       isDisabled={toggleMutation.isPending}
                       isSelected={plugin.enabled}
-                      onChange={(enabled) => toggleMutation.mutate({ id: plugin.id, enabled })}
+                      onChange={(enabled) => handleToggle(plugin, enabled)}
                     />
                   </div>
                 </div>
@@ -233,7 +220,15 @@ export default function PluginsPage() {
                   <span className="mr-auto text-[10px] text-text-tertiary">
                     {t('plugins.updated_at')} {formatDateTime(plugin.updated_at)}
                   </span>
-                  <Button size="sm" variant="secondary" onPress={() => setConfigTarget(plugin)}>
+                  <Button
+                    isDisabled={!plugin.config_schema?.fields.length}
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => {
+                      setEnableAfterConfig(false);
+                      setConfigTarget(plugin);
+                    }}
+                  >
                     <FileSliders className="h-3.5 w-3.5" />
                     {t('plugins.configure')}
                   </Button>
@@ -273,10 +268,18 @@ export default function PluginsPage() {
       />
       <PluginConfigModal
         plugin={configTarget}
-        onClose={() => setConfigTarget(null)}
+        onClose={() => {
+          setEnableAfterConfig(false);
+          setConfigTarget(null);
+        }}
         onSaved={() => {
+          const savedPlugin = configTarget;
           setConfigTarget(null);
           void refreshList();
+          if (enableAfterConfig && savedPlugin) {
+            setEnableAfterConfig(false);
+            toggleMutation.mutate({ id: savedPlugin.id, enabled: true });
+          }
         }}
       />
       <ConfirmDialog
@@ -439,27 +442,54 @@ function PluginConfigModal({
 }) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [config, setConfig] = useState('');
+  const [values, setValues] = useState<Record<string, unknown>>({});
   const open = !!plugin;
-  const { data, isLoading } = useQuery({
+  const { data, error, isLoading } = useQuery({
     queryKey: queryKeys.pluginConfig(plugin?.id || ''),
     queryFn: () => pluginsApi.getConfig(plugin!.id),
     enabled: open,
   });
+  const needsGroups = data?.schema.fields.some(
+    (field) => field.widget === 'multi_select' && field.data_source === 'groups',
+  ) ?? false;
+  const { data: groupsData, isLoading: groupsLoading } = useQuery({
+    queryKey: queryKeys.groups(FETCH_ALL_PARAMS),
+    queryFn: () => groupsApi.list(FETCH_ALL_PARAMS),
+    enabled: open && needsGroups,
+  });
+  const groups = groupsData?.list ?? [];
 
   useEffect(() => {
-    if (open && data) setConfig(data.config);
-    if (!open) setConfig('');
+    if (open && data) setValues({ ...data.values });
+    if (!open) setValues({});
   }, [data, open]);
 
   const saveMutation = useMutation({
-    mutationFn: () => pluginsApi.updateConfig(plugin!.id, config),
+    mutationFn: () => pluginsApi.updateConfig(plugin!.id, values),
     onSuccess: () => {
       toast('success', t('plugins.config_save_success'));
       onSaved();
     },
     onError: (error: Error) => toast('error', error.message),
   });
+
+  const updateMultiSelect = (key: string, id: number, selected: boolean) => {
+    setValues((current) => {
+      const selectedIDs = numberArray(current[key]);
+      return {
+        ...current,
+        [key]: selected
+          ? Array.from(new Set([...selectedIDs, id]))
+          : selectedIDs.filter((item) => item !== id),
+      };
+    });
+  };
+
+  const missingRequiredValue = data?.schema.fields.some((field) => {
+    if (!field.required) return false;
+    const value = values[field.key];
+    return value == null || value === '' || (Array.isArray(value) && value.length === 0);
+  }) ?? false;
 
   const modalState = useOverlayState({
     isOpen: open,
@@ -472,8 +502,8 @@ function PluginConfigModal({
     <Modal state={modalState}>
       <DialogTriggerShim />
       <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="inside" size="lg">
-          <Modal.Dialog className="ag-elevation-modal" style={{ maxWidth: '760px', width: 'min(100%, calc(100vw - 2rem))' }}>
+        <Modal.Container placement="center" scroll="inside" size="sm">
+          <Modal.Dialog className="ag-elevation-modal ag-plugin-config-modal">
             <Modal.Header>
               <Modal.Heading>{t('plugins.config_title', { name: plugin?.name || plugin?.id })}</Modal.Heading>
               <Modal.CloseTrigger />
@@ -481,28 +511,70 @@ function PluginConfigModal({
             <Modal.Body>
               {isLoading ? (
                 <div className="flex min-h-64 items-center justify-center"><Spinner /></div>
+              ) : error ? (
+                <div className="py-8 text-center text-sm text-danger">{(error as Error).message}</div>
               ) : (
-                <HeroTextField fullWidth>
-                  <Label>{t('plugins.yaml_config')}</Label>
-                  <TextArea
-                    autoFocus
-                    className="min-h-80 font-mono text-xs leading-5"
-                    rows={20}
-                    spellCheck={false}
-                    value={config}
-                    onChange={(event) => setConfig(event.target.value)}
-                  />
-                </HeroTextField>
+                <div className="space-y-5">
+                  {data?.schema.fields.map((field) => {
+                    const fieldValue = values[field.key];
+                    if (field.widget === 'multi_select' && field.data_source === 'groups') {
+                      const selectedIDs = numberArray(fieldValue);
+                      return (
+                        <fieldset key={field.key}>
+                          <legend className="mb-2 text-sm font-medium text-text">
+                            {field.label}{field.required ? <span className="ml-1 text-danger">*</span> : null}
+                          </legend>
+                          <div className="max-h-72 overflow-y-auto rounded-[var(--radius)] border border-border p-1">
+                            {groupsLoading ? (
+                              <div className="flex min-h-28 items-center justify-center"><Spinner size="sm" /></div>
+                            ) : groups.length === 0 ? (
+                              <div className="py-8 text-center text-xs text-text-tertiary">{t('common.no_data')}</div>
+                            ) : groups.map((group) => (
+                              <Checkbox
+                                className="flex w-full rounded-[var(--radius-sm)] px-3 py-2.5 hover:bg-default-50"
+                                isSelected={selectedIDs.includes(group.id)}
+                                key={group.id}
+                                onChange={(selected) => updateMultiSelect(field.key, group.id, selected)}
+                              >
+                                <Checkbox.Control>
+                                  <Checkbox.Indicator />
+                                </Checkbox.Control>
+                                <span className="min-w-0 truncate text-sm text-text">{group.name}</span>
+                              </Checkbox>
+                            ))}
+                          </div>
+                        </fieldset>
+                      );
+                    }
+                    if (field.widget === 'text') {
+                      return (
+                        <HeroTextField fullWidth isRequired={field.required} key={field.key}>
+                          <Label>{field.label}</Label>
+                          <Input
+                            value={typeof fieldValue === 'string' ? fieldValue : ''}
+                            onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
+                          />
+                        </HeroTextField>
+                      );
+                    }
+                    return (
+                      <div className="rounded-[var(--radius)] border border-border px-3 py-2 text-sm text-text-secondary" key={field.key}>
+                        {field.label}: {t('plugins.config_widget_unsupported')}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
-              {plugin?.running ? (
-                <div className="mt-3 text-xs text-text-tertiary">{t('plugins.config_reload_hint')}</div>
-              ) : null}
             </Modal.Body>
             <Modal.Footer>
               <Button isDisabled={saveMutation.isPending} variant="secondary" onPress={onClose}>
                 {t('common.cancel')}
               </Button>
-              <Button isDisabled={isLoading || saveMutation.isPending} variant="primary" onPress={() => saveMutation.mutate()}>
+              <Button
+                isDisabled={isLoading || !!error || groupsLoading || missingRequiredValue || saveMutation.isPending}
+                variant="primary"
+                onPress={() => saveMutation.mutate()}
+              >
                 {saveMutation.isPending ? <Spinner size="sm" /> : <FileSliders className="h-4 w-4" />}
                 {t('common.save')}
               </Button>
@@ -512,6 +584,13 @@ function PluginConfigModal({
       </Modal.Backdrop>
     </Modal>
   );
+}
+
+function numberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => Number(item))
+    .filter((item) => Number.isInteger(item) && item > 0);
 }
 
 function formatBytes(size: number): string {

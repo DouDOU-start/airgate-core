@@ -131,28 +131,28 @@ func (h *PluginHandler) InstallPluginFromURL(c *gin.Context) {
 	response.Success(c, item)
 }
 
-// GetPluginConfig 获取原始 YAML 配置。
+// GetPluginConfig 获取插件声明的动态表单和当前值。
 func (h *PluginHandler) GetPluginConfig(c *gin.Context) {
-	configText, err := h.manager.GetConfig(c.Param("id"))
+	form, err := h.manager.GetConfigForm(c.Param("id"))
 	if err != nil {
 		h.handleReadError(c, "读取插件配置失败", err)
 		return
 	}
-	response.Success(c, gin.H{"config": configText})
+	response.Success(c, form)
 }
 
 type updatePluginConfigRequest struct {
-	Config string `json:"config"`
+	Values map[string]any `json:"values" binding:"required"`
 }
 
-// UpdatePluginConfig 保存 YAML，运行中的插件会自动平滑重载。
+// UpdatePluginConfig 保存表单值，运行中的插件会自动平滑重载。
 func (h *PluginHandler) UpdatePluginConfig(c *gin.Context) {
 	var input updatePluginConfigRequest
 	if err := c.ShouldBindJSON(&input); err != nil {
 		response.BindError(c, err)
 		return
 	}
-	if err := h.manager.UpdateConfig(c.Request.Context(), c.Param("id"), input.Config); err != nil {
+	if err := h.manager.UpdateConfigForm(c.Request.Context(), c.Param("id"), input.Values); err != nil {
 		h.handleOperationError(c, "保存插件配置失败", err)
 		return
 	}
@@ -204,6 +204,10 @@ func (h *PluginHandler) handleReadError(c *gin.Context, logMessage string, err e
 		response.BadRequest(c, err.Error())
 		return
 	}
+	if errors.Is(err, pluginruntime.ErrPluginConfigUnsupported) {
+		response.BadRequest(c, err.Error())
+		return
+	}
 	slog.Error(logMessage, "error", err)
 	response.InternalError(c, logMessage)
 }
@@ -214,10 +218,10 @@ func (h *PluginHandler) handleOperationError(c *gin.Context, logMessage string, 
 		response.NotFound(c, err.Error())
 	case errors.Is(err, pluginruntime.ErrPluginExists):
 		response.Error(c, http.StatusConflict, http.StatusConflict, err.Error())
-	case errors.Is(err, pluginruntime.ErrInvalidPluginID), errors.Is(err, pluginruntime.ErrPluginDisabled):
+	case errors.Is(err, pluginruntime.ErrInvalidPluginID), errors.Is(err, pluginruntime.ErrPluginDisabled), errors.Is(err, pluginruntime.ErrPluginConfigUnsupported), errors.Is(err, pluginruntime.ErrPluginConfigIncomplete):
 		response.BadRequest(c, err.Error())
 	default:
-		// 进程握手、插件初始化和配置解析错误需要直接反馈给管理员，便于修正安装包或 YAML。
+		// 进程握手、插件初始化和配置解析错误需要直接反馈给管理员，便于修正安装包或表单配置。
 		slog.Warn(logMessage, "error", err)
 		response.BadRequest(c, err.Error())
 	}

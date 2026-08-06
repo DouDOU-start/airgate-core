@@ -11,7 +11,8 @@ tmp_dir = "tmp"
   # WSL2 + /mnt/* (9p drvfs) 不支持 inotify，必须开 poll 才能检测文件变更
   poll = true
   poll_interval = 1000
-  exclude_dir = ["tmp", "vendor", "node_modules"]
+  # data 是数据库、插件二进制及插件运行状态目录，变化不属于源码热重载范围。
+  exclude_dir = ["tmp", "vendor", "node_modules", "data"]
   exclude_regex = ["_test.go"]
   include_ext = ["go", "toml", "yaml"]
   kill_delay = "0s"

@@ -121,7 +121,7 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 			if !state.Enabled {
 				continue
 			}
-			inst, startErr := m.launchPlugin(ctx, id, exec.Command(binaryPath), filepath.Join(dir, "config.yaml"), true)
+			inst, startErr := m.launchPlugin(ctx, id, exec.Command(binaryPath), filepath.Join(dir, "config.yaml"), true, true)
 			if startErr != nil {
 				m.setLastError(id, startErr)
 				slog.Error("插件加载失败", "plugin_id", id, "error", startErr)
@@ -158,7 +158,7 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 		}
 		cmd := exec.Command("go", "run", ".")
 		cmd.Dir = dev.Path
-		inst, startErr := m.launchPlugin(ctx, "", cmd, configPath, true)
+		inst, startErr := m.launchPlugin(ctx, "", cmd, configPath, true, true)
 		if startErr != nil {
 			slog.Error("开发插件加载失败", "plugin_id", name, "error", startErr)
 			continue
@@ -169,7 +169,7 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 	return nil
 }
 
-func (m *Manager) launchPlugin(ctx context.Context, requestedID string, cmd *exec.Cmd, configPath string, start bool) (*instance, error) {
+func (m *Manager) launchPlugin(ctx context.Context, requestedID string, cmd *exec.Cmd, configPath string, initialize, start bool) (*instance, error) {
 	client := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig: protocol.Handshake,
 		Plugins: goplugin.PluginSet{
@@ -220,17 +220,19 @@ func (m *Manager) launchPlugin(ctx context.Context, requestedID string, cmd *exe
 		info.Name = id
 	}
 
-	values, err := loadPluginConfig(configPath, m.logLevel)
-	if err != nil {
-		client.Kill()
-		return nil, err
-	}
-	initCtx, cancel := context.WithTimeout(ctx, pluginStartTimeout)
-	err = plugin.Init(initCtx, values)
-	cancel()
-	if err != nil {
-		client.Kill()
-		return nil, fmt.Errorf("初始化插件失败: %w", err)
+	if initialize {
+		values, loadErr := loadPluginConfig(configPath, m.logLevel)
+		if loadErr != nil {
+			client.Kill()
+			return nil, loadErr
+		}
+		initCtx, initCancel := context.WithTimeout(ctx, pluginStartTimeout)
+		err = plugin.Init(initCtx, values)
+		initCancel()
+		if err != nil {
+			client.Kill()
+			return nil, fmt.Errorf("初始化插件失败: %w", err)
+		}
 	}
 	if start {
 		startCtx, startCancel := context.WithTimeout(ctx, pluginStartTimeout)

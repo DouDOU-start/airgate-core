@@ -10,6 +10,7 @@ export interface PluginStatus {
   type: string;
   priority: number;
   capabilities: string[];
+  config_schema?: PluginConfigSchema;
   supported: boolean;
   enabled: boolean;
   running: boolean;
@@ -18,7 +19,29 @@ export interface PluginStatus {
   updated_at: string;
   binary_size: number;
   has_config: boolean;
+  config_ready: boolean;
   error?: string;
+}
+
+export interface PluginConfigField {
+  key: string;
+  label: string;
+  description?: string;
+  widget: 'multi_select' | 'ordered_select' | 'string_list' | 'text';
+  data_source?: 'groups' | 'accounts';
+  required?: boolean;
+  default?: unknown;
+  filter?: Record<string, string>;
+}
+
+export interface PluginConfigSchema {
+  version: string;
+  fields: PluginConfigField[];
+}
+
+export interface PluginConfigForm {
+  schema: PluginConfigSchema;
+  values: Record<string, unknown>;
 }
 
 export interface InstallPluginURLRequest {
@@ -35,9 +58,9 @@ export const pluginsApi = {
   installURL: (data: InstallPluginURLRequest) =>
     post<PluginStatus>('/api/v1/admin/plugins/install-url', data),
   getConfig: (id: string) =>
-    get<{ config: string }>(`/api/v1/admin/plugins/${encodeURIComponent(id)}/config`),
-  updateConfig: (id: string, config: string) =>
-    put<void>(`/api/v1/admin/plugins/${encodeURIComponent(id)}/config`, { config }),
+    get<PluginConfigForm>(`/api/v1/admin/plugins/${encodeURIComponent(id)}/config`),
+  updateConfig: (id: string, values: Record<string, unknown>) =>
+    put<void>(`/api/v1/admin/plugins/${encodeURIComponent(id)}/config`, { values }),
   setEnabled: (id: string, enabled: boolean) =>
     patch<void>(`/api/v1/admin/plugins/${encodeURIComponent(id)}/enabled`, { enabled }),
   reload: (id: string) =>
