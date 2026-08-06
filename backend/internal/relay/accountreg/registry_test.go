@@ -90,6 +90,60 @@ func TestModelsForGroup(t *testing.T) {
 	}
 }
 
+func TestCandidateListsOnlyExplicitlyAllowRateLimitedAccounts(t *testing.T) {
+	until := time.Now().Add(time.Hour)
+	registry := New(registryLoaderStub{items: []Snapshot{
+		{ID: 1, State: StateActive, Platform: "codex", Type: "oauth", Models: map[string]struct{}{"gpt-test": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 2, State: StateRateLimited, StateUntil: &until, Platform: "codex", Type: "oauth", Models: map[string]struct{}{"gpt-test": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 3, State: StateDisabled, Platform: "codex", Type: "oauth", Models: map[string]struct{}{"gpt-test": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 4, State: StateRateLimited, StateUntil: &until, Platform: "codex", Type: "oauth", Models: map[string]struct{}{"gpt-test": {}}, GroupIDs: map[int]struct{}{8: {}}},
+		{ID: 5, State: StateRateLimited, StateUntil: &until, Platform: "codex", Type: "oauth", Models: map[string]struct{}{"other": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 6, State: StateRateLimited, StateUntil: &until, Platform: "xai", Type: "oauth", Models: map[string]struct{}{"gpt-test": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 7, State: StateRateLimited, StateUntil: &until, Platform: "codex", Type: "api_key", Models: map[string]struct{}{"gpt-test": {}}, GroupIDs: map[int]struct{}{7: {}}},
+	}}, nil)
+	if err := registry.Reload(context.Background()); err != nil {
+		t.Fatalf("加载注册表失败: %v", err)
+	}
+
+	if got := snapshotIDs(registry.ListCandidates(7, "gpt-test", nil)); !sameIntSet(got, []int{1}) {
+		t.Fatalf("普通候选 = %v，期望 [1]", got)
+	}
+	if got := snapshotIDs(registry.ListRelayHookCandidates(7, "gpt-test")); !sameIntSet(got, []int{1, 2, 6, 7}) {
+		t.Fatalf("Hook 可见候选 = %v，期望 [1 2 6 7]", got)
+	}
+	if got := snapshotIDs(registry.ListCandidatesAllowRateLimited(7, "gpt-test", nil, []int{2, 3, 4, 5, 6, 7})); !sameIntSet(got, []int{1, 2}) {
+		t.Fatalf("显式放行候选 = %v，期望 [1 2]", got)
+	}
+	if got := snapshotIDs(registry.ListCandidatesAllowRateLimited(7, "gpt-test", []int{2}, []int{2})); !sameIntSet(got, []int{1}) {
+		t.Fatalf("排除账号后的候选 = %v，期望 [1]", got)
+	}
+}
+
+func snapshotIDs(items []*Snapshot) []int {
+	result := make([]int, 0, len(items))
+	for _, item := range items {
+		result = append(result, item.ID)
+	}
+	return result
+}
+
+func sameIntSet(left, right []int) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	values := make(map[int]int, len(left))
+	for _, value := range left {
+		values[value]++
+	}
+	for _, value := range right {
+		values[value]--
+		if values[value] < 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func TestMarkActiveDoesNotPersistUnchangedState(t *testing.T) {
 	persister := registryPersisterStub{calls: make(chan statePersistCall, 1)}
 	registry := New(registryLoaderStub{items: []Snapshot{{ID: 1, State: StateActive}}}, persister)

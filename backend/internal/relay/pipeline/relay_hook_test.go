@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
@@ -132,9 +133,10 @@ func (l hookAccountLoader) LoadAllForAccountRegistry(context.Context) ([]account
 }
 
 func TestPickRouteUsesPluginAccountOrderThenCoreFallback(t *testing.T) {
+	until := time.Now().Add(time.Hour)
 	accounts := accountreg.New(hookAccountLoader{snaps: []accountreg.Snapshot{
-		{ID: 1, Name: "账号一", Priority: 100, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-4o": {}}, GroupIDs: map[int]struct{}{7: {}}},
-		{ID: 2, Name: "账号二", Priority: 1, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-4o": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 1, Name: "账号一", Platform: "codex", Type: "oauth", Priority: 100, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-4o": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 2, Name: "账号二", Platform: "codex", Type: "oauth", Priority: 1, Weight: 10, State: accountreg.StateRateLimited, StateUntil: &until, Models: map[string]struct{}{"gpt-4o": {}}, GroupIDs: map[int]struct{}{7: {}}},
 	}}, nil)
 	if err := accounts.Reload(context.Background()); err != nil {
 		t.Fatal(err)
@@ -143,8 +145,13 @@ func TestPickRouteUsesPluginAccountOrderThenCoreFallback(t *testing.T) {
 	plan := &relayhook.RoutePlan{AccountIDs: []int{2, 1}, Fallback: relayhook.FallbackCore}
 
 	target, ok := pipe.pickRoute(7, "gpt-4o", "openai", nil, nil, plan)
+	if !ok || target.account == nil || target.account.ID != 1 {
+		t.Fatalf("未授权限流账号时选择 = %+v，期望账号 1", target)
+	}
+	plan.AllowRateLimitedAccountIDs = []int{2}
+	target, ok = pipe.pickRoute(7, "gpt-4o", "openai", nil, nil, plan)
 	if !ok || target.account == nil || target.account.ID != 2 {
-		t.Fatalf("首选账号 = %+v，期望账号 2", target)
+		t.Fatalf("显式授权后的首选账号 = %+v，期望账号 2", target)
 	}
 	target, ok = pipe.pickRoute(7, "gpt-4o", "openai", nil, []int{2}, plan)
 	if !ok || target.account == nil || target.account.ID != 1 {

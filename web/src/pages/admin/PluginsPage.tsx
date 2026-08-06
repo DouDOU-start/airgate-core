@@ -411,7 +411,7 @@ function InstallPluginModal({
                   <HeroTextField fullWidth isRequired>
                     <Label>{t('plugins.download_url')}</Label>
                     <Input
-                      placeholder="https://example.com/airgate-overage"
+                      placeholder="https://example.com/airgate-codex-overage"
                       value={url}
                       onChange={(event) => setURL(event.target.value)}
                     />

@@ -23,6 +23,8 @@ type Hook interface {
 
 // Request 是发送给外部插件的版本化请求。Body 是客户端 JSON 请求体；Candidates
 // 只含调度元数据，绝不包含账号凭证、API Key、代理地址或上游地址。
+// 账号候选可能包含暂时不可调度的 rate_limited 状态，插件必须通过 RoutePlan
+// 显式声明本次允许尝试的限流 Codex OAuth 账号。
 type Request struct {
 	Version    string          `json:"version"`
 	RequestID  string          `json:"request_id,omitempty"`
@@ -53,7 +55,8 @@ type Candidate struct {
 }
 
 // Decision 是插件返回的本次请求决策。RequestBody 为完整替换体；Route 仅能指定
-// 当前请求可见的账号 ID，Core 会再次过滤并保留所有限流、并发与状态机检查。
+// 当前请求可见的账号 ID。普通账号仍遵循完整状态机；限流账号必须同时出现在
+// AllowRateLimitedAccountIDs 中，且 Core 仅接受 Codex OAuth 账号。
 type Decision struct {
 	Version     string          `json:"version"`
 	RequestBody json.RawMessage `json:"request_body,omitempty"`
@@ -62,6 +65,7 @@ type Decision struct {
 
 // RoutePlan 定义账号严格尝试顺序。当前只接受 FallbackCore。
 type RoutePlan struct {
-	AccountIDs []int  `json:"account_ids,omitempty"`
-	Fallback   string `json:"fallback"`
+	AccountIDs                 []int  `json:"account_ids,omitempty"`
+	AllowRateLimitedAccountIDs []int  `json:"allow_rate_limited_account_ids,omitempty"`
+	Fallback                   string `json:"fallback"`
 }

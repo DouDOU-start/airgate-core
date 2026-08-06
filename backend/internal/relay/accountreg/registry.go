@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -218,6 +219,36 @@ func (r *Registry) ensureLoaded() {
 // ListCandidates 返回可调度账号候选（已过滤 state / group / model / exclude）。
 // 返回切片内指针只读。degraded 账号包含在内（EffectivePriority 已压档）。
 func (r *Registry) ListCandidates(groupID int, model string, exclude []int) []*Snapshot {
+	return r.listCandidates(groupID, model, exclude, nil, false)
+}
+
+// ListCandidatesAllowRateLimited 返回普通可调度候选，并额外允许调用方显式列出的
+// rate_limited Codex OAuth 账号。该入口仅供已经通过 Relay Hook 决策校验的单次
+// 路由使用；其他平台、API Key、disabled、分组不匹配和模型不匹配仍会被过滤。
+func (r *Registry) ListCandidatesAllowRateLimited(groupID int, model string, exclude, allowRateLimited []int) []*Snapshot {
+	allowed := make(map[int]struct{}, len(allowRateLimited))
+	for _, id := range allowRateLimited {
+		if id > 0 {
+			allowed[id] = struct{}{}
+		}
+	}
+	return r.listCandidates(groupID, model, exclude, allowed, false)
+}
+
+// ListRelayHookCandidates 返回对 Relay Hook 可见的账号目录候选。
+// 与普通调度不同，它保留 rate_limited 账号供受信插件作显式单次决策；
+// disabled、分组不匹配和模型不匹配账号仍不可见。
+func (r *Registry) ListRelayHookCandidates(groupID int, model string) []*Snapshot {
+	return r.listCandidates(groupID, model, nil, nil, true)
+}
+
+func (r *Registry) listCandidates(
+	groupID int,
+	model string,
+	exclude []int,
+	allowRateLimited map[int]struct{},
+	includeAllRateLimited bool,
+) []*Snapshot {
 	if r == nil {
 		return nil
 	}
@@ -236,11 +267,15 @@ func (r *Registry) ListCandidates(groupID int, model string, exclude []int) []*S
 		if _, skip := excluded[a.ID]; skip {
 			continue
 		}
-		if !a.IsSchedulable(now) {
-			continue
-		}
 		if a.State == StateDisabled {
 			continue
+		}
+		if !a.IsSchedulable(now) {
+			_, explicitlyAllowed := allowRateLimited[a.ID]
+			if a.State != StateRateLimited ||
+				(!includeAllRateLimited && (!explicitlyAllowed || !isCodexOAuth(a))) {
+				continue
+			}
 		}
 		if _, ok := a.GroupIDs[groupID]; !ok {
 			continue
@@ -257,6 +292,12 @@ func (r *Registry) ListCandidates(groupID int, model string, exclude []int) []*S
 		out = append(out, a)
 	}
 	return out
+}
+
+func isCodexOAuth(account *Snapshot) bool {
+	return account != nil &&
+		strings.EqualFold(strings.TrimSpace(account.Platform), "codex") &&
+		strings.EqualFold(strings.TrimSpace(account.Type), "oauth")
 }
 
 // ModelsForGroup 返回指定分组下账号可服务的模型名并集（字典序）。

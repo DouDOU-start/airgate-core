@@ -75,7 +75,7 @@ func (p *Pipeline) relayHookCandidates(groupID int, model, protocol string) []re
 		}
 	}
 	if p.accounts != nil {
-		for _, item := range p.accounts.ListCandidates(groupID, model, nil) {
+		for _, item := range p.accounts.ListRelayHookCandidates(groupID, model) {
 			candidates = append(candidates, relayhook.Candidate{
 				Kind:           "account",
 				ID:             item.ID,
@@ -113,29 +113,10 @@ func validateRelayHookDecision(
 
 	var plan *relayhook.RoutePlan
 	if decision.Route != nil {
-		if decision.Route.Fallback != relayhook.FallbackCore {
-			return nil, nil, fmt.Errorf("不支持的 fallback %q", decision.Route.Fallback)
-		}
-		allowed := make(map[int]struct{})
-		for _, candidate := range candidates {
-			if candidate.Kind == "account" {
-				allowed[candidate.ID] = struct{}{}
-			}
-		}
-		seen := make(map[int]struct{}, len(decision.Route.AccountIDs))
-		accountIDs := make([]int, 0, len(decision.Route.AccountIDs))
-		for _, accountID := range decision.Route.AccountIDs {
-			if _, ok := allowed[accountID]; !ok {
-				continue
-			}
-			if _, duplicate := seen[accountID]; duplicate {
-				continue
-			}
-			seen[accountID] = struct{}{}
-			accountIDs = append(accountIDs, accountID)
-		}
-		if len(accountIDs) > 0 {
-			plan = &relayhook.RoutePlan{AccountIDs: accountIDs, Fallback: relayhook.FallbackCore}
+		var err error
+		plan, err = relayhook.NormalizeRoutePlan(candidates, decision.Route)
+		if err != nil {
+			return nil, nil, err
 		}
 	}
 

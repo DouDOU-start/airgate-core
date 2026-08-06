@@ -62,7 +62,11 @@ func (p *Pipeline) pickRoute(
 		}
 	}
 	if p.accounts != nil {
-		for _, a := range p.accounts.ListCandidates(groupID, model, excludeAccounts) {
+		var allowRateLimited []int
+		if plan != nil {
+			allowRateLimited = plan.AllowRateLimitedAccountIDs
+		}
+		for _, a := range p.accounts.ListCandidatesAllowRateLimited(groupID, model, excludeAccounts, allowRateLimited) {
 			cands = append(cands, routeTarget{
 				kind:     routeAccount,
 				priority: a.EffectivePriority(now),
@@ -75,9 +79,9 @@ func (p *Pipeline) pickRoute(
 		return nil, false
 	}
 
-	// 插件有序账号只改变本次请求的首选顺序。候选仍由 Core 注册表生成，因此
-	// 状态、分组、模型与 exclude 过滤不会被绕过；账号容量满后下一轮自然选择
-	// AccountIDs 中的下一项。
+	// 插件有序账号只改变本次请求的首选顺序。普通账号仍由 Core 完整过滤；只有
+	// 当前计划显式授权的限流 Codex OAuth 账号可进入本轮候选。账号容量满后，
+	// 下一轮自然选择 AccountIDs 中的下一项。
 	if plan != nil {
 		accounts := make(map[int]routeTarget, len(cands))
 		for _, candidate := range cands {

@@ -41,7 +41,7 @@ func (f *fakePlugin) Handle(ctx context.Context, request protocol.Request) (prot
 func testRelayRequest(accountIDs ...int) relayhook.Request {
 	candidates := make([]relayhook.Candidate, 0, len(accountIDs))
 	for _, id := range accountIDs {
-		candidates = append(candidates, relayhook.Candidate{Kind: "account", ID: id})
+		candidates = append(candidates, relayhook.Candidate{Kind: "account", ID: id, Platform: "codex", Type: "oauth", State: "active"})
 	}
 	return relayhook.Request{
 		Version:    relayhook.VersionV1,
@@ -159,6 +159,40 @@ func TestBeforeDispatchDecodesDecision(t *testing.T) {
 	if decision.Route == nil || len(decision.Route.AccountIDs) != 2 || decision.Route.AccountIDs[0] != 2 {
 		t.Fatalf("决策解析异常: %+v", decision)
 	}
+}
+
+func TestBeforeDispatchPreservesValidatedRateLimitedAuthorization(t *testing.T) {
+	plugin := &fakePlugin{handler: func(context.Context, protocol.Request) (protocol.Response, error) {
+		return protocol.Response{StatusCode: http.StatusOK, Body: []byte(`{"version":"v1","route":{"account_ids":[2,3],"allow_rate_limited_account_ids":[2,3],"fallback":"core"}}`)}, nil
+	}}
+	manager := &Manager{
+		hookTimeout: time.Second,
+		instances:   map[string]*instance{"route": testInstance("route", 10, plugin)},
+		lastErrors:  make(map[string]string),
+	}
+	request := testRelayRequest(2, 3)
+	request.Candidates[0].State = "rate_limited"
+	request.Candidates[1].Platform = "xai"
+	request.Candidates[1].State = "rate_limited"
+	decision, err := manager.BeforeDispatch(context.Background(), request)
+	if err != nil {
+		t.Fatalf("调用失败: %v", err)
+	}
+	if decision.Route == nil || !equalManagerIntSlice(decision.Route.AllowRateLimitedAccountIDs, []int{2}) {
+		t.Fatalf("限流账号授权未正确保留: %+v", decision.Route)
+	}
+}
+
+func equalManagerIntSlice(left, right []int) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestBeforeDispatchChainsPluginsByPriority(t *testing.T) {

@@ -371,6 +371,7 @@ func (m *Manager) BeforeDispatch(ctx context.Context, request relayhook.Request)
 		if normalized.Route != nil {
 			plan := *normalized.Route
 			plan.AccountIDs = append([]int(nil), normalized.Route.AccountIDs...)
+			plan.AllowRateLimitedAccountIDs = append([]int(nil), normalized.Route.AllowRateLimitedAccountIDs...)
 			result.Route = &plan
 			result.Version = relayhook.VersionV1
 		}
@@ -445,30 +446,11 @@ func normalizeRelayDecision(request relayhook.Request, decision relayhook.Decisi
 		result.RequestBody = append(json.RawMessage(nil), decision.RequestBody...)
 	}
 	if decision.Route != nil {
-		if decision.Route.Fallback != relayhook.FallbackCore {
-			return relayhook.Decision{}, fmt.Errorf("relay hook 不支持 fallback %q", decision.Route.Fallback)
+		plan, err := relayhook.NormalizeRoutePlan(request.Candidates, decision.Route)
+		if err != nil {
+			return relayhook.Decision{}, fmt.Errorf("relay hook 路由计划无效: %w", err)
 		}
-		allowed := make(map[int]struct{})
-		for _, candidate := range request.Candidates {
-			if candidate.Kind == "account" {
-				allowed[candidate.ID] = struct{}{}
-			}
-		}
-		seen := make(map[int]struct{}, len(decision.Route.AccountIDs))
-		accountIDs := make([]int, 0, len(decision.Route.AccountIDs))
-		for _, accountID := range decision.Route.AccountIDs {
-			if _, ok := allowed[accountID]; !ok {
-				continue
-			}
-			if _, duplicate := seen[accountID]; duplicate {
-				continue
-			}
-			seen[accountID] = struct{}{}
-			accountIDs = append(accountIDs, accountID)
-		}
-		if len(accountIDs) > 0 {
-			result.Route = &relayhook.RoutePlan{AccountIDs: accountIDs, Fallback: relayhook.FallbackCore}
-		}
+		result.Route = plan
 	}
 	return result, nil
 }

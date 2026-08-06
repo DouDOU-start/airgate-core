@@ -75,7 +75,7 @@ type TestMode string
 const (
 	// TestModeNormal 直接发送 Core 构造的普通探测请求。
 	TestModeNormal TestMode = "normal"
-	// TestModeOverage 先交给插件执行超额请求变换，再发送给当前账号。
+	// TestModeOverage 先交给插件执行 Codex 超额请求变换，再发送给当前账号。
 	TestModeOverage TestMode = "overage"
 )
 
@@ -319,7 +319,7 @@ func (s *Service) TestConnection(ctx context.Context, id int, modelID, prompt st
 	proxyURL := proxyURLFromRef(item.Proxy)
 	platform := strings.ToLower(strings.TrimSpace(item.Platform))
 	if testMode == TestModeOverage && platform != "codex" {
-		return emitErr(emit, "超额测试仅支持 Codex 账号")
+		return emitErr(emit, "Codex超额测试仅支持 Codex 账号")
 	}
 	start := time.Now()
 
@@ -495,9 +495,9 @@ func (s *Service) testCodex(ctx context.Context, item Account, modelID, prompt s
 		transformed, transformErr := s.transformAccountTestRequest(ctx, mode, model, raw)
 		if transformErr != nil {
 			if errors.Is(transformErr, accounttesthook.ErrUnavailable) {
-				return model, testStreamUsage{}, emitErr(emit, "超额测试插件不可用，请先安装并启用支持该模式的插件")
+				return model, testStreamUsage{}, emitErr(emit, "Codex超额测试插件不可用，请先安装并启用支持该模式的插件")
 			}
-			return model, testStreamUsage{}, emitErr(emit, "超额测试请求处理失败: "+transformErr.Error())
+			return model, testStreamUsage{}, emitErr(emit, "Codex超额测试请求处理失败: "+transformErr.Error())
 		}
 		raw = transformed
 	}
