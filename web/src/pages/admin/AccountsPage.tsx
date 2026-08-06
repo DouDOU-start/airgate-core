@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -31,6 +31,7 @@ import {
 import { AccountTestModal } from './accounts/AccountTestModal';
 import { AccountStatsModal } from './accounts/AccountStatsModal';
 import { AccountModelsModal } from './accounts/AccountModelsModal';
+import { useBackgroundAccountUsageRefresh } from './accounts/useBackgroundAccountUsageRefresh';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { MetricChips } from '../../shared/components/MetricChips';
 import { RefreshButton } from '../../shared/components/RefreshButton';
@@ -100,6 +101,11 @@ export default function AccountsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const initialUsageRefreshStartedRef = useRef(false);
+  const {
+    refresh: refreshUsageInBackground,
+    refreshingIds: backgroundUsageRefreshingIds,
+  } = useBackgroundAccountUsageRefresh();
 
   const { page, setPage, pageSize, setPageSize } = usePagination(DEFAULT_PAGE_SIZE, 'admin.accounts');
 
@@ -269,6 +275,18 @@ export default function AccountsPage() {
   const rows = data?.list ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
+
+  // 首次进入账号管理页时刷新一次当前页用量；不跟随 30 秒列表轮询重复执行。
+  useEffect(() => {
+    if (isLoading || rows.length === 0 || initialUsageRefreshStartedRef.current) return;
+    initialUsageRefreshStartedRef.current = true;
+    refreshUsageInBackground(rows);
+  }, [isLoading, refreshUsageInBackground, rows]);
+
+  async function handlePageRefresh() {
+    const result = await refetch();
+    if (result.isSuccess && result.data?.list) refreshUsageInBackground(result.data.list);
+  }
 
   const pageIds = rows.map((row) => row.id);
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
@@ -490,7 +508,7 @@ export default function AccountsPage() {
           <RefreshButton
             ariaLabel={t('common.refresh', '刷新')}
             isRefreshing={isFetching}
-            onRefresh={refetch}
+            onRefresh={handlePageRefresh}
           />
           <Button variant="primary" onPress={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4" />
@@ -699,7 +717,10 @@ export default function AccountsPage() {
                     usage={row.usage}
                     canRefresh={accountSupportsUsageRefresh(row.platform, row.type)}
                     canReset={accountSupportsUsageReset(row.platform, row.type)}
-                    refreshing={usageRefreshingId === row.id && usageRefreshMutation.isPending}
+                    refreshing={
+                      backgroundUsageRefreshingIds.has(row.id)
+                      || (usageRefreshingId === row.id && usageRefreshMutation.isPending)
+                    }
                     resetting={usageResettingId === row.id && usageResetMutation.isPending}
                     onRefresh={() => usageRefreshMutation.mutate(row.id)}
                     onReset={() => {
