@@ -3,6 +3,7 @@ import { PlatformIcon, platformDisplayLabel } from '../../../shared/components/P
 import type { AccountResp } from '../../../shared/types';
 import { formatSubscriptionExpiry } from './AccountIdentityCell';
 import { formatPlanTypeLabel, planTypeBadgeClass } from './AccountUsageCell';
+import { AccountStateMessage } from './AccountStateMessage';
 
 function accountTypeLabel(type?: string) {
   const key = (type || '').toLowerCase();
@@ -79,10 +80,18 @@ export function AccountSummaryCard({
           ) : null}
         </div>
       </div>
-      <span className="ag-account-summary__state" data-state={account.state}>
+      <span
+        className="ag-account-summary__state"
+        data-has-error={Boolean(account.error_msg?.trim()) || undefined}
+        data-state={account.state}
+      >
         <span className="ag-account-summary__state-dot" aria-hidden="true" />
         {stateLabel}
       </span>
+      <AccountStateMessage
+        className="ag-account-summary__message"
+        message={account.error_msg}
+      />
     </div>
   );
 }

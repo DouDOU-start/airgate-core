@@ -1,6 +1,7 @@
 import { Chip } from '@heroui/react';
 import { PlatformIcon, platformDisplayLabel } from '../../../shared/components/PlatformIcon';
 import { formatPlanTypeLabel, planTypeBadgeClass } from './AccountUsageCell';
+import { AccountStateMessage } from './AccountStateMessage';
 
 function typeLabel(type?: string) {
   const key = (type || '').toLowerCase();
@@ -64,6 +65,7 @@ export function AccountIdentityCell({
   email,
   planType,
   subscriptionActiveUntil,
+  errorMsg,
 }: {
   name: string;
   platform?: string;
@@ -72,6 +74,8 @@ export function AccountIdentityCell({
   planType?: string;
   /** 订阅有效期 */
   subscriptionActiveUntil?: string | null;
+  /** 当前运行时状态原因，例如 OAuth 授权失效。 */
+  errorMsg?: string | null;
 }) {
   const plan = formatPlanTypeLabel(planType);
   const expiry = formatSubscriptionExpiry(subscriptionActiveUntil);
@@ -131,6 +135,7 @@ export function AccountIdentityCell({
             {platformDisplayLabel(platform)}
           </div>
         )}
+        <AccountStateMessage message={errorMsg} />
       </div>
     </div>
   );

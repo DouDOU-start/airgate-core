@@ -64,6 +64,11 @@ const STATE_CHIP_COLOR: Record<AccountState, 'success' | 'warning' | 'danger' | 
   disabled: 'default',
 };
 
+function accountStateChipColor(row: AccountResp): 'success' | 'warning' | 'danger' | 'default' {
+  if (row.state === 'disabled' && row.error_msg?.trim()) return 'danger';
+  return STATE_CHIP_COLOR[row.state as AccountState] ?? 'default';
+}
+
 function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -674,6 +679,7 @@ export default function AccountsPage() {
                     platform={row.platform}
                     type={row.type}
                     email={row.email}
+                    errorMsg={row.error_msg}
                     planType={row.plan_type || row.usage?.plan_type}
                     subscriptionActiveUntil={row.subscription_active_until}
                   />
@@ -681,7 +687,7 @@ export default function AccountsPage() {
                 <CommonTable.Cell>
                   <Chip
                     className="whitespace-nowrap"
-                    color={STATE_CHIP_COLOR[row.state as AccountState] ?? 'default'}
+                    color={accountStateChipColor(row)}
                     size="sm"
                     variant="soft"
                   >
