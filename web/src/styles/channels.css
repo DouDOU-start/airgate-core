@@ -1,0 +1,517 @@
+/* ==========================================================================
+   渠道管理表单
+   长配置表单采用运维面板式分区，常用项优先，高级请求改写按需展开。
+   ========================================================================== */
+
+.ag-elevation-modal.ag-key-form-modal,
+.ag-elevation-modal.modal__dialog--lg.ag-key-form-modal {
+  width: min(64rem, calc(100vw - 2rem)) !important;
+  max-width: min(64rem, calc(100vw - 2rem)) !important;
+  max-height: min(92dvh, 64rem) !important;
+}
+
+.ag-key-form-modal__header {
+  flex: 0 0 auto;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 58%, transparent);
+  padding-bottom: 0.75rem !important;
+}
+
+.ag-key-form-modal__title {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.ag-key-form-modal__meta {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 0.625rem;
+  line-height: 1;
+}
+
+.ag-key-form-modal__meta > span,
+.ag-key-form-modal__meta > code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-key-form-modal__meta > i {
+  width: 0.2rem;
+  height: 0.2rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--muted) 55%, transparent);
+}
+
+.ag-key-form-modal__meta > code {
+  font-family: var(--font-mono);
+}
+
+.ag-key-form-modal__body {
+  flex: 1 1 auto;
+  padding-inline: 0 !important;
+  scroll-padding-block: 1rem 2rem !important;
+}
+
+.ag-key-form-modal__content {
+  display: grid;
+  min-width: 0;
+  padding-inline: 0.25rem;
+}
+
+.ag-key-form-section {
+  min-width: 0;
+  border-top: 1px solid color-mix(in oklab, var(--border) 62%, transparent);
+  padding: 1rem 0;
+}
+
+.ag-key-form-section--identity {
+  border-top: 0;
+  padding-top: 0.2rem;
+}
+
+.ag-key-form-section--automation {
+  padding-bottom: 0.35rem;
+}
+
+.ag-key-form-section__header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ag-key-form-section__heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.ag-key-form-section__icon {
+  display: inline-flex;
+  width: 1.875rem;
+  height: 1.875rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--accent) 20%, var(--border));
+  border-radius: 0.625rem;
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface-secondary));
+  color: color-mix(in oklab, var(--accent) 78%, var(--foreground));
+}
+
+.ag-key-form-section__copy {
+  min-width: 0;
+}
+
+.ag-key-form-section__copy h3 {
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+  line-height: 1.125rem;
+}
+
+.ag-key-form-section__copy p {
+  color: var(--muted);
+  font-size: 0.625rem;
+  line-height: 0.9375rem;
+  margin-top: 0.1rem;
+}
+
+.ag-key-form-section__aside {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 1.875rem;
+  align-items: center;
+}
+
+.ag-key-form-credentials-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  align-items: stretch;
+  gap: 0.875rem;
+  margin-top: 0.875rem;
+}
+
+.ag-key-form-credentials-fields {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 0.7rem;
+}
+
+.ag-key-form-protocol-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--surface-secondary) 62%, transparent);
+  padding: 0.625rem;
+}
+
+.ag-key-form-protocol-panel__head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.ag-key-form-protocol-panel__head > span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.625rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-key-form-protocol-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.ag-key-form-protocol-grid > :where(.checkbox, [data-slot="checkbox"]) {
+  min-width: 0;
+  min-height: 1.875rem;
+  border: 1px solid color-mix(in oklab, var(--border) 52%, transparent);
+  border-radius: 0.5rem;
+  background: color-mix(in oklab, var(--surface) 72%, transparent);
+  padding: 0.3rem 0.45rem;
+}
+
+.ag-key-form-protocol-grid > :where(.checkbox, [data-slot="checkbox"]):has([data-selected="true"]),
+.ag-key-form-protocol-grid > :where(.checkbox, [data-slot="checkbox"])[data-selected="true"] {
+  border-color: color-mix(in oklab, var(--accent) 34%, var(--border));
+  background: color-mix(in oklab, var(--accent) 9%, var(--surface));
+}
+
+.ag-key-form-protocol-grid :where([data-slot="checkbox-content"], .checkbox__content) {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.625rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-key-form-protocol-panel__foot {
+  border-top: 1px solid color-mix(in oklab, var(--border) 42%, transparent);
+  color: var(--muted);
+  font-size: 0.625rem;
+  line-height: 0.9375rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
+}
+
+.ag-key-form-secret-field {
+  min-height: 3.5rem !important;
+  font-family: var(--font-mono);
+  font-size: 0.75rem !important;
+  line-height: 1.4 !important;
+}
+
+.ag-key-form-metric-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.875rem;
+}
+
+.ag-key-form-metric-grid .input {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.ag-key-form-routing-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.875rem;
+  margin-top: 0.875rem;
+}
+
+.ag-key-form-field-group {
+  min-width: 0;
+}
+
+.ag-key-form-field-group > p,
+.ag-key-form-transform-card > p {
+  color: var(--muted);
+  font-size: 0.625rem;
+  line-height: 0.9375rem;
+  margin: 0.15rem 0 0.5rem;
+}
+
+.ag-key-form-group-list {
+  display: grid;
+  max-height: 8.75rem;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.ag-key-form-group-list > :where(.checkbox, [data-slot="checkbox"]) {
+  min-width: 0;
+  border: 1px solid color-mix(in oklab, var(--border) 56%, transparent);
+  border-radius: 0.55rem;
+  background: color-mix(in oklab, var(--surface-secondary) 50%, transparent);
+  padding: 0.4rem 0.5rem;
+}
+
+.ag-key-form-group-list > :where(.checkbox, [data-slot="checkbox"]):has([data-selected="true"]),
+.ag-key-form-group-list > :where(.checkbox, [data-slot="checkbox"])[data-selected="true"] {
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+}
+
+.ag-key-form-group-list :where([data-slot="checkbox-content"], .checkbox__content) {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.6875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-key-form-empty {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed color-mix(in oklab, var(--border) 72%, transparent);
+  border-radius: 0.625rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+
+.ag-key-form-toggle-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.625rem;
+  margin-top: 0.875rem;
+}
+
+.ag-key-form-toggle-card {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 4.25rem;
+  align-content: start;
+  gap: 0.45rem;
+  border: 1px solid color-mix(in oklab, var(--border) 62%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--surface-secondary) 48%, transparent);
+  padding: 0.65rem 0.75rem;
+  transition: border-color var(--ag-transition), background-color var(--ag-transition);
+}
+
+.ag-key-form-toggle-card[data-selected="true"] {
+  border-color: color-mix(in oklab, var(--accent) 32%, var(--border));
+  background: color-mix(in oklab, var(--accent) 7%, var(--surface));
+}
+
+.ag-key-form-toggle-card > p {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.625rem;
+  line-height: 0.875rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.ag-key-form-automation-fields {
+  display: grid;
+  min-width: 0;
+  gap: 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--border) 52%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--surface-secondary) 34%, transparent);
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+}
+
+.ag-key-form-rate-controls {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.ag-key-form-rate-switch {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  border: 1px solid color-mix(in oklab, var(--border) 54%, transparent);
+  border-radius: 0.625rem;
+  background: color-mix(in oklab, var(--surface) 72%, transparent);
+  padding: 0.5rem 0.65rem;
+}
+
+.ag-key-form-rate-switch[data-selected="true"] {
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+}
+
+.ag-key-form-advanced {
+  min-width: 0;
+  border: 1px solid color-mix(in oklab, var(--border) 66%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--surface-secondary) 38%, transparent);
+  margin: 0.2rem 0 0.9rem;
+  overflow: hidden;
+}
+
+.ag-key-form-advanced > summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.65rem;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.65rem 0.75rem;
+}
+
+.ag-key-form-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ag-key-form-advanced__copy {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 0.1rem;
+}
+
+.ag-key-form-advanced__copy > strong {
+  color: var(--foreground);
+  font-size: 0.75rem;
+  font-weight: 680;
+}
+
+.ag-key-form-advanced__copy > small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.625rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-key-form-advanced__count {
+  display: inline-flex;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 650;
+}
+
+.ag-key-form-advanced__chevron {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform var(--ag-transition);
+}
+
+.ag-key-form-advanced[open] .ag-key-form-advanced__chevron {
+  transform: rotate(180deg);
+}
+
+.ag-key-form-advanced__content {
+  display: grid;
+  min-width: 0;
+  grid-template-areas:
+    'params headers'
+    'remove remove';
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+  border-top: 1px solid color-mix(in oklab, var(--border) 52%, transparent);
+  padding: 0.75rem;
+}
+
+.ag-key-form-transform-card {
+  min-width: 0;
+  border: 1px solid color-mix(in oklab, var(--border) 52%, transparent);
+  border-radius: 0.625rem;
+  background: color-mix(in oklab, var(--surface) 74%, transparent);
+  padding: 0.65rem;
+}
+
+.ag-key-form-transform-card:nth-child(1) {
+  grid-area: params;
+}
+
+.ag-key-form-transform-card:nth-child(2) {
+  grid-area: remove;
+}
+
+.ag-key-form-transform-card:nth-child(3) {
+  grid-area: headers;
+}
+
+.ag-key-form-transform-card > :last-child {
+  margin-bottom: 0;
+}
+
+.ag-key-form-modal__footer {
+  flex: 0 0 auto;
+  border-top: 1px solid color-mix(in oklab, var(--border) 58%, transparent);
+  background: color-mix(in oklab, var(--overlay) 92%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+@media (max-width: 52rem) {
+  .ag-key-form-credentials-grid,
+  .ag-key-form-routing-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ag-key-form-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ag-key-form-toggle-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 40rem) {
+  .ag-key-form-section__header {
+    flex-wrap: wrap;
+  }
+
+  .ag-key-form-protocol-grid,
+  .ag-key-form-metric-grid,
+  .ag-key-form-group-list,
+  .ag-key-form-rate-controls,
+  .ag-key-form-advanced__content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ag-key-form-advanced__content {
+    grid-template-areas:
+      'params'
+      'headers'
+      'remove';
+  }
+}

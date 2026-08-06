@@ -64,19 +64,19 @@ export function ChannelKeysTable({
       className="ag-channel-keys-table"
       contentStyle={{ tableLayout: 'fixed' }}
       footer={footer}
-      minWidth={1460}
+      minWidth={1260}
     >
       <CommonTable.Header>
-        <CommonTable.Column id="channel" style={{ width: 170 }}>{t('channels.channel_name')}</CommonTable.Column>
-        <CommonTable.Column id="key" style={{ width: 250 }}>{t('channels.keys_label')}</CommonTable.Column>
-        <CommonTable.Column id="priority" style={{ width: 70 }}>
+        <CommonTable.Column id="channel" style={{ width: 140 }}>{t('channels.channel_name')}</CommonTable.Column>
+        <CommonTable.Column id="key" style={{ width: 200 }}>{t('channels.keys_label')}</CommonTable.Column>
+        <CommonTable.Column id="priority" style={{ width: 65 }}>
           <SortableHeader
             active={sortState('priority')}
             label={t('channels.priority')}
             onClick={() => onSortChange('priority')}
           />
         </CommonTable.Column>
-        <CommonTable.Column id="weight" style={{ width: 70 }}>
+        <CommonTable.Column id="weight" style={{ width: 65 }}>
           <SortableHeader
             active={sortState('weight')}
             label={t('channels.weight')}
@@ -90,8 +90,8 @@ export function ChannelKeysTable({
             <span>{t('channels.cost_ratio')}</span>
           </span>
         </CommonTable.Column>
-        <CommonTable.Column id="runtime" style={{ width: 210 }}>{t('channels.concurrency_rpm')}</CommonTable.Column>
-        <CommonTable.Column id="metrics" style={{ width: 280 }}>
+        <CommonTable.Column id="runtime" style={{ width: 170 }}>{t('channels.concurrency_rpm')}</CommonTable.Column>
+        <CommonTable.Column id="metrics" style={{ width: 230 }}>
           <Tooltip>
             <Tooltip.Trigger className="inline-flex cursor-help">
               <span>{t('channels.stats_header')}</span>
@@ -99,14 +99,14 @@ export function ChannelKeysTable({
             <Tooltip.Content className="max-w-sm">{t('channels.stats_hint')}</Tooltip.Content>
           </Tooltip>
         </CommonTable.Column>
-        <CommonTable.Column id="created" style={{ width: 110 }}>
+        <CommonTable.Column id="created" style={{ width: 85 }}>
           <SortableHeader
             active={sortState('created_at')}
             label={t('channels.created_at')}
             onClick={() => onSortChange('created_at')}
           />
         </CommonTable.Column>
-        <CommonTable.Column id="actions" style={{ width: 125 }}>{t('common.actions')}</CommonTable.Column>
+        <CommonTable.Column id="actions" style={{ width: 130 }}>{t('common.actions')}</CommonTable.Column>
       </CommonTable.Header>
       <CommonTable.Body>
         {isLoading ? (

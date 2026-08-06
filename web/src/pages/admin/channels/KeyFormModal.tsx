@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   Button, Checkbox, Input, Label, ListBox, Modal, Select, Spinner,
   TextArea, TextField as HeroTextField, useOverlayState,
 } from '@heroui/react';
+import {
+  Activity, Braces, ChevronDown, FolderTree, KeyRound, Save, SlidersHorizontal,
+} from 'lucide-react';
 import { DialogTriggerShim } from '../../../shared/components/DialogTriggerShim';
 import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { channelsApi } from '../../../shared/api/channels';
@@ -126,15 +129,47 @@ interface KeyFormModalProps {
   onClose: () => void;
 }
 
+function FormSectionHeader({
+  icon,
+  title,
+  hint,
+  aside,
+}: {
+  icon: ReactNode;
+  title: string;
+  hint?: string;
+  aside?: ReactNode;
+}) {
+  return (
+    <div className="ag-key-form-section__header">
+      <div className="ag-key-form-section__heading">
+        <span className="ag-key-form-section__icon" aria-hidden="true">{icon}</span>
+        <div className="ag-key-form-section__copy">
+          <h3>{title}</h3>
+          {hint ? <p>{hint}</p> : null}
+        </div>
+      </div>
+      {aside ? <div className="ag-key-form-section__aside">{aside}</div> : null}
+    </div>
+  );
+}
+
 export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormModalProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [form, setForm] = useState<KeyForm>(emptyForm);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const isEdit = !!channelKey;
 
   useEffect(() => {
     if (!open) return;
-    setForm(channelKey ? formFromKey(channelKey) : emptyForm);
+    const nextForm = channelKey ? formFromKey(channelKey) : emptyForm;
+    setForm(nextForm);
+    setAdvancedOpen(
+      nextForm.paramSetRows.length > 0
+      || nextForm.paramRemoveKeys.length > 0
+      || nextForm.headerRows.length > 0,
+    );
   }, [open, channelKey]);
 
   const { data: groupsData } = useQuery({
@@ -245,20 +280,45 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
   }
   const selectedUpstreamRatePlatformLabel = upstreamRatePlatformOptions
     .find((item) => item.id === form.upstreamRatePath)?.label ?? form.upstreamRatePath;
+  const overrideCount = form.paramSetRows.length + form.paramRemoveKeys.length + form.headerRows.length;
 
   return (
     <Modal state={modalState}>
       <DialogTriggerShim />
       <Modal.Backdrop>
-        <Modal.Container placement="center" size="lg">
-          <Modal.Dialog className="ag-elevation-modal">
-            <Modal.Header>
-              <Modal.Heading>{isEdit ? t('channels.edit_key') : t('channels.add_key')}</Modal.Heading>
+        <Modal.Container placement="center" scroll="inside" size="lg">
+          <Modal.Dialog className="ag-elevation-modal ag-key-form-modal">
+            <Modal.Header className="ag-key-form-modal__header">
+              <div className="ag-key-form-modal__title">
+                <Modal.Heading>{isEdit ? t('channels.edit_key') : t('channels.add_key')}</Modal.Heading>
+                {isEdit && channelKey ? (
+                  <div className="ag-key-form-modal__meta">
+                    <span>{channelKey.channel_name}</span>
+                    <i aria-hidden="true" />
+                    <code>{channelKey.api_key_hint || '-'}</code>
+                  </div>
+                ) : null}
+              </div>
               <Modal.CloseTrigger />
             </Modal.Header>
-            <Modal.Body>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Modal.Body className="ag-key-form-modal__body">
+              <div className="ag-key-form-modal__content">
+                <section className="ag-key-form-section ag-key-form-section--identity">
+                  <FormSectionHeader
+                    icon={<KeyRound size={16} />}
+                    title={t('channels.form_credentials_title')}
+                    hint={t('channels.form_credentials_hint')}
+                    aside={(
+                      <NativeSwitch
+                        ariaLabel={t('channels.key_enabled')}
+                        isSelected={form.enabled}
+                        label={t('channels.key_enabled')}
+                        onChange={(selected) => setForm((p) => ({ ...p, enabled: selected }))}
+                      />
+                    )}
+                  />
+                <div className="ag-key-form-credentials-grid">
+                  <div className="ag-key-form-credentials-fields">
                   <HeroTextField fullWidth>
                     <Label>{t('channels.key_name')}</Label>
                     <Input
@@ -268,12 +328,24 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                       onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
                     />
                   </HeroTextField>
-                  <div className="rounded-xl border border-border bg-surface-subtle px-3 py-2.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <Label className="text-sm">{t('channels.supported_protocols')}</Label>
-                      <span className="text-[11px] text-text-tertiary">{t('channels.protocol_shared_hint')}</span>
+                  <HeroTextField fullWidth isRequired={!isEdit}>
+                    <Label>{t('channels.api_key')}</Label>
+                    <TextArea
+                      className="ag-key-form-secret-field"
+                      autoComplete="off"
+                      placeholder={isEdit ? t('channels.api_key_edit_placeholder', { hint: channelKey?.api_key_hint }) : t('channels.api_key_placeholder')}
+                      rows={2}
+                      value={form.apiKey}
+                      onChange={(event) => setForm((prev) => ({ ...prev, apiKey: event.target.value }))}
+                    />
+                  </HeroTextField>
+                  </div>
+                  <div className="ag-key-form-protocol-panel">
+                    <div className="ag-key-form-protocol-panel__head">
+                      <Label>{t('channels.supported_protocols')}</Label>
+                      <span>{t('channels.protocol_shared_hint')}</span>
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
+                    <div className="ag-key-form-protocol-grid">
                       {CHANNEL_TYPE_OPTIONS.map((item) => (
                         <Checkbox
                           key={item.id}
@@ -287,22 +359,18 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                         </Checkbox>
                       ))}
                     </div>
+                    <p className="ag-key-form-protocol-panel__foot">{t('channels.models_in_key_modal_hint')}</p>
                   </div>
                 </div>
+                </section>
 
-                <HeroTextField fullWidth isRequired={!isEdit}>
-                  <Label>{t('channels.api_key')}</Label>
-                  <TextArea
-                    autoComplete="off"
-                    placeholder={isEdit ? t('channels.api_key_edit_placeholder', { hint: channelKey?.api_key_hint }) : t('channels.api_key_placeholder')}
-                    rows={2}
-                    value={form.apiKey}
-                    onChange={(event) => setForm((prev) => ({ ...prev, apiKey: event.target.value }))}
+                <section className="ag-key-form-section">
+                  <FormSectionHeader
+                    icon={<SlidersHorizontal size={16} />}
+                    title={t('channels.form_scheduling_title')}
+                    hint={t('channels.form_scheduling_hint')}
                   />
-                </HeroTextField>
-                <p className="text-xs text-text-tertiary">{t('channels.models_in_key_modal_hint')}</p>
-
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <div className="ag-key-form-metric-grid">
                   <HeroTextField>
                     <Label>{t('channels.priority')}</Label>
                     <Input min={0} max={999} type="number" value={form.priority} onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))} />
@@ -324,10 +392,26 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                     <Input min={0} step="0.01" type="number" value={form.costRatio} onChange={(e) => setForm((p) => ({ ...p, costRatio: e.target.value }))} />
                   </HeroTextField>
                 </div>
+                </section>
 
-                <div>
-                  <Label className="mb-1 block text-sm">{t('channels.param_override')}</Label>
-                  <p className="mb-1.5 text-xs text-text-tertiary">{t('channels.param_override_hint')}</p>
+                <details
+                  className="ag-key-form-advanced"
+                  open={advancedOpen}
+                  onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+                >
+                  <summary>
+                    <span className="ag-key-form-section__icon" aria-hidden="true"><Braces size={16} /></span>
+                    <span className="ag-key-form-advanced__copy">
+                      <strong>{t('channels.form_advanced_title')}</strong>
+                      <small>{t('channels.form_advanced_hint')}</small>
+                    </span>
+                    {overrideCount > 0 ? <span className="ag-key-form-advanced__count">{overrideCount}</span> : null}
+                    <ChevronDown className="ag-key-form-advanced__chevron" size={16} aria-hidden="true" />
+                  </summary>
+                  <div className="ag-key-form-advanced__content">
+                <div className="ag-key-form-transform-card">
+                  <Label>{t('channels.param_override')}</Label>
+                  <p>{t('channels.param_override_hint')}</p>
                   <KeyValueEditor
                     ariaLabel={t('channels.param_override')}
                     keyPlaceholder={t('channels.param_name_placeholder')}
@@ -336,9 +420,9 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                     onChange={(rows) => setForm((p) => ({ ...p, paramSetRows: rows }))}
                   />
                 </div>
-                <div>
-                  <Label className="mb-1 block text-sm">{t('channels.param_remove')}</Label>
-                  <p className="mb-1.5 text-xs text-text-tertiary">{t('channels.param_remove_hint')}</p>
+                <div className="ag-key-form-transform-card ag-key-form-transform-card--wide">
+                  <Label>{t('channels.param_remove')}</Label>
+                  <p>{t('channels.param_remove_hint')}</p>
                   <TagInput
                     ariaLabel={t('channels.param_remove')}
                     placeholder={t('channels.param_remove_placeholder')}
@@ -346,9 +430,9 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                     onChange={(tags) => setForm((p) => ({ ...p, paramRemoveKeys: tags }))}
                   />
                 </div>
-                <div>
-                  <Label className="mb-1 block text-sm">{t('channels.header_override')}</Label>
-                  <p className="mb-1.5 text-xs text-text-tertiary">{t('channels.header_override_hint')}</p>
+                <div className="ag-key-form-transform-card">
+                  <Label>{t('channels.header_override')}</Label>
+                  <p>{t('channels.header_override_hint')}</p>
                   <KeyValueEditor
                     ariaLabel={t('channels.header_override')}
                     keyPlaceholder={t('channels.header_name_placeholder')}
@@ -357,28 +441,42 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                     onChange={(rows) => setForm((p) => ({ ...p, headerRows: rows }))}
                   />
                 </div>
+                  </div>
+                </details>
 
-                <div>
+                <section className="ag-key-form-section">
+                  <FormSectionHeader
+                    icon={<FolderTree size={16} />}
+                    title={t('channels.form_routing_title')}
+                    hint={t('channels.form_routing_hint')}
+                  />
+                <div className="ag-key-form-routing-grid">
+                <div className="ag-key-form-field-group">
                   <Label className="mb-1 block text-sm">{t('channels.groups')}</Label>
                   <p className="mb-1.5 text-xs text-text-tertiary">{t('channels.groups_hint')}</p>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {groups.map((group) => (
-                      <Checkbox
-                        key={group.id}
-                        isSelected={form.groupIds.includes(group.id)}
-                        onChange={(selected) => toggleGroup(group.id, selected)}
-                      >
-                        <Checkbox.Control>
-                          <Checkbox.Indicator />
-                        </Checkbox.Control>
-                        <span className="text-sm">{group.name}</span>
-                      </Checkbox>
-                    ))}
-                  </div>
+                  {groups.length === 0 ? (
+                    <div className="ag-key-form-empty">{t('common.no_data')}</div>
+                  ) : (
+                    <div className="ag-key-form-group-list">
+                      {groups.map((group) => (
+                        <Checkbox
+                          key={group.id}
+                          isSelected={form.groupIds.includes(group.id)}
+                          onChange={(selected) => toggleGroup(group.id, selected)}
+                        >
+                          <Checkbox.Control>
+                            <Checkbox.Indicator />
+                          </Checkbox.Control>
+                          <span title={group.name}>{group.name}</span>
+                        </Checkbox>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div>
+                <div className="ag-key-form-field-group">
                   <Label className="mb-1 block text-sm">{t('channels.tags')}</Label>
+                  <p className="mb-1.5 text-xs text-text-tertiary">{t('channels.tags_placeholder')}</p>
                   <TagInput
                     ariaLabel={t('channels.tags')}
                     placeholder={t('channels.tags_placeholder')}
@@ -386,39 +484,52 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                     onChange={(tags) => setForm((p) => ({ ...p, tags }))}
                   />
                 </div>
-
-                <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-                  <NativeSwitch
-                    ariaLabel={t('channels.key_enabled')}
-                    isSelected={form.enabled}
-                    label={t('channels.key_enabled')}
-                    onChange={(selected) => setForm((p) => ({ ...p, enabled: selected }))}
-                  />
-                  <span title={t('channels.balance_check_enabled_hint')}>
-                    <NativeSwitch
-                      ariaLabel={t('channels.balance_check_enabled')}
-                      isSelected={form.balanceCheckEnabled}
-                      label={t('channels.balance_check_enabled')}
-                      onChange={(selected) => setForm((p) => ({ ...p, balanceCheckEnabled: selected }))}
-                    />
-                  </span>
-                  <NativeSwitch
-                    ariaLabel={t('channels.probe_enabled')}
-                    isSelected={form.probeEnabled}
-                    label={t('channels.probe_enabled')}
-                    onChange={(selected) => setForm((p) => ({ ...p, probeEnabled: selected }))}
-                  />
-                  <NativeSwitch
-                    ariaLabel={t('channels.upstream_rate_enabled')}
-                    isSelected={form.upstreamRateEnabled}
-                    label={t('channels.upstream_rate_enabled')}
-                    onChange={(selected) => setForm((p) => ({
-                      ...p,
-                      upstreamRateEnabled: selected,
-                      useUpstreamRateForCost: selected ? p.useUpstreamRateForCost : false,
-                    }))}
-                  />
                 </div>
+                </section>
+
+                <section className="ag-key-form-section ag-key-form-section--automation">
+                  <FormSectionHeader
+                    icon={<Activity size={16} />}
+                    title={t('channels.form_automation_title')}
+                    hint={t('channels.form_automation_hint')}
+                  />
+                <div className="ag-key-form-toggle-grid">
+                  <div className="ag-key-form-toggle-card" data-selected={form.balanceCheckEnabled}>
+                    <span title={t('channels.balance_check_enabled_hint')}>
+                      <NativeSwitch
+                        ariaLabel={t('channels.balance_check_enabled')}
+                        isSelected={form.balanceCheckEnabled}
+                        label={t('channels.balance_check_enabled')}
+                        onChange={(selected) => setForm((p) => ({ ...p, balanceCheckEnabled: selected }))}
+                      />
+                    </span>
+                    <p>{t('channels.form_balance_hint')}</p>
+                  </div>
+                  <div className="ag-key-form-toggle-card" data-selected={form.probeEnabled}>
+                    <NativeSwitch
+                      ariaLabel={t('channels.probe_enabled')}
+                      isSelected={form.probeEnabled}
+                      label={t('channels.probe_enabled')}
+                      onChange={(selected) => setForm((p) => ({ ...p, probeEnabled: selected }))}
+                    />
+                    <p>{t('channels.form_probe_hint')}</p>
+                  </div>
+                  <div className="ag-key-form-toggle-card" data-selected={form.upstreamRateEnabled}>
+                    <NativeSwitch
+                      ariaLabel={t('channels.upstream_rate_enabled')}
+                      isSelected={form.upstreamRateEnabled}
+                      label={t('channels.upstream_rate_enabled')}
+                      onChange={(selected) => setForm((p) => ({
+                        ...p,
+                        upstreamRateEnabled: selected,
+                        useUpstreamRateForCost: selected ? p.useUpstreamRateForCost : false,
+                      }))}
+                    />
+                    <p>{t('channels.form_rate_probe_hint')}</p>
+                  </div>
+                </div>
+                {form.probeEnabled || form.upstreamRateEnabled ? (
+                  <div className="ag-key-form-automation-fields">
                 {form.probeEnabled ? (
                   <HeroTextField fullWidth>
                     <Label>{t('channels.probe_model')}</Label>
@@ -431,7 +542,7 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                   </HeroTextField>
                 ) : null}
                 {form.upstreamRateEnabled ? (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-stretch sm:gap-x-6">
+                  <div className="ag-key-form-rate-controls">
                     <div>
                       <Label className="mb-1.5 block text-sm">{t('channels.upstream_rate_platform')}</Label>
                       <Select
@@ -455,32 +566,29 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                         </Select.Popover>
                       </Select>
                     </div>
-                    <div className="flex flex-col">
-                      {/* 与左列 Label 等高的隐形占位：撑出标题行，使开关中线对齐下拉框中线 */}
-                      <span aria-hidden className="mb-1.5 hidden select-none text-sm sm:block sm:invisible">
-                        {t('channels.upstream_rate_platform')}
+                    <div className="ag-key-form-rate-switch" data-selected={form.useUpstreamRateForCost}>
+                      <span title={t('channels.use_upstream_rate_for_cost_hint')}>
+                        <NativeSwitch
+                          ariaLabel={t('channels.use_upstream_rate_for_cost')}
+                          isSelected={form.useUpstreamRateForCost}
+                          label={t('channels.use_upstream_rate_for_cost')}
+                          onChange={(selected) => setForm((p) => ({ ...p, useUpstreamRateForCost: selected }))}
+                        />
                       </span>
-                      <div className="flex flex-1 items-center">
-                        <span title={t('channels.use_upstream_rate_for_cost_hint')}>
-                          <NativeSwitch
-                            ariaLabel={t('channels.use_upstream_rate_for_cost')}
-                            isSelected={form.useUpstreamRateForCost}
-                            label={t('channels.use_upstream_rate_for_cost')}
-                            onChange={(selected) => setForm((p) => ({ ...p, useUpstreamRateForCost: selected }))}
-                          />
-                        </span>
-                      </div>
                     </div>
                   </div>
                 ) : null}
+                  </div>
+                ) : null}
+                </section>
               </div>
             </Modal.Body>
-            <Modal.Footer>
+            <Modal.Footer className="ag-key-form-modal__footer">
               <Button variant="secondary" onPress={onClose}>
                 {t('common.cancel')}
               </Button>
               <Button isDisabled={saving} variant="primary" onPress={handleSubmit}>
-                {saving ? <Spinner size="sm" /> : null}
+                {saving ? <Spinner size="sm" /> : <Save size={15} />}
                 {isEdit ? t('common.save') : t('common.create')}
               </Button>
             </Modal.Footer>
