@@ -66,6 +66,12 @@ type Proxy func(*sql.Selector)
 // RedemptionCode is the predicate function for redemptioncode builders.
 type RedemptionCode func(*sql.Selector)
 
+// RequestAuditAttempt is the predicate function for requestauditattempt builders.
+type RequestAuditAttempt func(*sql.Selector)
+
+// RequestAuditLog is the predicate function for requestauditlog builders.
+type RequestAuditLog func(*sql.Selector)
+
 // Setting is the predicate function for setting builders.
 type Setting func(*sql.Selector)
 

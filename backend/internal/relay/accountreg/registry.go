@@ -33,8 +33,10 @@ var ErrNoAvailableAccount = errors.New("无可用账号")
 // Pick / ListCandidates 返回的快照为只读视图：copy-on-write 更新，
 // 调用方持有的指针不会被并发修改，禁止就地改写。
 type Snapshot struct {
-	ID             int
-	Name           string
+	ID   int
+	Name string
+	// Email 是账号表冗余邮箱快照，供调度审计展示；凭证中缺少 email 时仍可追溯。
+	Email          string
 	Platform       string
 	Type           string
 	Credentials    map[string]string

@@ -25,6 +25,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
 	"github.com/DouDOU-start/airgate-core/internal/relay/streamlife"
+	"github.com/DouDOU-start/airgate-core/internal/requestaudit"
 )
 
 const (
@@ -75,6 +76,10 @@ type attemptResult struct {
 	streamErr error
 	// done 流式是否收到 data: [DONE] 完成标志（仅 written=true 时有意义）。
 	done bool
+	// auditErr 审计写入失败；该错误发生在真实触网前，调用方必须以 500 终止。
+	auditErr error
+	// auditAttempt 是普通渠道路径在发包前创建的上游审计行。
+	auditAttempt *requestaudit.AttemptHandle
 }
 
 // failureSummary 记录各类失败，用于全部渠道耗尽后的响应选择。
@@ -146,6 +151,43 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 
 	// 0. 客户端识别 + 分组客户端限制预检。
 	clientid.Detect(c)
+
+	// 完整请求审计在所有业务预检之前同步创建，保存客户端原始 Header/Body。
+	// 后续收尾使用脱离取消的上下文，因此用户中断不会丢失已开始请求的记录。
+	var auditRequest *requestaudit.Handle
+	if p.requestAudit != nil {
+		inboundBody := relayInboundRequestBody(c)
+		var err error
+		auditRequest, err = p.requestAudit.Start(ctx, requestaudit.RequestInput{
+			RequestID: requestIDOf(c), UserID: keyInfo.UserID, UserEmail: keyInfo.UserEmail,
+			APIKeyID: keyInfo.KeyID, GroupID: keyInfo.GroupID, Client: clientid.Get(c),
+			Protocol: protocol, Endpoint: endpoint, Model: req.Model, Stream: req.Stream,
+			Method: c.Request.Method, Path: c.Request.URL.Path, RawQuery: c.Request.URL.RawQuery,
+			Host: c.Request.Host, RequestProto: c.Request.Proto, RemoteAddr: c.Request.RemoteAddr,
+			IPAddress: c.ClientIP(), UserAgent: c.Request.UserAgent(),
+			ContentType: c.Request.Header.Get("Content-Type"), ContentLen: c.Request.ContentLength,
+			Headers: c.Request.Header, Body: inboundBody,
+		})
+		if err != nil {
+			slog.Error("request_audit_start_failed", "request_id", requestIDOf(c), "error", err)
+			writeError(c, http.StatusInternalServerError, "server_error", "audit_write_failed", "请求审计写入失败，已阻止转发")
+			return
+		}
+		defer func() {
+			status := c.Writer.Status()
+			if ctx.Err() != nil && !c.Writer.Written() {
+				status = statusClientClosedRequest
+			} else if !c.Writer.Written() {
+				// 无响应直接退出只可能来自 panic；Recovery 会随后向客户端写 500。
+				status = http.StatusInternalServerError
+			}
+			responseBytes := int64(c.Writer.Size())
+			if responseBytes < 0 {
+				responseBytes = 0
+			}
+			auditRequest.Finish(status, responseBytes, true)
+		}()
+	}
 	if len(keyInfo.GroupAllowedClients) > 0 {
 		if !clientid.Matches(clientid.Get(c), keyInfo.GroupAllowedClients) {
 			if keyInfo.GroupFallbackID != nil {
@@ -325,9 +367,14 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				return
 			}
 			attemptStart := time.Now()
-			result := p.executeAccountAttempt(c, acc, req, endpoint, protocol, payload, start, requestID, rpmMinute)
+			result := p.executeAccountAttempt(c, acc, req, endpoint, protocol, payload, start, requestID, rpmMinute, auditRequest)
 			attemptLatency := time.Since(attemptStart).Milliseconds()
 			attempts++
+			if result.auditErr != nil {
+				writeError(c, http.StatusInternalServerError, "server_error", "audit_write_failed", "请求审计写入失败，已阻止转发")
+				p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
+				return
+			}
 			if p.handleAccountOutcome(c, keyInfo, acc, req, result, start, price, settings, opts,
 				rpmMinute, attempts, &hops, &summary, &hardExcludeAccounts, &softExcludeAccounts, attemptLatency) {
 				return
@@ -385,9 +432,19 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			Client:         p.client,
 		}
 		attemptStart := time.Now()
-		result := p.executeAttempt(c, ad, info, req, start, capacityID, requestID, rpmMinute)
+		auditTarget := requestaudit.Target{
+			RouteKind: "channel", ChannelID: ch.ChannelID, ChannelName: ch.ChannelName,
+			ChannelKeyID: ch.KeyID, ChannelKeyName: ch.KeyName,
+		}
+		result := p.executeAttempt(c, ad, info, req, start, capacityID, requestID, rpmMinute, auditRequest, auditTarget)
 		attemptLatency := time.Since(attemptStart).Milliseconds()
 		attempts++
+		finishChannelAuditAttempt(result, attemptLatency, apiKey)
+		if result.auditErr != nil {
+			p.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
+			writeError(c, http.StatusInternalServerError, "server_error", "audit_write_failed", "请求审计写入失败，已阻止转发")
+			return
+		}
 
 		// 构建上游请求即失败（坏请求体/不支持端点/翻译失败）：客户端/配置问题，
 		// 一次性 400 终止，不 failover、不计渠道健康信号。
@@ -657,7 +714,7 @@ func channelSlotTTL(stream bool) time.Duration {
 
 // executeAttempt 执行单次上游调用，并保证渠道并发槽/RPM 在 panic 时也正确回收：
 // 槽位恒经 defer 释放；panic 时回退 RPM 预递增后继续向上抛（由 Recovery 中间件转 500）。
-func (p *Pipeline) executeAttempt(c *gin.Context, ad adaptor.Adaptor, info *adaptor.RelayInfo, req *dto.ChatRequest, start time.Time, channelKeyID int, requestID string, rpmMinute int64) attemptResult {
+func (p *Pipeline) executeAttempt(c *gin.Context, ad adaptor.Adaptor, info *adaptor.RelayInfo, req *dto.ChatRequest, start time.Time, channelKeyID int, requestID string, rpmMinute int64, auditRequest *requestaudit.Handle, auditTarget requestaudit.Target) attemptResult {
 	defer func() {
 		p.concurrency.ReleaseKeySlot(context.Background(), channelKeyID, requestID)
 		if rec := recover(); rec != nil {
@@ -665,7 +722,7 @@ func (p *Pipeline) executeAttempt(c *gin.Context, ad adaptor.Adaptor, info *adap
 			panic(rec)
 		}
 	}()
-	return p.execute(c, ad, info, req, start)
+	return p.execute(c, ad, info, req, start, auditRequest, auditTarget)
 }
 
 // acquireClientSlots user → key 两级并发闸门。成功返回 (释放闭包, "")；
@@ -707,7 +764,7 @@ func (p *Pipeline) acquireClientSlots(c *gin.Context, keyInfo *auth.APIKeyInfo) 
 }
 
 // execute 单次上游调用：构建请求 → 直发 → 按流式/非流式分派响应处理。
-func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.RelayInfo, req *dto.ChatRequest, start time.Time) attemptResult {
+func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.RelayInfo, req *dto.ChatRequest, start time.Time, auditRequest *requestaudit.Handle, auditTarget requestaudit.Target) attemptResult {
 	clientCtx := c.Request.Context()
 	ctx := clientCtx
 	var cancel context.CancelFunc
@@ -727,16 +784,24 @@ func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.Rel
 		// 客户端或配置问题，failover 重试无益，且不应污染渠道健康。归 buildErr。
 		return attemptResult{buildErr: err}
 	}
+	var auditAttempt *requestaudit.AttemptHandle
+	if auditRequest != nil {
+		auditAttempt, err = auditRequest.BeginAttempt(ctx, auditTarget, httpReq)
+		if err != nil {
+			return attemptResult{auditErr: err}
+		}
+	}
 	resp, err := info.Client.Do(httpReq)
 	if err != nil {
-		return attemptResult{netErr: err}
+		return attemptResult{netErr: err, auditAttempt: auditAttempt}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	result := attemptResult{
-		statusCode:  resp.StatusCode,
-		headers:     resp.Header,
-		contentType: resp.Header.Get("Content-Type"),
+		statusCode:   resp.StatusCode,
+		headers:      resp.Header,
+		contentType:  resp.Header.Get("Content-Type"),
+		auditAttempt: auditAttempt,
 	}
 	if info.Stream && resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		// http.Client.Do 已收到上游响应头，视为流已开始；此后客户端断开不再取消上游。
@@ -809,10 +874,10 @@ func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.Rel
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodyBytes+1))
 	if err != nil {
 		// 非流式读体失败：未向客户端写出，按网络错误处理（可 failover）。
-		return attemptResult{netErr: err}
+		return attemptResult{netErr: err, statusCode: resp.StatusCode, headers: resp.Header, auditAttempt: auditAttempt}
 	}
 	if len(body) > maxResponseBodyBytes {
-		return attemptResult{netErr: fmt.Errorf("上游响应体超过 %d 字节上限", maxResponseBodyBytes)}
+		return attemptResult{netErr: fmt.Errorf("上游响应体超过 %d 字节上限", maxResponseBodyBytes), statusCode: resp.StatusCode, headers: resp.Header, auditAttempt: auditAttempt}
 	}
 	rewritten, usage := ad.ParseNonStreamResponse(info, body)
 	result.body = rewritten

@@ -86,6 +86,7 @@
     "model_prices": "Model Management",
     "groups": "Groups",
     "usage": "Usage",
+    "request_audit": "请求审计",
     "announcements": "Announcements",
     "payment": "Payments",
     "redemption": "Redemption Codes",

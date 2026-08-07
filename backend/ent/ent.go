@@ -32,6 +32,8 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/paymentproviderconfig"
 	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
+	"github.com/DouDOU-start/airgate-core/ent/requestauditattempt"
+	"github.com/DouDOU-start/airgate-core/ent/requestauditlog"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/ent/task"
 	"github.com/DouDOU-start/airgate-core/ent/tier"
@@ -118,6 +120,8 @@ func checkColumn(table, column string) error {
 			paymentproviderconfig.Table: paymentproviderconfig.ValidColumn,
 			proxy.Table:                 proxy.ValidColumn,
 			redemptioncode.Table:        redemptioncode.ValidColumn,
+			requestauditattempt.Table:   requestauditattempt.ValidColumn,
+			requestauditlog.Table:       requestauditlog.ValidColumn,
 			setting.Table:               setting.ValidColumn,
 			task.Table:                  task.ValidColumn,
 			tier.Table:                  tier.ValidColumn,

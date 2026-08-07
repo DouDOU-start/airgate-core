@@ -215,6 +215,9 @@ func (s *Server) registerRoutes() {
 
 		// 上游请求日志（失败留痕/渠道测试/拉模型，仅管理员）
 		adminGroup.GET("/upstream-logs", handlers.UpstreamLog.AdminList)
+		// 完整请求审计（解密后的 Header/Body 仅管理员可见）
+		adminGroup.GET("/request-audits", handlers.RequestAudit.List)
+		adminGroup.GET("/request-audits/:id", handlers.RequestAudit.Get)
 
 		// 风控中心（内容审核）：配置/状态/探活/日志/解封/命中哈希管理
 		adminGroup.GET("/risk-control/config", handlers.RiskControl.GetConfig)

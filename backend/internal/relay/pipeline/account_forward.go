@@ -2,12 +2,16 @@ package pipeline
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/router-for-me/CLIProxyAPI/v7/sdk/proxyutil"
 
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
@@ -18,6 +22,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
 	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
+	"github.com/DouDOU-start/airgate-core/internal/requestaudit"
 )
 
 // executeAccountAttempt 执行一次账号路径转发（CPA）。
@@ -32,6 +37,7 @@ func (p *Pipeline) executeAccountAttempt(
 	start time.Time,
 	requestID string,
 	rpmMinute int64,
+	auditRequest *requestaudit.Handle,
 ) attemptResult {
 	defer func() {
 		p.concurrency.ReleaseAccountSlot(context.Background(), acc.ID, requestID)
@@ -63,6 +69,27 @@ func (p *Pipeline) executeAccountAttempt(
 	}
 
 	ctx := c.Request.Context()
+	if auditRequest != nil {
+		baseTransport := http.RoundTripper(http.DefaultTransport)
+		if strings.TrimSpace(acc.ProxyURL) != "" {
+			transport, _, errBuild := proxyutil.BuildHTTPTransport(acc.ProxyURL)
+			if errBuild != nil {
+				return attemptResult{auditErr: fmt.Errorf("构造账号代理审计传输层失败: %w", errBuild)}
+			}
+			if transport != nil {
+				baseTransport = transport
+			}
+		}
+		target := requestaudit.Target{
+			RouteKind: "account", AccountID: acc.ID, AccountName: acc.Name,
+			AccountEmail: accountEmail(acc), AccountPlatform: acc.Platform, AccountType: acc.Type,
+		}
+		// CPA 通过固定字符串上下文键接收最终网络层；同时清空 Auth.ProxyURL，
+		// 避免 executor 的代理优先级绕过审计 RoundTripper。
+		//nolint:staticcheck
+		ctx = context.WithValue(ctx, "cliproxy.roundtripper", requestaudit.NewRoundTripper(baseTransport, auditRequest, target))
+		fwdReq.Account.ProxyURL = ""
+	}
 	cancel := context.CancelFunc(func() {})
 	if !req.Stream {
 		ctx, cancel = context.WithTimeout(ctx, nonStreamTimeout)
@@ -70,6 +97,9 @@ func (p *Pipeline) executeAccountAttempt(
 	defer cancel()
 
 	result := p.cpa.Forward(ctx, c, fwdReq)
+	if isAuditWriteError(result.NetErr) || isAuditWriteError(result.BuildErr) || isAuditWriteError(result.StreamErr) {
+		return attemptResult{auditErr: requestaudit.ErrWrite}
+	}
 	// 在 handleAccountOutcome 的成功分支调用 MarkActive 之前，捕获“账号已被并发请求
 	// 标为限流，但当前在途请求仍成功”的 Codex OAuth 诊断现场。
 	p.logCodexRateLimitedAccountSuccess(c, acc, req.Model, endpoint, req.Stream, payload, fwdReq.Headers, result)
@@ -92,6 +122,20 @@ func (p *Pipeline) executeAccountAttempt(
 		streamErr:    result.StreamErr,
 		done:         result.Done,
 	}
+}
+
+func accountEmail(acc *accountreg.Snapshot) string {
+	if acc == nil {
+		return ""
+	}
+	if email := strings.TrimSpace(acc.Email); email != "" {
+		return email
+	}
+	return strings.TrimSpace(acc.Credentials["email"])
+}
+
+func isAuditWriteError(err error) bool {
+	return err != nil && (errors.Is(err, requestaudit.ErrWrite) || strings.Contains(err.Error(), requestaudit.ErrWrite.Error()))
 }
 
 // errCPAUnavailable CPA 桥未注入时的构建错误（不 failover 到同账号）。

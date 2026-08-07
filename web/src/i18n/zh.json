@@ -86,6 +86,7 @@
     "model_prices": "模型管理",
     "groups": "分组管理",
     "usage": "使用记录",
+    "request_audit": "请求审计",
     "announcements": "公告管理",
     "payment": "支付管理",
     "redemption": "兑换码",

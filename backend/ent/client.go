@@ -35,6 +35,8 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/paymentproviderconfig"
 	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
+	"github.com/DouDOU-start/airgate-core/ent/requestauditattempt"
+	"github.com/DouDOU-start/airgate-core/ent/requestauditlog"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/ent/task"
 	"github.com/DouDOU-start/airgate-core/ent/tier"
@@ -88,6 +90,10 @@ type Client struct {
 	Proxy *ProxyClient
 	// RedemptionCode is the client for interacting with the RedemptionCode builders.
 	RedemptionCode *RedemptionCodeClient
+	// RequestAuditAttempt is the client for interacting with the RequestAuditAttempt builders.
+	RequestAuditAttempt *RequestAuditAttemptClient
+	// RequestAuditLog is the client for interacting with the RequestAuditLog builders.
+	RequestAuditLog *RequestAuditLogClient
 	// Setting is the client for interacting with the Setting builders.
 	Setting *SettingClient
 	// Task is the client for interacting with the Task builders.
@@ -131,6 +137,8 @@ func (c *Client) init() {
 	c.PaymentProviderConfig = NewPaymentProviderConfigClient(c.config)
 	c.Proxy = NewProxyClient(c.config)
 	c.RedemptionCode = NewRedemptionCodeClient(c.config)
+	c.RequestAuditAttempt = NewRequestAuditAttemptClient(c.config)
+	c.RequestAuditLog = NewRequestAuditLogClient(c.config)
 	c.Setting = NewSettingClient(c.config)
 	c.Task = NewTaskClient(c.config)
 	c.Tier = NewTierClient(c.config)
@@ -249,6 +257,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PaymentProviderConfig: NewPaymentProviderConfigClient(cfg),
 		Proxy:                 NewProxyClient(cfg),
 		RedemptionCode:        NewRedemptionCodeClient(cfg),
+		RequestAuditAttempt:   NewRequestAuditAttemptClient(cfg),
+		RequestAuditLog:       NewRequestAuditLogClient(cfg),
 		Setting:               NewSettingClient(cfg),
 		Task:                  NewTaskClient(cfg),
 		Tier:                  NewTierClient(cfg),
@@ -294,6 +304,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PaymentProviderConfig: NewPaymentProviderConfigClient(cfg),
 		Proxy:                 NewProxyClient(cfg),
 		RedemptionCode:        NewRedemptionCodeClient(cfg),
+		RequestAuditAttempt:   NewRequestAuditAttemptClient(cfg),
+		RequestAuditLog:       NewRequestAuditLogClient(cfg),
 		Setting:               NewSettingClient(cfg),
 		Task:                  NewTaskClient(cfg),
 		Tier:                  NewTierClient(cfg),
@@ -333,8 +345,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.Bookmark, c.Channel, c.ChannelCredential, c.ChannelKey, c.Group,
 		c.InviteProfile, c.InviteRebateLog, c.ModelPrice, c.ModelTag, c.ModerationLog,
 		c.OAuthClient, c.PaymentOrder, c.PaymentProviderConfig, c.Proxy,
-		c.RedemptionCode, c.Setting, c.Task, c.Tier, c.UpstreamRequestLog, c.UsageLog,
-		c.User,
+		c.RedemptionCode, c.RequestAuditAttempt, c.RequestAuditLog, c.Setting, c.Task,
+		c.Tier, c.UpstreamRequestLog, c.UsageLog, c.User,
 	} {
 		n.Use(hooks...)
 	}
@@ -348,8 +360,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.Bookmark, c.Channel, c.ChannelCredential, c.ChannelKey, c.Group,
 		c.InviteProfile, c.InviteRebateLog, c.ModelPrice, c.ModelTag, c.ModerationLog,
 		c.OAuthClient, c.PaymentOrder, c.PaymentProviderConfig, c.Proxy,
-		c.RedemptionCode, c.Setting, c.Task, c.Tier, c.UpstreamRequestLog, c.UsageLog,
-		c.User,
+		c.RedemptionCode, c.RequestAuditAttempt, c.RequestAuditLog, c.Setting, c.Task,
+		c.Tier, c.UpstreamRequestLog, c.UsageLog, c.User,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -398,6 +410,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Proxy.mutate(ctx, m)
 	case *RedemptionCodeMutation:
 		return c.RedemptionCode.mutate(ctx, m)
+	case *RequestAuditAttemptMutation:
+		return c.RequestAuditAttempt.mutate(ctx, m)
+	case *RequestAuditLogMutation:
+		return c.RequestAuditLog.mutate(ctx, m)
 	case *SettingMutation:
 		return c.Setting.mutate(ctx, m)
 	case *TaskMutation:
@@ -3459,6 +3475,304 @@ func (c *RedemptionCodeClient) mutate(ctx context.Context, m *RedemptionCodeMuta
 	}
 }
 
+// RequestAuditAttemptClient is a client for the RequestAuditAttempt schema.
+type RequestAuditAttemptClient struct {
+	config
+}
+
+// NewRequestAuditAttemptClient returns a client for the RequestAuditAttempt from the given config.
+func NewRequestAuditAttemptClient(c config) *RequestAuditAttemptClient {
+	return &RequestAuditAttemptClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `requestauditattempt.Hooks(f(g(h())))`.
+func (c *RequestAuditAttemptClient) Use(hooks ...Hook) {
+	c.hooks.RequestAuditAttempt = append(c.hooks.RequestAuditAttempt, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `requestauditattempt.Intercept(f(g(h())))`.
+func (c *RequestAuditAttemptClient) Intercept(interceptors ...Interceptor) {
+	c.inters.RequestAuditAttempt = append(c.inters.RequestAuditAttempt, interceptors...)
+}
+
+// Create returns a builder for creating a RequestAuditAttempt entity.
+func (c *RequestAuditAttemptClient) Create() *RequestAuditAttemptCreate {
+	mutation := newRequestAuditAttemptMutation(c.config, OpCreate)
+	return &RequestAuditAttemptCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of RequestAuditAttempt entities.
+func (c *RequestAuditAttemptClient) CreateBulk(builders ...*RequestAuditAttemptCreate) *RequestAuditAttemptCreateBulk {
+	return &RequestAuditAttemptCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *RequestAuditAttemptClient) MapCreateBulk(slice any, setFunc func(*RequestAuditAttemptCreate, int)) *RequestAuditAttemptCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &RequestAuditAttemptCreateBulk{err: fmt.Errorf("calling to RequestAuditAttemptClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*RequestAuditAttemptCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &RequestAuditAttemptCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for RequestAuditAttempt.
+func (c *RequestAuditAttemptClient) Update() *RequestAuditAttemptUpdate {
+	mutation := newRequestAuditAttemptMutation(c.config, OpUpdate)
+	return &RequestAuditAttemptUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *RequestAuditAttemptClient) UpdateOne(raa *RequestAuditAttempt) *RequestAuditAttemptUpdateOne {
+	mutation := newRequestAuditAttemptMutation(c.config, OpUpdateOne, withRequestAuditAttempt(raa))
+	return &RequestAuditAttemptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *RequestAuditAttemptClient) UpdateOneID(id int) *RequestAuditAttemptUpdateOne {
+	mutation := newRequestAuditAttemptMutation(c.config, OpUpdateOne, withRequestAuditAttemptID(id))
+	return &RequestAuditAttemptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for RequestAuditAttempt.
+func (c *RequestAuditAttemptClient) Delete() *RequestAuditAttemptDelete {
+	mutation := newRequestAuditAttemptMutation(c.config, OpDelete)
+	return &RequestAuditAttemptDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *RequestAuditAttemptClient) DeleteOne(raa *RequestAuditAttempt) *RequestAuditAttemptDeleteOne {
+	return c.DeleteOneID(raa.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *RequestAuditAttemptClient) DeleteOneID(id int) *RequestAuditAttemptDeleteOne {
+	builder := c.Delete().Where(requestauditattempt.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &RequestAuditAttemptDeleteOne{builder}
+}
+
+// Query returns a query builder for RequestAuditAttempt.
+func (c *RequestAuditAttemptClient) Query() *RequestAuditAttemptQuery {
+	return &RequestAuditAttemptQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeRequestAuditAttempt},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a RequestAuditAttempt entity by its id.
+func (c *RequestAuditAttemptClient) Get(ctx context.Context, id int) (*RequestAuditAttempt, error) {
+	return c.Query().Where(requestauditattempt.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *RequestAuditAttemptClient) GetX(ctx context.Context, id int) *RequestAuditAttempt {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryRequest queries the request edge of a RequestAuditAttempt.
+func (c *RequestAuditAttemptClient) QueryRequest(raa *RequestAuditAttempt) *RequestAuditLogQuery {
+	query := (&RequestAuditLogClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := raa.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(requestauditattempt.Table, requestauditattempt.FieldID, id),
+			sqlgraph.To(requestauditlog.Table, requestauditlog.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, requestauditattempt.RequestTable, requestauditattempt.RequestColumn),
+		)
+		fromV = sqlgraph.Neighbors(raa.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *RequestAuditAttemptClient) Hooks() []Hook {
+	return c.hooks.RequestAuditAttempt
+}
+
+// Interceptors returns the client interceptors.
+func (c *RequestAuditAttemptClient) Interceptors() []Interceptor {
+	return c.inters.RequestAuditAttempt
+}
+
+func (c *RequestAuditAttemptClient) mutate(ctx context.Context, m *RequestAuditAttemptMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&RequestAuditAttemptCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&RequestAuditAttemptUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&RequestAuditAttemptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&RequestAuditAttemptDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown RequestAuditAttempt mutation op: %q", m.Op())
+	}
+}
+
+// RequestAuditLogClient is a client for the RequestAuditLog schema.
+type RequestAuditLogClient struct {
+	config
+}
+
+// NewRequestAuditLogClient returns a client for the RequestAuditLog from the given config.
+func NewRequestAuditLogClient(c config) *RequestAuditLogClient {
+	return &RequestAuditLogClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `requestauditlog.Hooks(f(g(h())))`.
+func (c *RequestAuditLogClient) Use(hooks ...Hook) {
+	c.hooks.RequestAuditLog = append(c.hooks.RequestAuditLog, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `requestauditlog.Intercept(f(g(h())))`.
+func (c *RequestAuditLogClient) Intercept(interceptors ...Interceptor) {
+	c.inters.RequestAuditLog = append(c.inters.RequestAuditLog, interceptors...)
+}
+
+// Create returns a builder for creating a RequestAuditLog entity.
+func (c *RequestAuditLogClient) Create() *RequestAuditLogCreate {
+	mutation := newRequestAuditLogMutation(c.config, OpCreate)
+	return &RequestAuditLogCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of RequestAuditLog entities.
+func (c *RequestAuditLogClient) CreateBulk(builders ...*RequestAuditLogCreate) *RequestAuditLogCreateBulk {
+	return &RequestAuditLogCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *RequestAuditLogClient) MapCreateBulk(slice any, setFunc func(*RequestAuditLogCreate, int)) *RequestAuditLogCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &RequestAuditLogCreateBulk{err: fmt.Errorf("calling to RequestAuditLogClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*RequestAuditLogCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &RequestAuditLogCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for RequestAuditLog.
+func (c *RequestAuditLogClient) Update() *RequestAuditLogUpdate {
+	mutation := newRequestAuditLogMutation(c.config, OpUpdate)
+	return &RequestAuditLogUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *RequestAuditLogClient) UpdateOne(ral *RequestAuditLog) *RequestAuditLogUpdateOne {
+	mutation := newRequestAuditLogMutation(c.config, OpUpdateOne, withRequestAuditLog(ral))
+	return &RequestAuditLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *RequestAuditLogClient) UpdateOneID(id int) *RequestAuditLogUpdateOne {
+	mutation := newRequestAuditLogMutation(c.config, OpUpdateOne, withRequestAuditLogID(id))
+	return &RequestAuditLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for RequestAuditLog.
+func (c *RequestAuditLogClient) Delete() *RequestAuditLogDelete {
+	mutation := newRequestAuditLogMutation(c.config, OpDelete)
+	return &RequestAuditLogDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *RequestAuditLogClient) DeleteOne(ral *RequestAuditLog) *RequestAuditLogDeleteOne {
+	return c.DeleteOneID(ral.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *RequestAuditLogClient) DeleteOneID(id int) *RequestAuditLogDeleteOne {
+	builder := c.Delete().Where(requestauditlog.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &RequestAuditLogDeleteOne{builder}
+}
+
+// Query returns a query builder for RequestAuditLog.
+func (c *RequestAuditLogClient) Query() *RequestAuditLogQuery {
+	return &RequestAuditLogQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeRequestAuditLog},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a RequestAuditLog entity by its id.
+func (c *RequestAuditLogClient) Get(ctx context.Context, id int) (*RequestAuditLog, error) {
+	return c.Query().Where(requestauditlog.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *RequestAuditLogClient) GetX(ctx context.Context, id int) *RequestAuditLog {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryAttempts queries the attempts edge of a RequestAuditLog.
+func (c *RequestAuditLogClient) QueryAttempts(ral *RequestAuditLog) *RequestAuditAttemptQuery {
+	query := (&RequestAuditAttemptClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ral.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(requestauditlog.Table, requestauditlog.FieldID, id),
+			sqlgraph.To(requestauditattempt.Table, requestauditattempt.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, requestauditlog.AttemptsTable, requestauditlog.AttemptsColumn),
+		)
+		fromV = sqlgraph.Neighbors(ral.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *RequestAuditLogClient) Hooks() []Hook {
+	return c.hooks.RequestAuditLog
+}
+
+// Interceptors returns the client interceptors.
+func (c *RequestAuditLogClient) Interceptors() []Interceptor {
+	return c.inters.RequestAuditLog
+}
+
+func (c *RequestAuditLogClient) mutate(ctx context.Context, m *RequestAuditLogMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&RequestAuditLogCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&RequestAuditLogUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&RequestAuditLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&RequestAuditLogDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown RequestAuditLog mutation op: %q", m.Op())
+	}
+}
+
 // SettingClient is a client for the Setting schema.
 type SettingClient struct {
 	config
@@ -4455,14 +4769,16 @@ type (
 		APIKey, Account, Announcement, AnnouncementRead, BalanceLog, Bookmark, Channel,
 		ChannelCredential, ChannelKey, Group, InviteProfile, InviteRebateLog,
 		ModelPrice, ModelTag, ModerationLog, OAuthClient, PaymentOrder,
-		PaymentProviderConfig, Proxy, RedemptionCode, Setting, Task, Tier,
-		UpstreamRequestLog, UsageLog, User []ent.Hook
+		PaymentProviderConfig, Proxy, RedemptionCode, RequestAuditAttempt,
+		RequestAuditLog, Setting, Task, Tier, UpstreamRequestLog, UsageLog,
+		User []ent.Hook
 	}
 	inters struct {
 		APIKey, Account, Announcement, AnnouncementRead, BalanceLog, Bookmark, Channel,
 		ChannelCredential, ChannelKey, Group, InviteProfile, InviteRebateLog,
 		ModelPrice, ModelTag, ModerationLog, OAuthClient, PaymentOrder,
-		PaymentProviderConfig, Proxy, RedemptionCode, Setting, Task, Tier,
-		UpstreamRequestLog, UsageLog, User []ent.Interceptor
+		PaymentProviderConfig, Proxy, RedemptionCode, RequestAuditAttempt,
+		RequestAuditLog, Setting, Task, Tier, UpstreamRequestLog, UsageLog,
+		User []ent.Interceptor
 	}
 )

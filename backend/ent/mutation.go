@@ -33,6 +33,8 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/predicate"
 	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
+	"github.com/DouDOU-start/airgate-core/ent/requestauditattempt"
+	"github.com/DouDOU-start/airgate-core/ent/requestauditlog"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/ent/task"
 	"github.com/DouDOU-start/airgate-core/ent/tier"
@@ -70,6 +72,8 @@ const (
 	TypePaymentProviderConfig = "PaymentProviderConfig"
 	TypeProxy                 = "Proxy"
 	TypeRedemptionCode        = "RedemptionCode"
+	TypeRequestAuditAttempt   = "RequestAuditAttempt"
+	TypeRequestAuditLog       = "RequestAuditLog"
 	TypeSetting               = "Setting"
 	TypeTask                  = "Task"
 	TypeTier                  = "Tier"
@@ -23966,6 +23970,4355 @@ func (m *RedemptionCodeMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *RedemptionCodeMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown RedemptionCode edge %s", name)
+}
+
+// RequestAuditAttemptMutation represents an operation that mutates the RequestAuditAttempt nodes in the graph.
+type RequestAuditAttemptMutation struct {
+	config
+	op                    Op
+	typ                   string
+	id                    *int
+	seq                   *int
+	addseq                *int
+	route_kind            *requestauditattempt.RouteKind
+	channel_id            *int
+	addchannel_id         *int
+	channel_name          *string
+	channel_key_id        *int
+	addchannel_key_id     *int
+	channel_key_name      *string
+	account_id            *int
+	addaccount_id         *int
+	account_name          *string
+	account_email         *string
+	account_platform      *string
+	account_type          *string
+	method                *string
+	upstream_url_enc      *string
+	forward_headers_enc   *string
+	forward_body_enc      *string
+	forward_body_bytes    *int64
+	addforward_body_bytes *int64
+	status_code           *int
+	addstatus_code        *int
+	verdict               *string
+	reason                *string
+	retry_after_ms        *int64
+	addretry_after_ms     *int64
+	latency_ms            *int64
+	addlatency_ms         *int64
+	first_token_ms        *int64
+	addfirst_token_ms     *int64
+	response_started      *bool
+	stream_completed      *bool
+	finished              *bool
+	created_at            *time.Time
+	updated_at            *time.Time
+	clearedFields         map[string]struct{}
+	request               *int
+	clearedrequest        bool
+	done                  bool
+	oldValue              func(context.Context) (*RequestAuditAttempt, error)
+	predicates            []predicate.RequestAuditAttempt
+}
+
+var _ ent.Mutation = (*RequestAuditAttemptMutation)(nil)
+
+// requestauditattemptOption allows management of the mutation configuration using functional options.
+type requestauditattemptOption func(*RequestAuditAttemptMutation)
+
+// newRequestAuditAttemptMutation creates new mutation for the RequestAuditAttempt entity.
+func newRequestAuditAttemptMutation(c config, op Op, opts ...requestauditattemptOption) *RequestAuditAttemptMutation {
+	m := &RequestAuditAttemptMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeRequestAuditAttempt,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withRequestAuditAttemptID sets the ID field of the mutation.
+func withRequestAuditAttemptID(id int) requestauditattemptOption {
+	return func(m *RequestAuditAttemptMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *RequestAuditAttempt
+		)
+		m.oldValue = func(ctx context.Context) (*RequestAuditAttempt, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().RequestAuditAttempt.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withRequestAuditAttempt sets the old RequestAuditAttempt of the mutation.
+func withRequestAuditAttempt(node *RequestAuditAttempt) requestauditattemptOption {
+	return func(m *RequestAuditAttemptMutation) {
+		m.oldValue = func(context.Context) (*RequestAuditAttempt, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m RequestAuditAttemptMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m RequestAuditAttemptMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *RequestAuditAttemptMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *RequestAuditAttemptMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().RequestAuditAttempt.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetRequestAuditID sets the "request_audit_id" field.
+func (m *RequestAuditAttemptMutation) SetRequestAuditID(i int) {
+	m.request = &i
+}
+
+// RequestAuditID returns the value of the "request_audit_id" field in the mutation.
+func (m *RequestAuditAttemptMutation) RequestAuditID() (r int, exists bool) {
+	v := m.request
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestAuditID returns the old "request_audit_id" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldRequestAuditID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestAuditID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestAuditID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestAuditID: %w", err)
+	}
+	return oldValue.RequestAuditID, nil
+}
+
+// ResetRequestAuditID resets all changes to the "request_audit_id" field.
+func (m *RequestAuditAttemptMutation) ResetRequestAuditID() {
+	m.request = nil
+}
+
+// SetSeq sets the "seq" field.
+func (m *RequestAuditAttemptMutation) SetSeq(i int) {
+	m.seq = &i
+	m.addseq = nil
+}
+
+// Seq returns the value of the "seq" field in the mutation.
+func (m *RequestAuditAttemptMutation) Seq() (r int, exists bool) {
+	v := m.seq
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSeq returns the old "seq" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldSeq(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSeq is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSeq requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSeq: %w", err)
+	}
+	return oldValue.Seq, nil
+}
+
+// AddSeq adds i to the "seq" field.
+func (m *RequestAuditAttemptMutation) AddSeq(i int) {
+	if m.addseq != nil {
+		*m.addseq += i
+	} else {
+		m.addseq = &i
+	}
+}
+
+// AddedSeq returns the value that was added to the "seq" field in this mutation.
+func (m *RequestAuditAttemptMutation) AddedSeq() (r int, exists bool) {
+	v := m.addseq
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSeq resets all changes to the "seq" field.
+func (m *RequestAuditAttemptMutation) ResetSeq() {
+	m.seq = nil
+	m.addseq = nil
+}
+
+// SetRouteKind sets the "route_kind" field.
+func (m *RequestAuditAttemptMutation) SetRouteKind(rk requestauditattempt.RouteKind) {
+	m.route_kind = &rk
+}
+
+// RouteKind returns the value of the "route_kind" field in the mutation.
+func (m *RequestAuditAttemptMutation) RouteKind() (r requestauditattempt.RouteKind, exists bool) {
+	v := m.route_kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRouteKind returns the old "route_kind" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldRouteKind(ctx context.Context) (v requestauditattempt.RouteKind, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRouteKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRouteKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRouteKind: %w", err)
+	}
+	return oldValue.RouteKind, nil
+}
+
+// ResetRouteKind resets all changes to the "route_kind" field.
+func (m *RequestAuditAttemptMutation) ResetRouteKind() {
+	m.route_kind = nil
+}
+
+// SetChannelID sets the "channel_id" field.
+func (m *RequestAuditAttemptMutation) SetChannelID(i int) {
+	m.channel_id = &i
+	m.addchannel_id = nil
+}
+
+// ChannelID returns the value of the "channel_id" field in the mutation.
+func (m *RequestAuditAttemptMutation) ChannelID() (r int, exists bool) {
+	v := m.channel_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChannelID returns the old "channel_id" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldChannelID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChannelID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChannelID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChannelID: %w", err)
+	}
+	return oldValue.ChannelID, nil
+}
+
+// AddChannelID adds i to the "channel_id" field.
+func (m *RequestAuditAttemptMutation) AddChannelID(i int) {
+	if m.addchannel_id != nil {
+		*m.addchannel_id += i
+	} else {
+		m.addchannel_id = &i
+	}
+}
+
+// AddedChannelID returns the value that was added to the "channel_id" field in this mutation.
+func (m *RequestAuditAttemptMutation) AddedChannelID() (r int, exists bool) {
+	v := m.addchannel_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetChannelID resets all changes to the "channel_id" field.
+func (m *RequestAuditAttemptMutation) ResetChannelID() {
+	m.channel_id = nil
+	m.addchannel_id = nil
+}
+
+// SetChannelName sets the "channel_name" field.
+func (m *RequestAuditAttemptMutation) SetChannelName(s string) {
+	m.channel_name = &s
+}
+
+// ChannelName returns the value of the "channel_name" field in the mutation.
+func (m *RequestAuditAttemptMutation) ChannelName() (r string, exists bool) {
+	v := m.channel_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChannelName returns the old "channel_name" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldChannelName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChannelName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChannelName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChannelName: %w", err)
+	}
+	return oldValue.ChannelName, nil
+}
+
+// ResetChannelName resets all changes to the "channel_name" field.
+func (m *RequestAuditAttemptMutation) ResetChannelName() {
+	m.channel_name = nil
+}
+
+// SetChannelKeyID sets the "channel_key_id" field.
+func (m *RequestAuditAttemptMutation) SetChannelKeyID(i int) {
+	m.channel_key_id = &i
+	m.addchannel_key_id = nil
+}
+
+// ChannelKeyID returns the value of the "channel_key_id" field in the mutation.
+func (m *RequestAuditAttemptMutation) ChannelKeyID() (r int, exists bool) {
+	v := m.channel_key_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChannelKeyID returns the old "channel_key_id" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldChannelKeyID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChannelKeyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChannelKeyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChannelKeyID: %w", err)
+	}
+	return oldValue.ChannelKeyID, nil
+}
+
+// AddChannelKeyID adds i to the "channel_key_id" field.
+func (m *RequestAuditAttemptMutation) AddChannelKeyID(i int) {
+	if m.addchannel_key_id != nil {
+		*m.addchannel_key_id += i
+	} else {
+		m.addchannel_key_id = &i
+	}
+}
+
+// AddedChannelKeyID returns the value that was added to the "channel_key_id" field in this mutation.
+func (m *RequestAuditAttemptMutation) AddedChannelKeyID() (r int, exists bool) {
+	v := m.addchannel_key_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetChannelKeyID resets all changes to the "channel_key_id" field.
+func (m *RequestAuditAttemptMutation) ResetChannelKeyID() {
+	m.channel_key_id = nil
+	m.addchannel_key_id = nil
+}
+
+// SetChannelKeyName sets the "channel_key_name" field.
+func (m *RequestAuditAttemptMutation) SetChannelKeyName(s string) {
+	m.channel_key_name = &s
+}
+
+// ChannelKeyName returns the value of the "channel_key_name" field in the mutation.
+func (m *RequestAuditAttemptMutation) ChannelKeyName() (r string, exists bool) {
+	v := m.channel_key_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChannelKeyName returns the old "channel_key_name" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldChannelKeyName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChannelKeyName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChannelKeyName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChannelKeyName: %w", err)
+	}
+	return oldValue.ChannelKeyName, nil
+}
+
+// ResetChannelKeyName resets all changes to the "channel_key_name" field.
+func (m *RequestAuditAttemptMutation) ResetChannelKeyName() {
+	m.channel_key_name = nil
+}
+
+// SetAccountID sets the "account_id" field.
+func (m *RequestAuditAttemptMutation) SetAccountID(i int) {
+	m.account_id = &i
+	m.addaccount_id = nil
+}
+
+// AccountID returns the value of the "account_id" field in the mutation.
+func (m *RequestAuditAttemptMutation) AccountID() (r int, exists bool) {
+	v := m.account_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountID returns the old "account_id" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldAccountID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountID: %w", err)
+	}
+	return oldValue.AccountID, nil
+}
+
+// AddAccountID adds i to the "account_id" field.
+func (m *RequestAuditAttemptMutation) AddAccountID(i int) {
+	if m.addaccount_id != nil {
+		*m.addaccount_id += i
+	} else {
+		m.addaccount_id = &i
+	}
+}
+
+// AddedAccountID returns the value that was added to the "account_id" field in this mutation.
+func (m *RequestAuditAttemptMutation) AddedAccountID() (r int, exists bool) {
+	v := m.addaccount_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAccountID resets all changes to the "account_id" field.
+func (m *RequestAuditAttemptMutation) ResetAccountID() {
+	m.account_id = nil
+	m.addaccount_id = nil
+}
+
+// SetAccountName sets the "account_name" field.
+func (m *RequestAuditAttemptMutation) SetAccountName(s string) {
+	m.account_name = &s
+}
+
+// AccountName returns the value of the "account_name" field in the mutation.
+func (m *RequestAuditAttemptMutation) AccountName() (r string, exists bool) {
+	v := m.account_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountName returns the old "account_name" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldAccountName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountName: %w", err)
+	}
+	return oldValue.AccountName, nil
+}
+
+// ResetAccountName resets all changes to the "account_name" field.
+func (m *RequestAuditAttemptMutation) ResetAccountName() {
+	m.account_name = nil
+}
+
+// SetAccountEmail sets the "account_email" field.
+func (m *RequestAuditAttemptMutation) SetAccountEmail(s string) {
+	m.account_email = &s
+}
+
+// AccountEmail returns the value of the "account_email" field in the mutation.
+func (m *RequestAuditAttemptMutation) AccountEmail() (r string, exists bool) {
+	v := m.account_email
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountEmail returns the old "account_email" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldAccountEmail(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountEmail is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountEmail requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountEmail: %w", err)
+	}
+	return oldValue.AccountEmail, nil
+}
+
+// ResetAccountEmail resets all changes to the "account_email" field.
+func (m *RequestAuditAttemptMutation) ResetAccountEmail() {
+	m.account_email = nil
+}
+
+// SetAccountPlatform sets the "account_platform" field.
+func (m *RequestAuditAttemptMutation) SetAccountPlatform(s string) {
+	m.account_platform = &s
+}
+
+// AccountPlatform returns the value of the "account_platform" field in the mutation.
+func (m *RequestAuditAttemptMutation) AccountPlatform() (r string, exists bool) {
+	v := m.account_platform
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountPlatform returns the old "account_platform" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldAccountPlatform(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountPlatform is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountPlatform requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountPlatform: %w", err)
+	}
+	return oldValue.AccountPlatform, nil
+}
+
+// ResetAccountPlatform resets all changes to the "account_platform" field.
+func (m *RequestAuditAttemptMutation) ResetAccountPlatform() {
+	m.account_platform = nil
+}
+
+// SetAccountType sets the "account_type" field.
+func (m *RequestAuditAttemptMutation) SetAccountType(s string) {
+	m.account_type = &s
+}
+
+// AccountType returns the value of the "account_type" field in the mutation.
+func (m *RequestAuditAttemptMutation) AccountType() (r string, exists bool) {
+	v := m.account_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountType returns the old "account_type" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldAccountType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountType: %w", err)
+	}
+	return oldValue.AccountType, nil
+}
+
+// ResetAccountType resets all changes to the "account_type" field.
+func (m *RequestAuditAttemptMutation) ResetAccountType() {
+	m.account_type = nil
+}
+
+// SetMethod sets the "method" field.
+func (m *RequestAuditAttemptMutation) SetMethod(s string) {
+	m.method = &s
+}
+
+// Method returns the value of the "method" field in the mutation.
+func (m *RequestAuditAttemptMutation) Method() (r string, exists bool) {
+	v := m.method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMethod returns the old "method" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldMethod(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMethod: %w", err)
+	}
+	return oldValue.Method, nil
+}
+
+// ResetMethod resets all changes to the "method" field.
+func (m *RequestAuditAttemptMutation) ResetMethod() {
+	m.method = nil
+}
+
+// SetUpstreamURLEnc sets the "upstream_url_enc" field.
+func (m *RequestAuditAttemptMutation) SetUpstreamURLEnc(s string) {
+	m.upstream_url_enc = &s
+}
+
+// UpstreamURLEnc returns the value of the "upstream_url_enc" field in the mutation.
+func (m *RequestAuditAttemptMutation) UpstreamURLEnc() (r string, exists bool) {
+	v := m.upstream_url_enc
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpstreamURLEnc returns the old "upstream_url_enc" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldUpstreamURLEnc(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpstreamURLEnc is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpstreamURLEnc requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpstreamURLEnc: %w", err)
+	}
+	return oldValue.UpstreamURLEnc, nil
+}
+
+// ResetUpstreamURLEnc resets all changes to the "upstream_url_enc" field.
+func (m *RequestAuditAttemptMutation) ResetUpstreamURLEnc() {
+	m.upstream_url_enc = nil
+}
+
+// SetForwardHeadersEnc sets the "forward_headers_enc" field.
+func (m *RequestAuditAttemptMutation) SetForwardHeadersEnc(s string) {
+	m.forward_headers_enc = &s
+}
+
+// ForwardHeadersEnc returns the value of the "forward_headers_enc" field in the mutation.
+func (m *RequestAuditAttemptMutation) ForwardHeadersEnc() (r string, exists bool) {
+	v := m.forward_headers_enc
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldForwardHeadersEnc returns the old "forward_headers_enc" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldForwardHeadersEnc(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldForwardHeadersEnc is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldForwardHeadersEnc requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldForwardHeadersEnc: %w", err)
+	}
+	return oldValue.ForwardHeadersEnc, nil
+}
+
+// ResetForwardHeadersEnc resets all changes to the "forward_headers_enc" field.
+func (m *RequestAuditAttemptMutation) ResetForwardHeadersEnc() {
+	m.forward_headers_enc = nil
+}
+
+// SetForwardBodyEnc sets the "forward_body_enc" field.
+func (m *RequestAuditAttemptMutation) SetForwardBodyEnc(s string) {
+	m.forward_body_enc = &s
+}
+
+// ForwardBodyEnc returns the value of the "forward_body_enc" field in the mutation.
+func (m *RequestAuditAttemptMutation) ForwardBodyEnc() (r string, exists bool) {
+	v := m.forward_body_enc
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldForwardBodyEnc returns the old "forward_body_enc" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldForwardBodyEnc(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldForwardBodyEnc is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldForwardBodyEnc requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldForwardBodyEnc: %w", err)
+	}
+	return oldValue.ForwardBodyEnc, nil
+}
+
+// ResetForwardBodyEnc resets all changes to the "forward_body_enc" field.
+func (m *RequestAuditAttemptMutation) ResetForwardBodyEnc() {
+	m.forward_body_enc = nil
+}
+
+// SetForwardBodyBytes sets the "forward_body_bytes" field.
+func (m *RequestAuditAttemptMutation) SetForwardBodyBytes(i int64) {
+	m.forward_body_bytes = &i
+	m.addforward_body_bytes = nil
+}
+
+// ForwardBodyBytes returns the value of the "forward_body_bytes" field in the mutation.
+func (m *RequestAuditAttemptMutation) ForwardBodyBytes() (r int64, exists bool) {
+	v := m.forward_body_bytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldForwardBodyBytes returns the old "forward_body_bytes" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldForwardBodyBytes(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldForwardBodyBytes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldForwardBodyBytes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldForwardBodyBytes: %w", err)
+	}
+	return oldValue.ForwardBodyBytes, nil
+}
+
+// AddForwardBodyBytes adds i to the "forward_body_bytes" field.
+func (m *RequestAuditAttemptMutation) AddForwardBodyBytes(i int64) {
+	if m.addforward_body_bytes != nil {
+		*m.addforward_body_bytes += i
+	} else {
+		m.addforward_body_bytes = &i
+	}
+}
+
+// AddedForwardBodyBytes returns the value that was added to the "forward_body_bytes" field in this mutation.
+func (m *RequestAuditAttemptMutation) AddedForwardBodyBytes() (r int64, exists bool) {
+	v := m.addforward_body_bytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetForwardBodyBytes resets all changes to the "forward_body_bytes" field.
+func (m *RequestAuditAttemptMutation) ResetForwardBodyBytes() {
+	m.forward_body_bytes = nil
+	m.addforward_body_bytes = nil
+}
+
+// SetStatusCode sets the "status_code" field.
+func (m *RequestAuditAttemptMutation) SetStatusCode(i int) {
+	m.status_code = &i
+	m.addstatus_code = nil
+}
+
+// StatusCode returns the value of the "status_code" field in the mutation.
+func (m *RequestAuditAttemptMutation) StatusCode() (r int, exists bool) {
+	v := m.status_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatusCode returns the old "status_code" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldStatusCode(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatusCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatusCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatusCode: %w", err)
+	}
+	return oldValue.StatusCode, nil
+}
+
+// AddStatusCode adds i to the "status_code" field.
+func (m *RequestAuditAttemptMutation) AddStatusCode(i int) {
+	if m.addstatus_code != nil {
+		*m.addstatus_code += i
+	} else {
+		m.addstatus_code = &i
+	}
+}
+
+// AddedStatusCode returns the value that was added to the "status_code" field in this mutation.
+func (m *RequestAuditAttemptMutation) AddedStatusCode() (r int, exists bool) {
+	v := m.addstatus_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetStatusCode resets all changes to the "status_code" field.
+func (m *RequestAuditAttemptMutation) ResetStatusCode() {
+	m.status_code = nil
+	m.addstatus_code = nil
+}
+
+// SetVerdict sets the "verdict" field.
+func (m *RequestAuditAttemptMutation) SetVerdict(s string) {
+	m.verdict = &s
+}
+
+// Verdict returns the value of the "verdict" field in the mutation.
+func (m *RequestAuditAttemptMutation) Verdict() (r string, exists bool) {
+	v := m.verdict
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVerdict returns the old "verdict" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldVerdict(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVerdict is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVerdict requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVerdict: %w", err)
+	}
+	return oldValue.Verdict, nil
+}
+
+// ResetVerdict resets all changes to the "verdict" field.
+func (m *RequestAuditAttemptMutation) ResetVerdict() {
+	m.verdict = nil
+}
+
+// SetReason sets the "reason" field.
+func (m *RequestAuditAttemptMutation) SetReason(s string) {
+	m.reason = &s
+}
+
+// Reason returns the value of the "reason" field in the mutation.
+func (m *RequestAuditAttemptMutation) Reason() (r string, exists bool) {
+	v := m.reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReason returns the old "reason" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldReason(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReason: %w", err)
+	}
+	return oldValue.Reason, nil
+}
+
+// ResetReason resets all changes to the "reason" field.
+func (m *RequestAuditAttemptMutation) ResetReason() {
+	m.reason = nil
+}
+
+// SetRetryAfterMs sets the "retry_after_ms" field.
+func (m *RequestAuditAttemptMutation) SetRetryAfterMs(i int64) {
+	m.retry_after_ms = &i
+	m.addretry_after_ms = nil
+}
+
+// RetryAfterMs returns the value of the "retry_after_ms" field in the mutation.
+func (m *RequestAuditAttemptMutation) RetryAfterMs() (r int64, exists bool) {
+	v := m.retry_after_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRetryAfterMs returns the old "retry_after_ms" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldRetryAfterMs(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRetryAfterMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRetryAfterMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRetryAfterMs: %w", err)
+	}
+	return oldValue.RetryAfterMs, nil
+}
+
+// AddRetryAfterMs adds i to the "retry_after_ms" field.
+func (m *RequestAuditAttemptMutation) AddRetryAfterMs(i int64) {
+	if m.addretry_after_ms != nil {
+		*m.addretry_after_ms += i
+	} else {
+		m.addretry_after_ms = &i
+	}
+}
+
+// AddedRetryAfterMs returns the value that was added to the "retry_after_ms" field in this mutation.
+func (m *RequestAuditAttemptMutation) AddedRetryAfterMs() (r int64, exists bool) {
+	v := m.addretry_after_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRetryAfterMs resets all changes to the "retry_after_ms" field.
+func (m *RequestAuditAttemptMutation) ResetRetryAfterMs() {
+	m.retry_after_ms = nil
+	m.addretry_after_ms = nil
+}
+
+// SetLatencyMs sets the "latency_ms" field.
+func (m *RequestAuditAttemptMutation) SetLatencyMs(i int64) {
+	m.latency_ms = &i
+	m.addlatency_ms = nil
+}
+
+// LatencyMs returns the value of the "latency_ms" field in the mutation.
+func (m *RequestAuditAttemptMutation) LatencyMs() (r int64, exists bool) {
+	v := m.latency_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLatencyMs returns the old "latency_ms" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldLatencyMs(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLatencyMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLatencyMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLatencyMs: %w", err)
+	}
+	return oldValue.LatencyMs, nil
+}
+
+// AddLatencyMs adds i to the "latency_ms" field.
+func (m *RequestAuditAttemptMutation) AddLatencyMs(i int64) {
+	if m.addlatency_ms != nil {
+		*m.addlatency_ms += i
+	} else {
+		m.addlatency_ms = &i
+	}
+}
+
+// AddedLatencyMs returns the value that was added to the "latency_ms" field in this mutation.
+func (m *RequestAuditAttemptMutation) AddedLatencyMs() (r int64, exists bool) {
+	v := m.addlatency_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetLatencyMs resets all changes to the "latency_ms" field.
+func (m *RequestAuditAttemptMutation) ResetLatencyMs() {
+	m.latency_ms = nil
+	m.addlatency_ms = nil
+}
+
+// SetFirstTokenMs sets the "first_token_ms" field.
+func (m *RequestAuditAttemptMutation) SetFirstTokenMs(i int64) {
+	m.first_token_ms = &i
+	m.addfirst_token_ms = nil
+}
+
+// FirstTokenMs returns the value of the "first_token_ms" field in the mutation.
+func (m *RequestAuditAttemptMutation) FirstTokenMs() (r int64, exists bool) {
+	v := m.first_token_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFirstTokenMs returns the old "first_token_ms" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldFirstTokenMs(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFirstTokenMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFirstTokenMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFirstTokenMs: %w", err)
+	}
+	return oldValue.FirstTokenMs, nil
+}
+
+// AddFirstTokenMs adds i to the "first_token_ms" field.
+func (m *RequestAuditAttemptMutation) AddFirstTokenMs(i int64) {
+	if m.addfirst_token_ms != nil {
+		*m.addfirst_token_ms += i
+	} else {
+		m.addfirst_token_ms = &i
+	}
+}
+
+// AddedFirstTokenMs returns the value that was added to the "first_token_ms" field in this mutation.
+func (m *RequestAuditAttemptMutation) AddedFirstTokenMs() (r int64, exists bool) {
+	v := m.addfirst_token_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFirstTokenMs resets all changes to the "first_token_ms" field.
+func (m *RequestAuditAttemptMutation) ResetFirstTokenMs() {
+	m.first_token_ms = nil
+	m.addfirst_token_ms = nil
+}
+
+// SetResponseStarted sets the "response_started" field.
+func (m *RequestAuditAttemptMutation) SetResponseStarted(b bool) {
+	m.response_started = &b
+}
+
+// ResponseStarted returns the value of the "response_started" field in the mutation.
+func (m *RequestAuditAttemptMutation) ResponseStarted() (r bool, exists bool) {
+	v := m.response_started
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResponseStarted returns the old "response_started" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldResponseStarted(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResponseStarted is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResponseStarted requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResponseStarted: %w", err)
+	}
+	return oldValue.ResponseStarted, nil
+}
+
+// ResetResponseStarted resets all changes to the "response_started" field.
+func (m *RequestAuditAttemptMutation) ResetResponseStarted() {
+	m.response_started = nil
+}
+
+// SetStreamCompleted sets the "stream_completed" field.
+func (m *RequestAuditAttemptMutation) SetStreamCompleted(b bool) {
+	m.stream_completed = &b
+}
+
+// StreamCompleted returns the value of the "stream_completed" field in the mutation.
+func (m *RequestAuditAttemptMutation) StreamCompleted() (r bool, exists bool) {
+	v := m.stream_completed
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStreamCompleted returns the old "stream_completed" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldStreamCompleted(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStreamCompleted is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStreamCompleted requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStreamCompleted: %w", err)
+	}
+	return oldValue.StreamCompleted, nil
+}
+
+// ResetStreamCompleted resets all changes to the "stream_completed" field.
+func (m *RequestAuditAttemptMutation) ResetStreamCompleted() {
+	m.stream_completed = nil
+}
+
+// SetFinished sets the "finished" field.
+func (m *RequestAuditAttemptMutation) SetFinished(b bool) {
+	m.finished = &b
+}
+
+// Finished returns the value of the "finished" field in the mutation.
+func (m *RequestAuditAttemptMutation) Finished() (r bool, exists bool) {
+	v := m.finished
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinished returns the old "finished" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldFinished(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinished is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinished requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinished: %w", err)
+	}
+	return oldValue.Finished, nil
+}
+
+// ResetFinished resets all changes to the "finished" field.
+func (m *RequestAuditAttemptMutation) ResetFinished() {
+	m.finished = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *RequestAuditAttemptMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *RequestAuditAttemptMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *RequestAuditAttemptMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *RequestAuditAttemptMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *RequestAuditAttemptMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the RequestAuditAttempt entity.
+// If the RequestAuditAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditAttemptMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *RequestAuditAttemptMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetRequestID sets the "request" edge to the RequestAuditLog entity by id.
+func (m *RequestAuditAttemptMutation) SetRequestID(id int) {
+	m.request = &id
+}
+
+// ClearRequest clears the "request" edge to the RequestAuditLog entity.
+func (m *RequestAuditAttemptMutation) ClearRequest() {
+	m.clearedrequest = true
+	m.clearedFields[requestauditattempt.FieldRequestAuditID] = struct{}{}
+}
+
+// RequestCleared reports if the "request" edge to the RequestAuditLog entity was cleared.
+func (m *RequestAuditAttemptMutation) RequestCleared() bool {
+	return m.clearedrequest
+}
+
+// RequestID returns the "request" edge ID in the mutation.
+func (m *RequestAuditAttemptMutation) RequestID() (id int, exists bool) {
+	if m.request != nil {
+		return *m.request, true
+	}
+	return
+}
+
+// RequestIDs returns the "request" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// RequestID instead. It exists only for internal usage by the builders.
+func (m *RequestAuditAttemptMutation) RequestIDs() (ids []int) {
+	if id := m.request; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetRequest resets all changes to the "request" edge.
+func (m *RequestAuditAttemptMutation) ResetRequest() {
+	m.request = nil
+	m.clearedrequest = false
+}
+
+// Where appends a list predicates to the RequestAuditAttemptMutation builder.
+func (m *RequestAuditAttemptMutation) Where(ps ...predicate.RequestAuditAttempt) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the RequestAuditAttemptMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *RequestAuditAttemptMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.RequestAuditAttempt, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *RequestAuditAttemptMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *RequestAuditAttemptMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (RequestAuditAttempt).
+func (m *RequestAuditAttemptMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *RequestAuditAttemptMutation) Fields() []string {
+	fields := make([]string, 0, 28)
+	if m.request != nil {
+		fields = append(fields, requestauditattempt.FieldRequestAuditID)
+	}
+	if m.seq != nil {
+		fields = append(fields, requestauditattempt.FieldSeq)
+	}
+	if m.route_kind != nil {
+		fields = append(fields, requestauditattempt.FieldRouteKind)
+	}
+	if m.channel_id != nil {
+		fields = append(fields, requestauditattempt.FieldChannelID)
+	}
+	if m.channel_name != nil {
+		fields = append(fields, requestauditattempt.FieldChannelName)
+	}
+	if m.channel_key_id != nil {
+		fields = append(fields, requestauditattempt.FieldChannelKeyID)
+	}
+	if m.channel_key_name != nil {
+		fields = append(fields, requestauditattempt.FieldChannelKeyName)
+	}
+	if m.account_id != nil {
+		fields = append(fields, requestauditattempt.FieldAccountID)
+	}
+	if m.account_name != nil {
+		fields = append(fields, requestauditattempt.FieldAccountName)
+	}
+	if m.account_email != nil {
+		fields = append(fields, requestauditattempt.FieldAccountEmail)
+	}
+	if m.account_platform != nil {
+		fields = append(fields, requestauditattempt.FieldAccountPlatform)
+	}
+	if m.account_type != nil {
+		fields = append(fields, requestauditattempt.FieldAccountType)
+	}
+	if m.method != nil {
+		fields = append(fields, requestauditattempt.FieldMethod)
+	}
+	if m.upstream_url_enc != nil {
+		fields = append(fields, requestauditattempt.FieldUpstreamURLEnc)
+	}
+	if m.forward_headers_enc != nil {
+		fields = append(fields, requestauditattempt.FieldForwardHeadersEnc)
+	}
+	if m.forward_body_enc != nil {
+		fields = append(fields, requestauditattempt.FieldForwardBodyEnc)
+	}
+	if m.forward_body_bytes != nil {
+		fields = append(fields, requestauditattempt.FieldForwardBodyBytes)
+	}
+	if m.status_code != nil {
+		fields = append(fields, requestauditattempt.FieldStatusCode)
+	}
+	if m.verdict != nil {
+		fields = append(fields, requestauditattempt.FieldVerdict)
+	}
+	if m.reason != nil {
+		fields = append(fields, requestauditattempt.FieldReason)
+	}
+	if m.retry_after_ms != nil {
+		fields = append(fields, requestauditattempt.FieldRetryAfterMs)
+	}
+	if m.latency_ms != nil {
+		fields = append(fields, requestauditattempt.FieldLatencyMs)
+	}
+	if m.first_token_ms != nil {
+		fields = append(fields, requestauditattempt.FieldFirstTokenMs)
+	}
+	if m.response_started != nil {
+		fields = append(fields, requestauditattempt.FieldResponseStarted)
+	}
+	if m.stream_completed != nil {
+		fields = append(fields, requestauditattempt.FieldStreamCompleted)
+	}
+	if m.finished != nil {
+		fields = append(fields, requestauditattempt.FieldFinished)
+	}
+	if m.created_at != nil {
+		fields = append(fields, requestauditattempt.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, requestauditattempt.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *RequestAuditAttemptMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case requestauditattempt.FieldRequestAuditID:
+		return m.RequestAuditID()
+	case requestauditattempt.FieldSeq:
+		return m.Seq()
+	case requestauditattempt.FieldRouteKind:
+		return m.RouteKind()
+	case requestauditattempt.FieldChannelID:
+		return m.ChannelID()
+	case requestauditattempt.FieldChannelName:
+		return m.ChannelName()
+	case requestauditattempt.FieldChannelKeyID:
+		return m.ChannelKeyID()
+	case requestauditattempt.FieldChannelKeyName:
+		return m.ChannelKeyName()
+	case requestauditattempt.FieldAccountID:
+		return m.AccountID()
+	case requestauditattempt.FieldAccountName:
+		return m.AccountName()
+	case requestauditattempt.FieldAccountEmail:
+		return m.AccountEmail()
+	case requestauditattempt.FieldAccountPlatform:
+		return m.AccountPlatform()
+	case requestauditattempt.FieldAccountType:
+		return m.AccountType()
+	case requestauditattempt.FieldMethod:
+		return m.Method()
+	case requestauditattempt.FieldUpstreamURLEnc:
+		return m.UpstreamURLEnc()
+	case requestauditattempt.FieldForwardHeadersEnc:
+		return m.ForwardHeadersEnc()
+	case requestauditattempt.FieldForwardBodyEnc:
+		return m.ForwardBodyEnc()
+	case requestauditattempt.FieldForwardBodyBytes:
+		return m.ForwardBodyBytes()
+	case requestauditattempt.FieldStatusCode:
+		return m.StatusCode()
+	case requestauditattempt.FieldVerdict:
+		return m.Verdict()
+	case requestauditattempt.FieldReason:
+		return m.Reason()
+	case requestauditattempt.FieldRetryAfterMs:
+		return m.RetryAfterMs()
+	case requestauditattempt.FieldLatencyMs:
+		return m.LatencyMs()
+	case requestauditattempt.FieldFirstTokenMs:
+		return m.FirstTokenMs()
+	case requestauditattempt.FieldResponseStarted:
+		return m.ResponseStarted()
+	case requestauditattempt.FieldStreamCompleted:
+		return m.StreamCompleted()
+	case requestauditattempt.FieldFinished:
+		return m.Finished()
+	case requestauditattempt.FieldCreatedAt:
+		return m.CreatedAt()
+	case requestauditattempt.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *RequestAuditAttemptMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case requestauditattempt.FieldRequestAuditID:
+		return m.OldRequestAuditID(ctx)
+	case requestauditattempt.FieldSeq:
+		return m.OldSeq(ctx)
+	case requestauditattempt.FieldRouteKind:
+		return m.OldRouteKind(ctx)
+	case requestauditattempt.FieldChannelID:
+		return m.OldChannelID(ctx)
+	case requestauditattempt.FieldChannelName:
+		return m.OldChannelName(ctx)
+	case requestauditattempt.FieldChannelKeyID:
+		return m.OldChannelKeyID(ctx)
+	case requestauditattempt.FieldChannelKeyName:
+		return m.OldChannelKeyName(ctx)
+	case requestauditattempt.FieldAccountID:
+		return m.OldAccountID(ctx)
+	case requestauditattempt.FieldAccountName:
+		return m.OldAccountName(ctx)
+	case requestauditattempt.FieldAccountEmail:
+		return m.OldAccountEmail(ctx)
+	case requestauditattempt.FieldAccountPlatform:
+		return m.OldAccountPlatform(ctx)
+	case requestauditattempt.FieldAccountType:
+		return m.OldAccountType(ctx)
+	case requestauditattempt.FieldMethod:
+		return m.OldMethod(ctx)
+	case requestauditattempt.FieldUpstreamURLEnc:
+		return m.OldUpstreamURLEnc(ctx)
+	case requestauditattempt.FieldForwardHeadersEnc:
+		return m.OldForwardHeadersEnc(ctx)
+	case requestauditattempt.FieldForwardBodyEnc:
+		return m.OldForwardBodyEnc(ctx)
+	case requestauditattempt.FieldForwardBodyBytes:
+		return m.OldForwardBodyBytes(ctx)
+	case requestauditattempt.FieldStatusCode:
+		return m.OldStatusCode(ctx)
+	case requestauditattempt.FieldVerdict:
+		return m.OldVerdict(ctx)
+	case requestauditattempt.FieldReason:
+		return m.OldReason(ctx)
+	case requestauditattempt.FieldRetryAfterMs:
+		return m.OldRetryAfterMs(ctx)
+	case requestauditattempt.FieldLatencyMs:
+		return m.OldLatencyMs(ctx)
+	case requestauditattempt.FieldFirstTokenMs:
+		return m.OldFirstTokenMs(ctx)
+	case requestauditattempt.FieldResponseStarted:
+		return m.OldResponseStarted(ctx)
+	case requestauditattempt.FieldStreamCompleted:
+		return m.OldStreamCompleted(ctx)
+	case requestauditattempt.FieldFinished:
+		return m.OldFinished(ctx)
+	case requestauditattempt.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case requestauditattempt.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown RequestAuditAttempt field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *RequestAuditAttemptMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case requestauditattempt.FieldRequestAuditID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestAuditID(v)
+		return nil
+	case requestauditattempt.FieldSeq:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSeq(v)
+		return nil
+	case requestauditattempt.FieldRouteKind:
+		v, ok := value.(requestauditattempt.RouteKind)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRouteKind(v)
+		return nil
+	case requestauditattempt.FieldChannelID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChannelID(v)
+		return nil
+	case requestauditattempt.FieldChannelName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChannelName(v)
+		return nil
+	case requestauditattempt.FieldChannelKeyID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChannelKeyID(v)
+		return nil
+	case requestauditattempt.FieldChannelKeyName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChannelKeyName(v)
+		return nil
+	case requestauditattempt.FieldAccountID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountID(v)
+		return nil
+	case requestauditattempt.FieldAccountName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountName(v)
+		return nil
+	case requestauditattempt.FieldAccountEmail:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountEmail(v)
+		return nil
+	case requestauditattempt.FieldAccountPlatform:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountPlatform(v)
+		return nil
+	case requestauditattempt.FieldAccountType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountType(v)
+		return nil
+	case requestauditattempt.FieldMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMethod(v)
+		return nil
+	case requestauditattempt.FieldUpstreamURLEnc:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpstreamURLEnc(v)
+		return nil
+	case requestauditattempt.FieldForwardHeadersEnc:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetForwardHeadersEnc(v)
+		return nil
+	case requestauditattempt.FieldForwardBodyEnc:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetForwardBodyEnc(v)
+		return nil
+	case requestauditattempt.FieldForwardBodyBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetForwardBodyBytes(v)
+		return nil
+	case requestauditattempt.FieldStatusCode:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatusCode(v)
+		return nil
+	case requestauditattempt.FieldVerdict:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVerdict(v)
+		return nil
+	case requestauditattempt.FieldReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReason(v)
+		return nil
+	case requestauditattempt.FieldRetryAfterMs:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRetryAfterMs(v)
+		return nil
+	case requestauditattempt.FieldLatencyMs:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLatencyMs(v)
+		return nil
+	case requestauditattempt.FieldFirstTokenMs:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFirstTokenMs(v)
+		return nil
+	case requestauditattempt.FieldResponseStarted:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResponseStarted(v)
+		return nil
+	case requestauditattempt.FieldStreamCompleted:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStreamCompleted(v)
+		return nil
+	case requestauditattempt.FieldFinished:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinished(v)
+		return nil
+	case requestauditattempt.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case requestauditattempt.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown RequestAuditAttempt field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *RequestAuditAttemptMutation) AddedFields() []string {
+	var fields []string
+	if m.addseq != nil {
+		fields = append(fields, requestauditattempt.FieldSeq)
+	}
+	if m.addchannel_id != nil {
+		fields = append(fields, requestauditattempt.FieldChannelID)
+	}
+	if m.addchannel_key_id != nil {
+		fields = append(fields, requestauditattempt.FieldChannelKeyID)
+	}
+	if m.addaccount_id != nil {
+		fields = append(fields, requestauditattempt.FieldAccountID)
+	}
+	if m.addforward_body_bytes != nil {
+		fields = append(fields, requestauditattempt.FieldForwardBodyBytes)
+	}
+	if m.addstatus_code != nil {
+		fields = append(fields, requestauditattempt.FieldStatusCode)
+	}
+	if m.addretry_after_ms != nil {
+		fields = append(fields, requestauditattempt.FieldRetryAfterMs)
+	}
+	if m.addlatency_ms != nil {
+		fields = append(fields, requestauditattempt.FieldLatencyMs)
+	}
+	if m.addfirst_token_ms != nil {
+		fields = append(fields, requestauditattempt.FieldFirstTokenMs)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *RequestAuditAttemptMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case requestauditattempt.FieldSeq:
+		return m.AddedSeq()
+	case requestauditattempt.FieldChannelID:
+		return m.AddedChannelID()
+	case requestauditattempt.FieldChannelKeyID:
+		return m.AddedChannelKeyID()
+	case requestauditattempt.FieldAccountID:
+		return m.AddedAccountID()
+	case requestauditattempt.FieldForwardBodyBytes:
+		return m.AddedForwardBodyBytes()
+	case requestauditattempt.FieldStatusCode:
+		return m.AddedStatusCode()
+	case requestauditattempt.FieldRetryAfterMs:
+		return m.AddedRetryAfterMs()
+	case requestauditattempt.FieldLatencyMs:
+		return m.AddedLatencyMs()
+	case requestauditattempt.FieldFirstTokenMs:
+		return m.AddedFirstTokenMs()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *RequestAuditAttemptMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case requestauditattempt.FieldSeq:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSeq(v)
+		return nil
+	case requestauditattempt.FieldChannelID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddChannelID(v)
+		return nil
+	case requestauditattempt.FieldChannelKeyID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddChannelKeyID(v)
+		return nil
+	case requestauditattempt.FieldAccountID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAccountID(v)
+		return nil
+	case requestauditattempt.FieldForwardBodyBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddForwardBodyBytes(v)
+		return nil
+	case requestauditattempt.FieldStatusCode:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddStatusCode(v)
+		return nil
+	case requestauditattempt.FieldRetryAfterMs:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRetryAfterMs(v)
+		return nil
+	case requestauditattempt.FieldLatencyMs:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLatencyMs(v)
+		return nil
+	case requestauditattempt.FieldFirstTokenMs:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFirstTokenMs(v)
+		return nil
+	}
+	return fmt.Errorf("unknown RequestAuditAttempt numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *RequestAuditAttemptMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *RequestAuditAttemptMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *RequestAuditAttemptMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown RequestAuditAttempt nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *RequestAuditAttemptMutation) ResetField(name string) error {
+	switch name {
+	case requestauditattempt.FieldRequestAuditID:
+		m.ResetRequestAuditID()
+		return nil
+	case requestauditattempt.FieldSeq:
+		m.ResetSeq()
+		return nil
+	case requestauditattempt.FieldRouteKind:
+		m.ResetRouteKind()
+		return nil
+	case requestauditattempt.FieldChannelID:
+		m.ResetChannelID()
+		return nil
+	case requestauditattempt.FieldChannelName:
+		m.ResetChannelName()
+		return nil
+	case requestauditattempt.FieldChannelKeyID:
+		m.ResetChannelKeyID()
+		return nil
+	case requestauditattempt.FieldChannelKeyName:
+		m.ResetChannelKeyName()
+		return nil
+	case requestauditattempt.FieldAccountID:
+		m.ResetAccountID()
+		return nil
+	case requestauditattempt.FieldAccountName:
+		m.ResetAccountName()
+		return nil
+	case requestauditattempt.FieldAccountEmail:
+		m.ResetAccountEmail()
+		return nil
+	case requestauditattempt.FieldAccountPlatform:
+		m.ResetAccountPlatform()
+		return nil
+	case requestauditattempt.FieldAccountType:
+		m.ResetAccountType()
+		return nil
+	case requestauditattempt.FieldMethod:
+		m.ResetMethod()
+		return nil
+	case requestauditattempt.FieldUpstreamURLEnc:
+		m.ResetUpstreamURLEnc()
+		return nil
+	case requestauditattempt.FieldForwardHeadersEnc:
+		m.ResetForwardHeadersEnc()
+		return nil
+	case requestauditattempt.FieldForwardBodyEnc:
+		m.ResetForwardBodyEnc()
+		return nil
+	case requestauditattempt.FieldForwardBodyBytes:
+		m.ResetForwardBodyBytes()
+		return nil
+	case requestauditattempt.FieldStatusCode:
+		m.ResetStatusCode()
+		return nil
+	case requestauditattempt.FieldVerdict:
+		m.ResetVerdict()
+		return nil
+	case requestauditattempt.FieldReason:
+		m.ResetReason()
+		return nil
+	case requestauditattempt.FieldRetryAfterMs:
+		m.ResetRetryAfterMs()
+		return nil
+	case requestauditattempt.FieldLatencyMs:
+		m.ResetLatencyMs()
+		return nil
+	case requestauditattempt.FieldFirstTokenMs:
+		m.ResetFirstTokenMs()
+		return nil
+	case requestauditattempt.FieldResponseStarted:
+		m.ResetResponseStarted()
+		return nil
+	case requestauditattempt.FieldStreamCompleted:
+		m.ResetStreamCompleted()
+		return nil
+	case requestauditattempt.FieldFinished:
+		m.ResetFinished()
+		return nil
+	case requestauditattempt.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case requestauditattempt.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown RequestAuditAttempt field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *RequestAuditAttemptMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.request != nil {
+		edges = append(edges, requestauditattempt.EdgeRequest)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *RequestAuditAttemptMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case requestauditattempt.EdgeRequest:
+		if id := m.request; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *RequestAuditAttemptMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *RequestAuditAttemptMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *RequestAuditAttemptMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedrequest {
+		edges = append(edges, requestauditattempt.EdgeRequest)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *RequestAuditAttemptMutation) EdgeCleared(name string) bool {
+	switch name {
+	case requestauditattempt.EdgeRequest:
+		return m.clearedrequest
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *RequestAuditAttemptMutation) ClearEdge(name string) error {
+	switch name {
+	case requestauditattempt.EdgeRequest:
+		m.ClearRequest()
+		return nil
+	}
+	return fmt.Errorf("unknown RequestAuditAttempt unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *RequestAuditAttemptMutation) ResetEdge(name string) error {
+	switch name {
+	case requestauditattempt.EdgeRequest:
+		m.ResetRequest()
+		return nil
+	}
+	return fmt.Errorf("unknown RequestAuditAttempt edge %s", name)
+}
+
+// RequestAuditLogMutation represents an operation that mutates the RequestAuditLog nodes in the graph.
+type RequestAuditLogMutation struct {
+	config
+	op                    Op
+	typ                   string
+	id                    *int
+	request_id            *string
+	user_id               *int
+	adduser_id            *int
+	user_email_snapshot   *string
+	api_key_id            *int
+	addapi_key_id         *int
+	group_id              *int
+	addgroup_id           *int
+	client                *string
+	protocol              *string
+	endpoint              *string
+	model                 *string
+	stream                *bool
+	method                *string
+	_path                 *string
+	raw_query             *string
+	host                  *string
+	request_proto         *string
+	remote_addr           *string
+	ip_address            *string
+	user_agent            *string
+	content_type          *string
+	content_length        *int64
+	addcontent_length     *int64
+	inbound_headers_enc   *string
+	inbound_body_enc      *string
+	inbound_body_bytes    *int64
+	addinbound_body_bytes *int64
+	status_code           *int
+	addstatus_code        *int
+	duration_ms           *int64
+	addduration_ms        *int64
+	response_bytes        *int64
+	addresponse_bytes     *int64
+	completed             *bool
+	created_at            *time.Time
+	updated_at            *time.Time
+	clearedFields         map[string]struct{}
+	attempts              map[int]struct{}
+	removedattempts       map[int]struct{}
+	clearedattempts       bool
+	done                  bool
+	oldValue              func(context.Context) (*RequestAuditLog, error)
+	predicates            []predicate.RequestAuditLog
+}
+
+var _ ent.Mutation = (*RequestAuditLogMutation)(nil)
+
+// requestauditlogOption allows management of the mutation configuration using functional options.
+type requestauditlogOption func(*RequestAuditLogMutation)
+
+// newRequestAuditLogMutation creates new mutation for the RequestAuditLog entity.
+func newRequestAuditLogMutation(c config, op Op, opts ...requestauditlogOption) *RequestAuditLogMutation {
+	m := &RequestAuditLogMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeRequestAuditLog,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withRequestAuditLogID sets the ID field of the mutation.
+func withRequestAuditLogID(id int) requestauditlogOption {
+	return func(m *RequestAuditLogMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *RequestAuditLog
+		)
+		m.oldValue = func(ctx context.Context) (*RequestAuditLog, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().RequestAuditLog.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withRequestAuditLog sets the old RequestAuditLog of the mutation.
+func withRequestAuditLog(node *RequestAuditLog) requestauditlogOption {
+	return func(m *RequestAuditLogMutation) {
+		m.oldValue = func(context.Context) (*RequestAuditLog, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m RequestAuditLogMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m RequestAuditLogMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *RequestAuditLogMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *RequestAuditLogMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().RequestAuditLog.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetRequestID sets the "request_id" field.
+func (m *RequestAuditLogMutation) SetRequestID(s string) {
+	m.request_id = &s
+}
+
+// RequestID returns the value of the "request_id" field in the mutation.
+func (m *RequestAuditLogMutation) RequestID() (r string, exists bool) {
+	v := m.request_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestID returns the old "request_id" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldRequestID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestID: %w", err)
+	}
+	return oldValue.RequestID, nil
+}
+
+// ResetRequestID resets all changes to the "request_id" field.
+func (m *RequestAuditLogMutation) ResetRequestID() {
+	m.request_id = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *RequestAuditLogMutation) SetUserID(i int) {
+	m.user_id = &i
+	m.adduser_id = nil
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *RequestAuditLogMutation) UserID() (r int, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// AddUserID adds i to the "user_id" field.
+func (m *RequestAuditLogMutation) AddUserID(i int) {
+	if m.adduser_id != nil {
+		*m.adduser_id += i
+	} else {
+		m.adduser_id = &i
+	}
+}
+
+// AddedUserID returns the value that was added to the "user_id" field in this mutation.
+func (m *RequestAuditLogMutation) AddedUserID() (r int, exists bool) {
+	v := m.adduser_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *RequestAuditLogMutation) ResetUserID() {
+	m.user_id = nil
+	m.adduser_id = nil
+}
+
+// SetUserEmailSnapshot sets the "user_email_snapshot" field.
+func (m *RequestAuditLogMutation) SetUserEmailSnapshot(s string) {
+	m.user_email_snapshot = &s
+}
+
+// UserEmailSnapshot returns the value of the "user_email_snapshot" field in the mutation.
+func (m *RequestAuditLogMutation) UserEmailSnapshot() (r string, exists bool) {
+	v := m.user_email_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserEmailSnapshot returns the old "user_email_snapshot" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldUserEmailSnapshot(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserEmailSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserEmailSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserEmailSnapshot: %w", err)
+	}
+	return oldValue.UserEmailSnapshot, nil
+}
+
+// ResetUserEmailSnapshot resets all changes to the "user_email_snapshot" field.
+func (m *RequestAuditLogMutation) ResetUserEmailSnapshot() {
+	m.user_email_snapshot = nil
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (m *RequestAuditLogMutation) SetAPIKeyID(i int) {
+	m.api_key_id = &i
+	m.addapi_key_id = nil
+}
+
+// APIKeyID returns the value of the "api_key_id" field in the mutation.
+func (m *RequestAuditLogMutation) APIKeyID() (r int, exists bool) {
+	v := m.api_key_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAPIKeyID returns the old "api_key_id" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldAPIKeyID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAPIKeyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAPIKeyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAPIKeyID: %w", err)
+	}
+	return oldValue.APIKeyID, nil
+}
+
+// AddAPIKeyID adds i to the "api_key_id" field.
+func (m *RequestAuditLogMutation) AddAPIKeyID(i int) {
+	if m.addapi_key_id != nil {
+		*m.addapi_key_id += i
+	} else {
+		m.addapi_key_id = &i
+	}
+}
+
+// AddedAPIKeyID returns the value that was added to the "api_key_id" field in this mutation.
+func (m *RequestAuditLogMutation) AddedAPIKeyID() (r int, exists bool) {
+	v := m.addapi_key_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAPIKeyID resets all changes to the "api_key_id" field.
+func (m *RequestAuditLogMutation) ResetAPIKeyID() {
+	m.api_key_id = nil
+	m.addapi_key_id = nil
+}
+
+// SetGroupID sets the "group_id" field.
+func (m *RequestAuditLogMutation) SetGroupID(i int) {
+	m.group_id = &i
+	m.addgroup_id = nil
+}
+
+// GroupID returns the value of the "group_id" field in the mutation.
+func (m *RequestAuditLogMutation) GroupID() (r int, exists bool) {
+	v := m.group_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGroupID returns the old "group_id" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldGroupID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGroupID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGroupID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGroupID: %w", err)
+	}
+	return oldValue.GroupID, nil
+}
+
+// AddGroupID adds i to the "group_id" field.
+func (m *RequestAuditLogMutation) AddGroupID(i int) {
+	if m.addgroup_id != nil {
+		*m.addgroup_id += i
+	} else {
+		m.addgroup_id = &i
+	}
+}
+
+// AddedGroupID returns the value that was added to the "group_id" field in this mutation.
+func (m *RequestAuditLogMutation) AddedGroupID() (r int, exists bool) {
+	v := m.addgroup_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetGroupID resets all changes to the "group_id" field.
+func (m *RequestAuditLogMutation) ResetGroupID() {
+	m.group_id = nil
+	m.addgroup_id = nil
+}
+
+// SetClient sets the "client" field.
+func (m *RequestAuditLogMutation) SetClient(s string) {
+	m.client = &s
+}
+
+// GetClient returns the value of the "client" field in the mutation.
+func (m *RequestAuditLogMutation) GetClient() (r string, exists bool) {
+	v := m.client
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClient returns the old "client" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldClient(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClient is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClient requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClient: %w", err)
+	}
+	return oldValue.Client, nil
+}
+
+// ResetClient resets all changes to the "client" field.
+func (m *RequestAuditLogMutation) ResetClient() {
+	m.client = nil
+}
+
+// SetProtocol sets the "protocol" field.
+func (m *RequestAuditLogMutation) SetProtocol(s string) {
+	m.protocol = &s
+}
+
+// Protocol returns the value of the "protocol" field in the mutation.
+func (m *RequestAuditLogMutation) Protocol() (r string, exists bool) {
+	v := m.protocol
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProtocol returns the old "protocol" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldProtocol(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProtocol is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProtocol requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProtocol: %w", err)
+	}
+	return oldValue.Protocol, nil
+}
+
+// ResetProtocol resets all changes to the "protocol" field.
+func (m *RequestAuditLogMutation) ResetProtocol() {
+	m.protocol = nil
+}
+
+// SetEndpoint sets the "endpoint" field.
+func (m *RequestAuditLogMutation) SetEndpoint(s string) {
+	m.endpoint = &s
+}
+
+// Endpoint returns the value of the "endpoint" field in the mutation.
+func (m *RequestAuditLogMutation) Endpoint() (r string, exists bool) {
+	v := m.endpoint
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEndpoint returns the old "endpoint" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldEndpoint(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEndpoint is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEndpoint requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEndpoint: %w", err)
+	}
+	return oldValue.Endpoint, nil
+}
+
+// ResetEndpoint resets all changes to the "endpoint" field.
+func (m *RequestAuditLogMutation) ResetEndpoint() {
+	m.endpoint = nil
+}
+
+// SetModel sets the "model" field.
+func (m *RequestAuditLogMutation) SetModel(s string) {
+	m.model = &s
+}
+
+// Model returns the value of the "model" field in the mutation.
+func (m *RequestAuditLogMutation) Model() (r string, exists bool) {
+	v := m.model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModel returns the old "model" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldModel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModel: %w", err)
+	}
+	return oldValue.Model, nil
+}
+
+// ResetModel resets all changes to the "model" field.
+func (m *RequestAuditLogMutation) ResetModel() {
+	m.model = nil
+}
+
+// SetStream sets the "stream" field.
+func (m *RequestAuditLogMutation) SetStream(b bool) {
+	m.stream = &b
+}
+
+// Stream returns the value of the "stream" field in the mutation.
+func (m *RequestAuditLogMutation) Stream() (r bool, exists bool) {
+	v := m.stream
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStream returns the old "stream" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldStream(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStream is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStream requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStream: %w", err)
+	}
+	return oldValue.Stream, nil
+}
+
+// ResetStream resets all changes to the "stream" field.
+func (m *RequestAuditLogMutation) ResetStream() {
+	m.stream = nil
+}
+
+// SetMethod sets the "method" field.
+func (m *RequestAuditLogMutation) SetMethod(s string) {
+	m.method = &s
+}
+
+// Method returns the value of the "method" field in the mutation.
+func (m *RequestAuditLogMutation) Method() (r string, exists bool) {
+	v := m.method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMethod returns the old "method" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldMethod(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMethod: %w", err)
+	}
+	return oldValue.Method, nil
+}
+
+// ResetMethod resets all changes to the "method" field.
+func (m *RequestAuditLogMutation) ResetMethod() {
+	m.method = nil
+}
+
+// SetPath sets the "path" field.
+func (m *RequestAuditLogMutation) SetPath(s string) {
+	m._path = &s
+}
+
+// Path returns the value of the "path" field in the mutation.
+func (m *RequestAuditLogMutation) Path() (r string, exists bool) {
+	v := m._path
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPath returns the old "path" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldPath(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPath is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPath requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPath: %w", err)
+	}
+	return oldValue.Path, nil
+}
+
+// ResetPath resets all changes to the "path" field.
+func (m *RequestAuditLogMutation) ResetPath() {
+	m._path = nil
+}
+
+// SetRawQuery sets the "raw_query" field.
+func (m *RequestAuditLogMutation) SetRawQuery(s string) {
+	m.raw_query = &s
+}
+
+// RawQuery returns the value of the "raw_query" field in the mutation.
+func (m *RequestAuditLogMutation) RawQuery() (r string, exists bool) {
+	v := m.raw_query
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRawQuery returns the old "raw_query" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldRawQuery(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRawQuery is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRawQuery requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRawQuery: %w", err)
+	}
+	return oldValue.RawQuery, nil
+}
+
+// ResetRawQuery resets all changes to the "raw_query" field.
+func (m *RequestAuditLogMutation) ResetRawQuery() {
+	m.raw_query = nil
+}
+
+// SetHost sets the "host" field.
+func (m *RequestAuditLogMutation) SetHost(s string) {
+	m.host = &s
+}
+
+// Host returns the value of the "host" field in the mutation.
+func (m *RequestAuditLogMutation) Host() (r string, exists bool) {
+	v := m.host
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHost returns the old "host" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldHost(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHost: %w", err)
+	}
+	return oldValue.Host, nil
+}
+
+// ResetHost resets all changes to the "host" field.
+func (m *RequestAuditLogMutation) ResetHost() {
+	m.host = nil
+}
+
+// SetRequestProto sets the "request_proto" field.
+func (m *RequestAuditLogMutation) SetRequestProto(s string) {
+	m.request_proto = &s
+}
+
+// RequestProto returns the value of the "request_proto" field in the mutation.
+func (m *RequestAuditLogMutation) RequestProto() (r string, exists bool) {
+	v := m.request_proto
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestProto returns the old "request_proto" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldRequestProto(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestProto is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestProto requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestProto: %w", err)
+	}
+	return oldValue.RequestProto, nil
+}
+
+// ResetRequestProto resets all changes to the "request_proto" field.
+func (m *RequestAuditLogMutation) ResetRequestProto() {
+	m.request_proto = nil
+}
+
+// SetRemoteAddr sets the "remote_addr" field.
+func (m *RequestAuditLogMutation) SetRemoteAddr(s string) {
+	m.remote_addr = &s
+}
+
+// RemoteAddr returns the value of the "remote_addr" field in the mutation.
+func (m *RequestAuditLogMutation) RemoteAddr() (r string, exists bool) {
+	v := m.remote_addr
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRemoteAddr returns the old "remote_addr" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldRemoteAddr(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRemoteAddr is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRemoteAddr requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRemoteAddr: %w", err)
+	}
+	return oldValue.RemoteAddr, nil
+}
+
+// ResetRemoteAddr resets all changes to the "remote_addr" field.
+func (m *RequestAuditLogMutation) ResetRemoteAddr() {
+	m.remote_addr = nil
+}
+
+// SetIPAddress sets the "ip_address" field.
+func (m *RequestAuditLogMutation) SetIPAddress(s string) {
+	m.ip_address = &s
+}
+
+// IPAddress returns the value of the "ip_address" field in the mutation.
+func (m *RequestAuditLogMutation) IPAddress() (r string, exists bool) {
+	v := m.ip_address
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIPAddress returns the old "ip_address" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldIPAddress(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIPAddress is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIPAddress requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIPAddress: %w", err)
+	}
+	return oldValue.IPAddress, nil
+}
+
+// ResetIPAddress resets all changes to the "ip_address" field.
+func (m *RequestAuditLogMutation) ResetIPAddress() {
+	m.ip_address = nil
+}
+
+// SetUserAgent sets the "user_agent" field.
+func (m *RequestAuditLogMutation) SetUserAgent(s string) {
+	m.user_agent = &s
+}
+
+// UserAgent returns the value of the "user_agent" field in the mutation.
+func (m *RequestAuditLogMutation) UserAgent() (r string, exists bool) {
+	v := m.user_agent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserAgent returns the old "user_agent" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldUserAgent(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserAgent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserAgent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserAgent: %w", err)
+	}
+	return oldValue.UserAgent, nil
+}
+
+// ResetUserAgent resets all changes to the "user_agent" field.
+func (m *RequestAuditLogMutation) ResetUserAgent() {
+	m.user_agent = nil
+}
+
+// SetContentType sets the "content_type" field.
+func (m *RequestAuditLogMutation) SetContentType(s string) {
+	m.content_type = &s
+}
+
+// ContentType returns the value of the "content_type" field in the mutation.
+func (m *RequestAuditLogMutation) ContentType() (r string, exists bool) {
+	v := m.content_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContentType returns the old "content_type" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldContentType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContentType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContentType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContentType: %w", err)
+	}
+	return oldValue.ContentType, nil
+}
+
+// ResetContentType resets all changes to the "content_type" field.
+func (m *RequestAuditLogMutation) ResetContentType() {
+	m.content_type = nil
+}
+
+// SetContentLength sets the "content_length" field.
+func (m *RequestAuditLogMutation) SetContentLength(i int64) {
+	m.content_length = &i
+	m.addcontent_length = nil
+}
+
+// ContentLength returns the value of the "content_length" field in the mutation.
+func (m *RequestAuditLogMutation) ContentLength() (r int64, exists bool) {
+	v := m.content_length
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContentLength returns the old "content_length" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldContentLength(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContentLength is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContentLength requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContentLength: %w", err)
+	}
+	return oldValue.ContentLength, nil
+}
+
+// AddContentLength adds i to the "content_length" field.
+func (m *RequestAuditLogMutation) AddContentLength(i int64) {
+	if m.addcontent_length != nil {
+		*m.addcontent_length += i
+	} else {
+		m.addcontent_length = &i
+	}
+}
+
+// AddedContentLength returns the value that was added to the "content_length" field in this mutation.
+func (m *RequestAuditLogMutation) AddedContentLength() (r int64, exists bool) {
+	v := m.addcontent_length
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetContentLength resets all changes to the "content_length" field.
+func (m *RequestAuditLogMutation) ResetContentLength() {
+	m.content_length = nil
+	m.addcontent_length = nil
+}
+
+// SetInboundHeadersEnc sets the "inbound_headers_enc" field.
+func (m *RequestAuditLogMutation) SetInboundHeadersEnc(s string) {
+	m.inbound_headers_enc = &s
+}
+
+// InboundHeadersEnc returns the value of the "inbound_headers_enc" field in the mutation.
+func (m *RequestAuditLogMutation) InboundHeadersEnc() (r string, exists bool) {
+	v := m.inbound_headers_enc
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInboundHeadersEnc returns the old "inbound_headers_enc" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldInboundHeadersEnc(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInboundHeadersEnc is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInboundHeadersEnc requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInboundHeadersEnc: %w", err)
+	}
+	return oldValue.InboundHeadersEnc, nil
+}
+
+// ResetInboundHeadersEnc resets all changes to the "inbound_headers_enc" field.
+func (m *RequestAuditLogMutation) ResetInboundHeadersEnc() {
+	m.inbound_headers_enc = nil
+}
+
+// SetInboundBodyEnc sets the "inbound_body_enc" field.
+func (m *RequestAuditLogMutation) SetInboundBodyEnc(s string) {
+	m.inbound_body_enc = &s
+}
+
+// InboundBodyEnc returns the value of the "inbound_body_enc" field in the mutation.
+func (m *RequestAuditLogMutation) InboundBodyEnc() (r string, exists bool) {
+	v := m.inbound_body_enc
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInboundBodyEnc returns the old "inbound_body_enc" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldInboundBodyEnc(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInboundBodyEnc is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInboundBodyEnc requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInboundBodyEnc: %w", err)
+	}
+	return oldValue.InboundBodyEnc, nil
+}
+
+// ResetInboundBodyEnc resets all changes to the "inbound_body_enc" field.
+func (m *RequestAuditLogMutation) ResetInboundBodyEnc() {
+	m.inbound_body_enc = nil
+}
+
+// SetInboundBodyBytes sets the "inbound_body_bytes" field.
+func (m *RequestAuditLogMutation) SetInboundBodyBytes(i int64) {
+	m.inbound_body_bytes = &i
+	m.addinbound_body_bytes = nil
+}
+
+// InboundBodyBytes returns the value of the "inbound_body_bytes" field in the mutation.
+func (m *RequestAuditLogMutation) InboundBodyBytes() (r int64, exists bool) {
+	v := m.inbound_body_bytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInboundBodyBytes returns the old "inbound_body_bytes" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldInboundBodyBytes(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInboundBodyBytes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInboundBodyBytes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInboundBodyBytes: %w", err)
+	}
+	return oldValue.InboundBodyBytes, nil
+}
+
+// AddInboundBodyBytes adds i to the "inbound_body_bytes" field.
+func (m *RequestAuditLogMutation) AddInboundBodyBytes(i int64) {
+	if m.addinbound_body_bytes != nil {
+		*m.addinbound_body_bytes += i
+	} else {
+		m.addinbound_body_bytes = &i
+	}
+}
+
+// AddedInboundBodyBytes returns the value that was added to the "inbound_body_bytes" field in this mutation.
+func (m *RequestAuditLogMutation) AddedInboundBodyBytes() (r int64, exists bool) {
+	v := m.addinbound_body_bytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetInboundBodyBytes resets all changes to the "inbound_body_bytes" field.
+func (m *RequestAuditLogMutation) ResetInboundBodyBytes() {
+	m.inbound_body_bytes = nil
+	m.addinbound_body_bytes = nil
+}
+
+// SetStatusCode sets the "status_code" field.
+func (m *RequestAuditLogMutation) SetStatusCode(i int) {
+	m.status_code = &i
+	m.addstatus_code = nil
+}
+
+// StatusCode returns the value of the "status_code" field in the mutation.
+func (m *RequestAuditLogMutation) StatusCode() (r int, exists bool) {
+	v := m.status_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatusCode returns the old "status_code" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldStatusCode(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatusCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatusCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatusCode: %w", err)
+	}
+	return oldValue.StatusCode, nil
+}
+
+// AddStatusCode adds i to the "status_code" field.
+func (m *RequestAuditLogMutation) AddStatusCode(i int) {
+	if m.addstatus_code != nil {
+		*m.addstatus_code += i
+	} else {
+		m.addstatus_code = &i
+	}
+}
+
+// AddedStatusCode returns the value that was added to the "status_code" field in this mutation.
+func (m *RequestAuditLogMutation) AddedStatusCode() (r int, exists bool) {
+	v := m.addstatus_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetStatusCode resets all changes to the "status_code" field.
+func (m *RequestAuditLogMutation) ResetStatusCode() {
+	m.status_code = nil
+	m.addstatus_code = nil
+}
+
+// SetDurationMs sets the "duration_ms" field.
+func (m *RequestAuditLogMutation) SetDurationMs(i int64) {
+	m.duration_ms = &i
+	m.addduration_ms = nil
+}
+
+// DurationMs returns the value of the "duration_ms" field in the mutation.
+func (m *RequestAuditLogMutation) DurationMs() (r int64, exists bool) {
+	v := m.duration_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDurationMs returns the old "duration_ms" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldDurationMs(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDurationMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDurationMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDurationMs: %w", err)
+	}
+	return oldValue.DurationMs, nil
+}
+
+// AddDurationMs adds i to the "duration_ms" field.
+func (m *RequestAuditLogMutation) AddDurationMs(i int64) {
+	if m.addduration_ms != nil {
+		*m.addduration_ms += i
+	} else {
+		m.addduration_ms = &i
+	}
+}
+
+// AddedDurationMs returns the value that was added to the "duration_ms" field in this mutation.
+func (m *RequestAuditLogMutation) AddedDurationMs() (r int64, exists bool) {
+	v := m.addduration_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetDurationMs resets all changes to the "duration_ms" field.
+func (m *RequestAuditLogMutation) ResetDurationMs() {
+	m.duration_ms = nil
+	m.addduration_ms = nil
+}
+
+// SetResponseBytes sets the "response_bytes" field.
+func (m *RequestAuditLogMutation) SetResponseBytes(i int64) {
+	m.response_bytes = &i
+	m.addresponse_bytes = nil
+}
+
+// ResponseBytes returns the value of the "response_bytes" field in the mutation.
+func (m *RequestAuditLogMutation) ResponseBytes() (r int64, exists bool) {
+	v := m.response_bytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResponseBytes returns the old "response_bytes" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldResponseBytes(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResponseBytes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResponseBytes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResponseBytes: %w", err)
+	}
+	return oldValue.ResponseBytes, nil
+}
+
+// AddResponseBytes adds i to the "response_bytes" field.
+func (m *RequestAuditLogMutation) AddResponseBytes(i int64) {
+	if m.addresponse_bytes != nil {
+		*m.addresponse_bytes += i
+	} else {
+		m.addresponse_bytes = &i
+	}
+}
+
+// AddedResponseBytes returns the value that was added to the "response_bytes" field in this mutation.
+func (m *RequestAuditLogMutation) AddedResponseBytes() (r int64, exists bool) {
+	v := m.addresponse_bytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetResponseBytes resets all changes to the "response_bytes" field.
+func (m *RequestAuditLogMutation) ResetResponseBytes() {
+	m.response_bytes = nil
+	m.addresponse_bytes = nil
+}
+
+// SetCompleted sets the "completed" field.
+func (m *RequestAuditLogMutation) SetCompleted(b bool) {
+	m.completed = &b
+}
+
+// Completed returns the value of the "completed" field in the mutation.
+func (m *RequestAuditLogMutation) Completed() (r bool, exists bool) {
+	v := m.completed
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCompleted returns the old "completed" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldCompleted(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCompleted is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCompleted requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCompleted: %w", err)
+	}
+	return oldValue.Completed, nil
+}
+
+// ResetCompleted resets all changes to the "completed" field.
+func (m *RequestAuditLogMutation) ResetCompleted() {
+	m.completed = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *RequestAuditLogMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *RequestAuditLogMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *RequestAuditLogMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *RequestAuditLogMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *RequestAuditLogMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the RequestAuditLog entity.
+// If the RequestAuditLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestAuditLogMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *RequestAuditLogMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// AddAttemptIDs adds the "attempts" edge to the RequestAuditAttempt entity by ids.
+func (m *RequestAuditLogMutation) AddAttemptIDs(ids ...int) {
+	if m.attempts == nil {
+		m.attempts = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.attempts[ids[i]] = struct{}{}
+	}
+}
+
+// ClearAttempts clears the "attempts" edge to the RequestAuditAttempt entity.
+func (m *RequestAuditLogMutation) ClearAttempts() {
+	m.clearedattempts = true
+}
+
+// AttemptsCleared reports if the "attempts" edge to the RequestAuditAttempt entity was cleared.
+func (m *RequestAuditLogMutation) AttemptsCleared() bool {
+	return m.clearedattempts
+}
+
+// RemoveAttemptIDs removes the "attempts" edge to the RequestAuditAttempt entity by IDs.
+func (m *RequestAuditLogMutation) RemoveAttemptIDs(ids ...int) {
+	if m.removedattempts == nil {
+		m.removedattempts = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.attempts, ids[i])
+		m.removedattempts[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedAttempts returns the removed IDs of the "attempts" edge to the RequestAuditAttempt entity.
+func (m *RequestAuditLogMutation) RemovedAttemptsIDs() (ids []int) {
+	for id := range m.removedattempts {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// AttemptsIDs returns the "attempts" edge IDs in the mutation.
+func (m *RequestAuditLogMutation) AttemptsIDs() (ids []int) {
+	for id := range m.attempts {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetAttempts resets all changes to the "attempts" edge.
+func (m *RequestAuditLogMutation) ResetAttempts() {
+	m.attempts = nil
+	m.clearedattempts = false
+	m.removedattempts = nil
+}
+
+// Where appends a list predicates to the RequestAuditLogMutation builder.
+func (m *RequestAuditLogMutation) Where(ps ...predicate.RequestAuditLog) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the RequestAuditLogMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *RequestAuditLogMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.RequestAuditLog, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *RequestAuditLogMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *RequestAuditLogMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (RequestAuditLog).
+func (m *RequestAuditLogMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *RequestAuditLogMutation) Fields() []string {
+	fields := make([]string, 0, 29)
+	if m.request_id != nil {
+		fields = append(fields, requestauditlog.FieldRequestID)
+	}
+	if m.user_id != nil {
+		fields = append(fields, requestauditlog.FieldUserID)
+	}
+	if m.user_email_snapshot != nil {
+		fields = append(fields, requestauditlog.FieldUserEmailSnapshot)
+	}
+	if m.api_key_id != nil {
+		fields = append(fields, requestauditlog.FieldAPIKeyID)
+	}
+	if m.group_id != nil {
+		fields = append(fields, requestauditlog.FieldGroupID)
+	}
+	if m.client != nil {
+		fields = append(fields, requestauditlog.FieldClient)
+	}
+	if m.protocol != nil {
+		fields = append(fields, requestauditlog.FieldProtocol)
+	}
+	if m.endpoint != nil {
+		fields = append(fields, requestauditlog.FieldEndpoint)
+	}
+	if m.model != nil {
+		fields = append(fields, requestauditlog.FieldModel)
+	}
+	if m.stream != nil {
+		fields = append(fields, requestauditlog.FieldStream)
+	}
+	if m.method != nil {
+		fields = append(fields, requestauditlog.FieldMethod)
+	}
+	if m._path != nil {
+		fields = append(fields, requestauditlog.FieldPath)
+	}
+	if m.raw_query != nil {
+		fields = append(fields, requestauditlog.FieldRawQuery)
+	}
+	if m.host != nil {
+		fields = append(fields, requestauditlog.FieldHost)
+	}
+	if m.request_proto != nil {
+		fields = append(fields, requestauditlog.FieldRequestProto)
+	}
+	if m.remote_addr != nil {
+		fields = append(fields, requestauditlog.FieldRemoteAddr)
+	}
+	if m.ip_address != nil {
+		fields = append(fields, requestauditlog.FieldIPAddress)
+	}
+	if m.user_agent != nil {
+		fields = append(fields, requestauditlog.FieldUserAgent)
+	}
+	if m.content_type != nil {
+		fields = append(fields, requestauditlog.FieldContentType)
+	}
+	if m.content_length != nil {
+		fields = append(fields, requestauditlog.FieldContentLength)
+	}
+	if m.inbound_headers_enc != nil {
+		fields = append(fields, requestauditlog.FieldInboundHeadersEnc)
+	}
+	if m.inbound_body_enc != nil {
+		fields = append(fields, requestauditlog.FieldInboundBodyEnc)
+	}
+	if m.inbound_body_bytes != nil {
+		fields = append(fields, requestauditlog.FieldInboundBodyBytes)
+	}
+	if m.status_code != nil {
+		fields = append(fields, requestauditlog.FieldStatusCode)
+	}
+	if m.duration_ms != nil {
+		fields = append(fields, requestauditlog.FieldDurationMs)
+	}
+	if m.response_bytes != nil {
+		fields = append(fields, requestauditlog.FieldResponseBytes)
+	}
+	if m.completed != nil {
+		fields = append(fields, requestauditlog.FieldCompleted)
+	}
+	if m.created_at != nil {
+		fields = append(fields, requestauditlog.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, requestauditlog.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *RequestAuditLogMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case requestauditlog.FieldRequestID:
+		return m.RequestID()
+	case requestauditlog.FieldUserID:
+		return m.UserID()
+	case requestauditlog.FieldUserEmailSnapshot:
+		return m.UserEmailSnapshot()
+	case requestauditlog.FieldAPIKeyID:
+		return m.APIKeyID()
+	case requestauditlog.FieldGroupID:
+		return m.GroupID()
+	case requestauditlog.FieldClient:
+		return m.GetClient()
+	case requestauditlog.FieldProtocol:
+		return m.Protocol()
+	case requestauditlog.FieldEndpoint:
+		return m.Endpoint()
+	case requestauditlog.FieldModel:
+		return m.Model()
+	case requestauditlog.FieldStream:
+		return m.Stream()
+	case requestauditlog.FieldMethod:
+		return m.Method()
+	case requestauditlog.FieldPath:
+		return m.Path()
+	case requestauditlog.FieldRawQuery:
+		return m.RawQuery()
+	case requestauditlog.FieldHost:
+		return m.Host()
+	case requestauditlog.FieldRequestProto:
+		return m.RequestProto()
+	case requestauditlog.FieldRemoteAddr:
+		return m.RemoteAddr()
+	case requestauditlog.FieldIPAddress:
+		return m.IPAddress()
+	case requestauditlog.FieldUserAgent:
+		return m.UserAgent()
+	case requestauditlog.FieldContentType:
+		return m.ContentType()
+	case requestauditlog.FieldContentLength:
+		return m.ContentLength()
+	case requestauditlog.FieldInboundHeadersEnc:
+		return m.InboundHeadersEnc()
+	case requestauditlog.FieldInboundBodyEnc:
+		return m.InboundBodyEnc()
+	case requestauditlog.FieldInboundBodyBytes:
+		return m.InboundBodyBytes()
+	case requestauditlog.FieldStatusCode:
+		return m.StatusCode()
+	case requestauditlog.FieldDurationMs:
+		return m.DurationMs()
+	case requestauditlog.FieldResponseBytes:
+		return m.ResponseBytes()
+	case requestauditlog.FieldCompleted:
+		return m.Completed()
+	case requestauditlog.FieldCreatedAt:
+		return m.CreatedAt()
+	case requestauditlog.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *RequestAuditLogMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case requestauditlog.FieldRequestID:
+		return m.OldRequestID(ctx)
+	case requestauditlog.FieldUserID:
+		return m.OldUserID(ctx)
+	case requestauditlog.FieldUserEmailSnapshot:
+		return m.OldUserEmailSnapshot(ctx)
+	case requestauditlog.FieldAPIKeyID:
+		return m.OldAPIKeyID(ctx)
+	case requestauditlog.FieldGroupID:
+		return m.OldGroupID(ctx)
+	case requestauditlog.FieldClient:
+		return m.OldClient(ctx)
+	case requestauditlog.FieldProtocol:
+		return m.OldProtocol(ctx)
+	case requestauditlog.FieldEndpoint:
+		return m.OldEndpoint(ctx)
+	case requestauditlog.FieldModel:
+		return m.OldModel(ctx)
+	case requestauditlog.FieldStream:
+		return m.OldStream(ctx)
+	case requestauditlog.FieldMethod:
+		return m.OldMethod(ctx)
+	case requestauditlog.FieldPath:
+		return m.OldPath(ctx)
+	case requestauditlog.FieldRawQuery:
+		return m.OldRawQuery(ctx)
+	case requestauditlog.FieldHost:
+		return m.OldHost(ctx)
+	case requestauditlog.FieldRequestProto:
+		return m.OldRequestProto(ctx)
+	case requestauditlog.FieldRemoteAddr:
+		return m.OldRemoteAddr(ctx)
+	case requestauditlog.FieldIPAddress:
+		return m.OldIPAddress(ctx)
+	case requestauditlog.FieldUserAgent:
+		return m.OldUserAgent(ctx)
+	case requestauditlog.FieldContentType:
+		return m.OldContentType(ctx)
+	case requestauditlog.FieldContentLength:
+		return m.OldContentLength(ctx)
+	case requestauditlog.FieldInboundHeadersEnc:
+		return m.OldInboundHeadersEnc(ctx)
+	case requestauditlog.FieldInboundBodyEnc:
+		return m.OldInboundBodyEnc(ctx)
+	case requestauditlog.FieldInboundBodyBytes:
+		return m.OldInboundBodyBytes(ctx)
+	case requestauditlog.FieldStatusCode:
+		return m.OldStatusCode(ctx)
+	case requestauditlog.FieldDurationMs:
+		return m.OldDurationMs(ctx)
+	case requestauditlog.FieldResponseBytes:
+		return m.OldResponseBytes(ctx)
+	case requestauditlog.FieldCompleted:
+		return m.OldCompleted(ctx)
+	case requestauditlog.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case requestauditlog.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown RequestAuditLog field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *RequestAuditLogMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case requestauditlog.FieldRequestID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestID(v)
+		return nil
+	case requestauditlog.FieldUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case requestauditlog.FieldUserEmailSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserEmailSnapshot(v)
+		return nil
+	case requestauditlog.FieldAPIKeyID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAPIKeyID(v)
+		return nil
+	case requestauditlog.FieldGroupID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGroupID(v)
+		return nil
+	case requestauditlog.FieldClient:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClient(v)
+		return nil
+	case requestauditlog.FieldProtocol:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProtocol(v)
+		return nil
+	case requestauditlog.FieldEndpoint:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEndpoint(v)
+		return nil
+	case requestauditlog.FieldModel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModel(v)
+		return nil
+	case requestauditlog.FieldStream:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStream(v)
+		return nil
+	case requestauditlog.FieldMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMethod(v)
+		return nil
+	case requestauditlog.FieldPath:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPath(v)
+		return nil
+	case requestauditlog.FieldRawQuery:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRawQuery(v)
+		return nil
+	case requestauditlog.FieldHost:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHost(v)
+		return nil
+	case requestauditlog.FieldRequestProto:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestProto(v)
+		return nil
+	case requestauditlog.FieldRemoteAddr:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRemoteAddr(v)
+		return nil
+	case requestauditlog.FieldIPAddress:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIPAddress(v)
+		return nil
+	case requestauditlog.FieldUserAgent:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserAgent(v)
+		return nil
+	case requestauditlog.FieldContentType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContentType(v)
+		return nil
+	case requestauditlog.FieldContentLength:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContentLength(v)
+		return nil
+	case requestauditlog.FieldInboundHeadersEnc:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInboundHeadersEnc(v)
+		return nil
+	case requestauditlog.FieldInboundBodyEnc:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInboundBodyEnc(v)
+		return nil
+	case requestauditlog.FieldInboundBodyBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInboundBodyBytes(v)
+		return nil
+	case requestauditlog.FieldStatusCode:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatusCode(v)
+		return nil
+	case requestauditlog.FieldDurationMs:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDurationMs(v)
+		return nil
+	case requestauditlog.FieldResponseBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResponseBytes(v)
+		return nil
+	case requestauditlog.FieldCompleted:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCompleted(v)
+		return nil
+	case requestauditlog.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case requestauditlog.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown RequestAuditLog field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *RequestAuditLogMutation) AddedFields() []string {
+	var fields []string
+	if m.adduser_id != nil {
+		fields = append(fields, requestauditlog.FieldUserID)
+	}
+	if m.addapi_key_id != nil {
+		fields = append(fields, requestauditlog.FieldAPIKeyID)
+	}
+	if m.addgroup_id != nil {
+		fields = append(fields, requestauditlog.FieldGroupID)
+	}
+	if m.addcontent_length != nil {
+		fields = append(fields, requestauditlog.FieldContentLength)
+	}
+	if m.addinbound_body_bytes != nil {
+		fields = append(fields, requestauditlog.FieldInboundBodyBytes)
+	}
+	if m.addstatus_code != nil {
+		fields = append(fields, requestauditlog.FieldStatusCode)
+	}
+	if m.addduration_ms != nil {
+		fields = append(fields, requestauditlog.FieldDurationMs)
+	}
+	if m.addresponse_bytes != nil {
+		fields = append(fields, requestauditlog.FieldResponseBytes)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *RequestAuditLogMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case requestauditlog.FieldUserID:
+		return m.AddedUserID()
+	case requestauditlog.FieldAPIKeyID:
+		return m.AddedAPIKeyID()
+	case requestauditlog.FieldGroupID:
+		return m.AddedGroupID()
+	case requestauditlog.FieldContentLength:
+		return m.AddedContentLength()
+	case requestauditlog.FieldInboundBodyBytes:
+		return m.AddedInboundBodyBytes()
+	case requestauditlog.FieldStatusCode:
+		return m.AddedStatusCode()
+	case requestauditlog.FieldDurationMs:
+		return m.AddedDurationMs()
+	case requestauditlog.FieldResponseBytes:
+		return m.AddedResponseBytes()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *RequestAuditLogMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case requestauditlog.FieldUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUserID(v)
+		return nil
+	case requestauditlog.FieldAPIKeyID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAPIKeyID(v)
+		return nil
+	case requestauditlog.FieldGroupID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddGroupID(v)
+		return nil
+	case requestauditlog.FieldContentLength:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddContentLength(v)
+		return nil
+	case requestauditlog.FieldInboundBodyBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddInboundBodyBytes(v)
+		return nil
+	case requestauditlog.FieldStatusCode:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddStatusCode(v)
+		return nil
+	case requestauditlog.FieldDurationMs:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDurationMs(v)
+		return nil
+	case requestauditlog.FieldResponseBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddResponseBytes(v)
+		return nil
+	}
+	return fmt.Errorf("unknown RequestAuditLog numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *RequestAuditLogMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *RequestAuditLogMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *RequestAuditLogMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown RequestAuditLog nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *RequestAuditLogMutation) ResetField(name string) error {
+	switch name {
+	case requestauditlog.FieldRequestID:
+		m.ResetRequestID()
+		return nil
+	case requestauditlog.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case requestauditlog.FieldUserEmailSnapshot:
+		m.ResetUserEmailSnapshot()
+		return nil
+	case requestauditlog.FieldAPIKeyID:
+		m.ResetAPIKeyID()
+		return nil
+	case requestauditlog.FieldGroupID:
+		m.ResetGroupID()
+		return nil
+	case requestauditlog.FieldClient:
+		m.ResetClient()
+		return nil
+	case requestauditlog.FieldProtocol:
+		m.ResetProtocol()
+		return nil
+	case requestauditlog.FieldEndpoint:
+		m.ResetEndpoint()
+		return nil
+	case requestauditlog.FieldModel:
+		m.ResetModel()
+		return nil
+	case requestauditlog.FieldStream:
+		m.ResetStream()
+		return nil
+	case requestauditlog.FieldMethod:
+		m.ResetMethod()
+		return nil
+	case requestauditlog.FieldPath:
+		m.ResetPath()
+		return nil
+	case requestauditlog.FieldRawQuery:
+		m.ResetRawQuery()
+		return nil
+	case requestauditlog.FieldHost:
+		m.ResetHost()
+		return nil
+	case requestauditlog.FieldRequestProto:
+		m.ResetRequestProto()
+		return nil
+	case requestauditlog.FieldRemoteAddr:
+		m.ResetRemoteAddr()
+		return nil
+	case requestauditlog.FieldIPAddress:
+		m.ResetIPAddress()
+		return nil
+	case requestauditlog.FieldUserAgent:
+		m.ResetUserAgent()
+		return nil
+	case requestauditlog.FieldContentType:
+		m.ResetContentType()
+		return nil
+	case requestauditlog.FieldContentLength:
+		m.ResetContentLength()
+		return nil
+	case requestauditlog.FieldInboundHeadersEnc:
+		m.ResetInboundHeadersEnc()
+		return nil
+	case requestauditlog.FieldInboundBodyEnc:
+		m.ResetInboundBodyEnc()
+		return nil
+	case requestauditlog.FieldInboundBodyBytes:
+		m.ResetInboundBodyBytes()
+		return nil
+	case requestauditlog.FieldStatusCode:
+		m.ResetStatusCode()
+		return nil
+	case requestauditlog.FieldDurationMs:
+		m.ResetDurationMs()
+		return nil
+	case requestauditlog.FieldResponseBytes:
+		m.ResetResponseBytes()
+		return nil
+	case requestauditlog.FieldCompleted:
+		m.ResetCompleted()
+		return nil
+	case requestauditlog.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case requestauditlog.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown RequestAuditLog field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *RequestAuditLogMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.attempts != nil {
+		edges = append(edges, requestauditlog.EdgeAttempts)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *RequestAuditLogMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case requestauditlog.EdgeAttempts:
+		ids := make([]ent.Value, 0, len(m.attempts))
+		for id := range m.attempts {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *RequestAuditLogMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.removedattempts != nil {
+		edges = append(edges, requestauditlog.EdgeAttempts)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *RequestAuditLogMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case requestauditlog.EdgeAttempts:
+		ids := make([]ent.Value, 0, len(m.removedattempts))
+		for id := range m.removedattempts {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *RequestAuditLogMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedattempts {
+		edges = append(edges, requestauditlog.EdgeAttempts)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *RequestAuditLogMutation) EdgeCleared(name string) bool {
+	switch name {
+	case requestauditlog.EdgeAttempts:
+		return m.clearedattempts
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *RequestAuditLogMutation) ClearEdge(name string) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown RequestAuditLog unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *RequestAuditLogMutation) ResetEdge(name string) error {
+	switch name {
+	case requestauditlog.EdgeAttempts:
+		m.ResetAttempts()
+		return nil
+	}
+	return fmt.Errorf("unknown RequestAuditLog edge %s", name)
 }
 
 // SettingMutation represents an operation that mutates the Setting nodes in the graph.

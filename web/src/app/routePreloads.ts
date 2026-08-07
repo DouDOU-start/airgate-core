@@ -53,6 +53,7 @@ export const BookmarksPage = lazyWithPreload(() => import('../pages/admin/Bookma
 export const AccountsPage = lazyWithPreload(() => import('../pages/admin/AccountsPage'));
 export const ProxiesPage = lazyWithPreload(() => import('../pages/admin/ProxiesPage'));
 export const PluginsPage = lazyWithPreload(() => import('../pages/admin/PluginsPage'));
+export const RequestAuditsPage = lazyWithPreload(() => import('../pages/admin/RequestAuditsPage'));
 
 export const ADMIN_IDLE_PRELOADS = [
   DashboardPage,

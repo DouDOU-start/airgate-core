@@ -178,6 +178,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Moderation:    s.handlers.ModerationEngine,
 		HealthTracker: s.probeEngine,
 		RelayHook:     s.pluginRuntime,
+		RequestAudit:  s.handlers.RequestAuditService,
 	})
 
 	// 异步任务子系统（视频/音乐）：与同步管线同源组件 + task 持久化 + 余额动账适配器。

@@ -386,6 +386,89 @@ export interface ChannelFailureStatsResp {
   channels: ChannelFailureCounts[];
 }
 
+// ==================== 完整请求审计（仅管理员） ====================
+
+export interface RequestAuditPayload {
+  encoding: 'utf8' | 'base64';
+  content: string;
+  bytes: number;
+}
+
+export interface RequestAuditListItem {
+  id: number;
+  request_id: string;
+  user_id: number;
+  user_email: string;
+  api_key_id: number;
+  group_id: number;
+  client: string;
+  protocol: string;
+  endpoint: string;
+  model: string;
+  stream: boolean;
+  status_code: number;
+  duration_ms: number;
+  response_bytes: number;
+  completed: boolean;
+  attempt_count: number;
+  routes: string[];
+  created_at: string;
+}
+
+export interface RequestAuditAttempt {
+  id: number;
+  seq: number;
+  route_kind: 'channel' | 'account';
+  channel_id: number;
+  channel_name: string;
+  channel_key_id: number;
+  channel_key_name: string;
+  account_id: number;
+  account_name: string;
+  account_email: string;
+  account_platform: string;
+  account_type: string;
+  method: string;
+  upstream_url: RequestAuditPayload;
+  headers: RequestAuditPayload;
+  body: RequestAuditPayload;
+  status_code: number;
+  verdict: string;
+  reason: string;
+  retry_after_ms: number;
+  latency_ms: number;
+  first_token_ms: number;
+  response_started: boolean;
+  stream_completed: boolean;
+  finished: boolean;
+  created_at: string;
+}
+
+export interface RequestAuditDetail extends RequestAuditListItem {
+  method: string;
+  path: string;
+  raw_query: string;
+  host: string;
+  request_proto: string;
+  remote_addr: string;
+  ip_address: string;
+  user_agent: string;
+  content_type: string;
+  content_length: number;
+  inbound_headers: RequestAuditPayload;
+  inbound_body: RequestAuditPayload;
+  attempts: RequestAuditAttempt[];
+}
+
+export interface RequestAuditQuery extends PageReq {
+  model?: string;
+  status_code?: number;
+  account_id?: number;
+  channel_id?: number;
+  start?: string;
+  end?: string;
+}
+
 // ==================== Usage ====================
 
 export interface UsageLogResp {

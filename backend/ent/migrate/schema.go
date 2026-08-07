@@ -697,6 +697,145 @@ var (
 			},
 		},
 	}
+	// RequestAuditAttemptsColumns holds the columns for the "request_audit_attempts" table.
+	RequestAuditAttemptsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "seq", Type: field.TypeInt},
+		{Name: "route_kind", Type: field.TypeEnum, Enums: []string{"channel", "account"}},
+		{Name: "channel_id", Type: field.TypeInt, Default: 0},
+		{Name: "channel_name", Type: field.TypeString, Default: ""},
+		{Name: "channel_key_id", Type: field.TypeInt, Default: 0},
+		{Name: "channel_key_name", Type: field.TypeString, Default: ""},
+		{Name: "account_id", Type: field.TypeInt, Default: 0},
+		{Name: "account_name", Type: field.TypeString, Default: ""},
+		{Name: "account_email", Type: field.TypeString, Default: ""},
+		{Name: "account_platform", Type: field.TypeString, Default: ""},
+		{Name: "account_type", Type: field.TypeString, Default: ""},
+		{Name: "method", Type: field.TypeString, Default: ""},
+		{Name: "upstream_url_enc", Type: field.TypeString, Default: "", SchemaType: map[string]string{"mysql": "longtext", "postgres": "text", "sqlite3": "text"}},
+		{Name: "forward_headers_enc", Type: field.TypeString, Default: "", SchemaType: map[string]string{"mysql": "longtext", "postgres": "text", "sqlite3": "text"}},
+		{Name: "forward_body_enc", Type: field.TypeString, Default: "", SchemaType: map[string]string{"mysql": "longtext", "postgres": "text", "sqlite3": "text"}},
+		{Name: "forward_body_bytes", Type: field.TypeInt64, Default: 0},
+		{Name: "status_code", Type: field.TypeInt, Default: 0},
+		{Name: "verdict", Type: field.TypeString, Default: ""},
+		{Name: "reason", Type: field.TypeString, Default: "", SchemaType: map[string]string{"mysql": "longtext", "postgres": "text", "sqlite3": "text"}},
+		{Name: "retry_after_ms", Type: field.TypeInt64, Default: 0},
+		{Name: "latency_ms", Type: field.TypeInt64, Default: 0},
+		{Name: "first_token_ms", Type: field.TypeInt64, Default: 0},
+		{Name: "response_started", Type: field.TypeBool, Default: false},
+		{Name: "stream_completed", Type: field.TypeBool, Default: false},
+		{Name: "finished", Type: field.TypeBool, Default: false},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "request_audit_id", Type: field.TypeInt},
+	}
+	// RequestAuditAttemptsTable holds the schema information for the "request_audit_attempts" table.
+	RequestAuditAttemptsTable = &schema.Table{
+		Name:       "request_audit_attempts",
+		Columns:    RequestAuditAttemptsColumns,
+		PrimaryKey: []*schema.Column{RequestAuditAttemptsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "request_audit_attempts_request_audit_logs_attempts",
+				Columns:    []*schema.Column{RequestAuditAttemptsColumns[28]},
+				RefColumns: []*schema.Column{RequestAuditLogsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "request_audit_attempt_seq",
+				Unique:  true,
+				Columns: []*schema.Column{RequestAuditAttemptsColumns[28], RequestAuditAttemptsColumns[1]},
+			},
+			{
+				Name:    "request_audit_attempt_account_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RequestAuditAttemptsColumns[7], RequestAuditAttemptsColumns[26]},
+			},
+			{
+				Name:    "request_audit_attempt_channel_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RequestAuditAttemptsColumns[3], RequestAuditAttemptsColumns[26]},
+			},
+			{
+				Name:    "request_audit_attempt_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RequestAuditAttemptsColumns[17], RequestAuditAttemptsColumns[26]},
+			},
+		},
+	}
+	// RequestAuditLogsColumns holds the columns for the "request_audit_logs" table.
+	RequestAuditLogsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "request_id", Type: field.TypeString},
+		{Name: "user_id", Type: field.TypeInt, Default: 0},
+		{Name: "user_email_snapshot", Type: field.TypeString, Default: ""},
+		{Name: "api_key_id", Type: field.TypeInt, Default: 0},
+		{Name: "group_id", Type: field.TypeInt, Default: 0},
+		{Name: "client", Type: field.TypeString, Default: ""},
+		{Name: "protocol", Type: field.TypeString, Default: ""},
+		{Name: "endpoint", Type: field.TypeString, Default: ""},
+		{Name: "model", Type: field.TypeString, Default: ""},
+		{Name: "stream", Type: field.TypeBool, Default: false},
+		{Name: "method", Type: field.TypeString, Default: ""},
+		{Name: "path", Type: field.TypeString, Default: ""},
+		{Name: "raw_query", Type: field.TypeString, Default: ""},
+		{Name: "host", Type: field.TypeString, Default: ""},
+		{Name: "request_proto", Type: field.TypeString, Default: ""},
+		{Name: "remote_addr", Type: field.TypeString, Default: ""},
+		{Name: "ip_address", Type: field.TypeString, Default: ""},
+		{Name: "user_agent", Type: field.TypeString, Default: ""},
+		{Name: "content_type", Type: field.TypeString, Default: ""},
+		{Name: "content_length", Type: field.TypeInt64, Default: 0},
+		{Name: "inbound_headers_enc", Type: field.TypeString, Default: "", SchemaType: map[string]string{"mysql": "longtext", "postgres": "text", "sqlite3": "text"}},
+		{Name: "inbound_body_enc", Type: field.TypeString, Default: "", SchemaType: map[string]string{"mysql": "longtext", "postgres": "text", "sqlite3": "text"}},
+		{Name: "inbound_body_bytes", Type: field.TypeInt64, Default: 0},
+		{Name: "status_code", Type: field.TypeInt, Default: 0},
+		{Name: "duration_ms", Type: field.TypeInt64, Default: 0},
+		{Name: "response_bytes", Type: field.TypeInt64, Default: 0},
+		{Name: "completed", Type: field.TypeBool, Default: false},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// RequestAuditLogsTable holds the schema information for the "request_audit_logs" table.
+	RequestAuditLogsTable = &schema.Table{
+		Name:       "request_audit_logs",
+		Columns:    RequestAuditLogsColumns,
+		PrimaryKey: []*schema.Column{RequestAuditLogsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "request_audit_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RequestAuditLogsColumns[28]},
+			},
+			{
+				Name:    "request_audit_request_id",
+				Unique:  false,
+				Columns: []*schema.Column{RequestAuditLogsColumns[1]},
+			},
+			{
+				Name:    "request_audit_user_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RequestAuditLogsColumns[2], RequestAuditLogsColumns[28]},
+			},
+			{
+				Name:    "request_audit_api_key_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RequestAuditLogsColumns[4], RequestAuditLogsColumns[28]},
+			},
+			{
+				Name:    "request_audit_model_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RequestAuditLogsColumns[9], RequestAuditLogsColumns[28]},
+			},
+			{
+				Name:    "request_audit_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RequestAuditLogsColumns[24], RequestAuditLogsColumns[28]},
+			},
+		},
+	}
 	// SettingsColumns holds the columns for the "settings" table.
 	SettingsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1145,6 +1284,8 @@ var (
 		PaymentProviderConfigsTable,
 		ProxiesTable,
 		RedemptionCodesTable,
+		RequestAuditAttemptsTable,
+		RequestAuditLogsTable,
 		SettingsTable,
 		TasksTable,
 		TiersTable,
@@ -1166,6 +1307,7 @@ func init() {
 	ChannelKeysTable.ForeignKeys[0].RefTable = ChannelsTable
 	ChannelKeysTable.ForeignKeys[1].RefTable = ChannelCredentialsTable
 	ModelPricesTable.ForeignKeys[0].RefTable = ModelTagsTable
+	RequestAuditAttemptsTable.ForeignKeys[0].RefTable = RequestAuditLogsTable
 	UsageLogsTable.ForeignKeys[0].RefTable = APIKeysTable
 	UsageLogsTable.ForeignKeys[1].RefTable = AccountsTable
 	UsageLogsTable.ForeignKeys[2].RefTable = ChannelsTable

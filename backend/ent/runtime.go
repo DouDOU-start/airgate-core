@@ -25,6 +25,8 @@ import (
 	"github.com/DouDOU-start/airgate-core/ent/paymentproviderconfig"
 	"github.com/DouDOU-start/airgate-core/ent/proxy"
 	"github.com/DouDOU-start/airgate-core/ent/redemptioncode"
+	"github.com/DouDOU-start/airgate-core/ent/requestauditattempt"
+	"github.com/DouDOU-start/airgate-core/ent/requestauditlog"
 	"github.com/DouDOU-start/airgate-core/ent/schema"
 	"github.com/DouDOU-start/airgate-core/ent/setting"
 	"github.com/DouDOU-start/airgate-core/ent/task"
@@ -924,6 +926,230 @@ func init() {
 	redemptioncode.DefaultUpdatedAt = redemptioncodeDescUpdatedAt.Default.(func() time.Time)
 	// redemptioncode.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	redemptioncode.UpdateDefaultUpdatedAt = redemptioncodeDescUpdatedAt.UpdateDefault.(func() time.Time)
+	requestauditattemptFields := schema.RequestAuditAttempt{}.Fields()
+	_ = requestauditattemptFields
+	// requestauditattemptDescChannelID is the schema descriptor for channel_id field.
+	requestauditattemptDescChannelID := requestauditattemptFields[3].Descriptor()
+	// requestauditattempt.DefaultChannelID holds the default value on creation for the channel_id field.
+	requestauditattempt.DefaultChannelID = requestauditattemptDescChannelID.Default.(int)
+	// requestauditattemptDescChannelName is the schema descriptor for channel_name field.
+	requestauditattemptDescChannelName := requestauditattemptFields[4].Descriptor()
+	// requestauditattempt.DefaultChannelName holds the default value on creation for the channel_name field.
+	requestauditattempt.DefaultChannelName = requestauditattemptDescChannelName.Default.(string)
+	// requestauditattemptDescChannelKeyID is the schema descriptor for channel_key_id field.
+	requestauditattemptDescChannelKeyID := requestauditattemptFields[5].Descriptor()
+	// requestauditattempt.DefaultChannelKeyID holds the default value on creation for the channel_key_id field.
+	requestauditattempt.DefaultChannelKeyID = requestauditattemptDescChannelKeyID.Default.(int)
+	// requestauditattemptDescChannelKeyName is the schema descriptor for channel_key_name field.
+	requestauditattemptDescChannelKeyName := requestauditattemptFields[6].Descriptor()
+	// requestauditattempt.DefaultChannelKeyName holds the default value on creation for the channel_key_name field.
+	requestauditattempt.DefaultChannelKeyName = requestauditattemptDescChannelKeyName.Default.(string)
+	// requestauditattemptDescAccountID is the schema descriptor for account_id field.
+	requestauditattemptDescAccountID := requestauditattemptFields[7].Descriptor()
+	// requestauditattempt.DefaultAccountID holds the default value on creation for the account_id field.
+	requestauditattempt.DefaultAccountID = requestauditattemptDescAccountID.Default.(int)
+	// requestauditattemptDescAccountName is the schema descriptor for account_name field.
+	requestauditattemptDescAccountName := requestauditattemptFields[8].Descriptor()
+	// requestauditattempt.DefaultAccountName holds the default value on creation for the account_name field.
+	requestauditattempt.DefaultAccountName = requestauditattemptDescAccountName.Default.(string)
+	// requestauditattemptDescAccountEmail is the schema descriptor for account_email field.
+	requestauditattemptDescAccountEmail := requestauditattemptFields[9].Descriptor()
+	// requestauditattempt.DefaultAccountEmail holds the default value on creation for the account_email field.
+	requestauditattempt.DefaultAccountEmail = requestauditattemptDescAccountEmail.Default.(string)
+	// requestauditattemptDescAccountPlatform is the schema descriptor for account_platform field.
+	requestauditattemptDescAccountPlatform := requestauditattemptFields[10].Descriptor()
+	// requestauditattempt.DefaultAccountPlatform holds the default value on creation for the account_platform field.
+	requestauditattempt.DefaultAccountPlatform = requestauditattemptDescAccountPlatform.Default.(string)
+	// requestauditattemptDescAccountType is the schema descriptor for account_type field.
+	requestauditattemptDescAccountType := requestauditattemptFields[11].Descriptor()
+	// requestauditattempt.DefaultAccountType holds the default value on creation for the account_type field.
+	requestauditattempt.DefaultAccountType = requestauditattemptDescAccountType.Default.(string)
+	// requestauditattemptDescMethod is the schema descriptor for method field.
+	requestauditattemptDescMethod := requestauditattemptFields[12].Descriptor()
+	// requestauditattempt.DefaultMethod holds the default value on creation for the method field.
+	requestauditattempt.DefaultMethod = requestauditattemptDescMethod.Default.(string)
+	// requestauditattemptDescUpstreamURLEnc is the schema descriptor for upstream_url_enc field.
+	requestauditattemptDescUpstreamURLEnc := requestauditattemptFields[13].Descriptor()
+	// requestauditattempt.DefaultUpstreamURLEnc holds the default value on creation for the upstream_url_enc field.
+	requestauditattempt.DefaultUpstreamURLEnc = requestauditattemptDescUpstreamURLEnc.Default.(string)
+	// requestauditattemptDescForwardHeadersEnc is the schema descriptor for forward_headers_enc field.
+	requestauditattemptDescForwardHeadersEnc := requestauditattemptFields[14].Descriptor()
+	// requestauditattempt.DefaultForwardHeadersEnc holds the default value on creation for the forward_headers_enc field.
+	requestauditattempt.DefaultForwardHeadersEnc = requestauditattemptDescForwardHeadersEnc.Default.(string)
+	// requestauditattemptDescForwardBodyEnc is the schema descriptor for forward_body_enc field.
+	requestauditattemptDescForwardBodyEnc := requestauditattemptFields[15].Descriptor()
+	// requestauditattempt.DefaultForwardBodyEnc holds the default value on creation for the forward_body_enc field.
+	requestauditattempt.DefaultForwardBodyEnc = requestauditattemptDescForwardBodyEnc.Default.(string)
+	// requestauditattemptDescForwardBodyBytes is the schema descriptor for forward_body_bytes field.
+	requestauditattemptDescForwardBodyBytes := requestauditattemptFields[16].Descriptor()
+	// requestauditattempt.DefaultForwardBodyBytes holds the default value on creation for the forward_body_bytes field.
+	requestauditattempt.DefaultForwardBodyBytes = requestauditattemptDescForwardBodyBytes.Default.(int64)
+	// requestauditattemptDescStatusCode is the schema descriptor for status_code field.
+	requestauditattemptDescStatusCode := requestauditattemptFields[17].Descriptor()
+	// requestauditattempt.DefaultStatusCode holds the default value on creation for the status_code field.
+	requestauditattempt.DefaultStatusCode = requestauditattemptDescStatusCode.Default.(int)
+	// requestauditattemptDescVerdict is the schema descriptor for verdict field.
+	requestauditattemptDescVerdict := requestauditattemptFields[18].Descriptor()
+	// requestauditattempt.DefaultVerdict holds the default value on creation for the verdict field.
+	requestauditattempt.DefaultVerdict = requestauditattemptDescVerdict.Default.(string)
+	// requestauditattemptDescReason is the schema descriptor for reason field.
+	requestauditattemptDescReason := requestauditattemptFields[19].Descriptor()
+	// requestauditattempt.DefaultReason holds the default value on creation for the reason field.
+	requestauditattempt.DefaultReason = requestauditattemptDescReason.Default.(string)
+	// requestauditattemptDescRetryAfterMs is the schema descriptor for retry_after_ms field.
+	requestauditattemptDescRetryAfterMs := requestauditattemptFields[20].Descriptor()
+	// requestauditattempt.DefaultRetryAfterMs holds the default value on creation for the retry_after_ms field.
+	requestauditattempt.DefaultRetryAfterMs = requestauditattemptDescRetryAfterMs.Default.(int64)
+	// requestauditattemptDescLatencyMs is the schema descriptor for latency_ms field.
+	requestauditattemptDescLatencyMs := requestauditattemptFields[21].Descriptor()
+	// requestauditattempt.DefaultLatencyMs holds the default value on creation for the latency_ms field.
+	requestauditattempt.DefaultLatencyMs = requestauditattemptDescLatencyMs.Default.(int64)
+	// requestauditattemptDescFirstTokenMs is the schema descriptor for first_token_ms field.
+	requestauditattemptDescFirstTokenMs := requestauditattemptFields[22].Descriptor()
+	// requestauditattempt.DefaultFirstTokenMs holds the default value on creation for the first_token_ms field.
+	requestauditattempt.DefaultFirstTokenMs = requestauditattemptDescFirstTokenMs.Default.(int64)
+	// requestauditattemptDescResponseStarted is the schema descriptor for response_started field.
+	requestauditattemptDescResponseStarted := requestauditattemptFields[23].Descriptor()
+	// requestauditattempt.DefaultResponseStarted holds the default value on creation for the response_started field.
+	requestauditattempt.DefaultResponseStarted = requestauditattemptDescResponseStarted.Default.(bool)
+	// requestauditattemptDescStreamCompleted is the schema descriptor for stream_completed field.
+	requestauditattemptDescStreamCompleted := requestauditattemptFields[24].Descriptor()
+	// requestauditattempt.DefaultStreamCompleted holds the default value on creation for the stream_completed field.
+	requestauditattempt.DefaultStreamCompleted = requestauditattemptDescStreamCompleted.Default.(bool)
+	// requestauditattemptDescFinished is the schema descriptor for finished field.
+	requestauditattemptDescFinished := requestauditattemptFields[25].Descriptor()
+	// requestauditattempt.DefaultFinished holds the default value on creation for the finished field.
+	requestauditattempt.DefaultFinished = requestauditattemptDescFinished.Default.(bool)
+	// requestauditattemptDescCreatedAt is the schema descriptor for created_at field.
+	requestauditattemptDescCreatedAt := requestauditattemptFields[26].Descriptor()
+	// requestauditattempt.DefaultCreatedAt holds the default value on creation for the created_at field.
+	requestauditattempt.DefaultCreatedAt = requestauditattemptDescCreatedAt.Default.(func() time.Time)
+	// requestauditattemptDescUpdatedAt is the schema descriptor for updated_at field.
+	requestauditattemptDescUpdatedAt := requestauditattemptFields[27].Descriptor()
+	// requestauditattempt.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	requestauditattempt.DefaultUpdatedAt = requestauditattemptDescUpdatedAt.Default.(func() time.Time)
+	// requestauditattempt.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	requestauditattempt.UpdateDefaultUpdatedAt = requestauditattemptDescUpdatedAt.UpdateDefault.(func() time.Time)
+	requestauditlogFields := schema.RequestAuditLog{}.Fields()
+	_ = requestauditlogFields
+	// requestauditlogDescRequestID is the schema descriptor for request_id field.
+	requestauditlogDescRequestID := requestauditlogFields[0].Descriptor()
+	// requestauditlog.RequestIDValidator is a validator for the "request_id" field. It is called by the builders before save.
+	requestauditlog.RequestIDValidator = requestauditlogDescRequestID.Validators[0].(func(string) error)
+	// requestauditlogDescUserID is the schema descriptor for user_id field.
+	requestauditlogDescUserID := requestauditlogFields[1].Descriptor()
+	// requestauditlog.DefaultUserID holds the default value on creation for the user_id field.
+	requestauditlog.DefaultUserID = requestauditlogDescUserID.Default.(int)
+	// requestauditlogDescUserEmailSnapshot is the schema descriptor for user_email_snapshot field.
+	requestauditlogDescUserEmailSnapshot := requestauditlogFields[2].Descriptor()
+	// requestauditlog.DefaultUserEmailSnapshot holds the default value on creation for the user_email_snapshot field.
+	requestauditlog.DefaultUserEmailSnapshot = requestauditlogDescUserEmailSnapshot.Default.(string)
+	// requestauditlogDescAPIKeyID is the schema descriptor for api_key_id field.
+	requestauditlogDescAPIKeyID := requestauditlogFields[3].Descriptor()
+	// requestauditlog.DefaultAPIKeyID holds the default value on creation for the api_key_id field.
+	requestauditlog.DefaultAPIKeyID = requestauditlogDescAPIKeyID.Default.(int)
+	// requestauditlogDescGroupID is the schema descriptor for group_id field.
+	requestauditlogDescGroupID := requestauditlogFields[4].Descriptor()
+	// requestauditlog.DefaultGroupID holds the default value on creation for the group_id field.
+	requestauditlog.DefaultGroupID = requestauditlogDescGroupID.Default.(int)
+	// requestauditlogDescClient is the schema descriptor for client field.
+	requestauditlogDescClient := requestauditlogFields[5].Descriptor()
+	// requestauditlog.DefaultClient holds the default value on creation for the client field.
+	requestauditlog.DefaultClient = requestauditlogDescClient.Default.(string)
+	// requestauditlogDescProtocol is the schema descriptor for protocol field.
+	requestauditlogDescProtocol := requestauditlogFields[6].Descriptor()
+	// requestauditlog.DefaultProtocol holds the default value on creation for the protocol field.
+	requestauditlog.DefaultProtocol = requestauditlogDescProtocol.Default.(string)
+	// requestauditlogDescEndpoint is the schema descriptor for endpoint field.
+	requestauditlogDescEndpoint := requestauditlogFields[7].Descriptor()
+	// requestauditlog.DefaultEndpoint holds the default value on creation for the endpoint field.
+	requestauditlog.DefaultEndpoint = requestauditlogDescEndpoint.Default.(string)
+	// requestauditlogDescModel is the schema descriptor for model field.
+	requestauditlogDescModel := requestauditlogFields[8].Descriptor()
+	// requestauditlog.DefaultModel holds the default value on creation for the model field.
+	requestauditlog.DefaultModel = requestauditlogDescModel.Default.(string)
+	// requestauditlogDescStream is the schema descriptor for stream field.
+	requestauditlogDescStream := requestauditlogFields[9].Descriptor()
+	// requestauditlog.DefaultStream holds the default value on creation for the stream field.
+	requestauditlog.DefaultStream = requestauditlogDescStream.Default.(bool)
+	// requestauditlogDescMethod is the schema descriptor for method field.
+	requestauditlogDescMethod := requestauditlogFields[10].Descriptor()
+	// requestauditlog.DefaultMethod holds the default value on creation for the method field.
+	requestauditlog.DefaultMethod = requestauditlogDescMethod.Default.(string)
+	// requestauditlogDescPath is the schema descriptor for path field.
+	requestauditlogDescPath := requestauditlogFields[11].Descriptor()
+	// requestauditlog.DefaultPath holds the default value on creation for the path field.
+	requestauditlog.DefaultPath = requestauditlogDescPath.Default.(string)
+	// requestauditlogDescRawQuery is the schema descriptor for raw_query field.
+	requestauditlogDescRawQuery := requestauditlogFields[12].Descriptor()
+	// requestauditlog.DefaultRawQuery holds the default value on creation for the raw_query field.
+	requestauditlog.DefaultRawQuery = requestauditlogDescRawQuery.Default.(string)
+	// requestauditlogDescHost is the schema descriptor for host field.
+	requestauditlogDescHost := requestauditlogFields[13].Descriptor()
+	// requestauditlog.DefaultHost holds the default value on creation for the host field.
+	requestauditlog.DefaultHost = requestauditlogDescHost.Default.(string)
+	// requestauditlogDescRequestProto is the schema descriptor for request_proto field.
+	requestauditlogDescRequestProto := requestauditlogFields[14].Descriptor()
+	// requestauditlog.DefaultRequestProto holds the default value on creation for the request_proto field.
+	requestauditlog.DefaultRequestProto = requestauditlogDescRequestProto.Default.(string)
+	// requestauditlogDescRemoteAddr is the schema descriptor for remote_addr field.
+	requestauditlogDescRemoteAddr := requestauditlogFields[15].Descriptor()
+	// requestauditlog.DefaultRemoteAddr holds the default value on creation for the remote_addr field.
+	requestauditlog.DefaultRemoteAddr = requestauditlogDescRemoteAddr.Default.(string)
+	// requestauditlogDescIPAddress is the schema descriptor for ip_address field.
+	requestauditlogDescIPAddress := requestauditlogFields[16].Descriptor()
+	// requestauditlog.DefaultIPAddress holds the default value on creation for the ip_address field.
+	requestauditlog.DefaultIPAddress = requestauditlogDescIPAddress.Default.(string)
+	// requestauditlogDescUserAgent is the schema descriptor for user_agent field.
+	requestauditlogDescUserAgent := requestauditlogFields[17].Descriptor()
+	// requestauditlog.DefaultUserAgent holds the default value on creation for the user_agent field.
+	requestauditlog.DefaultUserAgent = requestauditlogDescUserAgent.Default.(string)
+	// requestauditlogDescContentType is the schema descriptor for content_type field.
+	requestauditlogDescContentType := requestauditlogFields[18].Descriptor()
+	// requestauditlog.DefaultContentType holds the default value on creation for the content_type field.
+	requestauditlog.DefaultContentType = requestauditlogDescContentType.Default.(string)
+	// requestauditlogDescContentLength is the schema descriptor for content_length field.
+	requestauditlogDescContentLength := requestauditlogFields[19].Descriptor()
+	// requestauditlog.DefaultContentLength holds the default value on creation for the content_length field.
+	requestauditlog.DefaultContentLength = requestauditlogDescContentLength.Default.(int64)
+	// requestauditlogDescInboundHeadersEnc is the schema descriptor for inbound_headers_enc field.
+	requestauditlogDescInboundHeadersEnc := requestauditlogFields[20].Descriptor()
+	// requestauditlog.DefaultInboundHeadersEnc holds the default value on creation for the inbound_headers_enc field.
+	requestauditlog.DefaultInboundHeadersEnc = requestauditlogDescInboundHeadersEnc.Default.(string)
+	// requestauditlogDescInboundBodyEnc is the schema descriptor for inbound_body_enc field.
+	requestauditlogDescInboundBodyEnc := requestauditlogFields[21].Descriptor()
+	// requestauditlog.DefaultInboundBodyEnc holds the default value on creation for the inbound_body_enc field.
+	requestauditlog.DefaultInboundBodyEnc = requestauditlogDescInboundBodyEnc.Default.(string)
+	// requestauditlogDescInboundBodyBytes is the schema descriptor for inbound_body_bytes field.
+	requestauditlogDescInboundBodyBytes := requestauditlogFields[22].Descriptor()
+	// requestauditlog.DefaultInboundBodyBytes holds the default value on creation for the inbound_body_bytes field.
+	requestauditlog.DefaultInboundBodyBytes = requestauditlogDescInboundBodyBytes.Default.(int64)
+	// requestauditlogDescStatusCode is the schema descriptor for status_code field.
+	requestauditlogDescStatusCode := requestauditlogFields[23].Descriptor()
+	// requestauditlog.DefaultStatusCode holds the default value on creation for the status_code field.
+	requestauditlog.DefaultStatusCode = requestauditlogDescStatusCode.Default.(int)
+	// requestauditlogDescDurationMs is the schema descriptor for duration_ms field.
+	requestauditlogDescDurationMs := requestauditlogFields[24].Descriptor()
+	// requestauditlog.DefaultDurationMs holds the default value on creation for the duration_ms field.
+	requestauditlog.DefaultDurationMs = requestauditlogDescDurationMs.Default.(int64)
+	// requestauditlogDescResponseBytes is the schema descriptor for response_bytes field.
+	requestauditlogDescResponseBytes := requestauditlogFields[25].Descriptor()
+	// requestauditlog.DefaultResponseBytes holds the default value on creation for the response_bytes field.
+	requestauditlog.DefaultResponseBytes = requestauditlogDescResponseBytes.Default.(int64)
+	// requestauditlogDescCompleted is the schema descriptor for completed field.
+	requestauditlogDescCompleted := requestauditlogFields[26].Descriptor()
+	// requestauditlog.DefaultCompleted holds the default value on creation for the completed field.
+	requestauditlog.DefaultCompleted = requestauditlogDescCompleted.Default.(bool)
+	// requestauditlogDescCreatedAt is the schema descriptor for created_at field.
+	requestauditlogDescCreatedAt := requestauditlogFields[27].Descriptor()
+	// requestauditlog.DefaultCreatedAt holds the default value on creation for the created_at field.
+	requestauditlog.DefaultCreatedAt = requestauditlogDescCreatedAt.Default.(func() time.Time)
+	// requestauditlogDescUpdatedAt is the schema descriptor for updated_at field.
+	requestauditlogDescUpdatedAt := requestauditlogFields[28].Descriptor()
+	// requestauditlog.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	requestauditlog.DefaultUpdatedAt = requestauditlogDescUpdatedAt.Default.(func() time.Time)
+	// requestauditlog.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	requestauditlog.UpdateDefaultUpdatedAt = requestauditlogDescUpdatedAt.UpdateDefault.(func() time.Time)
 	settingFields := schema.Setting{}.Fields()
 	_ = settingFields
 	// settingDescKey is the schema descriptor for key field.

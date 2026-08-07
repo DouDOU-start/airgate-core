@@ -50,6 +50,7 @@ import {
   Gift,
   Sparkles,
   Plug,
+  ScanSearch,
 } from 'lucide-react';
 import { oauthApi } from '../../shared/api/oauth';
 import { queryKeys } from '../../shared/queryKeys';
@@ -74,6 +75,7 @@ const adminMenuItems: MenuItem[] = [
   { path: '/admin/model-prices', labelKey: 'nav.model_prices', icon: <Boxes className="h-5 w-5" /> },
   { path: '/admin/groups', labelKey: 'nav.groups', icon: <FolderTree className="h-5 w-5" /> },
   { path: '/admin/usage', labelKey: 'nav.usage', icon: <ChartNoAxesCombined className="h-5 w-5" /> },
+  { path: '/admin/request-audits', labelKey: 'nav.request_audit', icon: <ScanSearch className="h-5 w-5" /> },
   { path: '/admin/payment', labelKey: 'nav.payment', icon: <CreditCard className="h-5 w-5" /> },
   { path: '/admin/redemption', labelKey: 'nav.redemption', icon: <Ticket className="h-5 w-5" /> },
   { path: '/admin/invite', labelKey: 'nav.admin_invite', icon: <Gift className="h-5 w-5" /> },

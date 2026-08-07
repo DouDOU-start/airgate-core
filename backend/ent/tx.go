@@ -52,6 +52,10 @@ type Tx struct {
 	Proxy *ProxyClient
 	// RedemptionCode is the client for interacting with the RedemptionCode builders.
 	RedemptionCode *RedemptionCodeClient
+	// RequestAuditAttempt is the client for interacting with the RequestAuditAttempt builders.
+	RequestAuditAttempt *RequestAuditAttemptClient
+	// RequestAuditLog is the client for interacting with the RequestAuditLog builders.
+	RequestAuditLog *RequestAuditLogClient
 	// Setting is the client for interacting with the Setting builders.
 	Setting *SettingClient
 	// Task is the client for interacting with the Task builders.
@@ -215,6 +219,8 @@ func (tx *Tx) init() {
 	tx.PaymentProviderConfig = NewPaymentProviderConfigClient(tx.config)
 	tx.Proxy = NewProxyClient(tx.config)
 	tx.RedemptionCode = NewRedemptionCodeClient(tx.config)
+	tx.RequestAuditAttempt = NewRequestAuditAttemptClient(tx.config)
+	tx.RequestAuditLog = NewRequestAuditLogClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
 	tx.Task = NewTaskClient(tx.config)
 	tx.Tier = NewTierClient(tx.config)

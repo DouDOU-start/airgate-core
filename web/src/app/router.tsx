@@ -32,6 +32,7 @@ import {
   preloadRoutePage,
   RedemptionCodesPage,
   RiskControlPage,
+  RequestAuditsPage,
   BookmarksPage,
   AccountsPage,
   ProxiesPage,
@@ -239,6 +240,7 @@ const adminBookmarksRoute = createRoute({ getParentRoute: () => adminLayout, pat
 const adminAccountsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/accounts', component: renderPage(AccountsPage) });
 const adminProxiesRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/proxies', component: renderPage(ProxiesPage) });
 const adminPluginsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/plugins', component: renderPage(PluginsPage) });
+const adminRequestAuditsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/request-audits', component: renderPage(RequestAuditsPage) });
 
 const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/profile', component: renderPage(ProfilePage) });
 const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/keys', component: renderPage(UserKeysPage) });
@@ -272,6 +274,7 @@ const routeTree = rootRoute.addChildren([
       adminAccountsRoute,
       adminProxiesRoute,
       adminPluginsRoute,
+      adminRequestAuditsRoute,
     ]),
     profileRoute,
     userKeysRoute,

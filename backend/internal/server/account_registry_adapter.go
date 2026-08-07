@@ -161,6 +161,7 @@ func (a *accountRegistryAdapter) mapSnapshot(item *ent.Account) (accountreg.Snap
 	snap := accountreg.Snapshot{
 		ID:             item.ID,
 		Name:           item.Name,
+		Email:          item.Email,
 		Platform:       item.Platform,
 		Type:           item.Type,
 		Credentials:    creds,

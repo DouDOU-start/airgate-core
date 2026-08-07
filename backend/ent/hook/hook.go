@@ -249,6 +249,30 @@ func (f RedemptionCodeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RedemptionCodeMutation", m)
 }
 
+// The RequestAuditAttemptFunc type is an adapter to allow the use of ordinary
+// function as RequestAuditAttempt mutator.
+type RequestAuditAttemptFunc func(context.Context, *ent.RequestAuditAttemptMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f RequestAuditAttemptFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.RequestAuditAttemptMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RequestAuditAttemptMutation", m)
+}
+
+// The RequestAuditLogFunc type is an adapter to allow the use of ordinary
+// function as RequestAuditLog mutator.
+type RequestAuditLogFunc func(context.Context, *ent.RequestAuditLogMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f RequestAuditLogFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.RequestAuditLogMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RequestAuditLogMutation", m)
+}
+
 // The SettingFunc type is an adapter to allow the use of ordinary
 // function as Setting mutator.
 type SettingFunc func(context.Context, *ent.SettingMutation) (ent.Value, error)

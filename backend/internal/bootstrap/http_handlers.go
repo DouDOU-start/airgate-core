@@ -40,6 +40,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/infra/store"
 	"github.com/DouDOU-start/airgate-core/internal/moderation"
 	"github.com/DouDOU-start/airgate-core/internal/probe"
+	"github.com/DouDOU-start/airgate-core/internal/requestaudit"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/handler"
 )
@@ -76,6 +77,7 @@ type HTTPHandlers struct {
 	Bookmark     *handler.BookmarkHandler
 	Account      *handler.AccountHandler
 	Proxy        *handler.ProxyHandler
+	RequestAudit *handler.RequestAuditHandler
 
 	// ChannelService / ModelPriceService / SettingsService 暴露给 server.go：
 	// ChannelService 充当渠道注册表的 Loader/Persister 并接收 Reloader/Tester 注入，
@@ -101,12 +103,15 @@ type HTTPHandlers struct {
 	AccountService *appaccount.Service
 	// ProxyService 暴露给 server.go：代理变更后重载账号注册表。
 	ProxyService *appproxy.Service
+	// RequestAuditService 同时注入 relay 写路径与管理员查询 Handler。
+	RequestAuditService *requestaudit.Service
 	// ChannelHealthNotifier 接收探针状态变化并按设置发送微信公众号提醒。
 	ChannelHealthNotifier probe.Notifier
 }
 
 // NewHTTPHandlers 统一构造 HTTP 处理器。
 func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
+	requestAuditService := requestaudit.New(dep.DB, dep.Config.APIKeySecret())
 	apiKeyStore := store.NewAPIKeyStore(dep.DB)
 	apiKeyService := appapikey.NewService(apiKeyStore, dep.Config.APIKeySecret())
 	authStore := store.NewAuthStore(dep.DB)
@@ -235,6 +240,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Bookmark:     handler.NewBookmarkHandler(bookmarkService),
 		Account:      handler.NewAccountHandler(accountService),
 		Proxy:        handler.NewProxyHandler(proxyService),
+		RequestAudit: handler.NewRequestAuditHandler(requestAuditService),
 
 		ChannelService:        channelService,
 		AccountService:        accountService,
@@ -248,6 +254,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		ModerationEngine:      moderationEngine,
 		ChannelStore:          channelStore,
 		ChannelHealthNotifier: channelHealthNotifier,
+		RequestAuditService:   requestAuditService,
 	}
 }
 
