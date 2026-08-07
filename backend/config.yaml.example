@@ -36,5 +36,5 @@ log:
 plugins:
   enabled: false                 # 无 runtime.yaml 的手工插件兼容默认值；Web 安装插件使用独立运行开关
   dir: data/plugins              # 生产插件目录：<dir>/<插件ID>/<插件ID>
-  hook_timeout_ms: 50            # Relay Hook 执行链总等待时间；单个插件失败时跳过该实例
+  hook_timeout_ms: 500           # Relay Hook 执行链总等待时间；连续失败会熔断并自动重启插件
   dev: []                        # 开发项需显式 enabled: true，path 指向插件源码目录

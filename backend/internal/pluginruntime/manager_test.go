@@ -305,6 +305,69 @@ func TestBeforeDispatchTimeoutAndCircuitBreaker(t *testing.T) {
 	}
 }
 
+func TestCircuitHalfOpenAllowsOnlyOneProbe(t *testing.T) {
+	inst := testInstance("half-open", 10, &fakePlugin{handler: func(context.Context, protocol.Request) (protocol.Response, error) {
+		return protocol.Response{StatusCode: http.StatusNoContent}, nil
+	}})
+	inst.circuitUntil = time.Now().Add(-time.Millisecond)
+	if !inst.acquireCall(time.Now()) {
+		t.Fatal("熔断到期后应允许一次半开探测")
+	}
+	if inst.acquireCall(time.Now()) {
+		t.Fatal("半开探测进行中不应放入第二个调用")
+	}
+	inst.recordSuccess()
+	inst.calls.Done()
+	if !inst.acquireCall(time.Now()) {
+		t.Fatal("半开探测成功后应恢复正常调用")
+	}
+	inst.calls.Done()
+}
+
+func TestBeforeDispatchAutomaticallyRestartsUnhealthyPlugin(t *testing.T) {
+	slow := &fakePlugin{handler: func(ctx context.Context, _ protocol.Request) (protocol.Response, error) {
+		<-ctx.Done()
+		return protocol.Response{}, ctx.Err()
+	}}
+	recovered := &fakePlugin{handler: func(context.Context, protocol.Request) (protocol.Response, error) {
+		return protocol.Response{StatusCode: http.StatusOK, Body: []byte(`{"version":"v1","route":{"account_ids":[2],"fallback":"core"}}`)}, nil
+	}}
+	failedInst := testInstance("auto-restart", 10, slow)
+	recoveredInst := testInstance("auto-restart", 10, recovered)
+	restartCalled := make(chan struct{}, 1)
+	failedInst.restart = func(context.Context) (*instance, error) {
+		restartCalled <- struct{}{}
+		return recoveredInst, nil
+	}
+	manager := &Manager{
+		hookTimeout: 5 * time.Millisecond,
+		instances:   map[string]*instance{"auto-restart": failedInst},
+		lastErrors:  make(map[string]string),
+	}
+	for index := 0; index < circuitFailureLimit; index++ {
+		_, _ = manager.BeforeDispatch(context.Background(), testRelayRequest(2))
+	}
+	select {
+	case <-restartCalled:
+	case <-time.After(time.Second):
+		t.Fatal("插件熔断后未触发自动重启")
+	}
+	deadline := time.Now().Add(time.Second)
+	for manager.instanceByID("auto-restart") != recoveredInst && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if manager.instanceByID("auto-restart") != recoveredInst {
+		t.Fatal("自动重启后未切换到健康实例")
+	}
+	decision, err := manager.BeforeDispatch(context.Background(), testRelayRequest(2))
+	if err != nil || decision.Route == nil || decision.Route.AccountIDs[0] != 2 {
+		t.Fatalf("自动恢复后的调用异常: decision=%+v err=%v", decision, err)
+	}
+	if manager.lastError("auto-restart") != "" {
+		t.Fatalf("自动恢复后仍保留错误: %s", manager.lastError("auto-restart"))
+	}
+}
+
 func TestLoadPluginConfigEncodesStructuredRulesAsJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
@@ -354,6 +417,26 @@ func TestManagerLoadsRealPluginProcess(t *testing.T) {
 	}
 	if decision.Route == nil || len(decision.Route.AccountIDs) != 1 || decision.Route.AccountIDs[0] != 7 {
 		t.Fatalf("真实插件决策异常: %+v", decision)
+	}
+
+	failed := manager.instanceByID("fixture-hook")
+	if failed == nil || failed.client == nil {
+		t.Fatal("未找到待模拟故障的真实插件实例")
+	}
+	failed.client.Kill()
+	for index := 0; index < circuitFailureLimit; index++ {
+		_, _ = manager.BeforeDispatch(context.Background(), testRelayRequest(7))
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for manager.instanceByID("fixture-hook") == failed && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if manager.instanceByID("fixture-hook") == failed {
+		t.Fatal("真实插件进程退出后未自动拉起新实例")
+	}
+	decision, err = manager.BeforeDispatch(context.Background(), testRelayRequest(7))
+	if err != nil || decision.Route == nil || len(decision.Route.AccountIDs) != 1 || decision.Route.AccountIDs[0] != 7 {
+		t.Fatalf("真实插件自动恢复后的决策异常: decision=%+v err=%v", decision, err)
 	}
 }
 

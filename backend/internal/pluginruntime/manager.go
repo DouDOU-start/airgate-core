@@ -30,7 +30,7 @@ const (
 	pluginStopTimeout   = 3 * time.Second
 	circuitFailureLimit = 3
 	circuitOpenDuration = 30 * time.Second
-	defaultHookTimeout  = 50 * time.Millisecond
+	defaultHookTimeout  = 500 * time.Millisecond
 	accountTestTimeout  = 2 * time.Second
 	maxHookBodyBytes    = 32 << 20
 )
@@ -48,6 +48,9 @@ type instance struct {
 	stopping            bool
 	consecutiveFailures int
 	circuitUntil        time.Time
+	halfOpenProbe       bool
+	recovering          bool
+	restart             func(context.Context) (*instance, error)
 }
 
 // Manager 管理多个相互独立的插件进程，并实现首个 relay_hook.v1 能力驱动。
@@ -124,7 +127,7 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 			if !state.Enabled {
 				continue
 			}
-			inst, startErr := m.launchPlugin(ctx, id, exec.Command(binaryPath), filepath.Join(dir, "config.yaml"), true, true)
+			inst, startErr := m.launchInstalled(ctx, id)
 			if startErr != nil {
 				m.setLastError(id, startErr)
 				slog.Error("插件加载失败", "plugin_id", id, "error", startErr)
@@ -155,21 +158,32 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 			slog.Error("开发插件名称与运行实例冲突", "plugin_id", name)
 			continue
 		}
-		configPath := dev.Config
-		if configPath == "" {
-			configPath = filepath.Join(dev.Path, "config.yaml")
-		}
-		cmd := exec.Command("go", "run", ".")
-		cmd.Dir = dev.Path
-		inst, startErr := m.launchPlugin(ctx, "", cmd, configPath, true, true)
+		inst, startErr := m.launchDevPlugin(ctx, name, dev)
 		if startErr != nil {
 			slog.Error("开发插件加载失败", "plugin_id", name, "error", startErr)
 			continue
 		}
-		inst.id = name
 		m.setInstance(inst)
 	}
 	return nil
+}
+
+func (m *Manager) launchDevPlugin(ctx context.Context, name string, dev config.DevPlugin) (*instance, error) {
+	configPath := dev.Config
+	if configPath == "" {
+		configPath = filepath.Join(dev.Path, "config.yaml")
+	}
+	cmd := exec.Command("go", "run", ".")
+	cmd.Dir = dev.Path
+	inst, err := m.launchPlugin(ctx, "", cmd, configPath, true, true)
+	if err != nil {
+		return nil, err
+	}
+	inst.id = name
+	inst.restart = func(restartCtx context.Context) (*instance, error) {
+		return m.launchDevPlugin(restartCtx, name, dev)
+	}
+	return inst, nil
 }
 
 func (m *Manager) launchPlugin(ctx context.Context, requestedID string, cmd *exec.Cmd, configPath string, initialize, start bool) (*instance, error) {
@@ -351,7 +365,6 @@ func (m *Manager) BeforeDispatch(ctx context.Context, request relayhook.Request)
 			continue
 		}
 		if err != nil {
-			m.setLastError(inst.id, err)
 			slog.Warn("Relay Hook 插件调用失败，已跳过当前实例", "plugin_id", inst.id, "error", err)
 			continue
 		}
@@ -359,7 +372,6 @@ func (m *Manager) BeforeDispatch(ctx context.Context, request relayhook.Request)
 		normalized, err := normalizeRelayDecision(current, decision)
 		if err != nil {
 			err = m.recordFailure(inst, err)
-			m.setLastError(inst.id, err)
 			slog.Warn("Relay Hook 插件决策无效，已跳过当前实例", "plugin_id", inst.id, "error", err)
 			continue
 		}
@@ -387,7 +399,7 @@ func (m *Manager) callRelayHook(ctx context.Context, inst *instance, request rel
 
 	payload, err := json.Marshal(request)
 	if err != nil {
-		return relayhook.Decision{}, true, fmt.Errorf("序列化 Relay Hook 请求失败: %w", err)
+		return relayhook.Decision{}, true, m.recordFailure(inst, fmt.Errorf("序列化 Relay Hook 请求失败: %w", err))
 	}
 	response, callErr := inst.plugin.Handle(ctx, protocol.Request{
 		Method: http.MethodPost,
@@ -476,14 +488,12 @@ func (m *Manager) TransformAccountTest(ctx context.Context, request accounttesth
 			continue
 		}
 		if err != nil {
-			m.setLastError(inst.id, err)
 			return accounttesthook.Decision{}, err
 		}
 		m.clearLastError(inst.id)
 		normalized, err := normalizeAccountTestDecision(current, decision)
 		if err != nil {
 			err = m.recordFailure(inst, err)
-			m.setLastError(inst.id, err)
 			return accounttesthook.Decision{}, err
 		}
 		if len(normalized.RequestBody) == 0 {
@@ -509,7 +519,7 @@ func (m *Manager) callAccountTestTransform(ctx context.Context, inst *instance, 
 
 	payload, err := json.Marshal(request)
 	if err != nil {
-		return accounttesthook.Decision{}, true, fmt.Errorf("序列化账号测试变换请求失败: %w", err)
+		return accounttesthook.Decision{}, true, m.recordFailure(inst, fmt.Errorf("序列化账号测试变换请求失败: %w", err))
 	}
 	response, callErr := inst.plugin.Handle(ctx, protocol.Request{
 		Method: http.MethodPost,
@@ -589,17 +599,61 @@ func normalizeAccountTestDecision(request accounttesthook.Request, decision acco
 }
 
 func (m *Manager) recordFailure(inst *instance, err error) error {
+	m.setLastError(inst.id, err)
 	if inst.recordFailure(time.Now()) {
-		slog.Warn("插件连续失败，已临时熔断", "plugin_id", inst.id, "duration", circuitOpenDuration.String(), "error", err)
+		slog.Warn("插件连续失败，已临时熔断并安排自动重启", "plugin_id", inst.id, "duration", circuitOpenDuration.String(), "error", err)
+		m.scheduleRestart(inst, err)
 	}
 	return err
+}
+
+func (m *Manager) scheduleRestart(inst *instance, cause error) {
+	if inst == nil || !inst.beginRecovery() {
+		return
+	}
+	go m.restartUnhealthyInstance(inst, cause)
+}
+
+func (m *Manager) restartUnhealthyInstance(failed *instance, cause error) {
+	m.opMu.Lock()
+	defer m.opMu.Unlock()
+	if m.instanceByID(failed.id) != failed {
+		failed.finishRecovery()
+		return
+	}
+
+	restartCtx, cancel := context.WithTimeout(context.Background(), pluginStartTimeout)
+	replacement, err := failed.restart(restartCtx)
+	cancel()
+	if err == nil && replacement == nil {
+		err = errors.New("自动重启返回了空插件实例")
+	}
+	if err != nil {
+		failed.finishRecovery()
+		restartErr := fmt.Errorf("插件自动重启失败: %w", err)
+		m.setLastError(failed.id, restartErr)
+		slog.Error("插件自动重启失败，保留熔断状态等待后续探测", "plugin_id", failed.id, "cause", cause, "error", err)
+		return
+	}
+
+	m.setInstance(replacement)
+	m.clearLastError(failed.id)
+	failed.finishRecovery()
+	stopPlugin(failed, context.Background())
+	slog.Info("插件已自动重启并恢复运行", "plugin_id", replacement.id, "cause", cause)
 }
 
 func (i *instance) acquireCall(now time.Time) bool {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	if i.stopping || (!i.circuitUntil.IsZero() && now.Before(i.circuitUntil)) {
+	if i.stopping || i.recovering {
 		return false
+	}
+	if !i.circuitUntil.IsZero() {
+		if now.Before(i.circuitUntil) || i.halfOpenProbe {
+			return false
+		}
+		i.halfOpenProbe = true
 	}
 	i.calls.Add(1)
 	return true
@@ -609,12 +663,19 @@ func (i *instance) recordSuccess() {
 	i.mu.Lock()
 	i.consecutiveFailures = 0
 	i.circuitUntil = time.Time{}
+	i.halfOpenProbe = false
 	i.mu.Unlock()
 }
 
 func (i *instance) recordFailure(now time.Time) bool {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	if i.halfOpenProbe || !i.circuitUntil.IsZero() {
+		i.consecutiveFailures = 0
+		i.halfOpenProbe = false
+		i.circuitUntil = now.Add(circuitOpenDuration)
+		return true
+	}
 	i.consecutiveFailures++
 	if i.consecutiveFailures < circuitFailureLimit {
 		return false
@@ -622,6 +683,22 @@ func (i *instance) recordFailure(now time.Time) bool {
 	i.consecutiveFailures = 0
 	i.circuitUntil = now.Add(circuitOpenDuration)
 	return true
+}
+
+func (i *instance) beginRecovery() bool {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.stopping || i.recovering || i.restart == nil {
+		return false
+	}
+	i.recovering = true
+	return true
+}
+
+func (i *instance) finishRecovery() {
+	i.mu.Lock()
+	i.recovering = false
+	i.mu.Unlock()
 }
 
 // StopAll 从运行集合摘除全部实例，等待在途调用后停止子进程。

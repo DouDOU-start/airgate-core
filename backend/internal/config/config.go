@@ -168,7 +168,7 @@ func Load(path string) (*Config, error) {
 	cfg := &Config{
 		Server:  ServerConfig{Host: DefaultHost, Port: DefaultPort, Mode: "release"},
 		JWT:     JWTConfig{ExpireHour: 24},
-		Plugins: PluginsConfig{Dir: "data/plugins", HookTimeoutMS: 50},
+		Plugins: PluginsConfig{Dir: "data/plugins", HookTimeoutMS: 500},
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -190,7 +190,7 @@ func Load(path string) (*Config, error) {
 		cfg.Plugins.Dir = "data/plugins"
 	}
 	if cfg.Plugins.HookTimeoutMS <= 0 {
-		cfg.Plugins.HookTimeoutMS = 50
+		cfg.Plugins.HookTimeoutMS = 500
 	}
 	applyEnvOverrides(cfg)
 	return cfg, nil

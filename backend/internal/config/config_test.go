@@ -94,7 +94,7 @@ func TestLoadDefaultsPluginsToDisabled(t *testing.T) {
 	if cfg.Plugins.Enabled {
 		t.Fatal("插件进程默认不应开启")
 	}
-	if cfg.Plugins.Dir != "data/plugins" || cfg.Plugins.HookTimeoutMS != 50 {
+	if cfg.Plugins.Dir != "data/plugins" || cfg.Plugins.HookTimeoutMS != 500 {
 		t.Fatalf("插件默认配置异常: %+v", cfg.Plugins)
 	}
 }

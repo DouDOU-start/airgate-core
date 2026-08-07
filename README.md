@@ -101,7 +101,7 @@ make dev       # 前后端热重载
 | `GIN_MODE` | `release` / `debug` | `debug` |
 | `LOG_LEVEL` / `LOG_FORMAT` | 日志级别 / 格式（`text`/`json`） | `info` / `text` |
 | `PLUGINS_ENABLED` | 没有 `runtime.yaml` 的手工安装插件的兼容默认开关 | `false` |
-| `PLUGINS_DIR` / `PLUGINS_HOOK_TIMEOUT_MS` | 插件目录 / Relay Hook 执行链总超时毫秒数 | `data/plugins` / `50` |
+| `PLUGINS_DIR` / `PLUGINS_HOOK_TIMEOUT_MS` | 插件目录 / Relay Hook 执行链总超时毫秒数 | `data/plugins` / `500` |
 
 配置文件不存在时，连接信息可完全由环境变量提供（docker compose 场景）。首次启动后注册的第一个账号会自动成为系统管理员。
 

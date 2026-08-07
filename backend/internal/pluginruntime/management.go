@@ -550,7 +550,14 @@ func (m *Manager) reloadLocked(ctx context.Context, id string) error {
 
 func (m *Manager) launchInstalled(ctx context.Context, id string) (*instance, error) {
 	dir := filepath.Join(m.pluginDir, id)
-	return m.launchPlugin(ctx, id, exec.Command(filepath.Join(dir, pluginBinaryName(id))), filepath.Join(dir, "config.yaml"), true, true)
+	inst, err := m.launchPlugin(ctx, id, exec.Command(filepath.Join(dir, pluginBinaryName(id))), filepath.Join(dir, "config.yaml"), true, true)
+	if err != nil {
+		return nil, err
+	}
+	inst.restart = func(restartCtx context.Context) (*instance, error) {
+		return m.launchInstalled(restartCtx, id)
+	}
+	return inst, nil
 }
 
 func (m *Manager) detachAndStop(id string, ctx context.Context) {
