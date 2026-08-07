@@ -55,6 +55,113 @@ func TestParseAntigravityUsage转换配额窗口(t *testing.T) {
 	}
 }
 
+func TestParseAntigravitySubscription识别订阅档位(t *testing.T) {
+	tests := []struct {
+		name     string
+		payload  string
+		wantPlan string
+		wantID   string
+		wantName string
+	}{
+		{
+			name:     "免费档位",
+			payload:  `{"currentTier":{"id":"free-tier","name":"Free"}}`,
+			wantPlan: "free",
+			wantID:   "free-tier",
+			wantName: "Free",
+		},
+		{
+			name:     "付费档位优先",
+			payload:  `{"currentTier":{"id":"free-tier"},"paidTier":{"id":"g1-pro-tier","name":"Google AI Pro"}}`,
+			wantPlan: "pro",
+			wantID:   "g1-pro-tier",
+			wantName: "Google AI Pro",
+		},
+		{
+			name:     "Ultra档位",
+			payload:  `{"paid_tier":{"id":"g1-ultra-tier","name":"Google AI Ultra"}}`,
+			wantPlan: "ultra",
+			wantID:   "g1-ultra-tier",
+			wantName: "Google AI Ultra",
+		},
+		{
+			name:     "未知档位保留名称",
+			payload:  `{"paidTier":{"id":"future-tier","name":"Future Plan"}}`,
+			wantPlan: "Future Plan",
+			wantID:   "future-tier",
+			wantName: "Future Plan",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			summary, err := parseAntigravitySubscription([]byte(tt.payload))
+			if err != nil {
+				t.Fatalf("解析订阅类型失败: %v", err)
+			}
+			if summary.PlanType != tt.wantPlan || summary.TierID != tt.wantID || summary.TierName != tt.wantName {
+				t.Fatalf("订阅摘要 = %+v，期望 plan=%q id=%q name=%q", summary, tt.wantPlan, tt.wantID, tt.wantName)
+			}
+		})
+	}
+}
+
+func TestFetchAntigravitySubscription发送正确请求(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost {
+			t.Errorf("请求方法 = %s，期望 POST", request.Method)
+		}
+		if request.Header.Get("Authorization") != "Bearer 测试访问令牌" {
+			t.Errorf("Authorization 请求头不正确: %q", request.Header.Get("Authorization"))
+		}
+		if request.Header.Get("User-Agent") != antigravityUsageUserAgent {
+			t.Errorf("User-Agent 请求头不正确: %q", request.Header.Get("User-Agent"))
+		}
+		var body map[string]any
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Errorf("解析请求体失败: %v", err)
+		}
+		metadata := asAnyMap(body["metadata"])
+		if readStringAny(metadata, "ideType") != "ANTIGRAVITY" {
+			t.Errorf("订阅请求 metadata 不正确: %#v", body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"paidTier":{"id":"g1-ultra-lite-tier","name":"Google AI Ultra Lite"},
+			"cloudaicompanionProject":"测试项目"
+		}`))
+	}))
+	defer server.Close()
+
+	summary, err := fetchAntigravitySubscriptionFromURLs(
+		context.Background(),
+		"测试访问令牌",
+		server.Client(),
+		[]string{server.URL},
+	)
+	if err != nil {
+		t.Fatalf("查询订阅类型失败: %v", err)
+	}
+	if summary.PlanType != "ultra-lite" || summary.ProjectID != "测试项目" {
+		t.Fatalf("订阅类型或项目解析不正确: %+v", summary)
+	}
+}
+
+func TestApplyAntigravitySubscriptionCredentials写入展示字段(t *testing.T) {
+	credentials := map[string]string{"access_token": "测试访问令牌"}
+	applyAntigravitySubscriptionCredentials(credentials, antigravitySubscriptionSummary{
+		PlanType:  "pro",
+		TierID:    "g1-pro-tier",
+		TierName:  "Google AI Pro",
+		ProjectID: "测试项目",
+	})
+	if credentials["plan_type"] != "pro" ||
+		credentials["antigravity_tier_id"] != "g1-pro-tier" ||
+		credentials["antigravity_tier_name"] != "Google AI Pro" ||
+		credentials["project_id"] != "测试项目" {
+		t.Fatalf("订阅字段写入不完整: %#v", credentials)
+	}
+}
+
 func TestFetchAntigravityUsage支持地址回退(t *testing.T) {
 	failed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "临时不可用", http.StatusServiceUnavailable)

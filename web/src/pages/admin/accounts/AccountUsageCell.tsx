@@ -87,6 +87,8 @@ export function formatPlanTypeLabel(plan?: string): string {
     superheavy: 'SuperGrok Heavy',
     supergrokheavy: 'SuperGrok Heavy',
     premium: 'Premium',
+    ultra: 'Ultra',
+    ultralite: 'Ultra Lite',
   };
   return map[lower] || key.charAt(0).toUpperCase() + key.slice(1);
 }
@@ -98,7 +100,7 @@ export function planTypeBadgeClass(plan?: string): string {
   if (key.includes('prolite')) {
     return `${base} ag-account-plan-badge--pro-lite`;
   }
-  if (key.includes('super') || key.includes('heavy') || key.includes('premium') || key.includes('max') || key === 'pro' || (key.includes('pro') && !key.includes('plus'))) {
+  if (key.includes('super') || key.includes('heavy') || key.includes('premium') || key.includes('ultra') || key.includes('max') || key === 'pro' || (key.includes('pro') && !key.includes('plus'))) {
     return `${base} ag-account-plan-badge--pro`;
   }
   if (key.includes('plus') || key.includes('go')) {

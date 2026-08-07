@@ -372,6 +372,9 @@ func (s *Service) createFromOAuthImport(
 	creds map[string]string,
 	fallbackName string,
 ) (Account, error) {
+	if strings.EqualFold(strings.TrimSpace(platform), "antigravity") {
+		_ = enrichAntigravitySubscriptionCredentials(ctx, creds, input.ProxyURL)
+	}
 	var item Account
 	var err error
 	if input.AccountID > 0 {
@@ -1022,6 +1025,9 @@ func applyXAIIdentityClaims(creds map[string]string, idToken string) {
 
 func (s *Service) finishOAuthWithCredentials(ctx context.Context, entry *oauthSessionEntry, creds map[string]string) error {
 	public := entry.snapshot()
+	if strings.EqualFold(strings.TrimSpace(public.Platform), "antigravity") {
+		_ = enrichAntigravitySubscriptionCredentials(ctx, creds, entry.input.ProxyURL)
+	}
 	var account Account
 	var err error
 	if entry.input.AccountID > 0 {

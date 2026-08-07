@@ -47,6 +47,12 @@ var antigravityUsageURLs = []string{
 	"https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
 }
 
+var antigravitySubscriptionURLs = []string{
+	"https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
+	"https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:loadCodeAssist",
+	"https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
+}
+
 // ErrUsageNotSupported 当前平台/凭证无法查询用量窗口。
 var ErrUsageNotSupported = errors.New("该账号不支持用量窗口查询")
 
@@ -353,14 +359,194 @@ func fetchAntigravityUsage(ctx context.Context, creds map[string]string, proxyUR
 	if projectID == "" {
 		return UsageSnapshot{}, fmt.Errorf("antigravity 用量查询缺少 project_id")
 	}
+	planType := strings.TrimSpace(creds["plan_type"])
+	if planType == "" {
+		if subscription, err := fetchAntigravitySubscription(ctx, accessToken, proxyURL); err == nil {
+			planType = subscription.PlanType
+		}
+	}
 	return fetchAntigravityUsageFromURLs(
 		ctx,
 		accessToken,
 		projectID,
-		strings.TrimSpace(creds["plan_type"]),
+		planType,
 		httpClient(proxyURL),
 		antigravityUsageURLs,
 	)
+}
+
+type antigravitySubscriptionSummary struct {
+	PlanType  string
+	TierID    string
+	TierName  string
+	ProjectID string
+}
+
+func fetchAntigravitySubscription(ctx context.Context, accessToken, proxyURL string) (antigravitySubscriptionSummary, error) {
+	return fetchAntigravitySubscriptionFromURLs(
+		ctx,
+		accessToken,
+		httpClient(proxyURL),
+		antigravitySubscriptionURLs,
+	)
+}
+
+func fetchAntigravitySubscriptionFromURLs(
+	ctx context.Context,
+	accessToken string,
+	client *http.Client,
+	targetURLs []string,
+) (antigravitySubscriptionSummary, error) {
+	if client == nil {
+		client = http.DefaultClient
+	}
+	requestBody := `{"metadata":{"ideType":"ANTIGRAVITY"}}`
+	var lastErr error
+	for _, targetURL := range targetURLs {
+		targetURL = strings.TrimSpace(targetURL)
+		if targetURL == "" {
+			continue
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, strings.NewReader(requestBody))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
+		req.Header.Set("Accept", "*/*")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("User-Agent", antigravityUsageUserAgent)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("查询 Antigravity 订阅类型失败: %w", err)
+			continue
+		}
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		_ = resp.Body.Close()
+		if readErr != nil {
+			lastErr = fmt.Errorf("读取 Antigravity 订阅响应失败: %w", readErr)
+			continue
+		}
+		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+			lastErr = &accountUpstreamHTTPError{
+				status: resp.StatusCode,
+				body:   body,
+				label:  "antigravity 订阅",
+			}
+			continue
+		}
+		summary, err := parseAntigravitySubscription(body)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		return summary, nil
+	}
+	if lastErr != nil {
+		return antigravitySubscriptionSummary{}, lastErr
+	}
+	return antigravitySubscriptionSummary{}, fmt.Errorf("antigravity 订阅接口不可用")
+}
+
+func parseAntigravitySubscription(body []byte) (antigravitySubscriptionSummary, error) {
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return antigravitySubscriptionSummary{}, fmt.Errorf("解析 Antigravity 订阅类型失败: %w", err)
+	}
+	if nested := asAnyMap(payload["body"]); nested != nil {
+		payload = nested
+	} else if nestedText, ok := payload["body"].(string); ok && strings.TrimSpace(nestedText) != "" {
+		var nested map[string]any
+		if json.Unmarshal([]byte(nestedText), &nested) == nil {
+			payload = nested
+		}
+	}
+
+	currentTier := asAnyMap(firstNonNil(payload["currentTier"], payload["current_tier"]))
+	paidTier := asAnyMap(firstNonNil(payload["paidTier"], payload["paid_tier"]))
+	effectiveTier := currentTier
+	if readStringAny(paidTier, "id", "name") != "" {
+		effectiveTier = paidTier
+	}
+	tierID := readStringAny(effectiveTier, "id")
+	tierName := readStringAny(effectiveTier, "name")
+	if tierID == "" && tierName == "" {
+		return antigravitySubscriptionSummary{}, fmt.Errorf("antigravity 上游未返回订阅类型")
+	}
+	return antigravitySubscriptionSummary{
+		PlanType:  antigravityPlanType(tierID, tierName),
+		TierID:    tierID,
+		TierName:  tierName,
+		ProjectID: antigravityProjectIDFromPayload(payload),
+	}, nil
+}
+
+func antigravityPlanType(tierID, tierName string) string {
+	switch strings.ToLower(strings.TrimSpace(tierID)) {
+	case "free-tier":
+		return "free"
+	case "g1-pro-tier":
+		return "pro"
+	case "g1-ultra-tier":
+		return "ultra"
+	case "g1-ultra-lite-tier":
+		return "ultra-lite"
+	default:
+		return firstNonEmpty(strings.TrimSpace(tierName), strings.TrimSpace(tierID))
+	}
+}
+
+func antigravityProjectIDFromPayload(payload map[string]any) string {
+	for _, key := range []string{"cloudaicompanionProject", "cloudaicompanion_project", "project"} {
+		switch value := payload[key].(type) {
+		case string:
+			if projectID := strings.TrimSpace(value); projectID != "" {
+				return projectID
+			}
+		case map[string]any:
+			if projectID := readStringAny(value, "id", "projectId", "project_id", "name"); projectID != "" {
+				return projectID
+			}
+		}
+	}
+	return ""
+}
+
+// enrichAntigravitySubscriptionCredentials 将订阅档位写入凭证。
+// 查询失败不阻断授权或导入，存量账号仍可在后续用量刷新时重试。
+func enrichAntigravitySubscriptionCredentials(ctx context.Context, credentials map[string]string, proxyURL string) error {
+	if credentials == nil {
+		return fmt.Errorf("antigravity 凭证为空")
+	}
+	accessToken := strings.TrimSpace(credentials["access_token"])
+	if accessToken == "" {
+		return fmt.Errorf("antigravity 凭证缺少 access_token")
+	}
+	summary, err := fetchAntigravitySubscription(ctx, accessToken, proxyURL)
+	if err != nil {
+		return err
+	}
+	applyAntigravitySubscriptionCredentials(credentials, summary)
+	return nil
+}
+
+func applyAntigravitySubscriptionCredentials(credentials map[string]string, summary antigravitySubscriptionSummary) {
+	if credentials == nil {
+		return
+	}
+	if summary.PlanType != "" {
+		credentials["plan_type"] = summary.PlanType
+	}
+	if summary.TierID != "" {
+		credentials["antigravity_tier_id"] = summary.TierID
+	}
+	if summary.TierName != "" {
+		credentials["antigravity_tier_name"] = summary.TierName
+	}
+	if strings.TrimSpace(credentials["project_id"]) == "" && summary.ProjectID != "" {
+		credentials["project_id"] = summary.ProjectID
+	}
 }
 
 func fetchAntigravityUsageFromURLs(
