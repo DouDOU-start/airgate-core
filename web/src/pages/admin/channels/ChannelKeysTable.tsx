@@ -8,9 +8,10 @@ import { NativeSwitch } from '../../../shared/components/NativeSwitch';
 import { SortableHeader } from '../../../shared/components/SortableHeader';
 import { formatDate, formatDateTime } from '../../../shared/utils/format';
 import type { ChannelKeyResp, ChannelKeySortBy, SortOrder } from '../../../shared/types';
+import type { HealthmonEntity } from '../../../shared/api/healthMonitor';
 import {
   CredentialProtocolChips, effectiveKeyStatus, HealthStatusChip, KeyConfigurationSummary,
-  KeyFinancialSummary, KeyRuntimeSummary, KeyStatusChip,
+  KeyFinancialSummary, KeyRuntimeSummary, KeyStatusChip, TrafficHealthBadge,
 } from './keyShared';
 
 const COLUMN_COUNT = 9;
@@ -34,6 +35,7 @@ export function ChannelKeysTable({
   refreshingUpstreamRateId,
   onToggleEnabled,
   togglingId,
+  trafficHealthByKey,
 }: {
   rows: ChannelKeyResp[];
   isLoading: boolean;
@@ -51,6 +53,7 @@ export function ChannelKeysTable({
   refreshingUpstreamRateId: number | null;
   onToggleEnabled: (key: ChannelKeyResp, enabled: boolean) => void;
   togglingId: number | null;
+  trafficHealthByKey?: Map<number, HealthmonEntity>;
 }) {
   const { t } = useTranslation();
 
@@ -162,6 +165,18 @@ export function ChannelKeysTable({
                     {key.health_status && key.health_status !== 'healthy' ? (
                       <HealthStatusChip status={key.health_status} />
                     ) : null}
+                    {(() => {
+                      const th = trafficHealthByKey?.get(key.id);
+                      if (!th) return null;
+                      return (
+                        <TrafficHealthBadge
+                          idle={th.sample.idle}
+                          lowSample={th.sample.low_sample}
+                          successRate={th.success_rate}
+                          errorRate={th.error_rate}
+                        />
+                      );
+                    })()}
                   </div>
                   {key.tags.length > 0 ? (
                     <div className="ag-key-tags">

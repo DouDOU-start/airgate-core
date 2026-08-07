@@ -25,6 +25,22 @@ const (
 	StateDisabled    = "disabled"
 )
 
+// RateLimitProbeDecision 是账号进入限流恢复探测前的原子判定。
+type RateLimitProbeDecision uint8
+
+const (
+	// RateLimitProbeBlocked 表示账号不存在、已禁用，或当前已有探测/仍处退避期。
+	RateLimitProbeBlocked RateLimitProbeDecision = iota
+	// RateLimitProbeNotNeeded 表示账号当前不是限流状态，可按普通请求处理。
+	RateLimitProbeNotNeeded
+	// RateLimitProbeAcquired 表示调用方独占了本轮限流恢复探测资格。
+	RateLimitProbeAcquired
+)
+
+// RateLimitProbeLease 标识一次具体的限流恢复探测。结算时必须携带原租约，避免旧
+// 请求的迟到结果误结算账号后续新一轮探测。
+type RateLimitProbeLease uint64
+
 // ErrNoAvailableAccount 当前分组/模型下无可调度账号。
 var ErrNoAvailableAccount = errors.New("无可用账号")
 
@@ -54,6 +70,13 @@ type Snapshot struct {
 	Models map[string]struct{}
 	// GroupIDs 绑定分组；空集合不参与任何分组调度。
 	GroupIDs map[int]struct{}
+
+	// 以下字段仅存在于运行时快照，不由 Loader/Persister 读写。恢复探测必须先原子
+	// claim；失败后按指数退避隐藏账号，避免插件跨请求反复放行同一限流账号。
+	rateLimitProbeInFlight   bool
+	rateLimitProbeLease      RateLimitProbeLease
+	rateLimitProbeFailures   int
+	rateLimitProbeBlockUntil time.Time
 }
 
 // EffectiveCostRatio 账号成本倍率；无效时回退 1。
@@ -116,8 +139,10 @@ type CredentialPersister interface {
 }
 
 const (
-	lazyReloadTimeout  = 5 * time.Second
-	lazyReloadInterval = 3 * time.Second
+	lazyReloadTimeout            = 5 * time.Second
+	lazyReloadInterval           = 3 * time.Second
+	rateLimitProbeInitialBackoff = 30 * time.Second
+	rateLimitProbeMaximumBackoff = 15 * time.Minute
 )
 
 // Registry 账号注册表。
@@ -131,11 +156,13 @@ type Registry struct {
 
 	loadedOnce     atomic.Bool
 	lazyMu         sync.Mutex
+	reloadMu       sync.Mutex
 	lastLazyReload time.Time
 
 	randFn         func(n int) int
 	persistTimeout time.Duration
 	stateSeq       atomic.Uint64
+	probeSeq       atomic.Uint64
 
 	persistMu      sync.Mutex
 	persistPending map[int]statePersistRequest
@@ -173,8 +200,21 @@ func (r *Registry) SetCredentialPersister(p CredentialPersister) {
 	r.credSink = p
 }
 
-// Reload 全量替换快照。
+// Reload 全量替换快照。仍处于同一轮限流的账号保留仅运行时探测门闩，避免账号或
+// 代理配置变更触发重载后，已经失败的超额探测立即获得新资格。
 func (r *Registry) Reload(ctx context.Context) error {
+	r.reloadMu.Lock()
+	defer r.reloadMu.Unlock()
+
+	// Loader 可能执行较慢，不能持有主锁。记录 copy-on-write 指针作为基线，装载
+	// 完成后若指针变化，说明期间有状态、凭证或探测门闩更新，必须保留新值。
+	r.mu.RLock()
+	baseline := make(map[int]*Snapshot, len(r.accounts))
+	for id, snap := range r.accounts {
+		baseline[id] = snap
+	}
+	r.mu.RUnlock()
+
 	snaps, err := r.loader.LoadAllForAccountRegistry(ctx)
 	if err != nil {
 		return err
@@ -186,9 +226,38 @@ func (r *Registry) Reload(ctx context.Context) error {
 		snap.Credentials = cloneStringMap(snap.Credentials)
 		snap.Models = cloneStructMap(snap.Models)
 		snap.GroupIDs = cloneIntSet(snap.GroupIDs)
+		// Loader 不负责运行时门闩；即使包内测试替身填入，也不能直接注入。
+		resetRateLimitProbe(&snap)
 		next[snap.ID] = &snap
 	}
 	r.mu.Lock()
+	for id, snap := range next {
+		old := r.accounts[id]
+		if old == nil {
+			continue
+		}
+		before := baseline[id]
+		if before != old {
+			loadedStateUntil := cloneTime(snap.StateUntil)
+			if before == nil || !sameStringMap(before.Credentials, old.Credentials) {
+				snap.Credentials = old.Credentials
+			}
+			if before == nil || !sameAccountRuntimeState(before, old) {
+				preserveConcurrentState(snap, old)
+				mergeRateLimitProbeDeadline(snap, loadedStateUntil)
+				continue
+			}
+			if !sameRateLimitProbeRuntime(before, old) && old.State == StateRateLimited && snap.State == StateRateLimited {
+				copyRateLimitProbeRuntime(snap, old)
+				mergeRateLimitProbeDeadline(snap, loadedStateUntil)
+			}
+			continue
+		}
+		if old.State == StateRateLimited && snap.State == StateRateLimited {
+			copyRateLimitProbeRuntime(snap, old)
+			mergeRateLimitProbeDeadline(snap, snap.StateUntil)
+		}
+	}
 	r.accounts = next
 	r.mu.Unlock()
 	r.loadedOnce.Store(true)
@@ -270,6 +339,11 @@ func (r *Registry) listCandidates(
 			continue
 		}
 		if a.State == StateDisabled {
+			continue
+		}
+		// 探测进行中或退避未结束时，所有候选入口一律隐藏。这样即使插件携带
+		// 先前生成的显式 allow，Core 也不会再次放行该账号。
+		if a.State == StateRateLimited && a.rateLimitProbeBlocked(now) {
 			continue
 		}
 		if !a.IsSchedulable(now) {
@@ -383,15 +457,128 @@ func (r *Registry) Snapshot(id int) (*Snapshot, bool) {
 	return a, ok
 }
 
+// BeginRateLimitProbe 原子判断账号状态并 claim 一次限流恢复探测。
+//
+// active / degraded 无需探测；rate_limited 在没有在途探测且退避已结束时仅允许一个
+// 调用方取得资格；disabled、未知状态和不存在的账号均拒绝。
+func (r *Registry) BeginRateLimitProbe(accountID int) (RateLimitProbeDecision, RateLimitProbeLease) {
+	if r == nil {
+		return RateLimitProbeBlocked, 0
+	}
+	r.ensureLoaded()
+	now := time.Now()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	old, ok := r.accounts[accountID]
+	if !ok || old == nil {
+		return RateLimitProbeBlocked, 0
+	}
+	switch old.State {
+	case StateActive, StateDegraded:
+		return RateLimitProbeNotNeeded, 0
+	case StateRateLimited:
+		if old.rateLimitProbeBlocked(now) {
+			return RateLimitProbeBlocked, 0
+		}
+		lease := RateLimitProbeLease(r.probeSeq.Add(1))
+		next := *old
+		next.rateLimitProbeInFlight = true
+		next.rateLimitProbeLease = lease
+		r.accounts[accountID] = &next
+		return RateLimitProbeAcquired, lease
+	default:
+		return RateLimitProbeBlocked, 0
+	}
+}
+
+// CancelRateLimitProbe 归还尚未触达上游的探测资格，例如本地并发/RPM 槽获取失败。
+func (r *Registry) CancelRateLimitProbe(accountID int, lease RateLimitProbeLease) {
+	if r == nil {
+		return
+	}
+	r.mutateRuntime(accountID, func(a *Snapshot) bool {
+		if !a.hasRateLimitProbeLease(lease) {
+			return false
+		}
+		a.rateLimitProbeInFlight = false
+		a.rateLimitProbeLease = 0
+		return true
+	})
+}
+
+// MarkRateLimitProbeFailed 记录已 claim 探测仍被限流。退避从 30 秒开始按失败次数
+// 翻倍，最高 15 分钟；最终截止时间不会早于上游 Retry-After 或当前 StateUntil。
+func (r *Registry) MarkRateLimitProbeFailed(accountID int, lease RateLimitProbeLease, retryAfter time.Duration, reason string) time.Time {
+	if r == nil {
+		return time.Time{}
+	}
+	now := time.Now()
+	snap, version := r.mutateState(accountID, func(a *Snapshot) bool {
+		if !a.hasRateLimitProbeLease(lease) {
+			return false
+		}
+		a.rateLimitProbeFailures++
+		until := now.Add(rateLimitProbeBackoff(a.rateLimitProbeFailures))
+		if retryAfter > 0 {
+			until = laterTime(until, now.Add(retryAfter))
+		}
+		if a.StateUntil != nil {
+			until = laterTime(until, *a.StateUntil)
+		}
+		a.rateLimitProbeInFlight = false
+		a.rateLimitProbeLease = 0
+		a.rateLimitProbeBlockUntil = until
+		a.State = StateRateLimited
+		a.StateUntil = cloneTime(&until)
+		a.ErrorMsg = reason
+		return true
+	})
+	if snap == nil || version == 0 {
+		return time.Time{}
+	}
+	r.persistAsync(accountID, StateRateLimited, snap.StateUntil, reason, version)
+	return snap.rateLimitProbeBlockUntil
+}
+
+// MarkRateLimitProbeSucceeded 仅允许当前在途的限流探测恢复账号。没有 claim 的旧请求
+// 不能借此覆盖较新的限流状态。
+func (r *Registry) MarkRateLimitProbeSucceeded(accountID int, lease RateLimitProbeLease) {
+	r.markActiveWhen(accountID, func(a *Snapshot) bool {
+		return a.hasRateLimitProbeLease(lease)
+	})
+}
+
+// MarkActiveIfNotRateLimited 处理普通请求成功：当前已经变成 rate_limited/disabled 时
+// 保持新状态，防止较早发出的 active 请求晚到成功后错误清除限流。
+func (r *Registry) MarkActiveIfNotRateLimited(accountID int) {
+	r.markActiveWhen(accountID, func(a *Snapshot) bool {
+		return a.State == StateActive || a.State == StateDegraded
+	})
+}
+
 // MarkRateLimited 标记限流（内存 + 异步落库）。
 func (r *Registry) MarkRateLimited(accountID int, until time.Time, reason string) {
-	untilCopy := until
 	snap, version := r.mutateState(accountID, func(a *Snapshot) bool {
-		if a.State == StateRateLimited && sameTime(a.StateUntil, &until) && a.ErrorMsg == reason {
+		wasRateLimited := a.State == StateRateLimited
+		// 同一轮限流只延长、不缩短已有冷却；探测失败门闩也不得被普通 429 清除。
+		if wasRateLimited {
+			if a.StateUntil != nil {
+				until = laterTime(until, *a.StateUntil)
+			}
+			if a.rateLimitProbeFailures > 0 {
+				until = laterTime(until, a.rateLimitProbeBlockUntil)
+				a.rateLimitProbeBlockUntil = until
+			}
+		} else {
+			// 从非限流状态首次进入新一轮限流，立即提供一次恢复探测资格。
+			resetRateLimitProbe(a)
+		}
+		if wasRateLimited && sameTime(a.StateUntil, &until) && a.ErrorMsg == reason {
 			return false
 		}
 		a.State = StateRateLimited
-		a.StateUntil = &untilCopy
+		a.StateUntil = cloneTime(&until)
 		a.ErrorMsg = reason
 		return true
 	})
@@ -404,12 +591,13 @@ func (r *Registry) MarkRateLimited(accountID int, until time.Time, reason string
 // MarkDisabled 标记禁用（凭证失效等）。
 func (r *Registry) MarkDisabled(accountID int, reason string) {
 	snap, version := r.mutateState(accountID, func(a *Snapshot) bool {
-		if a.State == StateDisabled && a.StateUntil == nil && a.ErrorMsg == reason {
+		if a.State == StateDisabled && a.StateUntil == nil && a.ErrorMsg == reason && a.rateLimitProbeClean() {
 			return false
 		}
 		a.State = StateDisabled
 		a.StateUntil = nil
 		a.ErrorMsg = reason
+		resetRateLimitProbe(a)
 		return true
 	})
 	if snap == nil || version == 0 {
@@ -420,31 +608,20 @@ func (r *Registry) MarkDisabled(accountID int, reason string) {
 
 // MarkActive 恢复 active。
 func (r *Registry) MarkActive(accountID int) {
-	snap, version := r.mutateState(accountID, func(a *Snapshot) bool {
-		if a.State == StateActive && a.StateUntil == nil && a.ErrorMsg == "" {
-			return false
-		}
-		a.State = StateActive
-		a.StateUntil = nil
-		a.ErrorMsg = ""
-		return true
-	})
-	if snap == nil || version == 0 {
-		return
-	}
-	r.persistAsync(accountID, StateActive, nil, "", version)
+	r.markActiveWhen(accountID, func(*Snapshot) bool { return true })
 }
 
 // MarkDegraded 软降级（upstream_is_pool 抖动）。
 func (r *Registry) MarkDegraded(accountID int, until time.Time, reason string) {
 	untilCopy := until
 	snap, version := r.mutateState(accountID, func(a *Snapshot) bool {
-		if a.State == StateDegraded && sameTime(a.StateUntil, &until) && a.ErrorMsg == reason {
+		if a.State == StateDegraded && sameTime(a.StateUntil, &until) && a.ErrorMsg == reason && a.rateLimitProbeClean() {
 			return false
 		}
 		a.State = StateDegraded
 		a.StateUntil = &untilCopy
 		a.ErrorMsg = reason
+		resetRateLimitProbe(a)
 		return true
 	})
 	if snap == nil || version == 0 {
@@ -489,6 +666,21 @@ func (r *Registry) mutate(accountID int, apply func(*Snapshot)) *Snapshot {
 	return &next
 }
 
+func (r *Registry) mutateRuntime(accountID int, apply func(*Snapshot) bool) *Snapshot {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	old, ok := r.accounts[accountID]
+	if !ok {
+		return nil
+	}
+	next := *old
+	if !apply(&next) {
+		return old
+	}
+	r.accounts[accountID] = &next
+	return &next
+}
+
 func (r *Registry) mutateState(accountID int, apply func(*Snapshot) bool) (*Snapshot, uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -509,6 +701,130 @@ func sameTime(left, right *time.Time) bool {
 		return left == nil && right == nil
 	}
 	return left.Equal(*right)
+}
+
+func (r *Registry) markActiveWhen(accountID int, allowed func(*Snapshot) bool) {
+	if r == nil {
+		return
+	}
+	snap, version := r.mutateState(accountID, func(a *Snapshot) bool {
+		if !allowed(a) {
+			return false
+		}
+		if a.State == StateActive && a.StateUntil == nil && a.ErrorMsg == "" && a.rateLimitProbeClean() {
+			return false
+		}
+		a.State = StateActive
+		a.StateUntil = nil
+		a.ErrorMsg = ""
+		resetRateLimitProbe(a)
+		return true
+	})
+	if snap == nil || version == 0 {
+		return
+	}
+	r.persistAsync(accountID, StateActive, nil, "", version)
+}
+
+func (s *Snapshot) rateLimitProbeBlocked(now time.Time) bool {
+	return s != nil && (s.rateLimitProbeInFlight || s.rateLimitProbeBlockUntil.After(now))
+}
+
+func (s *Snapshot) rateLimitProbeClean() bool {
+	return s != nil && !s.rateLimitProbeInFlight && s.rateLimitProbeLease == 0 && s.rateLimitProbeFailures == 0 && s.rateLimitProbeBlockUntil.IsZero()
+}
+
+func (s *Snapshot) hasRateLimitProbeLease(lease RateLimitProbeLease) bool {
+	return s != nil && lease != 0 && s.State == StateRateLimited && s.rateLimitProbeInFlight && s.rateLimitProbeLease == lease
+}
+
+func resetRateLimitProbe(s *Snapshot) {
+	if s == nil {
+		return
+	}
+	s.rateLimitProbeInFlight = false
+	s.rateLimitProbeLease = 0
+	s.rateLimitProbeFailures = 0
+	s.rateLimitProbeBlockUntil = time.Time{}
+}
+
+func copyRateLimitProbeRuntime(dst, src *Snapshot) {
+	if dst == nil || src == nil {
+		return
+	}
+	dst.rateLimitProbeInFlight = src.rateLimitProbeInFlight
+	dst.rateLimitProbeLease = src.rateLimitProbeLease
+	dst.rateLimitProbeFailures = src.rateLimitProbeFailures
+	dst.rateLimitProbeBlockUntil = src.rateLimitProbeBlockUntil
+}
+
+func preserveConcurrentState(dst, src *Snapshot) {
+	if dst == nil || src == nil {
+		return
+	}
+	dst.State = src.State
+	dst.StateUntil = cloneTime(src.StateUntil)
+	dst.ErrorMsg = src.ErrorMsg
+	copyRateLimitProbeRuntime(dst, src)
+}
+
+func sameAccountRuntimeState(left, right *Snapshot) bool {
+	return left != nil && right != nil &&
+		left.State == right.State && sameTime(left.StateUntil, right.StateUntil) && left.ErrorMsg == right.ErrorMsg
+}
+
+func sameRateLimitProbeRuntime(left, right *Snapshot) bool {
+	return left != nil && right != nil &&
+		left.rateLimitProbeInFlight == right.rateLimitProbeInFlight &&
+		left.rateLimitProbeLease == right.rateLimitProbeLease &&
+		left.rateLimitProbeFailures == right.rateLimitProbeFailures &&
+		left.rateLimitProbeBlockUntil.Equal(right.rateLimitProbeBlockUntil)
+}
+
+func sameStringMap(left, right map[string]string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for key, value := range left {
+		other, ok := right[key]
+		if !ok || other != value {
+			return false
+		}
+	}
+	return true
+}
+
+func mergeRateLimitProbeDeadline(s *Snapshot, loadedStateUntil *time.Time) {
+	if s == nil || s.State != StateRateLimited || s.rateLimitProbeFailures == 0 {
+		return
+	}
+	until := s.rateLimitProbeBlockUntil
+	if s.StateUntil != nil {
+		until = laterTime(until, *s.StateUntil)
+	}
+	if loadedStateUntil != nil {
+		until = laterTime(until, *loadedStateUntil)
+	}
+	s.rateLimitProbeBlockUntil = until
+	s.StateUntil = cloneTime(&until)
+}
+
+func rateLimitProbeBackoff(failures int) time.Duration {
+	backoff := rateLimitProbeInitialBackoff
+	for attempt := 1; attempt < failures && backoff < rateLimitProbeMaximumBackoff; attempt++ {
+		backoff *= 2
+		if backoff >= rateLimitProbeMaximumBackoff {
+			return rateLimitProbeMaximumBackoff
+		}
+	}
+	return backoff
+}
+
+func laterTime(left, right time.Time) time.Time {
+	if right.After(left) {
+		return right
+	}
+	return left
 }
 
 func (r *Registry) persistAsync(accountID int, state string, until *time.Time, errMsg string, version uint64) {

@@ -23,10 +23,10 @@ func (Group) Fields() []ent.Field {
 		// 实际扣费仍叠加分组 rate_multiplier（billing_rate 链）。
 		field.Float("alpha_search_price").Optional().Nillable(),
 		field.Bool("is_exclusive").Default(false),
-		// status_visible 控制此分组是否在公开「服务状态」页展示。
+		// status_visible 控制此分组是否在登录用户的「渠道状态」页展示。
 		// 默认 true 保持旧行为兼容；管理员可在「分组管理」中关掉以对外隐藏
 		// （比如仅限熟客的专属分组、调试中的分组等）。
-		// 隐藏仅影响公开状态页 (/status)，不影响 admin 视图和 API 鉴权逻辑。
+		// 隐藏仅影响用户渠道状态页 (/channel-status)，不影响 admin 视图和 API 鉴权逻辑。
 		field.Bool("status_visible").Default(true),
 		// allowed_clients 客户端白名单：非空时仅允许指定类型的客户端访问此分组。
 		// 空=不限制。值域: "claude_code", "codex"。

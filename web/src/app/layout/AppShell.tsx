@@ -51,6 +51,8 @@ import {
   Sparkles,
   Plug,
   ScanSearch,
+  HeartPulse,
+  RadioTower,
 } from 'lucide-react';
 import { oauthApi } from '../../shared/api/oauth';
 import { queryKeys } from '../../shared/queryKeys';
@@ -75,6 +77,7 @@ const adminMenuItems: MenuItem[] = [
   { path: '/admin/model-prices', labelKey: 'nav.model_prices', icon: <Boxes className="h-5 w-5" /> },
   { path: '/admin/groups', labelKey: 'nav.groups', icon: <FolderTree className="h-5 w-5" /> },
   { path: '/admin/usage', labelKey: 'nav.usage', icon: <ChartNoAxesCombined className="h-5 w-5" /> },
+  { path: '/admin/ops-health', labelKey: 'nav.ops_health', icon: <HeartPulse className="h-5 w-5" /> },
   { path: '/admin/request-audits', labelKey: 'nav.request_audit', icon: <ScanSearch className="h-5 w-5" /> },
   { path: '/admin/payment', labelKey: 'nav.payment', icon: <CreditCard className="h-5 w-5" /> },
   { path: '/admin/redemption', labelKey: 'nav.redemption', icon: <Ticket className="h-5 w-5" /> },
@@ -91,6 +94,7 @@ const userMenuItems: MenuItem[] = [
   { path: '/overview', labelKey: 'nav.my_overview', icon: <LayoutDashboard className="h-5 w-5" />, sectionKey: 'nav.personal' },
   { path: '/profile', labelKey: 'nav.profile', icon: <UserRoundCog className="h-5 w-5" /> },
   { path: '/keys', labelKey: 'nav.my_keys', icon: <KeyRound className="h-5 w-5" /> },
+  { path: '/channel-status', labelKey: 'nav.channel_status', icon: <RadioTower className="h-5 w-5" /> },
   { path: '/usage', labelKey: 'nav.my_usage', icon: <ReceiptText className="h-5 w-5" /> },
   { path: '/recharge', labelKey: 'nav.recharge', icon: <Wallet className="h-5 w-5" /> },
   { path: '/invite', labelKey: 'nav.invite', icon: <Gift className="h-5 w-5" /> },

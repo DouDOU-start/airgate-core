@@ -16,6 +16,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/clientid"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
@@ -31,6 +32,9 @@ import (
 const (
 	// maxFailoverAttempts 单请求内渠道切换上限（真实上游调用次数）。
 	maxFailoverAttempts = 3
+	// maxRateLimitProbesPerRequest 单请求最多执行一次限流账号恢复探测，
+	// 避免插件计划中的坏账号吃光 failover 预算，给健康 Core 候选保留机会。
+	maxRateLimitProbesPerRequest = 1
 	// queueWaitTimeout 渠道容量满（RPM/并发）时的最长排队时间。
 	queueWaitTimeout = 60 * time.Second
 	// queuePollInterval / queueMaxPollInterval 排队退避：200ms 起指数退避，2s 封顶。
@@ -287,6 +291,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	// hops 重试链（每次真实上游尝试一跳），随失败留痕落 attempt_chain。
 	var hops []errlog.AttemptHop
 	attempts := 0
+	rateLimitProbes := 0
 	recordCanceled := func() {
 		p.recordFailure(c, keyInfo, req, start, errlog.Entry{
 			Phase: errlog.PhaseCanceled, StatusCode: statusClientClosedRequest,
@@ -342,6 +347,12 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				hardExcludeAccounts = append(hardExcludeAccounts, acc.ID)
 				continue
 			}
+			// 本请求已探测过一个限流账号时，跳过其余限流账号，继续寻找插件计划中
+			// 的活跃账号或 Core fallback，避免三个坏账号恰好吃满全部重试预算。
+			if acc.State == accountreg.StateRateLimited && rateLimitProbes >= maxRateLimitProbesPerRequest {
+				hardExcludeAccounts = append(hardExcludeAccounts, acc.ID)
+				continue
+			}
 			requestID, rpmMinute, soft, slotOK := p.acquireAccountSlots(ctx, acc, req.Stream)
 			if !slotOK {
 				summary.localCapacity = true
@@ -366,17 +377,50 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				})
 				return
 			}
+
+			probeDecision := accountreg.RateLimitProbeNotNeeded
+			var probeLease accountreg.RateLimitProbeLease
+			if p.accounts != nil {
+				probeDecision, probeLease = p.accounts.BeginRateLimitProbe(acc.ID)
+			}
+			if probeDecision == accountreg.RateLimitProbeBlocked ||
+				(probeDecision == accountreg.RateLimitProbeAcquired && rateLimitProbes >= maxRateLimitProbesPerRequest) {
+				if probeDecision == accountreg.RateLimitProbeAcquired {
+					p.accounts.CancelRateLimitProbe(acc.ID, probeLease)
+				}
+				p.concurrency.ReleaseAccountSlot(context.Background(), acc.ID, requestID)
+				p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
+				hardExcludeAccounts = append(hardExcludeAccounts, acc.ID)
+				continue
+			}
+			rateLimitProbe := probeLease != 0
+			if rateLimitProbe {
+				rateLimitProbes++
+			}
 			attemptStart := time.Now()
-			result := p.executeAccountAttempt(c, acc, req, endpoint, protocol, payload, start, requestID, rpmMinute, auditRequest)
+			result := func() (result attemptResult) {
+				if rateLimitProbe {
+					defer func() {
+						if recovered := recover(); recovered != nil {
+							p.accounts.MarkRateLimitProbeFailed(acc.ID, probeLease, 0, "限流恢复探测执行异常，结果未知")
+							panic(recovered)
+						}
+					}()
+				}
+				return p.executeAccountAttempt(c, acc, req, endpoint, protocol, payload, start, requestID, rpmMinute, auditRequest)
+			}()
 			attemptLatency := time.Since(attemptStart).Milliseconds()
 			attempts++
 			if result.auditErr != nil {
+				if rateLimitProbe {
+					p.accounts.MarkRateLimitProbeFailed(acc.ID, probeLease, 0, "限流恢复探测审计失败，结果未知")
+				}
 				writeError(c, http.StatusInternalServerError, "server_error", "audit_write_failed", "请求审计写入失败，已阻止转发")
 				p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
 				return
 			}
 			if p.handleAccountOutcome(c, keyInfo, acc, req, result, start, price, settings, opts,
-				rpmMinute, attempts, &hops, &summary, &hardExcludeAccounts, &softExcludeAccounts, attemptLatency) {
+				rpmMinute, attempts, &hops, &summary, &hardExcludeAccounts, &softExcludeAccounts, attemptLatency, probeLease) {
 				return
 			}
 			continue
@@ -699,6 +743,15 @@ func (p *Pipeline) recordFailure(c *gin.Context, keyInfo *auth.APIKeyInfo, req *
 	e.IPAddress = c.ClientIP()
 	e.UserAgent = c.Request.UserAgent()
 	e.DurationMs = time.Since(start).Milliseconds()
+	// 末次跳的 channel_key_id 快照：健康监测 key 级失败率依赖此列。
+	if e.ChannelKeyID == 0 {
+		for i := len(e.Chain) - 1; i >= 0; i-- {
+			if e.Chain[i].KeyID > 0 {
+				e.ChannelKeyID = e.Chain[i].KeyID
+				break
+			}
+		}
+	}
 	p.errSink.CountFailure(context.Background(), 0, "", e.Phase)
 	p.errSink.Record(e)
 }

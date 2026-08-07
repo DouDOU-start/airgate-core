@@ -68,6 +68,43 @@ export function HealthStatusChip({ status }: { status: HealthStatus }) {
   );
 }
 
+/** 近窗真实流量健康徽章：空闲 / 样本不足 / 成功率。 */
+export function TrafficHealthBadge({
+  idle,
+  lowSample,
+  successRate,
+  errorRate,
+}: {
+  idle?: boolean;
+  lowSample?: boolean;
+  successRate?: number;
+  errorRate?: number;
+}) {
+  const { t } = useTranslation();
+  if (idle) {
+    return (
+      <Chip color="default" size="sm" variant="soft" title={t('channels.health_traffic')}>
+        {t('channels.health_idle')}
+      </Chip>
+    );
+  }
+  if (lowSample) {
+    return (
+      <Chip color="warning" size="sm" variant="soft" title={t('channels.health_traffic')}>
+        {t('channels.health_low_sample')}
+      </Chip>
+    );
+  }
+  if (successRate == null) return null;
+  const pct = (successRate * 100).toFixed(successRate >= 0.999 ? 0 : 1);
+  const color = (errorRate ?? 0) >= 0.05 ? 'danger' : (errorRate ?? 0) > 0 ? 'warning' : 'success';
+  return (
+    <Chip color={color} size="sm" variant="soft" title={t('channels.health_traffic')}>
+      {t('channels.health_success_pct', { pct })}
+    </Chip>
+  );
+}
+
 // key 状态徽章：enabled 绿 / disabled_manual 灰 / disabled_auto 红 + error_msg tooltip
 export function KeyStatusChip({ status, errorMsg }: { status: ChannelStatus; errorMsg: string }) {
   const { t } = useTranslation();

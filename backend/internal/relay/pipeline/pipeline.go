@@ -12,7 +12,6 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/upstreamclient"
 	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
-	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
@@ -61,8 +60,8 @@ type Options struct {
 	HealthTracker HealthTracker
 	// Accounts 账号注册表（nil 时仅渠道路径）。
 	Accounts *accountreg.Registry
-	// CPA CLIProxyAPI 桥接层（账号路径转发；nil 时账号候选不执行）。
-	CPA *cpa.Bridge
+	// CPA 账号路径转发器（生产环境注入 *cpa.Bridge；nil 时账号候选不执行）。
+	CPA AccountForwarder
 	// RelayHook 外部请求改写与本次请求路由扩展点（nil 时完全保持原路径）。
 	RelayHook relayhook.Hook
 	// RequestAudit 完整请求审计（nil 时关闭）。
@@ -82,7 +81,7 @@ type Pipeline struct {
 	moderation    ModerationChecker
 	healthTracker HealthTracker
 	accounts      *accountreg.Registry
-	cpa           *cpa.Bridge
+	cpa           AccountForwarder
 	relayHook     relayhook.Hook
 	requestAudit  *requestaudit.Service
 	randFn        func(n int) int

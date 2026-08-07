@@ -139,6 +139,11 @@ func ChannelName(v string) predicate.UpstreamRequestLog {
 	return predicate.UpstreamRequestLog(sql.FieldEQ(FieldChannelName, v))
 }
 
+// ChannelKeyID applies equality check predicate on the "channel_key_id" field. It's identical to ChannelKeyIDEQ.
+func ChannelKeyID(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldEQ(FieldChannelKeyID, v))
+}
+
 // AccountID applies equality check predicate on the "account_id" field. It's identical to AccountIDEQ.
 func AccountID(v int) predicate.UpstreamRequestLog {
 	return predicate.UpstreamRequestLog(sql.FieldEQ(FieldAccountID, v))
@@ -1047,6 +1052,46 @@ func ChannelNameEqualFold(v string) predicate.UpstreamRequestLog {
 // ChannelNameContainsFold applies the ContainsFold predicate on the "channel_name" field.
 func ChannelNameContainsFold(v string) predicate.UpstreamRequestLog {
 	return predicate.UpstreamRequestLog(sql.FieldContainsFold(FieldChannelName, v))
+}
+
+// ChannelKeyIDEQ applies the EQ predicate on the "channel_key_id" field.
+func ChannelKeyIDEQ(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldEQ(FieldChannelKeyID, v))
+}
+
+// ChannelKeyIDNEQ applies the NEQ predicate on the "channel_key_id" field.
+func ChannelKeyIDNEQ(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldNEQ(FieldChannelKeyID, v))
+}
+
+// ChannelKeyIDIn applies the In predicate on the "channel_key_id" field.
+func ChannelKeyIDIn(vs ...int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldIn(FieldChannelKeyID, vs...))
+}
+
+// ChannelKeyIDNotIn applies the NotIn predicate on the "channel_key_id" field.
+func ChannelKeyIDNotIn(vs ...int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldNotIn(FieldChannelKeyID, vs...))
+}
+
+// ChannelKeyIDGT applies the GT predicate on the "channel_key_id" field.
+func ChannelKeyIDGT(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldGT(FieldChannelKeyID, v))
+}
+
+// ChannelKeyIDGTE applies the GTE predicate on the "channel_key_id" field.
+func ChannelKeyIDGTE(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldGTE(FieldChannelKeyID, v))
+}
+
+// ChannelKeyIDLT applies the LT predicate on the "channel_key_id" field.
+func ChannelKeyIDLT(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldLT(FieldChannelKeyID, v))
+}
+
+// ChannelKeyIDLTE applies the LTE predicate on the "channel_key_id" field.
+func ChannelKeyIDLTE(v int) predicate.UpstreamRequestLog {
+	return predicate.UpstreamRequestLog(sql.FieldLTE(FieldChannelKeyID, v))
 }
 
 // AccountIDEQ applies the EQ predicate on the "account_id" field.

@@ -25,6 +25,12 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/requestaudit"
 )
 
+// AccountForwarder 是 Pipeline 使用的 CPA 转发窄接口。
+// *cpa.Bridge 天然满足；测试可注入确定性替身覆盖账号 failover 状态机。
+type AccountForwarder interface {
+	Forward(ctx context.Context, c *gin.Context, req cpa.ForwardRequest) cpa.ForwardResult
+}
+
 // executeAccountAttempt 执行一次账号路径转发（CPA）。
 // 槽位/RPM 由调用方在抢到后传入；本函数 defer 释放账号并发槽。
 func (p *Pipeline) executeAccountAttempt(
@@ -283,7 +289,9 @@ func (p *Pipeline) handleAccountOutcome(
 	summary *failureSummary,
 	hardExclude, softExclude *[]int,
 	attemptLatency int64,
+	probeLease accountreg.RateLimitProbeLease,
 ) (done bool) {
+	rateLimitProbe := probeLease != 0
 	apiKeyHint := ""
 	if acc.Credentials != nil {
 		apiKeyHint = acc.Credentials["access_token"]
@@ -296,6 +304,9 @@ func (p *Pipeline) handleAccountOutcome(
 	if result.buildErr != nil {
 		p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
 		adminMsg := outcome.SanitizeKeyLeak(result.buildErr.Error(), []string{apiKeyHint})
+		if rateLimitProbe && p.accounts != nil {
+			p.accounts.MarkRateLimitProbeFailed(acc.ID, probeLease, 0, adminMsg)
+		}
 		userMsg := outcome.SanitizeUpstreamLeak(result.buildErr.Error(), []string{apiKeyHint}, "")
 		writeError(c, http.StatusBadRequest, "invalid_request_error", "bad_request", userMsg)
 		p.recordFailure(c, keyInfo, req, start, errlog.Entry{
@@ -309,6 +320,11 @@ func (p *Pipeline) handleAccountOutcome(
 
 	ctx := c.Request.Context()
 	if ctx.Err() != nil && !result.written {
+		if rateLimitProbe && p.accounts != nil {
+			// Forward 已经开始执行，取消时无法确定请求是否触达上游；按失败探测
+			// 冷却，避免客户端连续取消后立即重新取得同一账号的探测资格。
+			p.accounts.MarkRateLimitProbeFailed(acc.ID, probeLease, 0, "限流恢复探测在响应完成前被取消，结果未知")
+		}
 		p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
 		markCanceled(c)
 		p.recordFailure(c, keyInfo, req, start, errlog.Entry{
@@ -325,9 +341,20 @@ func (p *Pipeline) handleAccountOutcome(
 			slog.Warn("relay_account_stream_aborted",
 				"account_id", acc.ID, "model", req.Model,
 				"complete", streamComplete, "error", result.streamErr)
+			if rateLimitProbe && p.accounts != nil {
+				reason := "上游未发送完成标志即断流"
+				if result.streamErr != nil {
+					reason = outcome.SanitizeKeyLeak(result.streamErr.Error(), []string{apiKeyHint})
+				}
+				p.accounts.MarkRateLimitProbeFailed(acc.ID, probeLease, 0, reason)
+			}
 		} else {
 			if p.accounts != nil {
-				p.accounts.MarkActive(acc.ID)
+				if rateLimitProbe {
+					p.accounts.MarkRateLimitProbeSucceeded(acc.ID, probeLease)
+				} else {
+					p.accounts.MarkActiveIfNotRateLimited(acc.ID)
+				}
 			}
 			if result.usage == nil {
 				slog.Warn("relay_account_stream_usage_missing",
@@ -359,7 +386,11 @@ func (p *Pipeline) handleAccountOutcome(
 	switch o.Verdict {
 	case outcome.Success:
 		if p.accounts != nil {
-			p.accounts.MarkActive(acc.ID)
+			if rateLimitProbe {
+				p.accounts.MarkRateLimitProbeSucceeded(acc.ID, probeLease)
+			} else {
+				p.accounts.MarkActiveIfNotRateLimited(acc.ID)
+			}
 		}
 		if !opts.zeroBilling {
 			p.recordAccountUsage(c, keyInfo, acc, req, result, start, price)
@@ -369,19 +400,27 @@ func (p *Pipeline) handleAccountOutcome(
 
 	case outcome.RateLimited:
 		p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
-		retryUntil := time.Now().Add(o.RetryAfter)
-		if o.RetryAfter <= 0 {
-			retryUntil = time.Now().Add(5 * time.Second)
-		}
+		retryAfter := o.RetryAfter
 		if p.accounts != nil {
-			p.accounts.MarkRateLimited(acc.ID, retryUntil, o.Reason)
+			if rateLimitProbe {
+				blockedUntil := p.accounts.MarkRateLimitProbeFailed(acc.ID, probeLease, retryAfter, o.Reason)
+				if remaining := time.Until(blockedUntil); remaining > retryAfter {
+					retryAfter = remaining
+				}
+			} else {
+				retryUntil := time.Now().Add(retryAfter)
+				if retryAfter <= 0 {
+					retryUntil = time.Now().Add(5 * time.Second)
+				}
+				p.accounts.MarkRateLimited(acc.ID, retryUntil, o.Reason)
+			}
 		}
 		*hardExclude = append(*hardExclude, acc.ID)
 		summary.rateLimited = true
-		summary.observeRetryAfter(o.RetryAfter)
-		*hops = append(*hops, accountAttemptHop(len(*hops)+1, acc, result.statusCode, "rateLimited", o.Reason, o.RetryAfter.Milliseconds(), attemptLatency, false))
+		summary.observeRetryAfter(retryAfter)
+		*hops = append(*hops, accountAttemptHop(len(*hops)+1, acc, result.statusCode, "rateLimited", o.Reason, retryAfter.Milliseconds(), attemptLatency, false))
 		slog.Warn("relay_account_rate_limited",
-			"account_id", acc.ID, "model", req.Model, "retry_after", o.RetryAfter.String())
+			"account_id", acc.ID, "model", req.Model, "retry_after", retryAfter.String(), "recovery_probe", rateLimitProbe)
 		return false
 
 	case outcome.AuthFailed:
@@ -389,6 +428,8 @@ func (p *Pipeline) handleAccountOutcome(
 		autoBan := settings.AutoBanEnabled
 		if autoBan && p.accounts != nil {
 			p.accounts.MarkDisabled(acc.ID, outcome.TruncateErrorMsg(o.Reason))
+		} else if rateLimitProbe && p.accounts != nil {
+			p.accounts.MarkRateLimitProbeFailed(acc.ID, probeLease, 0, o.Reason)
 		}
 		*hardExclude = append(*hardExclude, acc.ID)
 		summary.authFailed = true
@@ -399,8 +440,15 @@ func (p *Pipeline) handleAccountOutcome(
 
 	case outcome.Transient:
 		p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
-		// 账号池场景已收敛到渠道；账号 transient 仅本轮 soft 排除，不做 pool 软降级。
-		*softExclude = append(*softExclude, acc.ID)
+		if rateLimitProbe {
+			if p.accounts != nil {
+				p.accounts.MarkRateLimitProbeFailed(acc.ID, probeLease, 0, o.Reason)
+			}
+			*hardExclude = append(*hardExclude, acc.ID)
+		} else {
+			// 账号池场景已收敛到渠道；普通 transient 仅本轮 soft 排除，不做 pool 软降级。
+			*softExclude = append(*softExclude, acc.ID)
+		}
 		summary.transient = true
 		verdictName := "transient"
 		if result.netErr != nil {
@@ -412,6 +460,9 @@ func (p *Pipeline) handleAccountOutcome(
 		return false
 
 	default: // ClientError
+		if rateLimitProbe && p.accounts != nil {
+			p.accounts.MarkRateLimitProbeFailed(acc.ID, probeLease, 0, o.Reason)
+		}
 		billed := result.usage != nil && !opts.zeroBilling
 		if billed {
 			p.recordAccountUsage(c, keyInfo, acc, req, result, start, price)

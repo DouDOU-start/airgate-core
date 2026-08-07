@@ -77,10 +77,11 @@ func (p *Pipeline) TestChannel(ctx context.Context, snap *registry.ChannelKeySna
 					KeyName:     snap.KeyName,
 					Verdict:     "testFailed",
 				}},
-				ChannelID:   snap.ChannelID,
-				ChannelName: snap.ChannelName,
-				DurationMs:  time.Since(start).Milliseconds(),
-				Message:     err.Error(),
+				ChannelID:    snap.ChannelID,
+				ChannelName:  snap.ChannelName,
+				ChannelKeyID: snap.KeyID,
+				DurationMs:   time.Since(start).Milliseconds(),
+				Message:      err.Error(),
 			})
 		}
 		return 0, err

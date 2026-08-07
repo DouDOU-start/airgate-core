@@ -17,6 +17,7 @@ import {
   ADMIN_IDLE_PRELOADS,
   AnnouncementsPage,
   ChannelsPage,
+  ChannelStatusPage,
   DashboardPage,
   GroupsPage,
   InvitePage,
@@ -27,6 +28,7 @@ import {
   ModelPricesPage,
   OAuthAuthorizePage,
   OAuthClientsPage,
+  OpsHealthPage,
   PaymentPage,
   PluginsPage,
   preloadRoutePage,
@@ -208,6 +210,25 @@ function OverviewPage() {
 }
 const overviewRoute = createRoute({ getParentRoute: () => authLayout, path: '/overview', component: OverviewPage });
 
+// 用户渠道状态：管理员可查看用户视角；API Key 会话只保留自身使用记录，不暴露全站状态。
+function ChannelStatusRoutePage() {
+  const { user, loading, isAPIKeySession } = useAuth();
+  if (loading) return <PageLoading />;
+  if (!user) return null;
+  if (isAPIKeySession) return <Navigate replace to="/usage" />;
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <ChannelStatusPage />
+    </Suspense>
+  );
+}
+
+const channelStatusRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/channel-status',
+  component: ChannelStatusRoutePage,
+});
+
 // 管理员布局（需要 admin 角色）
 const adminLayout = createRoute({
   getParentRoute: () => authLayout,
@@ -241,6 +262,7 @@ const adminAccountsRoute = createRoute({ getParentRoute: () => adminLayout, path
 const adminProxiesRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/proxies', component: renderPage(ProxiesPage) });
 const adminPluginsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/plugins', component: renderPage(PluginsPage) });
 const adminRequestAuditsRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/request-audits', component: renderPage(RequestAuditsPage) });
+const adminOpsHealthRoute = createRoute({ getParentRoute: () => adminLayout, path: '/admin/ops-health', component: renderPage(OpsHealthPage) });
 
 const profileRoute = createRoute({ getParentRoute: () => authLayout, path: '/profile', component: renderPage(ProfilePage) });
 const userKeysRoute = createRoute({ getParentRoute: () => authLayout, path: '/keys', component: renderPage(UserKeysPage) });
@@ -257,6 +279,7 @@ const routeTree = rootRoute.addChildren([
   authLayout.addChildren([
     dashboardRoute,
     overviewRoute,
+    channelStatusRoute,
     adminLayout.addChildren([
       adminUsersRoute,
       adminChannelsRoute,
@@ -275,6 +298,7 @@ const routeTree = rootRoute.addChildren([
       adminProxiesRoute,
       adminPluginsRoute,
       adminRequestAuditsRoute,
+      adminOpsHealthRoute,
     ]),
     profileRoute,
     userKeysRoute,

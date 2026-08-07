@@ -21,6 +21,7 @@ import (
 	appchannel "github.com/DouDOU-start/airgate-core/internal/app/channel"
 	appdashboard "github.com/DouDOU-start/airgate-core/internal/app/dashboard"
 	appgroup "github.com/DouDOU-start/airgate-core/internal/app/group"
+	apphealthmon "github.com/DouDOU-start/airgate-core/internal/app/healthmon"
 	appinvite "github.com/DouDOU-start/airgate-core/internal/app/invite"
 	appmodelprice "github.com/DouDOU-start/airgate-core/internal/app/modelprice"
 	appoauth "github.com/DouDOU-start/airgate-core/internal/app/oauth"
@@ -78,6 +79,7 @@ type HTTPHandlers struct {
 	Account      *handler.AccountHandler
 	Proxy        *handler.ProxyHandler
 	RequestAudit *handler.RequestAuditHandler
+	Healthmon    *handler.HealthmonHandler
 
 	// ChannelService / ModelPriceService / SettingsService 暴露给 server.go：
 	// ChannelService 充当渠道注册表的 Loader/Persister 并接收 Reloader/Tester 注入，
@@ -170,6 +172,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	usageService := appusage.NewService(usageStore, dep.Redis)
 	upstreamLogStore := store.NewUpstreamLogStore(dep.DB)
 	upstreamLogService := appupstreamlog.NewService(upstreamLogStore)
+	healthmonStore := store.NewHealthmonStore(dep.DB)
+	healthmonService := apphealthmon.NewService(healthmonStore)
 
 	paymentStore := store.NewPaymentStore(dep.DB)
 	paymentService := apppayment.NewService(paymentStore, paymentSettingsAdapter{settingsService}, dep.Config.APIKeySecret())
@@ -240,6 +244,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 		Account:      handler.NewAccountHandler(accountService),
 		Proxy:        handler.NewProxyHandler(proxyService),
 		RequestAudit: handler.NewRequestAuditHandler(requestAuditService),
+		Healthmon:    handler.NewHealthmonHandler(healthmonService),
 
 		ChannelService:        channelService,
 		AccountService:        accountService,

@@ -2065,3 +2065,13 @@
     transform: none;
   }
 }
+
+/* Ops health keeps identifiers and incidents scannable while metrics align on digits. */
+.ag-ops-health-window-tabs :where(.tabs__tab, [data-slot="tabs-tab"]) {
+  min-width: 3.375rem;
+  padding-inline: 0.375rem;
+}
+
+.ag-ops-health-table :where([data-slot="wrapper"]) {
+  border-radius: var(--radius) !important;
+}

@@ -84,6 +84,10 @@ func (s *Server) registerRoutes() {
 		// 分组
 		accountGroup.GET("/groups", handlers.Group.ListAvailableGroups)
 
+		// 渠道状态（仅当前用户可访问且 status_visible=true 的分组，脱敏只读）
+		accountGroup.GET("/channel-status/overview", handlers.Healthmon.UserOverview)
+		accountGroup.GET("/channel-status/groups", handlers.Healthmon.UserGroups)
+
 		// 公告（用户端：查看 + 标已读）
 		accountGroup.GET("/announcements", handlers.Announcement.ListMyAnnouncements)
 		accountGroup.POST("/announcements/read-all", handlers.Announcement.MarkAllAnnouncementsRead)
@@ -217,6 +221,10 @@ func (s *Server) registerRoutes() {
 		// 完整请求审计（解密后的 Header/Body 仅管理员可见）
 		adminGroup.GET("/request-audits", handlers.RequestAudit.List)
 		adminGroup.GET("/request-audits/:id", handlers.RequestAudit.Get)
+
+		// 健康监测（真实流量统计，只读观测面）
+		adminGroup.GET("/health-monitor/overview", handlers.Healthmon.Overview)
+		adminGroup.GET("/health-monitor/entities", handlers.Healthmon.Entities)
 
 		// 风控中心（内容审核）：配置/状态/探活/日志/解封/命中哈希管理
 		adminGroup.GET("/risk-control/config", handlers.RiskControl.GetConfig)

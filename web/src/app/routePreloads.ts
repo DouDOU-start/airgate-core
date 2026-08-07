@@ -31,6 +31,7 @@ export const PublicHomePage = lazyWithPreload(() => import('../pages/HomePage'))
 export const ModelMarketPage = lazyWithPreload(() => import('../pages/ModelMarketPage'));
 export const DashboardPage = lazyWithPreload(() => import('../pages/DashboardPage'));
 export const UserOverviewPage = lazyWithPreload(() => import('../pages/user/UserOverviewPage'));
+export const ChannelStatusPage = lazyWithPreload(() => import('../pages/user/ChannelStatusPage'));
 export const UsersPage = lazyWithPreload(() => import('../pages/admin/UsersPage'));
 export const ChannelsPage = lazyWithPreload(() => import('../pages/admin/ChannelsPage'));
 export const ModelPricesPage = lazyWithPreload(() => import('../pages/admin/ModelPricesPage'));
@@ -54,15 +55,18 @@ export const AccountsPage = lazyWithPreload(() => import('../pages/admin/Account
 export const ProxiesPage = lazyWithPreload(() => import('../pages/admin/ProxiesPage'));
 export const PluginsPage = lazyWithPreload(() => import('../pages/admin/PluginsPage'));
 export const RequestAuditsPage = lazyWithPreload(() => import('../pages/admin/RequestAuditsPage'));
+export const OpsHealthPage = lazyWithPreload(() => import('../pages/admin/OpsHealthPage'));
 
 export const ADMIN_IDLE_PRELOADS = [
   DashboardPage,
   // 管理员侧边栏个人区也有个人概览（/overview），空闲时一并预热
   UserOverviewPage,
+  OpsHealthPage,
 ];
 
 export const USER_IDLE_PRELOADS = [
   UserOverviewPage,
+  ChannelStatusPage,
 ];
 
 // 预加载路由 chunk，并顺带深预载页面导出的子内容模块（如 UserUsagePage 的用量内容）

@@ -61,6 +61,9 @@ func (UpstreamRequestLog) Fields() []ent.Field {
 		// 末次尝试路由快照：渠道与账号字段互斥；渠道测试行写目标渠道。
 		field.Int("channel_id").Default(0),
 		field.String("channel_name").Default(""),
+		// channel_key_id 末次（或唯一次）选中的密钥端点；健康监测 key 级失败率依赖本列。
+		// 账号路径恒 0；历史行迁移前亦为 0（仅能按 channel 粗聚合）。
+		field.Int("channel_key_id").Default(0),
 		field.Int("account_id").Default(0),
 		field.String("account_name").Default(""),
 		field.String("ip_address").Default(""),
@@ -83,6 +86,8 @@ func (UpstreamRequestLog) Indexes() []ent.Index {
 			StorageKey("upstream_req_log_api_key_created_at"),
 		index.Fields("channel_id", "created_at").
 			StorageKey("upstream_req_log_channel_created_at"),
+		index.Fields("channel_key_id", "created_at").
+			StorageKey("upstream_req_log_channel_key_created_at"),
 		index.Fields("phase", "created_at").
 			StorageKey("upstream_req_log_phase_created_at"),
 		index.Fields("request_id").

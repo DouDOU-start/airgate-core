@@ -1376,32 +1376,36 @@ func init() {
 	upstreamrequestlogDescChannelName := upstreamrequestlogFields[18].Descriptor()
 	// upstreamrequestlog.DefaultChannelName holds the default value on creation for the channel_name field.
 	upstreamrequestlog.DefaultChannelName = upstreamrequestlogDescChannelName.Default.(string)
+	// upstreamrequestlogDescChannelKeyID is the schema descriptor for channel_key_id field.
+	upstreamrequestlogDescChannelKeyID := upstreamrequestlogFields[19].Descriptor()
+	// upstreamrequestlog.DefaultChannelKeyID holds the default value on creation for the channel_key_id field.
+	upstreamrequestlog.DefaultChannelKeyID = upstreamrequestlogDescChannelKeyID.Default.(int)
 	// upstreamrequestlogDescAccountID is the schema descriptor for account_id field.
-	upstreamrequestlogDescAccountID := upstreamrequestlogFields[19].Descriptor()
+	upstreamrequestlogDescAccountID := upstreamrequestlogFields[20].Descriptor()
 	// upstreamrequestlog.DefaultAccountID holds the default value on creation for the account_id field.
 	upstreamrequestlog.DefaultAccountID = upstreamrequestlogDescAccountID.Default.(int)
 	// upstreamrequestlogDescAccountName is the schema descriptor for account_name field.
-	upstreamrequestlogDescAccountName := upstreamrequestlogFields[20].Descriptor()
+	upstreamrequestlogDescAccountName := upstreamrequestlogFields[21].Descriptor()
 	// upstreamrequestlog.DefaultAccountName holds the default value on creation for the account_name field.
 	upstreamrequestlog.DefaultAccountName = upstreamrequestlogDescAccountName.Default.(string)
 	// upstreamrequestlogDescIPAddress is the schema descriptor for ip_address field.
-	upstreamrequestlogDescIPAddress := upstreamrequestlogFields[21].Descriptor()
+	upstreamrequestlogDescIPAddress := upstreamrequestlogFields[22].Descriptor()
 	// upstreamrequestlog.DefaultIPAddress holds the default value on creation for the ip_address field.
 	upstreamrequestlog.DefaultIPAddress = upstreamrequestlogDescIPAddress.Default.(string)
 	// upstreamrequestlogDescUserAgent is the schema descriptor for user_agent field.
-	upstreamrequestlogDescUserAgent := upstreamrequestlogFields[22].Descriptor()
+	upstreamrequestlogDescUserAgent := upstreamrequestlogFields[23].Descriptor()
 	// upstreamrequestlog.DefaultUserAgent holds the default value on creation for the user_agent field.
 	upstreamrequestlog.DefaultUserAgent = upstreamrequestlogDescUserAgent.Default.(string)
 	// upstreamrequestlogDescDurationMs is the schema descriptor for duration_ms field.
-	upstreamrequestlogDescDurationMs := upstreamrequestlogFields[23].Descriptor()
+	upstreamrequestlogDescDurationMs := upstreamrequestlogFields[24].Descriptor()
 	// upstreamrequestlog.DefaultDurationMs holds the default value on creation for the duration_ms field.
 	upstreamrequestlog.DefaultDurationMs = upstreamrequestlogDescDurationMs.Default.(int64)
 	// upstreamrequestlogDescRepeatCount is the schema descriptor for repeat_count field.
-	upstreamrequestlogDescRepeatCount := upstreamrequestlogFields[24].Descriptor()
+	upstreamrequestlogDescRepeatCount := upstreamrequestlogFields[25].Descriptor()
 	// upstreamrequestlog.DefaultRepeatCount holds the default value on creation for the repeat_count field.
 	upstreamrequestlog.DefaultRepeatCount = upstreamrequestlogDescRepeatCount.Default.(int)
 	// upstreamrequestlogDescCreatedAt is the schema descriptor for created_at field.
-	upstreamrequestlogDescCreatedAt := upstreamrequestlogFields[25].Descriptor()
+	upstreamrequestlogDescCreatedAt := upstreamrequestlogFields[26].Descriptor()
 	// upstreamrequestlog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	upstreamrequestlog.DefaultCreatedAt = upstreamrequestlogDescCreatedAt.Default.(func() time.Time)
 	usagelogFields := schema.UsageLog{}.Fields()

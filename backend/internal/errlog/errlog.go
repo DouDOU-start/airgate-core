@@ -100,30 +100,31 @@ type AttemptHop struct {
 
 // Entry 一条打上游失败的留痕。
 type Entry struct {
-	RequestID   string
-	Source      string // SourceRelay / SourceChannelTest
-	Phase       string // relay 失败阶段；渠道测试留空
-	StatusCode  int
-	ErrorType   string // 与 errfmt 错误体同源
-	ErrorCode   string
-	Message     string
-	Attempts    int
-	Chain       []AttemptHop
-	Billed      bool
-	Model       string
-	Endpoint    string
-	Stream      bool
-	UserID      int
-	UserEmail   string
-	APIKeyID    int
-	GroupID     int
-	ChannelID   int
-	ChannelName string
-	AccountID   int
-	AccountName string
-	IPAddress   string
-	UserAgent   string
-	DurationMs  int64
+	RequestID    string
+	Source       string // SourceRelay / SourceChannelTest
+	Phase        string // relay 失败阶段；渠道测试留空
+	StatusCode   int
+	ErrorType    string // 与 errfmt 错误体同源
+	ErrorCode    string
+	Message      string
+	Attempts     int
+	Chain        []AttemptHop
+	Billed       bool
+	Model        string
+	Endpoint     string
+	Stream       bool
+	UserID       int
+	UserEmail    string
+	APIKeyID     int
+	GroupID      int
+	ChannelID    int
+	ChannelName  string
+	ChannelKeyID int // 末次选中的密钥端点；账号路径为 0
+	AccountID    int
+	AccountName  string
+	IPAddress    string
+	UserAgent    string
+	DurationMs   int64
 }
 
 // secretPatterns sink 入口的通用凭证兜底脱敏（sanitizeKeyLeak 只能精确匹配
@@ -446,6 +447,7 @@ func (r *Recorder) entryCreate(e Entry, repeat int) *ent.UpstreamRequestLogCreat
 		SetGroupID(e.GroupID).
 		SetChannelID(e.ChannelID).
 		SetChannelName(e.ChannelName).
+		SetChannelKeyID(e.ChannelKeyID).
 		SetAccountID(e.AccountID).
 		SetAccountName(e.AccountName).
 		SetIPAddress(e.IPAddress).

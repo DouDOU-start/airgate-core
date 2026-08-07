@@ -265,6 +265,20 @@ func (urlc *UpstreamRequestLogCreate) SetNillableChannelName(s *string) *Upstrea
 	return urlc
 }
 
+// SetChannelKeyID sets the "channel_key_id" field.
+func (urlc *UpstreamRequestLogCreate) SetChannelKeyID(i int) *UpstreamRequestLogCreate {
+	urlc.mutation.SetChannelKeyID(i)
+	return urlc
+}
+
+// SetNillableChannelKeyID sets the "channel_key_id" field if the given value is not nil.
+func (urlc *UpstreamRequestLogCreate) SetNillableChannelKeyID(i *int) *UpstreamRequestLogCreate {
+	if i != nil {
+		urlc.SetChannelKeyID(*i)
+	}
+	return urlc
+}
+
 // SetAccountID sets the "account_id" field.
 func (urlc *UpstreamRequestLogCreate) SetAccountID(i int) *UpstreamRequestLogCreate {
 	urlc.mutation.SetAccountID(i)
@@ -462,6 +476,10 @@ func (urlc *UpstreamRequestLogCreate) defaults() {
 		v := upstreamrequestlog.DefaultChannelName
 		urlc.mutation.SetChannelName(v)
 	}
+	if _, ok := urlc.mutation.ChannelKeyID(); !ok {
+		v := upstreamrequestlog.DefaultChannelKeyID
+		urlc.mutation.SetChannelKeyID(v)
+	}
 	if _, ok := urlc.mutation.AccountID(); !ok {
 		v := upstreamrequestlog.DefaultAccountID
 		urlc.mutation.SetAccountID(v)
@@ -557,6 +575,9 @@ func (urlc *UpstreamRequestLogCreate) check() error {
 	}
 	if _, ok := urlc.mutation.ChannelName(); !ok {
 		return &ValidationError{Name: "channel_name", err: errors.New(`ent: missing required field "UpstreamRequestLog.channel_name"`)}
+	}
+	if _, ok := urlc.mutation.ChannelKeyID(); !ok {
+		return &ValidationError{Name: "channel_key_id", err: errors.New(`ent: missing required field "UpstreamRequestLog.channel_key_id"`)}
 	}
 	if _, ok := urlc.mutation.AccountID(); !ok {
 		return &ValidationError{Name: "account_id", err: errors.New(`ent: missing required field "UpstreamRequestLog.account_id"`)}
@@ -681,6 +702,10 @@ func (urlc *UpstreamRequestLogCreate) createSpec() (*UpstreamRequestLog, *sqlgra
 	if value, ok := urlc.mutation.ChannelName(); ok {
 		_spec.SetField(upstreamrequestlog.FieldChannelName, field.TypeString, value)
 		_node.ChannelName = value
+	}
+	if value, ok := urlc.mutation.ChannelKeyID(); ok {
+		_spec.SetField(upstreamrequestlog.FieldChannelKeyID, field.TypeInt, value)
+		_node.ChannelKeyID = value
 	}
 	if value, ok := urlc.mutation.AccountID(); ok {
 		_spec.SetField(upstreamrequestlog.FieldAccountID, field.TypeInt, value)
@@ -1029,6 +1054,24 @@ func (u *UpstreamRequestLogUpsert) SetChannelName(v string) *UpstreamRequestLogU
 // UpdateChannelName sets the "channel_name" field to the value that was provided on create.
 func (u *UpstreamRequestLogUpsert) UpdateChannelName() *UpstreamRequestLogUpsert {
 	u.SetExcluded(upstreamrequestlog.FieldChannelName)
+	return u
+}
+
+// SetChannelKeyID sets the "channel_key_id" field.
+func (u *UpstreamRequestLogUpsert) SetChannelKeyID(v int) *UpstreamRequestLogUpsert {
+	u.Set(upstreamrequestlog.FieldChannelKeyID, v)
+	return u
+}
+
+// UpdateChannelKeyID sets the "channel_key_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsert) UpdateChannelKeyID() *UpstreamRequestLogUpsert {
+	u.SetExcluded(upstreamrequestlog.FieldChannelKeyID)
+	return u
+}
+
+// AddChannelKeyID adds v to the "channel_key_id" field.
+func (u *UpstreamRequestLogUpsert) AddChannelKeyID(v int) *UpstreamRequestLogUpsert {
+	u.Add(upstreamrequestlog.FieldChannelKeyID, v)
 	return u
 }
 
@@ -1479,6 +1522,27 @@ func (u *UpstreamRequestLogUpsertOne) SetChannelName(v string) *UpstreamRequestL
 func (u *UpstreamRequestLogUpsertOne) UpdateChannelName() *UpstreamRequestLogUpsertOne {
 	return u.Update(func(s *UpstreamRequestLogUpsert) {
 		s.UpdateChannelName()
+	})
+}
+
+// SetChannelKeyID sets the "channel_key_id" field.
+func (u *UpstreamRequestLogUpsertOne) SetChannelKeyID(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetChannelKeyID(v)
+	})
+}
+
+// AddChannelKeyID adds v to the "channel_key_id" field.
+func (u *UpstreamRequestLogUpsertOne) AddChannelKeyID(v int) *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddChannelKeyID(v)
+	})
+}
+
+// UpdateChannelKeyID sets the "channel_key_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertOne) UpdateChannelKeyID() *UpstreamRequestLogUpsertOne {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateChannelKeyID()
 	})
 }
 
@@ -2110,6 +2174,27 @@ func (u *UpstreamRequestLogUpsertBulk) SetChannelName(v string) *UpstreamRequest
 func (u *UpstreamRequestLogUpsertBulk) UpdateChannelName() *UpstreamRequestLogUpsertBulk {
 	return u.Update(func(s *UpstreamRequestLogUpsert) {
 		s.UpdateChannelName()
+	})
+}
+
+// SetChannelKeyID sets the "channel_key_id" field.
+func (u *UpstreamRequestLogUpsertBulk) SetChannelKeyID(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.SetChannelKeyID(v)
+	})
+}
+
+// AddChannelKeyID adds v to the "channel_key_id" field.
+func (u *UpstreamRequestLogUpsertBulk) AddChannelKeyID(v int) *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.AddChannelKeyID(v)
+	})
+}
+
+// UpdateChannelKeyID sets the "channel_key_id" field to the value that was provided on create.
+func (u *UpstreamRequestLogUpsertBulk) UpdateChannelKeyID() *UpstreamRequestLogUpsertBulk {
+	return u.Update(func(s *UpstreamRequestLogUpsert) {
+		s.UpdateChannelKeyID()
 	})
 }
 

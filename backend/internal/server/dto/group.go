@@ -39,7 +39,7 @@ type CreateGroupReq struct {
 	// AlphaSearchPrice 联网搜索按次覆盖价（USD/次）；缺省/null=沿用全局设置。
 	AlphaSearchPrice *float64 `json:"alpha_search_price"`
 	IsExclusive      bool     `json:"is_exclusive"`
-	// StatusVisible 用指针区分"字段未提交"和"显式置 false"，缺省视为 true（在公开状态页可见）。
+	// StatusVisible 用指针区分"字段未提交"和"显式置 false"，缺省视为 true（在用户渠道状态页可见）。
 	StatusVisible   *bool    `json:"status_visible"`
 	AllowedClients  []string `json:"allowed_clients"`
 	FallbackGroupID *int     `json:"fallback_group_id"`

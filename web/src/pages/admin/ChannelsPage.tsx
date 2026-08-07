@@ -10,6 +10,7 @@ import {
   Download, KeyRound, Pencil, Plus, Search, Trash2, Upload,
 } from 'lucide-react';
 import { channelsApi } from '../../shared/api/channels';
+import { healthMonitorApi, type HealthmonEntity } from '../../shared/api/healthMonitor';
 import { upstreamLogsApi } from '../../shared/api/upstreamLogs';
 import { queryKeys } from '../../shared/queryKeys';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -28,7 +29,7 @@ import { ChannelStatsModal } from './channels/ChannelStatsModal';
 import { ChannelTestModal } from './channels/ChannelTestModal';
 import { ChannelKeysTable } from './channels/ChannelKeysTable';
 import {
-  CredentialProtocolChips, effectiveKeyStatus, HealthStatusChip, KeyMetricsRow, KeyStatusChip,
+  CredentialProtocolChips, effectiveKeyStatus, HealthStatusChip, KeyMetricsRow, KeyStatusChip, TrafficHealthBadge,
 } from './channels/keyShared';
 import { formatDate, formatDateTime } from '../../shared/utils/format';
 import type {
@@ -63,6 +64,7 @@ function KeyRow({
   refreshingUpstreamRate,
   onToggleEnabled,
   toggling,
+  trafficHealth,
 }: {
   channelKey: ChannelKeyResp;
   onOpenModels: () => void;
@@ -75,6 +77,12 @@ function KeyRow({
   refreshingUpstreamRate: boolean;
   onToggleEnabled: (enabled: boolean) => void;
   toggling: boolean;
+  trafficHealth?: {
+    idle: boolean;
+    low_sample: boolean;
+    success_rate: number;
+    error_rate: number;
+  } | null;
 }) {
   const { t } = useTranslation();
   const effectiveStatus = effectiveKeyStatus(channelKey);
@@ -99,6 +107,14 @@ function KeyRow({
         ) : null}
         {channelKey.health_status && channelKey.health_status !== 'healthy' ? (
           <HealthStatusChip status={channelKey.health_status} />
+        ) : null}
+        {trafficHealth ? (
+          <TrafficHealthBadge
+            idle={trafficHealth.idle}
+            lowSample={trafficHealth.low_sample}
+            successRate={trafficHealth.success_rate}
+            errorRate={trafficHealth.error_rate}
+          />
         ) : null}
         <span className="font-mono text-[11px] text-text-tertiary" title={t('channels.api_key')}>
           {channelKey.api_key_hint || '-'}
@@ -243,6 +259,32 @@ export default function ChannelsPage() {
     for (const item of failureStats?.channels ?? []) map.set(item.channel_id, item);
     return map;
   }, [failureStats]);
+
+  // 近 1h 真实流量健康（usage + upstream_request_logs），用于 key 行徽章。
+  const trafficHealthKeyIDs = useMemo(() => {
+    const ids = new Set<number>();
+    for (const row of rows) {
+      for (const key of row.keys ?? []) ids.add(key.id);
+    }
+    for (const key of keyRows) ids.add(key.id);
+    return Array.from(ids).sort((a, b) => a - b);
+  }, [rows, keyRows]);
+  const { data: trafficHealthEntities } = useQuery({
+    queryKey: queryKeys.healthMonitorEntities('1h', trafficHealthKeyIDs),
+    queryFn: () => healthMonitorApi.entities({
+      window: '1h',
+      scope: 'channel_key',
+      ids: trafficHealthKeyIDs.join(','),
+    }),
+    enabled: trafficHealthKeyIDs.length > 0,
+    refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
+  });
+  const trafficHealthByKey = useMemo(() => {
+    const map = new Map<number, HealthmonEntity>();
+    for (const item of trafficHealthEntities ?? []) map.set(item.id, item);
+    return map;
+  }, [trafficHealthEntities]);
 
   // 渠道视图 / 密钥视图是同一份 key 数据的两个独立 queryKey（跨渠道平铺 vs 按渠道分组），
   // 任何改动 key 状态的操作都要把两边一并失效，否则停留在密钥视图时改完不刷新，要手动刷新页面才可见。
@@ -780,13 +822,21 @@ export default function ChannelsPage() {
                               </Button>
                             </div>
                           ) : (
-                            row.keys.map((key) => (
+                            row.keys.map((key) => {
+                              const th = trafficHealthByKey.get(key.id);
+                              return (
                               <KeyRow
                                 channelKey={key}
                                 key={key.id}
                                 refreshingBalance={keyBalanceMutation.isPending && keyBalanceMutation.variables === key.id}
                                 refreshingUpstreamRate={keyUpstreamRateMutation.isPending && keyUpstreamRateMutation.variables === key.id}
                                 toggling={keyStatusMutation.isPending && keyStatusMutation.variables?.id === key.id}
+                                trafficHealth={th ? {
+                                  idle: th.sample.idle,
+                                  low_sample: th.sample.low_sample,
+                                  success_rate: th.success_rate,
+                                  error_rate: th.error_rate,
+                                } : null}
                                 onDelete={() => setDeleteKeyTarget(key)}
                                 onEdit={() => openEditKey(key)}
                                 onOpenModels={() => setTestTarget(key)}
@@ -795,7 +845,8 @@ export default function ChannelsPage() {
                                 onStats={() => setKeyStatsTarget(key)}
                                 onToggleEnabled={(enabled) => keyStatusMutation.mutate({ id: key.id, enabled })}
                               />
-                            ))
+                              );
+                            })
                           )}
                         </div>
                       </CommonTable.Cell>
@@ -813,6 +864,7 @@ export default function ChannelsPage() {
           rows={keyRows}
           sortBy={keysSort.by}
           sortOrder={keysSort.order}
+          trafficHealthByKey={trafficHealthByKey}
           footer={(
             <TablePaginationFooter
               page={keysPage}

@@ -950,6 +950,7 @@ var (
 		{Name: "group_id", Type: field.TypeInt, Default: 0},
 		{Name: "channel_id", Type: field.TypeInt, Default: 0},
 		{Name: "channel_name", Type: field.TypeString, Default: ""},
+		{Name: "channel_key_id", Type: field.TypeInt, Default: 0},
 		{Name: "account_id", Type: field.TypeInt, Default: 0},
 		{Name: "account_name", Type: field.TypeString, Default: ""},
 		{Name: "ip_address", Type: field.TypeString, Default: ""},
@@ -967,27 +968,32 @@ var (
 			{
 				Name:    "upstream_req_log_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UpstreamRequestLogsColumns[26]},
+				Columns: []*schema.Column{UpstreamRequestLogsColumns[27]},
 			},
 			{
 				Name:    "upstream_req_log_user_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UpstreamRequestLogsColumns[14], UpstreamRequestLogsColumns[26]},
+				Columns: []*schema.Column{UpstreamRequestLogsColumns[14], UpstreamRequestLogsColumns[27]},
 			},
 			{
 				Name:    "upstream_req_log_api_key_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UpstreamRequestLogsColumns[16], UpstreamRequestLogsColumns[26]},
+				Columns: []*schema.Column{UpstreamRequestLogsColumns[16], UpstreamRequestLogsColumns[27]},
 			},
 			{
 				Name:    "upstream_req_log_channel_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UpstreamRequestLogsColumns[18], UpstreamRequestLogsColumns[26]},
+				Columns: []*schema.Column{UpstreamRequestLogsColumns[18], UpstreamRequestLogsColumns[27]},
+			},
+			{
+				Name:    "upstream_req_log_channel_key_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UpstreamRequestLogsColumns[20], UpstreamRequestLogsColumns[27]},
 			},
 			{
 				Name:    "upstream_req_log_phase_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UpstreamRequestLogsColumns[3], UpstreamRequestLogsColumns[26]},
+				Columns: []*schema.Column{UpstreamRequestLogsColumns[3], UpstreamRequestLogsColumns[27]},
 			},
 			{
 				Name:    "upstream_req_log_request_id",

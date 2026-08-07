@@ -342,6 +342,27 @@ func (urlu *UpstreamRequestLogUpdate) SetNillableChannelName(s *string) *Upstrea
 	return urlu
 }
 
+// SetChannelKeyID sets the "channel_key_id" field.
+func (urlu *UpstreamRequestLogUpdate) SetChannelKeyID(i int) *UpstreamRequestLogUpdate {
+	urlu.mutation.ResetChannelKeyID()
+	urlu.mutation.SetChannelKeyID(i)
+	return urlu
+}
+
+// SetNillableChannelKeyID sets the "channel_key_id" field if the given value is not nil.
+func (urlu *UpstreamRequestLogUpdate) SetNillableChannelKeyID(i *int) *UpstreamRequestLogUpdate {
+	if i != nil {
+		urlu.SetChannelKeyID(*i)
+	}
+	return urlu
+}
+
+// AddChannelKeyID adds i to the "channel_key_id" field.
+func (urlu *UpstreamRequestLogUpdate) AddChannelKeyID(i int) *UpstreamRequestLogUpdate {
+	urlu.mutation.AddChannelKeyID(i)
+	return urlu
+}
+
 // SetAccountID sets the "account_id" field.
 func (urlu *UpstreamRequestLogUpdate) SetAccountID(i int) *UpstreamRequestLogUpdate {
 	urlu.mutation.ResetAccountID()
@@ -594,6 +615,12 @@ func (urlu *UpstreamRequestLogUpdate) sqlSave(ctx context.Context) (n int, err e
 	}
 	if value, ok := urlu.mutation.ChannelName(); ok {
 		_spec.SetField(upstreamrequestlog.FieldChannelName, field.TypeString, value)
+	}
+	if value, ok := urlu.mutation.ChannelKeyID(); ok {
+		_spec.SetField(upstreamrequestlog.FieldChannelKeyID, field.TypeInt, value)
+	}
+	if value, ok := urlu.mutation.AddedChannelKeyID(); ok {
+		_spec.AddField(upstreamrequestlog.FieldChannelKeyID, field.TypeInt, value)
 	}
 	if value, ok := urlu.mutation.AccountID(); ok {
 		_spec.SetField(upstreamrequestlog.FieldAccountID, field.TypeInt, value)
@@ -956,6 +983,27 @@ func (urluo *UpstreamRequestLogUpdateOne) SetNillableChannelName(s *string) *Ups
 	return urluo
 }
 
+// SetChannelKeyID sets the "channel_key_id" field.
+func (urluo *UpstreamRequestLogUpdateOne) SetChannelKeyID(i int) *UpstreamRequestLogUpdateOne {
+	urluo.mutation.ResetChannelKeyID()
+	urluo.mutation.SetChannelKeyID(i)
+	return urluo
+}
+
+// SetNillableChannelKeyID sets the "channel_key_id" field if the given value is not nil.
+func (urluo *UpstreamRequestLogUpdateOne) SetNillableChannelKeyID(i *int) *UpstreamRequestLogUpdateOne {
+	if i != nil {
+		urluo.SetChannelKeyID(*i)
+	}
+	return urluo
+}
+
+// AddChannelKeyID adds i to the "channel_key_id" field.
+func (urluo *UpstreamRequestLogUpdateOne) AddChannelKeyID(i int) *UpstreamRequestLogUpdateOne {
+	urluo.mutation.AddChannelKeyID(i)
+	return urluo
+}
+
 // SetAccountID sets the "account_id" field.
 func (urluo *UpstreamRequestLogUpdateOne) SetAccountID(i int) *UpstreamRequestLogUpdateOne {
 	urluo.mutation.ResetAccountID()
@@ -1238,6 +1286,12 @@ func (urluo *UpstreamRequestLogUpdateOne) sqlSave(ctx context.Context) (_node *U
 	}
 	if value, ok := urluo.mutation.ChannelName(); ok {
 		_spec.SetField(upstreamrequestlog.FieldChannelName, field.TypeString, value)
+	}
+	if value, ok := urluo.mutation.ChannelKeyID(); ok {
+		_spec.SetField(upstreamrequestlog.FieldChannelKeyID, field.TypeInt, value)
+	}
+	if value, ok := urluo.mutation.AddedChannelKeyID(); ok {
+		_spec.AddField(upstreamrequestlog.FieldChannelKeyID, field.TypeInt, value)
 	}
 	if value, ok := urluo.mutation.AccountID(); ok {
 		_spec.SetField(upstreamrequestlog.FieldAccountID, field.TypeInt, value)
