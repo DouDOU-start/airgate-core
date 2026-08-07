@@ -84,6 +84,31 @@ func TestDoNonStream在认证型403后刷新重试(t *testing.T) {
 	}
 }
 
+func TestNonStreamOK修正残留的SSE内容类型(t *testing.T) {
+	result := nonStreamOK(cliproxyexecutor.Response{
+		Headers: http.Header{"Content-Type": []string{"text/event-stream; charset=utf-8"}},
+		Payload: []byte(`{"id":"msg-1","type":"message","usage":{"input_tokens":12,"output_tokens":3}}`),
+	})
+
+	if result.ContentType != "application/json" {
+		t.Fatalf("非流式 JSON 内容类型 = %q，期望 application/json", result.ContentType)
+	}
+	if result.Usage == nil || result.Usage.PromptTokens != 12 || result.Usage.CompletionTokens != 3 {
+		t.Fatalf("非流式 Anthropic usage 解析错误：%+v", result.Usage)
+	}
+}
+
+func TestNonStreamOK保留JSON内容类型(t *testing.T) {
+	result := nonStreamOK(cliproxyexecutor.Response{
+		Headers: http.Header{"Content-Type": []string{"application/problem+json"}},
+		Payload: []byte(`{"type":"message","usage":{"input_tokens":1,"output_tokens":1}}`),
+	})
+
+	if result.ContentType != "application/problem+json" {
+		t.Fatalf("JSON 内容类型不应被改写，实际为 %q", result.ContentType)
+	}
+}
+
 func TestRefreshAuth仅有刷新令牌时复用并发结果(t *testing.T) {
 	bridge := &Bridge{}
 	executor := &refreshingTestExecutor{}

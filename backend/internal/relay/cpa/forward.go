@@ -370,7 +370,7 @@ func nonStreamOK(resp cliproxyexecutor.Response) ForwardResult {
 	} else if u, ok := dto.ExtractResponsesUsage(body); ok {
 		usage = &u
 	}
-	ct := headerOr(resp.Headers, "Content-Type", "application/json")
+	ct := nonStreamContentType(resp.Headers)
 	return ForwardResult{
 		StatusCode:  http.StatusOK,
 		Headers:     cloneHeader(resp.Headers),
@@ -378,6 +378,17 @@ func nonStreamOK(resp cliproxyexecutor.Response) ForwardResult {
 		ContentType: ct,
 		Usage:       usage,
 	}
+}
+
+// nonStreamContentType 修正 CPA executor 遗留的上游流式内容类型。
+// xAI 的 /responses 即使由 Execute 聚合、翻译成单个 JSON，响应头仍可能保留
+// text/event-stream；Anthropic SDK 会因此把普通 JSON 当作 SSE，最终丢失 usage。
+func nonStreamContentType(headers http.Header) string {
+	contentType := headerOr(headers, "Content-Type", "application/json")
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "text/event-stream") {
+		return "application/json"
+	}
+	return contentType
 }
 
 func errorToResult(err error) ForwardResult {
