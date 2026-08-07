@@ -1,8 +1,7 @@
 import { type FormEvent, useState, useEffect, useRef } from 'react';
-import QRCode from 'qrcode';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Card, Form, Input, Label, Modal, Spinner, Tabs, TextArea, useOverlayState } from '@heroui/react';
+import { Alert, Button, Card, Form, Input, Label, ListBox, Modal, Select, Spinner, Tabs, TextArea, useOverlayState } from '@heroui/react';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import { settingsApi } from '../../shared/api/settings';
 import { resolveAssetURL, ApiError } from '../../shared/api/client';
@@ -14,16 +13,13 @@ import { queryKeys } from '../../shared/queryKeys';
 import { useToast } from '../../shared/ui';
 import {
   Save, Loader2, Globe, Mail, MailSearch, Send, Upload, X, RotateCcw,
-  ShieldCheck, Copy, Trash2, KeyRound, Expand, Plus, Waypoints, MessageCircle,
-  CheckCircle2, QrCode, Unlink, Clock3, FileCheck2, ExternalLink,
+  ShieldCheck, Copy, Trash2, KeyRound, Expand, Plus, Waypoints, Bell,
 } from 'lucide-react';
-import type { SettingItem, TestSMTPReq, TestWeChatReq } from '../../shared/types';
-import type { WeChatBindSessionResp, WeChatBindStatusResp, WeChatVerificationFileResp } from '../../shared/types';
+import type { SettingItem, TestSMTPReq, TestBarkReq } from '../../shared/types';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { CommonModal } from '../../shared/components/CommonModal';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { parseCustomEndpoints, serializeCustomEndpoints } from '../../shared/utils/endpoints';
-import { formatDateTime } from '../../shared/utils/format';
 
 // ==================== 设置 key 定义 ====================
 
@@ -63,12 +59,23 @@ const SMTP_KEYS = [
   'recharge_email_subject', 'recharge_email_body',
 ] as const;
 
-// 微信公众号 AppSecret 与 SMTP 密码使用相同的掩码哨兵语义。
-const WECHAT_APP_SECRET_SENTINEL = '********';
+// Bark Device Key 与 SMTP 密码使用相同的掩码哨兵语义。
+const BARK_DEVICE_KEY_SENTINEL = '********';
+const DEFAULT_BARK_SERVER = 'https://api.day.app';
+const DEFAULT_BARK_GROUP = 'AirGate';
+const DEFAULT_BARK_LEVEL = 'timeSensitive';
 
-const WECHAT_KEYS = [
-  'wechat_enabled', 'wechat_app_id', 'wechat_app_secret', 'wechat_template_id',
-  'wechat_alert_detail_url', 'wechat_oauth_callback_url', 'wechat_notify_degraded',
+const BARK_LEVEL_OPTIONS = [
+  { id: 'passive', labelKey: 'settings.bark_level_passive', descKey: 'settings.bark_level_passive_desc' },
+  { id: 'active', labelKey: 'settings.bark_level_active', descKey: 'settings.bark_level_active_desc' },
+  { id: 'timeSensitive', labelKey: 'settings.bark_level_time_sensitive', descKey: 'settings.bark_level_time_sensitive_desc' },
+  { id: 'critical', labelKey: 'settings.bark_level_critical', descKey: 'settings.bark_level_critical_desc' },
+] as const;
+
+const BARK_KEYS = [
+  'bark_enabled', 'bark_server', 'bark_device_key',
+  'bark_group', 'bark_sound', 'bark_level',
+  'bark_alert_detail_url', 'bark_notify_degraded',
 ] as const;
 
 const DEFAULT_EMAIL_SUBJECT = '{{site_name}} - 邮箱验证码';
@@ -132,14 +139,14 @@ const DEFAULT_RECHARGE_BODY = `<div style="font-family: -apple-system, BlinkMacS
 
 // ==================== Tab 定义 ====================
 
-type TabKey = 'site' | 'gateway' | 'security' | 'smtp' | 'wechat';
+type TabKey = 'site' | 'gateway' | 'security' | 'smtp' | 'bark';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Globe }[] = [
   { key: 'site', labelKey: 'settings.tab_site', icon: Globe },
   { key: 'gateway', labelKey: 'settings.tab_gateway', icon: Waypoints },
   { key: 'security', labelKey: 'settings.tab_security', icon: ShieldCheck },
   { key: 'smtp', labelKey: 'settings.tab_smtp', icon: Mail },
-  { key: 'wechat', labelKey: 'settings.tab_wechat', icon: MessageCircle },
+  { key: 'bark', labelKey: 'settings.tab_bark', icon: Bell },
 ];
 
 type SaveTabKey = Exclude<TabKey, 'security'>;
@@ -148,20 +155,20 @@ const TAB_GROUP: Record<SaveTabKey, string> = {
   site: 'site',
   gateway: 'gateway',
   smtp: 'smtp',
-  wechat: 'wechat',
+  bark: 'bark',
 };
 
 const TAB_KEYS: Record<SaveTabKey, readonly string[]> = {
   site: SITE_KEYS,
   gateway: GATEWAY_KEYS,
   smtp: SMTP_KEYS,
-  wechat: WECHAT_KEYS,
+  bark: BARK_KEYS,
 };
 
 // ==================== Component ====================
 
 export default function SettingsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -171,10 +178,6 @@ export default function SettingsPage() {
   const [emailTplType, setEmailTplType] = useState<'verify' | 'balance_alert' | 'recharge'>('verify');
   const [isEmailPreviewOpen, setEmailPreviewOpen] = useState(false);
   const [isSmtpTestOpen, setSmtpTestOpen] = useState(false);
-  const [wechatBindSession, setWechatBindSession] = useState<WeChatBindSessionResp | null>(null);
-  const [wechatBindQrURL, setWechatBindQrURL] = useState('');
-  const [isWechatBindOpen, setWechatBindOpen] = useState(false);
-  const wechatBoundHandledRef = useRef('');
 
   // 获取所有设置
   const { data: settings, isLoading } = useQuery({
@@ -189,8 +192,8 @@ export default function SettingsPage() {
     (s) => s.key === 'smtp_password' && s.value === SMTP_PASSWORD_SENTINEL,
   ) ?? false;
 
-  const wechatAppSecretConfigured = settings?.some(
-    (s) => s.key === 'wechat_app_secret' && s.value === WECHAT_APP_SECRET_SENTINEL,
+  const barkDeviceKeyConfigured = settings?.some(
+    (s) => s.key === 'bark_device_key' && s.value === BARK_DEVICE_KEY_SENTINEL,
   ) ?? false;
 
   // 初始化
@@ -200,6 +203,10 @@ export default function SettingsPage() {
       for (const s of settings) {
         map[s.key] = s.value;
       }
+      // Bark 常用默认值：未配置时直接填入，自建/自定义再改。
+      if (!map.bark_server?.trim()) map.bark_server = DEFAULT_BARK_SERVER;
+      if (!map.bark_group?.trim()) map.bark_group = DEFAULT_BARK_GROUP;
+      if (!map.bark_level?.trim()) map.bark_level = DEFAULT_BARK_LEVEL;
       setValues(map);
       setHasChanges(false);
     }
@@ -226,66 +233,12 @@ export default function SettingsPage() {
     onError: (err: Error) => toast('error', err.message),
   });
 
-  // 微信公众号测试消息使用表单当前值，便于保存前验证；AppSecret 哨兵由后端回退存量值。
-  const wechatTestMutation = useMutation({
-    mutationFn: (data: TestWeChatReq) => settingsApi.testWeChat(data),
-    onSuccess: () => toast('success', t('settings.wechat_test_success')),
+  // Bark 测试推送使用表单当前值；Device Keys 哨兵由后端回退存量值。
+  const barkTestMutation = useMutation({
+    mutationFn: (data: TestBarkReq) => settingsApi.testBark(data),
+    onSuccess: () => toast('success', t('settings.bark_test_success')),
     onError: (err: Error) => toast('error', err.message),
   });
-
-  const createWechatBindMutation = useMutation({
-    mutationFn: () => settingsApi.createWeChatBind(),
-    onSuccess: (session) => {
-      wechatBoundHandledRef.current = '';
-      setWechatBindSession(session);
-      setWechatBindQrURL('');
-      setWechatBindOpen(true);
-    },
-    onError: (err: Error) => toast('error', err.message),
-  });
-
-  const unbindWechatMutation = useMutation({
-    mutationFn: () => settingsApi.unbindWeChat(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
-      toast('success', t('settings.wechat_unbind_success'));
-    },
-    onError: (err: Error) => toast('error', err.message),
-  });
-
-  const { data: wechatBindStatus } = useQuery<WeChatBindStatusResp>({
-    queryKey: ['settings', 'wechat-bind', wechatBindSession?.id],
-    queryFn: () => settingsApi.getWeChatBindStatus(wechatBindSession!.id),
-    enabled: isWechatBindOpen && !!wechatBindSession?.id,
-    refetchInterval: (query) => (query.state.data?.status === 'bound' ? false : 2000),
-    retry: false,
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!wechatBindSession?.oauth_url) {
-      setWechatBindQrURL('');
-      return;
-    }
-    QRCode.toDataURL(wechatBindSession.oauth_url, { width: 260, margin: 1 })
-      .then((url) => {
-        if (!cancelled) setWechatBindQrURL(url);
-      })
-      .catch(() => {
-        if (!cancelled) toast('error', t('settings.wechat_qr_generate_failed'));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [t, toast, wechatBindSession]);
-
-  useEffect(() => {
-    if (wechatBindStatus?.status !== 'bound' || !wechatBindSession) return;
-    if (wechatBoundHandledRef.current === wechatBindSession.id) return;
-    wechatBoundHandledRef.current = wechatBindSession.id;
-    queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
-    toast('success', t('settings.wechat_bind_success'));
-  }, [queryClient, t, toast, wechatBindSession, wechatBindStatus]);
 
   function set(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -351,25 +304,20 @@ export default function SettingsPage() {
     });
   }
 
-  function handleTestWeChat() {
-    const openID = firstOpenID(val('wechat_admin_open_ids'));
-    if (!openID) {
-      toast('error', t('settings.wechat_open_id_required'));
+  function handleTestBark() {
+    const deviceKey = val('bark_device_key').trim();
+    if (!deviceKey) {
+      toast('error', t('settings.bark_device_key_required'));
       return;
     }
-    wechatTestMutation.mutate({
-      app_id: val('wechat_app_id').trim(),
-      app_secret: val('wechat_app_secret'),
-      template_id: val('wechat_template_id').trim(),
-      open_id: openID,
-      detail_url: val('wechat_alert_detail_url').trim(),
+    barkTestMutation.mutate({
+      server: val('bark_server').trim() || DEFAULT_BARK_SERVER,
+      device_key: deviceKey,
+      group: val('bark_group').trim() || DEFAULT_BARK_GROUP,
+      sound: val('bark_sound').trim(),
+      level: val('bark_level').trim() || DEFAULT_BARK_LEVEL,
+      detail_url: val('bark_alert_detail_url').trim(),
     });
-  }
-
-  function closeWechatBind() {
-    setWechatBindOpen(false);
-    setWechatBindSession(null);
-    setWechatBindQrURL('');
   }
 
   if (isLoading) {
@@ -744,189 +692,159 @@ export default function SettingsPage() {
           </Card>
         )}
 
-        {activeTab === 'wechat' && (
+        {activeTab === 'bark' && (
           <Card>
             <Card.Header className="justify-between gap-3">
-              <Card.Title>{t('settings.wechat_config')}</Card.Title>
+              <Card.Title>{t('settings.bark_config')}</Card.Title>
               <Button
                 size="sm"
                 variant="secondary"
-                onPress={handleTestWeChat}
+                onPress={handleTestBark}
                 isDisabled={
-                  !val('wechat_app_id').trim()
-                  || !val('wechat_app_secret')
-                  || !val('wechat_template_id').trim()
-                  || !firstOpenID(val('wechat_admin_open_ids'))
-                  || wechatTestMutation.isPending
+                  !val('bark_device_key').trim()
+                  || barkTestMutation.isPending
                 }
-                aria-busy={wechatTestMutation.isPending}
+                aria-busy={barkTestMutation.isPending}
               >
-                {wechatTestMutation.isPending
+                {barkTestMutation.isPending
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   : <Send className="w-3.5 h-3.5" />}
-                {t('settings.wechat_test')}
+                {t('settings.bark_test')}
               </Button>
             </Card.Header>
             <Card.Content>
               <div className="ag-settings-section-stack">
                 <SettingsSection
-                  title={t('settings.wechat_credentials')}
-                  description={t('settings.wechat_credentials_desc')}
+                  title={t('settings.bark_credentials')}
+                  description={t('settings.bark_credentials_desc')}
                 >
-                  {boolVal('wechat_enabled') ? (
+                  {boolVal('bark_enabled') ? (
                     <div className="mb-5">
                       <Alert status="success">
-                      <Alert.Content>
-                          <Alert.Description>{t('settings.wechat_enabled_status')}</Alert.Description>
-                      </Alert.Content>
+                        <Alert.Content>
+                          <Alert.Description>{t('settings.bark_enabled_status')}</Alert.Description>
+                        </Alert.Content>
                       </Alert>
                     </div>
                   ) : null}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Field label={t('settings.wechat_app_id')}>
+                    <Field label={t('settings.bark_server')} hint={t('settings.bark_server_hint')}>
                       <Input
-                        value={val('wechat_app_id')}
-                        onChange={(e) => set('wechat_app_id', e.target.value)}
-                        placeholder={t('settings.wechat_app_id')}
+                        value={val('bark_server')}
+                        onChange={(e) => set('bark_server', e.target.value)}
+                        placeholder={DEFAULT_BARK_SERVER}
                         autoComplete="off"
                       />
                     </Field>
                     <Field
-                      label={t('settings.wechat_app_secret')}
-                      hint={wechatAppSecretConfigured ? t('settings.wechat_app_secret_configured') : undefined}
+                      label={t('settings.bark_device_key')}
+                      hint={barkDeviceKeyConfigured ? t('settings.bark_device_key_configured') : t('settings.bark_device_key_hint')}
                     >
                       <Input
-                        name="wechat_app_secret"
+                        name="bark_device_key"
                         type="password"
-                        value={val('wechat_app_secret')}
-                        onChange={(e) => set('wechat_app_secret', e.target.value)}
-                        autoComplete="off"
-                      />
-                    </Field>
-                    <Field className="col-span-1 md:col-span-2" label={t('settings.wechat_template_id')} hint={t('settings.wechat_template_id_hint')}>
-                      <Input
-                        value={val('wechat_template_id')}
-                        onChange={(e) => set('wechat_template_id', e.target.value)}
-                        placeholder="模板消息 ID"
+                        value={val('bark_device_key')}
+                        onChange={(e) => set('bark_device_key', e.target.value)}
+                        placeholder={t('settings.bark_device_key_placeholder')}
                         autoComplete="off"
                       />
                     </Field>
                   </div>
                 </SettingsSection>
 
-                <SettingsSection>
-                  <div className="space-y-6">
-                    <Field label={t('settings.wechat_oauth_callback_url')} hint={t('settings.wechat_oauth_callback_url_hint')}>
+                <SettingsSection title={t('settings.bark_options')}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Field label={t('settings.bark_group')} hint={t('settings.bark_group_hint')}>
                       <Input
-                        value={val('wechat_oauth_callback_url')}
-                        onChange={(e) => set('wechat_oauth_callback_url', e.target.value)}
-                        placeholder="https://example.com/api/v1/wechat/admin-bind/callback"
+                        value={val('bark_group')}
+                        onChange={(e) => set('bark_group', e.target.value)}
+                        placeholder={DEFAULT_BARK_GROUP}
+                        autoComplete="off"
                       />
                     </Field>
-
-                    <div className="rounded-2xl border border-glass-border bg-surface/70 p-5 sm:p-6">
-                      <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex min-w-0 items-start gap-4">
-                          <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
-                            firstOpenID(val('wechat_admin_open_ids'))
-                              ? 'bg-success/12 text-success'
-                              : 'bg-primary/10 text-primary'
-                          }`}>
-                            {firstOpenID(val('wechat_admin_open_ids'))
-                              ? <CheckCircle2 className="h-5 w-5" />
-                              : <QrCode className="h-5 w-5" />}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold text-text">
-                              {firstOpenID(val('wechat_admin_open_ids'))
-                                ? t('settings.wechat_bound_title')
-                                : t('settings.wechat_unbound_title')}
-                            </div>
-                            <p className="mt-1 text-xs leading-5 text-text-tertiary">
-                              {firstOpenID(val('wechat_admin_open_ids'))
-                                ? t('settings.wechat_bound_desc', { hint: maskOpenID(firstOpenID(val('wechat_admin_open_ids'))) })
-                                : t('settings.wechat_unbound_desc')}
-                            </p>
-                            {hasChanges ? (
-                              <p className="mt-2 text-xs font-medium text-warning">
-                                {t('settings.wechat_bind_save_first')}
-                              </p>
-                            ) : null}
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 flex-wrap gap-2">
-                          {firstOpenID(val('wechat_admin_open_ids')) ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onPress={() => unbindWechatMutation.mutate()}
-                              isDisabled={unbindWechatMutation.isPending}
-                            >
-                              {unbindWechatMutation.isPending
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <Unlink className="h-3.5 w-3.5" />}
-                              {t('settings.wechat_unbind')}
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onPress={() => createWechatBindMutation.mutate()}
-                              isDisabled={
-                                hasChanges
-                                || !val('wechat_app_id').trim()
-                                || !val('wechat_app_secret')
-                                || !val('wechat_oauth_callback_url').trim()
-                                || createWechatBindMutation.isPending
-                              }
-                            >
-                              {createWechatBindMutation.isPending
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <QrCode className="h-3.5 w-3.5" />}
-                              {t('settings.wechat_bind')}
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <Field label={t('settings.wechat_alert_detail_url')} hint={t('settings.wechat_alert_detail_url_hint')}>
-                        <Input
-                          value={val('wechat_alert_detail_url')}
-                          onChange={(e) => set('wechat_alert_detail_url', e.target.value)}
-                          placeholder="https://example.com/admin/channels"
-                        />
-                      </Field>
-                      <NativeSwitch
-                        isSelected={boolVal('wechat_notify_degraded')}
-                        label={(
-                          <>
-                            <span className="text-sm font-medium text-text">{t('settings.wechat_notify_degraded')}</span>
-                            <span className="block text-xs text-text-tertiary">{t('settings.wechat_notify_degraded_desc')}</span>
-                          </>
-                        )}
-                        onChange={(v) => set('wechat_notify_degraded', String(v))}
+                    <Field label={t('settings.bark_sound')} hint={t('settings.bark_sound_hint')}>
+                      <Input
+                        value={val('bark_sound')}
+                        onChange={(e) => set('bark_sound', e.target.value)}
+                        placeholder="alarm"
+                        autoComplete="off"
                       />
-                    </div>
-                  </div>
-                </SettingsSection>
-
-                <WeChatVerificationFilesPanel />
-
-                <SettingsSection title={t('settings.wechat_alert_policy')}>
-                  <div className="space-y-4">
+                    </Field>
+                    <Field label={t('settings.bark_level')} hint={t('settings.bark_level_hint')}>
+                      {(() => {
+                        const selectedLevel = val('bark_level') || DEFAULT_BARK_LEVEL;
+                        const selectedOption = BARK_LEVEL_OPTIONS.find((item) => item.id === selectedLevel)
+                          ?? BARK_LEVEL_OPTIONS.find((item) => item.id === DEFAULT_BARK_LEVEL)!;
+                        return (
+                          <Select
+                            // 语言切换时强制重建，避免 Select 缓存旧语言的选项文案
+                            key={`bark-level-${i18n.language}`}
+                            fullWidth
+                            selectedKey={selectedLevel}
+                            onSelectionChange={(key) => {
+                              set('bark_level', key == null ? DEFAULT_BARK_LEVEL : String(key));
+                            }}
+                          >
+                            <Label className="sr-only">{t('settings.bark_level')}</Label>
+                            <Select.Trigger>
+                              <Select.Value>{t(selectedOption.labelKey)}</Select.Value>
+                              <Select.Indicator />
+                            </Select.Trigger>
+                            <Select.Popover>
+                              <ListBox items={[...BARK_LEVEL_OPTIONS]}>
+                                {(item) => (
+                                  <ListBox.Item
+                                    id={item.id}
+                                    textValue={`${t(item.labelKey)} ${t(item.descKey)}`}
+                                  >
+                                    <div className="flex flex-col gap-0.5 py-0.5">
+                                      <span className="text-sm text-text">{t(item.labelKey)}</span>
+                                      <span className="text-[11px] leading-4 text-text-tertiary">
+                                        {t(item.descKey)}
+                                      </span>
+                                    </div>
+                                  </ListBox.Item>
+                                )}
+                              </ListBox>
+                            </Select.Popover>
+                          </Select>
+                        );
+                      })()}
+                    </Field>
+                    <Field label={t('settings.bark_alert_detail_url')} hint={t('settings.bark_alert_detail_url_hint')}>
+                      <Input
+                        value={val('bark_alert_detail_url')}
+                        onChange={(e) => set('bark_alert_detail_url', e.target.value)}
+                        placeholder="https://example.com/admin/channels"
+                      />
+                    </Field>
                     <NativeSwitch
-                      isSelected={boolVal('wechat_enabled')}
+                      isSelected={boolVal('bark_notify_degraded')}
                       label={(
                         <>
-                          <span className="text-sm font-medium text-text">{t('settings.wechat_enabled')}</span>
-                          <span className="block text-xs text-text-tertiary">{t('settings.wechat_enabled_desc')}</span>
+                          <span className="text-sm font-medium text-text">{t('settings.bark_notify_degraded')}</span>
+                          <span className="block text-xs text-text-tertiary">{t('settings.bark_notify_degraded_desc')}</span>
                         </>
                       )}
-                      onChange={(v) => set('wechat_enabled', String(v))}
+                      onChange={(v) => set('bark_notify_degraded', String(v))}
+                    />
+                  </div>
+                </SettingsSection>
+
+                <SettingsSection title={t('settings.bark_alert_policy')}>
+                  <div className="space-y-4">
+                    <NativeSwitch
+                      isSelected={boolVal('bark_enabled')}
+                      label={(
+                        <>
+                          <span className="text-sm font-medium text-text">{t('settings.bark_enabled')}</span>
+                          <span className="block text-xs text-text-tertiary">{t('settings.bark_enabled_desc')}</span>
+                        </>
+                      )}
+                      onChange={(v) => set('bark_enabled', String(v))}
                     />
                     <p className="text-xs leading-5 text-text-tertiary">
-                      {t('settings.wechat_policy_desc')}
+                      {t('settings.bark_policy_desc')}
                     </p>
                   </div>
                 </SettingsSection>
@@ -943,280 +861,7 @@ export default function SettingsPage() {
         onClose={() => setSmtpTestOpen(false)}
         onSubmit={submitSmtpTest}
       />
-      <WeChatBindModal
-        isCreating={createWechatBindMutation.isPending}
-        onClose={closeWechatBind}
-        open={isWechatBindOpen}
-        qrDataURL={wechatBindQrURL}
-        session={wechatBindSession}
-        status={wechatBindStatus}
-      />
     </div>
-  );
-}
-
-// 测试消息发送给列表中的第一位管理员；分隔规则与后端保持一致。
-function firstOpenID(value: string): string {
-  return value
-    .split(/[\s,，;；]+/)
-    .map((item) => item.trim())
-    .find(Boolean) ?? '';
-}
-
-function maskOpenID(value: string): string {
-  if (!value) return '';
-  return value.length <= 6 ? value : `••••••${value.slice(-6)}`;
-}
-
-// ==================== 微信域名校验文件 ====================
-
-const WECHAT_VERIFICATION_MAX_SIZE = 64 * 1024;
-const WECHAT_VERIFICATION_FILENAME = /^MP_verify_[A-Za-z0-9_-]+\.txt$/;
-
-function WeChatVerificationFilesPanel() {
-  const { t } = useTranslation();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const copy = useClipboard();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [deleteTarget, setDeleteTarget] = useState<WeChatVerificationFileResp | null>(null);
-
-  const { data: files = [], isLoading } = useQuery({
-    queryKey: queryKeys.wechatVerificationFiles(),
-    queryFn: () => settingsApi.listWeChatVerificationFiles(),
-  });
-
-  const uploadMutation = useMutation({
-    mutationFn: (file: File) => settingsApi.uploadWeChatVerificationFile(file),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.wechatVerificationFiles() });
-      toast('success', t('settings.wechat_verification_upload_success'));
-    },
-    onError: (err: Error) => toast('error', err.message || t('settings.wechat_verification_upload_failed')),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (filename: string) => settingsApi.deleteWeChatVerificationFile(filename),
-    onSuccess: () => {
-      setDeleteTarget(null);
-      queryClient.invalidateQueries({ queryKey: queryKeys.wechatVerificationFiles() });
-      toast('success', t('settings.wechat_verification_delete_success'));
-    },
-    onError: (err: Error) => toast('error', err.message),
-  });
-
-  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    if (!WECHAT_VERIFICATION_FILENAME.test(file.name)) {
-      toast('error', t('settings.wechat_verification_invalid_name'));
-      return;
-    }
-    if (file.size <= 0 || file.size > WECHAT_VERIFICATION_MAX_SIZE) {
-      toast('error', t('settings.wechat_verification_too_large'));
-      return;
-    }
-    uploadMutation.mutate(file);
-  }
-
-  function absoluteURL(file: WeChatVerificationFileResp): string {
-    return new URL(file.url, window.location.origin).toString();
-  }
-
-  return (
-    <>
-      <SettingsSection
-        title={t('settings.wechat_verification_title')}
-        action={(
-          <>
-            <input
-              ref={fileInputRef}
-              className="hidden"
-              type="file"
-              accept=".txt,text/plain"
-              onChange={handleFileChange}
-            />
-            <Button
-              size="sm"
-              variant="secondary"
-              isDisabled={uploadMutation.isPending}
-              onPress={() => fileInputRef.current?.click()}
-            >
-              {uploadMutation.isPending
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : <Upload className="h-3.5 w-3.5" />}
-              {t('settings.wechat_verification_upload')}
-            </Button>
-          </>
-        )}
-      >
-        {isLoading ? (
-          <div className="flex min-h-24 items-center justify-center text-text-tertiary">
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
-        ) : files.length === 0 ? (
-          <div className="flex min-h-32 flex-col items-center justify-center rounded-2xl border border-dashed border-glass-border bg-surface/45 px-6 text-center">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
-              <FileCheck2 className="h-5 w-5" />
-            </div>
-            <div className="mt-3 text-sm font-medium text-text">{t('settings.wechat_verification_empty')}</div>
-            <p className="mt-1 max-w-lg text-xs leading-5 text-text-tertiary">
-              {t('settings.wechat_verification_empty_hint')}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {files.map((file) => (
-              <div
-                key={file.filename}
-                className="flex flex-col gap-4 rounded-2xl border border-glass-border bg-surface/65 p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="flex min-w-0 items-start gap-3">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-success/12 text-success">
-                    <FileCheck2 className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <code className="block truncate text-xs font-semibold text-text">{file.filename}</code>
-                    <code className="mt-1 block truncate text-[11px] text-text-tertiary">{absoluteURL(file)}</code>
-                    <div className="mt-1.5 text-[11px] text-text-tertiary">
-                      {t('settings.wechat_verification_meta', {
-                        size: formatVerificationFileSize(file.size),
-                        time: formatDateTime(file.updated_at),
-                      })}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5 self-end sm:self-auto">
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="ghost"
-                    aria-label={t('settings.wechat_verification_copy')}
-                    onPress={() => copy(absoluteURL(file), t('settings.wechat_verification_copied'))}
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="ghost"
-                    aria-label={t('settings.wechat_verification_open')}
-                    onPress={() => window.open(absoluteURL(file), '_blank', 'noopener,noreferrer')}
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="danger"
-                    aria-label={t('settings.wechat_verification_delete')}
-                    onPress={() => setDeleteTarget(file)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </SettingsSection>
-
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => {
-          if (!open && !deleteMutation.isPending) setDeleteTarget(null);
-        }}
-        title={t('settings.wechat_verification_delete_confirm_title')}
-        description={t('settings.wechat_verification_delete_confirm_desc', { filename: deleteTarget?.filename ?? '' })}
-        loading={deleteMutation.isPending}
-        onConfirm={() => {
-          if (deleteTarget) deleteMutation.mutate(deleteTarget.filename);
-        }}
-      />
-    </>
-  );
-}
-
-function formatVerificationFileSize(size: number): string {
-  if (size < 1024) return `${size} B`;
-  return `${(size / 1024).toFixed(1)} KB`;
-}
-
-// ==================== 微信管理员扫码绑定 ====================
-
-function WeChatBindModal({
-  isCreating,
-  onClose,
-  open,
-  qrDataURL,
-  session,
-  status,
-}: {
-  isCreating: boolean;
-  onClose: () => void;
-  open: boolean;
-  qrDataURL: string;
-  session: WeChatBindSessionResp | null;
-  status?: WeChatBindStatusResp;
-}) {
-  const { t } = useTranslation();
-  const bound = status?.status === 'bound';
-  const modalState = useOverlayState({
-    isOpen: open,
-    onOpenChange: (nextOpen) => {
-      if (!nextOpen && !isCreating) onClose();
-    },
-  });
-
-  return (
-    <CommonModal
-      description={bound ? t('settings.wechat_bind_complete_desc') : t('settings.wechat_bind_modal_desc')}
-      footer={(
-        <div className="flex w-full justify-end">
-          <Button onPress={onClose} variant={bound ? 'primary' : 'secondary'}>
-            {bound ? t('settings.wechat_bind_done') : t('common.close')}
-          </Button>
-        </div>
-      )}
-      icon={bound ? <CheckCircle2 className="h-4 w-4" /> : <QrCode className="h-4 w-4" />}
-      showCloseTrigger
-      size="sm"
-      state={modalState}
-      surface={false}
-      title={bound ? t('settings.wechat_bind_complete') : t('settings.wechat_bind_modal_title')}
-    >
-      {bound ? (
-        <div className="rounded-2xl border border-success/25 bg-success/8 px-5 py-7 text-center">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-success/15 text-success">
-            <CheckCircle2 className="h-7 w-7" />
-          </div>
-          <div className="mt-4 text-base font-semibold text-text">{t('settings.wechat_bound_title')}</div>
-          <div className="mt-1 text-xs text-text-tertiary">
-            {status?.open_id_hint || t('settings.wechat_bind_complete_desc')}
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-4 py-2">
-          <div className="relative grid h-[284px] w-[284px] place-items-center overflow-hidden rounded-3xl border border-glass-border bg-white p-3 shadow-sm">
-            {qrDataURL ? (
-              <img className="h-full w-full rounded-2xl object-contain" src={qrDataURL} alt={t('settings.wechat_bind_qr_alt')} />
-            ) : (
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-text-tertiary">
-            <Clock3 className="h-3.5 w-3.5" />
-            <span>{t('settings.wechat_bind_expiry')}</span>
-          </div>
-          {session ? (
-            <p className="max-w-sm text-center text-xs leading-5 text-text-tertiary">
-              {t('settings.wechat_bind_scan_hint')}
-            </p>
-          ) : null}
-        </div>
-      )}
-    </CommonModal>
   );
 }
 

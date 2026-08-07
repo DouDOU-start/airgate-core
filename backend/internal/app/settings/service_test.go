@@ -100,7 +100,7 @@ func TestListMasked(t *testing.T) {
 	items := []Setting{
 		{Key: "site_name", Value: "AirGate", Group: "site"},
 		{Key: "smtp_password", Value: "super-secret", Group: "smtp"},
-		{Key: "wechat_app_secret", Value: "wechat-secret", Group: "wechat"},
+		{Key: "bark_device_key", Value: "bark-secret-key", Group: "bark"},
 		{Key: "admin_api_key_hash", Value: "hash", Group: "security"},
 	}
 	service := NewService(settingsStubRepository{
@@ -121,8 +121,8 @@ func TestListMasked(t *testing.T) {
 	if byKey["smtp_password"].Value != MaskedValue {
 		t.Fatalf("已配置掩码键应回哨兵值, got %q", byKey["smtp_password"].Value)
 	}
-	if byKey["wechat_app_secret"].Value != MaskedValue {
-		t.Fatalf("微信公众号 AppSecret 应回掩码哨兵，got %q", byKey["wechat_app_secret"].Value)
+	if byKey["bark_device_key"].Value != MaskedValue {
+		t.Fatalf("Bark Device Key 应回掩码哨兵，got %q", byKey["bark_device_key"].Value)
 	}
 	if byKey["site_name"].Value != "AirGate" {
 		t.Fatalf("普通键应原样返回, got %q", byKey["site_name"].Value)
@@ -139,38 +139,36 @@ func TestListMasked(t *testing.T) {
 	}
 }
 
-type captureWeChatTester struct {
-	input TestWeChatInput
+type captureBarkTester struct {
+	input TestBarkInput
 }
 
-func (t *captureWeChatTester) SendTest(_ context.Context, input TestWeChatInput) error {
+func (t *captureBarkTester) SendTest(_ context.Context, input TestBarkInput) error {
 	t.input = input
 	return nil
 }
 
-func TestWeChatResolvesMaskedAppSecret(t *testing.T) {
+func TestBarkResolvesMaskedDeviceKey(t *testing.T) {
 	service := NewService(settingsStubRepository{
 		list: func(_ context.Context, group string) ([]Setting, error) {
-			if group != "wechat" {
-				t.Fatalf("应读取 wechat 组，got %q", group)
+			if group != "bark" {
+				t.Fatalf("应读取 bark 组，got %q", group)
 			}
-			return []Setting{{Key: "wechat_app_secret", Value: "stored-secret", Group: "wechat"}}, nil
+			return []Setting{{Key: "bark_device_key", Value: "stored-device-key", Group: "bark"}}, nil
 		},
 	}, "")
-	tester := &captureWeChatTester{}
-	service.SetWeChatTester(tester)
+	tester := &captureBarkTester{}
+	service.SetBarkTester(tester)
 
-	err := service.TestWeChat(t.Context(), TestWeChatInput{
-		AppID:      "wx-test",
-		AppSecret:  MaskedValue,
-		TemplateID: "template-1",
-		OpenID:     "openid-1",
+	err := service.TestBark(t.Context(), TestBarkInput{
+		Server:    "https://api.day.app",
+		DeviceKey: MaskedValue,
 	})
 	if err != nil {
-		t.Fatalf("TestWeChat() 返回错误：%v", err)
+		t.Fatalf("TestBark() 返回错误：%v", err)
 	}
-	if tester.input.AppSecret != "stored-secret" {
-		t.Fatalf("AppSecret = %q，期望读取存量值", tester.input.AppSecret)
+	if tester.input.DeviceKey != "stored-device-key" {
+		t.Fatalf("DeviceKey = %q，期望读取存量值", tester.input.DeviceKey)
 	}
 }
 

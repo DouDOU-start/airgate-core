@@ -66,6 +66,8 @@ description: airgate-core（standalone-gateway 分支）开发指南：架构、
 - `internal/relay/errfmt` — 错误体的协议形态渲染（openai/anthropic/gemini/suno），pipeline、task 与鉴权中间件共用。网关自产错误与**上游错误**都经此包渲染：上游错误解析出语义（message/type/code）后按入口协议重建（语义保留、载体重建，非字节透传），HTTP 状态码保留上游原值。
 - `internal/relay/pricing` — 价目表缓存 + token→cost 纯函数。
 - `internal/moderation` — 风控中心判定核心（与 billing/errlog 同级顶层包）：输入抽取（gjson 按协议抽最后一条 user 消息）、关键词 Aho-Corasick、外部审核 API 客户端（多 key round-robin + 按状态分级冻结熔断）、observe 异步 worker 池、命中哈希 Redis 缓存、滑窗计数自动封禁（管理员豁免）与邮件通知副作用、日志双保留期 TTL 清理。**不 import ent**——落库/封禁/配置经窄接口（LogStore/UserBanner/ConfigSource/Notifier）注入；配置存 settings 表 `risk_control` 组（总开关 `risk_control_enabled` + 单 JSON `content_moderation_config`，审核 key AES-256-GCM 密文，加解密在 `app/riskcontrol`）；挂点：pipeline `forwardOpt` 并发闸门前 + task `handleSubmit` 提交前，拦截按入口协议 errfmt 渲染、errlog phase=`precheck_moderation`；引擎 fail-open（任何内部故障放行）。管理面 `/admin/risk-control/*`（app/riskcontrol + riskcontrol_handler 三件套）。注意：转发鉴权校验 `user.status`（禁用用户 sk- key 5s 缓存内失效）；管理员不可被禁用（手动与自动封禁双防线）。
+- `internal/probe` — 渠道密钥主动健康探针 / 余额同步；状态变化经 `probe.Notifier` 外推。当前实现：`bootstrap.channelBarkNotifier` + `infra/bark`（settings 组 `bark`，单 device key，10 分钟去重）。
+- `internal/notify` — 管理员外推通知窄抽象（`Message` / `Channel` / `Multi`），供 Bark 等通道复用；后续扩 Telegram/Webhook 时优先挂这里，不必再绑具体业务。
 - `internal/billing` — 三管道计费（actual=total×billing_rate 扣余额；billed=total×sell_rate 累加 key 用量；渠道成本=total×account_rate_multiplier 快照列查询期现算、不落列）与异步记账；billing_rate 优先级链 user.group_rates > tier.rates（用户等级批量分层）> group.rate_multiplier > 1.0（rate.go，鉴权时经 APIKeyInfo 预装载）。
 - `internal/scheduler` — 仅剩 ConcurrencyManager/RPMCounter（Redis 限流原语，渠道/用户/key 维度）。
 

@@ -53,6 +53,7 @@ Suno 的计费模型名由动作合成（`suno_music` / `suno_lyrics`），渠�
 - **充值**：易支付等支付渠道、兑换码
 - **OAuth 提供方**：标准 PKCE 授权码流程，供外部应用接入（`/oauth/token`、`/oauth/userinfo`、`/oauth/provision-key`）；支持 scope 约束的共享钱包查询、幂等扣款和关联退款（`/oauth/wallet/*`）
 - **运维**：管理仪表盘、上游请求留痕、公告系统、后台一键自更新（systemd/Docker 感知）
+- **渠道健康告警**：探针状态变化（暂停/恢复/可选降级）经 [Bark](https://github.com/Finb/Bark) 推送到管理员 iPhone，支持官方/自建 server 与 Device Key
 - **限流**：用户/密钥/渠道三级并发闸门 + RPM 限速（Redis 原语）
 - **风控中心**：转发前内容审核（关键词 Aho-Corasick 拦截 + 外部审核 API 多 key 轮询熔断 + 命中哈希缓存），observe/pre_block 双模式，采样率/分组/模型过滤，滑窗违规计数自动封禁（管理员豁免）+ 邮件通知，审核日志双保留期 TTL 清理
 - **可插拔插件运行时**：基于 `hashicorp/go-plugin + gRPC` 的多实例独立进程；插件以类型和能力声明接入点，管理后台支持上传或 URL 安装、YAML 配置、独立启停、重载与卸载
@@ -67,7 +68,7 @@ curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/standalone
 docker compose up -d
 ```
 
-脚本会生成随机密钥写入 `.env`（权限 600），并准备好数据目录。数据库、Redis、上传文件、微信校验文件和已安装插件都会持久化到部署目录下的 `data/`；升级镜像或重建容器不会丢失。启动后访问 `http://<host>:9517` 注册账号——第一个注册的账号会自动成为系统管理员。
+脚本会生成随机密钥写入 `.env`（权限 600），并准备好数据目录。数据库、Redis、上传文件和已安装插件都会持久化到部署目录下的 `data/`；升级镜像或重建容器不会丢失。启动后访问 `http://<host>:9517` 注册账号——第一个注册的账号会自动成为系统管理员。
 
 ### 裸金属（systemd）
 

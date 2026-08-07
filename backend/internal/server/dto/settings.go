@@ -1,7 +1,5 @@
 package dto
 
-import "time"
-
 // SettingResp 设置响应
 type SettingResp struct {
 	Key   string `json:"key"`
@@ -38,32 +36,12 @@ type TestSMTPReq struct {
 	To       string `json:"to" binding:"required"`
 }
 
-// TestWeChatReq 微信公众号测试消息请求。
-type TestWeChatReq struct {
-	AppID      string `json:"app_id" binding:"required"`
-	AppSecret  string `json:"app_secret" binding:"required"`
-	TemplateID string `json:"template_id" binding:"required"`
-	OpenID     string `json:"open_id" binding:"required"`
-	DetailURL  string `json:"detail_url"`
-}
-
-// WeChatBindSessionResp 微信公众号管理员扫码绑定会话响应。
-type WeChatBindSessionResp struct {
-	ID        string    `json:"id"`
-	OAuthURL  string    `json:"oauth_url"`
-	ExpiresAt time.Time `json:"expires_at"`
-}
-
-// WeChatBindStatusResp 微信公众号管理员扫码绑定状态响应。
-type WeChatBindStatusResp struct {
-	Status     string `json:"status"`
-	OpenIDHint string `json:"open_id_hint,omitempty"`
-}
-
-// WeChatVerificationFileResp 微信域名校验文件信息。
-type WeChatVerificationFileResp struct {
-	Filename  string    `json:"filename"`
-	URL       string    `json:"url"`
-	Size      int64     `json:"size"`
-	UpdatedAt time.Time `json:"updated_at"`
+// TestBarkReq Bark 测试推送请求。
+type TestBarkReq struct {
+	Server    string `json:"server"`
+	DeviceKey string `json:"device_key" binding:"required"`
+	Group     string `json:"group"`
+	Sound     string `json:"sound"`
+	Level     string `json:"level"`
+	DetailURL string `json:"detail_url"`
 }

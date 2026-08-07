@@ -1033,30 +1033,13 @@ export interface TestSMTPReq {
   to: string;
 }
 
-export interface TestWeChatReq {
-  app_id: string;
-  app_secret: string;
-  template_id: string;
-  open_id: string;
-  detail_url: string;
-}
-
-export interface WeChatBindSessionResp {
-  id: string;
-  oauth_url: string;
-  expires_at: string;
-}
-
-export interface WeChatBindStatusResp {
-  status: 'pending' | 'bound';
-  open_id_hint?: string;
-}
-
-export interface WeChatVerificationFileResp {
-  filename: string;
-  url: string;
-  size: number;
-  updated_at: string;
+export interface TestBarkReq {
+  server: string;
+  device_key: string;
+  group?: string;
+  sound?: string;
+  level?: string;
+  detail_url?: string;
 }
 
 // ==================== Dashboard ====================

@@ -105,7 +105,7 @@ type HTTPHandlers struct {
 	ProxyService *appproxy.Service
 	// RequestAuditService 同时注入 relay 写路径与管理员查询 Handler。
 	RequestAuditService *requestaudit.Service
-	// ChannelHealthNotifier 接收探针状态变化并按设置发送微信公众号提醒。
+	// ChannelHealthNotifier 接收探针状态变化并按设置发送 Bark 等外推提醒。
 	ChannelHealthNotifier probe.Notifier
 }
 
@@ -140,9 +140,8 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	dashboardService := appdashboard.NewService(dashboardStore, dep.Redis)
 	settingsStore := store.NewSettingsStore(dep.DB)
 	settingsService := appsettings.NewService(settingsStore, dep.Config.APIKeySecret())
-	channelHealthNotifier := newChannelWechatNotifier(settingsService, channelStore, dep.Redis)
-	settingsService.SetWeChatTester(channelHealthNotifier)
-	settingsService.SetWeChatBinder(channelHealthNotifier)
+	channelHealthNotifier := newChannelBarkNotifier(settingsService, channelStore, dep.Redis)
+	settingsService.SetBarkTester(channelHealthNotifier)
 
 	inviteStore := store.NewInviteStore(dep.DB)
 	inviteService := appinvite.NewService(inviteStore)
