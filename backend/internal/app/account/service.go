@@ -65,6 +65,18 @@ type OAuthCredentialRefresher interface {
 	) (map[string]string, error)
 }
 
+// OAuthCredentialImporter 复用 CPA executor 在账号落库前完成 RT 换票和必要凭证补全。
+// 与已有账号刷新分开定义，便于测试替身和不支持预导入的平台保持兼容。
+type OAuthCredentialImporter interface {
+	ImportOAuthCredentials(
+		ctx context.Context,
+		platform string,
+		accountType string,
+		credentials map[string]string,
+		proxyURL string,
+	) (map[string]string, error)
+}
+
 // Service 提供账号域用例编排。
 // 加解密在 service；store 只存/取 credentials_enc + email。
 type Service struct {

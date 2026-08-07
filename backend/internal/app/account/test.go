@@ -18,8 +18,10 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/accounttesthook"
+	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
+	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 )
 
 // 账号连通性测试（对齐 sub2api AccountTestService）。
@@ -339,8 +341,11 @@ func (s *Service) TestConnection(ctx context.Context, id int, modelID, prompt st
 	case "xai", "grok":
 		model, usage, testErr = s.testXAI(ctx, item, modelID, prompt, options.Media, proxyURL, emit)
 		endpoint = xaiTestEndpoint(model)
+	case "antigravity":
+		model, usage, testErr = s.testAntigravity(ctx, item, modelID, prompt, proxyURL, emit)
+		endpoint = "/v1beta/models/" + model + ":generateContent"
 	default:
-		msg := fmt.Sprintf("平台 %s 暂不支持连通性测试（当前支持 Codex / Claude / xAI）", item.Platform)
+		msg := fmt.Sprintf("平台 %s 暂不支持连通性测试（当前支持 Codex / Claude / xAI / Antigravity）", item.Platform)
 		emit(TestEvent{Type: "error", Error: msg})
 		return fmt.Errorf("%s", msg)
 	}
@@ -349,6 +354,150 @@ func (s *Service) TestConnection(ctx context.Context, id int, modelID, prompt st
 	}
 	s.recordAccountTestUsage(item, model, endpoint, usage, time.Since(start).Milliseconds())
 	return nil
+}
+
+type accountTestForwarder interface {
+	ForwardAccountTest(context.Context, cpa.ForwardRequest) cpa.ForwardResult
+}
+
+// testAntigravity 通过 CPA Antigravity executor 发起一次非流式探测请求。
+// 使用 OpenAI Chat Completions 作为统一输入格式，由 CPA 负责翻译为 Gemini 请求。
+func (s *Service) testAntigravity(ctx context.Context, item Account, modelID, prompt, proxyURL string, emit func(TestEvent)) (string, testStreamUsage, error) {
+	model := pickDefaultTestModel(item.Platform, resolvePlanType(item), modelID)
+	if model == "" {
+		return "", testStreamUsage{}, emitErr(emit, "无可测模型")
+	}
+	if err := s.ensureOAuthCredentialsFresh(ctx, &item, proxyURL); err != nil {
+		return model, testStreamUsage{}, emitErr(emit, "access_token 刷新失败: "+err.Error())
+	}
+	forwarder, ok := s.oauthRefresher.(accountTestForwarder)
+	if !ok || forwarder == nil {
+		return model, testStreamUsage{}, emitErr(emit, "CPA Antigravity 连通性测试执行器不可用")
+	}
+	payload := map[string]any{
+		"model": model,
+		"messages": []map[string]any{{
+			"role":    "user",
+			"content": resolveAccountTestPrompt(model, prompt),
+		}},
+		"stream":     false,
+		"max_tokens": 64,
+	}
+	raw, _ := json.Marshal(payload)
+	emit(TestEvent{Type: "test_start", Model: model})
+	result := forwarder.ForwardAccountTest(ctx, cpa.ForwardRequest{
+		Account: cpa.AccountAuthInput{
+			AccountID:   item.ID,
+			Name:        item.Name,
+			Platform:    item.Platform,
+			Type:        item.Type,
+			Credentials: item.Credentials,
+			ProxyURL:    proxyURL,
+		},
+		Model:         model,
+		Endpoint:      adaptor.EndpointChatCompletions,
+		EntryProtocol: registry.ProtocolOpenAI,
+		Payload:       raw,
+	})
+	if message := accountTestForwardError(result); message != "" {
+		return model, testStreamUsage{}, emitErr(emit, message)
+	}
+	if len(result.RefreshedCredentials) > 0 {
+		if err := s.applyRefreshedCredentials(ctx, &item, result.RefreshedCredentials); err != nil {
+			return model, testStreamUsage{}, emitErr(emit, "刷新凭证落库失败: "+err.Error())
+		}
+	}
+	usage := testStreamUsage{}
+	if result.Usage != nil {
+		usage.InputTokens = result.Usage.PromptTokens
+		usage.OutputTokens = result.Usage.CompletionTokens
+		usage.CachedTokens = result.Usage.CachedTokens
+	}
+	var body map[string]any
+	if err := json.Unmarshal(result.Body, &body); err != nil {
+		return model, usage, emitErr(emit, "解析 Antigravity 测试响应失败: "+err.Error())
+	}
+	mergeUsageMap(&usage, body["usage"])
+	if text := extractAccountTestResponseText(body); text != "" {
+		emit(TestEvent{Type: "content", Text: text})
+	}
+	emit(TestEvent{Type: "test_complete", Success: true})
+	return model, usage, nil
+}
+
+func accountTestForwardError(result cpa.ForwardResult) string {
+	if result.BuildErr != nil {
+		return "构造 Antigravity 测试请求失败: " + result.BuildErr.Error()
+	}
+	if result.NetErr != nil {
+		return "请求 Antigravity 失败: " + result.NetErr.Error()
+	}
+	if result.StreamErr != nil {
+		return "Antigravity 测试响应失败: " + result.StreamErr.Error()
+	}
+	if result.StatusCode < http.StatusOK || result.StatusCode >= http.StatusMultipleChoices {
+		return formatUpstreamHTTPError(result.StatusCode, result.Body)
+	}
+	return ""
+}
+
+func extractAccountTestResponseText(body map[string]any) string {
+	if body == nil {
+		return ""
+	}
+	if choices, ok := body["choices"].([]any); ok && len(choices) > 0 {
+		if choice, ok := choices[0].(map[string]any); ok {
+			if text := extractAccountTestTextValue(choice["message"]); text != "" {
+				return text
+			}
+			if text := extractAccountTestTextValue(choice["text"]); text != "" {
+				return text
+			}
+		}
+	}
+	if candidates, ok := body["candidates"].([]any); ok && len(candidates) > 0 {
+		if candidate, ok := candidates[0].(map[string]any); ok {
+			if text := extractAccountTestTextValue(candidate["content"]); text != "" {
+				return text
+			}
+		}
+	}
+	if output, ok := body["output"].([]any); ok {
+		for _, part := range output {
+			if text := extractAccountTestTextValue(part); text != "" {
+				return text
+			}
+		}
+	}
+	return ""
+}
+
+func extractAccountTestTextValue(raw any) string {
+	switch value := raw.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case map[string]any:
+		if text, ok := value["content"].(string); ok && strings.TrimSpace(text) != "" {
+			return strings.TrimSpace(text)
+		}
+		if text, ok := value["text"].(string); ok && strings.TrimSpace(text) != "" {
+			return strings.TrimSpace(text)
+		}
+		if parts, ok := value["parts"].([]any); ok {
+			for _, part := range parts {
+				if text := extractAccountTestTextValue(part); text != "" {
+					return text
+				}
+			}
+		}
+	case []any:
+		for _, part := range value {
+			if text := extractAccountTestTextValue(part); text != "" {
+				return text
+			}
+		}
+	}
+	return ""
 }
 
 func normalizeTestMode(mode TestMode) (TestMode, error) {

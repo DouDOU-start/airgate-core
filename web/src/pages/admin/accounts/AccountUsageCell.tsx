@@ -117,7 +117,7 @@ export function planTypeBadgeClass(plan?: string): string {
 }
 
 /** 是否支持主动刷新用量。
- *  Codex/Claude：官方 usage 窗口 API。
+ *  Codex/Claude/Antigravity：官方 usage/quota 窗口 API。
  *  xAI/Grok：cli-chat-proxy /v1/billing（对齐 CPA Manager 用量条）。
  */
 export function accountSupportsUsageRefresh(platform: string, type: string): boolean {
@@ -125,6 +125,7 @@ export function accountSupportsUsageRefresh(platform: string, type: string): boo
   const t = (type || '').toLowerCase();
   if (p === 'codex' && (t === 'oauth' || t === '')) return true;
   if (p === 'claude' && (t === 'oauth' || t === '')) return true;
+  if (p === 'antigravity' && (t === 'oauth' || t === '')) return true;
   if ((p === 'xai' || p === 'grok') && (t === 'oauth' || t === '')) return true;
   return false;
 }

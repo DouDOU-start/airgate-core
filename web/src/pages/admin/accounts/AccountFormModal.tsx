@@ -24,6 +24,7 @@ import { queryKeys } from '../../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
 import { OAuthAuthPanel, supportsInteractiveOAuth } from './OAuthAuthPanel';
 import { CodexImportPanel } from './CodexImportPanel';
+import { AntigravityImportPanel } from './AntigravityImportPanel';
 import type {
   AccountPlatform,
   AccountResp,
@@ -169,8 +170,9 @@ export function AccountFormModal({
   const [credentialsError, setCredentialsError] = useState('');
   /**
    * 新增 OAuth 方式：
-   * - codex：走 CodexImportPanel（授权/设备码/RT/Session）
-   * - 其它平台：authorize | paste
+   * - Codex：走专用授权 / RT / Session 面板
+   * - Antigravity：走专用授权 / RT 面板
+   * - 其它平台：授权或粘贴完整凭证
    */
   const [oauthMethod, setOauthMethod] = useState<OAuthMethod>('authorize');
 
@@ -237,9 +239,16 @@ export function AccountFormModal({
   const isCodexOAuthReauth = canInteractiveReauth && form.platform === 'codex';
   const showCodexOAuthPanel = isCodexOAuthCreate || isCodexOAuthReauth;
 
+  const isAntigravityOAuthCreate =
+    !isEdit && form.platform === 'antigravity' && form.type === 'oauth';
+  const isAntigravityOAuthReauth =
+    canInteractiveReauth && form.platform === 'antigravity';
+  const showAntigravityOAuthPanel =
+    isAntigravityOAuthCreate || isAntigravityOAuthReauth;
+
   const showOAuthAuthorize =
     form.type === 'oauth'
-    && form.platform !== 'codex'
+    && !['codex', 'antigravity'].includes(form.platform)
     && supportsInteractiveOAuth(form.platform)
     && (
       (!isEdit && oauthMethod === 'authorize')
@@ -249,12 +258,13 @@ export function AccountFormModal({
   // 新建可粘贴凭证；编辑仅 api_key 允许改密钥（OAuth 一律重新授权）
   const showManualCredentials =
     form.type === 'api_key'
-    || (!isEdit && form.type === 'oauth' && form.platform !== 'codex' && (
+    || (!isEdit && form.type === 'oauth' && !['codex', 'antigravity'].includes(form.platform) && (
       !supportsInteractiveOAuth(form.platform) || oauthMethod === 'paste'
     ));
 
   // 新建 + 交互式 OAuth 时名称可空（服务端用邮箱/自动名兜底）
-  const isNameOptional = !isEdit && (showOAuthAuthorize || showCodexOAuthPanel);
+  const isNameOptional =
+    !isEdit && (showOAuthAuthorize || showCodexOAuthPanel || showAntigravityOAuthPanel);
 
   const typeHint = (() => {
     if (form.type === 'api_key') {
@@ -289,7 +299,7 @@ export function AccountFormModal({
   const handleSubmit = () => {
     // 新建时的交互式 OAuth 在面板内完成；编辑态重新授权也在面板内写凭证，
     // 但编辑仍可提交名称/分组等非凭证字段。
-    if (!isEdit && (showOAuthAuthorize || showCodexOAuthPanel)) return;
+    if (!isEdit && (showOAuthAuthorize || showCodexOAuthPanel || showAntigravityOAuthPanel)) return;
 
     if (!form.name.trim()) return;
 
@@ -544,7 +554,7 @@ export function AccountFormModal({
 
                     {!isEdit
                       && form.type === 'oauth'
-                      && form.platform !== 'codex'
+                      && !['codex', 'antigravity'].includes(form.platform)
                       && supportsInteractiveOAuth(form.platform) ? (
                       <div className="ag-account-form-segmented">
                         {methodTabs.map((tab) => (
@@ -564,6 +574,16 @@ export function AccountFormModal({
                   <div className="ag-account-form-section__content">
                     {showCodexOAuthPanel ? (
                       <CodexImportPanel
+                        startOptions={oauthStartOptions}
+                        onSuccess={() => {
+                          onOAuthSuccess?.();
+                          onClose();
+                        }}
+                      />
+                    ) : null}
+
+                    {showAntigravityOAuthPanel ? (
+                      <AntigravityImportPanel
                         startOptions={oauthStartOptions}
                         onSuccess={() => {
                           onOAuthSuccess?.();
@@ -804,7 +824,11 @@ export function AccountFormModal({
               <Button variant="secondary" onPress={onClose}>
                 {t('common.cancel')}
               </Button>
-              {!isEdit && (showOAuthAuthorize || showCodexOAuthPanel) ? null : (
+              {!isEdit && (
+                showOAuthAuthorize
+                || showCodexOAuthPanel
+                || showAntigravityOAuthPanel
+              ) ? null : (
                 <Button variant="primary" isDisabled={loading} onPress={handleSubmit}>
                   {loading ? <Spinner size="sm" /> : null}
                   {!loading && isEdit ? <Save size={15} /> : null}

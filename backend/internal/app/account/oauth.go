@@ -126,8 +126,8 @@ func OAuthLoginHints(platform string) map[string]any {
 		out["flows"] = []string{OAuthFlowPasteCode, "import_refresh", "import_session"}
 		out["instruction"] = "Codex 支持：浏览器授权、Refresh Token 导入、Session 导入。"
 	case "antigravity":
-		out["flow"] = OAuthFlowPasteCode
-		out["instruction"] = "点击「生成授权链接」后打开 Google 授权。完成后浏览器会跳转到 localhost，把地址栏完整 URL 或 code 粘贴回来即可。"
+		out["flows"] = []string{OAuthFlowPasteCode, "import_refresh"}
+		out["instruction"] = "Antigravity 支持浏览器授权，也可以只粘贴 Refresh Token，由服务端自动换票并补全 project_id。"
 	case "kimi":
 		out["flow"] = OAuthFlowDevice
 		out["instruction"] = "点击「生成授权链接」后展示验证链接与用户码，在 Kimi 页面确认授权即可，后台自动完成绑定。"
@@ -316,6 +316,38 @@ func (s *Service) ImportCodexRefresh(ctx context.Context, input OAuthStartInput,
 	return s.createFromCodexImport(ctx, input, creds, "")
 }
 
+// ImportAntigravityRefresh 用 CPA Antigravity executor 将 RT 换成完整凭证后创建账号；
+// AccountID>0 时更新已有账号。换票和 project_id 补全成功前不会落库。
+func (s *Service) ImportAntigravityRefresh(ctx context.Context, input OAuthStartInput, refreshToken string) (Account, error) {
+	input.Platform = "antigravity"
+	if err := s.prepareOAuthReauth(ctx, &input); err != nil {
+		return Account{}, err
+	}
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return Account{}, fmt.Errorf("refresh_token 不能为空")
+	}
+	importer, ok := s.oauthRefresher.(OAuthCredentialImporter)
+	if !ok || importer == nil {
+		return Account{}, fmt.Errorf("antigravity RT 导入器不可用")
+	}
+	creds, err := importer.ImportOAuthCredentials(ctx, "antigravity", TypeOAuth, map[string]string{
+		"refresh_token": refreshToken,
+	}, input.ProxyURL)
+	if err != nil {
+		return Account{}, fmt.Errorf("antigravity refresh_token 换票失败: %w", err)
+	}
+	if strings.TrimSpace(creds["project_id"]) == "" {
+		return Account{}, fmt.Errorf("antigravity RT 导入后缺少 project_id")
+	}
+	creds["credential_origin"] = "import_refresh"
+	creds["auth_kind"] = TypeOAuth
+	if email := fetchGoogleEmail(ctx, creds["access_token"], input.ProxyURL); email != "" {
+		creds["email"] = email
+	}
+	return s.createFromOAuthImport(ctx, input, "antigravity", creds, "")
+}
+
 // ImportCodexSession 用 session JSON/token 创建 oauth 账号；AccountID>0 时更新已有账号。
 func (s *Service) ImportCodexSession(ctx context.Context, input OAuthStartInput, sessionRaw string) (Account, error) {
 	input.Platform = "codex"
@@ -330,10 +362,20 @@ func (s *Service) ImportCodexSession(ctx context.Context, input OAuthStartInput,
 }
 
 func (s *Service) createFromCodexImport(ctx context.Context, input OAuthStartInput, creds map[string]string, fallbackName string) (Account, error) {
+	return s.createFromOAuthImport(ctx, input, "codex", creds, fallbackName)
+}
+
+func (s *Service) createFromOAuthImport(
+	ctx context.Context,
+	input OAuthStartInput,
+	platform string,
+	creds map[string]string,
+	fallbackName string,
+) (Account, error) {
 	var item Account
 	var err error
 	if input.AccountID > 0 {
-		item, err = s.applyOAuthCredentials(ctx, input, "codex", creds)
+		item, err = s.applyOAuthCredentials(ctx, input, platform, creds)
 	} else {
 		name := strings.TrimSpace(input.Name)
 		if name == "" {
@@ -342,12 +384,12 @@ func (s *Service) createFromCodexImport(ctx context.Context, input OAuthStartInp
 			} else if fallbackName != "" {
 				name = fallbackName
 			} else {
-				name = "codex-" + time.Now().Format("0102-1504")
+				name = platform + "-" + time.Now().Format("0102-1504")
 			}
 		}
 		item, err = s.Create(ctx, CreateInput{
 			Name:           name,
-			Platform:       "codex",
+			Platform:       platform,
 			Type:           TypeOAuth,
 			Credentials:    creds,
 			Priority:       input.Priority,

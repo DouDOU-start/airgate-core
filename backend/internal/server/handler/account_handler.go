@@ -43,6 +43,19 @@ func (h *AccountHandler) handleImportError(logMessage string, err error) (int, s
 		return 500, "导入失败"
 	}
 	msg := err.Error()
+	var upstreamStatus interface{ StatusCode() int }
+	if errors.As(err, &upstreamStatus) {
+		statusCode := upstreamStatus.StatusCode()
+		if statusCode >= 400 && statusCode < 500 {
+			// 不直接透传 401，避免前端把上游凭证无效误判成管理员登录失效。
+			slog.Warn(logMessage, "upstream_status", statusCode, "error", err)
+			return 400, msg
+		}
+		if statusCode >= 500 {
+			slog.Error(logMessage, "upstream_status", statusCode, "error", err)
+			return 502, msg
+		}
+	}
 	switch {
 	case errors.Is(err, appaccount.ErrAccountNotFound):
 		return 404, msg
@@ -55,6 +68,9 @@ func (h *AccountHandler) handleImportError(logMessage string, err error) (int, s
 		strings.Contains(msg, "刷新 token"),
 		strings.Contains(msg, "请求 token"),
 		strings.Contains(msg, "请求 session"),
+		strings.Contains(msg, "缺少 project_id"),
+		strings.Contains(msg, "missing project_id"),
+		strings.Contains(msg, "invalid_grant"),
 		strings.Contains(msg, "解析"):
 		// 上游鉴权/业务拒绝或可诊断错误：4xx 语义
 		slog.Warn(logMessage, "error", err)

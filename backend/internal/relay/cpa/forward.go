@@ -55,6 +55,13 @@ type ForwardResult struct {
 	RefreshedCredentials map[string]string
 }
 
+// ForwardAccountTest 执行一次非流式账号连通性测试，供账号管理复用 CPA executor。
+// 与 HTTP 转发入口分开，避免账号测试为了构造 gin.Context 而依赖 Web 层对象。
+func (b *Bridge) ForwardAccountTest(ctx context.Context, req ForwardRequest) ForwardResult {
+	req.Stream = false
+	return b.Forward(ctx, nil, req)
+}
+
 // Forward 按账号平台选取 CPA executor 执行一次转发。
 //
 // 流式：边收 StreamChunk 边写 gin.Writer；旁路提取 usage。

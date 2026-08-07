@@ -501,6 +501,32 @@ func (h *AccountHandler) ImportCodexRefresh(c *gin.Context) {
 	response.Success(c, toAccountResp(item))
 }
 
+// ImportAntigravityRefresh Antigravity Refresh Token 导入。
+func (h *AccountHandler) ImportAntigravityRefresh(c *gin.Context) {
+	var req dto.AntigravityImportRefreshReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+	item, err := h.service.ImportAntigravityRefresh(c.Request.Context(), appaccount.OAuthStartInput{
+		Name:           req.Name,
+		ProxyURL:       req.ProxyURL,
+		ProxyID:        req.ProxyID,
+		GroupIDs:       intSliceToInt64(req.GroupIDs),
+		Priority:       req.Priority,
+		Weight:         req.Weight,
+		MaxConcurrency: req.MaxConcurrency,
+		RateMultiplier: req.RateMultiplier,
+		AccountID:      req.AccountID,
+	}, req.RefreshToken)
+	if err != nil {
+		httpCode, message := h.handleImportError("Antigravity RT 导入失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	response.Success(c, toAccountResp(item))
+}
+
 // ImportCodexSession Codex Session 导入（对齐 airgate-openai import-session）。
 func (h *AccountHandler) ImportCodexSession(c *gin.Context) {
 	var req dto.CodexImportSessionReq

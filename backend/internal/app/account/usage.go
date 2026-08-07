@@ -34,11 +34,18 @@ const (
 	xaiBillingMonthlyURL       = "https://cli-chat-proxy.grok.com/v1/billing"
 	xaiGrokClientVersion       = "0.2.101"
 	xaiGrokUserAgent           = "grok-pager/0.2.101 grok-shell/0.2.101 (macos; aarch64)"
+	antigravityUsageUserAgent  = "antigravity/cli/1.0.13 (aidev_client; os_type=darwin; arch=arm64)"
 	initialUsageRefreshTimeout = 20 * time.Second
 	// SuperGrok 月额度（美分）：$150 / $1500，对齐 CPA resolveXaiPlan。
 	xaiSuperGrokLimitCents      = 15_000.0
 	xaiSuperGrokHeavyLimitCents = 150_000.0
 )
+
+var antigravityUsageURLs = []string{
+	"https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+	"https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:retrieveUserQuotaSummary",
+	"https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+}
 
 // ErrUsageNotSupported 当前平台/凭证无法查询用量窗口。
 var ErrUsageNotSupported = errors.New("该账号不支持用量窗口查询")
@@ -186,7 +193,7 @@ func accountSupportsUsageRefresh(item Account) bool {
 		return false
 	}
 	switch strings.ToLower(strings.TrimSpace(item.Platform)) {
-	case "codex", "claude", "xai", "grok":
+	case "codex", "claude", "xai", "grok", "antigravity":
 		return true
 	default:
 		return false
@@ -322,9 +329,266 @@ func fetchUsageByPlatform(ctx context.Context, platform, accountType string, cre
 		return fetchClaudeUsage(ctx, creds, proxyURL)
 	case "xai", "grok":
 		return fetchXAIUsage(ctx, creds, proxyURL)
+	case "antigravity":
+		return fetchAntigravityUsage(ctx, creds, proxyURL)
 	default:
 		return UsageSnapshot{}, fmt.Errorf("%w: platform=%s", ErrUsageNotSupported, p)
 	}
+}
+
+// ---------- Antigravity /retrieveUserQuotaSummary ----------
+
+// fetchAntigravityUsage 查询 Google Cloud Code Assist 的账号配额摘要。
+// 上游按配额组返回剩余比例，这里转换为账号列表统一使用的已用百分比窗口。
+func fetchAntigravityUsage(ctx context.Context, creds map[string]string, proxyURL string) (UsageSnapshot, error) {
+	accessToken := strings.TrimSpace(creds["access_token"])
+	if accessToken == "" {
+		return UsageSnapshot{}, fmt.Errorf("%w: antigravity 需要 OAuth access_token", ErrUsageNotSupported)
+	}
+	projectID := firstNonEmpty(
+		strings.TrimSpace(creds["project_id"]),
+		strings.TrimSpace(creds["projectId"]),
+		strings.TrimSpace(creds["gemini_virtual_project"]),
+	)
+	if projectID == "" {
+		return UsageSnapshot{}, fmt.Errorf("antigravity 用量查询缺少 project_id")
+	}
+	return fetchAntigravityUsageFromURLs(
+		ctx,
+		accessToken,
+		projectID,
+		strings.TrimSpace(creds["plan_type"]),
+		httpClient(proxyURL),
+		antigravityUsageURLs,
+	)
+}
+
+func fetchAntigravityUsageFromURLs(
+	ctx context.Context,
+	accessToken string,
+	projectID string,
+	planType string,
+	client *http.Client,
+	targetURLs []string,
+) (UsageSnapshot, error) {
+	if client == nil {
+		client = http.DefaultClient
+	}
+	requestBody, _ := json.Marshal(map[string]string{"project": projectID})
+	var (
+		lastErr error
+		authErr error
+	)
+	for _, targetURL := range targetURLs {
+		targetURL = strings.TrimSpace(targetURL)
+		if targetURL == "" {
+			continue
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, strings.NewReader(string(requestBody)))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("User-Agent", antigravityUsageUserAgent)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("查询 Antigravity 用量失败: %w", err)
+			continue
+		}
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		_ = resp.Body.Close()
+		if readErr != nil {
+			lastErr = fmt.Errorf("读取 Antigravity 用量响应失败: %w", readErr)
+			continue
+		}
+		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+			upstreamErr := &accountUpstreamHTTPError{
+				status: resp.StatusCode,
+				body:   body,
+				label:  "antigravity 用量",
+			}
+			lastErr = upstreamErr
+			if (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) && authErr == nil {
+				authErr = upstreamErr
+			}
+			continue
+		}
+
+		snap, err := parseAntigravityUsage(body, time.Now().UTC())
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		snap.PlanType = planType
+		return snap, nil
+	}
+	if authErr != nil {
+		return UsageSnapshot{}, authErr
+	}
+	if lastErr != nil {
+		return UsageSnapshot{}, lastErr
+	}
+	return UsageSnapshot{}, fmt.Errorf("antigravity 用量接口不可用")
+}
+
+func parseAntigravityUsage(body []byte, now time.Time) (UsageSnapshot, error) {
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return UsageSnapshot{}, fmt.Errorf("解析 Antigravity 用量失败: %w", err)
+	}
+	// 兼容管理接口代理响应把真实 JSON 放在 body 字段中的形态。
+	if nested := asAnyMap(payload["body"]); nested != nil {
+		payload = nested
+	} else if nestedText, ok := payload["body"].(string); ok && strings.TrimSpace(nestedText) != "" {
+		var nested map[string]any
+		if json.Unmarshal([]byte(nestedText), &nested) == nil {
+			payload = nested
+		}
+	}
+
+	snap := UsageSnapshot{CapturedAt: now.UTC(), Windows: []UsageWindow{}}
+	groups := readAnySlice(payload, "groups")
+	for groupIndex, rawGroup := range groups {
+		group := asAnyMap(rawGroup)
+		if group == nil {
+			continue
+		}
+		groupName := readStringAny(group, "displayName", "display_name")
+		if groupName == "" {
+			groupName = fmt.Sprintf("Antigravity 配额组 %d", groupIndex+1)
+		}
+		for bucketIndex, rawBucket := range readAnySlice(group, "buckets") {
+			bucket := asAnyMap(rawBucket)
+			if bucket == nil {
+				continue
+			}
+			remaining, ok := antigravityRemainingFraction(firstNonNil(
+				bucket["remainingFraction"],
+				bucket["remaining_fraction"],
+			))
+			if !ok {
+				continue
+			}
+			bucketID := readStringAny(bucket, "bucketId", "bucket_id")
+			if bucketID == "" {
+				bucketID = fmt.Sprintf("antigravity-%d-%d", groupIndex+1, bucketIndex+1)
+			}
+			bucketName := readStringAny(bucket, "displayName", "display_name")
+			limitName := groupName
+			if bucketName != "" && !strings.EqualFold(bucketName, groupName) {
+				limitName += " · " + bucketName
+			}
+			windowRaw := readStringAny(bucket, "window")
+			windowKey, windowMinutes := antigravityWindow(windowRaw)
+			window := UsageWindow{
+				Key:           windowKey,
+				Label:         firstNonEmpty(bucketName, groupName),
+				UsedPercent:   clampPercent((1 - remaining) * 100),
+				WindowMinutes: windowMinutes,
+				LimitID:       bucketID,
+				LimitName:     limitName,
+			}
+			if resetAt := parseRFC3339Any(readStringAny(bucket, "resetTime", "reset_time")); resetAt != nil {
+				window.ResetsAt = resetAt
+			}
+			snap.Windows = append(snap.Windows, window)
+		}
+	}
+	if len(snap.Windows) == 0 {
+		return UsageSnapshot{}, fmt.Errorf("antigravity 上游未返回用量窗口数据")
+	}
+	return snap, nil
+}
+
+func antigravityRemainingFraction(raw any) (float64, bool) {
+	if text, ok := raw.(string); ok {
+		text = strings.TrimSpace(text)
+		if strings.HasSuffix(text, "%") {
+			value, ok := toFloat64(strings.TrimSpace(strings.TrimSuffix(text, "%")))
+			if !ok {
+				return 0, false
+			}
+			return clampPercent(value) / 100, true
+		}
+	}
+	value, ok := toFloat64(raw)
+	if !ok {
+		return 0, false
+	}
+	// 兼容少数代理把比例转成 0-100 百分数。
+	if value > 1 && value <= 100 {
+		value /= 100
+	}
+	if value < 0 {
+		value = 0
+	}
+	if value > 1 {
+		value = 1
+	}
+	return value, true
+}
+
+func antigravityWindow(raw string) (string, int) {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	compact := strings.NewReplacer(" ", "", "_", "", "-", "").Replace(normalized)
+	switch compact {
+	case "daily", "day":
+		return "daily", 24 * 60
+	case "weekly", "week":
+		return "weekly", 7 * 24 * 60
+	case "monthly", "month":
+		return "monthly", 30 * 24 * 60
+	}
+	parseDuration := func(suffixes ...string) (int, bool) {
+		for _, suffix := range suffixes {
+			if !strings.HasSuffix(compact, suffix) {
+				continue
+			}
+			var value int
+			if _, err := fmt.Sscanf(strings.TrimSuffix(compact, suffix), "%d", &value); err == nil && value > 0 {
+				return value, true
+			}
+		}
+		return 0, false
+	}
+	if hours, ok := parseDuration("hours", "hour", "hrs", "hr", "h"); ok {
+		if hours == 24 {
+			return "daily", hours * 60
+		}
+		return fmt.Sprintf("%dh", hours), hours * 60
+	}
+	if days, ok := parseDuration("days", "day", "d"); ok {
+		switch days {
+		case 1:
+			return "daily", 24 * 60
+		case 7:
+			return "weekly", 7 * 24 * 60
+		case 30:
+			return "monthly", 30 * 24 * 60
+		default:
+			return fmt.Sprintf("%dd", days), days * 24 * 60
+		}
+	}
+	if weeks, ok := parseDuration("weeks", "week", "w"); ok {
+		if weeks == 1 {
+			return "weekly", 7 * 24 * 60
+		}
+		return fmt.Sprintf("%dw", weeks), weeks * 7 * 24 * 60
+	}
+	if months, ok := parseDuration("months", "month", "mo"); ok {
+		if months == 1 {
+			return "monthly", 30 * 24 * 60
+		}
+		return fmt.Sprintf("%dmo", months), months * 30 * 24 * 60
+	}
+	if normalized != "" {
+		return normalized, 0
+	}
+	return "quota", 0
 }
 
 // ---------- Codex /wham/usage ----------

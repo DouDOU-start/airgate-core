@@ -37,6 +37,15 @@ func MapAuth(in AccountAuthInput) (*coreauth.Auth, error) {
 	if in.AccountID <= 0 {
 		return nil, fmt.Errorf("account_id 无效")
 	}
+	return mapAuthWithID(in, fmt.Sprintf("airgate-account-%d", in.AccountID))
+}
+
+// mapAuthWithID 允许账号落库前使用临时 Auth ID 完成 OAuth 换票。
+func mapAuthWithID(in AccountAuthInput, id string) (*coreauth.Auth, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, fmt.Errorf("auth_id 无效")
+	}
 	provider := ResolveProvider(in.Platform)
 	if provider == "" {
 		return nil, fmt.Errorf("platform 为空")
@@ -96,7 +105,6 @@ func MapAuth(in AccountAuthInput) (*coreauth.Auth, error) {
 		}
 	}
 
-	id := fmt.Sprintf("airgate-account-%d", in.AccountID)
 	label := strings.TrimSpace(in.Name)
 	if label == "" {
 		label = id

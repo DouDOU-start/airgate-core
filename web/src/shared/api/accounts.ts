@@ -191,6 +191,19 @@ export const accountsApi = {
     group_ids?: number[];
     account_id?: number;
   }) => post<AccountResp>('/api/v1/admin/accounts/oauth/codex/import-refresh', data),
+  /** Antigravity RT 导入；服务端自动换票并补全 project_id，account_id 时为重新授权 */
+  antigravityImportRefresh: (data: {
+    refresh_token: string;
+    name?: string;
+    proxy_url?: string;
+    proxy_id?: number | null;
+    priority?: number;
+    weight?: number;
+    max_concurrency?: number;
+    rate_multiplier?: number;
+    group_ids?: number[];
+    account_id?: number;
+  }) => post<AccountResp>('/api/v1/admin/accounts/oauth/antigravity/import-refresh', data),
   /** Codex Session 导入（对齐 airgate-openai import-session）；account_id 时为重新授权 */
   codexImportSession: (data: {
     session: string;

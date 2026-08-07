@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 )
 
@@ -20,6 +21,60 @@ type refreshedAuthCache struct {
 	auth                 *coreauth.Auth
 	previousAccessToken  string
 	previousRefreshToken string
+}
+
+type requestAuthPreparer interface {
+	ShouldPrepareRequestAuth(auth *coreauth.Auth) bool
+	PrepareRequestAuth(ctx context.Context, auth *coreauth.Auth) (*coreauth.Auth, error)
+}
+
+// ImportOAuthCredentials 在账号落库前使用临时 Auth 完成 RT 换票。
+// Antigravity executor 还会通过 PrepareRequestAuth 自动发现并校验 project_id。
+func (b *Bridge) ImportOAuthCredentials(
+	ctx context.Context,
+	platform string,
+	accountType string,
+	credentials map[string]string,
+	proxyURL string,
+) (map[string]string, error) {
+	auth, err := mapAuthWithID(AccountAuthInput{
+		Name:        "OAuth RT 导入",
+		Platform:    platform,
+		Type:        accountType,
+		Credentials: credentials,
+		ProxyURL:    proxyURL,
+	}, "airgate-import-"+uuid.NewString())
+	if err != nil {
+		return nil, err
+	}
+	// 临时 Auth 只用于本次导入，完成后清理并发锁和刷新缓存，避免长期导入累积内存。
+	defer b.refreshLocks.Delete(auth.ID)
+	defer b.refreshedAuths.Delete(auth.ID)
+	if !authHasRefreshCredential(auth) {
+		return nil, fmt.Errorf("账号缺少 refresh_token，无法导入 OAuth 凭证")
+	}
+	executor, err := b.EnsureExecutor(auth.Provider)
+	if err != nil {
+		return nil, err
+	}
+	refreshed, err := b.refreshAuth(ctx, executor, auth)
+	if err != nil {
+		return nil, err
+	}
+	if preparer, ok := executor.(requestAuthPreparer); ok && preparer.ShouldPrepareRequestAuth(refreshed) {
+		prepared, prepareErr := preparer.PrepareRequestAuth(ctx, refreshed.Clone())
+		if prepareErr != nil {
+			return nil, prepareErr
+		}
+		if prepared != nil {
+			refreshed = prepared
+		}
+	}
+	result := CredentialsFromAuth(refreshed)
+	if strings.TrimSpace(result["access_token"]) == "" {
+		return nil, fmt.Errorf("OAuth 换票后缺少 access_token")
+	}
+	return result, nil
 }
 
 // RefreshAccountCredentials 强制刷新一个指定账号的 OAuth 凭证。

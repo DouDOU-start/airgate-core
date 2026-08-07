@@ -5,8 +5,8 @@
 //   - sdk/cliproxy (+ auth Manager)
 //   - sdk/translator/builtin（注册翻译器）
 //
-// 不 import CPA internal/*。内置 executor 通过 cliproxy.Service.Run 的
-// registerConfigAPIKeyAuths 路径，用占位 API Key 触发 ensureExecutors 注册到共享 Manager。
+// 不 import CPA internal/*。有 API Key 配置入口的平台通过占位 Key 注册 executor；
+// Antigravity/Kimi 则通过短生命周期占位 auth 文件触发注册，完成后立即删除。
 //
 // 依赖约束：本包禁止 import ent / internal/app。
 package cpa
@@ -33,6 +33,9 @@ type Bridge struct {
 	cfg     *sdkconfig.Config
 	manager *coreauth.Manager
 	svc     *cliproxy.Service
+	// executorSeedPaths 是为触发无 API Key 平台 executor 注册而创建的临时凭证文件。
+	executorSeedPaths   []string
+	executorSeedCleanup sync.Once
 
 	mu             sync.RWMutex
 	ready          bool
@@ -47,6 +50,7 @@ type Bridge struct {
 func NewBridge(cfg *sdkconfig.Config) *Bridge {
 	b := &Bridge{}
 	if err := b.init(cfg); err != nil {
+		b.cleanupExecutorSeedAuthFiles()
 		b.initErr = err
 	}
 	return b
@@ -136,14 +140,11 @@ func (b *Bridge) EnsureExecutor(provider string) (coreauth.ProviderExecutor, err
 		return nil, fmt.Errorf("cpa bridge 未初始化")
 	}
 	key := normalizeProvider(provider)
+	if key == "" {
+		return nil, fmt.Errorf("provider 为空")
+	}
 	if ex, ok := b.manager.Executor(key); ok && ex != nil {
 		return ex, nil
-	}
-	// 常见别名回退
-	for _, alt := range []string{key, "openai-compatibility", "gemini"} {
-		if ex, ok := b.manager.Executor(alt); ok && ex != nil {
-			return ex, nil
-		}
 	}
 	return nil, fmt.Errorf("无可用 executor: %s（bridge 未就绪或平台未注册）", key)
 }
@@ -153,6 +154,7 @@ func (b *Bridge) Close(ctx context.Context) error {
 	if b == nil {
 		return nil
 	}
+	b.cleanupExecutorSeedAuthFiles()
 	if b.cancel != nil {
 		b.cancel()
 	}
@@ -171,6 +173,11 @@ func (b *Bridge) init(cfg *sdkconfig.Config) error {
 	if err := os.MkdirAll(authDir, 0o755); err != nil {
 		return err
 	}
+	seedPaths, err := seedOAuthExecutorAuthFiles(authDir)
+	if err != nil {
+		return err
+	}
+	b.executorSeedPaths = seedPaths
 	cfgPath := filepath.Join(workDir, "config.yaml")
 
 	// 最小 YAML：随机端口 + auth-dir。占位 API Key 在 seedPlaceholderKeys 注入。
@@ -234,7 +241,7 @@ func (b *Bridge) init(cfg *sdkconfig.Config) error {
 }
 
 func (b *Bridge) waitExecutors(mgr *coreauth.Manager) {
-	required := []string{"codex", "claude", "gemini", "xai"}
+	required := []string{"codex", "claude", "antigravity", "kimi", "gemini", "xai"}
 	deadline := time.Now().Add(45 * time.Second)
 	for time.Now().Before(deadline) {
 		hit := 0
@@ -243,8 +250,8 @@ func (b *Bridge) waitExecutors(mgr *coreauth.Manager) {
 				hit++
 			}
 		}
-		// 至少 2 个核心 provider 就绪即认为可用（kimi/antigravity 可能无 API-key 占位）
-		if hit >= 2 {
+		if hit == len(required) {
+			b.cleanupExecutorSeedAuthFiles()
 			b.mu.Lock()
 			b.ready = true
 			b.mu.Unlock()
@@ -252,18 +259,52 @@ func (b *Bridge) waitExecutors(mgr *coreauth.Manager) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	// 超时：有任意 executor 也标 ready
+	// 超时也清理临时凭证文件；已注册的 executor 不会随凭证删除而注销。
+	b.cleanupExecutorSeedAuthFiles()
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	for _, p := range required {
-		if _, ok := mgr.Executor(p); ok {
-			b.ready = true
-			return
-		}
-	}
 	if b.initErr == nil {
-		b.initErr = fmt.Errorf("cpa baseline executor 注册超时")
+		missing := make([]string, 0, len(required))
+		for _, provider := range required {
+			if executor, ok := mgr.Executor(provider); !ok || executor == nil {
+				missing = append(missing, provider)
+			}
+		}
+		b.initErr = fmt.Errorf("cpa baseline executor 注册超时，缺少: %s", strings.Join(missing, ", "))
 	}
+}
+
+// seedOAuthExecutorAuthFiles 为没有 API Key 配置入口的平台创建短生命周期占位凭证。
+// CPA 非 Home 模式只会按配置 API Key 和 auth 文件注册 executor；没有这些文件时，
+// Antigravity/Kimi executor 不会出现。占位凭证带远期过期时间，不会触发真实换票。
+func seedOAuthExecutorAuthFiles(authDir string) ([]string, error) {
+	seeds := map[string]string{
+		"airgate-antigravity-executor-seed.json": `{"type":"antigravity","access_token":"airgate-cpa-placeholder","refresh_token":"airgate-cpa-placeholder","project_id":"airgate-cpa-placeholder","expired":"2099-01-01T00:00:00Z","disabled":false}`,
+		"airgate-kimi-executor-seed.json":        `{"type":"kimi","access_token":"airgate-cpa-placeholder","refresh_token":"airgate-cpa-placeholder","expired":"2099-01-01T00:00:00Z","disabled":false}`,
+	}
+	paths := make([]string, 0, len(seeds))
+	for name, body := range seeds {
+		path := filepath.Join(authDir, name)
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			for _, created := range paths {
+				_ = os.Remove(created)
+			}
+			return nil, fmt.Errorf("写入 OAuth executor 占位凭证失败: %w", err)
+		}
+		paths = append(paths, path)
+	}
+	return paths, nil
+}
+
+func (b *Bridge) cleanupExecutorSeedAuthFiles() {
+	if b == nil {
+		return
+	}
+	b.executorSeedCleanup.Do(func() {
+		for _, path := range b.executorSeedPaths {
+			_ = os.Remove(path)
+		}
+	})
 }
 
 // seedPlaceholderKeys 写入各平台占位 API Key，驱动 CPA 内置 executor 注册。
