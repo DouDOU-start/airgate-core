@@ -24,6 +24,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
+	"github.com/DouDOU-start/airgate-core/internal/relay/streamlife"
 )
 
 const (
@@ -39,11 +40,11 @@ const (
 	// 撑爆（万级排队 × 平均百 KB 请求体即 GB 级）；超限按渠道容量满快速失败泄压。
 	maxQueueWaiters = 4096
 
-	// nonStreamTimeout 非流式请求总超时；流式无总超时（连接/TLS 超时在 Transport 层）。
+	// nonStreamTimeout 非流式请求总超时；流式请求使用 streamlife.MaxDuration 硬上限。
 	nonStreamTimeout = 5 * time.Minute
-	// streamSlotTTL 流式请求的渠道并发槽 TTL：流式无总超时，长流按 30min 防僵尸清理；
+	// streamSlotTTL 流式请求的渠道并发槽 TTL：长流按 30min 防僵尸清理；
 	// 非流式维持默认 5min（与 nonStreamTimeout 同量级）。
-	streamSlotTTL = 30 * time.Minute
+	streamSlotTTL = streamlife.MaxDuration
 	// maxErrorBodyBytes 上游错误体读取上限。
 	maxErrorBodyBytes = 64 << 10
 	// maxResponseBodyBytes 非流式成功响应体读取上限。
@@ -645,7 +646,7 @@ func (p *Pipeline) recordFailure(c *gin.Context, keyInfo *auth.APIKeyInfo, req *
 	p.errSink.Record(e)
 }
 
-// channelSlotTTL 渠道并发槽 TTL：流式 30min（无总超时的长流防僵尸清理），
+// channelSlotTTL 渠道并发槽 TTL：流式 30min（与上游流硬超时一致，防僵尸清理），
 // 非流式用默认值（传 0 → concurrency 层 5min）。
 func channelSlotTTL(stream bool) time.Duration {
 	if stream {
@@ -707,10 +708,16 @@ func (p *Pipeline) acquireClientSlots(c *gin.Context, keyInfo *auth.APIKeyInfo) 
 
 // execute 单次上游调用：构建请求 → 直发 → 按流式/非流式分派响应处理。
 func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.RelayInfo, req *dto.ChatRequest, start time.Time) attemptResult {
-	ctx := c.Request.Context()
-	cancel := context.CancelFunc(func() {})
+	clientCtx := c.Request.Context()
+	ctx := clientCtx
+	var cancel context.CancelFunc
+	var markStreamStarted func()
 	if !info.Stream {
 		ctx, cancel = context.WithTimeout(ctx, nonStreamTimeout)
+	} else {
+		// 流开始前仍跟随客户端取消；收到上游成功响应后脱离客户端连接，
+		// 即使下游中断也继续排空上游，以捕获最终 usage。硬上限防异常长流。
+		ctx, markStreamStarted, cancel = streamlife.DetachAfterStart(clientCtx, streamlife.MaxDuration)
 	}
 	defer cancel()
 
@@ -730,6 +737,10 @@ func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.Rel
 		statusCode:  resp.StatusCode,
 		headers:     resp.Header,
 		contentType: resp.Header.Get("Content-Type"),
+	}
+	if info.Stream && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		// http.Client.Do 已收到上游响应头，视为流已开始；此后客户端断开不再取消上游。
+		markStreamStarted()
 	}
 
 	// 上游非 2xx：读错误体（≤64KB）供判定/透传；错误体带 usage 仍计费。

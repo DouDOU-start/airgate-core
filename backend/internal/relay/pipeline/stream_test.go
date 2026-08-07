@@ -170,6 +170,30 @@ func TestRelaySSE(t *testing.T) {
 	}
 }
 
+// 客户端断开后，网关应停止写下游但继续排空上游，直到捕获最终 usage 与完成标志。
+func TestRelaySSE客户端写失败后继续捕获Usage(t *testing.T) {
+	body := strings.Join([]string{
+		`data: {"type":"response.output_text.delta","delta":"你好"}`,
+		``,
+		`data: {"type":"response.completed","response":{"usage":{"input_tokens":12,"output_tokens":3}}}`,
+		``,
+	}, "\n")
+	w := &alwaysFailResponseWriter{header: make(http.Header)}
+
+	result := relaySSE(w, newSSEResponse(strings.NewReader(body)), time.Now(),
+		dto.ExtractResponsesUsage, true, responsesFirstContentLine, sseMaxLineBytesResponses, nil)
+
+	if result.err != nil {
+		t.Fatalf("客户端写失败不应中断上游排空：%v", result.err)
+	}
+	if result.usage == nil || result.usage.PromptTokens != 12 || result.usage.CompletionTokens != 3 {
+		t.Fatalf("未捕获最终 usage：%+v", result.usage)
+	}
+	if w.writes != 1 {
+		t.Fatalf("下游失败后应停止继续写入，实际写入次数：%d", w.writes)
+	}
+}
+
 // TestRelaySSEFirstTokenOnlyOnDataLines first_token_ms 只在真实 data 载荷行触发：
 // 注释行 / event: 行 / [DONE] 不算首 token。
 func TestRelaySSEFirstTokenOnlyOnDataLines(t *testing.T) {
@@ -501,6 +525,23 @@ type errAfterReader struct {
 	data []byte
 	off  int
 }
+
+type alwaysFailResponseWriter struct {
+	header http.Header
+	status int
+	writes int
+}
+
+func (w *alwaysFailResponseWriter) Header() http.Header { return w.header }
+
+func (w *alwaysFailResponseWriter) WriteHeader(statusCode int) { w.status = statusCode }
+
+func (w *alwaysFailResponseWriter) Write([]byte) (int, error) {
+	w.writes++
+	return 0, errors.New("客户端已断开")
+}
+
+func (w *alwaysFailResponseWriter) Flush() {}
 
 func (r *errAfterReader) Read(p []byte) (int, error) {
 	if r.off >= len(r.data) {

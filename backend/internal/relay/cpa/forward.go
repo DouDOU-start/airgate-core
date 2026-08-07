@@ -18,6 +18,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
+	"github.com/DouDOU-start/airgate-core/internal/relay/streamlife"
 )
 
 // ForwardRequest 一次账号路径转发请求。
@@ -185,16 +186,19 @@ func (b *Bridge) doStream(
 ) ForwardResult {
 	opts.Stream = true
 	start := time.Now()
+	upstreamCtx, markStreamStarted, cancel := streamlife.DetachAfterStart(ctx, streamlife.MaxDuration)
+	defer cancel()
 
-	stream, err := ex.ExecuteStream(ctx, auth, execReq, opts)
+	stream, err := ex.ExecuteStream(upstreamCtx, auth, execReq, opts)
 	if err != nil {
 		if authHasRefreshCredential(auth) && isRefreshableAuthError(auth.Provider, err) {
-			refreshed, refreshErr := b.refreshAuth(ctx, ex, auth)
+			refreshed, refreshErr := b.refreshAuth(upstreamCtx, ex, auth)
 			if refreshErr == nil && refreshed != nil {
 				auth = refreshed
-				stream, err = ex.ExecuteStream(ctx, auth, execReq, opts)
+				stream, err = ex.ExecuteStream(upstreamCtx, auth, execReq, opts)
 				if err == nil {
-					result := b.relayStream(ctx, c, stream, start, endpoint)
+					markStreamStarted()
+					result := b.relayStream(upstreamCtx, c, stream, start, endpoint)
 					result.RefreshedCredentials = CredentialsFromAuth(auth)
 					return result
 				}
@@ -202,16 +206,19 @@ func (b *Bridge) doStream(
 		}
 		return errorToResult(err)
 	}
-	result := b.relayStream(ctx, c, stream, start, endpoint)
+	// ExecuteStream 成功表示已建立上游响应流；此后客户端断开不再取消上游，
+	// relayStream 会停止向客户端写入，但继续读取到完成事件以捕获 usage。
+	markStreamStarted()
+	result := b.relayStream(upstreamCtx, c, stream, start, endpoint)
 	// 部分 executor 在 goroutine 启动后才从首个 chunk 返回上游认证错误。
 	// 尚未向客户端写出内容时仍可安全刷新并重试一次。
 	if authHasRefreshCredential(auth) && isRefreshableAuthResult(auth.Provider, result) {
-		refreshed, refreshErr := b.refreshAuth(ctx, ex, auth)
+		refreshed, refreshErr := b.refreshAuth(upstreamCtx, ex, auth)
 		if refreshErr == nil && refreshed != nil {
 			auth = refreshed
-			stream, err = ex.ExecuteStream(ctx, auth, execReq, opts)
+			stream, err = ex.ExecuteStream(upstreamCtx, auth, execReq, opts)
 			if err == nil {
-				result = b.relayStream(ctx, c, stream, time.Now(), endpoint)
+				result = b.relayStream(upstreamCtx, c, stream, time.Now(), endpoint)
 				result.RefreshedCredentials = CredentialsFromAuth(auth)
 				return result
 			}
@@ -240,11 +247,12 @@ func (b *Bridge) relayStream(
 	w := c.Writer
 	flusher, _ := w.(http.Flusher)
 	var (
-		usage        *dto.Usage
-		firstTokenMs int64
-		written      bool
-		done         bool
-		streamErr    error
+		usage            *dto.Usage
+		firstTokenMs     int64
+		written          bool
+		downstreamClosed bool
+		done             bool
+		streamErr        error
 	)
 
 	extractUsage := dto.ExtractUsage
@@ -255,31 +263,39 @@ func (b *Bridge) relayStream(
 	if endpoint == adaptor.EndpointResponses {
 		responsesFramer = &responsesSSEFramer{}
 	}
+	isFirstContentPayload := looksLikeContent
+	if endpoint == adaptor.EndpointResponses {
+		isFirstContentPayload = responsesPayloadHasContentDelta
+	}
 
-	writePayload := func(payload []byte, ensureLineEnding bool) error {
+	writePayload := func(payload []byte, ensureLineEnding bool) {
 		// 旁路解析 usage / [DONE]。Responses 在分帧后解析，能够处理跨 chunk 的 JSON。
 		scanStreamPayload(payload, extractUsage, &usage, &done)
-		if firstTokenMs == 0 && looksLikeContent(payload) {
+		if firstTokenMs == 0 && isFirstContentPayload(payload) {
 			firstTokenMs = time.Since(start).Milliseconds()
+		}
+		if downstreamClosed {
+			return
 		}
 		if !written && !c.Writer.Written() {
 			writeStreamHeaders(w, stream.Headers)
 		}
 		if _, err := w.Write(payload); err != nil {
 			written = true
-			return err
+			downstreamClosed = true
+			return
 		}
 		if ensureLineEnding && !bytes.HasSuffix(payload, []byte("\n")) {
 			if _, err := w.Write([]byte("\n")); err != nil {
 				written = true
-				return err
+				downstreamClosed = true
+				return
 			}
 		}
 		written = true
 		if flusher != nil {
 			flusher.Flush()
 		}
-		return nil
 	}
 
 	for {
@@ -295,10 +311,7 @@ func (b *Bridge) relayStream(
 			if !ok {
 				if responsesFramer != nil {
 					for _, frame := range responsesFramer.Flush() {
-						if err := writePayload(frame, false); err != nil {
-							streamErr = err
-							goto finish
-						}
+						writePayload(frame, false)
 					}
 				}
 				goto finish
@@ -317,17 +330,11 @@ func (b *Bridge) relayStream(
 			}
 			if responsesFramer != nil {
 				for _, frame := range responsesFramer.WriteChunk(payload) {
-					if err := writePayload(frame, false); err != nil {
-						streamErr = err
-						goto finish
-					}
+					writePayload(frame, false)
 				}
 				continue
 			}
-			if err := writePayload(payload, true); err != nil {
-				streamErr = err
-				goto finish
-			}
+			writePayload(payload, true)
 		}
 	}
 
@@ -503,4 +510,26 @@ func looksLikeContent(payload []byte) bool {
 		strings.Contains(s, "delta") ||
 		strings.Contains(s, "text") ||
 		strings.Contains(s, "output")
+}
+
+// responsesPayloadHasContentDelta 判断 Responses SSE 帧是否包含真实内容增量。
+// response.created / response.in_progress 等生命周期事件可能含 output/content 字段，
+// 不能据此记录首字；仅 type 以 .delta 结尾的事件算首内容。
+func responsesPayloadHasContentDelta(payload []byte) bool {
+	scanner := bufio.NewScanner(bytes.NewReader(payload))
+	scanner.Buffer(make([]byte, 0, 64*1024), 32<<20)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := bytes.TrimSpace([]byte(strings.TrimPrefix(line, "data:")))
+		var event struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(data, &event) == nil && strings.HasSuffix(event.Type, ".delta") {
+			return true
+		}
+	}
+	return false
 }

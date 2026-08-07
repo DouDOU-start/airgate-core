@@ -66,6 +66,7 @@ type streamResult struct {
 //     不把截断响应伪装成完整。
 func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, extractUsage func([]byte) (dto.Usage, bool), forwardUsageChunk bool, isFirstContentLine func([]byte) bool, maxLineBytes int, observer adaptor.StreamObserver) streamResult {
 	result := streamResult{}
+	downstreamClosed := false
 
 	contentType := upstream.Header.Get("Content-Type")
 	if contentType == "" {
@@ -82,22 +83,25 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 
 	flusher, _ := w.(http.Flusher)
 
-	// writeLine 写出一行（补行尾换行）并 Flush；返回 false 表示客户端写失败。
+	// writeLine 写出一行（补行尾换行）并 Flush。
+	// 客户端写失败后只停止下发，不停止读取上游：继续排空到完成事件以捕获 usage。
 	// 行与换行分两次写（net/http 侧有写缓冲，Flush 前不落 socket）：
 	// 避免 line+"\n" 每行拼接一个新字符串——万级并发流下这是主要 GC 压力源之一。
-	writeLine := func(line string) bool {
+	writeLine := func(line string) {
+		if downstreamClosed {
+			return
+		}
 		if _, err := io.WriteString(w, line); err != nil {
-			result.err = err
-			return false
+			downstreamClosed = true
+			return
 		}
 		if _, err := io.WriteString(w, "\n"); err != nil {
-			result.err = err
-			return false
+			downstreamClosed = true
+			return
 		}
 		if flusher != nil {
 			flusher.Flush()
 		}
-		return true
 	}
 
 	scanner := bufio.NewScanner(upstream.Body)
@@ -113,9 +117,7 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 					result.firstTokenMs = time.Since(start).Milliseconds()
 				}
 			}
-			if !writeLine(line) {
-				break
-			}
+			writeLine(line)
 			continue
 		}
 
@@ -136,9 +138,7 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 				}
 			}
 		}
-		if !writeLine(line) {
-			break
-		}
+		writeLine(line)
 	}
 
 	if scanErr := scanner.Err(); scanErr != nil && result.err == nil {

@@ -198,6 +198,45 @@ func TestRelayStreamFramesSplitResponsesEvents(t *testing.T) {
 	}
 }
 
+func TestRelayStream客户端写失败后继续捕获ResponsesUsage(t *testing.T) {
+	c, recorder := newStreamTestContext()
+	failing := &alwaysFailGinWriter{ResponseWriter: c.Writer}
+	c.Writer = failing
+
+	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"response.output_text.delta","delta":"你好"}`)}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"response.completed","response":{"usage":{"input_tokens":12,"output_tokens":3}}}`)}
+	close(chunks)
+
+	result := (&Bridge{}).relayStream(context.Background(), c,
+		&cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), adaptor.EndpointResponses)
+
+	if result.StreamErr != nil {
+		t.Fatalf("客户端写失败不应中断上游排空：%v", result.StreamErr)
+	}
+	if result.Usage == nil || result.Usage.PromptTokens != 12 || result.Usage.CompletionTokens != 3 {
+		t.Fatalf("未捕获最终 usage：%+v", result.Usage)
+	}
+	if !result.Done {
+		t.Fatal("应识别 response.completed 完成事件")
+	}
+	if failing.writes != 1 {
+		t.Fatalf("下游失败后应停止继续写入，实际写入次数：%d", failing.writes)
+	}
+	if recorder.Body.Len() != 0 {
+		t.Fatalf("模拟断开的客户端不应收到响应体：%q", recorder.Body.String())
+	}
+}
+
+func TestResponses首字只认内容增量(t *testing.T) {
+	if responsesPayloadHasContentDelta([]byte(`data: {"type":"response.created","response":{"output":[]}}`)) {
+		t.Fatal("response.created 不应记录首字")
+	}
+	if !responsesPayloadHasContentDelta([]byte(`data: {"type":"response.output_text.delta","delta":"你好"}`)) {
+		t.Fatal("response.output_text.delta 应记录首字")
+	}
+}
+
 func TestRelayStreamFramesDataOnlyResponsesChunks(t *testing.T) {
 	c, recorder := newStreamTestContext()
 	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
@@ -256,6 +295,16 @@ func newStreamTestContext() (*gin.Context, *httptest.ResponseRecorder) {
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
 	return c, recorder
+}
+
+type alwaysFailGinWriter struct {
+	gin.ResponseWriter
+	writes int
+}
+
+func (w *alwaysFailGinWriter) Write([]byte) (int, error) {
+	w.writes++
+	return 0, errors.New("客户端已断开")
 }
 
 type refreshingTestExecutor struct {
