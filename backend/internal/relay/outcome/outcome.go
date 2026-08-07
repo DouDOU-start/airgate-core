@@ -18,7 +18,7 @@ const (
 	// Success 2xx：计费 + MarkRecovered（disabled_auto 渠道恢复）。
 	Success Verdict = iota
 	// RateLimited 429：本次请求硬排除换渠道重试；
-	// 不设冷却状态，下次请求该渠道照常参与调度。
+	// 调用方按 RetryAfter 对账号或渠道设置跨请求运行时冷却。
 	RateLimited
 	// AuthFailed 401/403：调用方按 401 凭证级、403 协议端点级自动禁用；恒硬排除重试。
 	AuthFailed
@@ -28,10 +28,10 @@ const (
 	ClientError
 )
 
-// Retry-After 解析边界（Retry-After 头优先，缺省 60s，钳制 [1s, 30min]）。
-// 仅用于全渠道耗尽时 429 响应的 Retry-After 头，不再驱动任何渠道冷却状态。
+// Retry-After 解析边界（Retry-After 头优先，缺省 5s，钳制 [1s, 30min]）。
+// 同时用于上游池耗尽响应的 Retry-After 头和账号/渠道运行时冷却。
 const (
-	retryAfterDefault = 60 * time.Second
+	retryAfterDefault = 5 * time.Second
 	retryAfterMin     = 1 * time.Second
 	retryAfterMax     = 30 * time.Minute
 )
@@ -50,7 +50,7 @@ type Outcome struct {
 //
 //	网络错误            → Transient（软排除）
 //	2xx                 → Success
-//	429                 → RateLimited（Retry-After 优先，缺省 60s，钳 [1s,30min]）
+//	429                 → RateLimited（Retry-After 优先，缺省 5s，钳 [1s,30min]）
 //	401/403             → AuthFailed（仅状态码触发，不做错误体关键词匹配）
 //	5xx                 → Transient
 //	其余 4xx/3xx        → ClientError（语义重建终止）
@@ -82,7 +82,7 @@ func Classify(statusCode int, headers http.Header, errBody []byte, netErr error)
 	return Outcome{Verdict: ClientError, Reason: "HTTP " + strconv.Itoa(statusCode) + ": " + snippet}
 }
 
-// parseRetryAfter 解析 Retry-After 头：整数秒优先，HTTP 日期回退；缺失/非法返回默认 60s。
+// parseRetryAfter 解析 Retry-After 头：整数秒优先，HTTP 日期回退；缺失/非法返回默认 5s。
 func parseRetryAfter(headers http.Header) time.Duration {
 	value := strings.TrimSpace(headers.Get("Retry-After"))
 	if value == "" {

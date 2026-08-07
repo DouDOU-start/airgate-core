@@ -492,10 +492,14 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			return
 
 		case outcome.RateLimited:
-			// 仅本次请求内硬排除换 key 重试；不设冷却状态，下次请求照常调度。
+			// 本次请求内硬排除，并按 Retry-After 对物理凭证做跨请求短冷却，
+			// 避免下游重试时立即再次命中同一把已限流的 API Key。
 			p.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
 			if p.healthTracker != nil {
 				p.healthTracker.RecordFailure(ch.KeyID)
+			}
+			if p.registry != nil {
+				p.registry.MarkRateLimited(ch.KeyID, time.Now().Add(o.RetryAfter))
 			}
 			hardExcludeKeys = append(hardExcludeKeys, ch.KeyID)
 			summary.rateLimited = true
@@ -953,8 +957,9 @@ func writeUpstreamError(c *gin.Context, status int, up errfmt.UpstreamError) {
 	c.JSON(status, errfmt.RenderUpstream(entryProtocolOf(c), status, up, requestIDOf(c)))
 }
 
-// writeAllFailed 全部渠道耗尽后的响应选择
-// （优先级：429 > 容量满 > 上游认证失败 > 上游故障 > 无渠道）。
+// writeAllFailed 全部渠道耗尽后的响应选择。
+// 上游 429 属资源池暂时不可用，对下游统一渲染为 503；本地用户/API Key
+// 并发限制仍在预检阶段返回 429，避免客户端把上游限流误判为自身额度耗尽。
 // 返回写下的 (状态码, error_type, error_code, message) 供失败留痕复用同一事实源。
 func writeAllFailed(c *gin.Context, summary failureSummary) (int, string, string, string) {
 	switch {
@@ -963,9 +968,9 @@ func writeAllFailed(c *gin.Context, summary failureSummary) (int, string, string
 		if retryAfter <= 0 {
 			retryAfter = time.Second
 		}
-		msg := "所有可用渠道均被限流，请稍后重试"
-		writeRateLimitError(c, "upstream_rate_limited", msg, retryAfter)
-		return http.StatusTooManyRequests, "rate_limit_error", "upstream_rate_limited", msg
+		msg := "上游资源池暂时不可用，请稍后重试"
+		writeTemporaryUnavailableError(c, "upstream_pool_exhausted", msg, retryAfter)
+		return http.StatusServiceUnavailable, "server_error", "upstream_pool_exhausted", msg
 	case summary.localCapacity:
 		msg := "渠道容量已满，请稍后重试"
 		writeError(c, http.StatusServiceUnavailable, "server_error", "all_channels_busy", msg)

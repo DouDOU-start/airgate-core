@@ -42,10 +42,21 @@ func writeError(c *gin.Context, status int, errType, code, message string) {
 
 // writeRateLimitError 写出 429 错误体并携带 Retry-After 头（秒向上取整，最小 1）。
 func writeRateLimitError(c *gin.Context, code, message string, retryAfter time.Duration) {
+	writeRetryAfter(c, retryAfter)
+	writeError(c, 429, "rate_limit_error", code, message)
+}
+
+// writeTemporaryUnavailableError 写出带 Retry-After 的 503。
+// 用于上游资源池耗尽，避免下游将上游限流误判为自己的 API Key 限流。
+func writeTemporaryUnavailableError(c *gin.Context, code, message string, retryAfter time.Duration) {
+	writeRetryAfter(c, retryAfter)
+	writeError(c, 503, "server_error", code, message)
+}
+
+func writeRetryAfter(c *gin.Context, retryAfter time.Duration) {
 	seconds := int(math.Ceil(retryAfter.Seconds()))
 	if seconds < 1 {
 		seconds = 1
 	}
 	c.Header("Retry-After", strconv.Itoa(seconds))
-	writeError(c, 429, "rate_limit_error", code, message)
 }

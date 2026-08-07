@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -9,8 +11,34 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
+	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 )
+
+// TestLocalRateLimitStillReturns429 验证本地用户/API Key 限制仍使用 429，
+// 只有聚合上游池耗尽会转换为 503。
+func TestLocalRateLimitStillReturns429(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	setEntryProtocol(c, registry.ProtocolOpenAI)
+
+	writeRateLimitError(c, "apikey_concurrency_limit", "API Key 并发数已达上限", 1500*time.Millisecond)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429", w.Code)
+	}
+	if got := w.Header().Get("Retry-After"); got != "2" {
+		t.Fatalf("Retry-After = %q, want 2", got)
+	}
+	var resp errfmt.OpenAIError
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("错误体非 JSON: %v", err)
+	}
+	if resp.Error.Type != "rate_limit_error" || resp.Error.Code != "apikey_concurrency_limit" {
+		t.Fatalf("错误体 = %+v", resp.Error)
+	}
+}
 
 // TestResolveAlphaSearchPrice 联网搜索按次单价：分组覆盖价优先，nil 回落全局，负值钳 0。
 func TestResolveAlphaSearchPrice(t *testing.T) {

@@ -466,7 +466,7 @@ func TestForwardStream(t *testing.T) {
 }
 
 // TestFailover429 坏渠道 429 → 本次请求硬排除 → 自动切换到好渠道成功；
-// 无冷却状态：不落库任何状态变更，下次请求坏渠道仍照常参与调度。
+// 运行时冷却不落库，下次请求跳过坏渠道。
 func TestFailover429(t *testing.T) {
 	var goodHits, badHits atomic.Int32
 	var lastBody atomic.Value
@@ -487,7 +487,7 @@ func TestFailover429(t *testing.T) {
 	if badHits.Load() != 1 || goodHits.Load() != 1 {
 		t.Errorf("hits bad=%d good=%d, want 1/1", badHits.Load(), goodHits.Load())
 	}
-	// 429 不产生任何状态落库（无冷却机制）。
+	// 429 冷却仅保存在运行时，不产生状态落库。
 	if got := env.persister.callCount(); got != 0 {
 		t.Errorf("429 不应有状态落库, got %d 次", got)
 	}
@@ -495,18 +495,19 @@ func TestFailover429(t *testing.T) {
 		t.Errorf("UsageRecord 条数 = %d, want 1（仅成功渠道计费）", env.sink.count())
 	}
 
-	// 429 仅本次请求内排除：下次请求高优先级坏渠道仍被选中，再次 failover 成功。
+	// 429 跨请求冷却：下次请求直接使用健康渠道，不再次撞击坏渠道。
 	w2 := env.do(t, `{"model":"gpt-4o","messages":[]}`)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("第二次请求 status = %d", w2.Code)
 	}
-	if badHits.Load() != 2 || goodHits.Load() != 2 {
-		t.Errorf("第二次 hits bad=%d good=%d, want 2/2（429 渠道下次请求应照常调度）",
+	if badHits.Load() != 1 || goodHits.Load() != 2 {
+		t.Errorf("第二次 hits bad=%d good=%d, want 1/2（429 渠道冷却期内不应再次调度）",
 			badHits.Load(), goodHits.Load())
 	}
 }
 
-// TestAllChannels429 两渠道全 429 → 返回 429 OpenAI 错误体 + Retry-After。
+// TestAllChannels429 两渠道全 429 → 对下游返回 503 + Retry-After，
+// 避免客户端误判为自身 API Key 限流；后续请求也不会再次撞击冷却渠道。
 func TestAllChannels429(t *testing.T) {
 	var hits1, hits2 atomic.Int32
 	bad1 := newFailingUpstream(http.StatusTooManyRequests, "5", &hits1)
@@ -517,8 +518,8 @@ func TestAllChannels429(t *testing.T) {
 	env := newTestEnv(t, testSnap(1, bad1.URL), testSnap(2, bad2.URL))
 	w := env.do(t, `{"model":"gpt-4o","messages":[]}`)
 
-	if w.Code != http.StatusTooManyRequests {
-		t.Fatalf("status = %d, want 429; body = %s", w.Code, w.Body.String())
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503; body = %s", w.Code, w.Body.String())
 	}
 	if hits1.Load() != 1 || hits2.Load() != 1 {
 		t.Errorf("hits = (%d,%d), want 各 1 次", hits1.Load(), hits2.Load())
@@ -527,14 +528,55 @@ func TestAllChannels429(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("错误体非 JSON: %v", err)
 	}
-	if resp.Error.Type != "rate_limit_error" || resp.Error.Code != "upstream_rate_limited" {
+	if resp.Error.Type != "server_error" || resp.Error.Code != "upstream_pool_exhausted" {
 		t.Errorf("错误体 = %+v", resp.Error)
 	}
-	if w.Header().Get("Retry-After") == "" {
-		t.Error("缺少 Retry-After 头")
+	if got := w.Header().Get("Retry-After"); got != "5" {
+		t.Errorf("Retry-After = %q, want 5", got)
 	}
 	if env.sink.count() != 0 {
 		t.Errorf("全败请求不应计费, got %d 条", env.sink.count())
+	}
+
+	w2 := env.do(t, `{"model":"gpt-4o","messages":[]}`)
+	if w2.Code != http.StatusServiceUnavailable {
+		t.Fatalf("冷却期内第二次 status = %d, want 503; body = %s", w2.Code, w2.Body.String())
+	}
+	if hits1.Load() != 1 || hits2.Load() != 1 {
+		t.Errorf("冷却期内仍请求上游: hits = (%d,%d), want (1,1)", hits1.Load(), hits2.Load())
+	}
+}
+
+// TestMixed429AndTransientExhausted 只要资源池最终耗尽，混合 429/5xx 也统一返回 503，
+// 不能因为其中一次 429 就把下游归类成自身限流。
+func TestMixed429AndTransientExhausted(t *testing.T) {
+	var rateLimitHits, transientHits atomic.Int32
+	rateLimited := newFailingUpstream(http.StatusTooManyRequests, "7", &rateLimitHits)
+	defer rateLimited.Close()
+	transient := newFailingUpstream(http.StatusBadGateway, "", &transientHits)
+	defer transient.Close()
+
+	env := newTestEnv(t,
+		testSnap(1, rateLimited.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 100 }),
+		testSnap(2, transient.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 1 }),
+	)
+	w := env.do(t, `{"model":"gpt-4o","messages":[]}`)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503; body = %s", w.Code, w.Body.String())
+	}
+	var resp errfmt.OpenAIError
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("错误体非 JSON: %v", err)
+	}
+	if resp.Error.Type != "server_error" || resp.Error.Code != "upstream_pool_exhausted" {
+		t.Errorf("错误体 = %+v", resp.Error)
+	}
+	if got := w.Header().Get("Retry-After"); got != "7" {
+		t.Errorf("Retry-After = %q, want 7", got)
+	}
+	if rateLimitHits.Load() != 1 || transientHits.Load() != 2 {
+		t.Errorf("hits rate_limit=%d transient=%d, want 1/2", rateLimitHits.Load(), transientHits.Load())
 	}
 }
 
@@ -1751,7 +1793,7 @@ func TestForwardMessagesFailover(t *testing.T) {
 	if oaiHits.Load() != 0 {
 		t.Errorf("openai 渠道被 anthropic 协议入口调度: hits=%d", oaiHits.Load())
 	}
-	// 429 不产生任何状态落库（无冷却机制）。
+	// 429 冷却仅保存在运行时，不产生状态落库。
 	if got := env.persister.callCount(); got != 0 {
 		t.Errorf("429 不应有状态落库, got %d 次", got)
 	}

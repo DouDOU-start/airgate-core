@@ -29,11 +29,11 @@ func TestClassifyOutcome(t *testing.T) {
 			wantVerdict: Success,
 		},
 		{
-			name:           "429 无 Retry-After 用默认 60s",
+			name:           "429 无 Retry-After 用默认 5s",
 			status:         429,
 			body:           `{"error":{"message":"rate limited"}}`,
 			wantVerdict:    RateLimited,
-			wantRetryAfter: 60 * time.Second,
+			wantRetryAfter: 5 * time.Second,
 		},
 		{
 			name:           "429 带 Retry-After 秒数",

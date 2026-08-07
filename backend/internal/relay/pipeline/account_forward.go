@@ -327,7 +327,7 @@ func (p *Pipeline) handleAccountOutcome(
 		p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
 		retryUntil := time.Now().Add(o.RetryAfter)
 		if o.RetryAfter <= 0 {
-			retryUntil = time.Now().Add(60 * time.Second)
+			retryUntil = time.Now().Add(5 * time.Second)
 		}
 		if p.accounts != nil {
 			p.accounts.MarkRateLimited(acc.ID, retryUntil, o.Reason)

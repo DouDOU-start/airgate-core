@@ -131,6 +131,50 @@ func TestMarkCredentialAutoDisabledStopsAllProtocols(t *testing.T) {
 	}
 }
 
+// TestMarkRateLimitedCoolsPhysicalCredential 验证 429 冷却按物理凭证共享且不落库，
+// 到期后自动恢复调度。
+func TestMarkRateLimitedCoolsPhysicalCredential(t *testing.T) {
+	persister := newFakePersister()
+	r := newTestRegistry(t, persister,
+		snap(1, func(s *ChannelKeySnapshot) {
+			s.CredentialID = 99
+			s.CredentialStatus = StatusEnabled
+		}),
+		snap(2, func(s *ChannelKeySnapshot) {
+			s.CredentialID = 99
+			s.CredentialStatus = StatusEnabled
+			s.Type = "anthropic"
+		}),
+		snap(3, func(s *ChannelKeySnapshot) {
+			s.CredentialID = 100
+			s.CredentialStatus = StatusEnabled
+		}),
+	)
+
+	r.MarkRateLimited(1, time.Now().Add(50*time.Millisecond))
+
+	selected, err := r.Pick(0, "gpt-4o", ProtocolOpenAI, nil)
+	if err != nil || selected.KeyID != 3 {
+		t.Fatalf("OpenAI 冷却后选择 = %+v, err=%v，期望端点 3", selected, err)
+	}
+	if _, err := r.Pick(0, "gpt-4o", ProtocolAnthropic, nil); !errors.Is(err, ErrNoAvailableChannel) {
+		t.Fatalf("同凭证 Anthropic 端点仍可调度: %v", err)
+	}
+
+	persister.mu.Lock()
+	persistCount := len(persister.calls)
+	persister.mu.Unlock()
+	if persistCount != 0 {
+		t.Fatalf("运行时 429 冷却不应落库，实际 %d 次", persistCount)
+	}
+
+	time.Sleep(75 * time.Millisecond)
+	selected, err = r.Pick(0, "gpt-4o", ProtocolAnthropic, nil)
+	if err != nil || selected.KeyID != 2 {
+		t.Fatalf("冷却到期后选择 = %+v, err=%v，期望端点 2", selected, err)
+	}
+}
+
 func TestChannelKeySnapshotEffectiveCostRatio(t *testing.T) {
 	tests := []struct {
 		name string

@@ -154,6 +154,11 @@ type Registry struct {
 	mu   sync.RWMutex
 	keys map[int]*ChannelKeySnapshot
 
+	// rateLimitedUntil 是物理凭证级的运行时 429 冷却，不落库。
+	// 同一 API Key 的多协议端点共享冷却，避免下游重试时立即再次命中已限流凭证。
+	rateLimitMu      sync.Mutex
+	rateLimitedUntil map[int]time.Time
+
 	// loadedOnce 是否成功加载过：false 时 Pick 触发惰性兜底重载。
 	loadedOnce atomic.Bool
 	// lazyMu 惰性重载互斥：TryLock 单飞，其余请求直接用当前快照。
@@ -171,11 +176,12 @@ type Registry struct {
 // New 创建密钥端点注册表。loader 必填；persister 可为 nil（不落库，仅内存生效）。
 func New(loader Loader, persister Persister) *Registry {
 	return &Registry{
-		loader:         loader,
-		persister:      persister,
-		keys:           map[int]*ChannelKeySnapshot{},
-		randFn:         rand.IntN,
-		persistTimeout: 5 * time.Second,
+		loader:           loader,
+		persister:        persister,
+		keys:             map[int]*ChannelKeySnapshot{},
+		rateLimitedUntil: map[int]time.Time{},
+		randFn:           rand.IntN,
+		persistTimeout:   5 * time.Second,
 	}
 }
 
@@ -233,6 +239,7 @@ func (r *Registry) ListCandidates(groupID int, model, protocol string, exclude [
 		excluded[id] = struct{}{}
 	}
 	allowedTypes := keyTypesForProtocol(protocol)
+	now := time.Now()
 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -246,6 +253,9 @@ func (r *Registry) ListCandidates(groupID int, model, protocol string, exclude [
 			continue
 		}
 		if k.Status != StatusEnabled || !credentialEnabled(k) {
+			continue
+		}
+		if r.isRateLimited(k, now) {
 			continue
 		}
 		if _, ok := k.Models[model]; !ok {
@@ -275,6 +285,7 @@ func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*Ch
 		excluded[id] = struct{}{}
 	}
 	allowedTypes := keyTypesForProtocol(protocol)
+	now := time.Now()
 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -290,6 +301,9 @@ func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*Ch
 			continue
 		}
 		if k.Status != StatusEnabled || !credentialEnabled(k) {
+			continue
+		}
+		if r.isRateLimited(k, now) {
 			continue
 		}
 		if _, ok := k.Models[model]; !ok {
@@ -466,6 +480,33 @@ func (r *Registry) MarkRecovered(keyID int) {
 		r.mutateCredentialStatus(credentialID, StatusEnabled)
 		r.persistCredentialAsync(credentialID, StatusEnabled, "")
 	}
+}
+
+// MarkRateLimited 将当前端点对应的物理凭证加入运行时冷却。
+// 冷却只影响后续调度，不修改 enabled 状态，也不产生持久化写入。
+func (r *Registry) MarkRateLimited(keyID int, until time.Time) {
+	snap, ok := r.Snapshot(keyID)
+	if !ok || !until.After(time.Now()) {
+		return
+	}
+	credentialID := effectiveCredentialID(snap)
+	r.rateLimitMu.Lock()
+	if current := r.rateLimitedUntil[credentialID]; until.After(current) {
+		r.rateLimitedUntil[credentialID] = until
+	}
+	r.rateLimitMu.Unlock()
+}
+
+func (r *Registry) isRateLimited(key *ChannelKeySnapshot, now time.Time) bool {
+	credentialID := effectiveCredentialID(key)
+	r.rateLimitMu.Lock()
+	until, ok := r.rateLimitedUntil[credentialID]
+	if ok && !until.After(now) {
+		delete(r.rateLimitedUntil, credentialID)
+		ok = false
+	}
+	r.rateLimitMu.Unlock()
+	return ok
 }
 
 // UpdateHealth 更新 key 的健康状态（内存即时生效，不落库——由探针引擎负责落库）。
