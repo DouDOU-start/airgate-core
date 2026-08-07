@@ -9,7 +9,7 @@
 #        cp .env.example .env && vim .env
 #        # 必填：DB_PASSWORD / REDIS_PASSWORD / JWT_SECRET
 #   2. 启动前先建好 ./data 子目录（避免 docker 以 root 创建后续读写不便）：
-#        mkdir -p data/postgres data/redis data/uploads data/wechat-verification
+#        mkdir -p data/postgres data/redis data/uploads data/wechat-verification data/plugins
 #   3. 启动：
 #        docker compose up -d
 #   4. 查看日志：
@@ -114,12 +114,16 @@ services:
       GIN_MODE: release
       LOG_LEVEL: info
       LOG_FORMAT: text
+      # 插件安装包、运行配置和启用状态都保存在此目录，必须挂载到宿主机
+      PLUGINS_DIR: /app/data/plugins
       TZ: ${TZ:-Asia/Shanghai}
     volumes:
       # 上传文件持久化
       - ./data/uploads:/app/data/uploads
       # 微信公众号域名校验文件持久化
       - ./data/wechat-verification:/app/data/wechat-verification
+      # 插件安装包、配置和启用状态持久化
+      - ./data/plugins:/app/data/plugins
     ports:
       - "${BIND_HOST:-0.0.0.0}:${PORT:-9517}:9517"
     healthcheck:

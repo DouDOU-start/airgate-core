@@ -43,7 +43,7 @@ WORKDIR /app
 COPY --from=backend /server ./server
 COPY deploy/config.docker.yaml ./config.yaml
 
-RUN mkdir -p data/uploads data/wechat-verification
+RUN mkdir -p data/uploads data/wechat-verification data/plugins
 
 EXPOSE 9517
 

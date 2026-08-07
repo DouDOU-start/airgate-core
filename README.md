@@ -67,7 +67,7 @@ curl -sSL https://raw.githubusercontent.com/DouDOU-start/airgate-core/standalone
 docker compose up -d
 ```
 
-脚本会生成随机密钥写入 `.env`（权限 600），并准备好数据目录。启动后访问 `http://<host>:9517` 注册账号——第一个注册的账号会自动成为系统管理员。
+脚本会生成随机密钥写入 `.env`（权限 600），并准备好数据目录。数据库、Redis、上传文件、微信校验文件和已安装插件都会持久化到部署目录下的 `data/`；升级镜像或重建容器不会丢失。启动后访问 `http://<host>:9517` 注册账号——第一个注册的账号会自动成为系统管理员。
 
 ### 裸金属（systemd）
 

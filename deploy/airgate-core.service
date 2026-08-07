@@ -8,7 +8,7 @@ Wants=postgresql.service redis.service
 Type=simple
 User=airgate
 Group=airgate
-# 工作目录指向数据目录：代码里的 data/uploads、data/wechat-verification 会落到这里，
+# 工作目录指向数据目录：代码里的 data/uploads、data/wechat-verification、data/plugins 会落到这里，
 # 卸载删除 /opt/airgate-core 时不会连带删掉用户数据。
 WorkingDirectory=/var/lib/airgate-core
 ExecStart=/opt/airgate-core/airgate-core --config /etc/airgate-core/config.yaml
