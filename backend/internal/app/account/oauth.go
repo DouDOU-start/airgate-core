@@ -440,6 +440,8 @@ func exchangeClaudeCode(ctx context.Context, code, state, verifier, redirectURI,
 		"access_token":      tok.AccessToken,
 		"refresh_token":     tok.RefreshToken,
 		"credential_origin": "oauth",
+		"token_endpoint":    claudeOAuthTokenURL,
+		"client_id":         claudeOAuthClientID,
 	}
 	if tok.Account != nil {
 		if tok.Account.EmailAddress != "" {
@@ -450,6 +452,7 @@ func exchangeClaudeCode(ctx context.Context, code, state, verifier, redirectURI,
 		}
 	}
 	if tok.ExpiresIn > 0 {
+		creds["expires_in"] = fmt.Sprintf("%d", tok.ExpiresIn)
 		creds["expired"] = time.Now().Add(time.Duration(tok.ExpiresIn) * time.Second).UTC().Format(time.RFC3339)
 	}
 	return creds, nil
@@ -516,6 +519,7 @@ func exchangeCodexCode(ctx context.Context, code, verifier, redirectURI, proxyUR
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
 		IDToken      string `json:"id_token"`
+		ExpiresIn    int64  `json:"expires_in"`
 	}
 	if err := json.Unmarshal(data, &tok); err != nil {
 		return nil, err
@@ -528,6 +532,10 @@ func exchangeCodexCode(ctx context.Context, code, verifier, redirectURI, proxyUR
 		"refresh_token":     tok.RefreshToken,
 		"id_token":          tok.IDToken,
 		"credential_origin": "oauth",
+	}
+	if tok.ExpiresIn > 0 {
+		creds["expires_in"] = fmt.Sprintf("%d", tok.ExpiresIn)
+		creds["expired"] = time.Now().Add(time.Duration(tok.ExpiresIn) * time.Second).UTC().Format(time.RFC3339)
 	}
 	applyCodexIDTokenClaims(creds, tok.IDToken)
 	return creds, nil
@@ -867,12 +875,21 @@ func pollKimiToken(ctx context.Context, deviceCode, deviceID, proxyURL string) (
 	if access == "" {
 		return nil, false, fmt.Errorf("kimi 响应缺少 access_token")
 	}
-	return map[string]string{
+	creds := map[string]string{
 		"access_token":      access,
 		"refresh_token":     refresh,
 		"device_id":         deviceID,
 		"credential_origin": "oauth",
-	}, false, nil
+		"type":              "kimi",
+	}
+	if tokenType, _ := body["token_type"].(string); strings.TrimSpace(tokenType) != "" {
+		creds["token_type"] = strings.TrimSpace(tokenType)
+	}
+	if expiresIn := anyToInt(body["expires_in"]); expiresIn > 0 {
+		creds["expires_in"] = fmt.Sprintf("%d", expiresIn)
+		creds["expired"] = time.Now().Add(time.Duration(expiresIn) * time.Second).UTC().Format(time.RFC3339)
+	}
+	return creds, false, nil
 }
 
 func pollXAIToken(ctx context.Context, deviceCode, tokenEndpoint, proxyURL string) (map[string]string, bool, error) {

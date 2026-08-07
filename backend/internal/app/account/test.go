@@ -467,16 +467,14 @@ func (s *Service) testCodex(ctx context.Context, item Account, modelID, prompt s
 		return model, testStreamUsage{}, emitErr(emit, credentialMissingMsg(item.Credentials))
 	}
 
-	var apiURL, auth string
+	var apiURL string
 	isOAuth := false
 	if token != "" {
 		apiURL = chatgptCodexAPIURL
-		auth = token
 		isOAuth = true
 	} else {
 		base := strings.TrimRight(firstNonEmpty(item.Credentials["base_url"], "https://api.openai.com"), "/")
 		apiURL = base + "/responses"
-		auth = apiKey
 	}
 
 	payload := map[string]any{
@@ -503,25 +501,48 @@ func (s *Service) testCodex(ctx context.Context, item Account, modelID, prompt s
 	}
 
 	emit(TestEvent{Type: "test_start", Model: model})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(raw))
-	if err != nil {
-		return model, testStreamUsage{}, emitErr(emit, "创建请求失败: "+err.Error())
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+auth)
-	req.Header.Set("Accept", "text/event-stream")
-	if isOAuth {
-		req.Host = "chatgpt.com"
-		if aid := strings.TrimSpace(item.Credentials["chatgpt_account_id"]); aid != "" {
-			req.Header.Set("ChatGPT-Account-Id", aid)
+	execute := func() (*http.Response, error) {
+		auth := strings.TrimSpace(item.Credentials["api_key"])
+		if isOAuth {
+			auth = strings.TrimSpace(item.Credentials["access_token"])
 		}
-		req.Header.Set("originator", codexOriginator)
-		req.Header.Set("User-Agent", codexOriginator)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(raw))
+		if err != nil {
+			return nil, fmt.Errorf("创建请求失败: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+auth)
+		req.Header.Set("Accept", "text/event-stream")
+		if isOAuth {
+			req.Host = "chatgpt.com"
+			if aid := strings.TrimSpace(item.Credentials["chatgpt_account_id"]); aid != "" {
+				req.Header.Set("ChatGPT-Account-Id", aid)
+			}
+			req.Header.Set("originator", codexOriginator)
+			req.Header.Set("User-Agent", codexOriginator)
+		}
+		return httpClient(proxyURL).Do(req)
 	}
 
-	resp, err := httpClient(proxyURL).Do(req)
+	resp, err := execute()
 	if err != nil {
 		return model, testStreamUsage{}, emitErr(emit, "请求失败: "+err.Error())
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, testMaxBody))
+		_ = resp.Body.Close()
+		if isOAuth && cpa.IsRefreshableAuthFailure(item.Platform, resp.StatusCode, string(body)) &&
+			(strings.TrimSpace(item.Credentials["refresh_token"]) != "" || strings.TrimSpace(item.Credentials["session_token"]) != "") {
+			if refreshErr := s.refreshOAuthCredentials(ctx, &item, proxyURL); refreshErr != nil {
+				return model, testStreamUsage{}, emitErr(emit, formatUpstreamHTTPError(resp.StatusCode, body)+"\naccess_token 刷新失败: "+refreshErr.Error())
+			}
+			resp, err = execute()
+			if err != nil {
+				return model, testStreamUsage{}, emitErr(emit, "刷新凭证后重试失败: "+err.Error())
+			}
+		} else {
+			return model, testStreamUsage{}, emitErr(emit, formatUpstreamHTTPError(resp.StatusCode, body))
+		}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -559,8 +580,9 @@ func (s *Service) testClaude(ctx context.Context, item Account, modelID, prompt,
 		return "", testStreamUsage{}, emitErr(emit, "无可测模型")
 	}
 	normalizeCredentialKeys(item.Credentials)
-	// Claude OAuth 若 access 过期但有 RT，可尝试 refresh（与 Codex 同路径时用 Import 语义不同，
-	// 当前 Claude 凭证通常直接存 access_token；仅缺 access 时报更明确错误）。
+	if err := s.ensureOAuthCredentialsFresh(ctx, &item, proxyURL); err != nil {
+		return model, testStreamUsage{}, emitErr(emit, "access_token 刷新失败: "+err.Error())
+	}
 	token := strings.TrimSpace(item.Credentials["access_token"])
 	apiKey := strings.TrimSpace(item.Credentials["api_key"])
 	useBearer := token != ""
@@ -586,23 +608,42 @@ func (s *Service) testClaude(ctx context.Context, item Account, modelID, prompt,
 	raw, _ := json.Marshal(payload)
 
 	emit(TestEvent{Type: "test_start", Model: model})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(raw))
-	if err != nil {
-		return model, testStreamUsage{}, emitErr(emit, "创建请求失败: "+err.Error())
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("anthropic-version", "2023-06-01")
-	req.Header.Set("Accept", "text/event-stream")
-	if useBearer {
-		req.Header.Set("Authorization", "Bearer "+token)
-		req.Header.Set("anthropic-beta", claudeBetaOAuth)
-	} else {
-		req.Header.Set("x-api-key", apiKey)
+	execute := func() (*http.Response, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(raw))
+		if err != nil {
+			return nil, fmt.Errorf("创建请求失败: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("anthropic-version", "2023-06-01")
+		req.Header.Set("Accept", "text/event-stream")
+		if useBearer {
+			req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(item.Credentials["access_token"]))
+			req.Header.Set("anthropic-beta", claudeBetaOAuth)
+		} else {
+			req.Header.Set("x-api-key", apiKey)
+		}
+		return httpClient(proxyURL).Do(req)
 	}
 
-	resp, err := httpClient(proxyURL).Do(req)
+	resp, err := execute()
 	if err != nil {
 		return model, testStreamUsage{}, emitErr(emit, "请求失败: "+err.Error())
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, testMaxBody))
+		_ = resp.Body.Close()
+		if useBearer && cpa.IsRefreshableAuthFailure(item.Platform, resp.StatusCode, string(body)) &&
+			strings.TrimSpace(item.Credentials["refresh_token"]) != "" {
+			if refreshErr := s.refreshOAuthCredentials(ctx, &item, proxyURL); refreshErr != nil {
+				return model, testStreamUsage{}, emitErr(emit, formatUpstreamHTTPError(resp.StatusCode, body)+"\naccess_token 刷新失败: "+refreshErr.Error())
+			}
+			resp, err = execute()
+			if err != nil {
+				return model, testStreamUsage{}, emitErr(emit, "刷新凭证后重试失败: "+err.Error())
+			}
+		} else {
+			return model, testStreamUsage{}, emitErr(emit, formatUpstreamHTTPError(resp.StatusCode, body))
+		}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -659,14 +700,18 @@ func (s *Service) testXAIText(ctx context.Context, item *Account, model, prompt,
 		return testStreamUsage{}, emitErr(emit, "请求失败: "+err.Error())
 	}
 
-	// 历史 OAuth 账号可能没有 expired 字段；首次 401 时刷新一次并重试。
-	if resp.StatusCode == http.StatusUnauthorized &&
+	// xAI 会用 403 bad-credentials 表达 OAuth access_token 已失效。
+	if (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) &&
 		NormalizeAccountType(item.Type) == TypeOAuth &&
 		strings.TrimSpace(item.Credentials["refresh_token"]) != "" {
 		firstBody, _ := io.ReadAll(io.LimitReader(resp.Body, testMaxBody))
 		_ = resp.Body.Close()
-		if refreshErr := s.refreshXAIAccessToken(ctx, item, proxyURL); refreshErr != nil {
-			msg := formatUpstreamHTTPError(http.StatusUnauthorized, firstBody) + "\naccess_token 刷新失败: " + refreshErr.Error()
+		if !cpa.IsRefreshableAuthFailure(item.Platform, resp.StatusCode, string(firstBody)) {
+			return testStreamUsage{}, emitErr(emit, formatUpstreamHTTPError(resp.StatusCode, firstBody))
+		}
+		firstStatus := resp.StatusCode
+		if refreshErr := s.refreshOAuthCredentials(ctx, item, proxyURL); refreshErr != nil {
+			msg := formatUpstreamHTTPError(firstStatus, firstBody) + "\naccess_token 刷新失败: " + refreshErr.Error()
 			return testStreamUsage{}, emitErr(emit, msg)
 		}
 		resp, err = executeXAITestRequest(ctx, *item, proxyURL, raw)
@@ -955,15 +1000,20 @@ func (s *Service) executeXAIMediaTestRequest(ctx context.Context, item *Account,
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != http.StatusUnauthorized ||
+	if (resp.StatusCode != http.StatusUnauthorized && resp.StatusCode != http.StatusForbidden) ||
 		NormalizeAccountType(item.Type) != TypeOAuth ||
 		strings.TrimSpace(item.Credentials["refresh_token"]) == "" {
 		return resp, nil
 	}
 	firstBody, _ := io.ReadAll(io.LimitReader(resp.Body, testMaxBody))
 	_ = resp.Body.Close()
-	if err := s.refreshXAIAccessToken(ctx, item, proxyURL); err != nil {
-		return nil, fmt.Errorf("%s\naccess_token 刷新失败: %w", formatUpstreamHTTPError(http.StatusUnauthorized, firstBody), err)
+	if !cpa.IsRefreshableAuthFailure(item.Platform, resp.StatusCode, string(firstBody)) {
+		resp.Body = io.NopCloser(bytes.NewReader(firstBody))
+		return resp, nil
+	}
+	firstStatus := resp.StatusCode
+	if err := s.refreshOAuthCredentials(ctx, item, proxyURL); err != nil {
+		return nil, fmt.Errorf("%s\naccess_token 刷新失败: %w", formatUpstreamHTTPError(firstStatus, firstBody), err)
 	}
 	return executeXAIMediaTestRequest(ctx, *item, proxyURL, method, endpoint, body)
 }
@@ -1088,7 +1138,7 @@ func applyXAITestHeaders(req *http.Request, auth string, useCLIHeaders bool) {
 	}
 }
 
-// ensureXAIAccessToken 在 OAuth access_token 缺失时使用 refresh_token 换票。
+// ensureXAIAccessToken 在 access_token 缺失或临近过期时使用 refresh_token 换票。
 func (s *Service) ensureXAIAccessToken(ctx context.Context, item *Account, proxyURL string, emit func(TestEvent)) error {
 	if item == nil {
 		return emitErr(emit, "账号为空")
@@ -1097,13 +1147,16 @@ func (s *Service) ensureXAIAccessToken(ctx context.Context, item *Account, proxy
 		item.Credentials = map[string]string{}
 	}
 	normalizeCredentialKeys(item.Credentials)
-	if strings.TrimSpace(item.Credentials["access_token"]) != "" || strings.TrimSpace(item.Credentials["api_key"]) != "" {
+	if strings.TrimSpace(item.Credentials["api_key"]) != "" {
+		return nil
+	}
+	if strings.TrimSpace(item.Credentials["access_token"]) != "" && !oauthCredentialsNeedRefresh(*item, time.Now()) {
 		return nil
 	}
 	if strings.TrimSpace(item.Credentials["refresh_token"]) == "" {
 		return emitErr(emit, credentialMissingMsg(item.Credentials))
 	}
-	if err := s.refreshXAIAccessToken(ctx, item, proxyURL); err != nil {
+	if err := s.refreshOAuthCredentials(ctx, item, proxyURL); err != nil {
 		return emitErr(emit, "access_token 刷新失败: "+err.Error())
 	}
 	return nil
@@ -1265,8 +1318,7 @@ func credentialMissingMsg(creds map[string]string) string {
 	)
 }
 
-// ensureCodexAccessToken 保证 item.Credentials 含可用 access_token。
-// 优先级：已有 access → session_token 刷新 → refresh_token 换票 → 写回 DB。
+// ensureCodexAccessToken 保证 item.Credentials 含未临近过期的 access_token。
 func (s *Service) ensureCodexAccessToken(ctx context.Context, item *Account, proxyURL string, emit func(TestEvent)) error {
 	if item == nil {
 		return fmt.Errorf("账号为空")
@@ -1275,7 +1327,7 @@ func (s *Service) ensureCodexAccessToken(ctx context.Context, item *Account, pro
 		item.Credentials = map[string]string{}
 	}
 	normalizeCredentialKeys(item.Credentials)
-	if strings.TrimSpace(item.Credentials["access_token"]) != "" {
+	if strings.TrimSpace(item.Credentials["access_token"]) != "" && !oauthCredentialsNeedRefresh(*item, time.Now()) {
 		return nil
 	}
 	// 纯 api_key 账号不走 OAuth 刷新
@@ -1284,69 +1336,13 @@ func (s *Service) ensureCodexAccessToken(ctx context.Context, item *Account, pro
 		strings.TrimSpace(item.Credentials["session_token"]) == "" {
 		return nil
 	}
-
-	var exchanged map[string]string
-	var err error
-
-	// 1) session_token → /api/auth/session
-	if st := strings.TrimSpace(item.Credentials["session_token"]); st != "" {
-		exchanged, _, err = ExchangeCodexSession(ctx, st, proxyURL)
-		if err != nil {
-			// session 失败时若还有 RT，继续尝试 RT；否则原样返回上游错误
-			if strings.TrimSpace(item.Credentials["refresh_token"]) == "" {
-				return emitErr(emit, "session_token 刷新失败: "+err.Error())
-			}
-		}
+	if strings.TrimSpace(item.Credentials["refresh_token"]) == "" && strings.TrimSpace(item.Credentials["session_token"]) == "" {
+		return emitErr(emit, credentialMissingMsg(item.Credentials))
 	}
-
-	// 2) refresh_token → OAuth token endpoint
-	if exchanged == nil || strings.TrimSpace(exchanged["access_token"]) == "" {
-		rt := strings.TrimSpace(item.Credentials["refresh_token"])
-		if rt == "" {
-			return emitErr(emit, credentialMissingMsg(item.Credentials))
-		}
-		clientID := strings.TrimSpace(item.Credentials["client_id"])
-		exchanged, err = ImportCodexRefreshToken(ctx, rt, proxyURL, clientID)
-		if err != nil {
-			// ImportCodexRefreshToken 已带上游错误原文
-			return emitErr(emit, err.Error())
-		}
-	}
-
-	merged := cloneStringMap(item.Credentials)
-	if merged == nil {
-		merged = map[string]string{}
-	}
-	for k, v := range exchanged {
-		if strings.TrimSpace(v) != "" {
-			merged[k] = v
-		}
-	}
-	normalizeCredentialKeys(merged)
-	if strings.TrimSpace(merged["access_token"]) == "" {
-		return emitErr(emit, "换票成功但未得到 access_token；返回字段: "+credentialKeyList(merged))
-	}
-	item.Credentials = merged
-	item.PlanType = resolvePlanType(*item)
-	item.SubscriptionActiveUntil = resolveSubscriptionActiveUntil(*item)
-
-	if _, err := s.Update(ctx, item.ID, UpdateInput{Credentials: merged}); err != nil {
-		_ = err // 落库失败不阻断：内存凭证仍可用于本次测试
+	if err := s.refreshOAuthCredentials(ctx, item, proxyURL); err != nil {
+		return emitErr(emit, "access_token 刷新失败: "+err.Error())
 	}
 	return nil
-}
-
-func credentialKeyList(creds map[string]string) string {
-	keys := make([]string, 0, len(creds))
-	for k, v := range creds {
-		if strings.TrimSpace(v) != "" {
-			keys = append(keys, k)
-		}
-	}
-	if len(keys) == 0 {
-		return "(无)"
-	}
-	return strings.Join(keys, ", ")
 }
 
 func processClaudeStream(body io.Reader, emit func(TestEvent)) (testStreamUsage, error) {

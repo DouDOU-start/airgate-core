@@ -132,6 +132,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		}
 	}
 	s.cpaBridge = cpa.NewBridge(nil)
+	if s.handlers.AccountService != nil {
+		s.handlers.AccountService.SetOAuthCredentialRefresher(s.cpaBridge)
+	}
 	s.pricingCache = pricing.NewCache(s.handlers.ModelPriceService)
 	s.handlers.ModelPriceService.SetInvalidator(s.pricingCache)
 	// 管理器始终存在，便于 Web 安装和配置；默认配置不会启动任何插件进程。

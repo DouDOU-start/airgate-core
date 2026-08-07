@@ -3,12 +3,14 @@ package cpa
 import (
 	"context"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
 
@@ -30,6 +32,77 @@ func TestXAIImageEndpointsUseOpenAIImageFormat(t *testing.T) {
 		if got := sourceFormatFor(endpoint, "openai"); got != want {
 			t.Errorf("端点 %s 的 CPA 格式 = %q，期望 %q", endpoint, got.String(), want.String())
 		}
+	}
+}
+
+func TestRefreshableAuthFailure识别认证型403(t *testing.T) {
+	if !IsRefreshableAuthFailure("xai", http.StatusForbidden, `{"code":"unauthenticated:bad-credentials","error":"The OAuth2 access token expired"}`) {
+		t.Fatal("xAI bad-credentials 403 应触发刷新")
+	}
+	if !IsRefreshableAuthFailure("antigravity", http.StatusForbidden, `{"status":"UNAUTHENTICATED","message":"invalid token credential"}`) {
+		t.Fatal("明确的 UNAUTHENTICATED token 403 应触发刷新")
+	}
+	if IsRefreshableAuthFailure("claude", http.StatusForbidden, `{"error":"permission_denied"}`) {
+		t.Fatal("普通权限不足 403 不应触发刷新")
+	}
+}
+
+func TestAuthNeedsProactiveRefresh按平台提前量判断(t *testing.T) {
+	now := time.Date(2026, 8, 7, 8, 0, 0, 0, time.UTC)
+	auth := &coreauth.Auth{Provider: "xai", Metadata: map[string]any{
+		"access_token":  "旧令牌",
+		"refresh_token": "刷新令牌",
+		"expired":       now.Add(4 * time.Minute).Format(time.RFC3339),
+	}}
+	if !authNeedsProactiveRefresh(auth, now) {
+		t.Fatal("xAI 距离过期不足五分钟时应主动刷新")
+	}
+	auth.Metadata["expired"] = now.Add(30 * time.Minute).Format(time.RFC3339)
+	if authNeedsProactiveRefresh(auth, now) {
+		t.Fatal("xAI 距离过期较远时不应主动刷新")
+	}
+}
+
+func TestDoNonStream在认证型403后刷新重试(t *testing.T) {
+	executor := &refreshingTestExecutor{}
+	auth := &coreauth.Auth{ID: "账号-1", Provider: "xai", Metadata: map[string]any{
+		"access_token":  "旧令牌",
+		"refresh_token": "旧刷新令牌",
+	}}
+	result := (&Bridge{}).doNonStream(
+		context.Background(),
+		executor,
+		auth,
+		cliproxyexecutor.Request{Model: "grok"},
+		cliproxyexecutor.Options{},
+	)
+	if result.StatusCode != http.StatusOK || executor.executeCalls != 2 || executor.refreshCalls != 1 {
+		t.Fatalf("刷新重试结果不符合预期：result=%+v execute=%d refresh=%d", result, executor.executeCalls, executor.refreshCalls)
+	}
+	if result.RefreshedCredentials["access_token"] != "新令牌" || result.RefreshedCredentials["refresh_token"] != "新刷新令牌" {
+		t.Fatalf("刷新后的凭证未回传：%v", result.RefreshedCredentials)
+	}
+}
+
+func TestRefreshAuth仅有刷新令牌时复用并发结果(t *testing.T) {
+	bridge := &Bridge{}
+	executor := &refreshingTestExecutor{}
+	auth := &coreauth.Auth{ID: "账号-仅RT", Provider: "xai", Metadata: map[string]any{
+		"refresh_token": "旧刷新令牌",
+	}}
+	first, err := bridge.refreshAuth(context.Background(), executor, auth)
+	if err != nil {
+		t.Fatalf("首次刷新失败: %v", err)
+	}
+	second, err := bridge.refreshAuth(context.Background(), executor, auth)
+	if err != nil {
+		t.Fatalf("复用刷新结果失败: %v", err)
+	}
+	if executor.refreshCalls != 1 {
+		t.Fatalf("同一个旧 refresh_token 只能消费一次，实际刷新 %d 次", executor.refreshCalls)
+	}
+	if authMetadataString(first, "access_token") != "新令牌" || authMetadataString(second, "access_token") != "新令牌" {
+		t.Fatalf("复用结果不完整：first=%v second=%v", first.Metadata, second.Metadata)
 	}
 }
 
@@ -184,3 +257,64 @@ func newStreamTestContext() (*gin.Context, *httptest.ResponseRecorder) {
 	c.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
 	return c, recorder
 }
+
+type refreshingTestExecutor struct {
+	executeCalls int
+	refreshCalls int
+}
+
+func (e *refreshingTestExecutor) Identifier() string { return "xai" }
+
+func (e *refreshingTestExecutor) Execute(
+	context.Context,
+	*coreauth.Auth,
+	cliproxyexecutor.Request,
+	cliproxyexecutor.Options,
+) (cliproxyexecutor.Response, error) {
+	e.executeCalls++
+	if e.executeCalls == 1 {
+		return cliproxyexecutor.Response{}, testHTTPStatusError{
+			status: http.StatusForbidden,
+			body:   `{"code":"unauthenticated:bad-credentials","error":"OAuth2 access token expired"}`,
+		}
+	}
+	return cliproxyexecutor.Response{Payload: []byte(`{"id":"resp-1"}`)}, nil
+}
+
+func (e *refreshingTestExecutor) ExecuteStream(
+	context.Context,
+	*coreauth.Auth,
+	cliproxyexecutor.Request,
+	cliproxyexecutor.Options,
+) (*cliproxyexecutor.StreamResult, error) {
+	return nil, errors.New("未使用")
+}
+
+func (e *refreshingTestExecutor) Refresh(_ context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
+	e.refreshCalls++
+	refreshed := auth.Clone()
+	refreshed.Metadata["access_token"] = "新令牌"
+	refreshed.Metadata["refresh_token"] = "新刷新令牌"
+	return refreshed, nil
+}
+
+func (e *refreshingTestExecutor) CountTokens(
+	context.Context,
+	*coreauth.Auth,
+	cliproxyexecutor.Request,
+	cliproxyexecutor.Options,
+) (cliproxyexecutor.Response, error) {
+	return cliproxyexecutor.Response{}, errors.New("未使用")
+}
+
+func (e *refreshingTestExecutor) HttpRequest(context.Context, *coreauth.Auth, *http.Request) (*http.Response, error) {
+	return nil, errors.New("未使用")
+}
+
+type testHTTPStatusError struct {
+	status int
+	body   string
+}
+
+func (e testHTTPStatusError) Error() string   { return e.body }
+func (e testHTTPStatusError) StatusCode() int { return e.status }

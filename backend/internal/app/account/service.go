@@ -52,6 +52,19 @@ type PriceLookup interface {
 
 type usageFetcher func(context.Context, string, string, map[string]string, string) (UsageSnapshot, error)
 
+// OAuthCredentialRefresher 复用 CPA executor 刷新指定账号的 OAuth 凭证。
+type OAuthCredentialRefresher interface {
+	RefreshAccountCredentials(
+		ctx context.Context,
+		accountID int,
+		name string,
+		platform string,
+		accountType string,
+		credentials map[string]string,
+		proxyURL string,
+	) (map[string]string, error)
+}
+
 // Service 提供账号域用例编排。
 // 加解密在 service；store 只存/取 credentials_enc + email。
 type Service struct {
@@ -62,10 +75,11 @@ type Service struct {
 	concurrency ConcurrencyReader
 	rpm         RPMReader
 	// 账号测试落账（可选：未注入则测试不写 usage_log）
-	usageSink    UsageSink
-	priceLookup  PriceLookup
-	calculator   *billing.Calculator
-	usageFetcher usageFetcher
+	usageSink      UsageSink
+	priceLookup    PriceLookup
+	calculator     *billing.Calculator
+	usageFetcher   usageFetcher
+	oauthRefresher OAuthCredentialRefresher
 	// 账号测试请求变换器（可选，由插件运行器实现）。
 	testTransformer accounttesthook.Transformer
 }
@@ -76,6 +90,14 @@ func (s *Service) SetTestRequestTransformer(transformer accounttesthook.Transfor
 		return
 	}
 	s.testTransformer = transformer
+}
+
+// SetOAuthCredentialRefresher 注入统一 OAuth 凭证刷新器。
+func (s *Service) SetOAuthCredentialRefresher(refresher OAuthCredentialRefresher) {
+	if s == nil {
+		return
+	}
+	s.oauthRefresher = refresher
 }
 
 // NewService 创建账号服务。secret 与渠道相同（APIKeySecret）。

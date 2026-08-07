@@ -89,11 +89,24 @@ func (s *Service) RefreshUsage(ctx context.Context, id int) (UsageSnapshot, Acco
 		return UsageSnapshot{}, Account{}, err
 	}
 	proxyURL := proxyURLFromRef(item.Proxy)
+	refreshedBeforeFetch := false
+	if oauthCredentialsNeedRefresh(item, time.Now()) {
+		if err := s.refreshOAuthCredentials(ctx, &item, proxyURL); err != nil {
+			return UsageSnapshot{}, item, fmt.Errorf("刷新 OAuth 凭证失败: %w", err)
+		}
+		refreshedBeforeFetch = true
+	}
 	fetcher := s.usageFetcher
 	if fetcher == nil {
 		fetcher = fetchUsageByPlatform
 	}
 	snap, err := fetcher(ctx, item.Platform, item.Type, item.Credentials, proxyURL)
+	if err != nil && !refreshedBeforeFetch && accountHasOAuthRefreshPath(item) && isRefreshableAccountAuthError(item.Platform, err) {
+		if refreshErr := s.refreshOAuthCredentials(ctx, &item, proxyURL); refreshErr != nil {
+			return UsageSnapshot{}, item, fmt.Errorf("%v；刷新 OAuth 凭证失败: %w", err, refreshErr)
+		}
+		snap, err = fetcher(ctx, item.Platform, item.Type, item.Credentials, proxyURL)
+	}
 	if err != nil {
 		return UsageSnapshot{}, item, err
 	}
@@ -341,7 +354,7 @@ func fetchCodexUsage(ctx context.Context, creds map[string]string, proxyURL stri
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return UsageSnapshot{}, fmt.Errorf("codex 用量 HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
+		return UsageSnapshot{}, &accountUpstreamHTTPError{status: resp.StatusCode, body: body, label: "codex 用量"}
 	}
 
 	var payload struct {
@@ -615,7 +628,7 @@ func fetchClaudeUsage(ctx context.Context, creds map[string]string, proxyURL str
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode != http.StatusOK {
-		return UsageSnapshot{}, fmt.Errorf("claude 用量 HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
+		return UsageSnapshot{}, &accountUpstreamHTTPError{status: resp.StatusCode, body: body, label: "claude 用量"}
 	}
 
 	var payload struct {
@@ -787,7 +800,7 @@ func xaiRequestBilling(ctx context.Context, accessToken, proxyURL, userID, targe
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("xAI billing HTTP %d: %s", resp.StatusCode, truncate(string(body), 400))
+		return nil, &accountUpstreamHTTPError{status: resp.StatusCode, body: body, label: "xAI billing"}
 	}
 
 	var payload map[string]any

@@ -34,10 +34,12 @@ type Bridge struct {
 	manager *coreauth.Manager
 	svc     *cliproxy.Service
 
-	mu      sync.RWMutex
-	ready   bool
-	initErr error
-	cancel  context.CancelFunc
+	mu             sync.RWMutex
+	ready          bool
+	initErr        error
+	cancel         context.CancelFunc
+	refreshLocks   sync.Map
+	refreshedAuths sync.Map
 }
 
 // NewBridge 创建桥接层并异步启动嵌入式 cliproxy.Service 以注册 executor。

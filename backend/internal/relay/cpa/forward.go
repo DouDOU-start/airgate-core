@@ -59,7 +59,7 @@ type ForwardResult struct {
 //
 // 流式：边收 StreamChunk 边写 gin.Writer；旁路提取 usage。
 // 非流式：返回完整 body + usage。
-// 401 时尝试 Refresh 一次再重试。
+// OAuth 凭证临近过期时主动刷新；认证失败时再刷新一次并重试。
 func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest) ForwardResult {
 	if b == nil {
 		return ForwardResult{BuildErr: fmt.Errorf("cpa bridge 未初始化")}
@@ -78,6 +78,13 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 	ex, err := b.EnsureExecutor(auth.Provider)
 	if err != nil {
 		return ForwardResult{BuildErr: err}
+	}
+	var proactiveCredentials map[string]string
+	if authNeedsProactiveRefresh(auth, time.Now()) {
+		if refreshed, refreshErr := b.refreshAuth(ctx, ex, auth); refreshErr == nil && refreshed != nil {
+			auth = refreshed
+			proactiveCredentials = CredentialsFromAuth(auth)
+		}
 	}
 
 	sourceFmt := sourceFormatFor(req.Endpoint, req.EntryProtocol)
@@ -98,12 +105,12 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 	}
 
 	if isCountTokensEndpoint(req.Endpoint) {
-		return b.doCount(ctx, ex, auth, execReq, opts)
+		return withRefreshedCredentials(b.doCount(ctx, ex, auth, execReq, opts), proactiveCredentials)
 	}
 	if req.Stream {
-		return b.doStream(ctx, c, ex, auth, execReq, opts, req.Endpoint)
+		return withRefreshedCredentials(b.doStream(ctx, c, ex, auth, execReq, opts, req.Endpoint), proactiveCredentials)
 	}
-	return b.doNonStream(ctx, ex, auth, execReq, opts)
+	return withRefreshedCredentials(b.doNonStream(ctx, ex, auth, execReq, opts), proactiveCredentials)
 }
 
 func (b *Bridge) doNonStream(
@@ -116,9 +123,8 @@ func (b *Bridge) doNonStream(
 	opts.Stream = false
 	resp, err := ex.Execute(ctx, auth, execReq, opts)
 	if err != nil {
-		// 401 → refresh 一次再试。
-		if isUnauthorized(err) {
-			refreshed, refreshErr := ex.Refresh(ctx, auth)
+		if authHasRefreshCredential(auth) && isRefreshableAuthError(auth.Provider, err) {
+			refreshed, refreshErr := b.refreshAuth(ctx, ex, auth)
 			if refreshErr == nil && refreshed != nil {
 				auth = refreshed
 				resp, err = ex.Execute(ctx, auth, execReq, opts)
@@ -144,8 +150,8 @@ func (b *Bridge) doCount(
 	opts.Stream = false
 	resp, err := ex.CountTokens(ctx, auth, execReq, opts)
 	if err != nil {
-		if isUnauthorized(err) {
-			refreshed, refreshErr := ex.Refresh(ctx, auth)
+		if authHasRefreshCredential(auth) && isRefreshableAuthError(auth.Provider, err) {
+			refreshed, refreshErr := b.refreshAuth(ctx, ex, auth)
 			if refreshErr == nil && refreshed != nil {
 				auth = refreshed
 				resp, err = ex.CountTokens(ctx, auth, execReq, opts)
@@ -175,8 +181,8 @@ func (b *Bridge) doStream(
 
 	stream, err := ex.ExecuteStream(ctx, auth, execReq, opts)
 	if err != nil {
-		if isUnauthorized(err) {
-			refreshed, refreshErr := ex.Refresh(ctx, auth)
+		if authHasRefreshCredential(auth) && isRefreshableAuthError(auth.Provider, err) {
+			refreshed, refreshErr := b.refreshAuth(ctx, ex, auth)
 			if refreshErr == nil && refreshed != nil {
 				auth = refreshed
 				stream, err = ex.ExecuteStream(ctx, auth, execReq, opts)
@@ -189,7 +195,22 @@ func (b *Bridge) doStream(
 		}
 		return errorToResult(err)
 	}
-	return b.relayStream(ctx, c, stream, start, endpoint)
+	result := b.relayStream(ctx, c, stream, start, endpoint)
+	// 部分 executor 在 goroutine 启动后才从首个 chunk 返回上游认证错误。
+	// 尚未向客户端写出内容时仍可安全刷新并重试一次。
+	if authHasRefreshCredential(auth) && isRefreshableAuthResult(auth.Provider, result) {
+		refreshed, refreshErr := b.refreshAuth(ctx, ex, auth)
+		if refreshErr == nil && refreshed != nil {
+			auth = refreshed
+			stream, err = ex.ExecuteStream(ctx, auth, execReq, opts)
+			if err == nil {
+				result = b.relayStream(ctx, c, stream, time.Now(), endpoint)
+				result.RefreshedCredentials = CredentialsFromAuth(auth)
+				return result
+			}
+		}
+	}
+	return result
 }
 
 // relayStream 把 CPA StreamResult 的 chunk 写成客户端 SSE，并旁路提取 usage。
@@ -357,9 +378,11 @@ func errorToResult(err error) ForwardResult {
 	}
 }
 
-func isUnauthorized(err error) bool {
-	info := ClassifyError(err)
-	return info.StatusCode == http.StatusUnauthorized
+func withRefreshedCredentials(result ForwardResult, credentials map[string]string) ForwardResult {
+	if len(result.RefreshedCredentials) == 0 && len(credentials) > 0 {
+		result.RefreshedCredentials = credentials
+	}
+	return result
 }
 
 func sourceFormatFor(endpoint, entryProtocol string) sdktranslator.Format {
