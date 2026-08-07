@@ -498,6 +498,58 @@
   min-width: max(var(--trigger-width), 12rem) !important;
 }
 
+/* 请求审计筛选栏：保留 HeroUI 的可访问交互，同时让触发器融入工具栏。 */
+.ag-audit-status-select .select__trigger,
+.ag-audit-status-select .select__trigger:hover,
+.ag-audit-status-select .select__trigger[data-hovered="true"],
+.ag-audit-status-select .select__trigger:focus-visible,
+.ag-audit-status-select .select__trigger[data-focus-visible="true"] {
+  min-height: 1.25rem !important;
+  height: 1.25rem !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.ag-audit-status-select .select__value {
+  color: var(--field-foreground) !important;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.ag-audit-status-select .select__indicator {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: var(--muted);
+  transition: color var(--ag-transition), transform var(--ag-transition);
+}
+
+.ag-audit-status-select .select__trigger[data-open="true"] .select__indicator {
+  color: var(--accent);
+}
+
+.ag-audit-status-popover.select__popover {
+  border-color: color-mix(in oklab, var(--border) 82%, var(--accent) 18%) !important;
+  background: color-mix(in oklab, var(--overlay) 96%, var(--accent) 4%) !important;
+}
+
+.ag-audit-status-popover .list-box {
+  padding: 0.375rem;
+}
+
+.ag-audit-status-popover .list-box-item {
+  border-radius: var(--radius-sm);
+  color: var(--overlay-foreground);
+}
+
+.ag-audit-status-popover .list-box-item[data-selected="true"],
+.ag-audit-status-popover .list-box-item[aria-selected="true"] {
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
 @media (min-width: 96rem) {
   .ag-elevation-modal.modal__dialog--sm {
     max-width: min(32rem, calc(100vw - 8rem)) !important;
