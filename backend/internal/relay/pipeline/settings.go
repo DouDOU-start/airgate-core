@@ -34,7 +34,7 @@ type SettingsLister interface {
 
 // GatewaySettings relay 管线运行时开关快照（同步转发与异步任务子系统共用）。
 type GatewaySettings struct {
-	// AutoBanEnabled 上游 401/403 自动禁用总开关（channel_auto_ban_enabled，默认 true）。
+	// AutoBanEnabled 上游 401/402/403 自动禁用总开关（channel_auto_ban_enabled，默认 true）。
 	AutoBanEnabled bool
 	// TaskTimeoutMinutes 异步任务超时分钟数（task_timeout_minutes，默认 30）：
 	// 提交后超过该时长仍未终态的任务由轮询器置失败并退款。

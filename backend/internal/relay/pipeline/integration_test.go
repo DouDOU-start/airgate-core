@@ -970,6 +970,48 @@ func TestAuthFailedSanitizedAndDistinctError(t *testing.T) {
 	}
 }
 
+// TestAuthFailed402DisablesChannel 上游 402 Payment Required：
+// 归 AuthFailed 自动禁用渠道，并返回 502 upstream_auth_failed（与 401 同口径）。
+// 防止配额耗尽账号/密钥被反复调度形成死循环（超额插件场景尤其关键）。
+func TestAuthFailed402DisablesChannel(t *testing.T) {
+	var hits atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusPaymentRequired)
+		_, _ = io.WriteString(w, `{"error":{"message":"insufficient_quota","type":"insufficient_quota"}}`)
+	}))
+	defer upstream.Close()
+
+	env := newTestEnv(t, testSnap(1, upstream.URL))
+	w := env.do(t, `{"model":"gpt-4o","messages":[]}`)
+
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502; body = %s", w.Code, w.Body.String())
+	}
+	var resp errfmt.OpenAIError
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("错误体非 JSON: %v", err)
+	}
+	if resp.Error.Code != "upstream_auth_failed" {
+		t.Errorf("错误码 = %q, want upstream_auth_failed", resp.Error.Code)
+	}
+
+	call := env.persister.waitOne(t)
+	if call != "1:disabled_auto" {
+		t.Fatalf("落库调用 = %q, want 1:disabled_auto", call)
+	}
+
+	// 禁用后不应再调度到该 key。
+	w2 := env.do(t, `{"model":"gpt-4o","messages":[]}`)
+	if w2.Code == http.StatusPaymentRequired {
+		t.Fatalf("第二次仍透传上游 402，说明未停调度: body=%s", w2.Body.String())
+	}
+	if hits.Load() != 1 {
+		t.Fatalf("上游命中次数 = %d, want 1（第二次不得再打）", hits.Load())
+	}
+}
+
 // TestClientErrorBodySanitized 上游 400（语义重建路径）回显渠道 key：
 // 提取出的 message 写响应前做精确 key 替换，其余语义不动。
 func TestClientErrorBodySanitized(t *testing.T) {
@@ -996,7 +1038,7 @@ func TestClientErrorBodySanitized(t *testing.T) {
 }
 
 // TestClientError400DoesNotDisableChannel 上游 400（错误体含凭证类文案）不自动禁用渠道：
-// 自动禁用仅由 401/403 状态码触发，错误体内容不参与判定
+// 自动禁用仅由 401/402/403 状态码触发，错误体内容不参与判定
 // （否则任意用户可构造回显文案打禁渠道）。
 func TestClientError400DoesNotDisableChannel(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

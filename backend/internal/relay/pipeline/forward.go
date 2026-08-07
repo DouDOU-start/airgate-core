@@ -1052,7 +1052,7 @@ func writeAllFailed(c *gin.Context, summary failureSummary) (int, string, string
 		writeError(c, http.StatusServiceUnavailable, "server_error", "all_channels_busy", msg)
 		return http.StatusServiceUnavailable, "server_error", "all_channels_busy", msg
 	case summary.authFailed:
-		// 渠道存在但上游认证失败（401/403）：与「无可用渠道」区分，指向密钥问题。
+		// 渠道存在但上游认证/配额失败（401/402/403）：与「无可用渠道」区分，指向密钥问题。
 		msg := "上游认证失败，请联系管理员检查渠道密钥"
 		writeError(c, http.StatusBadGateway, "server_error", "upstream_auth_failed", msg)
 		return http.StatusBadGateway, "server_error", "upstream_auth_failed", msg

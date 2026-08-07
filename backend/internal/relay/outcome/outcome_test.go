@@ -18,6 +18,7 @@ func TestClassifyOutcome(t *testing.T) {
 		wantVerdict    Verdict
 		wantRetryAfter time.Duration // 仅 rateLimited 校验
 	}{
+		// ----- 非 HTTP / 成功 -----
 		{
 			name:        "网络错误",
 			netErr:      errors.New("dial tcp: connection refused"),
@@ -28,6 +29,13 @@ func TestClassifyOutcome(t *testing.T) {
 			status:      200,
 			wantVerdict: Success,
 		},
+		{
+			name:        "201 成功",
+			status:      201,
+			wantVerdict: Success,
+		},
+
+		// ----- 429 RateLimited -----
 		{
 			name:           "429 无 Retry-After 用默认 5s",
 			status:         429,
@@ -56,6 +64,8 @@ func TestClassifyOutcome(t *testing.T) {
 			wantVerdict:    RateLimited,
 			wantRetryAfter: 30 * time.Minute,
 		},
+
+		// ----- 401/402/403 AuthFailed（禁用 + 切号）-----
 		{
 			name:        "401 认证失败",
 			status:      401,
@@ -63,20 +73,93 @@ func TestClassifyOutcome(t *testing.T) {
 			wantVerdict: AuthFailed,
 		},
 		{
+			// Codex/订阅账号配额耗尽常见 402：须 AuthFailed 禁用并切号，
+			// 不能 ClientError（不换号）也不能 RateLimited（会被超额插件再放行）。
+			name:        "402 配额/订阅不可用",
+			status:      402,
+			body:        `{"error":{"message":"insufficient_quota","type":"insufficient_quota"}}`,
+			wantVerdict: AuthFailed,
+		},
+		{
 			name:        "403 认证失败",
 			status:      403,
 			wantVerdict: AuthFailed,
 		},
+
+		// ----- 408 Transient -----
 		{
-			// 自动禁用仅由 401/403 状态码触发：错误体内容不参与判定
+			name:        "408 请求超时软换号",
+			status:      408,
+			body:        "request timeout",
+			wantVerdict: Transient,
+		},
+
+		// ----- ClientError：请求侧 4xx，不禁号不换号 -----
+		{
+			// 自动禁用仅由 401/402/403 状态码触发：错误体内容不参与判定
 			//（上游 400 会回显用户输入，据内容判定会被任意用户构造打禁渠道）。
-			name:        "400 错误体含凭证类文案不触发自动禁用（语义重建终止）",
+			name:        "400 错误体含凭证类文案不触发自动禁用",
 			status:      400,
 			body:        `{"error":{"code":"INVALID_API_KEY","message":"Incorrect API Key provided"}}`,
 			wantVerdict: ClientError,
 		},
 		{
-			name:        "500 错误体含凭证类文案仍按上游故障处理",
+			name:        "400 普通参数错误",
+			status:      400,
+			body:        `{"error":{"message":"messages is required"}}`,
+			wantVerdict: ClientError,
+		},
+		{
+			name:        "404 模型/路径不存在",
+			status:      404,
+			body:        `{"error":{"message":"model not found"}}`,
+			wantVerdict: ClientError,
+		},
+		{
+			name:        "405 方法不允许",
+			status:      405,
+			wantVerdict: ClientError,
+		},
+		{
+			name:        "409 冲突",
+			status:      409,
+			wantVerdict: ClientError,
+		},
+		{
+			name:        "413 请求体过大",
+			status:      413,
+			wantVerdict: ClientError,
+		},
+		{
+			name:        "415 不支持的媒体类型",
+			status:      415,
+			wantVerdict: ClientError,
+		},
+		{
+			name:        "422 语义校验失败",
+			status:      422,
+			body:        `{"error":{"message":"unprocessable"}}`,
+			wantVerdict: ClientError,
+		},
+		{
+			name:        "431 请求头过大",
+			status:      431,
+			wantVerdict: ClientError,
+		},
+		{
+			name:        "451 法律原因不可用",
+			status:      451,
+			wantVerdict: ClientError,
+		},
+		{
+			name:        "418 其余 4xx 默认 ClientError",
+			status:      418,
+			wantVerdict: ClientError,
+		},
+
+		// ----- 5xx Transient -----
+		{
+			name:        "500 错误体含配额文案仍按上游故障（不靠 body 判禁用）",
 			status:      500,
 			body:        `{"error":{"message":"insufficient_quota"}}`,
 			wantVerdict: Transient,
@@ -88,20 +171,25 @@ func TestClassifyOutcome(t *testing.T) {
 			wantVerdict: Transient,
 		},
 		{
+			name:        "502 上游故障",
+			status:      502,
+			wantVerdict: Transient,
+		},
+		{
 			name:        "503 上游故障",
 			status:      503,
 			wantVerdict: Transient,
 		},
 		{
-			name:        "普通 400 语义重建终止",
-			status:      400,
-			body:        `{"error":{"message":"messages is required"}}`,
-			wantVerdict: ClientError,
+			name:        "529 过载按 5xx 软换号",
+			status:      529,
+			wantVerdict: Transient,
 		},
+
+		// ----- 3xx 保守 ClientError -----
 		{
-			name:        "404 语义重建终止",
-			status:      404,
-			body:        `{"error":{"message":"model not found"}}`,
+			name:        "301 重定向不按成功",
+			status:      301,
 			wantVerdict: ClientError,
 		},
 	}
@@ -132,6 +220,28 @@ func TestClassifyOutcomeClientErrorReasonHasSnippet(t *testing.T) {
 	}
 	if !strings.Contains(got.Reason, "HTTP 400") || !strings.Contains(got.Reason, "bad param") {
 		t.Errorf("reason = %q, want 含状态码与原始体片段", got.Reason)
+	}
+}
+
+// TestClassifyAuthFailedReasonHasStatus 401/402/403 reason 带状态码，便于禁用落库排障。
+func TestClassifyAuthFailedReasonHasStatus(t *testing.T) {
+	for _, code := range []int{401, 402, 403} {
+		got := Classify(code, nil, []byte(`{"error":"x"}`), nil)
+		if got.Verdict != AuthFailed {
+			t.Fatalf("HTTP %d verdict = %v, want AuthFailed", code, got.Verdict)
+		}
+		prefix := "HTTP "
+		switch code {
+		case 401:
+			prefix += "401"
+		case 402:
+			prefix += "402"
+		case 403:
+			prefix += "403"
+		}
+		if !strings.Contains(got.Reason, prefix) {
+			t.Errorf("HTTP %d reason = %q, want 含 %q", code, got.Reason, prefix)
+		}
 	}
 }
 

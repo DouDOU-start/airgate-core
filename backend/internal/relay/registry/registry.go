@@ -417,7 +417,7 @@ func (r *Registry) AnyKeyForChannel(channelID int) (*ChannelKeySnapshot, bool) {
 	return nil, false
 }
 
-// MarkAutoDisabled 自动禁用 key 端点（上游 401/403）：内存即时生效 + 异步落库。
+// MarkAutoDisabled 自动禁用 key 端点（上游 402/403 等端点级不可用）：内存即时生效 + 异步落库。
 func (r *Registry) MarkAutoDisabled(keyID int, reason string) {
 	snap := r.mutate(keyID, func(k *ChannelKeySnapshot) {
 		k.Status = StatusDisabledAuto
