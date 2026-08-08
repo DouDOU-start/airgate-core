@@ -1754,11 +1754,11 @@
     "low_sample": "样本不足",
     "success_rate": "成功率",
     "error_rate": "错误率",
-    "avg_ttft": "平均首字",
-    "avg_duration": "平均耗时",
+    "avg_ttft": "首字（流式）",
+    "avg_duration": "总耗时（流式）",
     "no_requests": "{{window}}内暂无请求",
     "selected_window": "统计范围：{{window}}",
-    "success_samples_only": "基于有耗时记录的转发请求",
+    "success_samples_only": "基于有效首字的文本流式转发请求",
     "group_status": "分组状态",
     "group_count": "共 {{count}} 个可见分组",
     "group": "分组",
@@ -1823,8 +1823,8 @@
     "col_requests": "请求量",
     "col_success": "成功率",
     "requests": "请求量",
-    "ttft_avg": "平均首字",
-    "duration_avg": "平均耗时",
+    "ttft_avg": "首字（流式）",
+    "duration_avg": "总耗时（流式）",
     "unnamed_group": "未命名分组 #{{id}}"
   }
 }

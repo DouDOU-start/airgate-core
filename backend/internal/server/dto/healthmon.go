@@ -89,7 +89,7 @@ type HealthmonEntityResp struct {
 	LastError    *HealthmonLastError `json:"last_error,omitempty"`
 }
 
-// ChannelStatusLatency 用户状态页延迟摘要。
+// ChannelStatusLatency 用户状态页延迟摘要（仅有效文本流式成功样本）。
 // 用户视角仅公开平均值，不公开内部 P95/峰值细节。
 type ChannelStatusLatency struct {
 	AvgMs int64 `json:"avg_ms"`

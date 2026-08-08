@@ -32,12 +32,38 @@ func TestHealthmonNearestRankP95(t *testing.T) {
 
 func TestHealthmonPostgresP95ExpressionsUsePercentileDisc(t *testing.T) {
 	store := &HealthmonStore{sqlDialect: dialect.Postgres}
-	duration, ttft := store.healthmonP95Expressions(`"duration_ms"`, `"first_token_ms"`)
+	condition := `NOT (LOWER(TRIM("model")) LIKE 'gpt-image%') AND "first_token_ms" > 0`
+	duration, ttft := store.healthmonP95Expressions(`"duration_ms"`, `"first_token_ms"`, condition)
 	if !strings.Contains(duration, "PERCENTILE_DISC(0.95)") {
 		t.Fatalf("duration expression = %q, want percentile_disc", duration)
 	}
-	if !strings.Contains(ttft, "PERCENTILE_DISC(0.95)") || !strings.Contains(ttft, `FILTER (WHERE "first_token_ms" > 0)`) {
-		t.Fatalf("ttft expression = %q, want percentile_disc filtered to positive samples", ttft)
+	wantFilter := "FILTER (WHERE " + condition + ")"
+	if !strings.Contains(duration, wantFilter) {
+		t.Fatalf("duration expression = %q, want shared latency filter %q", duration, wantFilter)
+	}
+	if !strings.Contains(ttft, "PERCENTILE_DISC(0.95)") || !strings.Contains(ttft, wantFilter) {
+		t.Fatalf("ttft expression = %q, want percentile_disc with shared latency filter %q", ttft, wantFilter)
+	}
+}
+
+func TestHealthmonIsLatencySample(t *testing.T) {
+	tests := []struct {
+		name         string
+		model        string
+		firstTokenMs int64
+		want         bool
+	}{
+		{name: "streaming text", model: "gpt-5", firstTokenMs: 300, want: true},
+		{name: "missing first token", model: "gpt-5", firstTokenMs: 0},
+		{name: "image model", model: "gpt-image-1", firstTokenMs: 300},
+		{name: "normalized image model", model: "  GPT-IMAGE-2  ", firstTokenMs: 300},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := healthmonIsLatencySample(test.model, test.firstTokenMs); got != test.want {
+				t.Fatalf("healthmonIsLatencySample(%q, %d) = %v, want %v", test.model, test.firstTokenMs, got, test.want)
+			}
+		})
 	}
 }
 
@@ -64,10 +90,10 @@ func TestHealthmonStoreComputesExactP95PerDimensionAndSummary(t *testing.T) {
 
 	at := time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)
 	since := at.Add(-time.Hour)
-	createUsage := func(groupID, keyID int, source string, createdAt time.Time, durationMs, ttftMs int64) {
+	createUsage := func(groupID, keyID int, model, source string, createdAt time.Time, durationMs, ttftMs int64) {
 		t.Helper()
 		if _, err := db.UsageLog.Create().
-			SetModel("gpt-p95").
+			SetModel(model).
 			SetGroupID(groupID).
 			SetChannelKeyID(keyID).
 			SetSource(source).
@@ -81,15 +107,17 @@ func TestHealthmonStoreComputesExactP95PerDimensionAndSummary(t *testing.T) {
 
 	// 19 个正常 TTFT + 1 个缺失 TTFT；缺失值不参与 TTFT P95。
 	for range 19 {
-		createUsage(fastGroup.ID, fastKey, "relay", at, 1_500, 1_000)
+		createUsage(fastGroup.ID, fastKey, "gpt-p95", "relay", at, 1_500, 1_000)
 	}
-	createUsage(fastGroup.ID, fastKey, "relay", at, 1_500, 0)
+	createUsage(fastGroup.ID, fastKey, "gpt-p95", "relay", at, 100, 0)
 	// 单独的慢维度用于证明整体 P95 不能取 max(各维度 P95)。
-	createUsage(slowGroup.ID, slowKey, "relay", at, 90_000, 82_000)
+	createUsage(slowGroup.ID, slowKey, "gpt-p95", "relay", at, 90_000, 82_000)
+	// 生图流即使记录了 first_token_ms，也不属于文本流式延迟样本，但仍计入请求量。
+	createUsage(fastGroup.ID, fastKey, "  GPT-IMAGE-1  ", "relay", at, 999_000, 888_000)
 
 	// 非 relay 与窗口外极值不得污染结果。
-	createUsage(fastGroup.ID, fastKey, "channel_test", at, 999_000, 999_000)
-	createUsage(fastGroup.ID, fastKey, "relay", since.Add(-time.Second), 888_000, 888_000)
+	createUsage(fastGroup.ID, fastKey, "gpt-p95", "channel_test", at, 999_000, 999_000)
+	createUsage(fastGroup.ID, fastKey, "gpt-p95", "relay", since.Add(-time.Second), 888_000, 888_000)
 
 	store := NewHealthmonStore(db)
 	groups, err := store.AggregateSuccessByGroup(ctx, since)
@@ -125,8 +153,8 @@ func TestHealthmonStoreComputesExactP95PerDimensionAndSummary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AggregateSuccessSummary: %v", err)
 	}
-	if summary.Count != 21 || summary.TTFTCount != 20 {
-		t.Fatalf("summary counts = total %d ttft %d, want 21/20", summary.Count, summary.TTFTCount)
+	if summary.Count != 22 || summary.TTFTCount != 20 {
+		t.Fatalf("summary counts = total %d latency %d, want 22/20", summary.Count, summary.TTFTCount)
 	}
 	if summary.P95TTFT != 1_000 || summary.MaxTTFT != 82_000 {
 		t.Fatalf("summary TTFT = p95 %d max %.0f, want 1000/82000", summary.P95TTFT, summary.MaxTTFT)
@@ -134,16 +162,22 @@ func TestHealthmonStoreComputesExactP95PerDimensionAndSummary(t *testing.T) {
 	if summary.P95Duration != 1_500 || summary.MaxDuration != 90_000 {
 		t.Fatalf("summary duration = p95 %d max %.0f, want 1500/90000", summary.P95Duration, summary.MaxDuration)
 	}
+	if summary.AvgDuration != 5_925 {
+		t.Fatalf("summary avg duration = %.0f, want 5925 (same stream samples as TTFT)", summary.AvgDuration)
+	}
 	if summary.AvgTTFT != 5_050 {
-		t.Fatalf("summary avg TTFT = %.0f, want 5050 (zero TTFT excluded)", summary.AvgTTFT)
+		t.Fatalf("summary avg TTFT = %.0f, want 5050 (non-stream and image samples excluded)", summary.AvgTTFT)
+	}
+	if summary.AvgDuration < summary.AvgTTFT {
+		t.Fatalf("summary latency inverted: total %.0fms < TTFT %.0fms", summary.AvgDuration, summary.AvgTTFT)
 	}
 
 	visibleSummary, err := store.AggregateSuccessSummaryByGroupIDs(ctx, since, []int{fastGroup.ID, slowGroup.ID})
 	if err != nil {
 		t.Fatalf("AggregateSuccessSummaryByGroupIDs: %v", err)
 	}
-	if visibleSummary.P95TTFT != 1_000 || visibleSummary.Count != 21 {
-		t.Fatalf("visible summary = %+v, want overall P95 1000 and count 21", visibleSummary)
+	if visibleSummary.P95TTFT != 1_000 || visibleSummary.Count != 22 || visibleSummary.AvgDuration != 5_925 {
+		t.Fatalf("visible summary = %+v, want overall P95 1000, count 22, avg duration 5925", visibleSummary)
 	}
 	slowOnly, err := store.AggregateSuccessSummaryByGroupIDs(ctx, since, []int{slowGroup.ID})
 	if err != nil {

@@ -70,7 +70,7 @@ type Counts struct {
 	Other       int64 `json:"other"`
 }
 
-// Latency 延迟摘要（毫秒；仅成功样本）。
+// Latency 延迟摘要（毫秒；仅含有有效首字时间的非生图流式成功样本）。
 type Latency struct {
 	AvgMs int64 `json:"avg_ms"`
 	P95Ms int64 `json:"p95_ms"`
@@ -184,7 +184,8 @@ type ListFilter struct {
 // SuccessAgg 成功侧聚合行（store 输出；按 channel_key 或 group）。
 type SuccessAgg struct {
 	// DimID 维度主键：channel_key_id 或 group_id。
-	DimID       int
+	DimID int
+	// Count 统计全部成功转发请求；以下延迟字段仅统计有有效首字时间的非生图流式样本。
 	Count       int64
 	AvgDuration float64
 	P95Duration int64

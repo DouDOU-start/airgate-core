@@ -1754,11 +1754,11 @@
     "low_sample": "Low sample",
     "success_rate": "Success rate",
     "error_rate": "Error rate",
-    "avg_ttft": "Avg TTFT",
-    "avg_duration": "Avg duration",
+    "avg_ttft": "TTFT (stream)",
+    "avg_duration": "Total (stream)",
     "no_requests": "No requests in the last {{window}}",
     "selected_window": "Time range: {{window}}",
-    "success_samples_only": "Relay requests with latency records",
+    "success_samples_only": "Text streaming relay requests with a valid first token",
     "group_status": "Group status",
     "group_count": "{{count}} visible groups",
     "group": "Group",
@@ -1823,8 +1823,8 @@
     "col_requests": "Requests",
     "col_success": "Success rate",
     "requests": "Requests",
-    "ttft_avg": "Avg TTFT",
-    "duration_avg": "Avg duration",
+    "ttft_avg": "TTFT (stream)",
+    "duration_avg": "Total (stream)",
     "unnamed_group": "Unnamed group #{{id}}"
   }
 }
