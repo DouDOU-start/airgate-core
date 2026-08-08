@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"errors"
+	"io"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -92,6 +95,44 @@ func (h *RequestAuditHandler) Get(c *gin.Context) {
 		return
 	}
 	response.Success(c, detail)
+}
+
+// clearReq 清空请求审计参数。
+// mode: all=全部清空；older_than_24h=仅删除 24 小时前的记录。
+type clearReq struct {
+	Mode string `json:"mode" binding:"omitempty,oneof=all older_than_24h"`
+}
+
+// Clear DELETE /admin/request-audits 清空请求审计（含子表 attempt）。
+func (h *RequestAuditHandler) Clear(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.Header("Pragma", "no-cache")
+	var req clearReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// 兼容无 body 调用，默认全部清空
+		if !errors.Is(err, io.EOF) {
+			response.BindError(c, err)
+			return
+		}
+	}
+	mode := strings.TrimSpace(req.Mode)
+	if mode == "" {
+		mode = "all"
+	}
+
+	var before *time.Time
+	if mode == "older_than_24h" {
+		t := time.Now().Add(-24 * time.Hour)
+		before = &t
+	}
+
+	deleted, err := h.service.Clear(c.Request.Context(), before)
+	if err != nil {
+		slog.Error("清空请求审计失败", "mode", mode, "error", err)
+		response.InternalError(c, "清空请求审计失败")
+		return
+	}
+	response.Success(c, map[string]any{"deleted": deleted, "mode": mode})
 }
 
 func parseAuditTime(c *gin.Context, raw, field string) (*time.Time, bool) {

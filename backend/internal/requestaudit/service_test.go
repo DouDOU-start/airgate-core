@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"entgo.io/ent/dialect/sql/schema"
 	_ "github.com/mattn/go-sqlite3"
@@ -104,6 +105,36 @@ func Test审计完整保存并解密客户端与上游请求(t *testing.T) {
 	}
 	if total != 1 || len(items) != 1 || items[0].StatusCode != 200 {
 		t.Fatalf("429 后最终成功的请求未被筛出: total=%d items=%+v", total, items)
+	}
+
+	// 先按 24h 阈值清理：当前记录应被保留。
+	cutoff := time.Now().Add(-24 * time.Hour)
+	deletedOld, err := service.Clear(ctx, &cutoff)
+	if err != nil {
+		t.Fatalf("按时间清空请求审计失败: %v", err)
+	}
+	if deletedOld != 0 {
+		t.Fatalf("24h 内记录不应被删: deleted=%d", deletedOld)
+	}
+	// 再清空全部。
+	deleted, err := service.Clear(ctx, nil)
+	if err != nil {
+		t.Fatalf("清空请求审计失败: %v", err)
+	}
+	if deleted != 1 {
+		t.Fatalf("deleted = %d, want 1", deleted)
+	}
+	items, total, err = service.List(ctx, ListFilter{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatalf("清空后列表查询失败: %v", err)
+	}
+	if total != 0 || len(items) != 0 {
+		t.Fatalf("清空后仍有数据: total=%d items=%+v", total, items)
+	}
+	if attempts, err := service.db.RequestAuditAttempt.Query().Count(ctx); err != nil {
+		t.Fatalf("统计 attempt 失败: %v", err)
+	} else if attempts != 0 {
+		t.Fatalf("清空后 attempt 残留 %d 条", attempts)
 	}
 }
 

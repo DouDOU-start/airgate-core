@@ -626,6 +626,38 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]ListItem, int, erro
 	return items, total, nil
 }
 
+// Clear 清空请求审计。
+// before 非 nil 时仅删除 created_at 严格早于 before 的记录；nil 清空全部。
+// 先删 attempt 再删主表：SQLite 测试库与部分迁移环境下 bulk 删除不保证 CASCADE 生效。
+func (s *Service) Clear(ctx context.Context, before *time.Time) (int64, error) {
+	if s == nil || s.db == nil {
+		return 0, fmt.Errorf("请求审计服务未配置")
+	}
+	tx, err := s.db.Tx(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	attemptDel := tx.RequestAuditAttempt.Delete()
+	logDel := tx.RequestAuditLog.Delete()
+	if before != nil {
+		attemptDel = attemptDel.Where(entattempt.HasRequestWith(entlog.CreatedAtLT(*before)))
+		logDel = logDel.Where(entlog.CreatedAtLT(*before))
+	}
+	if _, err := attemptDel.Exec(ctx); err != nil {
+		return 0, err
+	}
+	n, err := logDel.Exec(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return int64(n), nil
+}
+
 // Get 查询并解密单条审计详情。
 func (s *Service) Get(ctx context.Context, id int) (Detail, error) {
 	row, err := s.db.RequestAuditLog.Query().

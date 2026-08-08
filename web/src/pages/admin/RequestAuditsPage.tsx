@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ListBox, Select } from '@heroui/react';
+import { Button, ListBox, Select } from '@heroui/react';
 import {
   Activity,
   ArrowRight,
@@ -17,13 +17,16 @@ import {
   Server,
   ShieldAlert,
   ShieldCheck,
+  Trash2,
   UserRound,
   X,
 } from 'lucide-react';
 
-import { requestAuditsApi } from '../../shared/api/requestAudits';
+import { requestAuditsApi, type RequestAuditClearMode } from '../../shared/api/requestAudits';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
 import { usePagination } from '../../shared/hooks/usePagination';
+import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { RefreshButton } from '../../shared/components/RefreshButton';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { formatDateTime } from '../../shared/utils/format';
@@ -32,6 +35,11 @@ import type {
   RequestAuditListItem,
   RequestAuditPayload,
 } from '../../shared/types';
+
+const CLEAR_MODE_OPTIONS: Array<{ id: RequestAuditClearMode; label: string; desc: string }> = [
+  { id: 'older_than_24h', label: '仅 24 小时前', desc: '保留最近 24 小时的记录，删除更早的数据' },
+  { id: 'all', label: '全部清空', desc: '删除全部请求审计记录，不可恢复' },
+];
 
 const STATUS_OPTIONS = [
   { id: '', label: '全部状态' },
@@ -245,11 +253,14 @@ export default function RequestAuditsPage() {
   const [statusCode, setStatusCode] = useState('');
   const [selectedID, setSelectedID] = useState<number | null>(null);
   const [attemptSeq, setAttemptSeq] = useState(1);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearMode, setClearMode] = useState<RequestAuditClearMode>('older_than_24h');
   const debouncedKeyword = useDebouncedValue(keyword, 300);
   const debouncedModel = useDebouncedValue(model, 300);
 
+  const listQueryKey = ['request-audits', page, pageSize, debouncedKeyword, debouncedModel, statusCode] as const;
   const listQuery = useQuery({
-    queryKey: ['request-audits', page, pageSize, debouncedKeyword, debouncedModel, statusCode],
+    queryKey: listQueryKey,
     queryFn: () => requestAuditsApi.list({
       page,
       page_size: pageSize,
@@ -260,6 +271,17 @@ export default function RequestAuditsPage() {
     placeholderData: keepPreviousData,
     refetchInterval: 15_000,
     meta: { globalLoading: false },
+  });
+
+  const clearMutation = useCrudMutation({
+    mutationFn: (mode: RequestAuditClearMode) => requestAuditsApi.clear(mode),
+    successMessage: '请求审计已清空',
+    queryKey: listQueryKey,
+    onSuccess: () => {
+      setConfirmClear(false);
+      setSelectedID(null);
+      setPage(1);
+    },
   });
 
   const rows = listQuery.data?.list ?? [];
@@ -376,7 +398,20 @@ export default function RequestAuditsPage() {
             </div>
           </div>
 
-          <div className="flex h-14 items-center justify-center">
+          <div className="flex h-14 items-center justify-center gap-1 px-2">
+            <Button
+              aria-label="清空请求审计"
+              className="min-w-0 px-2 text-text-tertiary hover:text-danger"
+              isDisabled={total === 0 || clearMutation.isPending}
+              size="sm"
+              variant="ghost"
+              onPress={() => {
+                setClearMode('older_than_24h');
+                setConfirmClear(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
             <RefreshButton ariaLabel="刷新请求审计" isRefreshing={listQuery.isFetching} onRefresh={() => listQuery.refetch()} />
           </div>
         </div>
@@ -570,6 +605,44 @@ export default function RequestAuditsPage() {
           )}
         </section>
       </div>
+
+      <ConfirmDialog
+        description={(
+          <div className="space-y-3">
+            <p className="text-sm text-text-secondary">
+              当前共 {total.toLocaleString()} 条记录。删除后不可恢复，请选择清理范围：
+            </p>
+            <div className="space-y-2">
+              {CLEAR_MODE_OPTIONS.map((option) => {
+                const active = clearMode === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
+                      active
+                        ? 'border-danger/40 bg-danger/5 shadow-sm'
+                        : 'border-border bg-surface hover:border-border-strong'
+                    }`}
+                    type="button"
+                    onClick={() => setClearMode(option.id)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${active ? 'bg-danger' : 'bg-text-tertiary/50'}`} />
+                      <span className="text-sm font-medium text-text">{option.label}</span>
+                    </div>
+                    <p className="mt-1 pl-4 text-xs text-text-tertiary">{option.desc}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        loading={clearMutation.isPending}
+        open={confirmClear}
+        title="清空请求审计"
+        onConfirm={() => clearMutation.mutate(clearMode)}
+        onOpenChange={(nextOpen) => { if (!nextOpen) setConfirmClear(false); }}
+      />
     </div>
   );
 }
