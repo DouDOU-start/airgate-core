@@ -31,15 +31,15 @@ func Rates(sample Sample) (successRate, errorRate float64) {
 //
 // business = 0.6*errorScore + 0.4*ttftScore
 //   - error_rate: 1%→100, 10%→0 线性
-//   - ttft 窗口峰值: 1s→100, 3s→0 线性；无 TTFT 样本时仅用 errorScore
-func ComputeHealthScore(sample Sample, errorRate float64, ttftMaxMs int64, hasTTFT bool) *int {
+//   - ttft P95: 1s→100, 3s→0 线性；无 TTFT 样本时仅用 errorScore
+func ComputeHealthScore(sample Sample, errorRate float64, ttftP95Ms int64, hasTTFT bool) *int {
 	if sample.Idle {
 		return nil
 	}
 	errorScore := scoreErrorRate(errorRate)
 	business := errorScore
-	if hasTTFT && ttftMaxMs > 0 {
-		ttftScore := scoreTTFT(float64(ttftMaxMs))
+	if hasTTFT && ttftP95Ms > 0 {
+		ttftScore := scoreTTFT(float64(ttftP95Ms))
 		business = errorScore*0.6 + ttftScore*0.4
 	}
 	score := int(math.Round(clamp(business, 0, 100)))

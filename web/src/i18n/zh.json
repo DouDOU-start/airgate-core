@@ -1789,7 +1789,7 @@
     "error_rate": "错误率（含 429）",
     "error_rate_short": "错误率",
     "rate_limit": "限流 429",
-    "peak": "峰值",
+    "p95": "P95",
     "available_keys": "可调度密钥",
     "available_keys_short": "可调度密钥",
     "sched_status_hint": "运行态可调度",

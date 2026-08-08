@@ -77,7 +77,7 @@ func toHealthmonCounts(c apphealthmon.Counts) dto.HealthmonCounts {
 }
 
 func toHealthmonLatency(l apphealthmon.Latency) dto.HealthmonLatency {
-	return dto.HealthmonLatency{AvgMs: l.AvgMs, MaxMs: l.MaxMs}
+	return dto.HealthmonLatency{AvgMs: l.AvgMs, P95Ms: l.P95Ms, MaxMs: l.MaxMs}
 }
 
 func toChannelStatusOverviewResp(item apphealthmon.UserOverview) dto.ChannelStatusOverviewResp {

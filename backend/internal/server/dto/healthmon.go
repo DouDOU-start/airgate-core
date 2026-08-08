@@ -37,6 +37,7 @@ type HealthmonCounts struct {
 // HealthmonLatency 延迟摘要（ms）。
 type HealthmonLatency struct {
 	AvgMs int64 `json:"avg_ms"`
+	P95Ms int64 `json:"p95_ms"`
 	MaxMs int64 `json:"max_ms"`
 }
 
@@ -88,8 +89,8 @@ type HealthmonEntityResp struct {
 	LastError    *HealthmonLastError `json:"last_error,omitempty"`
 }
 
-// ChannelStatusLatency 用户状态页延迟摘要。当前数据层尚未计算真实分位数，
-// 因此对外只返回平均值，不把 MAX 误标为 P95。
+// ChannelStatusLatency 用户状态页延迟摘要。
+// 用户视角仅公开平均值，不公开内部 P95/峰值细节。
 type ChannelStatusLatency struct {
 	AvgMs int64 `json:"avg_ms"`
 }

@@ -73,6 +73,7 @@ type Counts struct {
 // Latency 延迟摘要（毫秒；仅成功样本）。
 type Latency struct {
 	AvgMs int64 `json:"avg_ms"`
+	P95Ms int64 `json:"p95_ms"`
 	MaxMs int64 `json:"max_ms"`
 }
 
@@ -186,8 +187,11 @@ type SuccessAgg struct {
 	DimID       int
 	Count       int64
 	AvgDuration float64
+	P95Duration int64
 	MaxDuration float64
+	TTFTCount   int64
 	AvgTTFT     float64
+	P95TTFT     int64
 	MaxTTFT     float64
 }
 

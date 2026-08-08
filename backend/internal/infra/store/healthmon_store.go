@@ -2,8 +2,10 @@ package store
 
 import (
 	"context"
+	"sort"
 	"time"
 
+	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 
 	"github.com/DouDOU-start/airgate-core/ent"
@@ -17,19 +19,30 @@ import (
 
 // HealthmonStore 健康监测仓储（实现 app/healthmon.Repository）。
 type HealthmonStore struct {
-	db *ent.Client
+	db         *ent.Client
+	sqlDialect string
 }
 
 // NewHealthmonStore 创建健康监测仓储。
-func NewHealthmonStore(db *ent.Client) *HealthmonStore {
-	return &HealthmonStore{db: db}
+// 生产装配显式传 dialect.Postgres 以使用数据库原生 percentile_disc；
+// SQLite 等测试环境不传时使用同口径的 Go 精确排序回退。
+func NewHealthmonStore(db *ent.Client, sqlDialect ...string) *HealthmonStore {
+	s := &HealthmonStore{db: db}
+	if len(sqlDialect) > 0 {
+		s.sqlDialect = sqlDialect[0]
+	}
+	return s
 }
 
 // AggregateSuccess 按 channel_key 聚合 relay 成功流量（排除 test/task）。
-//
-// 当前直接聚合窗口平均值与最大值；精确分位和历史趋势留给后续预聚合。
 func (s *HealthmonStore) AggregateSuccess(ctx context.Context, since time.Time) ([]apphealthmon.SuccessAgg, error) {
 	return s.aggregateSuccessBy(ctx, since, entusagelog.FieldChannelKeyID, true, nil)
+}
+
+// AggregateSuccessSummary 汇总全部 channel_key relay 成功流量。
+// P95 必须直接基于全窗口样本计算，不能由各 key 的 P95 再合并。
+func (s *HealthmonStore) AggregateSuccessSummary(ctx context.Context, since time.Time) (apphealthmon.SuccessAgg, error) {
+	return s.aggregateSuccessSummary(ctx, since, entusagelog.FieldChannelKeyID, true, nil)
 }
 
 // AggregateSuccessByGroup 按 group 聚合 relay 成功流量。
@@ -45,15 +58,126 @@ func (s *HealthmonStore) AggregateSuccessByGroupIDs(ctx context.Context, since t
 	return s.aggregateSuccessBy(ctx, since, entusagelog.FieldGroupID, true, ids)
 }
 
-func (s *HealthmonStore) aggregateSuccessBy(ctx context.Context, since time.Time, dimField string, requirePositiveDim bool, dimIDs []int) ([]apphealthmon.SuccessAgg, error) {
-	var rows []struct {
-		DimID       int     `json:"dim_id"`
-		Count       int64   `json:"count"`
-		AvgDuration float64 `json:"avg_duration"`
-		MaxDuration float64 `json:"max_duration"`
-		AvgTTFT     float64 `json:"avg_ttft"`
-		MaxTTFT     float64 `json:"max_ttft"`
+// AggregateSuccessSummaryByGroupIDs 汇总指定分组的 relay 成功流量。
+// 空 allow-list 必须返回零值，避免权限过滤失效后退化为全量查询。
+func (s *HealthmonStore) AggregateSuccessSummaryByGroupIDs(ctx context.Context, since time.Time, ids []int) (apphealthmon.SuccessAgg, error) {
+	if len(ids) == 0 {
+		return apphealthmon.SuccessAgg{}, nil
 	}
+	return s.aggregateSuccessSummary(ctx, since, entusagelog.FieldGroupID, true, ids)
+}
+
+type healthmonSuccessAggregateRow struct {
+	DimID       int     `json:"dim_id"`
+	Count       int64   `json:"count"`
+	AvgDuration float64 `json:"avg_duration"`
+	P95Duration int64   `json:"p95_duration"`
+	MaxDuration float64 `json:"max_duration"`
+	TTFTCount   int64   `json:"ttft_count"`
+	AvgTTFT     float64 `json:"avg_ttft"`
+	P95TTFT     int64   `json:"p95_ttft"`
+	MaxTTFT     float64 `json:"max_ttft"`
+}
+
+func (s *HealthmonStore) aggregateSuccessBy(ctx context.Context, since time.Time, dimField string, requirePositiveDim bool, dimIDs []int) ([]apphealthmon.SuccessAgg, error) {
+	var rows []healthmonSuccessAggregateRow
+	q := s.healthmonSuccessQuery(since, dimField, requirePositiveDim, dimIDs)
+	err := q.Modify(func(sel *entsql.Selector) {
+		dimCol := sel.C(dimField)
+		durCol := sel.C(entusagelog.FieldDurationMs)
+		ttftCol := sel.C(entusagelog.FieldFirstTokenMs)
+		p95Duration, p95TTFT := s.healthmonP95Expressions(durCol, ttftCol)
+		sel.Select(
+			entsql.As(dimCol, "dim_id"),
+			entsql.As("COUNT(*)", "count"),
+			entsql.As("COALESCE(AVG("+durCol+"),0)", "avg_duration"),
+			entsql.As(p95Duration, "p95_duration"),
+			entsql.As("COALESCE(MAX("+durCol+"),0)", "max_duration"),
+			entsql.As("COUNT(CASE WHEN "+ttftCol+" > 0 THEN 1 END)", "ttft_count"),
+			entsql.As("COALESCE(AVG(CASE WHEN "+ttftCol+" > 0 THEN "+ttftCol+" END),0)", "avg_ttft"),
+			entsql.As(p95TTFT, "p95_ttft"),
+			entsql.As("COALESCE(MAX(CASE WHEN "+ttftCol+" > 0 THEN "+ttftCol+" END),0)", "max_ttft"),
+		).GroupBy(dimCol)
+	}).Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+	if s.sqlDialect != dialect.Postgres {
+		p95ByDim, err := s.healthmonP95ByDimension(ctx, since, dimField, requirePositiveDim, dimIDs)
+		if err != nil {
+			return nil, err
+		}
+		for i := range rows {
+			rows[i].P95Duration = p95ByDim[rows[i].DimID].duration
+			rows[i].P95TTFT = p95ByDim[rows[i].DimID].ttft
+		}
+	}
+	out := make([]apphealthmon.SuccessAgg, 0, len(rows))
+	for _, row := range rows {
+		if row.DimID <= 0 {
+			continue
+		}
+		out = append(out, apphealthmon.SuccessAgg{
+			DimID:       row.DimID,
+			Count:       row.Count,
+			AvgDuration: row.AvgDuration,
+			P95Duration: row.P95Duration,
+			MaxDuration: row.MaxDuration,
+			TTFTCount:   row.TTFTCount,
+			AvgTTFT:     row.AvgTTFT,
+			P95TTFT:     row.P95TTFT,
+			MaxTTFT:     row.MaxTTFT,
+		})
+	}
+	return out, nil
+}
+
+func (s *HealthmonStore) aggregateSuccessSummary(ctx context.Context, since time.Time, filterDimField string, requirePositiveDim bool, dimIDs []int) (apphealthmon.SuccessAgg, error) {
+	var rows []healthmonSuccessAggregateRow
+	q := s.healthmonSuccessQuery(since, filterDimField, requirePositiveDim, dimIDs)
+	err := q.Modify(func(sel *entsql.Selector) {
+		durCol := sel.C(entusagelog.FieldDurationMs)
+		ttftCol := sel.C(entusagelog.FieldFirstTokenMs)
+		p95Duration, p95TTFT := s.healthmonP95Expressions(durCol, ttftCol)
+		sel.Select(
+			entsql.As("COUNT(*)", "count"),
+			entsql.As("COALESCE(AVG("+durCol+"),0)", "avg_duration"),
+			entsql.As(p95Duration, "p95_duration"),
+			entsql.As("COALESCE(MAX("+durCol+"),0)", "max_duration"),
+			entsql.As("COUNT(CASE WHEN "+ttftCol+" > 0 THEN 1 END)", "ttft_count"),
+			entsql.As("COALESCE(AVG(CASE WHEN "+ttftCol+" > 0 THEN "+ttftCol+" END),0)", "avg_ttft"),
+			entsql.As(p95TTFT, "p95_ttft"),
+			entsql.As("COALESCE(MAX(CASE WHEN "+ttftCol+" > 0 THEN "+ttftCol+" END),0)", "max_ttft"),
+		)
+	}).Scan(ctx, &rows)
+	if err != nil {
+		return apphealthmon.SuccessAgg{}, err
+	}
+	if len(rows) == 0 {
+		return apphealthmon.SuccessAgg{}, nil
+	}
+	row := rows[0]
+	if s.sqlDialect != dialect.Postgres {
+		p95, err := s.healthmonP95Summary(ctx, since, filterDimField, requirePositiveDim, dimIDs)
+		if err != nil {
+			return apphealthmon.SuccessAgg{}, err
+		}
+		row.P95Duration = p95.duration
+		row.P95TTFT = p95.ttft
+	}
+	return apphealthmon.SuccessAgg{
+		Count:       row.Count,
+		AvgDuration: row.AvgDuration,
+		P95Duration: row.P95Duration,
+		MaxDuration: row.MaxDuration,
+		TTFTCount:   row.TTFTCount,
+		AvgTTFT:     row.AvgTTFT,
+		P95TTFT:     row.P95TTFT,
+		MaxTTFT:     row.MaxTTFT,
+	}, nil
+}
+
+func (s *HealthmonStore) healthmonSuccessQuery(since time.Time, dimField string, requirePositiveDim bool, dimIDs []int) *ent.UsageLogQuery {
 	q := s.db.UsageLog.Query().Where(
 		entusagelog.CreatedAtGTE(since),
 		entusagelog.SourceEQ("relay"),
@@ -74,37 +198,103 @@ func (s *HealthmonStore) aggregateSuccessBy(ctx context.Context, since time.Time
 			q = q.Where(entusagelog.GroupIDIn(dimIDs...))
 		}
 	}
-	err := q.Modify(func(sel *entsql.Selector) {
-		dimCol := sel.C(dimField)
-		durCol := sel.C(entusagelog.FieldDurationMs)
-		ttftCol := sel.C(entusagelog.FieldFirstTokenMs)
-		sel.Select(
-			entsql.As(dimCol, "dim_id"),
-			entsql.As("COUNT(*)", "count"),
-			entsql.As("COALESCE(AVG("+durCol+"),0)", "avg_duration"),
-			entsql.As("COALESCE(MAX("+durCol+"),0)", "max_duration"),
-			entsql.As("COALESCE(AVG(CASE WHEN "+ttftCol+" > 0 THEN "+ttftCol+" END),0)", "avg_ttft"),
-			entsql.As("COALESCE(MAX(CASE WHEN "+ttftCol+" > 0 THEN "+ttftCol+" END),0)", "max_ttft"),
-		).GroupBy(dimCol)
-	}).Scan(ctx, &rows)
+	return q
+}
+
+// healthmonP95Expressions 返回与 nearest-rank 定义一致的 PostgreSQL P95 表达式。
+// 非 PostgreSQL 方言返回常量占位，随后由 Go 精确排序回填。
+func (s *HealthmonStore) healthmonP95Expressions(durationCol, ttftCol string) (string, string) {
+	if s.sqlDialect != dialect.Postgres {
+		return "COALESCE(MAX(" + durationCol + "*0),0)",
+			"COALESCE(MAX(" + ttftCol + "*0),0)"
+	}
+	return "COALESCE(PERCENTILE_DISC(0.95) WITHIN GROUP (ORDER BY " + durationCol + "),0)",
+		"COALESCE(PERCENTILE_DISC(0.95) WITHIN GROUP (ORDER BY " + ttftCol + ") FILTER (WHERE " + ttftCol + " > 0),0)"
+}
+
+type healthmonP95 struct {
+	duration int64
+	ttft     int64
+}
+
+type healthmonLatencySamples struct {
+	duration []int64
+	ttft     []int64
+}
+
+func (s *HealthmonStore) healthmonP95ByDimension(ctx context.Context, since time.Time, dimField string, requirePositiveDim bool, dimIDs []int) (map[int]healthmonP95, error) {
+	fields := []string{dimField, entusagelog.FieldDurationMs, entusagelog.FieldFirstTokenMs}
+	logs, err := s.healthmonSuccessQuery(since, dimField, requirePositiveDim, dimIDs).
+		Select(fields...).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]apphealthmon.SuccessAgg, 0, len(rows))
-	for _, row := range rows {
-		if row.DimID <= 0 {
+	samplesByDim := make(map[int]*healthmonLatencySamples)
+	for _, log := range logs {
+		dimID := healthmonUsageLogDimID(log, dimField)
+		if dimID <= 0 {
 			continue
 		}
-		out = append(out, apphealthmon.SuccessAgg{
-			DimID:       row.DimID,
-			Count:       row.Count,
-			AvgDuration: row.AvgDuration,
-			MaxDuration: row.MaxDuration,
-			AvgTTFT:     row.AvgTTFT,
-			MaxTTFT:     row.MaxTTFT,
-		})
+		samples := samplesByDim[dimID]
+		if samples == nil {
+			samples = &healthmonLatencySamples{}
+			samplesByDim[dimID] = samples
+		}
+		samples.duration = append(samples.duration, log.DurationMs)
+		if log.FirstTokenMs > 0 {
+			samples.ttft = append(samples.ttft, log.FirstTokenMs)
+		}
+	}
+	out := make(map[int]healthmonP95, len(samplesByDim))
+	for dimID, samples := range samplesByDim {
+		out[dimID] = healthmonP95{
+			duration: healthmonNearestRankP95(samples.duration),
+			ttft:     healthmonNearestRankP95(samples.ttft),
+		}
 	}
 	return out, nil
+}
+
+func (s *HealthmonStore) healthmonP95Summary(ctx context.Context, since time.Time, filterDimField string, requirePositiveDim bool, dimIDs []int) (healthmonP95, error) {
+	logs, err := s.healthmonSuccessQuery(since, filterDimField, requirePositiveDim, dimIDs).
+		Select(entusagelog.FieldDurationMs, entusagelog.FieldFirstTokenMs).All(ctx)
+	if err != nil {
+		return healthmonP95{}, err
+	}
+	durations := make([]int64, 0, len(logs))
+	ttfts := make([]int64, 0, len(logs))
+	for _, log := range logs {
+		durations = append(durations, log.DurationMs)
+		if log.FirstTokenMs > 0 {
+			ttfts = append(ttfts, log.FirstTokenMs)
+		}
+	}
+	return healthmonP95{
+		duration: healthmonNearestRankP95(durations),
+		ttft:     healthmonNearestRankP95(ttfts),
+	}, nil
+}
+
+func healthmonUsageLogDimID(log *ent.UsageLog, dimField string) int {
+	switch dimField {
+	case entusagelog.FieldChannelKeyID:
+		return log.ChannelKeyID
+	case entusagelog.FieldGroupID:
+		return log.GroupID
+	default:
+		return 0
+	}
+}
+
+// healthmonNearestRankP95 与 PostgreSQL percentile_disc(0.95) 同口径：
+// 排序后取 rank=ceil(0.95*N) 的观测值。
+func healthmonNearestRankP95(values []int64) int64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
+	rank := (95*len(values) + 99) / 100
+	return values[rank-1]
 }
 
 // AggregateFailureRaws 按 channel_key + status + phase 聚合 relay 失败。

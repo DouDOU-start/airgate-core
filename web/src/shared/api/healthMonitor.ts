@@ -22,6 +22,7 @@ export interface HealthmonCounts {
 
 export interface HealthmonLatency {
   avg_ms: number;
+  p95_ms: number;
   max_ms: number;
 }
 

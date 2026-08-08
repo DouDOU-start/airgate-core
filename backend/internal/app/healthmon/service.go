@@ -27,6 +27,8 @@ type SettingsLister interface {
 type Repository interface {
 	// AggregateSuccess 按 channel_key 聚合 relay 成功流量。
 	AggregateSuccess(ctx context.Context, since time.Time) ([]SuccessAgg, error)
+	// AggregateSuccessSummary 汇总全部 relay 成功流量；P95 直接基于全窗口样本计算。
+	AggregateSuccessSummary(ctx context.Context, since time.Time) (SuccessAgg, error)
 	// AggregateSuccessByGroup 按 group 聚合 relay 成功流量。
 	AggregateSuccessByGroup(ctx context.Context, since time.Time) ([]SuccessAgg, error)
 	// AggregateFailureRaws 按 channel_key + status + phase 聚合 relay 失败。
@@ -41,6 +43,8 @@ type Repository interface {
 	ListUserVisibleGroupMeta(ctx context.Context, userID int) ([]GroupMeta, error)
 	// AggregateSuccessByGroupIDs 仅聚合指定分组的 relay 成功流量；ids 空返回空。
 	AggregateSuccessByGroupIDs(ctx context.Context, since time.Time, ids []int) ([]SuccessAgg, error)
+	// AggregateSuccessSummaryByGroupIDs 汇总指定分组的 relay 成功流量；ids 空返回零值。
+	AggregateSuccessSummaryByGroupIDs(ctx context.Context, since time.Time, ids []int) (SuccessAgg, error)
 	// AggregateFailureRawsByGroupIDs 仅聚合指定分组的 relay 失败；ids 空返回空。
 	AggregateFailureRawsByGroupIDs(ctx context.Context, since time.Time, ids []int) ([]FailureRaw, error)
 	// CountKeyAvailability 统计 enabled / 全部 key 数。
@@ -108,7 +112,7 @@ func (s *Service) Overview(ctx context.Context, windowRaw string) (Overview, err
 	window, dur := ParseWindow(windowRaw)
 	since := s.now().Add(-dur)
 
-	success, err := s.repo.AggregateSuccess(ctx, since)
+	success, err := s.repo.AggregateSuccessSummary(ctx, since)
 	if err != nil {
 		return Overview{}, err
 	}
@@ -121,7 +125,7 @@ func (s *Service) Overview(ctx context.Context, windowRaw string) (Overview, err
 		return Overview{}, err
 	}
 
-	metrics := mergeSuccessMetrics(success)
+	metrics := successMetricsFromAgg(success)
 	metrics.sCount = subtractBilledFailures(metrics.sCount, raws)
 	counts := mergeFailureCounts(raws, func(r FailureRaw) int { return r.ChannelKeyID })
 	eCount := SLAErrorCount(counts)
@@ -136,7 +140,7 @@ func (s *Service) Overview(ctx context.Context, windowRaw string) (Overview, err
 		Counts:      counts,
 		Latency:     metrics.latency,
 		TTFT:        metrics.ttft,
-		HealthScore: ComputeHealthScore(sample, er, metrics.ttft.MaxMs, metrics.hasTTFT),
+		HealthScore: ComputeHealthScore(sample, er, metrics.ttft.P95Ms, metrics.hasTTFT),
 		Availability: Availability{
 			ChannelKeysAvailable: avail,
 			ChannelKeysTotal:     total,
@@ -274,7 +278,7 @@ func (s *Service) UserOverview(ctx context.Context, userID int, windowRaw string
 		return UserOverview{}, err
 	}
 	ids := groupMetaIDs(metas)
-	success, err := s.repo.AggregateSuccessByGroupIDs(ctx, now.Add(-dur), ids)
+	success, err := s.repo.AggregateSuccessSummaryByGroupIDs(ctx, now.Add(-dur), ids)
 	if err != nil {
 		return UserOverview{}, err
 	}
@@ -283,7 +287,7 @@ func (s *Service) UserOverview(ctx context.Context, userID int, windowRaw string
 		return UserOverview{}, err
 	}
 
-	metrics := mergeSuccessMetrics(success)
+	metrics := successMetricsFromAgg(success)
 	metrics.sCount = subtractBilledFailures(metrics.sCount, raws)
 	counts := mergeFailureCounts(raws, func(r FailureRaw) int { return r.GroupID })
 	sample := BuildSample(metrics.sCount, SLAErrorCount(counts), s.minSample)
@@ -295,7 +299,7 @@ func (s *Service) UserOverview(ctx context.Context, userID int, windowRaw string
 		ErrorRate:   errorRate,
 		Latency:     metrics.latency,
 		TTFT:        metrics.ttft,
-		HealthScore: ComputeHealthScore(sample, errorRate, metrics.ttft.MaxMs, metrics.hasTTFT),
+		HealthScore: ComputeHealthScore(sample, errorRate, metrics.ttft.P95Ms, metrics.hasTTFT),
 		UpdatedAt:   now,
 	}, nil
 }
@@ -395,40 +399,21 @@ type successMetrics struct {
 	hasTTFT bool
 }
 
-func mergeSuccessMetrics(rows []SuccessAgg) successMetrics {
-	var m successMetrics
-	var durSum float64
-	var durWeight int64
-	var durationMax float64
-	var ttftSum float64
-	var ttftWeight int64
-	var ttftMax float64
-	for _, row := range rows {
-		m.sCount += row.Count
-		if row.Count <= 0 {
-			continue
-		}
-		durSum += row.AvgDuration * float64(row.Count)
-		durWeight += row.Count
-		if row.MaxDuration > durationMax {
-			durationMax = row.MaxDuration
-		}
-		if row.MaxTTFT > 0 {
-			m.hasTTFT = true
-			ttftSum += row.AvgTTFT * float64(row.Count)
-			ttftWeight += row.Count
-			if row.MaxTTFT > ttftMax {
-				ttftMax = row.MaxTTFT
-			}
-		}
+func successMetricsFromAgg(row SuccessAgg) successMetrics {
+	return successMetrics{
+		sCount: row.Count,
+		latency: Latency{
+			AvgMs: int64(row.AvgDuration),
+			P95Ms: row.P95Duration,
+			MaxMs: int64(row.MaxDuration),
+		},
+		ttft: Latency{
+			AvgMs: int64(row.AvgTTFT),
+			P95Ms: row.P95TTFT,
+			MaxMs: int64(row.MaxTTFT),
+		},
+		hasTTFT: row.TTFTCount > 0 || row.P95TTFT > 0,
 	}
-	if durWeight > 0 {
-		m.latency = Latency{AvgMs: int64(durSum / float64(durWeight)), MaxMs: int64(durationMax)}
-	}
-	if ttftWeight > 0 {
-		m.ttft = Latency{AvgMs: int64(ttftSum / float64(ttftWeight)), MaxMs: int64(ttftMax)}
-	}
-	return m
 }
 
 func mergeFailureCounts(raws []FailureRaw, dim func(FailureRaw) int) Counts {
@@ -530,10 +515,18 @@ func buildEntityRow(in entityBuildInput) EntityRow {
 	eCount := SLAErrorCount(in.Counts)
 	sample := BuildSample(in.Success.Count, eCount, in.MinSample)
 	sr, er := Rates(sample)
-	hasTTFT := in.Success.MaxTTFT > 0
-	latency := Latency{AvgMs: int64(in.Success.AvgDuration), MaxMs: int64(in.Success.MaxDuration)}
-	ttft := Latency{AvgMs: int64(in.Success.AvgTTFT), MaxMs: int64(in.Success.MaxTTFT)}
-	score := ComputeHealthScore(sample, er, ttft.MaxMs, hasTTFT)
+	hasTTFT := in.Success.TTFTCount > 0 || in.Success.P95TTFT > 0
+	latency := Latency{
+		AvgMs: int64(in.Success.AvgDuration),
+		P95Ms: in.Success.P95Duration,
+		MaxMs: int64(in.Success.MaxDuration),
+	}
+	ttft := Latency{
+		AvgMs: int64(in.Success.AvgTTFT),
+		P95Ms: in.Success.P95TTFT,
+		MaxMs: int64(in.Success.MaxTTFT),
+	}
+	score := ComputeHealthScore(sample, er, ttft.P95Ms, hasTTFT)
 	row := EntityRow{
 		ID:           in.ID,
 		Kind:         in.Kind,

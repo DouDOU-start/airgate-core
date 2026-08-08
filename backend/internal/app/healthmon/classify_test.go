@@ -72,6 +72,55 @@ func TestComputeHealthScoreRates(t *testing.T) {
 	}
 }
 
+func TestComputeHealthScoreTTFTP95Boundaries(t *testing.T) {
+	t.Parallel()
+	sample := BuildSample(100, 0, DefaultMinSample)
+	tests := []struct {
+		name    string
+		p95Ms   int64
+		hasTTFT bool
+		want    int
+	}{
+		{name: "no TTFT uses error score only", want: 100},
+		{name: "one second", p95Ms: 1_000, hasTTFT: true, want: 100},
+		{name: "two seconds", p95Ms: 2_000, hasTTFT: true, want: 80},
+		{name: "three seconds", p95Ms: 3_000, hasTTFT: true, want: 60},
+		{name: "above three seconds", p95Ms: 82_000, hasTTFT: true, want: 60},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			score := ComputeHealthScore(sample, 0, test.p95Ms, test.hasTTFT)
+			if score == nil || *score != test.want {
+				t.Fatalf("score = %v, want %d", score, test.want)
+			}
+		})
+	}
+}
+
+func TestBuildEntityRowUsesP95InsteadOfPeak(t *testing.T) {
+	t.Parallel()
+	row := buildEntityRow(entityBuildInput{
+		ID:     1,
+		Window: Window1h,
+		Success: SuccessAgg{
+			Count:       20,
+			TTFTCount:   20,
+			AvgTTFT:     5_050,
+			P95TTFT:     1_000,
+			MaxTTFT:     82_000,
+			P95Duration: 6_000,
+			MaxDuration: 90_000,
+		},
+		MinSample: DefaultMinSample,
+	})
+	if row.HealthScore == nil || *row.HealthScore != 100 {
+		t.Fatalf("health score = %v, want 100 from P95=1s", row.HealthScore)
+	}
+	if row.TTFT.P95Ms != 1_000 || row.TTFT.MaxMs != 82_000 {
+		t.Fatalf("TTFT = %+v, want P95=1000 max=82000", row.TTFT)
+	}
+}
+
 func TestRatesAndSLAErrorCount(t *testing.T) {
 	t.Parallel()
 	sample := BuildSample(80, 20, 10)

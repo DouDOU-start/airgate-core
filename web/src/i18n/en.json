@@ -1789,7 +1789,7 @@
     "error_rate": "Error rate (incl. 429)",
     "error_rate_short": "Error rate",
     "rate_limit": "Rate limit 429",
-    "peak": "Peak",
+    "p95": "P95",
     "available_keys": "Schedulable keys",
     "available_keys_short": "Keys ready",
     "sched_status_hint": "Runtime schedulable",

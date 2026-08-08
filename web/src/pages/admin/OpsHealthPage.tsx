@@ -253,7 +253,7 @@ function EntityTable({
                 <div className="font-mono text-xs tabular-nums leading-tight">
                   <div>{entity.sample.idle ? '—' : ms(entity.ttft.avg_ms)}</div>
                   <div className="mt-0.5 text-[10px] text-text-tertiary">
-                    {t('ops_health.peak')} {entity.sample.idle ? '—' : ms(entity.ttft.max_ms)}
+                    {t('ops_health.p95')} {entity.sample.idle ? '—' : ms(entity.ttft.p95_ms)}
                   </div>
                 </div>
               </CommonTable.Cell>
@@ -261,7 +261,7 @@ function EntityTable({
                 <div className="font-mono text-xs tabular-nums leading-tight">
                   <div>{entity.sample.idle ? '—' : ms(entity.latency.avg_ms)}</div>
                   <div className="mt-0.5 text-[10px] text-text-tertiary">
-                    {t('ops_health.peak')} {entity.sample.idle ? '—' : ms(entity.latency.max_ms)}
+                    {t('ops_health.p95')} {entity.sample.idle ? '—' : ms(entity.latency.p95_ms)}
                   </div>
                 </div>
               </CommonTable.Cell>
@@ -378,14 +378,14 @@ export default function OpsHealthPage() {
       icon: <Timer className="h-3.5 w-3.5 text-info" />,
       label: t('ops_health.ttft_avg'),
       value: overview.sample.idle ? '—' : ms(overview.ttft.avg_ms),
-      detail: `${t('ops_health.peak')} ${overview.sample.idle ? '—' : ms(overview.ttft.max_ms)}`,
+      detail: `${t('ops_health.p95')} ${overview.sample.idle ? '—' : ms(overview.ttft.p95_ms)}`,
     },
     {
       key: 'duration',
       icon: <Clock3 className="h-3.5 w-3.5 text-[var(--ag-tone-violet)]" />,
       label: t('ops_health.duration_avg'),
       value: overview.sample.idle ? '—' : ms(overview.latency.avg_ms),
-      detail: `${t('ops_health.peak')} ${overview.sample.idle ? '—' : ms(overview.latency.max_ms)}`,
+      detail: `${t('ops_health.p95')} ${overview.sample.idle ? '—' : ms(overview.latency.p95_ms)}`,
     },
     {
       key: 'avail',

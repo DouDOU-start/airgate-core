@@ -32,10 +32,26 @@ func (r *channelStatusTestRepository) AggregateSuccessByGroupIDs(context.Context
 		DimID:       17,
 		Count:       10,
 		AvgDuration: 1200,
+		P95Duration: 1800,
 		MaxDuration: 9000,
+		TTFTCount:   10,
 		AvgTTFT:     450,
+		P95TTFT:     800,
 		MaxTTFT:     7000,
 	}}, nil
+}
+
+func (r *channelStatusTestRepository) AggregateSuccessSummaryByGroupIDs(context.Context, time.Time, []int) (apphealthmon.SuccessAgg, error) {
+	return apphealthmon.SuccessAgg{
+		Count:       10,
+		AvgDuration: 1200,
+		P95Duration: 1800,
+		MaxDuration: 9000,
+		TTFTCount:   10,
+		AvgTTFT:     450,
+		P95TTFT:     800,
+		MaxTTFT:     7000,
+	}, nil
 }
 
 func (r *channelStatusTestRepository) AggregateFailureRawsByGroupIDs(context.Context, time.Time, []int) ([]apphealthmon.FailureRaw, error) {

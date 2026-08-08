@@ -11,6 +11,7 @@ import (
 type userStatusRepository struct {
 	visible       []GroupMeta
 	success       []SuccessAgg
+	summary       *SuccessAgg
 	failures      []FailureRaw
 	visibleUserID int
 	successIDs    []int
@@ -23,6 +24,13 @@ type userStatusRepository struct {
 
 func (r *userStatusRepository) AggregateSuccess(context.Context, time.Time) ([]SuccessAgg, error) {
 	return nil, nil
+}
+
+func (r *userStatusRepository) AggregateSuccessSummary(context.Context, time.Time) (SuccessAgg, error) {
+	if r.summary != nil {
+		return *r.summary, nil
+	}
+	return SuccessAgg{}, nil
 }
 
 func (r *userStatusRepository) AggregateSuccessByGroup(context.Context, time.Time) ([]SuccessAgg, error) {
@@ -58,6 +66,77 @@ func (r *userStatusRepository) AggregateSuccessByGroupIDs(_ context.Context, sin
 	return r.success, nil
 }
 
+func (r *userStatusRepository) AggregateSuccessSummaryByGroupIDs(_ context.Context, since time.Time, ids []int) (SuccessAgg, error) {
+	r.successSince = since
+	r.successCalled = true
+	r.successIDs = append([]int(nil), ids...)
+	allowed := make(map[int]struct{}, len(ids))
+	for _, id := range ids {
+		allowed[id] = struct{}{}
+	}
+	if r.summary != nil {
+		return *r.summary, nil
+	}
+	var out SuccessAgg
+	for _, row := range r.success {
+		if _, ok := allowed[row.DimID]; !ok {
+			continue
+		}
+		out.Count += row.Count
+		if out.Count == row.Count {
+			out.AvgDuration = row.AvgDuration
+			out.P95Duration = row.P95Duration
+			out.MaxDuration = row.MaxDuration
+			out.TTFTCount = row.TTFTCount
+			out.AvgTTFT = row.AvgTTFT
+			out.P95TTFT = row.P95TTFT
+			out.MaxTTFT = row.MaxTTFT
+		}
+	}
+	return out, nil
+}
+
+func TestOverviewHealthScoreUsesOverallTTFTP95NotPeak(t *testing.T) {
+	summary := SuccessAgg{
+		Count:       20,
+		AvgDuration: 5_000,
+		P95Duration: 6_000,
+		MaxDuration: 90_000,
+		TTFTCount:   20,
+		AvgTTFT:     5_050,
+		P95TTFT:     1_000,
+		MaxTTFT:     82_000,
+	}
+	repo := &userStatusRepository{
+		visible: []GroupMeta{{ID: 1}, {ID: 2}},
+		summary: &summary,
+		success: []SuccessAgg{
+			{DimID: 1, Count: 1, TTFTCount: 1, P95TTFT: 82_000, MaxTTFT: 82_000},
+			{DimID: 2, Count: 19, TTFTCount: 19, P95TTFT: 1_000, MaxTTFT: 1_000},
+		},
+	}
+	service := NewService(repo)
+
+	overview, err := service.Overview(context.Background(), "1h")
+	if err != nil {
+		t.Fatalf("Overview returned error: %v", err)
+	}
+	if overview.HealthScore == nil || *overview.HealthScore != 100 {
+		t.Fatalf("overview score = %v, want 100 from P95=1s despite max=82s", overview.HealthScore)
+	}
+	if overview.TTFT.P95Ms != 1_000 || overview.TTFT.MaxMs != 82_000 {
+		t.Fatalf("overview TTFT = %+v, want P95=1000 max=82000", overview.TTFT)
+	}
+
+	userOverview, err := service.UserOverview(context.Background(), 42, "1h")
+	if err != nil {
+		t.Fatalf("UserOverview returned error: %v", err)
+	}
+	if userOverview.HealthScore == nil || *userOverview.HealthScore != 100 {
+		t.Fatalf("user overview score = %v, want 100 from exact overall P95", userOverview.HealthScore)
+	}
+}
+
 func (r *userStatusRepository) AggregateFailureRawsByGroupIDs(_ context.Context, since time.Time, ids []int) ([]FailureRaw, error) {
 	r.failureSince = since
 	r.failureCalled = true
@@ -86,7 +165,7 @@ func TestListUserGroupsScopesTrafficToVisibleGroups(t *testing.T) {
 			{ID: 30, Name: "exclusive-allowed", Platform: "claude"},
 		},
 		success: []SuccessAgg{
-			{DimID: 10, Count: 10, AvgDuration: 1200, MaxDuration: 1500, AvgTTFT: 600, MaxTTFT: 800},
+			{DimID: 10, Count: 10, AvgDuration: 1200, P95Duration: 1400, MaxDuration: 1500, TTFTCount: 10, AvgTTFT: 600, P95TTFT: 750, MaxTTFT: 800},
 			{DimID: 30, Count: 8, AvgDuration: 2000, MaxDuration: 2500},
 			// Repository output is treated defensively: metadata remains the output allow-list.
 			{DimID: 99, Count: 1000, AvgDuration: 1, MaxDuration: 1},

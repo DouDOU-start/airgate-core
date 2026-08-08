@@ -172,7 +172,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	usageService := appusage.NewService(usageStore, dep.Redis)
 	upstreamLogStore := store.NewUpstreamLogStore(dep.DB)
 	upstreamLogService := appupstreamlog.NewService(upstreamLogStore)
-	healthmonStore := store.NewHealthmonStore(dep.DB)
+	healthmonStore := store.NewHealthmonStore(dep.DB, dialect.Postgres)
 	healthmonService := apphealthmon.NewService(healthmonStore)
 	healthmonService.SetSettingsLister(healthmonSettingsAdapter{settingsService})
 
