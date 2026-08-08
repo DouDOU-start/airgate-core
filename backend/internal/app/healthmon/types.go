@@ -2,7 +2,7 @@
 //
 // 口径（Phase 0 锁定）：
 //   - 仅 source=relay；排除 channel_test / account_test / task
-//   - 429 计入 error_rate；client 4xx / canceled / precheck 不计入
+//   - 429 计入 error_rate；client 4xx / canceled / precheck（余额不足、缺价等）不计入
 //   - usage_logs 中的 billed 失败先从成功数扣除；SLA 失败再计入错误数
 //   - idle（N==0）健康分为 nil，UI 显示「空闲」
 //   - 不写调度状态；与 probe/outcome 控制面分离

@@ -58,6 +58,7 @@ type FailureRaw struct {
 	GroupID      int
 	StatusCode   int
 	Phase        string
+	ErrorCode    string
 	Billed       bool
 	Count        int64
 }
@@ -436,7 +437,7 @@ func mergeFailureCounts(raws []FailureRaw, dim func(FailureRaw) int) Counts {
 		if dim(raw) <= 0 {
 			continue
 		}
-		MergeCounts(&counts, ClassifyFailure(raw.StatusCode, raw.Phase), raw.Count)
+		MergeCounts(&counts, ClassifyFailure(raw.StatusCode, raw.Phase, raw.ErrorCode), raw.Count)
 	}
 	return counts
 }
@@ -491,7 +492,7 @@ func indexFailureCounts(raws []FailureRaw, dim func(FailureRaw) int) map[int]Cou
 			c = &Counts{}
 			tmp[id] = c
 		}
-		MergeCounts(c, ClassifyFailure(raw.StatusCode, raw.Phase), raw.Count)
+		MergeCounts(c, ClassifyFailure(raw.StatusCode, raw.Phase, raw.ErrorCode), raw.Count)
 	}
 	out := make(map[int]Counts, len(tmp))
 	for id, c := range tmp {

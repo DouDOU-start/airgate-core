@@ -24,6 +24,8 @@ import { formatDateTime, fmtNum } from '../../shared/utils/format';
 
 type EntityScope = 'group' | 'channel_key';
 
+const LAST_ERROR_COLUMN_WIDTH = 320;
+
 interface SummaryMetric {
   detail: ReactNode;
   icon: ReactNode;
@@ -150,10 +152,11 @@ function EntityTable({
     <CommonTable
       ariaLabel={isGroup ? t('ops_health.group_table') : t('ops_health.entity_table')}
       className="ag-ops-health-table"
-      minWidth={isGroup ? 960 : 1160}
+      contentStyle={{ tableLayout: 'fixed' }}
+      minWidth={isGroup ? 1120 : 1380}
     >
       <CommonTable.Header>
-        <CommonTable.Column id="name" style={{ width: 220 }}>
+        <CommonTable.Column id="name">
           {isGroup ? t('ops_health.col_group') : t('ops_health.col_key')}
         </CommonTable.Column>
         {!isGroup ? (
@@ -182,7 +185,7 @@ function EntityTable({
         <CommonTable.Column id="score" style={{ width: 90 }}>
           {t('ops_health.health_score')}
         </CommonTable.Column>
-        <CommonTable.Column id="last" style={{ width: 220 }}>
+        <CommonTable.Column id="last" style={{ width: LAST_ERROR_COLUMN_WIDTH }}>
           {t('ops_health.col_last_error')}
         </CommonTable.Column>
       </CommonTable.Header>
@@ -271,13 +274,16 @@ function EntityTable({
                       : (entity.health_score ?? '—')}
                 </span>
               </CommonTable.Cell>
-              <CommonTable.Cell>
+              <CommonTable.Cell
+                className="overflow-hidden"
+                style={{ width: LAST_ERROR_COLUMN_WIDTH, maxWidth: LAST_ERROR_COLUMN_WIDTH }}
+              >
                 {entity.last_error ? (
-                  <div className="min-w-0">
-                    <div className="truncate text-xs text-text-secondary" title={entity.last_error.message}>
+                  <div className="mx-auto w-full min-w-0 max-w-[20rem] overflow-hidden">
+                    <div className="block truncate text-xs text-text-secondary" title={entity.last_error.message}>
                       {entity.last_error.message || entity.last_error.phase || '—'}
                     </div>
-                    <div className="mt-0.5 text-[11px] text-text-tertiary">
+                    <div className="mt-0.5 whitespace-nowrap text-[11px] text-text-tertiary">
                       {formatDateTime(entity.last_error.at)}
                     </div>
                   </div>

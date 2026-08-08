@@ -130,6 +130,7 @@ func (s *HealthmonStore) aggregateFailureRawsBy(ctx context.Context, since time.
 		DimID      int    `json:"dim_id"`
 		StatusCode int    `json:"status_code"`
 		Phase      string `json:"phase"`
+		ErrorCode  string `json:"error_code"`
 		Billed     bool   `json:"billed"`
 		Count      int64  `json:"count"`
 	}
@@ -157,15 +158,17 @@ func (s *HealthmonStore) aggregateFailureRawsBy(ctx context.Context, since time.
 		dimCol := sel.C(dimField)
 		statusCol := sel.C(entupstreamrequestlog.FieldStatusCode)
 		phaseCol := sel.C(entupstreamrequestlog.FieldPhase)
+		codeCol := sel.C(entupstreamrequestlog.FieldErrorCode)
 		billedCol := sel.C(entupstreamrequestlog.FieldBilled)
 		repeatCol := sel.C(entupstreamrequestlog.FieldRepeatCount)
 		sel.Select(
 			entsql.As(dimCol, "dim_id"),
 			entsql.As(statusCol, "status_code"),
 			entsql.As(phaseCol, "phase"),
+			entsql.As(codeCol, "error_code"),
 			entsql.As(billedCol, "billed"),
 			entsql.As("COALESCE(SUM("+repeatCol+"),0)", "count"),
-		).GroupBy(dimCol, statusCol, phaseCol, billedCol)
+		).GroupBy(dimCol, statusCol, phaseCol, codeCol, billedCol)
 	}).Scan(ctx, &rows)
 	if err != nil {
 		return nil, err
@@ -178,6 +181,7 @@ func (s *HealthmonStore) aggregateFailureRawsBy(ctx context.Context, since time.
 		raw := apphealthmon.FailureRaw{
 			StatusCode: row.StatusCode,
 			Phase:      row.Phase,
+			ErrorCode:  row.ErrorCode,
 			Billed:     row.Billed,
 			Count:      row.Count,
 		}
