@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -93,6 +94,10 @@ func (h *HealthmonHandler) UserOverview(c *gin.Context) {
 	}
 	out, err := h.service.UserOverview(c.Request.Context(), userID, query.Window)
 	if err != nil {
+		if errors.Is(err, apphealthmon.ErrChannelStatusDisabled) {
+			response.Forbidden(c, err.Error())
+			return
+		}
 		slog.Error("channel_status_overview_failed", "user_id", userID, "error", err)
 		response.InternalError(c, "查询失败")
 		return
@@ -114,6 +119,10 @@ func (h *HealthmonHandler) UserGroups(c *gin.Context) {
 	}
 	rows, err := h.service.ListUserGroups(c.Request.Context(), userID, query.Window)
 	if err != nil {
+		if errors.Is(err, apphealthmon.ErrChannelStatusDisabled) {
+			response.Forbidden(c, err.Error())
+			return
+		}
 		slog.Error("channel_status_groups_failed", "user_id", userID, "error", err)
 		response.InternalError(c, "查询失败")
 		return

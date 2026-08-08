@@ -876,6 +876,8 @@
     "contact_info": "Contact Info",
     "doc_url": "Documentation URL",
     "recharge_notice": "Recharge Page Notice",
+    "user_features": "User Features",
+    "channel_status_enabled": "Show Channel Status page",
     "registration_auth": "Registration & Authentication",
     "registration_enabled": "Open Registration",
     "registration_enabled_desc": "When disabled, only admins can create new users",

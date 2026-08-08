@@ -5,6 +5,24 @@ import (
 	"time"
 )
 
+// 用户渠道状态页系统总开关（settings 组 site）。
+// 缺省视为开启；仅显式 "false" 关闭。分组级 status_visible 仍生效。
+const (
+	settingGroupSite               = "site"
+	settingKeyChannelStatusEnabled = "channel_status_enabled"
+)
+
+// SettingItem 设置读取窄类型（避免依赖 settings 包）。
+type SettingItem struct {
+	Key   string
+	Value string
+}
+
+// SettingsLister 读取系统设置（由 bootstrap 适配 settings.Service）。
+type SettingsLister interface {
+	List(ctx context.Context, group string) ([]SettingItem, error)
+}
+
 // Repository 健康监测数据访问（由 store 实现）。
 type Repository interface {
 	// AggregateSuccess 按 channel_key 聚合 relay 成功流量。
@@ -47,6 +65,7 @@ type FailureRaw struct {
 // Service 健康监测用例。
 type Service struct {
 	repo      Repository
+	settings  SettingsLister
 	minSample int
 	now       func() time.Time
 }
@@ -58,6 +77,29 @@ func NewService(repo Repository) *Service {
 		minSample: DefaultMinSample,
 		now:       time.Now,
 	}
+}
+
+// SetSettingsLister 注入系统设置读取（渠道状态页总开关）。
+func (s *Service) SetSettingsLister(sl SettingsLister) {
+	s.settings = sl
+}
+
+// ChannelStatusEnabled 用户渠道状态页是否对用户开放。
+// 未配置 / 读取失败时默认开启，与历史行为一致。
+func (s *Service) ChannelStatusEnabled(ctx context.Context) bool {
+	if s.settings == nil {
+		return true
+	}
+	items, err := s.settings.List(ctx, settingGroupSite)
+	if err != nil {
+		return true
+	}
+	for _, item := range items {
+		if item.Key == settingKeyChannelStatusEnabled {
+			return item.Value != "false"
+		}
+	}
+	return true
 }
 
 // Overview 全局窗口总览。
@@ -212,8 +254,18 @@ func (s *Service) ListGroups(ctx context.Context, filter ListFilter) ([]EntityRo
 	return out, nil
 }
 
+// ErrChannelStatusDisabled 用户渠道状态页被系统设置关闭。
+var ErrChannelStatusDisabled = errChannelStatusDisabled{}
+
+type errChannelStatusDisabled struct{}
+
+func (errChannelStatusDisabled) Error() string { return "渠道状态页未开启" }
+
 // UserOverview 汇总当前用户有权访问且允许展示的分组健康状态。
 func (s *Service) UserOverview(ctx context.Context, userID int, windowRaw string) (UserOverview, error) {
+	if !s.ChannelStatusEnabled(ctx) {
+		return UserOverview{}, ErrChannelStatusDisabled
+	}
 	window, dur := ParseWindow(windowRaw)
 	now := s.now()
 	metas, err := s.repo.ListUserVisibleGroupMeta(ctx, userID)
@@ -249,6 +301,9 @@ func (s *Service) UserOverview(ctx context.Context, userID int, windowRaw string
 
 // ListUserGroups 返回当前用户有权访问且允许展示的分组健康快照。
 func (s *Service) ListUserGroups(ctx context.Context, userID int, windowRaw string) ([]UserGroupStatus, error) {
+	if !s.ChannelStatusEnabled(ctx) {
+		return nil, ErrChannelStatusDisabled
+	}
 	window, dur := ParseWindow(windowRaw)
 	metas, err := s.repo.ListUserVisibleGroupMeta(ctx, userID)
 	if err != nil {

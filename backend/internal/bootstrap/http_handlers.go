@@ -174,6 +174,7 @@ func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
 	upstreamLogService := appupstreamlog.NewService(upstreamLogStore)
 	healthmonStore := store.NewHealthmonStore(dep.DB)
 	healthmonService := apphealthmon.NewService(healthmonStore)
+	healthmonService.SetSettingsLister(healthmonSettingsAdapter{settingsService})
 
 	paymentStore := store.NewPaymentStore(dep.DB)
 	paymentService := apppayment.NewService(paymentStore, paymentSettingsAdapter{settingsService}, dep.Config.APIKeySecret())
@@ -402,6 +403,23 @@ func (a paymentSettingsAdapter) List(ctx context.Context, group string) ([]apppa
 	out := make([]apppayment.SettingItem, len(items))
 	for i, item := range items {
 		out[i] = apppayment.SettingItem{Key: item.Key, Value: item.Value}
+	}
+	return out, nil
+}
+
+// healthmonSettingsAdapter 将 appsettings.Service 适配为 apphealthmon.SettingsLister。
+type healthmonSettingsAdapter struct {
+	svc *appsettings.Service
+}
+
+func (a healthmonSettingsAdapter) List(ctx context.Context, group string) ([]apphealthmon.SettingItem, error) {
+	items, err := a.svc.List(ctx, group)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]apphealthmon.SettingItem, len(items))
+	for i, item := range items {
+		out[i] = apphealthmon.SettingItem{Key: item.Key, Value: item.Value}
 	}
 	return out, nil
 }

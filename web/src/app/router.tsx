@@ -10,6 +10,7 @@ import { Suspense, useEffect } from 'react';
 import type { ElementType, ReactNode } from 'react';
 import { useAuth } from './providers/AuthProvider';
 import { ErrorBoundary } from './providers/ErrorBoundary';
+import { useSiteSettings } from './providers/SiteSettingsProvider';
 import { getToken, getTokenRole } from '../shared/api/client';
 import { FullPageLoading, PageLoading } from '../shared/components/PageLoading';
 import { checkAdmin } from './routeGuards';
@@ -211,11 +212,16 @@ function OverviewPage() {
 const overviewRoute = createRoute({ getParentRoute: () => authLayout, path: '/overview', component: OverviewPage });
 
 // 用户渠道状态：管理员可查看用户视角；API Key 会话只保留自身使用记录，不暴露全站状态。
+// 系统设置关闭时对用户隐藏（管理员仍可从运维监控查看）。
 function ChannelStatusRoutePage() {
   const { user, loading, isAPIKeySession } = useAuth();
-  if (loading) return <PageLoading />;
+  const site = useSiteSettings();
+  if (loading || !site.settings_loaded) return <PageLoading />;
   if (!user) return null;
   if (isAPIKeySession) return <Navigate replace to="/usage" />;
+  if (!site.channel_status_enabled) {
+    return <Navigate replace to={user.role === 'admin' ? '/' : '/overview'} />;
+  }
   return (
     <Suspense fallback={<PageLoading />}>
       <ChannelStatusPage />

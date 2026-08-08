@@ -20,6 +20,8 @@ interface SiteSettings {
   registration_enabled: boolean;
   email_verify_enabled: boolean;
   invite_enabled: boolean;
+  /** 用户渠道状态页总开关；缺省开启 */
+  channel_status_enabled: boolean;
   settings_loaded: boolean;
 }
 
@@ -37,6 +39,7 @@ const defaults: SiteSettings = {
   registration_enabled: true,
   email_verify_enabled: false,
   invite_enabled: false,
+  channel_status_enabled: true,
   settings_loaded: false,
 };
 
@@ -57,6 +60,8 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
     registration_enabled: data?.registration_enabled !== 'false',
     email_verify_enabled: data?.email_verify_enabled === 'true',
     invite_enabled: data?.invite_enabled === 'true',
+    // 未配置视为开启（与后端 ChannelStatusEnabled 一致）
+    channel_status_enabled: data?.channel_status_enabled !== 'false',
     settings_loaded: !isPending,
   }), [data, isPending]);
 

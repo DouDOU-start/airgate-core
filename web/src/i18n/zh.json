@@ -876,6 +876,8 @@
     "contact_info": "联系方式",
     "doc_url": "文档链接",
     "recharge_notice": "充值页提示文案",
+    "user_features": "用户功能",
+    "channel_status_enabled": "显示渠道状态页",
     "registration_auth": "注册与认证",
     "registration_enabled": "开放注册",
     "registration_enabled_desc": "关闭后新用户无法自行注册，只能由管理员创建",

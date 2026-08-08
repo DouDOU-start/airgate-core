@@ -26,6 +26,7 @@ import { parseCustomEndpoints, serializeCustomEndpoints } from '../../shared/uti
 const SITE_KEYS = [
   'site_name', 'site_subtitle', 'site_logo', 'api_base_url', 'custom_endpoints',
   'contact_info', 'doc_url', 'recharge_notice', 'og_image',
+  'channel_status_enabled',
 ] as const;
 
 // 内置默认分享卡片封面图，与后端 backend/internal/server/ogimage.go 里的
@@ -207,6 +208,10 @@ export default function SettingsPage() {
       if (!map.bark_server?.trim()) map.bark_server = DEFAULT_BARK_SERVER;
       if (!map.bark_group?.trim()) map.bark_group = DEFAULT_BARK_GROUP;
       if (!map.bark_level?.trim()) map.bark_level = DEFAULT_BARK_LEVEL;
+      // 渠道状态页总开关：未配置视为开启，与公开读路径一致。
+      if (map.channel_status_enabled == null || map.channel_status_enabled === '') {
+        map.channel_status_enabled = 'true';
+      }
       setValues(map);
       setHasChanges(false);
     }
@@ -412,38 +417,48 @@ export default function SettingsPage() {
               <Card.Title>{t('settings.site_branding')}</Card.Title>
             </Card.Header>
             <Card.Content>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Field label={t('settings.site_name')} hint={t('settings.site_name_hint')}>
-                  <Input value={val('site_name')} onChange={(e) => set('site_name', e.target.value)} placeholder="AirGate" />
-                </Field>
-                <Field label={t('settings.site_subtitle')}>
-                  <Input value={val('site_subtitle')} onChange={(e) => set('site_subtitle', e.target.value)} placeholder="AI API Gateway" />
-                </Field>
-                <Field className="col-span-1 md:col-span-2" label={t('settings.api_base_url')} hint={t('settings.api_base_url_hint')}>
-                  <Input value={val('api_base_url')} onChange={(e) => set('api_base_url', e.target.value)} placeholder="https://api.example.com" />
-                </Field>
-                <Field className="col-span-1 md:col-span-2" label={t('settings.custom_endpoints')} hint={t('settings.custom_endpoints_hint')}>
-                  <CustomEndpointsEditor value={val('custom_endpoints')} onChange={(v) => set('custom_endpoints', v)} />
-                </Field>
-                <Field label={t('settings.contact_info')}>
-                  <Input value={val('contact_info')} onChange={(e) => set('contact_info', e.target.value)} />
-                </Field>
-                <Field label={t('settings.doc_url')}>
-                  <Input value={val('doc_url')} onChange={(e) => set('doc_url', e.target.value)} placeholder="https://docs.example.com" />
-                </Field>
-                <Field className="col-span-1 md:col-span-2" label={t('settings.site_logo')} hint={t('settings.site_logo_hint')}>
-                  <LogoUpload value={val('site_logo')} onChange={(url) => set('site_logo', url)} />
-                </Field>
-                <Field className="col-span-1 md:col-span-2" label={t('settings.og_image')} hint={t('settings.og_image_hint')}>
-                  <OGImageUpload value={val('og_image')} onChange={(url) => set('og_image', url)} />
-                </Field>
-                <Field className="col-span-1 md:col-span-2" label={t('settings.recharge_notice')}>
-                  <TextArea
-                    value={val('recharge_notice')}
-                    onChange={(e) => set('recharge_notice', e.target.value)}
-                    rows={3}
+              <div className="ag-settings-section-stack">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Field label={t('settings.site_name')} hint={t('settings.site_name_hint')}>
+                    <Input value={val('site_name')} onChange={(e) => set('site_name', e.target.value)} placeholder="AirGate" />
+                  </Field>
+                  <Field label={t('settings.site_subtitle')}>
+                    <Input value={val('site_subtitle')} onChange={(e) => set('site_subtitle', e.target.value)} placeholder="AI API Gateway" />
+                  </Field>
+                  <Field className="col-span-1 md:col-span-2" label={t('settings.api_base_url')} hint={t('settings.api_base_url_hint')}>
+                    <Input value={val('api_base_url')} onChange={(e) => set('api_base_url', e.target.value)} placeholder="https://api.example.com" />
+                  </Field>
+                  <Field className="col-span-1 md:col-span-2" label={t('settings.custom_endpoints')} hint={t('settings.custom_endpoints_hint')}>
+                    <CustomEndpointsEditor value={val('custom_endpoints')} onChange={(v) => set('custom_endpoints', v)} />
+                  </Field>
+                  <Field label={t('settings.contact_info')}>
+                    <Input value={val('contact_info')} onChange={(e) => set('contact_info', e.target.value)} />
+                  </Field>
+                  <Field label={t('settings.doc_url')}>
+                    <Input value={val('doc_url')} onChange={(e) => set('doc_url', e.target.value)} placeholder="https://docs.example.com" />
+                  </Field>
+                  <Field className="col-span-1 md:col-span-2" label={t('settings.site_logo')} hint={t('settings.site_logo_hint')}>
+                    <LogoUpload value={val('site_logo')} onChange={(url) => set('site_logo', url)} />
+                  </Field>
+                  <Field className="col-span-1 md:col-span-2" label={t('settings.og_image')} hint={t('settings.og_image_hint')}>
+                    <OGImageUpload value={val('og_image')} onChange={(url) => set('og_image', url)} />
+                  </Field>
+                  <Field className="col-span-1 md:col-span-2" label={t('settings.recharge_notice')}>
+                    <TextArea
+                      value={val('recharge_notice')}
+                      onChange={(e) => set('recharge_notice', e.target.value)}
+                      rows={3}
+                    />
+                  </Field>
+                </div>
+
+                <SettingsSection title={t('settings.user_features')}>
+                  <NativeSwitch
+                    isSelected={val('channel_status_enabled') !== 'false'}
+                    label={<span className="text-sm font-medium text-text">{t('settings.channel_status_enabled')}</span>}
+                    onChange={(v) => set('channel_status_enabled', String(v))}
                   />
-                </Field>
+                </SettingsSection>
               </div>
               {saveAction}
             </Card.Content>

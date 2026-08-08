@@ -2,6 +2,7 @@ package healthmon
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -149,6 +150,55 @@ func TestListUserGroupsWithNoVisibleGroupsStaysEmpty(t *testing.T) {
 	}
 	if !repo.successCalled || !repo.failureCalled || repo.successIDs == nil || repo.failureIDs == nil {
 		t.Fatalf("empty visible set must be passed as an explicit empty allow-list: success=%v failure=%v", repo.successIDs, repo.failureIDs)
+	}
+}
+
+type staticSettingsLister struct {
+	items []SettingItem
+	err   error
+}
+
+func (l staticSettingsLister) List(context.Context, string) ([]SettingItem, error) {
+	return l.items, l.err
+}
+
+func TestChannelStatusEnabledDefaultsTrue(t *testing.T) {
+	service := NewService(&userStatusRepository{})
+	if !service.ChannelStatusEnabled(context.Background()) {
+		t.Fatal("nil settings lister should default to enabled")
+	}
+
+	service.SetSettingsLister(staticSettingsLister{})
+	if !service.ChannelStatusEnabled(context.Background()) {
+		t.Fatal("missing key should default to enabled")
+	}
+
+	service.SetSettingsLister(staticSettingsLister{
+		items: []SettingItem{{Key: settingKeyChannelStatusEnabled, Value: "false"}},
+	})
+	if service.ChannelStatusEnabled(context.Background()) {
+		t.Fatal("explicit false should disable channel status page")
+	}
+}
+
+func TestUserChannelStatusRejectsWhenDisabled(t *testing.T) {
+	repo := &userStatusRepository{
+		visible: []GroupMeta{{ID: 10, Name: "public", Platform: "openai"}},
+		success: []SuccessAgg{{DimID: 10, Count: 5}},
+	}
+	service := NewService(repo)
+	service.SetSettingsLister(staticSettingsLister{
+		items: []SettingItem{{Key: settingKeyChannelStatusEnabled, Value: "false"}},
+	})
+
+	if _, err := service.UserOverview(context.Background(), 1, "1h"); !errors.Is(err, ErrChannelStatusDisabled) {
+		t.Fatalf("UserOverview err = %v, want ErrChannelStatusDisabled", err)
+	}
+	if _, err := service.ListUserGroups(context.Background(), 1, "1h"); !errors.Is(err, ErrChannelStatusDisabled) {
+		t.Fatalf("ListUserGroups err = %v, want ErrChannelStatusDisabled", err)
+	}
+	if repo.successCalled || repo.failureCalled {
+		t.Fatal("disabled gate must not query traffic aggregates")
 	}
 }
 

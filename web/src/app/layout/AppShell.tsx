@@ -164,10 +164,12 @@ export function AppShell({ children }: AppShellProps) {
     meta: { globalLoading: false },
   });
   const appEntries = (navApps ?? []).filter((app) => app.launch_url);
-  // 邀请返利未开启时，用户导航不展示入口（管理端入口不受影响，管理员需要它来开启功能）。
-  const visibleUserMenuItems = site.invite_enabled
-    ? userMenuItems
-    : userMenuItems.filter((item) => item.path !== '/invite');
+  // 功能未开启时隐藏对应入口（管理端入口不受影响，管理员需要它来开启功能）。
+  const visibleUserMenuItems = userMenuItems.filter((item) => {
+    if (item.path === '/invite' && !site.invite_enabled) return false;
+    if (item.path === '/channel-status' && !site.channel_status_enabled) return false;
+    return true;
+  });
   const sections = useMemo(() => {
     // 个人概览已独立在 /overview，与管理仪表盘（/）不再冲突，管理员直接拼完整用户菜单。
     const menuItems = isAPIKeySession
