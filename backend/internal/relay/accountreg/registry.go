@@ -10,6 +10,7 @@ import (
 	"errors"
 	"log/slog"
 	"math/rand/v2"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -68,6 +69,8 @@ type Snapshot struct {
 	UpstreamIsPool bool
 	// Models 可服务对外模型名；空则用平台默认（由 Loader 填好）。
 	Models map[string]struct{}
+	// ModelMapping 将对外模型名映射为上游模型名。
+	ModelMapping map[string]string
 	// GroupIDs 绑定分组；空集合不参与任何分组调度。
 	GroupIDs map[int]struct{}
 
@@ -77,6 +80,38 @@ type Snapshot struct {
 	rateLimitProbeLease      RateLimitProbeLease
 	rateLimitProbeFailures   int
 	rateLimitProbeBlockUntil time.Time
+}
+
+// ResolveModel 返回账号上游实际使用的模型名。
+func (s *Snapshot) ResolveModel(model string) string {
+	if s == nil {
+		return model
+	}
+	return ResolveModelMapping(s.ModelMapping, model)
+}
+
+// ResolveModelMapping 优先精确匹配，再选择字面字符最多的通配规则。
+func ResolveModelMapping(mapping map[string]string, model string) string {
+	if mapped := strings.TrimSpace(mapping[model]); mapped != "" {
+		return mapped
+	}
+	bestScore, best := -1, ""
+	for pattern, mapped := range mapping {
+		pattern, mapped = strings.TrimSpace(pattern), strings.TrimSpace(mapped)
+		if pattern == "" || mapped == "" || !strings.Contains(pattern, "*") {
+			continue
+		}
+		expression := "^" + strings.ReplaceAll(regexp.QuoteMeta(pattern), `\*`, ".*") + "$"
+		if matched, err := regexp.MatchString(expression, model); err == nil && matched {
+			if score := len(strings.ReplaceAll(pattern, "*", "")); score > bestScore {
+				bestScore, best = score, mapped
+			}
+		}
+	}
+	if best != "" {
+		return best
+	}
+	return model
 }
 
 // EffectiveCostRatio 账号成本倍率；无效时回退 1。
@@ -121,6 +156,42 @@ func (s *Snapshot) EffectivePriority(now time.Time) int {
 		return 0
 	}
 	return s.Priority
+}
+
+// ModelMappingFromExtra 解析 extra.model_mapping，过滤空映射。
+func ModelMappingFromExtra(extra map[string]any) map[string]string {
+	if extra == nil {
+		return nil
+	}
+	raw, ok := extra["model_mapping"]
+	if !ok || raw == nil {
+		return nil
+	}
+	out := map[string]string{}
+	switch values := raw.(type) {
+	case map[string]string:
+		for source, target := range values {
+			source, target = strings.TrimSpace(source), strings.TrimSpace(target)
+			if source != "" && target != "" {
+				out[source] = target
+			}
+		}
+	case map[string]any:
+		for source, value := range values {
+			target, ok := value.(string)
+			if !ok {
+				continue
+			}
+			source, target = strings.TrimSpace(source), strings.TrimSpace(target)
+			if source != "" && target != "" {
+				out[source] = target
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // Loader 全量加载账号快照（由 app/server 适配：解密凭证、解析代理 URL、填充模型）。

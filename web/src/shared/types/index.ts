@@ -964,6 +964,29 @@ export interface UpdateModelPriceReq {
   market_visible?: boolean;
 }
 
+export interface ModelPriceSyncResp {
+  source: string;
+  fetched: number;
+  matched: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  skipped: number;
+}
+
+export interface ModelPriceSyncCandidate {
+  model: string;
+  provider?: string;
+  mode?: string;
+  input_price: number;
+  output_price: number;
+  cached_input_price: number;
+  cache_creation_price: number;
+  cache_creation_1h_price: number;
+  per_request_price: number;
+  exists: boolean;
+}
+
 // ==================== Model Market（模型广场，未登录可见）====================
 
 export interface ModelMarketLongContext {
@@ -1684,6 +1707,7 @@ export interface AccountResp {
   extra?: Record<string, unknown>;
   /** 可服务模型白名单（extra.models）；空=平台默认 */
   models?: string[];
+  model_mapping?: Record<string, string>;
   /** 累计成本 / 收益（列表聚合） */
   total_cost?: number;
   total_revenue?: number;
@@ -1726,6 +1750,7 @@ export interface UpdateAccountReq {
   state?: AccountState;
   /** 可服务模型白名单；传空数组清除（回退平台默认） */
   models?: string[];
+  model_mapping?: Record<string, string>;
 }
 
 /** 账号列表排序字段（concurrency/rpm 为运行时 Redis 指标）。 */
@@ -1799,6 +1824,7 @@ export interface BulkUpdateAccountsReq {
   proxy_id?: number | null;
   /** 批量覆盖模型白名单；空数组清除 */
   models?: string[];
+  model_mapping?: Record<string, string>;
 }
 
 export interface BulkOpItemResp {

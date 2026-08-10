@@ -114,6 +114,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		GroupIDs:       intSliceToInt64(req.GroupIDs),
 		HasGroupIDs:    req.GroupIDs != nil,
 		Models:         req.Models,
+		ModelMapping:   req.ModelMapping,
 	}
 	if _, ok := rawPayload["extra"]; ok {
 		input.HasExtra = true
@@ -264,6 +265,7 @@ func (h *AccountHandler) BulkUpdateAccounts(c *gin.Context) {
 		GroupIDs:       intSliceToInt64(req.GroupIDs),
 		HasGroupIDs:    req.GroupIDs != nil,
 		Models:         req.Models,
+		ModelMapping:   req.ModelMapping,
 	}
 	if rawProxyID, ok := rawPayload["proxy_id"]; ok {
 		input.HasProxyID = true

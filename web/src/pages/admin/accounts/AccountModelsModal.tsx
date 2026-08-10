@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Modal, Spinner, useOverlayState } from '@heroui/react';
-import { Plus, X } from 'lucide-react';
+import { ArrowRight, Plus, X } from 'lucide-react';
 import { accountsApi } from '../../../shared/api/accounts';
 import { modelPricesApi } from '../../../shared/api/modelPrices';
 import { queryKeys } from '../../../shared/queryKeys';
@@ -19,6 +19,15 @@ function modelsFromAccount(account: AccountResp): string[] {
     return raw.map((item) => String(item).trim()).filter(Boolean);
   }
   return [];
+}
+
+function mappingFromAccount(account: AccountResp): Record<string, string> {
+  if (account.model_mapping) return { ...account.model_mapping };
+  const raw = account.extra?.model_mapping;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return Object.fromEntries(
+    Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  );
 }
 
 async function fetchCatalogNames(): Promise<string[]> {
@@ -53,6 +62,7 @@ export function AccountModelsModal({
   const single = accounts.length === 1 ? accounts[0] : null;
 
   const [models, setModels] = useState<string[]>([]);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
   const [modelInput, setModelInput] = useState('');
 
   const modalState = useOverlayState({
@@ -65,13 +75,16 @@ export function AccountModelsModal({
   useEffect(() => {
     if (!open) {
       setModels([]);
+      setMapping({});
       setModelInput('');
       return;
     }
     if (single) {
       setModels(modelsFromAccount(single));
+      setMapping(mappingFromAccount(single));
     } else {
       setModels([]);
+      setMapping({});
     }
     setModelInput('');
   }, [open, single?.id, accounts.length]);
@@ -100,15 +113,23 @@ export function AccountModelsModal({
       .filter(Boolean);
     if (parts.length === 0) return;
     const rejected: string[] = [];
+    const accepted = parts.filter((part) => {
+      if (catalogReady && !catalog.has(part)) {
+        rejected.push(part);
+        return false;
+      }
+      return true;
+    });
     setModels((prev) => {
       const next = [...prev];
-      for (const part of parts) {
-        if (catalogReady && !catalog.has(part)) {
-          rejected.push(part);
-          continue;
-        }
+      for (const part of accepted) {
         if (!next.includes(part)) next.push(part);
       }
+      return next;
+    });
+    setMapping((current) => {
+      const next = { ...current };
+      for (const part of accepted) next[part] ||= part;
       return next;
     });
     if (rejected.length > 0) {
@@ -119,6 +140,11 @@ export function AccountModelsModal({
 
   const removeModel = (name: string) => {
     setModels((prev) => prev.filter((item) => item !== name));
+    setMapping((prev) => {
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
   };
 
   const fillPlatformDefaults = async () => {
@@ -127,6 +153,7 @@ export function AccountModelsModal({
       const list = await accountsApi.testModels(single.id);
       const ids = (list ?? []).map((m) => m.id).filter(Boolean);
       setModels(ids);
+      setMapping((current) => Object.fromEntries(ids.map((id) => [id, current[id] || id])));
       toast('success', t('accounts.models_filled_defaults', { count: ids.length }));
     } catch (err) {
       toast('error', err instanceof Error ? err.message : t('accounts.models_fill_failed'));
@@ -136,14 +163,18 @@ export function AccountModelsModal({
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = [...models];
+      const model_mapping = Object.fromEntries(
+        payload.map((model) => [model, (mapping[model] || model).trim()]).filter(([, target]) => target),
+      );
       if (isBulk) {
         return accountsApi.bulkUpdate({
           account_ids: accounts.map((a) => a.id),
           models: payload,
+          model_mapping,
         });
       }
       if (!single) throw new Error('no account');
-      return accountsApi.update(single.id, { models: payload });
+      return accountsApi.update(single.id, { models: payload, model_mapping });
     },
     onSuccess: (resp) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
@@ -253,6 +284,16 @@ export function AccountModelsModal({
                         >
                           {model}
                         </span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
+                        <Input
+                          aria-label={t('accounts.upstream_model')}
+                          className="min-w-0 flex-1 font-mono text-xs"
+                          placeholder={model}
+                          value={mapping[model] ?? model}
+                          onChange={(event) =>
+                            setMapping((prev) => ({ ...prev, [model]: event.target.value }))
+                          }
+                        />
                         <Button
                           isIconOnly
                           size="sm"

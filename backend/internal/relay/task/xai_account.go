@@ -264,7 +264,7 @@ func (f *Flow) forwardXAIAccount(ctx context.Context, c *gin.Context, acc *accou
 			AccountID: acc.ID, Name: acc.Name, Platform: acc.Platform, Type: acc.Type,
 			Credentials: acc.Credentials, ProxyURL: acc.ProxyURL,
 		},
-		Model: model, Endpoint: endpoint, EntryProtocol: registry.ProtocolOpenAI,
+		Model: model, UpstreamModel: acc.ResolveModel(model), Endpoint: endpoint, EntryProtocol: registry.ProtocolOpenAI,
 		Payload: payload, Headers: http.Header{"Content-Type": []string{"application/json"}},
 	})
 }
@@ -273,7 +273,7 @@ func (f *Flow) newXAIAccountTask(c *gin.Context, keyInfo *auth.APIKeyInfo, acc *
 	now := time.Now()
 	t := &Task{
 		TaskID: taskID, Platform: PlatformXAIVideo, Action: sub.Action,
-		Status: StatusSubmitted, RequestModel: sub.Model, UpstreamModel: sub.Model,
+		Status: StatusSubmitted, RequestModel: sub.Model, UpstreamModel: acc.ResolveModel(sub.Model),
 		HoldAmount: hold, EstTotal: estTotal, RateMultiplier: billingRate,
 		SellRate: keyInfo.SellRate, AccountRateMultiplier: acc.EffectiveCostRatio(),
 		Seconds: sub.Seconds, Resolution: sub.Resolution,

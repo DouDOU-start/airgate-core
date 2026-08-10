@@ -66,6 +66,7 @@ func (p *Pipeline) executeAccountAttempt(
 			ProxyURL:    acc.ProxyURL,
 		},
 		Model:         req.Model,
+		UpstreamModel: acc.ResolveModel(req.Model),
 		Endpoint:      endpoint,
 		EntryProtocol: protocol,
 		Stream:        req.Stream,

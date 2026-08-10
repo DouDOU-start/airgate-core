@@ -14,6 +14,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/pagination"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/timezone"
+	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
 	"github.com/DouDOU-start/airgate-core/internal/relay/accounttesthook"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 )
@@ -90,6 +91,7 @@ type Service struct {
 	usageSink      UsageSink
 	priceLookup    PriceLookup
 	calculator     *billing.Calculator
+	testForwarder  TestForwarder
 	usageFetcher   usageFetcher
 	oauthRefresher OAuthCredentialRefresher
 	// 账号测试请求变换器（可选，由插件运行器实现）。
@@ -146,6 +148,13 @@ func (s *Service) SetTestUsageDeps(sink UsageSink, prices PriceLookup, calc *bil
 		s.calculator = calc
 	} else {
 		s.calculator = billing.NewCalculator()
+	}
+}
+
+// SetTestForwarder injects the production CPA bridge used by account connection tests.
+func (s *Service) SetTestForwarder(forwarder TestForwarder) {
+	if s != nil {
+		s.testForwarder = forwarder
 	}
 }
 
@@ -272,6 +281,7 @@ func (s *Service) enrichAccounts(ctx context.Context, list []Account) error {
 		list[i].SubscriptionActiveUntil = resolveSubscriptionActiveUntil(list[i])
 		list[i].MaxRPM = maxRPMFromExtra(list[i].Extra)
 		list[i].Models = modelsFromAccountExtra(list[i].Extra)
+		list[i].ModelMapping = accountreg.ModelMappingFromExtra(list[i].Extra)
 	}
 	s.attachRuntimeStats(ctx, list)
 	return nil
@@ -413,6 +423,7 @@ func (s *Service) FindByID(ctx context.Context, id int, opts LoadOptions) (Accou
 	item.SubscriptionActiveUntil = resolveSubscriptionActiveUntil(item)
 	item.MaxRPM = maxRPMFromExtra(item.Extra)
 	item.Models = modelsFromAccountExtra(item.Extra)
+	item.ModelMapping = accountreg.ModelMappingFromExtra(item.Extra)
 	return item, nil
 }
 
@@ -470,6 +481,8 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Account, error
 	if err := s.decryptAccount(&item); err != nil {
 		return Account{}, err
 	}
+	item.Models = modelsFromAccountExtra(item.Extra)
+	item.ModelMapping = accountreg.ModelMappingFromExtra(item.Extra)
 
 	logger.Info("account_created",
 		logx.LogFieldAccountID, item.ID,
@@ -520,7 +533,7 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Accoun
 	}
 
 	// 模型白名单：合并进 extra.models（保留 usage 等其它 extra 字段）
-	if input.Models != nil {
+	if input.Models != nil || input.ModelMapping != nil {
 		existing, err := s.repo.FindByID(ctx, id, LoadOptions{})
 		if err != nil {
 			logger.Error("account_lookup_failed",
@@ -537,11 +550,21 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Accoun
 		if extra == nil {
 			extra = map[string]any{}
 		}
-		models := normalizeModelsList(*input.Models)
-		if len(models) == 0 {
-			delete(extra, "models")
-		} else {
-			extra["models"] = models
+		if input.Models != nil {
+			models := normalizeModelsList(*input.Models)
+			if len(models) == 0 {
+				delete(extra, "models")
+			} else {
+				extra["models"] = models
+			}
+		}
+		if input.ModelMapping != nil {
+			mapping := normalizeModelMapping(*input.ModelMapping)
+			if len(mapping) == 0 {
+				delete(extra, "model_mapping")
+			} else {
+				extra["model_mapping"] = mapping
+			}
 		}
 		persist.Extra = extra
 		persist.HasExtra = true
@@ -589,6 +612,7 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Accoun
 	updated.SubscriptionActiveUntil = resolveSubscriptionActiveUntil(updated)
 	updated.MaxRPM = maxRPMFromExtra(updated.Extra)
 	updated.Models = modelsFromAccountExtra(updated.Extra)
+	updated.ModelMapping = accountreg.ModelMappingFromExtra(updated.Extra)
 
 	switch {
 	case input.State != nil:
@@ -602,6 +626,18 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Accoun
 	}
 	s.reloadRegistry(ctx)
 	return updated, nil
+}
+
+func normalizeModelMapping(input map[string]string) map[string]string {
+	out := make(map[string]string, len(input))
+	for source, target := range input {
+		source = strings.TrimSpace(source)
+		target = strings.TrimSpace(target)
+		if source != "" && target != "" {
+			out[source] = target
+		}
+	}
+	return out
 }
 
 // Delete 删除账号。
@@ -706,6 +742,7 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 			MaxConcurrency: input.MaxConcurrency,
 			RateMultiplier: input.RateMultiplier,
 			Models:         input.Models,
+			ModelMapping:   input.ModelMapping,
 		}
 		if input.HasProxyID {
 			patch.ProxyID = input.ProxyID

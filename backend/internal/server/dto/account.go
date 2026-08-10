@@ -31,9 +31,10 @@ type AccountResp struct {
 	ErrorMsg           string         `json:"error_msg,omitempty"`
 	Extra              map[string]any `json:"extra,omitempty"`
 	// Models 可服务模型白名单（extra.models）；空 = 使用平台默认目录。
-	Models     []string `json:"models"`
-	LastUsedAt *string  `json:"last_used_at,omitempty"`
-	GroupIDs   []int    `json:"group_ids"`
+	Models       []string          `json:"models"`
+	ModelMapping map[string]string `json:"model_mapping"`
+	LastUsedAt   *string           `json:"last_used_at,omitempty"`
+	GroupIDs     []int             `json:"group_ids"`
 	// TotalCost / TotalRevenue 累计金额：成本 = Σ(total_cost×倍率)，收益 = Σ(actual_cost)。
 	// TodayCost / TodayRevenue 为今日口径（按调用方 tz）。
 	TotalCost    float64 `json:"total_cost"`
@@ -194,7 +195,8 @@ type UpdateAccountReq struct {
 	Extra          map[string]any    `json:"extra,omitempty"`
 	GroupIDs       []int             `json:"group_ids"`
 	// Models 可服务模型白名单；字段出现则写入（空数组清除，回退平台默认）。
-	Models *[]string `json:"models"`
+	Models       *[]string          `json:"models"`
+	ModelMapping *map[string]string `json:"model_mapping"`
 }
 
 // AccountExportItem 导出文件中的单条账号（明文 credentials）。
@@ -251,7 +253,8 @@ type BulkUpdateAccountsReq struct {
 	GroupIDs       []int    `json:"group_ids"`
 	ProxyID        *int64   `json:"proxy_id"`
 	// Models 批量写入模型白名单；字段出现则覆盖（空数组清除）。
-	Models *[]string `json:"models"`
+	Models       *[]string          `json:"models"`
+	ModelMapping *map[string]string `json:"model_mapping"`
 }
 
 // BulkAccountIDsReq 仅携带账号 ID 列表的批量请求（删除等）。

@@ -201,7 +201,7 @@ func (p *Poller) pollXAIAccount(ctx context.Context, accountID int, tasks []*Tas
 				AccountID: acc.ID, Name: acc.Name, Platform: acc.Platform, Type: acc.Type,
 				Credentials: acc.Credentials, ProxyURL: acc.ProxyURL,
 			},
-			Model: model, Endpoint: adaptor.EndpointXAIVideosRetrieve,
+			Model: t.RequestModel, UpstreamModel: model, Endpoint: adaptor.EndpointXAIVideosRetrieve,
 			EntryProtocol: registry.ProtocolOpenAI, Payload: payload,
 			Headers: http.Header{"Content-Type": []string{"application/json"}},
 		})

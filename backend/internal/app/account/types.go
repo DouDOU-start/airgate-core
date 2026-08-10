@@ -92,6 +92,8 @@ type Account struct {
 	SubscriptionActiveUntil string
 	// Models 可服务模型白名单（来自 extra.models）；空表示使用平台默认目录。
 	Models []string
+	// ModelMapping maps external request models to provider-facing model names.
+	ModelMapping map[string]string
 	// TotalCost / TotalRevenue 累计金额（账号成本 / 平台真实收入），
 	// TodayCost / TodayRevenue 为今日口径；列表由 UsageStatsRepository 填充，不落库。
 	TotalCost    float64
@@ -191,6 +193,8 @@ type UpdateInput struct {
 	HasExtra       bool
 	// Models 非 nil 时写入 extra.models（空切片=清除白名单，回退平台默认）。
 	Models *[]string
+	// ModelMapping is stored in extra.model_mapping; an empty map clears it.
+	ModelMapping *map[string]string
 }
 
 // PersistCreateInput store 侧创建输入（密文凭证）。
@@ -257,7 +261,8 @@ type BulkUpdateInput struct {
 	ProxyID        *int64
 	HasProxyID     bool
 	// Models 非 nil 时批量写入 extra.models。
-	Models *[]string
+	Models       *[]string
+	ModelMapping *map[string]string
 }
 
 // BulkResultItem 批量操作单条结果。

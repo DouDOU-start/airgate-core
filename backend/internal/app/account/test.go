@@ -43,6 +43,11 @@ const (
 
 var sseDataPrefix = regexp.MustCompile(`^data:\s*`)
 
+// TestForwarder 是账号连通性测试所需的非流式 CPA 转发子集。
+type TestForwarder interface {
+	ForwardNonStream(context.Context, cpa.ForwardRequest) cpa.ForwardResult
+}
+
 // TestEvent 测试过程 SSE 事件。
 type TestEvent struct {
 	Type      string `json:"type"`

@@ -27,6 +27,9 @@ type ForwardRequest struct {
 	Account AccountAuthInput
 	// Model 对外模型名。
 	Model string
+	// UpstreamModel is the provider-facing model name after account mapping.
+	// When empty, Model is used.
+	UpstreamModel string
 	// Endpoint 入口端点标识（adaptor.Endpoint*）。
 	Endpoint string
 	// EntryProtocol 入口协议（openai / anthropic / gemini）。
@@ -95,9 +98,13 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 		}
 	}
 
+	upstreamModel := strings.TrimSpace(req.UpstreamModel)
+	if upstreamModel == "" {
+		upstreamModel = req.Model
+	}
 	sourceFmt := sourceFormatFor(req.Endpoint, req.EntryProtocol)
 	execReq := cliproxyexecutor.Request{
-		Model:   req.Model,
+		Model:   upstreamModel,
 		Payload: req.Payload,
 	}
 	opts := cliproxyexecutor.Options{
@@ -119,6 +126,13 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 		return withRefreshedCredentials(b.doStream(ctx, c, ex, auth, execReq, opts, req.Endpoint), proactiveCredentials)
 	}
 	return withRefreshedCredentials(b.doNonStream(ctx, ex, auth, execReq, opts), proactiveCredentials)
+}
+
+// ForwardNonStream executes an account request without an HTTP response writer.
+// It is used by connection tests so they exercise the same CPA path as relay traffic.
+func (b *Bridge) ForwardNonStream(ctx context.Context, req ForwardRequest) ForwardResult {
+	req.Stream = false
+	return b.Forward(ctx, nil, req)
 }
 
 func (b *Bridge) doNonStream(

@@ -28,6 +28,7 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 		ErrorMsg:                account.ErrorMsg,
 		Extra:                   account.Extra,
 		Models:                  account.Models,
+		ModelMapping:            account.ModelMapping,
 		TotalCost:               account.TotalCost,
 		TotalRevenue:            account.TotalRevenue,
 		TodayCost:               account.TodayCost,
@@ -43,6 +44,9 @@ func toAccountResp(account appaccount.Account) dto.AccountResp {
 	}
 	if resp.Models == nil {
 		resp.Models = []string{}
+	}
+	if resp.ModelMapping == nil {
+		resp.ModelMapping = map[string]string{}
 	}
 	if resp.GroupIDs == nil {
 		resp.GroupIDs = []int{}

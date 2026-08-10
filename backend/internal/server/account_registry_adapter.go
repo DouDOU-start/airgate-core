@@ -175,6 +175,7 @@ func (a *accountRegistryAdapter) mapSnapshot(item *ent.Account) (accountreg.Snap
 		ErrorMsg:       item.ErrorMsg,
 		UpstreamIsPool: item.UpstreamIsPool,
 		Models:         models,
+		ModelMapping:   accountreg.ModelMappingFromExtra(item.Extra),
 		GroupIDs:       groupIDs,
 	}
 	if item.StateUntil != nil {
