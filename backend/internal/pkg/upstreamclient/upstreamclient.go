@@ -19,7 +19,7 @@ import (
 // 与跨域重定向剥掉 Authorization 头引发的 401 误判自动禁用。
 func NewClient(timeout time.Duration) *http.Client {
 	client := &http.Client{
-		Transport: buildTransport(),
+		Transport: NewTransport(),
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
@@ -30,8 +30,8 @@ func NewClient(timeout time.Duration) *http.Client {
 	return client
 }
 
-// buildTransport 构建出口 Transport（连接/TLS 层超时，无总超时）。
-func buildTransport() *http.Transport {
+// NewTransport 构建出口 Transport（连接/TLS 层超时，无总超时）。
+func NewTransport() *http.Transport {
 	dialer := &net.Dialer{
 		Timeout:   15 * time.Second,
 		KeepAlive: 30 * time.Second,
@@ -54,4 +54,36 @@ func buildTransport() *http.Transport {
 		IdleConnTimeout:       90 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
+}
+
+// NewEnvironmentTransport 克隆标准 Transport，保留环境代理设置，
+// 同时避免共享默认 Transport 容量较小的连接池。
+func NewEnvironmentTransport() *http.Transport {
+	if transport, ok := http.DefaultTransport.(*http.Transport); ok && transport != nil {
+		return TuneTransport(transport.Clone())
+	}
+	return NewTransport()
+}
+
+// TuneTransport 将网关的连接池与超时设置应用到现有 Transport，
+// 同时保留自定义代理拨号器。
+func TuneTransport(transport *http.Transport) *http.Transport {
+	if transport == nil {
+		transport = &http.Transport{}
+	}
+	if transport.DialContext == nil {
+		dialer := &net.Dialer{
+			Timeout:   15 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+		transport.DialContext = dialer.DialContext
+	}
+	transport.TLSHandshakeTimeout = 10 * time.Second
+	transport.ResponseHeaderTimeout = 10 * time.Minute
+	transport.ForceAttemptHTTP2 = true
+	transport.MaxIdleConns = 2048
+	transport.MaxIdleConnsPerHost = 512
+	transport.IdleConnTimeout = 90 * time.Second
+	transport.ExpectContinueTimeout = 1 * time.Second
+	return transport
 }

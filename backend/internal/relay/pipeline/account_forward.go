@@ -11,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/router-for-me/CLIProxyAPI/v7/sdk/proxyutil"
 
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
@@ -76,15 +75,9 @@ func (p *Pipeline) executeAccountAttempt(
 
 	ctx := c.Request.Context()
 	if auditRequest != nil {
-		baseTransport := http.RoundTripper(http.DefaultTransport)
-		if strings.TrimSpace(acc.ProxyURL) != "" {
-			transport, _, errBuild := proxyutil.BuildHTTPTransport(acc.ProxyURL)
-			if errBuild != nil {
-				return attemptResult{auditErr: fmt.Errorf("构造账号代理审计传输层失败: %w", errBuild)}
-			}
-			if transport != nil {
-				baseTransport = transport
-			}
+		baseTransport, errBuild := p.accountAuditTransport(acc.ProxyURL)
+		if errBuild != nil {
+			return attemptResult{auditErr: fmt.Errorf("构造账号代理审计传输层失败: %w", errBuild)}
 		}
 		target := requestaudit.Target{
 			RouteKind: "account", AccountID: acc.ID, AccountName: acc.Name,
@@ -491,13 +484,11 @@ func prepareAccountPayload(req *dto.ChatRequest, opts forwardOptions) ([]byte, e
 
 // acquireAccountSlots 抢账号 RPM + 并发槽；失败返回 soft=true 表示容量满。
 func (p *Pipeline) acquireAccountSlots(ctx context.Context, acc *accountreg.Snapshot, stream bool) (requestID string, rpmMinute int64, soft bool, ok bool) {
-	rpmOK, minute, _ := p.rpm.TryIncrementAccountRPM(ctx, acc.ID, acc.MaxRPM)
-	if !rpmOK {
-		return "", 0, true, false
-	}
 	requestID = uuid.New().String()
-	if err := p.concurrency.AcquireAccountSlot(ctx, acc.ID, requestID, acc.MaxConcurrency, channelSlotTTL(stream)); err != nil {
-		p.rpm.DecrementAccountRPM(ctx, acc.ID, minute)
+	minute, err := p.concurrency.AcquireAccountCapacity(
+		ctx, acc.ID, requestID, acc.MaxRPM, acc.MaxConcurrency, channelSlotTTL(stream),
+	)
+	if err != nil {
 		return "", 0, true, false
 	}
 	return requestID, minute, false, true

@@ -413,15 +413,9 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 		}
 
 		// 物理凭证 RPM + 并发闸门：同一 API Key 的协议端点共享限额。
-		rpmOK, rpmMinute, _ := f.rpm.TryIncrementKeyRPM(ctx, capacityID, ch.MaxRPM)
-		if !rpmOK {
-			summary.localCapacity = true
-			softExclude = append(softExclude, ch.KeyID)
-			continue
-		}
 		slotID := uuid.New().String()
-		if err := f.concurrency.AcquireKeySlot(ctx, capacityID, slotID, ch.MaxConcurrency, 0); err != nil {
-			f.rpm.DecrementKeyRPM(ctx, capacityID, rpmMinute)
+		rpmMinute, err := f.concurrency.AcquireKeyCapacity(ctx, capacityID, slotID, ch.MaxRPM, ch.MaxConcurrency, 0)
+		if err != nil {
 			summary.localCapacity = true
 			softExclude = append(softExclude, ch.KeyID)
 			continue
@@ -628,35 +622,23 @@ func (f *Flow) executeSubmit(ctx context.Context, ad Adaptor, info *Info, sub *S
 func (f *Flow) acquireClientSlots(c *gin.Context, keyInfo *auth.APIKeyInfo) (func(), string) {
 	ctx := c.Request.Context()
 	slotID := uuid.New().String()
-
-	if keyInfo.UserMaxConcurrency > 0 {
-		if err := f.concurrency.AcquireUserSlot(ctx, keyInfo.UserID, slotID, keyInfo.UserMaxConcurrency, 0); err != nil {
-			writeRateLimitError(c, "user_concurrency_limit", "用户并发数已达上限", time.Second)
-			return nil, "user_concurrency_limit"
-		}
+	err := f.concurrency.AcquireClientCapacity(
+		ctx, keyInfo.UserID, keyInfo.KeyID, keyInfo.GroupID, slotID,
+		keyInfo.UserMaxConcurrency, keyInfo.KeyMaxConcurrency, submitTimeout,
+	)
+	if errors.Is(err, scheduler.ErrUserConcurrencyLimit) {
+		writeRateLimitError(c, "user_concurrency_limit", "用户并发数已达上限", time.Second)
+		return nil, "user_concurrency_limit"
 	}
-	if keyInfo.KeyMaxConcurrency > 0 {
-		if err := f.concurrency.AcquireAPIKeySlot(ctx, keyInfo.KeyID, slotID, keyInfo.KeyMaxConcurrency, 0); err != nil {
-			if keyInfo.UserMaxConcurrency > 0 {
-				f.concurrency.ReleaseUserSlot(context.Background(), keyInfo.UserID, slotID)
-			}
-			writeRateLimitError(c, "apikey_concurrency_limit", "API Key 并发数已达上限", time.Second)
-			return nil, "apikey_concurrency_limit"
-		}
-	}
-	if keyInfo.GroupID > 0 {
-		f.concurrency.TrackGroupSlot(ctx, keyInfo.GroupID, slotID, 0)
+	if errors.Is(err, scheduler.ErrAPIKeyConcurrencyLimit) {
+		writeRateLimitError(c, "apikey_concurrency_limit", "API Key 并发数已达上限", time.Second)
+		return nil, "apikey_concurrency_limit"
 	}
 	return func() {
-		if keyInfo.GroupID > 0 {
-			f.concurrency.ReleaseGroupSlot(context.Background(), keyInfo.GroupID, slotID)
-		}
-		if keyInfo.KeyMaxConcurrency > 0 {
-			f.concurrency.ReleaseAPIKeySlot(context.Background(), keyInfo.KeyID, slotID)
-		}
-		if keyInfo.UserMaxConcurrency > 0 {
-			f.concurrency.ReleaseUserSlot(context.Background(), keyInfo.UserID, slotID)
-		}
+		f.concurrency.ReleaseClientCapacity(
+			context.Background(), keyInfo.UserID, keyInfo.KeyID, keyInfo.GroupID, slotID,
+			keyInfo.UserMaxConcurrency > 0, keyInfo.KeyMaxConcurrency > 0,
+		)
 	}, ""
 }
 

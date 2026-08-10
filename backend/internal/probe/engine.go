@@ -88,6 +88,14 @@ func (e *Engine) StartBackground(ctx context.Context) {
 
 // RecordSuccess 转发成功时调用：驱动状态机并同步更新。
 func (e *Engine) RecordSuccess(keyID int) {
+	e.mu.RLock()
+	current := e.states[keyID]
+	if current != nil && current.health == HealthHealthy && current.failures == 0 {
+		e.mu.RUnlock()
+		return
+	}
+	e.mu.RUnlock()
+
 	e.mu.Lock()
 	st := e.getOrCreate(keyID)
 	if st.health == HealthHealthy && st.failures == 0 {

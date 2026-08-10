@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -15,7 +16,8 @@ var ErrConcurrencyLimit = errors.New("并发槽位已满")
 
 const (
 	// defaultSlotTTL 单个请求槽位的默认过期时间，防止异常未释放
-	defaultSlotTTL = 5 * time.Minute
+	defaultSlotTTL       = 5 * time.Minute
+	capacitySignalBuffer = 4096
 )
 
 // acquireSlotScript 是 apikey / user / channel / group 各类并发槽共用的原子 Lua 脚本。
@@ -63,12 +65,54 @@ var acquireSlotScript = redis.NewScript(`
 // 基于 Redis ZSET 实现，按渠道/用户/API Key/分组维度各一个 ZSET，
 // 成员为 request_id，score 为该 slot 的过期时刻。
 type ConcurrencyManager struct {
-	rdb *redis.Client
+	rdb              *redis.Client
+	capacityReleased chan struct{}
+	capacityWaiters  atomic.Int64
 }
 
 // NewConcurrencyManager 创建并发管理器
 func NewConcurrencyManager(rdb *redis.Client) *ConcurrencyManager {
-	return &ConcurrencyManager{rdb: rdb}
+	return &ConcurrencyManager{rdb: rdb, capacityReleased: make(chan struct{}, capacitySignalBuffer)}
+}
+
+// WaitForCapacity 阻塞等待本实例上游槽位释放，或等待兜底时间结束。
+// 兜底定时器用于保证跨实例场景下仍能继续重试。
+func (cm *ConcurrencyManager) WaitForCapacity(ctx context.Context, fallback time.Duration) bool {
+	if fallback <= 0 {
+		return true
+	}
+	if cm == nil || cm.capacityReleased == nil {
+		timer := time.NewTimer(fallback)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return false
+		case <-timer.C:
+			return true
+		}
+	}
+	timer := time.NewTimer(fallback)
+	defer timer.Stop()
+	cm.capacityWaiters.Add(1)
+	defer cm.capacityWaiters.Add(-1)
+	select {
+	case <-ctx.Done():
+		return false
+	case <-cm.capacityReleased:
+		return true
+	case <-timer.C:
+		return true
+	}
+}
+
+func (cm *ConcurrencyManager) signalCapacityReleased() {
+	if cm == nil || cm.capacityReleased == nil || cm.capacityWaiters.Load() == 0 {
+		return
+	}
+	select {
+	case cm.capacityReleased <- struct{}{}:
+	default:
+	}
 }
 
 // apiKeyConcurrencyKey 生成 API Key 级 Redis Key。
@@ -171,6 +215,7 @@ func (cm *ConcurrencyManager) ReleaseKeySlot(ctx context.Context, channelKeyID i
 		return
 	}
 	cm.rdb.ZRem(ctx, keyConcurrencyKey(channelKeyID), requestID)
+	cm.signalCapacityReleased()
 }
 
 // TrackGroupSlot 记录分组级在途请求槽位（纯观测口径：不限流、不拒绝，
@@ -286,6 +331,7 @@ func (cm *ConcurrencyManager) ReleaseAccountSlot(ctx context.Context, accountID 
 		return
 	}
 	cm.rdb.ZRem(ctx, accountConcurrencyKey(accountID), requestID)
+	cm.signalCapacityReleased()
 }
 
 // GetAccountCurrentCounts 批量获取多个账号的当前在途并发数（管理端观测用）。

@@ -6,6 +6,7 @@ package pipeline
 import (
 	"context"
 	"net/http"
+	"sync"
 	"sync/atomic"
 
 	"github.com/DouDOU-start/airgate-core/internal/billing"
@@ -70,21 +71,30 @@ type Options struct {
 
 // Pipeline relay 转发管线。
 type Pipeline struct {
-	registry      *registry.Registry
-	pricing       *pricing.Cache
-	concurrency   *scheduler.ConcurrencyManager
-	rpm           *scheduler.RPMCounter
-	calculator    *billing.Calculator
-	sink          UsageSink
-	errSink       ErrSink
-	settings      *SettingsReader
-	moderation    ModerationChecker
-	healthTracker HealthTracker
-	accounts      *accountreg.Registry
-	cpa           AccountForwarder
-	relayHook     relayhook.Hook
-	requestAudit  *requestaudit.Service
-	randFn        func(n int) int
+	registry               *registry.Registry
+	pricing                *pricing.Cache
+	concurrency            *scheduler.ConcurrencyManager
+	rpm                    *scheduler.RPMCounter
+	calculator             *billing.Calculator
+	sink                   UsageSink
+	errSink                ErrSink
+	settings               *SettingsReader
+	moderation             ModerationChecker
+	healthTracker          HealthTracker
+	accounts               *accountreg.Registry
+	cpa                    AccountForwarder
+	relayHook              relayhook.Hook
+	requestAudit           *requestaudit.Service
+	accountDirectTransport http.RoundTripper
+	accountTransportMu     sync.Mutex
+	accountTransports      sync.Map
+	accountTransportCount  atomic.Int64
+	routeMu                sync.Mutex
+	routeWeights           map[routeBalanceKey]routeBalanceState
+	routePicks             uint64
+	routeCatalogMu         sync.Mutex
+	routeCatalogs          sync.Map
+	routeCatalogCount      atomic.Int64
 	// client 出口 HTTP 客户端：不设总超时（流式无总超时），仅设连接/TLS 层超时；
 	// 非流式的总超时由调用方经 context 施加。重定向不跟随
 	//（upstreamclient.NewClient 统一设 ErrUseLastResponse），
@@ -106,20 +116,21 @@ func New(opts Options) *Pipeline {
 		calculator = billing.NewCalculator()
 	}
 	return &Pipeline{
-		registry:      opts.Registry,
-		pricing:       opts.Pricing,
-		concurrency:   opts.Concurrency,
-		rpm:           opts.RPM,
-		calculator:    calculator,
-		sink:          opts.Sink,
-		errSink:       opts.ErrLog,
-		settings:      settings,
-		moderation:    opts.Moderation,
-		healthTracker: opts.HealthTracker,
-		accounts:      opts.Accounts,
-		cpa:           opts.CPA,
-		relayHook:     opts.RelayHook,
-		requestAudit:  opts.RequestAudit,
-		client:        upstreamclient.NewClient(0),
+		registry:               opts.Registry,
+		pricing:                opts.Pricing,
+		concurrency:            opts.Concurrency,
+		rpm:                    opts.RPM,
+		calculator:             calculator,
+		sink:                   opts.Sink,
+		errSink:                opts.ErrLog,
+		settings:               settings,
+		moderation:             opts.Moderation,
+		healthTracker:          opts.HealthTracker,
+		accounts:               opts.Accounts,
+		cpa:                    opts.CPA,
+		relayHook:              opts.RelayHook,
+		requestAudit:           opts.RequestAudit,
+		accountDirectTransport: upstreamclient.NewEnvironmentTransport(),
+		client:                 upstreamclient.NewClient(0),
 	}
 }

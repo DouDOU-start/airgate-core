@@ -89,7 +89,7 @@ function routeLabel(attempt: RequestAuditAttempt): string {
 }
 
 function prettyPayload(payload?: RequestAuditPayload): string {
-  if (!payload) return '';
+  if (!payload || payload.pending) return '';
   if (payload.encoding === 'base64') return payload.content;
   try {
     return JSON.stringify(JSON.parse(payload.content), null, 2);
@@ -132,7 +132,7 @@ function CodePanel({ title, payload, empty = '无内容' }: {
         </button>
       </div>
       <pre className="h-[300px] overflow-auto whitespace-pre-wrap break-all p-3 font-mono text-[11px] leading-5 text-slate-300">
-        {content || <span className="text-slate-600">{empty}</span>}
+        {content || <span className="text-slate-600">{payload?.pending ? '异步写入中…' : empty}</span>}
       </pre>
     </section>
   );
@@ -300,6 +300,18 @@ export default function RequestAuditsPage() {
     queryFn: () => requestAuditsApi.get(selectedID as number),
     enabled: selectedID != null,
     refetchOnWindowFocus: false,
+    refetchInterval: (query) => {
+      const current = query.state.data;
+      if (!current) return false;
+      const payloadPending = current.inbound_headers.pending
+        || current.inbound_body.pending
+        || current.attempts.some((attempt) => (
+          attempt.upstream_url.pending || attempt.headers.pending || attempt.body.pending
+        ));
+      return payloadPending || !current.completed || current.attempts.some((attempt) => !attempt.finished)
+        ? 500
+        : false;
+    },
     meta: { globalLoading: false },
   });
   const detail = detailQuery.data;
@@ -584,7 +596,9 @@ export default function RequestAuditsPage() {
                       <Server className="h-3.5 w-3.5" />
                       实际上游 URL
                     </div>
-                    <div className="mt-2 break-all font-mono text-[11px] leading-5 text-text">{selectedAttempt.upstream_url.content || '—'}</div>
+                    <div className="mt-2 break-all font-mono text-[11px] leading-5 text-text">
+                      {selectedAttempt.upstream_url.pending ? '异步写入中…' : (selectedAttempt.upstream_url.content || '—')}
+                    </div>
                     {selectedAttempt.reason ? <div className="mt-3 border-t border-border-subtle pt-3 text-xs text-danger">{selectedAttempt.reason}</div> : null}
                   </div>
                 </div>

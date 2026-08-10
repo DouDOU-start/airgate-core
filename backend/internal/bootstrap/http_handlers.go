@@ -113,7 +113,12 @@ type HTTPHandlers struct {
 
 // NewHTTPHandlers 统一构造 HTTP 处理器。
 func NewHTTPHandlers(dep HTTPDependencies) *HTTPHandlers {
-	requestAuditService := requestaudit.New(dep.DB, dep.Config.APIKeySecret())
+	requestAuditService := requestaudit.New(dep.DB, dep.Config.APIKeySecret(), requestaudit.Options{
+		AsyncEnabled:    dep.Config.RequestAudit.AsyncEnabled,
+		QueueSize:       dep.Config.RequestAudit.QueueSize,
+		WorkerCount:     dep.Config.RequestAudit.WorkerCount,
+		MaxPendingBytes: int64(dep.Config.RequestAudit.MaxPendingBytesMB) << 20,
+	})
 	apiKeyStore := store.NewAPIKeyStore(dep.DB)
 	apiKeyService := appapikey.NewService(apiKeyStore, dep.Config.APIKeySecret())
 	authStore := store.NewAuthStore(dep.DB)

@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -27,6 +28,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
 	"github.com/DouDOU-start/airgate-core/internal/relay/streamlife"
 	"github.com/DouDOU-start/airgate-core/internal/requestaudit"
+	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 )
 
 const (
@@ -156,13 +158,13 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	// 0. 客户端识别 + 分组客户端限制预检。
 	clientid.Detect(c)
 
-	// 完整请求审计在所有业务预检之前同步创建，保存客户端原始 Header/Body。
-	// 后续收尾使用脱离取消的上下文，因此用户中断不会丢失已开始请求的记录。
+	// 完整请求审计在所有业务预检之前同步创建骨架，客户端原始 Header/Body
+	// 由有界工作池异步补写；队列满或内存超限时自动同步兜底。
 	var auditRequest *requestaudit.Handle
 	if p.requestAudit != nil {
 		inboundBody := relayInboundRequestBody(c)
 		var err error
-		auditRequest, err = p.requestAudit.Start(ctx, requestaudit.RequestInput{
+		auditRequest, err = p.requestAudit.StartFast(ctx, requestaudit.RequestInput{
 			RequestID: requestIDOf(c), UserID: keyInfo.UserID, UserEmail: keyInfo.UserEmail,
 			APIKeyID: keyInfo.KeyID, GroupID: keyInfo.GroupID, Client: clientid.Get(c),
 			Protocol: protocol, Endpoint: endpoint, Model: req.Model, Stream: req.Stream,
@@ -267,7 +269,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	}
 
 	// 6. user / key 并发闸门。
-	releaseClient, limitCode := p.acquireClientSlots(c, keyInfo)
+	releaseClient, limitCode := p.acquireClientSlots(c, keyInfo, channelSlotTTL(req.Stream))
 	if limitCode != "" {
 		p.recordFailure(c, keyInfo, req, start, errlog.Entry{
 			Phase: errlog.PhaseLocalLimit, StatusCode: http.StatusTooManyRequests,
@@ -326,7 +328,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				}
 				softExcludeKeys = softExcludeKeys[:0]
 				softExcludeAccounts = softExcludeAccounts[:0]
-				waited := sleepOrCancel(ctx, pollDelay, queueDeadline)
+				waited := p.waitForCapacity(ctx, pollDelay, queueDeadline)
 				p.queueWaiters.Add(-1)
 				if !waited {
 					markCanceled(c)
@@ -449,15 +451,11 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		// 物理凭证 RPM + 并发闸门：同一 API Key 的多个协议端点共享限额。
 		// rpmMinute 为预递增所用的分钟窗口，失败回退时对同一窗口 decrement
 		//（不重取当前时间，防跨分钟边界扣穿新窗口）。
-		rpmOK, rpmMinute, _ := p.rpm.TryIncrementKeyRPM(ctx, capacityID, ch.MaxRPM)
-		if !rpmOK {
-			summary.localCapacity = true
-			softExcludeKeys = append(softExcludeKeys, ch.KeyID)
-			continue
-		}
 		requestID := uuid.New().String()
-		if err := p.concurrency.AcquireKeySlot(ctx, capacityID, requestID, ch.MaxConcurrency, channelSlotTTL(req.Stream)); err != nil {
-			p.rpm.DecrementKeyRPM(ctx, capacityID, rpmMinute)
+		rpmMinute, err := p.concurrency.AcquireKeyCapacity(
+			ctx, capacityID, requestID, ch.MaxRPM, ch.MaxConcurrency, channelSlotTTL(req.Stream),
+		)
+		if err != nil {
 			summary.localCapacity = true
 			softExcludeKeys = append(softExcludeKeys, ch.KeyID)
 			continue
@@ -781,38 +779,26 @@ func (p *Pipeline) executeAttempt(c *gin.Context, ad adaptor.Adaptor, info *adap
 // acquireClientSlots user → key 两级并发闸门。成功返回 (释放闭包, "")；
 // 拒绝时已写出 429 错误体，返回 (nil, 错误码) 供失败留痕。
 // 顺带记录分组维度在途槽位（纯观测口径，不限流），供管理端展示分组实时并发。
-func (p *Pipeline) acquireClientSlots(c *gin.Context, keyInfo *auth.APIKeyInfo) (func(), string) {
+func (p *Pipeline) acquireClientSlots(c *gin.Context, keyInfo *auth.APIKeyInfo, slotTTL time.Duration) (func(), string) {
 	ctx := c.Request.Context()
 	slotID := uuid.New().String()
-
-	if keyInfo.UserMaxConcurrency > 0 {
-		if err := p.concurrency.AcquireUserSlot(ctx, keyInfo.UserID, slotID, keyInfo.UserMaxConcurrency, 0); err != nil {
-			writeRateLimitError(c, "user_concurrency_limit", "用户并发数已达上限", time.Second)
-			return nil, "user_concurrency_limit"
-		}
+	err := p.concurrency.AcquireClientCapacity(
+		ctx, keyInfo.UserID, keyInfo.KeyID, keyInfo.GroupID, slotID,
+		keyInfo.UserMaxConcurrency, keyInfo.KeyMaxConcurrency, slotTTL,
+	)
+	if errors.Is(err, scheduler.ErrUserConcurrencyLimit) {
+		writeRateLimitError(c, "user_concurrency_limit", "用户并发数已达上限", time.Second)
+		return nil, "user_concurrency_limit"
 	}
-	if keyInfo.KeyMaxConcurrency > 0 {
-		if err := p.concurrency.AcquireAPIKeySlot(ctx, keyInfo.KeyID, slotID, keyInfo.KeyMaxConcurrency, 0); err != nil {
-			if keyInfo.UserMaxConcurrency > 0 {
-				p.concurrency.ReleaseUserSlot(context.Background(), keyInfo.UserID, slotID)
-			}
-			writeRateLimitError(c, "apikey_concurrency_limit", "API Key 并发数已达上限", time.Second)
-			return nil, "apikey_concurrency_limit"
-		}
-	}
-	if keyInfo.GroupID > 0 {
-		p.concurrency.TrackGroupSlot(ctx, keyInfo.GroupID, slotID, 0)
+	if errors.Is(err, scheduler.ErrAPIKeyConcurrencyLimit) {
+		writeRateLimitError(c, "apikey_concurrency_limit", "API Key 并发数已达上限", time.Second)
+		return nil, "apikey_concurrency_limit"
 	}
 	return func() {
-		if keyInfo.GroupID > 0 {
-			p.concurrency.ReleaseGroupSlot(context.Background(), keyInfo.GroupID, slotID)
-		}
-		if keyInfo.KeyMaxConcurrency > 0 {
-			p.concurrency.ReleaseAPIKeySlot(context.Background(), keyInfo.KeyID, slotID)
-		}
-		if keyInfo.UserMaxConcurrency > 0 {
-			p.concurrency.ReleaseUserSlot(context.Background(), keyInfo.UserID, slotID)
-		}
+		p.concurrency.ReleaseClientCapacity(
+			context.Background(), keyInfo.UserID, keyInfo.KeyID, keyInfo.GroupID, slotID,
+			keyInfo.UserMaxConcurrency > 0, keyInfo.KeyMaxConcurrency > 0,
+		)
 	}, ""
 }
 
@@ -839,7 +825,7 @@ func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.Rel
 	}
 	var auditAttempt *requestaudit.AttemptHandle
 	if auditRequest != nil {
-		auditAttempt, err = auditRequest.BeginAttempt(ctx, auditTarget, httpReq)
+		auditAttempt, err = auditRequest.BeginAttemptFast(ctx, auditTarget, httpReq)
 		if err != nil {
 			return attemptResult{auditErr: err}
 		}
@@ -1128,13 +1114,17 @@ func markCanceled(c *gin.Context) {
 	c.Abort()
 }
 
-// sleepOrCancel 等待 delay（不超过 deadline），期间请求取消返回 false。
-func sleepOrCancel(ctx context.Context, delay time.Duration, deadline time.Time) bool {
+// waitForCapacity 优先等待本实例槽位释放，并以定时轮询作为跨实例兜底。
+// 请求被取消时返回 false。
+func (p *Pipeline) waitForCapacity(ctx context.Context, delay time.Duration, deadline time.Time) bool {
 	if remaining := time.Until(deadline); delay > remaining {
 		delay = remaining
 	}
 	if delay <= 0 {
 		return true
+	}
+	if p.concurrency != nil {
+		return p.concurrency.WaitForCapacity(ctx, delay)
 	}
 	timer := time.NewTimer(delay)
 	defer timer.Stop()

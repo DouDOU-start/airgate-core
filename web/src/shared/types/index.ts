@@ -389,9 +389,10 @@ export interface ChannelFailureStatsResp {
 // ==================== 完整请求审计（仅管理员） ====================
 
 export interface RequestAuditPayload {
-  encoding: 'utf8' | 'base64';
+  encoding: 'utf8' | 'base64' | 'pending';
   content: string;
   bytes: number;
+  pending: boolean;
 }
 
 export interface RequestAuditListItem {

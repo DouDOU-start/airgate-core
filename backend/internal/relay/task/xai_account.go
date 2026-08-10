@@ -114,15 +114,9 @@ func (f *Flow) submitXAIAccount(c *gin.Context, keyInfo *auth.APIKeyInfo, ad Ada
 			continue
 		}
 
-		rpmOK, rpmMinute, _ := f.rpm.TryIncrementAccountRPM(ctx, acc.ID, acc.MaxRPM)
-		if !rpmOK {
-			summary.localCapacity = true
-			softExclude = append(softExclude, acc.ID)
-			continue
-		}
 		slotID := uuid.New().String()
-		if err := f.concurrency.AcquireAccountSlot(ctx, acc.ID, slotID, acc.MaxConcurrency, 0); err != nil {
-			f.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
+		rpmMinute, err := f.concurrency.AcquireAccountCapacity(ctx, acc.ID, slotID, acc.MaxRPM, acc.MaxConcurrency, 0)
+		if err != nil {
 			summary.localCapacity = true
 			softExclude = append(softExclude, acc.ID)
 			continue

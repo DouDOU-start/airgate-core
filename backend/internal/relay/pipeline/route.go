@@ -1,8 +1,6 @@
 package pipeline
 
 import (
-	"math/rand/v2"
-	"sort"
 	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
@@ -27,11 +25,32 @@ type routeTarget struct {
 	account  *accountreg.Snapshot
 }
 
-// pickRoute 从渠道注册表与账号注册表取候选，按 priority 分档 + weight 加权随机。
+type routeBalanceKey struct {
+	groupID  int
+	model    string
+	protocol string
+	kind     routeKind
+	id       int
+	priority int
+}
+
+type routeBalanceState struct {
+	current  int64
+	weight   int64
+	lastSeen uint64
+}
+
+const (
+	maxRouteWeight       = 1_000_000
+	maxRouteBalanceState = 16_384
+	routeStateIdlePicks  = 65_536
+)
+
+// pickRoute 从渠道注册表与账号注册表取候选，按 priority 分档并在档内平滑加权轮询。
 //
 // 规则与 registry.Pick 对齐：
 //   - 最高 priority 档胜出
-//   - 档内 weight+10 加权；渠道 degraded 健康状态权重减半
+//   - 档内按配置 weight 原值调度；渠道 degraded 健康状态权重减半
 //   - 账号 degraded（未到期）EffectivePriority 已压到 0
 //
 // 两边皆无候选返回 (nil, false)。
@@ -40,13 +59,16 @@ func (p *Pipeline) pickRoute(
 	model, protocol string,
 	excludeKeys, excludeAccounts []int,
 	plan *relayhook.RoutePlan,
-) (*routeTarget, bool) {
+) (routeTarget, bool) {
+	if plan == nil {
+		return p.pickIndexedRoute(groupID, model, protocol, excludeKeys, excludeAccounts)
+	}
 	var cands []routeTarget
 	now := time.Now()
 
 	if p.registry != nil {
 		for _, k := range p.registry.ListCandidates(groupID, model, protocol, excludeKeys) {
-			w := k.Weight + 10
+			w := effectiveRouteWeight(k.Weight)
 			if k.HealthStatus == "degraded" {
 				w /= 2
 				if w < 1 {
@@ -70,13 +92,13 @@ func (p *Pipeline) pickRoute(
 			cands = append(cands, routeTarget{
 				kind:     routeAccount,
 				priority: a.EffectivePriority(now),
-				weight:   a.Weight + 10,
+				weight:   effectiveRouteWeight(a.Weight),
 				account:  a,
 			})
 		}
 	}
 	if len(cands) == 0 {
-		return nil, false
+		return routeTarget{}, false
 	}
 
 	// 插件有序账号只改变本次请求的首选顺序。普通账号仍由 Core 完整过滤；只有
@@ -91,13 +113,12 @@ func (p *Pipeline) pickRoute(
 		}
 		for _, accountID := range plan.AccountIDs {
 			if candidate, ok := accounts[accountID]; ok {
-				selected := candidate
-				return &selected, true
+				return candidate, true
 			}
 		}
 		// v1 只接受 core fallback；Pipeline 在接收决策时已校验。这里保留防御性判断。
 		if plan.Fallback != relayhook.FallbackCore {
-			return nil, false
+			return routeTarget{}, false
 		}
 	}
 
@@ -113,29 +134,8 @@ func (p *Pipeline) pickRoute(
 			tier = append(tier, c)
 		}
 	}
-	// 稳定排序：渠道 key 在前（同 id 空间不重叠），再按 id。
-	sort.Slice(tier, func(i, j int) bool {
-		if tier[i].kind != tier[j].kind {
-			return tier[i].kind < tier[j].kind
-		}
-		return routeID(tier[i]) < routeID(tier[j])
-	})
-
-	total := 0
-	for _, t := range tier {
-		total += t.weight
-	}
-	if total <= 0 {
-		total = len(tier)
-	}
-	n := p.routeRand(total)
-	for i := range tier {
-		n -= tier[i].weight
-		if n < 0 {
-			return &tier[i], true
-		}
-	}
-	return &tier[len(tier)-1], true
+	selected := p.pickSmoothWeighted(groupID, model, protocol, tier)
+	return selected, true
 }
 
 func routeID(t routeTarget) int {
@@ -148,12 +148,85 @@ func routeID(t routeTarget) int {
 	return 0
 }
 
-func (p *Pipeline) routeRand(n int) int {
-	if n <= 0 {
-		return 0
+func effectiveRouteWeight(weight int) int {
+	if weight <= 0 {
+		return 1
 	}
-	if p.randFn != nil {
-		return p.randFn(n)
+	if weight > maxRouteWeight {
+		return maxRouteWeight
 	}
-	return rand.IntN(n)
+	return weight
+}
+
+// pickSmoothWeighted 在同一优先级档内执行平滑加权轮询。
+func (p *Pipeline) pickSmoothWeighted(groupID int, model, protocol string, tier []routeTarget) routeTarget {
+	if len(tier) == 1 {
+		return tier[0]
+	}
+	p.routeMu.Lock()
+	defer p.routeMu.Unlock()
+	if p.routeWeights == nil {
+		p.routeWeights = make(map[routeBalanceKey]routeBalanceState, len(tier))
+	}
+	p.routePicks++
+
+	total := int64(0)
+	selected := 0
+	selectedCurrent := int64(-1 << 62)
+	var selectedKey routeBalanceKey
+	for i, candidate := range tier {
+		weight := int64(effectiveRouteWeight(candidate.weight))
+		total += weight
+		key := routeBalanceKey{
+			groupID: groupID, model: model, protocol: protocol,
+			kind: candidate.kind, id: routeID(candidate), priority: candidate.priority,
+		}
+		state := p.routeWeights[key]
+		if state.weight != 0 && state.weight != weight {
+			state.current = 0
+		}
+		if state.lastSeen > 0 && p.routePicks-state.lastSeen > routeStateIdlePicks {
+			state.current = 0
+		}
+		state.current += weight
+		state.weight = weight
+		state.lastSeen = p.routePicks
+		p.routeWeights[key] = state
+		if state.current > selectedCurrent ||
+			(state.current == selectedCurrent && routeLess(candidate, tier[selected])) {
+			selected = i
+			selectedCurrent = state.current
+			selectedKey = key
+		}
+	}
+	state := p.routeWeights[selectedKey]
+	state.current -= total
+	p.routeWeights[selectedKey] = state
+	p.pruneRouteWeights()
+	return tier[selected]
+}
+
+func routeLess(left, right routeTarget) bool {
+	if left.kind != right.kind {
+		return left.kind < right.kind
+	}
+	return routeID(left) < routeID(right)
+}
+
+func (p *Pipeline) pruneRouteWeights() {
+	if len(p.routeWeights) <= maxRouteBalanceState || p.routePicks%1024 != 0 {
+		return
+	}
+	cutoff := uint64(0)
+	if p.routePicks > routeStateIdlePicks {
+		cutoff = p.routePicks - routeStateIdlePicks
+	}
+	for key, state := range p.routeWeights {
+		if state.lastSeen < cutoff {
+			delete(p.routeWeights, key)
+		}
+	}
+	if len(p.routeWeights) > maxRouteBalanceState {
+		clear(p.routeWeights)
+	}
 }

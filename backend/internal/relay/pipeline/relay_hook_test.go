@@ -141,7 +141,7 @@ func TestPickRouteUsesPluginAccountOrderThenCoreFallback(t *testing.T) {
 	if err := accounts.Reload(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	pipe := &Pipeline{accounts: accounts, randFn: func(int) int { return 0 }}
+	pipe := &Pipeline{accounts: accounts}
 	plan := &relayhook.RoutePlan{AccountIDs: []int{2, 1}, Fallback: relayhook.FallbackCore}
 
 	target, ok := pipe.pickRoute(7, "gpt-4o", "openai", nil, nil, plan)

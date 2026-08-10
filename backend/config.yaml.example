@@ -27,6 +27,12 @@ security:
   api_key_secret: ""             # 可选，API Key 加密密钥（hex 编码，≥64 字符）
                                  # 未配置时使用内置默认值；或设置环境变量 API_KEY_SECRET
 
+request_audit:
+  async_enabled: true            # 同步创建审计骨架，异步补写密文与收尾状态
+  queue_size: 4096               # 有界任务队列；满时自动回退同步写入
+  worker_count: 4                # 异步审计写入协程数
+  max_pending_bytes_mb: 256      # 队列保留的请求体内存上限；超限时回退同步写入
+
 log:
   level: "info"                  # debug / info / warn / error
                                  # 或设置环境变量 LOG_LEVEL

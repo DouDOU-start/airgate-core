@@ -48,12 +48,6 @@ var protocolKeyTypes = map[string]map[string]struct{}{
 	ProtocolSuno:        {"suno": {}},
 }
 
-// keyTypesForProtocol 返回协议可路由的 key 类型集合；
-// 未知协议（含空串）返回 nil，Pick 侧表现为无可用 key。
-func keyTypesForProtocol(protocol string) map[string]struct{} {
-	return protocolKeyTypes[protocol]
-}
-
 // protocolForKeyType key Type → 入口协议（protocolKeyTypes 的反向映射）；
 // 未知类型返回空串（不进模型目录）。
 func protocolForKeyType(keyType string) string {
@@ -151,8 +145,9 @@ type Registry struct {
 	loader    Loader
 	persister Persister
 
-	mu   sync.RWMutex
-	keys map[int]*ChannelKeySnapshot
+	mu    sync.RWMutex
+	keys  map[int]*ChannelKeySnapshot
+	index map[channelCandidateKey][]int
 
 	// rateLimitedUntil 是物理凭证级的运行时 429 冷却，不落库。
 	// 同一 API Key 的多协议端点共享冷却，避免下游重试时立即再次命中已限流凭证。
@@ -160,7 +155,8 @@ type Registry struct {
 	rateLimitedUntil map[int]time.Time
 
 	// loadedOnce 是否成功加载过：false 时 Pick 触发惰性兜底重载。
-	loadedOnce atomic.Bool
+	loadedOnce   atomic.Bool
+	routeVersion atomic.Uint64
 	// lazyMu 惰性重载互斥：TryLock 单飞，其余请求直接用当前快照。
 	lazyMu sync.Mutex
 	// lastLazyReload 上次惰性重载时间（lazyMu 保护）：节流避免每请求打 DB。
@@ -173,12 +169,19 @@ type Registry struct {
 	persistTimeout time.Duration
 }
 
+type channelCandidateKey struct {
+	groupID  int
+	model    string
+	protocol string
+}
+
 // New 创建密钥端点注册表。loader 必填；persister 可为 nil（不落库，仅内存生效）。
 func New(loader Loader, persister Persister) *Registry {
 	return &Registry{
 		loader:           loader,
 		persister:        persister,
 		keys:             map[int]*ChannelKeySnapshot{},
+		index:            map[channelCandidateKey][]int{},
 		rateLimitedUntil: map[int]time.Time{},
 		randFn:           rand.IntN,
 		persistTimeout:   5 * time.Second,
@@ -198,8 +201,11 @@ func (r *Registry) Reload(ctx context.Context) error {
 		next[snap.KeyID] = &snap
 	}
 
+	index := buildChannelCandidateIndex(next)
 	r.mu.Lock()
 	r.keys = next
+	r.index = index
+	r.routeVersion.Add(1)
 	r.mu.Unlock()
 	r.loadedOnce.Store(true)
 	return nil
@@ -234,39 +240,104 @@ func (r *Registry) ensureLoaded() {
 // 供与账号路径统一混合选路；返回切片内指针只读。
 func (r *Registry) ListCandidates(groupID int, model, protocol string, exclude []int) []*ChannelKeySnapshot {
 	r.ensureLoaded()
-	excluded := make(map[int]struct{}, len(exclude))
-	for _, id := range exclude {
-		excluded[id] = struct{}{}
-	}
-	allowedTypes := keyTypesForProtocol(protocol)
 	now := time.Now()
 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	r.rateLimitMu.Lock()
+	defer r.rateLimitMu.Unlock()
 
-	out := make([]*ChannelKeySnapshot, 0, 8)
-	for _, k := range r.keys {
-		if _, skip := excluded[k.KeyID]; skip {
-			continue
-		}
-		if _, ok := allowedTypes[k.Type]; !ok {
+	ids := r.index[channelCandidateKey{groupID: groupID, model: model, protocol: protocol}]
+	out := make([]*ChannelKeySnapshot, 0, len(ids))
+	for _, id := range ids {
+		k := r.keys[id]
+		if k == nil || containsInt(exclude, k.KeyID) {
 			continue
 		}
 		if k.Status != StatusEnabled || !credentialEnabled(k) {
 			continue
 		}
-		if r.isRateLimited(k, now) {
-			continue
-		}
-		if _, ok := k.Models[model]; !ok {
-			continue
-		}
-		if _, ok := k.GroupIDs[groupID]; !ok {
+		if r.isRateLimitedLocked(k, now) {
 			continue
 		}
 		out = append(out, k)
 	}
 	return out
+}
+
+func buildChannelCandidateIndex(keys map[int]*ChannelKeySnapshot) map[channelCandidateKey][]int {
+	index := make(map[channelCandidateKey][]int)
+	for id, key := range keys {
+		if key == nil || len(key.Models) == 0 || len(key.GroupIDs) == 0 {
+			continue
+		}
+		protocol := protocolForKeyType(key.Type)
+		if protocol == "" {
+			continue
+		}
+		for groupID := range key.GroupIDs {
+			for model := range key.Models {
+				candidateKey := channelCandidateKey{groupID: groupID, model: model, protocol: protocol}
+				index[candidateKey] = append(index[candidateKey], id)
+			}
+		}
+	}
+	for key := range index {
+		sort.Ints(index[key])
+	}
+	return index
+}
+
+func containsInt(values []int, target int) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+// RouteCandidateIDs 返回指定路由分片的不可变成员索引。
+func (r *Registry) RouteCandidateIDs(groupID int, model, protocol string) (uint64, []int) {
+	if r == nil {
+		return 0, nil
+	}
+	r.ensureLoaded()
+	r.mu.RLock()
+	ids := r.index[channelCandidateKey{groupID: groupID, model: model, protocol: protocol}]
+	version := r.routeVersion.Load()
+	r.mu.RUnlock()
+	return version, ids
+}
+
+// RouteCandidate 解析并重新校验单个已索引的渠道密钥。
+func (r *Registry) RouteCandidate(id, groupID int, model, protocol string, now time.Time) (*ChannelKeySnapshot, bool) {
+	if r == nil {
+		return nil, false
+	}
+	r.mu.RLock()
+	key := r.keys[id]
+	if key == nil || key.Status != StatusEnabled || !credentialEnabled(key) || protocolForKeyType(key.Type) != protocol {
+		r.mu.RUnlock()
+		return nil, false
+	}
+	_, groupOK := key.GroupIDs[groupID]
+	_, modelOK := key.Models[model]
+	r.mu.RUnlock()
+	if !groupOK || !modelOK {
+		return nil, false
+	}
+	r.rateLimitMu.Lock()
+	limited := r.isRateLimitedLocked(key, now)
+	r.rateLimitMu.Unlock()
+	return key, !limited
+}
+
+func (r *Registry) RouteVersion() uint64 {
+	if r == nil {
+		return 0
+	}
+	return r.routeVersion.Load()
 }
 
 // Pick 为指定分组、模型与入口协议选择一把 key 端点：
@@ -278,40 +349,10 @@ func (r *Registry) ListCandidates(groupID int, model, protocol string, exclude [
 //
 // 无候选返回 ErrNoAvailableChannel。
 func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*ChannelKeySnapshot, error) {
-	r.ensureLoaded()
-
-	excluded := make(map[int]struct{}, len(exclude))
-	for _, id := range exclude {
-		excluded[id] = struct{}{}
-	}
-	allowedTypes := keyTypesForProtocol(protocol)
-	now := time.Now()
-
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	// 单趟扫描：维护当前最高 priority 档。
+	candidates := r.ListCandidates(groupID, model, protocol, exclude)
 	var tier []*ChannelKeySnapshot
 	best := -1
-	for _, k := range r.keys {
-		if _, skip := excluded[k.KeyID]; skip {
-			continue
-		}
-		if _, ok := allowedTypes[k.Type]; !ok {
-			continue
-		}
-		if k.Status != StatusEnabled || !credentialEnabled(k) {
-			continue
-		}
-		if r.isRateLimited(k, now) {
-			continue
-		}
-		if _, ok := k.Models[model]; !ok {
-			continue
-		}
-		if _, ok := k.GroupIDs[groupID]; !ok {
-			continue
-		}
+	for _, k := range candidates {
 		if k.Priority > best {
 			best = k.Priority
 			tier = tier[:0]
@@ -323,9 +364,6 @@ func (r *Registry) Pick(groupID int, model, protocol string, exclude []int) (*Ch
 	if len(tier) == 0 {
 		return nil, ErrNoAvailableChannel
 	}
-
-	// 档内按 KeyID 排序：map 遍历无序，排序保证同一随机值的选择结果可复现（也便于测试）。
-	sort.Slice(tier, func(i, j int) bool { return tier[i].KeyID < tier[j].KeyID })
 
 	total := 0
 	for _, k := range tier {
@@ -455,24 +493,35 @@ func (r *Registry) MarkCredentialAutoDisabled(keyID int, reason string) {
 
 // MarkRecovered 将 disabled_auto 的 key 恢复为 enabled；其余状态不动（手动禁用不自动恢复）。
 func (r *Registry) MarkRecovered(keyID int) {
+	r.mu.RLock()
+	current := r.keys[keyID]
+	if current == nil || (current.Status != StatusDisabledAuto && current.CredentialStatus != StatusDisabledAuto) {
+		r.mu.RUnlock()
+		return
+	}
+	r.mu.RUnlock()
+
 	recovered := false
 	credentialRecovered := false
 	credentialID := 0
-	snap := r.mutate(keyID, func(k *ChannelKeySnapshot) {
-		credentialID = effectiveCredentialID(k)
-		if k.CredentialStatus == StatusDisabledAuto {
-			k.CredentialStatus = StatusEnabled
-			credentialRecovered = true
-		}
-		if k.Status != StatusDisabledAuto {
-			return
-		}
-		k.Status = StatusEnabled
-		recovered = true
-	})
-	if snap == nil {
+	r.mu.Lock()
+	old := r.keys[keyID]
+	if old == nil || (old.Status != StatusDisabledAuto && old.CredentialStatus != StatusDisabledAuto) {
+		r.mu.Unlock()
 		return
 	}
+	next := *old
+	credentialID = effectiveCredentialID(&next)
+	if next.CredentialStatus == StatusDisabledAuto {
+		next.CredentialStatus = StatusEnabled
+		credentialRecovered = true
+	}
+	if next.Status == StatusDisabledAuto {
+		next.Status = StatusEnabled
+		recovered = true
+	}
+	r.keys[keyID] = &next
+	r.mu.Unlock()
 	if recovered {
 		r.persistAsync(keyID, StatusEnabled, "")
 	}
@@ -497,23 +546,29 @@ func (r *Registry) MarkRateLimited(keyID int, until time.Time) {
 	r.rateLimitMu.Unlock()
 }
 
-func (r *Registry) isRateLimited(key *ChannelKeySnapshot, now time.Time) bool {
+func (r *Registry) isRateLimitedLocked(key *ChannelKeySnapshot, now time.Time) bool {
 	credentialID := effectiveCredentialID(key)
-	r.rateLimitMu.Lock()
 	until, ok := r.rateLimitedUntil[credentialID]
 	if ok && !until.After(now) {
 		delete(r.rateLimitedUntil, credentialID)
 		ok = false
 	}
-	r.rateLimitMu.Unlock()
 	return ok
 }
 
 // UpdateHealth 更新 key 的健康状态（内存即时生效，不落库——由探针引擎负责落库）。
 func (r *Registry) UpdateHealth(keyID int, health string) {
-	r.mutate(keyID, func(k *ChannelKeySnapshot) {
-		k.HealthStatus = health
-	})
+	r.mu.Lock()
+	old := r.keys[keyID]
+	if old == nil || old.HealthStatus == health {
+		r.mu.Unlock()
+		return
+	}
+	next := *old
+	next.HealthStatus = health
+	r.keys[keyID] = &next
+	r.routeVersion.Add(1)
+	r.mu.Unlock()
 }
 
 // UpdateUpstreamRate 在探测结果落库后同步更新运行时快照；是否计入成本由密钥开关决定。

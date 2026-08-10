@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// RoundTripper 在 CPA executor 注入 OAuth Token 后、真正触网前保存最终请求。
-// 审计写入失败时直接返回错误，保证不会出现“已发包但无记录”。
+// RoundTripper 在 CPA executor 注入 OAuth Token 后、真正触网前保存最终请求骨架。
+// 骨架写入失败时直接返回错误；密文载荷和收尾状态由有界工作池异步补写。
 type RoundTripper struct {
 	base    http.RoundTripper
 	request *Handle
@@ -28,7 +28,7 @@ func NewRoundTripper(base http.RoundTripper, request *Handle, target Target) htt
 
 // RoundTrip 实现 http.RoundTripper。
 func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	attempt, err := t.request.BeginAttempt(req.Context(), t.target, req)
+	attempt, err := t.request.BeginAttemptFast(req.Context(), t.target, req)
 	if err != nil {
 		return nil, fmt.Errorf("%w，已阻止发包: %v", ErrWrite, err)
 	}

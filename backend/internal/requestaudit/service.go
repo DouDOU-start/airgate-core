@@ -39,13 +39,31 @@ var ErrWrite = errors.New("请求审计写入失败")
 
 // Service 提供审计写入和管理员查询。
 type Service struct {
-	db     *ent.Client
-	secret string
+	db      *ent.Client
+	secret  string
+	options Options
+
+	asyncOnce         sync.Once
+	asyncClose        sync.Once
+	asyncSubmitMu     sync.RWMutex
+	asyncQueue        chan asyncJob
+	asyncStop         chan struct{}
+	asyncDone         chan struct{}
+	asyncClosed       atomic.Bool
+	asyncPending      atomic.Int64
+	asyncPendingBytes atomic.Int64
+	asyncFallbacks    atomic.Uint64
+	asyncCompleted    atomic.Uint64
+	asyncFailed       atomic.Uint64
 }
 
 // New 创建请求审计服务。
-func New(db *ent.Client, secret string) *Service {
-	return &Service{db: db, secret: secret}
+func New(db *ent.Client, secret string, configured ...Options) *Service {
+	options := Options{}
+	if len(configured) > 0 {
+		options = configured[0]
+	}
+	return &Service{db: db, secret: secret, options: normalizeOptions(options)}
 }
 
 // RequestInput 是一次已解析转发请求的入站快照。
@@ -107,6 +125,7 @@ type Handle struct {
 	start   time.Time
 	seq     atomic.Int64
 	finish  sync.Once
+	fast    bool
 }
 
 // ID 返回审计主记录 ID。
@@ -169,12 +188,77 @@ func (s *Service) Start(ctx context.Context, in RequestInput) (*Handle, error) {
 	return &Handle{service: s, id: row.ID, start: time.Now()}, nil
 }
 
+// StartFast 同步创建审计主记录骨架，再异步补写压缩加密后的 Header 与 Body。
+// 数据库无法创建骨架时仍阻止向上游发包，保持请求触网前必有审计记录的约束。
+func (s *Service) StartFast(ctx context.Context, in RequestInput) (*Handle, error) {
+	if s == nil || s.db == nil {
+		return nil, fmt.Errorf("请求审计服务未配置")
+	}
+	if !s.options.AsyncEnabled {
+		return s.Start(ctx, in)
+	}
+	writeCtx, cancel := detachedTimeout(ctx)
+	defer cancel()
+	row, err := s.db.RequestAuditLog.Create().
+		SetRequestID(in.RequestID).
+		SetUserID(in.UserID).
+		SetUserEmailSnapshot(in.UserEmail).
+		SetAPIKeyID(in.APIKeyID).
+		SetGroupID(in.GroupID).
+		SetClient(in.Client).
+		SetProtocol(in.Protocol).
+		SetEndpoint(in.Endpoint).
+		SetModel(in.Model).
+		SetStream(in.Stream).
+		SetMethod(in.Method).
+		SetPath(in.Path).
+		SetRawQuery(in.RawQuery).
+		SetHost(in.Host).
+		SetRequestProto(in.RequestProto).
+		SetRemoteAddr(in.RemoteAddr).
+		SetIPAddress(in.IPAddress).
+		SetUserAgent(in.UserAgent).
+		SetContentType(in.ContentType).
+		SetContentLength(in.ContentLen).
+		SetInboundBodyBytes(int64(len(in.Body))).
+		Save(writeCtx)
+	if err != nil {
+		return nil, fmt.Errorf("保存请求审计主记录失败: %w", err)
+	}
+
+	snapshot := cloneRequestInput(in)
+	s.submitAsync(asyncJob{
+		name:          "request_payload",
+		retainedBytes: int64(len(snapshot.Body)),
+		run: func(jobCtx context.Context) error {
+			return s.enrichRequest(jobCtx, row.ID, snapshot)
+		},
+	})
+	return &Handle{service: s, id: row.ID, start: time.Now(), fast: true}, nil
+}
+
 // Finish 保存请求最终状态。该操作幂等，且不受客户端取消影响。
 func (h *Handle) Finish(statusCode int, responseBytes int64, completed bool) {
 	if h == nil || h.service == nil || h.id <= 0 {
 		return
 	}
 	h.finish.Do(func() {
+		if h.fast && h.service.options.AsyncEnabled {
+			duration := time.Since(h.start).Milliseconds()
+			h.service.submitAsync(asyncJob{
+				name: "request_finish",
+				run: func(ctx context.Context) error {
+					_, err := h.service.db.RequestAuditLog.UpdateOneID(h.id).
+						SetStatusCode(statusCode).
+						SetDurationMs(duration).
+						SetResponseBytes(responseBytes).
+						SetCompleted(completed).
+						Save(ctx)
+					return err
+				},
+			})
+			return
+		}
 		ctx, cancel := detachedTimeout(context.Background())
 		defer cancel()
 		_, _ = h.service.db.RequestAuditLog.UpdateOneID(h.id).
@@ -244,13 +328,67 @@ func (h *Handle) BeginAttempt(ctx context.Context, target Target, req *http.Requ
 	return &AttemptHandle{service: h.service, id: row.ID, start: time.Now()}, nil
 }
 
+// BeginAttemptFast 同步保存上游尝试骨架，再异步补写 URL、Header 与 Body 密文。
+func (h *Handle) BeginAttemptFast(ctx context.Context, target Target, req *http.Request) (*AttemptHandle, error) {
+	if h == nil || h.service == nil || h.id <= 0 {
+		return nil, fmt.Errorf("请求审计句柄无效")
+	}
+	if !h.service.options.AsyncEnabled {
+		return h.BeginAttempt(ctx, target, req)
+	}
+	if req == nil || req.URL == nil {
+		return nil, fmt.Errorf("上游请求为空")
+	}
+	body, err := readAndRestoreBody(req)
+	if err != nil {
+		return nil, fmt.Errorf("读取上游请求体失败: %w", err)
+	}
+	seq := int(h.seq.Add(1))
+	writeCtx, cancel := detachedTimeout(ctx)
+	defer cancel()
+	row, err := h.service.db.RequestAuditAttempt.Create().
+		SetRequestAuditID(h.id).
+		SetSeq(seq).
+		SetRouteKind(entattempt.RouteKind(target.RouteKind)).
+		SetChannelID(target.ChannelID).
+		SetChannelName(target.ChannelName).
+		SetChannelKeyID(target.ChannelKeyID).
+		SetChannelKeyName(target.ChannelKeyName).
+		SetAccountID(target.AccountID).
+		SetAccountName(target.AccountName).
+		SetAccountEmail(target.AccountEmail).
+		SetAccountPlatform(target.AccountPlatform).
+		SetAccountType(target.AccountType).
+		SetMethod(req.Method).
+		SetForwardBodyBytes(int64(len(body))).
+		Save(writeCtx)
+	if err != nil {
+		return nil, fmt.Errorf("保存上游请求审计失败: %w", err)
+	}
+
+	upstreamURL := req.URL.String()
+	headers := cloneHeader(req.Header)
+	h.service.submitAsync(asyncJob{
+		name:          "attempt_payload",
+		retainedBytes: int64(len(body)),
+		run: func(jobCtx context.Context) error {
+			return h.service.enrichAttempt(jobCtx, row.ID, upstreamURL, headers, body)
+		},
+	})
+	return &AttemptHandle{service: h.service, id: row.ID, start: time.Now(), fast: true}, nil
+}
+
 // AttemptHandle 关联一行实际上游尝试。
 type AttemptHandle struct {
-	service  *Service
-	id       int
-	start    time.Time
-	mu       sync.Mutex
-	finished bool
+	service        *Service
+	id             int
+	start          time.Time
+	fast           bool
+	mu             sync.Mutex
+	finished       bool
+	latestFinish   AttemptFinish
+	finishRevision uint64
+	finishQueued   bool
 }
 
 // Finish 保存一次上游尝试结果。允许后续调用覆盖更准确的 verdict/耗时。
@@ -258,11 +396,35 @@ func (h *AttemptHandle) Finish(in AttemptFinish) {
 	if h == nil || h.service == nil || h.id <= 0 {
 		return
 	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
 	if in.Latency <= 0 {
 		in.Latency = time.Since(h.start)
 	}
+	if h.fast && h.service.options.AsyncEnabled {
+		h.mu.Lock()
+		h.latestFinish = in
+		h.finishRevision++
+		if h.finishQueued {
+			h.mu.Unlock()
+			return
+		}
+		h.finishQueued = true
+		h.mu.Unlock()
+		h.service.submitAsync(asyncJob{
+			name: "attempt_finish",
+			run:  h.flushLatestFinish,
+			after: func(err error) {
+				if err == nil {
+					return
+				}
+				h.mu.Lock()
+				h.finishQueued = false
+				h.mu.Unlock()
+			},
+		})
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	ctx, cancel := detachedTimeout(context.Background())
 	defer cancel()
 	_, err := h.service.db.RequestAuditAttempt.UpdateOneID(h.id).
@@ -278,6 +440,39 @@ func (h *AttemptHandle) Finish(in AttemptFinish) {
 		Save(ctx)
 	if err == nil {
 		h.finished = true
+	}
+}
+
+func (h *AttemptHandle) flushLatestFinish(ctx context.Context) error {
+	for {
+		h.mu.Lock()
+		in := h.latestFinish
+		revision := h.finishRevision
+		h.mu.Unlock()
+
+		_, err := h.service.db.RequestAuditAttempt.UpdateOneID(h.id).
+			SetStatusCode(in.StatusCode).
+			SetVerdict(in.Verdict).
+			SetReason(in.Reason).
+			SetRetryAfterMs(in.RetryAfter.Milliseconds()).
+			SetLatencyMs(in.Latency.Milliseconds()).
+			SetFirstTokenMs(in.FirstTokenMs).
+			SetResponseStarted(in.ResponseStarted).
+			SetStreamCompleted(in.StreamCompleted).
+			SetFinished(true).
+			Save(ctx)
+		if err != nil {
+			return err
+		}
+
+		h.mu.Lock()
+		if h.finishRevision == revision {
+			h.finished = true
+			h.finishQueued = false
+			h.mu.Unlock()
+			return nil
+		}
+		h.mu.Unlock()
 	}
 }
 
@@ -453,6 +648,7 @@ type PayloadView struct {
 	Encoding string `json:"encoding"`
 	Content  string `json:"content"`
 	Bytes    int64  `json:"bytes"`
+	Pending  bool   `json:"pending"`
 }
 
 func payloadView(raw []byte) PayloadView {
@@ -460,6 +656,21 @@ func payloadView(raw []byte) PayloadView {
 		return PayloadView{Encoding: "utf8", Content: string(raw), Bytes: int64(len(raw))}
 	}
 	return PayloadView{Encoding: "base64", Content: base64.StdEncoding.EncodeToString(raw), Bytes: int64(len(raw))}
+}
+
+func (s *Service) openPayload(ciphertext string, logicalBytes int64) (PayloadView, error) {
+	if ciphertext == "" {
+		return PayloadView{Encoding: "pending", Bytes: logicalBytes, Pending: true}, nil
+	}
+	raw, err := s.open(ciphertext)
+	if err != nil {
+		return PayloadView{}, err
+	}
+	view := payloadView(raw)
+	if logicalBytes > 0 {
+		view.Bytes = logicalBytes
+	}
+	return view, nil
 }
 
 // ListFilter 是管理员审计列表筛选条件。
@@ -667,16 +878,14 @@ func (s *Service) Get(ctx context.Context, id int) (Detail, error) {
 	if err != nil {
 		return Detail{}, err
 	}
-	headers, err := s.open(row.InboundHeadersEnc)
+	headers, err := s.openPayload(row.InboundHeadersEnc, 0)
 	if err != nil {
 		return Detail{}, fmt.Errorf("解密入站请求头失败: %w", err)
 	}
-	body, err := s.open(row.InboundBodyEnc)
+	body, err := s.openPayload(row.InboundBodyEnc, row.InboundBodyBytes)
 	if err != nil {
 		return Detail{}, fmt.Errorf("解密入站请求体失败: %w", err)
 	}
-	inboundBody := payloadView(body)
-	inboundBody.Bytes = row.InboundBodyBytes
 	detail := Detail{
 		ListItem:       listItemFromEnt(row),
 		Method:         row.Method,
@@ -689,25 +898,23 @@ func (s *Service) Get(ctx context.Context, id int) (Detail, error) {
 		UserAgent:      row.UserAgent,
 		ContentType:    row.ContentType,
 		ContentLength:  row.ContentLength,
-		InboundHeaders: payloadView(headers),
-		InboundBody:    inboundBody,
+		InboundHeaders: headers,
+		InboundBody:    body,
 		Attempts:       make([]AttemptView, 0, len(row.Edges.Attempts)),
 	}
 	for _, attempt := range row.Edges.Attempts {
-		urlRaw, errOpen := s.open(attempt.UpstreamURLEnc)
+		urlView, errOpen := s.openPayload(attempt.UpstreamURLEnc, 0)
 		if errOpen != nil {
 			return Detail{}, fmt.Errorf("解密第 %d 次上游 URL 失败: %w", attempt.Seq, errOpen)
 		}
-		headersRaw, errOpen := s.open(attempt.ForwardHeadersEnc)
+		headersView, errOpen := s.openPayload(attempt.ForwardHeadersEnc, 0)
 		if errOpen != nil {
 			return Detail{}, fmt.Errorf("解密第 %d 次上游请求头失败: %w", attempt.Seq, errOpen)
 		}
-		bodyRaw, errOpen := s.open(attempt.ForwardBodyEnc)
+		bodyView, errOpen := s.openPayload(attempt.ForwardBodyEnc, attempt.ForwardBodyBytes)
 		if errOpen != nil {
 			return Detail{}, fmt.Errorf("解密第 %d 次上游请求体失败: %w", attempt.Seq, errOpen)
 		}
-		forwardBody := payloadView(bodyRaw)
-		forwardBody.Bytes = attempt.ForwardBodyBytes
 		detail.Attempts = append(detail.Attempts, AttemptView{
 			ID: attempt.ID, Seq: attempt.Seq, RouteKind: string(attempt.RouteKind),
 			ChannelID: attempt.ChannelID, ChannelName: attempt.ChannelName,
@@ -715,7 +922,7 @@ func (s *Service) Get(ctx context.Context, id int) (Detail, error) {
 			AccountID: attempt.AccountID, AccountName: attempt.AccountName,
 			AccountEmail: attempt.AccountEmail, AccountPlatform: attempt.AccountPlatform,
 			AccountType: attempt.AccountType, Method: attempt.Method,
-			UpstreamURL: payloadView(urlRaw), Headers: payloadView(headersRaw), Body: forwardBody,
+			UpstreamURL: urlView, Headers: headersView, Body: bodyView,
 			StatusCode: attempt.StatusCode, Verdict: attempt.Verdict, Reason: attempt.Reason,
 			RetryAfterMs: attempt.RetryAfterMs, LatencyMs: attempt.LatencyMs,
 			FirstTokenMs: attempt.FirstTokenMs, ResponseStarted: attempt.ResponseStarted,

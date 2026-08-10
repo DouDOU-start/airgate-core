@@ -153,6 +153,7 @@ type Registry struct {
 
 	mu       sync.RWMutex
 	accounts map[int]*Snapshot
+	index    map[accountCandidateKey][]int
 
 	loadedOnce     atomic.Bool
 	lazyMu         sync.Mutex
@@ -162,12 +163,18 @@ type Registry struct {
 	randFn         func(n int) int
 	persistTimeout time.Duration
 	stateSeq       atomic.Uint64
+	routeVersion   atomic.Uint64
 	probeSeq       atomic.Uint64
 
 	persistMu      sync.Mutex
 	persistPending map[int]statePersistRequest
 	persistRunning map[int]bool
 	persistLatest  map[int]uint64
+}
+
+type accountCandidateKey struct {
+	groupID int
+	model   string
 }
 
 type statePersistRequest struct {
@@ -184,6 +191,7 @@ func New(loader Loader, persister Persister) *Registry {
 		loader:         loader,
 		persister:      persister,
 		accounts:       map[int]*Snapshot{},
+		index:          map[accountCandidateKey][]int{},
 		randFn:         rand.IntN,
 		persistTimeout: 5 * time.Second,
 		persistPending: make(map[int]statePersistRequest),
@@ -259,6 +267,8 @@ func (r *Registry) Reload(ctx context.Context) error {
 		}
 	}
 	r.accounts = next
+	r.index = buildAccountCandidateIndex(next)
+	r.routeVersion.Add(1)
 	r.mu.Unlock()
 	r.loadedOnce.Store(true)
 	return nil
@@ -324,18 +334,16 @@ func (r *Registry) listCandidates(
 		return nil
 	}
 	r.ensureLoaded()
-	excluded := make(map[int]struct{}, len(exclude))
-	for _, id := range exclude {
-		excluded[id] = struct{}{}
-	}
 	now := time.Now()
 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	out := make([]*Snapshot, 0, 8)
-	for _, a := range r.accounts {
-		if _, skip := excluded[a.ID]; skip {
+	ids := r.index[accountCandidateKey{groupID: groupID, model: model}]
+	out := make([]*Snapshot, 0, len(ids))
+	for _, id := range ids {
+		a := r.accounts[id]
+		if a == nil || containsInt(exclude, a.ID) {
 			continue
 		}
 		if a.State == StateDisabled {
@@ -353,21 +361,75 @@ func (r *Registry) listCandidates(
 				continue
 			}
 		}
-		if _, ok := a.GroupIDs[groupID]; !ok {
-			continue
-		}
-		if len(a.Models) > 0 {
-			if _, ok := a.Models[model]; !ok {
-				continue
-			}
-		}
-		// Models 为空：视为不限制（由 Loader 应用平台默认；若仍空则跳过防误调度）。
-		if len(a.Models) == 0 {
-			continue
-		}
 		out = append(out, a)
 	}
 	return out
+}
+
+func buildAccountCandidateIndex(accounts map[int]*Snapshot) map[accountCandidateKey][]int {
+	index := make(map[accountCandidateKey][]int)
+	for id, account := range accounts {
+		if account == nil || len(account.Models) == 0 || len(account.GroupIDs) == 0 {
+			continue
+		}
+		for groupID := range account.GroupIDs {
+			for model := range account.Models {
+				key := accountCandidateKey{groupID: groupID, model: model}
+				index[key] = append(index[key], id)
+			}
+		}
+	}
+	for key := range index {
+		sort.Ints(index[key])
+	}
+	return index
+}
+
+func containsInt(values []int, target int) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+// RouteCandidateIDs 返回指定路由分片的不可变成员索引。
+// Reload 会整体替换索引映射，因此返回的切片在解锁后仍然有效。
+func (r *Registry) RouteCandidateIDs(groupID int, model string) (uint64, []int) {
+	if r == nil {
+		return 0, nil
+	}
+	r.ensureLoaded()
+	r.mu.RLock()
+	ids := r.index[accountCandidateKey{groupID: groupID, model: model}]
+	version := r.routeVersion.Load()
+	r.mu.RUnlock()
+	return version, ids
+}
+
+// RouteCandidate 根据当前写时复制运行时状态解析并重新校验单个索引账号。
+func (r *Registry) RouteCandidate(id, groupID int, model string, now time.Time) (*Snapshot, bool) {
+	if r == nil {
+		return nil, false
+	}
+	r.mu.RLock()
+	account := r.accounts[id]
+	if account == nil || account.State == StateDisabled || account.rateLimitProbeBlocked(now) || !account.IsSchedulable(now) {
+		r.mu.RUnlock()
+		return nil, false
+	}
+	_, groupOK := account.GroupIDs[groupID]
+	_, modelOK := account.Models[model]
+	r.mu.RUnlock()
+	return account, groupOK && modelOK
+}
+
+func (r *Registry) RouteVersion() uint64 {
+	if r == nil {
+		return 0
+	}
+	return r.routeVersion.Load()
 }
 
 func isCodexOAuth(account *Snapshot) bool {
@@ -552,6 +614,17 @@ func (r *Registry) MarkRateLimitProbeSucceeded(accountID int, lease RateLimitPro
 // MarkActiveIfNotRateLimited 处理普通请求成功：当前已经变成 rate_limited/disabled 时
 // 保持新状态，防止较早发出的 active 请求晚到成功后错误清除限流。
 func (r *Registry) MarkActiveIfNotRateLimited(accountID int) {
+	if r == nil {
+		return
+	}
+	r.mu.RLock()
+	account := r.accounts[accountID]
+	if account == nil || account.State == StateRateLimited || account.State == StateDisabled ||
+		(account.State == StateActive && account.StateUntil == nil && account.ErrorMsg == "" && account.rateLimitProbeClean()) {
+		r.mu.RUnlock()
+		return
+	}
+	r.mu.RUnlock()
 	r.markActiveWhen(accountID, func(a *Snapshot) bool {
 		return a.State == StateActive || a.State == StateDegraded
 	})
@@ -693,6 +766,7 @@ func (r *Registry) mutateState(accountID int, apply func(*Snapshot) bool) (*Snap
 		return old, 0
 	}
 	r.accounts[accountID] = &next
+	r.routeVersion.Add(1)
 	return &next, r.stateSeq.Add(1)
 }
 

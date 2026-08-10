@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,15 +18,201 @@ import (
 const testSecret = "1111111111111111111111111111111111111111111111111111111111111111"
 
 func openTestService(t *testing.T) *Service {
+	return openTestServiceWithOptions(t, Options{})
+}
+
+func openTestServiceWithOptions(t *testing.T, options Options) *Service {
 	t.Helper()
 	db := enttest.Open(t, "sqlite3", "file:"+strings.ReplaceAll(t.Name(), "/", "_")+"?mode=memory&cache=shared&_fk=1",
 		enttest.WithMigrateOptions(schema.WithGlobalUniqueID(false)))
+	service := New(db, testSecret, options)
 	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := service.CloseWithContext(ctx); err != nil {
+			t.Errorf("关闭请求审计工作池失败: %v", err)
+		}
 		if err := db.Close(); err != nil {
 			t.Errorf("关闭测试数据库失败: %v", err)
 		}
 	})
-	return New(db, testSecret)
+	return service
+}
+
+func Test快速审计异步补写完整记录(t *testing.T) {
+	service := openTestServiceWithOptions(t, Options{
+		AsyncEnabled: true, QueueSize: 16, WorkerCount: 2, MaxPendingBytes: 1 << 20,
+	})
+	service.StartBackground()
+	ctx := context.Background()
+	handle, err := service.StartFast(ctx, RequestInput{
+		RequestID: "req-fast", UserID: 7, UserEmail: "fast@example.com", APIKeyID: 9,
+		GroupID: 3, Protocol: "openai", Endpoint: "responses", Model: "gpt-5",
+		Method: http.MethodPost, Path: "/v1/responses",
+		Headers: http.Header{"Authorization": []string{"Bearer client-fast"}},
+		Body:    []byte(`{"model":"gpt-5","input":"异步审计"}`),
+	})
+	if err != nil {
+		t.Fatalf("创建快速审计主记录失败: %v", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, "https://api.example.com/v1/responses", strings.NewReader(`{"input":"实际请求"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer upstream-fast")
+	attempt, err := handle.BeginAttemptFast(ctx, Target{RouteKind: "account", AccountID: 12}, req)
+	if err != nil {
+		t.Fatalf("创建快速上游审计失败: %v", err)
+	}
+	attempt.Finish(AttemptFinish{StatusCode: 200, Verdict: "success", ResponseStarted: true, StreamCompleted: true})
+	handle.Finish(200, 128, true)
+
+	flushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := service.Flush(flushCtx); err != nil {
+		t.Fatalf("等待异步审计写入失败: %v", err)
+	}
+	detail, err := service.Get(ctx, handle.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !detail.Completed || detail.StatusCode != 200 || len(detail.Attempts) != 1 {
+		t.Fatalf("异步审计记录不完整: %+v", detail)
+	}
+	if !strings.Contains(detail.InboundHeaders.Content, "client-fast") ||
+		!strings.Contains(detail.Attempts[0].Headers.Content, "upstream-fast") {
+		t.Fatalf("异步审计密文补写不完整: %+v", detail)
+	}
+}
+
+func Test异步队列满时同步兜底(t *testing.T) {
+	service := openTestServiceWithOptions(t, Options{
+		AsyncEnabled: true, QueueSize: 1, WorkerCount: 1, MaxPendingBytes: 1 << 20,
+	})
+	service.StartBackground()
+	started := make(chan struct{})
+	release := make(chan struct{})
+	service.submitAsync(asyncJob{name: "阻塞任务", run: func(context.Context) error {
+		close(started)
+		<-release
+		return nil
+	}})
+	<-started
+	service.submitAsync(asyncJob{name: "排队任务", run: func(context.Context) error { return nil }})
+	var fallbackRan atomic.Bool
+	service.submitAsync(asyncJob{name: "同步兜底任务", run: func(context.Context) error {
+		fallbackRan.Store(true)
+		return nil
+	}})
+	if !fallbackRan.Load() {
+		t.Fatal("队列已满时没有执行同步兜底")
+	}
+	if got := service.AsyncStats().SynchronousFallback; got != 1 {
+		t.Fatalf("同步兜底次数 = %d，期望 1", got)
+	}
+	close(release)
+	flushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := service.Flush(flushCtx); err != nil {
+		t.Fatalf("排空异步队列失败: %v", err)
+	}
+}
+
+func Test异步载荷补写前详情返回等待状态(t *testing.T) {
+	service := openTestServiceWithOptions(t, Options{
+		AsyncEnabled: true, QueueSize: 4, WorkerCount: 1, MaxPendingBytes: 1 << 20,
+	})
+	service.StartBackground()
+	started := make(chan struct{})
+	release := make(chan struct{})
+	service.submitAsync(asyncJob{name: "阻塞载荷补写", run: func(context.Context) error {
+		close(started)
+		<-release
+		return nil
+	}})
+	<-started
+	handle, err := service.StartFast(context.Background(), RequestInput{
+		RequestID: "req-pending", Protocol: "openai", Model: "gpt-5",
+		Headers: http.Header{"X-Test": []string{"pending"}}, Body: []byte(`{"input":"pending"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	detail, err := service.Get(context.Background(), handle.ID())
+	if err != nil {
+		t.Fatalf("载荷补写期间读取详情失败: %v", err)
+	}
+	if !detail.InboundHeaders.Pending || !detail.InboundBody.Pending || detail.InboundBody.Bytes == 0 {
+		t.Fatalf("载荷补写期间未返回等待状态: %+v", detail)
+	}
+	close(release)
+	flushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := service.Flush(flushCtx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test关闭异步工作池会排空已提交任务(t *testing.T) {
+	service := openTestServiceWithOptions(t, Options{
+		AsyncEnabled: true, QueueSize: 16, WorkerCount: 2, MaxPendingBytes: 1 << 20,
+	})
+	service.StartBackground()
+	var completed atomic.Int64
+	for range 10 {
+		service.submitAsync(asyncJob{name: "关闭排空测试", run: func(context.Context) error {
+			time.Sleep(time.Millisecond)
+			completed.Add(1)
+			return nil
+		}})
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := service.CloseWithContext(ctx); err != nil {
+		t.Fatalf("关闭异步工作池失败: %v", err)
+	}
+	if completed.Load() != 10 {
+		t.Fatalf("关闭后完成任务数 = %d，期望 10", completed.Load())
+	}
+	stats := service.AsyncStats()
+	if !stats.Closed || stats.PendingJobs != 0 {
+		t.Fatalf("关闭后的工作池状态异常: %+v", stats)
+	}
+}
+
+func Test并发提交与关闭不会遗漏任务(t *testing.T) {
+	service := openTestServiceWithOptions(t, Options{
+		AsyncEnabled: true, QueueSize: 8, WorkerCount: 2, MaxPendingBytes: 1 << 20,
+	})
+	service.StartBackground()
+	const total = 64
+	start := make(chan struct{})
+	var submitted atomic.Int64
+	var completed atomic.Int64
+	done := make(chan struct{}, total)
+	for range total {
+		go func() {
+			<-start
+			service.submitAsync(asyncJob{name: "并发关闭测试", run: func(context.Context) error {
+				completed.Add(1)
+				return nil
+			}})
+			submitted.Add(1)
+			done <- struct{}{}
+		}()
+	}
+	close(start)
+	closeCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := service.CloseWithContext(closeCtx); err != nil {
+		t.Fatalf("并发关闭异步工作池失败: %v", err)
+	}
+	for range total {
+		<-done
+	}
+	if submitted.Load() != total || completed.Load() != total {
+		t.Fatalf("并发关闭后任务不完整: submitted=%d completed=%d", submitted.Load(), completed.Load())
+	}
 }
 
 func TestRedactBase64Images保留结构并移除图片原文(t *testing.T) {

@@ -38,13 +38,22 @@ func GetHost() string {
 
 // Config 应用配置
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	Redis    RedisConfig    `yaml:"redis"`
-	JWT      JWTConfig      `yaml:"jwt"`
-	Security SecurityConfig `yaml:"security"`
-	Log      LogConfig      `yaml:"log"`
-	Plugins  PluginsConfig  `yaml:"plugins"`
+	Server       ServerConfig       `yaml:"server"`
+	Database     DatabaseConfig     `yaml:"database"`
+	Redis        RedisConfig        `yaml:"redis"`
+	JWT          JWTConfig          `yaml:"jwt"`
+	Security     SecurityConfig     `yaml:"security"`
+	Log          LogConfig          `yaml:"log"`
+	Plugins      PluginsConfig      `yaml:"plugins"`
+	RequestAudit RequestAuditConfig `yaml:"request_audit"`
+}
+
+// RequestAuditConfig 控制完整请求审计的异步补写工作池。
+type RequestAuditConfig struct {
+	AsyncEnabled      bool `yaml:"async_enabled"`
+	QueueSize         int  `yaml:"queue_size"`
+	WorkerCount       int  `yaml:"worker_count"`
+	MaxPendingBytesMB int  `yaml:"max_pending_bytes_mb"`
 }
 
 // PluginsConfig 独立进程插件运行配置。
@@ -166,9 +175,10 @@ func (d DatabaseConfig) DSN() string {
 // 支持 docker compose 纯环境变量启动（DB_*/REDIS_*/JWT_SECRET 等）。
 func Load(path string) (*Config, error) {
 	cfg := &Config{
-		Server:  ServerConfig{Host: DefaultHost, Port: DefaultPort, Mode: "release"},
-		JWT:     JWTConfig{ExpireHour: 24},
-		Plugins: PluginsConfig{Dir: "data/plugins", HookTimeoutMS: 500},
+		Server:       ServerConfig{Host: DefaultHost, Port: DefaultPort, Mode: "release"},
+		JWT:          JWTConfig{ExpireHour: 24},
+		Plugins:      PluginsConfig{Dir: "data/plugins", HookTimeoutMS: 500},
+		RequestAudit: RequestAuditConfig{AsyncEnabled: true, QueueSize: 4096, WorkerCount: 4, MaxPendingBytesMB: 256},
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -177,6 +187,7 @@ func Load(path string) (*Config, error) {
 		}
 		// 无配置文件：完全依赖环境变量。
 		applyEnvOverrides(cfg)
+		normalizeRequestAuditConfig(&cfg.RequestAudit)
 		return cfg, nil
 	}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
@@ -193,7 +204,20 @@ func Load(path string) (*Config, error) {
 		cfg.Plugins.HookTimeoutMS = 500
 	}
 	applyEnvOverrides(cfg)
+	normalizeRequestAuditConfig(&cfg.RequestAudit)
 	return cfg, nil
+}
+
+func normalizeRequestAuditConfig(cfg *RequestAuditConfig) {
+	if cfg.QueueSize <= 0 {
+		cfg.QueueSize = 4096
+	}
+	if cfg.WorkerCount <= 0 {
+		cfg.WorkerCount = 4
+	}
+	if cfg.MaxPendingBytesMB <= 0 {
+		cfg.MaxPendingBytesMB = 256
+	}
 }
 
 // applyEnvOverrides 用环境变量覆盖配置值
@@ -229,6 +253,12 @@ func applyEnvOverrides(cfg *Config) {
 
 	// 安全
 	envStr("API_KEY_SECRET", &cfg.Security.APIKeySecret)
+
+	// 完整请求审计
+	envBool("REQUEST_AUDIT_ASYNC_ENABLED", &cfg.RequestAudit.AsyncEnabled)
+	envInt("REQUEST_AUDIT_QUEUE_SIZE", &cfg.RequestAudit.QueueSize)
+	envInt("REQUEST_AUDIT_WORKER_COUNT", &cfg.RequestAudit.WorkerCount)
+	envInt("REQUEST_AUDIT_MAX_PENDING_BYTES_MB", &cfg.RequestAudit.MaxPendingBytesMB)
 
 	// 独立进程插件
 	envBool("PLUGINS_ENABLED", &cfg.Plugins.Enabled)

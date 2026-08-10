@@ -220,6 +220,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/upstream-logs", handlers.UpstreamLog.AdminList)
 		// 完整请求审计（解密后的 Header/Body 仅管理员可见）
 		adminGroup.GET("/request-audits", handlers.RequestAudit.List)
+		adminGroup.GET("/request-audits/stats", handlers.RequestAudit.Stats)
 		adminGroup.DELETE("/request-audits", handlers.RequestAudit.Clear)
 		adminGroup.GET("/request-audits/:id", handlers.RequestAudit.Get)
 

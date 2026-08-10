@@ -233,6 +233,9 @@ func (s *Server) StartBackground(ctx context.Context) {
 	// 启动使用量异步记录器与上游请求日志记录器（含 TTL 清理）
 	s.recorder.Start()
 	s.errRecorder.Start()
+	if s.handlers.RequestAuditService != nil {
+		s.handlers.RequestAuditService.StartBackground()
+	}
 
 	backgroundCtx, cancel := context.WithCancel(ctx)
 	s.backgroundCancel = cancel
@@ -328,10 +331,20 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// 先排空 HTTP 在途请求，再停两个 recorder：在途请求收尾时仍会调 Record，
 	// 先停 recorder 会把关停窗口内的计费/留痕全部丢弃。
 	err := s.srv.Shutdown(ctx)
+	var auditErr error
+	if s.handlers.RequestAuditService != nil {
+		auditErr = s.handlers.RequestAuditService.CloseWithContext(ctx)
+		if auditErr != nil {
+			slog.Error("请求审计工作池排空失败", "error", auditErr)
+		}
+	}
 	if s.pluginRuntime != nil {
 		s.pluginRuntime.StopAll(ctx)
 	}
 	s.recorder.Stop()
 	s.errRecorder.Stop()
+	if err == nil {
+		err = auditErr
+	}
 	return err
 }

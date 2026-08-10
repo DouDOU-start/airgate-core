@@ -75,6 +75,13 @@ func (h *RequestAuditHandler) List(c *gin.Context) {
 	response.Success(c, response.PagedData(items, int64(total), page, pageSize))
 }
 
+// Stats 返回完整请求审计异步工作池状态。
+func (h *RequestAuditHandler) Stats(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.Header("Pragma", "no-cache")
+	response.Success(c, h.service.AsyncStats())
+}
+
 // Get 返回单条请求及全部实际上游尝试的解密详情。
 func (h *RequestAuditHandler) Get(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")

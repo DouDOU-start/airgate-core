@@ -178,7 +178,7 @@ var decrementRPMScript = redis.NewScript(`
 // minute 须传 TryIncrementKeyRPM 返回的分钟窗口：请求跨分钟边界失败时
 // 仍撤销原窗口的预递增，而不是扣穿新窗口/漏撤旧窗口。
 func (r *RPMCounter) DecrementKeyRPM(ctx context.Context, channelKeyID int, minute int64) {
-	if r.rdb == nil {
+	if r.rdb == nil || minute <= 0 {
 		return
 	}
 	decrementRPMScript.Run(ctx, r.rdb, []string{keyMinuteKey(channelKeyID, minute)})
@@ -251,7 +251,7 @@ func (r *RPMCounter) TryIncrementAccountRPM(ctx context.Context, accountID int, 
 
 // DecrementAccountRPM 回退账号 RPM 预递增。
 func (r *RPMCounter) DecrementAccountRPM(ctx context.Context, accountID int, minute int64) {
-	if r.rdb == nil {
+	if r.rdb == nil || minute <= 0 {
 		return
 	}
 	decrementRPMScript.Run(ctx, r.rdb, []string{accountMinuteKey(accountID, minute)})
