@@ -1,10 +1,14 @@
 # 仓库内模型价格目录
 
-`model_prices_and_context_window.json` 是模型价格同步功能使用的仓库内置目录，格式兼容 LiteLLM 的模型价格 JSON，并支持 AirGate 扩展字段。
+`model_prices_and_context_window.json` 是模型价格同步功能使用的仓库目录，格式兼容 LiteLLM 的模型价格 JSON，并支持 AirGate 扩展字段。
 
 ## 修改方式
 
-直接编辑 JSON 后提交即可。重新构建并重启服务后，管理后台「模型价格」页面的「同步模型」和「一键同步价格」会读取新目录。
+直接编辑 JSON、提交并推送到 `standalone-gateway` 分支即可。运行中的服务会通过当前仓库 Raw 地址读取新目录，不需要重新构建：
+
+```text
+https://raw.githubusercontent.com/DouDOU-start/airgate-core/standalone-gateway/backend/internal/app/modelprice/model_prices_and_context_window.json
+```
 
 价格字段单位如下：
 
