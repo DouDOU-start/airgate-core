@@ -91,3 +91,17 @@ func TestSyncConvertsPerTokenPricesToPerMillion(t *testing.T) {
 		t.Fatalf("update = %+v", repo.updated)
 	}
 }
+
+func TestEmbeddedCatalogIsValid(t *testing.T) {
+	service := NewService(&syncRepo{})
+	remote, err := service.fetchRemotePrices(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(remote) == 0 {
+		t.Fatal("仓库内置模型价格目录为空")
+	}
+	if _, ok := remote["gpt-5.4"]; !ok {
+		t.Fatal("仓库内置模型价格目录缺少 gpt-5.4")
+	}
+}

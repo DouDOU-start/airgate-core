@@ -2,71 +2,57 @@ package modelprice
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
-	"net/http"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 )
 
-const DefaultSyncURL = "https://raw.githubusercontent.com/Wei-Shaw/model-price-repo/main/model_prices_and_context_window.json"
+// DefaultSyncSource 是仓库内置的模型价格目录标识。
+const DefaultSyncSource = "仓库内置模型价格目录"
+
+// embeddedModelPriceCatalog 是可直接提交和审查的模型价格目录。
+// 修改 backend/internal/app/modelprice/model_prices_and_context_window.json 后重新构建即可生效。
+//
+//go:embed model_prices_and_context_window.json
+var embeddedModelPriceCatalog []byte
 
 type PriceSyncFetcher interface {
 	Fetch(context.Context, string) ([]byte, error)
 }
 
-type httpPriceSyncFetcher struct {
-	client *http.Client
-}
-
-func (f httpPriceSyncFetcher) Fetch(ctx context.Context, source string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, source, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := f.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("模型价格源返回 HTTP %d", resp.StatusCode)
-	}
-	return io.ReadAll(io.LimitReader(resp.Body, 64<<20))
-}
-
 type liteLLMPrice struct {
-	InputCostPerToken                   *float64 `json:"input_cost_per_token"`
-	InputCostPerTokenPriority           *float64 `json:"input_cost_per_token_priority"`
-	OutputCostPerToken                  *float64 `json:"output_cost_per_token"`
-	OutputCostPerTokenPriority          *float64 `json:"output_cost_per_token_priority"`
-	CacheCreationInputTokenCost         *float64 `json:"cache_creation_input_token_cost"`
-	CacheCreationInputTokenCostAbove1hr *float64 `json:"cache_creation_input_token_cost_above_1hr"`
-	CacheReadInputTokenCost             *float64 `json:"cache_read_input_token_cost"`
-	LongContextInputTokenThreshold      *int     `json:"long_context_input_token_threshold"`
-	LongContextInputCostMultiplier      *float64 `json:"long_context_input_cost_multiplier"`
-	LongContextOutputCostMultiplier     *float64 `json:"long_context_output_cost_multiplier"`
-	OutputCostPerImage                  *float64 `json:"output_cost_per_image"`
-	LiteLLMProvider                     string   `json:"litellm_provider"`
-	Mode                                string   `json:"mode"`
+	InputCostPerToken                   *float64               `json:"input_cost_per_token"`
+	InputCostPerTokenPriority           *float64               `json:"input_cost_per_token_priority"`
+	OutputCostPerToken                  *float64               `json:"output_cost_per_token"`
+	OutputCostPerTokenPriority          *float64               `json:"output_cost_per_token_priority"`
+	CacheCreationInputTokenCost         *float64               `json:"cache_creation_input_token_cost"`
+	CacheCreationInputTokenCostAbove1hr *float64               `json:"cache_creation_input_token_cost_above_1hr"`
+	CacheReadInputTokenCost             *float64               `json:"cache_read_input_token_cost"`
+	LongContextInputTokenThreshold      *int                   `json:"long_context_input_token_threshold"`
+	LongContextInputCostMultiplier      *float64               `json:"long_context_input_cost_multiplier"`
+	LongContextOutputCostMultiplier     *float64               `json:"long_context_output_cost_multiplier"`
+	OutputCostPerImage                  *float64               `json:"output_cost_per_image"`
+	LiteLLMProvider                     string                 `json:"litellm_provider"`
+	Mode                                string                 `json:"mode"`
+	AirgatePricingExtra                 map[string]interface{} `json:"airgate_pricing_extra"`
 }
 
-// SetSyncFetcher 替换网络拉取器，主要用于可重复的单元测试。
+// SetSyncFetcher 替换目录拉取器，主要用于可重复的单元测试。
 func (s *Service) SetSyncFetcher(fetcher PriceSyncFetcher) {
 	if s != nil {
 		s.syncFetcher = fetcher
 	}
 }
 
-// Sync 从兼容 LiteLLM 的价格仓库刷新已有模型及 CPA 支持的模型。
+// Sync 从仓库内置的兼容 LiteLLM 目录刷新已有模型及 CPA 支持的模型。
 // 仅存在于本地的条目和自定义 pricing_extra 字段会被保留。
 func (s *Service) Sync(ctx context.Context) (SyncResult, error) {
-	result := SyncResult{Source: DefaultSyncURL}
+	result := SyncResult{Source: DefaultSyncSource}
 	remote, err := s.fetchRemotePrices(ctx)
 	if err != nil {
 		return result, err
@@ -128,7 +114,7 @@ func (s *Service) Sync(ctx context.Context) (SyncResult, error) {
 	return result, nil
 }
 
-// SyncCandidates 返回远端价格目录，并标记模型是否已存在于本地。
+// SyncCandidates 返回目录中的模型，并标记模型是否已存在于本地。
 func (s *Service) SyncCandidates(ctx context.Context) ([]SyncCandidate, error) {
 	remote, err := s.fetchRemotePrices(ctx)
 	if err != nil {
@@ -176,9 +162,9 @@ func (s *Service) SyncCandidates(ctx context.Context) ([]SyncCandidate, error) {
 	return out, nil
 }
 
-// SyncSelected 仅创建或更新管理员选择的远端模型。
+// SyncSelected 仅创建或更新管理员选择的目录模型。
 func (s *Service) SyncSelected(ctx context.Context, selected []string) (SyncResult, error) {
-	result := SyncResult{Source: DefaultSyncURL}
+	result := SyncResult{Source: DefaultSyncSource}
 	models := normalizeSelectedModels(selected)
 	if len(models) == 0 {
 		return result, fmt.Errorf("请至少选择一个模型")
@@ -230,17 +216,28 @@ func (s *Service) SyncSelected(ctx context.Context, selected []string) (SyncResu
 func (s *Service) fetchRemotePrices(ctx context.Context) (map[string]liteLLMPrice, error) {
 	fetcher := s.syncFetcher
 	if fetcher == nil {
-		fetcher = httpPriceSyncFetcher{client: &http.Client{Timeout: 30 * time.Second}}
+		fetcher = embeddedPriceSyncFetcher{}
 	}
-	body, err := fetcher.Fetch(ctx, DefaultSyncURL)
+	body, err := fetcher.Fetch(ctx, DefaultSyncSource)
 	if err != nil {
 		return nil, err
 	}
 	remote := map[string]liteLLMPrice{}
 	if err := json.Unmarshal(body, &remote); err != nil {
-		return nil, fmt.Errorf("解析远端模型价格失败：%w", err)
+		return nil, fmt.Errorf("解析仓库内模型价格目录失败：%w", err)
 	}
 	return remote, nil
+}
+
+type embeddedPriceSyncFetcher struct{}
+
+func (embeddedPriceSyncFetcher) Fetch(ctx context.Context, _ string) ([]byte, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		return embeddedModelPriceCatalog, nil
+	}
 }
 
 func normalizeSelectedModels(input []string) []string {
@@ -281,8 +278,13 @@ func findRemotePrice(remote map[string]liteLLMPrice, model string) (liteLLMPrice
 }
 
 func hasUsablePrice(p liteLLMPrice) bool {
-	return p.InputCostPerToken != nil || p.OutputCostPerToken != nil ||
-		p.CacheReadInputTokenCost != nil || p.OutputCostPerImage != nil
+	if p.InputCostPerToken != nil || p.OutputCostPerToken != nil ||
+		p.CacheReadInputTokenCost != nil || p.OutputCostPerImage != nil {
+		return true
+	}
+	_, hasImage := p.AirgatePricingExtra["image"]
+	_, hasVideo := p.AirgatePricingExtra["video"]
+	return hasImage || hasVideo
 }
 
 func perMillion(value *float64) float64 {
@@ -329,6 +331,9 @@ func syncUpdate(current ModelPrice, p liteLLMPrice) (UpdateInput, bool) {
 func syncPricingExtra(existing map[string]interface{}, p liteLLMPrice) map[string]interface{} {
 	out := make(map[string]interface{}, len(existing)+2)
 	for key, value := range existing {
+		out[key] = value
+	}
+	for key, value := range p.AirgatePricingExtra {
 		out[key] = value
 	}
 	if p.InputCostPerToken != nil && *p.InputCostPerToken > 0 && p.InputCostPerTokenPriority != nil {
