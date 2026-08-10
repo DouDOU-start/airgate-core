@@ -6,7 +6,7 @@ import {
   Spinner, TextField as HeroTextField, ToggleButton, ToggleButtonGroup,
   useOverlayState,
 } from '@heroui/react';
-import { Check, Inbox, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Check, CloudDownload, Inbox, ListPlus, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { modelPricesApi, modelTagsApi } from '../../shared/api/modelPrices';
 import { queryKeys } from '../../shared/queryKeys';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -20,6 +20,7 @@ import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
 import type { CreateModelPriceReq, ModelPriceResp, ModelTagResp } from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { RefreshButton } from '../../shared/components/RefreshButton';
+import { ModelSyncModal } from './modelprices/ModelSyncModal';
 
 type Translate = (key: string) => string;
 
@@ -381,6 +382,7 @@ export default function ModelPricesPage() {
   const [editingTag, setEditingTag] = useState<{ id: number; name: string } | null>(null);
   const [deleteTagTarget, setDeleteTagTarget] = useState<ModelTagResp | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ModelPriceResp | null>(null);
+  const [modelSyncOpen, setModelSyncOpen] = useState(false);
 
   const listQuery = useMemo(() => ({
     page,
@@ -431,6 +433,19 @@ export default function ModelPricesPage() {
       modelPricesApi.update(id, { market_visible }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.modelPrices() });
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: modelPricesApi.sync,
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.modelPrices() });
+      toast('success', t('model_prices.sync_success', {
+        created: result.created,
+        updated: result.updated,
+        unchanged: result.unchanged,
+      }));
     },
     onError: (err: Error) => toast('error', err.message),
   });
@@ -768,6 +783,7 @@ export default function ModelPricesPage() {
 
   return (
     <div>
+      <ModelSyncModal open={modelSyncOpen} onClose={() => setModelSyncOpen(false)} />
       {/* 筛选 + 工具栏 */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative w-full sm:w-56">
@@ -799,6 +815,18 @@ export default function ModelPricesPage() {
           <ToggleButton id="off">{t('model_prices.market_visible_off')}</ToggleButton>
         </ToggleButtonGroup>
         <div className="ml-auto flex items-center gap-2">
+          <Button variant="secondary" onPress={() => setModelSyncOpen(true)}>
+            <ListPlus className="h-4 w-4" />
+            {t('model_prices.model_sync')}
+          </Button>
+          <Button
+            isDisabled={syncMutation.isPending}
+            variant="secondary"
+            onPress={() => syncMutation.mutate()}
+          >
+            {syncMutation.isPending ? <Spinner size="sm" /> : <CloudDownload className="h-4 w-4" />}
+            {t('model_prices.sync')}
+          </Button>
           <RefreshButton
             ariaLabel={t('common.refresh', 'Refresh')}
             isRefreshing={isFetching}

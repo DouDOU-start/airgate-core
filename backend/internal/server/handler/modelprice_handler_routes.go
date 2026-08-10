@@ -69,6 +69,44 @@ func (h *ModelPriceHandler) PublicListModelMarket(c *gin.Context) {
 	response.Success(c, resp)
 }
 
+// SyncModelPrices 从公共价格源刷新本地模型目录。
+func (h *ModelPriceHandler) SyncModelPrices(c *gin.Context) {
+	result, err := h.service.Sync(c.Request.Context())
+	if err != nil {
+		httpCode, message := h.handleError("同步模型价格失败", "同步模型价格失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	response.Success(c, result)
+}
+
+// ListModelPriceSyncCandidates 返回可从远端目录同步的模型候选。
+func (h *ModelPriceHandler) ListModelPriceSyncCandidates(c *gin.Context) {
+	items, err := h.service.SyncCandidates(c.Request.Context())
+	if err != nil {
+		httpCode, message := h.handleError("获取模型同步候选失败", "获取模型同步候选失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	response.Success(c, items)
+}
+
+// SyncSelectedModelPrices 仅同步管理员选择的远端模型。
+func (h *ModelPriceHandler) SyncSelectedModelPrices(c *gin.Context) {
+	var req dto.SyncModelPricesReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+	result, err := h.service.SyncSelected(c.Request.Context(), req.Models)
+	if err != nil {
+		httpCode, message := h.handleError("同步所选模型失败", "同步所选模型失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	response.Success(c, result)
+}
+
 // CreateModelPrice 创建模型价格。
 func (h *ModelPriceHandler) CreateModelPrice(c *gin.Context) {
 	var req dto.CreateModelPriceReq

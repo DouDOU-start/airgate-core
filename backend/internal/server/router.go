@@ -201,6 +201,9 @@ func (s *Server) registerRoutes() {
 
 		// 模型价格
 		adminGroup.GET("/model-prices", handlers.ModelPrice.ListModelPrices)
+		adminGroup.GET("/model-prices/sync-candidates", handlers.ModelPrice.ListModelPriceSyncCandidates)
+		adminGroup.POST("/model-prices/sync", handlers.ModelPrice.SyncModelPrices)
+		adminGroup.POST("/model-prices/sync-selected", handlers.ModelPrice.SyncSelectedModelPrices)
 		adminGroup.POST("/model-prices", handlers.ModelPrice.CreateModelPrice)
 		adminGroup.PUT("/model-prices/:id", handlers.ModelPrice.UpdateModelPrice)
 		adminGroup.DELETE("/model-prices/:id", handlers.ModelPrice.DeleteModelPrice)

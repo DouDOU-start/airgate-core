@@ -27,6 +27,7 @@ type Service struct {
 	repo        Repository
 	invalidator Invalidator
 	groupRates  GroupRateRangeReader
+	syncFetcher PriceSyncFetcher
 }
 
 // NewService 创建价目表服务。

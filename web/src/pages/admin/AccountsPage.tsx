@@ -874,15 +874,17 @@ export default function AccountsPage() {
                     >
                       <BarChart3 className="w-3.5 h-3.5 text-indigo-500" />
                     </Button>
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="secondary"
-                      aria-label={t('accounts.models')}
-                      onPress={() => setModelsTargets([row])}
-                    >
-                      <Boxes className="w-3.5 h-3.5 text-sky-500" />
-                    </Button>
+                    <span title={t('accounts.model_routing')}>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="secondary"
+                        aria-label={t('accounts.model_routing')}
+                        onPress={() => setModelsTargets([row])}
+                      >
+                        <Boxes className="w-3.5 h-3.5 text-sky-500" />
+                      </Button>
+                    </span>
                     <Button
                       isIconOnly
                       size="sm"

@@ -213,7 +213,7 @@ export function AccountModelsModal({
     <Modal state={modalState}>
       <DialogTriggerShim />
       <Modal.Backdrop>
-        <Modal.Container placement="center" size="md" scroll="inside">
+        <Modal.Container placement="center" size="lg" scroll="inside">
           <Modal.Dialog className="ag-elevation-modal">
             <Modal.Header>
               <Modal.Heading>{title}</Modal.Heading>
@@ -263,54 +263,74 @@ export function AccountModelsModal({
                 )
               ) : null}
 
-              <div className="max-h-[40vh] min-h-[8rem] overflow-y-auto rounded-[var(--radius)] border border-border">
+              <div className="max-h-[46vh] min-h-[10rem] overflow-y-auto rounded-[var(--radius)] border border-border bg-surface">
                 {models.length === 0 ? (
-                  <p className="px-3 py-6 text-center text-xs text-text-tertiary">
-                    {t('accounts.models_empty')}
-                  </p>
+                  <div className="flex min-h-40 flex-col items-center justify-center gap-3 px-6 py-8 text-center">
+                    <div className="flex items-center gap-2 font-mono text-xs text-text-secondary">
+                      <span className="rounded-md border border-border bg-bg px-2 py-1">{t('accounts.public_model')}</span>
+                      <ArrowRight className="h-4 w-4 text-sky-500" />
+                      <span className="rounded-md border border-border bg-bg px-2 py-1">{t('accounts.upstream_model')}</span>
+                    </div>
+                    <p className="max-w-md text-xs leading-5 text-text-tertiary">
+                      {t('accounts.models_empty')}
+                    </p>
+                    {single ? (
+                      <Button size="sm" variant="secondary" onPress={() => void fillPlatformDefaults()}>
+                        {t('accounts.models_fill_defaults')}
+                      </Button>
+                    ) : null}
+                  </div>
                 ) : (
-                  models.map((model) => {
-                    const notInCatalog = catalogReady && !catalog.has(model);
-                    return (
-                      <div
-                        className="flex items-center gap-2 border-b border-border px-3 py-2 last:border-b-0"
-                        key={model}
-                      >
-                        <span
-                          className={`min-w-0 flex-1 truncate font-mono text-xs ${
-                            notInCatalog ? 'text-warning' : 'text-text'
-                          }`}
-                          title={model}
+                  <>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_2rem] items-center gap-3 border-b border-border bg-bg px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-text-tertiary">
+                      <span>{t('accounts.public_model')}</span>
+                      <span aria-hidden="true" />
+                      <span>{t('accounts.upstream_model')}</span>
+                      <span aria-hidden="true" />
+                    </div>
+                    {models.map((model) => {
+                      const notInCatalog = catalogReady && !catalog.has(model);
+                      return (
+                        <div
+                          className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_2rem] items-center gap-3 border-b border-border px-3 py-2 last:border-b-0"
+                          key={model}
                         >
-                          {model}
-                        </span>
-                        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
-                        <Input
-                          aria-label={t('accounts.upstream_model')}
-                          className="min-w-0 flex-1 font-mono text-xs"
-                          placeholder={model}
-                          value={mapping[model] ?? model}
-                          onChange={(event) =>
-                            setMapping((prev) => ({ ...prev, [model]: event.target.value }))
-                          }
-                        />
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="ghost"
-                          aria-label={t('common.delete')}
-                          onPress={() => removeModel(model)}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    );
-                  })
+                          <span
+                            className={`min-w-0 truncate font-mono text-xs ${
+                              notInCatalog ? 'text-warning' : 'text-text'
+                            }`}
+                            title={model}
+                          >
+                            {model}
+                          </span>
+                          <ArrowRight className="h-3.5 w-3.5 text-sky-500" />
+                          <Input
+                            aria-label={`${t('accounts.upstream_model')} ${model}`}
+                            className="min-w-0 font-mono text-xs"
+                            placeholder={model}
+                            value={mapping[model] ?? model}
+                            onChange={(event) =>
+                              setMapping((prev) => ({ ...prev, [model]: event.target.value }))
+                            }
+                          />
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="ghost"
+                            aria-label={t('common.delete')}
+                            onPress={() => removeModel(model)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </>
                 )}
               </div>
             </Modal.Body>
             <Modal.Footer className="flex flex-wrap gap-2">
-              {single ? (
+              {single && models.length > 0 ? (
                 <Button
                   className="mr-auto"
                   size="sm"

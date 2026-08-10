@@ -2,6 +2,8 @@ import { get, post, put, del } from './client';
 import type {
   ModelPriceResp, CreateModelPriceReq, UpdateModelPriceReq,
   ModelTagResp, PageReq, PagedData,
+  ModelPriceSyncResp,
+  ModelPriceSyncCandidate,
 } from '../types';
 
 export const modelPricesApi = {
@@ -10,6 +12,10 @@ export const modelPricesApi = {
   create: (data: CreateModelPriceReq) => post<ModelPriceResp>('/api/v1/admin/model-prices', data),
   update: (id: number, data: UpdateModelPriceReq) => put<ModelPriceResp>(`/api/v1/admin/model-prices/${id}`, data),
   delete: (id: number) => del<void>(`/api/v1/admin/model-prices/${id}`),
+  sync: () => post<ModelPriceSyncResp>('/api/v1/admin/model-prices/sync', {}),
+  syncCandidates: () => get<ModelPriceSyncCandidate[]>('/api/v1/admin/model-prices/sync-candidates'),
+  syncSelected: (models: string[]) =>
+    post<ModelPriceSyncResp>('/api/v1/admin/model-prices/sync-selected', { models }),
 };
 
 // 模型标签（家族归类，归属模型管理）

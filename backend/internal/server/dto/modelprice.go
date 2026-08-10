@@ -8,6 +8,11 @@ type ListModelPricesReq struct {
 	MarketVisible *bool `form:"market_visible"`
 }
 
+// SyncModelPricesReq 指定要从远端同步的模型，模型列表不能为空。
+type SyncModelPricesReq struct {
+	Models []string `json:"models" binding:"required,min=1,max=500"`
+}
+
 // ModelPriceResp 模型价格响应。价格单位 USD / 1M tokens；per_request_price 为 USD / 次。
 type ModelPriceResp struct {
 	ID                   int64                  `json:"id"`

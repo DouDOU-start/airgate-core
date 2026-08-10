@@ -82,6 +82,31 @@ type ListResult struct {
 	PageSize int
 }
 
+// SyncResult 汇总一次远端模型价格同步结果。
+type SyncResult struct {
+	Source    string `json:"source"`
+	Fetched   int    `json:"fetched"`
+	Matched   int    `json:"matched"`
+	Created   int    `json:"created"`
+	Updated   int    `json:"updated"`
+	Unchanged int    `json:"unchanged"`
+	Skipped   int    `json:"skipped"`
+}
+
+// SyncCandidate 表示一个可选择性导入的远端模型。
+type SyncCandidate struct {
+	Model                string  `json:"model"`
+	Provider             string  `json:"provider,omitempty"`
+	Mode                 string  `json:"mode,omitempty"`
+	InputPrice           float64 `json:"input_price"`
+	OutputPrice          float64 `json:"output_price"`
+	CachedInputPrice     float64 `json:"cached_input_price"`
+	CacheCreationPrice   float64 `json:"cache_creation_price"`
+	CacheCreation1hPrice float64 `json:"cache_creation_1h_price"`
+	PerRequestPrice      float64 `json:"per_request_price"`
+	Exists               bool    `json:"exists"`
+}
+
 // CreateInput 创建价格输入。
 type CreateInput struct {
 	Model                string

@@ -134,6 +134,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	s.cpaBridge = cpa.NewBridge(nil)
 	if s.handlers.AccountService != nil {
 		s.handlers.AccountService.SetOAuthCredentialRefresher(s.cpaBridge)
+		s.handlers.AccountService.SetTestForwarder(s.cpaBridge)
 	}
 	s.pricingCache = pricing.NewCache(s.handlers.ModelPriceService)
 	s.handlers.ModelPriceService.SetInvalidator(s.pricingCache)
