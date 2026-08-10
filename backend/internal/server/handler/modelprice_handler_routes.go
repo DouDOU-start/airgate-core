@@ -21,6 +21,7 @@ func (h *ModelPriceHandler) ListModelPrices(c *gin.Context) {
 		PageSize:      req.PageSize,
 		Keyword:       req.Keyword,
 		TagID:         tagIDFromReq(req.TagID),
+		Enabled:       req.Enabled,
 		MarketVisible: req.MarketVisible,
 	}
 	result, err := h.service.List(c.Request.Context(), filter)
@@ -107,6 +108,27 @@ func (h *ModelPriceHandler) SyncSelectedModelPrices(c *gin.Context) {
 	response.Success(c, result)
 }
 
+// BulkUpdateModelPrices 批量启用、停用或删除模型价格条目。
+func (h *ModelPriceHandler) BulkUpdateModelPrices(c *gin.Context) {
+	var req dto.BulkUpdateModelPricesReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+	result := h.service.BulkUpdate(c.Request.Context(), appmodelprice.BulkUpdateInput{
+		IDs:    req.IDs,
+		Action: appmodelprice.BulkAction(req.Action),
+	})
+	items := make([]dto.BulkModelPriceResult, 0, len(result.Results))
+	for _, item := range result.Results {
+		items = append(items, dto.BulkModelPriceResult{ID: item.ID, Success: item.Success, Error: item.Error})
+	}
+	response.Success(c, dto.BulkUpdateModelPricesResp{
+		Success: result.Success, Failed: result.Failed,
+		SuccessIDs: result.SuccessIDs, FailedIDs: result.FailedIDs, Results: items,
+	})
+}
+
 // CreateModelPrice 创建模型价格。
 func (h *ModelPriceHandler) CreateModelPrice(c *gin.Context) {
 	var req dto.CreateModelPriceReq
@@ -120,6 +142,10 @@ func (h *ModelPriceHandler) CreateModelPrice(c *gin.Context) {
 	if req.MarketVisible != nil {
 		marketVisible = *req.MarketVisible
 	}
+	enabled := true
+	if req.Enabled != nil {
+		enabled = *req.Enabled
+	}
 
 	item, err := h.service.Create(c.Request.Context(), appmodelprice.CreateInput{
 		Model:                req.Model,
@@ -131,6 +157,7 @@ func (h *ModelPriceHandler) CreateModelPrice(c *gin.Context) {
 		PerRequestPrice:      req.PerRequestPrice,
 		PricingExtra:         req.PricingExtra,
 		TagID:                tagIDFromReq(req.TagID),
+		Enabled:              &enabled,
 		MarketVisible:        marketVisible,
 	})
 	if err != nil {
@@ -166,6 +193,7 @@ func (h *ModelPriceHandler) UpdateModelPrice(c *gin.Context) {
 		PerRequestPrice:      req.PerRequestPrice,
 		PricingExtra:         req.PricingExtra,
 		TagID:                tagIDFromReq(req.TagID),
+		Enabled:              req.Enabled,
 		MarketVisible:        req.MarketVisible,
 	})
 	if err != nil {

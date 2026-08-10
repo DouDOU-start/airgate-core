@@ -34,7 +34,7 @@ async function fetchCatalogNames(): Promise<string[]> {
   const names: string[] = [];
   let page = 1;
   for (;;) {
-    const resp = await modelPricesApi.list({ page, page_size: 100 });
+    const resp = await modelPricesApi.list({ page, page_size: 100, enabled: true });
     for (const item of resp.list) names.push(item.model);
     if (resp.list.length === 0 || page * 100 >= resp.total) break;
     page += 1;

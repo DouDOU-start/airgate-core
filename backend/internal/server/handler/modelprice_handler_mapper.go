@@ -17,6 +17,7 @@ func toModelPriceRespFromDomain(item appmodelprice.ModelPrice) dto.ModelPriceRes
 		CacheCreation1hPrice: item.CacheCreation1hPrice,
 		PerRequestPrice:      item.PerRequestPrice,
 		PricingExtra:         item.PricingExtra,
+		Enabled:              item.Enabled,
 		MarketVisible:        item.MarketVisible,
 		TimeMixin: dto.TimeMixin{
 			CreatedAt: item.CreatedAt,

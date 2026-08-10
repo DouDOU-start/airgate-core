@@ -1,8 +1,8 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Button, Chip, EmptyState, Input, Label, ListBox, Modal, Select,
+  Button, Checkbox, Chip, EmptyState, Input, Label, ListBox, Modal, Select,
   Spinner, TextField as HeroTextField, ToggleButton, ToggleButtonGroup,
   useOverlayState,
 } from '@heroui/react';
@@ -17,7 +17,9 @@ import { getTotalPages } from '../../shared/utils/pagination';
 import { NativeSwitch } from '../../shared/components/NativeSwitch';
 import { TablePaginationFooter } from '../../shared/components/TablePaginationFooter';
 import { DialogTriggerShim } from '../../shared/components/DialogTriggerShim';
-import type { CreateModelPriceReq, ModelPriceResp, ModelTagResp } from '../../shared/types';
+import type {
+  BulkModelPriceAction, CreateModelPriceReq, ModelPriceResp, ModelTagResp,
+} from '../../shared/types';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { RefreshButton } from '../../shared/components/RefreshButton';
 import { ModelSyncModal } from './modelprices/ModelSyncModal';
@@ -286,29 +288,61 @@ function specialLine(row: ModelPriceResp, t: Translate): ReactNode {
 
 // PriceCard 官网风价格卡片：模型名 + 家族标签、输入/输出大字单价为主视觉，
 // 缓存/特殊计费仅在有值时以小字行出现，底部编辑/删除操作。
-export function PriceCard({ onDelete, onEdit, onToggleMarketVisible, row, t, togglingMarketVisible }: {
+export function PriceCard({
+  onDelete, onEdit, onSelect, onToggleEnabled, onToggleMarketVisible, row, selected, t,
+  togglingEnabled, togglingMarketVisible,
+}: {
   onDelete: () => void;
   onEdit: () => void;
+  onSelect: (selected: boolean) => void;
+  onToggleEnabled: (enabled: boolean) => void;
   onToggleMarketVisible: (visible: boolean) => void;
   row: ModelPriceResp;
+  selected: boolean;
   t: Translate;
+  togglingEnabled?: boolean;
   togglingMarketVisible?: boolean;
 }) {
   const cache = cacheLine(row, t);
   const special = specialLine(row, t);
   const longContext = longContextLine(row, t);
   return (
-    <div className="flex flex-col rounded-[var(--ag-radius-lg)] border border-border bg-surface p-5 transition-colors hover:border-text-tertiary/50">
+    <div className={`flex flex-col rounded-[var(--ag-radius-lg)] border bg-surface p-5 transition-colors hover:border-text-tertiary/50 ${
+      selected ? 'border-accent ring-1 ring-accent/30' : 'border-border'
+    }`}>
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate font-mono text-sm font-medium text-text" title={row.model}>{row.model}</div>
+        <div className="flex min-w-0 items-start gap-2">
+          <Checkbox
+            aria-label={t('model_prices.select_model')}
+            isSelected={selected}
+            onChange={onSelect}
+          >
+            <Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>
+          </Checkbox>
+          <div className="min-w-0">
+            <div className="truncate font-mono text-sm font-medium text-text" title={row.model}>{row.model}</div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {row.tag ? <Chip size="sm" variant="soft">{row.tag.name}</Chip> : null}
+          {!row.enabled ? <Chip size="sm" variant="soft">{t('model_prices.disabled_badge')}</Chip> : null}
           <span
-            className="inline-flex items-center"
+            className="inline-flex items-center gap-1 text-[10px] text-text-tertiary"
+            title={t('model_prices.enabled_hint')}
+          >
+            {t('model_prices.enabled_short')}
+            <NativeSwitch
+              ariaLabel={t('model_prices.enabled')}
+              isDisabled={togglingEnabled}
+              isSelected={row.enabled}
+              onChange={onToggleEnabled}
+            />
+          </span>
+          <span
+            className="inline-flex items-center gap-1 text-[10px] text-text-tertiary"
             title={t('model_prices.market_visible_hint')}
           >
+            {t('model_prices.market_visible_short')}
             <NativeSwitch
               ariaLabel={t('model_prices.market_visible')}
               isDisabled={togglingMarketVisible}
@@ -354,6 +388,8 @@ export default function ModelPricesPage() {
   const debouncedKeyword = useDebouncedValue(keyword.trim(), 250);
   // 标签过滤（null = 全部）：点标签管理块里的标签名切换。
   const [tagFilter, setTagFilter] = useState<number | null>(null);
+  // 模型启用过滤（null = 全部 / true = 已启用 / false = 已停用）。
+  const [enabledFilter, setEnabledFilter] = useState<boolean | null>(null);
   // 广场可见过滤（null = 全部 / true = 已开启 / false = 未开启）。
   const [marketVisibleFilter, setMarketVisibleFilter] = useState<boolean | null>(null);
 
@@ -383,14 +419,21 @@ export default function ModelPricesPage() {
   const [deleteTagTarget, setDeleteTagTarget] = useState<ModelTagResp | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ModelPriceResp | null>(null);
   const [modelSyncOpen, setModelSyncOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [page, debouncedKeyword, tagFilter, enabledFilter, marketVisibleFilter]);
 
   const listQuery = useMemo(() => ({
     page,
     page_size: pageSize,
     keyword: debouncedKeyword || undefined,
     tag_id: tagFilter ?? undefined,
+    enabled: enabledFilter ?? undefined,
     market_visible: marketVisibleFilter ?? undefined,
-  }), [page, pageSize, debouncedKeyword, tagFilter, marketVisibleFilter]);
+  }), [page, pageSize, debouncedKeyword, tagFilter, enabledFilter, marketVisibleFilter]);
 
   const { data, isFetching, isLoading, refetch } = useQuery({
     queryKey: queryKeys.modelPrices(listQuery),
@@ -424,7 +467,12 @@ export default function ModelPricesPage() {
     mutationFn: (id: number) => modelPricesApi.delete(id),
     successMessage: t('model_prices.delete_success'),
     queryKey: queryKeys.modelPrices(),
-    onSuccess: () => setDeleteTarget(null),
+    onSuccess: () => {
+      if (deleteTarget) {
+        setSelectedIds((current) => current.filter((id) => id !== deleteTarget.id));
+      }
+      setDeleteTarget(null);
+    },
   });
 
   // 广场可见开关：卡片上直接点击，不弹窗、不出成功提示（同渠道 key 启停交互）。
@@ -433,6 +481,35 @@ export default function ModelPricesPage() {
       modelPricesApi.update(id, { market_visible }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.modelPrices() });
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  // 模型启停开关：关闭后从计费目录和模型路由移除，但保留价格配置。
+  const enabledMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
+      modelPricesApi.update(id, { enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.modelPrices() });
+    },
+    onError: (err: Error) => toast('error', err.message),
+  });
+
+  const bulkMutation = useMutation({
+    mutationFn: ({ action, ids }: { action: BulkModelPriceAction; ids: number[] }) =>
+      modelPricesApi.bulkUpdate({ action, ids }),
+    onSuccess: (resp) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.modelPrices() });
+      setSelectedIds([]);
+      setBulkDeleteOpen(false);
+      if (resp.failed > 0) {
+        toast(resp.success > 0 ? 'warning' : 'error', t('model_prices.bulk_partial', {
+          success: resp.success,
+          failed: resp.failed,
+        }));
+      } else {
+        toast('success', t('model_prices.bulk_success', { count: resp.success }));
+      }
     },
     onError: (err: Error) => toast('error', err.message),
   });
@@ -449,6 +526,15 @@ export default function ModelPricesPage() {
     },
     onError: (err: Error) => toast('error', err.message),
   });
+
+  const allPageSelected = rows.length > 0 && rows.every((row) => selectedIds.includes(row.id));
+  const togglePageSelection = (checked: boolean) => {
+    setSelectedIds((current) => {
+      if (checked) return [...new Set([...current, ...rows.map((row) => row.id)])];
+      const pageIDs = new Set(rows.map((row) => row.id));
+      return current.filter((id) => !pageIDs.has(id));
+    });
+  };
 
   // 标签重命名/删除会改动卡片上的标签显示，一并失效价目列表。
   const invalidateTagsAndPrices = () => {
@@ -785,7 +871,7 @@ export default function ModelPricesPage() {
     <div>
       <ModelSyncModal open={modelSyncOpen} onClose={() => setModelSyncOpen(false)} />
       {/* 筛选 + 工具栏 */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="relative w-full sm:w-56">
           <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
           <Input
@@ -799,21 +885,42 @@ export default function ModelPricesPage() {
             }}
           />
         </div>
-        <ToggleButtonGroup
-          aria-label={t('model_prices.market_visible_filter')}
-          disallowEmptySelection
-          selectedKeys={[marketVisibleFilter === null ? 'all' : marketVisibleFilter ? 'on' : 'off']}
-          selectionMode="single"
-          onSelectionChange={(keys) => {
-            const key = [...keys][0];
-            setPage(1);
-            setMarketVisibleFilter(key === 'on' ? true : key === 'off' ? false : null);
-          }}
-        >
-          <ToggleButton id="all">{t('common.all')}</ToggleButton>
-          <ToggleButton id="on">{t('model_prices.market_visible_on')}</ToggleButton>
-          <ToggleButton id="off">{t('model_prices.market_visible_off')}</ToggleButton>
-        </ToggleButtonGroup>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-text-tertiary">{t('model_prices.enabled_short')}</span>
+          <ToggleButtonGroup
+            aria-label={t('model_prices.enabled_filter')}
+            disallowEmptySelection
+            selectedKeys={[enabledFilter === null ? 'all' : enabledFilter ? 'on' : 'off']}
+            selectionMode="single"
+            onSelectionChange={(keys) => {
+              const key = [...keys][0];
+              setPage(1);
+              setEnabledFilter(key === 'on' ? true : key === 'off' ? false : null);
+            }}
+          >
+            <ToggleButton id="all">{t('common.all')}</ToggleButton>
+            <ToggleButton id="on">{t('model_prices.enabled_on')}</ToggleButton>
+            <ToggleButton id="off">{t('model_prices.enabled_off')}</ToggleButton>
+          </ToggleButtonGroup>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-text-tertiary">{t('model_prices.market_visible_short')}</span>
+          <ToggleButtonGroup
+            aria-label={t('model_prices.market_visible_filter')}
+            disallowEmptySelection
+            selectedKeys={[marketVisibleFilter === null ? 'all' : marketVisibleFilter ? 'on' : 'off']}
+            selectionMode="single"
+            onSelectionChange={(keys) => {
+              const key = [...keys][0];
+              setPage(1);
+              setMarketVisibleFilter(key === 'on' ? true : key === 'off' ? false : null);
+            }}
+          >
+            <ToggleButton id="all">{t('common.all')}</ToggleButton>
+            <ToggleButton id="on">{t('model_prices.market_visible_on')}</ToggleButton>
+            <ToggleButton id="off">{t('model_prices.market_visible_off')}</ToggleButton>
+          </ToggleButtonGroup>
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="secondary" onPress={() => setModelSyncOpen(true)}>
             <ListPlus className="h-4 w-4" />
@@ -839,6 +946,62 @@ export default function ModelPricesPage() {
           </Button>
         </div>
       </div>
+
+      {rows.length > 0 ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[var(--ag-radius-lg)] border border-border bg-surface px-4 py-2.5">
+          <Checkbox
+            aria-label={t('model_prices.select_all_page')}
+            isSelected={allPageSelected}
+            onChange={togglePageSelection}
+          >
+            <Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>
+            {t('model_prices.select_all_page')}
+          </Checkbox>
+          {selectedIds.length > 0 ? (
+            <>
+              <span className="border-l border-border pl-3 text-xs font-medium text-text-secondary">
+                {t('model_prices.selected_count', { count: selectedIds.length })}
+              </span>
+              <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                <Button
+                  isDisabled={bulkMutation.isPending}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => bulkMutation.mutate({ action: 'enable', ids: selectedIds })}
+                >
+                  {t('model_prices.bulk_enable')}
+                </Button>
+                <Button
+                  isDisabled={bulkMutation.isPending}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => bulkMutation.mutate({ action: 'disable', ids: selectedIds })}
+                >
+                  {t('model_prices.bulk_disable')}
+                </Button>
+                <Button
+                  className="text-danger"
+                  isDisabled={bulkMutation.isPending}
+                  size="sm"
+                  variant="danger-soft"
+                  onPress={() => setBulkDeleteOpen(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {t('model_prices.bulk_delete')}
+                </Button>
+                <Button
+                  isDisabled={bulkMutation.isPending}
+                  size="sm"
+                  variant="ghost"
+                  onPress={() => setSelectedIds([])}
+                >
+                  {t('model_prices.clear_selection')}
+                </Button>
+              </div>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* 标签管理：模型管理下的一小块（新增 / 重命名 / 删除，含模型计数；点标签名筛选模型） */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[var(--ag-radius-lg)] border border-border bg-surface px-4 py-2.5">
@@ -972,10 +1135,18 @@ export default function ModelPricesPage() {
             <PriceCard
               key={row.id}
               row={row}
+              selected={selectedIds.includes(row.id)}
               t={t}
+              togglingEnabled={enabledMutation.isPending && enabledMutation.variables?.id === row.id}
               togglingMarketVisible={marketVisibleMutation.isPending && marketVisibleMutation.variables?.id === row.id}
               onDelete={() => setDeleteTarget(row)}
               onEdit={() => openEdit(row)}
+              onSelect={(selected) => {
+                setSelectedIds((current) => selected
+                  ? [...new Set([...current, row.id])]
+                  : current.filter((id) => id !== row.id));
+              }}
+              onToggleEnabled={(enabled) => enabledMutation.mutate({ id: row.id, enabled })}
               onToggleMarketVisible={(visible) => marketVisibleMutation.mutate({ id: row.id, market_visible: visible })}
             />
           ))}
@@ -1256,6 +1427,18 @@ export default function ModelPricesPage() {
         description={t('model_prices.delete_confirm', { model: deleteTarget?.model })}
         loading={deleteMutation.isPending}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={(open) => {
+          if (!open && !bulkMutation.isPending) setBulkDeleteOpen(false);
+        }}
+        title={t('model_prices.bulk_delete_title')}
+        description={t('model_prices.bulk_delete_confirm', { count: selectedIds.length })}
+        loading={bulkMutation.isPending}
+        status="warning"
+        onConfirm={() => bulkMutation.mutate({ action: 'delete', ids: selectedIds })}
       />
     </div>
   );

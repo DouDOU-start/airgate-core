@@ -45,6 +45,8 @@ type ModelPrice struct {
 	// TagID / TagName 模型标签（家族归类，可空；TagName 由 store 联查填充）。
 	TagID   *int
 	TagName string
+	// Enabled 是否参与平台计费目录与模型路由。
+	Enabled bool
 	// MarketVisible 是否在模型广场（未登录可见的公开价目页）展示。
 	MarketVisible bool
 	CreatedAt     time.Time
@@ -70,6 +72,10 @@ type ListFilter struct {
 	TagID *int
 	// MarketVisibleOnly 仅返回 market_visible=true 的条目（模型广场公开查询用）。
 	MarketVisibleOnly bool
+	// EnabledOnly 仅返回 enabled=true 的条目（模型广场公开查询用）。
+	EnabledOnly bool
+	// Enabled 管理端按启用状态过滤（nil = 不过滤；非 nil = 按值精确匹配）。
+	Enabled *bool
 	// MarketVisible 管理端按广场可见状态过滤（nil = 不过滤；非 nil = 按值精确匹配）。
 	MarketVisible *bool
 }
@@ -107,6 +113,37 @@ type SyncCandidate struct {
 	Exists               bool    `json:"exists"`
 }
 
+// BulkAction 模型价格批量操作类型。
+type BulkAction string
+
+const (
+	BulkActionEnable  BulkAction = "enable"
+	BulkActionDisable BulkAction = "disable"
+	BulkActionDelete  BulkAction = "delete"
+)
+
+// BulkUpdateInput 模型价格批量操作输入。
+type BulkUpdateInput struct {
+	IDs    []int
+	Action BulkAction
+}
+
+// BulkResultItem 单个模型价格批量操作结果。
+type BulkResultItem struct {
+	ID      int
+	Success bool
+	Error   string
+}
+
+// BulkResult 模型价格批量操作结果，允许部分成功。
+type BulkResult struct {
+	Success    int
+	Failed     int
+	SuccessIDs []int
+	FailedIDs  []int
+	Results    []BulkResultItem
+}
+
 // CreateInput 创建价格输入。
 type CreateInput struct {
 	Model                string
@@ -119,6 +156,8 @@ type CreateInput struct {
 	PricingExtra         map[string]interface{}
 	// TagID 模型标签（nil = 不挂标签）。
 	TagID *int
+	// Enabled 是否启用；nil 时使用数据库默认值 true。
+	Enabled *bool
 	// MarketVisible 是否在模型广场展示。
 	MarketVisible bool
 }
@@ -136,6 +175,8 @@ type UpdateInput struct {
 	PerRequestPrice      *float64
 	PricingExtra         map[string]interface{}
 	TagID                *int
+	// Enabled nil = 不改；非 nil = 设为该值。
+	Enabled *bool
 	// MarketVisible nil = 不改；非 nil = 设为该值。
 	MarketVisible *bool
 }

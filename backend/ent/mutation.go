@@ -15570,6 +15570,7 @@ type ModelPriceMutation struct {
 	per_request_price          *float64
 	addper_request_price       *float64
 	pricing_extra              *map[string]interface{}
+	enabled                    *bool
 	market_visible             *bool
 	created_at                 *time.Time
 	updated_at                 *time.Time
@@ -16149,6 +16150,42 @@ func (m *ModelPriceMutation) ResetTagID() {
 	delete(m.clearedFields, modelprice.FieldTagID)
 }
 
+// SetEnabled sets the "enabled" field.
+func (m *ModelPriceMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *ModelPriceMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the ModelPrice entity.
+// If the ModelPrice object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ModelPriceMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *ModelPriceMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
 // SetMarketVisible sets the "market_visible" field.
 func (m *ModelPriceMutation) SetMarketVisible(b bool) {
 	m.market_visible = &b
@@ -16318,7 +16355,7 @@ func (m *ModelPriceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ModelPriceMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 13)
 	if m.model != nil {
 		fields = append(fields, modelprice.FieldModel)
 	}
@@ -16345,6 +16382,9 @@ func (m *ModelPriceMutation) Fields() []string {
 	}
 	if m.tag != nil {
 		fields = append(fields, modelprice.FieldTagID)
+	}
+	if m.enabled != nil {
+		fields = append(fields, modelprice.FieldEnabled)
 	}
 	if m.market_visible != nil {
 		fields = append(fields, modelprice.FieldMarketVisible)
@@ -16381,6 +16421,8 @@ func (m *ModelPriceMutation) Field(name string) (ent.Value, bool) {
 		return m.PricingExtra()
 	case modelprice.FieldTagID:
 		return m.TagID()
+	case modelprice.FieldEnabled:
+		return m.Enabled()
 	case modelprice.FieldMarketVisible:
 		return m.MarketVisible()
 	case modelprice.FieldCreatedAt:
@@ -16414,6 +16456,8 @@ func (m *ModelPriceMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldPricingExtra(ctx)
 	case modelprice.FieldTagID:
 		return m.OldTagID(ctx)
+	case modelprice.FieldEnabled:
+		return m.OldEnabled(ctx)
 	case modelprice.FieldMarketVisible:
 		return m.OldMarketVisible(ctx)
 	case modelprice.FieldCreatedAt:
@@ -16491,6 +16535,13 @@ func (m *ModelPriceMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTagID(v)
+		return nil
+	case modelprice.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
 		return nil
 	case modelprice.FieldMarketVisible:
 		v, ok := value.(bool)
@@ -16678,6 +16729,9 @@ func (m *ModelPriceMutation) ResetField(name string) error {
 		return nil
 	case modelprice.FieldTagID:
 		m.ResetTagID()
+		return nil
+	case modelprice.FieldEnabled:
+		m.ResetEnabled()
 		return nil
 	case modelprice.FieldMarketVisible:
 		m.ResetMarketVisible()

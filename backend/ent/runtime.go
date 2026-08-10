@@ -592,16 +592,20 @@ func init() {
 	modelpriceDescPerRequestPrice := modelpriceFields[6].Descriptor()
 	// modelprice.DefaultPerRequestPrice holds the default value on creation for the per_request_price field.
 	modelprice.DefaultPerRequestPrice = modelpriceDescPerRequestPrice.Default.(float64)
+	// modelpriceDescEnabled is the schema descriptor for enabled field.
+	modelpriceDescEnabled := modelpriceFields[9].Descriptor()
+	// modelprice.DefaultEnabled holds the default value on creation for the enabled field.
+	modelprice.DefaultEnabled = modelpriceDescEnabled.Default.(bool)
 	// modelpriceDescMarketVisible is the schema descriptor for market_visible field.
-	modelpriceDescMarketVisible := modelpriceFields[9].Descriptor()
+	modelpriceDescMarketVisible := modelpriceFields[10].Descriptor()
 	// modelprice.DefaultMarketVisible holds the default value on creation for the market_visible field.
 	modelprice.DefaultMarketVisible = modelpriceDescMarketVisible.Default.(bool)
 	// modelpriceDescCreatedAt is the schema descriptor for created_at field.
-	modelpriceDescCreatedAt := modelpriceFields[10].Descriptor()
+	modelpriceDescCreatedAt := modelpriceFields[11].Descriptor()
 	// modelprice.DefaultCreatedAt holds the default value on creation for the created_at field.
 	modelprice.DefaultCreatedAt = modelpriceDescCreatedAt.Default.(func() time.Time)
 	// modelpriceDescUpdatedAt is the schema descriptor for updated_at field.
-	modelpriceDescUpdatedAt := modelpriceFields[11].Descriptor()
+	modelpriceDescUpdatedAt := modelpriceFields[12].Descriptor()
 	// modelprice.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	modelprice.DefaultUpdatedAt = modelpriceDescUpdatedAt.Default.(func() time.Time)
 	// modelprice.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

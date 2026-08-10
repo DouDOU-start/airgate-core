@@ -95,6 +95,11 @@ func TagID(v int) predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldEQ(FieldTagID, v))
 }
 
+// Enabled applies equality check predicate on the "enabled" field. It's identical to EnabledEQ.
+func Enabled(v bool) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldEQ(FieldEnabled, v))
+}
+
 // MarketVisible applies equality check predicate on the "market_visible" field. It's identical to MarketVisibleEQ.
 func MarketVisible(v bool) predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldEQ(FieldMarketVisible, v))
@@ -453,6 +458,16 @@ func TagIDIsNil() predicate.ModelPrice {
 // TagIDNotNil applies the NotNil predicate on the "tag_id" field.
 func TagIDNotNil() predicate.ModelPrice {
 	return predicate.ModelPrice(sql.FieldNotNull(FieldTagID))
+}
+
+// EnabledEQ applies the EQ predicate on the "enabled" field.
+func EnabledEQ(v bool) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldEQ(FieldEnabled, v))
+}
+
+// EnabledNEQ applies the NEQ predicate on the "enabled" field.
+func EnabledNEQ(v bool) predicate.ModelPrice {
+	return predicate.ModelPrice(sql.FieldNEQ(FieldEnabled, v))
 }
 
 // MarketVisibleEQ applies the EQ predicate on the "market_visible" field.

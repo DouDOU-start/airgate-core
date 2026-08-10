@@ -1,9 +1,11 @@
 package dto
 
-// ListModelPricesReq 价目表列表查询参数（分页/关键词 + 可选标签/广场可见过滤）。
+// ListModelPricesReq 价目表列表查询参数（分页/关键词 + 可选标签/启用状态/广场可见过滤）。
 type ListModelPricesReq struct {
 	PageReq
 	TagID *int64 `form:"tag_id" binding:"omitempty,gte=1"`
+	// Enabled 按模型启用状态过滤（省略 = 不过滤）。
+	Enabled *bool `form:"enabled"`
 	// MarketVisible 按广场可见状态过滤（省略 = 不过滤）。
 	MarketVisible *bool `form:"market_visible"`
 }
@@ -11,6 +13,28 @@ type ListModelPricesReq struct {
 // SyncModelPricesReq 指定要从远端同步的模型，模型列表不能为空。
 type SyncModelPricesReq struct {
 	Models []string `json:"models" binding:"required,min=1,max=500"`
+}
+
+// BulkUpdateModelPricesReq 模型价格批量操作请求。
+type BulkUpdateModelPricesReq struct {
+	IDs    []int  `json:"ids" binding:"required,min=1"`
+	Action string `json:"action" binding:"required,oneof=enable disable delete"`
+}
+
+// BulkUpdateModelPricesResp 模型价格批量操作响应。
+type BulkUpdateModelPricesResp struct {
+	Success    int                    `json:"success"`
+	Failed     int                    `json:"failed"`
+	SuccessIDs []int                  `json:"success_ids"`
+	FailedIDs  []int                  `json:"failed_ids"`
+	Results    []BulkModelPriceResult `json:"results"`
+}
+
+// BulkModelPriceResult 单个模型价格批量操作结果。
+type BulkModelPriceResult struct {
+	ID      int    `json:"id"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
 }
 
 // ModelPriceResp 模型价格响应。价格单位 USD / 1M tokens；per_request_price 为 USD / 次。
@@ -26,6 +50,8 @@ type ModelPriceResp struct {
 	PricingExtra         map[string]interface{} `json:"pricing_extra,omitempty"`
 	// Tag 模型标签（家族归类，可空）。
 	Tag *ModelTagRef `json:"tag,omitempty"`
+	// Enabled 是否参与平台计费目录与模型路由。
+	Enabled bool `json:"enabled"`
 	// MarketVisible 是否在模型广场（未登录可见的公开价目页）展示。
 	MarketVisible bool `json:"market_visible"`
 	TimeMixin
@@ -49,6 +75,8 @@ type CreateModelPriceReq struct {
 	PricingExtra         map[string]interface{} `json:"pricing_extra"`
 	// TagID 模型标签 ID（省略或 0 = 不挂标签）。
 	TagID *int64 `json:"tag_id" binding:"omitempty,gte=0"`
+	// Enabled 是否启用；省略时默认 true。
+	Enabled *bool `json:"enabled"`
 	// MarketVisible 是否在模型广场展示；省略时默认 true。
 	MarketVisible *bool `json:"market_visible"`
 }
@@ -66,6 +94,8 @@ type UpdateModelPriceReq struct {
 	PricingExtra         map[string]interface{} `json:"pricing_extra"`
 	// TagID 三态：省略 = 不改；0 = 清空标签；正数 = 设为该标签。
 	TagID *int64 `json:"tag_id" binding:"omitempty,gte=0"`
+	// Enabled 省略 = 不改；否则设为该值。
+	Enabled *bool `json:"enabled"`
 	// MarketVisible 省略 = 不改；否则设为该值。
 	MarketVisible *bool `json:"market_visible"`
 }

@@ -202,6 +202,20 @@ func (mpu *ModelPriceUpdate) ClearTagID() *ModelPriceUpdate {
 	return mpu
 }
 
+// SetEnabled sets the "enabled" field.
+func (mpu *ModelPriceUpdate) SetEnabled(b bool) *ModelPriceUpdate {
+	mpu.mutation.SetEnabled(b)
+	return mpu
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (mpu *ModelPriceUpdate) SetNillableEnabled(b *bool) *ModelPriceUpdate {
+	if b != nil {
+		mpu.SetEnabled(*b)
+	}
+	return mpu
+}
+
 // SetMarketVisible sets the "market_visible" field.
 func (mpu *ModelPriceUpdate) SetMarketVisible(b bool) *ModelPriceUpdate {
 	mpu.mutation.SetMarketVisible(b)
@@ -346,6 +360,9 @@ func (mpu *ModelPriceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if mpu.mutation.PricingExtraCleared() {
 		_spec.ClearField(modelprice.FieldPricingExtra, field.TypeJSON)
+	}
+	if value, ok := mpu.mutation.Enabled(); ok {
+		_spec.SetField(modelprice.FieldEnabled, field.TypeBool, value)
 	}
 	if value, ok := mpu.mutation.MarketVisible(); ok {
 		_spec.SetField(modelprice.FieldMarketVisible, field.TypeBool, value)
@@ -576,6 +593,20 @@ func (mpuo *ModelPriceUpdateOne) ClearTagID() *ModelPriceUpdateOne {
 	return mpuo
 }
 
+// SetEnabled sets the "enabled" field.
+func (mpuo *ModelPriceUpdateOne) SetEnabled(b bool) *ModelPriceUpdateOne {
+	mpuo.mutation.SetEnabled(b)
+	return mpuo
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (mpuo *ModelPriceUpdateOne) SetNillableEnabled(b *bool) *ModelPriceUpdateOne {
+	if b != nil {
+		mpuo.SetEnabled(*b)
+	}
+	return mpuo
+}
+
 // SetMarketVisible sets the "market_visible" field.
 func (mpuo *ModelPriceUpdateOne) SetMarketVisible(b bool) *ModelPriceUpdateOne {
 	mpuo.mutation.SetMarketVisible(b)
@@ -750,6 +781,9 @@ func (mpuo *ModelPriceUpdateOne) sqlSave(ctx context.Context) (_node *ModelPrice
 	}
 	if mpuo.mutation.PricingExtraCleared() {
 		_spec.ClearField(modelprice.FieldPricingExtra, field.TypeJSON)
+	}
+	if value, ok := mpuo.mutation.Enabled(); ok {
+		_spec.SetField(modelprice.FieldEnabled, field.TypeBool, value)
 	}
 	if value, ok := mpuo.mutation.MarketVisible(); ok {
 		_spec.SetField(modelprice.FieldMarketVisible, field.TypeBool, value)

@@ -3,6 +3,7 @@ package modelprice
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -74,8 +75,9 @@ type PublicListResult struct {
 	HasMultiplier bool
 }
 
-// ListPublic 查询模型广场公开视图：仅 market_visible=true 的条目 + 非专属分组的倍率区间。
+// ListPublic 查询模型广场公开视图：仅 enabled=true 且 market_visible=true 的条目 + 非专属分组的倍率区间。
 func (s *Service) ListPublic(ctx context.Context, filter ListFilter) (PublicListResult, error) {
+	filter.EnabledOnly = true
 	filter.MarketVisibleOnly = true
 	listResult, err := s.List(ctx, filter)
 	if err != nil {
@@ -136,6 +138,48 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
+// BulkUpdate 批量启用、停用或删除模型价格条目，允许部分成功。
+func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkResult {
+	result := BulkResult{Results: make([]BulkResultItem, 0, len(input.IDs))}
+	seen := make(map[int]struct{}, len(input.IDs))
+	for _, id := range input.IDs {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		var err error
+		switch input.Action {
+		case BulkActionEnable:
+			enabled := true
+			_, err = s.repo.Update(ctx, id, UpdateInput{Enabled: &enabled})
+		case BulkActionDisable:
+			enabled := false
+			_, err = s.repo.Update(ctx, id, UpdateInput{Enabled: &enabled})
+		case BulkActionDelete:
+			err = s.repo.Delete(ctx, id)
+		default:
+			err = fmt.Errorf("不支持的批量操作：%s", input.Action)
+		}
+		item := BulkResultItem{ID: id, Success: err == nil}
+		if err != nil {
+			item.Error = err.Error()
+			result.Failed++
+			result.FailedIDs = append(result.FailedIDs, id)
+		} else {
+			result.Success++
+			result.SuccessIDs = append(result.SuccessIDs, id)
+		}
+		result.Results = append(result.Results, item)
+	}
+	if result.Success > 0 {
+		s.invalidate()
+	}
+	return result
+}
+
 // LoadAllPrices 实现 pricing.Loader：全量加载价目表为缓存数据。
 func (s *Service) LoadAllPrices(ctx context.Context) (map[string]pricing.Price, error) {
 	items, err := s.repo.ListAll(ctx)
@@ -144,6 +188,9 @@ func (s *Service) LoadAllPrices(ctx context.Context) (map[string]pricing.Price, 
 	}
 	prices := make(map[string]pricing.Price, len(items))
 	for _, item := range items {
+		if !item.Enabled {
+			continue
+		}
 		tiers, longCtx := ParsePricingExtra(item.Model, item.PricingExtra)
 		prices[item.Model] = pricing.Price{
 			Input:                 item.InputPrice,

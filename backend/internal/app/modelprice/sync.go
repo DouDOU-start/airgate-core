@@ -300,11 +300,13 @@ func perMillion(value *float64) float64 {
 }
 
 func syncCreate(model string, p liteLLMPrice) CreateInput {
+	enabled := true
 	return CreateInput{
 		Model: model, InputPrice: perMillion(p.InputCostPerToken), OutputPrice: perMillion(p.OutputCostPerToken),
 		CachedInputPrice: perMillion(p.CacheReadInputTokenCost), CacheCreationPrice: perMillion(p.CacheCreationInputTokenCost),
 		CacheCreation1hPrice: perMillion(p.CacheCreationInputTokenCostAbove1hr),
-		PerRequestPrice:      valueOrZero(p.OutputCostPerImage), PricingExtra: syncPricingExtra(nil, p), MarketVisible: true,
+		PerRequestPrice:      valueOrZero(p.OutputCostPerImage), PricingExtra: syncPricingExtra(nil, p),
+		Enabled: &enabled, MarketVisible: true,
 	}
 }
 

@@ -133,6 +133,20 @@ func (mpc *ModelPriceCreate) SetNillableTagID(i *int) *ModelPriceCreate {
 	return mpc
 }
 
+// SetEnabled sets the "enabled" field.
+func (mpc *ModelPriceCreate) SetEnabled(b bool) *ModelPriceCreate {
+	mpc.mutation.SetEnabled(b)
+	return mpc
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (mpc *ModelPriceCreate) SetNillableEnabled(b *bool) *ModelPriceCreate {
+	if b != nil {
+		mpc.SetEnabled(*b)
+	}
+	return mpc
+}
+
 // SetMarketVisible sets the "market_visible" field.
 func (mpc *ModelPriceCreate) SetMarketVisible(b bool) *ModelPriceCreate {
 	mpc.mutation.SetMarketVisible(b)
@@ -239,6 +253,10 @@ func (mpc *ModelPriceCreate) defaults() {
 		v := modelprice.DefaultPerRequestPrice
 		mpc.mutation.SetPerRequestPrice(v)
 	}
+	if _, ok := mpc.mutation.Enabled(); !ok {
+		v := modelprice.DefaultEnabled
+		mpc.mutation.SetEnabled(v)
+	}
 	if _, ok := mpc.mutation.MarketVisible(); !ok {
 		v := modelprice.DefaultMarketVisible
 		mpc.mutation.SetMarketVisible(v)
@@ -280,6 +298,9 @@ func (mpc *ModelPriceCreate) check() error {
 	}
 	if _, ok := mpc.mutation.PerRequestPrice(); !ok {
 		return &ValidationError{Name: "per_request_price", err: errors.New(`ent: missing required field "ModelPrice.per_request_price"`)}
+	}
+	if _, ok := mpc.mutation.Enabled(); !ok {
+		return &ValidationError{Name: "enabled", err: errors.New(`ent: missing required field "ModelPrice.enabled"`)}
 	}
 	if _, ok := mpc.mutation.MarketVisible(); !ok {
 		return &ValidationError{Name: "market_visible", err: errors.New(`ent: missing required field "ModelPrice.market_visible"`)}
@@ -348,6 +369,10 @@ func (mpc *ModelPriceCreate) createSpec() (*ModelPrice, *sqlgraph.CreateSpec) {
 	if value, ok := mpc.mutation.PricingExtra(); ok {
 		_spec.SetField(modelprice.FieldPricingExtra, field.TypeJSON, value)
 		_node.PricingExtra = value
+	}
+	if value, ok := mpc.mutation.Enabled(); ok {
+		_spec.SetField(modelprice.FieldEnabled, field.TypeBool, value)
+		_node.Enabled = value
 	}
 	if value, ok := mpc.mutation.MarketVisible(); ok {
 		_spec.SetField(modelprice.FieldMarketVisible, field.TypeBool, value)
@@ -583,6 +608,18 @@ func (u *ModelPriceUpsert) UpdateTagID() *ModelPriceUpsert {
 // ClearTagID clears the value of the "tag_id" field.
 func (u *ModelPriceUpsert) ClearTagID() *ModelPriceUpsert {
 	u.SetNull(modelprice.FieldTagID)
+	return u
+}
+
+// SetEnabled sets the "enabled" field.
+func (u *ModelPriceUpsert) SetEnabled(v bool) *ModelPriceUpsert {
+	u.Set(modelprice.FieldEnabled, v)
+	return u
+}
+
+// UpdateEnabled sets the "enabled" field to the value that was provided on create.
+func (u *ModelPriceUpsert) UpdateEnabled() *ModelPriceUpsert {
+	u.SetExcluded(modelprice.FieldEnabled)
 	return u
 }
 
@@ -834,6 +871,20 @@ func (u *ModelPriceUpsertOne) UpdateTagID() *ModelPriceUpsertOne {
 func (u *ModelPriceUpsertOne) ClearTagID() *ModelPriceUpsertOne {
 	return u.Update(func(s *ModelPriceUpsert) {
 		s.ClearTagID()
+	})
+}
+
+// SetEnabled sets the "enabled" field.
+func (u *ModelPriceUpsertOne) SetEnabled(v bool) *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetEnabled(v)
+	})
+}
+
+// UpdateEnabled sets the "enabled" field to the value that was provided on create.
+func (u *ModelPriceUpsertOne) UpdateEnabled() *ModelPriceUpsertOne {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateEnabled()
 	})
 }
 
@@ -1255,6 +1306,20 @@ func (u *ModelPriceUpsertBulk) UpdateTagID() *ModelPriceUpsertBulk {
 func (u *ModelPriceUpsertBulk) ClearTagID() *ModelPriceUpsertBulk {
 	return u.Update(func(s *ModelPriceUpsert) {
 		s.ClearTagID()
+	})
+}
+
+// SetEnabled sets the "enabled" field.
+func (u *ModelPriceUpsertBulk) SetEnabled(v bool) *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.SetEnabled(v)
+	})
+}
+
+// UpdateEnabled sets the "enabled" field to the value that was provided on create.
+func (u *ModelPriceUpsertBulk) UpdateEnabled() *ModelPriceUpsertBulk {
+	return u.Update(func(s *ModelPriceUpsert) {
+		s.UpdateEnabled()
 	})
 }
 
