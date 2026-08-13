@@ -158,10 +158,10 @@ func TestParseEmbeddedSeed(t *testing.T) {
 	}
 
 	// 覆盖总数：15 claude（含 5 别名）+ 8 openai（含 gpt-image-2）+ 7 gemini
-	// + 54 grok（6 个现役文本规范模型、36 个文本别名、2 个历史兼容文本模型、
-	// 4 个媒体规范模型、6 个媒体别名）= 84。
-	if len(items) != 84 {
-		t.Errorf("seed model count = %d, want 84", len(items))
+	// + 55 grok（7 个现役文本规范模型（含 grok-4.6）、36 个文本别名、2 个历史兼容文本模型、
+	// 4 个媒体规范模型、6 个媒体别名）= 85。
+	if len(items) != 85 {
+		t.Errorf("seed model count = %d, want 85", len(items))
 	}
 
 	// 抽样核对（claude/openai 值来自 airgate-claude/models.go 与 airgate-openai/registry.go，

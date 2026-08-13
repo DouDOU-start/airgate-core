@@ -43,13 +43,13 @@ func TestCodexPlanTiers(t *testing.T) {
 	if len(def) != len(pro) {
 		t.Errorf("default codex should match pro: default=%d pro=%d", len(def), len(pro))
 	}
-	// gpt-5.3-codex-spark 仅 pro（及 max 等同档），plus 不可用
+	// gpt-5.3-codex-spark 自 CPA v7.2.131 起开放至 plus/pro，free 不可用
 	const spark = "gpt-5.3-codex-spark"
 	if !containsModelID(pro, spark) {
 		t.Errorf("pro should include %s", spark)
 	}
-	if containsModelID(plus, spark) {
-		t.Errorf("plus must not include %s", spark)
+	if !containsModelID(plus, spark) {
+		t.Errorf("plus should include %s", spark)
 	}
 	if containsModelID(free, spark) {
 		t.Errorf("free must not include %s", spark)

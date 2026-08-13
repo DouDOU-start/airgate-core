@@ -396,6 +396,23 @@ models:
   - <<: *grok_45_price
     model: grok-build-latest
 
+  # grok-4.6 官方价：$2/$6，缓存输入 $0.5；≥200K 长上下文整单翻倍
+  - model: grok-4.6
+    tag: grok
+    input: 2.0
+    output: 6.0
+    cached_input: 0.5
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      service_tiers:
+        priority: 2.0
+      long_context:
+        threshold_tokens: 200000
+        input_multiplier: 2.0
+        output_multiplier: 2.0
+        cached_multiplier: 2.0
+
   - &grok_420_reasoning_price
     model: grok-4.20-0309-reasoning
     tag: grok

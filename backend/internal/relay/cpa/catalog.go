@@ -100,7 +100,9 @@ func withXAIMediaBuiltins(models []ModelInfo) []ModelInfo {
 	out = append(out,
 		ModelInfo{ID: "grok-imagine-image", DisplayName: "Grok Imagine 生图", OwnedBy: "xai", Type: "xai"},
 		ModelInfo{ID: "grok-imagine-image-quality", DisplayName: "Grok Imagine 高质量生图", OwnedBy: "xai", Type: "xai"},
+		ModelInfo{ID: "grok-imagine-image-2.0", DisplayName: "Grok Imagine 生图 2.0", OwnedBy: "xai", Type: "xai"},
 		ModelInfo{ID: "grok-imagine-video", DisplayName: "Grok Imagine 视频", OwnedBy: "xai", Type: "xai"},
+		ModelInfo{ID: "grok-imagine-video-1.5", DisplayName: "Grok Imagine 视频 1.5", OwnedBy: "xai", Type: "xai"},
 		ModelInfo{ID: "grok-imagine-video-1.5-preview", DisplayName: "Grok Imagine 视频 1.5 预览版", OwnedBy: "xai", Type: "xai"},
 	)
 	return out
