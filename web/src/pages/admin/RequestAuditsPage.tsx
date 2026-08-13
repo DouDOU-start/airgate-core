@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Button, ListBox, Select } from '@heroui/react';
+import { Button, Dropdown } from '@heroui/react';
 import {
   Activity,
   ArrowRight,
   Braces,
   Check,
+  ChevronDown,
   ChevronRight,
   Clipboard,
   FileSearch,
@@ -42,15 +43,15 @@ const CLEAR_MODE_OPTIONS: Array<{ id: RequestAuditClearMode; label: string; desc
 ];
 
 const STATUS_OPTIONS = [
-  { id: '', label: '全部状态' },
-  { id: '200', label: '200 成功' },
-  { id: '400', label: '400 请求错误' },
-  { id: '401', label: '401 未授权' },
-  { id: '403', label: '403 禁止访问' },
-  { id: '429', label: '包含 429 尝试' },
-  { id: '499', label: '499 用户中断' },
-  { id: '500', label: '500 服务错误' },
-  { id: '503', label: '503 上游不可用' },
+  { id: 'all', value: '', label: '全部状态' },
+  { id: '200', value: '200', label: '200 成功' },
+  { id: '400', value: '400', label: '400 请求错误' },
+  { id: '401', value: '401', label: '401 未授权' },
+  { id: '403', value: '403', label: '403 禁止访问' },
+  { id: '429', value: '429', label: '包含 429 尝试' },
+  { id: '499', value: '499', label: '499 用户中断' },
+  { id: '500', value: '500', label: '500 服务错误' },
+  { id: '503', value: '503', label: '503 上游不可用' },
 ];
 
 function statusOptionDotTone(status: string): string {
@@ -325,7 +326,7 @@ export default function RequestAuditsPage() {
   const total = listQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const hasFilters = Boolean(keyword || model || statusCode);
-  const selectedStatusLabel = STATUS_OPTIONS.find((item) => item.id === statusCode)?.label ?? '全部状态';
+  const selectedStatusLabel = STATUS_OPTIONS.find((item) => item.value === statusCode)?.label ?? '全部状态';
 
   const clearFilters = () => {
     setKeyword('');
@@ -380,33 +381,37 @@ export default function RequestAuditsPage() {
             <ListFilter className="h-4 w-4 shrink-0 text-text-tertiary" />
             <div className="min-w-0 flex-1">
               <span className="block text-[9px] font-semibold uppercase tracking-[0.16em] text-text-tertiary">响应状态</span>
-              <Select
-                aria-label="响应状态"
-                className="ag-audit-status-select mt-0.5"
-                fullWidth
-                selectedKey={statusCode}
-                onSelectionChange={(key) => {
-                  setStatusCode(key == null ? '' : String(key));
-                  setPage(1);
-                }}
-              >
-                <Select.Trigger>
-                  <Select.Value>{selectedStatusLabel}</Select.Value>
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover className="ag-audit-status-popover">
-                  <ListBox items={STATUS_OPTIONS}>
-                    {(item) => (
-                      <ListBox.Item id={item.id} textValue={item.label}>
-                        <span className="flex items-center gap-2">
-                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusOptionDotTone(item.id)}`} />
-                          <span>{item.label}</span>
+              <Dropdown>
+                <Dropdown.Trigger
+                  aria-label="响应状态"
+                  className="ag-audit-status-trigger mt-0.5"
+                >
+                  <span className="truncate">{selectedStatusLabel}</span>
+                  <ChevronDown className="ag-audit-status-chevron h-3.5 w-3.5 shrink-0" />
+                </Dropdown.Trigger>
+                <Dropdown.Popover className="ag-audit-status-popover" placement="bottom end">
+                  <Dropdown.Menu
+                    aria-label="响应状态"
+                    selectedKeys={new Set([statusCode || 'all'])}
+                    selectionMode="single"
+                    onAction={(key) => {
+                      const option = STATUS_OPTIONS.find((item) => item.id === String(key));
+                      setStatusCode(option?.value ?? '');
+                      setPage(1);
+                    }}
+                  >
+                    {STATUS_OPTIONS.map((item) => (
+                      <Dropdown.Item key={item.id} id={item.id} textValue={item.label}>
+                        <span className="flex w-full items-center gap-2.5">
+                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusOptionDotTone(item.value)}`} />
+                          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                          {item.value === statusCode ? <Check className="h-3.5 w-3.5 shrink-0 text-accent" /> : null}
                         </span>
-                      </ListBox.Item>
-                    )}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
+                      </Dropdown.Item>
+                    ))}
+                  </Dropdown.Menu>
+                </Dropdown.Popover>
+              </Dropdown>
             </div>
           </div>
 
