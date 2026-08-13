@@ -103,6 +103,7 @@ func (p *Pipeline) loadRouteCatalog(groupID int, model, protocol string) *routeC
 		return catalog
 	}
 
+	var last *routeCatalog
 	for range 2 {
 		var channelIDs, accountIDs []int
 		channelVersion := uint64(0)
@@ -126,8 +127,12 @@ func (p *Pipeline) loadRouteCatalog(groupID int, model, protocol string) *routeC
 			}
 			return catalog
 		}
+		last = catalog
 	}
-	return nil
+	// 两次构建期间版本都被撞：返回本次构建结果一次性使用（不入缓存），
+	// 候选可用性由 RouteCandidate 实时复核，轻微陈旧无碍；返回 nil 会让
+	// 请求跳过 failover 直接 503。
+	return last
 }
 
 func (p *Pipeline) cachedRouteCatalog(key routeCatalogKey) *routeCatalog {

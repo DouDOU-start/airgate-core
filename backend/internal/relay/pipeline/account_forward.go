@@ -45,7 +45,8 @@ func (p *Pipeline) executeAccountAttempt(
 	auditRequest *requestaudit.Handle,
 ) attemptResult {
 	defer func() {
-		p.concurrency.ReleaseAccountSlot(context.Background(), acc.ID, requestID)
+		// 槽位释放异步化：ZREM 幂等，不必阻塞请求收尾/下一次 failover 尝试。
+		go p.concurrency.ReleaseAccountSlot(context.Background(), acc.ID, requestID)
 		if rec := recover(); rec != nil {
 			p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
 			panic(rec)
@@ -173,7 +174,8 @@ func (p *Pipeline) recordAccountUsage(
 	if p.sink == nil {
 		return
 	}
-	p.rpm.IncrementUserGroupRPM(context.Background(), keyInfo.UserID, keyInfo.GroupID)
+	// 纯观测口径，异步执行不阻塞计费收尾。
+	go p.rpm.IncrementUserGroupRPM(context.Background(), keyInfo.UserID, keyInfo.GroupID)
 
 	var usage dto.Usage
 	if result.usage != nil {
@@ -344,6 +346,7 @@ func (p *Pipeline) handleAccountOutcome(
 			}
 		} else {
 			if p.accounts != nil {
+				p.accounts.ClearModelRateLimited(acc.ID, req.Model)
 				if rateLimitProbe {
 					p.accounts.MarkRateLimitProbeSucceeded(acc.ID, probeLease)
 				} else {
@@ -380,6 +383,7 @@ func (p *Pipeline) handleAccountOutcome(
 	switch o.Verdict {
 	case outcome.Success:
 		if p.accounts != nil {
+			p.accounts.ClearModelRateLimited(acc.ID, req.Model)
 			if rateLimitProbe {
 				p.accounts.MarkRateLimitProbeSucceeded(acc.ID, probeLease)
 			} else {
@@ -401,12 +405,18 @@ func (p *Pipeline) handleAccountOutcome(
 				if remaining := time.Until(blockedUntil); remaining > retryAfter {
 					retryAfter = remaining
 				}
+				p.accounts.MarkModelRateLimited(acc.ID, req.Model, retryAfter)
 			} else {
-				retryUntil := time.Now().Add(retryAfter)
-				if retryAfter <= 0 {
-					retryUntil = time.Now().Add(5 * time.Second)
+				// (账号, 模型) 级冷却：单模型限流只冷该模型（带退避+抖动）；
+				// 全部可服务模型都在冷却时才升级账号级 rate_limited，
+				// 走既有单飞恢复探测。
+				modelUntil := p.accounts.MarkModelRateLimited(acc.ID, req.Model, retryAfter)
+				if remaining := time.Until(modelUntil); remaining > retryAfter {
+					retryAfter = remaining
 				}
-				p.accounts.MarkRateLimited(acc.ID, retryUntil, o.Reason)
+				if p.accounts.AllModelsRateLimited(acc.ID, time.Now()) {
+					p.accounts.MarkRateLimited(acc.ID, modelUntil, o.Reason)
+				}
 			}
 		}
 		*hardExclude = append(*hardExclude, acc.ID)

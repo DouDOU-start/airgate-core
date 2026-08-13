@@ -151,7 +151,8 @@ type Registry struct {
 
 	// rateLimitedUntil 是物理凭证级的运行时 429 冷却，不落库。
 	// 同一 API Key 的多协议端点共享冷却，避免下游重试时立即再次命中已限流凭证。
-	rateLimitMu      sync.Mutex
+	// 读写锁：候选校验热路径只读（不做惰性删除），过期条目由写路径顺带清理。
+	rateLimitMu      sync.RWMutex
 	rateLimitedUntil map[int]time.Time
 
 	// loadedOnce 是否成功加载过：false 时 Pick 触发惰性兜底重载。
@@ -244,8 +245,8 @@ func (r *Registry) ListCandidates(groupID int, model, protocol string, exclude [
 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	r.rateLimitMu.Lock()
-	defer r.rateLimitMu.Unlock()
+	r.rateLimitMu.RLock()
+	defer r.rateLimitMu.RUnlock()
 
 	ids := r.index[channelCandidateKey{groupID: groupID, model: model, protocol: protocol}]
 	out := make([]*ChannelKeySnapshot, 0, len(ids))
@@ -327,9 +328,9 @@ func (r *Registry) RouteCandidate(id, groupID int, model, protocol string, now t
 	if !groupOK || !modelOK {
 		return nil, false
 	}
-	r.rateLimitMu.Lock()
+	r.rateLimitMu.RLock()
 	limited := r.isRateLimitedLocked(key, now)
-	r.rateLimitMu.Unlock()
+	r.rateLimitMu.RUnlock()
 	return key, !limited
 }
 
@@ -539,21 +540,24 @@ func (r *Registry) MarkRateLimited(keyID int, until time.Time) {
 		return
 	}
 	credentialID := effectiveCredentialID(snap)
+	now := time.Now()
 	r.rateLimitMu.Lock()
+	// 顺带清理已过期条目（读路径只读不删；map 规模为触发过 429 的凭证数，很小）。
+	for id, u := range r.rateLimitedUntil {
+		if !u.After(now) {
+			delete(r.rateLimitedUntil, id)
+		}
+	}
 	if current := r.rateLimitedUntil[credentialID]; until.After(current) {
 		r.rateLimitedUntil[credentialID] = until
 	}
 	r.rateLimitMu.Unlock()
 }
 
+// isRateLimitedLocked 判定凭证是否处于 429 冷却（调用方持 rateLimitMu 读锁；只读不删）。
 func (r *Registry) isRateLimitedLocked(key *ChannelKeySnapshot, now time.Time) bool {
-	credentialID := effectiveCredentialID(key)
-	until, ok := r.rateLimitedUntil[credentialID]
-	if ok && !until.After(now) {
-		delete(r.rateLimitedUntil, credentialID)
-		ok = false
-	}
-	return ok
+	until, ok := r.rateLimitedUntil[effectiveCredentialID(key)]
+	return ok && until.After(now)
 }
 
 // UpdateHealth 更新 key 的健康状态（内存即时生效，不落库——由探针引擎负责落库）。
@@ -567,7 +571,11 @@ func (r *Registry) UpdateHealth(keyID int, health string) {
 	next := *old
 	next.HealthStatus = health
 	r.keys[keyID] = &next
-	r.routeVersion.Add(1)
+	// 目录只在 degraded 转换时才烘焙不同权重（减半）；其余健康变化由
+	// RouteCandidate 按 Status 实时过滤，不作废目录，避免全量失效风暴。
+	if (old.HealthStatus == "degraded") != (health == "degraded") {
+		r.routeVersion.Add(1)
+	}
 	r.mu.Unlock()
 }
 

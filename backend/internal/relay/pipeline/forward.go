@@ -303,6 +303,15 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	queueDeadline := start.Add(queueWaitTimeout)
 	pollDelay := queuePollInterval
 
+	// 粘性会话：提取会话身份（显式标识或派生哈希），同会话尽量复用同一
+	// 路由目标以保住上游 prompt cache；Relay Hook plan 自带定向语义时让位。
+	sessionKey := ""
+	if routePlan == nil {
+		if sessionID := sessionIDForRequest(c, req); sessionID != "" {
+			sessionKey = affinityKey(keyInfo.UserID, keyInfo.GroupID, req.Model, protocol, sessionID)
+		}
+	}
+
 	for attempts < maxFailoverAttempts {
 		if ctx.Err() != nil {
 			markCanceled(c)
@@ -317,7 +326,20 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		excludeAccounts = append(excludeAccounts, hardExcludeAccounts...)
 		excludeAccounts = append(excludeAccounts, softExcludeAccounts...)
 
-		target, ok := p.pickRoute(keyInfo.GroupID, req.Model, protocol, excludeKeys, excludeAccounts, routePlan)
+		var target routeTarget
+		var ok bool
+		if sessionKey != "" {
+			if kind, id, bound := p.sessionAffinity.lookup(sessionKey); bound {
+				// 绑定优先于优先级：目标仍可调度（且未被本次 failover 排除）就复用。
+				target, ok = p.resolveAffinityTarget(kind, id, keyInfo.GroupID, req.Model, protocol, excludeKeys, excludeAccounts)
+			}
+		}
+		if !ok {
+			target, ok = p.pickRoute(keyInfo.GroupID, req.Model, protocol, excludeKeys, excludeAccounts, routePlan)
+			if ok && sessionKey != "" {
+				p.sessionAffinity.bind(sessionKey, target.kind, routeTargetID(target))
+			}
+		}
 		if !ok {
 			// 排队退避：有目标只是"暂时满"（软排除）且未超排队上限 → 清空软排除重新竞争。
 			if (len(softExcludeKeys) > 0 || len(softExcludeAccounts) > 0) && time.Now().Before(queueDeadline) {
@@ -595,9 +617,8 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			// 本次请求内硬排除，并按 Retry-After 对物理凭证做跨请求短冷却，
 			// 避免下游重试时立即再次命中同一把已限流的 API Key。
 			p.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
-			if p.healthTracker != nil {
-				p.healthTracker.RecordFailure(ch.KeyID)
-			}
+			// 429 只做短冷却，不喂健康失败计数：临时限流经健康状态机连续累计
+			// 会被升级成 disabled_auto 永久禁用，违反 outcome「限流→冷却」铁律。
 			if p.registry != nil {
 				p.registry.MarkRateLimited(ch.KeyID, time.Now().Add(o.RetryAfter))
 			}
@@ -614,10 +635,12 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 
 		case outcome.AuthFailed:
 			p.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
-			if p.healthTracker != nil {
-				p.healthTracker.RecordAuthFailure(ch.KeyID)
-			}
 			if settings.AutoBanEnabled {
+				// 健康信号也归入开关内：RecordAuthFailure 会经探针状态机单次
+				// suspend + MarkAutoDisabled，放在开关外等于绕过自动封禁总开关。
+				if p.healthTracker != nil {
+					p.healthTracker.RecordAuthFailure(ch.KeyID)
+				}
 				if result.statusCode == http.StatusUnauthorized {
 					p.registry.MarkCredentialAutoDisabled(ch.KeyID, outcome.TruncateErrorMsg(o.Reason))
 				} else {
@@ -767,7 +790,8 @@ func channelSlotTTL(stream bool) time.Duration {
 // 槽位恒经 defer 释放；panic 时回退 RPM 预递增后继续向上抛（由 Recovery 中间件转 500）。
 func (p *Pipeline) executeAttempt(c *gin.Context, ad adaptor.Adaptor, info *adaptor.RelayInfo, req *dto.ChatRequest, start time.Time, channelKeyID int, requestID string, rpmMinute int64, auditRequest *requestaudit.Handle, auditTarget requestaudit.Target) attemptResult {
 	defer func() {
-		p.concurrency.ReleaseKeySlot(context.Background(), channelKeyID, requestID)
+		// 槽位释放异步化：ZREM 幂等，不必阻塞请求收尾/下一次 failover 尝试。
+		go p.concurrency.ReleaseKeySlot(context.Background(), channelKeyID, requestID)
 		if rec := recover(); rec != nil {
 			p.rpm.DecrementKeyRPM(context.Background(), channelKeyID, rpmMinute)
 			panic(rec)
@@ -795,7 +819,8 @@ func (p *Pipeline) acquireClientSlots(c *gin.Context, keyInfo *auth.APIKeyInfo, 
 		return nil, "apikey_concurrency_limit"
 	}
 	return func() {
-		p.concurrency.ReleaseClientCapacity(
+		// 异步释放：观测/闸门口径允许亚毫秒级延迟，不阻塞请求收尾。
+		go p.concurrency.ReleaseClientCapacity(
 			context.Background(), keyInfo.UserID, keyInfo.KeyID, keyInfo.GroupID, slotID,
 			keyInfo.UserMaxConcurrency > 0, keyInfo.KeyMaxConcurrency > 0,
 		)
@@ -938,8 +963,9 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 	}
 
 	// 用户 / 分组 RPM 观测计数：与 usage_log 同源，仅成功计费的请求计入，口径对齐仪表盘。
-	// 用 Background ctx，避免请求收尾（尤其流式结束）ctx 已取消导致漏计。
-	p.rpm.IncrementUserGroupRPM(context.Background(), keyInfo.UserID, keyInfo.GroupID)
+	// 用 Background ctx，避免请求收尾（尤其流式结束）ctx 已取消导致漏计；
+	// 纯观测口径，异步执行不阻塞计费收尾。
+	go p.rpm.IncrementUserGroupRPM(context.Background(), keyInfo.UserID, keyInfo.GroupID)
 
 	var usage dto.Usage
 	if result.usage != nil {

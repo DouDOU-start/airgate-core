@@ -241,6 +241,9 @@ type Registry struct {
 	persistPending map[int]statePersistRequest
 	persistRunning map[int]bool
 	persistLatest  map[int]uint64
+
+	// modelCooldown (账号, 模型) 级 429 运行时冷却，见 model_cooldown.go。
+	modelCooldown modelCooldownState
 }
 
 type accountCandidateKey struct {
@@ -309,6 +312,9 @@ func (r *Registry) Reload(ctx context.Context) error {
 		resetRateLimitProbe(&snap)
 		next[snap.ID] = &snap
 	}
+	// 索引只依赖 GroupIDs/Models 等成员字段，锁内合并仅改运行时状态，
+	// 在写锁外构建后整体换入，避免 O(账号×分组×模型) 构建期间阻塞全部请求。
+	index := buildAccountCandidateIndex(next)
 	r.mu.Lock()
 	for id, snap := range next {
 		old := r.accounts[id]
@@ -338,7 +344,7 @@ func (r *Registry) Reload(ctx context.Context) error {
 		}
 	}
 	r.accounts = next
-	r.index = buildAccountCandidateIndex(next)
+	r.index = index
 	r.routeVersion.Add(1)
 	r.mu.Unlock()
 	r.loadedOnce.Store(true)
@@ -432,6 +438,10 @@ func (r *Registry) listCandidates(
 				continue
 			}
 		}
+		// (账号, 模型) 级冷却：该模型限流期内隐藏候选，其余模型不受影响。
+		if r.isModelRateLimited(a.ID, model, now) {
+			continue
+		}
 		out = append(out, a)
 	}
 	return out
@@ -493,6 +503,9 @@ func (r *Registry) RouteCandidate(id, groupID int, model string, now time.Time) 
 	_, groupOK := account.GroupIDs[groupID]
 	_, modelOK := account.Models[model]
 	r.mu.RUnlock()
+	if groupOK && modelOK && r.isModelRateLimited(id, model, now) {
+		return nil, false
+	}
 	return account, groupOK && modelOK
 }
 
@@ -600,6 +613,21 @@ func (r *Registry) BeginRateLimitProbe(accountID int) (RateLimitProbeDecision, R
 	}
 	r.ensureLoaded()
 	now := time.Now()
+
+	// 快路径：绝大多数请求的账号处于 active/degraded（无需探测、不改状态），
+	// 用读锁判定即返回，避免每个账号请求都在全局写锁上串行。
+	// 状态在读写锁之间可能变化，写锁内会重新判定，不影响正确性。
+	r.mu.RLock()
+	fast, ok := r.accounts[accountID]
+	if !ok || fast == nil {
+		r.mu.RUnlock()
+		return RateLimitProbeBlocked, 0
+	}
+	if fast.State == StateActive || fast.State == StateDegraded {
+		r.mu.RUnlock()
+		return RateLimitProbeNotNeeded, 0
+	}
+	r.mu.RUnlock()
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -837,7 +865,13 @@ func (r *Registry) mutateState(accountID int, apply func(*Snapshot) bool) (*Snap
 		return old, 0
 	}
 	r.accounts[accountID] = &next
-	r.routeVersion.Add(1)
+	// 路由目录只按 EffectivePriority 分桶；rate_limited/disabled 等状态由
+	// RouteCandidate 每次选取时实时复核，无需作废目录。只有优先级档位变化
+	// （degraded 压档/恢复）才需要重建，避免高频状态抖动引发全量目录失效风暴。
+	now := time.Now()
+	if old.EffectivePriority(now) != next.EffectivePriority(now) {
+		r.routeVersion.Add(1)
+	}
 	return &next, r.stateSeq.Add(1)
 }
 
