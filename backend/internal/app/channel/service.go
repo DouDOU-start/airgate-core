@@ -27,6 +27,11 @@ type Tester interface {
 	Test(ctx context.Context, key ChannelKey, model, endpoint string) (latencyMs int, err error)
 }
 
+// HealthResetter 探针引擎健康态重置窄接口（由 probe.Engine 实现，可为 nil——测试时不接）。
+type HealthResetter interface {
+	ResetHealth(keyID int)
+}
+
 // ModelFetcher 上游拉取接口：模型列表与账户余额。
 type ModelFetcher interface {
 	FetchModels(ctx context.Context, channelType, baseURL, apiKey string) ([]string, error)
@@ -54,6 +59,7 @@ type Service struct {
 	concurrency ConcurrencyReader
 	rpm         RPMReader
 	stats       StatsReader
+	healthReset HealthResetter
 }
 
 // NewService 创建渠道服务。secret 为 API Key 加密密钥（注入仿 apikey service）。
@@ -73,6 +79,11 @@ func (s *Service) SetReloader(reloader Reloader) {
 // SetTester 注入密钥端点测试器（relay 管线落地后由 server 装配阶段调用）。
 func (s *Service) SetTester(tester Tester) {
 	s.tester = tester
+}
+
+// SetHealthResetter 注入探针健康态重置器（server 装配阶段调用；nil 安全）。
+func (s *Service) SetHealthResetter(resetter HealthResetter) {
+	s.healthReset = resetter
 }
 
 // SetRuntimeStatsReaders 注入运行时指标读取器（server 装配阶段调用；nil 安全，
@@ -515,6 +526,16 @@ func (s *Service) Test(ctx context.Context, keyID int, model, endpoint string) (
 			if err := s.repo.UpdateCredentialState(ctx, current.CredentialID, StatusEnabled, ""); err != nil {
 				logger.Warn("channel_persist_failed", "op", "test_recover_credential", "credential_id", current.CredentialID, logx.LogFieldError, err)
 			}
+		}
+	}
+	// 恢复后同步清零健康态：残留的 suspended/计数会让探针状态机脱轨
+	// （suspended 态下后续失败不再触发自动禁用，DB health 也停在 suspended）。
+	if key.Status == StatusDisabledAuto || key.CredentialStatus == StatusDisabledAuto {
+		if err := s.repo.UpdateKeyHealthState(ctx, keyID, HealthHealthy, 0, 0); err != nil {
+			logger.Warn("channel_persist_failed", "op", "test_recover_health", "channel_key_id", keyID, logx.LogFieldError, err)
+		}
+		if s.healthReset != nil {
+			s.healthReset.ResetHealth(keyID)
 		}
 	}
 

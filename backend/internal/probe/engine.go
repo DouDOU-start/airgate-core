@@ -140,6 +140,14 @@ func (e *Engine) RecordAuthFailure(keyID int) {
 	e.applyAction(keyID, oldHealth, tr, "上游鉴权失败（HTTP 401/403）")
 }
 
+// ResetHealth 将 key 健康态重置为 healthy（管理端手动测试/启用恢复时调用），
+// 使状态机回到正常轨道；否则残留的 suspended 内存态会让后续失败不再触发自动禁用。
+func (e *Engine) ResetHealth(keyID int) {
+	e.mu.Lock()
+	e.states[keyID] = &keyState{health: HealthHealthy}
+	e.mu.Unlock()
+}
+
 // getOrCreate 内存中获取或初始化 key 状态（调用方持锁）。
 func (e *Engine) getOrCreate(keyID int) *keyState {
 	st, ok := e.states[keyID]
@@ -240,7 +248,18 @@ func (e *Engine) runProbes(ctx context.Context) {
 	sem := make(chan struct{}, 5) // 最多 5 并发探测
 
 	for _, t := range targets {
-		if t.HealthStatus != HealthSuspended && t.HealthStatus != HealthRecovering {
+		// 内存态优先（比 DB 新）；内存缺失时以 DB 快照播种，
+		// 避免 getOrCreate 造出 healthy 初值吞掉 suspended 状态（如进程重启后）。
+		e.mu.Lock()
+		st, ok := e.states[t.KeyID]
+		if !ok {
+			st = &keyState{health: t.HealthStatus, failures: t.ConsecutiveFailures, successes: t.ConsecutiveSuccesses}
+			e.states[t.KeyID] = st
+		}
+		health := st.health
+		e.mu.Unlock()
+
+		if health != HealthSuspended && health != HealthRecovering {
 			continue
 		}
 		if t.LastProbeAt != nil && now.Sub(*t.LastProbeAt) < DefaultProbeKeyInterval {

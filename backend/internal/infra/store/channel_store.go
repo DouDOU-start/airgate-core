@@ -741,14 +741,16 @@ func (s *ChannelStore) UpdateKeyProbeTime(ctx context.Context, keyID int, at tim
 }
 
 // ListProbeEnabledKeys 查询所有 probe_enabled=true 的 key 的健康快照。
+// 必须包含 disabled_auto 的 key/凭证：自动禁用正是探针要救回的对象，
+// 只查 enabled 会让被判死的 key 永远退出探测集（手动禁用仍排除，不自动恢复）。
 func (s *ChannelStore) ListProbeEnabledKeys(ctx context.Context) ([]appchannel.KeyHealthSnapshot, error) {
 	keys, err := s.db.ChannelKey.Query().
 		Where(
 			entchannelkey.ProbeEnabled(true),
-			entchannelkey.StatusEQ(entchannelkey.StatusEnabled),
+			entchannelkey.StatusIn(entchannelkey.StatusEnabled, entchannelkey.StatusDisabledAuto),
 			entchannelkey.Or(
 				entchannelkey.CredentialIDIsNil(),
-				entchannelkey.HasCredentialWith(entcredential.StatusEQ(entcredential.StatusEnabled)),
+				entchannelkey.HasCredentialWith(entcredential.StatusIn(entcredential.StatusEnabled, entcredential.StatusDisabledAuto)),
 			),
 		).
 		Select(

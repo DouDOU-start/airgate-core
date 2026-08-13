@@ -160,6 +160,8 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		&probeBillingStoreAdapter{store: channelStore, secret: cfg.APIKeySecret(), registry: s.channelRegistry},
 	)
 	s.probeEngine.SetNotifier(s.handlers.ChannelHealthNotifier)
+	// 手动测试恢复 disabled_auto 后清零探针内存健康态（防残留 suspended 使状态机脱轨）。
+	channelSvc.SetHealthResetter(s.probeEngine)
 
 	// relay 转发管线：注册表调度 + 渠道 RPM/并发闸门 + 计费落账；
 	// 渠道测试器走同一 adaptor 链路（server 层适配器负责解密与快照构造）。
