@@ -584,7 +584,10 @@ func scanStreamPayload(payload []byte, extract func([]byte) (dto.Usage, bool), u
 
 func isProtocolCompletion(data []byte) bool {
 	var event struct {
-		Type       string `json:"type"`
+		Type    string `json:"type"`
+		Choices []struct {
+			FinishReason string `json:"finish_reason"`
+		} `json:"choices"`
 		Candidates []struct {
 			FinishReason string `json:"finishReason"`
 		} `json:"candidates"`
@@ -592,8 +595,18 @@ func isProtocolCompletion(data []byte) bool {
 	if json.Unmarshal(data, &event) != nil {
 		return false
 	}
-	if event.Type == "response.completed" || event.Type == "response.done" || event.Type == "message_stop" {
+	// response.incomplete 是 Responses 的显式终态（常见原因是 max_output_tokens），
+	// CPA 会在转发该事件后正常关闭 chunk 通道；它不是传输中断。
+	if event.Type == "response.completed" || event.Type == "response.incomplete" ||
+		event.Type == "response.done" || event.Type == "message_stop" {
 		return true
+	}
+	// Codex 转成 Chat Completions 后，终态是带 finish_reason 的 choices chunk，
+	// CPA 不保证额外补发 [DONE]，因此需要直接识别协议终态。
+	for _, choice := range event.Choices {
+		if strings.TrimSpace(choice.FinishReason) != "" {
+			return true
+		}
 	}
 	for _, candidate := range event.Candidates {
 		if strings.TrimSpace(candidate.FinishReason) != "" {

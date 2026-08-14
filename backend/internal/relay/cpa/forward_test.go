@@ -233,6 +233,50 @@ func TestRelayStreamRecognizesDoneMarker(t *testing.T) {
 	}
 }
 
+func TestRelayStreamRecognizesResponsesIncompleteTerminal(t *testing.T) {
+	c, _ := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"response.output_text.delta","delta":"部分输出"}`)}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"response.incomplete","response":{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"usage":{"input_tokens":12,"output_tokens":3}}}`)}
+	close(chunks)
+
+	result := (&Bridge{}).relayStream(context.Background(), c,
+		&cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), adaptor.EndpointResponses)
+
+	if !result.Done {
+		t.Fatal("response.incomplete 是显式终态，不应误判为断流")
+	}
+	if result.StreamErr != nil {
+		t.Fatalf("显式 incomplete 终态不应产生流错误：%v", result.StreamErr)
+	}
+	if result.Usage == nil || result.Usage.PromptTokens != 12 || result.Usage.CompletionTokens != 3 {
+		t.Fatalf("incomplete 终态 usage 解析错误：%+v", result.Usage)
+	}
+}
+
+func TestRelayStreamRecognizesChatFinishReasonTerminal(t *testing.T) {
+	c, _ := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 1)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":3}}`)}
+	close(chunks)
+
+	result := (&Bridge{}).relayStream(context.Background(), c,
+		&cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), adaptor.EndpointChatCompletions)
+
+	if !result.Done {
+		t.Fatal("带 finish_reason 的 Chat Completions chunk 应视为显式终态")
+	}
+	if result.StreamErr != nil {
+		t.Fatalf("Chat Completions 显式终态不应产生流错误：%v", result.StreamErr)
+	}
+}
+
+func TestProtocolCompletionIgnoresNullChatFinishReason(t *testing.T) {
+	if isProtocolCompletion([]byte(`{"choices":[{"finish_reason":null}]}`)) {
+		t.Fatal("finish_reason=null 仍是生成中的普通 chunk，不应判定完成")
+	}
+}
+
 func TestRelayStreamRecognizesGeminiFinishReason(t *testing.T) {
 	c, _ := newStreamTestContext()
 	chunks := make(chan cliproxyexecutor.StreamChunk, 1)
