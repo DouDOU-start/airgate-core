@@ -90,6 +90,9 @@ type RequestInput struct {
 	ContentLen   int64
 	Headers      http.Header
 	Body         []byte
+	// BodyImmutable 表示调用方承诺 Body 在异步审计完成前只读。开启后审计直接
+	// 持有原切片，避免为十几 MB 请求同步复制一份；默认 false 保持防御性复制。
+	BodyImmutable bool
 }
 
 // Target 保存本次上游触网所使用的账号或渠道快照。

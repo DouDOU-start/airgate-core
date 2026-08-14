@@ -53,10 +53,15 @@ func (p *Pipeline) moderationCheck(c *gin.Context, keyInfo *auth.APIKeyInfo, req
 		return true
 	}
 	body := opts.rawBody
+	var jsonField func(string) ([]byte, bool)
 	if body == nil {
 		var err error
 		if body, err = req.Marshal(); err != nil {
 			return true
+		}
+		jsonField = func(name string) ([]byte, bool) {
+			raw, ok := req.Get(name)
+			return raw, ok
 		}
 	}
 	d := p.moderation.Check(c.Request.Context(), moderation.CheckRequest{
@@ -70,6 +75,7 @@ func (p *Pipeline) moderationCheck(c *gin.Context, keyInfo *auth.APIKeyInfo, req
 		Model:       req.Model,
 		ContentType: opts.rawContentType,
 		Body:        body,
+		JSONField:   jsonField,
 	})
 	if d.Allowed {
 		return true

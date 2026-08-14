@@ -172,7 +172,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			Host: c.Request.Host, RequestProto: c.Request.Proto, RemoteAddr: c.Request.RemoteAddr,
 			IPAddress: c.ClientIP(), UserAgent: c.Request.UserAgent(),
 			ContentType: c.Request.Header.Get("Content-Type"), ContentLen: c.Request.ContentLength,
-			Headers: c.Request.Header, Body: inboundBody,
+			Headers: c.Request.Header, Body: inboundBody, BodyImmutable: true,
 		})
 		if err != nil {
 			slog.Error("request_audit_start_failed", "request_id", requestIDOf(c), "error", err)

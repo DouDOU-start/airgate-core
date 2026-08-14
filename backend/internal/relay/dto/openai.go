@@ -1,8 +1,8 @@
 // Package dto 定义 relay 管线的对外协议数据结构（canonical：OpenAI chat completions）。
 //
-// 设计要点：请求体不做全量类型化解析——用 map[string]json.RawMessage 承载全部字段，
-// 只显式解析调度所需的 model / stream / stream_options，其余字段原样透传，
-// 避免 DTO 落后于上游字段演进。
+// 设计要点：请求体不做全量类型化解析——正常路径只为顶层字段建立零拷贝索引，
+// 仅在确实改写字段时才懒构造 map[string]json.RawMessage；调度只显式解析
+// model / stream / stream_options，其余字段原样透传，避免 DTO 落后于上游演进。
 package dto
 
 import (
@@ -14,9 +14,12 @@ import (
 var ErrInvalidBody = errors.New("请求体必须是 JSON 对象")
 
 // ChatRequest OpenAI chat completions 请求的透明载体。
-// fields 保存全部原始字段（含未知字段），Model/Stream 为显式解析出的调度字段。
+// fields 是改写请求时才构造的字段表，Model/Stream 为显式解析出的调度字段。
 type ChatRequest struct {
 	fields map[string]json.RawMessage
+	// rawFields 保存顶层字段在 raw 中的起止位置。正常透传请求只建立轻量索引，
+	// 不再让 encoding/json 为 input/messages 等超大字段复制一份 RawMessage。
+	rawFields map[string]rawFieldSpan
 	// raw 保存校验通过的原始 JSON。请求未发生字段改写时，Marshal 直接复用该切片，
 	// 避免 Relay Hook、内容审核、账号转发在热路径上反复编码大请求体。
 	// 该切片只读；Set/Remove 会清空它并回退到 fields 序列化。
@@ -28,42 +31,190 @@ type ChatRequest struct {
 	Stream bool
 }
 
-// ParseChatRequest 解析请求体：全字段进 map（未知字段透传），
+type rawFieldSpan struct {
+	start int
+	end   int
+}
+
+// ParseChatRequest 校验请求体并为顶层字段建立索引（未知字段透传），
 // 显式解析 model / stream。非 JSON 对象报 ErrInvalidBody。
 func ParseChatRequest(body []byte) (*ChatRequest, error) {
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(body, &fields); err != nil {
+	// json.Valid 保留严格 JSON 校验；随后只扫描顶层键值边界建立零拷贝索引。
+	// 相比反序列化 map[string]RawMessage，此路径不会复制数 MB 的 input/messages。
+	if !json.Valid(body) {
 		return nil, ErrInvalidBody
 	}
-	// JSON null 会解析成 nil map 且不报错，统一按非法请求体处理（避免后续 Set 写 nil map）。
-	if fields == nil {
+	rawFields, ok := indexTopLevelJSONFields(body)
+	if !ok {
 		return nil, ErrInvalidBody
 	}
-	req := &ChatRequest{fields: fields, raw: body}
-	if raw, ok := fields["model"]; ok {
+	req := &ChatRequest{rawFields: rawFields, raw: body}
+	if raw, ok := req.Get("model"); ok {
 		// model 非字符串时保持空串，由入口校验兜底报 400。
 		_ = json.Unmarshal(raw, &req.Model)
 	}
-	if raw, ok := fields["stream"]; ok {
+	if raw, ok := req.Get("stream"); ok {
 		_ = json.Unmarshal(raw, &req.Stream)
 	}
 	return req, nil
 }
 
+// indexTopLevelJSONFields 为已经通过 json.Valid 的对象建立顶层值切片索引。
+// 扫描器只识别字符串边界与嵌套深度，不复制字段值；重复键以后出现者为准，
+// 与 encoding/json 反序列化对象的行为一致。
+func indexTopLevelJSONFields(body []byte) (map[string]rawFieldSpan, bool) {
+	i := skipJSONSpace(body, 0)
+	if i >= len(body) || body[i] != '{' {
+		return nil, false
+	}
+	i++
+	fields := make(map[string]rawFieldSpan)
+	for {
+		i = skipJSONSpace(body, i)
+		if i >= len(body) {
+			return nil, false
+		}
+		if body[i] == '}' {
+			return fields, true
+		}
+		if body[i] != '"' {
+			return nil, false
+		}
+		keyStart := i
+		keyEnd := scanJSONStringEnd(body, keyStart)
+		if keyEnd <= keyStart {
+			return nil, false
+		}
+		var key string
+		if err := json.Unmarshal(body[keyStart:keyEnd], &key); err != nil {
+			return nil, false
+		}
+		i = skipJSONSpace(body, keyEnd)
+		if i >= len(body) || body[i] != ':' {
+			return nil, false
+		}
+		i = skipJSONSpace(body, i+1)
+		valueStart := i
+		valueEnd := scanJSONValueEnd(body, valueStart)
+		if valueEnd <= valueStart {
+			return nil, false
+		}
+		fields[key] = rawFieldSpan{start: valueStart, end: valueEnd}
+		i = skipJSONSpace(body, valueEnd)
+		if i >= len(body) {
+			return nil, false
+		}
+		switch body[i] {
+		case ',':
+			i++
+		case '}':
+			return fields, true
+		default:
+			return nil, false
+		}
+	}
+}
+
+func scanJSONValueEnd(body []byte, start int) int {
+	if start >= len(body) {
+		return -1
+	}
+	switch body[start] {
+	case '"':
+		return scanJSONStringEnd(body, start)
+	case '{', '[':
+		depth := 0
+		inString := false
+		for i := start; i < len(body); i++ {
+			current := body[i]
+			if current == '"' && !isEscapedJSONByte(body, i) {
+				inString = !inString
+				continue
+			}
+			if inString {
+				continue
+			}
+			switch current {
+			case '{', '[':
+				depth++
+			case '}', ']':
+				depth--
+				if depth == 0 {
+					return i + 1
+				}
+			}
+		}
+	default:
+		i := start
+		for i < len(body) && body[i] != ',' && body[i] != '}' && !isJSONSpaceByte(body[i]) {
+			i++
+		}
+		return i
+	}
+	return -1
+}
+
+func scanJSONStringEnd(body []byte, start int) int {
+	for i := start + 1; i < len(body); i++ {
+		if body[i] == '"' && !isEscapedJSONByte(body, i) {
+			return i + 1
+		}
+	}
+	return -1
+}
+
+func isEscapedJSONByte(body []byte, index int) bool {
+	slashes := 0
+	for index--; index >= 0 && body[index] == '\\'; index-- {
+		slashes++
+	}
+	return slashes%2 == 1
+}
+
+func skipJSONSpace(body []byte, index int) int {
+	for index < len(body) && isJSONSpaceByte(body[index]) {
+		index++
+	}
+	return index
+}
+
+func isJSONSpaceByte(value byte) bool {
+	return value == ' ' || value == '\t' || value == '\r' || value == '\n'
+}
+
 // Clone 浅拷贝字段表：RawMessage 值只读共享，改写只发生在 map 层。
 // failover 换渠道时各 attempt 的改写（model 重写 / param_override）互不污染。
 func (r *ChatRequest) Clone() *ChatRequest {
-	fields := make(map[string]json.RawMessage, len(r.fields))
-	for k, v := range r.fields {
-		fields[k] = v
+	if r == nil {
+		return nil
 	}
-	return &ChatRequest{fields: fields, raw: r.raw, Model: r.Model, Stream: r.Stream}
+	var fields map[string]json.RawMessage
+	if r.fields != nil {
+		fields = make(map[string]json.RawMessage, len(r.fields))
+		for k, v := range r.fields {
+			fields[k] = v
+		}
+	}
+	return &ChatRequest{
+		fields: fields, rawFields: r.rawFields, raw: r.raw,
+		Model: r.Model, Stream: r.Stream,
+	}
 }
 
 // Get 返回字段原始 JSON 值。
 func (r *ChatRequest) Get(key string) (json.RawMessage, bool) {
-	raw, ok := r.fields[key]
-	return raw, ok
+	if r == nil {
+		return nil, false
+	}
+	if r.fields != nil {
+		raw, ok := r.fields[key]
+		return raw, ok
+	}
+	span, ok := r.rawFields[key]
+	if !ok || span.start < 0 || span.end < span.start || span.end > len(r.raw) {
+		return nil, false
+	}
+	return json.RawMessage(r.raw[span.start:span.end]), true
 }
 
 // IncludeUsageRequested 判断客户端是否显式请求 stream_options.include_usage=true。
@@ -71,7 +222,7 @@ func (r *ChatRequest) Get(key string) (json.RawMessage, bool) {
 // 网关会强制向上游注入 include_usage 以保证计费，透传层据此决定
 // 是否把 usage-only chunk 下发给客户端。
 func (r *ChatRequest) IncludeUsageRequested() bool {
-	raw, ok := r.fields["stream_options"]
+	raw, ok := r.Get("stream_options")
 	if !ok {
 		return false
 	}
@@ -90,15 +241,22 @@ func (r *ChatRequest) Set(key string, v any) error {
 	if err != nil {
 		return err
 	}
+	r.materializeFields()
 	r.fields[key] = raw
 	r.raw = nil
+	r.rawFields = nil
 	return nil
 }
 
 // Remove 删除字段。
 func (r *ChatRequest) Remove(key string) {
+	if r == nil {
+		return
+	}
+	r.materializeFields()
 	delete(r.fields, key)
 	r.raw = nil
+	r.rawFields = nil
 }
 
 // Marshal 返回可转发 JSON。未修改请求直接复用入口原始字节；字段发生改写后才
@@ -107,7 +265,26 @@ func (r *ChatRequest) Marshal() ([]byte, error) {
 	if r != nil && r.raw != nil {
 		return r.raw, nil
 	}
+	if r == nil {
+		return nil, ErrInvalidBody
+	}
+	r.materializeFields()
 	return json.Marshal(r.fields)
+}
+
+// materializeFields 仅在请求确实发生字段改写时构造字段表；各 RawMessage 仍引用
+// 原始请求切片，避免为了改一个 model 就复制其余超大字段。
+func (r *ChatRequest) materializeFields() {
+	if r == nil || r.fields != nil {
+		return
+	}
+	r.fields = make(map[string]json.RawMessage, len(r.rawFields))
+	for key, span := range r.rawFields {
+		if span.start < 0 || span.end < span.start || span.end > len(r.raw) {
+			continue
+		}
+		r.fields[key] = json.RawMessage(r.raw[span.start:span.end])
+	}
 }
 
 // Usage 一次请求的 token 用量（上游口径：PromptTokens 包含 CachedTokens）。

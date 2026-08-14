@@ -10,6 +10,7 @@ import (
 
 	"github.com/tidwall/gjson"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/jsonview"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/multipartform"
 )
 
@@ -74,24 +75,46 @@ func ExtractInput(protocol, contentType string, body []byte) Input {
 	if len(body) == 0 || !gjson.ValidBytes(body) {
 		return Input{}
 	}
+	root := jsonview.ParseBytes(body)
+	return extractInputFromJSONResults(protocol, func(name string) gjson.Result {
+		return root.Get(name)
+	})
+}
+
+// extractInputFromJSONFields 使用调用方提供的已校验顶层 JSON 字段抽取审核输入。
+// 字段切片可直接引用原请求体，避免超大请求重复执行完整 JSON 校验和根对象扫描。
+func extractInputFromJSONFields(protocol string, get func(string) ([]byte, bool)) Input {
+	if get == nil {
+		return Input{}
+	}
+	return extractInputFromJSONResults(protocol, func(name string) gjson.Result {
+		raw, ok := get(name)
+		if !ok || len(raw) == 0 {
+			return gjson.Result{}
+		}
+		return jsonview.ParseBytes(raw)
+	})
+}
+
+func extractInputFromJSONResults(protocol string, field func(string) gjson.Result) Input {
 	var parts []string
 	var images []string
 	switch protocol {
 	case ProtocolAnthropicMessages:
-		collectLastAnthropicUserMessage(gjson.GetBytes(body, "messages"), &parts, &images)
+		collectLastAnthropicUserMessage(field("messages"), &parts, &images)
 	case ProtocolOpenAIChat:
-		collectLastRoleMessage(gjson.GetBytes(body, "messages"), "user", &parts, &images)
+		collectLastRoleMessage(field("messages"), "user", &parts, &images)
 	case ProtocolOpenAIResponses:
-		collectLastResponsesInput(gjson.GetBytes(body, "input"), &parts, &images)
+		collectLastResponsesInput(field("input"), &parts, &images)
 	case ProtocolGemini:
-		collectLastGeminiContent(gjson.GetBytes(body, "contents"), &parts, &images)
+		collectLastGeminiContent(field("contents"), &parts, &images)
 	case ProtocolOpenAIImages, ProtocolOpenAIVideo:
-		addText(&parts, gjson.GetBytes(body, "prompt").String())
+		addText(&parts, field("prompt").String())
 	case ProtocolOpenAISearch:
 		// codex 联网搜索体为纯透传（本仓不解析其结构），查询文本按常见字段宽松抽取，
 		// 取第一个非空者；均无则空输入放行（fail-open）。
-		for _, field := range []string{"query", "q", "prompt", "input"} {
-			if v := gjson.GetBytes(body, field); v.Type == gjson.String && strings.TrimSpace(v.String()) != "" {
+		for _, name := range []string{"query", "q", "prompt", "input"} {
+			if v := field(name); v.Type == gjson.String && strings.TrimSpace(v.String()) != "" {
 				addText(&parts, v.String())
 				break
 			}
@@ -99,13 +122,13 @@ func ExtractInput(protocol, contentType string, body []byte) Input {
 	case ProtocolSuno:
 		// suno 提交体的文本字段（music：prompt 歌词 / gpt_description_prompt 描述 /
 		// tags 风格 / title 标题；lyrics：prompt 描述）。
-		for _, field := range []string{"prompt", "gpt_description_prompt", "lyrics", "title", "tags"} {
-			addText(&parts, gjson.GetBytes(body, field).String())
+		for _, name := range []string{"prompt", "gpt_description_prompt", "lyrics", "title", "tags"} {
+			addText(&parts, field(name).String())
 		}
 	default:
-		collectLastResponsesInput(gjson.GetBytes(body, "input"), &parts, &images)
-		collectLastRoleMessage(gjson.GetBytes(body, "messages"), "user", &parts, &images)
-		collectLastGeminiContent(gjson.GetBytes(body, "contents"), &parts, &images)
+		collectLastResponsesInput(field("input"), &parts, &images)
+		collectLastRoleMessage(field("messages"), "user", &parts, &images)
+		collectLastGeminiContent(field("contents"), &parts, &images)
 	}
 	out := Input{
 		Text:   normalizeText(strings.Join(parts, "\n")),
@@ -126,14 +149,10 @@ func extractMultipartPrompt(contentType string, body []byte) Input {
 }
 
 func collectLastRoleMessage(messages gjson.Result, role string, parts *[]string, images *[]string) {
-	if !messages.IsArray() {
+	last, ok := lastJSONArrayItem(messages)
+	if !ok {
 		return
 	}
-	array := messages.Array()
-	if len(array) == 0 {
-		return
-	}
-	last := array[len(array)-1]
 	if strings.ToLower(strings.TrimSpace(last.Get("role").String())) != role {
 		return
 	}
@@ -148,14 +167,10 @@ func collectLastRoleMessage(messages gjson.Result, role string, parts *[]string,
 }
 
 func collectLastAnthropicUserMessage(messages gjson.Result, parts *[]string, images *[]string) {
-	if !messages.IsArray() {
+	last, ok := lastJSONArrayItem(messages)
+	if !ok {
 		return
 	}
-	array := messages.Array()
-	if len(array) == 0 {
-		return
-	}
-	last := array[len(array)-1]
 	if strings.ToLower(strings.TrimSpace(last.Get("role").String())) != "user" {
 		return
 	}
@@ -210,11 +225,10 @@ func collectLastResponsesInput(input gjson.Result, parts *[]string, images *[]st
 	case input.Type == gjson.String:
 		addText(parts, input.String())
 	case input.IsArray():
-		array := input.Array()
-		if len(array) == 0 {
+		last, ok := lastJSONArrayItem(input)
+		if !ok {
 			return
 		}
-		last := array[len(array)-1]
 		if !isResponsesUserTextItem(last) {
 			return
 		}
@@ -254,14 +268,10 @@ func responsesItemHasText(item gjson.Result) bool {
 }
 
 func collectLastGeminiContent(contents gjson.Result, parts *[]string, images *[]string) {
-	if !contents.IsArray() {
+	last, ok := lastJSONArrayItem(contents)
+	if !ok {
 		return
 	}
-	array := contents.Array()
-	if len(array) == 0 {
-		return
-	}
-	last := array[len(array)-1]
 	role := strings.ToLower(strings.TrimSpace(last.Get("role").String()))
 	if role != "" && role != "user" {
 		return
@@ -280,6 +290,66 @@ func collectLastGeminiContent(contents gjson.Result, parts *[]string, images *[]
 	}
 	*parts = append(*parts, candidate...)
 	*images = append(*images, candidateImages...)
+}
+
+// lastJSONArrayItem 从已校验 JSON 数组尾部定位最后一个元素。审核只关心最后一条
+// 用户输入，无需让 gjson.Array 为整段历史构造 Result 切片，也无需二次正向遍历。
+func lastJSONArrayItem(array gjson.Result) (gjson.Result, bool) {
+	if !array.IsArray() {
+		return gjson.Result{}, false
+	}
+	raw := strings.TrimSpace(array.Raw)
+	if len(raw) < 2 || raw[0] != '[' || raw[len(raw)-1] != ']' {
+		return gjson.Result{}, false
+	}
+	end := len(raw) - 1
+	for end > 1 && isJSONSpace(raw[end-1]) {
+		end--
+	}
+	if end <= 1 {
+		return gjson.Result{}, false
+	}
+	start := 1
+	depth := 0
+	inString := false
+	for i := end - 1; i >= 1; i-- {
+		current := raw[i]
+		if current == '"' && !isEscapedJSONQuote(raw, i) {
+			inString = !inString
+			continue
+		}
+		if inString {
+			continue
+		}
+		switch current {
+		case '}', ']':
+			depth++
+		case '{', '[':
+			depth--
+		case ',':
+			if depth == 0 {
+				start = i + 1
+				i = 0
+			}
+		}
+	}
+	item := strings.TrimSpace(raw[start:end])
+	if item == "" {
+		return gjson.Result{}, false
+	}
+	return gjson.Parse(item), true
+}
+
+func isEscapedJSONQuote(raw string, index int) bool {
+	slashes := 0
+	for index--; index >= 0 && raw[index] == '\\'; index-- {
+		slashes++
+	}
+	return slashes%2 == 1
+}
+
+func isJSONSpace(value byte) bool {
+	return value == ' ' || value == '\t' || value == '\r' || value == '\n'
 }
 
 func collectContentValue(value gjson.Result, parts *[]string, images *[]string) {

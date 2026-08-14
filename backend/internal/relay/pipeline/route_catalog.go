@@ -68,9 +68,13 @@ func (p *Pipeline) pickIndexedRoute(
 		if selectedPosition < 0 {
 			continue
 		}
-		// 只在首选账号已有在途时再看一个不同账号，形成有界的加权两选一。
-		// 探测步数固定封顶，避免极端权重配置把调度热路径退化为 O(n)。
-		if selected.kind == routeAccount && p.accountInflightCount(selected.account.ID) > 0 {
+		// 对账号候选做有界探测：优先预计首字更快且负载更合适的账号。
+		// 只读本实例内存状态，不增加 Redis/数据库 RTT；固定封顶避免退化为 O(n)。
+		hasLatency := false
+		if selected.kind == routeAccount && selected.account != nil {
+			_, hasLatency = p.recentAccountFirstToken(selected.account.ID, model, now)
+		}
+		if selected.kind == routeAccount && (p.accountInflightCount(selected.account.ID) > 0 || hasLatency) {
 			for offset := 1; offset < len(bucket.schedule) && offset <= accountLoadProbeLimit; offset++ {
 				ref := bucket.schedule[(selectedPosition+offset)%len(bucket.schedule)]
 				if ref.kind != routeAccount || ref.id == selected.account.ID {
@@ -79,8 +83,7 @@ func (p *Pipeline) pickIndexedRoute(
 				candidate, ok := p.resolveIndexedRoute(ref, bucket.priority, groupID, model, protocol,
 					excludeKeys, excludeAccounts, now)
 				if ok {
-					selected = p.preferLessLoadedAccount(selected, candidate)
-					break
+					selected = p.preferAccountCandidate(selected, candidate, model, now)
 				}
 			}
 		}

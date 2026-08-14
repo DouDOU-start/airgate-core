@@ -3,6 +3,7 @@ package moderation
 import (
 	"bytes"
 	"mime/multipart"
+	"strings"
 	"testing"
 )
 
@@ -245,4 +246,52 @@ func TestInputHashStable(t *testing.T) {
 	if a.Hash() == c.Hash() {
 		t.Fatal("不同输入哈希应不同")
 	}
+}
+
+func TestExtractInput字段索引与完整请求一致(t *testing.T) {
+	input := []byte(`[
+		{"type":"function_call_output","output":"历史 ],\\\" 内容"},
+		{"type":"message","role":"user","content":[{"type":"input_text","text":"最后一问, [ok]"}]}
+	]`)
+	body := []byte(`{"model":"gpt-5.6","input":` + string(input) + `,"stream":true}`)
+	want := ExtractInput(ProtocolOpenAIResponses, "", body)
+	got := extractInputFromJSONFields(ProtocolOpenAIResponses, func(name string) ([]byte, bool) {
+		if name == "input" {
+			return input, true
+		}
+		return nil, false
+	})
+	if got.Text != want.Text || got.Text != "最后一问, [ok]" {
+		t.Fatalf("字段索引抽取不一致：got=%q want=%q", got.Text, want.Text)
+	}
+}
+
+func BenchmarkExtractInputResponses大请求(b *testing.B) {
+	input := []byte(`[{"type":"function_call_output","output":"` + strings.Repeat("x", 2<<20) + `"},` +
+		`{"type":"message","role":"user","content":[{"type":"input_text","text":"最后一问"}]}]`)
+	body := []byte(`{"model":"gpt-5.6","input":` + string(input) + `,"stream":true}`)
+	getter := func(name string) ([]byte, bool) {
+		if name == "input" {
+			return input, true
+		}
+		return nil, false
+	}
+	b.Run("完整请求校验与根扫描", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(int64(len(body)))
+		for b.Loop() {
+			if got := ExtractInput(ProtocolOpenAIResponses, "", body); got.Text != "最后一问" {
+				b.Fatalf("抽取结果错误：%q", got.Text)
+			}
+		}
+	})
+	b.Run("复用顶层字段索引", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(int64(len(body)))
+		for b.Loop() {
+			if got := extractInputFromJSONFields(ProtocolOpenAIResponses, getter); got.Text != "最后一问" {
+				b.Fatalf("抽取结果错误：%q", got.Text)
+			}
+		}
+	})
 }

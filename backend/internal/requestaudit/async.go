@@ -296,7 +296,9 @@ func (s *Service) AsyncStats() AsyncStats {
 
 func cloneRequestInput(in RequestInput) RequestInput {
 	in.Headers = cloneHeader(in.Headers)
-	in.Body = append([]byte(nil), in.Body...)
+	if !in.BodyImmutable {
+		in.Body = append([]byte(nil), in.Body...)
+	}
 	return in
 }
 

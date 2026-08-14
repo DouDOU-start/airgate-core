@@ -2,15 +2,17 @@ package pipeline
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 )
 
-func newSessionTestContext(t *testing.T, headers map[string]string) *gin.Context {
+func newSessionTestContext(t testing.TB, headers map[string]string) *gin.Context {
 	t.Helper()
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
@@ -104,6 +106,37 @@ func TestDerivedSessionIDAnthropicSystemBlocks(t *testing.T) {
 	if got := sessionIDForRequest(c, req); got == "" {
 		t.Fatal("anthropic block 结构应能派生会话身份")
 	}
+}
+
+func BenchmarkDerivedSessionID大请求(b *testing.B) {
+	body := `{"model":"gpt-5.6","input":[` +
+		`{"role":"user","content":[{"type":"input_text","text":"第一问"}]},` +
+		`{"type":"function_call_output","output":"` + strings.Repeat("x", 2<<20) + `"}]}`
+	req, err := dto.ParseChatRequest([]byte(body))
+	if err != nil {
+		b.Fatal(err)
+	}
+	c := newSessionTestContext(b, nil)
+	raw, _ := req.Get("input")
+
+	b.Run("零拷贝派生", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(int64(len(body)))
+		for b.Loop() {
+			if id := sessionIDForRequest(c, req); id == "" {
+				b.Fatal("未派生会话 ID")
+			}
+		}
+	})
+	b.Run("旧gjson字节解析基线", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(int64(len(body)))
+		for b.Loop() {
+			if text := firstUserText(gjson.ParseBytes(raw), "role", "content"); text == "" {
+				b.Fatal("未提取首条用户输入")
+			}
+		}
+	})
 }
 
 func TestSessionAffinityCacheBindLookup(t *testing.T) {

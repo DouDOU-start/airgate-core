@@ -39,6 +39,37 @@ func BenchmarkPickRoute(b *testing.B) {
 	}
 }
 
+func BenchmarkPickRouteLatencyAware(b *testing.B) {
+	for _, total := range []int{5, 100} {
+		b.Run(fmt.Sprintf("accounts_%d", total), func(b *testing.B) {
+			snapshots := make([]accountreg.Snapshot, total)
+			for i := range snapshots {
+				snapshots[i] = accountreg.Snapshot{
+					ID: i + 1, Priority: 50, Weight: 10, State: accountreg.StateActive,
+					Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}},
+				}
+			}
+			accounts := accountreg.New(routeTestAccountLoader{accounts: snapshots}, nil)
+			if err := accounts.Reload(context.Background()); err != nil {
+				b.Fatal(err)
+			}
+			p := &Pipeline{accounts: accounts}
+			for i := range snapshots {
+				for range accountLatencyMinSamples {
+					p.recordAccountFirstToken(i+1, "gpt-5", int64(3_000+i*10))
+				}
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				if _, ok := p.pickRoute(7, "gpt-5", "openai", nil, nil, nil); !ok {
+					b.Fatal("未找到可用路由")
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkBuildWeightedSchedule(b *testing.B) {
 	candidates := make([]weightedRouteRef, 1_000)
 	for i := range candidates {
@@ -118,6 +149,52 @@ func TestIndexedRoutePrefersLessLoadedAccount(t *testing.T) {
 	selected, ok := p.pickRoute(7, "gpt-5", "openai", nil, nil, nil)
 	if !ok || selected.account == nil || selected.account.ID != 2 {
 		t.Fatalf("未优先选择低在途账号：%+v", selected)
+	}
+}
+
+func TestIndexedRoutePrefersRecentLowFirstTokenAccount(t *testing.T) {
+	accounts := accountreg.New(routeTestAccountLoader{accounts: []accountreg.Snapshot{
+		{ID: 1, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 2, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+	}}, nil)
+	if err := accounts.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p := &Pipeline{accounts: accounts}
+	for range accountLatencyMinSamples {
+		p.recordAccountFirstToken(1, "gpt-5", 8_000)
+		p.recordAccountFirstToken(2, "gpt-5", 3_000)
+	}
+
+	selected, ok := p.pickRoute(7, "gpt-5", "openai", nil, nil, nil)
+	if !ok || selected.account == nil || selected.account.ID != 2 {
+		t.Fatalf("未优先选择近期首字更低账号：%+v", selected)
+	}
+}
+
+func TestIndexedRouteBalancesLatencyAndInflight(t *testing.T) {
+	accounts := accountreg.New(routeTestAccountLoader{accounts: []accountreg.Snapshot{
+		{ID: 1, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 2, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+	}}, nil)
+	if err := accounts.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p := &Pipeline{accounts: accounts}
+	for range accountLatencyMinSamples {
+		p.recordAccountFirstToken(1, "gpt-5", 3_000)
+		p.recordAccountFirstToken(2, "gpt-5", 8_000)
+	}
+	releases := []func(){p.trackAccountAttempt(1), p.trackAccountAttempt(1)}
+	defer func() {
+		for _, release := range releases {
+			release()
+		}
+	}()
+
+	selected, ok := p.pickRoute(7, "gpt-5", "openai", nil, nil, nil)
+	if !ok || selected.account == nil || selected.account.ID != 2 {
+		t.Fatalf("快速账号在途较高时应选择预计完成更早的空闲账号：%+v", selected)
 	}
 }
 

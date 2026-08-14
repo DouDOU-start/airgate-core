@@ -9,6 +9,15 @@ import (
 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 )
 
+type mappedAuthEntry struct {
+	input                 AccountAuthInput
+	auth                  *coreauth.Auth
+	hasRefreshCredential  bool
+	hasAccessToken        bool
+	proactiveRefreshAt    time.Time
+	hasProactiveRefreshAt bool
+}
+
 // AccountAuthInput 将 airgate 账号快照映射为 CPA Auth 所需的最小字段。
 type AccountAuthInput struct {
 	// AccountID airgate 账号主键（写入 Auth.ID 前缀保证唯一）。
@@ -38,6 +47,85 @@ func MapAuth(in AccountAuthInput) (*coreauth.Auth, error) {
 		return nil, fmt.Errorf("account_id 无效")
 	}
 	return mapAuthWithID(in, fmt.Sprintf("airgate-account-%d", in.AccountID))
+}
+
+// mapAuthCached 复用同一 Codex 账号未变化配置对应的 CPA Auth。账号注册表的凭证
+// map 为写时复制只读快照，因此缓存可以安全持有旧引用；刷新或配置变更后内容
+// 比较会自动失配并重建。其他 executor 可能就地补充 Auth，仍维持每请求独立对象。
+func (b *Bridge) mapAuthCached(in AccountAuthInput) (*coreauth.Auth, error) {
+	entry, err := b.mappedAuth(in)
+	if err != nil {
+		return nil, err
+	}
+	return entry.auth, nil
+}
+
+func (b *Bridge) mappedAuth(in AccountAuthInput) (*mappedAuthEntry, error) {
+	cacheable := b != nil && in.AccountID > 0 && ResolveProvider(in.Platform) == "codex"
+	if !cacheable {
+		auth, err := MapAuth(in)
+		if err != nil {
+			return nil, err
+		}
+		return newMappedAuthEntry(in, auth), nil
+	}
+	if value, ok := b.mappedAuths.Load(in.AccountID); ok {
+		entry := value.(*mappedAuthEntry)
+		if sameAccountAuthInput(entry.input, in) {
+			return entry, nil
+		}
+	}
+	auth, err := MapAuth(in)
+	if err != nil {
+		return nil, err
+	}
+	entry := newMappedAuthEntry(in, auth)
+	b.mappedAuths.Store(in.AccountID, entry)
+	return entry, nil
+}
+
+func newMappedAuthEntry(input AccountAuthInput, auth *coreauth.Auth) *mappedAuthEntry {
+	entry := &mappedAuthEntry{
+		input:                input,
+		auth:                 auth,
+		hasRefreshCredential: authHasRefreshCredential(auth),
+		hasAccessToken:       authMetadataString(auth, "access_token") != "",
+	}
+	if entry.hasRefreshCredential {
+		if expiry, ok := auth.ExpirationTime(); ok && !expiry.IsZero() {
+			lead := defaultOAuthRefreshLead
+			if providerLead := coreauth.ProviderRefreshLead(auth.Provider, auth.Runtime); providerLead != nil && *providerLead > 0 {
+				lead = *providerLead
+			}
+			entry.proactiveRefreshAt = expiry.Add(-lead)
+			entry.hasProactiveRefreshAt = true
+		}
+	}
+	return entry
+}
+
+func (e *mappedAuthEntry) needsProactiveRefresh(now time.Time) bool {
+	if e == nil || !e.hasRefreshCredential {
+		return false
+	}
+	if !e.hasAccessToken {
+		return true
+	}
+	return e.hasProactiveRefreshAt && !now.Before(e.proactiveRefreshAt)
+}
+
+func sameAccountAuthInput(left, right AccountAuthInput) bool {
+	if left.AccountID != right.AccountID || left.Name != right.Name ||
+		left.Platform != right.Platform || left.Type != right.Type || left.ProxyURL != right.ProxyURL ||
+		len(left.Credentials) != len(right.Credentials) {
+		return false
+	}
+	for key, value := range left.Credentials {
+		if right.Credentials[key] != value {
+			return false
+		}
+	}
+	return true
 }
 
 // mapAuthWithID 允许账号落库前使用临时 Auth ID 完成 OAuth 换票。

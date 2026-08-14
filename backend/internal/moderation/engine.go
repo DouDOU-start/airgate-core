@@ -25,6 +25,9 @@ type CheckRequest struct {
 	// ContentType 仅 openai_video 的 multipart 提交体需要，JSON 协议留空。
 	ContentType string
 	Body        []byte
+	// JSONField 在调用方已完成 JSON 对象校验时提供顶层字段的零拷贝读取。
+	// 设置后审核无需再次校验并扫描整个请求体来定位 input/messages。
+	JSONField func(name string) ([]byte, bool)
 }
 
 // Decision 判定结果。Allowed=false 时调用方应以 StatusCode/Message 拒绝请求。
@@ -184,7 +187,12 @@ func (e *Engine) Check(ctx context.Context, in CheckRequest) Decision {
 	if !cfg.includesGroup(in.GroupID) || !cfg.includesModel(in.Model) {
 		return allow
 	}
-	content := ExtractInput(in.Protocol, in.ContentType, in.Body)
+	var content Input
+	if in.JSONField != nil {
+		content = extractInputFromJSONFields(in.Protocol, in.JSONField)
+	} else {
+		content = ExtractInput(in.Protocol, in.ContentType, in.Body)
+	}
 	if content.IsEmpty() {
 		return allow
 	}

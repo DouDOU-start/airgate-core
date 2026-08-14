@@ -148,6 +148,48 @@ func BenchmarkChatRequestMarshal大请求(b *testing.B) {
 	})
 }
 
+func TestChatRequest顶层字段零拷贝索引(t *testing.T) {
+	body := []byte(`{"model":"旧模型","input":{"nested":[1,2,3]},"model":"gpt-5.6","stream":true}`)
+	req, err := ParseChatRequest(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.Model != "gpt-5.6" || !req.Stream {
+		t.Fatalf("重复字段应沿用 JSON 对象最后值，model=%q stream=%v", req.Model, req.Stream)
+	}
+	raw, ok := req.Get("input")
+	if !ok || string(raw) != `{"nested":[1,2,3]}` {
+		t.Fatalf("input 索引错误：%q", raw)
+	}
+	inputOffset := bytes.Index(body, raw)
+	if inputOffset < 0 || &raw[0] != &body[inputOffset] {
+		t.Fatal("顶层字段应直接引用原始请求切片")
+	}
+}
+
+func BenchmarkParseChatRequest大请求(b *testing.B) {
+	body := []byte(`{"model":"gpt-5.6","stream":true,"input":"` + strings.Repeat("x", 2<<20) + `"}`)
+	b.Run("零拷贝顶层索引", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(int64(len(body)))
+		for b.Loop() {
+			if _, err := ParseChatRequest(body); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("旧全量RawMessage解析", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(int64(len(body)))
+		for b.Loop() {
+			var fields map[string]json.RawMessage
+			if err := json.Unmarshal(body, &fields); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
 // TestChatRequestRoundTrip 未知字段透传断言：解析 → 序列化后所有字段语义等价。
 func TestChatRequestRoundTrip(t *testing.T) {
 	body := `{"model":"gpt-4o","stream":false,"messages":[{"role":"user","content":"hi"}],` +

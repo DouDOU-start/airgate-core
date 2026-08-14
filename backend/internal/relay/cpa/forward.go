@@ -85,16 +85,17 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 		return ForwardResult{BuildErr: fmt.Errorf("请求体为空")}
 	}
 
-	auth, err := MapAuth(req.Account)
+	mappedAuth, err := b.mappedAuth(req.Account)
 	if err != nil {
 		return ForwardResult{BuildErr: err}
 	}
+	auth := mappedAuth.auth
 	ex, err := b.EnsureExecutor(auth.Provider)
 	if err != nil {
 		return ForwardResult{BuildErr: err}
 	}
 	var proactiveCredentials map[string]string
-	if authNeedsProactiveRefresh(auth, time.Now()) {
+	if mappedAuth.needsProactiveRefresh(time.Now()) {
 		if refreshed, refreshErr := b.refreshAuth(ctx, ex, auth); refreshErr == nil && refreshed != nil {
 			auth = refreshed
 			proactiveCredentials = CredentialsFromAuth(auth)

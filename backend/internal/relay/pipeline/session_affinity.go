@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 
+	"github.com/DouDOU-start/airgate-core/internal/pkg/jsonview"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 )
 
@@ -124,7 +125,7 @@ func sessionIDForRequest(c *gin.Context, req *dto.ChatRequest) string {
 	}
 	// anthropic metadata.user_id（Claude Code 会把会话身份编码在这里）
 	if raw, ok := req.Get("metadata"); ok {
-		if v := gjson.GetBytes(raw, "user_id").String(); v != "" {
+		if v := jsonview.ParseBytes(raw).Get("user_id").String(); v != "" {
 			return "meta:" + v
 		}
 	}
@@ -151,21 +152,21 @@ func derivedSessionID(req *dto.ChatRequest) string {
 
 	// openai responses：instructions + input（string 或消息数组）
 	if raw, ok := req.Get("instructions"); ok {
-		write(gjson.ParseBytes(raw).String())
+		write(jsonview.ParseBytes(raw).String())
 	}
 	// anthropic：system（string 或 block 数组）
 	if raw, ok := req.Get("system"); ok {
-		write(textOfContent(gjson.ParseBytes(raw)))
+		write(textOfContent(jsonview.ParseBytes(raw)))
 	}
 	// gemini：systemInstruction.parts[].text
 	if raw, ok := req.Get("systemInstruction"); ok {
-		write(textOfContent(gjson.GetBytes(raw, "parts")))
+		write(textOfContent(jsonview.ParseBytes(raw).Get("parts")))
 	}
 	if raw, ok := req.Get("messages"); ok {
-		write(firstUserText(gjson.ParseBytes(raw), "role", "content"))
+		write(firstUserText(jsonview.ParseBytes(raw), "role", "content"))
 	}
 	if raw, ok := req.Get("input"); ok {
-		parsed := gjson.ParseBytes(raw)
+		parsed := jsonview.ParseBytes(raw)
 		if parsed.Type == gjson.String {
 			write(parsed.String())
 		} else {
@@ -173,7 +174,7 @@ func derivedSessionID(req *dto.ChatRequest) string {
 		}
 	}
 	if raw, ok := req.Get("contents"); ok {
-		write(firstUserText(gjson.ParseBytes(raw), "role", "parts"))
+		write(firstUserText(jsonview.ParseBytes(raw), "role", "parts"))
 	}
 	if !wrote {
 		return ""

@@ -43,6 +43,9 @@ type Bridge struct {
 	cancel         context.CancelFunc
 	refreshLocks   sync.Map
 	refreshedAuths sync.Map
+	// mappedAuths 缓存 Codex 账号快照到 CPA Auth 的纯函数映射结果。同一账号的
+	// 凭证、类型或代理发生变化时会在读取时自动失效，避免每次请求重复构造 map。
+	mappedAuths sync.Map
 }
 
 // NewBridge 创建桥接层并异步启动嵌入式 cliproxy.Service 以注册 executor。

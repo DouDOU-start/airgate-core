@@ -24,6 +24,23 @@ func openTestService(t *testing.T) *Service {
 	return openTestServiceWithOptions(t, Options{})
 }
 
+func TestCloneRequestInput按只读承诺复用请求体(t *testing.T) {
+	body := []byte("immutable-body")
+	borrowed := cloneRequestInput(RequestInput{Body: body, BodyImmutable: true})
+	if len(borrowed.Body) == 0 || &borrowed.Body[0] != &body[0] {
+		t.Fatal("只读请求体应直接复用原切片")
+	}
+
+	owned := cloneRequestInput(RequestInput{Body: body})
+	if len(owned.Body) == 0 || &owned.Body[0] == &body[0] {
+		t.Fatal("未声明只读时仍应防御性复制")
+	}
+	body[0] = 'X'
+	if string(owned.Body) != "immutable-body" {
+		t.Fatalf("防御性副本被调用方修改污染：%q", owned.Body)
+	}
+}
+
 func Test快速上游审计不在发包前读取原请求体(t *testing.T) {
 	service := openTestServiceWithOptions(t, Options{
 		AsyncEnabled: true, QueueSize: 4, WorkerCount: 1, MaxPendingBytes: 1 << 20,

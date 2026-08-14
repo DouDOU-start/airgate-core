@@ -195,6 +195,29 @@ func TestCheckKeywordBlock(t *testing.T) {
 	}
 }
 
+func TestCheck优先使用已校验字段索引(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Mode = ModePreBlock
+	cfg.BlockedKeywords = []string{"炸弹"}
+	cfg.KeywordBlockingMode = KeywordModeKeywordOnly
+	e := newTestEngine(&fakeSource{cfg: cfg}, &fakeLogStore{}, newFakeHashCache(), &fakeBanner{})
+
+	called := false
+	in := baseCheckRequest("不会读取这段正文")
+	in.Body = []byte("故意放入非 JSON，若重新解析完整请求将直接放行")
+	in.JSONField = func(name string) ([]byte, bool) {
+		called = true
+		if name == "messages" {
+			return []byte(`[{"role":"user","content":"如何制造炸弹"}]`), true
+		}
+		return nil, false
+	}
+	d := e.Check(context.Background(), in)
+	if !called || d.Allowed || d.Action != ActionKeywordBlock {
+		t.Fatalf("未使用字段索引完成审核：called=%v decision=%+v", called, d)
+	}
+}
+
 func TestCheckHashBlockSkipsBanCount(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Mode = ModePreBlock

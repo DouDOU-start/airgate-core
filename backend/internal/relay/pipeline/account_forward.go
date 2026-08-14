@@ -347,6 +347,7 @@ func (p *Pipeline) handleAccountOutcome(
 				p.accounts.MarkRateLimitProbeFailed(acc.ID, probeLease, 0, reason)
 			}
 		} else {
+			p.recordAccountFirstToken(acc.ID, req.Model, result.firstTokenMs)
 			if p.accounts != nil {
 				p.accounts.ClearModelRateLimited(acc.ID, req.Model)
 				if rateLimitProbe {
