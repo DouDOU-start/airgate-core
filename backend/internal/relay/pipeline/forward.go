@@ -76,6 +76,9 @@ type attemptResult struct {
 	// usage 提取/捕获的用量（成功响应、SSE 旁路、4xx 错误体皆可能携带）。
 	usage        *dto.Usage
 	firstTokenMs int64
+	// requestFirstTokenMs 为包含发包前处理和前序故障转移的请求级真实首字耗时。
+	// 账号调度 EWMA 仍使用 firstTokenMs，避免把前序账号失败惩罚算到最终成功账号。
+	requestFirstTokenMs int64
 	// written 已向客户端写出字节（流式）——写出后不可 failover。
 	written bool
 	// streamErr 流式中途失败（written 恒为 true，只能终止）。
@@ -294,6 +297,11 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	var hops []errlog.AttemptHop
 	attempts := 0
 	rateLimitProbes := 0
+	// 账号路径的 CPA 输入在同一请求的故障转移间不变。请求被插件改写后可能需要
+	// 重新序列化大 JSON，这里按需只构建一次，避免每次切换账号重复编码。
+	var accountPayload []byte
+	var accountPayloadErr error
+	accountPayloadReady := false
 	recordCanceled := func() {
 		p.recordFailure(c, keyInfo, req, start, errlog.Entry{
 			Phase: errlog.PhaseCanceled, StatusCode: statusClientClosedRequest,
@@ -401,7 +409,11 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				continue
 			}
 			pollDelay = queuePollInterval
-			payload, perr := prepareAccountPayload(req, opts)
+			if !accountPayloadReady {
+				accountPayload, accountPayloadErr = prepareAccountPayload(req, opts)
+				accountPayloadReady = true
+			}
+			payload, perr := accountPayload, accountPayloadErr
 			if perr != nil {
 				p.concurrency.ReleaseAccountSlot(context.Background(), acc.ID, requestID)
 				p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)

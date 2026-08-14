@@ -168,20 +168,21 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	settingsReader := pipeline.NewSettingsReader(gatewaySettingsSource{s.handlers.SettingsService})
 	rpmCounter := scheduler.NewRPMCounter(rdb)
 	s.relay = pipeline.New(pipeline.Options{
-		Registry:      s.channelRegistry,
-		Accounts:      s.accountRegistry,
-		CPA:           s.cpaBridge,
-		Pricing:       s.pricingCache,
-		Concurrency:   concurrency,
-		RPM:           rpmCounter,
-		Calculator:    billing.NewCalculator(),
-		Sink:          recorder,
-		ErrLog:        errRecorder,
-		Settings:      settingsReader,
-		Moderation:    s.handlers.ModerationEngine,
-		HealthTracker: s.probeEngine,
-		RelayHook:     s.pluginRuntime,
-		RequestAudit:  s.handlers.RequestAuditService,
+		Registry:                s.channelRegistry,
+		Accounts:                s.accountRegistry,
+		AccountFirstTokenSource: accountFirstTokenStore{db: db},
+		CPA:                     s.cpaBridge,
+		Pricing:                 s.pricingCache,
+		Concurrency:             concurrency,
+		RPM:                     rpmCounter,
+		Calculator:              billing.NewCalculator(),
+		Sink:                    recorder,
+		ErrLog:                  errRecorder,
+		Settings:                settingsReader,
+		Moderation:              s.handlers.ModerationEngine,
+		HealthTracker:           s.probeEngine,
+		RelayHook:               s.pluginRuntime,
+		RequestAudit:            s.handlers.RequestAuditService,
 	})
 
 	// 异步任务子系统（视频/音乐）：与同步管线同源组件 + task 持久化 + 余额动账适配器。
@@ -259,6 +260,16 @@ func (s *Server) StartBackground(ctx context.Context) {
 		if err := s.accountRegistry.Reload(ctx); err != nil {
 			slog.Warn("account_registry_initial_load_failed", "error", err)
 			go retryReload(backgroundCtx, s.accountRegistry, "account_registry", time.Second)
+		}
+	}
+	if s.relay != nil {
+		warmCtx, warmCancel := context.WithTimeout(ctx, 3*time.Second)
+		warmed, err := s.relay.WarmAccountFirstTokens(warmCtx)
+		warmCancel()
+		if err != nil {
+			slog.Warn("account_first_token_warmup_failed", "error", err)
+		} else {
+			slog.Info("account_first_token_warmup_completed", "keys", warmed)
 		}
 	}
 	if err := s.pricingCache.Reload(ctx); err != nil {

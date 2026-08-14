@@ -426,6 +426,30 @@ func TestRelayStreamPreservesCompleteResponsesFrame(t *testing.T) {
 	}
 }
 
+func TestRelayStream同时记录Attempt与请求级首字(t *testing.T) {
+	c, _ := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte("data: {\"choices\":[{\"delta\":{\"content\":\"你好\"}}]}\n\n")}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte("data: [DONE]\n\n")}
+	close(chunks)
+
+	now := time.Now()
+	result := (&Bridge{}).relayStreamSince(
+		context.Background(), c, &cliproxyexecutor.StreamResult{Chunks: chunks},
+		now.Add(-10*time.Millisecond), now.Add(-50*time.Millisecond), adaptor.EndpointChatCompletions,
+	)
+
+	if result.FirstTokenMs < 10 {
+		t.Fatalf("attempt 首字耗时过小：%dms", result.FirstTokenMs)
+	}
+	if result.RequestFirstTokenMs < 50 {
+		t.Fatalf("请求级首字耗时过小：%dms", result.RequestFirstTokenMs)
+	}
+	if result.RequestFirstTokenMs <= result.FirstTokenMs {
+		t.Fatalf("请求级首字应包含前置耗时：request=%dms attempt=%dms", result.RequestFirstTokenMs, result.FirstTokenMs)
+	}
+}
+
 func newStreamTestContext() (*gin.Context, *httptest.ResponseRecorder) {
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)

@@ -54,3 +54,12 @@ func TestUsageStatusFor(t *testing.T) {
 		})
 	}
 }
+
+func TestAccountUsageFirstToken优先请求级耗时(t *testing.T) {
+	if got := accountUsageFirstToken(attemptResult{firstTokenMs: 120, requestFirstTokenMs: 860}); got != 860 {
+		t.Fatalf("使用记录首字 = %d，期望请求级耗时 860", got)
+	}
+	if got := accountUsageFirstToken(attemptResult{firstTokenMs: 120}); got != 120 {
+		t.Fatalf("请求级耗时缺失时应回退 attempt 耗时，实际 %d", got)
+	}
+}

@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"context"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -12,7 +14,22 @@ const (
 	accountLatencyFreshDuration = 15 * time.Minute
 	accountLatencyEWMAWeight    = 8
 	accountLatencySwitchRatio   = 0.95
+	accountLatencyWarmupMaxRows = 20_000
 )
+
+// AccountFirstTokenSample 是账号×模型一次成功流的历史首字样本。
+type AccountFirstTokenSample struct {
+	AccountID    int
+	Model        string
+	FirstTokenMs int64
+	CreatedAt    time.Time
+}
+
+// AccountFirstTokenSource 加载近期成功首字样本。
+// 实现方应优先返回时间窗内最新的有限行，避免启动预热扫描完整使用记录表。
+type AccountFirstTokenSource interface {
+	LoadRecentAccountFirstTokenSamples(ctx context.Context, since time.Time, limit int) ([]AccountFirstTokenSample, error)
+}
 
 type accountLatencyKey struct {
 	accountID int
@@ -23,6 +40,12 @@ type accountLatencyState struct {
 	ewmaMs    atomic.Int64
 	samples   atomic.Uint64
 	updatedAt atomic.Int64
+}
+
+type accountLatencySeed struct {
+	ewmaMs    int64
+	samples   uint64
+	updatedAt int64
 }
 
 // accountInflightCounter 返回账号的本实例在途计数器。
@@ -74,8 +97,12 @@ func (p *Pipeline) trackAccountAttempt(accountID int) func() {
 // recordAccountFirstToken 记录成功完成流的账号×模型首字 EWMA。
 // 不记录失败和中断，因此不会形成短时冷却；异常账号仍由现有 failover 处理。
 func (p *Pipeline) recordAccountFirstToken(accountID int, model string, firstTokenMs int64) {
+	p.recordAccountFirstTokenAt(accountID, model, firstTokenMs, time.Now())
+}
+
+func (p *Pipeline) recordAccountFirstTokenAt(accountID int, model string, firstTokenMs int64, recordedAt time.Time) {
 	model = strings.TrimSpace(model)
-	if p == nil || accountID <= 0 || model == "" || firstTokenMs <= 0 {
+	if p == nil || accountID <= 0 || model == "" || firstTokenMs <= 0 || recordedAt.IsZero() {
 		return
 	}
 	key := accountLatencyKey{accountID: accountID, model: model}
@@ -92,7 +119,61 @@ func (p *Pipeline) recordAccountFirstToken(accountID int, model string, firstTok
 		}
 	}
 	state.samples.Add(1)
-	state.updatedAt.Store(time.Now().UnixNano())
+	storeLatestUnixNano(&state.updatedAt, recordedAt.UnixNano())
+}
+
+func storeLatestUnixNano(target *atomic.Int64, candidate int64) {
+	for {
+		current := target.Load()
+		if candidate <= current || target.CompareAndSwap(current, candidate) {
+			return
+		}
+	}
+}
+
+// WarmAccountFirstTokens 从近期成功记录恢复本实例 EWMA，消除服务重启后的冷启动探索期。
+// 已被实时请求写入的 key 不覆盖，避免预热查询较慢时旧样本倒灌到新状态。
+func (p *Pipeline) WarmAccountFirstTokens(ctx context.Context) (int, error) {
+	if p == nil || p.accountFirstTokenSource == nil {
+		return 0, nil
+	}
+	now := time.Now()
+	since := now.Add(-accountLatencyFreshDuration)
+	samples, err := p.accountFirstTokenSource.LoadRecentAccountFirstTokenSamples(ctx, since, accountLatencyWarmupMaxRows)
+	if err != nil {
+		return 0, err
+	}
+	sort.Slice(samples, func(i, j int) bool { return samples[i].CreatedAt.Before(samples[j].CreatedAt) })
+
+	seeds := make(map[accountLatencyKey]accountLatencySeed, len(samples))
+	for _, sample := range samples {
+		model := strings.TrimSpace(sample.Model)
+		if sample.AccountID <= 0 || model == "" || sample.FirstTokenMs <= 0 || sample.CreatedAt.Before(since) || sample.CreatedAt.After(now) {
+			continue
+		}
+		key := accountLatencyKey{accountID: sample.AccountID, model: model}
+		seed := seeds[key]
+		next := sample.FirstTokenMs
+		if seed.ewmaMs > 0 {
+			next = (seed.ewmaMs*(accountLatencyEWMAWeight-1) + sample.FirstTokenMs) / accountLatencyEWMAWeight
+		}
+		seed.ewmaMs = next
+		seed.samples++
+		seed.updatedAt = max(seed.updatedAt, sample.CreatedAt.UnixNano())
+		seeds[key] = seed
+	}
+
+	warmed := 0
+	for key, seed := range seeds {
+		state := &accountLatencyState{}
+		state.ewmaMs.Store(seed.ewmaMs)
+		state.samples.Store(seed.samples)
+		state.updatedAt.Store(seed.updatedAt)
+		if _, loaded := p.accountFirstToken.LoadOrStore(key, state); !loaded {
+			warmed++
+		}
+	}
+	return warmed, nil
 }
 
 func (p *Pipeline) recentAccountFirstToken(accountID int, model string, now time.Time) (int64, bool) {

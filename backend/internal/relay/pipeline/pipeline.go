@@ -61,6 +61,8 @@ type Options struct {
 	HealthTracker HealthTracker
 	// Accounts 账号注册表（nil 时仅渠道路径）。
 	Accounts *accountreg.Registry
+	// AccountFirstTokenSource 提供近期账号×模型首字样本，用于服务重启后的调度预热。
+	AccountFirstTokenSource AccountFirstTokenSource
 	// CPA 账号路径转发器（生产环境注入 *cpa.Bridge；nil 时账号候选不执行）。
 	CPA AccountForwarder
 	// RelayHook 外部请求改写与本次请求路由扩展点（nil 时完全保持原路径）。
@@ -71,24 +73,25 @@ type Options struct {
 
 // Pipeline relay 转发管线。
 type Pipeline struct {
-	registry               *registry.Registry
-	pricing                *pricing.Cache
-	concurrency            *scheduler.ConcurrencyManager
-	rpm                    *scheduler.RPMCounter
-	calculator             *billing.Calculator
-	sink                   UsageSink
-	errSink                ErrSink
-	settings               *SettingsReader
-	moderation             ModerationChecker
-	healthTracker          HealthTracker
-	accounts               *accountreg.Registry
-	cpa                    AccountForwarder
-	relayHook              relayhook.Hook
-	requestAudit           *requestaudit.Service
-	accountDirectTransport http.RoundTripper
-	accountTransportMu     sync.Mutex
-	accountTransports      sync.Map
-	accountTransportCount  atomic.Int64
+	registry                *registry.Registry
+	pricing                 *pricing.Cache
+	concurrency             *scheduler.ConcurrencyManager
+	rpm                     *scheduler.RPMCounter
+	calculator              *billing.Calculator
+	sink                    UsageSink
+	errSink                 ErrSink
+	settings                *SettingsReader
+	moderation              ModerationChecker
+	healthTracker           HealthTracker
+	accounts                *accountreg.Registry
+	accountFirstTokenSource AccountFirstTokenSource
+	cpa                     AccountForwarder
+	relayHook               relayhook.Hook
+	requestAudit            *requestaudit.Service
+	accountDirectTransport  http.RoundTripper
+	accountTransportMu      sync.Mutex
+	accountTransports       sync.Map
+	accountTransportCount   atomic.Int64
 	// accountInflight 记录本实例各账号正在执行的真实上游 attempt。
 	// 新会话调度用它做无网络往返的轻量负载感知；跨实例仍由 Redis 并发闸门兜底。
 	accountInflight sync.Map
@@ -124,21 +127,22 @@ func New(opts Options) *Pipeline {
 		calculator = billing.NewCalculator()
 	}
 	return &Pipeline{
-		registry:               opts.Registry,
-		pricing:                opts.Pricing,
-		concurrency:            opts.Concurrency,
-		rpm:                    opts.RPM,
-		calculator:             calculator,
-		sink:                   opts.Sink,
-		errSink:                opts.ErrLog,
-		settings:               settings,
-		moderation:             opts.Moderation,
-		healthTracker:          opts.HealthTracker,
-		accounts:               opts.Accounts,
-		cpa:                    opts.CPA,
-		relayHook:              opts.RelayHook,
-		requestAudit:           opts.RequestAudit,
-		accountDirectTransport: upstreamclient.NewEnvironmentTransport(),
-		client:                 upstreamclient.NewClient(0),
+		registry:                opts.Registry,
+		pricing:                 opts.Pricing,
+		concurrency:             opts.Concurrency,
+		rpm:                     opts.RPM,
+		calculator:              calculator,
+		sink:                    opts.Sink,
+		errSink:                 opts.ErrLog,
+		settings:                settings,
+		moderation:              opts.Moderation,
+		healthTracker:           opts.HealthTracker,
+		accounts:                opts.Accounts,
+		accountFirstTokenSource: opts.AccountFirstTokenSource,
+		cpa:                     opts.CPA,
+		relayHook:               opts.RelayHook,
+		requestAudit:            opts.RequestAudit,
+		accountDirectTransport:  upstreamclient.NewEnvironmentTransport(),
+		client:                  upstreamclient.NewClient(0),
 	}
 }

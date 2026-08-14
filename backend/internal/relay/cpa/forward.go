@@ -43,21 +43,26 @@ type ForwardRequest struct {
 	Payload []byte
 	// Headers 可选转发头。
 	Headers http.Header
+	// RequestStartedAt 是请求进入转发主循环的时间，用于记录包含故障转移的真实首字耗时。
+	RequestStartedAt time.Time
 }
 
 // ForwardResult 转发结果，语义对齐 pipeline.attemptResult。
 type ForwardResult struct {
-	StatusCode   int
-	Headers      http.Header
-	Body         []byte
-	ContentType  string
-	Usage        *dto.Usage
+	StatusCode  int
+	Headers     http.Header
+	Body        []byte
+	ContentType string
+	Usage       *dto.Usage
+	// FirstTokenMs 是当前账号 attempt 自身的内容首字耗时，供账号调度 EWMA 使用。
 	FirstTokenMs int64
-	Written      bool
-	StreamErr    error
-	Done         bool
-	NetErr       error
-	BuildErr     error
+	// RequestFirstTokenMs 是从请求进入转发主循环到内容首字的总耗时，包含前置处理与故障转移。
+	RequestFirstTokenMs int64
+	Written             bool
+	StreamErr           error
+	Done                bool
+	NetErr              error
+	BuildErr            error
 	// RefreshedCredentials refresh 成功后的新凭证（调用方应落库）。
 	RefreshedCredentials map[string]string
 }
@@ -127,7 +132,7 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 		return withRefreshedCredentials(b.doCount(ctx, ex, auth, execReq, opts), proactiveCredentials)
 	}
 	if req.Stream {
-		return withRefreshedCredentials(b.doStream(ctx, c, ex, auth, execReq, opts, req.Endpoint), proactiveCredentials)
+		return withRefreshedCredentials(b.doStream(ctx, c, ex, auth, execReq, opts, req.Endpoint, req.RequestStartedAt), proactiveCredentials)
 	}
 	return withRefreshedCredentials(b.doNonStream(ctx, ex, auth, execReq, opts), proactiveCredentials)
 }
@@ -201,6 +206,7 @@ func (b *Bridge) doStream(
 	execReq cliproxyexecutor.Request,
 	opts cliproxyexecutor.Options,
 	endpoint string,
+	requestStartedAt time.Time,
 ) ForwardResult {
 	opts.Stream = true
 	start := time.Now()
@@ -216,7 +222,7 @@ func (b *Bridge) doStream(
 				stream, err = ex.ExecuteStream(upstreamCtx, auth, execReq, opts)
 				if err == nil {
 					markStreamStarted()
-					result := b.relayStream(upstreamCtx, c, stream, start, endpoint)
+					result := b.relayStreamSince(upstreamCtx, c, stream, start, requestStartedAt, endpoint)
 					result.RefreshedCredentials = CredentialsFromAuth(auth)
 					return result
 				}
@@ -227,7 +233,7 @@ func (b *Bridge) doStream(
 	// ExecuteStream 成功表示已建立上游响应流；此后客户端断开不再取消上游，
 	// relayStream 会停止向客户端写入，但继续读取到完成事件以捕获 usage。
 	markStreamStarted()
-	result := b.relayStream(upstreamCtx, c, stream, start, endpoint)
+	result := b.relayStreamSince(upstreamCtx, c, stream, start, requestStartedAt, endpoint)
 	// 部分 executor 在 goroutine 启动后才从首个 chunk 返回上游认证错误。
 	// 尚未向客户端写出内容时仍可安全刷新并重试一次。
 	if authHasRefreshCredential(auth) && isRefreshableAuthResult(auth.Provider, result) {
@@ -236,7 +242,7 @@ func (b *Bridge) doStream(
 			auth = refreshed
 			stream, err = ex.ExecuteStream(upstreamCtx, auth, execReq, opts)
 			if err == nil {
-				result = b.relayStream(upstreamCtx, c, stream, time.Now(), endpoint)
+				result = b.relayStreamSince(upstreamCtx, c, stream, time.Now(), requestStartedAt, endpoint)
 				result.RefreshedCredentials = CredentialsFromAuth(auth)
 				return result
 			}
@@ -253,6 +259,17 @@ func (b *Bridge) relayStream(
 	start time.Time,
 	endpoint string,
 ) ForwardResult {
+	return b.relayStreamSince(ctx, c, stream, start, time.Time{}, endpoint)
+}
+
+func (b *Bridge) relayStreamSince(
+	ctx context.Context,
+	c *gin.Context,
+	stream *cliproxyexecutor.StreamResult,
+	start time.Time,
+	requestStartedAt time.Time,
+	endpoint string,
+) ForwardResult {
 	if stream == nil {
 		return ForwardResult{NetErr: fmt.Errorf("CPA 返回空流")}
 	}
@@ -265,14 +282,15 @@ func (b *Bridge) relayStream(
 	w := c.Writer
 	flusher, _ := w.(http.Flusher)
 	var (
-		usage            *dto.Usage
-		firstTokenMs     int64
-		written          bool
-		downstreamClosed bool
-		contentStarted   bool
-		done             bool
-		streamErr        error
-		pending          bytes.Buffer
+		usage               *dto.Usage
+		firstTokenMs        int64
+		requestFirstTokenMs int64
+		written             bool
+		downstreamClosed    bool
+		contentStarted      bool
+		done                bool
+		streamErr           error
+		pending             bytes.Buffer
 	)
 
 	extractUsage := dto.ExtractUsage
@@ -357,8 +375,12 @@ func (b *Bridge) relayStream(
 		hasContent := isFirstContentPayload(payload)
 		if hasContent && !contentStarted {
 			contentStarted = true
+			now := time.Now()
 			if firstTokenMs == 0 {
-				firstTokenMs = time.Since(start).Milliseconds()
+				firstTokenMs = now.Sub(start).Milliseconds()
+			}
+			if requestFirstTokenMs == 0 && !requestStartedAt.IsZero() && now.After(requestStartedAt) {
+				requestFirstTokenMs = now.Sub(requestStartedAt).Milliseconds()
 			}
 			flushPending()
 		}
@@ -439,6 +461,7 @@ finish:
 	result.Written = written
 	result.Usage = usage
 	result.FirstTokenMs = firstTokenMs
+	result.RequestFirstTokenMs = requestFirstTokenMs
 	result.StreamErr = streamErr
 	result.Done = done
 	return result

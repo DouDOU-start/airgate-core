@@ -66,13 +66,14 @@ func (p *Pipeline) executeAccountAttempt(
 			Credentials: acc.Credentials,
 			ProxyURL:    acc.ProxyURL,
 		},
-		Model:         req.Model,
-		UpstreamModel: acc.ResolveModel(req.Model),
-		Endpoint:      endpoint,
-		EntryProtocol: protocol,
-		Stream:        req.Stream,
-		Payload:       payload,
-		Headers:       http.Header{"Content-Type": []string{"application/json"}},
+		Model:            req.Model,
+		UpstreamModel:    acc.ResolveModel(req.Model),
+		Endpoint:         endpoint,
+		EntryProtocol:    protocol,
+		Stream:           req.Stream,
+		Payload:          payload,
+		Headers:          http.Header{"Content-Type": []string{"application/json"}},
+		RequestStartedAt: start,
 	}
 
 	ctx := c.Request.Context()
@@ -111,17 +112,18 @@ func (p *Pipeline) executeAccountAttempt(
 	}
 
 	return attemptResult{
-		netErr:       result.NetErr,
-		buildErr:     result.BuildErr,
-		statusCode:   result.StatusCode,
-		headers:      result.Headers,
-		body:         result.Body,
-		contentType:  result.ContentType,
-		usage:        result.Usage,
-		firstTokenMs: result.FirstTokenMs,
-		written:      result.Written,
-		streamErr:    result.StreamErr,
-		done:         result.Done,
+		netErr:              result.NetErr,
+		buildErr:            result.BuildErr,
+		statusCode:          result.StatusCode,
+		headers:             result.Headers,
+		body:                result.Body,
+		contentType:         result.ContentType,
+		usage:               result.Usage,
+		firstTokenMs:        result.FirstTokenMs,
+		requestFirstTokenMs: result.RequestFirstTokenMs,
+		written:             result.Written,
+		streamErr:           result.StreamErr,
+		done:                result.Done,
 	}
 }
 
@@ -260,13 +262,20 @@ func (p *Pipeline) recordAccountUsage(
 		AccountRateMultiplier: calc.AccountRateMultiplier,
 		Stream:                req.Stream,
 		DurationMs:            time.Since(start).Milliseconds(),
-		FirstTokenMs:          result.firstTokenMs,
+		FirstTokenMs:          accountUsageFirstToken(result),
 		UserAgent:             truncateRunes(c.Request.UserAgent(), maxUserAgentLen),
 		IPAddress:             c.ClientIP(),
 		Endpoint:              c.Request.URL.Path,
 		Source:                billing.SourceRelay,
 		RequestID:             requestIDOf(c),
 	})
+}
+
+func accountUsageFirstToken(result attemptResult) int64 {
+	if result.requestFirstTokenMs > 0 {
+		return result.requestFirstTokenMs
+	}
+	return result.firstTokenMs
 }
 
 // handleAccountOutcome 处理账号路径一次 attempt 的 outcome（与渠道路径对称）。

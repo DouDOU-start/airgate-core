@@ -5,12 +5,29 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
 )
 
 type routeTestAccountLoader struct {
 	accounts []accountreg.Snapshot
+}
+
+type routeTestFirstTokenSource struct {
+	samples []AccountFirstTokenSample
+	since   time.Time
+	limit   int
+}
+
+func (s *routeTestFirstTokenSource) LoadRecentAccountFirstTokenSamples(
+	_ context.Context,
+	since time.Time,
+	limit int,
+) ([]AccountFirstTokenSample, error) {
+	s.since = since
+	s.limit = limit
+	return append([]AccountFirstTokenSample(nil), s.samples...), nil
 }
 
 func BenchmarkPickRoute(b *testing.B) {
@@ -169,6 +186,105 @@ func TestIndexedRoutePrefersRecentLowFirstTokenAccount(t *testing.T) {
 	selected, ok := p.pickRoute(7, "gpt-5", "openai", nil, nil, nil)
 	if !ok || selected.account == nil || selected.account.ID != 2 {
 		t.Fatalf("未优先选择近期首字更低账号：%+v", selected)
+	}
+}
+
+func TestWarmAccountFirstTokens启动后立即优选快速账号(t *testing.T) {
+	now := time.Now()
+	source := &routeTestFirstTokenSource{samples: []AccountFirstTokenSample{
+		{AccountID: 1, Model: "gpt-5", FirstTokenMs: 8_000, CreatedAt: now.Add(-6 * time.Minute)},
+		{AccountID: 2, Model: "gpt-5", FirstTokenMs: 3_000, CreatedAt: now.Add(-5 * time.Minute)},
+		{AccountID: 1, Model: "gpt-5", FirstTokenMs: 8_000, CreatedAt: now.Add(-4 * time.Minute)},
+		{AccountID: 2, Model: "gpt-5", FirstTokenMs: 3_000, CreatedAt: now.Add(-3 * time.Minute)},
+		{AccountID: 1, Model: "gpt-5", FirstTokenMs: 8_000, CreatedAt: now.Add(-2 * time.Minute)},
+		{AccountID: 2, Model: "gpt-5", FirstTokenMs: 3_000, CreatedAt: now.Add(-time.Minute)},
+	}}
+	accounts := accountreg.New(routeTestAccountLoader{accounts: []accountreg.Snapshot{
+		{ID: 1, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 2, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+	}}, nil)
+	if err := accounts.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p := &Pipeline{accounts: accounts, accountFirstTokenSource: source}
+	warmed, err := p.WarmAccountFirstTokens(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if warmed != 2 || source.limit != accountLatencyWarmupMaxRows {
+		t.Fatalf("预热结果 keys=%d limit=%d，期望 2/%d", warmed, source.limit, accountLatencyWarmupMaxRows)
+	}
+	if age := time.Since(source.since); age < accountLatencyFreshDuration || age > accountLatencyFreshDuration+time.Second {
+		t.Fatalf("预热时间窗异常：%v", age)
+	}
+
+	selected, ok := p.pickRoute(7, "gpt-5", "openai", nil, nil, nil)
+	if !ok || selected.account == nil || selected.account.ID != 2 {
+		t.Fatalf("预热后未立即优选快速账号：%+v", selected)
+	}
+}
+
+func TestWarmAccountFirstTokens样本不足不启用延迟评分(t *testing.T) {
+	now := time.Now()
+	source := &routeTestFirstTokenSource{samples: []AccountFirstTokenSample{
+		{AccountID: 7, Model: "gpt-5", FirstTokenMs: 2_000, CreatedAt: now.Add(-2 * time.Minute)},
+		{AccountID: 7, Model: "gpt-5", FirstTokenMs: 1_800, CreatedAt: now.Add(-time.Minute)},
+	}}
+	p := &Pipeline{accountFirstTokenSource: source}
+	if _, err := p.WarmAccountFirstTokens(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if latency, ok := p.recentAccountFirstToken(7, "gpt-5", time.Now()); ok {
+		t.Fatalf("不足 %d 个样本不应启用延迟评分，实际 %dms", accountLatencyMinSamples, latency)
+	}
+}
+
+func TestWarmAccountFirstTokens忽略非法和越界样本(t *testing.T) {
+	now := time.Now()
+	source := &routeTestFirstTokenSource{samples: []AccountFirstTokenSample{
+		{AccountID: 1, Model: "gpt-5", FirstTokenMs: 2_000, CreatedAt: now.Add(-time.Minute)},
+		{AccountID: 2, Model: "gpt-5", FirstTokenMs: 2_000, CreatedAt: now.Add(-accountLatencyFreshDuration - time.Minute)},
+		{AccountID: 3, Model: "gpt-5", FirstTokenMs: 2_000, CreatedAt: now.Add(time.Minute)},
+		{AccountID: 0, Model: "gpt-5", FirstTokenMs: 2_000, CreatedAt: now.Add(-time.Minute)},
+		{AccountID: 4, Model: " ", FirstTokenMs: 2_000, CreatedAt: now.Add(-time.Minute)},
+		{AccountID: 5, Model: "gpt-5", FirstTokenMs: 0, CreatedAt: now.Add(-time.Minute)},
+	}}
+	p := &Pipeline{accountFirstTokenSource: source}
+	warmed, err := p.WarmAccountFirstTokens(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if warmed != 1 {
+		t.Fatalf("只有一个合法 key 应被预热，实际 %d", warmed)
+	}
+	for _, accountID := range []int{2, 3, 4, 5} {
+		if _, ok := p.accountFirstToken.Load(accountLatencyKey{accountID: accountID, model: "gpt-5"}); ok {
+			t.Fatalf("非法账号样本不应进入预热状态：%d", accountID)
+		}
+	}
+}
+
+func TestWarmAccountFirstTokens不覆盖实时状态(t *testing.T) {
+	now := time.Now()
+	source := &routeTestFirstTokenSource{samples: []AccountFirstTokenSample{
+		{AccountID: 1, Model: "gpt-5", FirstTokenMs: 9_000, CreatedAt: now.Add(-3 * time.Minute)},
+		{AccountID: 1, Model: "gpt-5", FirstTokenMs: 9_000, CreatedAt: now.Add(-2 * time.Minute)},
+		{AccountID: 1, Model: "gpt-5", FirstTokenMs: 9_000, CreatedAt: now.Add(-time.Minute)},
+	}}
+	p := &Pipeline{accountFirstTokenSource: source}
+	for range accountLatencyMinSamples {
+		p.recordAccountFirstToken(1, "gpt-5", 1_000)
+	}
+	warmed, err := p.WarmAccountFirstTokens(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if warmed != 0 {
+		t.Fatalf("已有实时状态不应被历史状态覆盖，实际新增 %d 个 key", warmed)
+	}
+	latency, ok := p.recentAccountFirstToken(1, "gpt-5", time.Now())
+	if !ok || latency != 1_000 {
+		t.Fatalf("实时 EWMA 被预热污染：latency=%d ok=%v", latency, ok)
 	}
 }
 
