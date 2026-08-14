@@ -89,12 +89,15 @@ type Pipeline struct {
 	accountTransportMu     sync.Mutex
 	accountTransports      sync.Map
 	accountTransportCount  atomic.Int64
-	routeMu                sync.Mutex
-	routeWeights           map[routeBalanceKey]routeBalanceState
-	routePicks             uint64
-	routeCatalogMu         sync.Mutex
-	routeCatalogs          sync.Map
-	routeCatalogCount      atomic.Int64
+	// accountInflight 记录本实例各账号正在执行的真实上游 attempt。
+	// 新会话调度用它做无网络往返的轻量负载感知；跨实例仍由 Redis 并发闸门兜底。
+	accountInflight   sync.Map
+	routeMu           sync.Mutex
+	routeWeights      map[routeBalanceKey]routeBalanceState
+	routePicks        uint64
+	routeCatalogMu    sync.Mutex
+	routeCatalogs     sync.Map
+	routeCatalogCount atomic.Int64
 	// sessionAffinity 粘性会话绑定缓存（见 session_affinity.go）。
 	sessionAffinity sessionAffinityCache
 	// client 出口 HTTP 客户端：不设总超时（流式无总超时），仅设连接/TLS 层超时；

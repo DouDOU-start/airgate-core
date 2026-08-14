@@ -51,42 +51,83 @@ func (p *Pipeline) pickIndexedRoute(
 	}
 	now := time.Now()
 	for _, bucket := range catalog.buckets {
+		var selected routeTarget
+		selectedPosition := -1
 		for range len(bucket.schedule) {
 			position := bucket.cursor.Add(1) - 1
 			ref := bucket.schedule[position%uint64(len(bucket.schedule))]
-			switch ref.kind {
-			case routeAccount:
-				if routeExcluded(excludeAccounts, ref.id) || p.accounts == nil {
+			target, ok := p.resolveIndexedRoute(ref, bucket.priority, groupID, model, protocol,
+				excludeKeys, excludeAccounts, now)
+			if !ok {
+				continue
+			}
+			selected = target
+			selectedPosition = int(position % uint64(len(bucket.schedule)))
+			break
+		}
+		if selectedPosition < 0 {
+			continue
+		}
+		// 只在首选账号已有在途时再看一个不同账号，形成有界的加权两选一。
+		// 探测步数固定封顶，避免极端权重配置把调度热路径退化为 O(n)。
+		if selected.kind == routeAccount && p.accountInflightCount(selected.account.ID) > 0 {
+			for offset := 1; offset < len(bucket.schedule) && offset <= accountLoadProbeLimit; offset++ {
+				ref := bucket.schedule[(selectedPosition+offset)%len(bucket.schedule)]
+				if ref.kind != routeAccount || ref.id == selected.account.ID {
 					continue
 				}
-				account, ok := p.accounts.RouteCandidate(ref.id, groupID, model, now)
-				if !ok || account.EffectivePriority(now) != bucket.priority {
-					continue
+				candidate, ok := p.resolveIndexedRoute(ref, bucket.priority, groupID, model, protocol,
+					excludeKeys, excludeAccounts, now)
+				if ok {
+					selected = p.preferLessLoadedAccount(selected, candidate)
+					break
 				}
-				return routeTarget{
-					kind: routeAccount, priority: bucket.priority,
-					weight: effectiveRouteWeight(account.Weight), account: account,
-				}, true
-			case routeChannel:
-				if routeExcluded(excludeKeys, ref.id) || p.registry == nil {
-					continue
-				}
-				channel, ok := p.registry.RouteCandidate(ref.id, groupID, model, protocol, now)
-				if !ok || channel.Priority != bucket.priority {
-					continue
-				}
-				weight := effectiveRouteWeight(channel.Weight)
-				if channel.HealthStatus == "degraded" {
-					weight = max(weight/2, 1)
-				}
-				return routeTarget{
-					kind: routeChannel, priority: bucket.priority,
-					weight: weight, channel: channel,
-				}, true
 			}
 		}
+		return selected, true
 	}
 	return routeTarget{}, false
+}
+
+func (p *Pipeline) resolveIndexedRoute(
+	ref routeRef,
+	priority, groupID int,
+	model, protocol string,
+	excludeKeys, excludeAccounts []int,
+	now time.Time,
+) (routeTarget, bool) {
+	switch ref.kind {
+	case routeAccount:
+		if routeExcluded(excludeAccounts, ref.id) || p.accounts == nil {
+			return routeTarget{}, false
+		}
+		account, ok := p.accounts.RouteCandidate(ref.id, groupID, model, now)
+		if !ok || account.EffectivePriority(now) != priority {
+			return routeTarget{}, false
+		}
+		return routeTarget{
+			kind: routeAccount, priority: priority,
+			weight: effectiveRouteWeight(account.Weight), account: account,
+		}, true
+	case routeChannel:
+		if routeExcluded(excludeKeys, ref.id) || p.registry == nil {
+			return routeTarget{}, false
+		}
+		channel, ok := p.registry.RouteCandidate(ref.id, groupID, model, protocol, now)
+		if !ok || channel.Priority != priority {
+			return routeTarget{}, false
+		}
+		weight := effectiveRouteWeight(channel.Weight)
+		if channel.HealthStatus == "degraded" {
+			weight = max(weight/2, 1)
+		}
+		return routeTarget{
+			kind: routeChannel, priority: priority,
+			weight: weight, channel: channel,
+		}, true
+	default:
+		return routeTarget{}, false
+	}
 }
 
 func (p *Pipeline) loadRouteCatalog(groupID int, model, protocol string) *routeCatalog {

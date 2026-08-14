@@ -568,7 +568,7 @@ func readAndRestoreBody(req *http.Request) ([]byte, error) {
 // data:image/...;base64 数据和常见图片 base64 字段，用长度与 SHA-256 占位，
 // 既保留请求结构和可比性，也避免图片原文与超大字符串进入审计库。
 func redactBase64Images(body []byte) []byte {
-	if len(body) == 0 || !json.Valid(body) {
+	if len(body) == 0 || !mayContainBase64Image(body) {
 		return body
 	}
 	decoder := json.NewDecoder(bytes.NewReader(body))
@@ -585,6 +585,170 @@ func redactBase64Images(body []byte) []byte {
 		return body
 	}
 	return redacted
+}
+
+// mayContainBase64Image 是审计脱敏的低成本前置过滤。
+// 普通代码上下文和工具描述可能频繁出现 image/base64 字样，不能只按关键词判断；
+// 这里识别 data:image URI，或 JSON 字符串中至少 256 个字符的纯 base64 候选。
+// 两者覆盖 redactJSONValue 的全部可脱敏形态，同时避免构造完整 any JSON 树。
+func mayContainBase64Image(body []byte) bool {
+	for offset := 0; offset < len(body); offset++ {
+		if body[offset] != '"' {
+			continue
+		}
+		decodedLength := 0
+		candidate := true
+		trailingSpace := false
+		dataImageState := 0
+		for offset++; offset < len(body); offset++ {
+			current := body[offset]
+			if current == '"' {
+				if candidate && decodedLength >= 256 {
+					return true
+				}
+				break
+			}
+			if asciiLower(current) == 'd' && hasASCIIFoldPrefix(body[offset:], "data:image/") {
+				return true
+			}
+			if current == '\\' {
+				if !candidate && dataImageState == 0 {
+					if offset+1 < len(body) {
+						offset++
+					}
+					continue
+				}
+				decoded, consumed, ok := decodedJSONEscape(body[offset:])
+				if !ok {
+					candidate = false
+					dataImageState = 0
+					if consumed > 0 {
+						offset += consumed - 1
+					}
+					continue
+				}
+				offset += consumed - 1
+				current = decoded
+			}
+			if dataImageState > 0 || current == 'd' || current == 'D' {
+				if advanceDataImageMarker(&dataImageState, current) {
+					return true
+				}
+			}
+			if !candidate {
+				continue
+			}
+			if current == ' ' || current == '\t' {
+				if decodedLength > 0 {
+					trailingSpace = true
+				}
+				continue
+			}
+			if !isBase64AuditByte(current) || trailingSpace {
+				candidate = false
+				continue
+			}
+			decodedLength++
+			if candidate && decodedLength >= 256 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func advanceDataImageMarker(state *int, value byte) bool {
+	const marker = "data:image/"
+	if state == nil {
+		return false
+	}
+	value = asciiLower(value)
+	if value == marker[*state] {
+		*state = *state + 1
+		return *state == len(marker)
+	}
+	if value == marker[0] {
+		*state = 1
+	} else {
+		*state = 0
+	}
+	return false
+}
+
+func decodedJSONEscape(value []byte) (decoded byte, consumed int, ok bool) {
+	if len(value) < 2 || value[0] != '\\' {
+		return 0, 0, false
+	}
+	switch value[1] {
+	case '/', '\\', '"':
+		return value[1], 2, true
+	case 'r':
+		return '\r', 2, true
+	case 'n':
+		return '\n', 2, true
+	case 'b':
+		return '\b', 2, true
+	case 'f':
+		return '\f', 2, true
+	case 't':
+		return '\t', 2, true
+	case 'u':
+		if len(value) < 6 {
+			return 0, 0, false
+		}
+		decodedValue := 0
+		for _, current := range value[2:6] {
+			hex, valid := asciiHexValue(current)
+			if !valid {
+				return 0, 0, false
+			}
+			decodedValue = decodedValue*16 + hex
+		}
+		if decodedValue > 0x7f {
+			return 0, 6, false
+		}
+		return byte(decodedValue), 6, true
+	default:
+		return 0, 2, false
+	}
+}
+
+func asciiHexValue(value byte) (int, bool) {
+	switch {
+	case value >= '0' && value <= '9':
+		return int(value - '0'), true
+	case value >= 'a' && value <= 'f':
+		return int(value-'a') + 10, true
+	case value >= 'A' && value <= 'F':
+		return int(value-'A') + 10, true
+	default:
+		return 0, false
+	}
+}
+
+func isBase64AuditByte(value byte) bool {
+	return (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') ||
+		(value >= '0' && value <= '9') || value == '+' || value == '/' || value == '=' ||
+		value == '-' || value == '_' || value == '\r' || value == '\n'
+}
+
+func hasASCIIFoldPrefix(value []byte, prefix string) bool {
+	if len(value) < len(prefix) {
+		return false
+	}
+	for offset := range len(prefix) {
+		if asciiLower(value[offset]) != asciiLower(prefix[offset]) {
+			return false
+		}
+	}
+	return true
+}
+
+func asciiLower(value byte) byte {
+	if value >= 'A' && value <= 'Z' {
+		return value + ('a' - 'A')
+	}
+	return value
 }
 
 func redactJSONValue(value any, fieldName string) bool {
@@ -642,7 +806,8 @@ func isImageDataField(fieldName string) bool {
 
 func shouldRedactImageString(fieldName, value string) bool {
 	trimmed := strings.TrimSpace(value)
-	if strings.HasPrefix(strings.ToLower(trimmed), "data:image/") && strings.Contains(trimmed, ";base64,") {
+	lowerValue := strings.ToLower(trimmed)
+	if strings.HasPrefix(lowerValue, "data:image/") && strings.Contains(lowerValue, ";base64,") {
 		return true
 	}
 	key := strings.ToLower(strings.TrimSpace(fieldName))

@@ -99,6 +99,45 @@ func TestIndexedRouteUsesConfiguredWeight(t *testing.T) {
 	}
 }
 
+func TestIndexedRoutePrefersLessLoadedAccount(t *testing.T) {
+	accounts := accountreg.New(routeTestAccountLoader{accounts: []accountreg.Snapshot{
+		{ID: 1, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 2, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+	}}, nil)
+	if err := accounts.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p := &Pipeline{accounts: accounts}
+	releases := []func(){p.trackAccountAttempt(1), p.trackAccountAttempt(1)}
+	defer func() {
+		for _, release := range releases {
+			release()
+		}
+	}()
+
+	selected, ok := p.pickRoute(7, "gpt-5", "openai", nil, nil, nil)
+	if !ok || selected.account == nil || selected.account.ID != 2 {
+		t.Fatalf("未优先选择低在途账号：%+v", selected)
+	}
+}
+
+func TestTrackAccountAttemptReleasesLoad(t *testing.T) {
+	p := &Pipeline{}
+	release := p.trackAccountAttempt(9)
+	if got := p.accountInflightCount(9); got != 1 {
+		t.Fatalf("在途计数 = %d，期望 1", got)
+	}
+	release()
+	if got := p.accountInflightCount(9); got != 0 {
+		t.Fatalf("释放后在途计数 = %d，期望 0", got)
+	}
+	// 重复释放也不得把调度计数污染成负数。
+	release()
+	if got := p.accountInflightCount(9); got != 0 {
+		t.Fatalf("重复释放后在途计数 = %d，期望 0", got)
+	}
+}
+
 func TestIndexedRouteFallsBackWhenTopTierExcluded(t *testing.T) {
 	accounts := accountreg.New(routeTestAccountLoader{accounts: []accountreg.Snapshot{
 		{ID: 1, Priority: 100, Weight: 1, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},

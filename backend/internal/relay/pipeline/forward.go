@@ -435,8 +435,10 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			if rateLimitProbe {
 				rateLimitProbes++
 			}
+			releaseLocalLoad := p.trackAccountAttempt(acc.ID)
 			attemptStart := time.Now()
 			result := func() (result attemptResult) {
+				defer releaseLocalLoad()
 				if rateLimitProbe {
 					defer func() {
 						if recovered := recover(); recovered != nil {

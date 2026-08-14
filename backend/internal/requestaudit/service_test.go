@@ -1,7 +1,9 @@
 package requestaudit
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -292,6 +294,75 @@ func TestRedactBase64Images保留结构并移除图片原文(t *testing.T) {
 	if !strings.Contains(redacted, "画一只猫") || !strings.Contains(redacted, "sha256=") || !strings.Contains(redacted, "原始字符数=") {
 		t.Fatalf("脱敏后未保留结构或摘要信息: %s", redacted)
 	}
+}
+
+func TestRedactBase64Images普通大请求走快速路径(t *testing.T) {
+	body := []byte(`{"model":"gpt-5","tools":[{"name":"view_image","description":"读取 image/base64 数据"}],"input":"` + strings.Repeat("普通代码上下文", 100_000) + `"}`)
+	redacted := redactBase64Images(body)
+	if len(redacted) == 0 || &redacted[0] != &body[0] {
+		t.Fatal("不含图片的请求应直接复用原始审计切片")
+	}
+}
+
+func TestRedactBase64Images大小写变体仍会脱敏(t *testing.T) {
+	image := strings.Repeat("A", 512)
+	body := []byte(`{"TYPE":"IMAGE","DATA":"DATA:IMAGE/PNG;BASE64,` + image + `"}`)
+	redacted := string(redactBase64Images(body))
+	if strings.Contains(redacted, image) || !strings.Contains(redacted, "sha256=") {
+		t.Fatalf("大小写变体未正确脱敏：%s", redacted)
+	}
+}
+
+func TestRedactBase64Images转义DataURI仍会脱敏(t *testing.T) {
+	image := strings.Repeat("A", 512)
+	body := []byte(`{"image":"\u0064ata\u003aimage/png\u003bbase64,` + image + `"}`)
+	redacted := string(redactBase64Images(body))
+	if strings.Contains(redacted, image) || !strings.Contains(redacted, "sha256=") {
+		t.Fatalf("转义 Data URI 未正确脱敏：%s", redacted)
+	}
+}
+
+func BenchmarkRedactBase64Images普通大请求(b *testing.B) {
+	body := []byte(`{"model":"gpt-5","tools":[{"name":"view_image","description":"读取 image/base64 数据"}],"input":"` + strings.Repeat("普通代码上下文", 100_000) + `"}`)
+	b.SetBytes(int64(len(body)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if redacted := redactBase64Images(body); len(redacted) != len(body) {
+			b.Fatalf("快速路径意外改写请求：got=%d want=%d", len(redacted), len(body))
+		}
+	}
+}
+
+func BenchmarkRedactBase64Images全量JSON基线(b *testing.B) {
+	body := []byte(`{"model":"gpt-5","tools":[{"name":"view_image","description":"读取 image/base64 数据"}],"input":"` + strings.Repeat("普通代码上下文", 100_000) + `"}`)
+	b.SetBytes(int64(len(body)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if redacted := redactBase64ImagesFullDecodeForBenchmark(body); len(redacted) != len(body) {
+			b.Fatalf("基线意外改写请求：got=%d want=%d", len(redacted), len(body))
+		}
+	}
+}
+
+// redactBase64ImagesFullDecodeForBenchmark 保留优化前的全量 JSON 树路径，
+// 用于量化普通大请求快速过滤的收益，不进入生产调用链。
+func redactBase64ImagesFullDecodeForBenchmark(body []byte) []byte {
+	if len(body) == 0 || !json.Valid(body) {
+		return body
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err != nil || !redactJSONValue(value, "") {
+		return body
+	}
+	redacted, err := json.Marshal(value)
+	if err != nil {
+		return body
+	}
+	return redacted
 }
 
 func Test审计完整保存并解密客户端与上游请求(t *testing.T) {
