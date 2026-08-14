@@ -1526,48 +1526,52 @@ func init() {
 	usagelogDescVideoResolution := usagelogFields[27].Descriptor()
 	// usagelog.DefaultVideoResolution holds the default value on creation for the video_resolution field.
 	usagelog.DefaultVideoResolution = usagelogDescVideoResolution.Default.(string)
+	// usagelogDescUsageStatus is the schema descriptor for usage_status field.
+	usagelogDescUsageStatus := usagelogFields[28].Descriptor()
+	// usagelog.DefaultUsageStatus holds the default value on creation for the usage_status field.
+	usagelog.DefaultUsageStatus = usagelogDescUsageStatus.Default.(string)
 	// usagelogDescStream is the schema descriptor for stream field.
-	usagelogDescStream := usagelogFields[28].Descriptor()
+	usagelogDescStream := usagelogFields[29].Descriptor()
 	// usagelog.DefaultStream holds the default value on creation for the stream field.
 	usagelog.DefaultStream = usagelogDescStream.Default.(bool)
 	// usagelogDescDurationMs is the schema descriptor for duration_ms field.
-	usagelogDescDurationMs := usagelogFields[29].Descriptor()
+	usagelogDescDurationMs := usagelogFields[30].Descriptor()
 	// usagelog.DefaultDurationMs holds the default value on creation for the duration_ms field.
 	usagelog.DefaultDurationMs = usagelogDescDurationMs.Default.(int64)
 	// usagelogDescFirstTokenMs is the schema descriptor for first_token_ms field.
-	usagelogDescFirstTokenMs := usagelogFields[30].Descriptor()
+	usagelogDescFirstTokenMs := usagelogFields[31].Descriptor()
 	// usagelog.DefaultFirstTokenMs holds the default value on creation for the first_token_ms field.
 	usagelog.DefaultFirstTokenMs = usagelogDescFirstTokenMs.Default.(int64)
 	// usagelogDescUserAgent is the schema descriptor for user_agent field.
-	usagelogDescUserAgent := usagelogFields[31].Descriptor()
+	usagelogDescUserAgent := usagelogFields[32].Descriptor()
 	// usagelog.DefaultUserAgent holds the default value on creation for the user_agent field.
 	usagelog.DefaultUserAgent = usagelogDescUserAgent.Default.(string)
 	// usagelogDescIPAddress is the schema descriptor for ip_address field.
-	usagelogDescIPAddress := usagelogFields[32].Descriptor()
+	usagelogDescIPAddress := usagelogFields[33].Descriptor()
 	// usagelog.DefaultIPAddress holds the default value on creation for the ip_address field.
 	usagelog.DefaultIPAddress = usagelogDescIPAddress.Default.(string)
 	// usagelogDescEndpoint is the schema descriptor for endpoint field.
-	usagelogDescEndpoint := usagelogFields[33].Descriptor()
+	usagelogDescEndpoint := usagelogFields[34].Descriptor()
 	// usagelog.DefaultEndpoint holds the default value on creation for the endpoint field.
 	usagelog.DefaultEndpoint = usagelogDescEndpoint.Default.(string)
 	// usagelogDescSource is the schema descriptor for source field.
-	usagelogDescSource := usagelogFields[34].Descriptor()
+	usagelogDescSource := usagelogFields[35].Descriptor()
 	// usagelog.DefaultSource holds the default value on creation for the source field.
 	usagelog.DefaultSource = usagelogDescSource.Default.(string)
 	// usagelogDescRequestID is the schema descriptor for request_id field.
-	usagelogDescRequestID := usagelogFields[35].Descriptor()
+	usagelogDescRequestID := usagelogFields[36].Descriptor()
 	// usagelog.DefaultRequestID holds the default value on creation for the request_id field.
 	usagelog.DefaultRequestID = usagelogDescRequestID.Default.(string)
 	// usagelogDescUserIDSnapshot is the schema descriptor for user_id_snapshot field.
-	usagelogDescUserIDSnapshot := usagelogFields[36].Descriptor()
+	usagelogDescUserIDSnapshot := usagelogFields[37].Descriptor()
 	// usagelog.DefaultUserIDSnapshot holds the default value on creation for the user_id_snapshot field.
 	usagelog.DefaultUserIDSnapshot = usagelogDescUserIDSnapshot.Default.(int)
 	// usagelogDescUserEmailSnapshot is the schema descriptor for user_email_snapshot field.
-	usagelogDescUserEmailSnapshot := usagelogFields[37].Descriptor()
+	usagelogDescUserEmailSnapshot := usagelogFields[38].Descriptor()
 	// usagelog.DefaultUserEmailSnapshot holds the default value on creation for the user_email_snapshot field.
 	usagelog.DefaultUserEmailSnapshot = usagelogDescUserEmailSnapshot.Default.(string)
 	// usagelogDescCreatedAt is the schema descriptor for created_at field.
-	usagelogDescCreatedAt := usagelogFields[38].Descriptor()
+	usagelogDescCreatedAt := usagelogFields[39].Descriptor()
 	// usagelog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	usagelog.DefaultCreatedAt = usagelogDescCreatedAt.Default.(func() time.Time)
 	userFields := schema.User{}.Fields()

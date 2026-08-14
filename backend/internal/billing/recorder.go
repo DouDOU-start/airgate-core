@@ -60,6 +60,7 @@ type UsageRecord struct {
 	ImageSize             string // 图像端点实际产出分辨率（响应为准）；非图像端点恒空
 	ImageQuality          string // 图像端点实际产出质量档（响应为准）；非图像端点恒空
 	VideoResolution       string // 视频任务计费分辨率档位；非视频任务恒空
+	UsageStatus           string // 计量状态；空值按 completed 落库
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64
@@ -82,12 +83,30 @@ const (
 	SourceTask        = "task"         // 异步任务（视频/音乐）终态结算
 )
 
+// 使用记录计量状态（usage_logs.usage_status）。
+const (
+	UsageStatusCompleted                 = "completed"
+	UsageStatusMissing                   = "usage_missing"
+	UsageStatusStreamAborted             = "stream_aborted"
+	UsageStatusStreamAbortedUsageMissing = "stream_aborted_usage_missing"
+)
+
 // normalizedSource 空来源归一为 relay（防御性缺省：调用方漏填来源时不落空值）。
 func normalizedSource(source string) string {
 	if source == "" {
 		return SourceRelay
 	}
 	return source
+}
+
+// normalizedUsageStatus 防御调用方漏填或传入未知值；历史与非 relay 记录均按完成处理。
+func normalizedUsageStatus(status string) string {
+	switch status {
+	case UsageStatusMissing, UsageStatusStreamAborted, UsageStatusStreamAbortedUsageMissing:
+		return status
+	default:
+		return UsageStatusCompleted
+	}
 }
 
 // Recorder 异步记录器
@@ -366,6 +385,7 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord, withChannel bool) *ent.UsageLog
 		SetImageSize(rec.ImageSize).
 		SetImageQuality(rec.ImageQuality).
 		SetVideoResolution(rec.VideoResolution).
+		SetUsageStatus(normalizedUsageStatus(rec.UsageStatus)).
 		SetStream(rec.Stream).
 		SetDurationMs(rec.DurationMs).
 		SetFirstTokenMs(rec.FirstTokenMs).

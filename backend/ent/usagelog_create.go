@@ -412,6 +412,20 @@ func (ulc *UsageLogCreate) SetNillableVideoResolution(s *string) *UsageLogCreate
 	return ulc
 }
 
+// SetUsageStatus sets the "usage_status" field.
+func (ulc *UsageLogCreate) SetUsageStatus(s string) *UsageLogCreate {
+	ulc.mutation.SetUsageStatus(s)
+	return ulc
+}
+
+// SetNillableUsageStatus sets the "usage_status" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableUsageStatus(s *string) *UsageLogCreate {
+	if s != nil {
+		ulc.SetUsageStatus(*s)
+	}
+	return ulc
+}
+
 // SetStream sets the "stream" field.
 func (ulc *UsageLogCreate) SetStream(b bool) *UsageLogCreate {
 	ulc.mutation.SetStream(b)
@@ -823,6 +837,10 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultVideoResolution
 		ulc.mutation.SetVideoResolution(v)
 	}
+	if _, ok := ulc.mutation.UsageStatus(); !ok {
+		v := usagelog.DefaultUsageStatus
+		ulc.mutation.SetUsageStatus(v)
+	}
 	if _, ok := ulc.mutation.Stream(); !ok {
 		v := usagelog.DefaultStream
 		ulc.mutation.SetStream(v)
@@ -959,6 +977,9 @@ func (ulc *UsageLogCreate) check() error {
 	}
 	if _, ok := ulc.mutation.VideoResolution(); !ok {
 		return &ValidationError{Name: "video_resolution", err: errors.New(`ent: missing required field "UsageLog.video_resolution"`)}
+	}
+	if _, ok := ulc.mutation.UsageStatus(); !ok {
+		return &ValidationError{Name: "usage_status", err: errors.New(`ent: missing required field "UsageLog.usage_status"`)}
 	}
 	if _, ok := ulc.mutation.Stream(); !ok {
 		return &ValidationError{Name: "stream", err: errors.New(`ent: missing required field "UsageLog.stream"`)}
@@ -1131,6 +1152,10 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := ulc.mutation.VideoResolution(); ok {
 		_spec.SetField(usagelog.FieldVideoResolution, field.TypeString, value)
 		_node.VideoResolution = value
+	}
+	if value, ok := ulc.mutation.UsageStatus(); ok {
+		_spec.SetField(usagelog.FieldUsageStatus, field.TypeString, value)
+		_node.UsageStatus = value
 	}
 	if value, ok := ulc.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
@@ -1795,6 +1820,18 @@ func (u *UsageLogUpsert) SetVideoResolution(v string) *UsageLogUpsert {
 // UpdateVideoResolution sets the "video_resolution" field to the value that was provided on create.
 func (u *UsageLogUpsert) UpdateVideoResolution() *UsageLogUpsert {
 	u.SetExcluded(usagelog.FieldVideoResolution)
+	return u
+}
+
+// SetUsageStatus sets the "usage_status" field.
+func (u *UsageLogUpsert) SetUsageStatus(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldUsageStatus, v)
+	return u
+}
+
+// UpdateUsageStatus sets the "usage_status" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateUsageStatus() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldUsageStatus)
 	return u
 }
 
@@ -2632,6 +2669,20 @@ func (u *UsageLogUpsertOne) SetVideoResolution(v string) *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) UpdateVideoResolution() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateVideoResolution()
+	})
+}
+
+// SetUsageStatus sets the "usage_status" field.
+func (u *UsageLogUpsertOne) SetUsageStatus(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetUsageStatus(v)
+	})
+}
+
+// UpdateUsageStatus sets the "usage_status" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateUsageStatus() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateUsageStatus()
 	})
 }
 
@@ -3676,6 +3727,20 @@ func (u *UsageLogUpsertBulk) SetVideoResolution(v string) *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) UpdateVideoResolution() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateVideoResolution()
+	})
+}
+
+// SetUsageStatus sets the "usage_status" field.
+func (u *UsageLogUpsertBulk) SetUsageStatus(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetUsageStatus(v)
+	})
+}
+
+// UpdateUsageStatus sets the "usage_status" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateUsageStatus() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateUsageStatus()
 	})
 }
 

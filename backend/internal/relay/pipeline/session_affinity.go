@@ -84,6 +84,20 @@ func (s *sessionAffinityCache) bind(key string, kind routeKind, id int) {
 	s.entries[key] = affinityEntry{kind: kind, id: id, expiresAt: now.Add(sessionAffinityTTL)}
 }
 
+// unbind 仅在当前绑定仍指向指定目标时删除。
+// failover 与流中断可能和同会话的并发成功请求交错；带目标条件可避免旧请求
+// 把并发请求刚写入的新绑定误删。
+func (s *sessionAffinityCache) unbind(key string, kind routeKind, id int) {
+	if key == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if current, ok := s.entries[key]; ok && current.kind == kind && current.id == id {
+		delete(s.entries, key)
+	}
+}
+
 // sessionIDForRequest 提取本次请求的会话身份；无法确定时返回空串（不粘）。
 func sessionIDForRequest(c *gin.Context, req *dto.ChatRequest) string {
 	for _, h := range [...]struct{ name, prefix string }{

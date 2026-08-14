@@ -222,6 +222,7 @@ func (p *Pipeline) recordAccountUsage(
 			billedCalls = 1
 		}
 	}
+	usageStatus := usageStatusFor(result, usage, billedCalls)
 
 	p.sink.Record(billing.UsageRecord{
 		UserID:                keyInfo.UserID,
@@ -246,6 +247,7 @@ func (p *Pipeline) recordAccountUsage(
 		ReasoningEffort:       reasoningEffort,
 		ImageSize:             usage.ImageSize,
 		ImageQuality:          usage.ImageQuality,
+		UsageStatus:           usageStatus,
 		InputCost:             calc.InputCost,
 		OutputCost:            calc.OutputCost,
 		CachedInputCost:       calc.CachedInputCost,

@@ -195,6 +195,11 @@ func VideoResolution(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldVideoResolution, v))
 }
 
+// UsageStatus applies equality check predicate on the "usage_status" field. It's identical to UsageStatusEQ.
+func UsageStatus(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldUsageStatus, v))
+}
+
 // Stream applies equality check predicate on the "stream" field. It's identical to StreamEQ.
 func Stream(v bool) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldStream, v))
@@ -1548,6 +1553,71 @@ func VideoResolutionEqualFold(v string) predicate.UsageLog {
 // VideoResolutionContainsFold applies the ContainsFold predicate on the "video_resolution" field.
 func VideoResolutionContainsFold(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldContainsFold(FieldVideoResolution, v))
+}
+
+// UsageStatusEQ applies the EQ predicate on the "usage_status" field.
+func UsageStatusEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldUsageStatus, v))
+}
+
+// UsageStatusNEQ applies the NEQ predicate on the "usage_status" field.
+func UsageStatusNEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldUsageStatus, v))
+}
+
+// UsageStatusIn applies the In predicate on the "usage_status" field.
+func UsageStatusIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldUsageStatus, vs...))
+}
+
+// UsageStatusNotIn applies the NotIn predicate on the "usage_status" field.
+func UsageStatusNotIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldUsageStatus, vs...))
+}
+
+// UsageStatusGT applies the GT predicate on the "usage_status" field.
+func UsageStatusGT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldUsageStatus, v))
+}
+
+// UsageStatusGTE applies the GTE predicate on the "usage_status" field.
+func UsageStatusGTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldUsageStatus, v))
+}
+
+// UsageStatusLT applies the LT predicate on the "usage_status" field.
+func UsageStatusLT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldUsageStatus, v))
+}
+
+// UsageStatusLTE applies the LTE predicate on the "usage_status" field.
+func UsageStatusLTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldUsageStatus, v))
+}
+
+// UsageStatusContains applies the Contains predicate on the "usage_status" field.
+func UsageStatusContains(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContains(FieldUsageStatus, v))
+}
+
+// UsageStatusHasPrefix applies the HasPrefix predicate on the "usage_status" field.
+func UsageStatusHasPrefix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasPrefix(FieldUsageStatus, v))
+}
+
+// UsageStatusHasSuffix applies the HasSuffix predicate on the "usage_status" field.
+func UsageStatusHasSuffix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasSuffix(FieldUsageStatus, v))
+}
+
+// UsageStatusEqualFold applies the EqualFold predicate on the "usage_status" field.
+func UsageStatusEqualFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEqualFold(FieldUsageStatus, v))
+}
+
+// UsageStatusContainsFold applies the ContainsFold predicate on the "usage_status" field.
+func UsageStatusContainsFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContainsFold(FieldUsageStatus, v))
 }
 
 // StreamEQ applies the EQ predicate on the "stream" field.

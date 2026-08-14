@@ -132,3 +132,35 @@ func TestSessionAffinityCacheExpiry(t *testing.T) {
 		t.Fatal("过期条目不应命中")
 	}
 }
+
+func TestSessionAffinityCacheUnbind只删除匹配目标(t *testing.T) {
+	cache := &sessionAffinityCache{}
+	cache.bind("k", routeAccount, 42)
+
+	cache.unbind("k", routeChannel, 42)
+	if kind, id, ok := cache.lookup("k"); !ok || kind != routeAccount || id != 42 {
+		t.Fatalf("目标类型不匹配时不应删除，lookup = (%v,%v,%v)", kind, id, ok)
+	}
+
+	cache.unbind("k", routeAccount, 7)
+	if kind, id, ok := cache.lookup("k"); !ok || kind != routeAccount || id != 42 {
+		t.Fatalf("目标 ID 不匹配时不应删除，lookup = (%v,%v,%v)", kind, id, ok)
+	}
+
+	cache.unbind("k", routeAccount, 42)
+	if _, _, ok := cache.lookup("k"); ok {
+		t.Fatal("匹配目标应被删除")
+	}
+}
+
+func TestSessionAffinityCacheUnbind不误删并发重绑(t *testing.T) {
+	cache := &sessionAffinityCache{}
+	cache.bind("k", routeAccount, 42)
+	cache.bind("k", routeChannel, 7)
+
+	// 模拟旧账号请求失败后晚到的解除动作；新渠道绑定必须保留。
+	cache.unbind("k", routeAccount, 42)
+	if kind, id, ok := cache.lookup("k"); !ok || kind != routeChannel || id != 7 {
+		t.Fatalf("旧目标解除不应误删新绑定，lookup = (%v,%v,%v)", kind, id, ok)
+	}
+}

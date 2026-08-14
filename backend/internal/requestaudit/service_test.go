@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -19,6 +20,71 @@ const testSecret = "111111111111111111111111111111111111111111111111111111111111
 
 func openTestService(t *testing.T) *Service {
 	return openTestServiceWithOptions(t, Options{})
+}
+
+func Test快速上游审计不在发包前读取原请求体(t *testing.T) {
+	service := openTestServiceWithOptions(t, Options{
+		AsyncEnabled: true, QueueSize: 4, WorkerCount: 1, MaxPendingBytes: 1 << 20,
+	})
+	service.StartBackground()
+	started := make(chan struct{})
+	release := make(chan struct{})
+	service.submitAsync(asyncJob{name: "阻塞异步读取", run: func(context.Context) error {
+		close(started)
+		<-release
+		return nil
+	}})
+	<-started
+
+	handle, err := service.StartFast(context.Background(), RequestInput{
+		RequestID: "req-no-pre-read", Protocol: "openai", Model: "gpt-5",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := &countingReadCloser{Reader: strings.NewReader(`{"input":"真实发包正文"}`)}
+	req, err := http.NewRequest(http.MethodPost, "https://api.example.com/v1/responses", original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.ContentLength = int64(len(`{"input":"真实发包正文"}`))
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader(`{"input":"真实发包正文"}`)), nil
+	}
+	if _, err := handle.BeginAttemptFast(context.Background(), Target{RouteKind: "account", AccountID: 1}, req); err != nil {
+		t.Fatalf("创建快速上游审计失败: %v", err)
+	}
+	if original.ReadCount() != 0 {
+		t.Fatalf("发包前读取了原请求体 %d 次", original.ReadCount())
+	}
+
+	close(release)
+	flushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := service.Flush(flushCtx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+type countingReadCloser struct {
+	*strings.Reader
+	mu    sync.Mutex
+	reads int
+}
+
+func (r *countingReadCloser) Read(p []byte) (int, error) {
+	r.mu.Lock()
+	r.reads++
+	r.mu.Unlock()
+	return r.Reader.Read(p)
+}
+
+func (r *countingReadCloser) Close() error { return nil }
+
+func (r *countingReadCloser) ReadCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.reads
 }
 
 func openTestServiceWithOptions(t *testing.T, options Options) *Service {

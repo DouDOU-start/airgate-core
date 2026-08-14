@@ -18,8 +18,11 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
+	"github.com/DouDOU-start/airgate-core/internal/relay/streamerr"
 	"github.com/DouDOU-start/airgate-core/internal/relay/streamlife"
 )
+
+const cpaPreContentBufferLimit = 1 << 20
 
 // ForwardRequest 一次账号路径转发请求。
 type ForwardRequest struct {
@@ -265,8 +268,10 @@ func (b *Bridge) relayStream(
 		firstTokenMs     int64
 		written          bool
 		downstreamClosed bool
+		contentStarted   bool
 		done             bool
 		streamErr        error
+		pending          bytes.Buffer
 	)
 
 	extractUsage := dto.ExtractUsage
@@ -278,16 +283,14 @@ func (b *Bridge) relayStream(
 		responsesFramer = &responsesSSEFramer{}
 	}
 	isFirstContentPayload := looksLikeContent
-	if endpoint == adaptor.EndpointResponses {
+	switch endpoint {
+	case adaptor.EndpointResponses:
 		isFirstContentPayload = responsesPayloadHasContentDelta
+	case adaptor.EndpointMessages:
+		isFirstContentPayload = anthropicPayloadHasContentDelta
 	}
 
 	writePayload := func(payload []byte, ensureLineEnding bool) {
-		// 旁路解析 usage / [DONE]。Responses 在分帧后解析，能够处理跨 chunk 的 JSON。
-		scanStreamPayload(payload, extractUsage, &usage, &done)
-		if firstTokenMs == 0 && isFirstContentPayload(payload) {
-			firstTokenMs = time.Since(start).Milliseconds()
-		}
 		if downstreamClosed {
 			return
 		}
@@ -311,6 +314,60 @@ func (b *Bridge) relayStream(
 			flusher.Flush()
 		}
 	}
+	appendPayload := func(dst *bytes.Buffer, payload []byte, ensureLineEnding bool) {
+		_, _ = dst.Write(payload)
+		if ensureLineEnding && !bytes.HasSuffix(payload, []byte("\n")) {
+			_ = dst.WriteByte('\n')
+		}
+	}
+	flushPending := func() {
+		if pending.Len() == 0 {
+			return
+		}
+		writePayload(pending.Bytes(), false)
+		pending.Reset()
+	}
+	queuePayload := func(payload []byte, ensureLineEnding bool) {
+		appendPayload(&pending, payload, ensureLineEnding)
+		if pending.Len() > cpaPreContentBufferLimit {
+			// 极端上游在首内容前发送大量生命周期数据时停止缓冲，避免
+			// 单请求无界占用；一旦提交后，后续错误按流中断处理。
+			flushPending()
+		}
+	}
+	processPayload := func(payload []byte, ensureLineEnding bool) (stop bool) {
+		// 旁路解析 usage / 完成标志。Responses 在分帧后解析，可处理跨 chunk JSON。
+		scanStreamPayload(payload, extractUsage, &usage, &done)
+		if event, ok := streamerr.Detect(payload); ok {
+			if !contentStarted && !written {
+				pending.Reset()
+				result.StatusCode = event.StatusCode
+				result.Body = event.Body
+				result.Usage = usage
+				return true
+			}
+			// 已输出真实内容（或缓冲上限已迫使提交）后不可重试；保留错误帧
+			// 给客户端，并把该次请求标记为流中断。
+			streamErr = fmt.Errorf("上游流错误：%s", string(event.Body))
+			writePayload(payload, ensureLineEnding)
+			return true
+		}
+
+		hasContent := isFirstContentPayload(payload)
+		if hasContent && !contentStarted {
+			contentStarted = true
+			if firstTokenMs == 0 {
+				firstTokenMs = time.Since(start).Milliseconds()
+			}
+			flushPending()
+		}
+		if contentStarted || written {
+			writePayload(payload, ensureLineEnding)
+		} else {
+			queuePayload(payload, ensureLineEnding)
+		}
+		return false
+	}
 
 	for {
 		select {
@@ -325,7 +382,12 @@ func (b *Bridge) relayStream(
 			if !ok {
 				if responsesFramer != nil {
 					for _, frame := range responsesFramer.Flush() {
-						writePayload(frame, false)
+						if processPayload(frame, false) {
+							if !written {
+								return result
+							}
+							goto finish
+						}
 					}
 				}
 				goto finish
@@ -344,18 +406,34 @@ func (b *Bridge) relayStream(
 			}
 			if responsesFramer != nil {
 				for _, frame := range responsesFramer.WriteChunk(payload) {
-					writePayload(frame, false)
+					if processPayload(frame, false) {
+						if !written {
+							return result
+						}
+						goto finish
+					}
 				}
 				continue
 			}
-			writePayload(payload, true)
+			if processPayload(payload, true) {
+				if !written {
+					return result
+				}
+				goto finish
+			}
 		}
 	}
 
 finish:
 	if !written && streamErr == nil {
-		result.NetErr = fmt.Errorf("CPA 流在返回内容前结束")
-		return result
+		if done {
+			// 合法的无内容完成流仍需把生命周期事件交给客户端。
+			flushPending()
+		} else {
+			pending.Reset()
+			result.NetErr = fmt.Errorf("CPA 流在返回真实内容前结束")
+			return result
+		}
 	}
 	result.Written = written
 	result.Usage = usage
@@ -553,6 +631,28 @@ func responsesPayloadHasContentDelta(payload []byte) bool {
 			Type string `json:"type"`
 		}
 		if json.Unmarshal(data, &event) == nil && strings.HasSuffix(event.Type, ".delta") {
+			return true
+		}
+	}
+	return false
+}
+
+// anthropicPayloadHasContentDelta 判断 Anthropic Messages SSE 是否出现真实内容增量。
+// message_start 的 message.content 通常是空数组，不能因为包含 content 字段就提前
+// 提交响应头；仅 content_block_delta 代表客户端已经收到不可安全重放的正文。
+func anthropicPayloadHasContentDelta(payload []byte) bool {
+	scanner := bufio.NewScanner(bytes.NewReader(payload))
+	scanner.Buffer(make([]byte, 0, 64*1024), 32<<20)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := bytes.TrimSpace([]byte(strings.TrimPrefix(line, "data:")))
+		var event struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(data, &event) == nil && event.Type == "content_block_delta" {
 			return true
 		}
 	}

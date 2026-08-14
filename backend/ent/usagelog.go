@@ -79,6 +79,8 @@ type UsageLog struct {
 	ImageQuality string `json:"image_quality,omitempty"`
 	// 视频任务计费分辨率档位（如 480p/720p/1080p）；非视频任务恒空
 	VideoResolution string `json:"video_resolution,omitempty"`
+	// 计量状态：completed / usage_missing / stream_aborted / stream_aborted_usage_missing
+	UsageStatus string `json:"usage_status,omitempty"`
 	// Stream holds the value of the "stream" field.
 	Stream bool `json:"stream,omitempty"`
 	// DurationMs holds the value of the "duration_ms" field.
@@ -215,7 +217,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldCalls, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldUserIDSnapshot, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldChannelID, usagelog.FieldChannelKeyID, usagelog.FieldAccountID, usagelog.FieldGroupID:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldReasoningEffort, usagelog.FieldImageSize, usagelog.FieldImageQuality, usagelog.FieldVideoResolution, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldSource, usagelog.FieldRequestID, usagelog.FieldUserEmailSnapshot:
+		case usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldReasoningEffort, usagelog.FieldImageSize, usagelog.FieldImageQuality, usagelog.FieldVideoResolution, usagelog.FieldUsageStatus, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldSource, usagelog.FieldRequestID, usagelog.FieldUserEmailSnapshot:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -407,6 +409,12 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field video_resolution", values[i])
 			} else if value.Valid {
 				ul.VideoResolution = value.String
+			}
+		case usagelog.FieldUsageStatus:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_status", values[i])
+			} else if value.Valid {
+				ul.UsageStatus = value.String
 			}
 		case usagelog.FieldStream:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -659,6 +667,9 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("video_resolution=")
 	builder.WriteString(ul.VideoResolution)
+	builder.WriteString(", ")
+	builder.WriteString("usage_status=")
+	builder.WriteString(ul.UsageStatus)
 	builder.WriteString(", ")
 	builder.WriteString("stream=")
 	builder.WriteString(fmt.Sprintf("%v", ul.Stream))

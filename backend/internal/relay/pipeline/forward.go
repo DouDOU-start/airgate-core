@@ -311,6 +311,11 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			sessionKey = affinityKey(keyInfo.UserID, keyInfo.GroupID, req.Model, protocol, sessionID)
 		}
 	}
+	unbindAffinity := func(kind routeKind, id int) {
+		if sessionKey != "" && id > 0 {
+			p.sessionAffinity.unbind(sessionKey, kind, id)
+		}
+	}
 
 	for attempts < maxFailoverAttempts {
 		if ctx.Err() != nil {
@@ -332,6 +337,11 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			if kind, id, bound := p.sessionAffinity.lookup(sessionKey); bound {
 				// 绑定优先于优先级：目标仍可调度（且未被本次 failover 排除）就复用。
 				target, ok = p.resolveAffinityTarget(kind, id, keyInfo.GroupID, req.Model, protocol, excludeKeys, excludeAccounts)
+				if !ok {
+					// 目标已失效或已被当前请求排除，立即解除旧绑定；若没有
+					// 可替代目标，也不能让下一次请求继续粘回这个失败目标。
+					unbindAffinity(kind, id)
+				}
 			}
 		}
 		if !ok {
@@ -369,12 +379,14 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			if p.cpa == nil {
 				slog.Warn("relay_account_cpa_unavailable", "account_id", acc.ID)
 				hardExcludeAccounts = append(hardExcludeAccounts, acc.ID)
+				unbindAffinity(routeAccount, acc.ID)
 				continue
 			}
 			// 本请求已探测过一个限流账号时，跳过其余限流账号，继续寻找插件计划中
 			// 的活跃账号或 Core fallback，避免三个坏账号恰好吃满全部重试预算。
 			if acc.State == accountreg.StateRateLimited && rateLimitProbes >= maxRateLimitProbesPerRequest {
 				hardExcludeAccounts = append(hardExcludeAccounts, acc.ID)
+				unbindAffinity(routeAccount, acc.ID)
 				continue
 			}
 			requestID, rpmMinute, soft, slotOK := p.acquireAccountSlots(ctx, acc, req.Stream)
@@ -385,6 +397,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				} else {
 					hardExcludeAccounts = append(hardExcludeAccounts, acc.ID)
 				}
+				unbindAffinity(routeAccount, acc.ID)
 				continue
 			}
 			pollDelay = queuePollInterval
@@ -415,6 +428,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				p.concurrency.ReleaseAccountSlot(context.Background(), acc.ID, requestID)
 				p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
 				hardExcludeAccounts = append(hardExcludeAccounts, acc.ID)
+				unbindAffinity(routeAccount, acc.ID)
 				continue
 			}
 			rateLimitProbe := probeLease != 0
@@ -443,10 +457,16 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
 				return
 			}
+			accountStreamAborted := result.written && (result.streamErr != nil || !result.done)
 			if p.handleAccountOutcome(c, keyInfo, acc, req, result, start, price, settings, opts,
 				rpmMinute, attempts, &hops, &summary, &hardExcludeAccounts, &softExcludeAccounts, attemptLatency, probeLease) {
+				if accountStreamAborted {
+					unbindAffinity(routeAccount, acc.ID)
+				}
 				return
 			}
+			// handleAccountOutcome 返回 false 表示本次账号失败并将切换目标。
+			unbindAffinity(routeAccount, acc.ID)
 			continue
 		}
 
@@ -457,12 +477,14 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		if err != nil {
 			slog.Warn("relay_channel_key_type_unsupported", "channel_key_id", ch.KeyID, "type", ch.Type)
 			hardExcludeKeys = append(hardExcludeKeys, ch.KeyID)
+			unbindAffinity(routeChannel, ch.KeyID)
 			continue
 		}
 		apiKey := ch.APIKey
 		if apiKey == "" {
 			slog.Warn("relay_channel_key_no_api_key", "channel_key_id", ch.KeyID)
 			hardExcludeKeys = append(hardExcludeKeys, ch.KeyID)
+			unbindAffinity(routeChannel, ch.KeyID)
 			continue
 		}
 		capacityID := ch.CredentialID
@@ -480,6 +502,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		if err != nil {
 			summary.localCapacity = true
 			softExcludeKeys = append(softExcludeKeys, ch.KeyID)
+			unbindAffinity(routeChannel, ch.KeyID)
 			continue
 		}
 		pollDelay = queuePollInterval // 抢到槽位即重置退避
@@ -541,12 +564,10 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			// 完成信号（message_stop / finishReason，已回填 result.done）；
 			// responses 无 [DONE] 语义，以 completed 事件（usage 捕获点）为完成信号。
 			streamComplete := result.done
-			if endpoint == adaptor.EndpointResponses {
-				streamComplete = result.usage != nil
-			}
-			if result.streamErr != nil {
+			if result.streamErr != nil || !streamComplete {
 				slog.Warn("relay_stream_aborted",
-					"channel_key_id", ch.KeyID, "model", req.Model, "error", result.streamErr)
+					"channel_key_id", ch.KeyID, "model", req.Model,
+					"complete", streamComplete, "error", result.streamErr)
 			} else {
 				p.registry.MarkRecovered(ch.KeyID)
 				if p.healthTracker != nil {
@@ -562,6 +583,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				p.recordUsage(c, keyInfo, ch, req, result, start, price)
 			}
 			if result.streamErr != nil || !streamComplete {
+				unbindAffinity(routeChannel, ch.KeyID)
 				// 流式中断（含上游不发完成标志即断连的「静默不完整流」）：
 				// usage_log 照旧落账（billed=true），失败日志补一行供排障。
 				// Message 用固定文案：传输层原始错误串含上游 IP:port（渠道拓扑），
@@ -631,6 +653,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			}
 			slog.Warn("relay_channel_key_rate_limited",
 				"channel_key_id", ch.KeyID, "model", req.Model, "retry_after", o.RetryAfter.String())
+			unbindAffinity(routeChannel, ch.KeyID)
 			continue
 
 		case outcome.AuthFailed:
@@ -656,6 +679,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			slog.Warn("relay_channel_key_auth_failed",
 				"channel_key_id", ch.KeyID, "model", req.Model,
 				"auto_ban", settings.AutoBanEnabled, "reason", o.Reason)
+			unbindAffinity(routeChannel, ch.KeyID)
 			continue
 
 		case outcome.Transient:
@@ -675,6 +699,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			}
 			slog.Warn("relay_channel_key_transient_failure",
 				"channel_key_id", ch.KeyID, "model", req.Model, "reason", o.Reason)
+			unbindAffinity(routeChannel, ch.KeyID)
 			continue
 
 		default: // verdictClientError：语义重建终止，不重试；带 usage 仍计费（零计费端点除外）。
@@ -922,7 +947,22 @@ func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.Rel
 			result.usage = sr.usage
 			result.firstTokenMs = sr.firstTokenMs
 			result.written = sr.written
-			result.streamErr = sr.err
+			if sr.upstreamError != nil {
+				// 上游可能以 HTTP 200 建立 SSE，随后在首个真实内容前发送协议级
+				// error/response.failed。此时尚未向客户端提交任何内容，转换成
+				// 普通未写出 attempt，复用现有 outcome/failover 状态机。
+				result.statusCode = sr.upstreamError.StatusCode
+				result.body = sr.upstreamError.Body
+				result.written = false
+				return result
+			}
+			if sr.err != nil && !sr.written {
+				// 首内容前的扫描/网络错误尚可安全切换调度单元；不能放进
+				// streamErr，否则 status=2xx 会被误判为成功。
+				result.netErr = sr.err
+			} else {
+				result.streamErr = sr.err
+			}
 			// done 标志回传：streamErr==nil 但未收到完成信号的「静默不完整流」
 			//（上游不发完成标志即断连）借此可被失败日志捕获。
 			result.done = sr.done
@@ -1020,6 +1060,7 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 			billedCalls = 1
 		}
 	}
+	usageStatus := usageStatusFor(result, usage, billedCalls)
 
 	p.sink.Record(billing.UsageRecord{
 		UserID:                keyInfo.UserID,
@@ -1045,6 +1086,7 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		ReasoningEffort:       reasoningEffort,
 		ImageSize:             usage.ImageSize,
 		ImageQuality:          usage.ImageQuality,
+		UsageStatus:           usageStatus,
 		InputCost:             calc.InputCost,
 		OutputCost:            calc.OutputCost,
 		CachedInputCost:       calc.CachedInputCost,
@@ -1064,6 +1106,26 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		Source:                billing.SourceRelay,
 		RequestID:             requestIDOf(c),
 	})
+}
+
+// usageStatusFor 区分正常完成、计量缺失与流中断。按次/按张请求即使没有
+// token usage，只要已得到有效计次数也属于已计量，避免把图像/搜索记录误标缺失。
+func usageStatusFor(result attemptResult, usage dto.Usage, billedCalls int) string {
+	aborted := result.written && (result.streamErr != nil || !result.done)
+	missing := result.usage == nil && billedCalls == 0 &&
+		usage.PromptTokens == 0 && usage.CompletionTokens == 0 &&
+		usage.CachedTokens == 0 && usage.CacheCreationTokens == 0 &&
+		usage.CacheCreation5mTokens == 0 && usage.CacheCreation1hTokens == 0
+	switch {
+	case aborted && missing:
+		return billing.UsageStatusStreamAbortedUsageMissing
+	case aborted:
+		return billing.UsageStatusStreamAborted
+	case missing:
+		return billing.UsageStatusMissing
+	default:
+		return billing.UsageStatusCompleted
+	}
 }
 
 // maxUserAgentLen user_agent 落库长度上限：UA 为攻击者可控头部（HTTP 头上限约 1MB），

@@ -47,6 +47,7 @@ type UsageLogResp struct {
 	ImageSize             string  `json:"image_size,omitempty"`       // 图像端点实际产出分辨率
 	ImageQuality          string  `json:"image_quality,omitempty"`    // 图像端点实际产出质量档
 	VideoResolution       string  `json:"video_resolution,omitempty"` // 视频任务计费分辨率档位
+	UsageStatus           string  `json:"usage_status"`               // completed / usage_missing / stream_aborted / stream_aborted_usage_missing
 	Stream                bool    `json:"stream"`
 	DurationMs            int64   `json:"duration_ms"`
 	FirstTokenMs          int64   `json:"first_token_ms"`
@@ -79,6 +80,7 @@ type CustomerUsageLogResp struct {
 	ImageSize             string  `json:"image_size,omitempty"`       // 图像端点实际产出分辨率
 	ImageQuality          string  `json:"image_quality,omitempty"`    // 图像端点实际产出质量档
 	VideoResolution       string  `json:"video_resolution,omitempty"` // 视频任务计费分辨率档位
+	UsageStatus           string  `json:"usage_status"`
 	Stream                bool    `json:"stream"`
 	DurationMs            int64   `json:"duration_ms"`
 	FirstTokenMs          int64   `json:"first_token_ms"`

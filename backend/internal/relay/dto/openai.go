@@ -17,6 +17,10 @@ var ErrInvalidBody = errors.New("请求体必须是 JSON 对象")
 // fields 保存全部原始字段（含未知字段），Model/Stream 为显式解析出的调度字段。
 type ChatRequest struct {
 	fields map[string]json.RawMessage
+	// raw 保存校验通过的原始 JSON。请求未发生字段改写时，Marshal 直接复用该切片，
+	// 避免 Relay Hook、内容审核、账号转发在热路径上反复编码大请求体。
+	// 该切片只读；Set/Remove 会清空它并回退到 fields 序列化。
+	raw []byte
 
 	// Model 对外模型名（请求原始值）。
 	Model string
@@ -35,7 +39,7 @@ func ParseChatRequest(body []byte) (*ChatRequest, error) {
 	if fields == nil {
 		return nil, ErrInvalidBody
 	}
-	req := &ChatRequest{fields: fields}
+	req := &ChatRequest{fields: fields, raw: body}
 	if raw, ok := fields["model"]; ok {
 		// model 非字符串时保持空串，由入口校验兜底报 400。
 		_ = json.Unmarshal(raw, &req.Model)
@@ -53,7 +57,7 @@ func (r *ChatRequest) Clone() *ChatRequest {
 	for k, v := range r.fields {
 		fields[k] = v
 	}
-	return &ChatRequest{fields: fields, Model: r.Model, Stream: r.Stream}
+	return &ChatRequest{fields: fields, raw: r.raw, Model: r.Model, Stream: r.Stream}
 }
 
 // Get 返回字段原始 JSON 值。
@@ -87,16 +91,22 @@ func (r *ChatRequest) Set(key string, v any) error {
 		return err
 	}
 	r.fields[key] = raw
+	r.raw = nil
 	return nil
 }
 
 // Remove 删除字段。
 func (r *ChatRequest) Remove(key string) {
 	delete(r.fields, key)
+	r.raw = nil
 }
 
-// Marshal 序列化为 JSON（未知字段原样保留；键序为 Go map 序列化的字典序）。
+// Marshal 返回可转发 JSON。未修改请求直接复用入口原始字节；字段发生改写后才
+// 序列化 fields（未知字段仍原样保留，键序为 Go map 序列化的字典序）。
 func (r *ChatRequest) Marshal() ([]byte, error) {
+	if r != nil && r.raw != nil {
+		return r.raw, nil
+	}
 	return json.Marshal(r.fields)
 }
 

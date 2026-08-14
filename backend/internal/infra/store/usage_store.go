@@ -739,6 +739,7 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		ImageSize:             item.ImageSize,
 		ImageQuality:          item.ImageQuality,
 		VideoResolution:       item.VideoResolution,
+		UsageStatus:           item.UsageStatus,
 		Stream:                item.Stream,
 		DurationMs:            item.DurationMs,
 		FirstTokenMs:          item.FirstTokenMs,

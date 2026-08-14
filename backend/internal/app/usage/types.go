@@ -88,6 +88,7 @@ type LogRecord struct {
 	ImageSize             string // 图像端点实际产出分辨率；非图像端点恒空
 	ImageQuality          string // 图像端点实际产出质量档；非图像端点恒空
 	VideoResolution       string // 视频任务计费分辨率档位；非视频任务恒空
+	UsageStatus           string // completed / usage_missing / stream_aborted / stream_aborted_usage_missing
 	Stream                bool
 	DurationMs            int64
 	FirstTokenMs          int64

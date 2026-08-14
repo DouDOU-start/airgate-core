@@ -528,6 +528,8 @@ export interface UsageLogResp {
   image_quality?: string;
   /** 视频任务计费分辨率档位（如 720p）；非视频任务缺省 */
   video_resolution?: string;
+  /** 计量状态：正常完成、计量缺失或流中断 */
+  usage_status: 'completed' | 'usage_missing' | 'stream_aborted' | 'stream_aborted_usage_missing' | string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;
@@ -573,6 +575,8 @@ export interface CustomerUsageLogResp {
   image_quality?: string;
   /** 视频任务计费分辨率档位（如 720p）；非视频任务缺省 */
   video_resolution?: string;
+  /** 计量状态：正常完成、计量缺失或流中断 */
+  usage_status: 'completed' | 'usage_missing' | 'stream_aborted' | 'stream_aborted_usage_missing' | string;
   stream: boolean;
   duration_ms: number;
   first_token_ms: number;

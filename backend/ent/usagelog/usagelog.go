@@ -70,6 +70,8 @@ const (
 	FieldImageQuality = "image_quality"
 	// FieldVideoResolution holds the string denoting the video_resolution field in the database.
 	FieldVideoResolution = "video_resolution"
+	// FieldUsageStatus holds the string denoting the usage_status field in the database.
+	FieldUsageStatus = "usage_status"
 	// FieldStream holds the string denoting the stream field in the database.
 	FieldStream = "stream"
 	// FieldDurationMs holds the string denoting the duration_ms field in the database.
@@ -193,6 +195,7 @@ var Columns = []string{
 	FieldImageSize,
 	FieldImageQuality,
 	FieldVideoResolution,
+	FieldUsageStatus,
 	FieldStream,
 	FieldDurationMs,
 	FieldFirstTokenMs,
@@ -279,6 +282,8 @@ var (
 	DefaultImageQuality string
 	// DefaultVideoResolution holds the default value on creation for the "video_resolution" field.
 	DefaultVideoResolution string
+	// DefaultUsageStatus holds the default value on creation for the "usage_status" field.
+	DefaultUsageStatus string
 	// DefaultStream holds the default value on creation for the "stream" field.
 	DefaultStream bool
 	// DefaultDurationMs holds the default value on creation for the "duration_ms" field.
@@ -449,6 +454,11 @@ func ByImageQuality(opts ...sql.OrderTermOption) OrderOption {
 // ByVideoResolution orders the results by the video_resolution field.
 func ByVideoResolution(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVideoResolution, opts...).ToFunc()
+}
+
+// ByUsageStatus orders the results by the usage_status field.
+func ByUsageStatus(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUsageStatus, opts...).ToFunc()
 }
 
 // ByStream orders the results by the stream field.

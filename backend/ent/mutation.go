@@ -34150,6 +34150,7 @@ type UsageLogMutation struct {
 	image_size                  *string
 	image_quality               *string
 	video_resolution            *string
+	usage_status                *string
 	stream                      *bool
 	duration_ms                 *int64
 	addduration_ms              *int64
@@ -35728,6 +35729,42 @@ func (m *UsageLogMutation) ResetVideoResolution() {
 	m.video_resolution = nil
 }
 
+// SetUsageStatus sets the "usage_status" field.
+func (m *UsageLogMutation) SetUsageStatus(s string) {
+	m.usage_status = &s
+}
+
+// UsageStatus returns the value of the "usage_status" field in the mutation.
+func (m *UsageLogMutation) UsageStatus() (r string, exists bool) {
+	v := m.usage_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsageStatus returns the old "usage_status" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldUsageStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsageStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsageStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsageStatus: %w", err)
+	}
+	return oldValue.UsageStatus, nil
+}
+
+// ResetUsageStatus resets all changes to the "usage_status" field.
+func (m *UsageLogMutation) ResetUsageStatus() {
+	m.usage_status = nil
+}
+
 // SetStream sets the "stream" field.
 func (m *UsageLogMutation) SetStream(b bool) {
 	m.stream = &b
@@ -36674,7 +36711,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 45)
+	fields := make([]string, 0, 46)
 	if m.model != nil {
 		fields = append(fields, usagelog.FieldModel)
 	}
@@ -36758,6 +36795,9 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.video_resolution != nil {
 		fields = append(fields, usagelog.FieldVideoResolution)
+	}
+	if m.usage_status != nil {
+		fields = append(fields, usagelog.FieldUsageStatus)
 	}
 	if m.stream != nil {
 		fields = append(fields, usagelog.FieldStream)
@@ -36874,6 +36914,8 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.ImageQuality()
 	case usagelog.FieldVideoResolution:
 		return m.VideoResolution()
+	case usagelog.FieldUsageStatus:
+		return m.UsageStatus()
 	case usagelog.FieldStream:
 		return m.Stream()
 	case usagelog.FieldDurationMs:
@@ -36973,6 +37015,8 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldImageQuality(ctx)
 	case usagelog.FieldVideoResolution:
 		return m.OldVideoResolution(ctx)
+	case usagelog.FieldUsageStatus:
+		return m.OldUsageStatus(ctx)
 	case usagelog.FieldStream:
 		return m.OldStream(ctx)
 	case usagelog.FieldDurationMs:
@@ -37211,6 +37255,13 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetVideoResolution(v)
+		return nil
+	case usagelog.FieldUsageStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsageStatus(v)
 		return nil
 	case usagelog.FieldStream:
 		v, ok := value.(bool)
@@ -37805,6 +37856,9 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldVideoResolution:
 		m.ResetVideoResolution()
+		return nil
+	case usagelog.FieldUsageStatus:
+		m.ResetUsageStatus()
 		return nil
 	case usagelog.FieldStream:
 		m.ResetStream()

@@ -1,8 +1,10 @@
 package dto
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -67,6 +69,83 @@ func TestParseChatRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestChatRequest未改写时复用原始请求体(t *testing.T) {
+	body := []byte(" {\n  \"model\": \"gpt-5\", \"input\": \"保留原始格式\"\n} ")
+	req, err := ParseChatRequest(body)
+	if err != nil {
+		t.Fatalf("解析失败: %v", err)
+	}
+	out, err := req.Marshal()
+	if err != nil {
+		t.Fatalf("序列化失败: %v", err)
+	}
+	if !bytes.Equal(out, body) {
+		t.Fatalf("未改写请求没有复用原始字节: got=%q want=%q", out, body)
+	}
+}
+
+func TestChatRequest改写后重新序列化且不污染原请求(t *testing.T) {
+	body := []byte(`{"model":"gpt-5","input":"原始内容","temperature":0.5}`)
+	req, err := ParseChatRequest(body)
+	if err != nil {
+		t.Fatalf("解析失败: %v", err)
+	}
+	clone := req.Clone()
+	if err := clone.Set("model", "gpt-5-upstream"); err != nil {
+		t.Fatalf("改写模型失败: %v", err)
+	}
+	clone.Remove("temperature")
+
+	out, err := clone.Marshal()
+	if err != nil {
+		t.Fatalf("序列化改写请求失败: %v", err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(out, &fields); err != nil {
+		t.Fatalf("改写结果不是合法 JSON: %v", err)
+	}
+	if string(fields["model"]) != `"gpt-5-upstream"` {
+		t.Fatalf("模型改写未生效: %s", out)
+	}
+	if _, ok := fields["temperature"]; ok {
+		t.Fatalf("字段删除未生效: %s", out)
+	}
+	original, err := req.Marshal()
+	if err != nil || !bytes.Equal(original, body) {
+		t.Fatalf("Clone 改写污染原请求: body=%q err=%v", original, err)
+	}
+}
+
+func BenchmarkChatRequestMarshal大请求(b *testing.B) {
+	body := []byte(`{"model":"gpt-5.6","stream":true,"input":"` + strings.Repeat("x", 1<<20) + `"}`)
+	req, err := ParseChatRequest(body)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Run("未改写直接复用", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(int64(len(body)))
+		for b.Loop() {
+			if _, err := req.Marshal(); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("字段改写后编码", func(b *testing.B) {
+		clone := req.Clone()
+		if err := clone.Set("model", "gpt-5.6-upstream"); err != nil {
+			b.Fatal(err)
+		}
+		b.ReportAllocs()
+		b.SetBytes(int64(len(body)))
+		for b.Loop() {
+			if _, err := clone.Marshal(); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
 
 // TestChatRequestRoundTrip 未知字段透传断言：解析 → 序列化后所有字段语义等价。

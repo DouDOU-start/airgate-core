@@ -339,9 +339,22 @@ func (h *Handle) BeginAttemptFast(ctx context.Context, target Target, req *http.
 	if req == nil || req.URL == nil {
 		return nil, fmt.Errorf("上游请求为空")
 	}
-	body, err := readAndRestoreBody(req)
-	if err != nil {
-		return nil, fmt.Errorf("读取上游请求体失败: %w", err)
+	// http.NewRequest 对 bytes.Reader/strings.Reader 会提供 GetBody。优先在异步
+	// 工作池中读取独立副本，避免大请求在真正发包前被同步完整扫描一次。
+	// 少数自定义请求没有 GetBody 时仍沿用同步读取恢复，保证审计完整性。
+	bodyBytes := req.ContentLength
+	if bodyBytes < 0 {
+		bodyBytes = 0
+	}
+	bodyFactory := req.GetBody
+	var body []byte
+	if bodyFactory == nil {
+		var err error
+		body, err = readAndRestoreBody(req)
+		if err != nil {
+			return nil, fmt.Errorf("读取上游请求体失败: %w", err)
+		}
+		bodyBytes = int64(len(body))
 	}
 	seq := int(h.seq.Add(1))
 	writeCtx, cancel := detachedTimeout(ctx)
@@ -360,7 +373,7 @@ func (h *Handle) BeginAttemptFast(ctx context.Context, target Target, req *http.
 		SetAccountPlatform(target.AccountPlatform).
 		SetAccountType(target.AccountType).
 		SetMethod(req.Method).
-		SetForwardBodyBytes(int64(len(body))).
+		SetForwardBodyBytes(bodyBytes).
 		Save(writeCtx)
 	if err != nil {
 		return nil, fmt.Errorf("保存上游请求审计失败: %w", err)
@@ -370,9 +383,24 @@ func (h *Handle) BeginAttemptFast(ctx context.Context, target Target, req *http.
 	headers := cloneHeader(req.Header)
 	h.service.submitAsync(asyncJob{
 		name:          "attempt_payload",
-		retainedBytes: int64(len(body)),
+		retainedBytes: bodyBytes,
 		run: func(jobCtx context.Context) error {
-			return h.service.enrichAttempt(jobCtx, row.ID, upstreamURL, headers, body)
+			payload := body
+			if bodyFactory != nil {
+				reader, err := bodyFactory()
+				if err != nil {
+					return fmt.Errorf("复制上游请求体失败: %w", err)
+				}
+				payload, err = io.ReadAll(reader)
+				closeErr := reader.Close()
+				if err != nil {
+					return fmt.Errorf("读取上游请求体副本失败: %w", err)
+				}
+				if closeErr != nil {
+					return fmt.Errorf("关闭上游请求体副本失败: %w", closeErr)
+				}
+			}
+			return h.service.enrichAttempt(jobCtx, row.ID, upstreamURL, headers, payload)
 		},
 	})
 	return &AttemptHandle{service: h.service, id: row.ID, start: time.Now(), fast: true}, nil

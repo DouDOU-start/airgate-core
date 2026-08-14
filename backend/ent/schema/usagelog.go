@@ -66,6 +66,8 @@ func (UsageLog) Fields() []ent.Field {
 		field.String("image_quality").Default(""),
 		field.String("video_resolution").Default("").
 			Comment("视频任务计费分辨率档位（如 480p/720p/1080p）；非视频任务恒空"),
+		field.String("usage_status").Default("completed").
+			Comment("计量状态：completed / usage_missing / stream_aborted / stream_aborted_usage_missing"),
 		field.Bool("stream").Default(false),
 		field.Int64("duration_ms").Default(0),
 		field.Int64("first_token_ms").Default(0),

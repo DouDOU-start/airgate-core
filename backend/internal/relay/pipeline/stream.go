@@ -2,7 +2,9 @@ package pipeline
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
+	"github.com/DouDOU-start/airgate-core/internal/relay/streamerr"
 )
 
 // SSE 扫描缓冲：初始 8KB，单行上限 8MB（reasoning 大事件可能超 1MB）。
@@ -23,6 +26,10 @@ const (
 	// 对象（output 数组、可能的 base64 内容），单行体积远超 chat 独立小 usage chunk；
 	// 沿用 8MB 会触发 scanner ErrTooLong → usage 记 0 + 客户端流被截断。
 	sseMaxLineBytesResponses = 64 << 20
+	// preContentBufferLimit 在真实内容出现前暂存 SSE 生命周期事件。
+	// 这样上游若先发 response.created/message_start、随后返回错误事件，仍可安全
+	// 丢弃该次前导事件并切换调度单元。超过上限时为避免无界占用，回退为立即透传。
+	preContentBufferLimit = 1 << 20
 )
 
 // streamResult SSE 逐行透传的结果。
@@ -38,6 +45,9 @@ type streamResult struct {
 	// done 是否收到协议级完成信号：OpenAI 路径为 data: [DONE]；
 	// 观察器路径（anthropic/gemini 原生流）取 observer.Done()。
 	done bool
+	// upstreamError 是真实内容下发前识别到的协议级错误事件。此时 written=false，
+	// 调用方按归一化状态码进入现有 outcome/failover 状态机。
+	upstreamError *streamerr.Event
 }
 
 // relaySSE 把上游 SSE 流逐行透传给客户端，同时旁路捕获 usage 与 first_token_ms。
@@ -67,6 +77,8 @@ type streamResult struct {
 func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, extractUsage func([]byte) (dto.Usage, bool), forwardUsageChunk bool, isFirstContentLine func([]byte) bool, maxLineBytes int, observer adaptor.StreamObserver) streamResult {
 	result := streamResult{}
 	downstreamClosed := false
+	contentStarted := false
+	var pending bytes.Buffer
 
 	contentType := upstream.Header.Get("Content-Type")
 	if contentType == "" {
@@ -78,10 +90,15 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 		header.Set("Cache-Control", "no-cache")
 	}
 	header.Set("X-Accel-Buffering", "no")
-	w.WriteHeader(upstream.StatusCode)
-	result.written = true
 
 	flusher, _ := w.(http.Flusher)
+	commitHeaders := func() {
+		if result.written {
+			return
+		}
+		w.WriteHeader(upstream.StatusCode)
+		result.written = true
+	}
 
 	// writeLine 写出一行（补行尾换行）并 Flush。
 	// 客户端写失败后只停止下发，不停止读取上游：继续排空到完成事件以捕获 usage。
@@ -91,6 +108,7 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 		if downstreamClosed {
 			return
 		}
+		commitHeaders()
 		if _, err := io.WriteString(w, line); err != nil {
 			downstreamClosed = true
 			return
@@ -103,26 +121,58 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 			flusher.Flush()
 		}
 	}
+	flushPending := func() {
+		if pending.Len() == 0 || downstreamClosed {
+			pending.Reset()
+			return
+		}
+		commitHeaders()
+		if _, err := w.Write(pending.Bytes()); err != nil {
+			downstreamClosed = true
+		}
+		pending.Reset()
+		if !downstreamClosed && flusher != nil {
+			flusher.Flush()
+		}
+	}
+	queueLine := func(line string) {
+		pending.WriteString(line)
+		pending.WriteByte('\n')
+		if pending.Len() > preContentBufferLimit {
+			// 极端上游在首内容前发送超大前导数据时停止缓冲，避免单请求无界占用。
+			flushPending()
+		}
+	}
 
 	scanner := bufio.NewScanner(upstream.Body)
 	scanner.Buffer(make([]byte, sseInitialBufSize), maxLineBytes)
 	for scanner.Scan() {
 		line := scanner.Text()
+		data, hasData := extractSSEData(line)
 
 		if observer != nil {
-			// 原生协议流：观察器旁路解析，行内容原样下发。
+			// 原生协议流：观察器旁路解析；真实内容前先缓冲生命周期事件。
 			observer.ObserveLine(line)
-			if data, ok := extractSSEData(line); ok {
-				if result.firstTokenMs == 0 && isFirstContentLine([]byte(data)) {
-					result.firstTokenMs = time.Since(start).Milliseconds()
-				}
-			}
-			writeLine(line)
-			continue
 		}
 
-		// OpenAI 协议流：内联捕获 usage 与 [DONE]。
-		if data, ok := extractSSEData(line); ok {
+		// 错误识别必须先于 usage-only chunk 的吞帧逻辑：少数上游会在错误
+		// 事件里同时附带 usage，不能因此把错误误当作普通计量尾帧忽略。
+		if hasData && data != "[DONE]" {
+			if event, ok := streamerr.Detect([]byte(data)); ok {
+				if !contentStarted && !result.written {
+					result.upstreamError = &event
+					pending.Reset()
+					return result
+				}
+				// 已经下发真实内容后不可重试，保留错误事件并按流中断收尾。
+				result.err = errors.New(string(event.Body))
+				writeLine(line)
+				break
+			}
+		}
+
+		if observer == nil && hasData {
+			// OpenAI 协议流：内联捕获 usage 与 [DONE]。
 			if data == "[DONE]" {
 				result.done = true
 			} else {
@@ -133,12 +183,43 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 						continue
 					}
 				}
-				if result.firstTokenMs == 0 && isFirstContentLine([]byte(data)) {
-					result.firstTokenMs = time.Since(start).Milliseconds()
+				if streamDataCompleted([]byte(data)) {
+					result.done = true
 				}
 			}
 		}
-		writeLine(line)
+
+		lineHasContent := hasData && data != "[DONE]" && isFirstContentLine([]byte(data))
+		if lineHasContent && !contentStarted {
+			contentStarted = true
+			if result.firstTokenMs == 0 {
+				result.firstTokenMs = time.Since(start).Milliseconds()
+			}
+			flushPending()
+		}
+
+		if contentStarted || result.written {
+			writeLine(line)
+		} else {
+			queueLine(line)
+		}
+
+		if observer != nil {
+			result.done = observer.Done()
+			if oerr := observer.Err(); oerr != nil && result.err == nil {
+				if !contentStarted && !result.written {
+					event := streamerr.Event{StatusCode: http.StatusBadGateway, Body: []byte(oerr.Error())}
+					result.upstreamError = &event
+					pending.Reset()
+					return result
+				}
+				result.err = oerr
+			}
+		}
+		if result.done && !result.written {
+			// 合法的无内容完成流仍需把生命周期事件原样交给客户端。
+			flushPending()
+		}
 	}
 
 	if scanErr := scanner.Err(); scanErr != nil && result.err == nil {
@@ -153,6 +234,10 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 		if oerr := observer.Err(); oerr != nil && result.err == nil {
 			result.err = oerr
 		}
+	}
+	if !result.written && result.upstreamError == nil && result.err == nil && !result.done {
+		result.err = errors.New("上游流在返回真实内容前结束")
+		pending.Reset()
 	}
 	return result
 }
@@ -213,4 +298,26 @@ func extractSSEData(line string) (string, bool) {
 		return "", false
 	}
 	return strings.TrimSpace(line[len("data:"):]), true
+}
+
+// streamDataCompleted 识别不使用 [DONE] 的协议完成事件。
+func streamDataCompleted(data []byte) bool {
+	var event struct {
+		Type       string `json:"type"`
+		Candidates []struct {
+			FinishReason string `json:"finishReason"`
+		} `json:"candidates"`
+	}
+	if json.Unmarshal(data, &event) != nil {
+		return false
+	}
+	if event.Type == "response.completed" || event.Type == "response.done" || event.Type == "message_stop" {
+		return true
+	}
+	for _, candidate := range event.Candidates {
+		if strings.TrimSpace(candidate.FinishReason) != "" {
+			return true
+		}
+	}
+	return false
 }

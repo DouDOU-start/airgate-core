@@ -42,11 +42,12 @@ func TestRecordPersistsUserEmailSnapshot(t *testing.T) {
 	recorder := NewRecorder(db, 0)
 	recorder.Start()
 	recorder.Record(UsageRecord{
-		UserID:    user.ID,
-		UserEmail: user.Email,
-		ChannelID: channel.ID,
-		GroupID:   group.ID,
-		Model:     "gpt-5",
+		UserID:      user.ID,
+		UserEmail:   user.Email,
+		ChannelID:   channel.ID,
+		GroupID:     group.ID,
+		Model:       "gpt-5",
+		UsageStatus: UsageStatusStreamAbortedUsageMissing,
 	})
 	recorder.Stop() // 排空缓冲，保证记录已落库
 
@@ -56,6 +57,21 @@ func TestRecordPersistsUserEmailSnapshot(t *testing.T) {
 	}
 	if log.UserIDSnapshot != user.ID || log.UserEmailSnapshot != user.Email {
 		t.Fatalf("用户快照 = (%d, %q), 期望 (%d, %q)", log.UserIDSnapshot, log.UserEmailSnapshot, user.ID, user.Email)
+	}
+	if log.UsageStatus != UsageStatusStreamAbortedUsageMissing {
+		t.Fatalf("usage_status = %q，期望 %q", log.UsageStatus, UsageStatusStreamAbortedUsageMissing)
+	}
+}
+
+func TestNormalizedUsageStatus(t *testing.T) {
+	if got := normalizedUsageStatus(""); got != UsageStatusCompleted {
+		t.Fatalf("空状态应归一为 completed，实际 %q", got)
+	}
+	if got := normalizedUsageStatus(UsageStatusMissing); got != UsageStatusMissing {
+		t.Fatalf("已知异常状态不应被改写，实际 %q", got)
+	}
+	if got := normalizedUsageStatus("未知状态"); got != UsageStatusCompleted {
+		t.Fatalf("未知状态应归一为 completed，实际 %q", got)
 	}
 }
 

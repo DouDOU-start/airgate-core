@@ -160,6 +160,37 @@ const STREAM_CHIP_STYLE: CSSProperties = {
   color: HEROUI_BLUE,
 };
 
+const USAGE_STATUS_CHIP_STYLES: Record<string, CSSProperties> = {
+  usage_missing: {
+    background: 'color-mix(in srgb, var(--ag-warning) 16%, transparent)',
+    boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--ag-warning) 36%, transparent)',
+    color: 'var(--ag-warning)',
+  },
+  stream_aborted: {
+    background: 'color-mix(in srgb, var(--ag-danger) 14%, transparent)',
+    boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--ag-danger) 32%, transparent)',
+    color: 'var(--ag-danger)',
+  },
+  stream_aborted_usage_missing: {
+    background: 'color-mix(in srgb, var(--ag-danger) 18%, transparent)',
+    boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--ag-danger) 42%, transparent)',
+    color: 'var(--ag-danger)',
+  },
+};
+
+function usageStatusLabel(status: string, t: TFunction): string | null {
+  switch (status) {
+    case 'usage_missing':
+      return t('usage.status_usage_missing', '计量缺失');
+    case 'stream_aborted':
+      return t('usage.status_stream_aborted', '流中断');
+    case 'stream_aborted_usage_missing':
+      return t('usage.status_stream_aborted_usage_missing', '中断 / 无计量');
+    default:
+      return null;
+  }
+}
+
 // 延迟三档着色：[warning 起点, danger 起点]（毫秒），低于 warning 为 success。
 type LatencyTone = 'success' | 'warning' | 'danger';
 
@@ -620,16 +651,31 @@ export function useUsageColumns(opts?: { customerScope?: boolean; adminView?: bo
     {
       key: 'stream',
       title: t('usage.type'),
-      width: '72px',
+      width: '112px',
       hideOnMobile: true,
-      render: (row) => (
-        <span
-          className="inline-flex h-6 min-w-0 items-center justify-center rounded-[var(--radius)] px-1.5 text-[13px] font-medium leading-none text-text-secondary"
-          style={row.stream ? STREAM_CHIP_STYLE : undefined}
-        >
-          {row.stream ? t('usage.type_stream') : t('usage.type_sync')}
-        </span>
-      ),
+      render: (row) => {
+        const status = row.usage_status || 'completed';
+        const statusLabel = usageStatusLabel(status, t);
+        return (
+          <div className="flex min-w-0 flex-col items-center justify-center gap-1">
+            <span
+              className="inline-flex h-5 min-w-0 items-center justify-center rounded-[var(--radius)] px-1.5 text-[12px] font-medium leading-none text-text-secondary"
+              style={row.stream ? STREAM_CHIP_STYLE : undefined}
+            >
+              {row.stream ? t('usage.type_stream') : t('usage.type_sync')}
+            </span>
+            {statusLabel ? (
+              <span
+                className="inline-flex h-5 max-w-full items-center justify-center truncate rounded-[var(--radius)] px-1.5 text-[11px] font-semibold leading-none"
+                style={USAGE_STATUS_CHIP_STYLES[status]}
+                title={statusLabel}
+              >
+                {statusLabel}
+              </span>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       key: 'latency',

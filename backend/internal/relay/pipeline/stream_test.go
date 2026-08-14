@@ -474,26 +474,46 @@ func TestRelaySSEObserverInterruptUsesAccumulatedUsage(t *testing.T) {
 	}
 }
 
-// 流内 error 事件：观察器 Err() 非 nil → relaySSE 置 result.err、done=false
-// （截断响应不伪装成完整），错误事件本身已原样透传给客户端。
-func TestRelaySSEObserverErrorEventAborts(t *testing.T) {
+// 首内容前的流内 error 事件不能提交响应头或错误帧，应交给 failover 状态机。
+func TestRelaySSEObserverErrorEventBeforeContentCanFailover(t *testing.T) {
 	upstream := `data: {"type":"error","error":{"type":"overloaded_error","message":"overloaded"}}` + "\n"
 	obs := &fakeObserver{err: errors.New("overloaded"), usage: &dto.Usage{PromptTokens: 10}}
 	w := httptest.NewRecorder()
 	sr := relaySSE(w, newSSEResponse(strings.NewReader(upstream)), time.Now(),
 		dto.ExtractUsage, false, anthropicFirstContentLine, sseMaxLineBytes, obs)
 
-	if sr.err == nil {
-		t.Fatal("expected result.err from observer.Err()")
+	if sr.upstreamError == nil || sr.upstreamError.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("应识别为可切换的 503 协议错误，实际：%+v", sr.upstreamError)
+	}
+	if sr.written || w.Code != http.StatusOK || w.Body.Len() != 0 {
+		t.Fatalf("内容前错误不应提交下游响应，written=%v code=%d body=%q", sr.written, w.Code, w.Body.String())
 	}
 	if sr.done {
-		t.Error("done should be false (error event)")
+		t.Error("错误事件不得标记完成")
+	}
+}
+
+// 已下发真实内容后再出现错误时不可 failover，错误帧继续透传并按流中断收尾。
+func TestRelaySSEObserverErrorEventAfterContentAborts(t *testing.T) {
+	upstream := strings.Join([]string{
+		`data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"你好"}}`,
+		``,
+		`data: {"type":"error","error":{"type":"overloaded_error","message":"overloaded"}}`,
+		``,
+	}, "\n")
+	obs := &fakeObserver{usage: &dto.Usage{PromptTokens: 10}}
+	w := httptest.NewRecorder()
+	sr := relaySSE(w, newSSEResponse(strings.NewReader(upstream)), time.Now(),
+		dto.ExtractUsage, false, anthropicFirstContentLine, sseMaxLineBytes, obs)
+
+	if !sr.written || sr.err == nil || sr.upstreamError != nil {
+		t.Fatalf("内容后错误应作为已写出中断，written=%v err=%v upstreamError=%+v", sr.written, sr.err, sr.upstreamError)
 	}
 	if !strings.Contains(w.Body.String(), "overloaded_error") {
-		t.Errorf("错误事件应原样透传给客户端: %q", w.Body.String())
+		t.Errorf("内容后的错误事件应原样透传：%q", w.Body.String())
 	}
 	if sr.usage == nil || sr.usage.PromptTokens != 10 {
-		t.Errorf("usage 回退值 = %+v, 期望 prompt=10", sr.usage)
+		t.Errorf("usage 回退值 = %+v，期望 prompt=10", sr.usage)
 	}
 }
 

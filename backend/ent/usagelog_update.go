@@ -580,6 +580,20 @@ func (ulu *UsageLogUpdate) SetNillableVideoResolution(s *string) *UsageLogUpdate
 	return ulu
 }
 
+// SetUsageStatus sets the "usage_status" field.
+func (ulu *UsageLogUpdate) SetUsageStatus(s string) *UsageLogUpdate {
+	ulu.mutation.SetUsageStatus(s)
+	return ulu
+}
+
+// SetNillableUsageStatus sets the "usage_status" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableUsageStatus(s *string) *UsageLogUpdate {
+	if s != nil {
+		ulu.SetUsageStatus(*s)
+	}
+	return ulu
+}
+
 // SetStream sets the "stream" field.
 func (ulu *UsageLogUpdate) SetStream(b bool) *UsageLogUpdate {
 	ulu.mutation.SetStream(b)
@@ -1136,6 +1150,9 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := ulu.mutation.VideoResolution(); ok {
 		_spec.SetField(usagelog.FieldVideoResolution, field.TypeString, value)
+	}
+	if value, ok := ulu.mutation.UsageStatus(); ok {
+		_spec.SetField(usagelog.FieldUsageStatus, field.TypeString, value)
 	}
 	if value, ok := ulu.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
@@ -1918,6 +1935,20 @@ func (uluo *UsageLogUpdateOne) SetNillableVideoResolution(s *string) *UsageLogUp
 	return uluo
 }
 
+// SetUsageStatus sets the "usage_status" field.
+func (uluo *UsageLogUpdateOne) SetUsageStatus(s string) *UsageLogUpdateOne {
+	uluo.mutation.SetUsageStatus(s)
+	return uluo
+}
+
+// SetNillableUsageStatus sets the "usage_status" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableUsageStatus(s *string) *UsageLogUpdateOne {
+	if s != nil {
+		uluo.SetUsageStatus(*s)
+	}
+	return uluo
+}
+
 // SetStream sets the "stream" field.
 func (uluo *UsageLogUpdateOne) SetStream(b bool) *UsageLogUpdateOne {
 	uluo.mutation.SetStream(b)
@@ -2504,6 +2535,9 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if value, ok := uluo.mutation.VideoResolution(); ok {
 		_spec.SetField(usagelog.FieldVideoResolution, field.TypeString, value)
+	}
+	if value, ok := uluo.mutation.UsageStatus(); ok {
+		_spec.SetField(usagelog.FieldUsageStatus, field.TypeString, value)
 	}
 	if value, ok := uluo.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)

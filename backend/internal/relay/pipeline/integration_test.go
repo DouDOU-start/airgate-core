@@ -1181,6 +1181,9 @@ func TestStreamUsageMissingWarns(t *testing.T) {
 	if rec.TotalCost != 0 || rec.InputTokens != 0 {
 		t.Errorf("无 usage 流应记 0: %+v", rec)
 	}
+	if rec.UsageStatus != billing.UsageStatusMissing {
+		t.Errorf("无 usage 的完整流应标记 usage_missing，实际 %q", rec.UsageStatus)
+	}
 }
 
 // ===== Responses API 端点 =====
@@ -1328,6 +1331,87 @@ func TestForwardResponsesStream(t *testing.T) {
 	const wantTotal = 0.008 + 0.001 + 0.015
 	if !almostEqual(rec.TotalCost, wantTotal) {
 		t.Errorf("流式 TotalCost = %v, want %v（应从 completed 事件计费）", rec.TotalCost, wantTotal)
+	}
+	if rec.UsageStatus != billing.UsageStatusCompleted {
+		t.Errorf("完整且有 usage 的流应标记 completed，实际 %q", rec.UsageStatus)
+	}
+}
+
+// TestForwardResponsesPreContentErrorFailover 回归生产故障：上游先以 HTTP 200
+// 返回 response.created，随后发送 server_is_overloaded。生命周期事件尚未下发，
+// 网关应丢弃首渠道前导帧并切换到下一渠道，客户端只看到成功渠道的完整流。
+func TestForwardResponsesPreContentErrorFailover(t *testing.T) {
+	var badHits, goodHits atomic.Int32
+	var lastBody atomic.Value
+	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		badHits.Add(1)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "event: response.created\n")
+		_, _ = io.WriteString(w, `data: {"type":"response.created","response":{"id":"resp_bad"}}`+"\n\n")
+		_, _ = io.WriteString(w, "event: error\n")
+		_, _ = io.WriteString(w, `data: {"type":"error","error":{"type":"service_unavailable_error","code":"server_is_overloaded","message":"overloaded"}}`+"\n\n")
+	}))
+	defer bad.Close()
+	good := newResponsesUpstream(t, &goodHits, &lastBody)
+	defer good.Close()
+
+	env := newTestEnv(t,
+		testSnap(1, good.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 1 }),
+		testSnap(2, bad.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 100 }),
+	)
+	w := env.doResponses(t, `{"model":"gpt-4o","input":"hi","stream":true}`)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("内容前过载应切换到成功渠道，status=%d body=%s", w.Code, w.Body.String())
+	}
+	if badHits.Load() != 1 || goodHits.Load() != 1 {
+		t.Fatalf("上游命中 bad/good=%d/%d，期望 1/1", badHits.Load(), goodHits.Load())
+	}
+	body := w.Body.String()
+	if strings.Contains(body, "resp_bad") || strings.Contains(body, "server_is_overloaded") {
+		t.Fatalf("失败渠道前导帧或错误帧不应泄漏给客户端：%s", body)
+	}
+	if !strings.Contains(body, `"delta":"Hel"`) || !strings.Contains(body, "response.completed") {
+		t.Fatalf("客户端未收到成功渠道完整流：%s", body)
+	}
+	if env.sink.count() != 1 || env.sink.last(t).UsageStatus != billing.UsageStatusCompleted {
+		t.Fatalf("只应记录成功渠道的 completed 用量，records=%+v", env.sink.records)
+	}
+}
+
+// TestForwardResponsesErrorAfterContentMarkedAborted 已输出正文后不能切换渠道；
+// 错误帧照常结束当前响应，并把零计量记录明确标为“中断且无计量”。
+func TestForwardResponsesErrorAfterContentMarkedAborted(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, `data: {"type":"response.output_text.delta","delta":"你好"}`+"\n\n")
+		_, _ = io.WriteString(w, `data: {"type":"error","error":{"type":"overloaded_error","message":"overloaded"}}`+"\n\n")
+	}))
+	defer upstream.Close()
+
+	env := newTestEnv(t, testSnap(1, upstream.URL))
+	sessionKey := affinityKey(testKeyInfo().UserID, testKeyInfo().GroupID, testModel,
+		registry.ProtocolOpenAI, "header:stream-abort")
+	env.pipe.sessionAffinity.bind(sessionKey, routeChannel, 1)
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses",
+		strings.NewReader(`{"model":"gpt-4o","input":"hi","stream":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Session-Id", "stream-abort")
+	w := httptest.NewRecorder()
+	env.engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "overloaded_error") {
+		t.Fatalf("内容后错误应保留 200 流并透传错误帧，status=%d body=%s", w.Code, w.Body.String())
+	}
+	rec := env.sink.last(t)
+	if rec.UsageStatus != billing.UsageStatusStreamAbortedUsageMissing {
+		t.Fatalf("usage_status=%q，期望 %q", rec.UsageStatus, billing.UsageStatusStreamAbortedUsageMissing)
+	}
+	if entry := env.errSink.lastEntry(t); entry.Phase != errlog.PhaseStreamAborted {
+		t.Fatalf("失败留痕 phase=%q，期望 stream_aborted", entry.Phase)
+	}
+	if _, _, ok := env.pipe.sessionAffinity.lookup(sessionKey); ok {
+		t.Fatal("流中断后应解除会话粘性，避免下一请求继续绑定失败目标")
 	}
 }
 

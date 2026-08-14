@@ -147,6 +147,60 @@ func TestRelayStreamDoesNotCommitHeadersBeforeFirstChunk(t *testing.T) {
 	}
 }
 
+func TestRelayStreamResponses内容前过载可切换(t *testing.T) {
+	c, recorder := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte("event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp-1\"}}\n\n")}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte("event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"service_unavailable_error\",\"code\":\"server_is_overloaded\",\"message\":\"overloaded\"}}\n\n")}
+	close(chunks)
+
+	result := (&Bridge{}).relayStream(context.Background(), c,
+		&cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), adaptor.EndpointResponses)
+
+	if result.StatusCode != http.StatusServiceUnavailable || result.Written || result.NetErr != nil {
+		t.Fatalf("内容前过载应返回未写出的 503，result=%+v", result)
+	}
+	if c.Writer.Written() || recorder.Body.Len() != 0 {
+		t.Fatalf("response.created 与错误帧都不应提交客户端，body=%q", recorder.Body.String())
+	}
+}
+
+func TestRelayStreamAnthropic内容前过载可切换(t *testing.T) {
+	c, recorder := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"message_start","message":{"content":[]}}`)}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"error","error":{"type":"overloaded_error","message":"overloaded"}}`)}
+	close(chunks)
+
+	result := (&Bridge{}).relayStream(context.Background(), c,
+		&cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), adaptor.EndpointMessages)
+
+	if result.StatusCode != http.StatusServiceUnavailable || result.Written {
+		t.Fatalf("message_start 后的过载应返回未写出的 503，result=%+v", result)
+	}
+	if c.Writer.Written() || recorder.Body.Len() != 0 {
+		t.Fatalf("内容前事件不应提交客户端，body=%q", recorder.Body.String())
+	}
+}
+
+func TestRelayStreamAnthropic内容后错误按中断处理(t *testing.T) {
+	c, recorder := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"你好"}}`)}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"error","error":{"type":"overloaded_error","message":"overloaded"}}`)}
+	close(chunks)
+
+	result := (&Bridge{}).relayStream(context.Background(), c,
+		&cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), adaptor.EndpointMessages)
+
+	if !result.Written || result.StreamErr == nil || result.StatusCode != http.StatusOK {
+		t.Fatalf("内容后错误应保留当前流并标记中断，result=%+v", result)
+	}
+	if !strings.Contains(recorder.Body.String(), "overloaded_error") {
+		t.Fatalf("内容后的错误帧应透传客户端，body=%q", recorder.Body.String())
+	}
+}
+
 func TestRelayStreamRequiresExplicitCompletionMarker(t *testing.T) {
 	c, recorder := newStreamTestContext()
 	chunks := make(chan cliproxyexecutor.StreamChunk, 1)
@@ -262,6 +316,15 @@ func TestResponses首字只认内容增量(t *testing.T) {
 	}
 }
 
+func TestAnthropic首字只认内容增量(t *testing.T) {
+	if anthropicPayloadHasContentDelta([]byte(`data: {"type":"message_start","message":{"content":[]}}`)) {
+		t.Fatal("message_start 不应记录首字或提交响应头")
+	}
+	if !anthropicPayloadHasContentDelta([]byte(`data: {"type":"content_block_delta","delta":{"text":"你好"}}`)) {
+		t.Fatal("content_block_delta 应记录首字")
+	}
+}
+
 func TestRelayStreamFramesDataOnlyResponsesChunks(t *testing.T) {
 	c, recorder := newStreamTestContext()
 	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
@@ -282,19 +345,23 @@ func TestRelayStreamFramesDataOnlyResponsesChunks(t *testing.T) {
 
 func TestRelayStreamBuffersSplitResponsesJSON(t *testing.T) {
 	c, recorder := newStreamTestContext()
-	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
+	chunks := make(chan cliproxyexecutor.StreamChunk, 3)
 	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"response.created"`)}
 	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`,"response":{"id":"resp-1"}}`)}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"response.completed","response":{"id":"resp-1"}}`)}
 	close(chunks)
 
 	result := (&Bridge{}).relayStream(context.Background(), c, &cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), adaptor.EndpointResponses)
 
-	want := "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp-1\"}}\n\n"
+	want := "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp-1\"}}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-1\"}}\n\n"
 	if got := recorder.Body.String(); got != want {
 		t.Fatalf("被拆分的 JSON 应重组为一个事件，实际：%q，期望：%q", got, want)
 	}
 	if !result.Written {
-		t.Fatal("重组后的有效事件应写入客户端")
+		t.Fatal("重组后的生命周期事件应在完成时写入客户端")
+	}
+	if !result.Done {
+		t.Fatal("response.completed 应标记完整流")
 	}
 }
 

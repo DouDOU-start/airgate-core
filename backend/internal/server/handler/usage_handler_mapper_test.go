@@ -56,6 +56,7 @@ func TestToCustomerUsageLogRespStripsResellerFields(t *testing.T) {
 		SellRate:              2.5,
 		AccountRateMultiplier: 0.3,
 		ServiceTier:           "flex",
+		UsageStatus:           "stream_aborted_usage_missing",
 		Stream:                true,
 		DurationMs:            1200,
 		FirstTokenMs:          80,
@@ -80,7 +81,8 @@ func TestToCustomerUsageLogRespStripsResellerFields(t *testing.T) {
 		t.Fatalf("token 字段映射异常: %+v", resp)
 	}
 	if resp.ServiceTier != "flex" || !resp.Stream || resp.DurationMs != 1200 || resp.FirstTokenMs != 80 ||
-		resp.Endpoint != "/v1/chat/completions" || resp.RequestID != "req-1" || resp.Calls != 1 {
+		resp.Endpoint != "/v1/chat/completions" || resp.RequestID != "req-1" || resp.Calls != 1 ||
+		resp.UsageStatus != "stream_aborted_usage_missing" {
 		t.Fatalf("观测字段映射异常: %+v", resp)
 	}
 
