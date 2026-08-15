@@ -58,6 +58,9 @@ type ForwardResult struct {
 	FirstTokenMs int64
 	// RequestFirstTokenMs 是从请求进入转发主循环到内容首字的总耗时，包含前置处理与故障转移。
 	RequestFirstTokenMs int64
+	// ExecutorBootstrapMs 是 CPA executor 从开始执行到拿到上游响应头并返回流对象的耗时，
+	// 包含请求转换、请求构造和上游握手，用于定位超大请求首字前的本地开销。
+	ExecutorBootstrapMs int64
 	Written             bool
 	StreamErr           error
 	Done                bool
@@ -214,26 +217,32 @@ func (b *Bridge) doStream(
 	defer cancel()
 
 	stream, err := ex.ExecuteStream(upstreamCtx, auth, execReq, opts)
+	bootstrapMs := time.Since(start).Milliseconds()
 	if err != nil {
 		if authHasRefreshCredential(auth) && isRefreshableAuthError(auth.Provider, err) {
 			refreshed, refreshErr := b.refreshAuth(upstreamCtx, ex, auth)
 			if refreshErr == nil && refreshed != nil {
 				auth = refreshed
 				stream, err = ex.ExecuteStream(upstreamCtx, auth, execReq, opts)
+				bootstrapMs = time.Since(start).Milliseconds()
 				if err == nil {
 					markStreamStarted()
 					result := b.relayStreamSince(upstreamCtx, c, stream, start, requestStartedAt, endpoint)
+					result.ExecutorBootstrapMs = bootstrapMs
 					result.RefreshedCredentials = CredentialsFromAuth(auth)
 					return result
 				}
 			}
 		}
-		return errorToResult(err)
+		result := errorToResult(err)
+		result.ExecutorBootstrapMs = bootstrapMs
+		return result
 	}
 	// ExecuteStream 成功表示已建立上游响应流；此后客户端断开不再取消上游，
 	// relayStream 会停止向客户端写入，但继续读取到完成事件以捕获 usage。
 	markStreamStarted()
 	result := b.relayStreamSince(upstreamCtx, c, stream, start, requestStartedAt, endpoint)
+	result.ExecutorBootstrapMs = bootstrapMs
 	// 部分 executor 在 goroutine 启动后才从首个 chunk 返回上游认证错误。
 	// 尚未向客户端写出内容时仍可安全刷新并重试一次。
 	if authHasRefreshCredential(auth) && isRefreshableAuthResult(auth.Provider, result) {
@@ -242,7 +251,9 @@ func (b *Bridge) doStream(
 			auth = refreshed
 			stream, err = ex.ExecuteStream(upstreamCtx, auth, execReq, opts)
 			if err == nil {
+				bootstrapMs = time.Since(start).Milliseconds()
 				result = b.relayStreamSince(upstreamCtx, c, stream, time.Now(), requestStartedAt, endpoint)
+				result.ExecutorBootstrapMs = bootstrapMs
 				result.RefreshedCredentials = CredentialsFromAuth(auth)
 				return result
 			}
@@ -304,7 +315,7 @@ func (b *Bridge) relayStreamSince(
 	isFirstContentPayload := looksLikeContent
 	switch endpoint {
 	case adaptor.EndpointResponses:
-		isFirstContentPayload = responsesPayloadHasContentDelta
+		isFirstContentPayload = responsesPayloadHasContent
 	case adaptor.EndpointMessages:
 		isFirstContentPayload = anthropicPayloadHasContentDelta
 	}
@@ -372,8 +383,8 @@ func (b *Bridge) relayStreamSince(
 			return true
 		}
 
-		hasContent := isFirstContentPayload(payload)
-		if hasContent && !contentStarted {
+		hasContent := !contentStarted && isFirstContentPayload(payload)
+		if hasContent {
 			contentStarted = true
 			now := time.Now()
 			if firstTokenMs == 0 {
@@ -652,10 +663,10 @@ func looksLikeContent(payload []byte) bool {
 		strings.Contains(s, "output")
 }
 
-// responsesPayloadHasContentDelta 判断 Responses SSE 帧是否包含真实内容增量。
-// response.created / response.in_progress 等生命周期事件可能含 output/content 字段，
-// 不能据此记录首字；仅 type 以 .delta 结尾的事件算首内容。
-func responsesPayloadHasContentDelta(payload []byte) bool {
+// responsesPayloadHasContent 判断 Responses SSE 帧是否包含真实输出。
+// 生命周期事件可能含空 output/content 字段，不能据此记录首字；除增量事件外，
+// 部分上游只在 done/终态事件中给出最终正文或工具调用，也必须识别。
+func responsesPayloadHasContent(payload []byte) bool {
 	scanner := bufio.NewScanner(bytes.NewReader(payload))
 	scanner.Buffer(make([]byte, 0, 64*1024), 32<<20)
 	for scanner.Scan() {
@@ -664,10 +675,7 @@ func responsesPayloadHasContentDelta(payload []byte) bool {
 			continue
 		}
 		data := bytes.TrimSpace([]byte(strings.TrimPrefix(line, "data:")))
-		var event struct {
-			Type string `json:"type"`
-		}
-		if json.Unmarshal(data, &event) == nil && strings.HasSuffix(event.Type, ".delta") {
+		if dto.ResponsesEventHasContent(data) {
 			return true
 		}
 	}

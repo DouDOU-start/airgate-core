@@ -232,9 +232,8 @@ func TestRelaySSEFirstTokenOnlyOnDataLines(t *testing.T) {
 	})
 }
 
-// TestResponsesFirstContentLine Responses 首内容行谓词：仅内容增量事件（type 以 .delta
-// 结尾）算首 token；response.created / in_progress / output_item.added / content_part.added /
-// completed 等 preamble/生命周期事件跳过；非 JSON / 无 type 不算。
+// TestResponsesFirstContentLine Responses 首内容行谓词：内容增量以及 done/终态中的
+// 非空最终输出算首 token；纯生命周期事件、非 JSON 和无 type 数据不算。
 func TestResponsesFirstContentLine(t *testing.T) {
 	cases := []struct {
 		name string
@@ -244,6 +243,8 @@ func TestResponsesFirstContentLine(t *testing.T) {
 		{"output_text.delta", `{"type":"response.output_text.delta","delta":"hi"}`, true},
 		{"output_audio.delta", `{"type":"response.output_audio.delta","delta":"aGk="}`, true},
 		{"function_call_arguments.delta", `{"type":"response.function_call_arguments.delta","delta":"{"}`, true},
+		{"output_item.done", `{"type":"response.output_item.done","item":{"type":"function_call","name":"lookup","arguments":"{}"}}`, true},
+		{"completed 带输出", `{"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"完成"}]}]}}`, true},
 		{"response.created", `{"type":"response.created","response":{}}`, false},
 		{"response.in_progress", `{"type":"response.in_progress"}`, false},
 		{"output_item.added", `{"type":"response.output_item.added"}`, false},
@@ -261,9 +262,8 @@ func TestResponsesFirstContentLine(t *testing.T) {
 	}
 }
 
-// TestRelaySSEFirstTokenResponses 修1 回归：Responses 流 first_token 只在内容增量事件记录，
-// 跳过 response.created 等 preamble 生命周期事件（避免记成 ack 延迟）；chat 维持首个 data
-// 载荷行即记。
+// TestRelaySSEFirstTokenResponses 回归 Responses 首字口径：跳过 response.created 等
+// 生命周期事件，在增量或终态真实输出处记录；chat 维持首个 data 载荷行即记。
 func TestRelaySSEFirstTokenResponses(t *testing.T) {
 	// start 前移 50ms：任何记录必然 >= 50，与"未记录"（0）可区分。
 	backdated := func() time.Time { return time.Now().Add(-50 * time.Millisecond) }
@@ -285,7 +285,7 @@ func TestRelaySSEFirstTokenResponses(t *testing.T) {
 		}
 	})
 
-	t.Run("responses: 仅 created + completed 无 delta 则不记", func(t *testing.T) {
+	t.Run("responses: 仅 created + 无输出 completed 则不记", func(t *testing.T) {
 		body := strings.Join([]string{
 			`event: response.created`,
 			`data: {"type":"response.created","response":{"id":"resp_1"}}`,
@@ -298,10 +298,27 @@ func TestRelaySSEFirstTokenResponses(t *testing.T) {
 		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(),
 			dto.ExtractResponsesUsage, true, responsesFirstContentLine, sseMaxLineBytesResponses, nil)
 		if result.firstTokenMs != 0 {
-			t.Errorf("firstTokenMs = %d, want 0（无 delta 内容增量事件）", result.firstTokenMs)
+			t.Errorf("firstTokenMs = %d, want 0（没有真实输出）", result.firstTokenMs)
 		}
 		if result.usage == nil {
 			t.Error("completed 事件 usage 应被捕获")
+		}
+	})
+
+	t.Run("responses: completed 携带最终输出时记录", func(t *testing.T) {
+		body := strings.Join([]string{
+			`event: response.created`,
+			`data: {"type":"response.created","response":{"id":"resp_1"}}`,
+			``,
+			`event: response.completed`,
+			`data: {"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"完成"}]}],"usage":{"input_tokens":10,"output_tokens":5}}}`,
+			``,
+		}, "\n")
+		w := httptest.NewRecorder()
+		result := relaySSE(w, newSSEResponse(strings.NewReader(body)), backdated(),
+			dto.ExtractResponsesUsage, true, responsesFirstContentLine, sseMaxLineBytesResponses, nil)
+		if result.firstTokenMs < 50 {
+			t.Errorf("firstTokenMs = %d, want >= 50（应由 completed 最终输出触发）", result.firstTokenMs)
 		}
 	})
 

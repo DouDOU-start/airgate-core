@@ -30,8 +30,10 @@ import (
 )
 
 const (
-	payloadPrefix = "audit:gzip:v1:"
-	writeTimeout  = 10 * time.Second
+	payloadPrefix          = "audit:gzip:v1:"
+	writeTimeout           = 10 * time.Second
+	clearBatchSize         = 100
+	asyncClearStableWindow = time.Minute
 )
 
 // ErrWrite 标识在真实发包前审计写入失败。
@@ -42,6 +44,7 @@ type Service struct {
 	db      *ent.Client
 	secret  string
 	options Options
+	clearMu sync.Mutex
 
 	asyncOnce         sync.Once
 	asyncClose        sync.Once
@@ -1033,36 +1036,78 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]ListItem, int, erro
 	return items, total, nil
 }
 
-// Clear 清空请求审计。
-// before 非 nil 时仅删除 created_at 严格早于 before 的记录；nil 清空全部。
-// 先删 attempt 再删主表：SQLite 测试库与部分迁移环境下 bulk 删除不保证 CASCADE 生效。
+// Clear 分批清理请求审计，避免大事务长时间占用数据库连接和行锁。
+// before 非 nil 时删除 created_at 严格早于 before 的历史记录，包括崩溃后遗留的
+// 未完成记录；nil 时只删除已完成记录，避免与仍在写入 attempt 的活跃请求竞争。
+// 异步审计模式再保留一分钟稳定窗口，给正文补写和收尾任务留出完成时间。
 func (s *Service) Clear(ctx context.Context, before *time.Time) (int64, error) {
 	if s == nil || s.db == nil {
 		return 0, fmt.Errorf("请求审计服务未配置")
 	}
+	s.clearMu.Lock()
+	defer s.clearMu.Unlock()
+
+	var stableBefore time.Time
+	if before == nil && s.options.AsyncEnabled {
+		stableBefore = time.Now().Add(-asyncClearStableWindow)
+	}
+	var total int64
+	for {
+		deleted, selected, err := s.clearBatch(ctx, before, stableBefore)
+		if err != nil {
+			return total, err
+		}
+		total += int64(deleted)
+		if selected < clearBatchSize {
+			return total, nil
+		}
+	}
+}
+
+func (s *Service) clearBatch(ctx context.Context, before *time.Time, stableBefore time.Time) (deleted, selected int, err error) {
 	tx, err := s.db.Tx(ctx)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	attemptDel := tx.RequestAuditAttempt.Delete()
-	logDel := tx.RequestAuditLog.Delete()
+	query := tx.RequestAuditLog.Query()
 	if before != nil {
-		attemptDel = attemptDel.Where(entattempt.HasRequestWith(entlog.CreatedAtLT(*before)))
-		logDel = logDel.Where(entlog.CreatedAtLT(*before))
+		query = query.Where(entlog.CreatedAtLT(*before))
+	} else {
+		query = query.Where(entlog.CompletedEQ(true))
+		if !stableBefore.IsZero() {
+			query = query.Where(entlog.UpdatedAtLT(stableBefore))
+		}
 	}
-	if _, err := attemptDel.Exec(ctx); err != nil {
-		return 0, err
-	}
-	n, err := logDel.Exec(ctx)
+	ids, err := query.
+		Order(ent.Asc(entlog.FieldID)).
+		Limit(clearBatchSize).
+		IDs(ctx)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
+	}
+	if len(ids) == 0 {
+		if err := tx.Commit(); err != nil {
+			return 0, 0, err
+		}
+		return 0, 0, nil
+	}
+	if _, err := tx.RequestAuditAttempt.Delete().
+		Where(entattempt.RequestAuditIDIn(ids...)).
+		Exec(ctx); err != nil {
+		return 0, 0, err
+	}
+	n, err := tx.RequestAuditLog.Delete().
+		Where(entlog.IDIn(ids...)).
+		Exec(ctx)
+	if err != nil {
+		return 0, 0, err
 	}
 	if err := tx.Commit(); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return int64(n), nil
+	return n, len(ids), nil
 }
 
 // Get 查询并解密单条审计详情。

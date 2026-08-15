@@ -15,6 +15,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
+	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
 	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
@@ -99,6 +100,9 @@ func (p *Pipeline) executeAccountAttempt(
 	defer cancel()
 
 	result := p.cpa.Forward(ctx, c, fwdReq)
+	if req.Stream {
+		logLargeAccountRequestTiming(c, acc, req.Model, endpoint, len(payload), result)
+	}
 	if isAuditWriteError(result.NetErr) || isAuditWriteError(result.BuildErr) || isAuditWriteError(result.StreamErr) {
 		return attemptResult{auditErr: requestaudit.ErrWrite}
 	}
@@ -125,6 +129,48 @@ func (p *Pipeline) executeAccountAttempt(
 		streamErr:           result.StreamErr,
 		done:                result.Done,
 	}
+}
+
+const largeAccountRequestTimingThreshold = 1 << 20
+
+// logLargeAccountRequestTiming 仅记录 1MB 以上账号请求的首字前阶段耗时，避免普通请求
+// 产生日志噪声。executor_bootstrap 同时包含 CPA 请求转换与上游响应头握手；结合
+// post_bootstrap_first_content 可判断时间主要消耗在本地构造/握手阶段还是响应头之后。
+func logLargeAccountRequestTiming(
+	c *gin.Context,
+	acc *accountreg.Snapshot,
+	model string,
+	endpoint string,
+	payloadBytes int,
+	result cpa.ForwardResult,
+) {
+	if c == nil || c.Request == nil || acc == nil || payloadBytes < largeAccountRequestTimingThreshold {
+		return
+	}
+	postBootstrapFirstContentMs := int64(0)
+	if result.FirstTokenMs > result.ExecutorBootstrapMs {
+		postBootstrapFirstContentMs = result.FirstTokenMs - result.ExecutorBootstrapMs
+	}
+	requestBeforeAttemptMs := int64(0)
+	if result.RequestFirstTokenMs > result.FirstTokenMs {
+		requestBeforeAttemptMs = result.RequestFirstTokenMs - result.FirstTokenMs
+	}
+	logx.LoggerFromContext(c.Request.Context()).InfoContext(
+		c.Request.Context(),
+		"relay_account_large_request_timing",
+		logx.LogFieldAccountID, acc.ID,
+		logx.LogFieldPlatform, acc.Platform,
+		logx.LogFieldModel, model,
+		"endpoint", endpoint,
+		"payload_bytes", payloadBytes,
+		"request_before_attempt_ms", requestBeforeAttemptMs,
+		"executor_bootstrap_ms", result.ExecutorBootstrapMs,
+		"post_bootstrap_first_content_ms", postBootstrapFirstContentMs,
+		"attempt_first_token_ms", result.FirstTokenMs,
+		"request_first_token_ms", result.RequestFirstTokenMs,
+		logx.LogFieldStatus, result.StatusCode,
+		"stream_completed", result.Done,
+	)
 }
 
 func accountEmail(acc *accountreg.Snapshot) string {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"entgo.io/ent/dialect/sql/schema"
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/ent/enttest"
 )
 
@@ -476,6 +478,153 @@ func Test审计完整保存并解密客户端与上游请求(t *testing.T) {
 		t.Fatalf("统计 attempt 失败: %v", err)
 	} else if attempts != 0 {
 		t.Fatalf("清空后 attempt 残留 %d 条", attempts)
+	}
+}
+
+func TestClear无时间条件保留活跃请求并删除已完成请求(t *testing.T) {
+	service := openTestService(t)
+	ctx := context.Background()
+	active, err := service.db.RequestAuditLog.Create().
+		SetRequestID("req-clear-active").
+		SetCompleted(false).
+		Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := service.db.RequestAuditLog.Create().
+		SetRequestID("req-clear-completed").
+		SetCompleted(true).
+		Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range []*ent.RequestAuditLog{active, completed} {
+		if _, err := service.db.RequestAuditAttempt.Create().
+			SetRequestAuditID(row.ID).
+			SetSeq(1).
+			SetRouteKind("account").
+			Save(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	deleted, err := service.Clear(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 1 {
+		t.Fatalf("删除数量 = %d，期望 1", deleted)
+	}
+	if count, err := service.db.RequestAuditLog.Query().Count(ctx); err != nil || count != 1 {
+		t.Fatalf("主记录剩余数量 = %d，错误 = %v", count, err)
+	}
+	if count, err := service.db.RequestAuditAttempt.Query().Count(ctx); err != nil || count != 1 {
+		t.Fatalf("attempt 剩余数量 = %d，错误 = %v", count, err)
+	}
+	if _, err := service.db.RequestAuditLog.Get(ctx, active.ID); err != nil {
+		t.Fatalf("活跃请求被误删：%v", err)
+	}
+}
+
+func TestClear超过单批上限仍可全部删除(t *testing.T) {
+	service := openTestService(t)
+	ctx := context.Background()
+	want := clearBatchSize + 7
+	for i := range want {
+		if _, err := service.db.RequestAuditLog.Create().
+			SetRequestID(fmt.Sprintf("req-clear-batch-%d", i)).
+			SetCompleted(true).
+			Save(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	deleted, err := service.Clear(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != int64(want) {
+		t.Fatalf("删除数量 = %d，期望 %d", deleted, want)
+	}
+	if count, err := service.db.RequestAuditLog.Query().Count(ctx); err != nil || count != 0 {
+		t.Fatalf("分批清理后仍有 %d 条记录，错误 = %v", count, err)
+	}
+}
+
+func TestClear按时间可清理旧的未完成请求(t *testing.T) {
+	service := openTestService(t)
+	ctx := context.Background()
+	now := time.Now()
+	old, err := service.db.RequestAuditLog.Create().
+		SetRequestID("req-clear-old-incomplete").
+		SetCompleted(false).
+		SetCreatedAt(now.Add(-2 * time.Hour)).
+		SetUpdatedAt(now.Add(-2 * time.Hour)).
+		Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.db.RequestAuditAttempt.Create().
+		SetRequestAuditID(old.ID).
+		SetSeq(1).
+		SetRouteKind("account").
+		Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.db.RequestAuditLog.Create().
+		SetRequestID("req-clear-recent-incomplete").
+		SetCompleted(false).
+		SetCreatedAt(now).
+		SetUpdatedAt(now).
+		Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	cutoff := now.Add(-time.Hour)
+
+	deleted, err := service.Clear(ctx, &cutoff)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 1 {
+		t.Fatalf("删除数量 = %d，期望 1", deleted)
+	}
+	if count, err := service.db.RequestAuditAttempt.Query().Count(ctx); err != nil || count != 0 {
+		t.Fatalf("旧请求的 attempt 未同步删除，剩余 = %d，错误 = %v", count, err)
+	}
+	if count, err := service.db.RequestAuditLog.Query().Count(ctx); err != nil || count != 1 {
+		t.Fatalf("近期请求保留异常，剩余 = %d，错误 = %v", count, err)
+	}
+}
+
+func TestClear异步模式保留稳定窗口内的已完成请求(t *testing.T) {
+	service := openTestServiceWithOptions(t, Options{AsyncEnabled: true})
+	ctx := context.Background()
+	now := time.Now()
+	for _, item := range []struct {
+		requestID string
+		updatedAt time.Time
+	}{
+		{requestID: "req-clear-stable", updatedAt: now.Add(-2 * asyncClearStableWindow)},
+		{requestID: "req-clear-finishing", updatedAt: now},
+	} {
+		if _, err := service.db.RequestAuditLog.Create().
+			SetRequestID(item.requestID).
+			SetCompleted(true).
+			SetUpdatedAt(item.updatedAt).
+			Save(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	deleted, err := service.Clear(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 1 {
+		t.Fatalf("删除数量 = %d，期望 1", deleted)
+	}
+	if count, err := service.db.RequestAuditLog.Query().Count(ctx); err != nil || count != 1 {
+		t.Fatalf("稳定窗口内记录保留异常，剩余 = %d，错误 = %v", count, err)
 	}
 }
 

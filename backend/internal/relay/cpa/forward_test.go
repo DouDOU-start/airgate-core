@@ -351,12 +351,44 @@ func TestRelayStream客户端写失败后继续捕获ResponsesUsage(t *testing.T
 	}
 }
 
-func TestResponses首字只认内容增量(t *testing.T) {
-	if responsesPayloadHasContentDelta([]byte(`data: {"type":"response.created","response":{"output":[]}}`)) {
+func TestResponses首字识别增量与终态真实内容(t *testing.T) {
+	if responsesPayloadHasContent([]byte(`data: {"type":"response.created","response":{"output":[]}}`)) {
 		t.Fatal("response.created 不应记录首字")
 	}
-	if !responsesPayloadHasContentDelta([]byte(`data: {"type":"response.output_text.delta","delta":"你好"}`)) {
+	if responsesPayloadHasContent([]byte(`data: {"type":"response.in_progress","response":{"output":[]}}`)) {
+		t.Fatal("response.in_progress 不应记录首字")
+	}
+	if responsesPayloadHasContent([]byte(`data: {"type":"response.output_item.added","item":{"type":"message"}}`)) {
+		t.Fatal("response.output_item.added 不应记录首字")
+	}
+	if !responsesPayloadHasContent([]byte(`data: {"type":"response.output_text.delta","delta":"你好"}`)) {
 		t.Fatal("response.output_text.delta 应记录首字")
+	}
+	if !responsesPayloadHasContent([]byte(`data: {"type":"response.output_item.done","item":{"type":"function_call","name":"lookup","arguments":"{}"}}`)) {
+		t.Fatal("带工具调用的 response.output_item.done 应记录首字")
+	}
+	if !responsesPayloadHasContent([]byte(`data: {"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"完成"}]}]}}`)) {
+		t.Fatal("带最终输出的 response.completed 应记录首字")
+	}
+	if responsesPayloadHasContent([]byte(`data: {"type":"response.completed","response":{"output":[]}}`)) {
+		t.Fatal("空 output 的 response.completed 不应记录首字")
+	}
+}
+
+func TestRelayStream从Responses完成事件记录首字(t *testing.T) {
+	c, _ := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 1)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"完成"}]}],"usage":{"input_tokens":2,"output_tokens":1}}}`)}
+	close(chunks)
+	now := time.Now()
+
+	result := (&Bridge{}).relayStreamSince(
+		context.Background(), c, &cliproxyexecutor.StreamResult{Chunks: chunks},
+		now.Add(-10*time.Millisecond), now.Add(-20*time.Millisecond), adaptor.EndpointResponses,
+	)
+
+	if !result.Done || result.FirstTokenMs <= 0 || result.RequestFirstTokenMs <= 0 {
+		t.Fatalf("完成事件未记录首字：%+v", result)
 	}
 }
 

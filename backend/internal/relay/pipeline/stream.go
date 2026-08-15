@@ -56,7 +56,7 @@ type streamResult struct {
 //   - 逐行写出并 Flush；bufio.Scanner 天然处理跨 read 边界的半行拼接；
 //   - first_token_ms 只在 isFirstContentLine 判为「首内容行」的 data 载荷行触发
 //     （注释行/event: 行/[DONE] 恒不算）——chat 传 chatFirstContentLine（任意 data 载荷
-//     即算），responses 传 responsesFirstContentLine（仅 .delta 内容增量事件），
+//     即算），responses 传 responsesFirstContentLine（真实增量或终态输出），
 //     messages 传 anthropicFirstContentLine（仅 content_block_delta 事件）；
 //   - maxLineBytes 为 scanner 单行上限：chat 用 sseMaxLineBytes（8MB），responses 用
 //     sseMaxLineBytesResponses（64MB，容纳内嵌完整 response 的 completed 事件）。
@@ -189,8 +189,8 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 			}
 		}
 
-		lineHasContent := hasData && data != "[DONE]" && isFirstContentLine([]byte(data))
-		if lineHasContent && !contentStarted {
+		lineHasContent := !contentStarted && hasData && data != "[DONE]" && isFirstContentLine([]byte(data))
+		if lineHasContent {
 			contentStarted = true
 			if result.firstTokenMs == 0 {
 				result.firstTokenMs = time.Since(start).Milliseconds()
@@ -263,20 +263,13 @@ func isUsageOnlyChunk(data []byte) bool {
 // 每个 data 分片都是完整 JSON chunk（即内容增量），无 preamble 生命周期事件。
 func chatFirstContentLine([]byte) bool { return true }
 
-// responsesFirstContentLine Responses 端点首内容行谓词：仅内容增量事件算首 token。
+// responsesFirstContentLine Responses 端点首内容行谓词：识别内容增量以及只在
+// done/终态事件返回的最终正文或工具调用。
 // Responses 流为语义事件流，首事件是 response.created（上游 ack，早于生成），其后可能有
 // response.in_progress / output_item.added / content_part.added 等 preamble 生命周期事件；
 // 若以首个 data 行计 first_token 会记成 ack 延迟而失真、与 chat 口径不一致。
-// 只有内容增量事件（type 以 .delta 结尾，如 response.output_text.delta /
-// response.output_audio.delta / response.function_call_arguments.delta）才算首内容行。
 func responsesFirstContentLine(data []byte) bool {
-	var probe struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &probe); err != nil {
-		return false
-	}
-	return strings.HasSuffix(probe.Type, ".delta")
+	return dto.ResponsesEventHasContent(data)
 }
 
 // anthropicFirstContentLine Anthropic Messages 流首内容行谓词：仅 content_block_delta
