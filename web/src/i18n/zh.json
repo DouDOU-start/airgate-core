@@ -767,6 +767,7 @@
     "cache_creation_unit_price": "缓存写入 5m 单价",
     "cache_creation_1h_unit_price": "缓存写入 1h 单价",
     "cached_input_cost": "缓存读取成本",
+    "cache_creation_cost": "缓存写入成本",
     "image_size": "产出档位",
     "unit_price": "单价",
     "per_image": "/ 张",

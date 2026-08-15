@@ -350,6 +350,12 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
       const calls = row.calls ?? 0;
       const perUnit = calls > 0 && row.input_price > 0 && row.output_cost === 0
         && Math.abs(row.input_price * calls - row.input_cost) < 1e-9;
+      const hasCacheRead = row.cached_input_cost > 0;
+      const hasCacheWrite = row.cache_creation_cost > 0;
+      // 旧记录可能只有缓存写入总量，没有 5m/1h 拆分；此时用 5m 单价作为兼容展示。
+      const hasCacheWrite5m = row.cache_creation_5m_tokens > 0
+        || (hasCacheWrite && row.cache_creation_5m_tokens === 0 && row.cache_creation_1h_tokens === 0);
+      const hasCacheWrite1h = row.cache_creation_1h_tokens > 0;
       return (
         <RichTooltip
           placement="right"
@@ -357,6 +363,12 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
             <TooltipPanel title={t('usage.cost_detail')} subtitle={row.model}>
                 <TooltipRow label={t('usage.input_cost')} value={`$${row.input_cost.toFixed(6)}`} />
                 <TooltipRow label={t('usage.output_cost')} value={`$${row.output_cost.toFixed(6)}`} />
+                {row.cached_input_cost > 0 && (
+                  <TooltipRow label={t('usage.cached_input_cost')} value={`$${row.cached_input_cost.toFixed(6)}`} />
+                )}
+                {row.cache_creation_cost > 0 && (
+                  <TooltipRow label={t('usage.cache_creation_cost')} value={`$${row.cache_creation_cost.toFixed(6)}`} />
+                )}
                 {perUnit ? (
                   <TooltipRow
                     label={t('usage.unit_price', '单价')}
@@ -366,25 +378,22 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                   />
                 ) : (
                   <>
-                    {row.input_price > 0 && (
+                    {row.input_cost > 0 && row.input_price > 0 && (
                       <TooltipRow label={t('usage.input_unit_price')} value={`$${row.input_price.toFixed(4)} / 1M Token`} />
                     )}
-                    {row.output_price > 0 && (
+                    {row.output_cost > 0 && row.output_price > 0 && (
                       <TooltipRow label={t('usage.output_unit_price')} value={`$${row.output_price.toFixed(4)} / 1M Token`} />
                     )}
-                    {row.cached_input_price > 0 && (
+                    {hasCacheRead && row.cached_input_price > 0 && (
                       <TooltipRow label={t('usage.cached_input_unit_price')} value={`$${row.cached_input_price.toFixed(4)} / 1M Token`} />
                     )}
-                    {row.cache_creation_price > 0 && (
+                    {hasCacheWrite5m && row.cache_creation_price > 0 && (
                       <TooltipRow label={t('usage.cache_creation_unit_price')} value={`$${row.cache_creation_price.toFixed(4)} / 1M Token`} />
                     )}
-                    {row.cache_creation_1h_price > 0 && (
+                    {hasCacheWrite1h && row.cache_creation_1h_price > 0 && (
                       <TooltipRow label={t('usage.cache_creation_1h_unit_price')} value={`$${row.cache_creation_1h_price.toFixed(4)} / 1M Token`} />
                     )}
                   </>
-                )}
-                {row.cached_input_cost > 0 && (
-                  <TooltipRow label={t('usage.cached_input_cost')} value={`$${row.cached_input_cost.toFixed(6)}`} />
                 )}
                 {(row.calls ?? 0) > 0 && (
                   // 图像端点产出张数；按次计费时成本 = input_price × 张数。

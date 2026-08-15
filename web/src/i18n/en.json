@@ -767,6 +767,7 @@
     "cache_creation_unit_price": "Cache Write 5m Price",
     "cache_creation_1h_unit_price": "Cache Write 1h Price",
     "cached_input_cost": "Cache Read Cost",
+    "cache_creation_cost": "Cache Write Cost",
     "image_size": "Output Tier",
     "unit_price": "Unit Price",
     "per_image": "/ image",
