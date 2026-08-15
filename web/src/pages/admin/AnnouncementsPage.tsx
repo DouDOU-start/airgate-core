@@ -110,6 +110,7 @@ export default function AnnouncementsPage() {
       {/* 表格 */}
       <CommonTable
         ariaLabel={t('announcements.title', 'Announcements')}
+        mobileLayout="cards"
         footer={(
           <TablePaginationFooter
             page={page}

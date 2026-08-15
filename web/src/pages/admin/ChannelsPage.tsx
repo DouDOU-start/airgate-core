@@ -499,7 +499,7 @@ export default function ChannelsPage() {
   return (
     <div>
       {/* 筛选 + 工具栏 */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="ag-mobile-toolbar mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <Tabs
           className="ag-segmented-tabs ag-segmented-tabs-compact"
           selectedKey={view}
@@ -675,6 +675,7 @@ export default function ChannelsPage() {
       <CommonTable
         ariaLabel={t('channels.title')}
         className="ag-channels-table"
+        mobileLayout="scroll"
         footer={(
           <TablePaginationFooter
             page={page}

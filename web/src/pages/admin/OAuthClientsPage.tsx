@@ -97,7 +97,7 @@ export default function OAuthClientsPage() {
       </div>
 
       {/* 表格 */}
-      <CommonTable ariaLabel={t('oauth_clients.title', 'OAuth Clients')} minWidth={880}>
+      <CommonTable ariaLabel={t('oauth_clients.title', 'OAuth Clients')} mobileLayout="cards" minWidth={880}>
         <CommonTable.Header>
           <CommonTable.Column id="name" style={{ width: 220 }}>{t('oauth_clients.col_name')}</CommonTable.Column>
           <CommonTable.Column id="client_id" style={{ width: 240 }}>Client ID</CommonTable.Column>

@@ -151,7 +151,7 @@ export function AnnouncementFormModal({
                   <Description>{t('announcements.content_hint')}</Description>
                 </HeroTextField>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Select
                     fullWidth
                     selectedKey={form.status}
@@ -199,7 +199,7 @@ export function AnnouncementFormModal({
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <HeroTextField fullWidth>
                     <Label>{t('announcements.starts_at')}</Label>
                     <Input

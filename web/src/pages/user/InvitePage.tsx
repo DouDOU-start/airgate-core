@@ -242,6 +242,7 @@ export default function InvitePage() {
         {recordTab === 'invitees' ? (
           <CommonTable
             ariaLabel={t('invite.invitees_title')}
+            mobileLayout="cards"
             footer={(
               <TablePaginationFooter
                 page={inviteesPagination.page}

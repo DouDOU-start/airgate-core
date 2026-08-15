@@ -93,7 +93,8 @@ function CommonTableRoot({
   contentStyle,
   footer,
   minWidth,
-  mobileLayout = 'cards',
+  // 默认保留原生表格结构，复杂指标/长文本表格在手机上通过横向滚动保证可读性。
+  mobileLayout = 'scroll',
   scrollClassName,
   scrollOverlay,
 }: CommonTableProps) {

@@ -138,7 +138,7 @@ function OrdersTab() {
       ) : null}
 
       {/* 筛选 + 工具栏 */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="ag-mobile-toolbar mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="relative w-full sm:w-64">
           <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
           <Input
@@ -190,6 +190,7 @@ function OrdersTab() {
       {/* 订单表格 */}
       <CommonTable
         ariaLabel={t('payment.tab_orders')}
+        mobileLayout="cards"
         footer={(
           <TablePaginationFooter
             page={page}

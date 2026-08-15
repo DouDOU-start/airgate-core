@@ -640,6 +640,7 @@ export default function AccountsPage() {
       <CommonTable
         ariaLabel={t('accounts.title', '账号管理')}
         className="ag-accounts-table"
+        mobileLayout="cards"
         footer={(
           <TablePaginationFooter
             page={page}

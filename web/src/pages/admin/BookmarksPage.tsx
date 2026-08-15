@@ -107,6 +107,7 @@ export default function BookmarksPage() {
       {/* 表格 */}
       <CommonTable
         ariaLabel={t('bookmarks.title', 'Bookmarks')}
+        mobileLayout="cards"
         footer={(
           <TablePaginationFooter
             page={page}

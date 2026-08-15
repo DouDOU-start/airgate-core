@@ -5,6 +5,10 @@
   --ag-usage-table-row-height: 2.5rem;
 }
 
+.ag-usage-mobile-list {
+  display: none;
+}
+
 .ag-usage-table {
   table-layout: fixed;
 }
@@ -161,4 +165,110 @@
     max-width: 92px !important;
   }
 
+}
+
+@media (max-width: 767px) {
+  .ag-usage-table-scroll {
+    display: none;
+  }
+
+  .ag-usage-mobile-list {
+    --ag-usage-table-row-height: 3.25rem;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .ag-usage-mobile-card {
+    display: grid;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid color-mix(in oklab, var(--border) 78%, transparent);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--ag-shadow-sm);
+  }
+
+  .ag-usage-mobile-field {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(4.5rem, 28%) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.625rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--separator) 76%, transparent);
+    padding: 0.625rem 0.75rem;
+  }
+
+  .ag-usage-mobile-field:last-child {
+    border-bottom: 0;
+  }
+
+  .ag-usage-mobile-label {
+    min-width: 0;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 550;
+    line-height: 1.4;
+  }
+
+  .ag-usage-mobile-value {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .ag-usage-mobile-value > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ag-usage-mobile-field[data-column-id="model"],
+  .ag-usage-mobile-field[data-column-id="tokens"] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .ag-usage-mobile-field[data-column-id="model"] {
+    order: -2;
+    background: color-mix(in oklab, var(--surface-secondary) 55%, var(--surface));
+  }
+
+  .ag-usage-mobile-field[data-column-id="model"] .ag-usage-mobile-value > * {
+    justify-content: flex-start !important;
+    text-align: left !important;
+  }
+
+  .ag-usage-mobile-field[data-column-id="tokens"] .ag-usage-mobile-value > * {
+    margin-inline: auto;
+  }
+
+  .ag-usage-mobile-field[data-column-id="created_at"] {
+    order: -1;
+  }
+
+  .ag-usage-mobile-field[data-column-id="created_at"] .hidden {
+    display: inline !important;
+  }
+
+  .ag-usage-mobile-field[data-column-id="cost"] .ag-usage-mobile-value > *,
+  .ag-usage-mobile-field[data-column-id="user_id"] .ag-usage-mobile-value > * {
+    justify-content: center !important;
+    margin-inline: auto;
+    text-align: center !important;
+  }
+
+  .ag-usage-mobile-empty {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .ag-usage-mobile-card--loading {
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .ag-usage-mobile-card--new {
+    animation: ag-usage-row-new-enter 1.4s ease-out both;
+  }
 }

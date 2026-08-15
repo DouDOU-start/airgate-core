@@ -227,7 +227,7 @@ export default function RechargePage() {
               {/* 金额选择 */}
               <div>
                 <p className="mb-2 text-sm font-medium text-text">{t('payment.amount_label')}</p>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="grid grid-cols-2 gap-2 min-[360px]:grid-cols-3">
                   {PRESET_AMOUNTS.map((amount) => {
                     const selected = !customAmount.trim() && presetAmount === amount;
                     return (
@@ -244,7 +244,7 @@ export default function RechargePage() {
                       </Button>
                     );
                   })}
-                  <div className="w-36">
+                  <div className="col-span-full w-full">
                     <Input
                       aria-label={t('payment.custom_amount_placeholder')}
                       min={0}
@@ -346,6 +346,7 @@ export default function RechargePage() {
         </div>
         <CommonTable
           ariaLabel={t('payment.records_title')}
+          mobileLayout="cards"
           footer={(
             <TablePaginationFooter
               page={page}

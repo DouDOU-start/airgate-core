@@ -75,6 +75,7 @@ export function BalanceHistoryModal({ open, user, onClose }: BalanceHistoryModal
 
               <CommonTable
                 ariaLabel={t('users.balance_history')}
+                mobileLayout="cards"
                 footer={(
                   <TablePaginationFooter
                     page={page}

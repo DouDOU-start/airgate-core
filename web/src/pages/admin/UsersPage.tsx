@@ -237,6 +237,7 @@ export default function UsersPage() {
       <CommonTable
         ariaLabel={t('users.title', 'Users')}
         className="ag-users-table"
+        mobileLayout="cards"
         footer={(
           <TablePaginationFooter
             page={page}

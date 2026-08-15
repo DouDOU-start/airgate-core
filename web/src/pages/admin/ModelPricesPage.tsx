@@ -352,7 +352,7 @@ export function PriceCard({
           </span>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-4 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
         <PriceStat label={t('model_prices.price_short_input')} value={row.input_price} />
         <PriceStat label={t('model_prices.price_short_output')} value={row.output_price} />
       </div>
@@ -871,7 +871,7 @@ export default function ModelPricesPage() {
     <div>
       <ModelSyncModal open={modelSyncOpen} onClose={() => setModelSyncOpen(false)} />
       {/* 筛选 + 工具栏 */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="ag-mobile-toolbar mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="relative w-full sm:w-56">
           <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
           <Input
@@ -921,7 +921,7 @@ export default function ModelPricesPage() {
             <ToggleButton id="off">{t('model_prices.market_visible_off')}</ToggleButton>
           </ToggleButtonGroup>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ag-mobile-actions ml-auto flex items-center gap-2">
           <Button variant="secondary" onPress={() => setModelSyncOpen(true)}>
             <ListPlus className="h-4 w-4" />
             {t('model_prices.model_sync')}
@@ -962,7 +962,7 @@ export default function ModelPricesPage() {
               <span className="border-l border-border pl-3 text-xs font-medium text-text-secondary">
                 {t('model_prices.selected_count', { count: selectedIds.length })}
               </span>
-              <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              <div className="ag-mobile-bulk-actions ml-auto flex flex-wrap items-center gap-1.5">
                 <Button
                   isDisabled={bulkMutation.isPending}
                   size="sm"
@@ -1245,7 +1245,7 @@ export default function ModelPricesPage() {
                     <div className="space-y-2">
                       <p className="text-[11px] leading-4 text-text-tertiary">{t('model_prices.image_prices_hint')}</p>
                       {imageRows.map((row, index) => (
-                        <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2" key={index}>
+                        <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]" key={index}>
                           <HeroTextField fullWidth>
                             {index === 0 ? <Label>{t('model_prices.image_quality')}</Label> : null}
                             <Input

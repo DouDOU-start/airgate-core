@@ -108,6 +108,7 @@ export default function GroupsPage() {
         ariaLabel={t('groups.title', 'Groups')}
         className="ag-groups-table"
         contentClassName="ag-groups-table-content"
+        mobileLayout="cards"
         footer={(
           <TablePaginationFooter
             page={page}

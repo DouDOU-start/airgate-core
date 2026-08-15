@@ -309,7 +309,7 @@ function OverridesTab() {
 
   return (
     <div>
-      <div className="mb-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap">
+      <div className="ag-mobile-toolbar mb-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap">
         <div className="w-full sm:w-64">
           <HeroTextField fullWidth aria-label={t('invite.admin_overrides_search_placeholder')}>
             <div className="relative">
@@ -328,7 +328,7 @@ function OverridesTab() {
           isRefreshing={isFetching}
           onRefresh={refetch}
         />
-        <Button className="sm:ml-auto" variant="primary" onPress={() => setModalMode('add')}>
+        <Button className="ag-mobile-primary-action sm:ml-auto" variant="primary" onPress={() => setModalMode('add')}>
           <Plus className="h-4 w-4" />
           {t('invite.admin_override_add')}
         </Button>
@@ -438,7 +438,7 @@ function InviteesTab() {
 
   return (
     <div>
-      <div className="mb-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap">
+      <div className="ag-mobile-toolbar mb-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap">
         <div className="w-full sm:w-64">
           <HeroTextField fullWidth aria-label={t('invite.admin_overrides_search_placeholder')}>
             <div className="relative">
@@ -528,7 +528,7 @@ function LogsTab() {
 
   return (
     <div>
-      <div className="mb-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap">
+      <div className="ag-mobile-toolbar mb-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap">
         <div className="w-full sm:w-64">
           <HeroTextField fullWidth aria-label={t('invite.admin_overrides_search_placeholder')}>
             <div className="relative">

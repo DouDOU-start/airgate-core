@@ -179,6 +179,7 @@ export default function ProxiesPage() {
       {/* 表格 */}
       <CommonTable
         ariaLabel={t('proxies.title', 'Proxies')}
+        mobileLayout="cards"
         footer={(
           <TablePaginationFooter
             page={page}

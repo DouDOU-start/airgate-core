@@ -335,6 +335,7 @@ function MyBalanceHistoryModal({ open, balance, onClose }: { open: boolean; bala
 
               <CommonTable
                 ariaLabel={t('profile.balance_history')}
+                mobileLayout="cards"
                 footer={(
                   <TablePaginationFooter
                     page={page}

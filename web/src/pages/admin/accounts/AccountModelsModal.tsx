@@ -224,7 +224,7 @@ export function AccountModelsModal({
                 {isBulk ? t('accounts.models_bulk_hint') : t('accounts.models_hint')}
               </p>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Input
                   aria-label={t('accounts.models')}
                   className="flex-1 font-mono text-xs"
@@ -234,6 +234,7 @@ export function AccountModelsModal({
                   onKeyDown={handleKeyDown}
                 />
                 <Button
+                  className="w-full sm:w-auto"
                   isDisabled={!modelInput.trim()}
                   size="sm"
                   variant="secondary"
@@ -282,7 +283,7 @@ export function AccountModelsModal({
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_2rem] items-center gap-3 border-b border-border bg-bg px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-text-tertiary">
+                    <div className="hidden grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_2rem] items-center gap-3 border-b border-border bg-bg px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-text-tertiary sm:grid">
                       <span>{t('accounts.public_model')}</span>
                       <span aria-hidden="true" />
                       <span>{t('accounts.upstream_model')}</span>
@@ -292,18 +293,18 @@ export function AccountModelsModal({
                       const notInCatalog = catalogReady && !catalog.has(model);
                       return (
                         <div
-                          className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_2rem] items-center gap-3 border-b border-border px-3 py-2 last:border-b-0"
+                          className="grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-2 border-b border-border px-3 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_2rem] sm:gap-3 sm:py-2"
                           key={model}
                         >
                           <span
-                            className={`min-w-0 truncate font-mono text-xs ${
+                            className={`col-span-2 min-w-0 truncate font-mono text-xs sm:col-span-1 ${
                               notInCatalog ? 'text-warning' : 'text-text'
                             }`}
                             title={model}
                           >
                             {model}
                           </span>
-                          <ArrowRight className="h-3.5 w-3.5 text-sky-500" />
+                          <ArrowRight className="hidden h-3.5 w-3.5 text-sky-500 sm:block" />
                           <Input
                             aria-label={`${t('accounts.upstream_model')} ${model}`}
                             className="min-w-0 font-mono text-xs"

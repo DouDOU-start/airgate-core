@@ -157,6 +157,51 @@ const UsageTableRow = memo(function UsageTableRow({
   );
 });
 
+const UsageMobileCard = memo(function UsageMobileCard({
+  columns,
+  isNew,
+  onNewAnimationEnd,
+  row,
+}: {
+  columns: UsageColumnConfig[];
+  isNew: boolean;
+  onNewAnimationEnd: (rowId: string) => void;
+  row: UsageRow;
+}) {
+  const rowId = String(row.id);
+  const animationEndedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isNew) animationEndedRef.current = false;
+  }, [isNew]);
+
+  const handleAnimationEnd = (event: AnimationEvent<HTMLElement>) => {
+    if (animationEndedRef.current) return;
+    if (event.animationName !== NEW_ROW_ANIMATION_NAME) return;
+    animationEndedRef.current = true;
+    onNewAnimationEnd(rowId);
+  };
+
+  return (
+    <article
+      className={cx('ag-usage-mobile-card', isNew && 'ag-usage-mobile-card--new')}
+      onAnimationEnd={isNew ? handleAnimationEnd : undefined}
+      role="listitem"
+    >
+      {columns.map((column) => (
+        <div
+          className="ag-usage-mobile-field"
+          data-column-id={column.key}
+          key={column.key}
+        >
+          <div className="ag-usage-mobile-label">{column.title}</div>
+          <div className="ag-usage-mobile-value">{column.render(row)}</div>
+        </div>
+      ))}
+    </article>
+  );
+});
+
 export function UsageRecordsTable<T extends UsageRow>({
   ariaLabel,
   columns,
@@ -213,6 +258,10 @@ export function UsageRecordsTable<T extends UsageRow>({
     }) as CSSProperties,
     [tableMinWidth, tableMobileWidthDelta],
   );
+  const mobileColumns = useMemo(
+    () => columns.filter((column) => !column.hideOnMobile),
+    [columns],
+  );
   const { clearMarkedRowId, markedRowIds } = useNewRowMarkers({
     dataVersion,
     enabled: highlightNewRows,
@@ -238,6 +287,32 @@ export function UsageRecordsTable<T extends UsageRow>({
 
   return (
     <div className="ag-usage-records-table min-h-[240px]">
+      <div
+        aria-busy={isLoading}
+        aria-label={ariaLabel}
+        className="ag-usage-mobile-list"
+        role="list"
+      >
+        {isLoading ? (
+          Array.from({ length: 3 }, (_, index) => (
+            <div aria-hidden="true" className="ag-usage-mobile-card ag-usage-mobile-card--loading" key={index}>
+              <div className="h-4 w-2/3 animate-pulse rounded bg-default" />
+              <div className="h-10 animate-pulse rounded bg-default" />
+              <div className="h-14 animate-pulse rounded bg-default" />
+            </div>
+          ))
+        ) : rows.length === 0 ? (
+          <div className="ag-usage-mobile-empty">{emptyState}</div>
+        ) : rows.map((row) => (
+          <UsageMobileCard
+            key={row.id}
+            columns={mobileColumns as UsageColumnConfig[]}
+            isNew={markedRowIds.has(String(row.id))}
+            onNewAnimationEnd={clearMarkedRowId}
+            row={row}
+          />
+        ))}
+      </div>
       <div className="ag-usage-table-scroll" data-slot="wrapper">
         <table
           aria-label={ariaLabel}

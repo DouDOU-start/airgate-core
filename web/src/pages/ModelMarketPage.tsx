@@ -169,7 +169,7 @@ function MarketPriceCard({ row, t }: { row: ModelMarketItemResp; t: Translate })
         </div>
         {row.tag ? <Chip size="sm" variant="soft">{row.tag.name}</Chip> : null}
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-4 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
         <div>
           <div className="text-[11px] text-text-tertiary">{t('model_market.price_short_input')}</div>
           <div className="mt-0.5 font-mono tabular-nums">

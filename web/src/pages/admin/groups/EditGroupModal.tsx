@@ -136,7 +136,7 @@ export function GroupFormModal({
           </div>
         </HeroTextField>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <NativeSwitch
             isSelected={form.is_exclusive}
             label={<span className="text-sm text-text">{t('groups.exclusive_hint')}</span>}

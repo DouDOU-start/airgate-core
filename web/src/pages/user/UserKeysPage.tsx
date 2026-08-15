@@ -308,6 +308,7 @@ export default function UserKeysPage() {
       <CommonTable
         ariaLabel={t('user_keys.title', 'API keys')}
         className="ag-api-keys-table"
+        mobileLayout="scroll"
         footer={(
           <TablePaginationFooter
             page={page}

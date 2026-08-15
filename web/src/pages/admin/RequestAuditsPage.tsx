@@ -155,7 +155,7 @@ function AuditRow({ row, active, onSelect }: {
 }) {
   return (
     <button
-      className={`group relative grid w-full grid-cols-[78px_minmax(0,1fr)_76px_20px] items-center gap-3 border-b border-border-subtle px-4 py-3.5 text-left transition duration-200 ${active ? 'bg-[linear-gradient(90deg,var(--ag-primary-subtle),transparent_78%)]' : 'hover:bg-surface-secondary/55'}`}
+      className={`ag-request-audit-row group relative grid w-full grid-cols-[78px_minmax(0,1fr)_76px_20px] items-center gap-3 border-b border-border-subtle px-4 py-3.5 text-left transition duration-200 ${active ? 'bg-[linear-gradient(90deg,var(--ag-primary-subtle),transparent_78%)]' : 'hover:bg-surface-secondary/55'}`}
       type="button"
       onClick={onSelect}
     >
@@ -453,8 +453,8 @@ export default function RequestAuditsPage() {
         </div>
       </section>
 
-      <div className="grid min-h-[700px] overflow-hidden rounded-2xl border border-border bg-surface shadow-lg xl:h-[calc(100vh-220px)] xl:min-h-[650px] xl:grid-cols-[minmax(520px,0.88fr)_minmax(0,1.12fr)]">
-        <section className="flex min-w-0 flex-col border-b border-border xl:min-h-0 xl:border-b-0 xl:border-r">
+      <div className="ag-request-audits-layout grid min-h-[700px] overflow-hidden rounded-2xl border border-border bg-surface shadow-lg xl:h-[calc(100vh-220px)] xl:min-h-[650px] xl:grid-cols-[minmax(520px,0.88fr)_minmax(0,1.12fr)]">
+        <section className="ag-request-audits-list flex min-w-0 flex-col border-b border-border xl:min-h-0 xl:border-b-0 xl:border-r">
           <div className="flex h-12 shrink-0 items-center justify-between border-b border-border-subtle bg-surface-secondary/45 px-4">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-accent" />
@@ -462,10 +462,10 @@ export default function RequestAuditsPage() {
             </div>
             <span className="rounded-full border border-border-subtle bg-surface px-2 py-1 font-mono text-[10px] text-text-tertiary">{total.toLocaleString()} 条</span>
           </div>
-          <div className="grid shrink-0 grid-cols-[78px_minmax(0,1fr)_76px_20px] gap-3 border-b border-border-subtle px-4 py-2 font-mono text-[9px] uppercase tracking-[0.14em] text-text-tertiary">
+          <div className="ag-request-audit-header grid shrink-0 grid-cols-[78px_minmax(0,1fr)_76px_20px] gap-3 border-b border-border-subtle px-4 py-2 font-mono text-[9px] uppercase tracking-[0.14em] text-text-tertiary">
             <span>时间</span><span>请求 / 路由</span><span className="text-right">结果</span><span />
           </div>
-          <div className="min-h-[430px] flex-1 overflow-y-auto">
+          <div className="ag-request-audits-scroll min-h-[430px] flex-1 overflow-y-auto">
             {listQuery.isLoading ? (
               <ListLoadingState />
             ) : listQuery.isError ? (
@@ -507,7 +507,7 @@ export default function RequestAuditsPage() {
           </div>
         </section>
 
-        <section className="min-w-0 overflow-y-auto bg-[radial-gradient(circle_at_top_right,var(--ag-primary-subtle),transparent_30%)] xl:min-h-0">
+        <section className="ag-request-audits-detail min-w-0 overflow-y-auto bg-[radial-gradient(circle_at_top_right,var(--ag-primary-subtle),transparent_30%)] xl:min-h-0">
           {!selectedID ? (
             <DetailEmptyState />
           ) : detailQuery.isLoading ? (

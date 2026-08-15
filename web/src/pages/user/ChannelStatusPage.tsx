@@ -159,7 +159,7 @@ function GroupStatusRow({ group }: { group: ChannelStatusGroup }) {
     : Math.max(0, Math.min(100, group.success_rate * 100));
 
   return (
-    <div className="grid min-h-[76px] grid-cols-2 items-center gap-x-4 gap-y-3 border-t border-separator px-4 py-3 first:border-t-0 md:grid-cols-[minmax(220px,1.4fr)_minmax(180px,1fr)_110px_110px_110px] 2xl:px-5">
+    <div className="ag-channel-status-row grid min-h-[76px] grid-cols-2 items-center gap-x-4 gap-y-3 border-t border-separator px-4 py-3 first:border-t-0 md:grid-cols-[minmax(220px,1.4fr)_minmax(180px,1fr)_110px_110px_110px] 2xl:px-5">
       <div className="col-span-2 flex min-w-0 items-center justify-between gap-3 md:col-span-1 md:justify-center">
         <div className="flex min-w-0 items-center gap-3">
           <span
@@ -210,7 +210,7 @@ function GroupRowsSkeleton() {
   return (
     <div className="divide-y divide-separator">
       {Array.from({ length: 3 }, (_, index) => (
-        <div className="grid min-h-[76px] grid-cols-2 items-center gap-x-4 gap-y-3 px-4 py-3 md:grid-cols-[minmax(220px,1.4fr)_minmax(180px,1fr)_110px_110px_110px]" key={index}>
+        <div className="ag-channel-status-row grid min-h-[76px] grid-cols-2 items-center gap-x-4 gap-y-3 px-4 py-3 md:grid-cols-[minmax(220px,1.4fr)_minmax(180px,1fr)_110px_110px_110px]" key={index}>
           <Skeleton className="col-span-2 h-8 w-44 max-w-full rounded md:col-span-1 md:justify-self-center" />
           <Skeleton className="col-span-2 h-2 w-full rounded-full md:col-span-1" />
           <Skeleton className="h-4 w-14 rounded md:justify-self-center" />
@@ -253,7 +253,7 @@ export default function ChannelStatusPage() {
 
   return (
     <div className="space-y-5 2xl:space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="ag-mobile-toolbar flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="min-w-0 truncate text-xs text-text-tertiary">
           {overview?.updated_at
             ? t('channel_status.updated_at', { time: formatDateTime(overview.updated_at) })

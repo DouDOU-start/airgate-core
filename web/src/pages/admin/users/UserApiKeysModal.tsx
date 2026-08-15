@@ -56,6 +56,7 @@ export function UserApiKeysModal({ open, user, onClose }: UserApiKeysModalProps)
             <Modal.Body>
               <CommonTable
                 ariaLabel={t('users.api_keys')}
+                mobileLayout="cards"
                 footer={(
                   <TablePaginationFooter
                     page={page}
