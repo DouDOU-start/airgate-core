@@ -87,6 +87,42 @@ func BenchmarkPickRouteLatencyAware(b *testing.B) {
 	}
 }
 
+func BenchmarkRebalanceAffinityAccount(b *testing.B) {
+	for _, total := range []int{8, 100} {
+		b.Run(fmt.Sprintf("accounts_%d", total), func(b *testing.B) {
+			snapshots := make([]accountreg.Snapshot, total)
+			for i := range snapshots {
+				snapshots[i] = accountreg.Snapshot{
+					ID: i + 1, Priority: 50, Weight: 10, State: accountreg.StateActive,
+					Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}},
+				}
+			}
+			accounts := accountreg.New(routeTestAccountLoader{accounts: snapshots}, nil)
+			if err := accounts.Reload(context.Background()); err != nil {
+				b.Fatal(err)
+			}
+			p := &Pipeline{accounts: accounts}
+			for i := range snapshots {
+				for range accountAffinityRebindMinSamples {
+					p.recordAccountFirstToken(i+1, "gpt-5", int64(3_000+i*10))
+				}
+			}
+			bound, ok := p.resolveAffinityTarget(routeAccount, 1, 7, "gpt-5", "openai", nil, nil)
+			if !ok {
+				b.Fatal("未解析到粘性账号")
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				decision := p.rebalanceAffinityAccount(bound, 7, "gpt-5", nil)
+				if decision.target.account == nil {
+					b.Fatal("未返回粘性账号")
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkBuildWeightedSchedule(b *testing.B) {
 	candidates := make([]weightedRouteRef, 1_000)
 	for i := range candidates {
@@ -311,6 +347,166 @@ func TestIndexedRouteBalancesLatencyAndInflight(t *testing.T) {
 	selected, ok := p.pickRoute(7, "gpt-5", "openai", nil, nil, nil)
 	if !ok || selected.account == nil || selected.account.ID != 2 {
 		t.Fatalf("快速账号在途较高时应选择预计完成更早的空闲账号：%+v", selected)
+	}
+}
+
+func TestAffinity持续慢账号迁移到快速账号(t *testing.T) {
+	accounts := accountreg.New(routeTestAccountLoader{accounts: []accountreg.Snapshot{
+		{ID: 1, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 2, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+	}}, nil)
+	if err := accounts.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p := &Pipeline{accounts: accounts}
+	for range accountAffinityRebindMinSamples {
+		p.recordAccountFirstToken(1, "gpt-5", 9_000)
+		p.recordAccountFirstToken(2, "gpt-5", 3_000)
+	}
+	bound, ok := p.resolveAffinityTarget(routeAccount, 1, 7, "gpt-5", "openai", nil, nil)
+	if !ok {
+		t.Fatal("未解析到粘性账号")
+	}
+	decision := p.rebalanceAffinityAccount(bound, 7, "gpt-5", nil)
+	if decision.action != affinityAccountRebind || decision.target.account == nil || decision.target.account.ID != 2 {
+		t.Fatalf("持续慢账号未迁移到快速账号：%+v", decision)
+	}
+}
+
+func TestAffinity样本不足或差距较小时保持绑定(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		samples     int
+		boundMs     int64
+		candidateMs int64
+	}{
+		{name: "样本不足", samples: accountAffinityRebindMinSamples - 1, boundMs: 9_000, candidateMs: 3_000},
+		{name: "差距较小", samples: accountAffinityRebindMinSamples, boundMs: 4_000, candidateMs: 3_000},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			accounts := accountreg.New(routeTestAccountLoader{accounts: []accountreg.Snapshot{
+				{ID: 1, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+				{ID: 2, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+			}}, nil)
+			if err := accounts.Reload(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			p := &Pipeline{accounts: accounts}
+			for range tc.samples {
+				p.recordAccountFirstToken(1, "gpt-5", tc.boundMs)
+				p.recordAccountFirstToken(2, "gpt-5", tc.candidateMs)
+			}
+			bound, ok := p.resolveAffinityTarget(routeAccount, 1, 7, "gpt-5", "openai", nil, nil)
+			if !ok {
+				t.Fatal("未解析到粘性账号")
+			}
+			decision := p.rebalanceAffinityAccount(bound, 7, "gpt-5", nil)
+			if decision.action != affinityAccountKeep || decision.target.account.ID != 1 {
+				t.Fatalf("不应迁移粘性账号：%+v", decision)
+			}
+		})
+	}
+}
+
+func TestAffinity绑定账号繁忙时临时分流(t *testing.T) {
+	accounts := accountreg.New(routeTestAccountLoader{accounts: []accountreg.Snapshot{
+		{ID: 1, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 2, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+	}}, nil)
+	if err := accounts.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p := &Pipeline{accounts: accounts}
+	for range accountLatencyMinSamples {
+		p.recordAccountFirstToken(1, "gpt-5", 3_000)
+		p.recordAccountFirstToken(2, "gpt-5", 5_000)
+	}
+	releases := []func(){p.trackAccountAttempt(1), p.trackAccountAttempt(1)}
+	defer func() {
+		for _, release := range releases {
+			release()
+		}
+	}()
+	bound, ok := p.resolveAffinityTarget(routeAccount, 1, 7, "gpt-5", "openai", nil, nil)
+	if !ok {
+		t.Fatal("未解析到粘性账号")
+	}
+	decision := p.rebalanceAffinityAccount(bound, 7, "gpt-5", nil)
+	if decision.action != affinityAccountSpill || decision.target.account == nil || decision.target.account.ID != 2 {
+		t.Fatalf("繁忙粘性账号未临时分流：%+v", decision)
+	}
+}
+
+func TestAffinity轻微繁忙或迁移目标拥堵时保持绑定(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		boundMs           int64
+		candidateMs       int64
+		boundInflight     int
+		candidateInflight int
+	}{
+		{name: "轻微繁忙不足以分流", boundMs: 3_000, candidateMs: 5_000, boundInflight: 1},
+		{name: "快速迁移目标当前拥堵", boundMs: 9_000, candidateMs: 3_000, candidateInflight: 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			accounts := accountreg.New(routeTestAccountLoader{accounts: []accountreg.Snapshot{
+				{ID: 1, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+				{ID: 2, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+			}}, nil)
+			if err := accounts.Reload(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			p := &Pipeline{accounts: accounts}
+			for range accountAffinityRebindMinSamples {
+				p.recordAccountFirstToken(1, "gpt-5", tc.boundMs)
+				p.recordAccountFirstToken(2, "gpt-5", tc.candidateMs)
+			}
+			var releases []func()
+			for range tc.boundInflight {
+				releases = append(releases, p.trackAccountAttempt(1))
+			}
+			for range tc.candidateInflight {
+				releases = append(releases, p.trackAccountAttempt(2))
+			}
+			defer func() {
+				for _, release := range releases {
+					release()
+				}
+			}()
+			bound, ok := p.resolveAffinityTarget(routeAccount, 1, 7, "gpt-5", "openai", nil, nil)
+			if !ok {
+				t.Fatal("未解析到粘性账号")
+			}
+			decision := p.rebalanceAffinityAccount(bound, 7, "gpt-5", nil)
+			if decision.action != affinityAccountKeep || decision.target.account.ID != 1 {
+				t.Fatalf("不应在收益不足或目标拥堵时调整粘性账号：%+v", decision)
+			}
+		})
+	}
+}
+
+func TestAffinity不跨优先级且尊重排除列表(t *testing.T) {
+	accounts := accountreg.New(routeTestAccountLoader{accounts: []accountreg.Snapshot{
+		{ID: 1, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 2, Priority: 10, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 3, Priority: 50, Weight: 10, State: accountreg.StateActive, Models: map[string]struct{}{"gpt-5": {}}, GroupIDs: map[int]struct{}{7: {}}},
+	}}, nil)
+	if err := accounts.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p := &Pipeline{accounts: accounts}
+	for range accountAffinityRebindMinSamples {
+		p.recordAccountFirstToken(1, "gpt-5", 9_000)
+		p.recordAccountFirstToken(2, "gpt-5", 1_000)
+		p.recordAccountFirstToken(3, "gpt-5", 2_000)
+	}
+	bound, ok := p.resolveAffinityTarget(routeAccount, 1, 7, "gpt-5", "openai", nil, nil)
+	if !ok {
+		t.Fatal("未解析到粘性账号")
+	}
+	decision := p.rebalanceAffinityAccount(bound, 7, "gpt-5", []int{3})
+	if decision.action != affinityAccountKeep || decision.target.account.ID != 1 {
+		t.Fatalf("低优先级或被排除账号不应参与粘性迁移：%+v", decision)
 	}
 }
 

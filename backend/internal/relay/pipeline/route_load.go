@@ -177,23 +177,31 @@ func (p *Pipeline) WarmAccountFirstTokens(ctx context.Context) (int, error) {
 }
 
 func (p *Pipeline) recentAccountFirstToken(accountID int, model string, now time.Time) (int64, bool) {
+	latency, _, ok := p.recentAccountFirstTokenStats(accountID, model, now)
+	return latency, ok
+}
+
+// recentAccountFirstTokenStats 返回账号×模型的近期首字 EWMA 与有效样本数。
+// 粘性会话重平衡需要比新会话调度更高的样本门槛，避免少量抖动导致缓存迁移。
+func (p *Pipeline) recentAccountFirstTokenStats(accountID int, model string, now time.Time) (int64, uint64, bool) {
 	if p == nil || accountID <= 0 || strings.TrimSpace(model) == "" {
-		return 0, false
+		return 0, 0, false
 	}
 	value, ok := p.accountFirstToken.Load(accountLatencyKey{accountID: accountID, model: model})
 	if !ok {
-		return 0, false
+		return 0, 0, false
 	}
 	state := value.(*accountLatencyState)
-	if state.samples.Load() < accountLatencyMinSamples {
-		return 0, false
+	samples := state.samples.Load()
+	if samples < accountLatencyMinSamples {
+		return 0, samples, false
 	}
 	updatedAt := state.updatedAt.Load()
 	if updatedAt <= 0 || now.Sub(time.Unix(0, updatedAt)) > accountLatencyFreshDuration {
-		return 0, false
+		return 0, samples, false
 	}
 	latency := state.ewmaMs.Load()
-	return latency, latency > 0
+	return latency, samples, latency > 0
 }
 
 // preferAccountCandidate 在两个同优先级账号之间比较预计首字完成时间。

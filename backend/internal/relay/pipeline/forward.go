@@ -349,6 +349,35 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 					// 目标已失效或已被当前请求排除，立即解除旧绑定；若没有
 					// 可替代目标，也不能让下一次请求继续粘回这个失败目标。
 					unbindAffinity(kind, id)
+				} else if target.kind == routeAccount {
+					decision := p.rebalanceAffinityAccount(target, keyInfo.GroupID, req.Model, excludeAccounts)
+					if decision.action != affinityAccountKeep {
+						fromAccountID := target.account.ID
+						target = decision.target
+						if decision.action == affinityAccountRebind {
+							p.sessionAffinity.bind(sessionKey, routeAccount, target.account.ID)
+							slog.Info("relay_affinity_account_rebound",
+								"from_account_id", fromAccountID,
+								"to_account_id", target.account.ID,
+								"model", req.Model,
+								"from_first_token_ms", decision.boundLatencyMs,
+								"to_first_token_ms", decision.targetLatencyMs,
+								"from_inflight", decision.boundInflight,
+								"to_inflight", decision.targetInflight,
+							)
+						} else {
+							// 并发临时分流不修改粘性绑定，避免后续串行请求丢失 prompt cache。
+							slog.Debug("relay_affinity_account_spilled",
+								"bound_account_id", fromAccountID,
+								"target_account_id", target.account.ID,
+								"model", req.Model,
+								"bound_first_token_ms", decision.boundLatencyMs,
+								"target_first_token_ms", decision.targetLatencyMs,
+								"bound_inflight", decision.boundInflight,
+								"target_inflight", decision.targetInflight,
+							)
+						}
+					}
 				}
 			}
 		}

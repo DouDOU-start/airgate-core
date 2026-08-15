@@ -96,7 +96,8 @@ type Pipeline struct {
 	// 新会话调度用它做无网络往返的轻量负载感知；跨实例仍由 Redis 并发闸门兜底。
 	accountInflight sync.Map
 	// accountFirstToken 保存账号×模型近期成功首字的本实例 EWMA。
-	// 只参与同优先级新会话选择，不改变失败冷却、会话粘性或配置权重语义。
+	// 用于同优先级新会话选择和粘性会话自适应重平衡；不形成失败冷却，
+	// 也不跨越配置优先级或绕过配置权重。
 	accountFirstToken sync.Map
 	routeMu           sync.Mutex
 	routeWeights      map[routeBalanceKey]routeBalanceState
