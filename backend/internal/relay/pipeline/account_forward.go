@@ -78,6 +78,7 @@ func (p *Pipeline) executeAccountAttempt(
 	}
 
 	ctx := c.Request.Context()
+	var auditTransport *requestaudit.RoundTripper
 	if auditRequest != nil {
 		baseTransport, errBuild := p.accountAuditTransport(acc.ProxyURL)
 		if errBuild != nil {
@@ -89,8 +90,9 @@ func (p *Pipeline) executeAccountAttempt(
 		}
 		// CPA 通过固定字符串上下文键接收最终网络层；同时清空 Auth.ProxyURL，
 		// 避免 executor 的代理优先级绕过审计 RoundTripper。
+		auditTransport = requestaudit.NewRoundTripper(baseTransport, auditRequest, target)
 		//nolint:staticcheck
-		ctx = context.WithValue(ctx, "cliproxy.roundtripper", requestaudit.NewRoundTripper(baseTransport, auditRequest, target))
+		ctx = context.WithValue(ctx, "cliproxy.roundtripper", auditTransport)
 		fwdReq.Account.ProxyURL = ""
 	}
 	cancel := context.CancelFunc(func() {})
@@ -100,6 +102,12 @@ func (p *Pipeline) executeAccountAttempt(
 	defer cancel()
 
 	result := p.cpa.Forward(ctx, c, fwdReq)
+	if auditTransport != nil && req.Stream && result.Done && result.StreamErr == nil &&
+		result.NetErr == nil && result.BuildErr == nil && result.StatusCode >= 200 && result.StatusCode < 300 {
+		// CPA 已识别协议终态时覆盖底层“未继续读到 HTTP EOF”的临时观测，
+		// 避免把 executor 的正常提前收尾误报成上游流中断。
+		auditTransport.MarkLatestStreamCompleted()
+	}
 	if req.Stream {
 		logLargeAccountRequestTiming(c, acc, req.Model, endpoint, len(payload), result)
 	}

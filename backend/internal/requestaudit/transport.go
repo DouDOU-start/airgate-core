@@ -13,17 +13,36 @@ import (
 // RoundTripper 在 CPA executor 注入 OAuth Token 后、真正触网前保存最终请求骨架。
 // 骨架写入失败时直接返回错误；密文载荷和收尾状态由有界工作池异步补写。
 type RoundTripper struct {
-	base    http.RoundTripper
-	request *Handle
-	target  Target
+	base     http.RoundTripper
+	request  *Handle
+	target   Target
+	latestMu sync.RWMutex
+	latest   *observedAttempt
 }
 
 // NewRoundTripper 创建审计网络层包装器。
-func NewRoundTripper(base http.RoundTripper, request *Handle, target Target) http.RoundTripper {
+func NewRoundTripper(base http.RoundTripper, request *Handle, target Target) *RoundTripper {
 	if base == nil {
 		base = http.DefaultTransport
 	}
 	return &RoundTripper{base: base, request: request, target: target}
+}
+
+// MarkLatestStreamCompleted 把最新一次真实发包标记为协议级完整流。
+//
+// 部分上游 executor 收到 response.completed、response.incomplete 或 message_stop
+// 后会立即结束读取并关闭 HTTP Body，不再等待传输层 EOF。此时 Close 本身是正常
+// 收尾，不能被审计误判为上游流中断。真实读错误仍由 observedBody 原样保留。
+func (t *RoundTripper) MarkLatestStreamCompleted() {
+	if t == nil {
+		return
+	}
+	t.latestMu.RLock()
+	attempt := t.latest
+	t.latestMu.RUnlock()
+	if attempt != nil {
+		attempt.markStreamCompleted()
+	}
 }
 
 // RoundTrip 实现 http.RoundTripper。
@@ -32,10 +51,14 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w，已阻止发包: %v", ErrWrite, err)
 	}
+	observed := &observedAttempt{handle: attempt}
+	t.latestMu.Lock()
+	t.latest = observed
+	t.latestMu.Unlock()
 	started := time.Now()
 	resp, err := t.base.RoundTrip(req)
 	if err != nil {
-		attempt.Finish(AttemptFinish{
+		observed.finish(AttemptFinish{
 			Verdict: "networkError", Reason: err.Error(), Latency: time.Since(started),
 			StreamCompleted: false,
 		})
@@ -44,7 +67,7 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	statusVerdict := verdictForStatus(resp.StatusCode)
 	retryAfter := retryAfterOf(resp.Header)
 	if resp.Body == nil {
-		attempt.Finish(AttemptFinish{
+		observed.finish(AttemptFinish{
 			StatusCode: resp.StatusCode, Verdict: statusVerdict, RetryAfter: retryAfter,
 			Latency: time.Since(started), ResponseStarted: true, StreamCompleted: true,
 		})
@@ -54,7 +77,7 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		ReadCloser: resp.Body,
 		started:    started,
 		finish: func(firstTokenMs int64, complete bool, reason string) {
-			attempt.Finish(AttemptFinish{
+			observed.finish(AttemptFinish{
 				StatusCode: resp.StatusCode, Verdict: statusVerdict, Reason: reason,
 				RetryAfter: retryAfter, Latency: time.Since(started), FirstTokenMs: firstTokenMs,
 				ResponseStarted: true, StreamCompleted: complete,
@@ -62,6 +85,58 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		},
 	}
 	return resp, nil
+}
+
+const responseBodyClosedBeforeEOFReason = "响应体在 EOF 前关闭"
+
+// observedAttempt 合并传输层观测与上层协议终态。
+// MarkLatestStreamCompleted 与 Body.Close 的先后顺序都可能发生，故两侧统一在此
+// 串行合并，再利用 AttemptHandle 的 revision 机制覆盖异步落库结果。
+type observedAttempt struct {
+	handle *AttemptHandle
+
+	mu              sync.Mutex
+	latest          AttemptFinish
+	hasLatest       bool
+	streamCompleted bool
+}
+
+func (a *observedAttempt) finish(in AttemptFinish) {
+	if a == nil || a.handle == nil {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.streamCompleted {
+		in.StreamCompleted = true
+		if in.Reason == responseBodyClosedBeforeEOFReason {
+			in.Reason = ""
+		}
+	}
+	a.latest = in
+	a.hasLatest = true
+	// 必须在合并锁内提交，避免协议终态覆盖刚写入后，较早的 Close 结果
+	// 才进入 AttemptHandle.Finish，反向把最终状态覆盖回未完成。
+	a.handle.Finish(in)
+}
+
+func (a *observedAttempt) markStreamCompleted() {
+	if a == nil || a.handle == nil {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.streamCompleted = true
+	if !a.hasLatest {
+		return
+	}
+	in := a.latest
+	in.StreamCompleted = true
+	if in.Reason == responseBodyClosedBeforeEOFReason {
+		in.Reason = ""
+	}
+	a.latest = in
+	a.handle.Finish(in)
 }
 
 type observedBody struct {
@@ -92,7 +167,7 @@ func (b *observedBody) Close() error {
 	if err != nil {
 		b.done(false, err.Error())
 	} else {
-		b.done(false, "响应体在 EOF 前关闭")
+		b.done(false, responseBodyClosedBeforeEOFReason)
 	}
 	return err
 }

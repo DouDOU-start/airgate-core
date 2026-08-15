@@ -674,6 +674,126 @@ func TestRoundTripper捕获Token注入后的最终请求(t *testing.T) {
 	}
 }
 
+func TestRoundTripper协议终态覆盖EOF前关闭(t *testing.T) {
+	for _, markBeforeClose := range []bool{false, true} {
+		name := "关闭后覆盖"
+		if markBeforeClose {
+			name = "关闭前覆盖"
+		}
+		t.Run(name, func(t *testing.T) {
+			service := openTestServiceWithOptions(t, Options{
+				AsyncEnabled: true, QueueSize: 16, WorkerCount: 2, MaxPendingBytes: 1 << 20,
+			})
+			service.StartBackground()
+			handle, err := service.StartFast(context.Background(), RequestInput{
+				RequestID: "req-protocol-complete-" + name,
+				Protocol:  "openai",
+				Endpoint:  "responses",
+				Model:     "gpt-5",
+				Stream:    true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			base := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+					Body:       io.NopCloser(strings.NewReader("data: {\"type\":\"response.completed\"}\n\n未读取尾部")),
+					Request:    req,
+				}, nil
+			})
+			transport := NewRoundTripper(base, handle, Target{RouteKind: "account", AccountID: 33})
+			req, _ := http.NewRequest(http.MethodPost, "https://example.com/responses", strings.NewReader(`{"input":"测试"}`))
+			resp, err := transport.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if markBeforeClose {
+				transport.MarkLatestStreamCompleted()
+			}
+			time.Sleep(2 * time.Millisecond)
+			buf := make([]byte, 8)
+			if _, err := resp.Body.Read(buf); err != nil {
+				t.Fatalf("读取首段响应失败: %v", err)
+			}
+			if err := resp.Body.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if !markBeforeClose {
+				transport.MarkLatestStreamCompleted()
+			}
+			handle.Finish(http.StatusOK, 8, true)
+
+			flushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			if err := service.Flush(flushCtx); err != nil {
+				t.Fatal(err)
+			}
+			detail, err := service.Get(context.Background(), handle.ID())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(detail.Attempts) != 1 {
+				t.Fatalf("上游尝试数量 = %d，期望 1", len(detail.Attempts))
+			}
+			attempt := detail.Attempts[0]
+			if !attempt.Finished || !attempt.StreamCompleted || attempt.Reason != "" {
+				t.Fatalf("协议终态没有覆盖 EOF 前关闭误报: %+v", attempt)
+			}
+			if attempt.StatusCode != http.StatusOK || attempt.Verdict != "success" || attempt.FirstTokenMs <= 0 {
+				t.Fatalf("协议终态覆盖丢失传输层观测: %+v", attempt)
+			}
+		})
+	}
+}
+
+func TestRoundTripper真实提前关闭仍标记未完成(t *testing.T) {
+	service := openTestService(t)
+	handle, err := service.Start(context.Background(), RequestInput{
+		RequestID: "req-real-early-close", Protocol: "openai", Endpoint: "responses",
+		Model: "gpt-5", Stream: true, Headers: http.Header{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body:       io.NopCloser(strings.NewReader("data: 未完成内容\n\n仍有尾部")),
+			Request:    req,
+		}, nil
+	})
+	transport := NewRoundTripper(base, handle, Target{RouteKind: "account", AccountID: 33})
+	req, _ := http.NewRequest(http.MethodPost, "https://example.com/responses", strings.NewReader(`{"input":"测试"}`))
+	resp, err := transport.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, 4)
+	if _, err := resp.Body.Read(buf); err != nil {
+		t.Fatalf("读取首段响应失败: %v", err)
+	}
+	if err := resp.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	handle.Finish(http.StatusOK, 4, true)
+
+	detail, err := service.Get(context.Background(), handle.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(detail.Attempts) != 1 {
+		t.Fatalf("上游尝试数量 = %d，期望 1", len(detail.Attempts))
+	}
+	attempt := detail.Attempts[0]
+	if attempt.StreamCompleted || attempt.Reason != responseBodyClosedBeforeEOFReason {
+		t.Fatalf("真实提前关闭被误标为协议完成: %+v", attempt)
+	}
+}
+
 func Test取消上下文后仍可完成审计收尾(t *testing.T) {
 	service := openTestService(t)
 	ctx, cancel := context.WithCancel(context.Background())
