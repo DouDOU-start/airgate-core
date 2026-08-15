@@ -285,7 +285,7 @@ export default function UserKeysPage() {
 
   return (
     <div className="p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+      <div className="ag-mobile-toolbar flex flex-wrap items-center justify-between gap-3 mb-5">
         <EndpointsBar />
         <div className="flex items-center gap-2 ml-auto">
           <RefreshButton

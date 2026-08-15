@@ -1,0 +1,436 @@
+/* ==========================================================================
+   13. 移动端响应式收口
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  html {
+    scrollbar-gutter: auto;
+  }
+
+  body {
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  .ag-topbar {
+    height: calc(3rem + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .ag-main {
+    padding-top: calc(3rem + env(safe-area-inset-top)) !important;
+    overscroll-behavior: contain;
+  }
+
+  .ag-main-content {
+    min-width: 0;
+    padding: 1rem;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .ag-mobile-sidebar {
+    width: min(var(--ag-sidebar-width), calc(100vw - 3rem)) !important;
+    max-width: calc(100vw - 3rem);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: var(--overlay-shadow);
+  }
+
+  .ag-sidebar-nav-item {
+    min-height: 2.75rem;
+    padding-block: 0.625rem !important;
+  }
+
+  .ag-page-body {
+    gap: 1rem;
+  }
+
+  .ag-page-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.625rem;
+    margin-bottom: 1rem;
+  }
+
+  .ag-page-toolbar > *,
+  .ag-page-toolbar :where(.textfield, .select, .combo-box, .date-picker, .date-range-picker),
+  .ag-main-content :where(.textfield, .select, .combo-box, .date-picker, .date-range-picker) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ag-dashboard-panel:hover,
+  .ag-dashboard-metric:hover,
+  .ag-plugin-card:hover {
+    transform: none;
+  }
+
+  .ag-dashboard-panel,
+  .ag-dashboard-metric,
+  .ag-dashboard-toolbar,
+  :where([data-slot="wrapper"]:has(> [data-slot="table"])) {
+    border-radius: var(--radius-lg) !important;
+  }
+
+  /* 普通资源表在手机上改成带字段名的信息卡片，避免用户盲目横向拖动。 */
+  .ag-resource-table--mobile-cards {
+    min-width: 0;
+  }
+
+  .ag-resource-table--mobile-cards > .ag-resource-table-scroll {
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .ag-resource-table--mobile-cards .ag-resource-table-content {
+    display: block;
+    width: 100% !important;
+    min-width: 0 !important;
+    border-collapse: separate;
+    table-layout: auto !important;
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="thead"]) {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    clip: rect(0 0 0 0) !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="tbody"]) {
+    display: grid;
+    gap: 0.75rem;
+    background: transparent !important;
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="tbody"] > [data-slot="tr"]) {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid color-mix(in oklab, var(--border) 76%, transparent);
+    border-radius: var(--radius-lg);
+    background: var(--surface) !important;
+    box-shadow: var(--ag-shadow-sm);
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="tbody"] > [data-slot="tr"]:hover) {
+    background: var(--surface) !important;
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="tbody"] > [data-slot="tr"] > [data-slot="td"]) {
+    position: static !important;
+    display: grid !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 2.5rem !important;
+    grid-template-columns: minmax(5.5rem, 34%) minmax(0, 1fr);
+    align-items: start !important;
+    gap: 0.75rem;
+    overflow: visible !important;
+    border: 0 !important;
+    border-bottom: 1px solid color-mix(in oklab, var(--separator) 72%, transparent) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0.625rem 0.75rem !important;
+    color: var(--foreground);
+    text-align: left !important;
+    white-space: normal !important;
+    word-break: break-word;
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="tbody"] > [data-slot="tr"] > [data-slot="td"]:last-child) {
+    border-bottom: 0 !important;
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="tbody"] > [data-slot="tr"] > [data-slot="td"])::before {
+    min-width: 0;
+    color: var(--muted);
+    content: attr(data-label);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 550;
+    letter-spacing: 0.08em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="tbody"] > [data-slot="tr"] > [data-slot="td"]) > * {
+    min-width: 0;
+    max-width: 100%;
+    margin-inline: 0 !important;
+    justify-self: stretch;
+    text-align: left !important;
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="td"][data-column-id="actions"]) {
+    display: block !important;
+    padding-top: 0.75rem !important;
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="td"][data-column-id="actions"])::before,
+  .ag-resource-table--mobile-cards :where([data-slot="td"][colspan])::before {
+    display: none;
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="td"][colspan]) {
+    display: block !important;
+    min-height: 0 !important;
+    padding: 0.75rem !important;
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="tr"]:has(> [data-slot="td"][colspan])) {
+    display: block;
+  }
+
+  .ag-resource-table--mobile-cards .ag-table-row-actions {
+    display: flex !important;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end !important;
+    gap: 0.375rem !important;
+  }
+
+  .ag-resource-table--mobile-cards .ag-table-row-actions > .button:not(.button--icon-only) {
+    flex: 1 1 auto;
+  }
+
+  .ag-resource-table--mobile-cards > [data-slot="table-footer"] {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding-top: 0.75rem;
+  }
+
+  /* 仍需保留宽表结构的场景会明确使用 scroll 变体，并给出边缘提示。 */
+  .ag-resource-table--mobile-scroll > .ag-resource-table-scroll,
+  .ag-usage-table-scroll {
+    background:
+      linear-gradient(90deg, var(--surface) 30%, transparent),
+      linear-gradient(270deg, var(--surface) 30%, transparent) 100% 0,
+      linear-gradient(90deg, color-mix(in oklab, var(--foreground) 12%, transparent), transparent),
+      linear-gradient(270deg, color-mix(in oklab, var(--foreground) 12%, transparent), transparent) 100% 0;
+    background-attachment: local, local, scroll, scroll;
+    background-repeat: no-repeat;
+    background-size: 2rem 100%, 2rem 100%, 0.75rem 100%, 0.75rem 100%;
+  }
+
+  .ag-table-pagination {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    padding: 0.5rem 0 !important;
+  }
+
+  .ag-table-pagination-summary {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .ag-table-pagination .pagination__content {
+    width: 100%;
+    justify-content: center;
+    margin-left: 0 !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ag-table-pagination .pagination__content::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 设置页标签不再制造 60rem 的虚拟宽度，改为可触控横向切换。 */
+  .ag-settings-tabs {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .ag-settings-tabs :where(.tabs__list, [data-slot="tabs-list"]) {
+    display: flex;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .ag-settings-tabs :where(.tabs__tab, [data-slot="tabs-tab"]) {
+    width: auto;
+    min-width: 7rem;
+    flex: 0 0 auto;
+  }
+
+  /* 弹窗在手机上采用底部面板，减少四周无效留白并保留安全区。 */
+  .modal__container {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .modal__container .ag-elevation-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: min(92dvh, 62rem) !important;
+    border-right: 0 !important;
+    border-bottom: 0 !important;
+    border-left: 0 !important;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0 !important;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .alert-dialog__container {
+    padding: 1rem !important;
+  }
+
+  .alert-dialog__container .ag-elevation-modal {
+    width: 100% !important;
+    max-width: 28rem !important;
+  }
+
+  .ag-elevation-modal :where(.modal__header, [data-slot="modal-header"], .modal__body, [data-slot="modal-body"], .modal__footer, [data-slot="modal-footer"]) {
+    padding-inline: 1rem !important;
+  }
+
+  .ag-elevation-modal :where(.modal__footer, [data-slot="modal-footer"], .alert-dialog__footer, [data-slot="alert-dialog-footer"]) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .ag-elevation-modal :where(.modal__footer, [data-slot="modal-footer"], .alert-dialog__footer, [data-slot="alert-dialog-footer"]) > .button {
+    flex: 1 1 7rem;
+  }
+
+  .ag-plugin-card {
+    width: 100%;
+    max-width: none;
+    aspect-ratio: auto;
+  }
+
+  .ag-channel-key-row-header {
+    flex-wrap: wrap;
+    align-items: flex-start !important;
+  }
+
+  .ag-channel-key-row-header > :where(span, .chip) {
+    max-width: calc(100% - 2.5rem);
+  }
+
+  .ag-channel-key-row-actions {
+    width: 100%;
+    margin-left: 0 !important;
+    flex-wrap: wrap;
+    gap: 0.375rem !important;
+  }
+
+  .ag-channel-key-row-actions > .button {
+    flex: 1 1 7rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .ag-mobile-toolbar {
+    gap: 0.75rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .ag-mobile-actions {
+    display: flex !important;
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    margin-left: 0 !important;
+  }
+
+  .ag-mobile-actions > .button:not(.button--icon-only) {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .ag-public-nav {
+    gap: 0.5rem;
+    padding: 0.75rem 1rem !important;
+  }
+
+  .ag-public-brand {
+    min-width: 0;
+    gap: 0.5rem !important;
+  }
+
+  .ag-public-brand > span {
+    max-width: 5.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ag-public-nav-actions {
+    min-width: 0;
+    gap: 0.125rem !important;
+  }
+
+  .ag-public-nav-actions .ag-public-nav-icon-button {
+    width: 2.25rem !important;
+    min-width: 2.25rem !important;
+    height: 2.25rem !important;
+    padding-inline: 0 !important;
+  }
+
+  .ag-public-nav-label {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    clip: rect(0 0 0 0) !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+  }
+
+  .ag-public-nav-primary {
+    min-width: 0 !important;
+    padding-inline: 0.75rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  .ag-public-section {
+    padding-inline: 1rem !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .ag-main-content {
+    padding-inline: 0.75rem;
+  }
+
+  .ag-topbar {
+    gap: 0.25rem !important;
+    padding-inline: 0.75rem !important;
+  }
+
+  .ag-topbar-actions {
+    gap: 0.125rem !important;
+  }
+
+  .ag-topbar-actions > .button,
+  .ag-topbar-actions > [data-slot="button"] {
+    width: 2.25rem !important;
+    min-width: 2.25rem !important;
+    height: 2.25rem !important;
+    padding-inline: 0 !important;
+  }
+
+  .ag-resource-table--mobile-cards :where([data-slot="tbody"] > [data-slot="tr"] > [data-slot="td"]) {
+    grid-template-columns: minmax(4.75rem, 32%) minmax(0, 1fr);
+    gap: 0.5rem;
+    padding-inline: 0.625rem !important;
+  }
+
+  .ag-public-brand > span {
+    display: none;
+  }
+}

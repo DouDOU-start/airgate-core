@@ -2,10 +2,12 @@ import type {
   ComponentPropsWithoutRef,
   CSSProperties,
   HTMLAttributes,
+  ReactElement,
   ReactNode,
   TdHTMLAttributes,
   ThHTMLAttributes,
 } from 'react';
+import { Children, cloneElement, createContext, isValidElement, useContext, useMemo } from 'react';
 import { cx } from '../utils/cx';
 
 type NativeTableProps = ComponentPropsWithoutRef<'table'>;
@@ -21,6 +23,7 @@ interface CommonTableProps {
   contentStyle?: CSSProperties;
   footer?: ReactNode;
   minWidth?: number | string;
+  mobileLayout?: 'cards' | 'scroll';
   scrollClassName?: string;
   scrollOverlay?: ReactNode;
 }
@@ -33,6 +36,54 @@ type CommonTableRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'id'> & {
   id?: string | number;
 };
 
+interface TableColumnMeta {
+  id?: string;
+  label: string;
+}
+
+interface CommonTableCellInternalProps extends TdHTMLAttributes<HTMLTableCellElement> {
+  mobileColumnId?: string;
+  mobileLabel?: string;
+}
+
+const TableColumnsContext = createContext<TableColumnMeta[]>([]);
+
+function nodeText(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node).trim();
+  if (!isValidElement(node)) return '';
+  const props = node.props as { children?: ReactNode; label?: ReactNode };
+  const childrenText = Children.toArray(props.children)
+    .map(nodeText)
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  if (childrenText) return childrenText;
+  return nodeText(props.label);
+}
+
+function findColumnMeta(children: ReactNode): TableColumnMeta[] {
+  let columns: TableColumnMeta[] = [];
+
+  Children.forEach(children, (child) => {
+    if (columns.length > 0 || !isValidElement(child)) return;
+    const props = child.props as { children?: ReactNode };
+    if (child.type === CommonTableHeader) {
+      columns = Children.toArray(props.children).map((column) => {
+        if (!isValidElement(column)) return { label: '' };
+        const columnProps = column.props as CommonTableColumnProps;
+        return {
+          id: columnProps.id,
+          label: nodeText(columnProps.children),
+        };
+      });
+      return;
+    }
+    columns = findColumnMeta(props.children);
+  });
+
+  return columns;
+}
+
 function CommonTableRoot({
   ariaLabel,
   children,
@@ -42,6 +93,7 @@ function CommonTableRoot({
   contentStyle,
   footer,
   minWidth,
+  mobileLayout = 'cards',
   scrollClassName,
   scrollOverlay,
 }: CommonTableProps) {
@@ -52,26 +104,30 @@ function CommonTableRoot({
         ...contentStyle,
       };
 
+  const columns = useMemo(() => findColumnMeta(children), [children]);
+
   return (
-    <div className={cx('ag-resource-table', className)}>
-      <div className={cx('ag-resource-table-scroll', scrollClassName)} data-slot="wrapper">
-        {scrollOverlay}
-        <table
-          {...contentProps}
-          aria-label={ariaLabel}
-          className={cx('ag-resource-table-content', contentClassName)}
-          data-slot="table"
-          style={resolvedContentStyle}
-        >
-          {children}
-        </table>
-      </div>
-      {footer ? (
-        <div className="table__footer" data-slot="table-footer">
-          {footer}
+    <TableColumnsContext.Provider value={columns}>
+      <div className={cx('ag-resource-table', `ag-resource-table--mobile-${mobileLayout}`, className)}>
+        <div className={cx('ag-resource-table-scroll', scrollClassName)} data-slot="wrapper">
+          {scrollOverlay}
+          <table
+            {...contentProps}
+            aria-label={ariaLabel}
+            className={cx('ag-resource-table-content', contentClassName)}
+            data-slot="table"
+            style={resolvedContentStyle}
+          >
+            {children}
+          </table>
         </div>
-      ) : null}
-    </div>
+        {footer ? (
+          <div className="table__footer" data-slot="table-footer">
+            {footer}
+          </div>
+        ) : null}
+      </div>
+    </TableColumnsContext.Provider>
   );
 }
 
@@ -109,16 +165,38 @@ function CommonTableColumn({ id, isRowHeader, children, ...props }: CommonTableC
 }
 
 function CommonTableRow({ id, children, ...props }: CommonTableRowProps) {
+  const columns = useContext(TableColumnsContext);
+  let columnIndex = 0;
+  const labelledChildren = Children.map(children, (child) => {
+    if (!isValidElement(child) || child.type !== CommonTableCell) return child;
+    const column = columns[columnIndex];
+    columnIndex += Math.max(Number((child.props as TdHTMLAttributes<HTMLTableCellElement>).colSpan) || 1, 1);
+    return cloneElement(child as ReactElement<CommonTableCellInternalProps>, {
+      mobileColumnId: column?.id,
+      mobileLabel: column?.label,
+    });
+  });
+
   return (
     <tr {...props} data-key={id == null ? undefined : String(id)} data-slot="tr">
-      {children}
+      {labelledChildren}
     </tr>
   );
 }
 
-function CommonTableCell({ children, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
+function CommonTableCell({
+  children,
+  mobileColumnId,
+  mobileLabel,
+  ...props
+}: CommonTableCellInternalProps) {
   return (
-    <td {...props} data-slot="td">
+    <td
+      {...props}
+      data-column-id={mobileColumnId || undefined}
+      data-label={mobileLabel || undefined}
+      data-slot="td"
+    >
       {children}
     </td>
   );

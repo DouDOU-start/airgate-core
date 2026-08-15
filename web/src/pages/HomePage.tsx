@@ -12,7 +12,7 @@ import { setStoredLanguage } from '../i18n';
 import { AmbientAurora } from './login/AmbientAurora';
 import {
   Zap, Shield, Coins, ArrowRight, Sun, Moon, Sprout, BarChart3, KeyRound, Layers,
-  Github, Languages, MessageCircle,
+  Github, Languages, MessageCircle, BookOpen, Sparkles,
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -53,12 +53,12 @@ export default function HomePage() {
       {/* 主体内容：以块级布局承载，保证内部 mx-auto 居中不受外层 flex 影响；grow 占满空高把页脚顶到底部 */}
       <div className="relative z-10 flex-1">
       {/* 导航栏 */}
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 md:px-12">
-        <div className="flex items-center gap-2.5">
+      <nav className="ag-public-nav mx-auto flex max-w-6xl items-center justify-between px-6 py-4 md:px-12">
+        <div className="ag-public-brand flex items-center gap-2.5">
           <img src={site.site_logo || defaultLogoUrl} alt="" className="h-8 w-8 rounded-[var(--radius-md)] object-cover" />
           <span className="font-display text-base font-semibold tracking-tight">{site.site_name || 'AirGate'}</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="ag-public-nav-actions flex items-center gap-1.5">
           {site.contact_info && (
             <span
               className="mr-1 hidden items-center gap-1.5 text-xs text-text-tertiary md:inline-flex"
@@ -71,19 +71,21 @@ export default function HomePage() {
           <Button
             size="sm"
             variant="ghost"
-            className="px-3 text-xs font-medium"
+            className="ag-public-nav-icon-button gap-1.5 px-3 text-xs font-medium"
             onPress={() => navigate({ to: '/model-market' })}
           >
-            {t('home.model_market')}
+            <Sparkles className="h-4 w-4" />
+            <span className="ag-public-nav-label">{t('home.model_market')}</span>
           </Button>
           {docsUrl && (
             <HeroLink
               href={docsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:text-text"
+              className="ag-public-nav-icon-button inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:text-text"
             >
-              {t('home.docs')}
+              <BookOpen className="h-4 w-4" />
+              <span className="ag-public-nav-label">{t('home.docs')}</span>
             </HeroLink>
           )}
           <HeroLink
@@ -99,23 +101,24 @@ export default function HomePage() {
             aria-label={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
             size="sm"
             variant="ghost"
-            className="gap-1.5 px-2.5"
+            className="ag-public-nav-icon-button gap-1.5 px-2.5"
             onPress={toggleLanguage}
           >
             <Languages className="w-4 h-4" />
-            <span className="font-mono text-xs uppercase">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
+            <span className="ag-public-nav-label font-mono text-xs uppercase">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
           </Button>
           <Button
             aria-label={theme === 'dark' ? t('common.toggle_theme_light') : t('common.toggle_theme_dark')}
             isIconOnly
             size="sm"
+            className="ag-public-nav-icon-button"
             variant="ghost"
             onPress={toggleTheme}
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </Button>
           <Button
-            className="ml-2"
+            className="ag-public-nav-primary ml-2"
             size="sm"
             variant="primary"
             onPress={() => navigate({ to: isLoggedIn ? '/' : '/login', search: (prev: Record<string, unknown>) => prev })}

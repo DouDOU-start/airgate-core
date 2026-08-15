@@ -34,6 +34,7 @@ import {
   Sun,
   Moon,
   Menu,
+  X,
   ShieldCheck,
   ShieldAlert,
   BookmarkIcon,
@@ -244,6 +245,18 @@ export function AppShell({ children }: AppShellProps) {
               <ChevronLeft className="h-4 w-4" />
             </Button>
           )}
+          {isMobile && (
+            <Button
+              aria-label={t('nav.close_menu', '关闭菜单')}
+              className="ag-sidebar-collapse-button shrink-0"
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              onPress={() => setMobileOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -398,7 +411,7 @@ export function AppShell({ children }: AppShellProps) {
       {/* 侧边栏 */}
       {isMobile ? (
         <aside
-          className="fixed inset-y-0 left-0 z-50 flex flex-col bg-surface border-r border-border transition-transform duration-150 ease-out"
+          className="ag-mobile-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-surface transition-transform duration-150 ease-out"
           style={{ width: 'var(--ag-sidebar-width)', transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)' }}
         >
           {sidebarContent}
@@ -431,7 +444,7 @@ export function AppShell({ children }: AppShellProps) {
             )}
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="ag-topbar-actions flex shrink-0 items-center gap-2">
             {/* GitHub */}
             <HeroLink
               href="https://github.com/DouDOU-start/airgate-core"

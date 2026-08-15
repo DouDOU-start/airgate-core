@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Chip, EmptyState, Input } from '@heroui/react';
-import { Inbox, Languages, Moon, Search, Sparkles, Sun } from 'lucide-react';
+import { ArrowLeft, Inbox, Languages, Moon, Search, Sparkles, Sun } from 'lucide-react';
 import { modelMarketApi } from '../shared/api/modelMarket';
 import { queryKeys } from '../shared/queryKeys';
 import { useSiteSettings, defaultLogoUrl } from '../app/providers/SiteSettingsProvider';
@@ -260,41 +260,49 @@ export default function ModelMarketPage() {
   return (
     <div className="relative flex min-h-screen flex-col bg-bg text-text">
       <div className="relative z-10 flex-1">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 md:px-12">
-          <div className="flex items-center gap-2.5">
+        <nav className="ag-public-nav mx-auto flex max-w-6xl items-center justify-between px-6 py-4 md:px-12">
+          <div className="ag-public-brand flex items-center gap-2.5">
             <img src={site.site_logo || defaultLogoUrl} alt="" className="h-8 w-8 rounded-[var(--radius-md)] object-cover" />
             <span className="font-display text-base font-semibold tracking-tight">{site.site_name || 'AirGate'}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="ghost" onPress={() => navigate({ to: '/home' })}>
-              {t('model_market.back_home')}
+          <div className="ag-public-nav-actions flex items-center gap-2">
+            <Button
+              aria-label={t('model_market.back_home')}
+              className="ag-public-nav-icon-button gap-1.5 px-2.5"
+              size="sm"
+              variant="ghost"
+              onPress={() => navigate({ to: '/home' })}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="ag-public-nav-label">{t('model_market.back_home')}</span>
             </Button>
             <Button
               aria-label={i18n.language === 'zh' ? 'Switch to English' : '切换为中文'}
               size="sm"
               variant="ghost"
-              className="gap-1.5 px-2.5"
+              className="ag-public-nav-icon-button gap-1.5 px-2.5"
               onPress={toggleLanguage}
             >
               <Languages className="w-4 h-4" />
-              <span className="font-mono text-xs uppercase">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
+              <span className="ag-public-nav-label font-mono text-xs uppercase">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
             </Button>
             <Button
               aria-label={theme === 'dark' ? t('common.toggle_theme_light') : t('common.toggle_theme_dark')}
               isIconOnly
               size="sm"
+              className="ag-public-nav-icon-button"
               variant="ghost"
               onPress={toggleTheme}
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </Button>
-            <Button size="sm" variant="primary" onPress={() => navigate({ to: isLoggedIn ? '/' : '/login' })}>
+            <Button className="ag-public-nav-primary" size="sm" variant="primary" onPress={() => navigate({ to: isLoggedIn ? '/' : '/login' })}>
               {isLoggedIn ? t('home.go_dashboard') : t('home.login')}
             </Button>
           </div>
         </nav>
 
-        <section className="mx-auto max-w-6xl px-6 pb-6 pt-10 md:px-12">
+        <section className="ag-public-section mx-auto max-w-6xl px-6 pb-6 pt-10 md:px-12">
           <div className="mb-2 inline-flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-text-tertiary" strokeWidth={2.25} />
             <span className="font-mono text-base font-medium uppercase tracking-[0.13em] text-text-tertiary">
@@ -346,7 +354,7 @@ export default function ModelMarketPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-6 pb-20 md:px-12">
+        <section className="ag-public-section mx-auto max-w-6xl px-6 pb-20 md:px-12">
           {isLoading ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }, (_, i) => (

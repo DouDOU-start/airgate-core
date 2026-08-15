@@ -877,7 +877,7 @@ export default function UsagePage() {
       )}
 
       {/* 筛选栏 */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
+      <div className="ag-mobile-toolbar flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
         <div className="w-full sm:w-64">
           <UsageDateRangeFilter
             clearLabel={t('common.clear')}

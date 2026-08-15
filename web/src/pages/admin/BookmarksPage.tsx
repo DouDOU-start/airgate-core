@@ -79,7 +79,7 @@ export default function BookmarksPage() {
   return (
     <div>
       {/* 工具栏 */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
+      <div className="ag-mobile-toolbar flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
         <HeroTextField className="w-full sm:w-64">
           <Input
             placeholder={t('bookmarks.search_placeholder')}
@@ -91,7 +91,7 @@ export default function BookmarksPage() {
           />
         </HeroTextField>
 
-        <div className="flex items-center gap-2 sm:ml-auto">
+        <div className="ag-mobile-actions flex items-center gap-2 sm:ml-auto">
           <RefreshButton
             ariaLabel={t('common.refresh', 'Refresh')}
             isRefreshing={isFetching}

@@ -336,7 +336,7 @@ export default function RechargePage() {
 
       {/* 充值记录 */}
       <div>
-        <div className="mb-3 flex items-center justify-between">
+        <div className="ag-mobile-toolbar mb-3 flex items-center justify-between">
           <h3 className="text-base font-semibold text-text">{t('payment.records_title')}</h3>
           <RefreshButton
             ariaLabel={t('common.refresh', 'Refresh')}

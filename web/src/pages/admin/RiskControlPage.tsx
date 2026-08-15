@@ -144,7 +144,7 @@ export default function RiskControlPage() {
       </div>
 
       {/* 工具栏 */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
+      <div className="ag-mobile-toolbar flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5 flex-wrap">
         <div className="w-full sm:w-80">
           <HeroTextField fullWidth aria-label={t('common.search')}>
             <div className="relative">
@@ -182,7 +182,7 @@ export default function RiskControlPage() {
         <Chip color={status?.mode && status.mode !== 'off' ? 'success' : 'default'} size="sm">
           {t(`risk_control.mode_${status?.mode || 'off'}`)}
         </Chip>
-        <div className="flex items-center gap-2 sm:ml-auto">
+        <div className="ag-mobile-actions flex items-center gap-2 sm:ml-auto">
           <Button
             size="sm"
             variant="ghost"

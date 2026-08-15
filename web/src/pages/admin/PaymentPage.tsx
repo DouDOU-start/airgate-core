@@ -177,7 +177,7 @@ function OrdersTab() {
             </Select.Popover>
           </Select>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ag-mobile-actions ml-auto flex items-center gap-2">
           <RefreshButton
             ariaLabel={t('common.refresh', 'Refresh')}
             isRefreshing={isFetching}

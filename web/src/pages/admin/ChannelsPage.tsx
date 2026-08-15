@@ -90,7 +90,7 @@ function KeyRow({
   return (
     <div className="border-b border-border px-4 py-3 last:border-b-0">
       {/* 头部：名称 · 类型 · 启停开关 · 密钥提示 —— 操作靠右 */}
-      <div className="flex items-center gap-2.5">
+      <div className="ag-channel-key-row-header flex items-center gap-2.5">
         <span className="max-w-[200px] truncate font-medium text-text" title={channelKey.name}>
           {channelKey.name || t('channels.key_unnamed')}
         </span>
@@ -119,7 +119,7 @@ function KeyRow({
         <span className="font-mono text-[11px] text-text-tertiary" title={t('channels.api_key')}>
           {channelKey.api_key_hint || '-'}
         </span>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ag-channel-key-row-actions ml-auto flex items-center gap-1">
           <Button size="sm" variant="secondary" onPress={onStats}>
             <BarChart3 className="h-3.5 w-3.5" />
             {t('channels.stats_action')}
@@ -580,7 +580,7 @@ export default function ChannelsPage() {
             </Select.Popover>
           </Select>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ag-mobile-actions ml-auto flex items-center gap-2">
           <Button
             isDisabled={exporting}
             variant="secondary"

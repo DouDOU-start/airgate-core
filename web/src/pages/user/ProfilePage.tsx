@@ -443,7 +443,7 @@ function BalanceAlertCard({ threshold, balance }: { threshold: number; balance: 
       </Card.Header>
       <Card.Content>
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
+          <div className="ag-mobile-toolbar flex items-center justify-between gap-4">
             <div className="min-w-0">
               <div className="text-sm font-medium text-text">{t('profile.balance_alert_enabled')}</div>
               <p className="mt-0.5 text-xs text-text-tertiary">{t('profile.balance_alert_desc')}</p>
