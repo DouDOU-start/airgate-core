@@ -372,6 +372,15 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
                     {row.output_price > 0 && (
                       <TooltipRow label={t('usage.output_unit_price')} value={`$${row.output_price.toFixed(4)} / 1M Token`} />
                     )}
+                    {row.cached_input_price > 0 && (
+                      <TooltipRow label={t('usage.cached_input_unit_price')} value={`$${row.cached_input_price.toFixed(4)} / 1M Token`} />
+                    )}
+                    {row.cache_creation_price > 0 && (
+                      <TooltipRow label={t('usage.cache_creation_unit_price')} value={`$${row.cache_creation_price.toFixed(4)} / 1M Token`} />
+                    )}
+                    {row.cache_creation_1h_price > 0 && (
+                      <TooltipRow label={t('usage.cache_creation_1h_unit_price')} value={`$${row.cache_creation_1h_price.toFixed(4)} / 1M Token`} />
+                    )}
                   </>
                 )}
                 {row.cached_input_cost > 0 && (
