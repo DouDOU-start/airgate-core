@@ -132,6 +132,20 @@ func (ulc *UsageLogCreate) SetNillableCalls(i *int) *UsageLogCreate {
 	return ulc
 }
 
+// SetBillingMode sets the "billing_mode" field.
+func (ulc *UsageLogCreate) SetBillingMode(s string) *UsageLogCreate {
+	ulc.mutation.SetBillingMode(s)
+	return ulc
+}
+
+// SetNillableBillingMode sets the "billing_mode" field if the given value is not nil.
+func (ulc *UsageLogCreate) SetNillableBillingMode(s *string) *UsageLogCreate {
+	if s != nil {
+		ulc.SetBillingMode(*s)
+	}
+	return ulc
+}
+
 // SetInputPrice sets the "input_price" field.
 func (ulc *UsageLogCreate) SetInputPrice(f float64) *UsageLogCreate {
 	ulc.mutation.SetInputPrice(f)
@@ -757,6 +771,10 @@ func (ulc *UsageLogCreate) defaults() {
 		v := usagelog.DefaultCalls
 		ulc.mutation.SetCalls(v)
 	}
+	if _, ok := ulc.mutation.BillingMode(); !ok {
+		v := usagelog.DefaultBillingMode
+		ulc.mutation.SetBillingMode(v)
+	}
 	if _, ok := ulc.mutation.InputPrice(); !ok {
 		v := usagelog.DefaultInputPrice
 		ulc.mutation.SetInputPrice(v)
@@ -918,6 +936,9 @@ func (ulc *UsageLogCreate) check() error {
 	if _, ok := ulc.mutation.Calls(); !ok {
 		return &ValidationError{Name: "calls", err: errors.New(`ent: missing required field "UsageLog.calls"`)}
 	}
+	if _, ok := ulc.mutation.BillingMode(); !ok {
+		return &ValidationError{Name: "billing_mode", err: errors.New(`ent: missing required field "UsageLog.billing_mode"`)}
+	}
 	if _, ok := ulc.mutation.InputPrice(); !ok {
 		return &ValidationError{Name: "input_price", err: errors.New(`ent: missing required field "UsageLog.input_price"`)}
 	}
@@ -1072,6 +1093,10 @@ func (ulc *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := ulc.mutation.Calls(); ok {
 		_spec.SetField(usagelog.FieldCalls, field.TypeInt, value)
 		_node.Calls = value
+	}
+	if value, ok := ulc.mutation.BillingMode(); ok {
+		_spec.SetField(usagelog.FieldBillingMode, field.TypeString, value)
+		_node.BillingMode = value
 	}
 	if value, ok := ulc.mutation.InputPrice(); ok {
 		_spec.SetField(usagelog.FieldInputPrice, field.TypeFloat64, value)
@@ -1490,6 +1515,18 @@ func (u *UsageLogUpsert) UpdateCalls() *UsageLogUpsert {
 // AddCalls adds v to the "calls" field.
 func (u *UsageLogUpsert) AddCalls(v int) *UsageLogUpsert {
 	u.Add(usagelog.FieldCalls, v)
+	return u
+}
+
+// SetBillingMode sets the "billing_mode" field.
+func (u *UsageLogUpsert) SetBillingMode(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldBillingMode, v)
+	return u
+}
+
+// UpdateBillingMode sets the "billing_mode" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateBillingMode() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldBillingMode)
 	return u
 }
 
@@ -2284,6 +2321,20 @@ func (u *UsageLogUpsertOne) AddCalls(v int) *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) UpdateCalls() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateCalls()
+	})
+}
+
+// SetBillingMode sets the "billing_mode" field.
+func (u *UsageLogUpsertOne) SetBillingMode(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetBillingMode(v)
+	})
+}
+
+// UpdateBillingMode sets the "billing_mode" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateBillingMode() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateBillingMode()
 	})
 }
 
@@ -3342,6 +3393,20 @@ func (u *UsageLogUpsertBulk) AddCalls(v int) *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) UpdateCalls() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateCalls()
+	})
+}
+
+// SetBillingMode sets the "billing_mode" field.
+func (u *UsageLogUpsertBulk) SetBillingMode(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetBillingMode(v)
+	})
+}
+
+// UpdateBillingMode sets the "billing_mode" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateBillingMode() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateBillingMode()
 	})
 }
 

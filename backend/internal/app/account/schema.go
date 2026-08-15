@@ -80,7 +80,7 @@ func builtinCredentialSchema(platform string) CredentialSchema {
 				{
 					Key:         TypeOAuth,
 					Label:       "OAuth",
-					Description: "ChatGPT / Codex 订阅。可粘贴 refresh_token 导入（自动换 token），或填 access_token + refresh_token",
+					Description: "ChatGPT / Codex 订阅。支持浏览器授权、Refresh Token、Access Token 或 Session 导入",
 					Fields: []CredentialField{
 						{Key: "refresh_token", Label: "Refresh Token", Type: "password", Required: false, Placeholder: "仅 RT 即可导入"},
 						{Key: "access_token", Label: "Access Token", Type: "password", Required: false},

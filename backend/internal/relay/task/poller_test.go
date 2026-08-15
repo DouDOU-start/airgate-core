@@ -382,7 +382,7 @@ func TestPollerSettlePerSecond(t *testing.T) {
 	}
 	rec := sink.records[0]
 	if !rec.SkipBalanceCharge || rec.Source != billing.SourceTask ||
-		rec.Calls != 8 || rec.InputPrice != 0.1 ||
+		rec.BillingMode != billing.BillingModePerSecond || rec.Calls != 8 || rec.InputPrice != 0.1 ||
 		rec.ActualCost != 1.6 || rec.TotalCost != 0.8 {
 		t.Errorf("rec = %+v", rec)
 	}
@@ -410,7 +410,7 @@ func TestPollerSettleResolutionPrice(t *testing.T) {
 		t.Fatalf("usage records = %d", len(sink.records))
 	}
 	rec := sink.records[0]
-	if rec.InputPrice != 0.25 || rec.TotalCost != 2.0 || rec.ActualCost != 4.0 || rec.VideoResolution != "1080p" {
+	if rec.BillingMode != billing.BillingModePerSecond || rec.InputPrice != 0.25 || rec.TotalCost != 2.0 || rec.ActualCost != 4.0 || rec.VideoResolution != "1080p" {
 		t.Errorf("usage record = %+v", rec)
 	}
 }
@@ -476,7 +476,7 @@ func TestPollerXAIVideoUsesBoundOAuthAccount(t *testing.T) {
 		t.Fatalf("用量记录数 = %d，期望 1", len(sink.records))
 	}
 	record := sink.records[0]
-	if record.AccountID != 333 || record.ChannelID != 0 || record.Calls != 8 ||
+	if record.AccountID != 333 || record.ChannelID != 0 || record.BillingMode != billing.BillingModePerSecond || record.Calls != 8 ||
 		record.InputPrice != 0.07 || record.Endpoint != "/v1/videos/generations" {
 		t.Fatalf("xAI 视频用量记录错误: %+v", record)
 	}
@@ -610,7 +610,7 @@ func TestPollerBatchQuery(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	p, st, bal, _, _ := newTestPoller(t, pollSnap(1, "pollbatch", upstream.URL))
+	p, st, bal, sink, _ := newTestPoller(t, pollSnap(1, "pollbatch", upstream.URL))
 	st.seed(&Task{
 		TaskID: "bt-1", Platform: "pollbatch", Status: StatusInProgress,
 		RequestModel: "flat-model", HoldAmount: 1.0, EstTotal: 0.5,
@@ -632,6 +632,13 @@ func TestPollerBatchQuery(t *testing.T) {
 	// flat-model 按次结算：final actual = 0.5×2 = 1.0 = hold → 无差额动账。
 	if len(bal.ops) != 0 {
 		t.Errorf("动账 = %+v", bal.ops)
+	}
+	if len(sink.records) != 1 {
+		t.Fatalf("usage records = %d, want 1", len(sink.records))
+	}
+	record := sink.records[0]
+	if record.BillingMode != billing.BillingModePerRequest || record.Calls != 1 {
+		t.Errorf("按次任务计费快照错误: %+v", record)
 	}
 }
 

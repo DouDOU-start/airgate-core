@@ -30,6 +30,8 @@ const (
 	FieldCacheCreation1hTokens = "cache_creation_1h_tokens"
 	// FieldCalls holds the string denoting the calls field in the database.
 	FieldCalls = "calls"
+	// FieldBillingMode holds the string denoting the billing_mode field in the database.
+	FieldBillingMode = "billing_mode"
 	// FieldInputPrice holds the string denoting the input_price field in the database.
 	FieldInputPrice = "input_price"
 	// FieldOutputPrice holds the string denoting the output_price field in the database.
@@ -175,6 +177,7 @@ var Columns = []string{
 	FieldCacheCreation5mTokens,
 	FieldCacheCreation1hTokens,
 	FieldCalls,
+	FieldBillingMode,
 	FieldInputPrice,
 	FieldOutputPrice,
 	FieldCachedInputPrice,
@@ -242,6 +245,8 @@ var (
 	DefaultCacheCreation1hTokens int
 	// DefaultCalls holds the default value on creation for the "calls" field.
 	DefaultCalls int
+	// DefaultBillingMode holds the default value on creation for the "billing_mode" field.
+	DefaultBillingMode string
 	// DefaultInputPrice holds the default value on creation for the "input_price" field.
 	DefaultInputPrice float64
 	// DefaultOutputPrice holds the default value on creation for the "output_price" field.
@@ -354,6 +359,11 @@ func ByCacheCreation1hTokens(opts ...sql.OrderTermOption) OrderOption {
 // ByCalls orders the results by the calls field.
 func ByCalls(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCalls, opts...).ToFunc()
+}
+
+// ByBillingMode orders the results by the billing_mode field.
+func ByBillingMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBillingMode, opts...).ToFunc()
 }
 
 // ByInputPrice orders the results by the input_price field.

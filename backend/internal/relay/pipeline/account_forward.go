@@ -223,6 +223,7 @@ func (p *Pipeline) recordAccountUsage(
 	keyInfo *auth.APIKeyInfo,
 	acc *accountreg.Snapshot,
 	req *dto.ChatRequest,
+	endpoint string,
 	result attemptResult,
 	start time.Time,
 	price pricing.Price,
@@ -265,20 +266,8 @@ func (p *Pipeline) recordAccountUsage(
 	if inputTokens < 0 {
 		inputTokens = 0
 	}
-	inputPrice := price.Input
-	billedCalls := usage.Calls
-	if perImage, ok := pricing.ImagePriceFor(price, usage.ImageQuality, usage.ImageSize); ok {
-		inputPrice = perImage
-		if billedCalls < 1 {
-			billedCalls = 1
-		}
-	} else if price.PerRequest > 0 {
-		inputPrice = price.PerRequest
-		if billedCalls < 1 {
-			billedCalls = 1
-		}
-	}
-	usageStatus := usageStatusFor(result, usage, billedCalls)
+	billingSnapshot := resolveUsageBilling(endpoint, price, usage)
+	usageStatus := usageStatusFor(result, usage, billingSnapshot.Calls)
 
 	p.sink.Record(billing.UsageRecord{
 		UserID:                keyInfo.UserID,
@@ -293,8 +282,9 @@ func (p *Pipeline) recordAccountUsage(
 		CacheCreationTokens:   usage.CacheCreationTokens,
 		CacheCreation5mTokens: usage.CacheCreation5mTokens,
 		CacheCreation1hTokens: usage.CacheCreation1hTokens,
-		Calls:                 billedCalls,
-		InputPrice:            inputPrice,
+		Calls:                 billingSnapshot.Calls,
+		BillingMode:           billingSnapshot.Mode,
+		InputPrice:            billingSnapshot.InputPrice,
 		OutputPrice:           price.Output,
 		CachedInputPrice:      price.CachedInput,
 		CacheCreationPrice:    price.CacheCreation5m,
@@ -339,6 +329,7 @@ func (p *Pipeline) handleAccountOutcome(
 	keyInfo *auth.APIKeyInfo,
 	acc *accountreg.Snapshot,
 	req *dto.ChatRequest,
+	endpoint string,
 	result attemptResult,
 	start time.Time,
 	price pricing.Price,
@@ -425,7 +416,7 @@ func (p *Pipeline) handleAccountOutcome(
 			}
 		}
 		if !opts.zeroBilling {
-			p.recordAccountUsage(c, keyInfo, acc, req, result, start, price)
+			p.recordAccountUsage(c, keyInfo, acc, req, endpoint, result, start, price)
 		}
 		if result.streamErr != nil || !streamComplete {
 			reason := "上游未发送完成标志即断流"
@@ -457,7 +448,7 @@ func (p *Pipeline) handleAccountOutcome(
 			}
 		}
 		if !opts.zeroBilling {
-			p.recordAccountUsage(c, keyInfo, acc, req, result, start, price)
+			p.recordAccountUsage(c, keyInfo, acc, req, endpoint, result, start, price)
 		}
 		writeUpstreamBody(c, result)
 		return true
@@ -535,7 +526,7 @@ func (p *Pipeline) handleAccountOutcome(
 		}
 		billed := result.usage != nil && !opts.zeroBilling
 		if billed {
-			p.recordAccountUsage(c, keyInfo, acc, req, result, start, price)
+			p.recordAccountUsage(c, keyInfo, acc, req, endpoint, result, start, price)
 		}
 		up := errfmt.ParseUpstream(result.statusCode, result.body)
 		up.Message = outcome.SanitizeUpstreamLeak(up.Message, []string{apiKeyHint}, "")

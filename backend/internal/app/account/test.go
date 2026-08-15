@@ -1467,7 +1467,7 @@ func credentialMissingMsg(creds map[string]string) string {
 	return fmt.Sprintf(
 		"本地凭证缺少可用 token（需要 access_token / refresh_token / session_token / api_key 之一），未向上游发请求，因此没有上游响应体。\n"+
 			"当前已存字段：%s\n"+
-			"常见原因：编辑账号时只改了 email/分组等，旧版本会把 token 整包覆盖掉；请重新导入 RT/Session 或 OAuth 授权补回凭证。",
+			"常见原因：编辑账号时只改了 email/分组等，旧版本会把 token 整包覆盖掉；请重新导入 AT/RT/Session 或 OAuth 授权补回凭证。",
 		strings.Join(keys, ", "),
 	)
 }

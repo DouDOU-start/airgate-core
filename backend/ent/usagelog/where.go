@@ -95,6 +95,11 @@ func Calls(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCalls, v))
 }
 
+// BillingMode applies equality check predicate on the "billing_mode" field. It's identical to BillingModeEQ.
+func BillingMode(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldBillingMode, v))
+}
+
 // InputPrice applies equality check predicate on the "input_price" field. It's identical to InputPriceEQ.
 func InputPrice(v float64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldInputPrice, v))
@@ -628,6 +633,71 @@ func CallsLT(v int) predicate.UsageLog {
 // CallsLTE applies the LTE predicate on the "calls" field.
 func CallsLTE(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldLTE(FieldCalls, v))
+}
+
+// BillingModeEQ applies the EQ predicate on the "billing_mode" field.
+func BillingModeEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldBillingMode, v))
+}
+
+// BillingModeNEQ applies the NEQ predicate on the "billing_mode" field.
+func BillingModeNEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldBillingMode, v))
+}
+
+// BillingModeIn applies the In predicate on the "billing_mode" field.
+func BillingModeIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldBillingMode, vs...))
+}
+
+// BillingModeNotIn applies the NotIn predicate on the "billing_mode" field.
+func BillingModeNotIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldBillingMode, vs...))
+}
+
+// BillingModeGT applies the GT predicate on the "billing_mode" field.
+func BillingModeGT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldBillingMode, v))
+}
+
+// BillingModeGTE applies the GTE predicate on the "billing_mode" field.
+func BillingModeGTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldBillingMode, v))
+}
+
+// BillingModeLT applies the LT predicate on the "billing_mode" field.
+func BillingModeLT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldBillingMode, v))
+}
+
+// BillingModeLTE applies the LTE predicate on the "billing_mode" field.
+func BillingModeLTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldBillingMode, v))
+}
+
+// BillingModeContains applies the Contains predicate on the "billing_mode" field.
+func BillingModeContains(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContains(FieldBillingMode, v))
+}
+
+// BillingModeHasPrefix applies the HasPrefix predicate on the "billing_mode" field.
+func BillingModeHasPrefix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasPrefix(FieldBillingMode, v))
+}
+
+// BillingModeHasSuffix applies the HasSuffix predicate on the "billing_mode" field.
+func BillingModeHasSuffix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasSuffix(FieldBillingMode, v))
+}
+
+// BillingModeEqualFold applies the EqualFold predicate on the "billing_mode" field.
+func BillingModeEqualFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEqualFold(FieldBillingMode, v))
+}
+
+// BillingModeContainsFold applies the ContainsFold predicate on the "billing_mode" field.
+func BillingModeContainsFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContainsFold(FieldBillingMode, v))
 }
 
 // InputPriceEQ applies the EQ predicate on the "input_price" field.

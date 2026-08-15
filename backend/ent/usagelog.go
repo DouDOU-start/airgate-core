@@ -37,8 +37,10 @@ type UsageLog struct {
 	CacheCreation5mTokens int `json:"cache_creation_5m_tokens,omitempty"`
 	// CacheCreation1hTokens holds the value of the "cache_creation_1h_tokens" field.
 	CacheCreation1hTokens int `json:"cache_creation_1h_tokens,omitempty"`
-	// 按次计费计次数（图像端点=响应产出张数）；token 计费端点恒 0。按次成本 = input_price × max(calls,1)。
+	// 计费数量或产出数量：per_request=次数，per_image=张数，per_second=秒数；token 图片端点可记录产出张数。
 	Calls int `json:"calls,omitempty"`
+	// 计费模式快照：token / per_request / per_image / per_second；空值为历史记录。
+	BillingMode string `json:"billing_mode,omitempty"`
 	// InputPrice holds the value of the "input_price" field.
 	InputPrice float64 `json:"input_price,omitempty"`
 	// OutputPrice holds the value of the "output_price" field.
@@ -217,7 +219,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case usagelog.FieldID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedInputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldCalls, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldUserIDSnapshot, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldChannelID, usagelog.FieldChannelKeyID, usagelog.FieldAccountID, usagelog.FieldGroupID:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldModel, usagelog.FieldServiceTier, usagelog.FieldReasoningEffort, usagelog.FieldImageSize, usagelog.FieldImageQuality, usagelog.FieldVideoResolution, usagelog.FieldUsageStatus, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldSource, usagelog.FieldRequestID, usagelog.FieldUserEmailSnapshot:
+		case usagelog.FieldModel, usagelog.FieldBillingMode, usagelog.FieldServiceTier, usagelog.FieldReasoningEffort, usagelog.FieldImageSize, usagelog.FieldImageQuality, usagelog.FieldVideoResolution, usagelog.FieldUsageStatus, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldEndpoint, usagelog.FieldSource, usagelog.FieldRequestID, usagelog.FieldUserEmailSnapshot:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -289,6 +291,12 @@ func (ul *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field calls", values[i])
 			} else if value.Valid {
 				ul.Calls = int(value.Int64)
+			}
+		case usagelog.FieldBillingMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field billing_mode", values[i])
+			} else if value.Valid {
+				ul.BillingMode = value.String
 			}
 		case usagelog.FieldInputPrice:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
@@ -607,6 +615,9 @@ func (ul *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("calls=")
 	builder.WriteString(fmt.Sprintf("%v", ul.Calls))
+	builder.WriteString(", ")
+	builder.WriteString("billing_mode=")
+	builder.WriteString(ul.BillingMode)
 	builder.WriteString(", ")
 	builder.WriteString("input_price=")
 	builder.WriteString(fmt.Sprintf("%v", ul.InputPrice))

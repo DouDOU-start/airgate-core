@@ -67,7 +67,8 @@ type LogRecord struct {
 	CacheCreationTokens   int
 	CacheCreation5mTokens int
 	CacheCreation1hTokens int
-	Calls                 int // 按次计费计次数（图像端点=产出张数）；token 计费恒 0
+	Calls                 int // 计费数量或产出数量，具体单位由 BillingMode 决定
+	BillingMode           string
 	InputPrice            float64
 	OutputPrice           float64
 	CachedInputPrice      float64

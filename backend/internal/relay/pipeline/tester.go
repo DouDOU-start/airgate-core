@@ -126,6 +126,8 @@ func (p *Pipeline) recordTestUsage(snap *registry.ChannelKeySnapshot, model, end
 		CacheCreation5mTokens: u.CacheCreation5mTokens,
 		CacheCreation1hTokens: u.CacheCreation1hTokens,
 		Calls:                 u.Calls,
+		ImageSize:             u.ImageSize,
+		ImageQuality:          u.ImageQuality,
 	}, "")
 	calc := p.calculator.Calculate(billing.CalculateInput{
 		InputCost:         costs.Input,
@@ -140,6 +142,7 @@ func (p *Pipeline) recordTestUsage(snap *registry.ChannelKeySnapshot, model, end
 	if inputTokens < 0 {
 		inputTokens = 0
 	}
+	billingSnapshot := resolveUsageBilling(endpoint, price, u)
 	p.sink.Record(billing.UsageRecord{
 		ChannelID:             snap.ChannelID,
 		ChannelKeyID:          snap.KeyID,
@@ -150,8 +153,9 @@ func (p *Pipeline) recordTestUsage(snap *registry.ChannelKeySnapshot, model, end
 		CacheCreationTokens:   u.CacheCreationTokens,
 		CacheCreation5mTokens: u.CacheCreation5mTokens,
 		CacheCreation1hTokens: u.CacheCreation1hTokens,
-		Calls:                 u.Calls,
-		InputPrice:            price.Input,
+		Calls:                 billingSnapshot.Calls,
+		BillingMode:           billingSnapshot.Mode,
+		InputPrice:            billingSnapshot.InputPrice,
 		OutputPrice:           price.Output,
 		CachedInputPrice:      price.CachedInput,
 		CacheCreationPrice:    price.CacheCreation5m,

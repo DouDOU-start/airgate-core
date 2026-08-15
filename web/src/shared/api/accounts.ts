@@ -191,6 +191,19 @@ export const accountsApi = {
     group_ids?: number[];
     account_id?: number;
   }) => post<AccountResp>('/api/v1/admin/accounts/oauth/codex/import-refresh', data),
+  /** Codex AT 导入；Access Token 直接保存为不可刷新凭证，account_id 时为重新授权 */
+  codexImportAccessToken: (data: {
+    access_token: string;
+    name?: string;
+    proxy_url?: string;
+    proxy_id?: number | null;
+    priority?: number;
+    weight?: number;
+    max_concurrency?: number;
+    rate_multiplier?: number;
+    group_ids?: number[];
+    account_id?: number;
+  }) => post<AccountResp>('/api/v1/admin/accounts/oauth/codex/import-access-token', data),
   /** Antigravity RT 导入；服务端自动换票并补全 project_id，account_id 时为重新授权 */
   antigravityImportRefresh: (data: {
     refresh_token: string;

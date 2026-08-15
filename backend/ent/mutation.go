@@ -34115,6 +34115,7 @@ type UsageLogMutation struct {
 	addcache_creation_1h_tokens *int
 	calls                       *int
 	addcalls                    *int
+	billing_mode                *string
 	input_price                 *float64
 	addinput_price              *float64
 	output_price                *float64
@@ -34707,6 +34708,42 @@ func (m *UsageLogMutation) AddedCalls() (r int, exists bool) {
 func (m *UsageLogMutation) ResetCalls() {
 	m.calls = nil
 	m.addcalls = nil
+}
+
+// SetBillingMode sets the "billing_mode" field.
+func (m *UsageLogMutation) SetBillingMode(s string) {
+	m.billing_mode = &s
+}
+
+// BillingMode returns the value of the "billing_mode" field in the mutation.
+func (m *UsageLogMutation) BillingMode() (r string, exists bool) {
+	v := m.billing_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBillingMode returns the old "billing_mode" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldBillingMode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBillingMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBillingMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBillingMode: %w", err)
+	}
+	return oldValue.BillingMode, nil
+}
+
+// ResetBillingMode resets all changes to the "billing_mode" field.
+func (m *UsageLogMutation) ResetBillingMode() {
+	m.billing_mode = nil
 }
 
 // SetInputPrice sets the "input_price" field.
@@ -36711,7 +36748,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 46)
+	fields := make([]string, 0, 47)
 	if m.model != nil {
 		fields = append(fields, usagelog.FieldModel)
 	}
@@ -36735,6 +36772,9 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.calls != nil {
 		fields = append(fields, usagelog.FieldCalls)
+	}
+	if m.billing_mode != nil {
+		fields = append(fields, usagelog.FieldBillingMode)
 	}
 	if m.input_price != nil {
 		fields = append(fields, usagelog.FieldInputPrice)
@@ -36874,6 +36914,8 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.CacheCreation1hTokens()
 	case usagelog.FieldCalls:
 		return m.Calls()
+	case usagelog.FieldBillingMode:
+		return m.BillingMode()
 	case usagelog.FieldInputPrice:
 		return m.InputPrice()
 	case usagelog.FieldOutputPrice:
@@ -36975,6 +37017,8 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCacheCreation1hTokens(ctx)
 	case usagelog.FieldCalls:
 		return m.OldCalls(ctx)
+	case usagelog.FieldBillingMode:
+		return m.OldBillingMode(ctx)
 	case usagelog.FieldInputPrice:
 		return m.OldInputPrice(ctx)
 	case usagelog.FieldOutputPrice:
@@ -37115,6 +37159,13 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCalls(v)
+		return nil
+	case usagelog.FieldBillingMode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBillingMode(v)
 		return nil
 	case usagelog.FieldInputPrice:
 		v, ok := value.(float64)
@@ -37796,6 +37847,9 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldCalls:
 		m.ResetCalls()
+		return nil
+	case usagelog.FieldBillingMode:
+		m.ResetBillingMode()
 		return nil
 	case usagelog.FieldInputPrice:
 		m.ResetInputPrice()

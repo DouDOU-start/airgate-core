@@ -13,7 +13,8 @@ import (
 // Codex 导入方式：
 //  1. 浏览器授权（authorize + paste callback）— 见 oauth.go startCodexOAuth
 //  2. Refresh Token 导入 — ImportCodexRefreshToken
-//  3. Session 导入 — ImportCodexSession
+//  3. Access Token 导入 — CredentialsFromCodexAccessToken
+//  4. Session 导入 — ImportCodexSession
 // 设备码已移除。
 
 const (
@@ -23,6 +24,20 @@ const (
 	chatGPTSessionCookie    = "__Secure-next-auth.session-token"
 	chatGPTBrowserUserAgent = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0`
 )
+
+// CredentialsFromCodexAccessToken 将 Codex Access Token 规范为账号凭证。
+// Access Token 是不可刷新的独立凭证，不补充 refresh_token 或 session_token。
+func CredentialsFromCodexAccessToken(accessToken string) (map[string]string, error) {
+	accessToken = strings.TrimSpace(accessToken)
+	if accessToken == "" {
+		return nil, fmt.Errorf("access_token 不能为空")
+	}
+	return map[string]string{
+		"access_token":      accessToken,
+		"token_type":        "Bearer",
+		"credential_origin": "import_access_token",
+	}, nil
+}
 
 // ImportCodexRefreshToken 用 refresh_token 换取 access_token 等 OAuth 凭证。
 // 与 airgate-openai import-refresh 对齐：JSON body + client_id/grant_type/refresh_token。

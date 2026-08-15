@@ -1132,6 +1132,9 @@ func TestPerRequestPriceSnapshot(t *testing.T) {
 	}
 
 	rec := env.sink.last(t)
+	if rec.BillingMode != billing.BillingModePerRequest || rec.Calls != 1 {
+		t.Errorf("计费模式 = %q calls=%d，期望 per_request / 1", rec.BillingMode, rec.Calls)
+	}
 	if !almostEqual(rec.InputPrice, 0.02) {
 		t.Errorf("InputPrice = %v, want 0.02（per_request 单价快照）", rec.InputPrice)
 	}
@@ -2227,7 +2230,7 @@ func TestForwardImagesGenerationsResolutionBilling(t *testing.T) {
 	if !almostEqual(rec.TotalCost, 0.14) {
 		t.Errorf("TotalCost = %v, want 0.14（2K $0.07 × 实际 2 张）", rec.TotalCost)
 	}
-	if rec.Calls != 2 || rec.ImageSize != "2K" || !almostEqual(rec.InputPrice, 0.07) {
+	if rec.BillingMode != billing.BillingModePerImage || rec.Calls != 2 || rec.ImageSize != "2K" || !almostEqual(rec.InputPrice, 0.07) {
 		t.Errorf("媒体计费快照异常: %+v", rec)
 	}
 }
@@ -2283,8 +2286,8 @@ func TestForwardImagesGenerationsPerImageBilling(t *testing.T) {
 	if !almostEqual(rec.InputPrice, 0.04) {
 		t.Errorf("InputPrice = %v, want 0.04（per_request 单价快照）", rec.InputPrice)
 	}
-	if rec.Calls != 2 {
-		t.Errorf("Calls = %d, want 2（张数落账，供对账）", rec.Calls)
+	if rec.BillingMode != billing.BillingModePerImage || rec.Calls != 2 {
+		t.Errorf("BillingMode = %q, Calls = %d, want per_image / 2", rec.BillingMode, rec.Calls)
 	}
 	if rec.Endpoint != "/v1/images/generations" || rec.Model != imgPerReqModel || rec.Stream {
 		t.Errorf("record 元数据异常: %+v", rec)

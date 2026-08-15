@@ -23,7 +23,9 @@ func (UsageLog) Fields() []ent.Field {
 		field.Int("cache_creation_5m_tokens").Default(0),
 		field.Int("cache_creation_1h_tokens").Default(0),
 		field.Int("calls").Default(0).
-			Comment("按次计费计次数（图像端点=响应产出张数）；token 计费端点恒 0。按次成本 = input_price × max(calls,1)。"),
+			Comment("计费数量或产出数量：per_request=次数，per_image=张数，per_second=秒数；token 图片端点可记录产出张数。"),
+		field.String("billing_mode").Default("").
+			Comment("计费模式快照：token / per_request / per_image / per_second；空值为历史记录。"),
 		field.Float("input_price").Default(0).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("output_price").Default(0).

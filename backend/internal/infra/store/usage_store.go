@@ -719,6 +719,7 @@ func mapUsageLog(item *ent.UsageLog) appusage.LogRecord {
 		CacheCreation5mTokens: item.CacheCreation5mTokens,
 		CacheCreation1hTokens: item.CacheCreation1hTokens,
 		Calls:                 item.Calls,
+		BillingMode:           item.BillingMode,
 		InputPrice:            item.InputPrice,
 		OutputPrice:           item.OutputPrice,
 		CachedInputPrice:      item.CachedInputPrice,

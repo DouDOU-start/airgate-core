@@ -14,8 +14,8 @@ import { accountsApi } from '../../../shared/api/accounts';
 import { useToast } from '../../../shared/ui';
 import type { OAuthSessionResp, StartOAuthReq } from '../../../shared/types';
 
-/** Codex OAuth 导入方式：浏览器授权 / RT / Session（已移除设备码）。 */
-export type CodexImportTab = 'authorize' | 'refresh' | 'session';
+/** Codex OAuth 导入方式：浏览器授权 / RT / AT / Session（已移除设备码）。 */
+export type CodexImportTab = 'authorize' | 'refresh' | 'access' | 'session';
 
 export function CodexImportPanel({
   startOptions,
@@ -39,6 +39,9 @@ export function CodexImportPanel({
   // refresh
   const [refreshToken, setRefreshToken] = useState('');
   const [clientId, setClientId] = useState('');
+
+  // Access Token 导入
+  const [accessToken, setAccessToken] = useState('');
 
   // session
   const [sessionRaw, setSessionRaw] = useState('');
@@ -140,6 +143,29 @@ export function CodexImportPanel({
     }
   };
 
+  // ── AT ──
+  const submitAccessToken = async () => {
+    if (!accessToken.trim()) {
+      toast('error', t('accounts.codex_at_required'));
+      return;
+    }
+    setSaving(true);
+    setImportError('');
+    try {
+      const acc = await accountsApi.codexImportAccessToken({
+        access_token: accessToken.trim(),
+        ...baseOpts(),
+      });
+      setImportError('');
+      toast('success', t(successKey, { name: acc.name || acc.id }));
+      onSuccess();
+    } catch (err) {
+      showImportError(err, t('accounts.oauth_failed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // ── Session ──
   const submitSession = async () => {
     if (!sessionRaw.trim()) {
@@ -166,6 +192,7 @@ export function CodexImportPanel({
   const tabs: Array<{ id: CodexImportTab; label: string }> = [
     { id: 'authorize', label: t('accounts.codex_tab_authorize') },
     { id: 'refresh', label: t('accounts.codex_tab_refresh') },
+    { id: 'access', label: t('accounts.codex_tab_access') },
     { id: 'session', label: t('accounts.codex_tab_session') },
   ];
 
@@ -279,6 +306,27 @@ export function CodexImportPanel({
             />
           </HeroTextField>
           <Button variant="primary" onPress={submitRefresh} isDisabled={saving}>
+            {saving ? <Spinner size="sm" /> : null}
+            {t('accounts.codex_import')}
+          </Button>
+        </div>
+      ) : null}
+
+      {tab === 'access' ? (
+        <div className="space-y-3">
+          <Description className="text-sm text-default-500">
+            {t('accounts.codex_at_hint')}
+          </Description>
+          <HeroTextField fullWidth>
+            <Label>{t('accounts.access_token')}</Label>
+            <TextArea
+              value={accessToken}
+              onChange={(e) => setAccessToken(e.target.value)}
+              placeholder={t('accounts.codex_at_placeholder')}
+              rows={3}
+            />
+          </HeroTextField>
+          <Button variant="primary" onPress={submitAccessToken} isDisabled={saving}>
             {saving ? <Spinner size="sm" /> : null}
             {t('accounts.codex_import')}
           </Button>

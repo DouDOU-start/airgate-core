@@ -501,7 +501,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				return
 			}
 			accountStreamAborted := result.written && (result.streamErr != nil || !result.done)
-			if p.handleAccountOutcome(c, keyInfo, acc, req, result, start, price, settings, opts,
+			if p.handleAccountOutcome(c, keyInfo, acc, req, endpoint, result, start, price, settings, opts,
 				rpmMinute, attempts, &hops, &summary, &hardExcludeAccounts, &softExcludeAccounts, attemptLatency, probeLease) {
 				if accountStreamAborted {
 					unbindAffinity(routeAccount, acc.ID)
@@ -623,7 +623,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				}
 			}
 			if !opts.zeroBilling {
-				p.recordUsage(c, keyInfo, ch, req, result, start, price)
+				p.recordUsage(c, keyInfo, ch, req, endpoint, result, start, price)
 			}
 			if result.streamErr != nil || !streamComplete {
 				unbindAffinity(routeChannel, ch.KeyID)
@@ -673,7 +673,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			// 零计费端点（countTokens 类）：usage 归零、不写 usage_log；
 			// failover/outcome/透传语义与常规端点完全一致。
 			if !opts.zeroBilling {
-				p.recordUsage(c, keyInfo, ch, req, result, start, price)
+				p.recordUsage(c, keyInfo, ch, req, endpoint, result, start, price)
 			}
 			writeUpstreamBody(c, result)
 			return
@@ -748,7 +748,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		default: // verdictClientError：语义重建终止，不重试；带 usage 仍计费（零计费端点除外）。
 			billed := result.usage != nil && !opts.zeroBilling
 			if billed {
-				p.recordUsage(c, keyInfo, ch, req, result, start, price)
+				p.recordUsage(c, keyInfo, ch, req, endpoint, result, start, price)
 			}
 			// 语义保留、载体重建：解析上游错误体提取 (message/type/code)，按入口协议
 			// 渲染（HTTP 状态码保留上游原值）；message 出口给用户前抹掉渠道身份
@@ -1040,7 +1040,7 @@ func isSSEContentType(contentType string) bool {
 // recordUsage 计费收尾：ComputeCosts → Calculate 三管道 → UsageRecord 落账。
 // price 为转发前缺价预检解析的快照（每请求解析一次，不二次 Get，
 // 避免请求期间缓存失效把已定价请求静默记 0）；缺价请求在预检已被拒绝，进不到这里。
-func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *registry.ChannelKeySnapshot, req *dto.ChatRequest, result attemptResult, start time.Time, price pricing.Price) {
+func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *registry.ChannelKeySnapshot, req *dto.ChatRequest, endpoint string, result attemptResult, start time.Time, price pricing.Price) {
 	if p.sink == nil {
 		return
 	}
@@ -1088,22 +1088,8 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 	// InputCost = 单价 × 计次数（图像端点计次数=响应产出张数，其余端点恒 1），
 	// 保证 usage_log 的「单价 × 用量 = 成本」对账口径成立。
 	// 单价来源与 ComputeCosts 同一优先级链：分辨率表命中 > per_request。
-	inputPrice := price.Input
-	// billedCalls 落账计次：按次计费下上游未给张数（如联网搜索）时按 1 次记，
-	// 保证 usage_log「单价 × 计次 = 成本」对账口径成立（ComputeCosts 内部同样把 <1 钳为 1）。
-	billedCalls := usage.Calls
-	if perImage, ok := pricing.ImagePriceFor(price, usage.ImageQuality, usage.ImageSize); ok {
-		inputPrice = perImage
-		if billedCalls < 1 {
-			billedCalls = 1
-		}
-	} else if price.PerRequest > 0 {
-		inputPrice = price.PerRequest
-		if billedCalls < 1 {
-			billedCalls = 1
-		}
-	}
-	usageStatus := usageStatusFor(result, usage, billedCalls)
+	billingSnapshot := resolveUsageBilling(endpoint, price, usage)
+	usageStatus := usageStatusFor(result, usage, billingSnapshot.Calls)
 
 	p.sink.Record(billing.UsageRecord{
 		UserID:                keyInfo.UserID,
@@ -1119,8 +1105,9 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		CacheCreationTokens:   usage.CacheCreationTokens,
 		CacheCreation5mTokens: usage.CacheCreation5mTokens,
 		CacheCreation1hTokens: usage.CacheCreation1hTokens,
-		Calls:                 billedCalls,
-		InputPrice:            inputPrice,
+		Calls:                 billingSnapshot.Calls,
+		BillingMode:           billingSnapshot.Mode,
+		InputPrice:            billingSnapshot.InputPrice,
 		OutputPrice:           price.Output,
 		CachedInputPrice:      price.CachedInput,
 		CacheCreationPrice:    price.CacheCreation5m,

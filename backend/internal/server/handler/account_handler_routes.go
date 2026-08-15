@@ -503,6 +503,32 @@ func (h *AccountHandler) ImportCodexRefresh(c *gin.Context) {
 	response.Success(c, toAccountResp(item))
 }
 
+// ImportCodexAccessToken Codex Access Token 导入。
+func (h *AccountHandler) ImportCodexAccessToken(c *gin.Context) {
+	var req dto.CodexImportAccessTokenReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+	item, err := h.service.ImportCodexAccessToken(c.Request.Context(), appaccount.OAuthStartInput{
+		Name:           req.Name,
+		ProxyURL:       req.ProxyURL,
+		ProxyID:        req.ProxyID,
+		GroupIDs:       intSliceToInt64(req.GroupIDs),
+		Priority:       req.Priority,
+		Weight:         req.Weight,
+		MaxConcurrency: req.MaxConcurrency,
+		RateMultiplier: req.RateMultiplier,
+		AccountID:      req.AccountID,
+	}, req.AccessToken)
+	if err != nil {
+		httpCode, message := h.handleImportError("Codex AT 导入失败", err)
+		response.Error(c, httpCode, httpCode, message)
+		return
+	}
+	response.Success(c, toAccountResp(item))
+}
+
 // ImportAntigravityRefresh Antigravity Refresh Token 导入。
 func (h *AccountHandler) ImportAntigravityRefresh(c *gin.Context) {
 	var req dto.AntigravityImportRefreshReq

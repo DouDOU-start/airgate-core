@@ -264,6 +264,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.POST("/accounts/oauth/sessions/:sessionId/complete", handlers.Account.CompleteOAuth)
 		// OAuth 专用导入（浏览器授权走 oauth/:platform/start）
 		adminGroup.POST("/accounts/oauth/codex/import-refresh", handlers.Account.ImportCodexRefresh)
+		adminGroup.POST("/accounts/oauth/codex/import-access-token", handlers.Account.ImportCodexAccessToken)
 		adminGroup.POST("/accounts/oauth/codex/import-session", handlers.Account.ImportCodexSession)
 		adminGroup.POST("/accounts/oauth/antigravity/import-refresh", handlers.Account.ImportAntigravityRefresh)
 		adminGroup.POST("/accounts", handlers.Account.CreateAccount)

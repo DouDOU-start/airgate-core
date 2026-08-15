@@ -476,14 +476,22 @@ func (p *Poller) settleSuccess(ctx context.Context, t *Task, seconds int) {
 	price, priced := p.pricing.Get(t.RequestModel)
 	perUnitPrice := finalTotal
 	calls := 1
+	billingMode := ""
+	if t.Platform == PlatformSuno {
+		// Suno 当前 music / lyrics 均为按次任务；即使结算时价目缓存暂不可用，
+		// 仍可由任务平台确定计费单位。
+		billingMode = billing.BillingModePerRequest
+	}
 	if priced {
 		if price.PerRequest > 0 {
 			finalTotal = price.PerRequest
 			perUnitPrice = price.PerRequest
+			billingMode = billing.BillingModePerRequest
 		} else if perSecond, ok := pricing.VideoPriceFor(price, t.Resolution); ok && seconds > 0 {
 			finalTotal = perSecond * float64(seconds)
 			perUnitPrice = perSecond
 			calls = seconds
+			billingMode = billing.BillingModePerSecond
 		}
 	}
 
@@ -515,6 +523,7 @@ func (p *Poller) settleSuccess(ctx context.Context, t *Task, seconds int) {
 		GroupID:               t.GroupID,
 		Model:                 t.RequestModel,
 		Calls:                 calls,
+		BillingMode:           billingMode,
 		InputPrice:            perUnitPrice,
 		InputCost:             finalTotal,
 		TotalCost:             calc.TotalCost,

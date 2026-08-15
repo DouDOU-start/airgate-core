@@ -499,8 +499,10 @@ export interface UsageLogResp {
   cache_creation_5m_tokens: number;
   /** Anthropic 缓存创建 1h 档 */
   cache_creation_1h_tokens: number;
-  /** 按次计费计次数（图像端点=响应产出张数）；token 计费端点恒 0 */
+  /** 计费数量或产出数量，具体单位由 billing_mode 决定 */
   calls: number;
+  /** 计费模式快照；旧记录可能为空，由前端兼容推断 */
+  billing_mode?: 'token' | 'per_request' | 'per_image' | 'per_second' | string;
   input_price: number;
   output_price: number;
   cached_input_price: number;
@@ -563,8 +565,10 @@ export interface CustomerUsageLogResp {
   cache_creation_5m_tokens: number;
   /** Anthropic 缓存创建 1h 档 */
   cache_creation_1h_tokens: number;
-  /** 按次计费计次数（图像端点=响应产出张数）；token 计费端点恒 0 */
+  /** 计费数量或产出数量，具体单位由 billing_mode 决定 */
   calls: number;
+  /** 计费模式快照；旧记录可能为空 */
+  billing_mode?: 'token' | 'per_request' | 'per_image' | 'per_second' | string;
   /** 客户视角："本次消耗 = X 美元" */
   cost: number;
   service_tier?: string;

@@ -114,6 +114,274 @@ function TooltipDivider() {
   return <div className="my-0.5 border-t border-border" />;
 }
 
+type BillingCostItem = {
+  key: string;
+  label: string;
+  cost: number;
+  unitPrice: number;
+  unitSuffix: string;
+  quantity: number;
+  quantitySuffix: string;
+  color: string;
+};
+
+type BillingMode = 'token' | 'per_request' | 'per_image' | 'per_second';
+
+function endpointPath(row: UsageLogResp): string {
+  return ((row.endpoint ?? '').split('?', 1)[0] ?? '').toLowerCase();
+}
+
+function isImageUsage(row: UsageLogResp): boolean {
+  const endpoint = endpointPath(row);
+  return endpoint.includes('/images/generations')
+    || endpoint.includes('/images/edits')
+    || endpoint.endsWith(':predict');
+}
+
+function isVideoUsage(row: UsageLogResp): boolean {
+  const endpoint = endpointPath(row);
+  return row.video_resolution != null && row.video_resolution !== ''
+    || endpoint === '/v1/videos'
+    || endpoint === '/videos'
+    || endpoint.endsWith('/videos/generations');
+}
+
+function hasLegacyPerUnitBilling(row: UsageLogResp): boolean {
+  const calls = row.calls ?? 0;
+  if (calls <= 0 || row.input_price <= 0 || row.output_cost !== 0) return false;
+  const expected = row.input_price * calls;
+  const tolerance = Math.max(1e-9, Math.abs(row.input_cost) * 1e-8);
+  return Math.abs(expected - row.input_cost) <= tolerance;
+}
+
+/** 新记录使用后端快照；历史记录按端点、数量和金额关系兼容推断。 */
+function resolvedBillingMode(row: UsageLogResp): BillingMode {
+  switch (row.billing_mode) {
+    case 'token':
+    case 'per_request':
+    case 'per_image':
+    case 'per_second':
+      return row.billing_mode;
+    default:
+      break;
+  }
+  if (!hasLegacyPerUnitBilling(row)) return 'token';
+  if (isImageUsage(row)) return 'per_image';
+  if (isVideoUsage(row) && (row.calls ?? 0) > 1) return 'per_second';
+  return 'per_request';
+}
+
+function perUnitBillingLabel(row: UsageLogResp, mode: BillingMode, t: TFunction): string {
+  const endpoint = endpointPath(row);
+  if (mode === 'per_image' || isImageUsage(row)) return t('usage.billing_image', '图像生成');
+  if (isVideoUsage(row)) return t('usage.billing_video', '视频生成');
+  if (endpoint.endsWith('/suno/submit/music')) return t('usage.billing_music', '音乐生成');
+  if (endpoint.endsWith('/suno/submit/lyrics')) return t('usage.billing_lyrics', '歌词生成');
+  if (endpoint.endsWith('/alpha/search')) return t('usage.billing_search', '联网搜索');
+  return t('usage.billing_per_call', '按次计费');
+}
+
+function perUnitSuffix(mode: BillingMode, t: TFunction): string {
+  switch (mode) {
+    case 'per_image':
+      return t('usage.per_image', '/ 张');
+    case 'per_second':
+      return t('usage.per_second', '/ 秒');
+    default:
+      return t('usage.per_call', '/ 次');
+  }
+}
+
+function billingQuantity(row: UsageLogResp, mode: BillingMode, t: TFunction): { label: string; value: string } | null {
+  const calls = row.calls ?? 0;
+  if (calls <= 0) return null;
+  if (mode === 'token' && isImageUsage(row)) {
+    return { label: t('usage.calls', '产出张数'), value: `×${calls}` };
+  }
+  return null;
+}
+
+function perUnitQuantitySuffix(mode: BillingMode, t: TFunction): string {
+  switch (mode) {
+    case 'per_image':
+      return t('usage.billing_unit_image', '张');
+    case 'per_second':
+      return t('usage.seconds', '秒');
+    default:
+      return t('usage.billing_unit_call', '次');
+  }
+}
+
+function effectiveTokenUnitPrice(cost: number, tokens: number, fallbackPrice: number): number {
+  if (cost <= 0) return 0;
+  if (tokens > 0) return cost * 1e6 / tokens;
+  return fallbackPrice > 0 ? fallbackPrice : 0;
+}
+
+/**
+ * 把所有模型、协议和计费方式归一成同一组“计费项目”。
+ * 展示层不判断模型名称，只依据最终落库的用量与成本字段生成固定结构。
+ */
+function billingCostItems(row: UsageLogResp, mode: BillingMode, t: TFunction): BillingCostItem[] {
+  const items: BillingCostItem[] = [];
+  const calls = row.calls ?? 0;
+  if (mode !== 'token') {
+    if (row.input_cost <= 0) return items;
+    items.push({
+      key: 'per_unit',
+      label: perUnitBillingLabel(row, mode, t),
+      cost: row.input_cost,
+      unitPrice: calls > 0 ? row.input_cost / calls : row.input_price,
+      unitSuffix: perUnitSuffix(mode, t),
+      quantity: calls,
+      quantitySuffix: perUnitQuantitySuffix(mode, t),
+      color: USAGE_TOKEN_COLORS.input,
+    });
+    return items;
+  }
+
+  const pushTokenItem = ({
+    key,
+    label,
+    cost,
+    tokens,
+    fallbackPrice,
+    color,
+  }: {
+    key: string;
+    label: string;
+    cost: number;
+    tokens: number;
+    fallbackPrice: number;
+    color: string;
+  }) => {
+    if (cost <= 0) return;
+    items.push({
+      key,
+      label,
+      cost,
+      unitPrice: effectiveTokenUnitPrice(cost, tokens, fallbackPrice),
+      unitSuffix: '/ 1M Token',
+      quantity: tokens,
+      quantitySuffix: t('usage.tokens', 'Token'),
+      color,
+    });
+  };
+
+  pushTokenItem({
+    key: 'input',
+    label: t('usage.billing_input', '输入'),
+    cost: row.input_cost,
+    tokens: row.input_tokens,
+    fallbackPrice: row.input_price,
+    color: USAGE_TOKEN_COLORS.input,
+  });
+  pushTokenItem({
+    key: 'output',
+    label: t('usage.billing_output', '输出'),
+    cost: row.output_cost,
+    tokens: row.output_tokens,
+    fallbackPrice: row.output_price,
+    color: USAGE_TOKEN_COLORS.output,
+  });
+  pushTokenItem({
+    key: 'cache_read',
+    label: t('usage.billing_cache_read', '缓存读取'),
+    cost: row.cached_input_cost,
+    tokens: row.cached_input_tokens,
+    fallbackPrice: row.cached_input_price,
+    color: USAGE_TOKEN_COLORS.cacheRead,
+  });
+
+  const cacheWriteCost = row.cache_creation_cost;
+  if (cacheWriteCost <= 0) return items;
+
+  const cache5mTokens = row.cache_creation_5m_tokens ?? 0;
+  const cache1hTokens = row.cache_creation_1h_tokens ?? 0;
+  const splitTokens = cache5mTokens + cache1hTokens;
+  if (splitTokens > 0) {
+    // 数据库只存缓存写入总成本。使用两档“Token × 基础单价”的占比分摊总成本，
+    // 可保留服务档等整单倍率，且确保两档成本之和与落库总成本完全一致。
+    const weight5m = cache5mTokens * Math.max(row.cache_creation_price, 0);
+    const weight1h = cache1hTokens * Math.max(row.cache_creation_1h_price, 0);
+    const totalWeight = weight5m + weight1h;
+    const cost5m = cache5mTokens > 0
+      ? cacheWriteCost * (totalWeight > 0 ? weight5m / totalWeight : cache5mTokens / splitTokens)
+      : 0;
+    const cost1h = cache1hTokens > 0 ? cacheWriteCost - cost5m : 0;
+
+    pushTokenItem({
+      key: 'cache_write_5m',
+      label: t('usage.billing_cache_write_5m', '缓存写入 5m'),
+      cost: cost5m,
+      tokens: cache5mTokens,
+      fallbackPrice: row.cache_creation_price,
+      color: USAGE_TOKEN_COLORS.cacheCreation,
+    });
+    pushTokenItem({
+      key: 'cache_write_1h',
+      label: t('usage.billing_cache_write_1h', '缓存写入 1h'),
+      cost: cost1h,
+      tokens: cache1hTokens,
+      fallbackPrice: row.cache_creation_1h_price,
+      color: USAGE_TOKEN_COLORS.cacheCreation,
+    });
+    return items;
+  }
+
+  // 兼容只有缓存写入总量、没有 5m/1h 拆分的旧记录。
+  pushTokenItem({
+    key: 'cache_write',
+    label: t('usage.billing_cache_write', '缓存写入'),
+    cost: cacheWriteCost,
+    tokens: row.cache_creation_tokens ?? 0,
+    fallbackPrice: row.cache_creation_price,
+    color: USAGE_TOKEN_COLORS.cacheCreation,
+  });
+  return items;
+}
+
+function BillingCostCard({ item, t }: { item: BillingCostItem; t: TFunction }) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-[var(--radius)] border border-border bg-default px-2.5 py-1.5"
+      style={{ boxShadow: `inset 2px 0 0 ${item.color}` }}
+    >
+      <div className="grid grid-cols-[minmax(0,1fr)_max-content] items-center gap-3">
+        <span className="min-w-0 truncate text-xs font-semibold text-text-secondary">{item.label}</span>
+        <CostValue
+          className="font-mono text-xs font-semibold tabular-nums"
+          value={item.cost}
+          decimals={6}
+          tone="standard"
+        />
+      </div>
+      {(item.unitPrice > 0 || item.quantity > 0) && (
+        <div className="mt-0.5 grid grid-cols-[minmax(0,1fr)_max-content] items-center gap-3 text-[11px]">
+          <div className="flex min-w-0 items-center gap-1.5 text-text-tertiary">
+            {item.quantity > 0 && (
+              <>
+                <span>{t('usage.billing_quantity', '用量')}</span>
+                <span className="truncate font-mono font-medium tabular-nums text-text-secondary">
+                  {fmtNum(item.quantity)} {item.quantitySuffix}
+                </span>
+              </>
+            )}
+          </div>
+          {item.unitPrice > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-text-tertiary">{t('usage.billing_unit_price', '有效单价')}</span>
+              <span className="font-mono font-medium tabular-nums text-text-secondary">
+                ${item.unitPrice.toFixed(4)} {item.unitSuffix}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const META_CHIP_SERVICE_TIER_COLOR = 'rgb(168,85,247)';
 const META_CHIP_REASONING_EFFORT_COLOR = 'var(--ag-tone-indigo)';
 // 图像端点产出档位 chip（分辨率/质量，teal 区别于服务档紫与推理靛蓝）。
@@ -345,62 +613,24 @@ function buildResellerCostColumn(t: TFunction, adminView: boolean): UsageColumnC
     width: '140px',
     render: (raw) => {
       const row = raw as UsageLogResp;
-      // 按次/按张计费的记录：input_price 快照是「每次/每张」单价（成本 = 单价 × 计次数），
-      // 不是 token 单价；此时 token 单价快照（如兜底价）未参与计费，显示会误导，一并隐藏。
-      const calls = row.calls ?? 0;
-      const perUnit = calls > 0 && row.input_price > 0 && row.output_cost === 0
-        && Math.abs(row.input_price * calls - row.input_cost) < 1e-9;
-      const hasCacheRead = row.cached_input_cost > 0;
-      const hasCacheWrite = row.cache_creation_cost > 0;
-      // 旧记录可能只有缓存写入总量，没有 5m/1h 拆分；此时用 5m 单价作为兼容展示。
-      const hasCacheWrite5m = row.cache_creation_5m_tokens > 0
-        || (hasCacheWrite && row.cache_creation_5m_tokens === 0 && row.cache_creation_1h_tokens === 0);
-      const hasCacheWrite1h = row.cache_creation_1h_tokens > 0;
+      const billingMode = resolvedBillingMode(row);
+      const costItems = billingCostItems(row, billingMode, t);
+      const quantity = billingQuantity(row, billingMode, t);
       return (
         <RichTooltip
           placement="right"
           content={() => (
             <TooltipPanel title={t('usage.cost_detail')} subtitle={row.model}>
-                <TooltipRow label={t('usage.input_cost')} value={`$${row.input_cost.toFixed(6)}`} />
-                <TooltipRow label={t('usage.output_cost')} value={`$${row.output_cost.toFixed(6)}`} />
-                {row.cached_input_cost > 0 && (
-                  <TooltipRow label={t('usage.cached_input_cost')} value={`$${row.cached_input_cost.toFixed(6)}`} />
-                )}
-                {row.cache_creation_cost > 0 && (
-                  <TooltipRow label={t('usage.cache_creation_cost')} value={`$${row.cache_creation_cost.toFixed(6)}`} />
-                )}
-                {perUnit ? (
-                  <TooltipRow
-                    label={t('usage.unit_price', '单价')}
-                    value={`$${row.input_price.toFixed(4)} ${row.video_resolution
-                      ? t('usage.per_second', '/ 秒')
-                      : row.image_size ? t('usage.per_image', '/ 张') : t('usage.per_call', '/ 次')}`}
-                  />
+                <div className="px-2 pb-0.5 pt-0.5 text-[10px] font-semibold tracking-[0.14em] text-text-tertiary">
+                  {t('usage.billing_items', '计费项目')}
+                </div>
+                {costItems.length > 0 ? (
+                  costItems.map((item) => <BillingCostCard key={item.key} item={item} t={t} />)
                 ) : (
-                  <>
-                    {row.input_cost > 0 && row.input_price > 0 && (
-                      <TooltipRow label={t('usage.input_unit_price')} value={`$${row.input_price.toFixed(4)} / 1M Token`} />
-                    )}
-                    {row.output_cost > 0 && row.output_price > 0 && (
-                      <TooltipRow label={t('usage.output_unit_price')} value={`$${row.output_price.toFixed(4)} / 1M Token`} />
-                    )}
-                    {hasCacheRead && row.cached_input_price > 0 && (
-                      <TooltipRow label={t('usage.cached_input_unit_price')} value={`$${row.cached_input_price.toFixed(4)} / 1M Token`} />
-                    )}
-                    {hasCacheWrite5m && row.cache_creation_price > 0 && (
-                      <TooltipRow label={t('usage.cache_creation_unit_price')} value={`$${row.cache_creation_price.toFixed(4)} / 1M Token`} />
-                    )}
-                    {hasCacheWrite1h && row.cache_creation_1h_price > 0 && (
-                      <TooltipRow label={t('usage.cache_creation_1h_unit_price')} value={`$${row.cache_creation_1h_price.toFixed(4)} / 1M Token`} />
-                    )}
-                  </>
+                  <TooltipRow label={t('usage.billing_items', '计费项目')} value={t('usage.no_billing_items', '无计费')} />
                 )}
-                {(row.calls ?? 0) > 0 && (
-                  // 图像端点产出张数；按次计费时成本 = input_price × 张数。
-                  <TooltipRow
-                    label={row.video_resolution ? t('usage.video_seconds', '视频时长') : t('usage.calls', '产出张数')}
-                    value={row.video_resolution ? `${row.calls} ${t('usage.seconds', '秒')}` : `×${row.calls}`}
-                  />
+                {quantity && (
+                  <TooltipRow label={quantity.label} value={quantity.value} />
                 )}
                 <TooltipDivider />
                 {row.service_tier && (

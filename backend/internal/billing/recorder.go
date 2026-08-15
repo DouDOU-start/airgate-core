@@ -39,7 +39,8 @@ type UsageRecord struct {
 	CacheCreationTokens   int
 	CacheCreation5mTokens int
 	CacheCreation1hTokens int
-	Calls                 int // 按次计费计次数（图像端点=响应产出张数）；token 计费端点恒 0
+	Calls                 int // 计费数量或产出数量，具体单位由 BillingMode 决定
+	BillingMode           string
 	InputPrice            float64
 	OutputPrice           float64
 	CachedInputPrice      float64
@@ -82,6 +83,24 @@ const (
 	SourceAccountTest = "account_test" // 账号连通性测试（管理员操作，无用户归属）
 	SourceTask        = "task"         // 异步任务（视频/音乐）终态结算
 )
+
+// 计费模式快照（usage_logs.billing_mode）。展示层只依据该字段决定数量与单价单位，
+// 不再通过模型名或协议猜测计费方式。
+const (
+	BillingModeToken      = "token"
+	BillingModePerRequest = "per_request"
+	BillingModePerImage   = "per_image"
+	BillingModePerSecond  = "per_second"
+)
+
+func normalizedBillingMode(mode string) string {
+	switch mode {
+	case BillingModeToken, BillingModePerRequest, BillingModePerImage, BillingModePerSecond:
+		return mode
+	default:
+		return ""
+	}
+}
 
 // 使用记录计量状态（usage_logs.usage_status）。
 const (
@@ -365,6 +384,7 @@ func usageLogCreate(tx *ent.Tx, rec UsageRecord, withChannel bool) *ent.UsageLog
 		SetCacheCreation5mTokens(rec.CacheCreation5mTokens).
 		SetCacheCreation1hTokens(rec.CacheCreation1hTokens).
 		SetCalls(rec.Calls).
+		SetBillingMode(normalizedBillingMode(rec.BillingMode)).
 		SetInputPrice(rec.InputPrice).
 		SetOutputPrice(rec.OutputPrice).
 		SetCachedInputPrice(rec.CachedInputPrice).

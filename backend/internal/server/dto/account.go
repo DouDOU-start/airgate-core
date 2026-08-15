@@ -335,6 +335,21 @@ type CodexImportRefreshReq struct {
 	AccountID int `json:"account_id"`
 }
 
+// CodexImportAccessTokenReq Codex AT 导入。
+type CodexImportAccessTokenReq struct {
+	AccessToken    string  `json:"access_token" binding:"required"`
+	Name           string  `json:"name"`
+	ProxyURL       string  `json:"proxy_url"`
+	ProxyID        *int64  `json:"proxy_id"`
+	GroupIDs       []int   `json:"group_ids"`
+	Priority       int     `json:"priority"`
+	Weight         int     `json:"weight"`
+	MaxConcurrency int     `json:"max_concurrency"`
+	RateMultiplier float64 `json:"rate_multiplier"`
+	// AccountID 重新授权目标账号。
+	AccountID int `json:"account_id"`
+}
+
 // AntigravityImportRefreshReq Antigravity RT 导入。
 type AntigravityImportRefreshReq struct {
 	RefreshToken   string  `json:"refresh_token" binding:"required"`

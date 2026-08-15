@@ -195,6 +195,20 @@ func (ulu *UsageLogUpdate) AddCalls(i int) *UsageLogUpdate {
 	return ulu
 }
 
+// SetBillingMode sets the "billing_mode" field.
+func (ulu *UsageLogUpdate) SetBillingMode(s string) *UsageLogUpdate {
+	ulu.mutation.SetBillingMode(s)
+	return ulu
+}
+
+// SetNillableBillingMode sets the "billing_mode" field if the given value is not nil.
+func (ulu *UsageLogUpdate) SetNillableBillingMode(s *string) *UsageLogUpdate {
+	if s != nil {
+		ulu.SetBillingMode(*s)
+	}
+	return ulu
+}
+
 // SetInputPrice sets the "input_price" field.
 func (ulu *UsageLogUpdate) SetInputPrice(f float64) *UsageLogUpdate {
 	ulu.mutation.ResetInputPrice()
@@ -1046,6 +1060,9 @@ func (ulu *UsageLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := ulu.mutation.AddedCalls(); ok {
 		_spec.AddField(usagelog.FieldCalls, field.TypeInt, value)
 	}
+	if value, ok := ulu.mutation.BillingMode(); ok {
+		_spec.SetField(usagelog.FieldBillingMode, field.TypeString, value)
+	}
 	if value, ok := ulu.mutation.InputPrice(); ok {
 		_spec.SetField(usagelog.FieldInputPrice, field.TypeFloat64, value)
 	}
@@ -1547,6 +1564,20 @@ func (uluo *UsageLogUpdateOne) SetNillableCalls(i *int) *UsageLogUpdateOne {
 // AddCalls adds i to the "calls" field.
 func (uluo *UsageLogUpdateOne) AddCalls(i int) *UsageLogUpdateOne {
 	uluo.mutation.AddCalls(i)
+	return uluo
+}
+
+// SetBillingMode sets the "billing_mode" field.
+func (uluo *UsageLogUpdateOne) SetBillingMode(s string) *UsageLogUpdateOne {
+	uluo.mutation.SetBillingMode(s)
+	return uluo
+}
+
+// SetNillableBillingMode sets the "billing_mode" field if the given value is not nil.
+func (uluo *UsageLogUpdateOne) SetNillableBillingMode(s *string) *UsageLogUpdateOne {
+	if s != nil {
+		uluo.SetBillingMode(*s)
+	}
 	return uluo
 }
 
@@ -2430,6 +2461,9 @@ func (uluo *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, er
 	}
 	if value, ok := uluo.mutation.AddedCalls(); ok {
 		_spec.AddField(usagelog.FieldCalls, field.TypeInt, value)
+	}
+	if value, ok := uluo.mutation.BillingMode(); ok {
+		_spec.SetField(usagelog.FieldBillingMode, field.TypeString, value)
 	}
 	if value, ok := uluo.mutation.InputPrice(); ok {
 		_spec.SetField(usagelog.FieldInputPrice, field.TypeFloat64, value)

@@ -123,8 +123,8 @@ func OAuthLoginHints(platform string) map[string]any {
 		out["flow"] = OAuthFlowPasteCode
 		out["instruction"] = "点击「生成授权链接」后打开链接完成 Anthropic 登录。授权页会跳转到带 code 的地址，把地址栏里的 code（或完整 URL）粘贴回来完成绑定。"
 	case "codex":
-		out["flows"] = []string{OAuthFlowPasteCode, "import_refresh", "import_session"}
-		out["instruction"] = "Codex 支持：浏览器授权、Refresh Token 导入、Session 导入。"
+		out["flows"] = []string{OAuthFlowPasteCode, "import_refresh", "import_access_token", "import_session"}
+		out["instruction"] = "Codex 支持：浏览器授权、Refresh Token 导入、Access Token 导入、Session 导入。"
 	case "antigravity":
 		out["flows"] = []string{OAuthFlowPasteCode, "import_refresh"}
 		out["instruction"] = "Antigravity 支持浏览器授权，也可以只粘贴 Refresh Token，由服务端自动换票并补全 project_id。"
@@ -173,7 +173,7 @@ func (s *Service) StartOAuth(ctx context.Context, input OAuthStartInput) (OAuthS
 		err = s.startClaudeOAuth(entry)
 	case "codex":
 		if strings.EqualFold(strings.TrimSpace(input.Mode), "device") {
-			return OAuthSession{}, fmt.Errorf("codex 已不再支持设备码授权，请使用浏览器授权、Refresh Token 或 Session 导入")
+			return OAuthSession{}, fmt.Errorf("codex 已不再支持设备码授权，请使用浏览器授权、Refresh Token、Access Token 或 Session 导入")
 		}
 		err = s.startCodexOAuth(entry)
 	case "antigravity":
@@ -310,6 +310,19 @@ func (s *Service) ImportCodexRefresh(ctx context.Context, input OAuthStartInput,
 		return Account{}, err
 	}
 	creds, err := ImportCodexRefreshToken(ctx, refreshToken, input.ProxyURL, clientID)
+	if err != nil {
+		return Account{}, err
+	}
+	return s.createFromCodexImport(ctx, input, creds, "")
+}
+
+// ImportCodexAccessToken 用 AT 直接创建 oauth 账号；AccountID>0 时更新已有账号。
+func (s *Service) ImportCodexAccessToken(ctx context.Context, input OAuthStartInput, accessToken string) (Account, error) {
+	input.Platform = "codex"
+	if err := s.prepareOAuthReauth(ctx, &input); err != nil {
+		return Account{}, err
+	}
+	creds, err := CredentialsFromCodexAccessToken(accessToken)
 	if err != nil {
 		return Account{}, err
 	}
