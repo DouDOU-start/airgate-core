@@ -191,9 +191,10 @@
   .ag-usage-mobile-field {
     display: grid;
     min-width: 0;
-    grid-template-columns: minmax(4.5rem, 28%) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     align-items: center;
-    gap: 0.625rem;
+    justify-items: center;
+    gap: 0.375rem;
     border-bottom: 1px solid color-mix(in oklab, var(--separator) 76%, transparent);
     padding: 0.625rem 0.75rem;
   }
@@ -203,22 +204,33 @@
   }
 
   .ag-usage-mobile-label {
+    width: 100%;
     min-width: 0;
     color: var(--muted);
     font-family: var(--font-mono);
     font-size: 0.625rem;
     font-weight: 550;
     line-height: 1.4;
+    text-align: center;
   }
 
   .ag-usage-mobile-value {
+    display: flex;
+    width: 100%;
     min-width: 0;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
+    text-align: center;
   }
 
   .ag-usage-mobile-value > * {
+    width: 100%;
     min-width: 0;
     max-width: 100%;
+    justify-content: center !important;
+    margin-inline: auto !important;
+    text-align: center !important;
   }
 
   .ag-usage-mobile-field[data-column-id="model"],
@@ -233,8 +245,25 @@
   }
 
   .ag-usage-mobile-field[data-column-id="model"] .ag-usage-mobile-value > * {
-    justify-content: flex-start !important;
-    text-align: left !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    justify-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  .ag-usage-mobile-field[data-column-id="model"] .ag-usage-model-meta-slot {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .ag-usage-mobile-field[data-column-id="model"] .ag-usage-model-meta-slot:empty {
+    display: none;
+  }
+
+  .ag-usage-mobile-field[data-column-id="model"] .ag-usage-mobile-value span[title] {
+    width: 100%;
+    text-align: center;
   }
 
   .ag-usage-mobile-field[data-column-id="tokens"] .ag-usage-mobile-value > * {
@@ -247,6 +276,11 @@
 
   .ag-usage-mobile-field[data-column-id="created_at"] .hidden {
     display: inline !important;
+  }
+
+  .ag-usage-mobile-field[data-column-id="created_at"] .ag-usage-mobile-value > * {
+    flex-wrap: wrap;
+    gap: 0.375rem !important;
   }
 
   .ag-usage-mobile-field[data-column-id="cost"] .ag-usage-mobile-value > *,

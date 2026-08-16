@@ -212,7 +212,7 @@ export default function RiskControlPage() {
       </div>
 
       {/* 审核日志表 */}
-      <CommonTable ariaLabel={t('risk_control.title')} mobileLayout="scroll" minWidth={980}>
+      <CommonTable ariaLabel={t('risk_control.title')} mobileLayout="cards" minWidth={980}>
         <CommonTable.Header>
           <CommonTable.Column id="time" style={{ width: 150 }}>{t('risk_control.col_time')}</CommonTable.Column>
           <CommonTable.Column id="user" style={{ width: 190 }}>{t('risk_control.col_user')}</CommonTable.Column>

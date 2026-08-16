@@ -214,7 +214,7 @@ export function AccountModelsModal({
       <DialogTriggerShim />
       <Modal.Backdrop>
         <Modal.Container placement="center" size="lg" scroll="inside">
-          <Modal.Dialog className="ag-elevation-modal">
+          <Modal.Dialog className="ag-elevation-modal ag-account-models-modal">
             <Modal.Header>
               <Modal.Heading>{title}</Modal.Heading>
               <Modal.CloseTrigger />
@@ -264,7 +264,7 @@ export function AccountModelsModal({
                 )
               ) : null}
 
-              <div className="max-h-[46vh] min-h-[10rem] overflow-y-auto rounded-[var(--radius)] border border-border bg-surface">
+              <div className="ag-account-models-list max-h-[46vh] min-h-[10rem] overflow-y-auto rounded-[var(--radius)] border border-border bg-surface">
                 {models.length === 0 ? (
                   <div className="flex min-h-40 flex-col items-center justify-center gap-3 px-6 py-8 text-center">
                     <div className="flex items-center gap-2 font-mono text-xs text-text-secondary">

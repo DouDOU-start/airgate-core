@@ -55,7 +55,7 @@ export function UserUpstreamLogsTable({
     <CommonTable
       ariaLabel={t('usage.records_tab_upstream')}
       contentStyle={{ tableLayout: 'fixed' }}
-      mobileLayout="scroll"
+      mobileLayout="cards"
       footer={(
         <TablePaginationFooter
           page={page}

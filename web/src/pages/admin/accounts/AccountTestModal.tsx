@@ -328,7 +328,7 @@ export function AccountTestModal({
               ) : null}
 
               {isCodexAccount && overageAvailable ? (
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-default-200 bg-default-50 px-3 py-2.5">
+                <div className="ag-account-test-mode flex items-center justify-between gap-3 rounded-lg border border-default-200 bg-default-50 px-3 py-2.5">
                   <div className="min-w-0">
                     <Label>{t('accounts.test_mode')}</Label>
                     <p className="mt-0.5 text-xs text-text-tertiary">
@@ -409,9 +409,9 @@ export function AccountTestModal({
 
               <div className="space-y-1.5">
                 <HeroTextField fullWidth isDisabled={status === 'connecting'}>
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="ag-account-test-prompt-header flex items-center justify-between gap-3">
                     <Label>{t('accounts.test_prompt')}</Label>
-                    <div className="flex items-center gap-1.5">
+                    <div className="ag-account-test-prompt-actions flex items-center gap-1.5">
                       <span className="text-[11px] font-medium text-text-tertiary">
                         {t(`accounts.test_kind_${selectedKind}`)}
                       </span>
@@ -582,7 +582,7 @@ export function AccountTestModal({
 
               <div
                 ref={terminalRef}
-                className="max-h-[260px] min-h-[140px] overflow-y-auto rounded-xl border border-gray-700 bg-gray-950 p-4 font-mono text-sm"
+                className="ag-account-test-terminal max-h-[260px] min-h-[140px] overflow-y-auto rounded-xl border border-gray-700 bg-gray-950 p-4 font-mono text-sm"
               >
                 {status === 'idle' ? (
                   <div className="flex items-center gap-2 text-gray-500">

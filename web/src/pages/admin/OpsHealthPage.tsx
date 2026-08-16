@@ -153,7 +153,7 @@ function EntityTable({
       ariaLabel={isGroup ? t('ops_health.group_table') : t('ops_health.entity_table')}
       className="ag-ops-health-table"
       contentStyle={{ tableLayout: 'fixed' }}
-      mobileLayout="scroll"
+      mobileLayout="cards"
       minWidth={isGroup ? 1120 : 1380}
     >
       <CommonTable.Header>

@@ -368,7 +368,7 @@ export function ChannelTestModal({
               <Modal.CloseTrigger />
             </Modal.Header>
             <Modal.Body>
-              <div className="mb-3 flex items-center gap-2">
+              <div className="ag-channel-test-toolbar mb-3 flex items-center gap-2">
                 {runningAll ? (
                   <Button size="sm" variant="secondary" onPress={handleStop}>
                     <Square className="h-3.5 w-3.5" />
@@ -397,7 +397,7 @@ export function ChannelTestModal({
                 {channelKey?.type === 'openai_compatible' ? (
                   // openai 协议有 chat_completions / responses 两个端点，部分上游只实现其一
                   <div
-                    className="flex items-center gap-0.5 rounded-[var(--radius)] border border-border p-0.5"
+                    className="ag-channel-test-endpoints flex items-center gap-0.5 rounded-[var(--radius)] border border-border p-0.5"
                     title={t('channels.test_endpoint_hint')}
                   >
                     {(['chat_completions', 'responses'] as const).map((ep) => (
@@ -416,13 +416,13 @@ export function ChannelTestModal({
                 ) : null}
                 {runningAll ? <Spinner size="sm" /> : null}
                 {okCount + failCount > 0 ? (
-                  <span className="ml-auto text-xs text-text-secondary">
+                  <span className="ag-channel-test-summary ml-auto text-xs text-text-secondary">
                     {t('channels.test_summary', { ok: okCount, fail: failCount })}
                   </span>
                 ) : null}
               </div>
 
-              <div className="mb-2 flex items-center gap-2">
+              <div className="ag-channel-test-add-row mb-2 flex items-center gap-2">
                 <Input
                   aria-label={t('channels.public_model')}
                   className="flex-1 font-mono text-xs"
@@ -467,7 +467,7 @@ export function ChannelTestModal({
                 )
               ) : null}
 
-              <div className="mb-1 flex items-center gap-2 px-3 text-xs text-text-tertiary">
+              <div className="ag-channel-test-model-header mb-1 flex items-center gap-2 px-3 text-xs text-text-tertiary">
                 <span className="flex-1">{t('channels.public_model')}</span>
                 <span className="flex-1">{t('channels.channel_model')}</span>
                 <span aria-hidden="true" className="w-[7.25rem] shrink-0" />
@@ -482,7 +482,7 @@ export function ChannelTestModal({
                     const notInCatalog = catalogReady && !catalog.has(model);
                     return (
                       <div className="border-b border-border px-3 py-2 last:border-b-0" key={model}>
-                        <div className="flex items-center gap-2">
+                        <div className="ag-channel-test-model-row flex items-center gap-2">
                           <span className="flex min-w-0 flex-1 items-center gap-1">
                             <ModelNameField
                               ariaLabel={t('channels.public_model')}

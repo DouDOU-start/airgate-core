@@ -367,7 +367,7 @@ export default function RedemptionCodesPage() {
       {/* 表格 */}
       <CommonTable
         ariaLabel={t('redemption.title')}
-        mobileLayout="scroll"
+        mobileLayout="cards"
         footer={(
           <TablePaginationFooter
             page={page}

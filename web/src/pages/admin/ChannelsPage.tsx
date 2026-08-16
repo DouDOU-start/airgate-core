@@ -675,7 +675,7 @@ export default function ChannelsPage() {
       <CommonTable
         ariaLabel={t('channels.title')}
         className="ag-channels-table"
-        mobileLayout="scroll"
+        mobileLayout="cards"
         footer={(
           <TablePaginationFooter
             page={page}

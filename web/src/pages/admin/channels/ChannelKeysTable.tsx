@@ -66,7 +66,7 @@ export function ChannelKeysTable({
       ariaLabel={t('channels.view_keys')}
       className="ag-channel-keys-table"
       contentStyle={{ tableLayout: 'fixed' }}
-      mobileLayout="scroll"
+      mobileLayout="cards"
       footer={footer}
       minWidth={1260}
     >

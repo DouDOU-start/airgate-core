@@ -56,7 +56,7 @@ export function UpstreamLogsTable({
         ariaLabel={t('usage.records_tab_upstream')}
         // 固定布局：原因列文本极长，auto 布局会挤扁来源/结果等窄列（chip 竖排）
         contentStyle={{ tableLayout: 'fixed' }}
-        mobileLayout="scroll"
+        mobileLayout="cards"
         footer={(
           <TablePaginationFooter
             page={page}
