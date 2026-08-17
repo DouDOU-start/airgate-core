@@ -11,31 +11,20 @@ import (
 	"time"
 )
 
-func TestAntigravityOAuthRequiresEnvironmentCredentials(t *testing.T) {
-	t.Setenv(antigravityOAuthClientIDEnv, "")
-	t.Setenv(antigravityOAuthClientSecretEnv, "")
-
-	entry := &oauthSessionEntry{}
-	err := (&Service{}).startAntigravityOAuth(entry)
-	if err == nil {
-		t.Fatal("未配置 Antigravity OAuth 环境变量时应返回错误")
-	}
-}
-
-func TestAntigravityOAuthUsesEnvironmentClientID(t *testing.T) {
-	t.Setenv(antigravityOAuthClientIDEnv, "test-client-id")
-	t.Setenv(antigravityOAuthClientSecretEnv, "test-client-secret")
-
+func TestAntigravityOAuthUsesBuiltInClientID(t *testing.T) {
 	entry := &oauthSessionEntry{}
 	if err := (&Service{}).startAntigravityOAuth(entry); err != nil {
-		t.Fatalf("startAntigravityOAuth() 错误: %v", err)
+		t.Fatalf("使用内置 Antigravity OAuth 凭据生成授权链接失败: %v", err)
 	}
 	parsed, err := url.Parse(entry.public.AuthorizeURL)
 	if err != nil {
 		t.Fatalf("解析授权地址失败: %v", err)
 	}
-	if got := parsed.Query().Get("client_id"); got != "test-client-id" {
-		t.Fatalf("client_id = %q，期望 test-client-id", got)
+	if got := parsed.Query().Get("client_id"); got != antigravityOAuthClientID() {
+		t.Fatalf("client_id = %q，期望内置客户端 ID", got)
+	}
+	if antigravityOAuthClientSecret() == "" {
+		t.Fatal("内置 Antigravity OAuth 客户端密钥不能为空")
 	}
 }
 

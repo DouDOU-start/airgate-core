@@ -69,8 +69,6 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: airgate-dev
       JWT_SECRET: airgate-dev-secret
-      ANTIGRAVITY_OAUTH_CLIENT_ID: ${ANTIGRAVITY_OAUTH_CLIENT_ID:-}
-      ANTIGRAVITY_OAUTH_CLIENT_SECRET: ${ANTIGRAVITY_OAUTH_CLIENT_SECRET:-}
       # 显式放到仓库 data 目录，避免默认落入 backend/data/plugins
       PLUGINS_DIR: /workspace/data/plugins
       GIN_MODE: debug
