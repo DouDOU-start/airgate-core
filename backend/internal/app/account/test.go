@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -39,6 +40,11 @@ const (
 	testMediaMaxBody         = 16 << 20
 	testXAIVideoPollTimeout  = 10 * time.Minute
 	testXAIVideoPollInterval = 2 * time.Second
+	antigravityModelsPath    = "/v1internal:fetchAvailableModels"
+	antigravityModelsDaily   = "https://daily-cloudcode-pa.googleapis.com"
+	antigravityModelsProd    = "https://cloudcode-pa.googleapis.com"
+	antigravityModelsTimeout = 15 * time.Second
+	antigravityModelsUA      = "antigravity/hub/2.2.1 darwin/arm64"
 )
 
 var sseDataPrefix = regexp.MustCompile(`^data:\s*`)
@@ -107,23 +113,32 @@ var xaiMediaTestModels = []TestModel{
 
 // AvailableTestModels 返回账号可测模型列表。
 //
-// 来源对齐 CPA（CLIProxyAPI）静态目录，**不是**实时打上游 /v1/models：
+// 来源优先级：
 //  1. 账号 extra.models（若配置了白名单，优先）
-//  2. 否则 cpa 嵌入的 models.json（与 CLIProxyAPI internal/registry/models/models.json 同源）
+//  2. Antigravity OAuth 账号实时读取 fetchAvailableModels，并与白名单取交集
+//  3. 其他平台或实时查询失败时使用 cpa 嵌入的 models.json
 //     · Codex 按 credentials.plan_type / extra.plan_type 分 free/plus/team/pro 档
-//
-// 仅 Antigravity 等少数场景 CPA 本体会另拉上游 catalog；airgate 当前用静态目录。
 func (s *Service) AvailableTestModels(ctx context.Context, id int) ([]TestModel, error) {
-	item, err := s.FindByID(ctx, id, LoadOptions{})
+	item, err := s.FindByID(ctx, id, LoadOptions{WithProxy: true})
 	if err != nil {
 		return nil, err
 	}
 	plan := resolvePlanType(item)
+	allowedIDs := modelsFromAccountExtra(item.Extra)
+
+	if cpa.ResolveProvider(item.Platform) == "antigravity" {
+		proxyURL := proxyURLFromRef(item.Proxy)
+		if err := s.ensureOAuthCredentialsFresh(ctx, &item, proxyURL); err == nil {
+			if liveModels, fetchErr := fetchAntigravityAvailableModels(ctx, item.Credentials, proxyURL); fetchErr == nil {
+				return filterAntigravityTestModels(item.Platform, plan, liveModels, allowedIDs), nil
+			}
+		}
+	}
 
 	// 白名单：仅 ID 列表，展示名尽量从 CPA 目录补
-	if ids := modelsFromAccountExtra(item.Extra); len(ids) > 0 {
-		out := make([]TestModel, 0, len(ids))
-		for _, mid := range ids {
+	if len(allowedIDs) > 0 {
+		out := make([]TestModel, 0, len(allowedIDs))
+		for _, mid := range allowedIDs {
 			mid = strings.TrimSpace(mid)
 			if mid == "" {
 				continue
@@ -157,6 +172,131 @@ func (s *Service) AvailableTestModels(ctx context.Context, id int) ([]TestModel,
 		}
 	}
 	return out, nil
+}
+
+type antigravityAvailableModel struct {
+	ID          string
+	DisplayName string
+}
+
+type antigravityAvailableModelsResponse struct {
+	Models map[string]struct {
+		DisplayName string `json:"displayName"`
+	} `json:"models"`
+}
+
+func fetchAntigravityAvailableModels(ctx context.Context, credentials map[string]string, proxyURL string) ([]antigravityAvailableModel, error) {
+	accessToken := strings.TrimSpace(credentials["access_token"])
+	if accessToken == "" {
+		return nil, fmt.Errorf("antigravity 凭证缺少 access_token")
+	}
+
+	baseURLs := []string{antigravityModelsDaily, antigravityModelsProd}
+	if baseURL := strings.TrimRight(strings.TrimSpace(credentials["base_url"]), "/"); baseURL != "" {
+		baseURLs = []string{baseURL}
+	}
+	payload := map[string]string{}
+	if projectID := strings.TrimSpace(credentials["project_id"]); projectID != "" {
+		payload["project"] = projectID
+	}
+	rawPayload, _ := json.Marshal(payload)
+
+	fetchCtx, cancel := context.WithTimeout(ctx, antigravityModelsTimeout)
+	defer cancel()
+	client := httpClient(proxyURL)
+	var lastErr error
+	for _, baseURL := range baseURLs {
+		req, err := http.NewRequestWithContext(fetchCtx, http.MethodPost, strings.TrimRight(baseURL, "/")+antigravityModelsPath, bytes.NewReader(rawPayload))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req.Header.Set("Content-Type", "application/json")
+		userAgent := strings.TrimSpace(credentials["user_agent"])
+		if userAgent == "" {
+			userAgent = antigravityModelsUA
+		}
+		req.Header.Set("User-Agent", userAgent)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, testMaxBody))
+		_ = resp.Body.Close()
+		if readErr != nil {
+			lastErr = readErr
+			continue
+		}
+		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+			lastErr = fmt.Errorf("antigravity 模型目录 HTTP %d: %s", resp.StatusCode, truncate(string(body), 300))
+			continue
+		}
+
+		var parsed antigravityAvailableModelsResponse
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			lastErr = fmt.Errorf("解析 Antigravity 模型目录失败: %w", err)
+			continue
+		}
+		models := make([]antigravityAvailableModel, 0, len(parsed.Models))
+		for id, info := range parsed.Models {
+			id = strings.TrimSpace(id)
+			if id == "" {
+				continue
+			}
+			models = append(models, antigravityAvailableModel{ID: id, DisplayName: strings.TrimSpace(info.DisplayName)})
+		}
+		sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
+		return models, nil
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("antigravity 模型目录不可用")
+	}
+	return nil, lastErr
+}
+
+func filterAntigravityTestModels(platform, plan string, models []antigravityAvailableModel, allowedIDs []string) []TestModel {
+	allowed := make(map[string]struct{}, len(allowedIDs))
+	for _, id := range allowedIDs {
+		if id = strings.TrimSpace(id); id != "" {
+			allowed[strings.ToLower(id)] = struct{}{}
+		}
+	}
+	out := make([]TestModel, 0, len(models))
+	for _, model := range models {
+		if len(allowed) > 0 {
+			if _, ok := allowed[strings.ToLower(model.ID)]; !ok {
+				continue
+			}
+		}
+		out = append(out, buildAccountTestModel(platform, plan, model.ID, model.DisplayName))
+	}
+	return out
+}
+
+func antigravityModelAvailable(models []antigravityAvailableModel, modelID string) bool {
+	modelID = strings.TrimSpace(modelID)
+	for _, model := range models {
+		if strings.EqualFold(model.ID, modelID) {
+			return true
+		}
+	}
+	return false
+}
+
+func pickAntigravityAvailableModel(models []antigravityAvailableModel) string {
+	for _, model := range models {
+		low := strings.ToLower(model.ID)
+		if strings.Contains(low, "flash") && !strings.Contains(low, "thinking") {
+			return model.ID
+		}
+	}
+	if len(models) > 0 {
+		return models[0].ID
+	}
+	return ""
 }
 
 func buildAccountTestModel(platform, plan, modelID, displayName string) TestModel {
@@ -369,11 +509,22 @@ type accountTestForwarder interface {
 // 使用 OpenAI Chat Completions 作为统一输入格式，由 CPA 负责翻译为 Gemini 请求。
 func (s *Service) testAntigravity(ctx context.Context, item Account, modelID, prompt, proxyURL string, emit func(TestEvent)) (string, testStreamUsage, error) {
 	model := pickDefaultTestModel(item.Platform, resolvePlanType(item), modelID)
-	if model == "" {
-		return "", testStreamUsage{}, emitErr(emit, "无可测模型")
-	}
 	if err := s.ensureOAuthCredentialsFresh(ctx, &item, proxyURL); err != nil {
 		return model, testStreamUsage{}, emitErr(emit, "access_token 刷新失败: "+err.Error())
+	}
+	if liveModels, err := fetchAntigravityAvailableModels(ctx, item.Credentials, proxyURL); err == nil {
+		if strings.TrimSpace(modelID) == "" {
+			model = pickAntigravityAvailableModel(liveModels)
+		}
+		if model == "" {
+			return "", testStreamUsage{}, emitErr(emit, "当前 Antigravity 账号未返回可用模型")
+		}
+		if !antigravityModelAvailable(liveModels, model) {
+			return model, testStreamUsage{}, emitErr(emit, fmt.Sprintf("当前 Antigravity 账号未开放模型 %s，请从实时可用模型列表中重新选择", model))
+		}
+	}
+	if model == "" {
+		return "", testStreamUsage{}, emitErr(emit, "无可测模型")
 	}
 	forwarder, ok := s.oauthRefresher.(accountTestForwarder)
 	if !ok || forwarder == nil {
@@ -439,6 +590,9 @@ func accountTestForwardError(result cpa.ForwardResult) string {
 	}
 	if result.StreamErr != nil {
 		return "Antigravity 测试响应失败: " + result.StreamErr.Error()
+	}
+	if result.StatusCode == http.StatusNotFound && strings.Contains(strings.ToLower(string(result.Body)), "requested entity was not found") {
+		return "Antigravity 上游未找到模型或项目（HTTP 404）：当前账号未开放所选模型，或 project_id 已失效；请重新授权后从实时模型列表重新选择"
 	}
 	if result.StatusCode < http.StatusOK || result.StatusCode >= http.StatusMultipleChoices {
 		return formatUpstreamHTTPError(result.StatusCode, result.Body)
