@@ -138,7 +138,7 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
-// BulkUpdate 批量启用、停用或删除模型价格条目，允许部分成功。
+// BulkUpdate 批量启停模型、切换广场可见性或删除模型价格条目，允许部分成功。
 func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkResult {
 	result := BulkResult{Results: make([]BulkResultItem, 0, len(input.IDs))}
 	seen := make(map[int]struct{}, len(input.IDs))
@@ -158,6 +158,12 @@ func (s *Service) BulkUpdate(ctx context.Context, input BulkUpdateInput) BulkRes
 		case BulkActionDisable:
 			enabled := false
 			_, err = s.repo.Update(ctx, id, UpdateInput{Enabled: &enabled})
+		case BulkActionMarketEnable:
+			visible := true
+			_, err = s.repo.Update(ctx, id, UpdateInput{MarketVisible: &visible})
+		case BulkActionMarketDisable:
+			visible := false
+			_, err = s.repo.Update(ctx, id, UpdateInput{MarketVisible: &visible})
 		case BulkActionDelete:
 			err = s.repo.Delete(ctx, id)
 		default:

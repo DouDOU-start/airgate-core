@@ -108,7 +108,7 @@ func (h *ModelPriceHandler) SyncSelectedModelPrices(c *gin.Context) {
 	response.Success(c, result)
 }
 
-// BulkUpdateModelPrices 批量启用、停用或删除模型价格条目。
+// BulkUpdateModelPrices 批量启停模型、切换广场可见性或删除模型价格条目。
 func (h *ModelPriceHandler) BulkUpdateModelPrices(c *gin.Context) {
 	var req dto.BulkUpdateModelPricesReq
 	if err := c.ShouldBindJSON(&req); err != nil {

@@ -185,6 +185,15 @@ type antigravityAvailableModelsResponse struct {
 	} `json:"models"`
 }
 
+func isAntigravityInternalModel(modelID string) bool {
+	switch strings.ToLower(strings.TrimSpace(modelID)) {
+	case "chat_20706", "chat_23310", "tab_flash_lite_preview", "tab_jump_flash_lite_preview", "gemini-2.5-flash-thinking", "gemini-2.5-pro":
+		return true
+	default:
+		return false
+	}
+}
+
 func fetchAntigravityAvailableModels(ctx context.Context, credentials map[string]string, proxyURL string) ([]antigravityAvailableModel, error) {
 	accessToken := strings.TrimSpace(credentials["access_token"])
 	if accessToken == "" {
@@ -243,7 +252,7 @@ func fetchAntigravityAvailableModels(ctx context.Context, credentials map[string
 		models := make([]antigravityAvailableModel, 0, len(parsed.Models))
 		for id, info := range parsed.Models {
 			id = strings.TrimSpace(id)
-			if id == "" {
+			if id == "" || isAntigravityInternalModel(id) {
 				continue
 			}
 			models = append(models, antigravityAvailableModel{ID: id, DisplayName: strings.TrimSpace(info.DisplayName)})

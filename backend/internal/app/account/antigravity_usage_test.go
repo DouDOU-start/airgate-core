@@ -55,6 +55,29 @@ func TestParseAntigravityUsage转换配额窗口(t *testing.T) {
 	}
 }
 
+func TestParseAntigravityUsage将GeminiTiered保留为配额组(t *testing.T) {
+	snapshot, err := parseAntigravityUsage([]byte(`{
+		"groups":[{
+			"displayName":"Gemini Tiered",
+			"buckets":[{
+				"bucketId":"gemini-tiered-weekly",
+				"window":"7 days",
+				"remainingFraction":0.5
+			}]
+		}]
+	}`), time.Now())
+	if err != nil {
+		t.Fatalf("解析 Gemini Tiered 配额组失败: %v", err)
+	}
+	if len(snapshot.Windows) != 1 {
+		t.Fatalf("配额窗口数量 = %d，期望 1", len(snapshot.Windows))
+	}
+	window := snapshot.Windows[0]
+	if window.LimitID != "gemini-tiered-weekly" || window.LimitName != "Gemini Tiered" {
+		t.Fatalf("Gemini Tiered 应保留为配额组元数据: %+v", window)
+	}
+}
+
 func TestParseAntigravitySubscription识别订阅档位(t *testing.T) {
 	tests := []struct {
 		name     string

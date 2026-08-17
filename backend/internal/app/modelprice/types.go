@@ -117,9 +117,11 @@ type SyncCandidate struct {
 type BulkAction string
 
 const (
-	BulkActionEnable  BulkAction = "enable"
-	BulkActionDisable BulkAction = "disable"
-	BulkActionDelete  BulkAction = "delete"
+	BulkActionEnable        BulkAction = "enable"
+	BulkActionDisable       BulkAction = "disable"
+	BulkActionMarketEnable  BulkAction = "market_enable"
+	BulkActionMarketDisable BulkAction = "market_disable"
+	BulkActionDelete        BulkAction = "delete"
 )
 
 // BulkUpdateInput 模型价格批量操作输入。

@@ -980,6 +980,22 @@ export default function ModelPricesPage() {
                   {t('model_prices.bulk_disable')}
                 </Button>
                 <Button
+                  isDisabled={bulkMutation.isPending}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => bulkMutation.mutate({ action: 'market_enable', ids: selectedIds })}
+                >
+                  {t('model_prices.bulk_market_enable')}
+                </Button>
+                <Button
+                  isDisabled={bulkMutation.isPending}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => bulkMutation.mutate({ action: 'market_disable', ids: selectedIds })}
+                >
+                  {t('model_prices.bulk_market_disable')}
+                </Button>
+                <Button
                   className="text-danger"
                   isDisabled={bulkMutation.isPending}
                   size="sm"

@@ -18,7 +18,7 @@ type SyncModelPricesReq struct {
 // BulkUpdateModelPricesReq 模型价格批量操作请求。
 type BulkUpdateModelPricesReq struct {
 	IDs    []int  `json:"ids" binding:"required,min=1"`
-	Action string `json:"action" binding:"required,oneof=enable disable delete"`
+	Action string `json:"action" binding:"required,oneof=enable disable market_enable market_disable delete"`
 }
 
 // BulkUpdateModelPricesResp 模型价格批量操作响应。

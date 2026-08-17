@@ -392,9 +392,20 @@ export function AccountTestModal({
                   <Select.Popover>
                     <ListBox>
                       {models.map((m) => (
-                        <ListBox.Item key={m.id} id={m.id} textValue={m.display_name || m.id}>
+                        <ListBox.Item
+                          key={m.id}
+                          id={m.id}
+                          textValue={m.display_name && m.display_name !== m.id
+                            ? `${m.display_name} · ${m.id}`
+                            : m.id}
+                        >
                           <span className="flex min-w-0 flex-1 items-center gap-2">
-                            <span className="truncate">{m.display_name || m.id}</span>
+                            <span className="flex min-w-0 flex-1 flex-col">
+                              <span className="truncate">{m.display_name || m.id}</span>
+                              {m.display_name && m.display_name !== m.id ? (
+                                <span className="truncate font-mono text-[10px] text-text-tertiary">{m.id}</span>
+                              ) : null}
+                            </span>
                             <span className="ml-auto shrink-0 rounded-full border border-default-200 bg-default-100 px-1.5 py-0.5 text-[10px] font-medium text-default-500">
                               {t(`accounts.test_kind_${m.kind || 'text'}`)}
                             </span>

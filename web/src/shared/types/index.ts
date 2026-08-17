@@ -997,7 +997,12 @@ export interface ModelPriceSyncCandidate {
   exists: boolean;
 }
 
-export type BulkModelPriceAction = 'enable' | 'disable' | 'delete';
+export type BulkModelPriceAction =
+  | 'enable'
+  | 'disable'
+  | 'market_enable'
+  | 'market_disable'
+  | 'delete';
 
 export interface BulkUpdateModelPricesReq {
   ids: number[];

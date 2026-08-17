@@ -34,7 +34,7 @@ function isSparkWindow(w: AccountUsageWindow) {
   return fam.includes('spark') || fam.includes('bengalfox');
 }
 
-function shortWindowLabel(w: AccountUsageWindow) {
+function shortWindowLabel(w: AccountUsageWindow, platform: string, quotaLabel: string) {
   const slot =
     w.key === '5h' ? '5h'
       : (w.key === 'weekly' || w.key === '7d') ? '7d'
@@ -44,6 +44,7 @@ function shortWindowLabel(w: AccountUsageWindow) {
               : (w.label || w.key || '…').slice(0, 6);
 
   if (w.limit_id || w.limit_name) {
+    if (platform.toLowerCase() === 'antigravity') return `${quotaLabel}·${slot}`;
     if (isSparkWindow(w)) return `Sp·${slot}`;
     if (w.limit_id === 'xai-on-demand') return '按量';
     if (w.limit_id === 'xai-product') return (w.label || w.limit_name || '产品').slice(0, 6);
@@ -188,12 +189,18 @@ export function AccountUsageCell({
       || (usage.credits.balance && usage.credits.balance !== '0' && usage.credits.balance !== '0.0'));
   const empty = windows.length === 0 && !showCredits && resetAvailable <= 0;
 
+  const usageWindowName = (w: AccountUsageWindow) => {
+    const name = w.limit_name || w.limit_id || w.label || w.key;
+    if ((usage?.platform || '').toLowerCase() === 'antigravity' && (w.limit_name || w.limit_id)) {
+      return t('accounts.usage_quota_group', { name });
+    }
+    return name;
+  };
+
   const tipParts = (usage?.windows ?? []).map((w) => {
     const pct = clampPct(w.used_percent).toFixed(1);
     const reset = formatReset(w.resets_at, now);
-    const name = w.limit_name || w.limit_id
-      ? `${w.limit_name || w.limit_id} ${w.key}`
-      : (w.label || w.key);
+    const name = `${usageWindowName(w)} ${w.key}`;
     return `${name}: ${pct}%${reset ? ` · ${t('accounts.usage_resets_in', { time: reset })}` : ''}`;
   });
   if (resetAvailable > 0) {
@@ -221,14 +228,14 @@ export function AccountUsageCell({
                 <span
                   className="ag-account-usage__label"
                   data-supplementary={spark || undefined}
-                  title={w.limit_name || w.limit_id || w.label || w.key}
+                  title={usageWindowName(w)}
                 >
-                  {shortWindowLabel(w)}
+                  {shortWindowLabel(w, usage?.platform || '', t('accounts.usage_quota_group_short'))}
                 </span>
                 <div
                   className="ag-account-usage__track"
                   role="progressbar"
-                  aria-label={w.limit_name || w.limit_id || w.label || w.key}
+                  aria-label={usageWindowName(w)}
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-valuenow={Math.round(pct)}

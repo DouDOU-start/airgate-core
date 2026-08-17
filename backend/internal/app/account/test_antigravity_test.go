@@ -146,7 +146,7 @@ func TestAntigravity连通性测试透传上游错误(t *testing.T) {
 }
 
 func TestAntigravity可测模型优先使用账号实时目录(t *testing.T) {
-	server := newAntigravityModelsServer(t, []string{"gemini-3.6-flash-high", "claude-sonnet-4-6"})
+	server := newAntigravityModelsServer(t, []string{"gemini-3.6-flash-high", "claude-sonnet-4-6", "chat_20706"})
 	defer server.Close()
 	repo := &antigravityTestRepo{item: Account{
 		ID:       23,
@@ -171,6 +171,34 @@ func TestAntigravity可测模型优先使用账号实时目录(t *testing.T) {
 		if model.ID == "gemini-3.7-flash-high" {
 			t.Fatalf("账号未开放的 3.7 模型不应出现在测试列表: %+v", models)
 		}
+		if model.ID == "chat_20706" {
+			t.Fatalf("Antigravity 内部模型不应出现在测试列表: %+v", models)
+		}
+	}
+}
+
+func TestAntigravity实时目录过滤全部内部模型(t *testing.T) {
+	server := newAntigravityModelsServer(t, []string{
+		"chat_20706",
+		"chat_23310",
+		"tab_flash_lite_preview",
+		"tab_jump_flash_lite_preview",
+		"gemini-2.5-flash-thinking",
+		"gemini-2.5-pro",
+		"gemini-3.6-flash-high",
+	})
+	defer server.Close()
+
+	models, err := fetchAntigravityAvailableModels(context.Background(), map[string]string{
+		"access_token": "测试访问令牌",
+		"project_id":   "测试项目",
+		"base_url":     server.URL,
+	}, "")
+	if err != nil {
+		t.Fatalf("查询 Antigravity 实时模型失败: %v", err)
+	}
+	if len(models) != 1 || models[0].ID != "gemini-3.6-flash-high" {
+		t.Fatalf("内部模型过滤结果不正确: %+v", models)
 	}
 }
 

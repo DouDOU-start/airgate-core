@@ -163,7 +163,7 @@ func TestSyncCreatesCPAGemini37AliasesWithCanonicalPrice(t *testing.T) {
 	}
 	found := map[string]bool{}
 	for _, created := range repo.created {
-		if created.Model != "gemini-3.7-flash-high" && created.Model != "gemini-flash-latest" {
+		if created.Model != "gemini-3.7-flash-high" && created.Model != "gemini-3.7-flash-tiered" && created.Model != "gemini-flash-latest" {
 			continue
 		}
 		if created.InputPrice != 0.75 || created.OutputPrice != 3.75 || created.CachedInputPrice != 0.075 {
@@ -171,7 +171,7 @@ func TestSyncCreatesCPAGemini37AliasesWithCanonicalPrice(t *testing.T) {
 		}
 		found[created.Model] = true
 	}
-	for _, model := range []string{"gemini-3.7-flash-high", "gemini-flash-latest"} {
+	for _, model := range []string{"gemini-3.7-flash-high", "gemini-3.7-flash-tiered", "gemini-flash-latest"} {
 		if !found[model] {
 			t.Fatalf("同步结果缺少 %s: result=%+v created=%+v", model, result, repo.created)
 		}
@@ -192,6 +192,33 @@ func TestBulkUpdateAllowsPartialSuccessAndDeduplicatesIDs(t *testing.T) {
 	}
 	if repo.updated.Enabled == nil || *repo.updated.Enabled {
 		t.Fatalf("update = %+v", repo.updated)
+	}
+}
+
+func TestBulkUpdateSupportsMarketVisibility(t *testing.T) {
+	tests := []struct {
+		name    string
+		action  BulkAction
+		visible bool
+	}{
+		{name: "批量开启广场", action: BulkActionMarketEnable, visible: true},
+		{name: "批量关闭广场", action: BulkActionMarketDisable, visible: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &syncRepo{}
+			service := NewService(repo)
+			result := service.BulkUpdate(context.Background(), BulkUpdateInput{IDs: []int{7}, Action: tt.action})
+			if result.Success != 1 || result.Failed != 0 {
+				t.Fatalf("result = %+v", result)
+			}
+			if repo.updated.MarketVisible == nil || *repo.updated.MarketVisible != tt.visible {
+				t.Fatalf("market_visible 更新不正确: %+v", repo.updated)
+			}
+			if repo.updated.Enabled != nil {
+				t.Fatalf("广场可见性操作不应修改 enabled: %+v", repo.updated)
+			}
+		})
 	}
 }
 
