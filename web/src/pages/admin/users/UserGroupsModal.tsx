@@ -132,22 +132,22 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
     <Modal state={modalState}>
       <DialogTriggerShim />
       <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="inside" size="md">
+        <Modal.Container placement="center" scroll="outside" size="md">
           <Modal.Dialog
-            className="ag-elevation-modal"
+            className="ag-elevation-modal ag-user-groups-modal"
             style={{ maxWidth: '720px', width: 'min(100%, calc(100vw - 2rem))' }}
           >
             <Modal.Header>
               <Modal.Heading>{`${t('users.groups')} - ${user.email}`}</Modal.Heading>
               <Modal.CloseTrigger />
             </Modal.Header>
-            <Modal.Body>
+            <Modal.Body className="ag-user-groups-modal__body">
               {groupsLoading ? (
                 <p className="py-8 text-center text-sm text-text-tertiary">{t('common.loading')}</p>
               ) : allGroups.length === 0 ? (
                 <p className="py-8 text-center text-sm text-text-tertiary">{t('common.no_data')}</p>
               ) : (
-                <div className="max-h-[26rem] space-y-4 overflow-y-auto">
+                <div className="ag-user-groups-modal__list space-y-4">
                   {normalGroups.length > 0 ? (
                     <div>
                       <p className="mb-2 text-xs font-medium uppercase text-text-tertiary">

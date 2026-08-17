@@ -165,6 +165,26 @@
   font-weight: 800;
 }
 
+/* 用户分组弹窗：分组列表自己负责滚动，弹窗主体按内容收缩，避免 flex: 1
+   在大视口下把空白区域撑满并把操作栏挤到错误位置。 */
+.ag-elevation-modal.ag-user-groups-modal {
+  height: auto !important;
+  min-height: 0 !important;
+  flex: 0 0 auto;
+}
+
+.ag-user-groups-modal .ag-user-groups-modal__body {
+  flex: 0 1 auto !important;
+  min-height: 0;
+  max-height: min(calc(86dvh - 9rem), 28rem);
+  overflow-y: auto !important;
+}
+
+.ag-user-groups-modal__list {
+  max-height: none;
+  overflow: visible;
+}
+
 .ag-elevation-modal.ag-create-key-modal,
 .ag-elevation-modal.modal__dialog--lg.ag-create-key-modal {
   width: min(45rem, calc(100vw - 2rem)) !important;
