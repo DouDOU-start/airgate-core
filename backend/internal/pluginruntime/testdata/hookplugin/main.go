@@ -10,14 +10,17 @@ import (
 
 type fixturePlugin struct{}
 
-// fixturePluginID 允许测试通过 -ldflags 构建多个不同 ID 的真实插件进程。
-var fixturePluginID = "fixture-hook"
+// 以下变量允许测试通过 -ldflags 构建不同 ID 和版本的真实插件进程。
+var (
+	fixturePluginID      = "fixture-hook"
+	fixturePluginVersion = "0.0.1"
+)
 
 func (fixturePlugin) Info() protocol.PluginInfo {
 	return protocol.PluginInfo{
 		ID:              fixturePluginID,
 		Name:            "测试 Relay Hook",
-		Version:         "0.0.1",
+		Version:         fixturePluginVersion,
 		ProtocolVersion: protocol.ProtocolVersion,
 		Type:            "middleware",
 		Priority:        100,

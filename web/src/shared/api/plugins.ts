@@ -55,6 +55,11 @@ export const pluginsApi = {
     form.append('file', file);
     return uploadForm<PluginStatus>('/api/v1/admin/plugins/upload', form);
   },
+  updateBinary: (id: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return uploadForm<PluginStatus>(`/api/v1/admin/plugins/${encodeURIComponent(id)}/upload`, form);
+  },
   installURL: (data: InstallPluginURLRequest) =>
     post<PluginStatus>('/api/v1/admin/plugins/install-url', data),
   getConfig: (id: string) =>

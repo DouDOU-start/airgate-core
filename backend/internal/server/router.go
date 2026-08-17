@@ -287,6 +287,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/plugins", s.pluginHandler.ListPlugins)
 		adminGroup.POST("/plugins/upload", s.pluginHandler.UploadPlugin)
 		adminGroup.POST("/plugins/install-url", s.pluginHandler.InstallPluginFromURL)
+		adminGroup.POST("/plugins/:id/upload", s.pluginHandler.UpdatePlugin)
 		adminGroup.GET("/plugins/:id/config", s.pluginHandler.GetPluginConfig)
 		adminGroup.PUT("/plugins/:id/config", s.pluginHandler.UpdatePluginConfig)
 		adminGroup.PATCH("/plugins/:id/enabled", s.pluginHandler.SetPluginEnabled)

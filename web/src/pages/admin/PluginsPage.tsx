@@ -10,6 +10,7 @@ import {
   Modal,
   Spinner,
   TextField as HeroTextField,
+  Tooltip,
   useOverlayState,
 } from '@heroui/react';
 import {
@@ -42,6 +43,7 @@ export default function PluginsPage() {
   const [installOpen, setInstallOpen] = useState(false);
   const [configTarget, setConfigTarget] = useState<PluginStatus | null>(null);
   const [enableAfterConfig, setEnableAfterConfig] = useState(false);
+  const [updateTarget, setUpdateTarget] = useState<PluginStatus | null>(null);
   const [uninstallTarget, setUninstallTarget] = useState<PluginStatus | null>(null);
 
   const { data = [], isFetching, isLoading, refetch } = useQuery({
@@ -222,6 +224,21 @@ export default function PluginsPage() {
                     {t('plugins.updated_at')} {formatDateTime(plugin.updated_at)}
                   </span>
                   <div className="ag-plugin-card__actions">
+                    <Tooltip>
+                      <Tooltip.Trigger className="inline-flex">
+                        <Button
+                          isIconOnly
+                          aria-label={t('plugins.update')}
+                          className="ag-plugin-card__update"
+                          size="sm"
+                          variant="secondary"
+                          onPress={() => setUpdateTarget(plugin)}
+                        >
+                          <Upload className="h-3.5 w-3.5" />
+                        </Button>
+                      </Tooltip.Trigger>
+                      <Tooltip.Content>{t('plugins.update')}</Tooltip.Content>
+                    </Tooltip>
                     <Button
                       className="ag-plugin-card__action"
                       isDisabled={!plugin.config_schema?.fields.length}
@@ -271,6 +288,14 @@ export default function PluginsPage() {
           void refreshList();
         }}
       />
+      <UpdatePluginModal
+        plugin={updateTarget}
+        onClose={() => setUpdateTarget(null)}
+        onUpdated={() => {
+          setUpdateTarget(null);
+          void refreshList();
+        }}
+      />
       <PluginConfigModal
         plugin={configTarget}
         onClose={() => {
@@ -298,6 +323,102 @@ export default function PluginsPage() {
         }}
       />
     </div>
+  );
+}
+
+function UpdatePluginModal({
+  plugin,
+  onClose,
+  onUpdated,
+}: {
+  plugin: PluginStatus | null;
+  onClose: () => void;
+  onUpdated: () => void;
+}) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const open = !!plugin;
+
+  useEffect(() => {
+    if (!open) setFile(null);
+  }, [open]);
+
+  const updateMutation = useMutation({
+    mutationFn: () => pluginsApi.updateBinary(plugin!.id, file!),
+    onSuccess: () => {
+      toast('success', t('plugins.update_success'));
+      onUpdated();
+    },
+    onError: (error: Error) => toast('error', error.message),
+  });
+
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen && !updateMutation.isPending) onClose();
+    },
+  });
+
+  const handleUpdate = () => {
+    if (!file) {
+      toast('error', t('plugins.select_file'));
+      return;
+    }
+    if (file.size > MAX_PLUGIN_SIZE) {
+      toast('error', t('plugins.file_too_large'));
+      return;
+    }
+    updateMutation.mutate();
+  };
+
+  return (
+    <Modal state={modalState}>
+      <DialogTriggerShim />
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="sm">
+          <Modal.Dialog className="ag-elevation-modal ag-plugin-install-modal">
+            <Modal.Header>
+              <Modal.Heading>{t('plugins.update_title', { name: plugin?.name || plugin?.id })}</Modal.Heading>
+              <Modal.CloseTrigger />
+            </Modal.Header>
+            <Modal.Body>
+              <input
+                ref={fileInputRef}
+                className="hidden"
+                type="file"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
+              <button
+                className="flex w-full items-center gap-3 rounded-[var(--radius-lg)] border border-dashed border-border px-4 py-4 text-left transition-colors hover:border-primary hover:bg-primary-subtle"
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius)] bg-default-100 text-text-secondary">
+                  <FileCode2 className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-text">{file?.name || t('plugins.choose_binary')}</div>
+                  <div className="mt-0.5 text-xs text-text-tertiary">
+                    {file ? formatBytes(file.size) : t('plugins.binary_limit')}
+                  </div>
+                </div>
+              </button>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button isDisabled={updateMutation.isPending} variant="secondary" onPress={onClose}>
+                {t('common.cancel')}
+              </Button>
+              <Button isDisabled={updateMutation.isPending} variant="primary" onPress={handleUpdate}>
+                {updateMutation.isPending ? <Spinner size="sm" /> : <Upload className="h-4 w-4" />}
+                {t('plugins.update')}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
   );
 }
 

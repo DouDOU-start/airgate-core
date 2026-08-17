@@ -261,6 +261,189 @@ func (m *Manager) InstallBinary(ctx context.Context, requestedID, source string,
 	return status, nil
 }
 
+// UpdateBinary 使用现有配置校验并替换已安装插件。已启用插件会先启动新实例，
+// 成功提交二进制和元信息后再切换运行实例，失败时旧实例和磁盘文件保持不变。
+func (m *Manager) UpdateBinary(ctx context.Context, id, source string, reader io.Reader) (PluginStatus, error) {
+	m.opMu.Lock()
+	defer m.opMu.Unlock()
+
+	id = strings.TrimSpace(id)
+	if err := m.ensureInstalled(id); err != nil {
+		return PluginStatus{}, err
+	}
+	if reader == nil {
+		return PluginStatus{}, fmt.Errorf("插件二进制不能为空")
+	}
+
+	pluginDir := filepath.Join(m.pluginDir, id)
+	binaryPath := filepath.Join(pluginDir, pluginBinaryName(id))
+	binaryInfo, err := os.Stat(binaryPath)
+	if err != nil {
+		return PluginStatus{}, fmt.Errorf("读取插件二进制失败: %w", err)
+	}
+	state, err := m.readRuntimeState(id, binaryInfo.ModTime())
+	if err != nil {
+		return PluginStatus{}, err
+	}
+	configPath := filepath.Join(pluginDir, "config.yaml")
+	configData, err := os.ReadFile(configPath)
+	if err != nil && !os.IsNotExist(err) {
+		return PluginStatus{}, fmt.Errorf("读取插件配置失败: %w", err)
+	}
+	hasConfig := err == nil
+
+	tempDir, err := os.MkdirTemp(m.pluginDir, ".update-")
+	if err != nil {
+		return PluginStatus{}, fmt.Errorf("创建更新临时目录失败: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	tempBinary := filepath.Join(tempDir, "plugin-candidate")
+	file, err := os.OpenFile(tempBinary, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o700)
+	if err != nil {
+		return PluginStatus{}, fmt.Errorf("创建插件二进制失败: %w", err)
+	}
+	written, copyErr := io.Copy(file, io.LimitReader(reader, MaxPluginBinarySize+1))
+	closeErr := file.Close()
+	if copyErr != nil {
+		return PluginStatus{}, fmt.Errorf("写入插件二进制失败: %w", copyErr)
+	}
+	if closeErr != nil {
+		return PluginStatus{}, fmt.Errorf("关闭插件二进制失败: %w", closeErr)
+	}
+	if written == 0 {
+		return PluginStatus{}, fmt.Errorf("插件二进制不能为空")
+	}
+	if written > MaxPluginBinarySize {
+		return PluginStatus{}, fmt.Errorf("插件二进制不能超过 500MB")
+	}
+
+	inst, err := m.launchPlugin(ctx, id, exec.Command(tempBinary), configPath, state.Enabled, state.Enabled)
+	if err != nil {
+		return PluginStatus{}, fmt.Errorf("校验插件更新失败: %w", err)
+	}
+	info := inst.info
+	if state.Enabled && !configTextReady(string(configData), info.ConfigSchema) {
+		stopPlugin(inst, context.Background())
+		return PluginStatus{}, fmt.Errorf("%w，新版本需要补充配置", ErrPluginConfigIncomplete)
+	}
+
+	manifestData, err := yaml.Marshal(manifestFromInfo(info))
+	if err != nil {
+		stopPlugin(inst, context.Background())
+		return PluginStatus{}, fmt.Errorf("编码插件元信息失败: %w", err)
+	}
+	state.Source = strings.TrimSpace(source)
+	if state.Source == "" {
+		state.Source = "upload"
+	}
+	state.UpdatedAt = time.Now().UTC()
+	stateData, err := yaml.Marshal(state)
+	if err != nil {
+		stopPlugin(inst, context.Background())
+		return PluginStatus{}, fmt.Errorf("编码插件运行状态失败: %w", err)
+	}
+
+	tempManifest := filepath.Join(tempDir, "manifest.yaml")
+	tempRuntime := filepath.Join(tempDir, "runtime.yaml")
+	if err := atomicWriteFile(tempManifest, manifestData, 0o600); err != nil {
+		stopPlugin(inst, context.Background())
+		return PluginStatus{}, fmt.Errorf("暂存插件元信息失败: %w", err)
+	}
+	if err := atomicWriteFile(tempRuntime, stateData, 0o600); err != nil {
+		stopPlugin(inst, context.Background())
+		return PluginStatus{}, fmt.Errorf("暂存插件运行状态失败: %w", err)
+	}
+
+	backupDir, err := os.MkdirTemp(m.pluginDir, ".update-backup-")
+	if err != nil {
+		stopPlugin(inst, context.Background())
+		return PluginStatus{}, fmt.Errorf("创建更新备份目录失败: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(backupDir) }()
+	replacements := []fileReplacement{
+		{staged: tempBinary, target: binaryPath},
+		{staged: tempManifest, target: filepath.Join(pluginDir, "manifest.yaml")},
+		{staged: tempRuntime, target: filepath.Join(pluginDir, "runtime.yaml")},
+	}
+	if err := commitFileReplacements(replacements, backupDir); err != nil {
+		stopPlugin(inst, context.Background())
+		return PluginStatus{}, fmt.Errorf("提交插件更新失败: %w", err)
+	}
+
+	active := m.instanceByID(id)
+	if state.Enabled {
+		inst.restart = func(restartCtx context.Context) (*instance, error) {
+			return m.launchInstalled(restartCtx, id)
+		}
+		m.setInstance(inst)
+		if active != nil {
+			stopPlugin(active, context.Background())
+		}
+	} else {
+		stopPlugin(inst, context.Background())
+		if active != nil {
+			m.detachAndStop(id, context.Background())
+		}
+	}
+	m.clearLastError(id)
+
+	status := PluginStatus{
+		ID: id, Enabled: state.Enabled, Running: state.Enabled, Source: state.Source,
+		InstalledAt: state.InstalledAt, UpdatedAt: state.UpdatedAt, BinarySize: written,
+		HasConfig: hasConfig, ConfigReady: configTextReady(string(configData), info.ConfigSchema),
+	}
+	applyPluginInfo(&status, info)
+	return status, nil
+}
+
+type fileReplacement struct {
+	staged      string
+	target      string
+	backup      string
+	hadOriginal bool
+	committed   bool
+}
+
+// commitFileReplacements 在同一文件系统内提交一组文件替换；中途失败时恢复原文件。
+func commitFileReplacements(replacements []fileReplacement, backupDir string) error {
+	for index := range replacements {
+		replacement := &replacements[index]
+		replacement.backup = filepath.Join(backupDir, fmt.Sprintf("%d-%s", index, filepath.Base(replacement.target)))
+		if _, err := os.Stat(replacement.target); err == nil {
+			if err := os.Rename(replacement.target, replacement.backup); err != nil {
+				rollbackFileReplacements(replacements[:index])
+				return err
+			}
+			replacement.hadOriginal = true
+		} else if !os.IsNotExist(err) {
+			rollbackFileReplacements(replacements[:index])
+			return err
+		}
+		if err := os.Rename(replacement.staged, replacement.target); err != nil {
+			if replacement.hadOriginal {
+				_ = os.Rename(replacement.backup, replacement.target)
+			}
+			rollbackFileReplacements(replacements[:index])
+			return err
+		}
+		replacement.committed = true
+	}
+	return nil
+}
+
+func rollbackFileReplacements(replacements []fileReplacement) {
+	for index := len(replacements) - 1; index >= 0; index-- {
+		replacement := replacements[index]
+		if replacement.committed {
+			_ = os.Remove(replacement.target)
+		}
+		if replacement.hadOriginal {
+			_ = os.Rename(replacement.backup, replacement.target)
+		}
+	}
+}
+
 // GetConfig 返回插件原始 YAML 配置。
 func (m *Manager) GetConfig(id string) (string, error) {
 	m.opMu.Lock()

@@ -592,6 +592,88 @@ func TestManagerWebManagementLifecycle(t *testing.T) {
 	}
 }
 
+func TestManagerUpdatesBinaryWithoutLosingConfiguration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("短测试模式跳过真实插件进程构建")
+	}
+	buildFixture := func(id, version string) string {
+		path := filepath.Join(t.TempDir(), "fixture-source")
+		if runtime.GOOS == "windows" {
+			path += ".exe"
+		}
+		ldflags := "-X main.fixturePluginID=" + id + " -X main.fixturePluginVersion=" + version
+		cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", path, "./testdata/hookplugin")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("构建测试插件失败: %v\n%s", err, output)
+		}
+		return path
+	}
+	openFixture := func(path string) *os.File {
+		file, err := os.Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return file
+	}
+
+	manager := New(config.PluginsConfig{Dir: t.TempDir(), HookTimeoutMS: 500}, "error")
+	t.Cleanup(func() { manager.StopAll(context.Background()) })
+	configText := "group_ids:\n  - 7\n"
+
+	initialFile := openFixture(buildFixture("fixture-hook", "0.0.1"))
+	installed, err := manager.InstallBinary(context.Background(), "", "upload:fixture-v1", initialFile, configText)
+	_ = initialFile.Close()
+	if err != nil {
+		t.Fatalf("安装插件失败: %v", err)
+	}
+	if err := manager.SetEnabled(context.Background(), installed.ID, true); err != nil {
+		t.Fatalf("启用插件失败: %v", err)
+	}
+	oldInstance := manager.instanceByID(installed.ID)
+
+	updatedFile := openFixture(buildFixture("fixture-hook", "0.0.2"))
+	updated, err := manager.UpdateBinary(context.Background(), installed.ID, "upload:fixture-v2", updatedFile)
+	_ = updatedFile.Close()
+	if err != nil {
+		t.Fatalf("更新插件失败: %v", err)
+	}
+	if updated.Version != "0.0.2" || !updated.Enabled || !updated.Running {
+		t.Fatalf("更新状态异常: %+v", updated)
+	}
+	if !updated.InstalledAt.Equal(installed.InstalledAt) || !updated.UpdatedAt.After(installed.UpdatedAt) {
+		t.Fatalf("更新时间异常: installed=%s updated=%s", updated.InstalledAt, updated.UpdatedAt)
+	}
+	if updated.Source != "upload:fixture-v2" {
+		t.Fatalf("更新来源异常: %s", updated.Source)
+	}
+	if current := manager.instanceByID(installed.ID); current == nil || current == oldInstance || current.info.Version != "0.0.2" {
+		t.Fatalf("运行实例未切换到新版本: %+v", current)
+	}
+	persistedConfig, err := manager.GetConfig(installed.ID)
+	if err != nil || persistedConfig != configText {
+		t.Fatalf("更新后配置发生变化: %q, %v", persistedConfig, err)
+	}
+
+	activeAfterUpdate := manager.instanceByID(installed.ID)
+	invalidFile := openFixture(buildFixture("another-plugin", "9.9.9"))
+	_, err = manager.UpdateBinary(context.Background(), installed.ID, "upload:invalid", invalidFile)
+	_ = invalidFile.Close()
+	if err == nil {
+		t.Fatal("插件 ID 不一致时更新应失败")
+	}
+	if manager.instanceByID(installed.ID) != activeAfterUpdate {
+		t.Fatal("失败更新替换了原运行实例")
+	}
+	items, listErr := manager.ListInstalled()
+	if listErr != nil || len(items) != 1 || items[0].Version != "0.0.2" || !items[0].Running {
+		t.Fatalf("失败更新改变了已安装版本: items=%+v err=%v", items, listErr)
+	}
+	persistedConfig, err = manager.GetConfig(installed.ID)
+	if err != nil || persistedConfig != configText {
+		t.Fatalf("失败更新改变了配置: %q, %v", persistedConfig, err)
+	}
+}
+
 func TestManagerRunsMultipleInstalledPlugins(t *testing.T) {
 	if testing.Short() {
 		t.Skip("短测试模式跳过多个真实插件进程构建")

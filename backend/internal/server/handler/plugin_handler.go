@@ -81,6 +81,34 @@ func (h *PluginHandler) UploadPlugin(c *gin.Context) {
 	response.Success(c, item)
 }
 
+// UpdatePlugin 上传新二进制并原地更新插件，保留现有配置和启停状态。
+func (h *PluginHandler) UpdatePlugin(c *gin.Context) {
+	limit := pluginruntime.MaxPluginBinarySize + pluginUploadRequestOverhead
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		response.BadRequest(c, "请选择插件二进制文件")
+		return
+	}
+	defer func() { _ = file.Close() }()
+	if header.Size <= 0 {
+		response.BadRequest(c, "插件二进制不能为空")
+		return
+	}
+	if header.Size > pluginruntime.MaxPluginBinarySize {
+		response.BadRequest(c, "插件二进制不能超过 500MB")
+		return
+	}
+
+	source := "upload:" + filepath.Base(header.Filename)
+	item, err := h.manager.UpdateBinary(c.Request.Context(), c.Param("id"), source, file)
+	if err != nil {
+		h.handleOperationError(c, "更新插件失败", err)
+		return
+	}
+	response.Success(c, item)
+}
+
 type installPluginURLRequest struct {
 	URL    string `json:"url" binding:"required"`
 	ID     string `json:"id"`
