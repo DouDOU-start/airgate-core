@@ -298,8 +298,8 @@ func (m *Manager) UpdateBinary(ctx context.Context, id, source string, reader io
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
-	tempBinary := filepath.Join(tempDir, "plugin-candidate")
-	file, err := os.OpenFile(tempBinary, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o700)
+	stagedBinary := filepath.Join(tempDir, "plugin-staged")
+	file, err := os.OpenFile(stagedBinary, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o700)
 	if err != nil {
 		return PluginStatus{}, fmt.Errorf("创建插件二进制失败: %w", err)
 	}
@@ -318,7 +318,13 @@ func (m *Manager) UpdateBinary(ctx context.Context, id, source string, reader io
 		return PluginStatus{}, fmt.Errorf("插件二进制不能超过 500MB")
 	}
 
-	inst, err := m.launchPlugin(ctx, id, exec.Command(tempBinary), configPath, state.Enabled, state.Enabled)
+	// 校验进程和最终安装文件必须使用不同副本。在 WSL 挂载盘上运行中的
+	// 可执行文件被重命名后再清理原目录，最终路径可能随之进入删除状态。
+	validationBinary := filepath.Join(tempDir, "plugin-candidate")
+	if err := copyFile(stagedBinary, validationBinary, 0o700); err != nil {
+		return PluginStatus{}, fmt.Errorf("准备插件校验副本失败: %w", err)
+	}
+	inst, err := m.launchPlugin(ctx, id, exec.Command(validationBinary), configPath, state.Enabled, state.Enabled)
 	if err != nil {
 		return PluginStatus{}, fmt.Errorf("校验插件更新失败: %w", err)
 	}
@@ -362,7 +368,7 @@ func (m *Manager) UpdateBinary(ctx context.Context, id, source string, reader io
 	}
 	defer func() { _ = os.RemoveAll(backupDir) }()
 	replacements := []fileReplacement{
-		{staged: tempBinary, target: binaryPath},
+		{staged: stagedBinary, target: binaryPath},
 		{staged: tempManifest, target: filepath.Join(pluginDir, "manifest.yaml")},
 		{staged: tempRuntime, target: filepath.Join(pluginDir, "runtime.yaml")},
 	}
@@ -444,6 +450,24 @@ func rollbackFileReplacements(replacements []fileReplacement) {
 	}
 }
 
+func copyFile(source, destination string, mode os.FileMode) error {
+	input, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = input.Close() }()
+
+	output, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(output, input); err != nil {
+		_ = output.Close()
+		return err
+	}
+	return output.Close()
+}
+
 // GetConfig 返回插件原始 YAML 配置。
 func (m *Manager) GetConfig(id string) (string, error) {
 	m.opMu.Lock()
@@ -485,10 +509,8 @@ func (m *Manager) GetConfigForm(id string) (PluginConfigForm, error) {
 	}
 	values := make(map[string]any, len(manifest.ConfigSchema.Fields))
 	for _, field := range manifest.ConfigSchema.Fields {
-		if value, exists := stored[field.Key]; exists {
+		if value, exists := configFieldValue(stored, field); exists {
 			values[field.Key] = value
-		} else if field.Default != nil {
-			values[field.Key] = field.Default
 		}
 	}
 	return PluginConfigForm{Schema: manifest.ConfigSchema, Values: values}, nil
@@ -562,15 +584,27 @@ func configTextReady(configText string, schema *protocol.ConfigSchema) bool {
 		}
 	}
 	for _, field := range schema.Fields {
-		value, exists := values[field.Key]
-		if !exists && field.Default != nil {
-			value, exists = field.Default, true
-		}
+		value, exists := configFieldValue(values, field)
 		if field.Required && (!exists || emptyConfigValue(value)) {
 			return false
 		}
 	}
 	return true
+}
+
+func configFieldValue(values map[string]any, field protocol.ConfigField) (any, bool) {
+	if value, exists := values[field.Key]; exists {
+		return value, true
+	}
+	if field.FallbackKey != "" {
+		if value, exists := values[field.FallbackKey]; exists {
+			return value, true
+		}
+	}
+	if field.Default != nil {
+		return field.Default, true
+	}
+	return nil, false
 }
 
 func (m *Manager) ensureConfigReady(id string) error {

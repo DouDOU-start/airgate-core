@@ -539,9 +539,10 @@ func TestRegistryModelEntriesForGroup(t *testing.T) {
 			got := make([]string, 0, len(entries))
 			for _, e := range entries {
 				got = append(got, e.Name)
-				// 测试快照 key 均为 openai_compatible 类型：协议集合恒为 [openai]。
-				if !slices.Equal(e.Protocols, []string{ProtocolOpenAI}) {
-					t.Fatalf("模型 %s 协议 = %v, 期望 [openai]", e.Name, e.Protocols)
+				// 文本渠道模型会同时暴露三种入口协议，由调度命中后按需交给 CPA 翻译。
+				wantProtocols := []string{ProtocolAnthropic, ProtocolGemini, ProtocolOpenAI}
+				if !slices.Equal(e.Protocols, wantProtocols) {
+					t.Fatalf("模型 %s 协议 = %v, 期望 %v", e.Name, e.Protocols, wantProtocols)
 				}
 			}
 			if !slices.Equal(got, tc.want) {
@@ -661,9 +662,9 @@ func TestModelEntriesForGroupAggregatesProtocols(t *testing.T) {
 	}
 
 	want := map[string][]string{
-		"claude-sonnet":  {"anthropic", "openai"},
-		"gpt-4o":         {"openai"},
-		"gemini-2.5-pro": {"gemini"},
+		"claude-sonnet":  {"anthropic", "gemini", "openai"},
+		"gpt-4o":         {"anthropic", "gemini", "openai"},
+		"gemini-2.5-pro": {"anthropic", "gemini", "openai"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("模型目录条数 = %d, 期望 %d（%v）", len(got), len(want), got)

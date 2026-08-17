@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"sort"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -262,7 +261,7 @@ func (s *ChannelStore) Update(ctx context.Context, id int, input appchannel.Upda
 	return s.FindByID(ctx, id)
 }
 
-// CreateKey 在指定渠道下新增一条物理凭证，并为所选协议分别创建端点。
+// CreateKey 在指定渠道下新增一条单协议物理凭证及其唯一端点。
 func (s *ChannelStore) CreateKey(ctx context.Context, channelID int, key appchannel.KeyInput) (appchannel.ChannelKey, error) {
 	tx, err := s.db.Tx(ctx)
 	if err != nil {
@@ -278,30 +277,22 @@ func (s *ChannelStore) CreateKey(ctx context.Context, channelID int, key appchan
 		return appchannel.ChannelKey{}, err
 	}
 
-	var firstID int
-	for _, channelType := range requestedTypes(key) {
-		endpointInput := key
-		endpointInput.Type = channelType
-		item, err := applyKeyCreate(tx.ChannelKey.Create().
-			SetChannelID(channelID).
-			SetCredentialID(credential.ID), endpointInput).Save(ctx)
-		if err != nil {
-			if ent.IsConstraintError(err) {
-				return appchannel.ChannelKey{}, appchannel.ErrInvalidReference
-			}
-			return appchannel.ChannelKey{}, err
+	item, err := applyKeyCreate(tx.ChannelKey.Create().
+		SetChannelID(channelID).
+		SetCredentialID(credential.ID), key).Save(ctx)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			return appchannel.ChannelKey{}, appchannel.ErrInvalidReference
 		}
-		if firstID == 0 {
-			firstID = item.ID
-		}
+		return appchannel.ChannelKey{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return appchannel.ChannelKey{}, err
 	}
-	return s.FindKeyByID(ctx, firstID)
+	return s.FindKeyByID(ctx, item.ID)
 }
 
-// DeleteKey 删除一个协议端点；凭证已无任何端点时一并删除凭证。
+// DeleteKey 删除单协议端点及其物理凭证。
 func (s *ChannelStore) DeleteKey(ctx context.Context, keyID int) error {
 	item, err := s.db.ChannelKey.Get(ctx, keyID)
 	if err != nil {
@@ -331,17 +322,7 @@ func (s *ChannelStore) DeleteKey(ctx context.Context, keyID int) error {
 	return nil
 }
 
-func requestedTypes(key appchannel.KeyInput) []string {
-	if key.Types != nil {
-		return key.Types
-	}
-	if key.Type == "" {
-		return nil
-	}
-	return []string{key.Type}
-}
-
-// applyCredentialCreate 把共享配置应用到物理凭证创建构建器（APIKey 为密文）。
+// applyCredentialCreate 把凭证配置应用到物理凭证创建构建器（APIKey 为密文）。
 func applyCredentialCreate(builder *ent.ChannelCredentialCreate, key appchannel.KeyInput) *ent.ChannelCredentialCreate {
 	status := key.CredentialStatus
 	if status == nil {
@@ -368,7 +349,7 @@ func applyCredentialCreate(builder *ent.ChannelCredentialCreate, key appchannel.
 	return builder
 }
 
-// applyCredentialUpdate 更新物理凭证共享配置；空 APIKey 表示保持现有密钥。
+// applyCredentialUpdate 更新物理凭证配置；空 APIKey 表示保持现有密钥。
 func applyCredentialUpdate(builder *ent.ChannelCredentialUpdateOne, key appchannel.KeyInput) *ent.ChannelCredentialUpdateOne {
 	builder = builder.
 		SetNillableMaxConcurrency(key.MaxConcurrency).
@@ -474,7 +455,7 @@ func applyKeyUpdate(builder *ent.ChannelKeyUpdateOne, key appchannel.KeyInput) *
 	return builder
 }
 
-// UpdateKey 更新当前协议端点和共享凭证；Types 非 nil 时同步该凭证的完整协议集合。
+// UpdateKey 更新单协议端点及其物理凭证。
 func (s *ChannelStore) UpdateKey(ctx context.Context, keyID int, key appchannel.KeyInput) (appchannel.ChannelKey, error) {
 	current, err := s.db.ChannelKey.Query().Where(entchannelkey.IDEQ(keyID)).Only(ctx)
 	if err != nil {
@@ -486,11 +467,6 @@ func (s *ChannelStore) UpdateKey(ctx context.Context, keyID int, key appchannel.
 	if current.CredentialID == nil {
 		return appchannel.ChannelKey{}, appchannel.ErrInvalidReference
 	}
-	channelID, err := current.QueryChannel().OnlyID(ctx)
-	if err != nil {
-		return appchannel.ChannelKey{}, err
-	}
-
 	tx, err := s.db.Tx(ctx)
 	if err != nil {
 		return appchannel.ChannelKey{}, err
@@ -500,10 +476,7 @@ func (s *ChannelStore) UpdateKey(ctx context.Context, keyID int, key appchannel.
 		return appchannel.ChannelKey{}, err
 	}
 	if key.Name != "" {
-		if _, err := tx.ChannelKey.Update().
-			Where(entchannelkey.CredentialIDEQ(*current.CredentialID)).
-			SetName(key.Name).
-			Save(ctx); err != nil {
+		if err := tx.ChannelKey.UpdateOneID(keyID).SetName(key.Name).Exec(ctx); err != nil {
 			return appchannel.ChannelKey{}, err
 		}
 	}
@@ -514,54 +487,10 @@ func (s *ChannelStore) UpdateKey(ctx context.Context, keyID int, key appchannel.
 		return appchannel.ChannelKey{}, err
 	}
 
-	resultID := keyID
-	if key.Types != nil {
-		existing, err := tx.ChannelKey.Query().Where(entchannelkey.CredentialIDEQ(*current.CredentialID)).All(ctx)
-		if err != nil {
-			return appchannel.ChannelKey{}, err
-		}
-		byType := make(map[string]*ent.ChannelKey, len(existing))
-		for _, item := range existing {
-			byType[item.Type.String()] = item
-		}
-		desired := make(map[string]struct{}, len(key.Types))
-		for _, channelType := range key.Types {
-			desired[channelType] = struct{}{}
-			if _, ok := byType[channelType]; ok {
-				continue
-			}
-			endpointInput := key
-			endpointInput.Type = channelType
-			endpointInput.Status = nil
-			created, err := applyKeyCreate(tx.ChannelKey.Create().
-				SetChannelID(channelID).
-				SetCredentialID(*current.CredentialID), endpointInput).Save(ctx)
-			if err != nil {
-				return appchannel.ChannelKey{}, err
-			}
-			byType[channelType] = created
-		}
-		for _, item := range existing {
-			if _, keep := desired[item.Type.String()]; keep {
-				continue
-			}
-			if err := tx.ChannelKey.DeleteOneID(item.ID).Exec(ctx); err != nil {
-				return appchannel.ChannelKey{}, err
-			}
-		}
-		if _, keep := desired[current.Type.String()]; !keep {
-			for _, channelType := range key.Types {
-				if item := byType[channelType]; item != nil {
-					resultID = item.ID
-					break
-				}
-			}
-		}
-	}
 	if err := tx.Commit(); err != nil {
 		return appchannel.ChannelKey{}, err
 	}
-	return s.FindKeyByID(ctx, resultID)
+	return s.FindKeyByID(ctx, keyID)
 }
 
 // Delete 删除渠道（级联删除其 key）。
@@ -678,7 +607,7 @@ func (s *ChannelStore) UpdateKeyTestResult(ctx context.Context, keyID int, respo
 	return nil
 }
 
-// UpdateKeyBalance 通过协议端点定位物理凭证并记录共享余额。
+// UpdateKeyBalance 通过协议端点定位物理凭证并记录余额。
 func (s *ChannelStore) UpdateKeyBalance(ctx context.Context, keyID int, balance float64, updatedAt time.Time) error {
 	credentialID, err := s.credentialIDForKey(ctx, keyID)
 	if err != nil {
@@ -1070,25 +999,9 @@ func mapChannelKey(item *ent.ChannelKey, baseURL, channelName string) appchannel
 		key.UseUpstreamRateForCost = credential.UseUpstreamRateForCost
 		key.UpstreamRate = credential.UpstreamRate
 		key.UpstreamRateAt = credential.UpstreamRateAt
-		if endpoints, err := credential.Edges.KeysOrErr(); err == nil {
-			key.CredentialProtocols = make([]string, 0, len(endpoints))
-			seen := make(map[string]struct{}, len(endpoints))
-			for _, endpoint := range endpoints {
-				channelType := endpoint.Type.String()
-				if _, ok := seen[channelType]; ok {
-					continue
-				}
-				seen[channelType] = struct{}{}
-				key.CredentialProtocols = append(key.CredentialProtocols, channelType)
-			}
-			sort.Strings(key.CredentialProtocols)
-		}
 	}
 	if key.CredentialID == 0 {
 		key.CredentialID = key.ID
-	}
-	if len(key.CredentialProtocols) == 0 {
-		key.CredentialProtocols = []string{key.Type}
 	}
 	if ch, err := item.Edges.ChannelOrErr(); err == nil {
 		key.ChannelID = ch.ID

@@ -412,7 +412,7 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 			capacityID = ch.KeyID
 		}
 
-		// 物理凭证 RPM + 并发闸门：同一 API Key 的协议端点共享限额。
+		// 单协议物理凭证 RPM + 并发闸门：同一 API Key 的任务请求共享限额。
 		slotID := uuid.New().String()
 		rpmMinute, err := f.concurrency.AcquireKeyCapacity(ctx, capacityID, slotID, ch.MaxRPM, ch.MaxConcurrency, 0)
 		if err != nil {

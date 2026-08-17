@@ -8,8 +8,8 @@ import (
 	"entgo.io/ent/schema/index"
 )
 
-// ChannelCredential 上游物理凭证。同一把 API Key 的共享状态、限额、余额和
-// 成本配置只保存一份；具体可使用哪些协议由其下多个 ChannelKey 端点表达。
+// ChannelCredential 上游单协议物理凭证。真实 API Key、状态、限额、余额和
+// 成本配置只保存一份，并与唯一的 ChannelKey 协议端点一一对应。
 type ChannelCredential struct {
 	ent.Schema
 }

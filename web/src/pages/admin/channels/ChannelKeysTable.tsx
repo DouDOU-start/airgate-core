@@ -10,8 +10,8 @@ import { formatDate, formatDateTime } from '../../../shared/utils/format';
 import type { ChannelKeyResp, ChannelKeySortBy, SortOrder } from '../../../shared/types';
 import type { HealthmonEntity } from '../../../shared/api/healthMonitor';
 import {
-  CredentialProtocolChips, effectiveKeyStatus, HealthStatusChip, KeyConfigurationSummary,
-  KeyFinancialSummary, KeyRuntimeSummary, KeyStatusChip, TrafficHealthBadge, uniqueCredentialKeys,
+  ChannelTypeChip, effectiveKeyStatus, HealthStatusChip, KeyConfigurationSummary,
+  KeyFinancialSummary, KeyRuntimeSummary, KeyStatusChip, TrafficHealthBadge,
 } from './keyShared';
 
 const COLUMN_COUNT = 9;
@@ -61,8 +61,7 @@ export function ChannelKeysTable({
     return sortBy === field ? sortOrder : null;
   }
 
-  // 同一物理凭证的多协议端点在数据层分别保留，密钥视图按凭证合并展示。
-  const displayRows = uniqueCredentialKeys(rows);
+  const displayRows = rows;
 
   return (
     <CommonTable
@@ -159,7 +158,7 @@ export function ChannelKeysTable({
                     />
                   </div>
                   <div className="ag-key-identity-meta">
-                    <CredentialProtocolChips channelKey={key} />
+                    <ChannelTypeChip channelKey={key} />
                     <span className="font-mono text-[10px] text-text-tertiary" title={t('channels.api_key')}>
                       {key.api_key_hint || '-'}
                     </span>

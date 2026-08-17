@@ -10,7 +10,7 @@ import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { queryKeys } from '../../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
-import { CredentialProtocolChips, KeyStatusChip, uniqueCredentialKeys } from '../channels/keyShared';
+import { ChannelTypeChip, KeyStatusChip } from '../channels/keyShared';
 import type { GroupResp, ChannelKeyResp } from '../../../shared/types';
 
 interface GroupChannelKeysModalProps {
@@ -32,9 +32,8 @@ export function GroupChannelKeysModal({ open, group, onClose }: GroupChannelKeys
     queryFn: () => channelsApi.listKeys({ group_id: group.id, ...FETCH_ALL_PARAMS }),
     enabled: open,
   });
-  // 同一物理凭证的多个协议端点在路由层必须分别保留，弹窗展示时合并为一行。
   const boundKeys = useMemo(
-    () => uniqueCredentialKeys(boundData?.list ?? []),
+    () => boundData?.list ?? [],
     [boundData?.list],
   );
 
@@ -66,17 +65,13 @@ export function GroupChannelKeysModal({ open, group, onClose }: GroupChannelKeys
     extraQueryKeys: [queryKeys.channelKeys()],
   });
 
-  const existingCredentialIds = useMemo(
-    () => new Set(boundKeys.map((row) => row.credential_id || row.id)),
+  const existingKeyIds = useMemo(
+    () => new Set(boundKeys.map((row) => row.id)),
     [boundKeys],
   );
   const searchResults = useMemo(
-    () => uniqueCredentialKeys(
-      (searchData?.list ?? []).filter(
-        (key) => !existingCredentialIds.has(key.credential_id || key.id),
-      ),
-    ),
-    [existingCredentialIds, searchData?.list],
+    () => (searchData?.list ?? []).filter((key) => !existingKeyIds.has(key.id)),
+    [existingKeyIds, searchData?.list],
   );
   const searchOptions = useMemo(
     () => searchResults.map((key) => ({
@@ -229,7 +224,7 @@ export function GroupChannelKeysModal({ open, group, onClose }: GroupChannelKeys
                             <div className="truncate text-[11px] text-text-tertiary">{row.channel_name}</div>
                           ) : null}
                           <div className="mt-1">
-                            <CredentialProtocolChips channelKey={row} />
+                            <ChannelTypeChip channelKey={row} />
                           </div>
                         </div>
                         <KeyStatusChip status={row.status} errorMsg={row.error_msg} />

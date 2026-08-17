@@ -9,21 +9,27 @@ import {
   Label,
   Modal,
   Spinner,
+  TextArea,
   TextField as HeroTextField,
   Tooltip,
   useOverlayState,
 } from '@heroui/react';
 import {
+  AlertTriangle,
+  CheckCheck,
   FileCode2,
   FileSliders,
+  Layers3,
   Link2,
   PackagePlus,
   PlugZap,
   RefreshCw,
+  Settings2,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react';
-import { pluginsApi, type PluginStatus } from '../../shared/api/plugins';
+import { pluginsApi, type PluginConfigField, type PluginStatus } from '../../shared/api/plugins';
 import { groupsApi } from '../../shared/api/groups';
 import { FETCH_ALL_PARAMS } from '../../shared/constants';
 import { queryKeys } from '../../shared/queryKeys';
@@ -532,7 +538,7 @@ function InstallPluginModal({
                   <HeroTextField fullWidth isRequired>
                     <Label>{t('plugins.download_url')}</Label>
                     <Input
-                      placeholder="https://example.com/airgate-codex-overage"
+                      placeholder="https://example.com/airgate-codex-enhance"
                       value={url}
                       onChange={(event) => setURL(event.target.value)}
                     />
@@ -570,7 +576,7 @@ function PluginConfigModal({
   const { toast } = useToast();
   const [values, setValues] = useState<Record<string, unknown>>({});
   const open = !!plugin;
-  const { data, error, isLoading } = useQuery({
+  const { data, error, isLoading, refetch } = useQuery({
     queryKey: queryKeys.pluginConfig(plugin?.id || ''),
     queryFn: () => pluginsApi.getConfig(plugin!.id),
     enabled: open,
@@ -584,6 +590,13 @@ function PluginConfigModal({
     enabled: open && needsGroups,
   });
   const groups = groupsData?.list ?? [];
+  const fields = data?.schema.fields ?? [];
+  const scopeFields = fields.filter(
+    (field) => field.widget === 'multi_select' && field.data_source === 'groups',
+  );
+  const settingFields = fields.filter(
+    (field) => field.widget !== 'multi_select' || field.data_source !== 'groups',
+  );
 
   useEffect(() => {
     if (open && data) setValues({ ...data.values });
@@ -611,6 +624,10 @@ function PluginConfigModal({
     });
   };
 
+  const replaceMultiSelect = (key: string, ids: number[]) => {
+    setValues((current) => ({ ...current, [key]: ids }));
+  };
+
   const missingRequiredValue = data?.schema.fields.some((field) => {
     if (!field.required) return false;
     const value = values[field.key];
@@ -624,75 +641,222 @@ function PluginConfigModal({
     },
   });
 
+  const renderScopeField = (field: PluginConfigField) => {
+    const selectedIDs = numberArray(values[field.key]);
+    const allSelected = groups.length > 0 && groups.every((group) => selectedIDs.includes(group.id));
+
+    return (
+      <fieldset className="ag-plugin-config-scope-field" key={field.key}>
+        <div className="ag-plugin-config-scope-field__header">
+          <div className="min-w-0">
+            <legend className="ag-plugin-config-field-label">
+              {field.label}
+              {field.required ? <span className="text-danger">*</span> : null}
+            </legend>
+            {field.description ? (
+              <p className="ag-plugin-config-field-description">{field.description}</p>
+            ) : null}
+          </div>
+          <span className="ag-plugin-config-selection-count">
+            {t('plugins.config_selected_count', { count: selectedIDs.length })}
+          </span>
+        </div>
+
+        <div className="ag-plugin-config-selection-tools">
+          <Button
+            className="ag-plugin-config-selection-tool"
+            isDisabled={groupsLoading || groups.length === 0 || allSelected}
+            size="sm"
+            variant="ghost"
+            onPress={() => replaceMultiSelect(field.key, groups.map((group) => group.id))}
+          >
+            <CheckCheck className="h-3.5 w-3.5" />
+            {t('plugins.config_select_all')}
+          </Button>
+          <Button
+            className="ag-plugin-config-selection-tool"
+            isDisabled={groupsLoading || selectedIDs.length === 0}
+            size="sm"
+            variant="ghost"
+            onPress={() => replaceMultiSelect(field.key, [])}
+          >
+            <X className="h-3.5 w-3.5" />
+            {t('plugins.config_clear')}
+          </Button>
+        </div>
+
+        <div className="ag-plugin-config-options">
+          {groupsLoading ? (
+            <div className="ag-plugin-config-options__state"><Spinner size="sm" /></div>
+          ) : groups.length === 0 ? (
+            <div className="ag-plugin-config-options__state">{t('common.no_data')}</div>
+          ) : groups.map((group) => {
+            const selected = selectedIDs.includes(group.id);
+            return (
+              <Checkbox
+                className="ag-plugin-config-option"
+                data-selected={selected ? 'true' : 'false'}
+                isSelected={selected}
+                key={group.id}
+                onChange={(nextSelected) => updateMultiSelect(field.key, group.id, nextSelected)}
+              >
+                <Checkbox.Control>
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                <span className="ag-plugin-config-option__label" title={group.name}>{group.name}</span>
+              </Checkbox>
+            );
+          })}
+        </div>
+      </fieldset>
+    );
+  };
+
+  const renderSettingField = (field: PluginConfigField) => {
+    const fieldValue = values[field.key];
+    if (field.widget === 'text') {
+      return (
+        <HeroTextField className="ag-plugin-config-text-field" fullWidth isRequired={field.required} key={field.key}>
+          <Label className="ag-plugin-config-field-label">{field.label}</Label>
+          {field.description ? (
+            <p className="ag-plugin-config-field-description">{field.description}</p>
+          ) : null}
+          <Input
+            value={typeof fieldValue === 'string' ? fieldValue : ''}
+            onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
+          />
+        </HeroTextField>
+      );
+    }
+    if (field.widget === 'textarea') {
+      const textValue = typeof fieldValue === 'string' ? fieldValue : '';
+      return (
+        <HeroTextField className="ag-plugin-config-textarea-field" fullWidth isRequired={field.required} key={field.key}>
+          <div className="ag-plugin-config-textarea-field__header">
+            <div className="min-w-0">
+              <Label className="ag-plugin-config-field-label">{field.label}</Label>
+              {field.description ? (
+                <p className="ag-plugin-config-field-description">{field.description}</p>
+              ) : null}
+            </div>
+            <span className="ag-plugin-config-character-count">
+              {t('plugins.config_character_count', { count: textValue.length })}
+            </span>
+          </div>
+          <TextArea
+            className="ag-plugin-config-textarea"
+            rows={7}
+            spellCheck={false}
+            value={textValue}
+            onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
+          />
+        </HeroTextField>
+      );
+    }
+    if (field.widget === 'switch') {
+      const selected = boolValue(fieldValue, boolValue(field.default, false));
+      return (
+        <div className="ag-plugin-config-switch-field" data-selected={selected ? 'true' : 'false'} key={field.key}>
+          <div className="ag-plugin-config-switch-field__copy">
+            <div className="ag-plugin-config-field-label">
+              {field.label}
+              {field.required ? <span className="text-danger">*</span> : null}
+            </div>
+            {field.description ? (
+              <p className="ag-plugin-config-field-description">{field.description}</p>
+            ) : null}
+          </div>
+          <NativeSwitch
+            ariaLabel={field.label}
+            className="ag-plugin-config-switch-field__control"
+            isSelected={selected}
+            onChange={(nextSelected) => setValues((current) => ({ ...current, [field.key]: nextSelected }))}
+          />
+        </div>
+      );
+    }
+    return (
+      <div className="ag-plugin-config-unsupported" key={field.key}>
+        <AlertTriangle className="h-4 w-4" />
+        <span>{field.label}: {t('plugins.config_widget_unsupported')}</span>
+      </div>
+    );
+  };
+
   return (
     <Modal state={modalState}>
       <DialogTriggerShim />
       <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="inside" size="sm">
+        <Modal.Container placement="center" scroll="inside" size="lg">
           <Modal.Dialog className="ag-elevation-modal ag-plugin-config-modal">
-            <Modal.Header>
-              <Modal.Heading>{t('plugins.config_title', { name: plugin?.name || plugin?.id })}</Modal.Heading>
+            <Modal.Header className="ag-plugin-config-modal__header">
+              <div className="ag-plugin-config-modal__identity">
+                <div className="ag-plugin-config-modal__icon" aria-hidden="true">
+                  <FileSliders className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <Modal.Heading>{t('plugins.config_title', { name: plugin?.name || plugin?.id })}</Modal.Heading>
+                  <p className="ag-plugin-config-modal__subtitle">
+                    {t('plugins.config_subtitle')}
+                    {plugin?.id ? <code>{plugin.id}</code> : null}
+                  </p>
+                </div>
+              </div>
               <Modal.CloseTrigger />
             </Modal.Header>
-            <Modal.Body>
+            <Modal.Body className="ag-plugin-config-modal__body">
               {isLoading ? (
-                <div className="flex min-h-64 items-center justify-center"><Spinner /></div>
+                <div className="ag-plugin-config-state" role="status">
+                  <Spinner />
+                  <span>{t('plugins.config_loading')}</span>
+                </div>
               ) : error ? (
-                <div className="py-8 text-center text-sm text-danger">{(error as Error).message}</div>
+                <div className="ag-plugin-config-state ag-plugin-config-state--error" role="alert">
+                  <div className="ag-plugin-config-state__icon"><AlertTriangle className="h-5 w-5" /></div>
+                  <strong>{t('plugins.config_load_failed')}</strong>
+                  <span>{(error as Error).message}</span>
+                  <Button size="sm" variant="secondary" onPress={() => void refetch()}>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    {t('plugins.config_retry')}
+                  </Button>
+                </div>
+              ) : fields.length === 0 ? (
+                <div className="ag-plugin-config-state" role="status">
+                  <Settings2 className="h-5 w-5" />
+                  <span>{t('plugins.config_empty')}</span>
+                </div>
               ) : (
-                <div className="space-y-5">
-                  {data?.schema.fields.map((field) => {
-                    const fieldValue = values[field.key];
-                    if (field.widget === 'multi_select' && field.data_source === 'groups') {
-                      const selectedIDs = numberArray(fieldValue);
-                      return (
-                        <fieldset key={field.key}>
-                          <legend className="mb-2 text-sm font-medium text-text">
-                            {field.label}{field.required ? <span className="ml-1 text-danger">*</span> : null}
-                          </legend>
-                          <div className="max-h-72 overflow-y-auto rounded-[var(--radius)] border border-border p-1">
-                            {groupsLoading ? (
-                              <div className="flex min-h-28 items-center justify-center"><Spinner size="sm" /></div>
-                            ) : groups.length === 0 ? (
-                              <div className="py-8 text-center text-xs text-text-tertiary">{t('common.no_data')}</div>
-                            ) : groups.map((group) => (
-                              <Checkbox
-                                className="flex w-full rounded-[var(--radius-sm)] px-3 py-2.5 hover:bg-default-50"
-                                isSelected={selectedIDs.includes(group.id)}
-                                key={group.id}
-                                onChange={(selected) => updateMultiSelect(field.key, group.id, selected)}
-                              >
-                                <Checkbox.Control>
-                                  <Checkbox.Indicator />
-                                </Checkbox.Control>
-                                <span className="min-w-0 truncate text-sm text-text">{group.name}</span>
-                              </Checkbox>
-                            ))}
-                          </div>
-                        </fieldset>
-                      );
-                    }
-                    if (field.widget === 'text') {
-                      return (
-                        <HeroTextField fullWidth isRequired={field.required} key={field.key}>
-                          <Label>{field.label}</Label>
-                          <Input
-                            value={typeof fieldValue === 'string' ? fieldValue : ''}
-                            onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
-                          />
-                        </HeroTextField>
-                      );
-                    }
-                    return (
-                      <div className="rounded-[var(--radius)] border border-border px-3 py-2 text-sm text-text-secondary" key={field.key}>
-                        {field.label}: {t('plugins.config_widget_unsupported')}
+                <div className="ag-plugin-config-layout" data-has-scope={scopeFields.length > 0 ? 'true' : 'false'}>
+                  {scopeFields.length > 0 ? (
+                    <aside className="ag-plugin-config-scope">
+                      <div className="ag-plugin-config-section-heading">
+                        <span className="ag-plugin-config-section-heading__icon"><Layers3 className="h-4 w-4" /></span>
+                        <div>
+                          <h3>{t('plugins.config_scope_title')}</h3>
+                          <p>{t('plugins.config_scope_description')}</p>
+                        </div>
                       </div>
-                    );
-                  })}
+                      {scopeFields.map(renderScopeField)}
+                    </aside>
+                  ) : null}
+                  {settingFields.length > 0 ? (
+                    <section className="ag-plugin-config-settings">
+                      <div className="ag-plugin-config-section-heading">
+                        <span className="ag-plugin-config-section-heading__icon"><Settings2 className="h-4 w-4" /></span>
+                        <div>
+                          <h3>{t('plugins.config_settings_title')}</h3>
+                          <p>{t('plugins.config_settings_description')}</p>
+                        </div>
+                      </div>
+                      <div className="ag-plugin-config-settings__fields">
+                        {settingFields.map(renderSettingField)}
+                      </div>
+                    </section>
+                  ) : null}
                 </div>
               )}
             </Modal.Body>
-            <Modal.Footer>
+            <Modal.Footer className="ag-plugin-config-modal__footer">
               <Button isDisabled={saveMutation.isPending} variant="secondary" onPress={onClose}>
                 {t('common.cancel')}
               </Button>
@@ -717,6 +881,17 @@ function numberArray(value: unknown): number[] {
   return value
     .map((item) => Number(item))
     .filter((item) => Number.isInteger(item) && item > 0);
+}
+
+function boolValue(value: unknown, fallback = false): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on') return true;
+    if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'off') return false;
+  }
+  return fallback;
 }
 
 function formatBytes(size: number): string {

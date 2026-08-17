@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -92,5 +93,35 @@ func TestEmptyLegacyCredentialSQL(t *testing.T) {
 	}
 	if _, err := emptyLegacyCredentialSQL("bytea"); err == nil {
 		t.Fatal("未知旧字段类型应拒绝迁移")
+	}
+}
+
+func TestSharedCredentialEndpointsToSplit(t *testing.T) {
+	items := []endpointCredential{
+		{keyID: 1, credentialID: 10},
+		{keyID: 2, credentialID: 10},
+		{keyID: 3, credentialID: 10},
+		{keyID: 4, credentialID: 20},
+		{keyID: 5, credentialID: 20},
+		{keyID: 6, credentialID: 30},
+	}
+	want := []endpointCredential{
+		{keyID: 2, credentialID: 10},
+		{keyID: 3, credentialID: 10},
+		{keyID: 5, credentialID: 20},
+	}
+	if got := sharedCredentialEndpointsToSplit(items); !reflect.DeepEqual(got, want) {
+		t.Fatalf("待拆分端点 = %+v，期望 %+v", got, want)
+	}
+}
+
+func TestSharedCredentialEndpointsToSplitIsIdempotentForSingleProtocolData(t *testing.T) {
+	items := []endpointCredential{
+		{keyID: 1, credentialID: 10},
+		{keyID: 2, credentialID: 20},
+		{keyID: 3, credentialID: 30},
+	}
+	if got := sharedCredentialEndpointsToSplit(items); len(got) != 0 {
+		t.Fatalf("单协议凭证仍被判定为待拆分: %+v", got)
 	}
 }

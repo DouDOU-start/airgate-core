@@ -53,14 +53,17 @@ type ConfigSchema struct {
 
 // ConfigField 是一个通用配置字段。Widget 决定前端控件，DataSource 决定选项来源。
 type ConfigField struct {
-	Key         string            `json:"key" yaml:"key"`
-	Label       string            `json:"label" yaml:"label"`
-	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Widget      string            `json:"widget" yaml:"widget"`
-	DataSource  string            `json:"data_source,omitempty" yaml:"data_source,omitempty"`
-	Required    bool              `json:"required,omitempty" yaml:"required,omitempty"`
-	Default     any               `json:"default,omitempty" yaml:"default,omitempty"`
-	Filter      map[string]string `json:"filter,omitempty" yaml:"filter,omitempty"`
+	Key string `json:"key" yaml:"key"`
+	// FallbackKey 用于配置字段改名后的无感迁移；新字段不存在时读取旧字段值。
+	FallbackKey string `json:"fallback_key,omitempty" yaml:"fallback_key,omitempty"`
+	Label       string `json:"label" yaml:"label"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	// Widget 支持：multi_select / ordered_select / string_list / text / textarea / switch。
+	Widget     string            `json:"widget" yaml:"widget"`
+	DataSource string            `json:"data_source,omitempty" yaml:"data_source,omitempty"`
+	Required   bool              `json:"required,omitempty" yaml:"required,omitempty"`
+	Default    any               `json:"default,omitempty" yaml:"default,omitempty"`
+	Filter     map[string]string `json:"filter,omitempty" yaml:"filter,omitempty"`
 }
 
 // Request 是能力驱动器发给插件的通用请求。

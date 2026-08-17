@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/DouDOU-start/airgate-core/ent"
@@ -38,7 +36,16 @@ func Migrate(ctx context.Context, db *ent.Client, sqlDB *sql.DB, encryptionSecre
 			slog.Warn("db_legacy_fixup_failed", "stmt", stmt, logx.LogFieldError, err)
 		}
 	}
-	return migrateLegacySensitiveData(ctx, sqlDB, encryptionSecret)
+	if err := migrateLegacySensitiveData(ctx, sqlDB, encryptionSecret); err != nil {
+		return err
+	}
+	if err := splitSharedChannelCredentials(ctx, sqlDB); err != nil {
+		return fmt.Errorf("拆分多协议渠道凭证失败: %w", err)
+	}
+	if _, err := sqlDB.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS channel_keys_credential_id_unique ON channel_keys (credential_id)`); err != nil {
+		return fmt.Errorf("建立渠道凭证单协议约束失败: %w", err)
+	}
+	return nil
 }
 
 type legacyAccountCredential struct {
@@ -84,14 +91,13 @@ type legacyChannelKey struct {
 	upstreamRateAt         sql.NullTime
 }
 
-type channelCredentialGroup struct {
-	plain string
-	keys  []legacyChannelKey
+type endpointCredential struct {
+	keyID        int
+	credentialID int
 }
 
-// migrateLegacyChannelCredentials 把旧 channel_keys 中重复保存的真实密钥归并到
-// channel_credentials。AES-GCM 密文带随机 nonce，必须先解密后才能判断同一渠道下
-// 是否为同一把物理凭证，因此该迁移不能只靠 SQL 完成。
+// migrateLegacyChannelCredentials 把旧 channel_keys 中重复保存的真实密钥迁移到
+// channel_credentials。每个协议端点建立独立凭证，避免一把凭证同时声明多个协议。
 func migrateLegacyChannelCredentials(ctx context.Context, db *sql.DB, secret string) error {
 	_, hasCredentialID, err := columnDataType(ctx, db, "channel_keys", "credential_id")
 	if err != nil || !hasCredentialID {
@@ -121,7 +127,7 @@ ORDER BY id`)
 	if err != nil {
 		return err
 	}
-	groups := map[string]*channelCredentialGroup{}
+	items := make([]legacyChannelKey, 0)
 	for rows.Next() {
 		var item legacyChannelKey
 		var tagsRaw string
@@ -143,18 +149,11 @@ ORDER BY id`)
 			_ = rows.Close()
 			return fmt.Errorf("渠道端点 %d 缺少旧 API Key", item.id)
 		}
-		plain, err := auth.DecryptAPIKey(item.apiKey, secret)
-		if err != nil {
+		if _, err := auth.DecryptAPIKey(item.apiKey, secret); err != nil {
 			_ = rows.Close()
 			return fmt.Errorf("渠道端点 %d 的现有密文无法解密: %w", item.id, err)
 		}
-		groupKey := strconv.Itoa(item.channelID) + "\x00" + plain
-		group := groups[groupKey]
-		if group == nil {
-			group = &channelCredentialGroup{plain: plain}
-			groups[groupKey] = group
-		}
-		group.keys = append(group.keys, item)
+		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
 		_ = rows.Close()
@@ -164,15 +163,8 @@ ORDER BY id`)
 		return err
 	}
 
-	ordered := make([]string, 0, len(groups))
-	for key := range groups {
-		ordered = append(ordered, key)
-	}
-	sort.Strings(ordered)
-	for _, groupKey := range ordered {
-		group := groups[groupKey]
-		merged := mergeLegacyChannelCredential(group.keys)
-		tagsJSON, err := json.Marshal(merged.tags)
+	for _, item := range items {
+		tagsJSON, err := json.Marshal(item.tags)
 		if err != nil {
 			return err
 		}
@@ -187,29 +179,21 @@ INSERT INTO channel_credentials (
     $1, $2, $3, 'enabled', '', $4, $5, $6, $7::jsonb, $8, $9, $10,
     $11, $12, $13, $14, $15, now(), now()
 ) RETURNING id`,
-			merged.channelID, merged.name, merged.apiKey, merged.maxConcurrency,
-			merged.maxRPM, merged.costRatio, string(tagsJSON), merged.balance,
-			nullTimeValue(merged.balanceUpdatedAt), merged.balanceCheckEnabled,
-			merged.upstreamRateEnabled, merged.upstreamRatePath,
-			merged.useUpstreamRateForCost, merged.upstreamRate,
-			nullTimeValue(merged.upstreamRateAt),
+			item.channelID, item.name, item.apiKey, item.maxConcurrency,
+			item.maxRPM, item.costRatio, string(tagsJSON), item.balance,
+			nullTimeValue(item.balanceUpdatedAt), item.balanceCheckEnabled,
+			item.upstreamRateEnabled, item.upstreamRatePath,
+			item.useUpstreamRateForCost, item.upstreamRate,
+			nullTimeValue(item.upstreamRateAt),
 		).Scan(&credentialID)
 		if err != nil {
 			return err
 		}
-		for _, item := range group.keys {
-			if _, err := tx.ExecContext(ctx,
-				`UPDATE channel_keys SET credential_id = $1, api_key = '', name = $3 WHERE id = $2`,
-				credentialID, item.id, merged.name,
-			); err != nil {
-				return err
-			}
-		}
-		if len(group.keys) > 1 {
-			slog.Info("channel_credentials_merged",
-				"channel_id", merged.channelID,
-				"credential_id", credentialID,
-				"protocol_endpoints", len(group.keys))
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE channel_keys SET credential_id = $1, api_key = '', name = $3 WHERE id = $2`,
+			credentialID, item.id, item.name,
+		); err != nil {
+			return err
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `ALTER TABLE channel_keys ALTER COLUMN credential_id SET NOT NULL`); err != nil {
@@ -218,59 +202,107 @@ INSERT INTO channel_credentials (
 	return tx.Commit()
 }
 
-func mergeLegacyChannelCredential(items []legacyChannelKey) legacyChannelKey {
-	merged := items[0]
-	tags := map[string]struct{}{}
-	for _, item := range items {
-		if merged.name == "" && item.name != "" {
-			merged.name = item.name
-		}
-		merged.maxConcurrency = conservativePositiveLimit(merged.maxConcurrency, item.maxConcurrency)
-		merged.maxRPM = conservativePositiveLimit(merged.maxRPM, item.maxRPM)
-		if item.costRatio > merged.costRatio {
-			merged.costRatio = item.costRatio
-		}
-		for _, tag := range item.tags {
-			tags[tag] = struct{}{}
-		}
-		if item.balanceUpdatedAt.Valid && (!merged.balanceUpdatedAt.Valid || item.balanceUpdatedAt.Time.After(merged.balanceUpdatedAt.Time)) {
-			merged.balance = item.balance
-			merged.balanceUpdatedAt = item.balanceUpdatedAt
-		}
-		merged.balanceCheckEnabled = merged.balanceCheckEnabled || item.balanceCheckEnabled
-		merged.upstreamRateEnabled = merged.upstreamRateEnabled || item.upstreamRateEnabled
-		merged.useUpstreamRateForCost = merged.useUpstreamRateForCost || item.useUpstreamRateForCost
-		if merged.upstreamRatePath == "" && item.upstreamRatePath != "" {
-			merged.upstreamRatePath = item.upstreamRatePath
-		}
-		if item.upstreamRateAt.Valid && (!merged.upstreamRateAt.Valid || item.upstreamRateAt.Time.After(merged.upstreamRateAt.Time)) {
-			merged.upstreamRate = item.upstreamRate
-			merged.upstreamRateAt = item.upstreamRateAt
-		}
-	}
-	merged.tags = make([]string, 0, len(tags))
-	for tag := range tags {
-		merged.tags = append(merged.tags, tag)
-	}
-	sort.Strings(merged.tags)
-	return merged
-}
-
-func conservativePositiveLimit(current, candidate int) int {
-	if current <= 0 {
-		return candidate
-	}
-	if candidate <= 0 || current <= candidate {
-		return current
-	}
-	return candidate
-}
-
 func nullTimeValue(value sql.NullTime) any {
 	if !value.Valid {
 		return nil
 	}
 	return value.Time
+}
+
+// splitSharedChannelCredentials 把历史上一条凭证挂载的多个协议端点拆成一对一关系。
+// 第一条端点保留原凭证，其余端点复制完整凭证字段后重新绑定；重复执行不会再次复制。
+func splitSharedChannelCredentials(ctx context.Context, db *sql.DB) error {
+	_, hasCredentialID, err := columnDataType(ctx, db, "channel_keys", "credential_id")
+	if err != nil || !hasCredentialID {
+		return err
+	}
+	_, hasCredentialTable, err := columnDataType(ctx, db, "channel_credentials", "api_key")
+	if err != nil || !hasCredentialTable {
+		return err
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.QueryContext(ctx, `
+SELECT id, credential_id
+FROM channel_keys
+WHERE credential_id IN (
+    SELECT credential_id
+    FROM channel_keys
+    WHERE credential_id IS NOT NULL
+    GROUP BY credential_id
+    HAVING COUNT(*) > 1
+)
+ORDER BY credential_id, id`)
+	if err != nil {
+		return err
+	}
+	items := make([]endpointCredential, 0)
+	for rows.Next() {
+		var item endpointCredential
+		if err := rows.Scan(&item.keyID, &item.credentialID); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+
+	for _, item := range sharedCredentialEndpointsToSplit(items) {
+		var newCredentialID int
+		err := tx.QueryRowContext(ctx, `
+INSERT INTO channel_credentials (
+    channel_id, name, api_key, status, error_msg, max_concurrency, max_rpm,
+    cost_ratio, tags, balance, balance_updated_at, balance_check_enabled,
+    upstream_rate_enabled, upstream_rate_path, use_upstream_rate_for_cost,
+    upstream_rate, upstream_rate_at, created_at, updated_at
+)
+SELECT channel_id, name, api_key, status, error_msg, max_concurrency, max_rpm,
+       cost_ratio, tags, balance, balance_updated_at, balance_check_enabled,
+       upstream_rate_enabled, upstream_rate_path, use_upstream_rate_for_cost,
+       upstream_rate, upstream_rate_at, created_at, updated_at
+FROM channel_credentials
+WHERE id = $1
+RETURNING id`, item.credentialID).Scan(&newCredentialID)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE channel_keys SET credential_id = $1 WHERE id = $2`,
+			newCredentialID, item.keyID,
+		); err != nil {
+			return err
+		}
+		slog.Info("channel_credential_split",
+			"source_credential_id", item.credentialID,
+			"credential_id", newCredentialID,
+			"channel_key_id", item.keyID)
+	}
+	return tx.Commit()
+}
+
+// sharedCredentialEndpointsToSplit 保留每条凭证遇到的第一个端点，返回需要复制凭证的其余端点。
+func sharedCredentialEndpointsToSplit(items []endpointCredential) []endpointCredential {
+	kept := make(map[int]struct{}, len(items))
+	result := make([]endpointCredential, 0)
+	for _, item := range items {
+		if _, ok := kept[item.credentialID]; !ok {
+			kept[item.credentialID] = struct{}{}
+			continue
+		}
+		result = append(result, item)
+	}
+	return result
 }
 
 func migrateLegacyAccountCredentials(ctx context.Context, db *sql.DB, secret string) error {

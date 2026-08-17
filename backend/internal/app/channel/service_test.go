@@ -326,8 +326,8 @@ func TestAddKeyAllowsEmptyGroups(t *testing.T) {
 func TestAddKeyRequiresProtocol(t *testing.T) {
 	svc := NewService(&stubRepo{}, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 
-	if _, err := svc.AddKey(context.Background(), 1, KeyInput{APIKey: "sk-1"}); !errors.Is(err, ErrInvalidProtocolSet) {
-		t.Fatalf("err = %v，期望 ErrInvalidProtocolSet", err)
+	if _, err := svc.AddKey(context.Background(), 1, KeyInput{APIKey: "sk-1"}); !errors.Is(err, ErrInvalidProtocol) {
+		t.Fatalf("err = %v，期望 ErrInvalidProtocol", err)
 	}
 }
 
@@ -335,8 +335,8 @@ func TestAddKeyRequiresProtocol(t *testing.T) {
 func TestAddKeyRejectsRemovedCustomProtocol(t *testing.T) {
 	svc := NewService(&stubRepo{}, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 
-	if _, err := svc.AddKey(context.Background(), 1, KeyInput{Type: "custom", APIKey: "sk-1"}); !errors.Is(err, ErrInvalidProtocolSet) {
-		t.Fatalf("err = %v，期望 ErrInvalidProtocolSet", err)
+	if _, err := svc.AddKey(context.Background(), 1, KeyInput{Type: "custom", APIKey: "sk-1"}); !errors.Is(err, ErrInvalidProtocol) {
+		t.Fatalf("err = %v，期望 ErrInvalidProtocol", err)
 	}
 }
 

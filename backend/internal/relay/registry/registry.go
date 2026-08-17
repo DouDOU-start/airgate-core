@@ -28,15 +28,19 @@ const (
 	StatusDisabledAuto   = "disabled_auto"
 )
 
-// 入口协议常量：纯透传网关不做跨协议翻译，Pick 只在与入口协议同构的 key 类型集合内调度。
-// 任务类协议（openai_video / suno）的常量值与 key.Type、task.platform 同值——
-// 任务子系统按平台分树路由，协议即平台。
+// 入口协议常量。文本渠道可通过内部 translated_text 候选池跨协议调度并交给 CPA 翻译；
+// 媒体与任务协议仍只在原生同构类型内调度。任务类协议（openai_video / suno）的
+// 常量值与 key.Type、task.platform 同值，任务子系统按平台分树路由，协议即平台。
 const (
-	ProtocolOpenAI      = "openai"
-	ProtocolAnthropic   = "anthropic"
-	ProtocolGemini      = "gemini"
-	ProtocolOpenAIVideo = "openai_video"
-	ProtocolSuno        = "suno"
+	ProtocolOpenAI    = "openai"
+	ProtocolAnthropic = "anthropic"
+	ProtocolGemini    = "gemini"
+	// ProtocolTranslatedText 是文本端点的内部调度协议。
+	// 它允许 OpenAI、Anthropic、Gemini 三类文本渠道进入同一候选池，实际跨协议
+	// 转换由 pipeline 在命中渠道后交给 CPA 完成；不会作为对外协议暴露。
+	ProtocolTranslatedText = "translated_text"
+	ProtocolOpenAIVideo    = "openai_video"
+	ProtocolSuno           = "suno"
 )
 
 // protocolKeyTypes 入口协议 → 可路由 key Type 集合。
@@ -46,6 +50,30 @@ var protocolKeyTypes = map[string]map[string]struct{}{
 	ProtocolGemini:      {"gemini": {}},
 	ProtocolOpenAIVideo: {"openai_video": {}},
 	ProtocolSuno:        {"suno": {}},
+}
+
+var textKeyTypes = map[string]struct{}{
+	"openai_compatible": {},
+	"anthropic":         {},
+	"gemini":            {},
+}
+
+// IsTextKeyType 判断渠道类型是否属于 CPA 可做跨协议转换的文本协议。
+func IsTextKeyType(keyType string) bool {
+	_, ok := textKeyTypes[keyType]
+	return ok
+}
+
+// ProtocolForKeyType 返回渠道类型对应的原生入口协议。
+func ProtocolForKeyType(keyType string) string {
+	return protocolForKeyType(keyType)
+}
+
+func keyTypeSupportsProtocol(keyType, protocol string) bool {
+	if protocol == ProtocolTranslatedText {
+		return IsTextKeyType(keyType)
+	}
+	return protocolForKeyType(keyType) == protocol
 }
 
 // protocolForKeyType key Type → 入口协议（protocolKeyTypes 的反向映射）；
@@ -70,7 +98,7 @@ type ChannelKeySnapshot struct {
 	// KeyID / KeyName 密钥端点标识：调度、故障隔离与管理端留痕展示使用。
 	KeyID   int
 	KeyName string
-	// CredentialID 物理凭证标识：同一 API Key 的多协议端点共享并发、RPM 和整体状态。
+	// CredentialID 单协议物理凭证标识：用于并发、RPM 和整体状态隔离。
 	CredentialID     int
 	CredentialStatus string
 	// ChannelID / ChannelName 所属渠道（供应商）标识，供计费聚合与留痕。
@@ -150,7 +178,7 @@ type Registry struct {
 	index map[channelCandidateKey][]int
 
 	// rateLimitedUntil 是物理凭证级的运行时 429 冷却，不落库。
-	// 同一 API Key 的多协议端点共享冷却，避免下游重试时立即再次命中已限流凭证。
+	// 同一 API Key 的请求共享冷却，避免下游重试时立即再次命中已限流凭证。
 	// 读写锁：候选校验热路径只读（不做惰性删除），过期条目由写路径顺带清理。
 	rateLimitMu      sync.RWMutex
 	rateLimitedUntil map[int]time.Time
@@ -272,14 +300,20 @@ func buildChannelCandidateIndex(keys map[int]*ChannelKeySnapshot) map[channelCan
 		if key == nil || len(key.Models) == 0 || len(key.GroupIDs) == 0 {
 			continue
 		}
-		protocol := protocolForKeyType(key.Type)
-		if protocol == "" {
+		nativeProtocol := protocolForKeyType(key.Type)
+		if nativeProtocol == "" {
 			continue
+		}
+		protocols := []string{nativeProtocol}
+		if IsTextKeyType(key.Type) {
+			protocols = append(protocols, ProtocolTranslatedText)
 		}
 		for groupID := range key.GroupIDs {
 			for model := range key.Models {
-				candidateKey := channelCandidateKey{groupID: groupID, model: model, protocol: protocol}
-				index[candidateKey] = append(index[candidateKey], id)
+				for _, protocol := range protocols {
+					candidateKey := channelCandidateKey{groupID: groupID, model: model, protocol: protocol}
+					index[candidateKey] = append(index[candidateKey], id)
+				}
 			}
 		}
 	}
@@ -318,7 +352,7 @@ func (r *Registry) RouteCandidate(id, groupID int, model, protocol string, now t
 	}
 	r.mu.RLock()
 	key := r.keys[id]
-	if key == nil || key.Status != StatusEnabled || !credentialEnabled(key) || protocolForKeyType(key.Type) != protocol {
+	if key == nil || key.Status != StatusEnabled || !credentialEnabled(key) || !keyTypeSupportsProtocol(key.Type, protocol) {
 		r.mu.RUnlock()
 		return nil, false
 	}
@@ -344,7 +378,7 @@ func (r *Registry) RouteVersion() uint64 {
 // Pick 为指定分组、模型与入口协议选择一把 key 端点：
 //
 //	候选 = status==enabled 且模型命中
-//	       且 key.Type 属于入口协议的同构类型集合（纯透传：不做跨协议翻译）
+//	       且 key.Type 属于本次路由协议允许的类型集合
 //	       且分组命中（key.GroupIDs 为空则不命中任何分组）且不在 exclude（按 keyID）中
 //	→ 取最高 priority 档 → 档内按 weight+10 加权随机。
 //
@@ -410,11 +444,17 @@ func (r *Registry) ModelEntriesForGroup(groupID int) []ModelEntry {
 		if proto == "" {
 			continue
 		}
+		protocols := []string{proto}
+		if IsTextKeyType(k.Type) {
+			protocols = []string{ProtocolOpenAI, ProtocolAnthropic, ProtocolGemini}
+		}
 		for m := range k.Models {
 			if set[m] == nil {
 				set[m] = map[string]struct{}{}
 			}
-			set[m][proto] = struct{}{}
+			for _, protocol := range protocols {
+				set[m][protocol] = struct{}{}
+			}
 		}
 	}
 	r.mu.RUnlock()

@@ -127,7 +127,7 @@ func userConcurrencyKey(userID int) string {
 }
 
 // keyConcurrencyKey 生成上游物理凭证级 Redis Key。函数名保留以兼容现有调用接口，
-// 入参已改为 credential_id，同一 API Key 的多协议端点共享一个槽位集合。
+// 入参已改为 credential_id，同一 API Key 的请求共享一个槽位集合。
 func keyConcurrencyKey(credentialID int) string {
 	return fmt.Sprintf("concurrency:v3:credential:%d", credentialID)
 }

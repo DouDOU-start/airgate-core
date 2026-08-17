@@ -8,10 +8,10 @@ import (
 	"entgo.io/ent/schema/index"
 )
 
-// ChannelKey 渠道凭证下的协议端点：路由、模型、协议配置与故障隔离的最小单元。
+// ChannelKey 渠道凭证对应的唯一协议端点：路由、模型、协议配置与故障隔离的最小单元。
 //
-// 真实 API Key、共享限额、余额与成本配置由 ChannelCredential 保存；本实体继续
-// 保留旧共享列仅用于存量数据库和旧测试代码兼容，新业务不再读写其中的真实密钥。
+// 真实 API Key、凭证限额、余额与成本配置由 ChannelCredential 保存；本实体继续
+// 保留旧凭证列仅用于存量数据库和旧测试代码兼容，新业务不再读写其中的真实密钥。
 // 状态语义与旧 Channel 一致：
 //
 //	enabled          可调度
@@ -110,7 +110,7 @@ func (ChannelKey) Indexes() []ent.Index {
 
 func (ChannelKey) Edges() []ent.Edge {
 	return []ent.Edge{
-		// 所属物理凭证（多对一）。迁移期间允许旧端点暂时没有凭证。
+		// 所属物理凭证。迁移期间允许旧端点暂时没有凭证；迁移完成后由唯一索引保证一对一。
 		edge.From("credential", ChannelCredential.Type).
 			Ref("keys").
 			Field("credential_id").

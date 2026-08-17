@@ -187,9 +187,9 @@ func TestChannelStoreCreateAndManageKeys(t *testing.T) {
 	}
 }
 
-// TestChannelStoreOneCredentialMultipleProtocols 验证同一物理凭证只保存一份密文，
-// 多个协议端点共享限额，并可通过 Types 同步增删协议集合。
-func TestChannelStoreOneCredentialMultipleProtocols(t *testing.T) {
+// TestChannelStoreOneCredentialOneProtocol 验证每个协议端点都使用独立凭证，
+// 即使密钥内容相同也不会在协议之间共享状态和限额。
+func TestChannelStoreOneCredentialOneProtocol(t *testing.T) {
 	db := enttestOpen(t)
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -199,14 +199,24 @@ func TestChannelStoreOneCredentialMultipleProtocols(t *testing.T) {
 
 	ctx := context.Background()
 	store := NewChannelStore(db)
-	channel := createTestChannel(t, db, "multi-protocol")
+	channel := createTestChannel(t, db, "single-protocol")
 	maxConcurrency, maxRPM := 3, 60
 	created, err := store.CreateKey(ctx, channel.ID, appchannel.KeyInput{
-		Name: "共享凭证", Types: []string{"openai_compatible", "anthropic"}, APIKey: "cipher-shared",
+		Name: "OpenAI 凭证", Type: "openai_compatible", APIKey: "cipher-same",
 		Models: []string{"shared-model"}, MaxConcurrency: &maxConcurrency, MaxRPM: &maxRPM,
 	})
 	if err != nil {
 		t.Fatalf("CreateKey error: %v", err)
+	}
+	second, err := store.CreateKey(ctx, channel.ID, appchannel.KeyInput{
+		Name: "Anthropic 凭证", Type: "anthropic", APIKey: "cipher-same",
+		Models: []string{"shared-model"}, MaxConcurrency: &maxConcurrency, MaxRPM: &maxRPM,
+	})
+	if err != nil {
+		t.Fatalf("CreateKey second error: %v", err)
+	}
+	if created.CredentialID == second.CredentialID {
+		t.Fatalf("不同协议端点共享了 credential_id=%d", created.CredentialID)
 	}
 
 	channelView, err := store.FindByID(ctx, channel.ID)
@@ -214,48 +224,43 @@ func TestChannelStoreOneCredentialMultipleProtocols(t *testing.T) {
 		t.Fatalf("FindByID error: %v", err)
 	}
 	if len(channelView.Keys) != 2 {
-		t.Fatalf("协议端点数 = %d, want 2", len(channelView.Keys))
+		t.Fatalf("凭证端点数 = %d, want 2", len(channelView.Keys))
 	}
-	credentialID := created.CredentialID
 	for _, endpoint := range channelView.Keys {
-		if endpoint.CredentialID != credentialID || endpoint.APIKey != "cipher-shared" {
-			t.Fatalf("端点未共享凭证: %+v", endpoint)
+		if endpoint.APIKey != "cipher-same" {
+			t.Fatalf("端点未读取自己的凭证密文: %+v", endpoint)
 		}
 		if endpoint.MaxConcurrency != 3 || endpoint.MaxRPM != 60 {
-			t.Fatalf("端点未读取共享限额: %+v", endpoint)
+			t.Fatalf("端点未读取自己的限额: %+v", endpoint)
 		}
 		stored, err := db.ChannelKey.Get(ctx, endpoint.ID)
 		if err != nil {
 			t.Fatalf("读取端点失败: %v", err)
 		}
 		if stored.APIKey != "" {
-			t.Fatalf("协议端点仍重复保存真实密文: %q", stored.APIKey)
+			t.Fatalf("协议端点仍保存真实密文: %q", stored.APIKey)
 		}
 	}
-	if count, err := db.ChannelCredential.Query().Count(ctx); err != nil || count != 1 {
-		t.Fatalf("物理凭证数 = %d, err = %v, want 1", count, err)
+	if count, err := db.ChannelCredential.Query().Count(ctx); err != nil || count != 2 {
+		t.Fatalf("物理凭证数 = %d, err = %v, want 2", count, err)
 	}
 
 	maxConcurrency = 2
 	updated, err := store.UpdateKey(ctx, created.ID, appchannel.KeyInput{
-		Types: []string{"anthropic", "gemini"}, MaxConcurrency: &maxConcurrency,
+		Type: "gemini", MaxConcurrency: &maxConcurrency,
 	})
 	if err != nil {
 		t.Fatalf("UpdateKey error: %v", err)
 	}
-	if updated.CredentialID != credentialID || updated.MaxConcurrency != 2 {
-		t.Fatalf("更新后共享凭证不一致: %+v", updated)
+	if updated.CredentialID != created.CredentialID || updated.Type != "gemini" || updated.MaxConcurrency != 2 {
+		t.Fatalf("更新后的单协议凭证不一致: %+v", updated)
 	}
-	channelView, _ = store.FindByID(ctx, channel.ID)
-	types := map[string]bool{}
-	for _, endpoint := range channelView.Keys {
-		types[endpoint.Type] = true
-		if endpoint.CredentialID != credentialID || endpoint.MaxConcurrency != 2 {
-			t.Fatalf("同步协议后共享配置不一致: %+v", endpoint)
-		}
+	unchanged, err := store.FindKeyByID(ctx, second.ID)
+	if err != nil {
+		t.Fatalf("FindKeyByID second error: %v", err)
 	}
-	if len(types) != 2 || !types["anthropic"] || !types["gemini"] || types["openai_compatible"] {
-		t.Fatalf("同步后的协议集合 = %v", types)
+	if unchanged.Type != "anthropic" || unchanged.MaxConcurrency != 3 {
+		t.Fatalf("更新第一把凭证影响了第二把凭证: %+v", unchanged)
 	}
 }
 

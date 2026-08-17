@@ -121,6 +121,23 @@ func protocolForEndpoint(endpoint string) string {
 	}
 }
 
+// channelRoutingProtocolForEndpoint 返回渠道候选池使用的内部协议。
+// CPA 已覆盖的文本端点允许三类文本渠道混合调度；生图、视频、音乐、搜索等
+// 未纳入翻译白名单的端点仍按入口协议只选择原生渠道。
+func channelRoutingProtocolForEndpoint(endpoint string) string {
+	switch endpoint {
+	case adaptor.EndpointChatCompletions,
+		adaptor.EndpointResponses,
+		adaptor.EndpointMessages,
+		adaptor.EndpointMessagesCountTokens,
+		adaptor.EndpointGenerateContent,
+		adaptor.EndpointCountTokens:
+		return registry.ProtocolTranslatedText
+	default:
+		return protocolForEndpoint(endpoint)
+	}
+}
+
 // resolveAlphaSearchPrice 解析 codex 联网搜索的按次单价（USD/次）：
 // 分组覆盖价（Group.alpha_search_price，非 nil 即生效，含 0=免费）优先，
 // 否则用全局 gateway 设置 alpha_search_price。负值钳 0（防脏配置写入负成本）。
@@ -160,6 +177,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	start := time.Now()
 	ctx := c.Request.Context()
 	protocol := protocolForEndpoint(endpoint)
+	channelRoutingProtocol := channelRoutingProtocolForEndpoint(endpoint)
 
 	// 0. 客户端识别 + 分组客户端限制预检。
 	clientid.Detect(c)
@@ -347,7 +365,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		if sessionKey != "" {
 			if kind, id, bound := p.sessionAffinity.lookup(sessionKey); bound {
 				// 绑定优先于优先级：目标仍可调度（且未被本次 failover 排除）就复用。
-				target, ok = p.resolveAffinityTarget(kind, id, keyInfo.GroupID, req.Model, protocol, excludeKeys, excludeAccounts)
+				target, ok = p.resolveAffinityTarget(kind, id, keyInfo.GroupID, req.Model, channelRoutingProtocol, excludeKeys, excludeAccounts)
 				if !ok {
 					// 目标已失效或已被当前请求排除，立即解除旧绑定；若没有
 					// 可替代目标，也不能让下一次请求继续粘回这个失败目标。
@@ -388,7 +406,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			target, ok = p.pickRouteWithChannelConfig(
 				keyInfo.GroupID,
 				req.Model,
-				protocol,
+				channelRoutingProtocol,
 				excludeKeys,
 				excludeAccounts,
 				routePlan,
@@ -524,8 +542,15 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			continue
 		}
 
-		// ---------- 渠道 key 路径（零翻译透传）----------
+		// ---------- 渠道 key 路径（同协议直发，跨协议文本走 CPA）----------
 		ch := target.channel
+		needsCPATranslation := channelNeedsCPATranslation(endpoint, protocol, ch.Type)
+		if needsCPATranslation && p.cpa == nil {
+			slog.Warn("relay_channel_cpa_unavailable", "channel_key_id", ch.KeyID, "type", ch.Type)
+			hardExcludeKeys = append(hardExcludeKeys, ch.KeyID)
+			unbindAffinity(routeChannel, ch.KeyID)
+			continue
+		}
 		// key 级配置检查：适配器 / 密钥，任一缺失即硬排除（不消耗 attempt）。
 		ad, err := adaptor.GetAdaptor(ch.Type)
 		if err != nil {
@@ -546,7 +571,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			capacityID = ch.KeyID
 		}
 
-		// 物理凭证 RPM + 并发闸门：同一 API Key 的多个协议端点共享限额。
+		// 单协议物理凭证 RPM + 并发闸门：同一 API Key 的请求共享限额。
 		// rpmMinute 为预递增所用的分钟窗口，失败回退时对同一窗口 decrement
 		//（不重取当前时间，防跨分钟边界扣穿新窗口）。
 		requestID := uuid.New().String()
@@ -580,6 +605,11 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		}
 		result := func() (result attemptResult) {
 			defer releaseLocalLoad()
+			if needsCPATranslation {
+				return p.executeChannelCPAAttempt(
+					c, ch, req, endpoint, protocol, start, requestID, rpmMinute, capacityID, auditRequest,
+				)
+			}
 			return p.executeAttempt(c, ad, info, req, start, attemptStart, capacityID, requestID, rpmMinute, auditRequest, auditTarget)
 		}()
 		attemptLatency := time.Since(attemptStart).Milliseconds()

@@ -42,7 +42,7 @@ function parseParamValue(raw: string): unknown {
 
 interface KeyForm {
   name: string;
-  types: ChannelType[];
+  type: ChannelType;
   apiKey: string;
   paramSetRows: KVRow[];
   paramRemoveKeys: string[];
@@ -72,7 +72,7 @@ const UPSTREAM_RATE_PLATFORM_PRESETS = [
 
 const emptyForm: KeyForm = {
   name: '',
-  types: ['openai_compatible'],
+  type: 'openai_compatible',
   apiKey: '',
   paramSetRows: [],
   paramRemoveKeys: [],
@@ -99,7 +99,7 @@ function formFromKey(key: ChannelKeyResp): KeyForm {
   const remove = (override.remove ?? []) as string[];
   return {
     name: key.name,
-    types: key.credential_protocols?.length > 0 ? key.credential_protocols : [key.type],
+    type: key.type,
     apiKey: '', // 明文不回显，留空 = 保持原密钥
     paramSetRows: recordToKVRows(set),
     paramRemoveKeys: Array.isArray(remove) ? remove : [],
@@ -201,27 +201,13 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
     }));
   }
 
-  function toggleProtocol(type: ChannelType, selected: boolean) {
-    setForm((prev) => {
-      if (!selected) {
-        return { ...prev, types: prev.types.filter((item) => item !== type) };
-      }
-      // 异步任务协议生命周期独立，保持单选；同步协议之间可任意组合。
-      if (type === 'openai_video' || type === 'suno') {
-        return { ...prev, types: [type] };
-      }
-      const withoutTaskProtocols = prev.types.filter((item) => item !== 'openai_video' && item !== 'suno');
-      return { ...prev, types: [...new Set([...withoutTaskProtocols, type])] };
-    });
-  }
-
   function handleSubmit() {
     const apiKey = form.apiKey.trim();
     if (!isEdit && !apiKey) {
       toast('error', t('channels.api_key_required'));
       return;
     }
-    if (form.types.length === 0) {
+    if (!form.type) {
       toast('error', t('channels.protocol_required'));
       return;
     }
@@ -234,7 +220,7 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
 
     const payload: ChannelKeyReq = {
       name: form.name.trim(),
-      types: form.types,
+      type: form.type,
       api_key: apiKey, // 编辑时留空 = 保持原密钥
       param_override: paramOverride,
       header_override: kvRowsToRecord(form.headerRows) as Record<string, string>,
@@ -280,6 +266,7 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
   }
   const selectedUpstreamRatePlatformLabel = upstreamRatePlatformOptions
     .find((item) => item.id === form.upstreamRatePath)?.label ?? form.upstreamRatePath;
+  const selectedProtocolLabel = CHANNEL_TYPE_OPTIONS.find((item) => item.id === form.type)?.label ?? form.type;
   const overrideCount = form.paramSetRows.length + form.paramRemoveKeys.length + form.headerRows.length;
 
   return (
@@ -342,23 +329,29 @@ export function KeyFormModal({ channelId, channelKey, open, onClose }: KeyFormMo
                   </div>
                   <div className="ag-key-form-protocol-panel">
                     <div className="ag-key-form-protocol-panel__head">
-                      <Label>{t('channels.supported_protocols')}</Label>
-                      <span>{t('channels.protocol_shared_hint')}</span>
+                      <Label>{t('channels.native_protocol')}</Label>
+                      <span>{t('channels.native_protocol_hint')}</span>
                     </div>
-                    <div className="ag-key-form-protocol-grid">
-                      {CHANNEL_TYPE_OPTIONS.map((item) => (
-                        <Checkbox
-                          key={item.id}
-                          isSelected={form.types.includes(item.id)}
-                          onChange={(selected) => toggleProtocol(item.id, selected)}
-                        >
-                          <Checkbox.Control>
-                            <Checkbox.Indicator />
-                          </Checkbox.Control>
-                          <span className="text-xs">{item.label}</span>
-                        </Checkbox>
-                      ))}
-                    </div>
+                    <Select
+                      aria-label={t('channels.native_protocol')}
+                      fullWidth
+                      selectedKey={form.type}
+                      onSelectionChange={(key) => setForm((prev) => ({ ...prev, type: String(key) as ChannelType }))}
+                    >
+                      <Select.Trigger>
+                        <Select.Value>{selectedProtocolLabel}</Select.Value>
+                        <Select.Indicator />
+                      </Select.Trigger>
+                      <Select.Popover>
+                        <ListBox items={CHANNEL_TYPE_OPTIONS}>
+                          {(item) => (
+                            <ListBox.Item id={item.id} textValue={item.label}>
+                              {item.label}
+                            </ListBox.Item>
+                          )}
+                        </ListBox>
+                      </Select.Popover>
+                    </Select>
                     <p className="ag-key-form-protocol-panel__foot">{t('channels.models_in_key_modal_hint')}</p>
                   </div>
                 </div>

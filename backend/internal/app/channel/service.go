@@ -152,8 +152,8 @@ func (s *Service) ImportChannels(ctx context.Context, items []ImportChannelInput
 			if strings.TrimSpace(k.APIKey) == "" {
 				continue
 			}
-			if err := validateProtocolSet(&k); err != nil {
-				return result, fmt.Errorf("渠道 %q 的协议组合无效: %w", item.Name, err)
+			if err := validateProtocol(k.Type); err != nil {
+				return result, fmt.Errorf("渠道 %q 的原生协议无效: %w", item.Name, err)
 			}
 			cipher, err := s.encryptPlainKey(k.APIKey, true)
 			if err != nil {
@@ -371,11 +371,11 @@ func (s *Service) Update(ctx context.Context, id int, input UpdateInput) (Channe
 	return item, nil
 }
 
-// AddKey 在指定渠道下新增一条物理凭证及其协议端点（明文密钥在本层加密）。
+// AddKey 在指定渠道下新增一条单协议物理凭证及其唯一端点（明文密钥在本层加密）。
 // 允许不绑定分组：未绑定分组的端点不会被任何分组调度到（registry.Pick 按分组过滤，空集合天然不命中）。
 func (s *Service) AddKey(ctx context.Context, channelID int, key KeyInput) (ChannelKey, error) {
 	logger := logx.LoggerFromContext(ctx)
-	if err := validateProtocolSet(&key); err != nil {
+	if err := validateProtocol(key.Type); err != nil {
 		return ChannelKey{}, err
 	}
 
@@ -397,13 +397,13 @@ func (s *Service) AddKey(ctx context.Context, channelID int, key KeyInput) (Chan
 	return item, nil
 }
 
-// UpdateKey 更新物理凭证共享配置和当前协议端点；Types 非 nil 时同步完整协议集合。
+// UpdateKey 更新单协议物理凭证及其唯一端点。
 // APIKey 提供即加密替换（空串保持原密钥）；GroupIDs 非 nil 即整组替换（允许显式传空，
 // 即解绑全部分组，未绑定分组的 key 不会被任何分组调度到），nil 表示不改动分组。
 func (s *Service) UpdateKey(ctx context.Context, keyID int, key KeyInput) (ChannelKey, error) {
 	logger := logx.LoggerFromContext(ctx)
-	if key.Types != nil {
-		if err := validateProtocolSet(&key); err != nil {
+	if key.Type != "" {
+		if err := validateProtocol(key.Type); err != nil {
 			return ChannelKey{}, err
 		}
 	}
@@ -771,13 +771,8 @@ func (s *Service) ProbeKeyBilling(ctx context.Context, keyID int) (float64, erro
 	return result.RateMultiplier, nil
 }
 
-// validateProtocolSet 校验并去重同一物理凭证的协议集合。视频和音乐任务协议
-// 生命周期与同步协议不同，暂不允许和其他协议共享同一凭证。
-func validateProtocolSet(key *KeyInput) error {
-	types := key.Types
-	if types == nil {
-		types = []string{key.Type}
-	}
+// validateProtocol 校验单把 API Key 声明的唯一上游原生协议。
+func validateProtocol(channelType string) error {
 	allowed := map[string]struct{}{
 		"openai_compatible": {},
 		"anthropic":         {},
@@ -785,32 +780,9 @@ func validateProtocolSet(key *KeyInput) error {
 		"openai_video":      {},
 		"suno":              {},
 	}
-	seen := make(map[string]struct{}, len(types))
-	normalized := make([]string, 0, len(types))
-	for _, channelType := range types {
-		channelType = strings.TrimSpace(channelType)
-		if _, ok := allowed[channelType]; !ok {
-			return ErrInvalidProtocolSet
-		}
-		if _, ok := seen[channelType]; ok {
-			continue
-		}
-		seen[channelType] = struct{}{}
-		normalized = append(normalized, channelType)
-	}
-	if len(normalized) == 0 {
-		return ErrInvalidProtocolSet
-	}
-	if len(normalized) > 1 {
-		if _, ok := seen["openai_video"]; ok {
-			return ErrInvalidProtocolSet
-		}
-		if _, ok := seen["suno"]; ok {
-			return ErrInvalidProtocolSet
-		}
-	}
-	if key.Types != nil {
-		key.Types = normalized
+	channelType = strings.TrimSpace(channelType)
+	if _, ok := allowed[channelType]; !ok {
+		return ErrInvalidProtocol
 	}
 	return nil
 }

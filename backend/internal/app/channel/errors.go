@@ -9,8 +9,8 @@ var (
 	ErrInvalidReference = errors.New("引用的分组或代理不存在")
 	// ErrInvalidBulkAction 表示批量操作动作非法或缺少必要参数。
 	ErrInvalidBulkAction = errors.New("无效的批量操作")
-	// ErrInvalidProtocolSet 表示同一凭证选择了非法协议组合。
-	ErrInvalidProtocolSet = errors.New("无效的协议组合")
+	// ErrInvalidProtocol 表示凭证声明了不支持的上游原生协议。
+	ErrInvalidProtocol = errors.New("无效的上游原生协议")
 	// ErrNoAPIKey 表示渠道未配置任何 API Key。
 	ErrNoAPIKey = errors.New("渠道未配置 API Key")
 	// ErrTesterNotReady 表示转发管线尚未就绪，渠道测试不可用。

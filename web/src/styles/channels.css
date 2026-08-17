@@ -175,36 +175,6 @@
   white-space: nowrap;
 }
 
-.ag-key-form-protocol-grid {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.35rem;
-}
-
-.ag-key-form-protocol-grid > :where(.checkbox, [data-slot="checkbox"]) {
-  min-width: 0;
-  min-height: 1.875rem;
-  border: 1px solid color-mix(in oklab, var(--border) 52%, transparent);
-  border-radius: 0.5rem;
-  background: color-mix(in oklab, var(--surface) 72%, transparent);
-  padding: 0.3rem 0.45rem;
-}
-
-.ag-key-form-protocol-grid > :where(.checkbox, [data-slot="checkbox"]):has([data-selected="true"]),
-.ag-key-form-protocol-grid > :where(.checkbox, [data-slot="checkbox"])[data-selected="true"] {
-  border-color: color-mix(in oklab, var(--accent) 34%, var(--border));
-  background: color-mix(in oklab, var(--accent) 9%, var(--surface));
-}
-
-.ag-key-form-protocol-grid :where([data-slot="checkbox-content"], .checkbox__content) {
-  min-width: 0;
-  overflow: hidden;
-  font-size: 0.625rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .ag-key-form-protocol-panel__foot {
   border-top: 1px solid color-mix(in oklab, var(--border) 42%, transparent);
   color: var(--muted);
@@ -500,7 +470,6 @@
     flex-wrap: wrap;
   }
 
-  .ag-key-form-protocol-grid,
   .ag-key-form-metric-grid,
   .ag-key-form-group-list,
   .ag-key-form-rate-controls,

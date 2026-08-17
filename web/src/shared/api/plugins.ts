@@ -25,9 +25,10 @@ export interface PluginStatus {
 
 export interface PluginConfigField {
   key: string;
+  fallback_key?: string;
   label: string;
   description?: string;
-  widget: 'multi_select' | 'ordered_select' | 'string_list' | 'text';
+  widget: 'multi_select' | 'ordered_select' | 'string_list' | 'text' | 'textarea' | 'switch';
   data_source?: 'groups' | 'accounts';
   required?: boolean;
   default?: unknown;

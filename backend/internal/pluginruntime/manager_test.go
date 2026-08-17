@@ -155,7 +155,7 @@ func TestBeforeDispatchSanitizesPluginCallErrorInCoreLog(t *testing.T) {
 		return protocol.Response{}, errors.New(sensitive)
 	}}
 	manager := &Manager{
-		instances:  map[string]*instance{"airgate-codex-overage": testInstance("airgate-codex-overage", 10, plugin)},
+		instances:  map[string]*instance{"airgate-codex-enhance": testInstance("airgate-codex-enhance", 10, plugin)},
 		lastErrors: make(map[string]string),
 	}
 	var logs bytes.Buffer
@@ -168,7 +168,7 @@ func TestBeforeDispatchSanitizesPluginCallErrorInCoreLog(t *testing.T) {
 		t.Fatalf("Relay Hook 应保持 fail-open: decision=%+v err=%v", decision, err)
 	}
 	output := logs.String()
-	if strings.Contains(output, sensitive) || strings.Contains(output, "airgate-codex-overage") {
+	if strings.Contains(output, sensitive) || strings.Contains(output, "airgate-codex-enhance") {
 		t.Fatalf("Core 日志暴露了插件身份或错误正文: %s", output)
 	}
 	if !strings.Contains(output, "plugin_ref=p-") || !strings.Contains(output, "error_code=plugin_error") {
@@ -437,6 +437,27 @@ func TestLoadPluginConfigEncodesStructuredRulesAsJSON(t *testing.T) {
 	}
 }
 
+func TestConfigFieldValueUsesMigrationFallback(t *testing.T) {
+	field := protocol.ConfigField{
+		Key:         "overage_group_ids",
+		FallbackKey: "group_ids",
+		Default:     []int{99},
+	}
+	legacy := []any{12, 15}
+	value, exists := configFieldValue(map[string]any{"group_ids": legacy}, field)
+	if !exists || fmt.Sprint(value) != fmt.Sprint(legacy) {
+		t.Fatalf("旧配置未回填到新字段: value=%v exists=%v", value, exists)
+	}
+
+	value, exists = configFieldValue(map[string]any{
+		"group_ids":         legacy,
+		"overage_group_ids": []any{},
+	}, field)
+	if !exists || !emptyConfigValue(value) {
+		t.Fatalf("新字段应优先于旧字段，显式空值也不能回退: value=%v exists=%v", value, exists)
+	}
+}
+
 func TestManagerLoadsRealPluginProcess(t *testing.T) {
 	if testing.Short() {
 		t.Skip("短测试模式跳过真实插件进程构建")
@@ -648,6 +669,10 @@ func TestManagerUpdatesBinaryWithoutLosingConfiguration(t *testing.T) {
 	}
 	if current := manager.instanceByID(installed.ID); current == nil || current == oldInstance || current.info.Version != "0.0.2" {
 		t.Fatalf("运行实例未切换到新版本: %+v", current)
+	}
+	installedBinary := filepath.Join(manager.pluginDir, installed.ID, pluginBinaryName(installed.ID))
+	if info, statErr := os.Stat(installedBinary); statErr != nil || !info.Mode().IsRegular() || info.Size() != updated.BinarySize {
+		t.Fatalf("更新后安装文件缺失或异常: path=%s info=%+v err=%v", installedBinary, info, statErr)
 	}
 	persistedConfig, err := manager.GetConfig(installed.ID)
 	if err != nil || persistedConfig != configText {

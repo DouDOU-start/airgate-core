@@ -37,7 +37,6 @@ func toChannelKeyResp(k appchannel.ChannelKey) dto.ChannelKeyResp {
 		CredentialID:           int64(k.CredentialID),
 		CredentialStatus:       k.CredentialStatus,
 		CredentialErrorMsg:     k.CredentialErrorMsg,
-		CredentialProtocols:    emptyIfNilStrings(k.CredentialProtocols),
 		ChannelID:              int64(k.ChannelID),
 		ChannelName:            k.ChannelName,
 		BaseURL:                k.BaseURL,
@@ -99,7 +98,6 @@ func toKeyInput(req dto.ChannelKeyReq) appchannel.KeyInput {
 	return appchannel.KeyInput{
 		Name:                   name,
 		Type:                   req.Type,
-		Types:                  req.Types,
 		APIKey:                 req.APIKey,
 		Models:                 req.Models,
 		ModelMapping:           req.ModelMapping,
@@ -131,7 +129,6 @@ func toChannelExportItem(ch appchannel.Channel) dto.ChannelExportItem {
 		keys = append(keys, dto.ChannelKeyExportItem{
 			Name:                   k.Name,
 			Type:                   k.Type,
-			Types:                  emptyIfNilStrings(k.CredentialProtocols),
 			APIKey:                 "",
 			APIKeyHint:             k.APIKeyHint,
 			Models:                 emptyIfNilStrings(k.Models),

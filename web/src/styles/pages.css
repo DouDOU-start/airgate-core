@@ -1706,9 +1706,422 @@
 }
 
 .ag-elevation-modal.ag-plugin-config-modal,
-.ag-elevation-modal.modal__dialog--sm.ag-plugin-config-modal {
-  width: min(32.5rem, calc(100vw - 2rem)) !important;
-  max-width: min(32.5rem, calc(100vw - 2rem)) !important;
+.ag-elevation-modal.modal__dialog--lg.ag-plugin-config-modal {
+  width: min(54rem, calc(100vw - 2rem)) !important;
+  max-width: min(54rem, calc(100vw - 2rem)) !important;
+  max-height: min(88dvh, 50rem) !important;
+}
+
+.ag-plugin-config-modal__header {
+  min-height: 5.5rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 64%, transparent);
+  background: color-mix(in oklab, var(--overlay) 94%, var(--accent) 6%);
+  padding: 1.125rem 1.5rem !important;
+}
+
+.ag-plugin-config-modal__identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.ag-plugin-config-modal__icon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in oklab, var(--accent) 28%, var(--border));
+  border-radius: 0.5rem;
+  background: color-mix(in oklab, var(--accent) 11%, var(--surface));
+  color: var(--accent);
+  box-shadow: 0 0.5rem 1.5rem -1rem color-mix(in oklab, var(--accent) 55%, transparent);
+}
+
+.ag-plugin-config-modal__subtitle {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.625rem;
+  margin-top: 0.1875rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.ag-plugin-config-modal__subtitle code {
+  overflow: hidden;
+  max-width: 18rem;
+  color: color-mix(in oklab, var(--foreground) 62%, var(--muted));
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-plugin-config-modal__body.modal__body {
+  padding: 0 !important;
+}
+
+.ag-plugin-config-layout {
+  display: grid;
+  min-height: 28rem;
+  grid-template-columns: minmax(18rem, 20rem) minmax(0, 1fr);
+}
+
+.ag-plugin-config-layout[data-has-scope="false"] {
+  display: block;
+}
+
+.ag-plugin-config-scope,
+.ag-plugin-config-settings {
+  min-width: 0;
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.ag-plugin-config-scope {
+  border-right: 1px solid color-mix(in oklab, var(--border) 62%, transparent);
+  background: color-mix(in oklab, var(--surface-secondary) 54%, var(--overlay));
+}
+
+.ag-plugin-config-settings {
+  background: var(--overlay);
+}
+
+.ag-plugin-config-layout[data-has-scope="false"] .ag-plugin-config-settings {
+  width: min(100%, 40rem);
+  margin-inline: auto;
+}
+
+.ag-plugin-config-section-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding-bottom: 1rem;
+}
+
+.ag-plugin-config-section-heading__icon {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.4375rem;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+  color: var(--accent);
+}
+
+.ag-plugin-config-section-heading h3 {
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.ag-plugin-config-section-heading p {
+  margin-top: 0.1875rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 1.45;
+}
+
+.ag-plugin-config-scope-field {
+  --ag-plugin-scope-accent: var(--accent);
+  min-width: 0;
+  border-top: 1px solid color-mix(in oklab, var(--border) 52%, transparent);
+  padding-top: 0.875rem;
+}
+
+.ag-plugin-config-scope-field:nth-of-type(1) {
+  --ag-plugin-scope-accent: var(--warning);
+}
+
+.ag-plugin-config-scope-field:nth-of-type(2) {
+  --ag-plugin-scope-accent: var(--ag-data-blue);
+}
+
+.ag-plugin-config-scope-field + .ag-plugin-config-scope-field {
+  margin-top: 1rem;
+}
+
+.ag-plugin-config-scope-field__header,
+.ag-plugin-config-textarea-field__header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ag-plugin-config-field-label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--foreground);
+  font-size: 0.75rem;
+  font-weight: 620;
+  line-height: 1.4;
+}
+
+.ag-plugin-config-field-description {
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.65625rem;
+  line-height: 1.5;
+}
+
+.ag-plugin-config-selection-count,
+.ag-plugin-config-character-count {
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in oklab, var(--border) 62%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface) 76%, transparent);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.59375rem;
+  line-height: 1.4;
+  padding: 0.125rem 0.4375rem;
+}
+
+.ag-plugin-config-selection-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.125rem;
+  margin: 0.375rem -0.375rem 0.375rem;
+}
+
+.ag-plugin-config-selection-tool.button {
+  min-width: 0;
+  height: 1.625rem;
+  min-height: 1.625rem;
+  gap: 0.25rem;
+  border-radius: 0.375rem !important;
+  color: var(--muted);
+  font-size: 0.625rem;
+  padding-inline: 0.375rem;
+}
+
+.ag-plugin-config-selection-tool.button:hover,
+.ag-plugin-config-selection-tool.button[data-hovered="true"] {
+  color: var(--accent);
+}
+
+.ag-plugin-config-options {
+  display: grid;
+  max-height: 9.25rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.375rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.125rem;
+}
+
+.ag-plugin-config-options__state {
+  display: grid;
+  min-height: 4.5rem;
+  grid-column: 1 / -1;
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+
+.ag-plugin-config-option.checkbox {
+  display: flex;
+  min-width: 0;
+  min-height: 2.25rem;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--border) 58%, transparent);
+  border-radius: 0.4375rem;
+  background: color-mix(in oklab, var(--surface) 78%, transparent);
+  padding: 0.4375rem 0.5rem;
+  transition: border-color var(--ag-transition), background-color var(--ag-transition), color var(--ag-transition);
+}
+
+.ag-plugin-config-option.checkbox:hover,
+.ag-plugin-config-option.checkbox[data-hovered="true"] {
+  border-color: color-mix(in oklab, var(--ag-plugin-scope-accent) 26%, var(--border));
+  background: color-mix(in oklab, var(--ag-plugin-scope-accent) 5%, var(--surface));
+}
+
+.ag-plugin-config-option.checkbox[data-selected="true"] {
+  border-color: color-mix(in oklab, var(--ag-plugin-scope-accent) 38%, var(--border));
+  background: color-mix(in oklab, var(--ag-plugin-scope-accent) 10%, var(--surface));
+}
+
+.ag-plugin-config-option :where([data-slot="checkbox-content"], .checkbox__content) {
+  min-width: 0;
+}
+
+.ag-plugin-config-option__label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 550;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-plugin-config-option.checkbox[data-selected="true"] .ag-plugin-config-option__label {
+  color: var(--foreground);
+}
+
+.ag-plugin-config-settings__fields {
+  border-top: 1px solid color-mix(in oklab, var(--border) 52%, transparent);
+}
+
+.ag-plugin-config-switch-field {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 52%, transparent);
+  padding: 0.9375rem 0;
+}
+
+.ag-plugin-config-switch-field__copy {
+  min-width: 0;
+}
+
+.ag-plugin-config-switch-field__control {
+  --ag-native-switch-checked-track: var(--ag-plugin-feature-accent, var(--accent));
+  --ag-native-switch-checked-track-border: color-mix(in oklab, var(--ag-plugin-feature-accent, var(--accent)) 82%, var(--border) 18%);
+  flex: 0 0 auto;
+}
+
+.ag-plugin-config-switch-field:nth-child(1) {
+  --ag-plugin-feature-accent: var(--warning);
+}
+
+.ag-plugin-config-switch-field:nth-child(2) {
+  --ag-plugin-feature-accent: var(--ag-data-blue);
+}
+
+.ag-plugin-config-text-field,
+.ag-plugin-config-textarea-field {
+  display: block;
+  min-width: 0;
+  padding-top: 1rem;
+}
+
+.ag-plugin-config-text-field .input {
+  margin-top: 0.625rem;
+}
+
+.ag-plugin-config-textarea-field__header {
+  margin-bottom: 0.625rem;
+}
+
+.ag-plugin-config-textarea.textarea {
+  min-height: 10.5rem;
+  max-height: 15rem;
+  border-radius: 0.5rem !important;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.65;
+  resize: vertical;
+}
+
+.ag-plugin-config-unsupported {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--warning) 24%, var(--border));
+  color: var(--warning);
+  font-size: 0.6875rem;
+  padding: 0.875rem 0;
+}
+
+.ag-plugin-config-state {
+  display: flex;
+  min-height: 28rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.ag-plugin-config-state--error strong {
+  color: var(--foreground);
+  font-size: 0.8125rem;
+}
+
+.ag-plugin-config-state--error > span {
+  max-width: 28rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.ag-plugin-config-state__icon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: color-mix(in oklab, var(--danger) 12%, var(--surface));
+  color: var(--danger);
+}
+
+.ag-plugin-config-modal__footer {
+  min-height: 4.25rem;
+  border-top: 1px solid color-mix(in oklab, var(--border) 64%, transparent);
+  background: color-mix(in oklab, var(--surface-secondary) 34%, var(--overlay));
+  padding: 0.75rem 1.5rem !important;
+}
+
+@media (max-width: 767px) {
+  .ag-plugin-config-modal__header {
+    min-height: 4.875rem;
+  }
+
+  .ag-plugin-config-modal__icon {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .ag-plugin-config-modal__subtitle code {
+    max-width: min(16rem, 72vw);
+  }
+
+  .ag-plugin-config-layout {
+    display: block;
+    min-height: 0;
+  }
+
+  .ag-plugin-config-scope,
+  .ag-plugin-config-settings {
+    padding: 1rem;
+  }
+
+  .ag-plugin-config-scope {
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 62%, transparent);
+  }
+
+  .ag-plugin-config-options {
+    max-height: 10.5rem;
+  }
+
+  .ag-plugin-config-state {
+    min-height: 22rem;
+  }
+
+  .ag-plugin-config-modal__footer {
+    min-height: 4rem;
+  }
 }
 
 /* 插件管理：卡片列表，空状态始终相对剩余内容区居中。 */

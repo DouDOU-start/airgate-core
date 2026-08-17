@@ -23,7 +23,7 @@ func (h *ChannelHandler) handleError(logMessage, publicMessage string, err error
 		return 404, err.Error()
 	case errors.Is(err, appchannel.ErrInvalidReference),
 		errors.Is(err, appchannel.ErrInvalidBulkAction),
-		errors.Is(err, appchannel.ErrInvalidProtocolSet),
+		errors.Is(err, appchannel.ErrInvalidProtocol),
 		errors.Is(err, appchannel.ErrNoAPIKey):
 		return 400, err.Error()
 	case errors.Is(err, appchannel.ErrTesterNotReady):

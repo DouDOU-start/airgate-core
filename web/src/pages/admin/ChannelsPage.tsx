@@ -29,8 +29,7 @@ import { ChannelStatsModal } from './channels/ChannelStatsModal';
 import { ChannelTestModal } from './channels/ChannelTestModal';
 import { ChannelKeysTable } from './channels/ChannelKeysTable';
 import {
-  CredentialProtocolChips, effectiveKeyStatus, HealthStatusChip, KeyMetricsRow, KeyStatusChip, TrafficHealthBadge,
-  uniqueCredentialKeys,
+  ChannelTypeChip, effectiveKeyStatus, HealthStatusChip, KeyMetricsRow, KeyStatusChip, TrafficHealthBadge,
 } from './channels/keyShared';
 import { formatDate, formatDateTime } from '../../shared/utils/format';
 import type {
@@ -95,7 +94,7 @@ function KeyRow({
         <span className="max-w-[200px] truncate font-medium text-text" title={channelKey.name}>
           {channelKey.name || t('channels.key_unnamed')}
         </span>
-        <CredentialProtocolChips channelKey={channelKey} />
+        <ChannelTypeChip channelKey={channelKey} />
         {/* 直接点击启停：on=enabled，off=手动禁用 */}
         <NativeSwitch
           ariaLabel={t('channels.status_enabled')}
@@ -770,7 +769,7 @@ export default function ChannelsPage() {
                     <CommonTable.Cell>
                       <div className="flex items-center gap-1.5">
                         <Chip color="default" size="sm" variant="soft">
-                          {t('channels.key_count', { count: uniqueCredentialKeys(row.keys).length })}
+                          {t('channels.key_count', { count: row.keys.length })}
                         </Chip>
                         {failures > 0 ? (
                           <Tooltip>
@@ -824,7 +823,7 @@ export default function ChannelsPage() {
                               </Button>
                             </div>
                           ) : (
-                            uniqueCredentialKeys(row.keys).map((key) => {
+                            row.keys.map((key) => {
                               const th = trafficHealthByKey.get(key.id);
                               return (
                               <KeyRow
