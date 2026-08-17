@@ -10,13 +10,13 @@ import (
 
 const (
 	channelLoadProbeLimit          = 8
-	channelLatencyMinSamples       = 3
+	channelLatencyMinSamples       = 5
 	channelLatencyFreshDuration    = 15 * time.Minute
 	channelLatencyEWMAWeight       = 8
-	channelLatencySwitchRatio      = 0.95
+	channelLatencySwitchRatio      = 0.9
 	channelLatencyWarmupMaxRows    = 20_000
-	channelSlowFailureThreshold    = 10 * time.Second
-	channelSlowFailureDecay        = 2 * time.Minute
+	channelSlowFailureThreshold    = 8 * time.Second
+	channelSlowFailureDecay        = 3 * time.Minute
 	channelSlowFailureMaxLevel     = 3
 	channelSlowFailureFactorLevel1 = 0.5
 	channelSlowFailureFactorLevel2 = 0.25

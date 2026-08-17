@@ -15,6 +15,15 @@ type routeTestChannelFirstTokenSource struct {
 	limit   int
 }
 
+func TestDefaultChannelLatencyConfig生产默认值(t *testing.T) {
+	got := defaultChannelLatencyConfig()
+	if !got.Enabled || got.MinSamples != 5 || got.FreshDuration != 15*time.Minute ||
+		got.EWMAWeight != 8 || got.ProbeLimit != 8 || got.SwitchRatio != 0.9 ||
+		got.SlowFailureThreshold != 8*time.Second || got.SlowFailureDecay != 3*time.Minute {
+		t.Fatalf("渠道性能调度默认值异常：%+v", got)
+	}
+}
+
 func (s *routeTestChannelFirstTokenSource) LoadRecentChannelFirstTokenSamples(
 	_ context.Context,
 	since time.Time,
@@ -132,6 +141,10 @@ func TestTrackChannelAttempt释放在途量(t *testing.T) {
 func TestWarmChannelFirstTokens启动后立即生效(t *testing.T) {
 	now := time.Now()
 	source := &routeTestChannelFirstTokenSource{samples: []ChannelFirstTokenSample{
+		{ChannelKeyID: 1, Model: testModel, FirstTokenMs: 8_000, CreatedAt: now.Add(-10 * time.Minute)},
+		{ChannelKeyID: 2, Model: testModel, FirstTokenMs: 3_000, CreatedAt: now.Add(-9 * time.Minute)},
+		{ChannelKeyID: 1, Model: testModel, FirstTokenMs: 8_000, CreatedAt: now.Add(-8 * time.Minute)},
+		{ChannelKeyID: 2, Model: testModel, FirstTokenMs: 3_000, CreatedAt: now.Add(-7 * time.Minute)},
 		{ChannelKeyID: 1, Model: testModel, FirstTokenMs: 8_000, CreatedAt: now.Add(-6 * time.Minute)},
 		{ChannelKeyID: 2, Model: testModel, FirstTokenMs: 3_000, CreatedAt: now.Add(-5 * time.Minute)},
 		{ChannelKeyID: 1, Model: testModel, FirstTokenMs: 8_000, CreatedAt: now.Add(-4 * time.Minute)},
