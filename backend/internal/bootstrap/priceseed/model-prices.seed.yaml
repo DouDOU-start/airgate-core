@@ -246,17 +246,67 @@ models:
           "high:1024x1024": 0.211
           "high:1024x1536": 0.165
           "high:1536x1024": 0.165
-  # ── gemini（ai.google.dev 官方价 2026-07 核实；Pro 系列长上下文阶梯阈值 200K；
+  # ── gemini（ai.google.dev 官方价 2026-08 核实；Pro 系列长上下文阶梯阈值 200K；
+  #    3.6/3.7 Flash 使用截至 2026-12-31 生效的官方优惠价；
   #    2.0 系列已于 2026-06-01 停服不收录。3.1-flash-lite / 3-flash-preview 官方未列
-  #    缓存读价，按「缓存读 = 输入价 10%」的现行折扣规则推算。──
-  - model: gemini-3.5-flash
+  #    缓存读价，按「缓存读 = 输入价 10%」的现行折扣规则推算。
+  #    CPA/AiStudio 别名作为独立价格条目导入，避免精确模型名计费时缺价。──
+  - &gemini_37_flash_price
+    model: gemini-3.7-flash
+    tag: gemini
+    input: 0.75
+    output: 3.75
+    cached_input: 0.075
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      service_tiers:
+        flex: 0.5
+        priority: 1.8
+  - <<: *gemini_37_flash_price
+    model: gemini-3.7-flash-high
+  - <<: *gemini_37_flash_price
+    model: gemini-flash-latest
+  - &gemini_36_flash_price
+    model: gemini-3.6-flash
+    tag: gemini
+    input: 0.75
+    output: 3.75
+    cached_input: 0.075
+    cache_creation: 0
+    per_request: 0
+    pricing_extra:
+      service_tiers:
+        flex: 0.5
+        priority: 1.8
+  - <<: *gemini_36_flash_price
+    model: gemini-3.6-flash-high
+  - &gemini_35_flash_price
+    model: gemini-3.5-flash
     tag: gemini
     input: 1.5
     output: 9.0
     cached_input: 0.15
     cache_creation: 0
     per_request: 0
-  - model: gemini-3.1-pro-preview
+  - <<: *gemini_35_flash_price
+    model: gemini-3-flash-agent
+  - <<: *gemini_35_flash_price
+    model: gemini-3.5-flash-low
+  - <<: *gemini_35_flash_price
+    model: gemini-3.5-flash-extra-low
+  - &gemini_35_flash_lite_price
+    model: gemini-3.5-flash-lite
+    tag: gemini
+    input: 0.3
+    output: 2.5
+    cached_input: 0.03
+    cache_creation: 0
+    per_request: 0
+  - <<: *gemini_35_flash_lite_price
+    model: gemini-flash-lite-latest
+  - &gemini_31_pro_price
+    model: gemini-3.1-pro-preview
     tag: gemini
     input: 2.0
     output: 12.0
@@ -269,20 +319,32 @@ models:
         input_multiplier: 2.0
         output_multiplier: 1.5
         cached_multiplier: 2.0
-  - model: gemini-3.1-flash-lite
+  - <<: *gemini_31_pro_price
+    model: gemini-3.1-pro-low
+  - <<: *gemini_31_pro_price
+    model: gemini-pro-agent
+  - <<: *gemini_31_pro_price
+    model: gemini-pro-latest
+  - &gemini_31_flash_lite_price
+    model: gemini-3.1-flash-lite
     tag: gemini
     input: 0.25
     output: 1.5
     cached_input: 0.025
     cache_creation: 0
     per_request: 0
-  - model: gemini-3-flash-preview
+  - <<: *gemini_31_flash_lite_price
+    model: gemini-3.1-flash-lite-preview
+  - &gemini_3_flash_price
+    model: gemini-3-flash-preview
     tag: gemini
     input: 0.5
     output: 3.0
     cached_input: 0.05
     cache_creation: 0
     per_request: 0
+  - <<: *gemini_3_flash_price
+    model: gemini-3-flash
   - model: gemini-2.5-pro
     tag: gemini
     input: 1.25

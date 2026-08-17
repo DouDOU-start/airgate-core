@@ -74,6 +74,13 @@ func TestDefaultModelsNonEmptyForMainPlatforms(t *testing.T) {
 	}
 }
 
+func TestAntigravityDefaultModelsIncludeGemini37(t *testing.T) {
+	const model = "gemini-3.7-flash-high"
+	if !containsModelID(DefaultModels("antigravity"), model) {
+		t.Fatalf("Antigravity 默认模型目录缺少 CPA 当前模型 %s", model)
+	}
+}
+
 func TestXAIDefaultModelsIncludeMediaBuiltins(t *testing.T) {
 	models := DefaultModels("xai")
 	for _, id := range []string{

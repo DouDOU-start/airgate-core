@@ -127,6 +127,55 @@ func TestRepositoryCatalogIsValid(t *testing.T) {
 	if _, ok := remote["gpt-5.4"]; !ok {
 		t.Fatal("仓库模型价格目录缺少 gpt-5.4")
 	}
+	for model, expected := range map[string][3]float64{
+		"gemini-3.5-flash-lite": {0.30, 2.50, 0.03},
+		"gemini-3.6-flash":      {0.75, 3.75, 0.075},
+		"gemini-3.7-flash":      {0.75, 3.75, 0.075},
+	} {
+		price, ok := remote[model]
+		if !ok {
+			t.Fatalf("仓库模型价格目录缺少 %s", model)
+		}
+		if perMillion(price.InputCostPerToken) != expected[0] ||
+			perMillion(price.OutputCostPerToken) != expected[1] ||
+			perMillion(price.CacheReadInputTokenCost) != expected[2] {
+			t.Fatalf("%s 官方价格不正确: input=%v output=%v cached=%v", model,
+				perMillion(price.InputCostPerToken), perMillion(price.OutputCostPerToken),
+				perMillion(price.CacheReadInputTokenCost))
+		}
+	}
+}
+
+func TestSyncCreatesCPAGemini37AliasesWithCanonicalPrice(t *testing.T) {
+	repo := &syncRepo{}
+	service := NewService(repo)
+	service.SetSyncFetcher(staticSyncFetcher(`{
+		"gemini-3.7-flash": {
+			"input_cost_per_token": 0.00000075,
+			"output_cost_per_token": 0.00000375,
+			"cache_read_input_token_cost": 0.000000075
+		}
+	}`))
+
+	result, err := service.Sync(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]bool{}
+	for _, created := range repo.created {
+		if created.Model != "gemini-3.7-flash-high" && created.Model != "gemini-flash-latest" {
+			continue
+		}
+		if created.InputPrice != 0.75 || created.OutputPrice != 3.75 || created.CachedInputPrice != 0.075 {
+			t.Fatalf("CPA Gemini 3.7 模型价格不正确: %+v", created)
+		}
+		found[created.Model] = true
+	}
+	for _, model := range []string{"gemini-3.7-flash-high", "gemini-flash-latest"} {
+		if !found[model] {
+			t.Fatalf("同步结果缺少 %s: result=%+v created=%+v", model, result, repo.created)
+		}
+	}
 }
 
 func TestBulkUpdateAllowsPartialSuccessAndDeduplicatesIDs(t *testing.T) {

@@ -157,11 +157,11 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		t.Fatalf("seed contains duplicate model names: items=%d unique=%d", len(items), len(byModel))
 	}
 
-	// 覆盖总数：15 claude（含 5 别名）+ 8 openai（含 gpt-image-2）+ 7 gemini
+	// 覆盖总数：15 claude（含 5 别名）+ 8 openai（含 gpt-image-2）+ 22 gemini（含 12 CPA 别名）
 	// + 55 grok（7 个现役文本规范模型（含 grok-4.6）、36 个文本别名、2 个历史兼容文本模型、
-	// 4 个媒体规范模型、6 个媒体别名）= 85。
-	if len(items) != 85 {
-		t.Errorf("seed model count = %d, want 85", len(items))
+	// 4 个媒体规范模型、6 个媒体别名）= 100。
+	if len(items) != 100 {
+		t.Errorf("seed model count = %d, want 100", len(items))
 	}
 
 	// 抽样核对（claude/openai 值来自 airgate-claude/models.go 与 airgate-openai/registry.go，
@@ -181,6 +181,11 @@ func TestParseEmbeddedSeed(t *testing.T) {
 		{"gemini-2.5-pro", 1.25, 10.0, 0.31, 0},
 		{"gemini-3.1-pro-preview", 2.0, 12.0, 0.2, 0},
 		{"gemini-3.5-flash", 1.5, 9.0, 0.15, 0},
+		{"gemini-3.5-flash-lite", 0.3, 2.5, 0.03, 0},
+		{"gemini-3.6-flash", 0.75, 3.75, 0.075, 0},
+		{"gemini-3.7-flash", 0.75, 3.75, 0.075, 0},
+		{"gemini-3.7-flash-high", 0.75, 3.75, 0.075, 0},
+		{"gemini-flash-latest", 0.75, 3.75, 0.075, 0},
 		{"grok-4.3", 1.25, 2.5, 0.2, 0},
 		{"grok-4.5", 2.0, 6.0, 0.3, 0},
 		{"grok-build-0.1", 1.0, 2.0, 0.2, 0},

@@ -263,7 +263,32 @@ func normalizeSelectedModels(input []string) []string {
 	return out
 }
 
+var cpaModelPriceAliases = map[string]string{
+	"gemini-3-flash":                "gemini-3-flash-preview",
+	"gemini-3-flash-agent":          "gemini-3.5-flash",
+	"gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite",
+	"gemini-3.1-pro-low":            "gemini-3.1-pro-preview",
+	"gemini-3.5-flash-extra-low":    "gemini-3.5-flash",
+	"gemini-3.5-flash-low":          "gemini-3.5-flash",
+	"gemini-3.6-flash-high":         "gemini-3.6-flash",
+	"gemini-3.7-flash-high":         "gemini-3.7-flash",
+	"gemini-flash-latest":           "gemini-3.7-flash",
+	"gemini-flash-lite-latest":      "gemini-3.5-flash-lite",
+	"gemini-pro-agent":              "gemini-3.1-pro-preview",
+	"gemini-pro-latest":             "gemini-3.1-pro-preview",
+}
+
 func findRemotePrice(remote map[string]liteLLMPrice, model string) (liteLLMPrice, bool) {
+	if price, ok := findExactRemotePrice(remote, model); ok {
+		return price, true
+	}
+	if canonical := cpaModelPriceAliases[model]; canonical != "" {
+		return findExactRemotePrice(remote, canonical)
+	}
+	return liteLLMPrice{}, false
+}
+
+func findExactRemotePrice(remote map[string]liteLLMPrice, model string) (liteLLMPrice, bool) {
 	if price, ok := remote[model]; ok {
 		return price, true
 	}
