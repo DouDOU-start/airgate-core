@@ -40,10 +40,11 @@ type routeCatalogBucket struct {
 	cursor   atomic.Uint64
 }
 
-func (p *Pipeline) pickIndexedRoute(
+func (p *Pipeline) pickIndexedRouteWithChannelConfig(
 	groupID int,
 	model, protocol string,
 	excludeKeys, excludeAccounts []int,
+	channelConfig ChannelLatencyConfig,
 ) (routeTarget, bool) {
 	catalog := p.loadRouteCatalog(groupID, model, protocol)
 	if catalog == nil {
@@ -68,13 +69,17 @@ func (p *Pipeline) pickIndexedRoute(
 		if selectedPosition < 0 {
 			continue
 		}
-		// 对账号候选做有界探测：优先预计首字更快且负载更合适的账号。
+		// 对同类候选做有界探测：优先预计首字更快且负载更合适的目标。
 		// 只读本实例内存状态，不增加 Redis/数据库 RTT；固定封顶避免退化为 O(n)。
-		hasLatency := false
-		if selected.kind == routeAccount && selected.account != nil {
-			_, hasLatency = p.recentAccountFirstToken(selected.account.ID, model, now)
-		}
-		if selected.kind == routeAccount && (p.accountInflightCount(selected.account.ID) > 0 || hasLatency) {
+		switch selected.kind {
+		case routeAccount:
+			if selected.account == nil {
+				return selected, true
+			}
+			_, hasLatency := p.recentAccountFirstToken(selected.account.ID, model, now)
+			if p.accountInflightCount(selected.account.ID) == 0 && !hasLatency {
+				return selected, true
+			}
 			for offset := 1; offset < len(bucket.schedule) && offset <= accountLoadProbeLimit; offset++ {
 				ref := bucket.schedule[(selectedPosition+offset)%len(bucket.schedule)]
 				if ref.kind != routeAccount || ref.id == selected.account.ID {
@@ -84,6 +89,28 @@ func (p *Pipeline) pickIndexedRoute(
 					excludeKeys, excludeAccounts, now)
 				if ok {
 					selected = p.preferAccountCandidate(selected, candidate, model, now)
+				}
+			}
+		case routeChannel:
+			if selected.channel == nil {
+				return selected, true
+			}
+			if !channelConfig.Enabled {
+				return selected, true
+			}
+			stats := p.recentChannelPerformanceWithConfig(selected.channel.KeyID, model, now, channelConfig)
+			if p.channelInflightCount(selected.channel.KeyID) == 0 && !stats.hasLatency && stats.failureLevel == 0 {
+				return selected, true
+			}
+			for offset := 1; offset < len(bucket.schedule) && offset <= channelConfig.ProbeLimit; offset++ {
+				ref := bucket.schedule[(selectedPosition+offset)%len(bucket.schedule)]
+				if ref.kind != routeChannel || ref.id == selected.channel.KeyID {
+					continue
+				}
+				candidate, ok := p.resolveIndexedRoute(ref, bucket.priority, groupID, model, protocol,
+					excludeKeys, excludeAccounts, now)
+				if ok {
+					selected = p.preferChannelCandidateWithConfig(selected, candidate, model, now, channelConfig)
 				}
 			}
 		}

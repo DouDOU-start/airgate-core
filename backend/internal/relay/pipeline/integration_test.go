@@ -426,6 +426,33 @@ func TestForwardNonStream(t *testing.T) {
 	}
 }
 
+func TestForward成功流写入渠道单次首字状态(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		time.Sleep(20 * time.Millisecond)
+		_, _ = io.WriteString(w, `data: {"id":"c1","model":"gpt-4o-upstream","choices":[{"delta":{"content":"ok"}}]}`+"\n\n")
+		_, _ = io.WriteString(w, `data: {"id":"c1","model":"gpt-4o-upstream","choices":[],"usage":{"prompt_tokens":1,"completion_tokens":1}}`+"\n\n")
+		_, _ = io.WriteString(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	env := newTestEnv(t, testSnap(1, upstream.URL))
+	for range channelLatencyMinSamples {
+		w := env.do(t, `{"model":"gpt-4o","messages":[{"role":"user","content":"hi"}],"stream":true}`)
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+		}
+	}
+
+	stats := env.pipe.recentChannelPerformance(1, testModel, time.Now())
+	if !stats.hasLatency || stats.latencyMs < 15 || stats.latencyMs > 500 {
+		t.Fatalf("渠道单次首字状态异常：%+v", stats)
+	}
+	if got := env.pipe.channelInflightCount(1); got != 0 {
+		t.Fatalf("请求完成后渠道在途计数 = %d，期望 0", got)
+	}
+}
+
 // TestForwardStream 流式转发：逐行透传 + usage 旁路捕获 + include_usage 注入。
 func TestForwardStream(t *testing.T) {
 	var hits atomic.Int32

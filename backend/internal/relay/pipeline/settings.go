@@ -42,6 +42,8 @@ type GatewaySettings struct {
 	// AlphaSearchPrice codex /v1/alpha/search 联网搜索的全局按次价（USD/次，默认 0.01）；
 	// 分组可经 Group.alpha_search_price 覆盖，实际扣费再叠加分组倍率。
 	AlphaSearchPrice float64
+	// ChannelLatency 控制同一静态优先级内的渠道 TTFT、在途量与慢失败调度。
+	ChannelLatency ChannelLatencyConfig
 }
 
 // defaultAlphaSearchPrice codex 联网搜索默认按次价（对齐 sub2api 默认 $0.01/次）。
@@ -53,6 +55,7 @@ func defaultGatewaySettings() GatewaySettings {
 		AutoBanEnabled:     true,
 		TaskTimeoutMinutes: 30,
 		AlphaSearchPrice:   defaultAlphaSearchPrice,
+		ChannelLatency:     defaultChannelLatencyConfig(),
 	}
 }
 
@@ -149,6 +152,39 @@ func applySettings(s *GatewaySettings, items []Setting) {
 			if f, err := strconv.ParseFloat(value, 64); err == nil && f >= 0 {
 				s.AlphaSearchPrice = f
 			}
+		case "channel_latency_enabled":
+			if enabled, err := strconv.ParseBool(value); err == nil {
+				s.ChannelLatency.Enabled = enabled
+			}
+		case "channel_latency_min_samples":
+			if n, err := strconv.Atoi(value); err == nil && n > 0 {
+				s.ChannelLatency.MinSamples = n
+			}
+		case "channel_latency_window_minutes":
+			if n, err := strconv.Atoi(value); err == nil && n > 0 {
+				s.ChannelLatency.FreshDuration = time.Duration(n) * time.Minute
+			}
+		case "channel_latency_ewma_weight":
+			if n, err := strconv.Atoi(value); err == nil && n >= 2 {
+				s.ChannelLatency.EWMAWeight = n
+			}
+		case "channel_latency_probe_limit":
+			if n, err := strconv.Atoi(value); err == nil && n > 0 {
+				s.ChannelLatency.ProbeLimit = n
+			}
+		case "channel_latency_switch_gain_percent":
+			if n, err := strconv.Atoi(value); err == nil && n >= 0 && n < 100 {
+				s.ChannelLatency.SwitchRatio = 1 - float64(n)/100
+			}
+		case "channel_latency_slow_failure_threshold_ms":
+			if n, err := strconv.Atoi(value); err == nil && n > 0 {
+				s.ChannelLatency.SlowFailureThreshold = time.Duration(n) * time.Millisecond
+			}
+		case "channel_latency_slow_failure_decay_seconds":
+			if n, err := strconv.Atoi(value); err == nil && n > 0 {
+				s.ChannelLatency.SlowFailureDecay = time.Duration(n) * time.Second
+			}
 		}
 	}
+	s.ChannelLatency = normalizeChannelLatencyConfig(s.ChannelLatency)
 }

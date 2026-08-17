@@ -66,8 +66,56 @@ func (s accountFirstTokenStore) LoadRecentAccountFirstTokenSamples(
 	return samples, nil
 }
 
-// loadMultiAttemptRequestIDs 找出发生过账号切换或重试的请求。usage_logs 的首字是
-// 请求级总耗时，不能在启动预热时把前序失败耗时归因给最终成功账号。
+// LoadRecentChannelFirstTokenSamples 从使用记录中读取近期渠道成功首字。
+// 使用记录保存请求级首字，因此与账号预热相同，排除发生过故障转移的请求。
+func (s accountFirstTokenStore) LoadRecentChannelFirstTokenSamples(
+	ctx context.Context,
+	since time.Time,
+	limit int,
+) ([]pipeline.ChannelFirstTokenSample, error) {
+	if s.db == nil || limit <= 0 {
+		return nil, nil
+	}
+	rows, err := s.db.UsageLog.Query().
+		Where(
+			entusagelog.ChannelKeyIDNotNil(),
+			entusagelog.CreatedAtGTE(since),
+			entusagelog.StreamEQ(true),
+			entusagelog.UsageStatusEQ(billing.UsageStatusCompleted),
+			entusagelog.FirstTokenMsGT(0),
+		).
+		Select(
+			entusagelog.FieldChannelKeyID,
+			entusagelog.FieldModel,
+			entusagelog.FieldFirstTokenMs,
+			entusagelog.FieldCreatedAt,
+			entusagelog.FieldRequestID,
+		).
+		Order(ent.Desc(entusagelog.FieldCreatedAt)).
+		Limit(limit).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	multiAttemptRequestIDs, err := s.loadMultiAttemptRequestIDs(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	samples := make([]pipeline.ChannelFirstTokenSample, 0, len(rows))
+	for _, row := range rows {
+		if _, excluded := multiAttemptRequestIDs[strings.TrimSpace(row.RequestID)]; excluded {
+			continue
+		}
+		samples = append(samples, pipeline.ChannelFirstTokenSample{
+			ChannelKeyID: row.ChannelKeyID, Model: row.Model,
+			FirstTokenMs: row.FirstTokenMs, CreatedAt: row.CreatedAt,
+		})
+	}
+	return samples, nil
+}
+
+// loadMultiAttemptRequestIDs 找出发生过调度目标切换或重试的请求。usage_logs 的首字是
+// 请求级总耗时，不能在启动预热时把前序失败耗时归因给最终成功目标。
 // 找不到审计记录时保留样本，兼容审计已清理或旧版本尚未写入审计的历史数据。
 func (s accountFirstTokenStore) loadMultiAttemptRequestIDs(
 	ctx context.Context,

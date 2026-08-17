@@ -76,6 +76,72 @@ func TestAccountFirstTokenStore只加载近期成功流(t *testing.T) {
 	}
 }
 
+func TestChannelFirstTokenStore只加载近期成功流(t *testing.T) {
+	db := enttest.Open(t, "sqlite3", "file:channel_latency_adapter?mode=memory&cache=shared&_fk=1",
+		enttest.WithMigrateOptions(entmigrate.WithGlobalUniqueID(false)))
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("关闭测试数据库失败：%v", err)
+		}
+	})
+
+	ctx := context.Background()
+	now := time.Now()
+	since := now.Add(-15 * time.Minute)
+	channel, err := db.Channel.Create().
+		SetName("测试渠道").
+		SetBaseURL("https://upstream.example.com").
+		Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	channelKey, err := db.ChannelKey.Create().
+		SetChannelID(channel.ID).
+		SetType("openai_compatible").
+		SetModels([]string{"gpt-5"}).
+		Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	create := func(firstTokenMs int64, createdAt time.Time, stream bool, status string, withChannel bool) {
+		t.Helper()
+		builder := db.UsageLog.Create().
+			SetModel("gpt-5").
+			SetFirstTokenMs(firstTokenMs).
+			SetCreatedAt(createdAt).
+			SetStream(stream).
+			SetUsageStatus(status)
+		if withChannel {
+			builder.SetChannelID(channel.ID).SetChannelKeyID(channelKey.ID)
+		}
+		if _, createErr := builder.Save(ctx); createErr != nil {
+			t.Fatal(createErr)
+		}
+	}
+
+	create(900, now.Add(-10*time.Minute), true, billing.UsageStatusCompleted, true)
+	create(300, now.Add(-time.Minute), true, billing.UsageStatusCompleted, true)
+	create(100, now.Add(-30*time.Second), false, billing.UsageStatusCompleted, true)
+	create(100, now.Add(-20*time.Second), true, billing.UsageStatusMissing, true)
+	create(100, now.Add(-10*time.Second), true, billing.UsageStatusCompleted, false)
+	create(1_500, since.Add(-time.Second), true, billing.UsageStatusCompleted, true)
+
+	store := accountFirstTokenStore{db: db}
+	samples, err := store.LoadRecentChannelFirstTokenSamples(ctx, since, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(samples) != 2 {
+		t.Fatalf("有效预热样本数 = %d，期望 2", len(samples))
+	}
+	if samples[0].ChannelKeyID != channelKey.ID || samples[0].Model != "gpt-5" || samples[0].FirstTokenMs != 300 {
+		t.Fatalf("最新样本异常：%+v", samples[0])
+	}
+	if samples[1].FirstTokenMs != 900 {
+		t.Fatalf("较早样本异常：%+v", samples[1])
+	}
+}
+
 func TestAccountFirstTokenStore排除多Attempt请求(t *testing.T) {
 	db := enttest.Open(t, "sqlite3", "file:account_latency_multi_attempt?mode=memory&cache=shared&_fk=1",
 		enttest.WithMigrateOptions(entmigrate.WithGlobalUniqueID(false)))

@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestGetPortAndHostUseEnvironmentWithFallback(t *testing.T) {
@@ -96,6 +98,24 @@ func TestLoadDefaultsPluginsToDisabled(t *testing.T) {
 	}
 	if cfg.Plugins.Dir != "data/plugins" || cfg.Plugins.HookTimeoutMS != 500 {
 		t.Fatalf("插件默认配置异常: %+v", cfg.Plugins)
+	}
+}
+
+func Test仓库YAML示例语法有效(t *testing.T) {
+	paths := []string{
+		filepath.Join("..", "..", "config.yaml.example"),
+		filepath.Join("..", "..", "..", "deploy", "config.docker.yaml"),
+		filepath.Join("..", "..", "..", "deploy", "docker-compose.yml"),
+	}
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("读取 YAML 示例 %s 失败：%v", path, err)
+		}
+		var document any
+		if err := yaml.Unmarshal(data, &document); err != nil {
+			t.Fatalf("YAML 示例 %s 语法无效：%v", path, err)
+		}
 	}
 }
 

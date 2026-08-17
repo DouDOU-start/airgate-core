@@ -63,6 +63,8 @@ type Options struct {
 	Accounts *accountreg.Registry
 	// AccountFirstTokenSource 提供近期账号×模型首字样本，用于服务重启后的调度预热。
 	AccountFirstTokenSource AccountFirstTokenSource
+	// ChannelFirstTokenSource 提供近期渠道密钥×模型首字样本，用于服务重启后的调度预热。
+	ChannelFirstTokenSource ChannelFirstTokenSource
 	// CPA 账号路径转发器（生产环境注入 *cpa.Bridge；nil 时账号候选不执行）。
 	CPA AccountForwarder
 	// RelayHook 外部请求改写与本次请求路由扩展点（nil 时完全保持原路径）。
@@ -85,6 +87,7 @@ type Pipeline struct {
 	healthTracker           HealthTracker
 	accounts                *accountreg.Registry
 	accountFirstTokenSource AccountFirstTokenSource
+	channelFirstTokenSource ChannelFirstTokenSource
 	cpa                     AccountForwarder
 	relayHook               relayhook.Hook
 	requestAudit            *requestaudit.Service
@@ -99,6 +102,10 @@ type Pipeline struct {
 	// 用于同优先级新会话选择和粘性会话自适应重平衡；不形成失败冷却，
 	// 也不跨越配置优先级或绕过配置权重。
 	accountFirstToken sync.Map
+	// channelInflight 记录本实例各渠道密钥正在执行的真实上游 attempt。
+	channelInflight sync.Map
+	// channelFirstToken 保存渠道密钥×模型近期首字 EWMA 与慢失败等级。
+	channelFirstToken sync.Map
 	routeMu           sync.Mutex
 	routeWeights      map[routeBalanceKey]routeBalanceState
 	routePicks        uint64
@@ -140,6 +147,7 @@ func New(opts Options) *Pipeline {
 		healthTracker:           opts.HealthTracker,
 		accounts:                opts.Accounts,
 		accountFirstTokenSource: opts.AccountFirstTokenSource,
+		channelFirstTokenSource: opts.ChannelFirstTokenSource,
 		cpa:                     opts.CPA,
 		relayHook:               opts.RelayHook,
 		requestAudit:            opts.RequestAudit,

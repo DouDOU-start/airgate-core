@@ -74,8 +74,11 @@ type attemptResult struct {
 	body        []byte
 	contentType string
 	// usage 提取/捕获的用量（成功响应、SSE 旁路、4xx 错误体皆可能携带）。
-	usage        *dto.Usage
+	usage *dto.Usage
+	// firstTokenMs 是从请求进入转发主循环到内容首字的请求级总耗时，继续用于用量和审计。
 	firstTokenMs int64
+	// attemptFirstTokenMs 是当前渠道 attempt 自身的内容首字耗时，只用于渠道调度 EWMA。
+	attemptFirstTokenMs int64
 	// requestFirstTokenMs 为包含发包前处理和前序故障转移的请求级真实首字耗时。
 	// 账号调度 EWMA 仍使用 firstTokenMs，避免把前序账号失败惩罚算到最终成功账号。
 	requestFirstTokenMs int64
@@ -382,7 +385,15 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			}
 		}
 		if !ok {
-			target, ok = p.pickRoute(keyInfo.GroupID, req.Model, protocol, excludeKeys, excludeAccounts, routePlan)
+			target, ok = p.pickRouteWithChannelConfig(
+				keyInfo.GroupID,
+				req.Model,
+				protocol,
+				excludeKeys,
+				excludeAccounts,
+				routePlan,
+				settings.ChannelLatency,
+			)
 			if ok && sessionKey != "" {
 				p.sessionAffinity.bind(sessionKey, target.kind, routeTargetID(target))
 			}
@@ -561,12 +572,16 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			RawContentType: opts.rawContentType,
 			Client:         p.client,
 		}
+		releaseLocalLoad := p.trackChannelAttempt(ch.KeyID)
 		attemptStart := time.Now()
 		auditTarget := requestaudit.Target{
 			RouteKind: "channel", ChannelID: ch.ChannelID, ChannelName: ch.ChannelName,
 			ChannelKeyID: ch.KeyID, ChannelKeyName: ch.KeyName,
 		}
-		result := p.executeAttempt(c, ad, info, req, start, capacityID, requestID, rpmMinute, auditRequest, auditTarget)
+		result := func() (result attemptResult) {
+			defer releaseLocalLoad()
+			return p.executeAttempt(c, ad, info, req, start, attemptStart, capacityID, requestID, rpmMinute, auditRequest, auditTarget)
+		}()
 		attemptLatency := time.Since(attemptStart).Milliseconds()
 		attempts++
 		finishChannelAuditAttempt(result, attemptLatency, apiKey)
@@ -612,6 +627,13 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 					"channel_key_id", ch.KeyID, "model", req.Model,
 					"complete", streamComplete, "error", result.streamErr)
 			} else {
+				if result.attemptFirstTokenMs > 0 {
+					p.recordChannelFirstTokenWithConfig(
+						ch.KeyID, req.Model, result.attemptFirstTokenMs, time.Now(), settings.ChannelLatency,
+					)
+				} else {
+					p.recordChannelFastSuccessWithConfig(ch.KeyID, req.Model, attemptLatency, settings.ChannelLatency)
+				}
 				p.registry.MarkRecovered(ch.KeyID)
 				if p.healthTracker != nil {
 					p.healthTracker.RecordSuccess(ch.KeyID)
@@ -666,6 +688,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		}
 		switch o.Verdict {
 		case outcome.Success:
+			p.recordChannelFastSuccessWithConfig(ch.KeyID, req.Model, attemptLatency, settings.ChannelLatency)
 			p.registry.MarkRecovered(ch.KeyID)
 			if p.healthTracker != nil {
 				p.healthTracker.RecordSuccess(ch.KeyID)
@@ -679,6 +702,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			return
 
 		case outcome.RateLimited:
+			p.recordChannelSlowFailureWithConfig(ch.KeyID, req.Model, attemptLatency, settings.ChannelLatency)
 			// 本次请求内硬排除，并按 Retry-After 对物理凭证做跨请求短冷却，
 			// 避免下游重试时立即再次命中同一把已限流的 API Key。
 			p.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
@@ -726,6 +750,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			continue
 
 		case outcome.Transient:
+			p.recordChannelSlowFailureWithConfig(ch.KeyID, req.Model, attemptLatency, settings.ChannelLatency)
 			p.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
 			if p.healthTracker != nil {
 				p.healthTracker.RecordFailure(ch.KeyID)
@@ -856,7 +881,7 @@ func channelSlotTTL(stream bool) time.Duration {
 
 // executeAttempt 执行单次上游调用，并保证渠道并发槽/RPM 在 panic 时也正确回收：
 // 槽位恒经 defer 释放；panic 时回退 RPM 预递增后继续向上抛（由 Recovery 中间件转 500）。
-func (p *Pipeline) executeAttempt(c *gin.Context, ad adaptor.Adaptor, info *adaptor.RelayInfo, req *dto.ChatRequest, start time.Time, channelKeyID int, requestID string, rpmMinute int64, auditRequest *requestaudit.Handle, auditTarget requestaudit.Target) attemptResult {
+func (p *Pipeline) executeAttempt(c *gin.Context, ad adaptor.Adaptor, info *adaptor.RelayInfo, req *dto.ChatRequest, start, attemptStart time.Time, channelKeyID int, requestID string, rpmMinute int64, auditRequest *requestaudit.Handle, auditTarget requestaudit.Target) attemptResult {
 	defer func() {
 		// 槽位释放异步化：ZREM 幂等，不必阻塞请求收尾/下一次 failover 尝试。
 		go p.concurrency.ReleaseKeySlot(context.Background(), channelKeyID, requestID)
@@ -865,7 +890,7 @@ func (p *Pipeline) executeAttempt(c *gin.Context, ad adaptor.Adaptor, info *adap
 			panic(rec)
 		}
 	}()
-	return p.execute(c, ad, info, req, start, auditRequest, auditTarget)
+	return p.execute(c, ad, info, req, start, attemptStart, auditRequest, auditTarget)
 }
 
 // acquireClientSlots user → key 两级并发闸门。成功返回 (释放闭包, "")；
@@ -896,7 +921,7 @@ func (p *Pipeline) acquireClientSlots(c *gin.Context, keyInfo *auth.APIKeyInfo, 
 }
 
 // execute 单次上游调用：构建请求 → 直发 → 按流式/非流式分派响应处理。
-func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.RelayInfo, req *dto.ChatRequest, start time.Time, auditRequest *requestaudit.Handle, auditTarget requestaudit.Target) attemptResult {
+func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.RelayInfo, req *dto.ChatRequest, start, attemptStart time.Time, auditRequest *requestaudit.Handle, auditTarget requestaudit.Target) attemptResult {
 	clientCtx := c.Request.Context()
 	ctx := clientCtx
 	var cancel context.CancelFunc
@@ -986,9 +1011,13 @@ func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.Rel
 			if so, ok := ad.(adaptor.StreamObserving); ok {
 				observer = so.NewStreamObserver(info)
 			}
-			sr := relaySSE(c.Writer, resp, start, extractUsage, forwardUsageChunk, isFirstContentLine, maxLineBytes, observer)
+			sr := relaySSE(c.Writer, resp, attemptStart, extractUsage, forwardUsageChunk, isFirstContentLine, maxLineBytes, observer)
 			result.usage = sr.usage
-			result.firstTokenMs = sr.firstTokenMs
+			result.attemptFirstTokenMs = sr.firstTokenMs
+			if sr.firstTokenMs > 0 {
+				requestBeforeAttemptMs := max(attemptStart.Sub(start).Milliseconds(), 0)
+				result.firstTokenMs = requestBeforeAttemptMs + sr.firstTokenMs
+			}
 			result.written = sr.written
 			if sr.upstreamError != nil {
 				// 上游可能以 HTTP 200 建立 SSE，随后在首个真实内容前发送协议级

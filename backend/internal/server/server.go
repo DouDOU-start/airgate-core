@@ -171,6 +171,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Registry:                s.channelRegistry,
 		Accounts:                s.accountRegistry,
 		AccountFirstTokenSource: accountFirstTokenStore{db: db},
+		ChannelFirstTokenSource: accountFirstTokenStore{db: db},
 		CPA:                     s.cpaBridge,
 		Pricing:                 s.pricingCache,
 		Concurrency:             concurrency,
@@ -263,13 +264,22 @@ func (s *Server) StartBackground(ctx context.Context) {
 		}
 	}
 	if s.relay != nil {
-		warmCtx, warmCancel := context.WithTimeout(ctx, 3*time.Second)
-		warmed, err := s.relay.WarmAccountFirstTokens(warmCtx)
-		warmCancel()
-		if err != nil {
-			slog.Warn("account_first_token_warmup_failed", "error", err)
+		accountWarmCtx, accountWarmCancel := context.WithTimeout(ctx, 3*time.Second)
+		accountWarmed, accountErr := s.relay.WarmAccountFirstTokens(accountWarmCtx)
+		accountWarmCancel()
+		if accountErr != nil {
+			slog.Warn("account_first_token_warmup_failed", "error", accountErr)
 		} else {
-			slog.Info("account_first_token_warmup_completed", "keys", warmed)
+			slog.Info("account_first_token_warmup_completed", "keys", accountWarmed)
+		}
+
+		channelWarmCtx, channelWarmCancel := context.WithTimeout(ctx, 3*time.Second)
+		channelWarmed, channelErr := s.relay.WarmChannelFirstTokens(channelWarmCtx)
+		channelWarmCancel()
+		if channelErr != nil {
+			slog.Warn("channel_first_token_warmup_failed", "error", channelErr)
+		} else {
+			slog.Info("channel_first_token_warmup_completed", "keys", channelWarmed)
 		}
 	}
 	if err := s.pricingCache.Reload(ctx); err != nil {

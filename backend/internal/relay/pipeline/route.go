@@ -60,8 +60,22 @@ func (p *Pipeline) pickRoute(
 	excludeKeys, excludeAccounts []int,
 	plan *relayhook.RoutePlan,
 ) (routeTarget, bool) {
+	return p.pickRouteWithChannelConfig(
+		groupID, model, protocol, excludeKeys, excludeAccounts, plan, defaultChannelLatencyConfig(),
+	)
+}
+
+func (p *Pipeline) pickRouteWithChannelConfig(
+	groupID int,
+	model, protocol string,
+	excludeKeys, excludeAccounts []int,
+	plan *relayhook.RoutePlan,
+	channelConfig ChannelLatencyConfig,
+) (routeTarget, bool) {
 	if plan == nil {
-		return p.pickIndexedRoute(groupID, model, protocol, excludeKeys, excludeAccounts)
+		return p.pickIndexedRouteWithChannelConfig(
+			groupID, model, protocol, excludeKeys, excludeAccounts, channelConfig,
+		)
 	}
 	var cands []routeTarget
 	now := time.Now()
@@ -135,6 +149,25 @@ func (p *Pipeline) pickRoute(
 		}
 	}
 	selected := p.pickSmoothWeighted(groupID, model, protocol, tier)
+	// RoutePlan 只改变账号首选顺序；进入 Core fallback 后，渠道仍使用与普通
+	// 目录路径相同的通用 TTFT/在途/慢失败评分，并严格限制在最高优先级档内。
+	if selected.kind == routeChannel && selected.channel != nil {
+		if !channelConfig.Enabled {
+			return selected, true
+		}
+		probed := 0
+		for _, candidate := range tier {
+			if probed >= channelConfig.ProbeLimit {
+				break
+			}
+			if candidate.kind != routeChannel || candidate.channel == nil ||
+				candidate.channel.KeyID == selected.channel.KeyID {
+				continue
+			}
+			selected = p.preferChannelCandidateWithConfig(selected, candidate, model, now, channelConfig)
+			probed++
+		}
+	}
 	return selected, true
 }
 

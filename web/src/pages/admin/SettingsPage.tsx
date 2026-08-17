@@ -45,7 +45,27 @@ const DEFAULT_KEYS = [
 // 网关转发设置（gateway 分组，见 backend internal/relay/pipeline/settings.go）。
 const GATEWAY_KEYS = [
   'alpha_search_price',
+  'channel_latency_enabled',
+  'channel_latency_min_samples',
+  'channel_latency_window_minutes',
+  'channel_latency_ewma_weight',
+  'channel_latency_probe_limit',
+  'channel_latency_switch_gain_percent',
+  'channel_latency_slow_failure_threshold_ms',
+  'channel_latency_slow_failure_decay_seconds',
 ] as const;
+
+const CHANNEL_LATENCY_DEFAULTS: Record<(typeof GATEWAY_KEYS)[number], string> = {
+  alpha_search_price: '',
+  channel_latency_enabled: 'true',
+  channel_latency_min_samples: '3',
+  channel_latency_window_minutes: '15',
+  channel_latency_ewma_weight: '8',
+  channel_latency_probe_limit: '8',
+  channel_latency_switch_gain_percent: '5',
+  channel_latency_slow_failure_threshold_ms: '10000',
+  channel_latency_slow_failure_decay_seconds: '120',
+};
 
 // SMTP 密码哨兵值（与后端约定）：GET 返回 "********" 表示已配置；
 // 提交 "********" = 保持不变；提交空串 = 清空密码。
@@ -211,6 +231,11 @@ export default function SettingsPage() {
       // 渠道状态页总开关：未配置视为开启，与公开读路径一致。
       if (map.channel_status_enabled == null || map.channel_status_enabled === '') {
         map.channel_status_enabled = 'true';
+      }
+      for (const key of GATEWAY_KEYS) {
+        if (key !== 'alpha_search_price' && !map[key]?.trim()) {
+          map[key] = CHANNEL_LATENCY_DEFAULTS[key];
+        }
       }
       setValues(map);
       setHasChanges(false);
@@ -471,17 +496,62 @@ export default function SettingsPage() {
               <Card.Title>{t('settings.gateway_relay')}</Card.Title>
             </Card.Header>
             <Card.Content>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Field label={t('settings.alpha_search_price')} hint={t('settings.alpha_search_price_hint')}>
-                  <Input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    value={val('alpha_search_price')}
-                    onChange={(e) => set('alpha_search_price', e.target.value)}
-                    placeholder="0.01"
-                  />
-                </Field>
+              <div className="ag-settings-section-stack">
+                <SettingsSection>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Field label={t('settings.alpha_search_price')} hint={t('settings.alpha_search_price_hint')}>
+                      <Input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        value={val('alpha_search_price')}
+                        onChange={(e) => set('alpha_search_price', e.target.value)}
+                        placeholder="0.01"
+                      />
+                    </Field>
+                  </div>
+                </SettingsSection>
+
+                <SettingsSection
+                  title={t('settings.channel_latency_section')}
+                  description={t('settings.channel_latency_section_desc')}
+                >
+                  <div className="space-y-6">
+                    <NativeSwitch
+                      isSelected={boolVal('channel_latency_enabled')}
+                      label={(
+                        <>
+                          <span className="text-sm font-medium text-text">{t('settings.channel_latency_enabled')}</span>
+                          <span className="block text-xs text-text-tertiary">{t('settings.channel_latency_enabled_desc')}</span>
+                        </>
+                      )}
+                      onChange={(v) => set('channel_latency_enabled', String(v))}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <Field label={t('settings.channel_latency_min_samples')} hint={t('settings.channel_latency_min_samples_hint')}>
+                        <Input type="number" step="1" min="1" value={val('channel_latency_min_samples')} onChange={(e) => set('channel_latency_min_samples', e.target.value)} />
+                      </Field>
+                      <Field label={t('settings.channel_latency_window_minutes')} hint={t('settings.channel_latency_window_minutes_hint')}>
+                        <Input type="number" step="1" min="1" value={val('channel_latency_window_minutes')} onChange={(e) => set('channel_latency_window_minutes', e.target.value)} />
+                      </Field>
+                      <Field label={t('settings.channel_latency_ewma_weight')} hint={t('settings.channel_latency_ewma_weight_hint')}>
+                        <Input type="number" step="1" min="2" value={val('channel_latency_ewma_weight')} onChange={(e) => set('channel_latency_ewma_weight', e.target.value)} />
+                      </Field>
+                      <Field label={t('settings.channel_latency_probe_limit')} hint={t('settings.channel_latency_probe_limit_hint')}>
+                        <Input type="number" step="1" min="1" value={val('channel_latency_probe_limit')} onChange={(e) => set('channel_latency_probe_limit', e.target.value)} />
+                      </Field>
+                      <Field label={t('settings.channel_latency_switch_gain_percent')} hint={t('settings.channel_latency_switch_gain_percent_hint')}>
+                        <Input type="number" step="1" min="0" max="99" value={val('channel_latency_switch_gain_percent')} onChange={(e) => set('channel_latency_switch_gain_percent', e.target.value)} />
+                      </Field>
+                      <Field label={t('settings.channel_latency_slow_failure_threshold_ms')} hint={t('settings.channel_latency_slow_failure_threshold_ms_hint')}>
+                        <Input type="number" step="100" min="1" value={val('channel_latency_slow_failure_threshold_ms')} onChange={(e) => set('channel_latency_slow_failure_threshold_ms', e.target.value)} />
+                      </Field>
+                      <Field label={t('settings.channel_latency_slow_failure_decay_seconds')} hint={t('settings.channel_latency_slow_failure_decay_seconds_hint')}>
+                        <Input type="number" step="1" min="1" value={val('channel_latency_slow_failure_decay_seconds')} onChange={(e) => set('channel_latency_slow_failure_decay_seconds', e.target.value)} />
+                      </Field>
+                    </div>
+                  </div>
+                </SettingsSection>
               </div>
               {saveAction}
             </Card.Content>

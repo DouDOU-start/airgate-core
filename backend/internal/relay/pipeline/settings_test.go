@@ -51,6 +51,7 @@ func TestSettingsReader(t *testing.T) {
 				AutoBanEnabled:     false,
 				TaskTimeoutMinutes: 30,
 				AlphaSearchPrice:   defaultAlphaSearchPrice,
+				ChannelLatency:     defaultChannelLatencyConfig(),
 			},
 		},
 		{
@@ -62,6 +63,7 @@ func TestSettingsReader(t *testing.T) {
 				AutoBanEnabled:     true,
 				TaskTimeoutMinutes: 60,
 				AlphaSearchPrice:   defaultAlphaSearchPrice,
+				ChannelLatency:     defaultChannelLatencyConfig(),
 			},
 		},
 		{
@@ -73,6 +75,7 @@ func TestSettingsReader(t *testing.T) {
 				AutoBanEnabled:     true,
 				TaskTimeoutMinutes: 30,
 				AlphaSearchPrice:   0,
+				ChannelLatency:     defaultChannelLatencyConfig(),
 			},
 		},
 		{
@@ -113,6 +116,52 @@ func TestSettingsReader(t *testing.T) {
 				t.Errorf("Get = %+v, want %+v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestSettingsReader解析渠道首字调度(t *testing.T) {
+	lister := &fakeLister{items: []Setting{
+		{Key: "channel_latency_enabled", Value: "false"},
+		{Key: "channel_latency_min_samples", Value: "5"},
+		{Key: "channel_latency_window_minutes", Value: "20"},
+		{Key: "channel_latency_ewma_weight", Value: "10"},
+		{Key: "channel_latency_probe_limit", Value: "6"},
+		{Key: "channel_latency_switch_gain_percent", Value: "12"},
+		{Key: "channel_latency_slow_failure_threshold_ms", Value: "15000"},
+		{Key: "channel_latency_slow_failure_decay_seconds", Value: "180"},
+	}}
+
+	got := NewSettingsReader(lister).Get(context.Background()).ChannelLatency
+	want := ChannelLatencyConfig{
+		Enabled:              false,
+		MinSamples:           5,
+		FreshDuration:        20 * time.Minute,
+		EWMAWeight:           10,
+		ProbeLimit:           6,
+		SwitchRatio:          0.88,
+		SlowFailureThreshold: 15 * time.Second,
+		SlowFailureDecay:     3 * time.Minute,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("渠道首字调度设置 = %+v，期望 %+v", got, want)
+	}
+}
+
+func TestSettingsReader渠道首字非法值保留默认(t *testing.T) {
+	lister := &fakeLister{items: []Setting{
+		{Key: "channel_latency_enabled", Value: "不是布尔值"},
+		{Key: "channel_latency_min_samples", Value: "0"},
+		{Key: "channel_latency_window_minutes", Value: "-1"},
+		{Key: "channel_latency_ewma_weight", Value: "1"},
+		{Key: "channel_latency_probe_limit", Value: "0"},
+		{Key: "channel_latency_switch_gain_percent", Value: "100"},
+		{Key: "channel_latency_slow_failure_threshold_ms", Value: "0"},
+		{Key: "channel_latency_slow_failure_decay_seconds", Value: "-1"},
+	}}
+
+	got := NewSettingsReader(lister).Get(context.Background()).ChannelLatency
+	if want := defaultChannelLatencyConfig(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("非法设置未保留默认值：得到 %+v，期望 %+v", got, want)
 	}
 }
 
