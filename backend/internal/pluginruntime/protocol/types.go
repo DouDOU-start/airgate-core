@@ -9,7 +9,7 @@ import (
 
 const (
 	// ProtocolVersion 是当前 AirGate 插件协议版本。
-	ProtocolVersion = "1"
+	ProtocolVersion = "2"
 	// PluginKey 是 go-plugin 握手后的通用插件服务名。
 	PluginKey = "plugin"
 	// CapabilityRelayHookV1 表示插件实现 Relay Hook v1 请求处理能力。
@@ -24,9 +24,9 @@ const (
 
 // Handshake 是 Core 与插件进程共同使用的 go-plugin 握手配置。
 var Handshake = goplugin.HandshakeConfig{
-	ProtocolVersion:  1,
+	ProtocolVersion:  2,
 	MagicCookieKey:   "AIRGATE_PLUGIN",
-	MagicCookieValue: "airgate-plugin-v1",
+	MagicCookieValue: "airgate-plugin-v2",
 }
 
 // PluginInfo 描述插件身份、类型与所提供的能力。

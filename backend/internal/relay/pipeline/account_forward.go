@@ -115,8 +115,8 @@ func (p *Pipeline) executeAccountAttempt(
 		return attemptResult{auditErr: requestaudit.ErrWrite}
 	}
 	// 在 handleAccountOutcome 的成功分支调用 MarkActive 之前，捕获“账号已被并发请求
-	// 标为限流，但当前在途请求仍成功”的 Codex OAuth 诊断现场。
-	p.logCodexRateLimitedAccountSuccess(c, acc, req.Model, endpoint, req.Stream, payload, fwdReq.Headers, result)
+	// 标为限流，但当前在途请求仍成功”的通用调度摘要。
+	p.logRateLimitedAccountSuccess(c, acc, req.Model, endpoint, req.Stream, len(payload), result)
 
 	// refresh 后的凭证写回内存（+ 可选落库）。
 	if len(result.RefreshedCredentials) > 0 && p.accounts != nil {

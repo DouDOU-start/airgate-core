@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 
@@ -10,20 +11,133 @@ import (
 	"google.golang.org/grpc/encoding"
 )
 
-const serviceName = "airgate.plugin.v1.Plugin"
+const serviceName = "airgate.plugin.v2.Plugin"
 
-type jsonCodec struct{}
+type wireCodec struct{}
 
-func (jsonCodec) Name() string { return "json" }
-func (jsonCodec) Marshal(value any) ([]byte, error) {
-	return json.Marshal(value)
+func (wireCodec) Name() string { return "airgate-v2" }
+func (wireCodec) Marshal(value any) ([]byte, error) {
+	switch typed := value.(type) {
+	case Request:
+		return marshalRequest(typed)
+	case *Request:
+		if typed == nil {
+			return nil, fmt.Errorf("插件协议请求不能为空")
+		}
+		return marshalRequest(*typed)
+	case Response:
+		return marshalResponse(typed)
+	case *Response:
+		if typed == nil {
+			return nil, fmt.Errorf("插件协议响应不能为空")
+		}
+		return marshalResponse(*typed)
+	default:
+		return json.Marshal(value)
+	}
 }
-func (jsonCodec) Unmarshal(data []byte, value any) error {
-	return json.Unmarshal(data, value)
+func (wireCodec) Unmarshal(data []byte, value any) error {
+	switch typed := value.(type) {
+	case *Request:
+		return unmarshalRequest(data, typed)
+	case *Response:
+		return unmarshalResponse(data, typed)
+	default:
+		return json.Unmarshal(data, value)
+	}
 }
 
 func init() {
-	encoding.RegisterCodec(jsonCodec{})
+	encoding.RegisterCodec(wireCodec{})
+}
+
+type requestMetadata struct {
+	Method string              `json:"method"`
+	Path   string              `json:"path"`
+	Query  string              `json:"query,omitempty"`
+	Header map[string][]string `json:"header,omitempty"`
+}
+
+type responseMetadata struct {
+	StatusCode int                 `json:"status_code"`
+	Header     map[string][]string `json:"header,omitempty"`
+}
+
+func marshalRequest(request Request) ([]byte, error) {
+	return marshalEnvelope(requestMetadata{
+		Method: request.Method,
+		Path:   request.Path,
+		Query:  request.Query,
+		Header: request.Header,
+	}, request.Body)
+}
+
+func unmarshalRequest(data []byte, request *Request) error {
+	var metadata requestMetadata
+	body, err := unmarshalEnvelope(data, &metadata)
+	if err != nil {
+		return err
+	}
+	*request = Request{
+		Method: metadata.Method,
+		Path:   metadata.Path,
+		Query:  metadata.Query,
+		Header: metadata.Header,
+		Body:   body,
+	}
+	return nil
+}
+
+func marshalResponse(response Response) ([]byte, error) {
+	return marshalEnvelope(responseMetadata{
+		StatusCode: response.StatusCode,
+		Header:     response.Header,
+	}, response.Body)
+}
+
+func unmarshalResponse(data []byte, response *Response) error {
+	var metadata responseMetadata
+	body, err := unmarshalEnvelope(data, &metadata)
+	if err != nil {
+		return err
+	}
+	*response = Response{
+		StatusCode: metadata.StatusCode,
+		Header:     metadata.Header,
+		Body:       body,
+	}
+	return nil
+}
+
+// marshalEnvelope 只对小型元数据使用 JSON，正文按原始字节追加，避免 Base64
+// 膨胀和大正文的重复 JSON 编解码。前四字节是大端元数据长度。
+func marshalEnvelope(metadata any, body []byte) ([]byte, error) {
+	encoded, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, err
+	}
+	if uint64(len(encoded)) > uint64(^uint32(0)) {
+		return nil, fmt.Errorf("插件协议元数据过大")
+	}
+	result := make([]byte, 4+len(encoded)+len(body))
+	binary.BigEndian.PutUint32(result[:4], uint32(len(encoded)))
+	copy(result[4:], encoded)
+	copy(result[4+len(encoded):], body)
+	return result, nil
+}
+
+func unmarshalEnvelope(data []byte, metadata any) ([]byte, error) {
+	if len(data) < 4 {
+		return nil, fmt.Errorf("插件协议消息缺少元数据长度")
+	}
+	metadataBytes := int(binary.BigEndian.Uint32(data[:4]))
+	if metadataBytes > len(data)-4 {
+		return nil, fmt.Errorf("插件协议元数据长度无效")
+	}
+	if err := json.Unmarshal(data[4:4+metadataBytes], metadata); err != nil {
+		return nil, fmt.Errorf("解析插件协议元数据失败: %w", err)
+	}
+	return append([]byte(nil), data[4+metadataBytes:]...), nil
 }
 
 type empty struct{}
@@ -50,7 +164,7 @@ func (c *Client) invoke(ctx context.Context, method string, input, output any) e
 		"/"+serviceName+"/"+method,
 		input,
 		output,
-		grpc.ForceCodec(jsonCodec{}),
+		grpc.ForceCodec(wireCodec{}),
 		grpc.MaxCallRecvMsgSize(MaxMessageBytes),
 		grpc.MaxCallSendMsgSize(MaxMessageBytes),
 	)

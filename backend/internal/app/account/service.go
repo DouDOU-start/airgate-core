@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
@@ -88,12 +90,14 @@ type Service struct {
 	concurrency ConcurrencyReader
 	rpm         RPMReader
 	// 账号测试落账（可选：未注入则测试不写 usage_log）
-	usageSink      UsageSink
-	priceLookup    PriceLookup
-	calculator     *billing.Calculator
-	testForwarder  TestForwarder
-	usageFetcher   usageFetcher
-	oauthRefresher OAuthCredentialRefresher
+	usageSink     UsageSink
+	priceLookup   PriceLookup
+	calculator    *billing.Calculator
+	testForwarder TestForwarder
+	usageFetcher  usageFetcher
+	// 同一账号的并发用量刷新合并为一次上游请求，避免管理端轮询形成刷新风暴。
+	usageRefreshGroup singleflight.Group
+	oauthRefresher    OAuthCredentialRefresher
 	// 账号测试请求变换器（可选，由插件运行器实现）。
 	testTransformer accounttesthook.Transformer
 }

@@ -1,10 +1,12 @@
 package pluginruntime
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -123,6 +125,54 @@ func TestTransformAccountTestRequiresAvailablePlugin(t *testing.T) {
 	_, err := manager.TransformAccountTest(context.Background(), accounttesthook.Request{})
 	if !errors.Is(err, accounttesthook.ErrUnavailable) {
 		t.Fatalf("无插件时错误 = %v，期望 ErrUnavailable", err)
+	}
+}
+
+func TestTransformAccountTestDoesNotExposePluginErrorBody(t *testing.T) {
+	const sensitive = "注入 function call 历史失败"
+	plugin := &fakePlugin{handler: func(context.Context, protocol.Request) (protocol.Response, error) {
+		return protocol.Response{StatusCode: http.StatusUnprocessableEntity, Body: []byte(`{"error":"` + sensitive + `"}`)}, nil
+	}}
+	manager := &Manager{
+		instances:  map[string]*instance{"sensitive-plugin": testAccountTransformInstance("sensitive-plugin", 10, plugin)},
+		lastErrors: make(map[string]string),
+	}
+	_, err := manager.TransformAccountTest(context.Background(), accounttesthook.Request{
+		Version: accounttesthook.VersionV1,
+		Body:    json.RawMessage(`{"model":"gpt-test","stream":true,"input":"你好"}`),
+	})
+	if err == nil || !strings.Contains(err.Error(), "状态码 422") {
+		t.Fatalf("插件错误状态未保留: %v", err)
+	}
+	if strings.Contains(err.Error(), sensitive) || strings.Contains(manager.lastError("sensitive-plugin"), sensitive) {
+		t.Fatalf("Core 暴露了插件错误正文: err=%v last_error=%s", err, manager.lastError("sensitive-plugin"))
+	}
+}
+
+func TestBeforeDispatchSanitizesPluginCallErrorInCoreLog(t *testing.T) {
+	const sensitive = "function_call_secret"
+	plugin := &fakePlugin{handler: func(context.Context, protocol.Request) (protocol.Response, error) {
+		return protocol.Response{}, errors.New(sensitive)
+	}}
+	manager := &Manager{
+		instances:  map[string]*instance{"airgate-codex-overage": testInstance("airgate-codex-overage", 10, plugin)},
+		lastErrors: make(map[string]string),
+	}
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	defer slog.SetDefault(previous)
+
+	decision, err := manager.BeforeDispatch(context.Background(), testRelayRequest(1))
+	if err != nil || decision.Version != "" {
+		t.Fatalf("Relay Hook 应保持 fail-open: decision=%+v err=%v", decision, err)
+	}
+	output := logs.String()
+	if strings.Contains(output, sensitive) || strings.Contains(output, "airgate-codex-overage") {
+		t.Fatalf("Core 日志暴露了插件身份或错误正文: %s", output)
+	}
+	if !strings.Contains(output, "plugin_ref=p-") || !strings.Contains(output, "error_code=plugin_error") {
+		t.Fatalf("Core 日志缺少通用插件诊断字段: %s", output)
 	}
 }
 

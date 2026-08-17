@@ -26,7 +26,7 @@ func (l diagnosticAccountLoader) LoadAllForAccountRegistry(context.Context) ([]a
 	return l.accounts, nil
 }
 
-func TestLogCodexRateLimitedAccountSuccessRecordsCompleteRequest(t *testing.T) {
+func TestLogRateLimitedAccountSuccessOnlyRecordsSafeSummary(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	registry := accountreg.New(diagnosticAccountLoader{accounts: []accountreg.Snapshot{{
 		ID: 17, Name: "codex-oauth", Platform: "codex", Type: "oauth",
@@ -42,7 +42,6 @@ func TestLogCodexRateLimitedAccountSuccessRecordsCompleteRequest(t *testing.T) {
 	registry.MarkRateLimited(17, time.Now().Add(2*time.Minute), "并发请求返回 429")
 
 	originalBody := []byte(`{ "model": "gpt-5", "input": "原始敏感提示词" }`)
-	forwardBody := []byte(`{"input":"改写后的敏感提示词","model":"gpt-5"}`)
 	request := httptest.NewRequest(http.MethodPost, "https://gateway.example/v1/responses?trace=full", bytes.NewReader(originalBody))
 	request.Host = "gateway.example"
 	request.RemoteAddr = "203.0.113.10:4567"
@@ -62,14 +61,13 @@ func TestLogCodexRateLimitedAccountSuccessRecordsCompleteRequest(t *testing.T) {
 	defer slog.SetDefault(previous)
 
 	pipe := &Pipeline{accounts: registry}
-	pipe.logCodexRateLimitedAccountSuccess(
+	pipe.logRateLimitedAccountSuccess(
 		c,
 		selected,
 		"gpt-5",
 		"responses",
 		false,
-		forwardBody,
-		http.Header{"Content-Type": []string{"application/json"}},
+		12345,
 		cpa.ForwardResult{
 			StatusCode: http.StatusOK,
 			Headers:    http.Header{"X-Request-Id": []string{"upstream-request-1"}},
@@ -78,26 +76,35 @@ func TestLogCodexRateLimitedAccountSuccessRecordsCompleteRequest(t *testing.T) {
 
 	output := logs.String()
 	for _, expected := range []string{
-		"relay_codex_rate_limited_account_request_succeeded",
+		"relay_rate_limited_account_request_succeeded",
 		"request_id=req-sensitive-1",
 		"account_id=17",
 		"selected_account_state=active",
 		"current_account_state=rate_limited",
-		"sk-client-secret",
-		"session=raw-cookie",
-		"first second",
-		"原始敏感提示词",
-		"改写后的敏感提示词",
-		"upstream-request-1",
-		"request_body_rewritten=true",
+		"payload_bytes=12345",
+		"upstream_response_status=200",
 	} {
 		if !strings.Contains(output, expected) {
 			t.Errorf("诊断日志缺少 %q:\n%s", expected, output)
 		}
 	}
+	for _, forbidden := range []string{
+		"sk-client-secret",
+		"session=raw-cookie",
+		"first second",
+		"原始敏感提示词",
+		"upstream-request-1",
+		"inbound_request_body",
+		"forward_request_body",
+		"request_body_rewritten",
+	} {
+		if strings.Contains(output, forbidden) {
+			t.Errorf("诊断日志泄露了 %q:\n%s", forbidden, output)
+		}
+	}
 }
 
-func TestLogCodexRateLimitedAccountSuccessRejectsOtherCases(t *testing.T) {
+func TestLogRateLimitedAccountSuccessRejectsOtherCases(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
@@ -114,16 +121,18 @@ func TestLogCodexRateLimitedAccountSuccessRejectsOtherCases(t *testing.T) {
 			result:       cpa.ForwardResult{StatusCode: http.StatusOK},
 		},
 		{
-			name:         "非 Codex 账号",
-			account:      accountreg.Snapshot{ID: 1, Platform: "xai", Type: "oauth", State: accountreg.StateActive},
-			currentState: accountreg.StateRateLimited,
-			result:       cpa.ForwardResult{StatusCode: http.StatusOK},
+			name:           "非 Codex 账号",
+			account:        accountreg.Snapshot{ID: 1, Platform: "xai", Type: "oauth", State: accountreg.StateActive},
+			currentState:   accountreg.StateRateLimited,
+			result:         cpa.ForwardResult{StatusCode: http.StatusOK},
+			wantDiagnostic: true,
 		},
 		{
-			name:         "Codex API Key 账号",
-			account:      accountreg.Snapshot{ID: 1, Platform: "codex", Type: "api_key", State: accountreg.StateActive},
-			currentState: accountreg.StateRateLimited,
-			result:       cpa.ForwardResult{StatusCode: http.StatusOK},
+			name:           "Codex API Key 账号",
+			account:        accountreg.Snapshot{ID: 1, Platform: "codex", Type: "api_key", State: accountreg.StateActive},
+			currentState:   accountreg.StateRateLimited,
+			result:         cpa.ForwardResult{StatusCode: http.StatusOK},
+			wantDiagnostic: true,
 		},
 		{
 			name:         "上游返回限流",
@@ -165,9 +174,9 @@ func TestLogCodexRateLimitedAccountSuccessRejectsOtherCases(t *testing.T) {
 			defer slog.SetDefault(previous)
 
 			pipe := &Pipeline{accounts: registry}
-			pipe.logCodexRateLimitedAccountSuccess(c, &test.account, "gpt-5", "responses", test.result.Written, []byte(`{"model":"gpt-5"}`), nil, test.result)
+			pipe.logRateLimitedAccountSuccess(c, &test.account, "gpt-5", "responses", test.result.Written, 17, test.result)
 
-			gotDiagnostic := strings.Contains(logs.String(), "relay_codex_rate_limited_account_request_succeeded")
+			gotDiagnostic := strings.Contains(logs.String(), "relay_rate_limited_account_request_succeeded")
 			if gotDiagnostic != test.wantDiagnostic {
 				t.Fatalf("是否输出诊断日志 = %v，期望 %v；日志=%s", gotDiagnostic, test.wantDiagnostic, logs.String())
 			}

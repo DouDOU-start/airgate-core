@@ -3,9 +3,11 @@ package pluginruntime
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,11 +19,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
 
 	"github.com/DouDOU-start/airgate-core/internal/config"
 	"github.com/DouDOU-start/airgate-core/internal/pluginruntime/protocol"
 	"github.com/DouDOU-start/airgate-core/internal/relay/accounttesthook"
+	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
 )
 
@@ -121,7 +125,7 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 			state, stateErr := m.readRuntimeState(id, info.ModTime())
 			if stateErr != nil {
 				m.setLastError(id, stateErr)
-				slog.Error("读取插件运行状态失败", "plugin_id", id, "error", stateErr)
+				slog.Error("读取插件运行状态失败", "plugin_ref", pluginLogRef(id), "error_code", pluginErrorCode(stateErr))
 				continue
 			}
 			if !state.Enabled {
@@ -130,7 +134,7 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 			inst, startErr := m.launchInstalled(ctx, id)
 			if startErr != nil {
 				m.setLastError(id, startErr)
-				slog.Error("插件加载失败", "plugin_id", id, "error", startErr)
+				slog.Error("插件加载失败", "plugin_ref", pluginLogRef(id), "error_code", pluginErrorCode(startErr))
 				continue
 			}
 			m.setInstance(inst)
@@ -143,7 +147,7 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 			continue
 		}
 		if dev.Path == "" {
-			slog.Error("开发插件缺少源码目录", "plugin_id", dev.Name)
+			slog.Error("开发插件缺少源码目录", "plugin_ref", pluginLogRef(dev.Name))
 			continue
 		}
 		name := strings.TrimSpace(dev.Name)
@@ -151,16 +155,16 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 			name = filepath.Base(filepath.Clean(dev.Path))
 		}
 		if err := ValidatePluginID(name); err != nil {
-			slog.Error("开发插件名称无效", "plugin_id", name, "error", err)
+			slog.Error("开发插件名称无效", "plugin_ref", pluginLogRef(name), "error_code", pluginErrorCode(err))
 			continue
 		}
 		if m.instanceByID(name) != nil {
-			slog.Error("开发插件名称与运行实例冲突", "plugin_id", name)
+			slog.Error("开发插件名称与运行实例冲突", "plugin_ref", pluginLogRef(name))
 			continue
 		}
 		inst, startErr := m.launchDevPlugin(ctx, name, dev)
 		if startErr != nil {
-			slog.Error("开发插件加载失败", "plugin_id", name, "error", startErr)
+			slog.Error("开发插件加载失败", "plugin_ref", pluginLogRef(name), "error_code", pluginErrorCode(startErr))
 			continue
 		}
 		m.setInstance(inst)
@@ -195,8 +199,13 @@ func (m *Manager) launchPlugin(ctx context.Context, requestedID string, cmd *exe
 		Cmd:              cmd,
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
 		StartTimeout:     pluginStartTimeout,
-		SyncStdout:       os.Stdout,
-		SyncStderr:       os.Stderr,
+		// 同时关闭子进程原始 stderr、同步标准流和 go-plugin 内部日志转发。
+		// 插件需要的业务诊断应由插件自身写入独立日志目标，避免宿主日志
+		// 泄露请求改写规则、正文或插件身份。
+		Stderr:     io.Discard,
+		SyncStdout: io.Discard,
+		SyncStderr: io.Discard,
+		Logger:     hclog.NewNullLogger(),
 	})
 
 	rpcClient, err := client.Client()
@@ -263,7 +272,7 @@ func (m *Manager) launchPlugin(ctx context.Context, requestedID string, cmd *exe
 
 	inst := &instance{id: id, name: info.Name, info: info, client: client, plugin: plugin, started: start}
 	if start {
-		slog.Info("插件已启动", "plugin_id", id, "type", info.Type, "capabilities", info.Capabilities, "version", info.Version)
+		slog.Info("插件已启动", "plugin_ref", pluginLogRef(id))
 	}
 	return inst, nil
 }
@@ -340,6 +349,38 @@ func hasCapability(info protocol.PluginInfo, capability string) bool {
 	return false
 }
 
+// pluginLogRef 为 Core 日志生成稳定但不暴露插件名称的引用。
+func pluginLogRef(id string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(id)))
+	return fmt.Sprintf("p-%x", sum[:6])
+}
+
+// pluginErrorCode 将跨插件边界的错误压缩为宿主可观测的通用分类，避免插件
+// 返回的业务文案进入 Core 日志。
+func pluginErrorCode(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, context.DeadlineExceeded):
+		return "deadline_exceeded"
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	default:
+		return "plugin_error"
+	}
+}
+
+func sanitizedPluginCallError(message string, err error) error {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		return fmt.Errorf("%s: %w", message, context.DeadlineExceeded)
+	case errors.Is(err, context.Canceled):
+		return fmt.Errorf("%s: %w", message, context.Canceled)
+	default:
+		return errors.New(message)
+	}
+}
+
 // BeforeDispatch 按 priority 升序、ID 升序执行全部 relay_hook.v1 插件。
 // 请求体修改会传给后续插件，路由使用最后一个非空结果；单个插件失败只跳过该实例。
 func (m *Manager) BeforeDispatch(ctx context.Context, request relayhook.Request) (relayhook.Decision, error) {
@@ -365,19 +406,19 @@ func (m *Manager) BeforeDispatch(ctx context.Context, request relayhook.Request)
 			continue
 		}
 		if err != nil {
-			slog.Warn("Relay Hook 插件调用失败，已跳过当前实例", "plugin_id", inst.id, "error", err)
+			slog.Warn("Relay Hook 插件调用失败，已跳过当前实例", "plugin_ref", pluginLogRef(inst.id), "error_code", pluginErrorCode(err))
 			continue
 		}
 		m.clearLastError(inst.id)
 		normalized, err := normalizeRelayDecision(current, decision)
 		if err != nil {
 			err = m.recordFailure(inst, err)
-			slog.Warn("Relay Hook 插件决策无效，已跳过当前实例", "plugin_id", inst.id, "error", err)
+			slog.Warn("Relay Hook 插件决策无效，已跳过当前实例", "plugin_ref", pluginLogRef(inst.id), "error_code", pluginErrorCode(err))
 			continue
 		}
 		if len(normalized.RequestBody) > 0 {
-			current.Body = append(json.RawMessage(nil), normalized.RequestBody...)
-			result.RequestBody = append(json.RawMessage(nil), normalized.RequestBody...)
+			current.Body = normalized.RequestBody
+			result.RequestBody = normalized.RequestBody
 			result.Version = relayhook.VersionV1
 		}
 		if normalized.Route != nil {
@@ -408,7 +449,7 @@ func (m *Manager) callRelayHook(ctx context.Context, inst *instance, request rel
 		Body:   payload,
 	})
 	if callErr != nil {
-		return relayhook.Decision{}, true, m.recordFailure(inst, fmt.Errorf("调用 Relay Hook 插件失败: %w", callErr))
+		return relayhook.Decision{}, true, m.recordFailure(inst, sanitizedPluginCallError("调用 Relay Hook 插件失败", callErr))
 	}
 	if response.StatusCode == http.StatusNoContent || len(response.Body) == 0 {
 		inst.recordSuccess()
@@ -438,24 +479,17 @@ func normalizeRelayDecision(request relayhook.Request, decision relayhook.Decisi
 		if len(decision.RequestBody) > maxHookBodyBytes {
 			return relayhook.Decision{}, fmt.Errorf("relay hook 替换请求体超过 %d 字节限制", maxHookBodyBytes)
 		}
-		var object map[string]json.RawMessage
-		if err := json.Unmarshal(decision.RequestBody, &object); err != nil || object == nil {
+		parsed, err := dto.ParseChatRequest(decision.RequestBody)
+		if err != nil {
 			return relayhook.Decision{}, fmt.Errorf("relay hook 替换请求体不是 JSON 对象")
 		}
-		var model string
-		if err := json.Unmarshal(object["model"], &model); err != nil || model != request.Model {
+		if parsed.Model != request.Model {
 			return relayhook.Decision{}, fmt.Errorf("relay hook 插件不得修改 model")
 		}
-		stream := false
-		if raw, exists := object["stream"]; exists {
-			if err := json.Unmarshal(raw, &stream); err != nil {
-				return relayhook.Decision{}, fmt.Errorf("relay hook 替换请求体的 stream 无效")
-			}
-		}
-		if stream != request.Stream {
+		if parsed.Stream != request.Stream {
 			return relayhook.Decision{}, fmt.Errorf("relay hook 插件不得修改 stream")
 		}
-		result.RequestBody = append(json.RawMessage(nil), decision.RequestBody...)
+		result.RequestBody = decision.RequestBody
 	}
 	if decision.Route != nil {
 		plan, err := relayhook.NormalizeRoutePlan(request.Candidates, decision.Route)
@@ -499,7 +533,7 @@ func (m *Manager) TransformAccountTest(ctx context.Context, request accounttesth
 		if len(normalized.RequestBody) == 0 {
 			continue
 		}
-		current.Body = append(json.RawMessage(nil), normalized.RequestBody...)
+		current.Body = normalized.RequestBody
 		applied = true
 	}
 	if !applied {
@@ -507,7 +541,7 @@ func (m *Manager) TransformAccountTest(ctx context.Context, request accounttesth
 	}
 	return accounttesthook.Decision{
 		Version:     accounttesthook.VersionV1,
-		RequestBody: append(json.RawMessage(nil), current.Body...),
+		RequestBody: current.Body,
 	}, nil
 }
 
@@ -528,21 +562,14 @@ func (m *Manager) callAccountTestTransform(ctx context.Context, inst *instance, 
 		Body:   payload,
 	})
 	if callErr != nil {
-		return accounttesthook.Decision{}, true, m.recordFailure(inst, fmt.Errorf("调用账号测试变换插件 %s 失败: %w", inst.id, callErr))
+		return accounttesthook.Decision{}, true, m.recordFailure(inst, sanitizedPluginCallError("调用账号测试变换插件失败", callErr))
 	}
 	if response.StatusCode == http.StatusNoContent || len(response.Body) == 0 {
 		inst.recordSuccess()
 		return accounttesthook.Decision{}, true, nil
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		message := strings.TrimSpace(string(response.Body))
-		if len(message) > 1024 {
-			message = message[:1024]
-		}
-		if message == "" {
-			message = http.StatusText(response.StatusCode)
-		}
-		return accounttesthook.Decision{}, true, m.recordFailure(inst, fmt.Errorf("账号测试变换插件 %s 返回状态码 %d: %s", inst.id, response.StatusCode, message))
+		return accounttesthook.Decision{}, true, m.recordFailure(inst, fmt.Errorf("账号测试变换插件返回状态码 %d", response.StatusCode))
 	}
 
 	var decision accounttesthook.Decision
@@ -566,42 +593,30 @@ func normalizeAccountTestDecision(request accounttesthook.Request, decision acco
 	if len(decision.RequestBody) > maxHookBodyBytes {
 		return accounttesthook.Decision{}, fmt.Errorf("账号测试变换请求体超过 %d 字节限制", maxHookBodyBytes)
 	}
-	var object map[string]json.RawMessage
-	if err := json.Unmarshal(decision.RequestBody, &object); err != nil || object == nil {
+	replaced, err := dto.ParseChatRequest(decision.RequestBody)
+	if err != nil {
 		return accounttesthook.Decision{}, fmt.Errorf("账号测试变换请求体不是 JSON 对象")
 	}
-	var model string
-	if err := json.Unmarshal(object["model"], &model); err != nil || model != request.Model {
+	if replaced.Model != request.Model {
 		return accounttesthook.Decision{}, fmt.Errorf("账号测试变换插件不得修改 model")
 	}
-	var original map[string]json.RawMessage
-	if err := json.Unmarshal(request.Body, &original); err != nil || original == nil {
+	original, err := dto.ParseChatRequest(request.Body)
+	if err != nil {
 		return accounttesthook.Decision{}, fmt.Errorf("账号测试原始请求体不是 JSON 对象")
 	}
-	var originalStream, replacedStream bool
-	if raw, exists := original["stream"]; exists {
-		if err := json.Unmarshal(raw, &originalStream); err != nil {
-			return accounttesthook.Decision{}, fmt.Errorf("账号测试原始请求体的 stream 无效")
-		}
-	}
-	if raw, exists := object["stream"]; exists {
-		if err := json.Unmarshal(raw, &replacedStream); err != nil {
-			return accounttesthook.Decision{}, fmt.Errorf("账号测试变换请求体的 stream 无效")
-		}
-	}
-	if replacedStream != originalStream {
+	if replaced.Stream != original.Stream {
 		return accounttesthook.Decision{}, fmt.Errorf("账号测试变换插件不得修改 stream")
 	}
 	return accounttesthook.Decision{
 		Version:     accounttesthook.VersionV1,
-		RequestBody: append(json.RawMessage(nil), decision.RequestBody...),
+		RequestBody: decision.RequestBody,
 	}, nil
 }
 
 func (m *Manager) recordFailure(inst *instance, err error) error {
 	m.setLastError(inst.id, err)
 	if inst.recordFailure(time.Now()) {
-		slog.Warn("插件连续失败，已临时熔断并安排自动重启", "plugin_id", inst.id, "duration", circuitOpenDuration.String(), "error", err)
+		slog.Warn("插件连续失败，已临时熔断并安排自动重启", "plugin_ref", pluginLogRef(inst.id), "duration", circuitOpenDuration.String(), "error_code", pluginErrorCode(err))
 		m.scheduleRestart(inst, err)
 	}
 	return err
@@ -632,7 +647,7 @@ func (m *Manager) restartUnhealthyInstance(failed *instance, cause error) {
 		failed.finishRecovery()
 		restartErr := fmt.Errorf("插件自动重启失败: %w", err)
 		m.setLastError(failed.id, restartErr)
-		slog.Error("插件自动重启失败，保留熔断状态等待后续探测", "plugin_id", failed.id, "cause", cause, "error", err)
+		slog.Error("插件自动重启失败，保留熔断状态等待后续探测", "plugin_ref", pluginLogRef(failed.id), "cause_code", pluginErrorCode(cause), "error_code", pluginErrorCode(err))
 		return
 	}
 
@@ -640,7 +655,7 @@ func (m *Manager) restartUnhealthyInstance(failed *instance, cause error) {
 	m.clearLastError(failed.id)
 	failed.finishRecovery()
 	stopPlugin(failed, context.Background())
-	slog.Info("插件已自动重启并恢复运行", "plugin_id", replacement.id, "cause", cause)
+	slog.Info("插件已自动重启并恢复运行", "plugin_ref", pluginLogRef(replacement.id), "cause_code", pluginErrorCode(cause))
 }
 
 func (i *instance) acquireCall(now time.Time) bool {
@@ -717,7 +732,7 @@ func (m *Manager) StopAll(ctx context.Context) {
 	m.mu.Unlock()
 	for _, inst := range instances {
 		stopPlugin(inst, ctx)
-		slog.Info("插件已停止", "plugin_id", inst.id)
+		slog.Info("插件已停止", "plugin_ref", pluginLogRef(inst.id))
 	}
 }
 
@@ -750,11 +765,11 @@ func stopPlugin(inst *instance, parent context.Context) {
 	select {
 	case <-waitDone:
 	case <-stopCtx.Done():
-		slog.Warn("等待插件在途调用结束超时", "plugin_id", inst.id)
+		slog.Warn("等待插件在途调用结束超时", "plugin_ref", pluginLogRef(inst.id))
 	}
 	if inst.started && inst.plugin != nil {
 		if err := inst.plugin.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-			slog.Warn("停止插件失败", "plugin_id", inst.id, "error", err)
+			slog.Warn("停止插件失败", "plugin_ref", pluginLogRef(inst.id), "error_code", pluginErrorCode(err))
 		}
 	}
 	if inst.client != nil {

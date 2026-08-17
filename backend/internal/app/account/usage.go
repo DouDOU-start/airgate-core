@@ -95,8 +95,43 @@ type UsageResetResult struct {
 	Usage        UsageSnapshot `json:"-"`
 }
 
-// RefreshUsage 主动向上游查询用量窗口，写入 account.extra.usage 并返回。
+type usageRefreshResult struct {
+	snapshot UsageSnapshot
+	account  Account
+}
+
+// RefreshUsage 主动向上游查询用量窗口。同一账号的并发调用共享一次上游刷新；
+// 每个调用方仍独立响应自身取消，共享刷新最多运行 initialUsageRefreshTimeout。
 func (s *Service) RefreshUsage(ctx context.Context, id int) (UsageSnapshot, Account, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	resultCh := s.usageRefreshGroup.DoChan(fmt.Sprintf("%d", id), func() (any, error) {
+		sharedCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), initialUsageRefreshTimeout)
+		defer cancel()
+		snapshot, account, err := s.refreshUsage(sharedCtx, id)
+		if err != nil {
+			return nil, err
+		}
+		return usageRefreshResult{snapshot: snapshot, account: account}, nil
+	})
+	select {
+	case <-ctx.Done():
+		return UsageSnapshot{}, Account{}, ctx.Err()
+	case result := <-resultCh:
+		if result.Err != nil {
+			return UsageSnapshot{}, Account{}, result.Err
+		}
+		value, ok := result.Val.(usageRefreshResult)
+		if !ok {
+			return UsageSnapshot{}, Account{}, fmt.Errorf("用量刷新返回了无效结果")
+		}
+		return value.snapshot, value.account, nil
+	}
+}
+
+// refreshUsage 执行单次真实上游刷新，写入 account.extra.usage 并返回。
+func (s *Service) refreshUsage(ctx context.Context, id int) (UsageSnapshot, Account, error) {
 	item, err := s.FindByID(ctx, id, LoadOptions{WithProxy: true})
 	if err != nil {
 		return UsageSnapshot{}, Account{}, err
