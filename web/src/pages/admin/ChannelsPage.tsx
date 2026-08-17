@@ -30,6 +30,7 @@ import { ChannelTestModal } from './channels/ChannelTestModal';
 import { ChannelKeysTable } from './channels/ChannelKeysTable';
 import {
   CredentialProtocolChips, effectiveKeyStatus, HealthStatusChip, KeyMetricsRow, KeyStatusChip, TrafficHealthBadge,
+  uniqueCredentialKeys,
 } from './channels/keyShared';
 import { formatDate, formatDateTime } from '../../shared/utils/format';
 import type {
@@ -769,7 +770,7 @@ export default function ChannelsPage() {
                     <CommonTable.Cell>
                       <div className="flex items-center gap-1.5">
                         <Chip color="default" size="sm" variant="soft">
-                          {t('channels.key_count', { count: row.keys.length })}
+                          {t('channels.key_count', { count: uniqueCredentialKeys(row.keys).length })}
                         </Chip>
                         {failures > 0 ? (
                           <Tooltip>
@@ -823,7 +824,7 @@ export default function ChannelsPage() {
                               </Button>
                             </div>
                           ) : (
-                            row.keys.map((key) => {
+                            uniqueCredentialKeys(row.keys).map((key) => {
                               const th = trafficHealthByKey.get(key.id);
                               return (
                               <KeyRow

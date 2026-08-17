@@ -21,6 +21,23 @@ export function typeLabel(type: string): string {
   return CHANNEL_TYPE_OPTIONS.find((item) => item.id === type)?.label ?? type;
 }
 
+/**
+ * 管理端展示时按物理凭证合并协议端点。
+ *
+ * 同一把 API Key 选择多个协议后，后端仍会为每个协议保留独立端点用于路由，
+ * 因而列表数据里会出现多条拥有同一 credential_id 的记录。展示层只需要一行，
+ * 协议集合由 credential_protocols 在该行的徽章中完整呈现。
+ */
+export function uniqueCredentialKeys(keys: ChannelKeyResp[]): ChannelKeyResp[] {
+  const seen = new Set<number>();
+  return keys.filter((key) => {
+    const credentialID = key.credential_id || key.id;
+    if (seen.has(credentialID)) return false;
+    seen.add(credentialID);
+    return true;
+  });
+}
+
 export function CredentialProtocolChips({ channelKey }: { channelKey: ChannelKeyResp }) {
   const protocols = channelKey.credential_protocols?.length > 0
     ? channelKey.credential_protocols

@@ -11,7 +11,7 @@ import type { ChannelKeyResp, ChannelKeySortBy, SortOrder } from '../../../share
 import type { HealthmonEntity } from '../../../shared/api/healthMonitor';
 import {
   CredentialProtocolChips, effectiveKeyStatus, HealthStatusChip, KeyConfigurationSummary,
-  KeyFinancialSummary, KeyRuntimeSummary, KeyStatusChip, TrafficHealthBadge,
+  KeyFinancialSummary, KeyRuntimeSummary, KeyStatusChip, TrafficHealthBadge, uniqueCredentialKeys,
 } from './keyShared';
 
 const COLUMN_COUNT = 9;
@@ -60,6 +60,9 @@ export function ChannelKeysTable({
   function sortState(field: ChannelKeySortBy): SortOrder | null {
     return sortBy === field ? sortOrder : null;
   }
+
+  // 同一物理凭证的多协议端点在数据层分别保留，密钥视图按凭证合并展示。
+  const displayRows = uniqueCredentialKeys(rows);
 
   return (
     <CommonTable
@@ -115,7 +118,7 @@ export function ChannelKeysTable({
       <CommonTable.Body>
         {isLoading ? (
           <TableLoadingRow colSpan={COLUMN_COUNT} />
-        ) : rows.length === 0 ? (
+        ) : displayRows.length === 0 ? (
           <CommonTable.Row id="empty">
             <CommonTable.Cell colSpan={COLUMN_COUNT}>
               <EmptyState>
@@ -124,7 +127,7 @@ export function ChannelKeysTable({
             </CommonTable.Cell>
           </CommonTable.Row>
         ) : (
-          rows.map((key) => {
+          displayRows.map((key) => {
             const effectiveStatus = effectiveKeyStatus(key);
             return (
             <CommonTable.Row id={String(key.id)} key={key.id}>

@@ -10,7 +10,7 @@ import { useCrudMutation } from '../../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { queryKeys } from '../../../shared/queryKeys';
 import { FETCH_ALL_PARAMS } from '../../../shared/constants';
-import { KeyStatusChip } from '../channels/keyShared';
+import { CredentialProtocolChips, KeyStatusChip, uniqueCredentialKeys } from '../channels/keyShared';
 import type { GroupResp, ChannelKeyResp } from '../../../shared/types';
 
 interface GroupChannelKeysModalProps {
@@ -32,7 +32,11 @@ export function GroupChannelKeysModal({ open, group, onClose }: GroupChannelKeys
     queryFn: () => channelsApi.listKeys({ group_id: group.id, ...FETCH_ALL_PARAMS }),
     enabled: open,
   });
-  const boundKeys = boundData?.list ?? [];
+  // 同一物理凭证的多个协议端点在路由层必须分别保留，弹窗展示时合并为一行。
+  const boundKeys = useMemo(
+    () => uniqueCredentialKeys(boundData?.list ?? []),
+    [boundData?.list],
+  );
 
   const { data: searchData } = useQuery({
     queryKey: queryKeys.channelKeys('group-channel-keys-search', debouncedSearchQuery),
@@ -62,13 +66,17 @@ export function GroupChannelKeysModal({ open, group, onClose }: GroupChannelKeys
     extraQueryKeys: [queryKeys.channelKeys()],
   });
 
-  const existingKeyIds = useMemo(
-    () => new Set(boundKeys.map((row) => row.id)),
+  const existingCredentialIds = useMemo(
+    () => new Set(boundKeys.map((row) => row.credential_id || row.id)),
     [boundKeys],
   );
   const searchResults = useMemo(
-    () => (searchData?.list ?? []).filter((key) => !existingKeyIds.has(key.id)),
-    [existingKeyIds, searchData?.list],
+    () => uniqueCredentialKeys(
+      (searchData?.list ?? []).filter(
+        (key) => !existingCredentialIds.has(key.credential_id || key.id),
+      ),
+    ),
+    [existingCredentialIds, searchData?.list],
   );
   const searchOptions = useMemo(
     () => searchResults.map((key) => ({
@@ -220,6 +228,9 @@ export function GroupChannelKeysModal({ open, group, onClose }: GroupChannelKeys
                           {row.name ? (
                             <div className="truncate text-[11px] text-text-tertiary">{row.channel_name}</div>
                           ) : null}
+                          <div className="mt-1">
+                            <CredentialProtocolChips channelKey={row} />
+                          </div>
                         </div>
                         <KeyStatusChip status={row.status} errorMsg={row.error_msg} />
                         <Button
