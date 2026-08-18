@@ -1041,6 +1041,24 @@ func applyXAIIdentityClaims(creds map[string]string, idToken string) {
 func (s *Service) finishOAuthWithCredentials(ctx context.Context, entry *oauthSessionEntry, creds map[string]string) error {
 	public := entry.snapshot()
 	if strings.EqualFold(strings.TrimSpace(public.Platform), "antigravity") {
+		preparer, ok := s.oauthRefresher.(OAuthCredentialPreparer)
+		if !ok || preparer == nil {
+			return fmt.Errorf("antigravity CPA 授权准备器不可用")
+		}
+		prepared, err := preparer.PrepareOAuthCredentials(
+			ctx,
+			"antigravity",
+			TypeOAuth,
+			creds,
+			entry.input.ProxyURL,
+		)
+		if err != nil {
+			return fmt.Errorf("antigravity CPA 授权准备失败: %w", err)
+		}
+		if strings.TrimSpace(prepared["project_id"]) == "" {
+			return fmt.Errorf("antigravity CPA 授权准备后缺少 project_id")
+		}
+		creds = prepared
 		_ = enrichAntigravitySubscriptionCredentials(ctx, creds, entry.input.ProxyURL)
 	}
 	var account Account

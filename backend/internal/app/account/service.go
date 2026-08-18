@@ -80,6 +80,18 @@ type OAuthCredentialImporter interface {
 	) (map[string]string, error)
 }
 
+// OAuthCredentialPreparer 复用 CPA executor 在交互式 OAuth 落库前补全平台必需凭证。
+// 与 RT 导入分开定义，避免刚换取 authorization code 后再次强制刷新 token。
+type OAuthCredentialPreparer interface {
+	PrepareOAuthCredentials(
+		ctx context.Context,
+		platform string,
+		accountType string,
+		credentials map[string]string,
+		proxyURL string,
+	) (map[string]string, error)
+}
+
 // Service 提供账号域用例编排。
 // 加解密在 service；store 只存/取 credentials_enc + email。
 type Service struct {

@@ -40,6 +40,36 @@ func TestImportOAuthCredentials刷新并补全项目ID(t *testing.T) {
 	}
 }
 
+func TestPrepareOAuthCredentials复用访问令牌补全项目ID(t *testing.T) {
+	manager := coreauth.NewManager(&memoryAuthStore{}, nil, nil)
+	executor := &oauthImportExecutorStub{}
+	manager.RegisterExecutor(executor)
+	bridge := &Bridge{manager: manager}
+
+	credentials, err := bridge.PrepareOAuthCredentials(
+		context.Background(),
+		"antigravity",
+		"oauth",
+		map[string]string{
+			"access_token":  "刚换取的访问令牌",
+			"refresh_token": "刚换取的刷新令牌",
+			"expired":       "2099-01-01T00:00:00Z",
+		},
+		"http://127.0.0.1:7890",
+	)
+	if err != nil {
+		t.Fatalf("PrepareOAuthCredentials() 错误: %v", err)
+	}
+	if executor.refreshCalls != 0 || executor.prepareCalls != 1 {
+		t.Fatalf("授权准备调用次数不正确: refresh=%d prepare=%d", executor.refreshCalls, executor.prepareCalls)
+	}
+	if credentials["access_token"] != "刚换取的访问令牌" ||
+		credentials["refresh_token"] != "刚换取的刷新令牌" ||
+		credentials["project_id"] != "自动发现的项目" {
+		t.Fatalf("授权准备结果不完整: %#v", credentials)
+	}
+}
+
 func TestEnsureExecutor不回退到其他平台(t *testing.T) {
 	manager := coreauth.NewManager(&memoryAuthStore{}, nil, nil)
 	manager.RegisterExecutor(&oauthImportExecutorStub{provider: "gemini"})

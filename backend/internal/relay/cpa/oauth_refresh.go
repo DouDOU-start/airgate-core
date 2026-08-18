@@ -28,6 +28,43 @@ type requestAuthPreparer interface {
 	PrepareRequestAuth(ctx context.Context, auth *coreauth.Auth) (*coreauth.Auth, error)
 }
 
+// PrepareOAuthCredentials 使用 CPA executor 补全交互式 OAuth 已换取的凭证。
+// 与 RT 导入不同，这里优先复用现有 access_token，仅在 executor 判定有需要时自行刷新。
+func (b *Bridge) PrepareOAuthCredentials(
+	ctx context.Context,
+	platform string,
+	accountType string,
+	credentials map[string]string,
+	proxyURL string,
+) (map[string]string, error) {
+	auth, err := mapAuthWithID(AccountAuthInput{
+		Name:        "OAuth 授权准备",
+		Platform:    platform,
+		Type:        accountType,
+		Credentials: credentials,
+		ProxyURL:    proxyURL,
+	}, "airgate-prepare-"+uuid.NewString())
+	if err != nil {
+		return nil, err
+	}
+	defer b.refreshLocks.Delete(auth.ID)
+	defer b.refreshedAuths.Delete(auth.ID)
+
+	executor, err := b.EnsureExecutor(auth.Provider)
+	if err != nil {
+		return nil, err
+	}
+	prepared, err := prepareRequestAuth(ctx, executor, auth)
+	if err != nil {
+		return nil, err
+	}
+	result := CredentialsFromAuth(prepared)
+	if strings.TrimSpace(result["access_token"]) == "" {
+		return nil, fmt.Errorf("OAuth 授权准备后缺少 access_token")
+	}
+	return result, nil
+}
+
 // ImportOAuthCredentials 在账号落库前使用临时 Auth 完成 RT 换票。
 // Antigravity executor 还会通过 PrepareRequestAuth 自动发现并校验 project_id。
 func (b *Bridge) ImportOAuthCredentials(
@@ -61,20 +98,34 @@ func (b *Bridge) ImportOAuthCredentials(
 	if err != nil {
 		return nil, err
 	}
-	if preparer, ok := executor.(requestAuthPreparer); ok && preparer.ShouldPrepareRequestAuth(refreshed) {
-		prepared, prepareErr := preparer.PrepareRequestAuth(ctx, refreshed.Clone())
-		if prepareErr != nil {
-			return nil, prepareErr
-		}
-		if prepared != nil {
-			refreshed = prepared
-		}
+	refreshed, err = prepareRequestAuth(ctx, executor, refreshed)
+	if err != nil {
+		return nil, err
 	}
 	result := CredentialsFromAuth(refreshed)
 	if strings.TrimSpace(result["access_token"]) == "" {
 		return nil, fmt.Errorf("OAuth 换票后缺少 access_token")
 	}
 	return result, nil
+}
+
+func prepareRequestAuth(
+	ctx context.Context,
+	executor coreauth.ProviderExecutor,
+	auth *coreauth.Auth,
+) (*coreauth.Auth, error) {
+	preparer, ok := executor.(requestAuthPreparer)
+	if !ok || !preparer.ShouldPrepareRequestAuth(auth) {
+		return auth, nil
+	}
+	prepared, err := preparer.PrepareRequestAuth(ctx, auth.Clone())
+	if err != nil {
+		return nil, err
+	}
+	if prepared == nil {
+		return auth, nil
+	}
+	return prepared, nil
 }
 
 // RefreshAccountCredentials 强制刷新一个指定账号的 OAuth 凭证。
