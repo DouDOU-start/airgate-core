@@ -35,6 +35,92 @@ func TestXAIImageEndpointsUseOpenAIImageFormat(t *testing.T) {
 	}
 }
 
+func TestAntigravity标准37模型仅在上游转换为Tiered(t *testing.T) {
+	tests := []struct {
+		name           string
+		provider       string
+		requestedModel string
+		upstreamModel  string
+		wantUpstream   string
+	}{
+		{
+			name:           "默认映射",
+			provider:       "antigravity",
+			requestedModel: "gemini-3.7-flash-high",
+			upstreamModel:  "gemini-3.7-flash-high",
+			wantUpstream:   "gemini-3.7-flash-tiered",
+		},
+		{
+			name:           "显式账号映射优先",
+			provider:       "antigravity",
+			requestedModel: "gemini-3.7-flash-high",
+			upstreamModel:  "自定义上游模型",
+			wantUpstream:   "自定义上游模型",
+		},
+		{
+			name:           "其他供应商不转换",
+			provider:       "gemini",
+			requestedModel: "gemini-3.7-flash-high",
+			upstreamModel:  "gemini-3.7-flash-high",
+			wantUpstream:   "gemini-3.7-flash-high",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolveProviderUpstreamModel(tt.provider, tt.requestedModel, tt.upstreamModel); got != tt.wantUpstream {
+				t.Fatalf("上游模型 = %q，期望 %q", got, tt.wantUpstream)
+			}
+		})
+	}
+}
+
+func TestAntigravity标准37非流式响应回写对外模型(t *testing.T) {
+	rewrite := newResponseModelRewrite("gemini-3.7-flash-high", "gemini-3.7-flash-tiered")
+	payload := []byte(`{"model":"gemini-3.7-flash-tiered","response":{"model":"gemini-3.7-flash-tiered"},"choices":[{"message":{"content":"正文 gemini-3.7-flash-tiered 不应被替换"}}]}`)
+	rewritten := string(rewriteResponseModelPayload(payload, rewrite))
+	if strings.Count(rewritten, `"model":"gemini-3.7-flash-high"`) != 2 {
+		t.Fatalf("响应 model 字段未完整回写: %s", rewritten)
+	}
+	if !strings.Contains(rewritten, "正文 gemini-3.7-flash-tiered 不应被替换") {
+		t.Fatalf("普通正文不应被模型回写修改: %s", rewritten)
+	}
+}
+
+func Test响应模型回写仅限Antigravity标准37映射(t *testing.T) {
+	if rewrite := providerResponseModelRewrite("antigravity", "gemini-3.7-flash-high", "gemini-3.7-flash-tiered"); rewrite.from == "" {
+		t.Fatal("Antigravity 3.7 内部映射应启用响应回写")
+	}
+	for _, rewrite := range []responseModelRewrite{
+		providerResponseModelRewrite("gemini", "gemini-3.7-flash-high", "gemini-3.7-flash-tiered"),
+		providerResponseModelRewrite("antigravity", "其他模型", "内部模型"),
+	} {
+		if rewrite.from != "" || rewrite.to != "" {
+			t.Fatalf("非目标映射不应启用响应回写: %+v", rewrite)
+		}
+	}
+}
+
+func TestAntigravity标准37流式响应回写对外模型(t *testing.T) {
+	c, recorder := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`{"id":"chat-1","model":"gemini-3.7-flash-tiered","choices":[{"delta":{"content":"hi"}}]}`)}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`[DONE]`)}
+	close(chunks)
+
+	rewrite := newResponseModelRewrite("gemini-3.7-flash-high", "gemini-3.7-flash-tiered")
+	result := (&Bridge{}).relayStreamSinceWithModelRewrite(
+		context.Background(), c, &cliproxyexecutor.StreamResult{Chunks: chunks},
+		time.Now(), time.Time{}, adaptor.EndpointChatCompletions, rewrite,
+	)
+	body := recorder.Body.String()
+	if !result.Done || !strings.Contains(body, `"model":"gemini-3.7-flash-high"`) {
+		t.Fatalf("流式响应未回写标准模型: result=%+v body=%s", result, body)
+	}
+	if strings.Contains(body, `"model":"gemini-3.7-flash-tiered"`) {
+		t.Fatalf("流式响应泄漏上游内部模型: %s", body)
+	}
+}
+
 func TestRefreshableAuthFailure识别认证型403(t *testing.T) {
 	if !IsRefreshableAuthFailure("xai", http.StatusForbidden, `{"code":"unauthenticated:bad-credentials","error":"The OAuth2 access token expired"}`) {
 		t.Fatal("xAI bad-credentials 403 应触发刷新")
@@ -268,6 +354,37 @@ func TestRelayStreamRecognizesChatFinishReasonTerminal(t *testing.T) {
 	}
 	if result.StreamErr != nil {
 		t.Fatalf("Chat Completions 显式终态不应产生流错误：%v", result.StreamErr)
+	}
+}
+
+func TestRelayStreamFramesRawChatCompletionsChunks(t *testing.T) {
+	c, recorder := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
+	content := `{"id":"chatcmpl-1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"你好"},"finish_reason":null}]}`
+	terminal := `{"id":"chatcmpl-1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":3,"total_tokens":15}}`
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(content)}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(terminal)}
+	close(chunks)
+
+	result := (&Bridge{}).relayStream(context.Background(), c,
+		&cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), adaptor.EndpointChatCompletions)
+
+	want := "data: " + content + "\n\ndata: " + terminal + "\n\n"
+	if got := recorder.Body.String(); got != want {
+		t.Fatalf("CPA 裸 JSON 应恢复为标准 SSE 帧，实际：%q，期望：%q", got, want)
+	}
+	if !result.Written || !result.Done || result.StreamErr != nil {
+		t.Fatalf("带 finish_reason 的裸 JSON 末帧应正常完成：%+v", result)
+	}
+	if result.Usage == nil || result.Usage.PromptTokens != 12 || result.Usage.CompletionTokens != 3 {
+		t.Fatalf("裸 JSON 末帧 usage 解析错误：%+v", result.Usage)
+	}
+}
+
+func TestFrameChatCompletionsPayloadPreservesExistingSSE(t *testing.T) {
+	payload := []byte("event: message\ndata: {\"choices\":[]}\n\n")
+	if got := frameChatCompletionsPayload(payload); string(got) != string(payload) {
+		t.Fatalf("已有 SSE 帧不应重复包装，实际：%q", got)
 	}
 }
 

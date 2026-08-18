@@ -222,7 +222,7 @@ func TestAntigravity未指定模型时从CPA目录选择默认模型(t *testing.
 	}
 }
 
-func TestAntigravity测试模型过滤Tiered并保留标准37模型(t *testing.T) {
+func TestAntigravity测试模型忽略路由白名单并保留标准37模型(t *testing.T) {
 	repo := &antigravityTestRepo{item: Account{
 		ID:       26,
 		Platform: "antigravity",
@@ -238,8 +238,15 @@ func TestAntigravity测试模型过滤Tiered并保留标准37模型(t *testing.T
 	if err != nil {
 		t.Fatalf("查询 Antigravity 测试模型失败: %v", err)
 	}
-	if len(models) != 1 || models[0].ID != "gemini-3.7-flash-high" {
-		t.Fatalf("测试模型未按 CPA 规范过滤: %+v", models)
+	seen := make(map[string]bool, len(models))
+	for _, model := range models {
+		seen[model.ID] = true
+	}
+	if !seen["gemini-3.7-flash-high"] {
+		t.Fatalf("路由白名单不应隐藏 CPA 标准 3.7 模型: %+v", models)
+	}
+	if seen["gemini-3.7-flash-tiered"] {
+		t.Fatalf("tiered 不应出现在 Antigravity 测试模型中: %+v", models)
 	}
 }
 

@@ -108,8 +108,9 @@ var xaiMediaTestModels = []TestModel{
 // AvailableTestModels 返回账号可测模型列表。
 //
 // 来源优先级：
-//  1. 账号 extra.models（若配置了白名单，优先；Antigravity 仅接受 CPA 标准 ID）
-//  2. 否则使用 cpa 嵌入的 models.json
+//  1. Antigravity 始终使用 cpa 嵌入的 models.json，账号路由白名单不限制连通性测试
+//  2. 其他平台优先使用账号 extra.models 白名单
+//  3. 未配置白名单时使用 cpa 嵌入的 models.json
 //     · Codex 按 credentials.plan_type / extra.plan_type 分 free/plus/team/pro 档
 func (s *Service) AvailableTestModels(ctx context.Context, id int) ([]TestModel, error) {
 	item, err := s.FindByID(ctx, id, LoadOptions{})
@@ -118,12 +119,10 @@ func (s *Service) AvailableTestModels(ctx context.Context, id int) ([]TestModel,
 	}
 	plan := resolvePlanType(item)
 	allowedIDs := modelsFromAccountExtra(item.Extra)
+	isAntigravity := cpa.ResolveProvider(item.Platform) == "antigravity"
 
-	// 白名单：仅 ID 列表，展示名尽量从 CPA 目录补
-	if len(allowedIDs) > 0 {
-		if cpa.ResolveProvider(item.Platform) == "antigravity" {
-			allowedIDs = canonicalAntigravityTestModelIDs(item.Platform, plan, allowedIDs)
-		}
+	// extra.models 是路由白名单，不代表 Antigravity 账号的实时能力，不能据此裁剪测试模型。
+	if len(allowedIDs) > 0 && !isAntigravity {
 		out := make([]TestModel, 0, len(allowedIDs))
 		for _, mid := range allowedIDs {
 			mid = strings.TrimSpace(mid)
@@ -181,23 +180,6 @@ func canonicalAntigravityModelID(platform, plan, modelID string) (string, bool) 
 		}
 	}
 	return "", false
-}
-
-func canonicalAntigravityTestModelIDs(platform, plan string, modelIDs []string) []string {
-	seen := make(map[string]struct{}, len(modelIDs))
-	out := make([]string, 0, len(modelIDs))
-	for _, modelID := range modelIDs {
-		canonical, ok := canonicalAntigravityModelID(platform, plan, modelID)
-		if !ok {
-			continue
-		}
-		if _, ok := seen[canonical]; ok {
-			continue
-		}
-		seen[canonical] = struct{}{}
-		out = append(out, canonical)
-	}
-	return out
 }
 
 func buildAccountTestModel(platform, plan, modelID, displayName string) TestModel {

@@ -22,7 +22,11 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/streamlife"
 )
 
-const cpaPreContentBufferLimit = 1 << 20
+const (
+	cpaPreContentBufferLimit       = 1 << 20
+	antigravityGemini37FlashPublic = "gemini-3.7-flash-high"
+	antigravityGemini37FlashTiered = "gemini-3.7-flash-tiered"
+)
 
 // ForwardRequest 一次账号路径转发请求。
 type ForwardRequest struct {
@@ -114,6 +118,8 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 	if upstreamModel == "" {
 		upstreamModel = req.Model
 	}
+	upstreamModel = resolveProviderUpstreamModel(auth.Provider, req.Model, upstreamModel)
+	modelRewrite := providerResponseModelRewrite(auth.Provider, req.Model, upstreamModel)
 	sourceFmt := sourceFormatFor(req.Endpoint, req.EntryProtocol)
 	execReq := cliproxyexecutor.Request{
 		Model:   upstreamModel,
@@ -132,12 +138,148 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 	}
 
 	if isCountTokensEndpoint(req.Endpoint) {
-		return withRefreshedCredentials(b.doCount(ctx, ex, auth, execReq, opts), proactiveCredentials)
+		result := b.doCount(ctx, ex, auth, execReq, opts)
+		return withRefreshedCredentials(rewriteForwardResultModel(result, modelRewrite), proactiveCredentials)
 	}
 	if req.Stream {
-		return withRefreshedCredentials(b.doStream(ctx, c, ex, auth, execReq, opts, req.Endpoint, req.RequestStartedAt), proactiveCredentials)
+		return withRefreshedCredentials(b.doStream(ctx, c, ex, auth, execReq, opts, req.Endpoint, req.RequestStartedAt, modelRewrite), proactiveCredentials)
 	}
-	return withRefreshedCredentials(b.doNonStream(ctx, ex, auth, execReq, opts), proactiveCredentials)
+	result := b.doNonStream(ctx, ex, auth, execReq, opts)
+	return withRefreshedCredentials(rewriteForwardResultModel(result, modelRewrite), proactiveCredentials)
+}
+
+// resolveProviderUpstreamModel 只处理供应商内部模型名，Model 仍保留对外标准 ID。
+// Antigravity 实时目录把 Gemini 3.7 Flash 暴露为 tiered，但 CPA 静态目录、
+// 模型广场和计费统一使用 high；因此仅在最终上游请求处转换。
+func resolveProviderUpstreamModel(provider, requestedModel, upstreamModel string) string {
+	if strings.EqualFold(strings.TrimSpace(provider), "antigravity") &&
+		strings.EqualFold(strings.TrimSpace(requestedModel), antigravityGemini37FlashPublic) &&
+		strings.EqualFold(strings.TrimSpace(upstreamModel), antigravityGemini37FlashPublic) {
+		return antigravityGemini37FlashTiered
+	}
+	return upstreamModel
+}
+
+type responseModelRewrite struct {
+	from string
+	to   string
+}
+
+func newResponseModelRewrite(requestedModel, upstreamModel string) responseModelRewrite {
+	requestedModel = strings.TrimSpace(requestedModel)
+	upstreamModel = strings.TrimSpace(upstreamModel)
+	if requestedModel == "" || upstreamModel == "" || strings.EqualFold(requestedModel, upstreamModel) {
+		return responseModelRewrite{}
+	}
+	return responseModelRewrite{from: upstreamModel, to: requestedModel}
+}
+
+func providerResponseModelRewrite(provider, requestedModel, upstreamModel string) responseModelRewrite {
+	if strings.EqualFold(strings.TrimSpace(provider), "antigravity") &&
+		strings.EqualFold(strings.TrimSpace(requestedModel), antigravityGemini37FlashPublic) &&
+		strings.EqualFold(strings.TrimSpace(upstreamModel), antigravityGemini37FlashTiered) {
+		return newResponseModelRewrite(requestedModel, upstreamModel)
+	}
+	return responseModelRewrite{}
+}
+
+func rewriteForwardResultModel(result ForwardResult, rewrite responseModelRewrite) ForwardResult {
+	if len(result.Body) > 0 {
+		result.Body = rewriteResponseModelPayload(result.Body, rewrite)
+	}
+	return result
+}
+
+// rewriteResponseModelPayload 仅回写 JSON 中名为 model 的字段，不替换正文里的普通文本。
+// 同时兼容非流式 JSON、裸流式 JSON 和 SSE data 行。
+func rewriteResponseModelPayload(payload []byte, rewrite responseModelRewrite) []byte {
+	if rewrite.from == "" || rewrite.to == "" || !bytes.Contains(payload, []byte(rewrite.from)) {
+		return payload
+	}
+	trimmed := bytes.TrimSpace(payload)
+	if json.Valid(trimmed) {
+		if rewritten, ok := rewriteJSONModelFields(trimmed, rewrite); ok {
+			return rewritten
+		}
+		return payload
+	}
+
+	lines := bytes.SplitAfter(payload, []byte("\n"))
+	changed := false
+	for i, line := range lines {
+		lineEnding := []byte{}
+		content := line
+		if bytes.HasSuffix(content, []byte("\n")) {
+			lineEnding = []byte("\n")
+			content = content[:len(content)-1]
+		}
+		if bytes.HasSuffix(content, []byte("\r")) {
+			lineEnding = []byte("\r\n")
+			content = content[:len(content)-1]
+		}
+		trimmedLine := bytes.TrimSpace(content)
+		if !bytes.HasPrefix(trimmedLine, []byte("data:")) {
+			continue
+		}
+		data := bytes.TrimSpace(trimmedLine[len("data:"):])
+		if !json.Valid(data) {
+			continue
+		}
+		rewritten, ok := rewriteJSONModelFields(data, rewrite)
+		if !ok {
+			continue
+		}
+		prefixLen := bytes.Index(content, []byte("data:")) + len("data:")
+		prefix := content[:prefixLen]
+		spacing := content[prefixLen:]
+		spacing = spacing[:len(spacing)-len(bytes.TrimLeft(spacing, " \t"))]
+		lines[i] = bytes.Join([][]byte{prefix, spacing, rewritten, lineEnding}, nil)
+		changed = true
+	}
+	if !changed {
+		return payload
+	}
+	return bytes.Join(lines, nil)
+}
+
+func rewriteJSONModelFields(payload []byte, rewrite responseModelRewrite) ([]byte, bool) {
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err != nil || !rewriteModelFields(value, rewrite) {
+		return payload, false
+	}
+	rewritten, err := json.Marshal(value)
+	if err != nil {
+		return payload, false
+	}
+	return rewritten, true
+}
+
+func rewriteModelFields(value any, rewrite responseModelRewrite) bool {
+	changed := false
+	switch current := value.(type) {
+	case map[string]any:
+		for key, child := range current {
+			if key == "model" {
+				if model, ok := child.(string); ok && strings.EqualFold(strings.TrimSpace(model), rewrite.from) {
+					current[key] = rewrite.to
+					changed = true
+					continue
+				}
+			}
+			if rewriteModelFields(child, rewrite) {
+				changed = true
+			}
+		}
+	case []any:
+		for _, child := range current {
+			if rewriteModelFields(child, rewrite) {
+				changed = true
+			}
+		}
+	}
+	return changed
 }
 
 // ForwardNonStream executes an account request without an HTTP response writer.
@@ -210,6 +352,7 @@ func (b *Bridge) doStream(
 	opts cliproxyexecutor.Options,
 	endpoint string,
 	requestStartedAt time.Time,
+	modelRewrite responseModelRewrite,
 ) ForwardResult {
 	opts.Stream = true
 	start := time.Now()
@@ -227,7 +370,7 @@ func (b *Bridge) doStream(
 				bootstrapMs = time.Since(start).Milliseconds()
 				if err == nil {
 					markStreamStarted()
-					result := b.relayStreamSince(upstreamCtx, c, stream, start, requestStartedAt, endpoint)
+					result := b.relayStreamSinceWithModelRewrite(upstreamCtx, c, stream, start, requestStartedAt, endpoint, modelRewrite)
 					result.ExecutorBootstrapMs = bootstrapMs
 					result.RefreshedCredentials = CredentialsFromAuth(auth)
 					return result
@@ -241,7 +384,7 @@ func (b *Bridge) doStream(
 	// ExecuteStream 成功表示已建立上游响应流；此后客户端断开不再取消上游，
 	// relayStream 会停止向客户端写入，但继续读取到完成事件以捕获 usage。
 	markStreamStarted()
-	result := b.relayStreamSince(upstreamCtx, c, stream, start, requestStartedAt, endpoint)
+	result := b.relayStreamSinceWithModelRewrite(upstreamCtx, c, stream, start, requestStartedAt, endpoint, modelRewrite)
 	result.ExecutorBootstrapMs = bootstrapMs
 	// 部分 executor 在 goroutine 启动后才从首个 chunk 返回上游认证错误。
 	// 尚未向客户端写出内容时仍可安全刷新并重试一次。
@@ -252,7 +395,7 @@ func (b *Bridge) doStream(
 			stream, err = ex.ExecuteStream(upstreamCtx, auth, execReq, opts)
 			if err == nil {
 				bootstrapMs = time.Since(start).Milliseconds()
-				result = b.relayStreamSince(upstreamCtx, c, stream, time.Now(), requestStartedAt, endpoint)
+				result = b.relayStreamSinceWithModelRewrite(upstreamCtx, c, stream, time.Now(), requestStartedAt, endpoint, modelRewrite)
 				result.ExecutorBootstrapMs = bootstrapMs
 				result.RefreshedCredentials = CredentialsFromAuth(auth)
 				return result
@@ -280,6 +423,18 @@ func (b *Bridge) relayStreamSince(
 	start time.Time,
 	requestStartedAt time.Time,
 	endpoint string,
+) ForwardResult {
+	return b.relayStreamSinceWithModelRewrite(ctx, c, stream, start, requestStartedAt, endpoint, responseModelRewrite{})
+}
+
+func (b *Bridge) relayStreamSinceWithModelRewrite(
+	ctx context.Context,
+	c *gin.Context,
+	stream *cliproxyexecutor.StreamResult,
+	start time.Time,
+	requestStartedAt time.Time,
+	endpoint string,
+	modelRewrite responseModelRewrite,
 ) ForwardResult {
 	if stream == nil {
 		return ForwardResult{NetErr: fmt.Errorf("CPA 返回空流")}
@@ -366,6 +521,7 @@ func (b *Bridge) relayStreamSince(
 		}
 	}
 	processPayload := func(payload []byte, ensureLineEnding bool) (stop bool) {
+		payload = rewriteResponseModelPayload(payload, modelRewrite)
 		// 旁路解析 usage / 完成标志。Responses 在分帧后解析，可处理跨 chunk JSON。
 		scanStreamPayload(payload, extractUsage, &usage, &done)
 		if event, ok := streamerr.Detect(payload); ok {
@@ -438,6 +594,9 @@ func (b *Bridge) relayStreamSince(
 			if len(payload) == 0 {
 				continue
 			}
+			if endpoint == adaptor.EndpointChatCompletions {
+				payload = frameChatCompletionsPayload(payload)
+			}
 			if responsesFramer != nil {
 				for _, frame := range responsesFramer.WriteChunk(payload) {
 					if processPayload(frame, false) {
@@ -476,6 +635,46 @@ finish:
 	result.StreamErr = streamErr
 	result.Done = done
 	return result
+}
+
+// frameChatCompletionsPayload 把 CPA 翻译器产出的裸 Chat Completions JSON
+// 恢复为标准 SSE data 帧。Codex executor 在响应格式为 openai 时返回裸 JSON，
+// 若直接写出，不仅客户端无法按 SSE 解析，完成标志与 usage 的旁路扫描也会失效。
+// 已经带 SSE 字段的 payload 保持原样，避免重复添加 data 前缀。
+func frameChatCompletionsPayload(payload []byte) []byte {
+	trimmed := bytes.TrimSpace(payload)
+	if len(trimmed) == 0 || hasSSEField(trimmed) {
+		return payload
+	}
+	if !bytes.Equal(trimmed, []byte("[DONE]")) && !json.Valid(trimmed) {
+		return payload
+	}
+	framed := make([]byte, 0, len(trimmed)+len("data: \n\n"))
+	framed = append(framed, "data: "...)
+	framed = append(framed, trimmed...)
+	framed = append(framed, '\n', '\n')
+	return framed
+}
+
+func hasSSEField(payload []byte) bool {
+	for len(payload) > 0 {
+		line := payload
+		if i := bytes.IndexByte(payload, '\n'); i >= 0 {
+			line = payload[:i]
+			payload = payload[i+1:]
+		} else {
+			payload = nil
+		}
+		line = bytes.TrimSpace(line)
+		for _, prefix := range [][]byte{
+			[]byte("data:"), []byte("event:"), []byte("id:"), []byte("retry:"), []byte(":"),
+		} {
+			if bytes.HasPrefix(line, prefix) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func writeStreamHeaders(w gin.ResponseWriter, headers http.Header) {
