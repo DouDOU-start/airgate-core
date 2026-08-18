@@ -164,16 +164,18 @@ func TestAntigravity可测模型优先使用账号实时目录(t *testing.T) {
 	if err != nil {
 		t.Fatalf("查询 Antigravity 实时模型失败: %v", err)
 	}
-	if len(models) != 2 {
+	if len(models) != 3 {
 		t.Fatalf("实时模型数量 = %d，模型: %+v", len(models), models)
 	}
+	seen := make(map[string]bool, len(models))
 	for _, model := range models {
-		if model.ID == "gemini-3.7-flash-high" {
-			t.Fatalf("账号未开放的 3.7 模型不应出现在测试列表: %+v", models)
-		}
+		seen[model.ID] = true
 		if model.ID == "chat_20706" {
 			t.Fatalf("Antigravity 内部模型不应出现在测试列表: %+v", models)
 		}
+	}
+	if !seen["gemini-3.7-flash-high"] {
+		t.Fatalf("CPA 标准 3.7 模型应保留在测试列表: %+v", models)
 	}
 }
 

@@ -115,7 +115,8 @@ var xaiMediaTestModels = []TestModel{
 //
 // 来源优先级：
 //  1. 账号 extra.models（若配置了白名单，优先）
-//  2. Antigravity OAuth 账号实时读取 fetchAvailableModels，并与白名单取交集
+//  2. Antigravity OAuth 账号实时读取 fetchAvailableModels，过滤未知/内部模型
+//     · CPA 标准 Gemini 3.7 Flash 保留规范兜底入口，避免上游目录漏报导致无法选择
 //  3. 其他平台或实时查询失败时使用 cpa 嵌入的 models.json
 //     · Codex 按 credentials.plan_type / extra.plan_type 分 free/plus/team/pro 档
 func (s *Service) AvailableTestModels(ctx context.Context, id int) ([]TestModel, error) {
@@ -335,8 +336,28 @@ func canonicalAntigravityTestModelIDs(platform, plan string, modelIDs []string) 
 func buildAntigravityTestModels(platform, plan string, liveModels []antigravityAvailableModel, allowedIDs []string) []TestModel {
 	canonical := canonicalAntigravityAvailableModels(platform, plan, liveModels, allowedIDs)
 	out := make([]TestModel, 0, len(canonical))
+	seen := make(map[string]struct{}, len(canonical))
 	for _, model := range canonical {
 		out = append(out, buildAccountTestModel(platform, plan, model.ID, model.DisplayName))
+		seen[strings.ToLower(model.ID)] = struct{}{}
+	}
+
+	// Antigravity 的实时目录偶尔漏报标准 3.7，但 CPA 仍以 high 作为唯一规范模型 ID。
+	// 只补这一条规范入口，不把配额组名称或其他未知 ID 映射成模型。
+	const gemini37FlashHigh = "gemini-3.7-flash-high"
+	if _, ok := seen[gemini37FlashHigh]; !ok {
+		allowed := len(allowedIDs) == 0
+		for _, id := range allowedIDs {
+			if strings.EqualFold(strings.TrimSpace(id), gemini37FlashHigh) {
+				allowed = true
+				break
+			}
+		}
+		if allowed {
+			if canonicalID, ok := canonicalAntigravityModelID(platform, plan, gemini37FlashHigh); ok {
+				out = append(out, buildAccountTestModel(platform, plan, canonicalID, cpa.LookupModelDisplayName(platform, plan, canonicalID)))
+			}
+		}
 	}
 	return out
 }
