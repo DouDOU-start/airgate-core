@@ -15,6 +15,7 @@ import (
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
 
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
+	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 )
 
 func TestXAIVideoEndpointsUseOpenAIVideoFormat(t *testing.T) {
@@ -127,7 +128,7 @@ func TestAntigravity标准37流式响应回写对外模型(t *testing.T) {
 	rewrite := newResponseModelRewrite("gemini-3.7-flash-high", "gemini-3.7-flash-tiered")
 	result := (&Bridge{}).relayStreamSinceWithModelRewrite(
 		context.Background(), c, &cliproxyexecutor.StreamResult{Chunks: chunks},
-		time.Now(), time.Time{}, adaptor.EndpointChatCompletions, rewrite,
+		time.Now(), time.Time{}, adaptor.EndpointChatCompletions, "antigravity", rewrite,
 	)
 	body := recorder.Body.String()
 	if !result.Done || !strings.Contains(body, `"model":"gemini-3.7-flash-high"`) {
@@ -178,6 +179,7 @@ func TestDoNonStream在认证型403后刷新重试(t *testing.T) {
 		auth,
 		cliproxyexecutor.Request{Model: "grok"},
 		cliproxyexecutor.Options{},
+		adaptor.EndpointChatCompletions,
 	)
 	if result.StatusCode != http.StatusOK || executor.executeCalls != 2 || executor.refreshCalls != 1 {
 		t.Fatalf("刷新重试结果不符合预期：result=%+v execute=%d refresh=%d", result, executor.executeCalls, executor.refreshCalls)
@@ -190,14 +192,167 @@ func TestDoNonStream在认证型403后刷新重试(t *testing.T) {
 func TestNonStreamOK修正残留的SSE内容类型(t *testing.T) {
 	result := nonStreamOK(cliproxyexecutor.Response{
 		Headers: http.Header{"Content-Type": []string{"text/event-stream; charset=utf-8"}},
-		Payload: []byte(`{"id":"msg-1","type":"message","usage":{"input_tokens":12,"output_tokens":3}}`),
-	})
+		Payload: []byte(`{"id":"msg-1","type":"message","usage":{"input_tokens":12,"output_tokens":3,"cache_read_input_tokens":22000}}`),
+	}, usageExtractorFor("xai", adaptor.EndpointMessages, false))
 
 	if result.ContentType != "application/json" {
 		t.Fatalf("非流式 JSON 内容类型 = %q，期望 application/json", result.ContentType)
 	}
-	if result.Usage == nil || result.Usage.PromptTokens != 12 || result.Usage.CompletionTokens != 3 {
+	if result.Usage == nil || result.Usage.PromptTokens != 22012 ||
+		result.Usage.CachedTokens != 22000 || result.Usage.CompletionTokens != 3 {
 		t.Fatalf("非流式 Anthropic usage 解析错误：%+v", result.Usage)
+	}
+}
+
+func TestNonStreamOK保留Antigravity总输入口径(t *testing.T) {
+	result := nonStreamOK(cliproxyexecutor.Response{
+		Payload: []byte(`{"id":"msg-1","type":"message","usage":{"input_tokens":100,"output_tokens":3,"cache_read_input_tokens":20}}`),
+	}, usageExtractorFor("antigravity", adaptor.EndpointMessages, false))
+
+	if result.Usage == nil || result.Usage.PromptTokens != 100 || result.Usage.CachedTokens != 20 {
+		t.Fatalf("Antigravity 总输入口径被重复累加缓存：%+v", result.Usage)
+	}
+}
+
+func TestNonStreamOK提取Gemini完整用量(t *testing.T) {
+	result := nonStreamOK(cliproxyexecutor.Response{
+		Payload: []byte(`{"usageMetadata":{"promptTokenCount":100,"toolUsePromptTokenCount":5,"candidatesTokenCount":20,"thoughtsTokenCount":30,"cachedContentTokenCount":40,"totalTokenCount":155}}`),
+	}, usageExtractorFor("gemini", adaptor.EndpointGenerateContent, false))
+
+	if result.Usage == nil || result.Usage.PromptTokens != 105 ||
+		result.Usage.CompletionTokens != 50 || result.Usage.CachedTokens != 40 {
+		t.Fatalf("Gemini usageMetadata 解析错误：%+v", result.Usage)
+	}
+}
+
+func TestNonStreamOK按来源解析翻译后的Gemini用量(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider string
+		payload  string
+		want     dto.Usage
+	}{
+		{
+			name:     "OpenAI 输出已包含思考 token",
+			provider: "xai",
+			payload: `{"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":50,
+				"thoughtsTokenCount":30,"cachedContentTokenCount":40,"totalTokenCount":150}}`,
+			want: dto.Usage{PromptTokens: 100, CompletionTokens: 50, CachedTokens: 40},
+		},
+		{
+			name:     "Claude 输入未包含缓存",
+			provider: "claude",
+			payload: `{"usageMetadata":{"promptTokenCount":13,"candidatesTokenCount":4,
+				"thoughtsTokenCount":2,"cachedContentTokenCount":22000,"totalTokenCount":17}}`,
+			want: dto.Usage{PromptTokens: 22013, CompletionTokens: 4, CachedTokens: 22000},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := nonStreamOK(cliproxyexecutor.Response{Payload: []byte(tt.payload)},
+				usageExtractorFor(tt.provider, adaptor.EndpointGenerateContent, false))
+			if result.Usage == nil || *result.Usage != tt.want {
+				t.Fatalf("翻译后的 Gemini usage 解析错误：%+v，期望 %+v", result.Usage, tt.want)
+			}
+		})
+	}
+}
+
+func TestNonStreamOK补偿Gemini翻译到OpenAI的缺失分量(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		payload  string
+	}{
+		{
+			name:     "Chat Completions",
+			endpoint: adaptor.EndpointChatCompletions,
+			payload: `{"usage":{"prompt_tokens":100,"completion_tokens":20,"total_tokens":155,
+				"prompt_tokens_details":{"cached_tokens":40},
+				"completion_tokens_details":{"reasoning_tokens":30}}}`,
+		},
+		{
+			name:     "Responses",
+			endpoint: adaptor.EndpointResponses,
+			payload: `{"type":"response.completed","response":{"usage":{"input_tokens":100,"output_tokens":20,"total_tokens":155,
+				"input_tokens_details":{"cached_tokens":40},
+				"output_tokens_details":{"reasoning_tokens":30}}}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := nonStreamOK(cliproxyexecutor.Response{Payload: []byte(tt.payload)},
+				usageExtractorFor("gemini", tt.endpoint, false))
+			if result.Usage == nil || result.Usage.PromptTokens != 105 ||
+				result.Usage.CompletionTokens != 50 || result.Usage.CachedTokens != 40 {
+				t.Fatalf("Gemini 翻译 usage 补偿错误：%+v", result.Usage)
+			}
+		})
+	}
+}
+
+func TestRelayStream按Antigravity流式口径补回缓存读取(t *testing.T) {
+	c, _ := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":80,"output_tokens":3,"cache_read_input_tokens":20}}`)}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"message_stop"}`)}
+	close(chunks)
+
+	result := (&Bridge{}).relayStreamSinceWithModelRewrite(
+		context.Background(), c, &cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), time.Time{},
+		adaptor.EndpointMessages, "antigravity", responseModelRewrite{},
+	)
+
+	if result.Usage == nil || result.Usage.PromptTokens != 100 ||
+		result.Usage.CachedTokens != 20 || result.Usage.CompletionTokens != 3 {
+		t.Fatalf("Antigravity 流式缓存口径解析错误：%+v", result.Usage)
+	}
+}
+
+func TestRelayStream提取GeminiUsageMetadata(t *testing.T) {
+	c, _ := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 1)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"candidates":[{"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":100,"toolUsePromptTokenCount":5,"candidatesTokenCount":20,"thoughtsTokenCount":30,"cachedContentTokenCount":40,"totalTokenCount":155}}`)}
+	close(chunks)
+
+	result := (&Bridge{}).relayStreamSinceWithModelRewrite(
+		context.Background(), c, &cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), time.Time{},
+		adaptor.EndpointGenerateContent, "gemini", responseModelRewrite{},
+	)
+
+	if !result.Done || result.Usage == nil || result.Usage.PromptTokens != 105 ||
+		result.Usage.CompletionTokens != 50 || result.Usage.CachedTokens != 40 {
+		t.Fatalf("Gemini 流式 usageMetadata 解析错误：%+v", result)
+	}
+}
+
+func TestRelayStream归一化Anthropic缓存读取用量(t *testing.T) {
+	c, _ := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 4)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"message_start","message":{"usage":{"input_tokens":13,"output_tokens":1,"cache_read_input_tokens":22000,"cache_creation_input_tokens":31,"cache_creation":{"ephemeral_5m_input_tokens":11,"ephemeral_1h_input_tokens":20}}}}`)}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"你好"}}`)}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":4}}`)}
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"message_stop"}`)}
+	close(chunks)
+
+	result := (&Bridge{}).relayStream(
+		context.Background(),
+		c,
+		&cliproxyexecutor.StreamResult{Chunks: chunks},
+		time.Now(),
+		adaptor.EndpointMessages,
+	)
+
+	if !result.Done || result.StreamErr != nil {
+		t.Fatalf("Anthropic 流应正常完成：%+v", result)
+	}
+	if result.Usage == nil || result.Usage.PromptTokens != 22013 ||
+		result.Usage.CachedTokens != 22000 || result.Usage.CompletionTokens != 4 ||
+		result.Usage.CacheCreationTokens != 31 || result.Usage.CacheCreation5mTokens != 11 ||
+		result.Usage.CacheCreation1hTokens != 20 {
+		t.Fatalf("流式 Anthropic usage 归一化错误：%+v", result.Usage)
 	}
 }
 
@@ -205,7 +360,7 @@ func TestNonStreamOK保留JSON内容类型(t *testing.T) {
 	result := nonStreamOK(cliproxyexecutor.Response{
 		Headers: http.Header{"Content-Type": []string{"application/problem+json"}},
 		Payload: []byte(`{"type":"message","usage":{"input_tokens":1,"output_tokens":1}}`),
-	})
+	}, usageExtractorFor("", adaptor.EndpointChatCompletions, false))
 
 	if result.ContentType != "application/problem+json" {
 		t.Fatalf("JSON 内容类型不应被改写，实际为 %q", result.ContentType)

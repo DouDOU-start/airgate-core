@@ -199,6 +199,24 @@ func TestParseNonStreamResponse(t *testing.T) {
 			want: &dto.Usage{PromptTokens: 100, CompletionTokens: 700},
 		},
 		{
+			name: "工具调用提示 token 并入输入",
+			body: `{"candidates":[{"finishReason":"STOP"}],
+				"usageMetadata":{"promptTokenCount":10,"toolUsePromptTokenCount":5,"candidatesTokenCount":2,"totalTokenCount":17}}`,
+			want: &dto.Usage{PromptTokens: 15, CompletionTokens: 2},
+		},
+		{
+			name: "总量补足缺失的输出明细",
+			body: `{"candidates":[{"finishReason":"STOP"}],
+				"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":20,"totalTokenCount":150}}`,
+			want: &dto.Usage{PromptTokens: 100, CompletionTokens: 50},
+		},
+		{
+			name: "非法负分量不会抵消有效用量",
+			body: `{"candidates":[{"finishReason":"STOP"}],
+				"usageMetadata":{"promptTokenCount":-10,"toolUsePromptTokenCount":5,"candidatesTokenCount":20,"thoughtsTokenCount":-30,"cachedContentTokenCount":-40}}`,
+			want: &dto.Usage{PromptTokens: 5, CompletionTokens: 20},
+		},
+		{
 			name: "无 usageMetadata",
 			body: `{"candidates":[{"content":{"parts":[{"text":"x"}],"role":"model"}}]}`,
 			want: nil,
@@ -318,6 +336,15 @@ func TestStreamObserver(t *testing.T) {
 				`data: {"candidates":[{"content":{"parts":[{"text":"x"}],"role":"model"},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":20,"thoughtsTokenCount":30,"cachedContentTokenCount":40,"totalTokenCount":150}}`,
 			},
 			wantUsage: &dto.Usage{PromptTokens: 100, CompletionTokens: 50, CachedTokens: 40},
+			wantDone:  true,
+		},
+		{
+			name: "多帧用量逐字段合并",
+			lines: []string{
+				`data: {"usageMetadata":{"promptTokenCount":100,"toolUsePromptTokenCount":5,"cachedContentTokenCount":40}}`,
+				`data: {"candidates":[{"finishReason":"STOP"}],"usageMetadata":{"candidatesTokenCount":20,"thoughtsTokenCount":30,"totalTokenCount":155}}`,
+			},
+			wantUsage: &dto.Usage{PromptTokens: 105, CompletionTokens: 50, CachedTokens: 40},
 			wantDone:  true,
 		},
 		{

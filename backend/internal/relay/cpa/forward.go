@@ -146,7 +146,7 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 	if req.Stream {
 		return withRefreshedCredentials(b.doStream(ctx, c, ex, auth, execReq, opts, req.Endpoint, req.RequestStartedAt, modelRewrite), proactiveCredentials)
 	}
-	result := b.doNonStream(ctx, ex, auth, execReq, opts)
+	result := b.doNonStream(ctx, ex, auth, execReq, opts, req.Endpoint)
 	return withRefreshedCredentials(rewriteForwardResultModel(result, modelRewrite), proactiveCredentials)
 }
 
@@ -309,8 +309,10 @@ func (b *Bridge) doNonStream(
 	auth *coreauth.Auth,
 	execReq cliproxyexecutor.Request,
 	opts cliproxyexecutor.Options,
+	endpoint string,
 ) ForwardResult {
 	opts.Stream = false
+	extractUsage := usageExtractorFor(auth.Provider, endpoint, false)
 	resp, err := ex.Execute(ctx, auth, execReq, opts)
 	if err != nil {
 		if authHasRefreshCredential(auth) && isRefreshableAuthError(auth.Provider, err) {
@@ -319,7 +321,7 @@ func (b *Bridge) doNonStream(
 				auth = refreshed
 				resp, err = ex.Execute(ctx, auth, execReq, opts)
 				if err == nil {
-					result := nonStreamOK(resp)
+					result := nonStreamOK(resp, extractUsage)
 					result.RefreshedCredentials = CredentialsFromAuth(auth)
 					return result
 				}
@@ -327,7 +329,7 @@ func (b *Bridge) doNonStream(
 		}
 		return errorToResult(err)
 	}
-	return nonStreamOK(resp)
+	return nonStreamOK(resp, extractUsage)
 }
 
 func (b *Bridge) doCount(
@@ -346,7 +348,7 @@ func (b *Bridge) doCount(
 				auth = refreshed
 				resp, err = ex.CountTokens(ctx, auth, execReq, opts)
 				if err == nil {
-					result := nonStreamOK(resp)
+					result := nonStreamOK(resp, dto.ExtractUsage)
 					result.RefreshedCredentials = CredentialsFromAuth(auth)
 					return result
 				}
@@ -354,7 +356,7 @@ func (b *Bridge) doCount(
 		}
 		return errorToResult(err)
 	}
-	return nonStreamOK(resp)
+	return nonStreamOK(resp, dto.ExtractUsage)
 }
 
 func (b *Bridge) doStream(
@@ -384,7 +386,7 @@ func (b *Bridge) doStream(
 				bootstrapMs = time.Since(start).Milliseconds()
 				if err == nil {
 					markStreamStarted()
-					result := b.relayStreamSinceWithModelRewrite(upstreamCtx, c, stream, start, requestStartedAt, endpoint, modelRewrite)
+					result := b.relayStreamSinceWithModelRewrite(upstreamCtx, c, stream, start, requestStartedAt, endpoint, auth.Provider, modelRewrite)
 					result.ExecutorBootstrapMs = bootstrapMs
 					result.RefreshedCredentials = CredentialsFromAuth(auth)
 					return result
@@ -398,7 +400,7 @@ func (b *Bridge) doStream(
 	// ExecuteStream 成功表示已建立上游响应流；此后客户端断开不再取消上游，
 	// relayStream 会停止向客户端写入，但继续读取到完成事件以捕获 usage。
 	markStreamStarted()
-	result := b.relayStreamSinceWithModelRewrite(upstreamCtx, c, stream, start, requestStartedAt, endpoint, modelRewrite)
+	result := b.relayStreamSinceWithModelRewrite(upstreamCtx, c, stream, start, requestStartedAt, endpoint, auth.Provider, modelRewrite)
 	result.ExecutorBootstrapMs = bootstrapMs
 	// 部分 executor 在 goroutine 启动后才从首个 chunk 返回上游认证错误。
 	// 尚未向客户端写出内容时仍可安全刷新并重试一次。
@@ -409,7 +411,7 @@ func (b *Bridge) doStream(
 			stream, err = ex.ExecuteStream(upstreamCtx, auth, execReq, opts)
 			if err == nil {
 				bootstrapMs = time.Since(start).Milliseconds()
-				result = b.relayStreamSinceWithModelRewrite(upstreamCtx, c, stream, time.Now(), requestStartedAt, endpoint, modelRewrite)
+				result = b.relayStreamSinceWithModelRewrite(upstreamCtx, c, stream, time.Now(), requestStartedAt, endpoint, auth.Provider, modelRewrite)
 				result.ExecutorBootstrapMs = bootstrapMs
 				result.RefreshedCredentials = CredentialsFromAuth(auth)
 				return result
@@ -438,7 +440,7 @@ func (b *Bridge) relayStreamSince(
 	requestStartedAt time.Time,
 	endpoint string,
 ) ForwardResult {
-	return b.relayStreamSinceWithModelRewrite(ctx, c, stream, start, requestStartedAt, endpoint, responseModelRewrite{})
+	return b.relayStreamSinceWithModelRewrite(ctx, c, stream, start, requestStartedAt, endpoint, "", responseModelRewrite{})
 }
 
 func (b *Bridge) relayStreamSinceWithModelRewrite(
@@ -448,6 +450,7 @@ func (b *Bridge) relayStreamSinceWithModelRewrite(
 	start time.Time,
 	requestStartedAt time.Time,
 	endpoint string,
+	provider string,
 	modelRewrite responseModelRewrite,
 ) ForwardResult {
 	if stream == nil {
@@ -473,10 +476,7 @@ func (b *Bridge) relayStreamSinceWithModelRewrite(
 		pending             bytes.Buffer
 	)
 
-	extractUsage := dto.ExtractUsage
-	if endpoint == adaptor.EndpointResponses {
-		extractUsage = dto.ExtractResponsesUsage
-	}
+	extractUsage := usageExtractorFor(provider, endpoint, true)
 	var responsesFramer *responsesSSEFramer
 	if endpoint == adaptor.EndpointResponses {
 		responsesFramer = &responsesSSEFramer{}
@@ -702,12 +702,13 @@ func writeStreamHeaders(w gin.ResponseWriter, headers http.Header) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func nonStreamOK(resp cliproxyexecutor.Response) ForwardResult {
+func nonStreamOK(resp cliproxyexecutor.Response, extractUsage func([]byte) (dto.Usage, bool)) ForwardResult {
 	body := resp.Payload
 	var usage *dto.Usage
-	if u, ok := dto.ExtractUsage(body); ok {
-		usage = &u
-	} else if u, ok := dto.ExtractResponsesUsage(body); ok {
+	if extractUsage == nil {
+		extractUsage = dto.ExtractUsage
+	}
+	if u, ok := extractUsage(body); ok {
 		usage = &u
 	}
 	ct := nonStreamContentType(resp.Headers)
@@ -717,6 +718,54 @@ func nonStreamOK(resp cliproxyexecutor.Response) ForwardResult {
 		Body:        body,
 		ContentType: ct,
 		Usage:       usage,
+	}
+}
+
+// usageExtractorFor 按 CPA 目标协议、供应商翻译器与流模式的实际计数口径选择解析器。
+// Grok/OpenAI/Codex/Claude 的 Claude 响应中 input_tokens 已扣除缓存读取；
+// Gemini 系翻译器仍写完整 prompt。Antigravity 当前非流式写完整 prompt，
+// 流式却会先扣缓存读取，因此必须分开处理。
+func usageExtractorFor(provider, endpoint string, stream bool) func([]byte) (dto.Usage, bool) {
+	geminiFamily := func() bool {
+		switch ResolveProvider(provider) {
+		case "antigravity", "gemini", "aistudio", "vertex":
+			return true
+		default:
+			return false
+		}
+	}
+	switch endpoint {
+	case adaptor.EndpointResponses:
+		if geminiFamily() {
+			return dto.ExtractGeminiTranslatedResponsesUsage
+		}
+		return dto.ExtractResponsesUsage
+	case adaptor.EndpointMessages:
+		switch ResolveProvider(provider) {
+		case "antigravity":
+			if stream {
+				return dto.ExtractAnthropicUsage
+			}
+			return dto.ExtractUsage
+		case "gemini", "aistudio", "vertex":
+			return dto.ExtractUsage
+		default:
+			return dto.ExtractAnthropicUsage
+		}
+	case adaptor.EndpointGenerateContent:
+		switch ResolveProvider(provider) {
+		case "antigravity", "gemini", "aistudio", "vertex":
+			return dto.ExtractGeminiUsage
+		case "claude":
+			return dto.ExtractClaudeTranslatedGeminiUsage
+		default:
+			return dto.ExtractOpenAITranslatedGeminiUsage
+		}
+	default:
+		if endpoint == adaptor.EndpointChatCompletions && geminiFamily() {
+			return dto.ExtractGeminiTranslatedOpenAIUsage
+		}
+		return dto.ExtractUsage
 	}
 }
 
@@ -820,14 +869,48 @@ func scanStreamPayload(payload []byte, extract func([]byte) (dto.Usage, bool), u
 				continue
 			}
 			if u, ok := extract([]byte(data)); ok {
-				cp := u
-				*usage = &cp
+				if *usage == nil {
+					cp := u
+					*usage = &cp
+				} else {
+					merged := mergeStreamUsage(**usage, u)
+					*usage = &merged
+				}
 			}
 			if isProtocolCompletion([]byte(data)) {
 				*done = true
 			}
 		}
 	}
+}
+
+// mergeStreamUsage 合并分散在不同终端事件中的累计用量。
+// 各协议上报的是累计值而非增量值，因此逐维取最大值，不能直接相加。
+func mergeStreamUsage(current, next dto.Usage) dto.Usage {
+	max := func(left, right int) int {
+		if right > left {
+			return right
+		}
+		return left
+	}
+	merged := dto.Usage{
+		PromptTokens:          max(current.PromptTokens, next.PromptTokens),
+		CompletionTokens:      max(current.CompletionTokens, next.CompletionTokens),
+		CachedTokens:          max(current.CachedTokens, next.CachedTokens),
+		CacheCreationTokens:   max(current.CacheCreationTokens, next.CacheCreationTokens),
+		CacheCreation5mTokens: max(current.CacheCreation5mTokens, next.CacheCreation5mTokens),
+		CacheCreation1hTokens: max(current.CacheCreation1hTokens, next.CacheCreation1hTokens),
+		Calls:                 max(current.Calls, next.Calls),
+		ImageSize:             current.ImageSize,
+		ImageQuality:          current.ImageQuality,
+	}
+	if next.ImageSize != "" {
+		merged.ImageSize = next.ImageSize
+	}
+	if next.ImageQuality != "" {
+		merged.ImageQuality = next.ImageQuality
+	}
+	return merged
 }
 
 func isProtocolCompletion(data []byte) bool {

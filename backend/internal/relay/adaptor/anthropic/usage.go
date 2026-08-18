@@ -30,35 +30,61 @@ type normUsage struct {
 // promptTokens = PromptTokens - CachedTokens 拆「纯输入」，故 PromptTokens 必须含缓存读，
 // 否则纯输入被低估、缓存读被漏计。
 func normalizeUsage(u anthropicUsage) normUsage {
+	inputTokens := nonNegativeTokenCount(u.InputTokens)
+	cacheReadTokens := nonNegativeTokenCount(u.CacheReadInputTokens)
 	n := normUsage{
-		PromptTokens:     u.InputTokens + u.CacheReadInputTokens,
-		CompletionTokens: u.OutputTokens,
-		CachedTokens:     u.CacheReadInputTokens,
-		CacheCreation:    u.CacheCreationInputTokens,
+		PromptTokens:     addTokenCounts(inputTokens, cacheReadTokens),
+		CompletionTokens: nonNegativeTokenCount(u.OutputTokens),
+		CachedTokens:     cacheReadTokens,
+		CacheCreation:    nonNegativeTokenCount(u.CacheCreationInputTokens),
 	}
 	if u.CacheCreation != nil {
-		n.CacheCreation5m = u.CacheCreation.Ephemeral5mInputTokens
-		n.CacheCreation1h = u.CacheCreation.Ephemeral1hInputTokens
+		n.CacheCreation5m = nonNegativeTokenCount(u.CacheCreation.Ephemeral5mInputTokens)
+		n.CacheCreation1h = nonNegativeTokenCount(u.CacheCreation.Ephemeral1hInputTokens)
+		if n.CacheCreation == 0 {
+			n.CacheCreation = addTokenCounts(n.CacheCreation5m, n.CacheCreation1h)
+		}
 	}
 	return n
 }
 
+func nonNegativeTokenCount(value int) int {
+	if value < 0 {
+		return 0
+	}
+	return value
+}
+
+func addTokenCounts(values ...int) int {
+	maxInt := int(^uint(0) >> 1)
+	total := 0
+	for _, value := range values {
+		value = nonNegativeTokenCount(value)
+		if value > maxInt-total {
+			return maxInt
+		}
+		total += value
+	}
+	return total
+}
+
 // merge 合并另一段 usage（流式：input 侧来自 message_start，output 侧来自 message_delta）。
-// 各字段取非零者（后到的 output_tokens 覆盖 message_start 的占位 1）。
+// 各字段都是累计值，逐字段取最大值既能覆盖 message_start 的 output_tokens 占位值，
+// 也不会因兼容上游的后帧缺字段或较小值丢失已经观察到的用量。
 func (n normUsage) merge(other normUsage) normUsage {
-	pick := func(a, b int) int {
-		if b != 0 {
+	max := func(a, b int) int {
+		if b > a {
 			return b
 		}
 		return a
 	}
 	return normUsage{
-		PromptTokens:     pick(n.PromptTokens, other.PromptTokens),
-		CompletionTokens: pick(n.CompletionTokens, other.CompletionTokens),
-		CachedTokens:     pick(n.CachedTokens, other.CachedTokens),
-		CacheCreation:    pick(n.CacheCreation, other.CacheCreation),
-		CacheCreation5m:  pick(n.CacheCreation5m, other.CacheCreation5m),
-		CacheCreation1h:  pick(n.CacheCreation1h, other.CacheCreation1h),
+		PromptTokens:     max(n.PromptTokens, other.PromptTokens),
+		CompletionTokens: max(n.CompletionTokens, other.CompletionTokens),
+		CachedTokens:     max(n.CachedTokens, other.CachedTokens),
+		CacheCreation:    max(n.CacheCreation, other.CacheCreation),
+		CacheCreation5m:  max(n.CacheCreation5m, other.CacheCreation5m),
+		CacheCreation1h:  max(n.CacheCreation1h, other.CacheCreation1h),
 	}
 }
 

@@ -99,7 +99,10 @@ func TestForwardCrossProtocolChannelUsesCPA(t *testing.T) {
 		StatusCode:  http.StatusOK,
 		ContentType: "application/json",
 		Body:        []byte(`{"id":"chat-cpa","model":"gpt-4o","choices":[{"message":{"role":"assistant","content":"ok"}}]}`),
-		Usage:       &dto.Usage{PromptTokens: 10, CompletionTokens: 2},
+		Usage: &dto.Usage{
+			PromptTokens: 22013, CompletionTokens: 2,
+			CachedTokens: 22000, CacheCreationTokens: 40,
+		},
 	}}
 	env.pipe.cpa = forwarder
 
@@ -126,6 +129,11 @@ func TestForwardCrossProtocolChannelUsesCPA(t *testing.T) {
 	}
 	if call.UpstreamModel != "gpt-4o-upstream" {
 		t.Fatalf("CPA upstream model = %q", call.UpstreamModel)
+	}
+	record := env.sink.last(t)
+	if record.InputTokens != 13 || record.CachedInputTokens != 22000 || record.CacheCreationTokens != 40 {
+		t.Fatalf("CPA 翻译后的缓存用量拆分错误: input=%d cached=%d creation=%d",
+			record.InputTokens, record.CachedInputTokens, record.CacheCreationTokens)
 	}
 }
 

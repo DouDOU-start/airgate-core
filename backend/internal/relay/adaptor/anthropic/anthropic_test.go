@@ -218,6 +218,25 @@ func TestParseNonStreamResponse(t *testing.T) {
 			want: &dto.Usage{PromptTokens: 100, CompletionTokens: 50},
 		},
 		{
+			name: "仅双档缓存写明细时回填总量",
+			body: `{"id":"m","model":"claude-3-5-sonnet","content":[],"usage":{"input_tokens":10,"output_tokens":2,
+				"cache_creation":{"ephemeral_5m_input_tokens":3,"ephemeral_1h_input_tokens":4}}}`,
+			want: &dto.Usage{
+				PromptTokens: 10, CompletionTokens: 2,
+				CacheCreationTokens: 7, CacheCreation5mTokens: 3, CacheCreation1hTokens: 4,
+			},
+		},
+		{
+			name: "非法负分量不会抵消有效用量",
+			body: `{"id":"m","model":"claude","content":[],"usage":{"input_tokens":-10,"output_tokens":-2,
+				"cache_read_input_tokens":20,"cache_creation_input_tokens":-7,
+				"cache_creation":{"ephemeral_5m_input_tokens":3,"ephemeral_1h_input_tokens":4}}}`,
+			want: &dto.Usage{
+				PromptTokens: 20, CachedTokens: 20,
+				CacheCreationTokens: 7, CacheCreation5mTokens: 3, CacheCreation1hTokens: 4,
+			},
+		},
+		{
 			name: "无 usage 字段",
 			body: `{"id":"m","model":"claude-3-5-sonnet","content":[]}`,
 			want: nil,
@@ -302,6 +321,17 @@ func TestStreamObserver(t *testing.T) {
 			},
 			wantUsage: &dto.Usage{
 				PromptTokens: 10, CompletionTokens: 2,
+				CacheCreationTokens: 7, CacheCreation5mTokens: 3, CacheCreation1hTokens: 4,
+			},
+			wantDone: true,
+		},
+		{
+			name: "仅缓存写也属于有效用量",
+			lines: []string{
+				`data: {"type":"message_start","message":{"id":"m","usage":{"cache_creation_input_tokens":7,"cache_creation":{"ephemeral_5m_input_tokens":3,"ephemeral_1h_input_tokens":4}}}}`,
+				`data: {"type":"message_stop"}`,
+			},
+			wantUsage: &dto.Usage{
 				CacheCreationTokens: 7, CacheCreation5mTokens: 3, CacheCreation1hTokens: 4,
 			},
 			wantDone: true,

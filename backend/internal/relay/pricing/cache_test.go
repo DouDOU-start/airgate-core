@@ -164,6 +164,20 @@ func TestComputeCosts(t *testing.T) {
 			want: Costs{Input: 5, Output: 22.5},
 		},
 		{
+			name:  "长上下文：缓存写计入完整输入阈值",
+			price: Price{Input: 2.5, Output: 15, CacheCreation5m: 3.75, LongContext: longCtxRule},
+			usage: Usage{PromptTokens: 100_000, CompletionTokens: 1_000_000, CacheCreationTokens: 200_000},
+			// 完整输入 300k 超过 272k：普通输入×2、输出×1.5；缓存写仍按自身固定档位计价。
+			want: Costs{Input: 0.5, Output: 22.5, CacheCreation5m: 0.75},
+		},
+		{
+			name:  "长上下文：缓存写明细优先且不与总量重复累计",
+			price: Price{Input: 2.5, Output: 15, CacheCreation5m: 3.75, CacheCreation1h: 6, LongContext: longCtxRule},
+			usage: Usage{PromptTokens: 100_000, CompletionTokens: 1_000_000, CacheCreationTokens: 200_000,
+				CacheCreation5mTokens: 50_000, CacheCreation1hTokens: 150_000},
+			want: Costs{Input: 0.5, Output: 22.5, CacheCreation5m: 0.1875, CacheCreation1h: 0.9},
+		},
+		{
 			name:  "服务档 priority 整单乘倍率",
 			price: Price{Input: 2.5, Output: 15, ServiceTiers: map[string]float64{"priority": 2, "flex": 0.5}},
 			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000},

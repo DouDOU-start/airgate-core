@@ -271,6 +271,20 @@ func TestParseUsage(t *testing.T) {
 			found: true,
 		},
 		{
+			name: "Responses 缓存写从总输入中独立拆分",
+			raw: `{"input_tokens":100,"input_tokens_details":{"cached_tokens":30,"cache_write_tokens":40},` +
+				`"output_tokens":20,"total_tokens":120}`,
+			want:  Usage{PromptTokens: 60, CompletionTokens: 20, CachedTokens: 30, CacheCreationTokens: 40},
+			found: true,
+		},
+		{
+			name: "Chat Completions 兼容 cache_creation_tokens 命名",
+			raw: `{"prompt_tokens":80,"prompt_tokens_details":{"cached_tokens":20,"cache_creation_tokens":10},` +
+				`"completion_tokens":5}`,
+			want:  Usage{PromptTokens: 70, CompletionTokens: 5, CachedTokens: 20, CacheCreationTokens: 10},
+			found: true,
+		},
+		{
 			name:  "Responses 无 details 子对象",
 			raw:   `{"input_tokens":10,"output_tokens":5,"total_tokens":15}`,
 			want:  Usage{PromptTokens: 10, CompletionTokens: 5},
@@ -319,6 +333,148 @@ func TestParseUsage(t *testing.T) {
 	}
 }
 
+func TestParseAnthropicUsage补回缓存读取(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want Usage
+	}{
+		{
+			name: "缓存读写分列",
+			raw:  `{"input_tokens":80,"output_tokens":40,"cache_read_input_tokens":20,"cache_creation_input_tokens":10}`,
+			want: Usage{PromptTokens: 100, CompletionTokens: 40, CachedTokens: 20, CacheCreationTokens: 10},
+		},
+		{
+			name: "大量缓存读取不会把新鲜输入重复扣减",
+			raw:  `{"input_tokens":13,"output_tokens":4,"cache_read_input_tokens":22000}`,
+			want: Usage{PromptTokens: 22013, CompletionTokens: 4, CachedTokens: 22000},
+		},
+		{
+			name: "OpenAI Responses 明细仍按总输入解释",
+			raw:  `{"input_tokens":36,"output_tokens":4,"input_tokens_details":{"cached_tokens":6}}`,
+			want: Usage{PromptTokens: 36, CompletionTokens: 4, CachedTokens: 6},
+		},
+		{
+			name: "缓存写双档明细回填总量",
+			raw:  `{"input_tokens":3,"output_tokens":1,"cache_creation":{"ephemeral_5m_input_tokens":11,"ephemeral_1h_input_tokens":20}}`,
+			want: Usage{PromptTokens: 3, CompletionTokens: 1, CacheCreationTokens: 31, CacheCreation5mTokens: 11, CacheCreation1hTokens: 20},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, found := ParseAnthropicUsage([]byte(tt.raw))
+			if !found || got != tt.want {
+				t.Fatalf("Usage = %+v, found=%v，期望 %+v", got, found, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseGeminiTranslatedOpenAIUsage补回思考与工具提示(t *testing.T) {
+	raw := []byte(`{"prompt_tokens":100,"completion_tokens":20,"total_tokens":155,
+		"prompt_tokens_details":{"cached_tokens":40},
+		"completion_tokens_details":{"reasoning_tokens":30}}`)
+	got, found := ParseGeminiTranslatedOpenAIUsage(raw)
+	want := Usage{PromptTokens: 105, CompletionTokens: 50, CachedTokens: 40}
+	if !found || got != want {
+		t.Fatalf("Usage = %+v, found=%v，期望 %+v", got, found, want)
+	}
+
+	// 原生 OpenAI 的 completion_tokens 已包含 reasoning，通用解析器不得套用 CPA 补偿。
+	generic, found := ParseUsage(raw)
+	genericWant := Usage{PromptTokens: 100, CompletionTokens: 20, CachedTokens: 40}
+	if !found || generic != genericWant {
+		t.Fatalf("通用 Usage = %+v, found=%v，期望 %+v", generic, found, genericWant)
+	}
+}
+
+func TestParseGeminiUsage补齐特殊用量(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want Usage
+	}{
+		{
+			name: "缓存读取工具提示与思考分列",
+			raw:  `{"promptTokenCount":100,"toolUsePromptTokenCount":5,"candidatesTokenCount":20,"thoughtsTokenCount":30,"cachedContentTokenCount":40,"totalTokenCount":155}`,
+			want: Usage{PromptTokens: 105, CompletionTokens: 50, CachedTokens: 40},
+		},
+		{
+			name: "仅有总量时补回输出",
+			raw:  `{"promptTokenCount":10,"toolUsePromptTokenCount":5,"totalTokenCount":18}`,
+			want: Usage{PromptTokens: 15, CompletionTokens: 3},
+		},
+		{
+			name: "已有部分输出时总量补足缺失明细",
+			raw:  `{"promptTokenCount":100,"candidatesTokenCount":20,"totalTokenCount":150}`,
+			want: Usage{PromptTokens: 100, CompletionTokens: 50},
+		},
+		{
+			name: "负数钳零",
+			raw:  `{"promptTokenCount":-10,"candidatesTokenCount":-2,"thoughtsTokenCount":-3,"cachedContentTokenCount":-4}`,
+			want: Usage{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, found := ParseGeminiUsage([]byte(tt.raw))
+			if !found || got != tt.want {
+				t.Fatalf("Usage = %+v, found=%v，期望 %+v", got, found, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseTranslatedGeminiUsage按来源区分口径(t *testing.T) {
+	openAIRaw := []byte(`{"promptTokenCount":100,"candidatesTokenCount":50,
+		"thoughtsTokenCount":30,"cachedContentTokenCount":40,"totalTokenCount":150}`)
+	got, found := ParseOpenAITranslatedGeminiUsage(openAIRaw)
+	want := Usage{PromptTokens: 100, CompletionTokens: 50, CachedTokens: 40}
+	if !found || got != want {
+		t.Fatalf("OpenAI -> Gemini Usage = %+v, found=%v，期望 %+v", got, found, want)
+	}
+
+	claudeRaw := []byte(`{"promptTokenCount":13,"candidatesTokenCount":4,
+		"thoughtsTokenCount":2,"cachedContentTokenCount":22000,"totalTokenCount":17}`)
+	got, found = ParseClaudeTranslatedGeminiUsage(claudeRaw)
+	want = Usage{PromptTokens: 22013, CompletionTokens: 4, CachedTokens: 22000}
+	if !found || got != want {
+		t.Fatalf("Claude -> Gemini Usage = %+v, found=%v，期望 %+v", got, found, want)
+	}
+}
+
+func TestExtractGeminiUsage兼容原生与包装响应(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+		want Usage
+	}{
+		{
+			name: "原生响应",
+			data: `{"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":20,
+				"thoughtsTokenCount":30,"cachedContentTokenCount":40,"totalTokenCount":150}}`,
+			want: Usage{PromptTokens: 100, CompletionTokens: 50, CachedTokens: 40},
+		},
+		{
+			name: "Antigravity 包装响应",
+			data: `{"response":{"usageMetadata":{"promptTokenCount":10,"toolUsePromptTokenCount":5,
+				"candidatesTokenCount":2,"totalTokenCount":17}}}`,
+			want: Usage{PromptTokens: 15, CompletionTokens: 2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, found := ExtractGeminiUsage([]byte(tt.data))
+			if !found || got != tt.want {
+				t.Fatalf("Usage = %+v, found=%v，期望 %+v", got, found, tt.want)
+			}
+		})
+	}
+}
+
 func TestExtractUsage(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -344,6 +500,34 @@ func TestExtractUsage(t *testing.T) {
 			}
 			if found && got != tc.want {
 				t.Errorf("Usage = %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestExtractAnthropicUsage兼容流式嵌套与顶层(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+		want Usage
+	}{
+		{
+			name: "message_start 嵌套用量",
+			data: `{"type":"message_start","message":{"usage":{"input_tokens":13,"output_tokens":1,"cache_read_input_tokens":22000,"cache_creation_input_tokens":31}}}`,
+			want: Usage{PromptTokens: 22013, CompletionTokens: 1, CachedTokens: 22000, CacheCreationTokens: 31},
+		},
+		{
+			name: "message_delta 顶层用量",
+			data: `{"type":"message_delta","usage":{"output_tokens":4}}`,
+			want: Usage{CompletionTokens: 4},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, found := ExtractAnthropicUsage([]byte(tt.data))
+			if !found || got != tt.want {
+				t.Fatalf("Usage = %+v, found=%v，期望 %+v", got, found, tt.want)
 			}
 		})
 	}

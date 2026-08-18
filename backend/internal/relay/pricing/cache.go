@@ -44,7 +44,7 @@ type Price struct {
 	LongContext *LongContextRule
 }
 
-// LongContextRule 长上下文阶梯规则：Usage.PromptTokens > ThresholdTokens 时各维度单价乘对应倍率。
+// LongContextRule 长上下文阶梯规则：完整输入（含缓存读写）超过阈值时各维度单价乘对应倍率。
 type LongContextRule struct {
 	ThresholdTokens int
 	InputMul        float64
@@ -193,10 +193,11 @@ func (c *Cache) Invalidate() {
 //  3. PerRequest > 0：整单按次计费，Input = PerRequest × max(Calls, 1)
 //     （图像端点 Calls=响应产出张数；chat 等未设 Calls 恒按 1 次），
 //     其余为 0（忽略全部 token 单价 / 服务档 / 长上下文）。
-//  4. 取 base 单价 inR/outR/cachedR；若 LongContext!=nil 且 PromptTokens 超阈值，
-//     各单价乘对应倍率（长上下文阶梯，阈值比较对象是含 cached 的完整 prompt）。
-//  5. 缓存写入分档：cc5mTokens = CacheCreation5mTokens>0 ? 它 : CacheCreationTokens（泛化回退当 5m）；
-//     cc1hTokens = CacheCreation1hTokens。
+//  4. 取 base 单价 inR/outR/cachedR；若 LongContext!=nil 且完整输入超阈值，
+//     各单价乘对应倍率。完整输入 = PromptTokens（已含缓存读）+ 缓存写；
+//     缓存写优先使用 5m/1h 明细，明细缺失时使用泛化总量。
+//  5. 缓存写入分档：任一双档明细存在时按明细计价；双档都缺失时才把
+//     CacheCreationTokens 作为 5m 写入回退。
 //  6. 分段计价：input 按 (prompt-cached) 扣减避免与 cached 双计。
 //  7. 服务档：serviceTier 非空且非 standard/auto，且 ServiceTiers[serviceTier]>0，
 //     则整单五项统一乘该倍率（priority/flex 对各维度倍率一致，按整单处理等价）。
@@ -225,7 +226,23 @@ func ComputeCosts(p Price, u Usage, serviceTier string) Costs {
 	}
 
 	inR, outR, cachedR := p.Input, p.Output, p.CachedInput
-	if p.LongContext != nil && u.PromptTokens > p.LongContext.ThresholdTokens {
+	longContext := false
+	if p.LongContext != nil {
+		// 逐段从剩余阈值扣减，避免不可信 token 计数相加后发生 int 溢出。
+		remaining := p.LongContext.ThresholdTokens
+		parts := []int{u.PromptTokens, u.CacheCreationTokens}
+		if u.CacheCreation5mTokens > 0 || u.CacheCreation1hTokens > 0 {
+			parts = []int{u.PromptTokens, u.CacheCreation5mTokens, u.CacheCreation1hTokens}
+		}
+		for _, tokens := range parts {
+			if tokens > remaining {
+				longContext = true
+				break
+			}
+			remaining -= tokens
+		}
+	}
+	if longContext {
 		inR *= p.LongContext.InputMul
 		outR *= p.LongContext.OutputMul
 		cachedR *= p.LongContext.CachedMul

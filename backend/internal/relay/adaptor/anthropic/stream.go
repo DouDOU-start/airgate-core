@@ -71,7 +71,9 @@ func (s *streamObserver) ObserveLine(line string) {
 // 上游中途断连时管线据此计费兜底，避免记 0。
 func (s *streamObserver) Usage() (dto.Usage, bool) {
 	u := s.usage.dtoUsage()
-	if u.PromptTokens == 0 && u.CompletionTokens == 0 && u.CachedTokens == 0 {
+	if u.PromptTokens == 0 && u.CompletionTokens == 0 && u.CachedTokens == 0 &&
+		u.CacheCreationTokens == 0 && u.CacheCreation5mTokens == 0 &&
+		u.CacheCreation1hTokens == 0 {
 		return dto.Usage{}, false
 	}
 	return u, true

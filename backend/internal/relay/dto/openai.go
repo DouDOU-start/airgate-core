@@ -313,16 +313,27 @@ type usageWire struct {
 	// OpenAI chat completions 风格
 	PromptTokens        *int `json:"prompt_tokens"`
 	CompletionTokens    *int `json:"completion_tokens"`
+	TotalTokens         *int `json:"total_tokens"`
 	PromptTokensDetails *struct {
-		CachedTokens *int `json:"cached_tokens"`
+		CachedTokens        *int `json:"cached_tokens"`
+		CacheWriteTokens    *int `json:"cache_write_tokens"`
+		CacheCreationTokens *int `json:"cache_creation_tokens"`
 	} `json:"prompt_tokens_details"`
 
 	// OpenAI Responses 风格（input_tokens/output_tokens + details 子对象）。
 	// 计数字段 input_tokens/output_tokens 与 Anthropic 同名，复用下方回退候选，
 	// 仅 details 子对象命名不同（cached_tokens 在 input_tokens_details）。
 	InputTokensDetails *struct {
-		CachedTokens *int `json:"cached_tokens"`
+		CachedTokens        *int `json:"cached_tokens"`
+		CacheWriteTokens    *int `json:"cache_write_tokens"`
+		CacheCreationTokens *int `json:"cache_creation_tokens"`
 	} `json:"input_tokens_details"`
+	CompletionTokensDetails *struct {
+		ReasoningTokens *int `json:"reasoning_tokens"`
+	} `json:"completion_tokens_details"`
+	OutputTokensDetails *struct {
+		ReasoningTokens *int `json:"reasoning_tokens"`
+	} `json:"output_tokens_details"`
 
 	// Anthropic 风格（缺省回退）
 	InputTokens              *int `json:"input_tokens"`
@@ -336,10 +347,52 @@ type usageWire struct {
 	} `json:"cache_creation"`
 }
 
-// ParseUsage 解析 usage 对象：OpenAI 命名优先，Anthropic 命名回退。
+// ParseUsage 解析 usage 对象：OpenAI 命名优先，Anthropic 字段仅作值回退。
+// input_tokens 按“已含缓存读取的总输入”解释；若调用方确认响应是 Anthropic
+// 原生计数语义，应使用 ParseAnthropicUsage。
 // raw 不是对象或不含任何已知计数字段时返回 (Usage{}, false)。
 // 上游为不可信第三方：负数计数一律钳 0，防虚增计费/负成本入账。
 func ParseUsage(raw []byte) (Usage, bool) {
+	return parseUsage(raw, false)
+}
+
+// ParseAnthropicUsage 解析 Anthropic usage：input_tokens 是未命中缓存的新鲜输入，
+// cache_read_input_tokens 单列，因此 PromptTokens 需要合并二者以符合计费总输入口径。
+func ParseAnthropicUsage(raw []byte) (Usage, bool) {
+	return parseUsage(raw, true)
+}
+
+// ParseGeminiTranslatedOpenAIUsage 解析 CPA 将 Gemini 系响应翻译成 OpenAI 后的 usage。
+// 当前 CPA 翻译器把思考 token 只写入 reasoning_tokens 明细，未并入输出总量；
+// toolUsePromptTokenCount 未单列，但仍包含在 total_tokens 中，因此按总量差额补入输入。
+func ParseGeminiTranslatedOpenAIUsage(raw []byte) (Usage, bool) {
+	u, found := parseUsage(raw, false)
+	if !found {
+		return Usage{}, false
+	}
+	var w usageWire
+	if err := json.Unmarshal(raw, &w); err != nil {
+		return Usage{}, false
+	}
+	reasoning := 0
+	if w.CompletionTokensDetails != nil && w.CompletionTokensDetails.ReasoningTokens != nil {
+		reasoning = *w.CompletionTokensDetails.ReasoningTokens
+	} else if w.OutputTokensDetails != nil && w.OutputTokensDetails.ReasoningTokens != nil {
+		reasoning = *w.OutputTokensDetails.ReasoningTokens
+	}
+	if reasoning > 0 {
+		u.CompletionTokens = saturatingTokenSum(u.CompletionTokens, reasoning)
+	}
+	if w.TotalTokens != nil && *w.TotalTokens > 0 {
+		accounted := saturatingTokenSum(u.PromptTokens, u.CompletionTokens, u.CacheCreationTokens)
+		if gap := *w.TotalTokens - accounted; gap > 0 {
+			u.PromptTokens = saturatingTokenSum(u.PromptTokens, gap)
+		}
+	}
+	return u, true
+}
+
+func parseUsage(raw []byte, anthropicInputSemantics bool) (Usage, bool) {
 	var w usageWire
 	if err := json.Unmarshal(raw, &w); err != nil {
 		return Usage{}, false
@@ -362,19 +415,42 @@ func ParseUsage(raw []byte) (Usage, bool) {
 
 	u.PromptTokens = pick(w.PromptTokens, w.InputTokens)
 	u.CompletionTokens = pick(w.CompletionTokens, w.OutputTokens)
-	var chatCached, responsesCached *int
+	var chatCached, responsesCached, chatCreation, responsesCreation *int
 	if w.PromptTokensDetails != nil {
 		chatCached = w.PromptTokensDetails.CachedTokens
+		chatCreation = w.PromptTokensDetails.CacheCreationTokens
+		if chatCreation == nil {
+			chatCreation = w.PromptTokensDetails.CacheWriteTokens
+		}
 	}
 	if w.InputTokensDetails != nil {
 		responsesCached = w.InputTokensDetails.CachedTokens
+		responsesCreation = w.InputTokensDetails.CacheCreationTokens
+		if responsesCreation == nil {
+			responsesCreation = w.InputTokensDetails.CacheWriteTokens
+		}
 	}
 	u.CachedTokens = pick(chatCached, responsesCached, w.CacheReadInputTokens)
-	u.CacheCreationTokens = pick(w.CacheCreationInputTokens)
+	u.CacheCreationTokens = pick(chatCreation, responsesCreation, w.CacheCreationInputTokens)
+	// OpenAI 的 cache_write/cache_creation 是 prompt/input_tokens 的子集；
+	// canonical PromptTokens 不含缓存写，避免后续同时按普通输入与缓存写重复计费。
+	if (chatCreation != nil || responsesCreation != nil) && u.CacheCreationTokens > 0 {
+		u.PromptTokens -= u.CacheCreationTokens
+		if u.PromptTokens < 0 {
+			u.PromptTokens = 0
+		}
+	}
+	if anthropicInputSemantics && w.PromptTokens == nil &&
+		w.InputTokensDetails == nil && w.CacheReadInputTokens != nil {
+		u.PromptTokens = saturatingTokenSum(u.PromptTokens, u.CachedTokens)
+	}
 	// Anthropic 双档缓存写入明细（存在时供计费分档；OpenAI 上游无此字段 → 0）。
 	if w.CacheCreation != nil {
 		u.CacheCreation5mTokens = pick(w.CacheCreation.Ephemeral5mInputTokens)
 		u.CacheCreation1hTokens = pick(w.CacheCreation.Ephemeral1hInputTokens)
+		if u.CacheCreationTokens == 0 {
+			u.CacheCreationTokens = saturatingTokenSum(u.CacheCreation5mTokens, u.CacheCreation1hTokens)
+		}
 	}
 
 	if !found {
@@ -386,6 +462,178 @@ func ParseUsage(raw []byte) (Usage, bool) {
 // ExtractUsage 从一段响应 JSON（非流式响应体或 SSE data 载荷）中提取顶层 usage 字段。
 // 无 usage 字段、usage 为 null 或解析失败时返回 (Usage{}, false)。
 func ExtractUsage(data []byte) (Usage, bool) {
+	return extractUsage(data, ParseUsage)
+}
+
+// ExtractGeminiTranslatedOpenAIUsage 从 OpenAI Chat 响应中提取 CPA Gemini 翻译用量。
+func ExtractGeminiTranslatedOpenAIUsage(data []byte) (Usage, bool) {
+	return extractUsage(data, ParseGeminiTranslatedOpenAIUsage)
+}
+
+// ExtractAnthropicUsage 从响应顶层提取并按 Anthropic 语义归一化 usage。
+func ExtractAnthropicUsage(data []byte) (Usage, bool) {
+	var probe struct {
+		Message *struct {
+			Usage json.RawMessage `json:"usage"`
+		} `json:"message"`
+		Usage json.RawMessage `json:"usage"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return Usage{}, false
+	}
+	// Anthropic 流式 message_start 把输入与缓存用量放在 message.usage；
+	// message_delta 和非流式响应则使用顶层 usage。
+	if probe.Message != nil && len(probe.Message.Usage) > 0 && string(probe.Message.Usage) != "null" {
+		return ParseAnthropicUsage(probe.Message.Usage)
+	}
+	if len(probe.Usage) > 0 && string(probe.Usage) != "null" {
+		return ParseAnthropicUsage(probe.Usage)
+	}
+	return Usage{}, false
+}
+
+// geminiUsageWire 是 Gemini usageMetadata 的最小计量字段集合。
+// promptTokenCount 不含工具调用提示，thoughtsTokenCount 不含在正文输出中，
+// 两者都需要分别补入 canonical 输入/输出口径。
+type geminiUsageWire struct {
+	PromptTokenCount        *int `json:"promptTokenCount"`
+	CandidatesTokenCount    *int `json:"candidatesTokenCount"`
+	ThoughtsTokenCount      *int `json:"thoughtsTokenCount"`
+	CachedContentTokenCount *int `json:"cachedContentTokenCount"`
+	ToolUsePromptTokenCount *int `json:"toolUsePromptTokenCount"`
+	TotalTokenCount         *int `json:"totalTokenCount"`
+}
+
+// ParseGeminiUsage 解析 Gemini usageMetadata。
+// promptTokenCount 已包含缓存读取，但不含 toolUsePromptTokenCount；
+// candidatesTokenCount 与 thoughtsTokenCount 是互不重叠的输出分量。
+func ParseGeminiUsage(raw []byte) (Usage, bool) {
+	var w geminiUsageWire
+	if err := json.Unmarshal(raw, &w); err != nil {
+		return Usage{}, false
+	}
+	found := w.PromptTokenCount != nil || w.CandidatesTokenCount != nil ||
+		w.ThoughtsTokenCount != nil || w.CachedContentTokenCount != nil ||
+		w.ToolUsePromptTokenCount != nil || w.TotalTokenCount != nil
+	if !found {
+		return Usage{}, false
+	}
+	value := func(v *int) int {
+		if v == nil || *v < 0 {
+			return 0
+		}
+		return *v
+	}
+	prompt := value(w.PromptTokenCount)
+	toolPrompt := value(w.ToolUsePromptTokenCount)
+	input := saturatingTokenSum(prompt, toolPrompt)
+	completion := saturatingTokenSum(value(w.CandidatesTokenCount), value(w.ThoughtsTokenCount))
+	// totalTokenCount 可补足兼容上游遗漏的 candidates/thoughts 分量；取较大值
+	// 而非相加，避免完整明细与累计总量重复计数。
+	fromTotal := value(w.TotalTokenCount) - input
+	if fromTotal > completion {
+		completion = fromTotal
+	}
+	return Usage{
+		PromptTokens:     input,
+		CompletionTokens: completion,
+		CachedTokens:     value(w.CachedContentTokenCount),
+	}, true
+}
+
+// ParseOpenAITranslatedGeminiUsage 解析 CPA 将 OpenAI/Codex 系响应翻译成 Gemini 后的
+// usageMetadata。翻译后的 candidatesTokenCount 已包含 reasoning，thoughtsTokenCount
+// 只是其明细，不能像 Gemini 原生口径一样再次相加。
+func ParseOpenAITranslatedGeminiUsage(raw []byte) (Usage, bool) {
+	return parseTranslatedGeminiUsage(raw, false)
+}
+
+// ParseClaudeTranslatedGeminiUsage 解析 CPA 将 Claude 响应翻译成 Gemini 后的
+// usageMetadata。翻译器直接把 Claude 新鲜输入写入 promptTokenCount，并把缓存读写
+// 合并到 cachedContentTokenCount，因此 canonical PromptTokens 需要补回缓存总量。
+func ParseClaudeTranslatedGeminiUsage(raw []byte) (Usage, bool) {
+	return parseTranslatedGeminiUsage(raw, true)
+}
+
+func parseTranslatedGeminiUsage(raw []byte, independentCache bool) (Usage, bool) {
+	var w geminiUsageWire
+	if err := json.Unmarshal(raw, &w); err != nil {
+		return Usage{}, false
+	}
+	found := w.PromptTokenCount != nil || w.CandidatesTokenCount != nil ||
+		w.ThoughtsTokenCount != nil || w.CachedContentTokenCount != nil ||
+		w.ToolUsePromptTokenCount != nil || w.TotalTokenCount != nil
+	if !found {
+		return Usage{}, false
+	}
+	value := func(v *int) int {
+		if v == nil || *v < 0 {
+			return 0
+		}
+		return *v
+	}
+	prompt := saturatingTokenSum(value(w.PromptTokenCount), value(w.ToolUsePromptTokenCount))
+	completion := value(w.CandidatesTokenCount)
+	if fromTotal := value(w.TotalTokenCount) - prompt; fromTotal > completion {
+		completion = fromTotal
+	}
+	cached := value(w.CachedContentTokenCount)
+	if independentCache {
+		prompt = saturatingTokenSum(prompt, cached)
+	}
+	return Usage{PromptTokens: prompt, CompletionTokens: completion, CachedTokens: cached}, true
+}
+
+func saturatingTokenSum(values ...int) int {
+	maxInt := int(^uint(0) >> 1)
+	total := 0
+	for _, value := range values {
+		if value <= 0 {
+			continue
+		}
+		if value > maxInt-total {
+			return maxInt
+		}
+		total += value
+	}
+	return total
+}
+
+// ExtractGeminiUsage 从 Gemini 原生响应或 Antigravity 包装响应中提取 usageMetadata。
+func ExtractGeminiUsage(data []byte) (Usage, bool) {
+	return extractGeminiUsage(data, ParseGeminiUsage)
+}
+
+// ExtractOpenAITranslatedGeminiUsage 提取 OpenAI/Codex 系翻译后的 Gemini 用量。
+func ExtractOpenAITranslatedGeminiUsage(data []byte) (Usage, bool) {
+	return extractGeminiUsage(data, ParseOpenAITranslatedGeminiUsage)
+}
+
+// ExtractClaudeTranslatedGeminiUsage 提取 Claude 翻译后的 Gemini 用量。
+func ExtractClaudeTranslatedGeminiUsage(data []byte) (Usage, bool) {
+	return extractGeminiUsage(data, ParseClaudeTranslatedGeminiUsage)
+}
+
+func extractGeminiUsage(data []byte, parse func([]byte) (Usage, bool)) (Usage, bool) {
+	var probe struct {
+		Response *struct {
+			UsageMetadata json.RawMessage `json:"usageMetadata"`
+		} `json:"response"`
+		UsageMetadata json.RawMessage `json:"usageMetadata"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return Usage{}, false
+	}
+	if probe.Response != nil && len(probe.Response.UsageMetadata) > 0 && string(probe.Response.UsageMetadata) != "null" {
+		return parse(probe.Response.UsageMetadata)
+	}
+	if len(probe.UsageMetadata) > 0 && string(probe.UsageMetadata) != "null" {
+		return parse(probe.UsageMetadata)
+	}
+	return Usage{}, false
+}
+
+func extractUsage(data []byte, parse func([]byte) (Usage, bool)) (Usage, bool) {
 	var probe struct {
 		Usage json.RawMessage `json:"usage"`
 	}
@@ -395,7 +643,7 @@ func ExtractUsage(data []byte) (Usage, bool) {
 	if len(probe.Usage) == 0 || string(probe.Usage) == "null" {
 		return Usage{}, false
 	}
-	return ParseUsage(probe.Usage)
+	return parse(probe.Usage)
 }
 
 // ExtractResponsesUsage 从 Responses API 的 response.completed 事件载荷提取 usage。
@@ -403,6 +651,15 @@ func ExtractUsage(data []byte) (Usage, bool) {
 // 优先取 response.usage；无 response 包装时回退顶层 usage（容错，兼容个别上游
 // 把 usage 放顶层）。usage 缺失/为 null/解析失败返回 (Usage{}, false)。
 func ExtractResponsesUsage(data []byte) (Usage, bool) {
+	return extractResponsesUsage(data, ParseUsage)
+}
+
+// ExtractGeminiTranslatedResponsesUsage 从 Responses 响应中提取 CPA Gemini 翻译用量。
+func ExtractGeminiTranslatedResponsesUsage(data []byte) (Usage, bool) {
+	return extractResponsesUsage(data, ParseGeminiTranslatedOpenAIUsage)
+}
+
+func extractResponsesUsage(data []byte, parse func([]byte) (Usage, bool)) (Usage, bool) {
 	var probe struct {
 		Response *struct {
 			Usage json.RawMessage `json:"usage"`
@@ -413,10 +670,10 @@ func ExtractResponsesUsage(data []byte) (Usage, bool) {
 		return Usage{}, false
 	}
 	if probe.Response != nil && len(probe.Response.Usage) > 0 && string(probe.Response.Usage) != "null" {
-		return ParseUsage(probe.Response.Usage)
+		return parse(probe.Response.Usage)
 	}
 	if len(probe.Usage) > 0 && string(probe.Usage) != "null" {
-		return ParseUsage(probe.Usage)
+		return parse(probe.Usage)
 	}
 	return Usage{}, false
 }

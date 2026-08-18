@@ -11,7 +11,7 @@ import (
 // streamObserver Gemini streamGenerateContent SSE 的透传型 usage 观察器。
 // Gemini SSE 每个 data 行即一个完整 generateContent JSON 分片；管线原样转发，
 // 本观察器旁路解析：
-//   - usageMetadata（末 chunk 携带，个别上游中间 chunk 也带）——取最后一个非空；
+//   - usageMetadata（末 chunk 携带，个别上游中间 chunk 也带）——逐字段合并累计值；
 //   - candidates[0].finishReason 为协议级完成信号（Gemini 无显式结束事件，靠 EOF 收尾）；
 //   - 顶层 error 对象记为流内错误——管线据此按流中断处理，不把截断响应伪装成完整。
 type streamObserver struct {
@@ -53,7 +53,7 @@ func (s *streamObserver) ObserveLine(line string) {
 		return
 	}
 	if !chunk.UsageMetadata.empty() {
-		s.usage = chunk.UsageMetadata
+		s.usage = s.usage.merge(chunk.UsageMetadata)
 	}
 	if len(chunk.Candidates) > 0 && chunk.Candidates[0].FinishReason != "" {
 		s.sawFinish = true
