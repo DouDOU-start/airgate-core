@@ -75,11 +75,9 @@ func TestDefaultModelsNonEmptyForMainPlatforms(t *testing.T) {
 }
 
 func TestAntigravityDefaultModelsIncludeGemini37(t *testing.T) {
-	models := DefaultModels("antigravity")
-	for _, model := range []string{"gemini-3.7-flash-high", "gemini-3.7-flash-tiered"} {
-		if !containsModelID(models, model) {
-			t.Fatalf("Antigravity 默认模型目录缺少 CPA 当前模型 %s", model)
-		}
+	const model = "gemini-3.7-flash-high"
+	if !containsModelID(DefaultModels("antigravity"), model) {
+		t.Fatalf("Antigravity 默认模型目录缺少 CPA 当前模型 %s", model)
 	}
 }
 

@@ -564,6 +564,10 @@ END $$`,
 
 // legacyFixups 存量库定点修复清单（幂等；按时间序追加，勿改历史条目）。
 var legacyFixups = []string{
+	// 2026-08：Gemini Tiered 是 Antigravity 用量接口的配额组名称，不是可计费模型。
+	// 清理上一版本误写入模型价格表的条目，避免模型目录和计费缓存继续暴露错误模型。
+	`DELETE FROM model_prices WHERE model = 'gemini-3.7-flash-tiered'`,
+
 	// 2026-07：provisioned key 幂等键从（用户×应用）扩为（用户×应用×分组，
 	// 见 ent/schema/apikey.go）。旧的两维部分唯一索引已被三维索引取代，
 	// 不清理会导致同应用按组领第二把 key 时撞旧约束。

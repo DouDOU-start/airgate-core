@@ -130,13 +130,16 @@ func (s *Service) AvailableTestModels(ctx context.Context, id int) ([]TestModel,
 		proxyURL := proxyURLFromRef(item.Proxy)
 		if err := s.ensureOAuthCredentialsFresh(ctx, &item, proxyURL); err == nil {
 			if liveModels, fetchErr := fetchAntigravityAvailableModels(ctx, item.Credentials, proxyURL); fetchErr == nil {
-				return filterAntigravityTestModels(item.Platform, plan, liveModels, allowedIDs), nil
+				return buildAntigravityTestModels(item.Platform, plan, liveModels, allowedIDs), nil
 			}
 		}
 	}
 
 	// 白名单：仅 ID 列表，展示名尽量从 CPA 目录补
 	if len(allowedIDs) > 0 {
+		if cpa.ResolveProvider(item.Platform) == "antigravity" {
+			allowedIDs = canonicalAntigravityTestModelIDs(item.Platform, plan, allowedIDs)
+		}
 		out := make([]TestModel, 0, len(allowedIDs))
 		for _, mid := range allowedIDs {
 			mid = strings.TrimSpace(mid)
@@ -266,20 +269,73 @@ func fetchAntigravityAvailableModels(ctx context.Context, credentials map[string
 	return nil, lastErr
 }
 
-func filterAntigravityTestModels(platform, plan string, models []antigravityAvailableModel, allowedIDs []string) []TestModel {
+func canonicalAntigravityAvailableModels(platform, plan string, liveModels []antigravityAvailableModel, allowedIDs []string) []antigravityAvailableModel {
+	live := make(map[string]antigravityAvailableModel, len(liveModels))
+	for _, model := range liveModels {
+		if !isAntigravityInternalModel(model.ID) {
+			live[strings.ToLower(strings.TrimSpace(model.ID))] = model
+		}
+	}
 	allowed := make(map[string]struct{}, len(allowedIDs))
 	for _, id := range allowedIDs {
 		if id = strings.TrimSpace(id); id != "" {
 			allowed[strings.ToLower(id)] = struct{}{}
 		}
 	}
-	out := make([]TestModel, 0, len(models))
-	for _, model := range models {
+	out := make([]antigravityAvailableModel, 0, len(live))
+	for _, canonical := range cpa.DefaultModelInfos(platform, plan) {
+		model, ok := live[strings.ToLower(strings.TrimSpace(canonical.ID))]
+		if !ok {
+			continue
+		}
 		if len(allowed) > 0 {
-			if _, ok := allowed[strings.ToLower(model.ID)]; !ok {
+			if _, ok := allowed[strings.ToLower(canonical.ID)]; !ok {
 				continue
 			}
 		}
+		model.ID = canonical.ID
+		if strings.TrimSpace(canonical.DisplayName) != "" {
+			model.DisplayName = canonical.DisplayName
+		}
+		out = append(out, model)
+	}
+	return out
+}
+
+func canonicalAntigravityModelID(platform, plan, modelID string) (string, bool) {
+	modelID = strings.TrimSpace(modelID)
+	if modelID == "" || isAntigravityInternalModel(modelID) {
+		return "", false
+	}
+	for _, canonical := range cpa.DefaultModelInfos(platform, plan) {
+		if strings.EqualFold(canonical.ID, modelID) {
+			return canonical.ID, true
+		}
+	}
+	return "", false
+}
+
+func canonicalAntigravityTestModelIDs(platform, plan string, modelIDs []string) []string {
+	seen := make(map[string]struct{}, len(modelIDs))
+	out := make([]string, 0, len(modelIDs))
+	for _, modelID := range modelIDs {
+		canonical, ok := canonicalAntigravityModelID(platform, plan, modelID)
+		if !ok {
+			continue
+		}
+		if _, ok := seen[canonical]; ok {
+			continue
+		}
+		seen[canonical] = struct{}{}
+		out = append(out, canonical)
+	}
+	return out
+}
+
+func buildAntigravityTestModels(platform, plan string, liveModels []antigravityAvailableModel, allowedIDs []string) []TestModel {
+	canonical := canonicalAntigravityAvailableModels(platform, plan, liveModels, allowedIDs)
+	out := make([]TestModel, 0, len(canonical))
+	for _, model := range canonical {
 		out = append(out, buildAccountTestModel(platform, plan, model.ID, model.DisplayName))
 	}
 	return out
@@ -517,11 +573,22 @@ type accountTestForwarder interface {
 // testAntigravity 通过 CPA Antigravity executor 发起一次非流式探测请求。
 // 使用 OpenAI Chat Completions 作为统一输入格式，由 CPA 负责翻译为 Gemini 请求。
 func (s *Service) testAntigravity(ctx context.Context, item Account, modelID, prompt, proxyURL string, emit func(TestEvent)) (string, testStreamUsage, error) {
-	model := pickDefaultTestModel(item.Platform, resolvePlanType(item), modelID)
+	plan := resolvePlanType(item)
+	model := strings.TrimSpace(modelID)
+	if model != "" {
+		canonical, ok := canonicalAntigravityModelID(item.Platform, plan, model)
+		if !ok {
+			return model, testStreamUsage{}, emitErr(emit, fmt.Sprintf("模型 %s 不在 Antigravity CPA 标准模型目录中", model))
+		}
+		model = canonical
+	} else {
+		model = pickDefaultTestModel(item.Platform, plan, "")
+	}
 	if err := s.ensureOAuthCredentialsFresh(ctx, &item, proxyURL); err != nil {
 		return model, testStreamUsage{}, emitErr(emit, "access_token 刷新失败: "+err.Error())
 	}
 	if liveModels, err := fetchAntigravityAvailableModels(ctx, item.Credentials, proxyURL); err == nil {
+		liveModels = canonicalAntigravityAvailableModels(item.Platform, plan, liveModels, modelsFromAccountExtra(item.Extra))
 		if strings.TrimSpace(modelID) == "" {
 			model = pickAntigravityAvailableModel(liveModels)
 		}

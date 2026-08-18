@@ -14,7 +14,7 @@ import (
 )
 
 func TestAntigravity连通性测试通过CPA转发(t *testing.T) {
-	server := newAntigravityModelsServer(t, []string{"gemini-2.5-flash"})
+	server := newAntigravityModelsServer(t, []string{"gemini-3.6-flash-high"})
 	defer server.Close()
 	repo := &antigravityTestRepo{item: Account{
 		ID:       21,
@@ -44,7 +44,7 @@ func TestAntigravity连通性测试通过CPA转发(t *testing.T) {
 	err := service.TestConnection(
 		context.Background(),
 		repo.item.ID,
-		"gemini-2.5-flash",
+		"gemini-3.6-flash-high",
 		"请只回复连接成功",
 		TestOptions{},
 		func(event TestEvent) { events = append(events, event) },
@@ -62,7 +62,7 @@ func TestAntigravity连通性测试通过CPA转发(t *testing.T) {
 	if request.Account.Platform != "antigravity" || request.Account.AccountID != repo.item.ID {
 		t.Fatalf("转发账号信息不正确: %+v", request.Account)
 	}
-	if request.Model != "gemini-2.5-flash" || request.Endpoint != adaptor.EndpointChatCompletions {
+	if request.Model != "gemini-3.6-flash-high" || request.Endpoint != adaptor.EndpointChatCompletions {
 		t.Fatalf("转发模型或端点不正确: model=%q endpoint=%q", request.Model, request.Endpoint)
 	}
 	if request.EntryProtocol != registry.ProtocolOpenAI || request.Stream {
@@ -79,7 +79,7 @@ func TestAntigravity连通性测试通过CPA转发(t *testing.T) {
 	if err := json.Unmarshal(request.Payload, &payload); err != nil {
 		t.Fatalf("解析转发请求体失败: %v", err)
 	}
-	if payload.Model != "gemini-2.5-flash" || payload.Stream || len(payload.Messages) != 1 {
+	if payload.Model != "gemini-3.6-flash-high" || payload.Stream || len(payload.Messages) != 1 {
 		t.Fatalf("转发请求体不正确: %+v", payload)
 	}
 	if payload.Messages[0].Role != "user" || payload.Messages[0].Content != "请只回复连接成功" {
@@ -89,7 +89,7 @@ func TestAntigravity连通性测试通过CPA转发(t *testing.T) {
 	if len(events) != 3 {
 		t.Fatalf("事件数量 = %d，期望 3，事件: %+v", len(events), events)
 	}
-	if events[0].Type != "test_start" || events[0].Model != "gemini-2.5-flash" {
+	if events[0].Type != "test_start" || events[0].Model != "gemini-3.6-flash-high" {
 		t.Fatalf("开始事件不正确: %+v", events[0])
 	}
 	if events[1].Type != "content" || events[1].Text != "连接成功" {
@@ -101,7 +101,7 @@ func TestAntigravity连通性测试通过CPA转发(t *testing.T) {
 }
 
 func TestAntigravity连通性测试透传上游错误(t *testing.T) {
-	server := newAntigravityModelsServer(t, []string{"gemini-2.5-flash"})
+	server := newAntigravityModelsServer(t, []string{"gemini-3.6-flash-high"})
 	defer server.Close()
 	repo := &antigravityTestRepo{item: Account{
 		ID:       22,
@@ -126,7 +126,7 @@ func TestAntigravity连通性测试透传上游错误(t *testing.T) {
 	err := service.TestConnection(
 		context.Background(),
 		repo.item.ID,
-		"gemini-2.5-flash",
+		"gemini-3.6-flash-high",
 		"hi",
 		TestOptions{},
 		func(event TestEvent) { events = append(events, event) },
@@ -261,6 +261,78 @@ func TestAntigravity未指定模型时从实时目录选择默认模型(t *testi
 	}
 	if forwarder.request.Model != "gemini-3.7-flash-high" {
 		t.Fatalf("默认模型 = %q，期望使用实时目录中的 Flash 模型", forwarder.request.Model)
+	}
+}
+
+func TestAntigravity测试模型过滤Tiered并保留标准37模型(t *testing.T) {
+	server := newAntigravityModelsServer(t, []string{"gemini-3.7-flash-tiered", "gemini-3.7-flash-high"})
+	defer server.Close()
+	repo := &antigravityTestRepo{item: Account{
+		ID:       26,
+		Platform: "antigravity",
+		Type:     TypeOAuth,
+		Credentials: map[string]string{
+			"access_token": "测试访问令牌",
+			"base_url":     server.URL,
+		},
+	}}
+	service := NewService(repo, "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
+
+	models, err := service.AvailableTestModels(context.Background(), repo.item.ID)
+	if err != nil {
+		t.Fatalf("查询 Antigravity 测试模型失败: %v", err)
+	}
+	if len(models) != 1 || models[0].ID != "gemini-3.7-flash-high" {
+		t.Fatalf("测试模型未按 CPA 规范过滤: %+v", models)
+	}
+}
+
+func TestAntigravity测试连接拒绝Tiered模型(t *testing.T) {
+	server := newAntigravityModelsServer(t, []string{"gemini-3.7-flash-tiered"})
+	defer server.Close()
+	repo := &antigravityTestRepo{item: Account{
+		ID:       27,
+		Platform: "antigravity",
+		Type:     TypeOAuth,
+		Credentials: map[string]string{
+			"access_token": "测试访问令牌",
+			"base_url":     server.URL,
+		},
+	}}
+	forwarder := &antigravityTestForwarder{}
+	service := NewService(repo, "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
+	service.SetOAuthCredentialRefresher(forwarder)
+
+	err := service.TestConnection(context.Background(), repo.item.ID, "gemini-3.7-flash-tiered", "hi", TestOptions{}, func(TestEvent) {})
+	if err == nil || !strings.Contains(err.Error(), "不在 Antigravity CPA 标准模型目录中") {
+		t.Fatalf("tiered 模型未被拒绝: %v", err)
+	}
+	if forwarder.calls != 0 {
+		t.Fatalf("tiered 模型不应调用 CPA，实际调用 %d 次", forwarder.calls)
+	}
+}
+
+func TestAntigravity实时目录失败时白名单仍过滤Tiered(t *testing.T) {
+	repo := &antigravityTestRepo{item: Account{
+		ID:       28,
+		Platform: "antigravity",
+		Type:     TypeOAuth,
+		Extra: map[string]any{
+			"models": []any{"gemini-3.7-flash-tiered", "gemini-3.7-flash-high"},
+		},
+		Credentials: map[string]string{
+			"access_token": "测试访问令牌",
+			"base_url":     "http://127.0.0.1:1",
+		},
+	}}
+	service := NewService(repo, "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
+
+	models, err := service.AvailableTestModels(context.Background(), repo.item.ID)
+	if err != nil {
+		t.Fatalf("查询回退测试模型失败: %v", err)
+	}
+	if len(models) != 1 || models[0].ID != "gemini-3.7-flash-high" {
+		t.Fatalf("实时目录失败时仍透传 tiered: %+v", models)
 	}
 }
 

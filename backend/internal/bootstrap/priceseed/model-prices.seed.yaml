@@ -266,8 +266,6 @@ models:
   - <<: *gemini_37_flash_price
     model: gemini-3.7-flash-high
   - <<: *gemini_37_flash_price
-    model: gemini-3.7-flash-tiered
-  - <<: *gemini_37_flash_price
     model: gemini-flash-latest
   - &gemini_36_flash_price
     model: gemini-3.6-flash
