@@ -3241,12 +3241,12 @@
   ],
   "antigravity": [
     {
-      "id": "claude-opus-4-6-thinking",
+      "id": "claude-opus-4-6",
       "object": "model",
       "owned_by": "antigravity",
       "type": "antigravity",
       "display_name": "Claude Opus 4.6 (Thinking)",
-      "name": "claude-opus-4-6-thinking",
+      "name": "claude-opus-4-6",
       "description": "Claude Opus 4.6 (Thinking)",
       "context_length": 200000,
       "max_completion_tokens": 64000,

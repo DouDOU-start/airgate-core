@@ -26,6 +26,8 @@ const (
 	cpaPreContentBufferLimit       = 1 << 20
 	antigravityGemini37FlashPublic = "gemini-3.7-flash-high"
 	antigravityGemini37FlashTiered = "gemini-3.7-flash-tiered"
+	antigravityClaudeOpusPublic    = "claude-opus-4-6"
+	antigravityClaudeOpusUpstream  = "claude-opus-4-6-thinking"
 )
 
 // ForwardRequest 一次账号路径转发请求。
@@ -152,10 +154,16 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 // Antigravity 实时目录把 Gemini 3.7 Flash 暴露为 tiered，但 CPA 静态目录、
 // 模型广场和计费统一使用 high；因此仅在最终上游请求处转换。
 func resolveProviderUpstreamModel(provider, requestedModel, upstreamModel string) string {
-	if strings.EqualFold(strings.TrimSpace(provider), "antigravity") &&
-		strings.EqualFold(strings.TrimSpace(requestedModel), antigravityGemini37FlashPublic) &&
-		strings.EqualFold(strings.TrimSpace(upstreamModel), antigravityGemini37FlashPublic) {
+	if !strings.EqualFold(strings.TrimSpace(provider), "antigravity") {
+		return upstreamModel
+	}
+	switch {
+	case strings.EqualFold(strings.TrimSpace(requestedModel), antigravityGemini37FlashPublic) &&
+		strings.EqualFold(strings.TrimSpace(upstreamModel), antigravityGemini37FlashPublic):
 		return antigravityGemini37FlashTiered
+	case strings.EqualFold(strings.TrimSpace(requestedModel), antigravityClaudeOpusPublic) &&
+		strings.EqualFold(strings.TrimSpace(upstreamModel), antigravityClaudeOpusPublic):
+		return antigravityClaudeOpusUpstream
 	}
 	return upstreamModel
 }
@@ -175,9 +183,15 @@ func newResponseModelRewrite(requestedModel, upstreamModel string) responseModel
 }
 
 func providerResponseModelRewrite(provider, requestedModel, upstreamModel string) responseModelRewrite {
-	if strings.EqualFold(strings.TrimSpace(provider), "antigravity") &&
-		strings.EqualFold(strings.TrimSpace(requestedModel), antigravityGemini37FlashPublic) &&
-		strings.EqualFold(strings.TrimSpace(upstreamModel), antigravityGemini37FlashTiered) {
+	if !strings.EqualFold(strings.TrimSpace(provider), "antigravity") {
+		return responseModelRewrite{}
+	}
+	switch {
+	case strings.EqualFold(strings.TrimSpace(requestedModel), antigravityGemini37FlashPublic) &&
+		strings.EqualFold(strings.TrimSpace(upstreamModel), antigravityGemini37FlashTiered):
+		return newResponseModelRewrite(requestedModel, upstreamModel)
+	case strings.EqualFold(strings.TrimSpace(requestedModel), antigravityClaudeOpusPublic) &&
+		strings.EqualFold(strings.TrimSpace(upstreamModel), antigravityClaudeOpusUpstream):
 		return newResponseModelRewrite(requestedModel, upstreamModel)
 	}
 	return responseModelRewrite{}

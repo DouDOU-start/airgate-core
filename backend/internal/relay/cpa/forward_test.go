@@ -64,6 +64,20 @@ func TestAntigravity标准37模型仅在上游转换为Tiered(t *testing.T) {
 			upstreamModel:  "gemini-3.7-flash-high",
 			wantUpstream:   "gemini-3.7-flash-high",
 		},
+		{
+			name:           "Claude Opus 映射到 thinking",
+			provider:       "antigravity",
+			requestedModel: "claude-opus-4-6",
+			upstreamModel:  "claude-opus-4-6",
+			wantUpstream:   "claude-opus-4-6-thinking",
+		},
+		{
+			name:           "Claude Opus 显式账号映射优先",
+			provider:       "antigravity",
+			requestedModel: "claude-opus-4-6",
+			upstreamModel:  "自定义上游",
+			wantUpstream:   "自定义上游",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -86,9 +100,12 @@ func TestAntigravity标准37非流式响应回写对外模型(t *testing.T) {
 	}
 }
 
-func Test响应模型回写仅限Antigravity标准37映射(t *testing.T) {
+func Test响应模型回写仅限Antigravity内部映射(t *testing.T) {
 	if rewrite := providerResponseModelRewrite("antigravity", "gemini-3.7-flash-high", "gemini-3.7-flash-tiered"); rewrite.from == "" {
 		t.Fatal("Antigravity 3.7 内部映射应启用响应回写")
+	}
+	if rewrite := providerResponseModelRewrite("antigravity", "claude-opus-4-6", "claude-opus-4-6-thinking"); rewrite.from == "" {
+		t.Fatal("Antigravity Claude Opus 内部映射应启用响应回写")
 	}
 	for _, rewrite := range []responseModelRewrite{
 		providerResponseModelRewrite("gemini", "gemini-3.7-flash-high", "gemini-3.7-flash-tiered"),
