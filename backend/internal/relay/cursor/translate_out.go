@@ -118,6 +118,14 @@ func CollectEvents(events <-chan Event) *Aggregate {
 	if len(agg.ToolCalls) > 0 && agg.FinishReason == "stop" {
 		agg.FinishReason = "tool_calls"
 	}
+	// 输出兜底：短回复可能一个 TokenDelta 都没收到，用透出内容估算托底。
+	contentBytes := len(agg.Text) + len(agg.Reasoning)
+	for _, tc := range agg.ToolCalls {
+		contentBytes += len(tc.Args)
+	}
+	if est := estimateTokensFromBytes(contentBytes); est > agg.OutputTokens {
+		agg.OutputTokens = est
+	}
 	return agg
 }
 
@@ -173,11 +181,12 @@ type OpenAIStreamRenderer struct {
 	Created      int64
 	PromptTokens int
 
-	sentRole    bool
-	toolIndex   map[string]int
-	argsSent    map[string]int
-	namedSent   map[string]bool // 该调用的非空 name 是否已下发
-	usageTokens int
+	sentRole     bool
+	toolIndex    map[string]int
+	argsSent     map[string]int
+	namedSent    map[string]bool // 该调用的非空 name 是否已下发
+	usageTokens  int
+	contentBytes int // 已透出内容字节数，为输出计量托底
 }
 
 func NewOpenAIStreamRenderer(id, model string, created int64, promptTokens int) *OpenAIStreamRenderer {
@@ -224,9 +233,11 @@ func (r *OpenAIStreamRenderer) Render(e Event) []SSEFrame {
 		// token 前客户端长时间零字节。
 		frames = r.roleChunkIfNeeded(frames)
 	case TextDelta:
+		r.contentBytes += len(ev.Text)
 		frames = r.roleChunkIfNeeded(frames)
 		frames = append(frames, r.chunk(map[string]any{"content": ev.Text}, nil, nil))
 	case ReasoningDelta:
+		r.contentBytes += len(ev.Text)
 		frames = r.roleChunkIfNeeded(frames)
 		frames = append(frames, r.chunk(map[string]any{"reasoning_content": ev.Text}, nil, nil))
 	case ToolCallStart:
@@ -248,6 +259,7 @@ func (r *OpenAIStreamRenderer) Render(e Event) []SSEFrame {
 	case ToolCallArgsDelta:
 		if idx, ok := r.toolIndex[ev.ID]; ok && ev.Args != "" {
 			r.argsSent[ev.ID] += len(ev.Args)
+			r.contentBytes += len(ev.Args)
 			fn := map[string]any{"arguments": ev.Args}
 			// 名字晚到（Start 时为空）：借参数增量 chunk 补发。
 			if !r.namedSent[ev.ID] && ev.Name != "" {
@@ -265,6 +277,7 @@ func (r *OpenAIStreamRenderer) Render(e Event) []SSEFrame {
 			// 若从未流过参数（exec 直达），一次性补发完整 arguments。
 			if r.argsSent[ev.ID] == 0 && len(ev.ArgsJSON) > 0 {
 				r.argsSent[ev.ID] = len(ev.ArgsJSON)
+				r.contentBytes += len(ev.ArgsJSON)
 				fn["arguments"] = string(ev.ArgsJSON)
 			}
 			if !r.namedSent[ev.ID] && ev.Name != "" {
@@ -282,10 +295,11 @@ func (r *OpenAIStreamRenderer) Render(e Event) []SSEFrame {
 		r.usageTokens += ev.Tokens
 	case Done:
 		frames = r.roleChunkIfNeeded(frames)
+		output := outputTokensFloor(r.usageTokens, r.contentBytes)
 		frames = append(frames, r.chunk(map[string]any{}, ev.FinishReason, map[string]any{
 			"prompt_tokens":     r.PromptTokens,
-			"completion_tokens": r.usageTokens,
-			"total_tokens":      r.PromptTokens + r.usageTokens,
+			"completion_tokens": output,
+			"total_tokens":      r.PromptTokens + output,
 		}))
 	}
 	return frames
@@ -336,13 +350,14 @@ type AnthropicStreamRenderer struct {
 	Model        string
 	PromptTokens int
 
-	started     bool
-	blockOpen   bool
-	blockType   string // "text" | "thinking" | "tool_use"
-	blockIndex  int
-	curToolID   string
-	argsSent    map[string]int
-	usageTokens int
+	started      bool
+	blockOpen    bool
+	blockType    string // "text" | "thinking" | "tool_use"
+	blockIndex   int
+	curToolID    string
+	argsSent     map[string]int
+	usageTokens  int
+	contentBytes int // 已透出内容字节数，为输出计量托底
 	// pendingTool / pendingArgs：工具名可能晚于调用事件到达（interaction
 	// update 先到且无名），content_block_start 一旦发出 name 无法更正，
 	// 故名字为空时延迟开块，参数增量先缓存，拿到名字后一并冲刷。
@@ -371,6 +386,7 @@ func (r *AnthropicStreamRenderer) openToolBlock(id, name string) []SSEFrame {
 	delete(r.pendingTool, id)
 	if buf := r.pendingArgs[id]; buf != "" {
 		r.argsSent[id] += len(buf)
+		r.contentBytes += len(buf)
 		frames = append(frames, r.delta(map[string]any{"type": "input_json_delta", "partial_json": buf}))
 		delete(r.pendingArgs, id)
 	}
@@ -443,11 +459,13 @@ func (r *AnthropicStreamRenderer) Render(e Event) []SSEFrame {
 	}
 	switch ev := e.(type) {
 	case TextDelta:
+		r.contentBytes += len(ev.Text)
 		if !r.blockOpen || r.blockType != "text" {
 			frames = append(frames, r.openBlock("text", map[string]any{"type": "text", "text": ""})...)
 		}
 		frames = append(frames, r.delta(map[string]any{"type": "text_delta", "text": ev.Text}))
 	case ReasoningDelta:
+		r.contentBytes += len(ev.Text)
 		if !r.blockOpen || r.blockType != "thinking" {
 			frames = append(frames, r.openBlock("thinking", map[string]any{"type": "thinking", "thinking": ""})...)
 		}
@@ -469,6 +487,7 @@ func (r *AnthropicStreamRenderer) Render(e Event) []SSEFrame {
 		}
 		if r.blockOpen && r.blockType == "tool_use" && r.curToolID == ev.ID && ev.Args != "" {
 			r.argsSent[ev.ID] += len(ev.Args)
+			r.contentBytes += len(ev.Args)
 			frames = append(frames, r.delta(map[string]any{"type": "input_json_delta", "partial_json": ev.Args}))
 		}
 	case ToolCallEnd:
@@ -482,6 +501,7 @@ func (r *AnthropicStreamRenderer) Render(e Event) []SSEFrame {
 		if r.blockOpen && r.blockType == "tool_use" && r.curToolID == ev.ID {
 			if r.argsSent[ev.ID] == 0 && len(ev.ArgsJSON) > 0 {
 				r.argsSent[ev.ID] = len(ev.ArgsJSON)
+				r.contentBytes += len(ev.ArgsJSON)
 				frames = append(frames, r.delta(map[string]any{"type": "input_json_delta", "partial_json": string(ev.ArgsJSON)}))
 			}
 			frames = append(frames, r.closeBlock()...)
@@ -496,7 +516,7 @@ func (r *AnthropicStreamRenderer) Render(e Event) []SSEFrame {
 				Data: mustJSON(map[string]any{
 					"type":  "message_delta",
 					"delta": map[string]any{"stop_reason": mapFinishReasonAnthropic(ev.FinishReason), "stop_sequence": nil},
-					"usage": map[string]any{"output_tokens": r.usageTokens},
+					"usage": map[string]any{"output_tokens": outputTokensFloor(r.usageTokens, r.contentBytes)},
 				}),
 			},
 			SSEFrame{Event: "message_stop", Data: mustJSON(map[string]any{"type": "message_stop"})},
@@ -514,6 +534,8 @@ func EncodeSSE(f SSEFrame) []byte {
 }
 
 // EstimatePromptTokens 粗估 prompt token 数（Cursor 不回报输入侧用量）。
+// 工具定义（name/description/schema）随请求全量下发，是 agent 类客户端输入
+// 的大头，必须计入。
 func EstimatePromptTokens(req *ParsedRequest) int {
 	total := 0
 	for _, sp := range req.SystemPrompts {
@@ -525,12 +547,28 @@ func EstimatePromptTokens(req *ParsedRequest) int {
 			total += len(tc.Name) + len(tc.Args)
 		}
 	}
-	if total == 0 {
+	for _, t := range req.Tools {
+		total += len(t.Name) + len(t.Description) + len(t.Schema)
+	}
+	return estimateTokensFromBytes(total)
+}
+
+// estimateTokensFromBytes 按 4 字节/token 粗估，非空内容至少记 1。
+func estimateTokensFromBytes(n int) int {
+	if n <= 0 {
 		return 0
 	}
-	tokens := total / 4
-	if tokens < 1 {
-		tokens = 1
+	if n < 4 {
+		return 1
 	}
-	return tokens
+	return n / 4
+}
+
+// outputTokensFloor 取 TokenDelta 累加与透出内容估算的较大者：TokenDelta 约
+// 每 2s 才推一次，短回复可能一个都收不到，不兜底会记 0。
+func outputTokensFloor(usageTokens, contentBytes int) int {
+	if est := estimateTokensFromBytes(contentBytes); est > usageTokens {
+		return est
+	}
+	return usageTokens
 }

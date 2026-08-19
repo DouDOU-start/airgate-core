@@ -245,6 +245,62 @@ func TestBuildAnthropicResponse(t *testing.T) {
 	}
 }
 
+func TestEstimatePromptTokens计入工具定义(t *testing.T) {
+	req := &ParsedRequest{
+		Messages: []NMessage{{Role: "user", Content: []ContentPart{{Type: "text", Text: strings.Repeat("x", 400)}}}},
+	}
+	base := EstimatePromptTokens(req)
+	req.Tools = []NToolDef{{Name: "t", Description: "d", Schema: json.RawMessage(strings.Repeat("s", 398))}}
+	if got := EstimatePromptTokens(req); got != base+100 {
+		t.Errorf("含工具估算 = %d, want %d", got, base+100)
+	}
+}
+
+func TestCollectEvents输出计量兜底(t *testing.T) {
+	// 无任何 TokenDelta（短回复常见）：输出按透出内容估算托底。
+	events := make(chan Event, 4)
+	events <- TextDelta{Text: strings.Repeat("蓝", 20)} // 60 字节 → 15 tokens
+	events <- Done{FinishReason: "stop"}
+	close(events)
+	agg := CollectEvents(events)
+	if agg.OutputTokens != 15 {
+		t.Errorf("OutputTokens = %d, want 15", agg.OutputTokens)
+	}
+
+	// TokenDelta 大于估算时以 TokenDelta 为准。
+	events = make(chan Event, 4)
+	events <- TextDelta{Text: "hi"}
+	events <- UsageDelta{Tokens: 900} // 含隐藏 thinking
+	events <- Done{FinishReason: "stop"}
+	close(events)
+	if agg = CollectEvents(events); agg.OutputTokens != 900 {
+		t.Errorf("OutputTokens = %d, want 900", agg.OutputTokens)
+	}
+}
+
+func TestAnthropicStream计量校准(t *testing.T) {
+	r := NewAnthropicStreamRenderer("msg_1", "m", 100)
+	var frames []SSEFrame
+	frames = append(frames, r.Render(TextDelta{Text: strings.Repeat("a", 40)})...) // 10 tokens
+	frames = append(frames, r.Render(Done{FinishReason: "stop"})...)
+	dump := framesDump(frames)
+	if !strings.Contains(dump, `"output_tokens":10`) {
+		t.Errorf("终帧缺少兜底输出，dump=%s", dump)
+	}
+}
+
+func TestOpenAIStream计量校准(t *testing.T) {
+	r := NewOpenAIStreamRenderer("c1", "m", 0, 100)
+	var frames []SSEFrame
+	frames = append(frames, r.Render(TextDelta{Text: strings.Repeat("a", 40)})...)
+	frames = append(frames, r.Render(UsageDelta{Tokens: 3})...) // 小于估算 10
+	frames = append(frames, r.Render(Done{FinishReason: "stop"})...)
+	dump := framesDump(frames)
+	if !strings.Contains(dump, `"completion_tokens":10`) || !strings.Contains(dump, `"prompt_tokens":100`) {
+		t.Errorf("usage 校准不符，dump=%s", dump)
+	}
+}
+
 func framesDump(frames []SSEFrame) string {
 	var b strings.Builder
 	for _, f := range frames {

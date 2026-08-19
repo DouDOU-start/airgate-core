@@ -188,7 +188,12 @@ func (s *session) handle(sm *agentpb.AgentServerMessage) (stop bool) {
 		// 忽略；模型侧一般不会走到这里，联调若遇到再补拒绝应答。
 		slog.Warn("cursor_session_query_ignored", "type", serverMessageKind(sm))
 	case *agentpb.AgentServerMessage_ConversationCheckpointUpdate:
-		// 无状态网关不持久化 checkpoint。
+		// 无状态网关不持久化 checkpoint。其 token_details.used_tokens 是上游
+		// 真实上下文口径，但包含 Cursor 注入的约 25K 平台系统提示，直接用于
+		// 下游计费会把小请求的输入抬到数万，故仅记日志供对账。
+		if n := int(m.ConversationCheckpointUpdate.GetTokenDetails().GetUsedTokens()); n > 0 {
+			slog.Debug("cursor_session_context_tokens", "used_tokens", n)
+		}
 	default:
 		slog.Warn("cursor_session_unhandled_message", "type", serverMessageKind(sm))
 	}
@@ -397,6 +402,7 @@ func (s *session) handleUpdate(u *agentpb.InteractionUpdate) (stop bool) {
 		s.onToolCallCompleted(m.ToolCallCompleted)
 	case *agentpb.InteractionUpdate_TokenDelta:
 		if n := int(m.TokenDelta.GetTokens()); n > 0 {
+			slog.Debug("cursor_session_token_delta", "tokens", n)
 			s.emit(UsageDelta{Tokens: n})
 		}
 	case *agentpb.InteractionUpdate_TurnEnded:
