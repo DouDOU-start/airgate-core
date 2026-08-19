@@ -45,6 +45,7 @@ var SupportedPlatforms = []string{
 	"gemini",
 	"aistudio",
 	"vertex",
+	"cursor",
 }
 
 // GetCredentialsSchema 返回平台凭证 schema。
@@ -188,6 +189,20 @@ func builtinCredentialSchema(platform string) CredentialSchema {
 					},
 				},
 			},
+		}
+	case "cursor":
+		return CredentialSchema{
+			AccountTypes: []AccountType{{
+				Key:         TypeOAuth,
+				Label:       "OAuth",
+				Description: "Cursor 订阅账号：点击生成授权链接，在浏览器完成 Cursor 登录后自动绑定；也可直接粘贴 Access/Refresh Token",
+				Fields: []CredentialField{
+					{Key: "access_token", Label: "Access Token", Type: "password", Required: false},
+					{Key: "refresh_token", Label: "Refresh Token", Type: "password", Required: false},
+					{Key: "email", Label: "Email", Type: "text", Required: false},
+					{Key: "expired", Label: "Token Expiry", Type: "text", Required: false},
+				},
+			}},
 		}
 	case "gemini", "aistudio":
 		return CredentialSchema{

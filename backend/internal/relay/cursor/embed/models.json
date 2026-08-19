@@ -1,0 +1,1434 @@
+[
+ {
+  "id": "claude-4-sonnet",
+  "name": "Claude Sonnet 4",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-4.5-opus-high",
+  "name": "Claude Opus 4.5",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-4.5-sonnet",
+  "name": "Claude Sonnet 4.5",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-4.6-opus-high",
+  "name": "Claude Opus 4.6 1M",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": false
+ },
+ {
+  "id": "claude-4.6-opus-max",
+  "name": "Claude Opus 4.6 1M Max",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-4.6-sonnet-medium",
+  "name": "Claude Sonnet 4.6 1M",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": false
+ },
+ {
+  "id": "claude-fable-5-high",
+  "name": "Claude Fable 5 1M (NO ZDR)",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-fable-5-low",
+  "name": "Claude Fable 5 1M Low (NO ZDR)",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-fable-5-max",
+  "name": "Claude Fable 5 1M Max (NO ZDR)",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-fable-5-medium",
+  "name": "Claude Fable 5 1M Medium (NO ZDR)",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-fable-5-xhigh",
+  "name": "Claude Fable 5 1M Extra High (NO ZDR)",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-7-high",
+  "name": "Claude Opus 4.7 1M High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-7-high-fast",
+  "name": "Claude Opus 4.7 1M High Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-7-low",
+  "name": "Claude Opus 4.7 1M Low",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-7-low-fast",
+  "name": "Claude Opus 4.7 1M Low Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-7-max",
+  "name": "Claude Opus 4.7 1M Max",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-7-max-fast",
+  "name": "Claude Opus 4.7 1M Max Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-7-medium",
+  "name": "Claude Opus 4.7 1M Medium",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-7-medium-fast",
+  "name": "Claude Opus 4.7 1M Medium Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-7-xhigh",
+  "name": "Claude Opus 4.7 1M",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-7-xhigh-fast",
+  "name": "Claude Opus 4.7 1M Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-8-high",
+  "name": "Claude Opus 4.8 1M",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-8-high-fast",
+  "name": "Claude Opus 4.8 1M Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-8-low",
+  "name": "Claude Opus 4.8 1M Low",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-8-low-fast",
+  "name": "Claude Opus 4.8 1M Low Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-8-max",
+  "name": "Claude Opus 4.8 1M Max",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-8-max-fast",
+  "name": "Claude Opus 4.8 1M Max Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-8-medium",
+  "name": "Claude Opus 4.8 1M Medium",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-8-medium-fast",
+  "name": "Claude Opus 4.8 1M Medium Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-8-xhigh",
+  "name": "Claude Opus 4.8 1M Extra High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-4-8-xhigh-fast",
+  "name": "Claude Opus 4.8 1M Extra High Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-5-high",
+  "name": "Claude Opus 5 1M",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-5-high-fast",
+  "name": "Claude Opus 5 1M Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-5-low",
+  "name": "Claude Opus 5 1M Low",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-5-low-fast",
+  "name": "Claude Opus 5 1M Low Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-5-medium",
+  "name": "Claude Opus 5 1M Medium",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-5-medium-fast",
+  "name": "Claude Opus 5 1M Medium Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-5-thinking-max",
+  "name": "Claude Opus 5 1M Max Thinking",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-5-thinking-max-fast",
+  "name": "Claude Opus 5 1M Max Thinking Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-5-thinking-xhigh",
+  "name": "Claude Opus 5 1M Extra High Thinking",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "claude-opus-5-thinking-xhigh-fast",
+  "name": "Claude Opus 5 1M Extra High Thinking Fast",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "claude-sonnet-5-high",
+  "name": "Claude Sonnet 5 1M",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-sonnet-5-low",
+  "name": "Claude Sonnet 5 1M Low",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-sonnet-5-max",
+  "name": "Claude Sonnet 5 1M Max",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-sonnet-5-medium",
+  "name": "Claude Sonnet 5 1M Medium",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "claude-sonnet-5-xhigh",
+  "name": "Claude Sonnet 5 1M Extra High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "composer-1",
+  "name": "Composer 1",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "composer-1.5",
+  "name": "Composer 1.5",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "composer-2.5",
+  "name": "Composer 2.5",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "composer-2.5-fast",
+  "name": "Composer 2.5 Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.5-high",
+  "name": "Cursor Grok 4.5",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.5-high-fast",
+  "name": "Cursor Grok 4.5 Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.5-low",
+  "name": "Cursor Grok 4.5 Low",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.5-low-fast",
+  "name": "Cursor Grok 4.5 Low Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.5-medium",
+  "name": "Cursor Grok 4.5 Medium",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.5-medium-fast",
+  "name": "Cursor Grok 4.5 Medium Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.6-high",
+  "name": "Cursor Grok 4.6",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.6-high-fast",
+  "name": "Cursor Grok 4.6 Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.6-low",
+  "name": "Cursor Grok 4.6 Low",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.6-low-fast",
+  "name": "Cursor Grok 4.6 Low Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.6-medium",
+  "name": "Cursor Grok 4.6 Medium",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.6-medium-fast",
+  "name": "Cursor Grok 4.6 Medium Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.6-xhigh",
+  "name": "Cursor Grok 4.6 Extra High",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "cursor-grok-4.6-xhigh-fast",
+  "name": "Cursor Grok 4.6 Extra High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "default",
+  "name": "Auto",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gemini-3-flash",
+  "name": "Gemini 3 Flash",
+  "context_window": 1048576,
+  "max_tokens": 65536,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gemini-3-pro",
+  "name": "Gemini 3 Pro",
+  "context_window": 1048576,
+  "max_tokens": 65536,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gemini-3.1-pro",
+  "name": "Gemini 3.1 Pro Preview",
+  "context_window": 1048576,
+  "max_tokens": 65536,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gemini-3.5-flash",
+  "name": "Gemini 3.5 Flash",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gemini-3.6-flash-high",
+  "name": "Gemini 3.6 Flash",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gemini-3.6-flash-low",
+  "name": "Gemini 3.6 Flash Low",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gemini-3.6-flash-medium",
+  "name": "Gemini 3.6 Flash Medium",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gemini-3.6-flash-minimal",
+  "name": "Gemini 3.6 Flash Minimal",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gemini-3.7-flash-high",
+  "name": "Gemini 3.7 Flash",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gemini-3.7-flash-low",
+  "name": "Gemini 3.7 Flash Low",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gemini-3.7-flash-medium",
+  "name": "Gemini 3.7 Flash Medium",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "glm-5.2-high",
+  "name": "GLM 5.2",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "glm-5.2-max",
+  "name": "GLM 5.2 Max",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5-mini",
+  "name": "GPT-5 Mini",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.1",
+  "name": "GPT-5.1",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.1-codex-max",
+  "name": "GPT-5.1 Codex Max",
+  "context_window": 272000,
+  "max_tokens": 128000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.1-codex-max-high",
+  "name": "GPT-5.1 Codex Max High",
+  "context_window": 272000,
+  "max_tokens": 128000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.1-codex-mini",
+  "name": "GPT-5.1 Codex Mini",
+  "context_window": 272000,
+  "max_tokens": 128000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.1-high",
+  "name": "GPT-5.1 High",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.1-low",
+  "name": "GPT-5.1 Low",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.2",
+  "name": "GPT-5.2",
+  "context_window": 400000,
+  "max_tokens": 128000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.2-codex",
+  "name": "GPT-5.2 Codex",
+  "context_window": 272000,
+  "max_tokens": 128000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.2-codex-fast",
+  "name": "GPT-5.2 Codex Fast",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.2-codex-high",
+  "name": "GPT-5.2 Codex High",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.2-codex-high-fast",
+  "name": "GPT-5.2 Codex High Fast",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.2-codex-low",
+  "name": "GPT-5.2 Codex Low",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.2-codex-low-fast",
+  "name": "GPT-5.2 Codex Low Fast",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.2-codex-xhigh",
+  "name": "GPT-5.2 Codex Extra High",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.2-codex-xhigh-fast",
+  "name": "GPT-5.2 Codex Extra High Fast",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.2-fast",
+  "name": "GPT-5.2 Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.2-high",
+  "name": "GPT-5.2 High",
+  "context_window": 400000,
+  "max_tokens": 128000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.2-high-fast",
+  "name": "GPT-5.2 High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.2-low",
+  "name": "GPT-5.2 Low",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.2-low-fast",
+  "name": "GPT-5.2 Low Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.2-xhigh",
+  "name": "GPT-5.2 Extra High",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.2-xhigh-fast",
+  "name": "GPT-5.2 Extra High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.3-codex",
+  "name": "GPT-5.3 Codex",
+  "context_window": 272000,
+  "max_tokens": 128000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.3-codex-fast",
+  "name": "Codex 5.3 Fast",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.3-codex-high",
+  "name": "Codex 5.3 High",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.3-codex-high-fast",
+  "name": "Codex 5.3 High Fast",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.3-codex-low",
+  "name": "Codex 5.3 Low",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.3-codex-low-fast",
+  "name": "Codex 5.3 Low Fast",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.3-codex-spark-preview",
+  "name": "GPT-5.3 Codex Spark",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.3-codex-xhigh",
+  "name": "Codex 5.3 Extra High",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.3-codex-xhigh-fast",
+  "name": "Codex 5.3 Extra High Fast",
+  "context_window": 272000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.4-high",
+  "name": "GPT-5.4 1M High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.4-high-fast",
+  "name": "GPT-5.4 High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.4-low",
+  "name": "GPT-5.4 1M Low",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.4-medium",
+  "name": "GPT-5.4 1M",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.4-medium-fast",
+  "name": "GPT-5.4 Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.4-mini-high",
+  "name": "GPT-5.4 Mini High",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.4-mini-low",
+  "name": "GPT-5.4 Mini Low",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.4-mini-medium",
+  "name": "GPT-5.4 Mini",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.4-mini-none",
+  "name": "GPT-5.4 Mini None",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.4-mini-xhigh",
+  "name": "GPT-5.4 Mini Extra High",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.4-nano-high",
+  "name": "GPT-5.4 Nano High",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.4-nano-low",
+  "name": "GPT-5.4 Nano Low",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.4-nano-medium",
+  "name": "GPT-5.4 Nano",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.4-nano-none",
+  "name": "GPT-5.4 Nano None",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.4-nano-xhigh",
+  "name": "GPT-5.4 Nano Extra High",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.4-xhigh",
+  "name": "GPT-5.4 1M Extra High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.4-xhigh-fast",
+  "name": "GPT-5.4 Extra High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": false
+ },
+ {
+  "id": "gpt-5.5-extra-high",
+  "name": "GPT-5.5 1M Extra High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.5-extra-high-fast",
+  "name": "GPT-5.5 Extra High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.5-high",
+  "name": "GPT-5.5 1M High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.5-high-fast",
+  "name": "GPT-5.5 High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.5-low",
+  "name": "GPT-5.5 1M Low",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.5-low-fast",
+  "name": "GPT-5.5 Low Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.5-medium",
+  "name": "GPT-5.5 1M",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.5-medium-fast",
+  "name": "GPT-5.5 Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.5-none",
+  "name": "GPT-5.5 1M None",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.5-none-fast",
+  "name": "GPT-5.5 None Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-luna-high",
+  "name": "GPT-5.6 Luna 1M High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-luna-high-fast",
+  "name": "GPT-5.6 Luna High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-luna-low",
+  "name": "GPT-5.6 Luna 1M Low",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-luna-low-fast",
+  "name": "GPT-5.6 Luna Low Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-luna-max",
+  "name": "GPT-5.6 Luna 1M Max",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-luna-max-fast",
+  "name": "GPT-5.6 Luna Max Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-luna-medium",
+  "name": "GPT-5.6 Luna 1M",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-luna-medium-fast",
+  "name": "GPT-5.6 Luna Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-luna-none",
+  "name": "GPT-5.6 Luna 1M None",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-luna-none-fast",
+  "name": "GPT-5.6 Luna None Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-luna-xhigh",
+  "name": "GPT-5.6 Luna 1M Extra High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-luna-xhigh-fast",
+  "name": "GPT-5.6 Luna Extra High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-sol-high",
+  "name": "GPT-5.6 Sol 1M High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-sol-high-fast",
+  "name": "GPT-5.6 Sol High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-sol-low",
+  "name": "GPT-5.6 Sol 1M Low",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-sol-low-fast",
+  "name": "GPT-5.6 Sol Low Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-sol-max",
+  "name": "GPT-5.6 Sol 1M Max",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-sol-max-fast",
+  "name": "GPT-5.6 Sol Max Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-sol-medium",
+  "name": "GPT-5.6 Sol 1M",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-sol-medium-fast",
+  "name": "GPT-5.6 Sol Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-sol-none",
+  "name": "GPT-5.6 Sol 1M None",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-sol-none-fast",
+  "name": "GPT-5.6 Sol None Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-sol-xhigh",
+  "name": "GPT-5.6 Sol 1M Extra High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-sol-xhigh-fast",
+  "name": "GPT-5.6 Sol Extra High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-terra-high",
+  "name": "GPT-5.6 Terra 1M High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-terra-high-fast",
+  "name": "GPT-5.6 Terra High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-terra-low",
+  "name": "GPT-5.6 Terra 1M Low",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-terra-low-fast",
+  "name": "GPT-5.6 Terra Low Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-terra-max",
+  "name": "GPT-5.6 Terra 1M Max",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-terra-max-fast",
+  "name": "GPT-5.6 Terra Max Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-terra-medium",
+  "name": "GPT-5.6 Terra 1M",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-terra-medium-fast",
+  "name": "GPT-5.6 Terra Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-terra-none",
+  "name": "GPT-5.6 Terra 1M None",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-terra-none-fast",
+  "name": "GPT-5.6 Terra None Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-terra-xhigh",
+  "name": "GPT-5.6 Terra 1M Extra High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "gpt-5.6-terra-xhigh-fast",
+  "name": "GPT-5.6 Terra Extra High Fast",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": false,
+  "vision": true
+ },
+ {
+  "id": "grok-code-fast-1",
+  "name": "Grok Code Fast 1",
+  "context_window": 256000,
+  "max_tokens": 10000,
+  "reasoning": true,
+  "vision": false
+ },
+ {
+  "id": "kimi-k2.5",
+  "name": "Kimi K2.5",
+  "context_window": 262144,
+  "max_tokens": 65536,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "kimi-k2.7-code",
+  "name": "Kimi K2.7 Code",
+  "context_window": 200000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": true
+ },
+ {
+  "id": "kimi-k3-high",
+  "name": "Kimi K3 High",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": false
+ },
+ {
+  "id": "kimi-k3-low",
+  "name": "Kimi K3 Low",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": false
+ },
+ {
+  "id": "kimi-k3-max",
+  "name": "Kimi K3",
+  "context_window": 1000000,
+  "max_tokens": 64000,
+  "reasoning": true,
+  "vision": false
+ }
+]

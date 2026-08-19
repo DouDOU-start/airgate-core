@@ -18,6 +18,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
 	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
+	"github.com/DouDOU-start/airgate-core/internal/relay/cursor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
 	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
@@ -80,7 +81,15 @@ func (p *Pipeline) executeAccountAttempt(
 	ctx := c.Request.Context()
 	var auditTransport *requestaudit.RoundTripper
 	if auditRequest != nil {
-		baseTransport, errBuild := p.accountAuditTransport(acc.ProxyURL)
+		var baseTransport http.RoundTripper
+		var errBuild error
+		if acc.Platform == "cursor" {
+			// Cursor Agent 走 Connect-RPC over HTTP/2 双向流，必须强制 h2
+			// ALPN；通用账号传输层会被上游 ALB 以 464 拒绝。
+			baseTransport, errBuild = cursor.SharedH2Transport(acc.ProxyURL)
+		} else {
+			baseTransport, errBuild = p.accountAuditTransport(acc.ProxyURL)
+		}
 		if errBuild != nil {
 			return attemptResult{auditErr: fmt.Errorf("构造账号代理审计传输层失败: %w", errBuild)}
 		}

@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
+	"github.com/DouDOU-start/airgate-core/internal/relay/cursor"
 )
 
 // OAuth 会话状态。
@@ -154,6 +155,9 @@ func OAuthLoginHints(platform string) map[string]any {
 	case "xai":
 		out["flow"] = OAuthFlowDevice
 		out["instruction"] = "点击「生成授权链接」后展示验证链接与用户码，在 xAI 页面确认授权即可，后台自动完成绑定。"
+	case "cursor":
+		out["flow"] = OAuthFlowDevice
+		out["instruction"] = "点击「生成授权链接」后在浏览器完成 Cursor 登录授权，后台会自动轮询并完成绑定。"
 	default:
 		out["instruction"] = "该平台请手动粘贴凭证创建账号。"
 	}
@@ -165,7 +169,7 @@ func OAuthLoginHints(platform string) map[string]any {
 func (s *Service) StartOAuth(ctx context.Context, input OAuthStartInput) (OAuthSession, error) {
 	platform := strings.ToLower(strings.TrimSpace(input.Platform))
 	switch platform {
-	case "claude", "codex", "antigravity", "kimi", "xai":
+	case "claude", "codex", "antigravity", "kimi", "xai", "cursor":
 	default:
 		return OAuthSession{}, fmt.Errorf("%w: %s", ErrUnsupportedPlatform, platform)
 	}
@@ -202,6 +206,8 @@ func (s *Service) StartOAuth(ctx context.Context, input OAuthStartInput) (OAuthS
 		err = s.startKimiOAuth(ctx, entry)
 	case "xai":
 		err = s.startXAIOauth(ctx, entry)
+	case "cursor":
+		err = s.startCursorOAuth(entry)
 	}
 	if err != nil {
 		return OAuthSession{}, err
@@ -836,6 +842,65 @@ func (s *Service) startXAIOauth(ctx context.Context, entry *oauthSessionEntry) e
 	return nil
 }
 
+// startCursorOAuth 生成 Cursor 登录链接并进入后台轮询。Cursor 不走标准 device
+// oauth，而是浏览器登录 + poll(uuid, verifier)；这里复用 device 流的轮询骨架，
+// 用 entry.state 存 uuid、entry.codeVerifier 存 PKCE verifier。
+func (s *Service) startCursorOAuth(entry *oauthSessionEntry) error {
+	params, err := cursor.GenerateAuthParams()
+	if err != nil {
+		return fmt.Errorf("生成 Cursor 授权参数失败: %w", err)
+	}
+	// 轮询骨架以 deviceCode 非空作为"可轮询"的判定，uuid 必须存在这里。
+	entry.deviceCode = params.UUID
+	entry.codeVerifier = params.Verifier
+	entry.pollInterval = 2 * time.Second
+
+	entry.public.Flow = OAuthFlowDevice
+	entry.public.AuthorizeURL = params.LoginURL
+	entry.public.VerificationURI = params.LoginURL
+	entry.public.VerificationURIComplete = params.LoginURL
+	entry.public.Message = "请打开授权链接并在浏览器完成 Cursor 登录，完成后会自动创建账号。"
+	return nil
+}
+
+func pollCursorToken(ctx context.Context, uuid, verifier, proxyURL string) (map[string]string, bool, error) {
+	hc := httpClient(proxyURL)
+	tokens, pending, err := cursor.PollOnce(ctx, hc, uuid, verifier)
+	if err != nil {
+		return nil, false, err
+	}
+	if pending {
+		return nil, true, nil
+	}
+	creds := map[string]string{
+		"access_token":      tokens.AccessToken,
+		"refresh_token":     tokens.RefreshToken,
+		"credential_origin": TypeOAuth,
+		"type":              "cursor",
+	}
+	if !tokens.ExpiresAt.IsZero() {
+		creds["expired"] = tokens.ExpiresAt.UTC().Format(time.RFC3339)
+	}
+	if uid := cursorUserID(tokens.AccessToken); uid != "" {
+		creds["account_id"] = uid
+	}
+	return creds, false, nil
+}
+
+// cursorUserID 从 Cursor JWT 的 sub（形如 "auth0|user_xxx"）提取用户标识。
+func cursorUserID(accessToken string) string {
+	claims := parseJWTPayload(accessToken)
+	sub, _ := claims["sub"].(string)
+	sub = strings.TrimSpace(sub)
+	if sub == "" {
+		return ""
+	}
+	if parts := strings.Split(sub, "|"); len(parts) > 1 {
+		return strings.TrimSpace(parts[1])
+	}
+	return sub
+}
+
 // ---------- shared finish / poll ----------
 
 func (s *Service) devicePollLoop(entry *oauthSessionEntry) {
@@ -885,6 +950,8 @@ func (s *Service) pollDeviceOnce(entry *oauthSessionEntry) {
 		creds, pending, err = pollKimiToken(ctx, entry.deviceCode, entry.codeVerifier, entry.input.ProxyURL)
 	case "xai":
 		creds, pending, err = pollXAIToken(ctx, entry.deviceCode, entry.tokenEndpoint, entry.input.ProxyURL)
+	case "cursor":
+		creds, pending, err = pollCursorToken(ctx, entry.deviceCode, entry.codeVerifier, entry.input.ProxyURL)
 	default:
 		return
 	}

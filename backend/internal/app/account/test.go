@@ -312,6 +312,10 @@ func pickDefaultTestModel(platform, planType, preferred string) string {
 			if strings.Contains(low, "flash") && !strings.Contains(low, "thinking") {
 				return id
 			}
+		case "cursor":
+			if strings.Contains(low, "flash") && !strings.Contains(low, "thinking") {
+				return id
+			}
 		}
 	}
 	return ids[0]
@@ -372,8 +376,11 @@ func (s *Service) TestConnection(ctx context.Context, id int, modelID, prompt st
 	case "antigravity":
 		model, usage, testErr = s.testAntigravity(ctx, item, modelID, prompt, proxyURL, emit)
 		endpoint = "/v1beta/models/" + model + ":generateContent"
+	case "cursor":
+		model, usage, testErr = s.testCursor(ctx, item, modelID, prompt, proxyURL, emit)
+		endpoint = "/v1/chat/completions"
 	default:
-		msg := fmt.Sprintf("平台 %s 暂不支持连通性测试（当前支持 Codex / Claude / xAI / Antigravity）", item.Platform)
+		msg := fmt.Sprintf("平台 %s 暂不支持连通性测试（当前支持 Codex / Claude / xAI / Antigravity / Cursor）", item.Platform)
 		emit(TestEvent{Type: "error", Error: msg})
 		return fmt.Errorf("%s", msg)
 	}
@@ -402,6 +409,22 @@ func (s *Service) testAntigravity(ctx context.Context, item Account, modelID, pr
 	} else {
 		model = pickDefaultTestModel(item.Platform, plan, "")
 	}
+	return s.testViaCPAForward(ctx, item, model, prompt, proxyURL, emit, "Antigravity")
+}
+
+// testCursor 通过 CPA Cursor executor 发起一次非流式探测请求。
+// 使用 OpenAI Chat Completions 作为统一输入格式，由 cursor 包翻译为 Agent 协议。
+func (s *Service) testCursor(ctx context.Context, item Account, modelID, prompt, proxyURL string, emit func(TestEvent)) (string, testStreamUsage, error) {
+	model := strings.TrimSpace(modelID)
+	if model == "" {
+		model = pickDefaultTestModel(item.Platform, resolvePlanType(item), "")
+	}
+	return s.testViaCPAForward(ctx, item, model, prompt, proxyURL, emit, "Cursor")
+}
+
+// testViaCPAForward 是走 CPA executor 转发的连通性测试公共主体：
+// 刷新凭证 → 构造 OpenAI 非流式探测请求 → ForwardAccountTest → 解析文本与用量。
+func (s *Service) testViaCPAForward(ctx context.Context, item Account, model, prompt, proxyURL string, emit func(TestEvent), label string) (string, testStreamUsage, error) {
 	if err := s.ensureOAuthCredentialsFresh(ctx, &item, proxyURL); err != nil {
 		return model, testStreamUsage{}, emitErr(emit, "access_token 刷新失败: "+err.Error())
 	}
@@ -410,7 +433,7 @@ func (s *Service) testAntigravity(ctx context.Context, item Account, modelID, pr
 	}
 	forwarder, ok := s.oauthRefresher.(accountTestForwarder)
 	if !ok || forwarder == nil {
-		return model, testStreamUsage{}, emitErr(emit, "CPA Antigravity 连通性测试执行器不可用")
+		return model, testStreamUsage{}, emitErr(emit, "CPA "+label+" 连通性测试执行器不可用")
 	}
 	payload := map[string]any{
 		"model": model,
@@ -437,7 +460,7 @@ func (s *Service) testAntigravity(ctx context.Context, item Account, modelID, pr
 		EntryProtocol: registry.ProtocolOpenAI,
 		Payload:       raw,
 	})
-	if message := accountTestForwardError(result); message != "" {
+	if message := accountTestForwardError(result, label); message != "" {
 		return model, testStreamUsage{}, emitErr(emit, message)
 	}
 	if len(result.RefreshedCredentials) > 0 {
@@ -453,7 +476,7 @@ func (s *Service) testAntigravity(ctx context.Context, item Account, modelID, pr
 	}
 	var body map[string]any
 	if err := json.Unmarshal(result.Body, &body); err != nil {
-		return model, usage, emitErr(emit, "解析 Antigravity 测试响应失败: "+err.Error())
+		return model, usage, emitErr(emit, "解析 "+label+" 测试响应失败: "+err.Error())
 	}
 	mergeUsageMap(&usage, body["usage"])
 	if text := extractAccountTestResponseText(body); text != "" {
@@ -463,17 +486,17 @@ func (s *Service) testAntigravity(ctx context.Context, item Account, modelID, pr
 	return model, usage, nil
 }
 
-func accountTestForwardError(result cpa.ForwardResult) string {
+func accountTestForwardError(result cpa.ForwardResult, label string) string {
 	if result.BuildErr != nil {
-		return "构造 Antigravity 测试请求失败: " + result.BuildErr.Error()
+		return "构造 " + label + " 测试请求失败: " + result.BuildErr.Error()
 	}
 	if result.NetErr != nil {
-		return "请求 Antigravity 失败: " + result.NetErr.Error()
+		return "请求 " + label + " 失败: " + result.NetErr.Error()
 	}
 	if result.StreamErr != nil {
-		return "Antigravity 测试响应失败: " + result.StreamErr.Error()
+		return label + " 测试响应失败: " + result.StreamErr.Error()
 	}
-	if result.StatusCode == http.StatusNotFound && strings.Contains(strings.ToLower(string(result.Body)), "requested entity was not found") {
+	if label == "Antigravity" && result.StatusCode == http.StatusNotFound && strings.Contains(strings.ToLower(string(result.Body)), "requested entity was not found") {
 		return "Antigravity 上游未找到模型或项目（HTTP 404）：当前账号未开放所选模型，或 project_id 已失效；请重新授权后从实时模型列表重新选择"
 	}
 	if result.StatusCode < http.StatusOK || result.StatusCode >= http.StatusMultipleChoices {

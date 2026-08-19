@@ -40,6 +40,7 @@ const PLATFORM_OPTIONS: Array<{ id: AccountPlatform; label: string }> = [
   { id: 'antigravity', label: 'Antigravity' },
   { id: 'kimi', label: 'Kimi' },
   { id: 'xai', label: 'xAI / Grok' },
+  { id: 'cursor', label: 'Cursor' },
   { id: 'gemini', label: 'Gemini' },
   { id: 'aistudio', label: 'AI Studio' },
   { id: 'vertex', label: 'Vertex' },

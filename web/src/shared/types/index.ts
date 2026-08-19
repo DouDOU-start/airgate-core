@@ -1670,6 +1670,7 @@ export type AccountPlatform =
   | 'antigravity'
   | 'kimi'
   | 'xai'
+  | 'cursor'
   | 'gemini'
   | 'aistudio'
   | 'vertex'

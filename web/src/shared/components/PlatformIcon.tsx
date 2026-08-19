@@ -8,6 +8,8 @@ import iconGrok from '../../assets/icons/platforms/grok.svg';
 import iconGrokDark from '../../assets/icons/platforms/grok-dark.svg';
 import iconKimiLight from '../../assets/icons/platforms/kimi-light.svg';
 import iconKimiDark from '../../assets/icons/platforms/kimi-dark.svg';
+import iconCursorLight from '../../assets/icons/platforms/cursor-light.svg';
+import iconCursorDark from '../../assets/icons/platforms/cursor-dark.svg';
 import iconVertex from '../../assets/icons/platforms/vertex.svg';
 import iconOpenaiLight from '../../assets/icons/platforms/openai-light.svg';
 import iconOpenaiDark from '../../assets/icons/platforms/openai-dark.svg';
@@ -22,6 +24,7 @@ const PLATFORM_COLORS: Record<string, { light: string; dark: string; textLight: 
   gemini: { light: '#e3f2fd', dark: '#0d47a1', textLight: '#1565c0', textDark: '#64b5f6' },
   aistudio: { light: '#f0f2f5', dark: '#373c42', textLight: '#2f343c', textDark: '#cfd3db' },
   vertex: { light: '#e4edfd', dark: '#1a3d80', textLight: '#2b5fbc', textDark: '#89b3f7' },
+  cursor: { light: '#f0f2f5', dark: '#1f2430', textLight: '#111827', textDark: '#e5e7eb' },
 };
 
 type IconAsset = string | { light: string; dark: string };
@@ -34,6 +37,7 @@ const PLATFORM_ICONS: Record<string, IconAsset> = {
   kimi: { light: iconKimiDark, dark: iconKimiLight }, // CPA 同款：浅色主题用深色字标
   xai: { light: iconGrok, dark: iconGrokDark },
   grok: { light: iconGrok, dark: iconGrokDark },
+  cursor: { light: iconCursorLight, dark: iconCursorDark },
   gemini: iconGemini,
   aistudio: iconGemini,
   vertex: iconVertex,
@@ -62,6 +66,7 @@ export function platformDisplayLabel(platform?: string): string {
     kimi: 'Kimi',
     xai: 'xAI',
     grok: 'Grok',
+    cursor: 'Cursor',
     gemini: 'Gemini',
     aistudio: 'AI Studio',
     vertex: 'Vertex',

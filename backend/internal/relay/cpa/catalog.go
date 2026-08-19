@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
+
+	"github.com/DouDOU-start/airgate-core/internal/relay/cursor"
 )
 
 //go:embed embed/models.json
@@ -87,6 +89,8 @@ func DefaultModelInfos(platform, planType string) []ModelInfo {
 		// CLIProxyAPI 会在静态 models.json 之外注入 xAI 媒体模型；这里同步
 		// 该行为，确保账号注册表能按 Grok Build 实际发送的模型名选中账号。
 		list = withXAIMediaBuiltins(cat.XAI)
+	case "cursor":
+		list = cursorModelInfos()
 	default:
 		return nil
 	}
@@ -105,6 +109,32 @@ func withXAIMediaBuiltins(models []ModelInfo) []ModelInfo {
 		ModelInfo{ID: "grok-imagine-video-1.5", DisplayName: "Grok Imagine 视频 1.5", OwnedBy: "xai", Type: "xai"},
 		ModelInfo{ID: "grok-imagine-video-1.5-preview", DisplayName: "Grok Imagine 视频 1.5 预览版", OwnedBy: "xai", Type: "xai"},
 	)
+	return out
+}
+
+// cursorModelInfos 把 cursor 包内置目录转成通用 ModelInfo，并追加裸基础
+// 别名（如 claude-fable-5）：Cursor 档位编码在 id 后缀，下游常按基础名请求，
+// 别名保证账号注册表可按基础名选中账号，实际档位由 executor 侧解析。
+func cursorModelInfos() []ModelInfo {
+	models := cursor.Models()
+	aliases := cursor.BaseAliases()
+	out := make([]ModelInfo, 0, len(models)+len(aliases))
+	for _, m := range models {
+		out = append(out, ModelInfo{
+			ID:          m.ID,
+			DisplayName: m.Name,
+			OwnedBy:     "cursor",
+			Type:        "cursor",
+		})
+	}
+	for _, base := range aliases {
+		out = append(out, ModelInfo{
+			ID:          base,
+			DisplayName: base,
+			OwnedBy:     "cursor",
+			Type:        "cursor",
+		})
+	}
 	return out
 }
 

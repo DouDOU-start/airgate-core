@@ -274,7 +274,7 @@ func TestAntigravity上游实体不存在时返回明确诊断(t *testing.T) {
 	message := accountTestForwardError(cpa.ForwardResult{
 		StatusCode: http.StatusNotFound,
 		Body:       []byte(`{"error":{"code":404,"message":"Requested entity was not found.","status":"NOT_FOUND"}}`),
-	})
+	}, "Antigravity")
 	if !strings.Contains(message, "未开放所选模型") || !strings.Contains(message, "project_id 已失效") {
 		t.Fatalf("404 诊断信息不明确: %q", message)
 	}

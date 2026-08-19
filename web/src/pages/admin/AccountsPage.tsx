@@ -314,6 +314,7 @@ export default function AccountsPage() {
     { id: 'antigravity', label: 'Antigravity' },
     { id: 'kimi', label: 'Kimi' },
     { id: 'xai', label: 'xAI' },
+    { id: 'cursor', label: 'Cursor' },
     { id: 'gemini', label: 'Gemini' },
     { id: 'vertex', label: 'Vertex' },
   ];

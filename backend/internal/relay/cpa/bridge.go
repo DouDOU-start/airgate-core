@@ -24,6 +24,8 @@ import (
 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 	sdkconfig "github.com/router-for-me/CLIProxyAPI/v7/sdk/config"
 
+	"github.com/DouDOU-start/airgate-core/internal/relay/cursor"
+
 	// 注册 CPA 全部内置翻译器。
 	_ "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator/builtin"
 )
@@ -209,6 +211,10 @@ func (b *Bridge) init(cfg *sdkconfig.Config) error {
 
 	mgr := coreauth.NewManager(&memoryAuthStore{}, nil, nil)
 	mgr.SetConfig(cfg)
+
+	// cursor executor 是 airgate 原生实现（非 CPA baseline），直接注册即可用，
+	// 不依赖占位凭证或 CPA service 的注册流程。
+	mgr.RegisterExecutor(cursor.NewExecutor())
 
 	svc, err := cliproxy.NewBuilder().
 		WithConfig(cfg).
@@ -411,5 +417,6 @@ func SupportedProviders() []string {
 		"aistudio",
 		"vertex",
 		"openai-compatibility",
+		"cursor",
 	}
 }

@@ -20,6 +20,7 @@ export const INTERACTIVE_OAUTH_PLATFORMS: AccountPlatform[] = [
   'antigravity',
   'kimi',
   'xai',
+  'cursor',
 ];
 
 export function supportsInteractiveOAuth(platform: string): boolean {
