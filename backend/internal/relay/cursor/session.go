@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -20,7 +22,7 @@ import (
 const (
 	// execRejectReason 是对服务端发起的本地工具执行请求的统一拒绝话术：
 	// 网关模式下没有本地文件系统/shell，引导模型只使用下发的函数工具。
-	execRejectReason = "API 网关模式不提供本地文件系统或 shell；请仅使用请求中提供的函数工具，或直接返回文本。"
+	execRejectReason = "你调用了 Cursor 内置本地工具，但 API 网关不能直接执行；请立即改用请求中提供的同名函数工具（如 Read、Write、Bash），不要向用户报告环境不可用。"
 
 	// interactionRejectReason 用于无法在无交互网关中完成的询问。
 	interactionRejectReason = "API 网关模式不支持交互式确认。"
@@ -76,7 +78,7 @@ func RunSession(ctx context.Context, opts SessionOptions) <-chan Event {
 			events:              events,
 			onCheckpoint:        opts.OnCheckpoint,
 			started:             make(map[string]*trackedCall),
-			pendingMCP:          make(map[string]pendingMCPCall),
+			pendingExec:         make(map[string]pendingExecCall),
 			toolCallDrainWindow: durationOrDefault(opts.ToolCallDrainWindow, defaultToolCallDrainWindow),
 			pausedStreamTTL:     durationOrDefault(opts.PausedStreamTTL, defaultPausedStreamTTL),
 			resumable:           opts.Resumable,
@@ -110,7 +112,7 @@ type session struct {
 	finishTimer   *time.Timer
 	doneSent      bool
 	segmentClosed bool
-	pendingMCP    map[string]pendingMCPCall
+	pendingExec   map[string]pendingExecCall
 	finishReady   chan uint64
 	finishBatch   uint64
 	resumable     *resumableCursorStream
@@ -293,12 +295,12 @@ func (s *session) closeSegment() {
 }
 
 func (s *session) pauseAndResume(ctx context.Context) bool {
-	if s.resumable == nil || len(s.pendingMCP) == 0 {
+	if s.resumable == nil || len(s.pendingExec) == 0 {
 		_ = s.stream.Close()
 		return false
 	}
 	s.stopSegmentWatcher()
-	s.resumable.setWaiting(s.pendingMCP)
+	s.resumable.setWaiting(s.pendingExec)
 	s.finish("tool_calls")
 	s.closeSegment()
 
@@ -310,7 +312,7 @@ func (s *session) pauseAndResume(ctx context.Context) bool {
 		s.segmentClosed = false
 		s.segmentDone = make(chan struct{})
 		s.started = make(map[string]*trackedCall)
-		s.pendingMCP = make(map[string]pendingMCPCall)
+		s.pendingExec = make(map[string]pendingExecCall)
 		s.sawToolCall = false
 		s.finishing = false
 		s.doneSent = false
@@ -593,6 +595,58 @@ func (s *session) handleExec(ex *agentpb.ExecServerMessage) {
 			msg.Message = &agentpb.ExecClientMessage_DiagnosticsResult{DiagnosticsResult: r}
 		case *agentpb.FetchResult:
 			msg.Message = &agentpb.ExecClientMessage_FetchResult{FetchResult: r}
+		case *agentpb.SubagentResult:
+			msg.Message = &agentpb.ExecClientMessage_SubagentResult{SubagentResult: r}
+		case *agentpb.BackgroundShellSpawnResult:
+			msg.Message = &agentpb.ExecClientMessage_BackgroundShellSpawnResult{BackgroundShellSpawnResult: r}
+		case *agentpb.ListMcpResourcesExecResult:
+			msg.Message = &agentpb.ExecClientMessage_ListMcpResourcesExecResult{ListMcpResourcesExecResult: r}
+		case *agentpb.ReadMcpResourceExecResult:
+			msg.Message = &agentpb.ExecClientMessage_ReadMcpResourceExecResult{ReadMcpResourceExecResult: r}
+		case *agentpb.RecordScreenResult:
+			msg.Message = &agentpb.ExecClientMessage_RecordScreenResult{RecordScreenResult: r}
+		case *agentpb.ComputerUseResult:
+			msg.Message = &agentpb.ExecClientMessage_ComputerUseResult{ComputerUseResult: r}
+		case *agentpb.WriteShellStdinResult:
+			msg.Message = &agentpb.ExecClientMessage_WriteShellStdinResult{WriteShellStdinResult: r}
+		case *agentpb.McpStateExecResult:
+			msg.Message = &agentpb.ExecClientMessage_McpStateExecResult{McpStateExecResult: r}
+		case *agentpb.ExecuteHookResult:
+			msg.Message = &agentpb.ExecClientMessage_ExecuteHookResult{ExecuteHookResult: r}
+		case *agentpb.ForceBackgroundShellResult:
+			msg.Message = &agentpb.ExecClientMessage_ForceBackgroundShellResult{ForceBackgroundShellResult: r}
+		case *agentpb.ForceBackgroundSubagentResult:
+			msg.Message = &agentpb.ExecClientMessage_ForceBackgroundSubagentResult{ForceBackgroundSubagentResult: r}
+		case *agentpb.SubagentAwaitResult:
+			msg.Message = &agentpb.ExecClientMessage_SubagentAwaitResult{SubagentAwaitResult: r}
+		case *agentpb.SmartModeClassifierResult:
+			msg.Message = &agentpb.ExecClientMessage_SmartModeClassifierResult{SmartModeClassifierResult: r}
+		case *agentpb.CanvasDiagnosticsResult:
+			msg.Message = &agentpb.ExecClientMessage_CanvasDiagnosticsResult{CanvasDiagnosticsResult: r}
+		case *agentpb.ShellAllowlistPrecheckResult:
+			msg.Message = &agentpb.ExecClientMessage_ShellAllowlistPrecheckResult{ShellAllowlistPrecheckResult: r}
+		case *agentpb.McpAllowlistPrecheckResult:
+			msg.Message = &agentpb.ExecClientMessage_McpAllowlistPrecheckResult{McpAllowlistPrecheckResult: r}
+		case *agentpb.WebFetchAllowlistPrecheckResult:
+			msg.Message = &agentpb.ExecClientMessage_WebFetchAllowlistPrecheckResult{WebFetchAllowlistPrecheckResult: r}
+		case *agentpb.ConversationSearchResult:
+			msg.Message = &agentpb.ExecClientMessage_ConversationSearchResult{ConversationSearchResult: r}
+		case *agentpb.AgentStoreConflictResult:
+			msg.Message = &agentpb.ExecClientMessage_AgentStoreConflictResult{AgentStoreConflictResult: r}
+		case *agentpb.PiReadExecResult:
+			msg.Message = &agentpb.ExecClientMessage_PiReadResult{PiReadResult: r}
+		case *agentpb.PiBashExecResult:
+			msg.Message = &agentpb.ExecClientMessage_PiBashResult{PiBashResult: r}
+		case *agentpb.PiEditExecResult:
+			msg.Message = &agentpb.ExecClientMessage_PiEditResult{PiEditResult: r}
+		case *agentpb.PiWriteExecResult:
+			msg.Message = &agentpb.ExecClientMessage_PiWriteResult{PiWriteResult: r}
+		case *agentpb.PiGrepExecResult:
+			msg.Message = &agentpb.ExecClientMessage_PiGrepResult{PiGrepResult: r}
+		case *agentpb.PiFindExecResult:
+			msg.Message = &agentpb.ExecClientMessage_PiFindResult{PiFindResult: r}
+		case *agentpb.PiLsExecResult:
+			msg.Message = &agentpb.ExecClientMessage_PiLsResult{PiLsResult: r}
 		default:
 			return
 		}
@@ -606,10 +660,6 @@ func (s *session) handleExec(ex *agentpb.ExecServerMessage) {
 				Success: &agentpb.RequestContextSuccess{
 					RequestContext: &agentpb.RequestContext{
 						Tools: s.tools,
-						Env: &agentpb.RequestContextEnv{
-							OsVersion: "linux",
-							Shell:     "/bin/bash",
-						},
 					},
 				},
 			},
@@ -617,50 +667,194 @@ func (s *session) handleExec(ex *agentpb.ExecServerMessage) {
 	case *agentpb.ExecServerMessage_McpArgs:
 		s.onMcpExec(ex, m.McpArgs)
 	case *agentpb.ExecServerMessage_ShellArgs:
-		reply(rejectedShellResult())
+		if !s.onShellExec(ex, m.ShellArgs, false) {
+			reply(rejectedShellResult())
+		}
 	case *agentpb.ExecServerMessage_ShellStreamArgs:
-		// 流式 shell 的应答通道是 ShellStream 事件，不是 ShellResult；回错
-		// 类型服务端会永远等待，挂死整条流（实测 Claude Code 场景必现）。
-		_ = s.replyExec(&agentpb.ExecClientMessage{
-			Id:     execID,
-			ExecId: ex.GetExecId(),
-			Message: &agentpb.ExecClientMessage_ShellStream{
-				ShellStream: &agentpb.ShellStream{
-					Event: &agentpb.ShellStream_Rejected{Rejected: &agentpb.ShellRejected{
-						Command: m.ShellStreamArgs.GetCommand(),
-						Reason:  execRejectReason,
-					}},
+		if !s.onShellExec(ex, m.ShellStreamArgs, true) {
+			// 流式 shell 的应答通道是 ShellStream 事件，不是 ShellResult。
+			_ = s.replyExec(&agentpb.ExecClientMessage{
+				Id:     execID,
+				ExecId: ex.GetExecId(),
+				Message: &agentpb.ExecClientMessage_ShellStream{
+					ShellStream: &agentpb.ShellStream{
+						Event: &agentpb.ShellStream_Rejected{Rejected: &agentpb.ShellRejected{
+							Command: m.ShellStreamArgs.GetCommand(),
+							Reason:  execRejectReason,
+						}},
+					},
 				},
-			},
-		})
+			})
+		}
 	case *agentpb.ExecServerMessage_ReadArgs:
-		reply(&agentpb.ReadResult{
-			Result: &agentpb.ReadResult_Rejected{Rejected: &agentpb.ReadRejected{Reason: execRejectReason}},
-		})
+		if !s.onReadExec(ex, m.ReadArgs) {
+			reply(&agentpb.ReadResult{
+				Result: &agentpb.ReadResult_Rejected{Rejected: &agentpb.ReadRejected{
+					Path: m.ReadArgs.GetPath(), Reason: execRejectReason,
+				}},
+			})
+		}
 	case *agentpb.ExecServerMessage_WriteArgs:
-		reply(&agentpb.WriteResult{
-			Result: &agentpb.WriteResult_Rejected{Rejected: &agentpb.WriteRejected{Reason: execRejectReason}},
-		})
+		if !s.onWriteExec(ex, m.WriteArgs) {
+			reply(&agentpb.WriteResult{
+				Result: &agentpb.WriteResult_Rejected{Rejected: &agentpb.WriteRejected{
+					Path: m.WriteArgs.GetPath(), Reason: execRejectReason,
+				}},
+			})
+		}
 	case *agentpb.ExecServerMessage_DeleteArgs:
-		reply(&agentpb.DeleteResult{
-			Result: &agentpb.DeleteResult_Error{Error: &agentpb.DeleteError{Error: execRejectReason}},
-		})
+		if !s.onDeleteExec(ex, m.DeleteArgs) {
+			reply(&agentpb.DeleteResult{Result: &agentpb.DeleteResult_Error{Error: &agentpb.DeleteError{
+				Path: m.DeleteArgs.GetPath(), Error: execRejectReason,
+			}}})
+		}
 	case *agentpb.ExecServerMessage_GrepArgs:
-		reply(&agentpb.GrepResult{
-			Result: &agentpb.GrepResult_Error{Error: &agentpb.GrepError{Error: execRejectReason}},
-		})
+		if !s.onGrepExec(ex, m.GrepArgs) {
+			reason := execRejectReason
+			if strings.TrimSpace(m.GrepArgs.GetPattern()) == "" {
+				reason = "搜索表达式不能为空"
+			}
+			reply(&agentpb.GrepResult{Result: &agentpb.GrepResult_Error{Error: &agentpb.GrepError{Error: reason}}})
+		}
 	case *agentpb.ExecServerMessage_LsArgs:
-		reply(&agentpb.LsResult{
-			Result: &agentpb.LsResult_Error{Error: &agentpb.LsError{Error: execRejectReason}},
-		})
+		if !s.onLsExec(ex, m.LsArgs) {
+			reply(&agentpb.LsResult{Result: &agentpb.LsResult_Error{Error: &agentpb.LsError{
+				Path: m.LsArgs.GetPath(), Error: execRejectReason,
+			}}})
+		}
 	case *agentpb.ExecServerMessage_DiagnosticsArgs:
-		reply(&agentpb.DiagnosticsResult{
-			Result: &agentpb.DiagnosticsResult_Error{Error: &agentpb.DiagnosticsError{Error: execRejectReason}},
-		})
+		if !s.onDiagnosticsExec(ex, m.DiagnosticsArgs) {
+			reply(&agentpb.DiagnosticsResult{
+				Result: &agentpb.DiagnosticsResult_Error{Error: &agentpb.DiagnosticsError{Error: execRejectReason}},
+			})
+		}
+	case *agentpb.ExecServerMessage_BackgroundShellSpawnArgs:
+		reply(&agentpb.BackgroundShellSpawnResult{Result: &agentpb.BackgroundShellSpawnResult_Rejected{
+			Rejected: &agentpb.ShellRejected{
+				Command:          m.BackgroundShellSpawnArgs.GetCommand(),
+				WorkingDirectory: m.BackgroundShellSpawnArgs.GetWorkingDirectory(), Reason: execRejectReason,
+			},
+		}})
+	case *agentpb.ExecServerMessage_WriteShellStdinArgs:
+		reply(&agentpb.WriteShellStdinResult{Result: &agentpb.WriteShellStdinResult_Error{
+			Error: &agentpb.WriteShellStdinError{Error: "当前下游没有可续写的后台 Shell"},
+		}})
+	case *agentpb.ExecServerMessage_ListMcpResourcesExecArgs:
+		reply(&agentpb.ListMcpResourcesExecResult{Result: &agentpb.ListMcpResourcesExecResult_Success{
+			Success: &agentpb.ListMcpResourcesSuccess{},
+		}})
+	case *agentpb.ExecServerMessage_ReadMcpResourceExecArgs:
+		reply(&agentpb.ReadMcpResourceExecResult{Result: &agentpb.ReadMcpResourceExecResult_NotFound{
+			NotFound: &agentpb.ReadMcpResourceNotFound{Uri: m.ReadMcpResourceExecArgs.GetUri()},
+		}})
+	case *agentpb.ExecServerMessage_RecordScreenArgs:
+		reply(&agentpb.RecordScreenResult{Result: &agentpb.RecordScreenResult_Failure{
+			Failure: &agentpb.RecordScreenFailure{Error: "API 网关无法访问 Claude Code 客户端屏幕"},
+		}})
+	case *agentpb.ExecServerMessage_ComputerUseArgs:
+		reply(&agentpb.ComputerUseResult{Result: &agentpb.ComputerUseResult_Error{
+			Error: &agentpb.ComputerUseError{Error: "API 网关无法代替 Claude Code 操作本地桌面"},
+		}})
 	case *agentpb.ExecServerMessage_FetchArgs:
-		reply(&agentpb.FetchResult{
-			Result: &agentpb.FetchResult_Error{Error: &agentpb.FetchError{Url: m.FetchArgs.GetUrl(), Error: execRejectReason}},
+		if !s.onFetchExec(ex, m.FetchArgs) {
+			reply(&agentpb.FetchResult{Result: &agentpb.FetchResult_Error{Error: &agentpb.FetchError{
+				Url: m.FetchArgs.GetUrl(), Error: execRejectReason,
+			}}})
+		}
+	case *agentpb.ExecServerMessage_SubagentArgs:
+		if !s.onSubagentExec(ex, m.SubagentArgs) {
+			reply(&agentpb.SubagentResult{Result: &agentpb.SubagentResult_Error{Error: &agentpb.SubagentError{
+				Error: execRejectReason,
+			}}})
+		}
+	case *agentpb.ExecServerMessage_PiReadArgs:
+		if !s.onPiReadExec(ex, m.PiReadArgs) {
+			reply(&agentpb.PiReadExecResult{Result: &agentpb.PiReadExecResult_Error{Error: &agentpb.PiReadExecError{Error: execRejectReason}}})
+		}
+	case *agentpb.ExecServerMessage_PiBashArgs:
+		if !s.onPiBashExec(ex, m.PiBashArgs) {
+			reply(&agentpb.PiBashExecResult{Result: &agentpb.PiBashExecResult_Error{Error: &agentpb.PiBashExecError{Error: execRejectReason}}})
+		}
+	case *agentpb.ExecServerMessage_PiEditArgs:
+		if !s.onPiEditExec(ex, m.PiEditArgs) {
+			reply(&agentpb.PiEditExecResult{Result: &agentpb.PiEditExecResult_Error{Error: &agentpb.PiEditExecError{
+				Error: "没有可用的 Edit/MultiEdit 工具，或请求包含不受支持的多处编辑",
+			}}})
+		}
+	case *agentpb.ExecServerMessage_PiWriteArgs:
+		if !s.onPiWriteExec(ex, m.PiWriteArgs) {
+			reply(&agentpb.PiWriteExecResult{Result: &agentpb.PiWriteExecResult_Error{Error: &agentpb.PiWriteExecError{Error: execRejectReason}}})
+		}
+	case *agentpb.ExecServerMessage_PiGrepArgs:
+		if !s.onPiGrepExec(ex, m.PiGrepArgs) {
+			reply(&agentpb.PiGrepExecResult{Result: &agentpb.PiGrepExecResult_Error{Error: &agentpb.PiGrepExecError{Error: execRejectReason}}})
+		}
+	case *agentpb.ExecServerMessage_PiFindArgs:
+		if !s.onPiFindExec(ex, m.PiFindArgs) {
+			reply(&agentpb.PiFindExecResult{Result: &agentpb.PiFindExecResult_Error{Error: &agentpb.PiFindExecError{Error: execRejectReason}}})
+		}
+	case *agentpb.ExecServerMessage_PiLsArgs:
+		if !s.onPiLsExec(ex, m.PiLsArgs) {
+			reply(&agentpb.PiLsExecResult{Result: &agentpb.PiLsExecResult_Error{Error: &agentpb.PiLsExecError{Error: execRejectReason}}})
+		}
+	case *agentpb.ExecServerMessage_MiniSweAgentBashArgs:
+		if !s.onMiniSweBashExec(ex, m.MiniSweAgentBashArgs) {
+			msg := &agentpb.ExecClientMessage{Id: execID, ExecId: ex.GetExecId()}
+			msg.Message = &agentpb.ExecClientMessage_MiniSweAgentBashResult{MiniSweAgentBashResult: rejectedShellResult()}
+			_ = s.replyExec(msg)
+		}
+	case *agentpb.ExecServerMessage_RedactedReadArgs:
+		msg := &agentpb.ExecClientMessage{Id: execID, ExecId: ex.GetExecId()}
+		msg.Message = &agentpb.ExecClientMessage_RedactedReadResult{RedactedReadResult: &agentpb.ReadResult{
+			Result: &agentpb.ReadResult_Error{Error: &agentpb.ReadError{
+				Path: m.RedactedReadArgs.GetPath(), Error: "网关尚未实现敏感信息脱敏，已拒绝返回未脱敏内容",
+			}},
+		}}
+		_ = s.replyExec(msg)
+	case *agentpb.ExecServerMessage_McpStateExecArgs:
+		reply(buildMcpStateResult(s.tools, m.McpStateExecArgs.GetServerIdentifiers()))
+	case *agentpb.ExecServerMessage_ExecuteHookArgs:
+		if result := buildNeutralHookResult(m.ExecuteHookArgs.GetRequest()); result != nil {
+			reply(result)
+		} else {
+			s.replyExecFailure(ex, "Cursor 请求了无法识别的 Hook 类型")
+		}
+	case *agentpb.ExecServerMessage_SubagentAwaitArgs:
+		reply(&agentpb.SubagentAwaitResult{Result: &agentpb.SubagentAwaitResult_NotFound{
+			NotFound: &agentpb.SubagentAwaitNotFound{AgentId: m.SubagentAwaitArgs.GetAgentId()},
+		}})
+	case *agentpb.ExecServerMessage_ForceBackgroundShellArgs:
+		reply(&agentpb.ForceBackgroundShellResult{
+			Status: agentpb.ForceBackgroundShellStatus_FORCE_BACKGROUND_SHELL_STATUS_NOT_FOUND,
 		})
+	case *agentpb.ExecServerMessage_ForceBackgroundSubagentArgs:
+		reply(&agentpb.ForceBackgroundSubagentResult{
+			Status: agentpb.ForceBackgroundSubagentStatus_FORCE_BACKGROUND_SUBAGENT_STATUS_NOT_FOUND,
+		})
+	case *agentpb.ExecServerMessage_SmartModeClassifierArgs:
+		reply(&agentpb.SmartModeClassifierResult{Result: &agentpb.SmartModeClassifierResult_Error{
+			Error: &agentpb.SmartModeClassifierError{Error: "API 网关不执行 Cursor 智能模式风险分类"},
+		}})
+	case *agentpb.ExecServerMessage_CanvasDiagnosticsArgs:
+		reply(&agentpb.CanvasDiagnosticsResult{Result: &agentpb.CanvasDiagnosticsResult_Error{
+			Error: &agentpb.CanvasDiagnosticsError{
+				Path: m.CanvasDiagnosticsArgs.GetPath(), Error: "API 网关无法读取 Cursor 画布诊断信息",
+			},
+		}})
+	case *agentpb.ExecServerMessage_ShellAllowlistPrecheckArgs:
+		reply(&agentpb.ShellAllowlistPrecheckResult{Allowlisted: false})
+	case *agentpb.ExecServerMessage_McpAllowlistPrecheckArgs:
+		reply(&agentpb.McpAllowlistPrecheckResult{Allowlisted: false})
+	case *agentpb.ExecServerMessage_WebFetchAllowlistPrecheckArgs:
+		reply(&agentpb.WebFetchAllowlistPrecheckResult{Allowlisted: false})
+	case *agentpb.ExecServerMessage_ConversationSearchArgs:
+		reply(&agentpb.ConversationSearchResult{Result: &agentpb.ConversationSearchResult_Error{
+			Error: &agentpb.ConversationSearchError{Error: "API 网关没有 Cursor 本地会话索引"},
+		}})
+	case *agentpb.ExecServerMessage_AgentStoreConflictArgs:
+		reply(&agentpb.AgentStoreConflictResult{Result: &agentpb.AgentStoreConflictResult_Error{
+			Error: &agentpb.AgentStoreConflictError{Error: "API 网关不维护 Cursor 本地 Agent Store"},
+		}})
 	default:
 		// 未实现的 exec 必须在控制通道内失败并关闭对应子流；静默丢弃会让
 		// Cursor 服务端永久等待一个永远不会到来的 typed result。
@@ -720,29 +914,178 @@ func mcpArgsToolName(args *agentpb.McpArgs) string {
 	return localToolName(name)
 }
 
+func (s *session) downstreamTool(candidates ...string) (string, *agentpb.McpToolDefinition) {
+	for _, candidate := range candidates {
+		for _, definition := range s.tools {
+			if definition == nil {
+				continue
+			}
+			name := localToolName(definition.GetName())
+			if name == "" {
+				name = localToolName(definition.GetToolName())
+			}
+			if strings.EqualFold(name, candidate) {
+				return name, definition
+			}
+		}
+	}
+	return "", nil
+}
+
+func toolSchemaProperty(definition *agentpb.McpToolDefinition, candidates ...string) (string, bool) {
+	if definition == nil || len(definition.GetInputSchema()) == 0 {
+		return "", false
+	}
+	var schema structpb.Value
+	if err := proto.Unmarshal(definition.GetInputSchema(), &schema); err != nil {
+		return "", false
+	}
+	object, ok := schema.AsInterface().(map[string]any)
+	if !ok {
+		return "", false
+	}
+	properties, ok := object["properties"].(map[string]any)
+	if !ok {
+		return "", false
+	}
+	for _, candidate := range candidates {
+		if _, exists := properties[candidate]; exists {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
+func requiredToolProperty(definition *agentpb.McpToolDefinition, candidates ...string) string {
+	if property, ok := toolSchemaProperty(definition, candidates...); ok {
+		return property
+	}
+	return candidates[0]
+}
+
+func (s *session) onReadExec(ex *agentpb.ExecServerMessage, args *agentpb.ReadArgs) bool {
+	name, definition := s.downstreamTool("Read")
+	if name == "" || args == nil {
+		return false
+	}
+	toolArgs := map[string]any{requiredToolProperty(definition, "file_path", "path"): args.GetPath()}
+	if args.Offset != nil {
+		if property, ok := toolSchemaProperty(definition, "offset"); ok {
+			toolArgs[property] = args.GetOffset()
+		}
+	}
+	if args.Limit != nil {
+		if property, ok := toolSchemaProperty(definition, "limit"); ok {
+			toolArgs[property] = args.GetLimit()
+		}
+	}
+	s.queueExecTool(ex, pendingExecCall{
+		kind: pendingExecRead, name: name, path: args.GetPath(),
+		rangeApplied: args.Offset != nil || args.Limit != nil,
+	}, toolArgs, args.GetToolCallId())
+	return true
+}
+
+func (s *session) onWriteExec(ex *agentpb.ExecServerMessage, args *agentpb.WriteArgs) bool {
+	name, definition := s.downstreamTool("Write")
+	if name == "" || args == nil {
+		return false
+	}
+	content := args.GetFileText()
+	fileSize := len([]byte(content))
+	if len(args.GetFileBytes()) > 0 {
+		content = string(args.GetFileBytes())
+		fileSize = len(args.GetFileBytes())
+	}
+	toolArgs := map[string]any{
+		requiredToolProperty(definition, "file_path", "path"):    args.GetPath(),
+		requiredToolProperty(definition, "content", "file_text"): content,
+	}
+	s.queueExecTool(ex, pendingExecCall{
+		kind: pendingExecWrite, name: name, path: args.GetPath(),
+		writeContent: content, writeFileSize: fileSize,
+		returnWriteContent: args.GetReturnFileContentAfterWrite(),
+	}, toolArgs, args.GetToolCallId())
+	return true
+}
+
+func (s *session) onShellExec(ex *agentpb.ExecServerMessage, args *agentpb.ShellArgs, stream bool) bool {
+	name, definition := s.downstreamTool("Bash", "Shell")
+	if name == "" || args == nil {
+		return false
+	}
+	command := args.GetCommand()
+	if args.GetWorkingDirectory() != "" {
+		command = "cd -- " + shellQuote(args.GetWorkingDirectory()) + " && " + command
+	}
+	toolArgs := map[string]any{requiredToolProperty(definition, "command"): command}
+	if args.GetTimeout() > 0 {
+		if property, ok := toolSchemaProperty(definition, "timeout"); ok {
+			toolArgs[property] = args.GetTimeout()
+		}
+	}
+	if args.GetDescription() != "" {
+		if property, ok := toolSchemaProperty(definition, "description"); ok {
+			toolArgs[property] = args.GetDescription()
+		}
+	}
+	kind := pendingExecShell
+	if stream {
+		kind = pendingExecShellStream
+	}
+	s.queueExecTool(ex, pendingExecCall{
+		kind: kind, name: name, command: args.GetCommand(), workingDirectory: args.GetWorkingDirectory(),
+	}, toolArgs, args.GetToolCallId())
+	return true
+}
+
+func (s *session) queueExecTool(
+	ex *agentpb.ExecServerMessage,
+	call pendingExecCall,
+	args map[string]any,
+	toolCallID string,
+) {
+	if toolCallID == "" {
+		toolCallID = "tool_" + uuid.NewString()
+	}
+	call.toolCallID = toolCallID
+	if ex != nil {
+		call.messageID = ex.GetId()
+		call.execID = ex.GetExecId()
+	}
+	if s.pendingExec == nil {
+		s.pendingExec = make(map[string]pendingExecCall)
+	}
+	s.pendingExec[toolCallID] = call
+	tc := s.trackTool(toolCallID, call.name)
+	if !tc.ended {
+		tc.ended = true
+		argsJSON, err := json.Marshal(args)
+		if err != nil {
+			argsJSON = []byte("{}")
+		}
+		s.emit(ToolCallEnd{ID: toolCallID, Name: tc.name, ArgsJSON: argsJSON})
+	}
+	s.scheduleToolFinish()
+}
+
 // onMcpExec 是 function calling 的截获点：服务端请求执行我们下发的工具时，
 // 不真正执行，而是把完整参数透出为 tool_calls。收集完同批并行调用后结束当前
 // 下游分段；可续接会话保持原始流，等待 API 调用方在下一请求中携带结果。
 func (s *session) onMcpExec(ex *agentpb.ExecServerMessage, args *agentpb.McpArgs) {
 	s.logPhaseOnce(&s.toolLogged, "tool_call")
 	id := args.GetToolCallId()
-	if ex != nil && id != "" {
-		if s.pendingMCP == nil {
-			s.pendingMCP = make(map[string]pendingMCPCall)
-		}
-		s.pendingMCP[id] = pendingMCPCall{
-			toolCallID: id,
-			name:       mcpArgsToolName(args),
-			messageID:  ex.GetId(),
-			execID:     ex.GetExecId(),
-		}
+	call := pendingExecCall{kind: pendingExecMCP, name: mcpArgsToolName(args)}
+	decoded := decodeMcpArgsMap(args.GetArgs())
+	var toolArgs map[string]any
+	if err := json.Unmarshal(decoded, &toolArgs); err != nil {
+		toolArgs = map[string]any{}
 	}
-	tc := s.trackTool(id, mcpArgsToolName(args))
-	if !tc.ended {
-		tc.ended = true
-		argsJSON := decodeMcpArgsMap(args.GetArgs())
-		s.emit(ToolCallEnd{ID: id, Name: tc.name, ArgsJSON: argsJSON})
-	}
+	s.queueExecTool(ex, call, toolArgs, id)
+}
+
+func (s *session) scheduleToolFinish() {
+	s.logPhaseOnce(&s.toolLogged, "tool_call")
 	s.sawToolCall = true
 	s.finishing = true
 	s.finishBatch++

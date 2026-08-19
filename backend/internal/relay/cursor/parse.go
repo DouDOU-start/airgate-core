@@ -436,17 +436,23 @@ func antToolResultParts(raw json.RawMessage) []ContentPart {
 		}
 		return nil
 	}
-	var items []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
-	}
+	var items []antBlock
 	if json.Unmarshal(raw, &items) != nil {
 		return nil
 	}
 	var parts []ContentPart
 	for _, it := range items {
-		if it.Type == "text" && it.Text != "" {
-			parts = append(parts, ContentPart{Type: "text", Text: it.Text})
+		switch it.Type {
+		case "text":
+			if it.Text != "" {
+				parts = append(parts, ContentPart{Type: "text", Text: it.Text})
+			}
+		case "image":
+			if it.Source != nil && it.Source.Data != "" {
+				parts = append(parts, ContentPart{
+					Type: "image", ImageMime: it.Source.MediaType, ImageData: it.Source.Data,
+				})
+			}
 		}
 	}
 	return parts

@@ -8,7 +8,7 @@ import (
 )
 
 func TestBuildMCPResumeResults保留关联字段并转换成功结果(t *testing.T) {
-	pending := map[string]pendingMCPCall{
+	pending := map[string]pendingExecCall{
 		"call-2": {toolCallID: "call-2", name: "second", messageID: 12, execID: "exec-12"},
 		"call-1": {toolCallID: "call-1", name: "first", messageID: 11, execID: "exec-11"},
 	}
@@ -17,7 +17,7 @@ func TestBuildMCPResumeResults保留关联字段并转换成功结果(t *testing
 		{Role: "tool", ToolCallID: "call-1", Content: []ContentPart{{Type: "text", Text: "第一个结果"}}},
 	}}
 
-	results, err := buildMCPResumeResults(parsed, pending)
+	results, err := buildExecResumeResults(parsed, pending)
 	if err != nil {
 		t.Fatalf("构造 MCP 续接结果失败: %v", err)
 	}
@@ -41,10 +41,10 @@ func TestBuildMCPResumeResults保留关联字段并转换成功结果(t *testing
 }
 
 func TestBuildMCPResumeResults转换错误结果(t *testing.T) {
-	results, err := buildMCPResumeResults(&ParsedRequest{Messages: []NMessage{{
+	results, err := buildExecResumeResults(&ParsedRequest{Messages: []NMessage{{
 		Role: "tool", ToolCallID: "call-error", IsError: true,
 		Content: []ContentPart{{Type: "text", Text: "执行失败"}},
-	}}}, map[string]pendingMCPCall{
+	}}}, map[string]pendingExecCall{
 		"call-error": {toolCallID: "call-error", name: "broken", messageID: 7, execID: "exec-7"},
 	})
 	if err != nil {
@@ -85,7 +85,7 @@ func TestBuildMCPResumeResults支持OpenAI和Anthropic请求(t *testing.T) {
 			if err != nil {
 				t.Fatalf("解析请求失败: %v", err)
 			}
-			results, err := buildMCPResumeResults(parsed, map[string]pendingMCPCall{
+			results, err := buildExecResumeResults(parsed, map[string]pendingExecCall{
 				"call-1": {toolCallID: "call-1", messageID: 8, execID: "exec-8"},
 			})
 			if err != nil {
@@ -107,7 +107,7 @@ func TestBuildMCPResumeResults支持OpenAI和Anthropic请求(t *testing.T) {
 }
 
 func TestBuildMCPResumeResults缺少工具结果时明确报错(t *testing.T) {
-	_, err := buildMCPResumeResults(&ParsedRequest{}, map[string]pendingMCPCall{
+	_, err := buildExecResumeResults(&ParsedRequest{}, map[string]pendingExecCall{
 		"call-missing": {toolCallID: "call-missing", name: "read"},
 	})
 	if err == nil || !strings.Contains(err.Error(), "call-missing") {
@@ -117,7 +117,7 @@ func TestBuildMCPResumeResults缺少工具结果时明确报错(t *testing.T) {
 
 func TestResumableStream缺失结果不会清空等待状态(t *testing.T) {
 	stream := newResumableCursorStream(func() {})
-	stream.setWaiting(map[string]pendingMCPCall{
+	stream.setWaiting(map[string]pendingExecCall{
 		"call-1": {toolCallID: "call-1", name: "read", messageID: 9, execID: "exec-9"},
 	})
 	if _, active, err := stream.tryResume(context.Background(), &ParsedRequest{}); !active || err == nil {
@@ -146,7 +146,7 @@ func TestResumableStream缺失结果不会清空等待状态(t *testing.T) {
 
 func TestResumableStream投递取消后可重试(t *testing.T) {
 	stream := newResumableCursorStream(func() {})
-	stream.setWaiting(map[string]pendingMCPCall{
+	stream.setWaiting(map[string]pendingExecCall{
 		"call-1": {toolCallID: "call-1", messageID: 1},
 	})
 	parsed := &ParsedRequest{Messages: []NMessage{{

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	agentpb "github.com/DouDOU-start/airgate-core/internal/relay/cursor/proto/agentpb"
@@ -12,12 +13,50 @@ import (
 
 const resumeEventBuffer = 64
 
-// pendingMCPCall 保存 Cursor exec 通道中等待结果的一次 MCP 调用。
-type pendingMCPCall struct {
+type pendingExecKind uint8
+
+const (
+	pendingExecMCP pendingExecKind = iota
+	pendingExecRead
+	pendingExecWrite
+	pendingExecShell
+	pendingExecShellStream
+	pendingExecDelete
+	pendingExecGrep
+	pendingExecLs
+	pendingExecFetch
+	pendingExecSubagent
+	pendingExecDiagnostics
+	pendingExecPiRead
+	pendingExecPiBash
+	pendingExecPiEdit
+	pendingExecPiWrite
+	pendingExecPiGrep
+	pendingExecPiFind
+	pendingExecPiLs
+	pendingExecMiniSweBash
+)
+
+// pendingExecCall 保存 Cursor exec 通道中已转交下游、等待工具结果的调用。
+// 原始参数用于把 Claude Code 的通用 tool_result 还原成 Cursor 要求的类型。
+type pendingExecCall struct {
 	toolCallID string
 	name       string
 	messageID  uint32
 	execID     string
+	kind       pendingExecKind
+
+	path               string
+	rangeApplied       bool
+	writeContent       string
+	writeFileSize      int
+	returnWriteContent bool
+	command            string
+	workingDirectory   string
+	pattern            string
+	outputMode         string
+	grepOffset         *int32
+	url                string
 }
 
 type resumeCommand struct {
@@ -35,7 +74,7 @@ type resumableCursorStream struct {
 	waiting  bool
 	resuming bool
 	closed   bool
-	pending  map[string]pendingMCPCall
+	pending  map[string]pendingExecCall
 	resumeCh chan resumeCommand
 	done     chan struct{}
 	cancel   context.CancelFunc
@@ -43,14 +82,14 @@ type resumableCursorStream struct {
 
 func newResumableCursorStream(cancel context.CancelFunc) *resumableCursorStream {
 	return &resumableCursorStream{
-		pending:  make(map[string]pendingMCPCall),
+		pending:  make(map[string]pendingExecCall),
 		resumeCh: make(chan resumeCommand),
 		done:     make(chan struct{}),
 		cancel:   cancel,
 	}
 }
 
-func (s *resumableCursorStream) setWaiting(pending map[string]pendingMCPCall) {
+func (s *resumableCursorStream) setWaiting(pending map[string]pendingExecCall) {
 	if s == nil {
 		return
 	}
@@ -103,7 +142,7 @@ func (s *resumableCursorStream) tryResume(
 		return nil, true, fmt.Errorf("同一 Cursor 会话正在续接工具结果")
 	}
 	pending := clonePendingCalls(s.pending)
-	results, buildErr := buildMCPResumeResults(parsed, pending)
+	results, buildErr := buildExecResumeResults(parsed, pending)
 	if buildErr != nil {
 		s.mu.Unlock()
 		return nil, true, buildErr
@@ -140,7 +179,7 @@ func (s *resumableCursorStream) tryResume(
 		s.mu.Lock()
 		s.waiting = false
 		s.resuming = false
-		s.pending = make(map[string]pendingMCPCall)
+		s.pending = make(map[string]pendingExecCall)
 		s.mu.Unlock()
 		return segment, true, nil
 	case <-s.done:
@@ -148,17 +187,17 @@ func (s *resumableCursorStream) tryResume(
 	}
 }
 
-func clonePendingCalls(source map[string]pendingMCPCall) map[string]pendingMCPCall {
-	cloned := make(map[string]pendingMCPCall, len(source))
+func clonePendingCalls(source map[string]pendingExecCall) map[string]pendingExecCall {
+	cloned := make(map[string]pendingExecCall, len(source))
 	for id, call := range source {
 		cloned[id] = call
 	}
 	return cloned
 }
 
-func buildMCPResumeResults(
+func buildExecResumeResults(
 	parsed *ParsedRequest,
-	pending map[string]pendingMCPCall,
+	pending map[string]pendingExecCall,
 ) ([]*agentpb.ExecClientMessage, error) {
 	if parsed == nil {
 		return nil, fmt.Errorf("续接 Cursor 流时请求为空")
@@ -169,7 +208,7 @@ func buildMCPResumeResults(
 			toolResults[message.ToolCallID] = message
 		}
 	}
-	calls := make([]pendingMCPCall, 0, len(pending))
+	calls := make([]pendingExecCall, 0, len(pending))
 	for _, call := range pending {
 		calls = append(calls, call)
 	}
@@ -186,22 +225,212 @@ func buildMCPResumeResults(
 		if !ok {
 			return nil, fmt.Errorf("cursor 流正在等待工具 %q 的结果（tool_call_id=%s）", call.name, toolCallID)
 		}
+		results = append(results, buildExecResult(call, result)...)
+	}
+	return results, nil
+}
+
+func buildExecResult(call pendingExecCall, result NMessage) []*agentpb.ExecClientMessage {
+	base := func() *agentpb.ExecClientMessage {
+		return &agentpb.ExecClientMessage{Id: call.messageID, ExecId: call.execID}
+	}
+	switch call.kind {
+	case pendingExecRead:
+		readResult := &agentpb.ReadResult{}
+		text := normalizeClaudeReadOutput(partsText(result.Content))
+		if result.IsError {
+			readResult.Result = &agentpb.ReadResult_Error{Error: &agentpb.ReadError{
+				Path: call.path, Error: errorResultText(result, "读取文件失败"),
+			}}
+		} else {
+			success := &agentpb.ReadSuccess{
+				Path: call.path, TotalLines: textLineCount(text),
+				FileSize: int64(len([]byte(text))), RangeApplied: call.rangeApplied,
+				Output: &agentpb.ReadSuccess_Content{Content: text},
+			}
+			if data := firstImageData(result.Content); len(data) > 0 {
+				success.Output = &agentpb.ReadSuccess_Data{Data: data}
+				success.TotalLines = 0
+				success.FileSize = int64(len(data))
+			}
+			readResult.Result = &agentpb.ReadResult_Success{Success: success}
+		}
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_ReadResult{ReadResult: readResult}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecWrite:
+		writeResult := &agentpb.WriteResult{}
+		if result.IsError {
+			writeResult.Result = &agentpb.WriteResult_Error{Error: &agentpb.WriteError{
+				Path: call.path, Error: errorResultText(result, "写入文件失败"),
+			}}
+		} else {
+			success := &agentpb.WriteSuccess{
+				Path: call.path, LinesCreated: textLineCount(call.writeContent), FileSize: int32(call.writeFileSize),
+			}
+			if call.returnWriteContent {
+				content := call.writeContent
+				success.FileContentAfterWrite = &content
+			}
+			writeResult.Result = &agentpb.WriteResult_Success{Success: success}
+		}
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_WriteResult{WriteResult: writeResult}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecShell:
+		shellResult := buildShellResumeResult(call, result)
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_ShellResult{ShellResult: shellResult}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecShellStream:
+		return buildShellStreamResumeResults(call, result)
+	case pendingExecDelete:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_DeleteResult{DeleteResult: buildDeleteResumeResult(call, result)}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecGrep:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_GrepResult{GrepResult: buildGrepResumeResult(call, result)}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecLs:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_LsResult{LsResult: buildLsResumeResult(call, result)}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecFetch:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_FetchResult{FetchResult: buildFetchResumeResult(call, result)}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecSubagent:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_SubagentResult{SubagentResult: buildSubagentResumeResult(result)}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecDiagnostics:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_DiagnosticsResult{
+			DiagnosticsResult: buildDiagnosticsResumeResult(call, result),
+		}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecPiRead:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_PiReadResult{PiReadResult: buildPiReadResumeResult(result)}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecPiBash:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_PiBashResult{PiBashResult: buildPiBashResumeResult(result)}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecPiEdit:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_PiEditResult{PiEditResult: buildPiEditResumeResult(result)}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecPiWrite:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_PiWriteResult{PiWriteResult: buildPiWriteResumeResult(result)}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecPiGrep:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_PiGrepResult{PiGrepResult: buildPiGrepResumeResult(result)}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecPiFind:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_PiFindResult{PiFindResult: buildPiFindResumeResult(result)}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecPiLs:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_PiLsResult{PiLsResult: buildPiLsResumeResult(result)}
+		return []*agentpb.ExecClientMessage{message}
+	case pendingExecMiniSweBash:
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_MiniSweAgentBashResult{
+			MiniSweAgentBashResult: buildShellResumeResult(call, result),
+		}
+		return []*agentpb.ExecClientMessage{message}
+	default:
 		mcpResult := &agentpb.McpResult{}
 		if result.IsError {
 			mcpResult.Result = &agentpb.McpResult_Error{Error: &agentpb.McpError{
-				Error: toolResultText(result),
+				Error: errorResultText(result, "工具执行失败"),
 			}}
 		} else {
 			mcpResult.Result = &agentpb.McpResult_Success{Success: &agentpb.McpSuccess{
 				Content: buildMCPResultContent(result.Content),
 			}}
 		}
-		results = append(results, &agentpb.ExecClientMessage{
-			Id: call.messageID, ExecId: call.execID,
-			Message: &agentpb.ExecClientMessage_McpResult{McpResult: mcpResult},
-		})
+		message := base()
+		message.Message = &agentpb.ExecClientMessage_McpResult{McpResult: mcpResult}
+		return []*agentpb.ExecClientMessage{message}
 	}
-	return results, nil
+}
+
+func buildShellResumeResult(call pendingExecCall, result NMessage) *agentpb.ShellResult {
+	text := partsText(result.Content)
+	if result.IsError {
+		return &agentpb.ShellResult{Result: &agentpb.ShellResult_Failure{Failure: &agentpb.ShellFailure{
+			Command: call.command, WorkingDirectory: call.workingDirectory, ExitCode: 1,
+			Stderr: errorResultText(result, "命令执行失败"),
+		}}}
+	}
+	return &agentpb.ShellResult{Result: &agentpb.ShellResult_Success{Success: &agentpb.ShellSuccess{
+		Command: call.command, WorkingDirectory: call.workingDirectory, Stdout: text,
+	}}}
+}
+
+func buildShellStreamResumeResults(call pendingExecCall, result NMessage) []*agentpb.ExecClientMessage {
+	message := func(stream *agentpb.ShellStream) *agentpb.ExecClientMessage {
+		return &agentpb.ExecClientMessage{
+			Id: call.messageID, ExecId: call.execID,
+			Message: &agentpb.ExecClientMessage_ShellStream{ShellStream: stream},
+		}
+	}
+	results := []*agentpb.ExecClientMessage{message(&agentpb.ShellStream{
+		Event: &agentpb.ShellStream_Start{Start: &agentpb.ShellStreamStart{}},
+	})}
+	text := partsText(result.Content)
+	if text != "" {
+		if result.IsError {
+			results = append(results, message(&agentpb.ShellStream{
+				Event: &agentpb.ShellStream_Stderr{Stderr: &agentpb.ShellStreamStderr{Data: text}},
+			}))
+		} else {
+			results = append(results, message(&agentpb.ShellStream{
+				Event: &agentpb.ShellStream_Stdout{Stdout: &agentpb.ShellStreamStdout{Data: text}},
+			}))
+		}
+	}
+	code := uint32(0)
+	if result.IsError {
+		code = 1
+	}
+	results = append(results, message(&agentpb.ShellStream{Event: &agentpb.ShellStream_Exit{
+		Exit: &agentpb.ShellStreamExit{Code: code, Cwd: call.workingDirectory},
+	}}))
+	return results
+}
+
+func textLineCount(text string) int32 {
+	if text == "" {
+		return 0
+	}
+	return int32(strings.Count(text, "\n") + 1)
+}
+
+func errorResultText(message NMessage, fallback string) string {
+	if text := partsText(message.Content); text != "" {
+		return text
+	}
+	return fallback
+}
+
+func firstImageData(parts []ContentPart) []byte {
+	for _, part := range parts {
+		if part.Type != "image" || part.ImageData == "" {
+			continue
+		}
+		data, err := base64.StdEncoding.DecodeString(part.ImageData)
+		if err == nil {
+			return data
+		}
+	}
+	return nil
 }
 
 func buildMCPResultContent(parts []ContentPart) []*agentpb.McpToolResultContentItem {
@@ -223,14 +452,6 @@ func buildMCPResultContent(parts []ContentPart) []*agentpb.McpToolResultContentI
 		}
 	}
 	return content
-}
-
-func toolResultText(message NMessage) string {
-	text := partsText(message.Content)
-	if text == "" {
-		return "工具执行失败"
-	}
-	return text
 }
 
 // resumableStreamManager 按账号和下游会话保存单实例活跃流。

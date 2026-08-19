@@ -258,3 +258,27 @@ func TestParseAnthropicToolBlocks(t *testing.T) {
 		t.Fatalf("构建失败: %v", err)
 	}
 }
+
+func TestParseAnthropicToolResult保留图片内容(t *testing.T) {
+	payload := []byte(`{
+		"model":"claude",
+		"messages":[
+			{"role":"assistant","content":[{"type":"tool_use","id":"tu_image","name":"screenshot","input":{}}]},
+			{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_image","content":[
+				{"type":"text","text":"截图完成"},
+				{"type":"image","source":{"type":"base64","media_type":"image/png","data":"AQID"}}
+			]}]}
+		]
+	}`)
+	req, err := ParseRequest(ProtoAnthropic, payload)
+	if err != nil {
+		t.Fatalf("解析失败: %v", err)
+	}
+	if len(req.Messages) != 2 || req.Messages[1].Role != "tool" || len(req.Messages[1].Content) != 2 {
+		t.Fatalf("图片工具结果未完整保留: %+v", req.Messages)
+	}
+	image := req.Messages[1].Content[1]
+	if image.Type != "image" || image.ImageMime != "image/png" || image.ImageData != "AQID" {
+		t.Fatalf("图片工具结果错误: %+v", image)
+	}
+}
