@@ -405,6 +405,65 @@ func TestRelayStreamDoesNotCommitHeadersBeforeFirstChunk(t *testing.T) {
 	}
 }
 
+func TestRelayStream内容前超时保活(t *testing.T) {
+	oldDelay, oldInterval := cpaPreContentFlushDelay, cpaPreContentKeepaliveInterval
+	cpaPreContentFlushDelay, cpaPreContentKeepaliveInterval = 30*time.Millisecond, 10*time.Millisecond
+	defer func() { cpaPreContentFlushDelay, cpaPreContentKeepaliveInterval = oldDelay, oldInterval }()
+
+	c, recorder := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
+	// 先只给生命周期帧（会被缓冲），拖过保活阈值后再给内容。
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"message_start","message":{"usage":{"input_tokens":10}}}`)}
+	go func() {
+		time.Sleep(120 * time.Millisecond)
+		chunks <- cliproxyexecutor.StreamChunk{Payload: []byte(`data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"你好"}}`)}
+		close(chunks)
+	}()
+
+	result := (&Bridge{}).relayStreamSince(context.Background(), c,
+		&cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), time.Time{}, adaptor.EndpointMessages)
+
+	body := recorder.Body.String()
+	if !strings.Contains(body, ": keepalive") {
+		t.Fatalf("超过阈值后应写出保活注释行，body=%q", body)
+	}
+	if !strings.Contains(body, "message_start") || !strings.Contains(body, "content_block_delta") {
+		t.Fatalf("缓冲帧与内容帧都应送达客户端，body=%q", body)
+	}
+	// 保活提交后 message_start 必须先于内容帧（缓冲区先冲刷）。
+	if strings.Index(body, "message_start") > strings.Index(body, "content_block_delta") {
+		t.Fatalf("缓冲帧应先于内容帧写出，body=%q", body)
+	}
+	if !result.Written || result.StatusCode != http.StatusOK {
+		t.Fatalf("保活流应按已写出的 200 结束，result=%+v", result)
+	}
+}
+
+func TestRelayStream内容前保活不提前触发(t *testing.T) {
+	oldDelay, oldInterval := cpaPreContentFlushDelay, cpaPreContentKeepaliveInterval
+	cpaPreContentFlushDelay, cpaPreContentKeepaliveInterval = 10*time.Second, 10*time.Millisecond
+	defer func() { cpaPreContentFlushDelay, cpaPreContentKeepaliveInterval = oldDelay, oldInterval }()
+
+	c, recorder := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 1)
+	go func() {
+		time.Sleep(80 * time.Millisecond)
+		chunks <- cliproxyexecutor.StreamChunk{Err: errors.New("上游失败")}
+		close(chunks)
+	}()
+
+	result := (&Bridge{}).relayStreamSince(context.Background(), c,
+		&cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), time.Time{}, adaptor.EndpointMessages)
+
+	// 阈值未到，ticker 触发也不得写出任何字节，错误仍可整体 failover。
+	if c.Writer.Written() || recorder.Body.Len() != 0 {
+		t.Fatalf("阈值内不应提交响应，body=%q", recorder.Body.String())
+	}
+	if result.NetErr == nil {
+		t.Fatal("阈值内的上游错误应保持可重试语义")
+	}
+}
+
 func TestRelayStreamResponses内容前过载可切换(t *testing.T) {
 	c, recorder := newStreamTestContext()
 	chunks := make(chan cliproxyexecutor.StreamChunk, 2)

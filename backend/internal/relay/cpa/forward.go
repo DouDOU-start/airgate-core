@@ -22,6 +22,18 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/streamlife"
 )
 
+// 内容前保活：thinking 模型（如 Cursor 的 fable 系）首 token 前上游可能
+// 数分钟无任何增量，而缓冲策略在首内容前不写一个字节，前置反代（如
+// Cloudflare 100~120s Proxy Read Timeout）会以 524 掐断连接。等待超过
+// cpaPreContentFlushDelay 后提交响应头并周期写 SSE 注释行保活；代价是
+// 此后上游失败只能以流内错误呈现，无法再整体 failover 换账号。阈值取
+// 60s：可重试的账号级错误（401/429/连接失败）几乎都在数秒内出现。
+// 变量形式仅为测试可注入。
+var (
+	cpaPreContentFlushDelay        = 60 * time.Second
+	cpaPreContentKeepaliveInterval = 15 * time.Second
+)
+
 const (
 	cpaPreContentBufferLimit       = 1 << 20
 	antigravityGemini37FlashPublic = "gemini-3.7-flash-high"
@@ -573,6 +585,9 @@ func (b *Bridge) relayStreamSinceWithModelRewrite(
 		return false
 	}
 
+	keepalive := time.NewTicker(cpaPreContentKeepaliveInterval)
+	defer keepalive.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -582,6 +597,13 @@ func (b *Bridge) relayStreamSinceWithModelRewrite(
 			}
 			streamErr = ctx.Err()
 			goto finish
+		case <-keepalive.C:
+			if contentStarted || downstreamClosed || time.Since(start) < cpaPreContentFlushDelay {
+				continue
+			}
+			// SSE 注释行对所有入口协议合法且被客户端解析器忽略。
+			flushPending()
+			writePayload([]byte(": keepalive\n\n"), false)
 		case chunk, ok := <-stream.Chunks:
 			if !ok {
 				if responsesFramer != nil {
