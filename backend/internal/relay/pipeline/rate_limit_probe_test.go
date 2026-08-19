@@ -20,16 +20,64 @@ import (
 )
 
 type scriptedAccountForwarder struct {
-	mu      sync.Mutex
-	calls   []int
-	forward func(cpa.ForwardRequest) cpa.ForwardResult
+	mu       sync.Mutex
+	calls    []int
+	requests []cpa.ForwardRequest
+	forward  func(cpa.ForwardRequest) cpa.ForwardResult
 }
 
 func (f *scriptedAccountForwarder) Forward(_ context.Context, _ *gin.Context, req cpa.ForwardRequest) cpa.ForwardResult {
 	f.mu.Lock()
 	f.calls = append(f.calls, req.Account.AccountID)
+	f.requests = append(f.requests, req)
 	f.mu.Unlock()
 	return f.forward(req)
+}
+
+func (f *scriptedAccountForwarder) forwardedRequests() []cpa.ForwardRequest {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]cpa.ForwardRequest(nil), f.requests...)
+}
+
+func TestCursorSessionKeyThroughRelayHookAccountRoute(t *testing.T) {
+	env := newTestEnv(t)
+	accounts := accountreg.New(&fakeAccountLoader{snaps: []accountreg.Snapshot{{
+		ID: 1, Name: "cursor-1", Platform: "cursor", Type: "oauth",
+		Priority: 100, Weight: 10, State: accountreg.StateActive,
+		Models: map[string]struct{}{testModel: {}}, GroupIDs: map[int]struct{}{7: {}},
+	}}}, nil)
+	if err := accounts.Reload(context.Background()); err != nil {
+		t.Fatalf("账号注册表加载失败: %v", err)
+	}
+	forwarder := &scriptedAccountForwarder{forward: func(req cpa.ForwardRequest) cpa.ForwardResult {
+		return cpa.ForwardResult{
+			StatusCode: http.StatusOK, ContentType: "application/json",
+			Body: []byte(`{"id":"chat-account","model":"` + req.Model + `","choices":[{"message":{"role":"assistant","content":"ok"}}]}`),
+		}
+	}}
+	env.pipe.accounts = accounts
+	env.pipe.cpa = forwarder
+	env.pipe.relayHook = &staticRelayHook{decision: relayhook.Decision{
+		Version: relayhook.VersionV1,
+		Route:   &relayhook.RoutePlan{AccountIDs: []int{1}, Fallback: relayhook.FallbackCore},
+	}}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(
+		`{"model":"`+testModel+`","messages":[{"role":"user","content":"hello"}]}`,
+	))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Claude-Code-Session-Id", "claude-session-1")
+	response := httptest.NewRecorder()
+	env.engine.ServeHTTP(response, req)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	requests := forwarder.forwardedRequests()
+	if len(requests) != 1 || requests[0].CursorSessionKey == "" ||
+		!strings.Contains(requests[0].CursorSessionKey, "claude:claude-session-1") {
+		t.Fatalf("Cursor session key 未贯通到 CPA: %+v", requests)
+	}
 }
 
 func (f *scriptedAccountForwarder) accountCalls() []int {

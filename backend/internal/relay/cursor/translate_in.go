@@ -45,6 +45,7 @@ func BuildRunRequest(
 	req *ParsedRequest,
 	wireModel, conversationID string,
 	blobStore BlobStore,
+	checkpoints ...*agentpb.ConversationStateStructure,
 ) (reqBytes []byte, tools []*agentpb.McpToolDefinition, err error) {
 	if req == nil {
 		return nil, nil, fmt.Errorf("请求为空")
@@ -86,6 +87,16 @@ func BuildRunRequest(
 	convState := &agentpb.ConversationStateStructure{
 		RootPromptMessagesJson: rootIDs,
 		Turns:                  turnIDs,
+	}
+	if len(checkpoints) > 0 && checkpoints[0] != nil {
+		// Cursor checkpoint 还包含文件状态、计划、摘要、待执行工具等不在
+		// Anthropic/OpenAI messages 中的会话信息。以 checkpoint 为底稿，再
+		// 用本次请求重建的 root/turns 覆盖消息部分，避免旧请求状态丢失。
+		if cloned, ok := proto.Clone(checkpoints[0]).(*agentpb.ConversationStateStructure); ok {
+			convState = cloned
+			convState.RootPromptMessagesJson = rootIDs
+			convState.Turns = turnIDs
+		}
 	}
 	model := &agentpb.ModelDetails{
 		ModelId:        wireModel,

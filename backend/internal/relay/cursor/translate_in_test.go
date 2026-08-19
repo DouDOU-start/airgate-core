@@ -180,6 +180,47 @@ func TestBuildRunRequestResumeWhenTrailingToolResult(t *testing.T) {
 	}
 }
 
+func TestBuildRunRequestPreservesCheckpointState(t *testing.T) {
+	payload := []byte(`{"model":"m","messages":[{"role":"user","content":"当前问题"}]}`)
+	req, err := ParseRequest(ProtoOpenAI, payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkpoint := &agentpb.ConversationStateStructure{
+		Todos:            [][]byte{[]byte(`[{"text":"保留待办"}]`)},
+		Summary:          []byte("保留摘要"),
+		Plan:             []byte("保留计划"),
+		PendingToolCalls: []string{"{\"name\":\"fn_tool\"}"},
+		FileStates: map[string][]byte{
+			"/workspace/a.go": []byte("file-state-blob"),
+		},
+	}
+	store := NewBlobStore()
+	raw, _, err := BuildRunRequest(req, "m", "conversation-1", store, checkpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var msg agentpb.AgentClientMessage
+	if err := proto.Unmarshal(raw, &msg); err != nil {
+		t.Fatal(err)
+	}
+	state := msg.GetRunRequest().GetConversationState()
+	if state == nil {
+		t.Fatal("conversation state 为空")
+	}
+	if string(state.GetSummary()) != "保留摘要" || string(state.GetPlan()) != "保留计划" ||
+		len(state.GetTodos()) != 1 || string(state.GetTodos()[0]) != `[{"text":"保留待办"}]` ||
+		len(state.GetPendingToolCalls()) != 1 || state.GetFileStates()["/workspace/a.go"] == nil {
+		t.Fatalf("checkpoint 状态未保留: %+v", state)
+	}
+	if len(state.GetRootPromptMessagesJson()) != 1 {
+		t.Fatalf("当前请求只有 active user，rootPromptMessages 应仅含默认 system: %d", len(state.GetRootPromptMessagesJson()))
+	}
+	if len(state.GetTurns()) != 0 {
+		t.Fatalf("当前请求没有历史消息，turns 应为空: %d", len(state.GetTurns()))
+	}
+}
+
 func TestParseAnthropicToolBlocks(t *testing.T) {
 	payload := []byte(`{
 		"model":"claude",

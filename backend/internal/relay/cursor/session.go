@@ -10,27 +10,56 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	agentpb "github.com/DouDOU-start/airgate-core/internal/relay/cursor/proto/agentpb"
 )
 
-// execRejectReason 是对服务端发起的本地工具执行请求的统一拒绝话术：
-// 网关模式下没有本地文件系统/shell，引导模型只使用下发的 function 工具。
-const execRejectReason = "This tool is not available in API gateway mode; respond using only the provided function tools or plain text."
+const (
+	// execRejectReason 是对服务端发起的本地工具执行请求的统一拒绝话术：
+	// 网关模式下没有本地文件系统/shell，引导模型只使用下发的函数工具。
+	execRejectReason = "API 网关模式不提供本地文件系统或 shell；请仅使用请求中提供的函数工具，或直接返回文本。"
 
-// toolCallDrainWindow 是截获首个工具调用后继续收流的窗口，用于收齐同一
-// 模型调用产生的并行 tool calls，窗口结束后关闭流并以 tool_calls 收尾。
-const toolCallDrainWindow = 400 * time.Millisecond
+	// interactionRejectReason 用于无法在无交互网关中完成的询问。
+	interactionRejectReason = "API 网关模式不支持交互式确认。"
+
+	// defaultClientHeartbeatInterval 与 Cursor CLI 的保活频率保持一致，避免
+	// 长思考或等待工具期间 HTTP/2 双向流被中间网络设备判定为空闲。
+	defaultClientHeartbeatInterval = 5 * time.Second
+
+	// defaultToolCallDrainWindow 是最后一个 MCP 工具调用后的静默窗口。Cursor
+	// 会连续下发同一批并行调用，无需每轮固定多等 400ms；100ms 在保留并行
+	// 调用收集余量的同时，可直接减少常见单工具轮次约 300ms 的额外等待。
+	defaultToolCallDrainWindow = 100 * time.Millisecond
+
+	// 暂停的原始 Cursor 流最多等待下游工具结果 10 分钟；超时后关闭流，
+	// 后续请求仍可通过 checkpoint 重建。
+	defaultPausedStreamTTL = 10 * time.Minute
+)
 
 // SessionOptions 描述一次 Run 会话所需的全部输入。
 type SessionOptions struct {
-	Client       *Client
-	Run          RunOptions
-	RequestBytes []byte
-	Tools        []*agentpb.McpToolDefinition
-	Store        BlobStore
+	Client              *Client
+	Run                 RunOptions
+	RequestBytes        []byte
+	Tools               []*agentpb.McpToolDefinition
+	Store               BlobStore
+	HeartbeatInterval   time.Duration
+	ToolCallDrainWindow time.Duration
+	PausedStreamTTL     time.Duration
+	// Resumable 非空时工具调用不会关闭 Cursor 原始流，而是分段结束当前
+	// 响应并等待下一次请求写回 McpResult。
+	Resumable *resumableCursorStream
+	// DownstreamContext 只控制当前响应阶段；进入工具等待态后，其结束不再
+	// 关闭原始流。未设置时沿用 RunSession 的 ctx。
+	DownstreamContext context.Context
+	// OnCheckpoint 接收 Cursor 服务端发来的最新会话快照。回调参数已克隆，
+	// 调用方可持久化或继续克隆，不会与 protobuf 解码缓冲共享可变内存。
+	OnCheckpoint func(*agentpb.ConversationStateStructure)
+	// OnDone 在会话 goroutine 的所有退出路径执行一次，用于释放跨请求 lease。
+	OnDone func()
 }
 
 // RunSession 打开 Connect 流并驱动完整会话，事件按序写入返回的 channel，
@@ -38,14 +67,24 @@ type SessionOptions struct {
 func RunSession(ctx context.Context, opts SessionOptions) <-chan Event {
 	events := make(chan Event, 64)
 	go func() {
-		defer close(events)
+		if opts.OnDone != nil {
+			defer opts.OnDone()
+		}
 		s := &session{
-			store:   opts.Store,
-			tools:   opts.Tools,
-			events:  events,
-			started: make(map[string]*trackedCall),
+			store:               opts.Store,
+			tools:               opts.Tools,
+			events:              events,
+			onCheckpoint:        opts.OnCheckpoint,
+			started:             make(map[string]*trackedCall),
+			pendingMCP:          make(map[string]pendingMCPCall),
+			toolCallDrainWindow: durationOrDefault(opts.ToolCallDrainWindow, defaultToolCallDrainWindow),
+			pausedStreamTTL:     durationOrDefault(opts.PausedStreamTTL, defaultPausedStreamTTL),
+			resumable:           opts.Resumable,
+			segmentDone:         make(chan struct{}),
+			finishReady:         make(chan uint64, 16),
 		}
 		s.run(ctx, opts)
+		s.closeSegment()
 	}()
 	return events
 }
@@ -57,21 +96,36 @@ type trackedCall struct {
 }
 
 type session struct {
-	stream *Stream
-	store  BlobStore
-	tools  []*agentpb.McpToolDefinition
-	events chan<- Event
+	stream    *Stream
+	store     BlobStore
+	tools     []*agentpb.McpToolDefinition
+	events    chan Event
+	startedAt time.Time
 
 	sendMu sync.Mutex
 
-	started     map[string]*trackedCall
-	sawToolCall bool
-	finishing   bool
-	finishTimer *time.Timer
-	doneSent    bool
+	started       map[string]*trackedCall
+	sawToolCall   bool
+	finishing     bool
+	finishTimer   *time.Timer
+	doneSent      bool
+	segmentClosed bool
+	pendingMCP    map[string]pendingMCPCall
+	finishReady   chan uint64
+	finishBatch   uint64
+	resumable     *resumableCursorStream
+	segmentDone   chan struct{}
+
+	toolCallDrainWindow time.Duration
+	pausedStreamTTL     time.Duration
+	onCheckpoint        func(*agentpb.ConversationStateStructure)
+	readyLogged         bool
+	contentLogged       bool
+	toolLogged          bool
 }
 
 func (s *session) run(ctx context.Context, opts SessionOptions) {
+	s.startedAt = time.Now()
 	stream, err := opts.Client.OpenRun(ctx, opts.Run)
 	if err != nil {
 		s.emit(ErrEvent{Err: err})
@@ -79,6 +133,7 @@ func (s *session) run(ctx context.Context, opts SessionOptions) {
 	}
 	s.stream = stream
 	defer func() {
+		s.stopSegmentWatcher()
 		if s.finishTimer != nil {
 			s.finishTimer.Stop()
 		}
@@ -89,10 +144,78 @@ func (s *session) run(ctx context.Context, opts SessionOptions) {
 		s.emit(ErrEvent{Err: err})
 		return
 	}
+	heartbeatStop := make(chan struct{})
+	heartbeatDone := make(chan struct{})
+	go s.runHeartbeat(ctx, durationOrDefault(opts.HeartbeatInterval, defaultClientHeartbeatInterval), heartbeatStop, heartbeatDone)
+	defer func() {
+		close(heartbeatStop)
+		// 心跳可能正阻塞在 HTTP 请求体写入；先关闭流以解除写阻塞，再等待
+		// goroutine 退出，避免请求结束阶段泄漏或卡死。
+		_ = stream.Close()
+		<-heartbeatDone
+	}()
+	downstreamContext := opts.DownstreamContext
+	if downstreamContext == nil {
+		downstreamContext = ctx
+	}
+	s.watchDownstream(downstreamContext)
 
 	ready := false
+	type receiveResult struct {
+		end     bool
+		payload []byte
+		err     error
+	}
+	receiveCh := make(chan receiveResult, 1)
+	receiveStop := make(chan struct{})
+	receiveDone := make(chan struct{})
+	go func() {
+		defer close(receiveDone)
+		for {
+			end, payload, recvErr := stream.Recv()
+			select {
+			case receiveCh <- receiveResult{end: end, payload: payload, err: recvErr}:
+			case <-receiveStop:
+				return
+			}
+			if recvErr != nil || end {
+				return
+			}
+		}
+	}()
+	defer func() {
+		close(receiveStop)
+		_ = stream.Close()
+		<-receiveDone
+	}()
 	for {
-		end, payload, err := stream.Recv()
+		var end bool
+		var payload []byte
+		var err error
+		var received receiveResult
+		// 收集窗口到期与新帧同时就绪时优先处理帧，确保已经抵达的并行
+		// 工具调用进入同一批次；否则 select 的随机选择会偶发漏掉最后一项。
+		select {
+		case received = <-receiveCh:
+		default:
+			select {
+			case received = <-receiveCh:
+			case batch := <-s.finishReady:
+				if batch != s.finishBatch {
+					continue
+				}
+				if s.resumable != nil {
+					if s.pauseAndResume(ctx) {
+						continue
+					}
+					return
+				}
+				_ = s.stream.Close()
+				s.finish("tool_calls")
+				return
+			}
+		}
+		end, payload, err = received.end, received.payload, received.err
 		if err != nil {
 			switch {
 			case s.finishing:
@@ -107,6 +230,7 @@ func (s *session) run(ctx context.Context, opts SessionOptions) {
 		if !ready {
 			ready = true
 			s.emit(Ready{})
+			s.logPhaseOnce(&s.readyLogged, "ready")
 		}
 		if end {
 			if e := EndStreamError(payload); e != nil {
@@ -130,6 +254,125 @@ func (s *session) run(ctx context.Context, opts SessionOptions) {
 	}
 }
 
+func (s *session) watchDownstream(ctx context.Context) {
+	if ctx == nil || s.stream == nil {
+		return
+	}
+	done := s.segmentDone
+	stream := s.stream
+	go func() {
+		select {
+		case <-ctx.Done():
+			// 分段正常结束时先关闭 done、再关闭事件通道。若请求上下文随后
+			// 取消，两者可能同时可读；这里二次确认，避免误关等待工具结果的流。
+			select {
+			case <-done:
+				return
+			default:
+			}
+			_ = stream.Close()
+		case <-done:
+		}
+	}()
+}
+
+func (s *session) stopSegmentWatcher() {
+	if s.segmentDone == nil {
+		return
+	}
+	close(s.segmentDone)
+	s.segmentDone = nil
+}
+
+func (s *session) closeSegment() {
+	if s.segmentClosed || s.events == nil {
+		return
+	}
+	close(s.events)
+	s.segmentClosed = true
+}
+
+func (s *session) pauseAndResume(ctx context.Context) bool {
+	if s.resumable == nil || len(s.pendingMCP) == 0 {
+		_ = s.stream.Close()
+		return false
+	}
+	s.stopSegmentWatcher()
+	s.resumable.setWaiting(s.pendingMCP)
+	s.finish("tool_calls")
+	s.closeSegment()
+
+	timer := time.NewTimer(durationOrDefault(s.pausedStreamTTL, defaultPausedStreamTTL))
+	defer timer.Stop()
+	select {
+	case command := <-s.resumable.resumeCh:
+		s.events = command.events
+		s.segmentClosed = false
+		s.segmentDone = make(chan struct{})
+		s.started = make(map[string]*trackedCall)
+		s.pendingMCP = make(map[string]pendingMCPCall)
+		s.sawToolCall = false
+		s.finishing = false
+		s.doneSent = false
+		s.readyLogged = false
+		s.contentLogged = false
+		s.toolLogged = false
+		s.watchDownstream(command.downstreamContext)
+		for _, result := range command.results {
+			if err := s.replyExec(result); err != nil {
+				command.ready <- fmt.Errorf("写回 Cursor 工具结果失败: %w", err)
+				return false
+			}
+		}
+		command.ready <- nil
+		s.emit(Ready{})
+		return true
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		slog.Debug("cursor_session_resume_timeout")
+		_ = s.stream.Close()
+		return false
+	}
+}
+
+func (s *session) logPhaseOnce(done *bool, phase string) {
+	if *done {
+		return
+	}
+	*done = true
+	fields := []any{"phase", phase}
+	if !s.startedAt.IsZero() {
+		fields = append(fields, "elapsed_ms", time.Since(s.startedAt).Milliseconds())
+	}
+	slog.Debug("cursor_session_phase", fields...)
+}
+
+func durationOrDefault(value, fallback time.Duration) time.Duration {
+	if value <= 0 {
+		return fallback
+	}
+	return value
+}
+
+func (s *session) runHeartbeat(ctx context.Context, interval time.Duration, stop <-chan struct{}, done chan<- struct{}) {
+	defer close(done)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-stop:
+			return
+		case <-ticker.C:
+			_ = s.send(&agentpb.AgentClientMessage{Message: &agentpb.AgentClientMessage_ClientHeartbeat{
+				ClientHeartbeat: &agentpb.ClientHeartbeat{},
+			}})
+		}
+	}
+}
+
 func (s *session) defaultFinishReason() string {
 	if s.sawToolCall {
 		return "tool_calls"
@@ -149,14 +392,19 @@ func (s *session) finish(reason string) {
 	s.emit(Done{FinishReason: reason})
 }
 
-func (s *session) send(msg *agentpb.AgentClientMessage) {
+func (s *session) send(msg *agentpb.AgentClientMessage) error {
 	payload, err := proto.Marshal(msg)
 	if err != nil {
-		return
+		slog.Warn("cursor_session_client_message_marshal_failed", "error", err)
+		return err
 	}
 	s.sendMu.Lock()
 	defer s.sendMu.Unlock()
-	_ = s.stream.Send(payload, false)
+	if err := s.stream.Send(payload, false); err != nil {
+		slog.Debug("cursor_session_client_message_send_failed", "error", err)
+		return err
+	}
+	return nil
 }
 
 // serverMessageKind 返回服务端消息的简短类型名（含内层 oneof），仅用于日志。
@@ -184,20 +432,115 @@ func (s *session) handle(sm *agentpb.AgentServerMessage) (stop bool) {
 	case *agentpb.AgentServerMessage_InteractionUpdate:
 		return s.handleUpdate(m.InteractionUpdate)
 	case *agentpb.AgentServerMessage_InteractionQuery:
-		// 交互式询问（ask_question / web_search 确认等）在网关模式下无人应答，
-		// 忽略；模型侧一般不会走到这里，联调若遇到再补拒绝应答。
-		slog.Warn("cursor_session_query_ignored", "type", serverMessageKind(sm))
+		return s.handleInteractionQuery(m.InteractionQuery)
 	case *agentpb.AgentServerMessage_ConversationCheckpointUpdate:
-		// 无状态网关不持久化 checkpoint。其 token_details.used_tokens 是上游
-		// 真实上下文口径，但包含 Cursor 注入的约 25K 平台系统提示，直接用于
-		// 下游计费会把小请求的输入抬到数万，故仅记日志供对账。
-		if n := int(m.ConversationCheckpointUpdate.GetTokenDetails().GetUsedTokens()); n > 0 {
-			slog.Debug("cursor_session_context_tokens", "used_tokens", n)
+		// token_details.used_tokens 是上游真实上下文口径，但包含 Cursor 注入
+		// 的约 25K 平台系统提示，直接用于下游计费会把小请求的输入抬到数万，
+		// 故仍只记日志；完整 checkpoint 则用于同一粘性会话的后续请求。
+		if m.ConversationCheckpointUpdate != nil {
+			if n := int(m.ConversationCheckpointUpdate.GetTokenDetails().GetUsedTokens()); n > 0 {
+				slog.Debug("cursor_session_context_tokens", "used_tokens", n)
+			}
+		}
+		if s.onCheckpoint != nil && m.ConversationCheckpointUpdate != nil {
+			checkpoint := proto.Clone(m.ConversationCheckpointUpdate).(*agentpb.ConversationStateStructure)
+			s.onCheckpoint(checkpoint)
 		}
 	default:
 		slog.Warn("cursor_session_unhandled_message", "type", serverMessageKind(sm))
 	}
 	return false
+}
+
+// handleInteractionQuery 为 Cursor 的交互式权限门发送确定答复。托管搜索无需
+// 访问网关本机资源，可直接批准；需要真人选择或本地文件的操作明确拒绝，避免
+// 服务端一直等待 interaction_response。
+func (s *session) handleInteractionQuery(query *agentpb.InteractionQuery) bool {
+	if query == nil {
+		return false
+	}
+	response := &agentpb.InteractionResponse{Id: query.GetId()}
+	switch query.Query.(type) {
+	case *agentpb.InteractionQuery_WebSearchRequestQuery:
+		response.Result = &agentpb.InteractionResponse_WebSearchRequestResponse{
+			WebSearchRequestResponse: &agentpb.WebSearchRequestResponse{Result: &agentpb.WebSearchRequestResponse_Approved{
+				Approved: &agentpb.WebSearchRequestResponse_ApprovedMsg{},
+			}},
+		}
+	case *agentpb.InteractionQuery_ExaSearchRequestQuery:
+		response.Result = &agentpb.InteractionResponse_ExaSearchRequestResponse{
+			ExaSearchRequestResponse: &agentpb.ExaSearchRequestResponse{Result: &agentpb.ExaSearchRequestResponse_Approved{
+				Approved: &agentpb.ExaSearchRequestResponse_ApprovedMsg{},
+			}},
+		}
+	case *agentpb.InteractionQuery_ExaFetchRequestQuery:
+		response.Result = &agentpb.InteractionResponse_ExaFetchRequestResponse{
+			ExaFetchRequestResponse: &agentpb.ExaFetchRequestResponse{Result: &agentpb.ExaFetchRequestResponse_Approved{
+				Approved: &agentpb.ExaFetchRequestResponse_ApprovedMsg{},
+			}},
+		}
+	case *agentpb.InteractionQuery_AskQuestionInteractionQuery:
+		response.Result = &agentpb.InteractionResponse_AskQuestionInteractionResponse{
+			AskQuestionInteractionResponse: &agentpb.AskQuestionInteractionResponse{Result: &agentpb.AskQuestionResult{
+				Result: &agentpb.AskQuestionResult_Rejected{Rejected: &agentpb.AskQuestionRejected{Reason: interactionRejectReason}},
+			}},
+		}
+	case *agentpb.InteractionQuery_SwitchModeRequestQuery:
+		response.Result = &agentpb.InteractionResponse_SwitchModeRequestResponse{
+			SwitchModeRequestResponse: &agentpb.SwitchModeRequestResponse{Result: &agentpb.SwitchModeRequestResponse_Rejected{
+				Rejected: &agentpb.SwitchModeRequestResponse_RejectedMsg{Reason: interactionRejectReason},
+			}},
+		}
+	case *agentpb.InteractionQuery_CreatePlanRequestQuery:
+		response.Result = &agentpb.InteractionResponse_CreatePlanRequestResponse{
+			CreatePlanRequestResponse: &agentpb.CreatePlanRequestResponse{Result: &agentpb.CreatePlanResult{
+				Result: &agentpb.CreatePlanResult_Error{Error: &agentpb.CreatePlanError{Error: interactionRejectReason}},
+			}},
+		}
+	case *agentpb.InteractionQuery_SetupVmEnvironmentArgs:
+		err := fmt.Errorf("cursor 请求建立本地 VM 环境，但 API 网关不提供该能力")
+		s.emit(ErrEvent{Err: err})
+		_ = s.stream.Close()
+		return true
+	default:
+		field, ok := unknownInteractionQueryField(query)
+		if !ok {
+			err := fmt.Errorf("cursor 返回了无法识别的交互询问")
+			s.emit(ErrEvent{Err: err})
+			_ = s.stream.Close()
+			return true
+		}
+		// 新版 Cursor 偶尔会先于本地 proto 增加权限门（例如托管 WebFetch）。
+		// 沿用同字段号返回 approved{}，既保持前向兼容，也不会授权访问网关本机。
+		unknown := protowire.AppendTag(nil, field, protowire.BytesType)
+		unknown = protowire.AppendBytes(unknown, []byte{0x0a, 0x00})
+		response.ProtoReflect().SetUnknown(unknown)
+		slog.Warn("cursor_session_unknown_query_approved", "field", field)
+	}
+	_ = s.send(&agentpb.AgentClientMessage{Message: &agentpb.AgentClientMessage_InteractionResponse{
+		InteractionResponse: response,
+	}})
+	return false
+}
+
+func unknownInteractionQueryField(query *agentpb.InteractionQuery) (protowire.Number, bool) {
+	raw := query.ProtoReflect().GetUnknown()
+	for len(raw) > 0 {
+		number, wireType, tagLen := protowire.ConsumeTag(raw)
+		if tagLen < 0 {
+			return 0, false
+		}
+		raw = raw[tagLen:]
+		valueLen := protowire.ConsumeFieldValue(number, wireType, raw)
+		if valueLen < 0 {
+			return 0, false
+		}
+		if number >= 2 && wireType == protowire.BytesType {
+			return number, true
+		}
+		raw = raw[valueLen:]
+	}
+	return 0, false
 }
 
 // ---- KV：服务端按需索取/写回 blob ----
@@ -206,7 +549,7 @@ func (s *session) handleKv(kv *agentpb.KvServerMessage) {
 	switch m := kv.Message.(type) {
 	case *agentpb.KvServerMessage_GetBlobArgs:
 		data, _ := s.store.Get(m.GetBlobArgs.GetBlobId())
-		s.send(&agentpb.AgentClientMessage{Message: &agentpb.AgentClientMessage_KvClientMessage{
+		_ = s.send(&agentpb.AgentClientMessage{Message: &agentpb.AgentClientMessage_KvClientMessage{
 			KvClientMessage: &agentpb.KvClientMessage{
 				Id: kv.GetId(),
 				Message: &agentpb.KvClientMessage_GetBlobResult{
@@ -216,7 +559,7 @@ func (s *session) handleKv(kv *agentpb.KvServerMessage) {
 		}})
 	case *agentpb.KvServerMessage_SetBlobArgs:
 		s.store.Set(m.SetBlobArgs.GetBlobId(), m.SetBlobArgs.GetBlobData())
-		s.send(&agentpb.AgentClientMessage{Message: &agentpb.AgentClientMessage_KvClientMessage{
+		_ = s.send(&agentpb.AgentClientMessage{Message: &agentpb.AgentClientMessage_KvClientMessage{
 			KvClientMessage: &agentpb.KvClientMessage{
 				Id:      kv.GetId(),
 				Message: &agentpb.KvClientMessage_SetBlobResult{SetBlobResult: &agentpb.SetBlobResult{}},
@@ -230,7 +573,7 @@ func (s *session) handleKv(kv *agentpb.KvServerMessage) {
 func (s *session) handleExec(ex *agentpb.ExecServerMessage) {
 	execID := ex.GetId()
 	reply := func(result any) {
-		msg := &agentpb.ExecClientMessage{Id: execID}
+		msg := &agentpb.ExecClientMessage{Id: execID, ExecId: ex.GetExecId()}
 		switch r := result.(type) {
 		case *agentpb.RequestContextResult:
 			msg.Message = &agentpb.ExecClientMessage_RequestContextResult{RequestContextResult: r}
@@ -253,7 +596,7 @@ func (s *session) handleExec(ex *agentpb.ExecServerMessage) {
 		default:
 			return
 		}
-		s.replyExec(msg)
+		_ = s.replyExec(msg)
 	}
 
 	switch m := ex.Message.(type) {
@@ -272,14 +615,15 @@ func (s *session) handleExec(ex *agentpb.ExecServerMessage) {
 			},
 		})
 	case *agentpb.ExecServerMessage_McpArgs:
-		s.onMcpExec(m.McpArgs)
+		s.onMcpExec(ex, m.McpArgs)
 	case *agentpb.ExecServerMessage_ShellArgs:
 		reply(rejectedShellResult())
 	case *agentpb.ExecServerMessage_ShellStreamArgs:
 		// 流式 shell 的应答通道是 ShellStream 事件，不是 ShellResult；回错
 		// 类型服务端会永远等待，挂死整条流（实测 Claude Code 场景必现）。
-		s.replyExec(&agentpb.ExecClientMessage{
-			Id: execID,
+		_ = s.replyExec(&agentpb.ExecClientMessage{
+			Id:     execID,
+			ExecId: ex.GetExecId(),
 			Message: &agentpb.ExecClientMessage_ShellStream{
 				ShellStream: &agentpb.ShellStream{
 					Event: &agentpb.ShellStream_Rejected{Rejected: &agentpb.ShellRejected{
@@ -318,9 +662,9 @@ func (s *session) handleExec(ex *agentpb.ExecServerMessage) {
 			Result: &agentpb.FetchResult_Error{Error: &agentpb.FetchError{Url: m.FetchArgs.GetUrl(), Error: execRejectReason}},
 		})
 	default:
-		// 其余小众 exec 类型（后台 shell、子代理等）暂不应答；
-		// 若联调发现服务端因此挂起，再补对应的拒绝变体。
-		slog.Warn("cursor_session_exec_unanswered", "type", fmt.Sprintf("%T", ex.Message))
+		// 未实现的 exec 必须在控制通道内失败并关闭对应子流；静默丢弃会让
+		// Cursor 服务端永久等待一个永远不会到来的 typed result。
+		s.replyExecFailure(ex, fmt.Sprintf("API 网关不支持 Cursor exec 类型 %T", ex.Message))
 	}
 }
 
@@ -330,9 +674,23 @@ func rejectedShellResult() *agentpb.ShellResult {
 	}
 }
 
-func (s *session) replyExec(msg *agentpb.ExecClientMessage) {
-	s.send(&agentpb.AgentClientMessage{Message: &agentpb.AgentClientMessage_ExecClientMessage{
+func (s *session) replyExec(msg *agentpb.ExecClientMessage) error {
+	return s.send(&agentpb.AgentClientMessage{Message: &agentpb.AgentClientMessage_ExecClientMessage{
 		ExecClientMessage: msg,
+	}})
+}
+
+func (s *session) replyExecFailure(ex *agentpb.ExecServerMessage, reason string) {
+	errorCode := "UNSUPPORTED_EXEC"
+	_ = s.send(&agentpb.AgentClientMessage{Message: &agentpb.AgentClientMessage_ExecClientControlMessage{
+		ExecClientControlMessage: &agentpb.ExecClientControlMessage{Message: &agentpb.ExecClientControlMessage_Throw{
+			Throw: &agentpb.ExecClientThrow{Id: ex.GetId(), Error: reason, ErrorCode: &errorCode},
+		}},
+	}})
+	_ = s.send(&agentpb.AgentClientMessage{Message: &agentpb.AgentClientMessage_ExecClientControlMessage{
+		ExecClientControlMessage: &agentpb.ExecClientControlMessage{Message: &agentpb.ExecClientControlMessage_StreamClose{
+			StreamClose: &agentpb.ExecClientStreamClose{Id: ex.GetId()},
+		}},
 	}})
 }
 
@@ -363,10 +721,22 @@ func mcpArgsToolName(args *agentpb.McpArgs) string {
 }
 
 // onMcpExec 是 function calling 的截获点：服务端请求执行我们下发的工具时，
-// 不真正执行，而是把完整参数透出为 tool_calls，随后在 drain 窗口后关流收尾，
-// 由 API 调用方执行工具并在下一次请求中携带结果。
-func (s *session) onMcpExec(args *agentpb.McpArgs) {
+// 不真正执行，而是把完整参数透出为 tool_calls。收集完同批并行调用后结束当前
+// 下游分段；可续接会话保持原始流，等待 API 调用方在下一请求中携带结果。
+func (s *session) onMcpExec(ex *agentpb.ExecServerMessage, args *agentpb.McpArgs) {
+	s.logPhaseOnce(&s.toolLogged, "tool_call")
 	id := args.GetToolCallId()
+	if ex != nil && id != "" {
+		if s.pendingMCP == nil {
+			s.pendingMCP = make(map[string]pendingMCPCall)
+		}
+		s.pendingMCP[id] = pendingMCPCall{
+			toolCallID: id,
+			name:       mcpArgsToolName(args),
+			messageID:  ex.GetId(),
+			execID:     ex.GetExecId(),
+		}
+	}
 	tc := s.trackTool(id, mcpArgsToolName(args))
 	if !tc.ended {
 		tc.ended = true
@@ -375,11 +745,23 @@ func (s *session) onMcpExec(args *agentpb.McpArgs) {
 	}
 	s.sawToolCall = true
 	s.finishing = true
+	s.finishBatch++
+	batch := s.finishBatch
 	if s.finishTimer != nil {
 		s.finishTimer.Stop()
 	}
-	stream := s.stream
-	s.finishTimer = time.AfterFunc(toolCallDrainWindow, func() { _ = stream.Close() })
+	window := durationOrDefault(s.toolCallDrainWindow, defaultToolCallDrainWindow)
+	s.finishTimer = time.AfterFunc(window, func() {
+		if s.finishReady == nil {
+			_ = s.stream.Close()
+			return
+		}
+		select {
+		case s.finishReady <- batch:
+		default:
+			slog.Warn("cursor_session_tool_finish_signal_dropped", "batch", batch)
+		}
+	})
 }
 
 // ---- 生成增量 ----
@@ -388,10 +770,12 @@ func (s *session) handleUpdate(u *agentpb.InteractionUpdate) (stop bool) {
 	switch m := u.Message.(type) {
 	case *agentpb.InteractionUpdate_TextDelta:
 		if t := m.TextDelta.GetText(); t != "" {
+			s.logPhaseOnce(&s.contentLogged, "content")
 			s.emit(TextDelta{Text: t})
 		}
 	case *agentpb.InteractionUpdate_ThinkingDelta:
 		if t := m.ThinkingDelta.GetText(); t != "" {
+			s.logPhaseOnce(&s.contentLogged, "thinking")
 			s.emit(ReasoningDelta{Text: t})
 		}
 	case *agentpb.InteractionUpdate_PartialToolCall:

@@ -249,10 +249,14 @@ type respResult struct {
 type Stream struct {
 	pw     *io.PipeWriter
 	respCh chan respResult
+	cancel context.CancelFunc
+	done   chan struct{}
 
+	mu     sync.Mutex
 	resp   *http.Response
 	reader *bufio.Reader
 	setup  bool
+	closed bool
 
 	closeOnce sync.Once
 }
@@ -279,8 +283,12 @@ func (c *Client) OpenRun(ctx context.Context, opts RunOptions) (*Stream, error) 
 	}
 
 	pr, pw := io.Pipe()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+runPath, pr)
+	requestContext, cancel := context.WithCancel(ctx)
+	req, err := http.NewRequestWithContext(requestContext, http.MethodPost, c.baseURL+runPath, pr)
 	if err != nil {
+		cancel()
+		_ = pr.Close()
+		_ = pw.Close()
 		return nil, err
 	}
 	if opts.Transport != nil {
@@ -299,7 +307,7 @@ func (c *Client) OpenRun(ctx context.Context, opts RunOptions) (*Stream, error) 
 	req.Header.Set("x-cursor-client-type", clientType)
 	req.Header.Set("x-request-id", requestID)
 
-	s := &Stream{pw: pw, respCh: make(chan respResult, 1)}
+	s := &Stream{pw: pw, respCh: make(chan respResult, 1), cancel: cancel, done: make(chan struct{})}
 	go func() {
 		resp, doErr := hc.Do(req)
 		s.respCh <- respResult{resp: resp, err: doErr}
@@ -323,28 +331,49 @@ func (s *Stream) CloseSend() error {
 // 返回携带状态码的 ConnectError。流正常读尽返回 io.EOF。
 func (s *Stream) Recv() (end bool, payload []byte, err error) {
 	if !s.setup {
-		r := <-s.respCh
+		var r respResult
+		select {
+		case r = <-s.respCh:
+		case <-s.done:
+			return false, nil, io.ErrClosedPipe
+		}
 		if r.err != nil {
 			return false, nil, r.err
 		}
+		s.mu.Lock()
+		if s.closed {
+			s.mu.Unlock()
+			_ = r.resp.Body.Close()
+			return false, nil, io.ErrClosedPipe
+		}
 		s.resp = r.resp
-		if s.resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(io.LimitReader(s.resp.Body, 64<<10))
-			_ = s.resp.Body.Close()
+		s.reader = bufio.NewReaderSize(r.resp.Body, 64<<10)
+		s.setup = true
+		s.mu.Unlock()
+		if r.resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(io.LimitReader(r.resp.Body, 64<<10))
+			_ = r.resp.Body.Close()
 			return false, nil, &ConnectError{
-				Code:       strings.ToLower(strings.ReplaceAll(s.resp.Status, " ", "_")),
+				Code:       strings.ToLower(strings.ReplaceAll(r.resp.Status, " ", "_")),
 				Message:    string(body),
-				HTTPStatus: s.resp.StatusCode,
+				HTTPStatus: r.resp.StatusCode,
 			}
 		}
-		s.reader = bufio.NewReaderSize(s.resp.Body, 64<<10)
-		s.setup = true
 	}
-	return ReadFrame(s.reader)
+	s.mu.Lock()
+	reader := s.reader
+	closed := s.closed
+	s.mu.Unlock()
+	if closed || reader == nil {
+		return false, nil, io.ErrClosedPipe
+	}
+	return ReadFrame(reader)
 }
 
 // StatusCode 返回上游响应的 HTTP 状态码（Recv 首次成功后可用，否则 0）。
 func (s *Stream) StatusCode() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.resp == nil {
 		return 0
 	}
@@ -354,9 +383,19 @@ func (s *Stream) StatusCode() int {
 // Close 释放流资源：关闭发送管道与响应体。可安全多次调用。
 func (s *Stream) Close() error {
 	s.closeOnce.Do(func() {
+		if s.done != nil {
+			close(s.done)
+		}
+		if s.cancel != nil {
+			s.cancel()
+		}
 		_ = s.pw.Close()
-		if s.resp != nil && s.resp.Body != nil {
-			_ = s.resp.Body.Close()
+		s.mu.Lock()
+		s.closed = true
+		resp := s.resp
+		s.mu.Unlock()
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
 		}
 	})
 	return nil

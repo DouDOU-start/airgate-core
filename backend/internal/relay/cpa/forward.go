@@ -63,6 +63,9 @@ type ForwardRequest struct {
 	Headers http.Header
 	// RequestStartedAt 是请求进入转发主循环的时间，用于记录包含故障转移的真实首字耗时。
 	RequestStartedAt time.Time
+	// CursorSessionKey 是下游会话的稳定粘性标识，仅供 Cursor executor
+	// 跨请求复用 conversationId、BlobStore 和 checkpoint。为空时保持无状态。
+	CursorSessionKey string
 }
 
 // ForwardResult 转发结果，语义对齐 pipeline.attemptResult。
@@ -138,6 +141,9 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 	execReq := cliproxyexecutor.Request{
 		Model:   upstreamModel,
 		Payload: req.Payload,
+		Metadata: map[string]any{
+			"cursor_session_key": strings.TrimSpace(req.CursorSessionKey),
+		},
 	}
 	opts := cliproxyexecutor.Options{
 		Stream:          req.Stream,
@@ -566,6 +572,13 @@ func (b *Bridge) relayStreamSinceWithModelRewrite(
 		}
 
 		hasContent := !contentStarted && isFirstContentPayload(payload)
+		// Cursor executor 在收到上游首个 protobuf 消息后才发出
+		// Anthropic message_start。此时认证与 Connect 响应头已经成功，继续
+		// 把生命周期帧缓冲到正文会让 Claude Code 看不到首帧；仅对 Cursor
+		// 提前提交 message_start，仍不把它计为真正的首字，避免污染 TTFT。
+		cursorLifecycleStart := !hasContent && !contentStarted && !written &&
+			provider == "cursor" && endpoint == adaptor.EndpointMessages &&
+			anthropicPayloadHasMessageStart(payload)
 		if hasContent {
 			contentStarted = true
 			now := time.Now()
@@ -576,6 +589,11 @@ func (b *Bridge) relayStreamSinceWithModelRewrite(
 				requestFirstTokenMs = now.Sub(requestStartedAt).Milliseconds()
 			}
 			flushPending()
+		}
+		if cursorLifecycleStart {
+			flushPending()
+			writePayload(payload, ensureLineEnding)
+			return false
 		}
 		if contentStarted || written {
 			writePayload(payload, ensureLineEnding)
@@ -1016,6 +1034,27 @@ func anthropicPayloadHasContentDelta(payload []byte) bool {
 			Type string `json:"type"`
 		}
 		if json.Unmarshal(data, &event) == nil && event.Type == "content_block_delta" {
+			return true
+		}
+	}
+	return false
+}
+
+// anthropicPayloadHasMessageStart 判断 Anthropic SSE 中是否出现生命周期首帧。
+// 该帧不能作为首字统计，但 Cursor 已经完成上游建流，适合用于提前提交响应头。
+func anthropicPayloadHasMessageStart(payload []byte) bool {
+	scanner := bufio.NewScanner(bytes.NewReader(payload))
+	scanner.Buffer(make([]byte, 0, 64*1024), 32<<20)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := bytes.TrimSpace([]byte(strings.TrimPrefix(line, "data:")))
+		var event struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(data, &event) == nil && event.Type == "message_start" {
 			return true
 		}
 	}

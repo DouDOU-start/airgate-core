@@ -332,12 +332,16 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	queueDeadline := start.Add(queueWaitTimeout)
 	pollDelay := queuePollInterval
 
-	// 粘性会话：提取会话身份（显式标识或派生哈希），同会话尽量复用同一
-	// 路由目标以保住上游 prompt cache；Relay Hook plan 自带定向语义时让位。
+	// 粘性会话：提取会话身份（显式标识或派生哈希）。路由粘性和 Cursor
+	// 状态复用使用同一稳定身份，但 Relay Hook plan 存在时只关闭前者，不能
+	// 改变 Hook 指定的账号探测/故障转移顺序；Cursor executor 仍按账号 ID
+	// 隔离 conversation/checkpoint，账号切换时不会串用会话状态。
 	sessionKey := ""
-	if routePlan == nil {
-		if sessionID := sessionIDForRequest(c, req); sessionID != "" {
-			sessionKey = affinityKey(keyInfo.UserID, keyInfo.GroupID, req.Model, protocol, sessionID)
+	cursorSessionKey := ""
+	if sessionID := sessionIDForRequest(c, req); sessionID != "" {
+		cursorSessionKey = affinityKey(keyInfo.UserID, keyInfo.GroupID, req.Model, protocol, sessionID)
+		if routePlan == nil {
+			sessionKey = cursorSessionKey
 		}
 	}
 	unbindAffinity := func(kind routeKind, id int) {
@@ -517,7 +521,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 						}
 					}()
 				}
-				return p.executeAccountAttempt(c, acc, req, endpoint, protocol, payload, start, requestID, rpmMinute, auditRequest)
+				return p.executeAccountAttempt(c, acc, req, endpoint, protocol, payload, start, requestID, rpmMinute, auditRequest, cursorSessionKey)
 			}()
 			attemptLatency := time.Since(attemptStart).Milliseconds()
 			attempts++

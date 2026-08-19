@@ -45,6 +45,7 @@ func (p *Pipeline) executeAccountAttempt(
 	requestID string,
 	rpmMinute int64,
 	auditRequest *requestaudit.Handle,
+	sessionKey string,
 ) attemptResult {
 	defer func() {
 		// 槽位释放异步化：ZREM 幂等，不必阻塞请求收尾/下一次 failover 尝试。
@@ -76,6 +77,7 @@ func (p *Pipeline) executeAccountAttempt(
 		Payload:          payload,
 		Headers:          http.Header{"Content-Type": []string{"application/json"}},
 		RequestStartedAt: start,
+		CursorSessionKey: sessionKey,
 	}
 
 	ctx := c.Request.Context()

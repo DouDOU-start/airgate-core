@@ -12,6 +12,8 @@ import (
 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
+
+	agentpb "github.com/DouDOU-start/airgate-core/internal/relay/cursor/proto/agentpb"
 )
 
 // ProviderKey 是 cursor 在 CPA manager 中的 executor 键。
@@ -21,12 +23,18 @@ const ProviderKey = "cursor"
 // Cursor Agent 协议。协议翻译不经 CPA translator，executor 直接产出
 // 入口格式（ResponseFormat）的响应。
 type Executor struct {
-	client *Client
+	client   *Client
+	sessions *conversationStateManager
+	streams  *resumableStreamManager
 }
 
 // NewExecutor 创建 cursor executor。
 func NewExecutor() *Executor {
-	return &Executor{client: NewClient("", "")}
+	return &Executor{
+		client:   NewClient("", ""),
+		sessions: newConversationStateManager(),
+		streams:  newResumableStreamManager(),
+	}
 }
 
 // Identifier 返回 provider 键。
@@ -47,6 +55,14 @@ func metaString(auth *coreauth.Auth, key string) string {
 		return strings.TrimSpace(v)
 	}
 	return ""
+}
+
+func requestMetaString(req cliproxyexecutor.Request, key string) string {
+	if req.Metadata == nil {
+		return ""
+	}
+	value, _ := req.Metadata[key].(string)
+	return strings.TrimSpace(value)
 }
 
 // buildAuditBody 生成审计展示用的请求体摘要。真实上行是 Connect-RPC protobuf
@@ -91,13 +107,57 @@ func (e *Executor) prepare(ctx context.Context, auth *coreauth.Auth, req cliprox
 	if err != nil {
 		return nil, err
 	}
+	sessionKey := requestMetaString(req, "cursor_session_key")
+	accountID := ""
+	if auth != nil {
+		accountID = strings.TrimSpace(auth.ID)
+	}
+	if e.sessions == nil {
+		e.sessions = newConversationStateManager()
+	}
+	if e.streams == nil {
+		e.streams = newResumableStreamManager()
+	}
+	streamKey := resumableStreamKey(sessionKey, accountID)
+	if parsed.Stream && streamKey != "" {
+		if active := e.streams.get(streamKey); active != nil {
+			events, resumed, resumeErr := active.tryResume(ctx, parsed)
+			if resumeErr != nil {
+				return nil, resumeErr
+			}
+			if resumed {
+				return &prepared{
+					parsed: parsed, events: events,
+					promptTokens: EstimatePromptTokens(parsed),
+					protocol:     protocolFromFormat(cliproxyexecutor.ResponseFormatOrSource(opts)),
+				}, nil
+			}
+		}
+	}
 	store := NewBlobStore()
+	conversationID := uuid.NewString()
+	var checkpoint *agentpb.ConversationStateStructure
+	var lease *conversationLease
+	if auth != nil {
+		lease = e.sessions.acquire(sessionKey, accountID)
+	}
+	if lease != nil {
+		store = lease.store()
+		conversationID = lease.conversationID()
+		checkpoint = lease.checkpoint()
+	}
+	releaseLease := func() {
+		if lease != nil {
+			lease.Release()
+		}
+	}
 	// 下游可经标准协议传思考档位（reasoning_effort / thinking.budget_tokens），
 	// Cursor 侧档位编码在模型 id 后缀，这里改写实际上行的模型；响应回显仍用原 model。
 	// 裸基础别名（如 claude-fable-5）在未指定档位时落到 medium 就近变体。
 	wireModel := ResolveWireModel(req.Model, parsed.ReasoningEffort)
-	reqBytes, tools, err := BuildRunRequest(parsed, wireModel, uuid.NewString(), store)
+	reqBytes, tools, err := BuildRunRequest(parsed, wireModel, conversationID, store, checkpoint)
 	if err != nil {
+		releaseLease()
 		return nil, err
 	}
 	proxyURL := ""
@@ -112,12 +172,42 @@ func (e *Executor) prepare(ctx context.Context, auth *coreauth.Auth, req cliprox
 		run.Transport = rt
 		run.AuditBody = buildAuditBody(req.Model, wireModel, parsed, len(reqBytes))
 	}
-	events := RunSession(ctx, SessionOptions{
-		Client:       e.client,
-		Run:          run,
-		RequestBytes: reqBytes,
-		Tools:        tools,
-		Store:        store,
+	sessionContext := ctx
+	var resumable *resumableCursorStream
+	if parsed.Stream && streamKey != "" {
+		var cancel context.CancelFunc
+		sessionContext, cancel = context.WithCancel(context.WithoutCancel(ctx))
+		resumable = newResumableCursorStream(cancel)
+		if !e.streams.register(streamKey, resumable) {
+			cancel()
+			releaseLease()
+			return nil, fmt.Errorf("同一 Cursor 会话已有请求正在执行")
+		}
+	}
+	onDone := func() {
+		if resumable != nil {
+			resumable.markClosed()
+			e.streams.remove(streamKey, resumable)
+			resumable.abort()
+		}
+		releaseLease()
+	}
+	events := RunSession(sessionContext, SessionOptions{
+		Client:              e.client,
+		Run:                 run,
+		RequestBytes:        reqBytes,
+		Tools:               tools,
+		Store:               store,
+		HeartbeatInterval:   defaultClientHeartbeatInterval,
+		ToolCallDrainWindow: defaultToolCallDrainWindow,
+		Resumable:           resumable,
+		DownstreamContext:   ctx,
+		OnCheckpoint: func(checkpoint *agentpb.ConversationStateStructure) {
+			if lease != nil {
+				lease.updateCheckpoint(checkpoint)
+			}
+		},
+		OnDone: onDone,
 	})
 	return &prepared{
 		parsed:       parsed,
