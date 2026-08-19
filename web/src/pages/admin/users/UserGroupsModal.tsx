@@ -132,7 +132,7 @@ export function UserGroupsModal({ open, user, onClose, onSaved }: UserGroupsModa
     <Modal state={modalState}>
       <DialogTriggerShim />
       <Modal.Backdrop>
-        <Modal.Container placement="center" scroll="outside" size="md">
+        <Modal.Container placement="center" scroll="inside" size="md">
           <Modal.Dialog
             className="ag-elevation-modal ag-user-groups-modal"
             style={{ maxWidth: '720px', width: 'min(100%, calc(100vw - 2rem))' }}

@@ -165,8 +165,8 @@
   font-weight: 800;
 }
 
-/* 用户分组弹窗：分组列表自己负责滚动，弹窗主体按内容收缩，避免 flex: 1
-   在大视口下把空白区域撑满并把操作栏挤到错误位置。 */
+/* 用户分组弹窗：正文是唯一滚动区域。分组较多时保持标题和操作栏固定，
+   同时避免弹窗外层被勾选框的焦点滚动带离可视区。 */
 .ag-elevation-modal.ag-user-groups-modal {
   height: auto !important;
   min-height: 0 !important;

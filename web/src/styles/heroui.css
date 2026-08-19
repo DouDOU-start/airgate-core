@@ -214,7 +214,11 @@
 /* 弹窗卡片：hairline 边 + 柔光浮影 */
 .ag-elevation-modal {
   position: relative;
+  /* 保留 hidden 作为旧浏览器回退；clip 不会创建可被焦点滚动的外层滚动容器。
+     分组较多时，勾选框聚焦曾会改写弹窗自身 scrollTop，把整块内容滚出可视区。 */
   overflow: hidden;
+  overflow: clip;
+  overscroll-behavior: contain;
   max-height: min(86dvh, 62rem) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-lg) !important;
@@ -293,6 +297,7 @@
   min-height: 0;
   overflow: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
   padding-inline: 0.25rem;
   scroll-padding: 0.25rem;
 }
