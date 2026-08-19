@@ -189,8 +189,9 @@ func SharedH2Transport(proxyURL string) (http.RoundTripper, error) {
 	transport := &http.Transport{
 		ForceAttemptHTTP2: true,
 		TLSClientConfig:   &tls.Config{NextProtos: []string{"h2"}},
-		// 长连接空闲上限；Agent 流可能长时间保持。
-		IdleConnTimeout:       90 * time.Second,
+		// 空闲上限放宽到 15 分钟：交互式客户端（Claude Code）相邻请求
+		// 间隔常超 90s，过短会导致每轮都重新 TLS+h2 建连（约 1s 首字开销）。
+		IdleConnTimeout:       15 * time.Minute,
 		TLSHandshakeTimeout:   30 * time.Second,
 		ExpectContinueTimeout: time.Second,
 	}

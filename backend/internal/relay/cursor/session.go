@@ -90,6 +90,7 @@ func (s *session) run(ctx context.Context, opts SessionOptions) {
 		return
 	}
 
+	ready := false
 	for {
 		end, payload, err := stream.Recv()
 		if err != nil {
@@ -102,6 +103,10 @@ func (s *session) run(ctx context.Context, opts SessionOptions) {
 				s.emit(ErrEvent{Err: err})
 			}
 			return
+		}
+		if !ready {
+			ready = true
+			s.emit(Ready{})
 		}
 		if end {
 			if e := EndStreamError(payload); e != nil {

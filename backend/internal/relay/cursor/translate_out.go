@@ -219,6 +219,10 @@ func (r *OpenAIStreamRenderer) roleChunkIfNeeded(frames []SSEFrame) []SSEFrame {
 func (r *OpenAIStreamRenderer) Render(e Event) []SSEFrame {
 	var frames []SSEFrame
 	switch ev := e.(type) {
+	case Ready:
+		// 上游流已建立：立即下发 role 起始 chunk，避免 thinking 模型首
+		// token 前客户端长时间零字节。
+		frames = r.roleChunkIfNeeded(frames)
 	case TextDelta:
 		frames = r.roleChunkIfNeeded(frames)
 		frames = append(frames, r.chunk(map[string]any{"content": ev.Text}, nil, nil))

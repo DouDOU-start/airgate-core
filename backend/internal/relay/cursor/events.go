@@ -13,6 +13,11 @@ type TextDelta struct{ Text string }
 // ReasoningDelta 是一段思维链（thinking）增量。
 type ReasoningDelta struct{ Text string }
 
+// Ready 表示上游流已建立（收到首条服务端消息，HTTP 层与鉴权/限流错误已排
+// 除）。渲染层据此提前下发协议起始帧：thinking 模型首 token 可达 10 秒以上
+// 且期间上游无任何增量，不提前发帧客户端会长时间收不到一个字节。
+type Ready struct{}
+
 // ToolCallStart 表示模型开始调用一个（用户下发的）工具。
 type ToolCallStart struct {
 	ID   string
@@ -50,6 +55,7 @@ type Done struct{ FinishReason string }
 // ErrEvent 表示流异常终止。
 type ErrEvent struct{ Err error }
 
+func (Ready) isCursorEvent()             {}
 func (TextDelta) isCursorEvent()         {}
 func (ReasoningDelta) isCursorEvent()    {}
 func (ToolCallStart) isCursorEvent()     {}
