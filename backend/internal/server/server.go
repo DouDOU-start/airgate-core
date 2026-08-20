@@ -3,6 +3,8 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -45,20 +47,21 @@ type Server struct {
 	srv    *http.Server
 
 	// 核心服务组件
-	concurrency     *scheduler.ConcurrencyManager
-	recorder        *billing.Recorder
-	errRecorder     *errlog.Recorder
-	handlers        *bootstrap.HTTPHandlers
-	channelRegistry *registry.Registry
-	accountRegistry *accountreg.Registry
-	cpaBridge       *cpa.Bridge
-	pricingCache    *pricing.Cache
-	relay           *pipeline.Pipeline
-	taskFlow        *task.Flow
-	taskPoller      *task.Poller
-	probeEngine     *probe.Engine
-	pluginRuntime   *pluginruntime.Manager
-	pluginHandler   *handler.PluginHandler
+	concurrency       *scheduler.ConcurrencyManager
+	recorder          *billing.Recorder
+	errRecorder       *errlog.Recorder
+	handlers          *bootstrap.HTTPHandlers
+	channelRegistry   *registry.Registry
+	accountRegistry   *accountreg.Registry
+	cpaBridge         *cpa.Bridge
+	pricingCache      *pricing.Cache
+	relay             *pipeline.Pipeline
+	taskFlow          *task.Flow
+	taskPoller        *task.Poller
+	probeEngine       *probe.Engine
+	pluginRuntime     *pluginruntime.Manager
+	pluginHandler     *handler.PluginHandler
+	pluginAccessToken string
 
 	// 中间件组件（需 Shutdown 时释放）
 	ipRateLimiter *middleware.IPRateLimiter
@@ -139,7 +142,11 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	s.pricingCache = pricing.NewCache(s.handlers.ModelPriceService)
 	s.handlers.ModelPriceService.SetInvalidator(s.pricingCache)
 	// 管理器始终存在，便于 Web 安装和配置；默认配置不会启动任何插件进程。
-	s.pluginRuntime = pluginruntime.New(cfg.Plugins, cfg.Log.Level)
+	s.pluginAccessToken = mustGeneratePluginAccessToken()
+	s.pluginRuntime = pluginruntime.New(cfg.Plugins, cfg.Log.Level, pluginruntime.HostAccess{
+		BaseURL: fmt.Sprintf("http://127.0.0.1:%d", cfg.Server.Port),
+		Token:   s.pluginAccessToken,
+	})
 	s.pluginHandler = handler.NewPluginHandler(s.pluginRuntime)
 	if s.handlers.AccountService != nil {
 		s.handlers.AccountService.SetTestRequestTransformer(s.pluginRuntime)
@@ -221,6 +228,15 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 	}
 
 	return s
+}
+
+// mustGeneratePluginAccessToken 生成仅在当前 Core 进程生命周期内有效的插件令牌。
+func mustGeneratePluginAccessToken() string {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		panic(fmt.Sprintf("生成插件访问令牌失败: %v", err))
+	}
+	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
 // Start 启动 HTTP 服务器（阻塞）

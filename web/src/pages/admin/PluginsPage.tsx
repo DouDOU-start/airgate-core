@@ -7,7 +7,9 @@ import {
   Chip,
   Input,
   Label,
+  ListBox,
   Modal,
+  Select,
   Spinner,
   TextArea,
   TextField as HeroTextField,
@@ -17,10 +19,12 @@ import {
 import {
   AlertTriangle,
   CheckCheck,
+  CircleDollarSign,
   FileCode2,
   FileSliders,
   Layers3,
   Link2,
+  PackageOpen,
   PackagePlus,
   PlugZap,
   RefreshCw,
@@ -29,7 +33,15 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { pluginsApi, type PluginConfigField, type PluginStatus } from '../../shared/api/plugins';
+import {
+  pluginsApi,
+  type PluginConfigField,
+  type PluginProviderInventory,
+  type PluginProviderManualOrderRequest,
+  type PluginProviderOrderStatus,
+  type PluginProviderOverview,
+  type PluginStatus,
+} from '../../shared/api/plugins';
 import { groupsApi } from '../../shared/api/groups';
 import { FETCH_ALL_PARAMS } from '../../shared/constants';
 import { queryKeys } from '../../shared/queryKeys';
@@ -41,6 +53,7 @@ import { RefreshButton } from '../../shared/components/RefreshButton';
 import { formatDateTime } from '../../shared/utils/format';
 
 const MAX_PLUGIN_SIZE = 500 * 1024 * 1024;
+const PROVIDER_MANAGEMENT_CAPABILITY = 'account_provider_management.v1';
 
 export default function PluginsPage() {
   const { t } = useTranslation();
@@ -50,6 +63,7 @@ export default function PluginsPage() {
   const [configTarget, setConfigTarget] = useState<PluginStatus | null>(null);
   const [enableAfterConfig, setEnableAfterConfig] = useState(false);
   const [updateTarget, setUpdateTarget] = useState<PluginStatus | null>(null);
+  const [pickupTarget, setPickupTarget] = useState<PluginStatus | null>(null);
   const [uninstallTarget, setUninstallTarget] = useState<PluginStatus | null>(null);
 
   const { data = [], isFetching, isLoading, refetch } = useQuery({
@@ -132,6 +146,7 @@ export default function PluginsPage() {
           {data.map((plugin) => {
             const isToggling = toggleMutation.isPending && toggleMutation.variables?.id === plugin.id;
             const isReloading = reloadMutation.isPending && reloadMutation.variables === plugin.id;
+            const supportsPickup = plugin.capabilities?.includes(PROVIDER_MANAGEMENT_CAPABILITY) ?? false;
             return (
               <article
                 className="ag-plugin-card"
@@ -229,7 +244,7 @@ export default function PluginsPage() {
                   <span className="ag-plugin-card__updated-at">
                     {t('plugins.updated_at')} {formatDateTime(plugin.updated_at)}
                   </span>
-                  <div className="ag-plugin-card__actions">
+                  <div className="ag-plugin-card__actions" data-has-provider={supportsPickup ? 'true' : 'false'}>
                     <Tooltip>
                       <Tooltip.Trigger className="inline-flex">
                         <Button
@@ -245,6 +260,18 @@ export default function PluginsPage() {
                       </Tooltip.Trigger>
                       <Tooltip.Content>{t('plugins.update')}</Tooltip.Content>
                     </Tooltip>
+                    {supportsPickup ? (
+                      <Button
+                        className="ag-plugin-card__action"
+                        isDisabled={!plugin.running}
+                        size="sm"
+                        variant="secondary"
+                        onPress={() => setPickupTarget(plugin)}
+                      >
+                        <PackageOpen className="h-3.5 w-3.5" />
+                        {t('plugins.pickup')}
+                      </Button>
+                    ) : null}
                     <Button
                       className="ag-plugin-card__action"
                       isDisabled={!plugin.config_schema?.fields.length}
@@ -317,6 +344,10 @@ export default function PluginsPage() {
             toggleMutation.mutate({ id: savedPlugin.id, enabled: true });
           }
         }}
+      />
+      <PluginPickupModal
+        plugin={pickupTarget ? data.find((plugin) => plugin.id === pickupTarget.id) ?? pickupTarget : null}
+        onClose={() => setPickupTarget(null)}
       />
       <ConfirmDialog
         description={t('plugins.uninstall_confirm', { name: uninstallTarget?.name || uninstallTarget?.id })}
@@ -563,6 +594,351 @@ function InstallPluginModal({
   );
 }
 
+function PluginPickupModal({
+  plugin,
+  onClose,
+}: {
+  plugin: PluginStatus | null;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const initializedPluginRef = useRef('');
+  const open = !!plugin;
+  const [product, setProduct] = useState<'oauth_30d' | 'oauth_7d'>('oauth_30d');
+  const [quantity, setQuantity] = useState(1);
+  const [groupIDs, setGroupIDs] = useState<number[]>([]);
+  const [priority, setPriority] = useState(50);
+  const [maxConcurrency, setMaxConcurrency] = useState(10);
+  const [inventory, setInventory] = useState<PluginProviderInventory | null>(null);
+  const [orderStatus, setOrderStatus] = useState<PluginProviderOrderStatus | null>(null);
+
+  const overviewQuery = useQuery({
+    queryKey: ['plugin-provider-overview', plugin?.id ?? ''],
+    queryFn: () => pluginsApi.action<PluginProviderOverview>(plugin!.id, 'overview'),
+    enabled: open && plugin?.running === true,
+  });
+  const { data: groupsData, isLoading: groupsLoading } = useQuery({
+    queryKey: queryKeys.groups(FETCH_ALL_PARAMS),
+    queryFn: () => groupsApi.list(FETCH_ALL_PARAMS),
+    enabled: open,
+  });
+  const groups = groupsData?.list ?? [];
+
+  useEffect(() => {
+    if (!open) {
+      initializedPluginRef.current = '';
+      setInventory(null);
+      setOrderStatus(null);
+      return;
+    }
+    const overview = overviewQuery.data;
+    if (!overview || initializedPluginRef.current === plugin?.id) return;
+    initializedPluginRef.current = plugin?.id ?? '';
+    setProduct(overview.defaults.product);
+    setQuantity(overview.defaults.quantity);
+    setGroupIDs(overview.defaults.group_ids);
+    setPriority(overview.defaults.priority);
+    setMaxConcurrency(overview.defaults.max_concurrency);
+    setOrderStatus(overview.order);
+  }, [open, overviewQuery.data, plugin?.id]);
+
+  const statusQuery = useQuery({
+    queryKey: ['plugin-provider-order-status', plugin?.id ?? ''],
+    queryFn: () => pluginsApi.action<PluginProviderOrderStatus>(plugin!.id, 'orders/status'),
+    enabled: open && plugin?.running === true && orderStatus?.pending === true,
+    refetchInterval: 3000,
+  });
+
+  useEffect(() => {
+    if (!statusQuery.data) return;
+    setOrderStatus(statusQuery.data);
+    if (!statusQuery.data.pending) void overviewQuery.refetch();
+  }, [statusQuery.data]);
+
+  const inventoryMutation = useMutation({
+    mutationFn: () => pluginsApi.action<PluginProviderInventory>(plugin!.id, 'inventory', { product, quantity }),
+    onSuccess: setInventory,
+    onError: (error: Error) => toast('error', error.message),
+  });
+
+  const orderMutation = useMutation({
+    mutationFn: (payload: PluginProviderManualOrderRequest) => (
+      pluginsApi.action<PluginProviderOrderStatus>(plugin!.id, 'orders', payload)
+    ),
+    onSuccess: (result) => {
+      setOrderStatus(result);
+      toast('success', t('plugins.pickup_order_created'));
+      void overviewQuery.refetch();
+    },
+    onError: (error: Error) => toast('error', error.message),
+  });
+
+  const modalState = useOverlayState({
+    isOpen: open,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen && !inventoryMutation.isPending && !orderMutation.isPending) onClose();
+    },
+  });
+
+  const toggleGroup = (id: number, selected: boolean) => {
+    setGroupIDs((current) => selected
+      ? Array.from(new Set([...current, id]))
+      : current.filter((item) => item !== id));
+  };
+
+  const queryInventory = () => {
+    if (quantity < 1 || quantity > 100) {
+      toast('error', t('plugins.pickup_quantity_invalid'));
+      return;
+    }
+    inventoryMutation.mutate();
+  };
+
+  const createOrder = () => {
+    if (quantity < 1 || quantity > 100) {
+      toast('error', t('plugins.pickup_quantity_invalid'));
+      return;
+    }
+    if (groupIDs.length === 0) {
+      toast('error', t('plugins.pickup_groups_required'));
+      return;
+    }
+    if (priority < 0 || priority > 999) {
+      toast('error', t('plugins.pickup_priority_invalid'));
+      return;
+    }
+    if (maxConcurrency < 1 || maxConcurrency > 10000) {
+      toast('error', t('plugins.pickup_concurrency_invalid'));
+      return;
+    }
+    orderMutation.mutate({
+      product, quantity, group_ids: groupIDs, priority, max_concurrency: maxConcurrency,
+    });
+  };
+
+  const overview = overviewQuery.data;
+  const displayedOrder = orderStatus?.order ?? orderStatus?.last_order ?? overview?.order.order ?? overview?.order.last_order;
+  const pending = orderStatus?.pending ?? overview?.order.pending ?? false;
+  const unavailable = plugin?.running !== true;
+
+  return (
+    <Modal state={modalState}>
+      <DialogTriggerShim />
+      <Modal.Backdrop>
+        <Modal.Container placement="center" scroll="inside" size="lg">
+          <Modal.Dialog className="ag-elevation-modal ag-plugin-pickup-modal">
+            <Modal.Header className="ag-plugin-pickup-modal__header">
+              <div className="ag-plugin-pickup-modal__title">
+                <span className="ag-plugin-pickup-modal__icon"><PackageOpen className="h-4 w-4" /></span>
+                <span>
+                  <Modal.Heading>{t('plugins.pickup_title')}</Modal.Heading>
+                  <span className="ag-plugin-pickup-modal__plugin-name">{plugin?.name || plugin?.id}</span>
+                </span>
+              </div>
+              <div className="ag-plugin-pickup-modal__header-actions">
+                <Button
+                  isIconOnly
+                  aria-label={t('common.refresh')}
+                  isDisabled={unavailable || overviewQuery.isFetching}
+                  size="sm"
+                  variant="ghost"
+                  onPress={() => {
+                    void overviewQuery.refetch();
+                    if (pending) void statusQuery.refetch();
+                  }}
+                >
+                  <RefreshCw className={`h-4 w-4 ${overviewQuery.isFetching ? 'animate-spin' : ''}`} />
+                </Button>
+                <Modal.CloseTrigger />
+              </div>
+            </Modal.Header>
+            <Modal.Body className="ag-plugin-pickup-modal__body">
+              {unavailable ? (
+                <div className="ag-plugin-pickup-unavailable" role="status">
+                  <AlertTriangle className="h-4 w-4" />
+                  {t('plugins.pickup_unavailable')}
+                </div>
+              ) : overviewQuery.isLoading ? (
+                <div className="ag-plugin-pickup-loading"><Spinner size="lg" /></div>
+              ) : overviewQuery.error ? (
+                <div className="ag-plugin-pickup-unavailable" role="alert">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span>{overviewQuery.error.message}</span>
+                  <Button size="sm" variant="secondary" onPress={() => void overviewQuery.refetch()}>
+                    {t('common.retry')}
+                  </Button>
+                </div>
+              ) : overview ? (
+                <div className="ag-plugin-pickup-content">
+                  <section className="ag-plugin-pickup-section ag-plugin-pickup-section--balance">
+                    <div className="ag-plugin-pickup-section__heading">
+                      <CircleDollarSign className="h-4 w-4" />
+                      <h3>{t('plugins.pickup_balance')}</h3>
+                      <Chip color={overview.auto_refill_enabled ? 'success' : 'default'} size="sm" variant="soft">
+                        {overview.auto_refill_enabled ? t('plugins.pickup_auto_on') : t('plugins.pickup_auto_off')}
+                      </Chip>
+                    </div>
+                    <div className="ag-plugin-pickup-stats">
+                      <PickupStat label={t('plugins.pickup_total_balance')} value={formatFen(overview.balance.balance_fen)} />
+                      <PickupStat label={t('plugins.pickup_held_balance')} value={formatFen(overview.balance.held_fen)} tone="warning" />
+                      <PickupStat label={t('plugins.pickup_available_balance')} value={formatFen(overview.balance.available_fen)} tone="success" />
+                    </div>
+                  </section>
+
+                  {displayedOrder ? (
+                    <section className="ag-plugin-pickup-order" data-pending={pending ? 'true' : 'false'}>
+                      <div className="ag-plugin-pickup-order__status">
+                        {pending ? <Spinner size="sm" /> : <CheckCheck className="h-4 w-4" />}
+                        <span>{pending ? t('plugins.pickup_order_processing') : t('plugins.pickup_order_latest')}</span>
+                      </div>
+                      <code>{displayedOrder.id || t('plugins.pickup_order_creating')}</code>
+                      <span>{pickupStatusLabel(displayedOrder.status, t)}</span>
+                      <span>{t('plugins.pickup_order_quantity', { count: displayedOrder.quantity })}</span>
+                    </section>
+                  ) : null}
+
+                  <section className="ag-plugin-pickup-section">
+                    <div className="ag-plugin-pickup-section__heading">
+                      <PackageOpen className="h-4 w-4" />
+                      <h3>{t('plugins.pickup_quote_and_order')}</h3>
+                    </div>
+                    <div className="ag-plugin-pickup-form-grid">
+                      <div className="ag-plugin-pickup-field">
+                        <Label>{t('plugins.pickup_product')}</Label>
+                        <Select
+                          aria-label={t('plugins.pickup_product')}
+                          fullWidth
+                          selectedKey={product}
+                          onSelectionChange={(key) => {
+                            if (key === 'oauth_30d' || key === 'oauth_7d') {
+                              setProduct(key);
+                              setInventory(null);
+                            }
+                          }}
+                        >
+                          <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
+                          <Select.Popover>
+                            <ListBox>
+                              <ListBox.Item id="oauth_30d" textValue="Bug Team · 30D">Bug Team · 30D</ListBox.Item>
+                              <ListBox.Item id="oauth_7d" textValue="普通 Team · 7D">普通 Team · 7D</ListBox.Item>
+                            </ListBox>
+                          </Select.Popover>
+                        </Select>
+                      </div>
+                      <HeroTextField className="ag-plugin-pickup-field" fullWidth>
+                        <Label>{t('plugins.pickup_quantity')}</Label>
+                        <Input min={1} max={100} type="number" value={String(quantity)} onChange={(event) => {
+                          setQuantity(Number(event.target.value));
+                          setInventory(null);
+                        }} />
+                      </HeroTextField>
+                      <div className="ag-plugin-pickup-query-action">
+                        <Button isDisabled={inventoryMutation.isPending} variant="secondary" onPress={queryInventory}>
+                          {inventoryMutation.isPending ? <Spinner size="sm" /> : <RefreshCw className="h-4 w-4" />}
+                          {t('plugins.pickup_query_quote')}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {inventory ? (
+                      <div className="ag-plugin-pickup-quote" data-shortage={inventory.missing > 0 ? 'true' : 'false'}>
+                        <PickupStat label={t('plugins.pickup_inventory')} value={String(inventory.available)} />
+                        <PickupStat label={t('plugins.pickup_missing')} value={String(inventory.missing)} tone={inventory.missing > 0 ? 'warning' : 'success'} />
+                        <PickupStat label={t('plugins.pickup_unit_price')} value={formatFen(inventory.estimated_unit_price_fen)} />
+                        <PickupStat label={t('plugins.pickup_estimated_total')} value={formatFen(inventory.estimated_total_fen)} tone="accent" />
+                        <span className="ag-plugin-pickup-quote__remaining">
+                          {t('plugins.pickup_remaining_range', {
+                            range: formatRemainingRange(inventory.minimum_remaining_seconds, inventory.maximum_remaining_seconds),
+                          })}
+                        </span>
+                        {inventory.needs_production ? (
+                          <Chip color="warning" size="sm" variant="soft">{t('plugins.pickup_needs_production')}</Chip>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </section>
+
+                  <section className="ag-plugin-pickup-section">
+                    <div className="ag-plugin-pickup-section__heading">
+                      <Layers3 className="h-4 w-4" />
+                      <h3>{t('plugins.pickup_import_settings')}</h3>
+                      <span>{t('plugins.config_selected_count', { count: groupIDs.length })}</span>
+                    </div>
+                    <div className="ag-plugin-pickup-groups">
+                      {groupsLoading ? <Spinner size="sm" /> : groups.map((group) => {
+                        const selected = groupIDs.includes(group.id);
+                        return (
+                          <Checkbox
+                            className="ag-plugin-config-option"
+                            data-selected={selected ? 'true' : 'false'}
+                            isSelected={selected}
+                            key={group.id}
+                            onChange={(nextSelected) => toggleGroup(group.id, nextSelected)}
+                          >
+                            <Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>
+                            <span className="ag-plugin-config-option__label" title={group.name}>{group.name}</span>
+                          </Checkbox>
+                        );
+                      })}
+                    </div>
+                    <div className="ag-plugin-pickup-import-grid">
+                      <HeroTextField className="ag-plugin-pickup-field" fullWidth>
+                        <Label>{t('plugins.pickup_account_priority')}</Label>
+                        <Input min={0} max={999} type="number" value={String(priority)} onChange={(event) => setPriority(Number(event.target.value))} />
+                      </HeroTextField>
+                      <HeroTextField className="ag-plugin-pickup-field" fullWidth>
+                        <Label>{t('plugins.pickup_max_concurrency')}</Label>
+                        <Input min={1} max={10000} type="number" value={String(maxConcurrency)} onChange={(event) => setMaxConcurrency(Number(event.target.value))} />
+                      </HeroTextField>
+                    </div>
+                  </section>
+                </div>
+              ) : null}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button isDisabled={orderMutation.isPending} variant="secondary" onPress={onClose}>{t('common.close')}</Button>
+              <Button
+                isDisabled={unavailable || !overview || pending || orderMutation.isPending}
+                variant="primary"
+                onPress={createOrder}
+              >
+                {orderMutation.isPending ? <Spinner size="sm" /> : <PackagePlus className="h-4 w-4" />}
+                {pending ? t('plugins.pickup_order_processing') : t('plugins.pickup_create_order')}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
+  );
+}
+
+function PickupStat({ label, value, tone = 'default' }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="ag-plugin-pickup-stat" data-tone={tone}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function formatFen(value: number): string {
+  return `¥${(Number(value || 0) / 100).toFixed(2)}`;
+}
+
+function formatRemainingRange(minimum: number, maximum: number): string {
+  const format = (seconds: number) => `${Math.max(0, Math.floor(seconds / 60))} 分钟`;
+  if (minimum <= 0 && maximum <= 0) return '—';
+  if (minimum === maximum) return format(minimum);
+  return `${format(minimum)} - ${format(maximum)}`;
+}
+
+function pickupStatusLabel(status: string, t: ReturnType<typeof useTranslation>['t']): string {
+  const key = `plugins.pickup_status_${String(status || 'creating').toLowerCase()}`;
+  return t(key, { defaultValue: status || t('plugins.pickup_order_creating') });
+}
+
 function PluginConfigModal({
   plugin,
   onClose,
@@ -582,7 +958,8 @@ function PluginConfigModal({
     enabled: open,
   });
   const needsGroups = data?.schema.fields.some(
-    (field) => field.widget === 'multi_select' && field.data_source === 'groups',
+    (field) => (field.widget === 'multi_select' || field.widget === 'single_select')
+      && field.data_source === 'groups',
   ) ?? false;
   const { data: groupsData, isLoading: groupsLoading } = useQuery({
     queryKey: queryKeys.groups(FETCH_ALL_PARAMS),
@@ -714,6 +1091,44 @@ function PluginConfigModal({
 
   const renderSettingField = (field: PluginConfigField) => {
     const fieldValue = values[field.key];
+    if (field.widget === 'single_select' && field.data_source === 'groups') {
+      const selectedID = Number(fieldValue) || null;
+      const selectedGroup = groups.find((group) => group.id === selectedID);
+      return (
+        <div className="ag-plugin-config-text-field" key={field.key}>
+          <Label className="ag-plugin-config-field-label">
+            {field.label}
+            {field.required ? <span className="text-danger">*</span> : null}
+          </Label>
+          {field.description ? (
+            <p className="ag-plugin-config-field-description">{field.description}</p>
+          ) : null}
+          <Select
+            aria-label={field.label}
+            fullWidth
+            selectedKey={selectedID}
+            onSelectionChange={(key) => setValues((current) => ({
+              ...current,
+              [field.key]: key == null ? '' : Number(key),
+            }))}
+          >
+            <Select.Trigger>
+              <Select.Value>{selectedGroup?.name ?? field.label}</Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={groups}>
+                {(group) => (
+                  <ListBox.Item id={group.id} textValue={group.name}>
+                    {group.name}
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+        </div>
+      );
+    }
     if (field.widget === 'text') {
       return (
         <HeroTextField className="ag-plugin-config-text-field" fullWidth isRequired={field.required} key={field.key}>
@@ -722,7 +1137,27 @@ function PluginConfigModal({
             <p className="ag-plugin-config-field-description">{field.description}</p>
           ) : null}
           <Input
-            value={typeof fieldValue === 'string' ? fieldValue : ''}
+            autoComplete={field.secret ? 'new-password' : undefined}
+            type={field.secret ? 'password' : 'text'}
+            value={typeof fieldValue === 'string' ? fieldValue : String(fieldValue ?? '')}
+            onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
+          />
+        </HeroTextField>
+      );
+    }
+    if (field.widget === 'number') {
+      return (
+        <HeroTextField className="ag-plugin-config-text-field" fullWidth isRequired={field.required} key={field.key}>
+          <Label className="ag-plugin-config-field-label">{field.label}</Label>
+          {field.description ? (
+            <p className="ag-plugin-config-field-description">{field.description}</p>
+          ) : null}
+          <Input
+            max={field.max}
+            min={field.min}
+            step={field.step}
+            type="number"
+            value={String(fieldValue ?? '')}
             onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
           />
         </HeroTextField>

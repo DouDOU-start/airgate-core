@@ -28,10 +28,14 @@ export interface PluginConfigField {
   fallback_key?: string;
   label: string;
   description?: string;
-  widget: 'multi_select' | 'ordered_select' | 'string_list' | 'text' | 'textarea' | 'switch';
+  widget: 'multi_select' | 'single_select' | 'ordered_select' | 'string_list' | 'text' | 'number' | 'textarea' | 'switch';
   data_source?: 'groups' | 'accounts';
   required?: boolean;
+  secret?: boolean;
   default?: unknown;
+  min?: number;
+  max?: number;
+  step?: number;
   filter?: Record<string, string>;
 }
 
@@ -47,6 +51,71 @@ export interface PluginConfigForm {
 
 export interface InstallPluginURLRequest {
   url: string;
+}
+
+export interface PluginProviderBalance {
+  balance_fen: number;
+  held_fen: number;
+  available_fen: number;
+  currency: string;
+}
+
+export interface PluginProviderDefaults {
+  product: 'oauth_30d' | 'oauth_7d';
+  quantity: number;
+  group_ids: number[];
+  priority: number;
+  max_concurrency: number;
+}
+
+export interface PluginProviderImportOptions {
+  group_ids: number[];
+  priority: number;
+  max_concurrency: number;
+}
+
+export interface PluginProviderOrder {
+  id?: string;
+  product: string;
+  quantity: number;
+  status: string;
+  source: 'auto' | 'manual' | string;
+  import_options: PluginProviderImportOptions;
+  imported_accounts?: number;
+  created_at: string;
+  completed_at?: string;
+}
+
+export interface PluginProviderOrderStatus {
+  pending: boolean;
+  order?: PluginProviderOrder | null;
+  last_order?: PluginProviderOrder | null;
+  last_error?: string;
+}
+
+export interface PluginProviderOverview {
+  balance: PluginProviderBalance;
+  defaults: PluginProviderDefaults;
+  auto_refill_enabled: boolean;
+  order: PluginProviderOrderStatus;
+}
+
+export interface PluginProviderInventory {
+  available: number;
+  missing: number;
+  needs_production: boolean;
+  minimum_remaining_seconds: number;
+  maximum_remaining_seconds: number;
+  estimated_total_fen: number;
+  estimated_unit_price_fen: number;
+}
+
+export interface PluginProviderManualOrderRequest {
+  product: 'oauth_30d' | 'oauth_7d';
+  quantity: number;
+  group_ids: number[];
+  priority: number;
+  max_concurrency: number;
 }
 
 export const pluginsApi = {
@@ -71,6 +140,10 @@ export const pluginsApi = {
     patch<void>(`/api/v1/admin/plugins/${encodeURIComponent(id)}/enabled`, { enabled }),
   reload: (id: string) =>
     post<void>(`/api/v1/admin/plugins/${encodeURIComponent(id)}/reload`),
+  action: <T>(id: string, action: string, payload: unknown = {}) => {
+    const encodedAction = action.split('/').map(encodeURIComponent).join('/');
+    return post<T>(`/api/v1/admin/plugins/${encodeURIComponent(id)}/actions/${encodedAction}`, payload);
+  },
   uninstall: (id: string) =>
     del<void>(`/api/v1/admin/plugins/${encodeURIComponent(id)}`),
 };

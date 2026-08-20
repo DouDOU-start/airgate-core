@@ -60,11 +60,13 @@ type instance struct {
 // Manager 管理多个相互独立的插件进程，并实现首个 relay_hook.v1 能力驱动。
 // 插件类型不参与运行限制；能力驱动只选择声明了对应 capability 的实例。
 type Manager struct {
-	pluginDir      string
-	logLevel       string
-	hookTimeout    time.Duration
-	defaultEnabled bool
-	dev            []config.DevPlugin
+	pluginDir       string
+	logLevel        string
+	hookTimeout     time.Duration
+	defaultEnabled  bool
+	dev             []config.DevPlugin
+	coreBaseURL     string
+	corePluginToken string
 
 	opMu sync.Mutex
 	mu   sync.RWMutex
@@ -73,11 +75,18 @@ type Manager struct {
 	lastErrors map[string]string
 }
 
+// HostAccess 是 Core 启动时提供给需要回调宿主的插件的进程期访问参数。
+// 这些值只在 Init 调用中注入，不属于插件持久化配置。
+type HostAccess struct {
+	BaseURL string
+	Token   string
+}
+
 var _ relayhook.Hook = (*Manager)(nil)
 var _ accounttesthook.Transformer = (*Manager)(nil)
 
 // New 创建插件运行器。调用 LoadAll 前不会启动任何外部进程。
-func New(cfg config.PluginsConfig, logLevel string) *Manager {
+func New(cfg config.PluginsConfig, logLevel string, hostAccess ...HostAccess) *Manager {
 	timeout := time.Duration(cfg.HookTimeoutMS) * time.Millisecond
 	if timeout <= 0 {
 		timeout = defaultHookTimeout
@@ -86,14 +95,20 @@ func New(cfg config.PluginsConfig, logLevel string) *Manager {
 	if pluginDir == "" {
 		pluginDir = "data/plugins"
 	}
+	var host HostAccess
+	if len(hostAccess) > 0 {
+		host = hostAccess[0]
+	}
 	return &Manager{
-		pluginDir:      pluginDir,
-		logLevel:       logLevel,
-		hookTimeout:    timeout,
-		defaultEnabled: cfg.Enabled,
-		dev:            append([]config.DevPlugin(nil), cfg.Dev...),
-		instances:      make(map[string]*instance),
-		lastErrors:     make(map[string]string),
+		pluginDir:       pluginDir,
+		logLevel:        logLevel,
+		hookTimeout:     timeout,
+		defaultEnabled:  cfg.Enabled,
+		dev:             append([]config.DevPlugin(nil), cfg.Dev...),
+		coreBaseURL:     strings.TrimRight(strings.TrimSpace(host.BaseURL), "/"),
+		corePluginToken: strings.TrimSpace(host.Token),
+		instances:       make(map[string]*instance),
+		lastErrors:      make(map[string]string),
 	}
 }
 
@@ -252,6 +267,10 @@ func (m *Manager) launchPlugin(ctx context.Context, requestedID string, cmd *exe
 			client.Kill()
 			return nil, loadErr
 		}
+		if prepareErr := m.preparePluginConfig(info, values); prepareErr != nil {
+			client.Kill()
+			return nil, prepareErr
+		}
 		initCtx, initCancel := context.WithTimeout(ctx, pluginStartTimeout)
 		err = plugin.Init(initCtx, values)
 		initCancel()
@@ -275,6 +294,22 @@ func (m *Manager) launchPlugin(ctx context.Context, requestedID string, cmd *exe
 		slog.Info("插件已启动", "plugin_ref", pluginLogRef(id))
 	}
 	return inst, nil
+}
+
+// preparePluginConfig 清除配置文件中可能伪造的宿主保留键，并只向声明了
+// account_autofill.v1 的插件注入当前 Core 的进程期访问参数。
+func (m *Manager) preparePluginConfig(info protocol.PluginInfo, values map[string]string) error {
+	delete(values, protocol.ConfigKeyCoreBaseURL)
+	delete(values, protocol.ConfigKeyCorePluginToken)
+	if !hasCapability(info, protocol.CapabilityAccountAutofillV1) {
+		return nil
+	}
+	if m.coreBaseURL == "" || m.corePluginToken == "" {
+		return fmt.Errorf("宿主未提供自动补号插件所需的访问参数")
+	}
+	values[protocol.ConfigKeyCoreBaseURL] = m.coreBaseURL
+	values[protocol.ConfigKeyCorePluginToken] = m.corePluginToken
+	return nil
 }
 
 func normalizePluginInfo(info protocol.PluginInfo) protocol.PluginInfo {

@@ -16,8 +16,22 @@ const (
 	CapabilityRelayHookV1 = "relay_hook.v1"
 	// CapabilityAccountTestTransformV1 表示插件可按测试模式改写账号连接测试请求。
 	CapabilityAccountTestTransformV1 = "account_test_transform.v1"
+	// CapabilityAccountAutofillV1 表示插件会在独立后台任务中自动补充上游账号。
+	// 此能力由插件自行调度，Core 负责生命周期管理和配置托管。
+	CapabilityAccountAutofillV1 = "account_autofill.v1"
+	// CapabilityAccountProviderManagementV1 表示插件提供账号供应商管理动作，
+	// 包括余额、库存报价和手动取货订单。
+	CapabilityAccountProviderManagementV1 = "account_provider_management.v1"
 	// ConfigKeyLogLevel 是 Core 传给插件的日志级别配置键。
 	ConfigKeyLogLevel = "log_level"
+	// ConfigKeyCoreBaseURL 是 Core 仅向受支持宿主能力注入的本机访问地址。
+	// 该值不会写入插件配置文件，也不应出现在插件配置表单中。
+	ConfigKeyCoreBaseURL = "_airgate_core_base_url"
+	// ConfigKeyCorePluginToken 是 Core 仅向受支持宿主能力注入的进程期访问令牌。
+	// 令牌只驻留内存，Core 重启后自动失效。
+	ConfigKeyCorePluginToken = "_airgate_core_plugin_token"
+	// CorePluginTokenHeader 是插件访问 Core 内部接口时使用的认证头。
+	CorePluginTokenHeader = "X-AirGate-Plugin-Token"
 	// MaxMessageBytes 限制单次插件 RPC 消息大小。
 	MaxMessageBytes = 64 << 20
 )
@@ -58,12 +72,18 @@ type ConfigField struct {
 	FallbackKey string `json:"fallback_key,omitempty" yaml:"fallback_key,omitempty"`
 	Label       string `json:"label" yaml:"label"`
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-	// Widget 支持：multi_select / ordered_select / string_list / text / textarea / switch。
-	Widget     string            `json:"widget" yaml:"widget"`
-	DataSource string            `json:"data_source,omitempty" yaml:"data_source,omitempty"`
-	Required   bool              `json:"required,omitempty" yaml:"required,omitempty"`
-	Default    any               `json:"default,omitempty" yaml:"default,omitempty"`
-	Filter     map[string]string `json:"filter,omitempty" yaml:"filter,omitempty"`
+	// Widget 支持：multi_select / single_select / ordered_select / string_list /
+	// text / number / textarea / switch。
+	Widget     string `json:"widget" yaml:"widget"`
+	DataSource string `json:"data_source,omitempty" yaml:"data_source,omitempty"`
+	Required   bool   `json:"required,omitempty" yaml:"required,omitempty"`
+	// Secret 表示配置值只能写入，管理页读取时只返回固定掩码。
+	Secret  bool              `json:"secret,omitempty" yaml:"secret,omitempty"`
+	Default any               `json:"default,omitempty" yaml:"default,omitempty"`
+	Min     *float64          `json:"min,omitempty" yaml:"min,omitempty"`
+	Max     *float64          `json:"max,omitempty" yaml:"max,omitempty"`
+	Step    *float64          `json:"step,omitempty" yaml:"step,omitempty"`
+	Filter  map[string]string `json:"filter,omitempty" yaml:"filter,omitempty"`
 }
 
 // Request 是能力驱动器发给插件的通用请求。

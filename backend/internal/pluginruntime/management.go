@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,16 +24,20 @@ const (
 	MaxPluginBinarySize int64 = 500 << 20
 	// MaxPluginConfigSize 是在线编辑单个插件配置的上限。
 	MaxPluginConfigSize = 1 << 20
+	// maskedPluginSecret 是管理表单读取已配置敏感值时返回的固定占位符。
+	maskedPluginSecret = "********"
 )
 
 var (
-	ErrPluginNotFound          = errors.New("插件不存在")
-	ErrPluginExists            = errors.New("插件已安装")
-	ErrPluginDisabled          = errors.New("插件尚未启用")
-	ErrPluginConfigUnsupported = errors.New("插件未声明可视化配置")
-	ErrPluginConfigIncomplete  = errors.New("插件配置未完成")
-	ErrInvalidPluginID         = errors.New("插件 ID 无效")
-	pluginIDPattern            = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
+	ErrPluginNotFound              = errors.New("插件不存在")
+	ErrPluginExists                = errors.New("插件已安装")
+	ErrPluginDisabled              = errors.New("插件尚未启用")
+	ErrPluginConfigUnsupported     = errors.New("插件未声明可视化配置")
+	ErrPluginConfigIncomplete      = errors.New("插件配置未完成")
+	ErrPluginCapabilityUnsupported = errors.New("插件不支持该管理能力")
+	ErrPluginUnavailable           = errors.New("插件暂时不可用")
+	ErrInvalidPluginID             = errors.New("插件 ID 无效")
+	pluginIDPattern                = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 )
 
 // PluginStatus 是管理 API 展示的已安装插件状态。
@@ -510,7 +515,11 @@ func (m *Manager) GetConfigForm(id string) (PluginConfigForm, error) {
 	values := make(map[string]any, len(manifest.ConfigSchema.Fields))
 	for _, field := range manifest.ConfigSchema.Fields {
 		if value, exists := configFieldValue(stored, field); exists {
-			values[field.Key] = value
+			if field.Secret && !emptyConfigValue(value) {
+				values[field.Key] = maskedPluginSecret
+			} else {
+				values[field.Key] = value
+			}
 		}
 	}
 	return PluginConfigForm{Schema: manifest.ConfigSchema, Values: values}, nil
@@ -528,9 +537,22 @@ func (m *Manager) UpdateConfigForm(ctx context.Context, id string, values map[st
 	if manifest.ConfigSchema == nil || len(manifest.ConfigSchema.Fields) == 0 {
 		return ErrPluginConfigUnsupported
 	}
+	stored := make(map[string]any)
+	configText, err := m.GetConfig(id)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(configText) != "" {
+		if err := yaml.Unmarshal([]byte(configText), &stored); err != nil {
+			return fmt.Errorf("解析插件原配置失败: %w", err)
+		}
+	}
 	normalized := make(map[string]any, len(manifest.ConfigSchema.Fields))
 	for _, field := range manifest.ConfigSchema.Fields {
 		value, exists := values[field.Key]
+		if field.Secret && (!exists || emptyConfigValue(value) || value == maskedPluginSecret) {
+			value, exists = configFieldValue(stored, field)
+		}
 		if !exists && field.Default != nil {
 			value, exists = field.Default, true
 		}
@@ -538,6 +560,9 @@ func (m *Manager) UpdateConfigForm(ctx context.Context, id string, values map[st
 			return fmt.Errorf("%s不能为空", field.Label)
 		}
 		if exists {
+			if err := validateConfigFieldValue(field, value); err != nil {
+				return err
+			}
 			normalized[field.Key] = value
 		}
 	}
@@ -546,6 +571,56 @@ func (m *Manager) UpdateConfigForm(ctx context.Context, id string, values map[st
 		return fmt.Errorf("编码插件配置失败: %w", err)
 	}
 	return m.UpdateConfig(ctx, id, string(data))
+}
+
+func validateConfigFieldValue(field protocol.ConfigField, value any) error {
+	if field.Widget != "number" || emptyConfigValue(value) {
+		return nil
+	}
+	number, err := configNumber(value)
+	if err != nil {
+		return fmt.Errorf("%s必须是数字", field.Label)
+	}
+	if field.Min != nil && number < *field.Min {
+		return fmt.Errorf("%s不能小于 %v", field.Label, *field.Min)
+	}
+	if field.Max != nil && number > *field.Max {
+		return fmt.Errorf("%s不能大于 %v", field.Label, *field.Max)
+	}
+	return nil
+}
+
+func configNumber(value any) (float64, error) {
+	switch typed := value.(type) {
+	case int:
+		return float64(typed), nil
+	case int8:
+		return float64(typed), nil
+	case int16:
+		return float64(typed), nil
+	case int32:
+		return float64(typed), nil
+	case int64:
+		return float64(typed), nil
+	case uint:
+		return float64(typed), nil
+	case uint8:
+		return float64(typed), nil
+	case uint16:
+		return float64(typed), nil
+	case uint32:
+		return float64(typed), nil
+	case uint64:
+		return float64(typed), nil
+	case float32:
+		return float64(typed), nil
+	case float64:
+		return typed, nil
+	case string:
+		return strconv.ParseFloat(strings.TrimSpace(typed), 64)
+	default:
+		return 0, fmt.Errorf("不是数字")
+	}
 }
 
 func emptyConfigValue(value any) bool {
@@ -913,7 +988,10 @@ func applyPluginInfo(status *PluginStatus, info protocol.PluginInfo) {
 
 func supportsAnyCapability(capabilities []string) bool {
 	for _, capability := range capabilities {
-		if capability == protocol.CapabilityRelayHookV1 || capability == protocol.CapabilityAccountTestTransformV1 {
+		if capability == protocol.CapabilityRelayHookV1 ||
+			capability == protocol.CapabilityAccountTestTransformV1 ||
+			capability == protocol.CapabilityAccountAutofillV1 ||
+			capability == protocol.CapabilityAccountProviderManagementV1 {
 			return true
 		}
 	}

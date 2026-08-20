@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -214,6 +216,53 @@ func (h *PluginHandler) ReloadPlugin(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+// InvokePluginAction 通过 Core 调用已运行插件的受限管理动作。
+func (h *PluginHandler) InvokePluginAction(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, pluginruntime.MaxPluginActionBodySize)
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		response.BadRequest(c, "插件动作请求体过大或无法读取")
+		return
+	}
+	if len(body) == 0 {
+		body = []byte("{}")
+	}
+	if !json.Valid(body) {
+		response.BadRequest(c, "插件动作请求体必须是 JSON")
+		return
+	}
+	result, err := h.manager.InvokeManagement(c.Request.Context(), c.Param("id"), c.Param("action"), body)
+	if err != nil {
+		h.handleOperationError(c, "调用插件管理动作失败", err)
+		return
+	}
+
+	var data any
+	if len(result.Body) > 0 {
+		if err := json.Unmarshal(result.Body, &data); err != nil {
+			response.BadRequest(c, "插件管理动作返回了无效 JSON")
+			return
+		}
+	}
+	if result.StatusCode >= http.StatusBadRequest {
+		message := pluginActionErrorMessage(data)
+		response.Error(c, result.StatusCode, result.StatusCode, message)
+		return
+	}
+	c.JSON(result.StatusCode, response.R{Code: 0, Data: data, Message: "ok"})
+}
+
+func pluginActionErrorMessage(data any) string {
+	if object, ok := data.(map[string]any); ok {
+		for _, key := range []string{"message", "error"} {
+			if value, ok := object[key].(string); ok && strings.TrimSpace(value) != "" {
+				return value
+			}
+		}
+	}
+	return "插件管理动作执行失败"
+}
+
 // UninstallPlugin 停止并卸载插件。
 func (h *PluginHandler) UninstallPlugin(c *gin.Context) {
 	if err := h.manager.Uninstall(c.Request.Context(), c.Param("id")); err != nil {
@@ -246,7 +295,7 @@ func (h *PluginHandler) handleOperationError(c *gin.Context, logMessage string, 
 		response.NotFound(c, err.Error())
 	case errors.Is(err, pluginruntime.ErrPluginExists):
 		response.Error(c, http.StatusConflict, http.StatusConflict, err.Error())
-	case errors.Is(err, pluginruntime.ErrInvalidPluginID), errors.Is(err, pluginruntime.ErrPluginDisabled), errors.Is(err, pluginruntime.ErrPluginConfigUnsupported), errors.Is(err, pluginruntime.ErrPluginConfigIncomplete):
+	case errors.Is(err, pluginruntime.ErrInvalidPluginID), errors.Is(err, pluginruntime.ErrPluginDisabled), errors.Is(err, pluginruntime.ErrPluginConfigUnsupported), errors.Is(err, pluginruntime.ErrPluginConfigIncomplete), errors.Is(err, pluginruntime.ErrPluginCapabilityUnsupported), errors.Is(err, pluginruntime.ErrPluginUnavailable):
 		response.BadRequest(c, err.Error())
 	default:
 		// 进程握手、插件初始化和配置解析错误需要直接反馈给管理员，便于修正安装包或表单配置。

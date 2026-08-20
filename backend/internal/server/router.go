@@ -33,6 +33,16 @@ func (s *Server) registerRoutes() {
 	// API v1 路由组
 	v1 := r.Group("/api/v1")
 
+	// 插件内部账号接口只接受 Core 同机插件进程访问。认证使用 Core 启动时生成、
+	// 仅驻留内存的随机令牌，不复用管理员 API Key。
+	pluginAccountGroup := v1.Group("/internal/plugins")
+	pluginAccountGroup.Use(middleware.PluginTokenAuth(s.pluginAccessToken))
+	{
+		pluginAccountGroup.GET("/accounts", handlers.Account.ListAccounts)
+		pluginAccountGroup.POST("/accounts", handlers.Account.CreateAccount)
+		pluginAccountGroup.PUT("/accounts/:id", handlers.Account.UpdateAccount)
+	}
+
 	// === 公共路由（无需认证） ===
 	v1.GET("/settings/public", handlers.Settings.GetPublicSettings)
 
@@ -292,6 +302,7 @@ func (s *Server) registerRoutes() {
 		adminGroup.PUT("/plugins/:id/config", s.pluginHandler.UpdatePluginConfig)
 		adminGroup.PATCH("/plugins/:id/enabled", s.pluginHandler.SetPluginEnabled)
 		adminGroup.POST("/plugins/:id/reload", s.pluginHandler.ReloadPlugin)
+		adminGroup.POST("/plugins/:id/actions/*action", s.pluginHandler.InvokePluginAction)
 		adminGroup.DELETE("/plugins/:id", s.pluginHandler.UninstallPlugin)
 
 		// 系统设置

@@ -613,6 +613,125 @@ func TestManagerWebManagementLifecycle(t *testing.T) {
 	}
 }
 
+func TestManager自动补号配置保留敏感值并校验数字(t *testing.T) {
+	pluginDir := t.TempDir()
+	installDir := filepath.Join(pluginDir, "autofill-fixture")
+	if err := os.MkdirAll(installDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	binaryPath := filepath.Join(installDir, pluginBinaryName("autofill-fixture"))
+	if err := os.WriteFile(binaryPath, []byte("fixture"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `id: autofill-fixture
+name: 自动补号测试插件
+version: 1.0.0
+protocol_version: "2"
+capabilities:
+  - account_autofill.v1
+config_schema:
+  version: "1"
+  fields:
+    - key: password
+      label: 客户密码
+      widget: text
+      required: true
+      secret: true
+    - key: batch_size
+      label: 每次补号数量
+      widget: number
+      required: true
+      min: 1
+      max: 100
+`
+	if err := os.WriteFile(filepath.Join(installDir, "manifest.yaml"), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(installDir, "config.yaml"), []byte("password: real-secret\nbatch_size: 10\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manager := New(config.PluginsConfig{Dir: pluginDir}, "error")
+	if err := manager.writeRuntimeState("autofill-fixture", runtimeState{Enabled: false, InstalledAt: time.Now(), UpdatedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+
+	form, err := manager.GetConfigForm("autofill-fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if form.Values["password"] != maskedPluginSecret {
+		t.Fatalf("敏感配置未掩码: %+v", form.Values)
+	}
+	if err := manager.UpdateConfigForm(context.Background(), "autofill-fixture", map[string]any{
+		"password":   maskedPluginSecret,
+		"batch_size": "20",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	configText, err := manager.GetConfig("autofill-fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(configText, "real-secret") || strings.Contains(configText, maskedPluginSecret) {
+		t.Fatalf("保存表单后敏感配置被覆盖: %s", configText)
+	}
+	if err := manager.UpdateConfigForm(context.Background(), "autofill-fixture", map[string]any{
+		"password":   maskedPluginSecret,
+		"batch_size": 101,
+	}); err == nil {
+		t.Fatal("超过上限的补号数量应被拒绝")
+	}
+	if !supportsAnyCapability([]string{protocol.CapabilityAccountAutofillV1}) {
+		t.Fatal("Core 未识别自动补号能力")
+	}
+}
+
+func TestManager只向自动补号能力注入宿主访问参数(t *testing.T) {
+	manager := New(config.PluginsConfig{Dir: t.TempDir()}, "error", HostAccess{
+		BaseURL: "http://127.0.0.1:9517/",
+		Token:   "core-plugin-token",
+	})
+	autofillValues := map[string]string{
+		protocol.ConfigKeyCoreBaseURL:     "http://伪造地址",
+		protocol.ConfigKeyCorePluginToken: "伪造令牌",
+	}
+	if err := manager.preparePluginConfig(protocol.PluginInfo{
+		Capabilities: []string{protocol.CapabilityAccountAutofillV1},
+	}, autofillValues); err != nil {
+		t.Fatal(err)
+	}
+	if autofillValues[protocol.ConfigKeyCoreBaseURL] != "http://127.0.0.1:9517" ||
+		autofillValues[protocol.ConfigKeyCorePluginToken] != "core-plugin-token" {
+		t.Fatalf("自动补号插件未收到可信宿主参数: %+v", autofillValues)
+	}
+
+	ordinaryValues := map[string]string{
+		protocol.ConfigKeyCoreBaseURL:     "http://伪造地址",
+		protocol.ConfigKeyCorePluginToken: "伪造令牌",
+	}
+	if err := manager.preparePluginConfig(protocol.PluginInfo{
+		Capabilities: []string{protocol.CapabilityRelayHookV1},
+	}, ordinaryValues); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := ordinaryValues[protocol.ConfigKeyCoreBaseURL]; exists {
+		t.Fatalf("普通插件获得了宿主地址: %+v", ordinaryValues)
+	}
+	if _, exists := ordinaryValues[protocol.ConfigKeyCorePluginToken]; exists {
+		t.Fatalf("普通插件获得了宿主令牌: %+v", ordinaryValues)
+	}
+}
+
+func TestManager自动补号能力缺少宿主参数时拒绝初始化(t *testing.T) {
+	manager := New(config.PluginsConfig{Dir: t.TempDir()}, "error")
+	err := manager.preparePluginConfig(protocol.PluginInfo{
+		Capabilities: []string{protocol.CapabilityAccountAutofillV1},
+	}, map[string]string{})
+	if err == nil || !strings.Contains(err.Error(), "宿主访问参数") {
+		t.Fatalf("缺少宿主参数时错误 = %v", err)
+	}
+}
+
 func TestManagerUpdatesBinaryWithoutLosingConfiguration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("短测试模式跳过真实插件进程构建")
