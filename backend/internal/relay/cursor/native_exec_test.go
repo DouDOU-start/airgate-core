@@ -394,7 +394,7 @@ func TestBuildExecResult还原扩展和Pi强类型结果(t *testing.T) {
 }
 
 func TestRunSession原生列目录写入读取经ClaudeCode续接(t *testing.T) {
-	serverResults := make(chan *agentpb.ExecClientMessage, 3)
+	serverResults := make(chan *agentpb.ExecClientMessage, 4)
 	serverErrors := make(chan error, 1)
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		report := func(err error) {
@@ -442,6 +442,15 @@ func TestRunSession原生列目录写入读取经ClaudeCode续接(t *testing.T) 
 
 		if !writeMessage(&agentpb.AgentServerMessage{Message: &agentpb.AgentServerMessage_ExecServerMessage{
 			ExecServerMessage: &agentpb.ExecServerMessage{Id: 40, ExecId: "ls-exec", Message: &agentpb.ExecServerMessage_LsArgs{
+				LsArgs: &agentpb.LsArgs{Path: "/tmp", ToolCallId: "ls-call"},
+			}},
+		}}) || !readResult() {
+			return
+		}
+		// Cursor 可能在工具结果到达前重发同一 exec 请求。网关应直接
+		// 重放已完成结果，不能让 Claude Code 再执行一次。
+		if !writeMessage(&agentpb.AgentServerMessage{Message: &agentpb.AgentServerMessage_ExecServerMessage{
+			ExecServerMessage: &agentpb.ExecServerMessage{Id: 140, ExecId: "ls-exec-retry", Message: &agentpb.ExecServerMessage_LsArgs{
 				LsArgs: &agentpb.LsArgs{Path: "/tmp", ToolCallId: "ls-call"},
 			}},
 		}}) || !readResult() {
@@ -499,6 +508,18 @@ func TestRunSession原生列目录写入读取经ClaudeCode续接(t *testing.T) 
 		t.Fatal(err)
 	case <-time.After(time.Second):
 		t.Fatal("Cursor 未收到列目录结果")
+	}
+	select {
+	case result := <-serverResults:
+		root := result.GetLsResult().GetSuccess().GetDirectoryTreeRoot()
+		if result.GetId() != 140 || result.GetExecId() != "ls-exec-retry" || root == nil ||
+			len(root.GetChildrenFiles()) != 1 || root.GetChildrenFiles()[0].GetName() != "rw_test.txt" {
+			t.Fatalf("Cursor 重发请求未收到关联字段更新后的缓存结果: %+v", result)
+		}
+	case err := <-serverErrors:
+		t.Fatal(err)
+	case <-time.After(time.Second):
+		t.Fatal("Cursor 重发请求未收到缓存结果")
 	}
 	assertToolSegment(t, second, "write-call", "Write")
 	third := resumeToolResult(t, resumable, "write-call", "写入成功")

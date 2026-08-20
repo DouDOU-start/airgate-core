@@ -337,6 +337,18 @@ func TestRunSession工具结果续接原始Cursor流(t *testing.T) {
 		serverResult <- clientMessage.GetExecClientMessage()
 
 		if !writeServerMessage(&agentpb.AgentServerMessage{Message: &agentpb.AgentServerMessage_InteractionUpdate{
+			InteractionUpdate: &agentpb.InteractionUpdate{Message: &agentpb.InteractionUpdate_ToolCallCompleted{
+				ToolCallCompleted: &agentpb.ToolCallCompletedUpdate{
+					CallId: "call-31",
+					ToolCall: &agentpb.ToolCall{Tool: &agentpb.ToolCall_McpToolCall{McpToolCall: &agentpb.McpToolCall{
+						Args: &agentpb.McpArgs{ToolCallId: "call-31", Name: "fn_read", ToolName: "fn_read"},
+					}}},
+				},
+			}},
+		}}) {
+			return
+		}
+		if !writeServerMessage(&agentpb.AgentServerMessage{Message: &agentpb.AgentServerMessage_InteractionUpdate{
 			InteractionUpdate: &agentpb.InteractionUpdate{Message: &agentpb.InteractionUpdate_TextDelta{
 				TextDelta: &agentpb.TextDeltaUpdate{Text: "续接成功"},
 			}},
@@ -415,11 +427,13 @@ func TestRunSession工具结果续接原始Cursor流(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var sawReady, sawText, sawSecondDone bool
+	var sawReady, sawText, sawSecondDone, sawDuplicateTool bool
 	for event := range secondEvents {
 		switch value := event.(type) {
 		case Ready:
 			sawReady = true
+		case ToolCallStart, ToolCallEnd, ToolCallArgsDelta:
+			sawDuplicateTool = true
 		case TextDelta:
 			sawText = value.Text == "续接成功"
 		case Done:
@@ -428,8 +442,9 @@ func TestRunSession工具结果续接原始Cursor流(t *testing.T) {
 			t.Fatalf("续接段响应异常: %v", value.Err)
 		}
 	}
-	if !sawReady || !sawText || !sawSecondDone {
-		t.Fatalf("续接段事件不完整: ready=%v text=%v done=%v", sawReady, sawText, sawSecondDone)
+	if !sawReady || !sawText || !sawSecondDone || sawDuplicateTool {
+		t.Fatalf("续接段事件异常: ready=%v text=%v done=%v duplicate_tool=%v",
+			sawReady, sawText, sawSecondDone, sawDuplicateTool)
 	}
 	select {
 	case err := <-serverError:

@@ -79,6 +79,7 @@ func RunSession(ctx context.Context, opts SessionOptions) <-chan Event {
 			onCheckpoint:        opts.OnCheckpoint,
 			started:             make(map[string]*trackedCall),
 			pendingExec:         make(map[string]pendingExecCall),
+			completedExec:       make(map[string][]*agentpb.ExecClientMessage),
 			toolCallDrainWindow: durationOrDefault(opts.ToolCallDrainWindow, defaultToolCallDrainWindow),
 			pausedStreamTTL:     durationOrDefault(opts.PausedStreamTTL, defaultPausedStreamTTL),
 			resumable:           opts.Resumable,
@@ -113,6 +114,7 @@ type session struct {
 	doneSent      bool
 	segmentClosed bool
 	pendingExec   map[string]pendingExecCall
+	completedExec map[string][]*agentpb.ExecClientMessage
 	finishReady   chan uint64
 	finishBatch   uint64
 	resumable     *resumableCursorStream
@@ -311,7 +313,8 @@ func (s *session) pauseAndResume(ctx context.Context) bool {
 		s.events = command.events
 		s.segmentClosed = false
 		s.segmentDone = make(chan struct{})
-		s.started = make(map[string]*trackedCall)
+		// started 跟踪的是整条 Cursor turn。HTTP 分段只是下游边界，
+		// 不能清空，否则结果写回后的 ToolCallCompleted 会被当成新调用。
 		s.pendingExec = make(map[string]pendingExecCall)
 		s.sawToolCall = false
 		s.finishing = false
@@ -325,6 +328,12 @@ func (s *session) pauseAndResume(ctx context.Context) bool {
 				command.ready <- fmt.Errorf("写回 Cursor 工具结果失败: %w", err)
 				return false
 			}
+		}
+		if s.completedExec == nil {
+			s.completedExec = make(map[string][]*agentpb.ExecClientMessage)
+		}
+		for toolCallID, results := range command.completed {
+			s.completedExec[toolCallID] = cloneExecClientMessages(results)
 		}
 		command.ready <- nil
 		s.emit(Ready{})
@@ -1049,6 +1058,18 @@ func (s *session) queueExecTool(
 		toolCallID = "tool_" + uuid.NewString()
 	}
 	call.toolCallID = toolCallID
+	if completed := s.completedExec[toolCallID]; len(completed) > 0 {
+		for _, result := range completed {
+			replay := proto.Clone(result).(*agentpb.ExecClientMessage)
+			if ex != nil {
+				replay.Id = ex.GetId()
+				replay.ExecId = ex.GetExecId()
+			}
+			_ = s.replyExec(replay)
+		}
+		slog.Debug("cursor_session_duplicate_exec_replayed", "tool_call_id", toolCallID, "tool", call.name)
+		return
+	}
 	if ex != nil {
 		call.messageID = ex.GetId()
 		call.execID = ex.GetExecId()
@@ -1067,6 +1088,17 @@ func (s *session) queueExecTool(
 		s.emit(ToolCallEnd{ID: toolCallID, Name: tc.name, ArgsJSON: argsJSON})
 	}
 	s.scheduleToolFinish()
+}
+
+func cloneExecClientMessages(messages []*agentpb.ExecClientMessage) []*agentpb.ExecClientMessage {
+	cloned := make([]*agentpb.ExecClientMessage, 0, len(messages))
+	for _, message := range messages {
+		if message == nil {
+			continue
+		}
+		cloned = append(cloned, proto.Clone(message).(*agentpb.ExecClientMessage))
+	}
+	return cloned
 }
 
 // onMcpExec 是 function calling 的截获点：服务端请求执行我们下发的工具时，
@@ -1182,8 +1214,11 @@ func (s *session) onToolCallCompleted(u *agentpb.ToolCallCompletedUpdate) {
 	if !tc.ended {
 		tc.ended = true
 		s.emit(ToolCallEnd{ID: id, Name: tc.name, ArgsJSON: decodeMcpArgsMap(mcp.GetArgs().GetArgs())})
+		s.sawToolCall = true
+		return
 	}
-	s.sawToolCall = true
+	// Cursor 已确认收到结果，之后不再需要为 exec 重发保留缓存。
+	delete(s.completedExec, id)
 }
 
 // decodeMcpArgsMap 把 McpArgs.args（每个值是序列化的 structpb.Value）还原成

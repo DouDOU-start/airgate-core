@@ -61,6 +61,7 @@ type pendingExecCall struct {
 
 type resumeCommand struct {
 	results           []*agentpb.ExecClientMessage
+	completed         map[string][]*agentpb.ExecClientMessage
 	events            chan Event
 	downstreamContext context.Context
 	ready             chan error
@@ -142,7 +143,7 @@ func (s *resumableCursorStream) tryResume(
 		return nil, true, fmt.Errorf("同一 Cursor 会话正在续接工具结果")
 	}
 	pending := clonePendingCalls(s.pending)
-	results, buildErr := buildExecResumeResults(parsed, pending)
+	results, completed, buildErr := buildExecResumeResultSet(parsed, pending)
 	if buildErr != nil {
 		s.mu.Unlock()
 		return nil, true, buildErr
@@ -160,7 +161,7 @@ func (s *resumableCursorStream) tryResume(
 	segment := make(chan Event, resumeEventBuffer)
 	ready := make(chan error, 1)
 	command := resumeCommand{
-		results: results, events: segment, downstreamContext: ctx, ready: ready,
+		results: results, completed: completed, events: segment, downstreamContext: ctx, ready: ready,
 	}
 	select {
 	case s.resumeCh <- command:
@@ -199,8 +200,16 @@ func buildExecResumeResults(
 	parsed *ParsedRequest,
 	pending map[string]pendingExecCall,
 ) ([]*agentpb.ExecClientMessage, error) {
+	results, _, err := buildExecResumeResultSet(parsed, pending)
+	return results, err
+}
+
+func buildExecResumeResultSet(
+	parsed *ParsedRequest,
+	pending map[string]pendingExecCall,
+) ([]*agentpb.ExecClientMessage, map[string][]*agentpb.ExecClientMessage, error) {
 	if parsed == nil {
-		return nil, fmt.Errorf("续接 Cursor 流时请求为空")
+		return nil, nil, fmt.Errorf("续接 Cursor 流时请求为空")
 	}
 	toolResults := make(map[string]NMessage)
 	for _, message := range parsed.Messages {
@@ -219,15 +228,18 @@ func buildExecResumeResults(
 		return calls[i].messageID < calls[j].messageID
 	})
 	results := make([]*agentpb.ExecClientMessage, 0, len(calls))
+	completed := make(map[string][]*agentpb.ExecClientMessage, len(calls))
 	for _, call := range calls {
 		toolCallID := call.toolCallID
 		result, ok := toolResults[toolCallID]
 		if !ok {
-			return nil, fmt.Errorf("cursor 流正在等待工具 %q 的结果（tool_call_id=%s）", call.name, toolCallID)
+			return nil, nil, fmt.Errorf("cursor 流正在等待工具 %q 的结果（tool_call_id=%s）", call.name, toolCallID)
 		}
-		results = append(results, buildExecResult(call, result)...)
+		messages := buildExecResult(call, result)
+		results = append(results, messages...)
+		completed[toolCallID] = messages
 	}
-	return results, nil
+	return results, completed, nil
 }
 
 func buildExecResult(call pendingExecCall, result NMessage) []*agentpb.ExecClientMessage {
