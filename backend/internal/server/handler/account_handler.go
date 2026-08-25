@@ -104,9 +104,13 @@ func (h *AccountHandler) handleError(logMessage, publicMessage string, err error
 		// 因账号状态无法处理。
 		return 422, err.Error()
 	case errors.Is(err, appaccount.ErrModelRequired),
+		errors.Is(err, appaccount.ErrInvalidConnectivityTestMode),
+		errors.Is(err, appaccount.ErrConnectivityTestModeAccountTypeUnsupported),
 		errors.Is(err, appaccount.ErrQuotaRefreshUnsupported),
 		errors.Is(err, appaccount.ErrInvalidDateRange):
 		return 400, err.Error()
+	case errors.Is(err, appaccount.ErrConnectivityTestTransformUnavailable):
+		return 422, err.Error()
 	default:
 		slog.Error(logMessage, "error", err)
 		return 500, publicMessage

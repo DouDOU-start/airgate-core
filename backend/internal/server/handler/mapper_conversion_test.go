@@ -13,6 +13,7 @@ import (
 	appsubscription "github.com/DouDOU-start/airgate-core/internal/app/subscription"
 	appusage "github.com/DouDOU-start/airgate-core/internal/app/usage"
 	appuser "github.com/DouDOU-start/airgate-core/internal/app/user"
+	"github.com/DouDOU-start/airgate-core/internal/plugin"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
 
@@ -171,6 +172,38 @@ func TestPluginMappers(t *testing.T) {
 	})
 	if resp.Name != "gateway-openai" || len(resp.AccountTypes) != 1 || len(resp.FrontendPages) != 1 || len(resp.ConfigSchema) != 1 || resp.Metadata["account.oauth_plans"] == "" {
 		t.Fatalf("插件响应异常: %+v", resp)
+	}
+	if resp.ConfigSchema[0].Key != "base_url" || resp.ConfigSchema[0].Default != "" {
+		t.Fatalf("SDK v1 配置结构映射异常: %+v", resp.ConfigSchema)
+	}
+
+	richResp := toPluginResp(apppluginadmin.PluginMeta{
+		Name:         "relay-hook-v2",
+		ConfigSchema: []sdk.ConfigField{{Key: "legacy", Type: "text"}},
+		RichConfigSchema: &plugin.PluginConfigSchema{
+			Version: "4",
+			Fields: []plugin.PluginConfigField{{
+				Key:         "group_ids",
+				FallbackKey: "legacy_group_ids",
+				Label:       "生效分组",
+				Type:        "string",
+				Widget:      "multi_select",
+				DataSource:  "groups",
+				Default:     []int{1, 2},
+				Filter:      map[string]string{"platform": "example"},
+			}},
+		},
+	})
+	if richResp.ConfigSchemaVersion != "4" || len(richResp.ConfigSchema) != 1 || richResp.ConfigSchema[0].Key != "group_ids" ||
+		richResp.ConfigSchema[0].FallbackKey != "legacy_group_ids" ||
+		richResp.ConfigSchema[0].Widget != "multi_select" ||
+		richResp.ConfigSchema[0].DataSource != "groups" ||
+		richResp.ConfigSchema[0].Filter["platform"] != "example" {
+		t.Fatalf("富配置结构映射异常: %+v", richResp.ConfigSchema)
+	}
+	defaults, ok := richResp.ConfigSchema[0].Default.([]int)
+	if !ok || len(defaults) != 2 || defaults[0] != 1 || defaults[1] != 2 {
+		t.Fatalf("富配置默认值映射异常: %#v", richResp.ConfigSchema[0].Default)
 	}
 
 	marketResp := toMarketplacePluginResp(apppluginadmin.MarketplacePlugin{

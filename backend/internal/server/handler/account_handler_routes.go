@@ -417,10 +417,11 @@ func (h *AccountHandler) TestAccount(c *gin.Context) {
 
 	var req struct {
 		ModelID string `json:"model_id"`
+		Mode    string `json:"mode"`
 	}
 	_ = c.ShouldBindJSON(&req)
 
-	testPlan, err := h.service.PrepareConnectivityTest(c.Request.Context(), id, req.ModelID)
+	testPlan, err := h.service.PrepareConnectivityTest(c.Request.Context(), id, req.ModelID, req.Mode)
 	if err != nil {
 		httpCode, message := h.handleError("测试账号失败", "测试失败", err)
 		response.Error(c, httpCode, httpCode, message)
@@ -438,6 +439,7 @@ func (h *AccountHandler) TestAccount(c *gin.Context) {
 		"account":      testPlan.AccountName,
 		"model":        testPlan.ModelID,
 		"account_type": testPlan.AccountType,
+		"mode":         testPlan.Mode,
 	})
 
 	if err := testPlan.Run(c.Request.Context(), c.Writer); err != nil {

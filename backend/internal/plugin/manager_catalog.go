@@ -269,6 +269,24 @@ func (m *Manager) MatchPluginByRoute(method, path string) *PluginInstance {
 	return nil
 }
 
+// PluginSupportsRoute reports whether a concrete running plugin declared the
+// exact method/path pair.  WebSocket admission uses this after path/platform
+// matching so an HTTP-only endpoint cannot be upgraded accidentally.
+func (m *Manager) PluginSupportsRoute(pluginName, method, path string) bool {
+	if m == nil {
+		return false
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	name := m.resolveNameLocked(pluginName)
+	for _, route := range m.routeCache[name] {
+		if strings.EqualFold(route.Method, method) && route.Path == path {
+			return true
+		}
+	}
+	return false
+}
+
 // MatchPluginByPathPrefix 根据路径前缀匹配插件。
 func (m *Manager) MatchPluginByPathPrefix(path string) *PluginInstance {
 	m.mu.RLock()
@@ -371,6 +389,7 @@ func (m *Manager) GetAllPluginMeta() []PluginMeta {
 			Platform:           inst.Platform,
 			InstructionPresets: inst.InstructionPresets,
 			ConfigSchema:       cloneConfigSchema(inst.ConfigSchema),
+			RichConfigSchema:   inst.RichConfigSchema.Clone(),
 			Metadata:           cloneMetadata(inst.Metadata),
 			IsDev:              isDev,
 		}
@@ -463,9 +482,9 @@ func (m *Manager) ReloadInstance(ctx context.Context, name string) error {
 	if binaryDir == "" {
 		binaryDir = resolved
 	}
-	binaryPath := filepath.Join(m.pluginDir, binaryDir, binaryDir)
-	if _, err := os.Stat(binaryPath); err != nil {
-		return fmt.Errorf("插件二进制不存在: %s", binaryPath)
+	binaryPath, err := runnablePluginExecutablePath(filepath.Join(m.pluginDir, binaryDir), binaryDir)
+	if err != nil {
+		return fmt.Errorf("插件二进制不可用: %s: %w", binaryPath, err)
 	}
 	m.stopPlugin(resolved)
 	if _, err := m.startPlugin(ctx, binaryDir, exec.Command(binaryPath), binaryDir); err != nil {

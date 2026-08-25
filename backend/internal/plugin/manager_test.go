@@ -49,6 +49,26 @@ func TestMatchPluginByPlatformAndPathRejectsUnsupportedPath(t *testing.T) {
 	}
 }
 
+func TestPluginSupportsRouteWebSocketMethod(t *testing.T) {
+	mgr := &Manager{
+		instances: map[string]*PluginInstance{
+			"openai-plugin": {Name: "openai-plugin", Platform: "openai"},
+		},
+		routeCache: map[string][]sdk.RouteDefinition{
+			"openai-plugin": {
+				{Method: "WS", Path: "/v1/responses"},
+				{Method: "POST", Path: "/v1/responses"},
+			},
+		},
+	}
+	if !mgr.PluginSupportsRoute("openai-plugin", "ws", "/v1/responses") {
+		t.Fatal("expected WS route to be supported")
+	}
+	if mgr.PluginSupportsRoute("openai-plugin", "GET", "/v1/responses") {
+		t.Fatal("GET must not be treated as a declared WS route")
+	}
+}
+
 func TestParseGithubRepo(t *testing.T) {
 	owner, name, err := parseGithubRepo("https://github.com/acme/airgate-plugin.git")
 	if err != nil {

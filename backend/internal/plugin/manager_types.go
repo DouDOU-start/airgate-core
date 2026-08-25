@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	goplugin "github.com/hashicorp/go-plugin"
 
@@ -27,14 +28,16 @@ type PluginInstance struct {
 	Type               string // "gateway", "extension", "middleware"
 	InstructionPresets []string
 	ConfigSchema       []sdk.ConfigField
+	RichConfigSchema   *PluginConfigSchema
 	Metadata           map[string]string
 	Capabilities       []string // 插件声明的 host capability 列表（仅展示用）
 	Priority           int32    // 仅对 type=middleware 生效，决定 chain 顺序
 
-	Client     *goplugin.Client
-	Gateway    *sdkgrpc.GatewayGRPCClient
-	Extension  *sdkgrpc.ExtensionGRPCClient
-	Middleware *sdkgrpc.MiddlewareGRPCClient
+	Client      *goplugin.Client
+	Gateway     *sdkgrpc.GatewayGRPCClient
+	Extension   *sdkgrpc.ExtensionGRPCClient
+	Middleware  *sdkgrpc.MiddlewareGRPCClient
+	RelayHookV2 *relayHookV2Plugin
 
 	// 后台任务调度上下文。stopBackground 由 Core 调度器创建，用于停止
 	// 该插件实例的所有后台任务 goroutine。stopPlugin 时调用。
@@ -80,6 +83,10 @@ type Manager struct {
 	// metadataOnlyPaths 汇总所有插件声明了 Metadata["metadata_only"]="true" 的路由路径。
 	// 由 rebuildMetadataOnlyPathsLocked 在路由缓存变更后重建。
 	metadataOnlyPaths map[string]bool
+
+	// relayHookV2Timeout 限制旧版通用 Relay Hook 整条调用链的总耗时。
+	// 仅测试会覆盖该值；生产默认值由 relay_hook_v2.go 定义。
+	relayHookV2Timeout time.Duration
 }
 
 // SetHostService 注入 Core 实现的 HostService 工厂。
@@ -102,6 +109,7 @@ type PluginMeta struct {
 	FrontendPages      []sdk.FrontendPage
 	InstructionPresets []string
 	ConfigSchema       []sdk.ConfigField
+	RichConfigSchema   *PluginConfigSchema
 	Metadata           map[string]string
 	Config             map[string]string
 	HasWebAssets       bool
@@ -115,20 +123,21 @@ type PluginMeta struct {
 // 走 HTTP + admin key 回调 core。
 func NewManager(pluginDir, logLevel, coreDSN string, db *ent.Client) *Manager {
 	m := &Manager{
-		pluginDir:         pluginDir,
-		logLevel:          logLevel,
-		coreDSN:           coreDSN,
-		db:                db,
-		hostHandles:       make(map[string]*pluginHostHandle),
-		instances:         make(map[string]*PluginInstance),
-		aliases:           make(map[string]string),
-		devPaths:          make(map[string]string),
-		modelCache:        make(map[string][]sdk.ModelInfo),
-		routeCache:        make(map[string][]sdk.RouteDefinition),
-		credCache:         make(map[string][]sdk.CredentialField),
-		accountTypeCache:  make(map[string][]sdk.AccountType),
-		frontendPageCache: make(map[string][]sdk.FrontendPage),
-		metadataOnlyPaths: make(map[string]bool),
+		pluginDir:          pluginDir,
+		logLevel:           logLevel,
+		coreDSN:            coreDSN,
+		db:                 db,
+		hostHandles:        make(map[string]*pluginHostHandle),
+		instances:          make(map[string]*PluginInstance),
+		aliases:            make(map[string]string),
+		devPaths:           make(map[string]string),
+		modelCache:         make(map[string][]sdk.ModelInfo),
+		routeCache:         make(map[string][]sdk.RouteDefinition),
+		credCache:          make(map[string][]sdk.CredentialField),
+		accountTypeCache:   make(map[string][]sdk.AccountType),
+		frontendPageCache:  make(map[string][]sdk.FrontendPage),
+		metadataOnlyPaths:  make(map[string]bool),
+		relayHookV2Timeout: defaultRelayHookV2Timeout,
 	}
 	if coreDSN != "" && db != nil {
 		m.pluginDB = newPluginDSNProvisioner(db, coreDSN)

@@ -4,9 +4,34 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/DouDOU-start/airgate-core/ent"
 )
+
+func TestRouteAccountsAnyModelBypassesOnlyModelRouting(t *testing.T) {
+	t.Parallel()
+
+	accounts := []*ent.Account{{ID: 1}, {ID: 2}}
+	s := &Scheduler{routeCache: newRouteCache(time.Minute)}
+	s.routeCache.Set(7, "openai", accounts, map[string][]int64{"gpt-5.4": {2}})
+
+	ordinary, err := s.routeAccounts(context.Background(), "openai", "", 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ordinary) != 0 {
+		t.Fatalf("ordinary empty-model routing = %#v, want no accounts", ordinary)
+	}
+
+	unknownModel, err := s.routeAccountsForSelection(context.Background(), "openai", "", 7, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unknownModel) != 2 || unknownModel[0].ID != 1 || unknownModel[1].ID != 2 {
+		t.Fatalf("unknown-model routing = %#v, want both accounts", unknownModel)
+	}
+}
 
 func TestExcludeAccountsDoesNotMutateCandidates(t *testing.T) {
 	t.Parallel()

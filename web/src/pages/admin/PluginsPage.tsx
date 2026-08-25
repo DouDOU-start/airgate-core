@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pluginsApi } from '../../shared/api/plugins';
+import { groupsApi } from '../../shared/api/groups';
 import { clearPluginFrontendCache } from '../../app/plugin-loader';
 import { useToast } from '../../shared/ui';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
@@ -14,7 +15,7 @@ import {
   Package, User, Tag, Plus, Upload, Github, Settings, Store,
 } from 'lucide-react';
 import { CommonTable } from '../../shared/components/CommonTable';
-import type { PluginResp, MarketplacePluginResp } from '../../shared/types';
+import type { GroupResp, MarketplacePluginResp, PluginConfigField, PluginResp } from '../../shared/types';
 
 // 插件类型 Badge 颜色
 const typeVariant: Record<string, 'accent' | 'success' | 'warning'> = {
@@ -367,6 +368,41 @@ export default function PluginsPage() {
 // ============================================================================
 // 插件配置编辑 Modal
 // ============================================================================
+function encodePluginConfigValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value);
+  try {
+    return JSON.stringify(value) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function parsePluginGroupIDs(value: string | undefined): number[] {
+  if (!value?.trim()) return [];
+  let candidates: unknown[];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    candidates = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    candidates = value.replace(/^\s*\[/, '').replace(/\]\s*$/, '').split(/[\s,]+/);
+  }
+  const ids = candidates
+    .map((item) => typeof item === 'number' ? item : Number(item))
+    .filter((item) => Number.isInteger(item) && item > 0);
+  return Array.from(new Set(ids));
+}
+
+function filterPluginGroups(field: PluginConfigField, groups: GroupResp[]): GroupResp[] {
+  const filters = Object.entries(field.filter ?? {});
+  if (filters.length === 0) return groups;
+  return groups.filter((group) => {
+    const values = group as unknown as Record<string, unknown>;
+    return filters.every(([key, expected]) => values[key] !== undefined && String(values[key]) === expected);
+  });
+}
+
 function PluginConfigModal({
   plugin,
   onClose,
@@ -379,6 +415,9 @@ function PluginConfigModal({
   const { toast } = useToast();
   const [values, setValues] = useState<Record<string, string>>({});
   const open = !!plugin;
+  const needsGroups = plugin?.config_schema?.some(
+    (field) => field.widget === 'multi_select' && field.data_source === 'groups',
+  ) ?? false;
 
   // 拉取持久化配置作为初始值
   const { data: configData, isLoading } = useQuery({
@@ -386,22 +425,31 @@ function PluginConfigModal({
     queryFn: () => pluginsApi.getConfig(plugin!.name),
     enabled: open,
   });
+  const { data: groupsData, isLoading: groupsLoading } = useQuery({
+    queryKey: queryKeys.groupsAll(),
+    queryFn: () => groupsApi.list(FETCH_ALL_PARAMS),
+    enabled: open && needsGroups,
+  });
+  const groups = groupsData?.list ?? [];
 
   useEffect(() => {
     if (!plugin) {
       setValues({});
       return;
     }
-    // 用 schema 中的 default 兜底，再用持久化值覆盖
-    const init: Record<string, string> = {};
+    // 保留未声明的旧配置；字段自身缺失时依次读取 fallback 和 default。
+    const init: Record<string, string> = { ...(configData?.config ?? {}) };
     plugin.config_schema?.forEach((f) => {
-      if (f.default !== undefined && f.default !== '') {
-        init[f.key] = f.default;
+      if (init[f.key] !== undefined) return;
+      const fallbackValue = f.fallback_key ? init[f.fallback_key] : undefined;
+      if (fallbackValue !== undefined) {
+        init[f.key] = fallbackValue;
+        return;
+      }
+      if (f.default !== undefined && f.default !== null) {
+        init[f.key] = encodePluginConfigValue(f.default);
       }
     });
-    if (configData?.config) {
-      Object.assign(init, configData.config);
-    }
     setValues(init);
   }, [plugin, configData]);
 
@@ -420,7 +468,13 @@ function PluginConfigModal({
   function handleSave() {
     // 必填校验
     const missing = (plugin?.config_schema || [])
-      .filter((f) => f.required && !values[f.key])
+      .filter((f) => {
+        if (!f.required) return false;
+        if (f.widget === 'multi_select' && f.data_source === 'groups') {
+          return parsePluginGroupIDs(values[f.key]).length === 0;
+        }
+        return !values[f.key];
+      })
       .map((f) => f.label || f.key);
     if (missing.length > 0) {
       toast('error', `以下字段必填: ${missing.join(', ')}`);
@@ -461,8 +515,56 @@ function PluginConfigModal({
               field.type === 'int' || field.type === 'float' ? 'number' :
               'text';
 
-            // bool 渲染为复选框
-            if (field.type === 'bool') {
+            if (field.widget === 'multi_select' && field.data_source === 'groups') {
+              const availableGroups = filterPluginGroups(field, groups);
+              const selectedIDs = parsePluginGroupIDs(values[field.key]);
+              return (
+                <fieldset key={field.key}>
+                  <legend className="text-sm font-medium text-text">
+                    {field.label || field.key}
+                    {field.required && <span className="text-danger ml-1">*</span>}
+                  </legend>
+                  {field.description && (
+                    <p className="mt-1 text-xs text-text-tertiary">{field.description}</p>
+                  )}
+                  <div className="mt-2 max-h-52 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                    {groupsLoading ? (
+                      <div className="flex justify-center py-4"><Spinner size="sm" /></div>
+                    ) : availableGroups.length === 0 ? (
+                      <p className="py-3 text-center text-xs text-text-tertiary">暂无可选分组</p>
+                    ) : availableGroups.map((group) => {
+                      const selected = selectedIDs.includes(group.id);
+                      return (
+                        <Checkbox
+                          key={group.id}
+                          isSelected={selected}
+                          onChange={(nextSelected) => {
+                            setValues((current) => {
+                              const currentIDs = parsePluginGroupIDs(current[field.key]);
+                              const nextIDs = nextSelected
+                                ? Array.from(new Set([...currentIDs, group.id])).sort((a, b) => a - b)
+                                : currentIDs.filter((id) => id !== group.id);
+                              return { ...current, [field.key]: JSON.stringify(nextIDs) };
+                            });
+                          }}
+                        >
+                          <Checkbox.Control>
+                            <Checkbox.Indicator />
+                          </Checkbox.Control>
+                          <Checkbox.Content>
+                            <span>{group.name}</span>
+                            <span className="ml-2 text-xs text-text-tertiary">{group.platform}</span>
+                          </Checkbox.Content>
+                        </Checkbox>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              );
+            }
+
+            // bool / switch 渲染为复选框
+            if (field.type === 'bool' || field.widget === 'switch') {
               const checked = values[field.key] === 'true';
               return (
                 <div key={field.key}>

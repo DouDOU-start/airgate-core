@@ -24,6 +24,7 @@ import (
 // TestMain 在所有并行测试启动前调一次 gin.SetMode，避免 SetMode 内部变量
 // 被多个 t.Parallel() goroutine 同时写导致 -race 告警。
 func TestMain(m *testing.M) {
+	serveRelayHookV2ProbeProcessIfRequested()
 	gin.SetMode(gin.TestMode)
 	os.Exit(m.Run())
 }

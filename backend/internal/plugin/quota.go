@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/DouDOU-start/airgate-core/ent"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	sdk "github.com/DouDOU-start/airgate-sdk/sdkgo"
 )
@@ -96,16 +97,32 @@ func (f *Forwarder) acquireClientQuota(c *gin.Context, state *forwardState) func
 func (f *Forwarder) pickAccount(c *gin.Context, state *forwardState, excludeIDs ...int) error {
 	var lastErr error
 	for _, model := range state.schedulingModelCandidates() {
-		account, err := f.scheduler.SelectAccountWithRequirements(
-			c.Request.Context(),
-			state.requestedPlatform,
-			model,
-			state.keyInfo.UserID,
-			state.keyInfo.GroupID,
-			state.sessionID,
-			state.accountReq,
-			excludeIDs...,
+		var (
+			account *ent.Account
+			err     error
 		)
+		if model == "" && state.websocket {
+			account, err = f.scheduler.SelectAccountWithRequirementsAnyModel(
+				c.Request.Context(),
+				state.requestedPlatform,
+				state.keyInfo.UserID,
+				state.keyInfo.GroupID,
+				state.sessionID,
+				state.accountReq,
+				excludeIDs...,
+			)
+		} else {
+			account, err = f.scheduler.SelectAccountWithRequirements(
+				c.Request.Context(),
+				state.requestedPlatform,
+				model,
+				state.keyInfo.UserID,
+				state.keyInfo.GroupID,
+				state.sessionID,
+				state.accountReq,
+				excludeIDs...,
+			)
+		}
 		if err == nil {
 			state.account = account
 			state.schedulingModel = model

@@ -26,6 +26,7 @@ type forwardState struct {
 	schedulingModel  string
 	stream           bool
 	realtime         bool
+	websocket        bool
 	sessionID        string
 
 	// 推理强度档位快照。

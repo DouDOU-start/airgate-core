@@ -34,16 +34,35 @@ func toPluginResp(item apppluginadmin.PluginMeta) dto.PluginResp {
 			Audience:    page.Audience,
 		})
 	}
-	for _, field := range item.ConfigSchema {
-		resp.ConfigSchema = append(resp.ConfigSchema, dto.ConfigFieldResp{
-			Key:         field.Key,
-			Label:       field.Label,
-			Type:        field.Type,
-			Required:    field.Required,
-			Default:     field.Default,
-			Description: field.Description,
-			Placeholder: field.Placeholder,
-		})
+	if item.RichConfigSchema != nil {
+		resp.ConfigSchemaVersion = item.RichConfigSchema.Version
+		for _, field := range item.RichConfigSchema.Fields {
+			resp.ConfigSchema = append(resp.ConfigSchema, dto.ConfigFieldResp{
+				Key:         field.Key,
+				FallbackKey: field.FallbackKey,
+				Label:       field.Label,
+				Type:        field.Type,
+				Widget:      field.Widget,
+				DataSource:  field.DataSource,
+				Required:    field.Required,
+				Default:     field.Default,
+				Description: field.Description,
+				Placeholder: field.Placeholder,
+				Filter:      field.Filter,
+			})
+		}
+	} else {
+		for _, field := range item.ConfigSchema {
+			resp.ConfigSchema = append(resp.ConfigSchema, dto.ConfigFieldResp{
+				Key:         field.Key,
+				Label:       field.Label,
+				Type:        field.Type,
+				Required:    field.Required,
+				Default:     field.Default,
+				Description: field.Description,
+				Placeholder: field.Placeholder,
+			})
+		}
 	}
 	return resp
 }

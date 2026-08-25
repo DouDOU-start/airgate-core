@@ -487,6 +487,9 @@ func buildHeaders(source http.Header, keyInfo *auth.APIKeyInfo) http.Header {
 		}
 		headers[k] = v
 	}
+	if keyInfo == nil {
+		return headers
+	}
 	if keyInfo.UserID > 0 {
 		headers.Set("X-Airgate-User-ID", strconv.Itoa(keyInfo.UserID))
 	}

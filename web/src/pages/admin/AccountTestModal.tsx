@@ -9,6 +9,7 @@ import { CommonModal } from '../../shared/components/CommonModal';
 import type { AccountResp, ModelInfo } from '../../shared/types';
 
 type TestStatus = 'idle' | 'connecting' | 'streaming' | 'success' | 'error';
+type TestMode = 'normal' | 'overage';
 
 interface OutputLine {
   text: string;
@@ -26,6 +27,7 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
 
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
+  const [selectedMode, setSelectedMode] = useState<TestMode>('normal');
   const [loadingModels, setLoadingModels] = useState(false);
 
   const [status, setStatus] = useState<TestStatus>('idle');
@@ -37,6 +39,12 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
   const terminalRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const streamingRef = useRef('');
+  const supportsOverageMode = account?.type?.toLowerCase() === 'oauth'
+    && ['openai', 'codex'].includes(account.platform.toLowerCase());
+
+  useEffect(() => {
+    if (!supportsOverageMode) setSelectedMode('normal');
+  }, [supportsOverageMode]);
 
   // 加载模型列表
   useEffect(() => {
@@ -66,6 +74,7 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
       setStreamingContent('');
       setErrorMessage('');
       setSelectedModel('');
+      setSelectedMode('normal');
       setModels([]);
       setCopied(false);
     }
@@ -111,7 +120,7 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
       const res = await fetch(url.toString(), {
         method: 'POST',
         headers,
-        body: JSON.stringify({ model_id: selectedModel }),
+        body: JSON.stringify({ model_id: selectedModel, mode: selectedMode }),
         signal: controller.signal,
       });
 
@@ -199,6 +208,11 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
               if (data.type === 'test_start') {
                 addLine(t('accounts.test_connected'), 'text-green-400');
                 addLine(t('accounts.test_model_used', { model: data.model }), 'text-cyan-400');
+                addLine(t('accounts.test_mode_used', {
+                  mode: t(data.mode === 'overage'
+                    ? 'accounts.test_mode_overage'
+                    : 'accounts.test_mode_normal'),
+                }), 'text-cyan-400');
                 addLine(t('accounts.test_sending'), 'text-gray-400');
                 addLine(t('accounts.test_response'), 'text-yellow-400');
                 setStatus('streaming');
@@ -276,7 +290,7 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
       setErrorMessage(msg);
       addLine(msg, 'text-red-400');
     }
-  }, [account, selectedModel, addLine, scrollToBottom, t]);
+  }, [account, selectedMode, selectedModel, addLine, scrollToBottom, t]);
 
   const handleClose = () => {
     abortRef.current?.abort();
@@ -304,6 +318,11 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
     ? [{ id: '', label: t('common.loading') }]
     : models.map((m) => ({ id: m.id, label: m.name || m.id }));
   const selectedModelLabel = modelOptions.find((item) => item.id === selectedModel)?.label ?? '';
+  const modeOptions = [
+    { id: 'normal', label: t('accounts.test_mode_normal') },
+    { id: 'overage', label: t('accounts.test_mode_overage') },
+  ];
+  const selectedModeLabel = modeOptions.find((item) => item.id === selectedMode)?.label ?? '';
   const isRunning = status === 'connecting' || status === 'streaming';
 
   return (
@@ -372,6 +391,39 @@ export function AccountTestModal({ open, account, onClose }: AccountTestModalPro
                     </ListBox>
                   </Select.Popover>
                 </Select>
+
+                {supportsOverageMode && (
+                  <div className="space-y-1.5">
+                    <Select
+                      fullWidth
+                      selectedKey={selectedMode}
+                      onSelectionChange={(key) => setSelectedMode(
+                        key === 'overage' ? 'overage' : 'normal',
+                      )}
+                      isDisabled={isRunning}
+                    >
+                      <Label>{t('accounts.select_test_mode')}</Label>
+                      <Select.Trigger>
+                        <Select.Value>{selectedModeLabel}</Select.Value>
+                        <Select.Indicator />
+                      </Select.Trigger>
+                      <Select.Popover>
+                        <ListBox items={modeOptions}>
+                          {(item) => (
+                            <ListBox.Item id={item.id} textValue={item.label}>
+                              {item.label}
+                            </ListBox.Item>
+                          )}
+                        </ListBox>
+                      </Select.Popover>
+                    </Select>
+                    {selectedMode === 'overage' && (
+                      <p className="text-xs text-[var(--ag-text-muted)]">
+                        {t('accounts.test_mode_overage_hint')}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* 终端输出区域 */}
                 <div className="relative group">

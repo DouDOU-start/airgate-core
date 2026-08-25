@@ -690,6 +690,20 @@ export interface TestProxyResp {
 
 // ==================== Plugin ====================
 
+export interface PluginConfigField {
+  key: string;
+  fallback_key?: string;
+  label?: string;
+  type: string;
+  widget?: string;
+  data_source?: string;
+  required?: boolean;
+  default?: unknown;
+  description?: string;
+  placeholder?: string;
+  filter?: Record<string, string>;
+}
+
 export interface PluginResp {
   name: string;
   display_name?: string;
@@ -710,15 +724,8 @@ export interface PluginResp {
     /** "admin" | "user" | "all"，空字符串视为 "admin"（向后兼容） */
     audience?: string;
   }>;
-  config_schema?: Array<{
-    key: string;
-    label?: string;
-    type: string;
-    required?: boolean;
-    default?: string;
-    description?: string;
-    placeholder?: string;
-  }>;
+  config_schema_version?: string;
+  config_schema?: PluginConfigField[];
   metadata?: Record<string, string>;
   instruction_presets?: string[];
   has_web_assets?: boolean;

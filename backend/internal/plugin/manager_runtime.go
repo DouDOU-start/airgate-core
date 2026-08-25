@@ -174,9 +174,12 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 			continue
 		}
 		name := entry.Name()
-		binaryPath := filepath.Join(m.pluginDir, name, name)
-		info, err := os.Stat(binaryPath)
-		if err != nil || info.IsDir() {
+		binaryPath, err := runnablePluginExecutablePath(filepath.Join(m.pluginDir, name), name)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			slog.Error("plugin_binary_prepare_failed", sdk.LogFieldPluginID, name, sdk.LogFieldError, err)
 			continue
 		}
 
@@ -257,7 +260,7 @@ func (m *Manager) IsDev(name string) bool {
 	return ok
 }
 
-func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *exec.Cmd, binaryDir string) (string, error) {
+func (m *Manager) startSDKPlugin(ctx context.Context, requestedName string, cmd *exec.Cmd, binaryDir string) (string, error) {
 	// 在 spawn 之前先用 requestedName 占位创建 host handle。
 	// canonical name 可能在 Info() 之后才确定；spawn 完成后会用 canonicalName 重新注册 handle。
 	hostHandle := m.prepareHostHandle(requestedName)
@@ -267,7 +270,7 @@ func (m *Manager) startPlugin(ctx context.Context, requestedName string, cmd *ex
 	if err != nil {
 		client.Kill()
 		m.removeHostHandle(requestedName)
-		return "", fmt.Errorf("连接插件进程失败: %w", err)
+		return "", fmt.Errorf("%w: 连接插件进程失败: %v", errSDKPluginHandshake, err)
 	}
 
 	raw, err := rpcClient.Dispense(sdkgrpc.PluginKeyGateway)
@@ -679,6 +682,14 @@ func (m *Manager) stopPlugin(name string) {
 			slog.Warn("plugin_stop_failed",
 				sdk.LogFieldPluginID, inst.Name, "kind", "middleware", sdk.LogFieldError, err)
 		}
+	}
+	if inst.RelayHookV2 != nil {
+		stopCtx, cancel := context.WithTimeout(context.Background(), relayHookV2StopTimeout)
+		if err := inst.RelayHookV2.stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Warn("plugin_stop_failed",
+				sdk.LogFieldPluginID, inst.Name, "kind", "relay_hook_v2", sdk.LogFieldError, err)
+		}
+		cancel()
 	}
 	if inst.Client != nil {
 		inst.Client.Kill()

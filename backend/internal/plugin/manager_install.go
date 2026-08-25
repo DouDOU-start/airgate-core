@@ -59,7 +59,7 @@ func (m *Manager) InstallFromBinary(ctx context.Context, name string, binary []b
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return fmt.Errorf("创建插件目录失败: %w", err)
 	}
-	binaryPath := filepath.Join(targetDir, realName)
+	binaryPath := filepath.Join(targetDir, pluginExecutableName(realName))
 	if err := os.WriteFile(binaryPath, binary, 0755); err != nil {
 		return fmt.Errorf("写入插件二进制失败: %w", err)
 	}
@@ -73,7 +73,7 @@ func (m *Manager) InstallFromBinary(ctx context.Context, name string, binary []b
 	return nil
 }
 
-func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, error) {
+func (m *Manager) probeSDKPluginName(fallbackName string, binary []byte) (string, error) {
 	tmpDir, err := os.MkdirTemp("", "airgate-probe-*")
 	if err != nil {
 		return "", fmt.Errorf("创建临时目录失败: %w", err)
@@ -84,7 +84,7 @@ func (m *Manager) probePluginName(fallbackName string, binary []byte) (string, e
 		}
 	}()
 
-	tmpBinary := filepath.Join(tmpDir, fallbackName)
+	tmpBinary := filepath.Join(tmpDir, pluginExecutableName(fallbackName))
 	if err := os.WriteFile(tmpBinary, binary, 0755); err != nil {
 		return "", fmt.Errorf("写入临时二进制失败: %w", err)
 	}

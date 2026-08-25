@@ -2,30 +2,35 @@ package dto
 
 // PluginResp 插件响应
 type PluginResp struct {
-	Name               string             `json:"name"`
-	DisplayName        string             `json:"display_name,omitempty"`
-	Version            string             `json:"version,omitempty"`
-	Author             string             `json:"author,omitempty"`
-	Type               string             `json:"type,omitempty"`
-	Platform           string             `json:"platform"`
-	AccountTypes       []AccountTypeResp  `json:"account_types,omitempty"`
-	FrontendPages      []FrontendPageResp `json:"frontend_pages,omitempty"`
-	InstructionPresets []string           `json:"instruction_presets,omitempty"`
-	ConfigSchema       []ConfigFieldResp  `json:"config_schema,omitempty"`
-	Metadata           map[string]string  `json:"metadata,omitempty"`
-	HasWebAssets       bool               `json:"has_web_assets"`
-	IsDev              bool               `json:"is_dev"`
+	Name                string             `json:"name"`
+	DisplayName         string             `json:"display_name,omitempty"`
+	Version             string             `json:"version,omitempty"`
+	Author              string             `json:"author,omitempty"`
+	Type                string             `json:"type,omitempty"`
+	Platform            string             `json:"platform"`
+	AccountTypes        []AccountTypeResp  `json:"account_types,omitempty"`
+	FrontendPages       []FrontendPageResp `json:"frontend_pages,omitempty"`
+	InstructionPresets  []string           `json:"instruction_presets,omitempty"`
+	ConfigSchemaVersion string             `json:"config_schema_version,omitempty"`
+	ConfigSchema        []ConfigFieldResp  `json:"config_schema,omitempty"`
+	Metadata            map[string]string  `json:"metadata,omitempty"`
+	HasWebAssets        bool               `json:"has_web_assets"`
+	IsDev               bool               `json:"is_dev"`
 }
 
 // ConfigFieldResp 插件配置字段声明
 type ConfigFieldResp struct {
-	Key         string `json:"key"`
-	Label       string `json:"label,omitempty"`
-	Type        string `json:"type"`
-	Required    bool   `json:"required,omitempty"`
-	Default     string `json:"default,omitempty"`
-	Description string `json:"description,omitempty"`
-	Placeholder string `json:"placeholder,omitempty"`
+	Key         string            `json:"key"`
+	FallbackKey string            `json:"fallback_key,omitempty"`
+	Label       string            `json:"label,omitempty"`
+	Type        string            `json:"type"`
+	Widget      string            `json:"widget,omitempty"`
+	DataSource  string            `json:"data_source,omitempty"`
+	Required    bool              `json:"required,omitempty"`
+	Default     any               `json:"default,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Placeholder string            `json:"placeholder,omitempty"`
+	Filter      map[string]string `json:"filter,omitempty"`
 }
 
 // PluginConfigResp 插件持久化配置

@@ -9,6 +9,12 @@ var (
 	ErrPluginNotFound = errors.New("未找到对应平台插件")
 	// ErrModelRequired 缺少测试模型。
 	ErrModelRequired = errors.New("请指定测试模型")
+	// ErrInvalidConnectivityTestMode 账号测试模式不受支持。
+	ErrInvalidConnectivityTestMode = errors.New("不支持的账号测试模式")
+	// ErrConnectivityTestTransformUnavailable 显式增强测试无法获得有效请求体。
+	ErrConnectivityTestTransformUnavailable = errors.New("超额模式测试增强不可用")
+	// ErrConnectivityTestModeAccountTypeUnsupported 当前账号类型不支持所选测试模式。
+	ErrConnectivityTestModeAccountTypeUnsupported = errors.New("超额模式仅支持 OAuth 账号")
 	// ErrQuotaRefreshUnsupported 当前平台不支持额度刷新。
 	ErrQuotaRefreshUnsupported = errors.New("该平台不支持刷新额度")
 	// ErrInvalidDateRange 日期范围参数非法。

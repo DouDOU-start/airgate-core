@@ -33,6 +33,12 @@ type PluginCatalog interface {
 	GetAllPluginMeta() []plugin.PluginMeta
 }
 
+// AccountTestTransformer 是插件目录可选提供的管理员账号测试请求变换能力。
+// 普通测试不依赖它；只有显式 mode=overage 时才会调用。
+type AccountTestTransformer interface {
+	TransformAccountTest(ctx context.Context, mode, platform, endpoint, model string, body []byte) ([]byte, error)
+}
+
 // ConcurrencyReader 并发读接口。
 type ConcurrencyReader interface {
 	GetCurrentCounts(context.Context, []int) map[int]int
@@ -432,14 +438,21 @@ func (s *Service) ToggleScheduling(ctx context.Context, id int) (ToggleResult, e
 }
 
 // PrepareConnectivityTest 准备账号连通性测试。
-func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID string) (*ConnectivityTest, error) {
+func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID, mode string) (*ConnectivityTest, error) {
 	logger := sdk.LoggerFromContext(ctx)
+	mode, err := normalizeConnectivityTestMode(mode)
+	if err != nil {
+		return nil, err
+	}
 	item, err := s.repo.FindByID(ctx, id, LoadOptions{WithProxy: true})
 	if err != nil {
 		logger.Error("account_lookup_failed",
 			sdk.LogFieldAccountID, id,
 			sdk.LogFieldError, err)
 		return nil, err
+	}
+	if mode == "overage" && !strings.EqualFold(strings.TrimSpace(item.Type), "oauth") {
+		return nil, ErrConnectivityTestModeAccountTypeUnsupported
 	}
 
 	inst := s.plugins.GetPluginByPlatform(item.Platform)
@@ -461,11 +474,35 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 		return nil, ErrModelRequired
 	}
 
-	testBody, _ := json.Marshal(map[string]any{
-		"model":    modelID,
-		"messages": []map[string]string{{"role": "user", "content": "hi"}},
-		"stream":   true,
-	})
+	var testBody []byte
+	headers := http.Header{
+		"Content-Type":       {"application/json"},
+		"X-Airgate-Internal": {"test"},
+	}
+	if mode == "overage" {
+		testBody, _ = json.Marshal(map[string]any{
+			"model":  modelID,
+			"input":  "hi",
+			"stream": true,
+		})
+		transformer, ok := s.plugins.(AccountTestTransformer)
+		if !ok {
+			return nil, ErrConnectivityTestTransformUnavailable
+		}
+		transformed, transformErr := transformer.TransformAccountTest(ctx, mode, item.Platform, "responses", modelID, testBody)
+		if transformErr != nil {
+			return nil, fmt.Errorf("%w: %v", ErrConnectivityTestTransformUnavailable, transformErr)
+		}
+		testBody = transformed
+		headers.Set("X-Forwarded-Path", "/v1/responses")
+		headers.Set("X-Forwarded-Method", http.MethodPost)
+	} else {
+		testBody, _ = json.Marshal(map[string]any{
+			"model":    modelID,
+			"messages": []map[string]string{{"role": "user", "content": "hi"}},
+			"stream":   true,
+		})
+	}
 
 	// X-Airgate-Internal 让下游网关（如 gateway-claude 的 claude_code_only 开关）
 	// 能识别这是管理后台自家的探测流量，跳过面向外部客户端的身份闸。
@@ -478,19 +515,17 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			Credentials: cloneStringMap(item.Credentials),
 			ProxyURL:    buildProxyURL(item.Proxy),
 		},
-		Body: testBody,
-		Headers: http.Header{
-			"Content-Type":       {"application/json"},
-			"X-Airgate-Internal": {"test"},
-		},
-		Model:  modelID,
-		Stream: true,
+		Body:    testBody,
+		Headers: headers,
+		Model:   modelID,
+		Stream:  true,
 	}
 
 	return &ConnectivityTest{
 		AccountName: item.Name,
 		AccountType: item.Type,
 		ModelID:     modelID,
+		Mode:        mode,
 		run: func(runCtx context.Context, writer http.ResponseWriter) error {
 			req := *forwardReq
 			req.Writer = writer
@@ -513,6 +548,17 @@ func (s *Service) PrepareConnectivityTest(ctx context.Context, id int, modelID s
 			return errors.New(msg)
 		},
 	}, nil
+}
+
+func normalizeConnectivityTestMode(mode string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", "normal":
+		return "normal", nil
+	case "overage":
+		return "overage", nil
+	default:
+		return "", ErrInvalidConnectivityTestMode
+	}
 }
 
 func connectivityTestErrorMessage(outcome sdk.ForwardOutcome) string {

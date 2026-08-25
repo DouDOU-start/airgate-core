@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -37,11 +38,11 @@ func (dr *DynamicRouter) Handle(c *gin.Context) {
 	if path == "" {
 		path = c.Request.URL.Path
 	}
-	key := c.Request.Method + " " + path
+	isWebSocket := isWebSocketUpgrade(c.Request)
 
 	dr.mu.RLock()
 	hasRoutes := len(dr.routes) > 0
-	matched := !hasRoutes || dr.routes[key]
+	matched := dynamicRouteMatches(dr.routes, c.Request.Method, path, isWebSocket)
 	dr.mu.RUnlock()
 
 	if hasRoutes && !matched {
@@ -49,7 +50,38 @@ func (dr *DynamicRouter) Handle(c *gin.Context) {
 		return
 	}
 
+	if isWebSocket {
+		dr.forwarder.ForwardWebSocket(c)
+		return
+	}
 	dr.forwarder.Forward(c)
+}
+
+func dynamicRouteMatches(routes map[string]bool, method, path string, isWebSocket bool) bool {
+	if len(routes) == 0 {
+		return true
+	}
+	if isWebSocket {
+		// Plugins declare WebSocket endpoints with the synthetic method "WS",
+		// while the wire-level handshake is an HTTP GET.
+		return routes["WS "+path] || routes[method+" "+path]
+	}
+	return routes[method+" "+path]
+}
+
+func isWebSocketUpgrade(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	if !strings.EqualFold(strings.TrimSpace(r.Header.Get("Upgrade")), "websocket") {
+		return false
+	}
+	for _, token := range strings.Split(r.Header.Get("Connection"), ",") {
+		if strings.EqualFold(strings.TrimSpace(token), "upgrade") {
+			return true
+		}
+	}
+	return false
 }
 
 // AddRoutes 注册插件路由

@@ -28,7 +28,22 @@ func (s *Scheduler) SelectAccount(ctx context.Context, platform, model string, u
 }
 
 func (s *Scheduler) SelectAccountWithRequirements(ctx context.Context, platform, model string, userID, groupID int, sessionID string, req AccountRequirements, excludeIDs ...int) (*ent.Account, error) {
-	candidates, err := s.routeAccounts(ctx, platform, model, groupID)
+	return s.selectAccountWithRequirements(ctx, platform, model, userID, groupID, sessionID, req, false, excludeIDs...)
+}
+
+// SelectAccountWithRequirementsAnyModel selects from all accounts in the
+// platform/group when the protocol has not exposed its model yet (for
+// example, a Responses WebSocket whose model is carried in the first frame).
+// It intentionally bypasses only the group's model-routing map; normal state,
+// capability, session and load checks remain unchanged.  HTTP callers should
+// continue to use SelectAccountWithRequirements so an explicit model remains
+// subject to model routing.
+func (s *Scheduler) SelectAccountWithRequirementsAnyModel(ctx context.Context, platform string, userID, groupID int, sessionID string, req AccountRequirements, excludeIDs ...int) (*ent.Account, error) {
+	return s.selectAccountWithRequirements(ctx, platform, "", userID, groupID, sessionID, req, true, excludeIDs...)
+}
+
+func (s *Scheduler) selectAccountWithRequirements(ctx context.Context, platform, model string, userID, groupID int, sessionID string, req AccountRequirements, anyModel bool, excludeIDs ...int) (*ent.Account, error) {
+	candidates, err := s.routeAccountsForSelection(ctx, platform, model, groupID, !anyModel)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +169,14 @@ func (s *Scheduler) maybeRegisterSession(ctx context.Context, selected *ent.Acco
 // 规则与账号列表一起缓存，按 model 过滤的动作每次都重新跑——避免"不同 model 复用同一条缓存"
 // 带来的错配。
 func (s *Scheduler) routeAccounts(ctx context.Context, platform, model string, groupID int) ([]*ent.Account, error) {
+	return s.routeAccountsForSelection(ctx, platform, model, groupID, true)
+}
+
+func (s *Scheduler) routeAccountsForSelection(ctx context.Context, platform, model string, groupID int, useModelRouting bool) ([]*ent.Account, error) {
 	if accounts, routing, ok := s.routeCache.Get(groupID, platform); ok {
+		if !useModelRouting {
+			return accounts, nil
+		}
 		return applyModelRouting(accounts, routing, model), nil
 	}
 
@@ -174,6 +196,9 @@ func (s *Scheduler) routeAccounts(ctx context.Context, platform, model string, g
 	// 缓存全量 platform 账号（包含所有 state）+ group 的 ModelRouting
 	s.routeCache.Set(groupID, platform, accounts, grp.ModelRouting)
 
+	if !useModelRouting {
+		return accounts, nil
+	}
 	return applyModelRouting(accounts, grp.ModelRouting, model), nil
 }
 

@@ -38,6 +38,7 @@ func (s *Service) List() []PluginMeta {
 			FrontendPages:      append([]sdk.FrontendPage(nil), item.FrontendPages...),
 			InstructionPresets: append([]string(nil), item.InstructionPresets...),
 			ConfigSchema:       append([]sdk.ConfigField(nil), item.ConfigSchema...),
+			RichConfigSchema:   item.RichConfigSchema.Clone(),
 			Metadata:           cloneStringMap(item.Metadata),
 			HasWebAssets:       item.HasWebAssets,
 			IsDev:              item.IsDev,

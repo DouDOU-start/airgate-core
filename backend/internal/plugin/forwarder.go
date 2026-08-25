@@ -128,6 +128,11 @@ func (f *Forwarder) Forward(c *gin.Context) {
 	}
 	defer releaseClientQuota()
 
+	// 旧版通用 Relay Hook 只允许在账号选择前改写 JSON 请求体。先通过客户端
+	// 并发闸门，避免已超配额请求触发候选枚举和外部进程调用；Hook 仍早于
+	// routes/pickAccount，且不会获得路由控制权。异常均 fail-open。
+	f.applyRelayHookV2(c, state)
+
 	requirements := routing.Requirements{
 		NeedsImage: requestNeedsImageCached(f.manager, state),
 	}

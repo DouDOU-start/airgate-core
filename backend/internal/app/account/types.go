@@ -310,6 +310,7 @@ type ConnectivityTest struct {
 	AccountName string
 	AccountType string
 	ModelID     string
+	Mode        string
 	run         func(context.Context, http.ResponseWriter) error
 }
 
