@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"strings"
@@ -37,6 +38,28 @@ func ResponsesEventHasContent(data []byte) bool {
 	default:
 		return false
 	}
+}
+
+// ResponsesPayloadHasContent 扫描 Responses SSE 帧或裸 JSON 事件，判断是否出现真实输出。
+// 原生 Codex 插件可能一次下发带 data: 前缀的 SSE 块，也可能下发裸 JSON。
+func ResponsesPayloadHasContent(payload []byte) bool {
+	trimmed := bytes.TrimSpace(payload)
+	if len(trimmed) > 0 && trimmed[0] == '{' && ResponsesEventHasContent(trimmed) {
+		return true
+	}
+	scanner := bufio.NewScanner(bytes.NewReader(payload))
+	scanner.Buffer(make([]byte, 0, 64*1024), 32<<20)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := bytes.TrimSpace([]byte(strings.TrimPrefix(line, "data:")))
+		if ResponsesEventHasContent(data) {
+			return true
+		}
+	}
+	return false
 }
 
 func rawJSONHasContent(raw json.RawMessage) bool {

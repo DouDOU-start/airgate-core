@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -16,11 +17,12 @@ import (
 )
 
 type fakeCodexManager struct {
-	req    protocol.CodexExecuteRequest
-	events []protocol.CodexExecuteEvent
-	err    error
-	called bool
-	mode   string
+	req        protocol.CodexExecuteRequest
+	events     []protocol.CodexExecuteEvent
+	err        error
+	called     bool
+	mode       string
+	eventDelay time.Duration
 }
 
 type concurrentCodexManager struct{}
@@ -43,7 +45,10 @@ func (f *fakeCodexManager) CodexTransportMode() string { return f.mode }
 func (f *fakeCodexManager) ExecuteCodex(_ context.Context, req protocol.CodexExecuteRequest, emit func(protocol.CodexExecuteEvent) error) error {
 	f.req = req
 	f.called = true
-	for _, event := range f.events {
+	for i, event := range f.events {
+		if i > 0 && f.eventDelay > 0 {
+			time.Sleep(f.eventDelay)
+		}
 		if err := emit(event); err != nil {
 			return err
 		}
@@ -390,6 +395,54 @@ func TestCodexPluginTransportTurnCostsRejectsOAuth(t *testing.T) {
 	})
 	if !errors.Is(result.BuildErr, ErrCodexPluginUnsupported) || mgr.called {
 		t.Fatalf("OAuth turn-cost request was not rejected: result=%+v called=%v", result, mgr.called)
+	}
+}
+
+func TestCodexPluginTransportRecordsResponsesFirstContent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	mgr := &fakeCodexManager{
+		eventDelay: 8 * time.Millisecond,
+		events: []protocol.CodexExecuteEvent{
+			{Type: protocol.CodexEventResponseHeaders, StatusCode: 200, Header: map[string][]string{"Content-Type": {"text/event-stream"}}},
+			{Type: protocol.CodexEventData, Data: []byte("data: {\"type\":\"response.created\",\"response\":{\"output\":[]}}\n\n")},
+			{Type: protocol.CodexEventData, Data: []byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"你好\"}\n\n")},
+			{Type: protocol.CodexEventCompleted},
+		},
+	}
+	startedAt := time.Now().Add(-120 * time.Millisecond)
+	result := NewCodexPluginTransport(mgr).Execute(context.Background(), Request{
+		Account: Account{Platform: "codex", Type: "oauth"}, EntryProtocol: "openai", Endpoint: "responses",
+		Stream: true, LegacyContext: c, RequestStartedAt: startedAt,
+	})
+	if result.BuildErr != nil || !result.Written {
+		t.Fatalf("stream failed: %+v", result)
+	}
+	if result.FirstTokenMs <= 0 {
+		t.Fatalf("native responses stream missing first-token ms: %+v", result)
+	}
+	if result.RequestFirstTokenMs < result.FirstTokenMs {
+		t.Fatalf("request first-token %d < attempt first-token %d", result.RequestFirstTokenMs, result.FirstTokenMs)
+	}
+}
+
+func TestCodexPluginTransportIgnoresResponsesLifecycleAsFirstContent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	mgr := &fakeCodexManager{events: []protocol.CodexExecuteEvent{
+		{Type: protocol.CodexEventResponseHeaders, StatusCode: 200, Header: map[string][]string{"Content-Type": {"text/event-stream"}}},
+		{Type: protocol.CodexEventData, Data: []byte("data: {\"type\":\"response.created\",\"response\":{\"output\":[]}}\n\n")},
+		{Type: protocol.CodexEventData, Data: []byte("data: {\"type\":\"response.in_progress\",\"response\":{\"output\":[]}}\n\n")},
+		{Type: protocol.CodexEventCompleted},
+	}}
+	result := NewCodexPluginTransport(mgr).Execute(context.Background(), Request{
+		Account: Account{Platform: "codex", Type: "oauth"}, EntryProtocol: "openai", Endpoint: "responses",
+		Stream: true, LegacyContext: c, RequestStartedAt: time.Now().Add(-50 * time.Millisecond),
+	})
+	if result.FirstTokenMs != 0 || result.RequestFirstTokenMs != 0 {
+		t.Fatalf("lifecycle events should not count as first content: %+v", result)
 	}
 }
 

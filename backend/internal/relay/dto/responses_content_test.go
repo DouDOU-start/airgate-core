@@ -28,3 +28,23 @@ func TestResponsesEventHasContent(t *testing.T) {
 		})
 	}
 }
+
+func TestResponsesPayloadHasContent(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload string
+		want    bool
+	}{
+		{name: "SSE文本增量", payload: "data: {\"type\":\"response.output_text.delta\",\"delta\":\"你好\"}\n\n", want: true},
+		{name: "裸JSON增量", payload: "{\"type\":\"response.output_text.delta\",\"delta\":\"你好\"}", want: true},
+		{name: "SSE生命周期", payload: "data: {\"type\":\"response.created\",\"response\":{\"output\":[]}}\n\n", want: false},
+		{name: "空负载", payload: "", want: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := ResponsesPayloadHasContent([]byte(test.payload)); got != test.want {
+				t.Fatalf("ResponsesPayloadHasContent() = %v，期望 %v", got, test.want)
+			}
+		})
+	}
+}

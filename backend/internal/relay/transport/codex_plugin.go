@@ -321,6 +321,7 @@ func (t *CodexPluginTransport) Execute(ctx context.Context, req Request) Result 
 	}
 	var result Result
 	var started bool
+	attemptStarted := time.Now()
 	// A third-party Codex manager may deliver events concurrently. Serialize
 	// the callback so result state, audit bookkeeping, image usage observation,
 	// and the downstream streaming writer remain race-free and wire-ordered.
@@ -421,6 +422,7 @@ func (t *CodexPluginTransport) Execute(ctx context.Context, req Request) Result 
 				}
 				result.Written = true
 				started = true
+				markCodexFirstContent(&result, req, event.Data, attemptStarted)
 			} else {
 				result.Body = append(result.Body, event.Data...)
 			}
@@ -1098,4 +1100,29 @@ func isAuditHopByHopHeader(lower string) bool {
 		}
 	}
 	return false
+}
+
+// markCodexFirstContent 按 CPA 同一口径记录内容首字：Responses 跳过 created 等生命周期事件，
+// 只在真实增量/终态输出出现时落 FirstTokenMs。原生插件路径此前只写出流、不记首字，
+// 用量里会显示为空。
+func markCodexFirstContent(result *Result, req Request, data []byte, attemptStarted time.Time) {
+	if result == nil || result.FirstTokenMs > 0 || !codexPayloadHasFirstContent(req.Endpoint, data) {
+		return
+	}
+	now := time.Now()
+	if !attemptStarted.IsZero() {
+		result.FirstTokenMs = now.Sub(attemptStarted).Milliseconds()
+	}
+	if !req.RequestStartedAt.IsZero() && now.After(req.RequestStartedAt) {
+		result.RequestFirstTokenMs = now.Sub(req.RequestStartedAt).Milliseconds()
+	}
+}
+
+func codexPayloadHasFirstContent(endpoint string, data []byte) bool {
+	switch strings.ToLower(strings.TrimSpace(endpoint)) {
+	case protocol.CodexEndpointResponses:
+		return dto.ResponsesPayloadHasContent(data)
+	default:
+		return len(bytes.TrimSpace(data)) > 0
+	}
 }

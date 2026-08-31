@@ -1285,19 +1285,7 @@ func (o *cpaImageStreamObserver) Done() bool {
 // 生命周期事件可能含空 output/content 字段，不能据此记录首字；除增量事件外，
 // 部分上游只在 done/终态事件中给出最终正文或工具调用，也必须识别。
 func responsesPayloadHasContent(payload []byte) bool {
-	scanner := bufio.NewScanner(bytes.NewReader(payload))
-	scanner.Buffer(make([]byte, 0, 64*1024), 32<<20)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "data:") {
-			continue
-		}
-		data := bytes.TrimSpace([]byte(strings.TrimPrefix(line, "data:")))
-		if dto.ResponsesEventHasContent(data) {
-			return true
-		}
-	}
-	return false
+	return dto.ResponsesPayloadHasContent(payload)
 }
 
 // anthropicPayloadHasContentDelta 判断 Anthropic Messages SSE 是否出现真实内容增量。
