@@ -653,6 +653,27 @@ func TestCodexPluginTransportPreservesCachedHTTPErrorBody(t *testing.T) {
 	}
 }
 
+func TestCodexPluginTransportRewritesCapacityErrorTo429(t *testing.T) {
+	body := []byte(`{"error":{"message":"Selected model is at capacity. Please try a different model."}}`)
+	mgr := &fakeCodexManager{events: []protocol.CodexExecuteEvent{
+		{Type: protocol.CodexEventResponseHeaders, StatusCode: http.StatusBadRequest},
+		{Type: protocol.CodexEventData, Data: body},
+		{Type: protocol.CodexEventError, Error: &protocol.CodexExecutorError{Code: "upstream_http_error", UpstreamStatus: http.StatusBadRequest}},
+	}}
+	result := NewCodexPluginTransport(mgr).Execute(context.Background(), Request{
+		Account: Account{Platform: "codex", Type: "oauth"}, EntryProtocol: "openai", Endpoint: "responses", Stream: true,
+	})
+	if result.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("capacity error status = %d, want 429: %+v", result.StatusCode, result)
+	}
+	if string(result.Body) != string(body) {
+		t.Fatalf("capacity error body rewritten: %s", result.Body)
+	}
+	if result.Written {
+		t.Fatal("buffered 400 capacity error was committed downstream")
+	}
+}
+
 func TestCodexPluginTransportNonStream(t *testing.T) {
 	mgr := &fakeCodexManager{events: []protocol.CodexExecuteEvent{
 		{Type: protocol.CodexEventResponseHeaders, StatusCode: 200, Header: map[string][]string{"Content-Type": {"application/json"}}},

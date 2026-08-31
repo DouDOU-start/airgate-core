@@ -542,6 +542,7 @@ func (t *CodexPluginTransport) Execute(ctx context.Context, req Request) Result 
 		attempt.FinishUpstreamAttempt(UpstreamAuditResult{NetworkError: true, ErrorCode: "native_executor_terminated"})
 	}
 	eventMu.Unlock()
+	rewriteCodexRetryableStatus(&result)
 	return result
 }
 
