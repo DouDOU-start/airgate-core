@@ -43,7 +43,7 @@ description: airgate-core（standalone-gateway 分支）开发指南：架构、
         → outcome 判定 }
     rate_limited 账号恢复：原子单飞探测；单请求至多一次；完整 2xx 才恢复 active；
     失败按 30s→1m→2m→4m→8m→15m 指数冷却，并拒绝插件旧 allow，保留 Core fallback
-  → pricing → billing → usage_log（channel_key_id 或 account_id）
+  → pricing → billing → usage_log（channel_key_id 或 account_id；无计量 / 中断且无 token 不落库，只 WARN + 失败留痕）
 
 异步任务分树（internal/relay/task，与 pipeline 并列的独立子系统）：
       openai_video → POST /v1/videos、GET /v1/videos/{id}、GET /v1/videos/{id}/content（openai_video 渠道）
@@ -70,7 +70,7 @@ description: airgate-core（standalone-gateway 分支）开发指南：架构、
 - `internal/moderation` — 风控中心判定核心（与 billing/errlog 同级顶层包）：输入抽取（gjson 按协议抽最后一条 user 消息）、关键词 Aho-Corasick、外部审核 API 客户端（多 key round-robin + 按状态分级冻结熔断）、observe 异步 worker 池、命中哈希 Redis 缓存、滑窗计数自动封禁（管理员豁免）与邮件通知副作用、日志双保留期 TTL 清理。**不 import ent**——落库/封禁/配置经窄接口（LogStore/UserBanner/ConfigSource/Notifier）注入；配置存 settings 表 `risk_control` 组（总开关 `risk_control_enabled` + 单 JSON `content_moderation_config`，审核 key AES-256-GCM 密文，加解密在 `app/riskcontrol`）；挂点：pipeline `forwardOpt` 并发闸门前 + task `handleSubmit` 提交前，拦截按入口协议 errfmt 渲染、errlog phase=`precheck_moderation`；引擎 fail-open（任何内部故障放行）。管理面 `/admin/risk-control/*`（app/riskcontrol + riskcontrol_handler 三件套）。注意：转发鉴权校验 `user.status`（禁用用户 sk- key 5s 缓存内失效）；管理员不可被禁用（手动与自动封禁双防线）。
 - `internal/probe` — 渠道密钥主动健康探针 / 余额同步；状态变化经 `probe.Notifier` 外推。当前实现：`bootstrap.channelBarkNotifier` + `infra/bark`（settings 组 `bark`，单 device key，10 分钟去重）。**恢复语义**：探测集含 `disabled_auto` 的 key/凭证（自动禁用正是探针要救回的对象；`disabled_manual` 不探不恢复）；探针连续成功经状态机 `ActionRecover` → `MarkRecovered` 自动回 enabled；429 只进凭证冷却**不进健康失败计数**（防临时限流被升级成永久禁用）；401/403 的健康信号与自动禁用统一受 `channel_auto_ban_enabled` 总开关约束；管理端手动测试恢复会重置健康计数（`HealthResetter`）。
 - `internal/notify` — 管理员外推通知窄抽象（`Message` / `Channel` / `Multi`），供 Bark 等通道复用；后续扩 Telegram/Webhook 时优先挂这里，不必再绑具体业务。
-- `internal/billing` — 三管道计费（actual=total×billing_rate 扣余额；billed=total×sell_rate 累加 key 用量；渠道成本=total×account_rate_multiplier 快照列查询期现算、不落列）与异步记账；billing_rate 优先级链 user.group_rates > tier.rates（用户等级批量分层）> group.rate_multiplier > 1.0（rate.go，鉴权时经 APIKeyInfo 预装载）。
+- `internal/billing` — 三管道计费（actual=total×billing_rate 扣余额；billed=total×sell_rate 累加 key 用量；渠道成本=total×account_rate_multiplier 快照列查询期现算、不落列）与异步记账；billing_rate 优先级链 user.group_rates > tier.rates（用户等级批量分层）> group.rate_multiplier > 1.0（rate.go，鉴权时经 APIKeyInfo 预装载）。**无计量（usage_missing）与中断且无 token（stream_aborted_usage_missing）不落 usage_log**，避免 $0 行污染使用记录；有部分 token 的流中断仍落账。
 - `internal/scheduler` — 仅剩 ConcurrencyManager/RPMCounter（Redis 限流原语，渠道/用户/key 维度）。
 - `internal/pluginruntime` — 独立进程插件（go-plugin gRPC）。能力驱动：`relay_hook.v1` 在选路前整包替换 JSON 请求体（fail-open，不得改 model/stream），`account_test_transform.v1` 仅服务账号连接测试（fail-closed）。配置表单控件：`multi_select` / `single_select`（`data_source=groups` 或静态 `options`）/ `text` / `number` / `textarea` / `switch`。Codex 增强实现在仓外 `airgate-codex-overage`，插件 ID `airgate-codex-enhance`（超额 + instruction 注入）。
 

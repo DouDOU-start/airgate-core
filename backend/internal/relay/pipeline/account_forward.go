@@ -423,9 +423,6 @@ func (p *Pipeline) recordAccountUsage(
 	if p.sink == nil {
 		return
 	}
-	// 纯观测口径，异步执行不阻塞计费收尾。
-	go p.rpm.IncrementUserGroupRPM(context.Background(), keyInfo.UserID, keyInfo.GroupID)
-
 	var usage dto.Usage
 	if result.usage != nil {
 		usage = *result.usage
@@ -460,6 +457,12 @@ func (p *Pipeline) recordAccountUsage(
 	}
 	billingSnapshot := resolveUsageBilling(endpoint, price, usage)
 	usageStatus := usageStatusFor(result, usage, billingSnapshot.Calls)
+	if !persistableUsageStatus(usageStatus) {
+		return
+	}
+
+	// 纯观测口径，异步执行不阻塞计费收尾。
+	go p.rpm.IncrementUserGroupRPM(context.Background(), keyInfo.UserID, keyInfo.GroupID)
 
 	p.sink.Record(billing.UsageRecord{
 		UserID:                keyInfo.UserID,

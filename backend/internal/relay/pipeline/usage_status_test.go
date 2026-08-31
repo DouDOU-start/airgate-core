@@ -55,6 +55,21 @@ func TestUsageStatusFor(t *testing.T) {
 	}
 }
 
+func TestPersistableUsageStatus(t *testing.T) {
+	if !persistableUsageStatus(billing.UsageStatusCompleted) {
+		t.Fatal("completed 应落 usage_log")
+	}
+	if !persistableUsageStatus(billing.UsageStatusStreamAborted) {
+		t.Fatal("有计量的流中断应落 usage_log")
+	}
+	if persistableUsageStatus(billing.UsageStatusMissing) {
+		t.Fatal("计量缺失不应落 usage_log")
+	}
+	if persistableUsageStatus(billing.UsageStatusStreamAbortedUsageMissing) {
+		t.Fatal("中断且无计量不应落 usage_log")
+	}
+}
+
 func TestAccountUsageFirstToken优先请求级耗时(t *testing.T) {
 	if got := accountUsageFirstToken(attemptResult{firstTokenMs: 120, requestFirstTokenMs: 860}); got != 860 {
 		t.Fatalf("使用记录首字 = %d，期望请求级耗时 860", got)

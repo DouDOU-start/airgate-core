@@ -953,8 +953,8 @@ func TestResponsesWebSocketCompletedWithoutUsageRecordsMissingAndReleasesTurnSlo
 	}
 
 	records := sink.snapshot()
-	if len(records) != 1 || records[0].UsageStatus != billing.UsageStatusMissing {
-		t.Fatalf("usage records = %+v, want one usage_missing record", records)
+	if len(records) != 0 {
+		t.Fatalf("usage records = %+v, want none for usage_missing", records)
 	}
 	if got := p.concurrency.GetUserCurrentCounts(context.Background(), []int{22})[22]; got != 0 {
 		t.Fatalf("user in-flight slots = %d, want 0", got)
@@ -1131,8 +1131,8 @@ func TestResponsesWebSocketCleanEOFWithoutTerminalIsFailureAndReleasesTurn(t *te
 	case <-time.After(3 * time.Second):
 		t.Fatal("websocket transport did not finish")
 	}
-	if records := sink.snapshot(); len(records) != 1 || records[0].UsageStatus != billing.UsageStatusStreamAbortedUsageMissing {
-		t.Fatalf("clean EOF usage records = %+v, want one stream_aborted_usage_missing record", records)
+	if records := sink.snapshot(); len(records) != 0 {
+		t.Fatalf("clean EOF usage records = %+v, want none", records)
 	}
 	if got := p.concurrency.GetUserCurrentCounts(context.Background(), []int{22})[22]; got != 0 {
 		t.Fatalf("user in-flight slots = %d, want 0", got)
@@ -1199,7 +1199,7 @@ func TestResponsesWebSocketDownstreamCloseCancelsStalledExecutor(t *testing.T) {
 	for time.Now().Before(deadline) {
 		if p.concurrency.GetAccountCurrentCounts(context.Background(), []int{41})[41] == 0 &&
 			p.concurrency.GetUserCurrentCounts(context.Background(), []int{22})[22] == 0 &&
-			len(sink.snapshot()) == 1 {
+			len(sink.snapshot()) == 0 {
 			released = true
 			break
 		}
@@ -1215,8 +1215,8 @@ func TestResponsesWebSocketDownstreamCloseCancelsStalledExecutor(t *testing.T) {
 	if got := p.rpm.GetAccountRPMs(context.Background(), []int{41})[41]; got != 1 {
 		t.Fatalf("account RPM after stalled executor cancellation = %d, want 1", got)
 	}
-	if records := sink.snapshot(); len(records) != 1 || records[0].UsageStatus != billing.UsageStatusStreamAbortedUsageMissing {
-		t.Fatalf("stalled executor usage records = %+v, want one stream_aborted_usage_missing record", records)
+	if records := sink.snapshot(); len(records) != 0 {
+		t.Fatalf("stalled executor usage records = %+v, want none", records)
 	}
 }
 

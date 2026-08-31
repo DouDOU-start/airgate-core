@@ -1363,11 +1363,6 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 		return
 	}
 
-	// 用户 / 分组 RPM 观测计数：与 usage_log 同源，仅成功计费的请求计入，口径对齐仪表盘。
-	// 用 Background ctx，避免请求收尾（尤其流式结束）ctx 已取消导致漏计；
-	// 纯观测口径，异步执行不阻塞计费收尾。
-	go p.rpm.IncrementUserGroupRPM(context.Background(), keyInfo.UserID, keyInfo.GroupID)
-
 	var usage dto.Usage
 	if result.usage != nil {
 		usage = *result.usage
@@ -1408,6 +1403,14 @@ func (p *Pipeline) recordUsage(c *gin.Context, keyInfo *auth.APIKeyInfo, ch *reg
 	// 单价来源与 ComputeCosts 同一优先级链：分辨率表命中 > per_request。
 	billingSnapshot := resolveUsageBilling(endpoint, price, usage)
 	usageStatus := usageStatusFor(result, usage, billingSnapshot.Calls)
+	if !persistableUsageStatus(usageStatus) {
+		return
+	}
+
+	// 用户 / 分组 RPM 观测计数：与 usage_log 同源，仅实际落账的请求计入，口径对齐仪表盘。
+	// 用 Background ctx，避免请求收尾（尤其流式结束）ctx 已取消导致漏计；
+	// 纯观测口径，异步执行不阻塞计费收尾。
+	go p.rpm.IncrementUserGroupRPM(context.Background(), keyInfo.UserID, keyInfo.GroupID)
 
 	p.sink.Record(billing.UsageRecord{
 		UserID:                keyInfo.UserID,

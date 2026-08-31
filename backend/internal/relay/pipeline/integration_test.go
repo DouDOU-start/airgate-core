@@ -1171,8 +1171,8 @@ func TestPerRequestPriceSnapshot(t *testing.T) {
 	}
 }
 
-// TestStreamUsageMissingWarns 流式成功但未捕获 usage：记 0 费并打 WARN（含渠道与模型），
-// 让静默的计费缺口可被监控发现。
+// TestStreamUsageMissingWarns 流式成功但未捕获 usage：打 WARN，不落 usage_log，
+// 避免 $0 计量缺失行污染使用记录。
 func TestStreamUsageMissingWarns(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -1208,12 +1208,8 @@ func TestStreamUsageMissingWarns(t *testing.T) {
 		t.Errorf("告警日志缺少 channel_key_id/model 字段:\n%s", logs)
 	}
 
-	rec := env.sink.last(t)
-	if rec.TotalCost != 0 || rec.InputTokens != 0 {
-		t.Errorf("无 usage 流应记 0: %+v", rec)
-	}
-	if rec.UsageStatus != billing.UsageStatusMissing {
-		t.Errorf("无 usage 的完整流应标记 usage_missing，实际 %q", rec.UsageStatus)
+	if env.sink.count() != 0 {
+		t.Errorf("无 usage 的完整流不应写入 usage_log，实际 %+v", env.sink.records)
 	}
 }
 
@@ -1411,7 +1407,7 @@ func TestForwardResponsesPreContentErrorFailover(t *testing.T) {
 }
 
 // TestForwardResponsesErrorAfterContentMarkedAborted 已输出正文后不能切换渠道；
-// 错误帧照常结束当前响应，并把零计量记录明确标为“中断且无计量”。
+// 错误帧照常结束当前响应，零计量不落 usage_log，失败留痕仍记流中断。
 func TestForwardResponsesErrorAfterContentMarkedAborted(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -1434,9 +1430,8 @@ func TestForwardResponsesErrorAfterContentMarkedAborted(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "overloaded_error") {
 		t.Fatalf("内容后错误应保留 200 流并透传错误帧，status=%d body=%s", w.Code, w.Body.String())
 	}
-	rec := env.sink.last(t)
-	if rec.UsageStatus != billing.UsageStatusStreamAbortedUsageMissing {
-		t.Fatalf("usage_status=%q，期望 %q", rec.UsageStatus, billing.UsageStatusStreamAbortedUsageMissing)
+	if env.sink.count() != 0 {
+		t.Fatalf("中断且无计量不应写入 usage_log，records=%+v", env.sink.records)
 	}
 	if entry := env.errSink.lastEntry(t); entry.Phase != errlog.PhaseStreamAborted {
 		t.Fatalf("失败留痕 phase=%q，期望 stream_aborted", entry.Phase)

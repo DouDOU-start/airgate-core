@@ -943,8 +943,7 @@ func (p *Pipeline) handleCodexWebSocket(c *gin.Context, route codexWebSocketRout
 							usage = &u
 						}
 						// Both completed and incomplete are explicit terminal
-						// events.  Record even when usage is absent so the billing
-						// row carries usage_missing instead of disappearing.
+						// events. 无计量不落 usage_log。
 						p.recordAccountUsage(c, keyInfo, acc, billReq, route.endpoint,
 							attemptResult{usage: usage, written: true, done: true}, turn.start, turn.price)
 					}
