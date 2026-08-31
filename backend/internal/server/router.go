@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -12,7 +13,611 @@ import (
 	webfs "github.com/DouDOU-start/airgate-core/internal/web"
 )
 
-// registerRoutes 注册所有 API 路由
+// registerCodexResponsesWebSocketFallbackRoutes explicitly handles the GET
+// upgrade probe used by recent Codex CLI versions. The supplied handler is the
+// real native WebSocket relay in production; when that capability is absent it
+// returns 426, which lets the official client switch to HTTP Responses instead
+// of falling through to the SPA NoRoute handler (which would return
+// 200/text-html).
+func registerCodexResponsesWebSocketFallbackRoutes(
+	relayGroup gin.IRouter,
+	noPrefixGroup gin.IRouter,
+	codexGroup gin.IRouter,
+	handler gin.HandlerFunc,
+) {
+	relayGroup.GET("/responses", handler)
+	noPrefixGroup.GET("/responses", handler)
+	codexGroup.GET("/v1/responses", handler)
+	codexGroup.GET("/responses", handler)
+}
+
+// registerCodexGuardianUnsupportedRoutes reserves the internal Guardian
+// endpoint names on every Codex-compatible public route shape. The official
+// CLI can select these paths for its approval-review and risk-classifier
+// agents; until AirGate implements those dedicated contracts, returning an
+// authenticated JSON 501 is safer than allowing Gin's SPA NoRoute fallback
+// to answer with 200/text-html or accidentally routing the request through
+// ordinary Responses/CPA translation.
+func registerCodexGuardianUnsupportedRoutes(
+	relayGroup gin.IRouter,
+	noPrefixGroup gin.IRouter,
+	codexGroup gin.IRouter,
+	handler gin.HandlerFunc,
+) {
+	for _, path := range []string{"/guardian", "/guardian-classifier"} {
+		relayGroup.POST(path, handler)
+		relayGroup.GET(path, handler)
+		noPrefixGroup.POST(path, handler)
+		noPrefixGroup.GET(path, handler)
+		codexGroup.POST("/v1"+path, handler)
+		codexGroup.GET("/v1"+path, handler)
+		codexGroup.POST(path, handler)
+		codexGroup.GET(path, handler)
+	}
+}
+
+// registerCodexGuardianNativeRoutes exposes the official Codex Guardian
+// Responses-compatible endpoints. POST is handled by the native Codex
+// executor.  GET is a Responses WebSocket handshake for recent Codex CLI
+// builds; callers that do not have a duplex executor can omit the optional
+// handlers and retain the authenticated JSON 501 fallback.
+func registerCodexGuardianNativeRoutes(
+	relayGroup gin.IRouter,
+	noPrefixGroup gin.IRouter,
+	codexGroup gin.IRouter,
+	guardian gin.HandlerFunc,
+	classifier gin.HandlerFunc,
+	unsupported gin.HandlerFunc,
+	websocketHandlers ...gin.HandlerFunc,
+) {
+	guardianWebSocket := unsupported
+	classifierWebSocket := unsupported
+	if len(websocketHandlers) > 0 && websocketHandlers[0] != nil {
+		guardianWebSocket = websocketHandlers[0]
+	}
+	if len(websocketHandlers) > 1 && websocketHandlers[1] != nil {
+		classifierWebSocket = websocketHandlers[1]
+	}
+	registerGuardianPair := func(group gin.IRouter, prefix string) {
+		group.POST(prefix+"/guardian", guardian)
+		group.POST(prefix+"/guardian-classifier", classifier)
+		group.GET(prefix+"/guardian", guardianWebSocket)
+		group.GET(prefix+"/guardian-classifier", classifierWebSocket)
+	}
+	registerGuardianPair(relayGroup, "")
+	registerGuardianPair(noPrefixGroup, "")
+	registerGuardianPair(codexGroup, "/v1")
+	registerGuardianPair(codexGroup, "")
+}
+
+func registerCodexNativeHTTPRoutes(
+	relayGroup gin.IRouter,
+	noPrefixGroup gin.IRouter,
+	codexGroup gin.IRouter,
+	realtimeCalls gin.HandlerFunc,
+	realtimeLive gin.HandlerFunc,
+	memories gin.HandlerFunc,
+) {
+	relayGroup.POST("/realtime/calls", realtimeCalls)
+	relayGroup.POST("/live", realtimeLive)
+	relayGroup.POST("/memories/trace_summarize", memories)
+	noPrefixGroup.POST("/realtime/calls", realtimeCalls)
+	noPrefixGroup.POST("/live", realtimeLive)
+	noPrefixGroup.POST("/memories/trace_summarize", memories)
+	codexGroup.POST("/v1/realtime/calls", realtimeCalls)
+	codexGroup.POST("/v1/live", realtimeLive)
+	codexGroup.POST("/v1/memories/trace_summarize", memories)
+	codexGroup.POST("/realtime/calls", realtimeCalls)
+	codexGroup.POST("/live", realtimeLive)
+	codexGroup.POST("/memories/trace_summarize", memories)
+}
+
+func registerCodexRealtimeSidebandRoutes(
+	relayGroup gin.IRouter,
+	noPrefixGroup gin.IRouter,
+	codexGroup gin.IRouter,
+	handler gin.HandlerFunc,
+) {
+	relayGroup.GET("/realtime", handler)
+	relayGroup.GET("/live/:call_id", handler)
+	noPrefixGroup.GET("/realtime", handler)
+	noPrefixGroup.GET("/live/:call_id", handler)
+	codexGroup.GET("/v1/realtime", handler)
+	codexGroup.GET("/v1/live/:call_id", handler)
+	codexGroup.GET("/realtime", handler)
+	codexGroup.GET("/live/:call_id", handler)
+}
+
+// registerCodexControlPlaneRoutes exposes the finite set of raw JSON POST
+// contracts used by the official History/Notes extension and analytics queue.
+// There is intentionally no wildcard route: unknown alpha/notes or analytics
+// paths must not become an arbitrary account credentialed proxy.
+func registerCodexControlPlaneRoutes(
+	relayGroup gin.IRouter,
+	noPrefixGroup gin.IRouter,
+	codexGroup gin.IRouter,
+	handler gin.HandlerFunc,
+) {
+	register := func(group gin.IRouter, prefix string) {
+		registerCodexControlPlaneRoutesAt(group, prefix, handler)
+	}
+	register(relayGroup, "")
+	register(noPrefixGroup, "")
+	register(codexGroup, "/v1")
+	register(codexGroup, "")
+}
+
+// registerCodexControlPlaneRoutesAt is the prefix-parametric form used by
+// backend aliases that are not represented by the historical relay/codex
+// groups (for example /backend-api/v1/wham). Keeping the finite path table in
+// one place prevents one alias from silently accepting a different surface.
+func registerCodexControlPlaneRoutesAt(group gin.IRouter, prefix string, handler gin.HandlerFunc) {
+	if group == nil || handler == nil {
+		return
+	}
+	paths := []string{
+		"/alpha/history/v2/list_windows",
+		"/alpha/history/v2/list_items",
+		"/alpha/history/v2/read_item",
+		"/alpha/history/v2/search_contents",
+		"/alpha/notes/v2/list_files_by_prefix",
+		"/alpha/notes/v2/read_file",
+		"/alpha/notes/v2/search_contents",
+		"/alpha/notes/v2/append_to_file",
+		"/alpha/notes/v2/write_file",
+		"/alpha/notes/v2/thread_hint",
+		"/analytics-events/events",
+		"/analytics/codex/turn-costs",
+	}
+	for _, path := range paths {
+		group.POST(prefix+path, handler)
+	}
+}
+
+// registerCodexFilesRoutes exposes the finite official Codex file lifecycle
+// under every supported public base-url shape. The blob PUT itself is not
+// registered here: it uses the unauthenticated opaque-token route below so
+// the official client can send the signed-upload headers without copying its
+// API key.
+func registerCodexFilesRoutes(
+	relayGroup gin.IRouter,
+	noPrefixGroup gin.IRouter,
+	codexGroup gin.IRouter,
+	create gin.HandlerFunc,
+	finalize gin.HandlerFunc,
+) {
+	register := func(group gin.IRouter, prefix string) {
+		if group == nil {
+			return
+		}
+		if create != nil {
+			group.POST(prefix+"/files", create)
+		}
+		if finalize != nil {
+			group.POST(prefix+"/files/:file_id/uploaded", finalize)
+		}
+	}
+	register(relayGroup, "")
+	register(noPrefixGroup, "")
+	register(codexGroup, "/v1")
+	register(codexGroup, "")
+}
+
+// registerCodexBackendClientRoutes exposes the finite management surface used
+// by the official Codex backend-client. Registering all common verbs lets the
+// shared handler return an authenticated JSON 405 for a known path instead of
+// falling through to the SPA NoRoute handler; the handler still enforces the
+// exact method for each operation.
+func registerCodexBackendClientRoutes(group gin.IRouter, prefix string, handler gin.HandlerFunc) {
+	registerCodexBackendClientRoutesExcept(group, prefix, handler, nil)
+}
+
+// registerCodexCuratedPluginsExportRoute exposes the exact public startup-sync
+// URL used by the official Codex CLI. It must remain outside APIKeyAuth: the
+// official client deliberately sends only Originator/User-Agent here while it
+// bootstraps a local curated-plugin snapshot. The handler itself owns the
+// fixed-upstream and response-size/security checks.
+func registerCodexCuratedPluginsExportRoute(router gin.IRouter, handlers ...gin.HandlerFunc) {
+	if router == nil || len(handlers) == 0 {
+		return
+	}
+	for _, handler := range handlers {
+		if handler == nil {
+			return
+		}
+	}
+	// Any reserves the known path for every method so malformed POST/PUT/etc.
+	// requests receive the handler's structured 405 rather than the SPA
+	// fallback. The handler forwards only GET.
+	router.Any("/backend-api/plugins/export/curated", handlers...)
+}
+
+// registerCodexBackendClientRoutesExcept is used when a compatibility route
+// already owns one exact method/path pair on an otherwise Codex-compatible
+// base.  The important case is GET /v1/usage: AirGate has long exposed that
+// endpoint as the cc-switch balance probe, so registering the Codex backend
+// usage contract on top of it would both change existing behavior and make
+// Gin panic while the server is starting.  Other verbs for the same known path
+// remain reserved by the backend-client handler and return its structured 405.
+func registerCodexBackendClientRoutesExcept(
+	group gin.IRouter,
+	prefix string,
+	handler gin.HandlerFunc,
+	skip func(method, path string) bool,
+) {
+	if group == nil || handler == nil {
+		return
+	}
+	paths := []string{
+		"/usage",
+		"/usage/thread_usage/query",
+		"/rate-limit-reset-credits",
+		"/rate-limit-reset-credits/consume",
+		"/accounts/check",
+		"/accounts/send_add_credits_nudge_email",
+		"/profiles/me",
+		"/config/bundle",
+		"/settings/user",
+		"/tasks",
+		"/tasks/list",
+		"/tasks/:task_id",
+		"/tasks/:task_id/turns/:turn_id/sibling_turns",
+		// Cloud Tasks environment discovery. The by-repo route deliberately
+		// registers both the upstream three-segment form and its optional ref
+		// extension; the handler applies the stricter finite shape/encoding
+		// validation before forwarding.
+		"/environments",
+		"/environments/by-repo/:provider/:owner/:repo",
+		"/environments/by-repo/:provider/:owner/:repo/:ref",
+		"/workspace-messages",
+		"/ps/mcp",
+		// Remote plugin catalog/mutation endpoints. Keep these in the same
+		// finite registration table as the other backend-client contracts so an
+		// unknown /ps/plugins path cannot become a credentialed catch-all proxy.
+		"/ps/plugins/list",
+		"/ps/plugins/search",
+		"/ps/plugins/suggested/codex",
+		"/ps/plugins/installed",
+		"/ps/plugins/workspace/shared",
+		"/ps/plugins/workspace/created",
+		"/ps/plugins/:plugin_id",
+		"/ps/plugins/:plugin_id/skills/:skill_name",
+		"/ps/plugins/:plugin_id/install",
+		"/ps/plugins/:plugin_id/uninstall",
+		"/ps/plugins/:plugin_id/shares",
+		// Apps/Connectors directory and metadata endpoints used by the official
+		// ChatGPT/Codex client. These are finite paths; arbitrary /connectors or
+		// /ps/apps requests must still fall through to the JSON 404 boundary.
+		"/connectors/directory/list",
+		"/connectors/directory/list_workspace",
+		"/ps/apps/batch",
+		// Legacy featured-plugin discovery and mutations.
+		"/plugins/featured",
+		"/plugins/:plugin_id/enable",
+		"/plugins/:plugin_id/uninstall",
+		// Workspace plugin sharing/public upload lifecycle.
+		"/public/plugins/workspace/upload-url",
+		"/public/plugins/workspace",
+		"/public/plugins/workspace/:remote_plugin_id",
+	}
+	methods := []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions}
+	for _, path := range paths {
+		for _, method := range methods {
+			if skip != nil && skip(method, prefix+path) {
+				continue
+			}
+			group.Handle(method, prefix+path, handler)
+		}
+	}
+}
+
+// registerCodexRemoteControlRoutes exposes the finite HTTP portion of the
+// official app-server Remote Control contract. The websocket server endpoint
+// is accepted as an optional handler so a native duplex implementation can be
+// installed without changing the route table; until then the shared HTTP
+// handler returns a structured method/capability error.
+func registerCodexRemoteControlRoutes(group gin.IRouter, prefix string, handler gin.HandlerFunc, websocketHandler ...gin.HandlerFunc) {
+	if group == nil || handler == nil {
+		return
+	}
+	registerAllMethods := func(path string) {
+		for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions} {
+			group.Handle(method, prefix+path, handler)
+		}
+	}
+	for _, path := range []string{
+		"/remote/control/server/enroll",
+		"/remote/control/server/refresh",
+		"/remote/control/server/pair",
+		"/remote/control/server/pair/status",
+		"/remote/control/environments/:environment_id/clients",
+		"/remote/control/environments/:environment_id/clients/:client_id",
+	} {
+		registerAllMethods(path)
+	}
+	serverHandler := handler
+	if len(websocketHandler) > 0 && websocketHandler[0] != nil {
+		serverHandler = websocketHandler[0]
+	}
+	// Reserve the websocket path with the supplied duplex handler when one is
+	// available. Other verbs still go through the HTTP handler so known-path
+	// method errors remain JSON rather than Gin's SPA fallback.
+	group.GET(prefix+"/remote/control/server", serverHandler)
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions} {
+		group.Handle(method, prefix+"/remote/control/server", handler)
+	}
+}
+
+// registerCodexAgentIdentityJWKSUnsupportedRoutes reserves the exact JWKS
+// paths emitted by the official Codex auth client. Agent Identity is a
+// separate Ed25519/AgentAssertion trust flow and is intentionally not treated
+// as an ordinary bearer/API-key proxy; the supplied handler returns a
+// structured 501 until that flow has a dedicated Core contract. Keeping the
+// aliases explicit also prevents a broad /agent-identities wildcard from
+// becoming a credentialed or cacheable catch-all endpoint.
+var codexAgentIdentityJWKSPaths = [...]string{
+	// Public/rooted Codex API bases (for example a deployment configured with
+	// `https://gateway.example/v1` or a host-root base). The official helper
+	// appends `/agent-identities/jwks` whenever the base does not contain
+	// `/backend-api`.
+	"/agent-identities/jwks",
+	"/v1/agent-identities/jwks",
+	"/codex/agent-identities/jwks",
+	"/codex/v1/agent-identities/jwks",
+	"/wham/agent-identities/jwks",
+	"/wham/v1/agent-identities/jwks",
+	// Official ChatGPT production/staging base rooted at /backend-api.
+	"/backend-api/wham/agent-identities/jwks",
+	"/backend-api/v1/wham/agent-identities/jwks",
+	// Be liberal about complete /backend-api/codex aliases accepted by
+	// current launchers; agent_identity_jwks_url appends /wham when the
+	// base contains /backend-api.
+	"/backend-api/codex/wham/agent-identities/jwks",
+	"/backend-api/codex/v1/wham/agent-identities/jwks",
+	// Public/custom Codex base rooted at /api/codex.
+	"/api/codex/agent-identities/jwks",
+	"/api/codex/v1/agent-identities/jwks",
+}
+
+func registerCodexAgentIdentityJWKSUnsupportedRoutes(group gin.IRouter, handler gin.HandlerFunc) {
+	if group == nil || handler == nil {
+		return
+	}
+	for _, path := range codexAgentIdentityJWKSPaths {
+		// Register the complete standard method set so a known trust-boundary
+		// path always reaches the structured method/capability handler. In
+		// particular, POST/CONNECT/TRACE must not depend on the SPA NoRoute
+		// fallback to synthesize a 405.
+		group.Any(path, handler)
+	}
+}
+
+// registerCodexAgentIdentityJWKSRoutes registers the public Agent Identity
+// JWKS aliases with the supplied middleware/handler chain.  The official
+// Codex client performs this discovery before it has an AirGate API-key
+// context, so callers should pass only the dedicated rate limiter and fixed
+// upstream proxy (never APIKeyAuth or account selection middleware).
+func registerCodexAgentIdentityJWKSRoutes(group gin.IRouter, handlers ...gin.HandlerFunc) {
+	if group == nil || len(handlers) == 0 {
+		return
+	}
+	methodHandler := handlers[len(handlers)-1]
+	if methodHandler == nil {
+		return
+	}
+	for _, path := range codexAgentIdentityJWKSPaths {
+		// Only valid GET discovery consumes the public endpoint's rate-limit
+		// budget. Invalid methods go straight to the terminal handler, which
+		// returns the structured 405 without allowing cheap quota exhaustion.
+		group.GET(path, handlers...)
+		for _, method := range []string{
+			http.MethodHead,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodPatch,
+			http.MethodDelete,
+			http.MethodOptions,
+			http.MethodConnect,
+			http.MethodTrace,
+		} {
+			group.Handle(method, path, methodHandler)
+		}
+	}
+}
+
+func isCodexAgentIdentityJWKSPath(path string) bool {
+	path = strings.TrimRight(strings.TrimSpace(path), "/")
+	if path == "" {
+		return false
+	}
+	for _, candidate := range codexAgentIdentityJWKSPaths {
+		if path == candidate {
+			return true
+		}
+	}
+	return false
+}
+
+// isCodexFilesPath reports whether a request is aimed at one of the finite
+// Codex Files route families. Gin's global NoRoute handler serves the SPA for
+// browser deep-links, but doing that for a misspelled Files endpoint would
+// turn an API error into a 200/text-html response.
+func isCodexFilesPath(path string) bool {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return false
+	}
+	for _, prefix := range []string{
+		"", "/v1", "/codex", "/codex/v1",
+		"/backend-api", "/backend-api/v1", "/backend-api/codex", "/backend-api/codex/v1",
+		"/api/codex", "/api/codex/v1",
+	} {
+		base := prefix + "/files"
+		if path == base || strings.HasPrefix(path, base+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func isCodexBackendClientPath(path string) bool {
+	path = strings.TrimRight(strings.TrimSpace(path), "/")
+	if path == "" {
+		return false
+	}
+	for _, prefix := range []string{
+		"", "/v1", "/codex", "/codex/v1",
+		"/backend-api/v1/wham", "/backend-api/wham/v1",
+		"/backend-api/wham", "/backend-api/codex/v1", "/backend-api/codex",
+		"/backend-api/v1", "/backend-api", "/api/codex/v1", "/api/codex",
+		"/codex/v1", "/codex", "/wham/v1", "/wham",
+	} {
+		if path == prefix || !strings.HasPrefix(path, prefix+"/") {
+			continue
+		}
+		rest := strings.TrimPrefix(path, prefix+"/")
+		for _, root := range []string{
+			"usage", "rate-limit-reset-credits", "accounts", "profiles", "config",
+			"settings", "tasks", "environments", "workspace-messages", "ps",
+			"connectors", "plugins", "public",
+		} {
+			if rest == root || strings.HasPrefix(rest, root+"/") {
+				return true
+			}
+		}
+	}
+	return strings.HasPrefix(path, "/backend-api/ps/") || path == "/backend-api/ps"
+}
+
+func isCodexRemoteControlPath(path string) bool {
+	path = strings.TrimRight(strings.TrimSpace(path), "/")
+	if path == "" {
+		return false
+	}
+	for _, prefix := range []string{
+		"", "/v1", "/codex", "/codex/v1", "/api/codex", "/api/codex/v1",
+		"/backend-api", "/backend-api/v1", "/backend-api/v1/wham", "/backend-api/codex", "/backend-api/codex/v1",
+		"/backend-api/wham", "/backend-api/wham/v1", "/wham", "/wham/v1",
+	} {
+		base := prefix + "/remote/control"
+		if path == base || strings.HasPrefix(path, base+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// codexBackendAliasHandlers contains the handlers shared by the ChatGPT
+// backend-compatible /backend-api/codex route family. The official Codex CLI
+// uses this prefix for OAuth accounts, while API-key callers commonly use
+// /v1, /codex, or an unprefixed public route. Keep the aliases pointed at the
+// exact same handlers so authentication, scheduling, translation, and native
+// framing semantics cannot drift between URL shapes.
+type codexBackendAliasHandlers struct {
+	responses                   gin.HandlerFunc
+	responsesWebSocket          gin.HandlerFunc
+	compact                     gin.HandlerFunc
+	alphaSearch                 gin.HandlerFunc
+	imagesGenerations           gin.HandlerFunc
+	imagesEdits                 gin.HandlerFunc
+	models                      gin.HandlerFunc
+	realtimeCalls               gin.HandlerFunc
+	realtimeLive                gin.HandlerFunc
+	memories                    gin.HandlerFunc
+	realtimeSidebandWebSocket   gin.HandlerFunc
+	guardian                    gin.HandlerFunc
+	guardianClassifier          gin.HandlerFunc
+	guardianWebSocket           gin.HandlerFunc
+	guardianClassifierWebSocket gin.HandlerFunc
+	controlPlane                gin.HandlerFunc
+	filesCreate                 gin.HandlerFunc
+	filesFinalize               gin.HandlerFunc
+}
+
+// registerCodexBackendAliasRoutes exposes both /backend-api/codex/<endpoint>
+// and /backend-api/codex/v1/<endpoint>. It intentionally registers the full
+// native Codex surface (including WebSocket GET upgrades), not only the
+// Responses POST route, because recent official clients use the backend path
+// for Realtime and Guardian control-plane traffic as well.
+func registerCodexBackendAliasRoutes(group gin.IRouter, handlers codexBackendAliasHandlers) {
+	if group == nil {
+		return
+	}
+	for _, prefix := range []string{"", "/v1"} {
+		if handlers.responses != nil {
+			group.POST(prefix+"/responses", handlers.responses)
+		}
+		if handlers.responsesWebSocket != nil {
+			group.GET(prefix+"/responses", handlers.responsesWebSocket)
+		}
+		if handlers.compact != nil {
+			group.POST(prefix+"/responses/compact", handlers.compact)
+		}
+		if handlers.alphaSearch != nil {
+			group.POST(prefix+"/alpha/search", handlers.alphaSearch)
+		}
+		if handlers.imagesGenerations != nil {
+			group.POST(prefix+"/images/generations", handlers.imagesGenerations)
+		}
+		if handlers.imagesEdits != nil {
+			group.POST(prefix+"/images/edits", handlers.imagesEdits)
+		}
+		if handlers.models != nil {
+			group.GET(prefix+"/models", handlers.models)
+		}
+		if handlers.realtimeCalls != nil {
+			group.POST(prefix+"/realtime/calls", handlers.realtimeCalls)
+		}
+		if handlers.realtimeLive != nil {
+			group.POST(prefix+"/live", handlers.realtimeLive)
+		}
+		if handlers.memories != nil {
+			group.POST(prefix+"/memories/trace_summarize", handlers.memories)
+		}
+		if handlers.realtimeSidebandWebSocket != nil {
+			group.GET(prefix+"/realtime", handlers.realtimeSidebandWebSocket)
+			group.GET(prefix+"/live/:call_id", handlers.realtimeSidebandWebSocket)
+		}
+		if handlers.guardian != nil {
+			group.POST(prefix+"/guardian", handlers.guardian)
+		}
+		if handlers.guardianClassifier != nil {
+			group.POST(prefix+"/guardian-classifier", handlers.guardianClassifier)
+		}
+		if handlers.guardianWebSocket != nil {
+			group.GET(prefix+"/guardian", handlers.guardianWebSocket)
+		}
+		if handlers.guardianClassifierWebSocket != nil {
+			group.GET(prefix+"/guardian-classifier", handlers.guardianClassifierWebSocket)
+		}
+		if handlers.controlPlane != nil {
+			for _, path := range []string{
+				"/alpha/history/v2/list_windows",
+				"/alpha/history/v2/list_items",
+				"/alpha/history/v2/read_item",
+				"/alpha/history/v2/search_contents",
+				"/alpha/notes/v2/list_files_by_prefix",
+				"/alpha/notes/v2/read_file",
+				"/alpha/notes/v2/search_contents",
+				"/alpha/notes/v2/append_to_file",
+				"/alpha/notes/v2/write_file",
+				"/alpha/notes/v2/thread_hint",
+				"/analytics-events/events",
+				"/analytics/codex/turn-costs",
+			} {
+				group.POST(prefix+path, handlers.controlPlane)
+			}
+		}
+		if handlers.filesCreate != nil {
+			group.POST(prefix+"/files", handlers.filesCreate)
+		}
+		if handlers.filesFinalize != nil {
+			group.POST(prefix+"/files/:file_id/uploaded", handlers.filesFinalize)
+		}
+	}
+}
+
+// registerRoutes wires the public API and compatibility route families.
 func (s *Server) registerRoutes() {
 	r := s.engine
 	handlers := s.handlers
@@ -29,6 +634,16 @@ func (s *Server) registerRoutes() {
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+
+	// Official Codex startup sync fetches curated-plugin export metadata without
+	// an AirGate/API key. Keep this exact endpoint outside every APIKeyAuth
+	// group, and protect the fixed public fetch with a modest per-IP limiter.
+	if s.curatedPluginsProxy == nil {
+		s.curatedPluginsProxy = newCodexCuratedPluginsExportProxy()
+	}
+	curatedPluginsRL := middleware.NewIPRateLimit(60)
+	s.curatedPluginsRateLimiter = curatedPluginsRL.Limiter
+	registerCodexCuratedPluginsExportRoute(r, curatedPluginsRL.Handler, s.curatedPluginsProxy.Handle)
 
 	// API v1 路由组
 	v1 := r.Group("/api/v1")
@@ -372,6 +987,7 @@ func (s *Server) registerRoutes() {
 		// OpenAI 协议（openai_compatible 渠道）
 		relayGroup.POST("/chat/completions", s.relay.HandleChatCompletions)
 		relayGroup.POST("/responses", s.relay.HandleResponses)
+		relayGroup.POST("/responses/compact", s.relay.HandleCompact)
 		// codex CLI 内置联网搜索（openai 协议，POST 非流式，按次计费）
 		relayGroup.POST("/alpha/search", s.relay.HandleAlphaSearch)
 		relayGroup.POST("/images/generations", s.relay.HandleImagesGenerations)
@@ -394,6 +1010,7 @@ func (s *Server) registerRoutes() {
 	{
 		noPrefixGroup.POST("/chat/completions", s.relay.HandleChatCompletions)
 		noPrefixGroup.POST("/responses", s.relay.HandleResponses)
+		noPrefixGroup.POST("/responses/compact", s.relay.HandleCompact)
 		noPrefixGroup.POST("/alpha/search", s.relay.HandleAlphaSearch)
 		noPrefixGroup.POST("/images/generations", s.relay.HandleImagesGenerations)
 		noPrefixGroup.POST("/images/edits", s.relay.HandleImagesEdits)
@@ -403,7 +1020,215 @@ func (s *Server) registerRoutes() {
 		noPrefixGroup.GET("/videos/:task_id", s.taskFlow.HandleVideoGet)
 		noPrefixGroup.GET("/videos/:task_id/content", s.taskFlow.HandleVideoContent)
 	}
+	// Bare `/v1` and host-root clients may use the backend-client management
+	// surface directly; keep these aliases on the authenticated relay group.
+	// GET /v1/usage is the pre-existing cc-switch balance probe registered on
+	// the root router below.  Keep that exact compatibility contract and only
+	// reserve the remaining backend-client paths on the /v1 group; attempting
+	// to register a second GET /v1/usage makes Gin panic during startup.
+	registerCodexBackendClientRoutesExcept(relayGroup, "", s.relay.HandleCodexBackendClient,
+		func(method, path string) bool {
+			return method == http.MethodGet && path == "/usage"
+		})
+	registerCodexBackendClientRoutes(noPrefixGroup, "", s.relay.HandleCodexBackendClient)
+	// Codex CLI 专用模型目录：保持官方 {models:[ModelInfo...]} 契约，
+	// 与兼容 OpenAI 客户端使用的 /v1/models 分离，避免响应形态互相影响。
+	codexGroup := r.Group("/codex", middleware.APIKeyAuth(s.db))
+	{
+		codexGroup.POST("/v1/responses", s.relay.HandleResponses)
+		codexGroup.POST("/v1/responses/compact", s.relay.HandleCompact)
+		codexGroup.POST("/v1/alpha/search", s.relay.HandleAlphaSearch)
+		codexGroup.GET("/v1/models", s.relay.HandleCodexModels)
+		codexGroup.POST("/responses", s.relay.HandleResponses)
+		codexGroup.POST("/responses/compact", s.relay.HandleCompact)
+		codexGroup.POST("/alpha/search", s.relay.HandleAlphaSearch)
+		codexGroup.GET("/models", s.relay.HandleCodexModels)
+		registerCodexBackendClientRoutes(codexGroup, "/v1", s.relay.HandleCodexBackendClient)
+		registerCodexBackendClientRoutes(codexGroup, "", s.relay.HandleCodexBackendClient)
+	}
 	// Suno 音乐任务（suno 渠道，Suno-API 社区协议；错误体 {"code":"fail",...}）
+	// Official ChatGPT OAuth builds use /backend-api/codex as their base URL.
+	// Register the same native and CPA-capable handlers under that prefix so a
+	// caller can select either the historical /v1 shape or the backend's
+	// unversioned shape without falling through to the SPA.
+	backendCodexGroup := r.Group("/backend-api/codex", middleware.APIKeyAuth(s.db))
+	registerCodexBackendAliasRoutes(backendCodexGroup, codexBackendAliasHandlers{
+		responses:                   s.relay.HandleResponses,
+		responsesWebSocket:          s.relay.HandleResponsesWebSocket,
+		compact:                     s.relay.HandleCompact,
+		alphaSearch:                 s.relay.HandleAlphaSearch,
+		imagesGenerations:           s.relay.HandleImagesGenerations,
+		imagesEdits:                 s.relay.HandleImagesEdits,
+		models:                      s.relay.HandleCodexModels,
+		realtimeCalls:               s.relay.HandleRealtimeCalls,
+		realtimeLive:                s.relay.HandleRealtimeLive,
+		memories:                    s.relay.HandleMemoriesTraceSummarize,
+		realtimeSidebandWebSocket:   s.relay.HandleRealtimeSidebandWebSocket,
+		guardian:                    s.relay.HandleCodexGuardian,
+		guardianClassifier:          s.relay.HandleCodexGuardianClassifier,
+		guardianWebSocket:           s.relay.HandleCodexGuardianWebSocket,
+		guardianClassifierWebSocket: s.relay.HandleCodexGuardianClassifierWebSocket,
+		controlPlane:                s.relay.HandleCodexControlPlane,
+		filesCreate:                 s.relay.HandleCodexFilesCreate,
+		filesFinalize:               s.relay.HandleCodexFilesFinalize,
+	})
+	registerCodexBackendClientRoutes(backendCodexGroup, "", s.relay.HandleCodexBackendClient)
+	registerCodexBackendClientRoutes(backendCodexGroup, "/v1", s.relay.HandleCodexBackendClient)
+	// The public Codex API provider uses `/api/codex` as its base URL. Keep the
+	// same finite native surface as the ChatGPT backend alias so a custom
+	// provider can switch between API-key and OAuth accounts without changing
+	// the client-side endpoint paths. This is a route alias only; authentication,
+	// account selection, native/CPA policy, and endpoint allowlists remain in the
+	// shared handlers below.
+	apiCodexGroup := r.Group("/api/codex", middleware.APIKeyAuth(s.db))
+	registerCodexBackendAliasRoutes(apiCodexGroup, codexBackendAliasHandlers{
+		responses:                   s.relay.HandleResponses,
+		responsesWebSocket:          s.relay.HandleResponsesWebSocket,
+		compact:                     s.relay.HandleCompact,
+		alphaSearch:                 s.relay.HandleAlphaSearch,
+		imagesGenerations:           s.relay.HandleImagesGenerations,
+		imagesEdits:                 s.relay.HandleImagesEdits,
+		models:                      s.relay.HandleCodexModels,
+		realtimeCalls:               s.relay.HandleRealtimeCalls,
+		realtimeLive:                s.relay.HandleRealtimeLive,
+		memories:                    s.relay.HandleMemoriesTraceSummarize,
+		realtimeSidebandWebSocket:   s.relay.HandleRealtimeSidebandWebSocket,
+		guardian:                    s.relay.HandleCodexGuardian,
+		guardianClassifier:          s.relay.HandleCodexGuardianClassifier,
+		guardianWebSocket:           s.relay.HandleCodexGuardianWebSocket,
+		guardianClassifierWebSocket: s.relay.HandleCodexGuardianClassifierWebSocket,
+		controlPlane:                s.relay.HandleCodexControlPlane,
+		filesCreate:                 s.relay.HandleCodexFilesCreate,
+		filesFinalize:               s.relay.HandleCodexFilesFinalize,
+	})
+	registerCodexBackendClientRoutes(apiCodexGroup, "", s.relay.HandleCodexBackendClient)
+	registerCodexBackendClientRoutes(apiCodexGroup, "/v1", s.relay.HandleCodexBackendClient)
+	// ChatGPT OAuth backend-client calls use /backend-api/wham/... while the
+	// Responses/files surface remains under /backend-api/codex or /backend-api.
+	backendWhamGroup := r.Group("/backend-api/wham", middleware.APIKeyAuth(s.db))
+	registerCodexBackendClientRoutes(backendWhamGroup, "", s.relay.HandleCodexBackendClient)
+	registerCodexBackendClientRoutes(backendWhamGroup, "/v1", s.relay.HandleCodexBackendClient)
+	registerCodexControlPlaneRoutesAt(backendWhamGroup, "", s.relay.HandleCodexControlPlane)
+	registerCodexControlPlaneRoutesAt(backendWhamGroup, "/v1", s.relay.HandleCodexControlPlane)
+	// A few official builds receive a base URL already rooted at `/wham` (or
+	// append `/v1` themselves). Keep this sibling alias on the normal API-key
+	// boundary; account selection still supplies the upstream OAuth/API lease.
+	whamGroup := r.Group("/wham", middleware.APIKeyAuth(s.db))
+	registerCodexBackendClientRoutes(whamGroup, "", s.relay.HandleCodexBackendClient)
+	registerCodexBackendClientRoutes(whamGroup, "/v1", s.relay.HandleCodexBackendClient)
+	registerCodexControlPlaneRoutesAt(whamGroup, "", s.relay.HandleCodexControlPlane)
+	registerCodexControlPlaneRoutesAt(whamGroup, "/v1", s.relay.HandleCodexControlPlane)
+	// Some official ChatGPT clients keep `/backend-api` as the base URL and
+	// append `/files` directly. Register that root alias (and its versioned
+	// spelling) with the same authenticated handlers.
+	backendAPIGroup := r.Group("/backend-api", middleware.APIKeyAuth(s.db))
+	registerCodexFilesRoutes(backendAPIGroup, nil, nil,
+		s.relay.HandleCodexFilesCreate, s.relay.HandleCodexFilesFinalize)
+	registerCodexControlPlaneRoutesAt(backendAPIGroup, "", s.relay.HandleCodexControlPlane)
+	backendAPIV1Group := r.Group("/backend-api/v1", middleware.APIKeyAuth(s.db))
+	registerCodexFilesRoutes(backendAPIV1Group, nil, nil,
+		s.relay.HandleCodexFilesCreate, s.relay.HandleCodexFilesFinalize)
+	registerCodexControlPlaneRoutesAt(backendAPIV1Group, "", s.relay.HandleCodexControlPlane)
+	registerCodexControlPlaneRoutesAt(backendAPIV1Group, "/wham", s.relay.HandleCodexControlPlane)
+	registerCodexBackendClientRoutes(backendAPIV1Group, "", s.relay.HandleCodexBackendClient)
+	registerCodexBackendClientRoutes(backendAPIV1Group, "/wham", s.relay.HandleCodexBackendClient)
+	// Hosted Apps MCP is rooted directly at /backend-api/ps/mcp (not /wham).
+	registerCodexBackendClientRoutes(backendAPIGroup, "", s.relay.HandleCodexBackendClient)
+	// The root alias above intentionally exposes the full finite table for
+	// compatibility; only /ps/mcp can match this base in the handler's path
+	// classifier, while other paths receive JSON 404.
+	// Remote Control has its own authentication boundary.  In particular, the
+	// official client puts the enrolled bearer in Authorization, which must not
+	// be consumed by the ordinary APIKeyAuth middleware used by the surrounding
+	// Codex aliases.  Register the same finite route set on sibling groups that
+	// carry CodexRemoteControlAuth instead of stacking both auth middlewares.
+	remoteControlAuth := middleware.CodexRemoteControlAuth(s.db, s.remoteControlTokens)
+	registerRemoteControlAliases := func(base string, prefixes ...string) {
+		group := r.Group(base, remoteControlAuth)
+		for _, prefix := range prefixes {
+			registerCodexRemoteControlRoutes(group, prefix, s.relay.HandleCodexRemoteControl, s.relay.HandleCodexRemoteControlWebSocket)
+		}
+	}
+	registerRemoteControlAliases("/codex", "", "/v1")
+	registerRemoteControlAliases("/backend-api/codex", "", "/v1")
+	registerRemoteControlAliases("/api/codex", "", "/v1")
+	registerRemoteControlAliases("/backend-api/wham", "", "/v1")
+	registerRemoteControlAliases("/backend-api/v1/wham", "")
+	// A custom Codex API base may already be rooted at `/wham` (or may append
+	// `/v1` after that root).  The official backend client derives these paths
+	// from a non-`/backend-api` base in the same way as its `/api/codex` style.
+	// Keep the aliases on the dedicated Remote Control auth boundary so an
+	// upstream server bearer is never consumed by the ordinary API-key group.
+	registerRemoteControlAliases("/wham", "", "/v1")
+	// The official CLI derives the Remote Control URLs from the configured
+	// backend base.  A deployment may therefore expose the same contract from
+	// a bare `/backend-api` or `/v1` base (without the `/codex`/`/wham`
+	// suffix).  Keep these aliases on the dedicated Remote Control auth
+	// middleware; registering them on the ordinary API-key groups would consume
+	// the OAuth bearer as if it were an AirGate key.
+	registerRemoteControlAliases("/backend-api", "", "/v1")
+	registerRemoteControlAliases("/v1", "")
+	// Agent Identity JWKS discovery is a public, unauthenticated GET made before
+	// the CLI has an AirGate API-key/account context. Keep it on a fixed-host
+	// proxy with its own IP limiter; it must never enter account selection or
+	// become a caller-controlled upstream URL.
+	if s.agentIdentityJWKSProxy == nil {
+		s.agentIdentityJWKSProxy = newCodexAgentIdentityJWKSProxy()
+	}
+	agentIdentityJWKSRateLimit := middleware.NewIPRateLimit(60)
+	s.agentIdentityJWKSRateLimiter = agentIdentityJWKSRateLimit.Limiter
+	registerCodexAgentIdentityJWKSRoutes(r, agentIdentityJWKSRateLimit.Handler, s.agentIdentityJWKSProxy.Handle)
+	registerCodexResponsesWebSocketFallbackRoutes(
+		relayGroup,
+		noPrefixGroup,
+		codexGroup,
+		s.relay.HandleResponsesWebSocket,
+	)
+	registerCodexNativeHTTPRoutes(
+		relayGroup,
+		noPrefixGroup,
+		codexGroup,
+		s.relay.HandleRealtimeCalls,
+		s.relay.HandleRealtimeLive,
+		s.relay.HandleMemoriesTraceSummarize,
+	)
+	registerCodexRealtimeSidebandRoutes(
+		relayGroup,
+		noPrefixGroup,
+		codexGroup,
+		s.relay.HandleRealtimeSidebandWebSocket,
+	)
+	registerCodexGuardianNativeRoutes(
+		relayGroup,
+		noPrefixGroup,
+		codexGroup,
+		s.relay.HandleCodexGuardian,
+		s.relay.HandleCodexGuardianClassifier,
+		s.relay.HandleCodexGuardianUnsupported,
+		s.relay.HandleCodexGuardianWebSocket,
+		s.relay.HandleCodexGuardianClassifierWebSocket,
+	)
+	registerCodexControlPlaneRoutes(
+		relayGroup,
+		noPrefixGroup,
+		codexGroup,
+		s.relay.HandleCodexControlPlane,
+	)
+	registerCodexFilesRoutes(
+		relayGroup,
+		noPrefixGroup,
+		codexGroup,
+		s.relay.HandleCodexFilesCreate,
+		s.relay.HandleCodexFilesFinalize,
+	)
+	// The upload URL returned by Files create is a random bearer token. It must
+	// remain outside APIKeyAuth because the official client intentionally sends
+	// no AirGate key on the signed blob PUT.
+	r.PUT("/_airgate/codex/files/upload/:token", s.relay.HandleCodexFileUpload)
+	// Workspace plugin bundles use a separate opaque lease namespace. Keep the
+	// PUT unauthenticated for the same reason as Files, while the lease itself
+	// is bound to the API key/group/account that issued upload-url.
+	r.PUT("/_airgate/codex/plugins/upload/:token", s.relay.HandleCodexPluginUpload)
 	sunoGroup := r.Group("/suno", middleware.APIKeyAuth(s.db))
 	{
 		sunoGroup.POST("/submit/:action", s.taskFlow.HandleSunoSubmit)
@@ -476,6 +1301,44 @@ func (s *Server) registerRoutes() {
 	// NoRoute: 未匹配路径回退前端 index.html。
 	// P1 起对外网关路由（/v1/chat/completions 等）走显式注册，不再经 NoRoute 分发。
 	r.NoRoute(func(c *gin.Context) {
+		if c != nil && c.Request != nil && c.Request.URL != nil && isCodexAgentIdentityJWKSPath(c.Request.URL.Path) {
+			s.relay.HandleCodexAgentIdentityJWKSUnsupported(c)
+			return
+		}
+		if c != nil && c.Request != nil && c.Request.URL != nil && isCodexFilesPath(c.Request.URL.Path) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"type":    "invalid_request_error",
+					"code":    "not_found",
+					"message": "Codex Files endpoint not found",
+				},
+			})
+			return
+		}
+		if c != nil && c.Request != nil && c.Request.URL != nil && isCodexRemoteControlPath(c.Request.URL.Path) {
+			// Keep unknown Remote Control paths in the API error domain.  The
+			// global NoRoute handler normally serves index.html for browser
+			// deep-links, but a misspelled native endpoint must never look like a
+			// successful HTML response to the official Codex client.
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"type":    "invalid_request_error",
+					"code":    "unsupported_endpoint",
+					"message": "Codex remote-control endpoint not found",
+				},
+			})
+			return
+		}
+		if c != nil && c.Request != nil && c.Request.URL != nil && isCodexBackendClientPath(c.Request.URL.Path) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"type":    "invalid_request_error",
+					"code":    "unsupported_endpoint",
+					"message": "Codex backend-client endpoint not found",
+				},
+			})
+			return
+		}
 		c.Data(http.StatusOK, "text/html; charset=utf-8", ogIndex.Bytes(c.Request.Context()))
 	})
 }

@@ -57,7 +57,7 @@ func RequestLogger() gin.HandlerFunc {
 
 		duration := time.Since(start)
 		status := c.Writer.Status()
-		path := c.Request.URL.Path
+		path := RedactSensitiveRequestPath(c.Request.URL.Path)
 
 		// 根据 path/状态码挑选日志级别
 		level := slog.LevelInfo

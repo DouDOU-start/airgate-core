@@ -25,7 +25,7 @@ func moderationProtocolFor(endpoint string) (string, bool) {
 	switch endpoint {
 	case adaptor.EndpointChatCompletions:
 		return moderation.ProtocolOpenAIChat, true
-	case adaptor.EndpointResponses:
+	case adaptor.EndpointResponses, adaptor.EndpointCompact:
 		return moderation.ProtocolOpenAIResponses, true
 	case adaptor.EndpointImagesGenerations, adaptor.EndpointImagesEdits:
 		return moderation.ProtocolOpenAIImages, true

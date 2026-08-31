@@ -7,7 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1810,16 +1813,13 @@ func proxyURLFromRef(p *ProxyRef) string {
 	if scheme == "" {
 		scheme = "http"
 	}
-	host := fmt.Sprintf("%s:%d", p.Address, p.Port)
+	u := &url.URL{Scheme: scheme, Host: net.JoinHostPort(strings.Trim(p.Address, "[]"), strconv.Itoa(p.Port))}
 	user := strings.TrimSpace(p.Username)
 	pass := strings.TrimSpace(p.Password)
-	if user != "" {
-		if pass != "" {
-			return fmt.Sprintf("%s://%s:%s@%s", scheme, user, pass, host)
-		}
-		return fmt.Sprintf("%s://%s@%s", scheme, user, host)
+	if user != "" || pass != "" {
+		u.User = url.UserPassword(user, pass)
 	}
-	return fmt.Sprintf("%s://%s", scheme, host)
+	return u.String()
 }
 
 func cloneAnyMap(in map[string]any) map[string]any {

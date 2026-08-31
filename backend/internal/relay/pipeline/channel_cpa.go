@@ -49,7 +49,7 @@ func (p *Pipeline) executeChannelCPAAttempt(
 		}
 	}()
 
-	if p.cpa == nil {
+	if p.cpa == nil && p.providerTransport == nil {
 		return attemptResult{buildErr: errCPAUnavailable}
 	}
 	payload, err := req.Marshal()
@@ -111,7 +111,7 @@ func (p *Pipeline) executeChannelCPAAttempt(
 	}
 	defer cancel()
 
-	result := p.cpa.Forward(ctx, c, fwdReq)
+	result := p.executeProvider(ctx, c, fwdReq)
 	if auditTransport != nil && req.Stream && result.Done && result.StreamErr == nil &&
 		result.NetErr == nil && result.BuildErr == nil && result.StatusCode >= 200 && result.StatusCode < 300 {
 		auditTransport.MarkLatestStreamCompleted()
@@ -135,6 +135,8 @@ func (p *Pipeline) executeChannelCPAAttempt(
 		attemptFirstTokenMs: result.FirstTokenMs,
 		requestFirstTokenMs: result.RequestFirstTokenMs,
 		written:             result.Written,
+		responseStarted:     result.ResponseStarted,
+		dataReceived:        result.DataReceived,
 		streamErr:           result.StreamErr,
 		done:                result.Done,
 	}
@@ -170,6 +172,12 @@ func channelCPAHeaders(c *gin.Context) http.Header {
 	}
 	for _, name := range []string{"Authorization", "Proxy-Authorization", "X-Api-Key", "X-Goog-Api-Key"} {
 		headers.Del(name)
+	}
+	// The relay decodes inbound request compression before CPA translation.
+	// Remove the stale marker so the translated JSON is not advertised as
+	// gzip/zstd-compressed to the downstream provider.
+	if requestBodyWasDecoded(c) {
+		headers.Del("Content-Encoding")
 	}
 	headers.Set("Content-Type", "application/json")
 	return headers

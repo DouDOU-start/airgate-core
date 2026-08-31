@@ -75,6 +75,131 @@ func testAccountTransformInstance(id string, priority int32, plugin *fakePlugin)
 	return &instance{id: id, name: id, info: plugin.info, plugin: plugin}
 }
 
+func testProviderAttemptInstance(id string, priority int32, plugin *fakePlugin) *instance {
+	plugin.info = protocol.PluginInfo{
+		ID:              id,
+		Name:            id,
+		ProtocolVersion: protocol.ProtocolVersion,
+		Priority:        priority,
+		Capabilities:    []string{protocol.CapabilityProviderAttemptTransformV1},
+	}
+	return &instance{id: id, name: id, info: plugin.info, plugin: plugin}
+}
+
+func testCodexInstance(id string, priority int32, mode string) *instance {
+	plugin := &fakePlugin{}
+	plugin.info = protocol.PluginInfo{
+		ID:              id,
+		Name:            id,
+		ProtocolVersion: protocol.ProtocolVersion,
+		Priority:        priority,
+		Capabilities:    []string{protocol.CapabilityCodexExecutorV1},
+	}
+	return &instance{id: id, name: id, info: plugin.info, plugin: plugin, started: true, codexMode: mode}
+}
+
+func TestTransformProviderAttemptChainsPluginsByPriority(t *testing.T) {
+	transform := func(key string, wantPrevious string) *fakePlugin {
+		return &fakePlugin{handler: func(_ context.Context, request protocol.Request) (protocol.Response, error) {
+			if request.Path != relayhook.ProviderAttemptPath {
+				return protocol.Response{}, fmt.Errorf("unexpected path %q", request.Path)
+			}
+			var attempt relayhook.ProviderAttemptRequest
+			if err := json.Unmarshal(request.Body, &attempt); err != nil {
+				return protocol.Response{}, err
+			}
+			if attempt.Client != "codex" || attempt.Account.Platform != "codex" || attempt.Account.Type != "oauth" {
+				return protocol.Response{}, fmt.Errorf("attempt metadata was not preserved: %+v", attempt)
+			}
+			var body map[string]any
+			if err := json.Unmarshal(attempt.Body, &body); err != nil {
+				return protocol.Response{}, err
+			}
+			if wantPrevious != "" && body[wantPrevious] != true {
+				return protocol.Response{}, fmt.Errorf("previous transform %q is missing from %s", wantPrevious, attempt.Body)
+			}
+			body[key] = true
+			replaced, err := json.Marshal(body)
+			if err != nil {
+				return protocol.Response{}, err
+			}
+			decision, err := json.Marshal(relayhook.ProviderAttemptDecision{Version: relayhook.VersionV1, RequestBody: replaced})
+			if err != nil {
+				return protocol.Response{}, err
+			}
+			return protocol.Response{StatusCode: http.StatusOK, Body: decision}, nil
+		}}
+	}
+
+	first := transform("first", "")
+	second := transform("second", "first")
+	manager := &Manager{
+		hookTimeout: time.Second,
+		instances: map[string]*instance{
+			"second": testProviderAttemptInstance("second", 20, second),
+			"first":  testProviderAttemptInstance("first", 10, first),
+		},
+		lastErrors: make(map[string]string),
+	}
+	request := relayhook.ProviderAttemptRequest{
+		Version: relayhook.VersionV1, Client: "codex", Endpoint: "responses", Protocol: "openai",
+		Model: "gpt-test", Stream: false, Body: json.RawMessage(`{"model":"gpt-test","stream":false,"input":"hello"}`),
+		Account: relayhook.Candidate{Kind: "account", ID: 7, Platform: "codex", Type: "oauth", State: "active"},
+	}
+
+	decision, err := manager.TransformProviderAttempt(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(decision.RequestBody, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["first"] != true || got["second"] != true {
+		t.Fatalf("provider-attempt chain result = %s", decision.RequestBody)
+	}
+	if first.calls.Load() != 1 || second.calls.Load() != 1 {
+		t.Fatalf("plugin calls = first:%d second:%d", first.calls.Load(), second.calls.Load())
+	}
+	if bytes.Contains(request.Body, []byte(`"first"`)) || bytes.Contains(request.Body, []byte(`"second"`)) {
+		t.Fatalf("manager mutated caller-owned body: %s", request.Body)
+	}
+}
+
+func TestTransformProviderAttemptSkipsInvalidReplacementAndContinues(t *testing.T) {
+	invalid := &fakePlugin{handler: func(context.Context, protocol.Request) (protocol.Response, error) {
+		return protocol.Response{StatusCode: http.StatusOK, Body: []byte(`{"version":"v1","request_body":{"model":"changed","stream":false}}`)}, nil
+	}}
+	valid := &fakePlugin{handler: func(_ context.Context, request protocol.Request) (protocol.Response, error) {
+		var attempt relayhook.ProviderAttemptRequest
+		if err := json.Unmarshal(request.Body, &attempt); err != nil {
+			return protocol.Response{}, err
+		}
+		if bytes.Contains(attempt.Body, []byte("changed")) {
+			return protocol.Response{}, errors.New("invalid replacement leaked into the chain")
+		}
+		return protocol.Response{StatusCode: http.StatusOK, Body: []byte(`{"version":"v1","request_body":{"model":"gpt-test","stream":false,"input":"safe"}}`)}, nil
+	}}
+	manager := &Manager{
+		hookTimeout: time.Second,
+		instances: map[string]*instance{
+			"invalid": testProviderAttemptInstance("invalid", 10, invalid),
+			"valid":   testProviderAttemptInstance("valid", 20, valid),
+		},
+		lastErrors: make(map[string]string),
+	}
+	decision, err := manager.TransformProviderAttempt(context.Background(), relayhook.ProviderAttemptRequest{
+		Version: relayhook.VersionV1, Model: "gpt-test", Stream: false,
+		Body: json.RawMessage(`{"model":"gpt-test","stream":false,"input":"base"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(decision.RequestBody, []byte(`"input":"safe"`)) {
+		t.Fatalf("valid transform was not applied after invalid plugin: %s", decision.RequestBody)
+	}
+}
+
 func TestTransformAccountTestAppliesPluginResult(t *testing.T) {
 	plugin := &fakePlugin{handler: func(_ context.Context, request protocol.Request) (protocol.Response, error) {
 		if request.Path != accounttesthook.TransformPath {
@@ -125,6 +250,100 @@ func TestTransformAccountTestRequiresAvailablePlugin(t *testing.T) {
 	_, err := manager.TransformAccountTest(context.Background(), accounttesthook.Request{})
 	if !errors.Is(err, accounttesthook.ErrUnavailable) {
 		t.Fatalf("无插件时错误 = %v，期望 ErrUnavailable", err)
+	}
+}
+
+func TestManagerCodexTransportModeUsesHighestPriorityPluginPolicy(t *testing.T) {
+	manager := &Manager{instances: map[string]*instance{
+		"later":   testCodexInstance("later", 200, "cpa_only"),
+		"primary": testCodexInstance("primary", 100, " CPA_TRANSLATE "),
+	}}
+	if got := manager.CodexTransportMode(); got != "cpa_translate" {
+		t.Fatalf("CodexTransportMode() = %q, want cpa_translate", got)
+	}
+	manager.instances["primary"].codexMode = "invalid"
+	if got := manager.CodexTransportMode(); got != "auto" {
+		t.Fatalf("invalid policy should fail safe to auto, got %q", got)
+	}
+}
+
+func TestManagerCodexTransportModeDefaultsToAuto(t *testing.T) {
+	if got := (&Manager{}).CodexTransportMode(); got != defaultCodexMode {
+		t.Fatalf("empty manager mode = %q, want %q", got, defaultCodexMode)
+	}
+}
+
+func TestManagerCodexTransportModeReturnsAutoAfterExecutorIsDisabled(t *testing.T) {
+	pluginDir := t.TempDir()
+	id := "codex-fixture"
+	installDir := filepath.Join(pluginDir, id)
+	if err := os.MkdirAll(installDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(installDir, pluginBinaryName(id)), []byte("fixture"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(installDir, "runtime.yaml"), []byte("enabled: true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	manager := New(config.PluginsConfig{Dir: pluginDir}, "error")
+	manager.setInstance(testCodexInstance(id, 10, "native_only"))
+	if got := manager.CodexTransportMode(); got != "native_only" {
+		t.Fatalf("enabled executor mode = %q, want native_only", got)
+	}
+	if err := manager.SetEnabled(context.Background(), id, false); err != nil {
+		t.Fatalf("disable executor: %v", err)
+	}
+	if got := manager.CodexTransportMode(); got != defaultCodexMode {
+		t.Fatalf("disabled executor left stale mode %q, want %q", got, defaultCodexMode)
+	}
+}
+
+func TestManagerCodexTransportModeIgnoresInstalledExecutorThatIsNotRunning(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		enabled bool
+	}{
+		{name: "disabled", enabled: false},
+		{name: "startup failure", enabled: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			pluginDir := t.TempDir()
+			id := "codex-fixture"
+			installDir := filepath.Join(pluginDir, id)
+			if err := os.MkdirAll(installDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			// The enabled case deliberately uses an invalid executable so LoadAll
+			// exercises a failed launch after reading native_only from disk.
+			if err := os.WriteFile(filepath.Join(installDir, pluginBinaryName(id)), []byte("not an executable"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			manifest := "id: " + id + "\npriority: 10\ncapabilities:\n  - " + protocol.CapabilityCodexExecutorV1 + "\n"
+			if err := os.WriteFile(filepath.Join(installDir, "manifest.yaml"), []byte(manifest), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(installDir, "config.yaml"), []byte("codex_mode: native_only\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			runtimeState := fmt.Sprintf("enabled: %t\n", test.enabled)
+			if err := os.WriteFile(filepath.Join(installDir, "runtime.yaml"), []byte(runtimeState), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			manager := New(config.PluginsConfig{Dir: pluginDir}, "error")
+			if err := manager.LoadAll(context.Background()); err != nil {
+				t.Fatalf("LoadAll: %v", err)
+			}
+			t.Cleanup(func() { manager.StopAll(context.Background()) })
+			if manager.instanceByID(id) != nil {
+				t.Fatal("non-running executor was added to the active instance set")
+			}
+			if got := manager.CodexTransportMode(); got != defaultCodexMode {
+				t.Fatalf("non-running executor left stale mode %q, want %q", got, defaultCodexMode)
+			}
+		})
 	}
 }
 
@@ -727,7 +946,7 @@ func TestManager自动补号能力缺少宿主参数时拒绝初始化(t *testin
 	err := manager.preparePluginConfig(protocol.PluginInfo{
 		Capabilities: []string{protocol.CapabilityAccountAutofillV1},
 	}, map[string]string{})
-	if err == nil || !strings.Contains(err.Error(), "宿主访问参数") {
+	if err == nil || !strings.Contains(err.Error(), "访问参数") {
 		t.Fatalf("缺少宿主参数时错误 = %v", err)
 	}
 }

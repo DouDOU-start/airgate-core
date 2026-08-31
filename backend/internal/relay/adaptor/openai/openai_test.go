@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime"
 	"mime/multipart"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -55,6 +56,66 @@ func TestResponsesURL(t *testing.T) {
 				t.Errorf("ResponsesURL(%q) = %q, want %q", tc.baseURL, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestCompactURL(t *testing.T) {
+	for baseURL, want := range map[string]string{
+		"https://api.example.com":    "https://api.example.com/v1/responses/compact",
+		"https://api.example.com/v1": "https://api.example.com/v1/responses/compact",
+	} {
+		if got := CompactURL(baseURL); got != want {
+			t.Errorf("CompactURL(%q) = %q, want %q", baseURL, got, want)
+		}
+	}
+}
+
+func TestBuildRequestCompactPreservesContractAndCodexHeaders(t *testing.T) {
+	req, err := dto.ParseChatRequest([]byte(`{"model":"gpt-5","input":[{"type":"message"}],"tools":[{"type":"function"}],"unknown":{"keep":true},"stream":true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	info := buildInfo(func(i *adaptor.RelayInfo) {
+		i.Endpoint = adaptor.EndpointCompact
+		i.RequestModel = "gpt-5"
+		i.UpstreamModel = "gpt-5-upstream"
+		i.Stream = false
+		i.RequestHeaders = http.Header{
+			"Authorization":       {"Bearer client-secret"},
+			"Connection":          {"close"},
+			"X-Codex-Turn-State":  {"turn-1"},
+			"X-Client-Request-Id": {"request-1"},
+		}
+	})
+	httpReq, err := (Adaptor{}).BuildRequest(context.Background(), info, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := httpReq.URL.String(); got != "https://api.example.com/v1/responses/compact" {
+		t.Fatalf("URL = %q", got)
+	}
+	if got := httpReq.Header.Get("Authorization"); got != "Bearer sk-upstream" {
+		t.Fatalf("Authorization = %q", got)
+	}
+	if got := httpReq.Header.Get("X-Codex-Turn-State"); got != "turn-1" {
+		t.Fatalf("X-Codex-Turn-State = %q", got)
+	}
+	if got := httpReq.Header.Get("X-Client-Request-Id"); got != "request-1" {
+		t.Fatalf("X-Client-Request-Id = %q", got)
+	}
+	if got := httpReq.Header.Get("Connection"); got != "" {
+		t.Fatalf("hop-by-hop Connection leaked: %q", got)
+	}
+	body, _ := io.ReadAll(httpReq.Body)
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		t.Fatal(err)
+	}
+	if string(fields["model"]) != `"gpt-5-upstream"` || len(fields["input"]) == 0 || len(fields["tools"]) == 0 || len(fields["unknown"]) == 0 {
+		t.Fatalf("compact body fields were not preserved: %s", body)
+	}
+	if _, exists := fields["stream_options"]; exists {
+		t.Fatalf("compact body must not contain stream_options: %s", body)
 	}
 }
 
@@ -357,10 +418,74 @@ func TestBuildRequestImagesEdits(t *testing.T) {
 		t.Errorf("multipart 体被改写:\ngot  %q\nwant %q", sent, rawBody)
 	}
 
-	// 缺 RawBody 属装配错误：明确报错（管线转一次性 400）。
-	bad := buildInfo(func(i *adaptor.RelayInfo) { i.Endpoint = adaptor.EndpointImagesEdits })
-	if _, err := (Adaptor{}).BuildRequest(context.Background(), bad, req); err == nil {
-		t.Error("缺少 RawBody 应报错")
+}
+
+// TestBuildRequestImagesEditsJSON verifies the official Codex CLI image-edit
+// JSON shape (images[].image_url) remains transparent while model_mapping is
+// applied by the OpenAI adaptor.
+func TestBuildRequestImagesEditsJSON(t *testing.T) {
+	body := []byte(`{"model":"gpt-image-1","prompt":"make it blue",` +
+		`"images":[{"image_url":"data:image/png;base64,QUJD"}],` +
+		`"mask":{"image_url":"data:image/png;base64,REVG"},` +
+		`"unknown":{"keep":true}}`)
+	req, err := dto.ParseChatRequest(body)
+	if err != nil {
+		t.Fatalf("ParseChatRequest: %v", err)
+	}
+	info := buildInfo(func(i *adaptor.RelayInfo) {
+		i.Endpoint = adaptor.EndpointImagesEdits
+		i.RequestModel = "gpt-image-1"
+		i.UpstreamModel = "gpt-image-upstream"
+	})
+	httpReq, err := (Adaptor{}).BuildRequest(context.Background(), info, req)
+	if err != nil {
+		t.Fatalf("BuildRequest: %v", err)
+	}
+	if got := httpReq.Header.Get("Content-Type"); got != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", got)
+	}
+	sent, err := io.ReadAll(httpReq.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(sent, &got); err != nil {
+		t.Fatalf("upstream body is not JSON: %v", err)
+	}
+	if got["model"] != "gpt-image-upstream" {
+		t.Errorf("model = %v, want gpt-image-upstream", got["model"])
+	}
+	if _, ok := got["images"]; !ok {
+		t.Fatal("images field was not preserved")
+	}
+	if _, ok := got["mask"]; !ok {
+		t.Fatal("mask field was not preserved")
+	}
+	if unknown, ok := got["unknown"].(map[string]any); !ok || unknown["keep"] != true {
+		t.Errorf("unknown field was not preserved: %v", got["unknown"])
+	}
+}
+
+func TestBuildRequestImagesEditsRawJSON(t *testing.T) {
+	rawBody := []byte(`{"model":"gpt-image-1","prompt":"x","images":[]}`)
+	req, _ := dto.ParseChatRequest([]byte(`{"model":"gpt-image-1"}`))
+	info := buildInfo(func(i *adaptor.RelayInfo) {
+		i.Endpoint = adaptor.EndpointImagesEdits
+		i.RequestModel = "gpt-image-1"
+		i.UpstreamModel = "gpt-image-upstream"
+		i.RawBody = rawBody
+		i.RawContentType = "application/json; charset=utf-8"
+	})
+	httpReq, err := (Adaptor{}).BuildRequest(context.Background(), info, req)
+	if err != nil {
+		t.Fatalf("BuildRequest: %v", err)
+	}
+	if got := httpReq.Header.Get("Content-Type"); got != "application/json" {
+		t.Errorf("Content-Type = %q, want normalized application/json", got)
+	}
+	sent, _ := io.ReadAll(httpReq.Body)
+	if !strings.Contains(string(sent), `"gpt-image-upstream"`) {
+		t.Errorf("raw JSON model mapping missing: %s", sent)
 	}
 }
 
@@ -522,6 +647,21 @@ func TestParseNonStreamResponse(t *testing.T) {
 		out, usage := (Adaptor{}).ParseNonStreamResponse(info, raw)
 		if string(out) != "not-json" || usage != nil {
 			t.Errorf("非 JSON 响应应原样返回")
+		}
+	})
+
+	t.Run("realtime call response is returned byte-for-byte", func(t *testing.T) {
+		realtimeInfo := buildInfo(func(i *adaptor.RelayInfo) {
+			i.Endpoint = adaptor.EndpointRealtimeCalls
+			i.UpstreamModel = "gpt-realtime-upstream"
+		})
+		raw := []byte("{\n  \"model\": \"gpt-realtime-upstream\",\n  \"sdp\": \"v=0\\r\\n\"\n}\n")
+		out, usage := (Adaptor{}).ParseNonStreamResponse(realtimeInfo, raw)
+		if !bytes.Equal(out, raw) {
+			t.Fatalf("realtime response changed:\ngot  %q\nwant %q", out, raw)
+		}
+		if usage != nil {
+			t.Fatalf("realtime usage = %+v, want nil", usage)
 		}
 	})
 }

@@ -132,6 +132,17 @@ type Handle struct {
 	seq     atomic.Int64
 	finish  sync.Once
 	fast    bool
+
+	// payloadMu serializes asynchronous inbound-payload enrichments for this
+	// request.  A prepared WebSocket creates the audit row before its first
+	// response.create frame is available, then replaces the initially empty
+	// body after the downstream upgrade.  Multiple async workers may otherwise
+	// execute the stale skeleton job after the replacement and overwrite the
+	// real frame.  The revision check plus mutex makes the latest snapshot win
+	// regardless of worker scheduling.
+	payloadMu       sync.Mutex
+	payloadRevision uint64
+	payloadHeaders  http.Header
 }
 
 // ID 返回审计主记录 ID。
@@ -191,7 +202,10 @@ func (s *Service) Start(ctx context.Context, in RequestInput) (*Handle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("保存请求审计主记录失败: %w", err)
 	}
-	return &Handle{service: s, id: row.ID, start: time.Now()}, nil
+	return &Handle{
+		service: s, id: row.ID, start: time.Now(),
+		payloadHeaders: cloneHeader(in.Headers),
+	}, nil
 }
 
 // StartFast 同步创建审计主记录骨架，再异步补写压缩加密后的 Header 与 Body。
@@ -232,15 +246,62 @@ func (s *Service) StartFast(ctx context.Context, in RequestInput) (*Handle, erro
 		return nil, fmt.Errorf("保存请求审计主记录失败: %w", err)
 	}
 
+	handle := &Handle{
+		service: s, id: row.ID, start: time.Now(), fast: true,
+		payloadHeaders: cloneHeader(in.Headers),
+	}
+	handle.enqueueInboundPayload(in)
+	return handle, nil
+}
+
+// UpdateInboundBody replaces the request body captured by a fast audit row.
+//
+// Native Responses WebSockets are upgraded only after the provider handshake,
+// so a request audit skeleton may be created before the client's first
+// response.create frame is readable.  Callers should invoke this method once
+// that frame arrives.  The update is asynchronous under the normal audit
+// worker-pool policy and is safe to call concurrently; the newest body wins.
+// A nil body is a valid empty payload.  The method intentionally does not
+// return asynchronous write failures, matching StartFast's existing contract;
+// those failures are logged by the audit worker and surfaced as a pending
+// payload in the management view.
+func (h *Handle) UpdateInboundBody(body []byte) {
+	if h == nil || h.service == nil || h.id <= 0 {
+		return
+	}
+	h.enqueueInboundPayload(RequestInput{
+		Headers:       cloneHeader(h.payloadHeaders),
+		Body:          append([]byte(nil), body...),
+		BodyImmutable: true,
+	})
+}
+
+// enqueueInboundPayload schedules the latest inbound payload snapshot while
+// preventing an older worker from overwriting it after a replacement arrives.
+func (h *Handle) enqueueInboundPayload(in RequestInput) {
+	if h == nil || h.service == nil || h.id <= 0 {
+		return
+	}
 	snapshot := cloneRequestInput(in)
-	s.submitAsync(asyncJob{
+	h.payloadMu.Lock()
+	h.payloadRevision++
+	revision := h.payloadRevision
+	h.payloadMu.Unlock()
+	h.service.submitAsync(asyncJob{
 		name:          "request_payload",
 		retainedBytes: int64(len(snapshot.Body)),
 		run: func(jobCtx context.Context) error {
-			return s.enrichRequest(jobCtx, row.ID, snapshot)
+			h.payloadMu.Lock()
+			defer h.payloadMu.Unlock()
+			if revision != h.payloadRevision {
+				// A newer body snapshot superseded this job.  Treat the stale
+				// write as successful so it leaves the queue cleanly without
+				// touching the database.
+				return nil
+			}
+			return h.service.enrichRequest(jobCtx, h.id, snapshot)
 		},
 	})
-	return &Handle{service: s, id: row.ID, start: time.Now(), fast: true}, nil
 }
 
 // Finish 保存请求最终状态。该操作幂等，且不受客户端取消影响。

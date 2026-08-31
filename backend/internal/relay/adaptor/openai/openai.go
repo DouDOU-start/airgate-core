@@ -13,6 +13,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
@@ -33,11 +34,10 @@ type Adaptor struct{}
 //     绝不注入 stream_options（Responses API 无此参数，注入会污染请求）。
 //   - images generations：ImagesGenerationsURL；仅公共改写（Images API 同样无
 //     stream_options 概念，绝不注入）。
-//   - images edits：ImagesEditsURL；multipart 透传——渠道 model_mapping 未生效时
-//     RawBody 原始字节 + 原 Content-Type（含 boundary）直发上游、零重组；
-//     映射生效时仅定点重写 model 普通字段值（模型重写属 adaptor 职责清单），
-//     其余 part 逐字节复制、boundary 沿用（见 RewriteMultipartModel）；
-//     param_override 对 multipart 不生效（JSON 语义的覆盖值无法映射到表单字段）。
+//   - images edits：ImagesEditsURL；官方 Codex JSON 形态走透明 JSON 改写，
+//     multipart 形态保留 RawBody/原 Content-Type（含 boundary）零重组；
+//     multipart 仅在映射生效时定点重写 model 普通字段，param_override 仅对 JSON
+//     形态生效（JSON 语义的覆盖值无法安全映射到表单字段）。
 //   - chat_completions（默认）：ChatCompletionsURL；公共改写 + 流式 include_usage 注入。
 //
 // 公共改写顺序：model 重写 → param_override（set/remove）。
@@ -53,21 +53,60 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 	case adaptor.EndpointResponses:
 		body, err = rewritePlainBody(info, req)
 		url = ResponsesURL(info.ChannelKey.BaseURL)
+	case adaptor.EndpointCompact:
+		// Compact has an independent upstream contract. Preserve all unknown
+		// fields and only apply the normal model/parameter overrides.
+		body, err = rewritePlainBody(info, req)
+		url = CompactURL(info.ChannelKey.BaseURL)
 	case adaptor.EndpointImagesGenerations:
 		body, err = rewritePlainBody(info, req)
 		url = ImagesGenerationsURL(info.ChannelKey.BaseURL)
 	case adaptor.EndpointImagesEdits:
 		if len(info.RawBody) == 0 {
-			return nil, errors.New("images edits 缺少原始 multipart 请求体")
+			if mediaType, _, parseErr := mime.ParseMediaType(info.RawContentType); parseErr == nil &&
+				strings.HasPrefix(strings.ToLower(mediaType), "multipart/") {
+				return nil, errors.New("images edits 缺少原始 multipart 请求体")
+			}
+			// Official Codex image edits use a typed JSON body (images:
+			// [{image_url: ...}]). Keep the transparent DTO path available for
+			// callers that did not need to retain a non-JSON wire body.
+			if req == nil {
+				return nil, errors.New("images edits JSON 请求缺少解析后的请求体")
+			}
+			body, err = rewritePlainBody(info, req)
+		} else if isJSONContentType(info.RawContentType) {
+			// Raw JSON may be supplied by account/native bridges. Parse it again
+			// so unknown fields remain transparent and model/param overrides are
+			// applied consistently with the normal JSON path.
+			rawReq, parseErr := dto.ParseChatRequest(info.RawBody)
+			if parseErr != nil {
+				return nil, fmt.Errorf("images edits JSON 请求体无效: %w", parseErr)
+			}
+			body, err = rewritePlainBody(info, rawReq)
+		} else {
+			// Preserve the historical multipart path exactly when the caller
+			// supplies a non-JSON raw body. Content-Type validation remains the
+			// responsibility of RewriteMultipartModel only when a model rewrite
+			// is actually needed; otherwise zero-reassembly forwarding is kept.
+			body = info.RawBody
+			contentType = info.RawContentType
+			// model_mapping 生效时定点重写 multipart 的 model 字段（沿用原 boundary，
+			// Content-Type 不变）；未生效时原样直发、零重组。
+			if info.UpstreamModel != "" && info.UpstreamModel != info.RequestModel {
+				body, err = RewriteMultipartModel(info.RawBody, info.RawContentType, info.UpstreamModel)
+			}
+		}
+		url = ImagesEditsURL(info.ChannelKey.BaseURL)
+	case adaptor.EndpointRealtimeCalls:
+		if info.RawBody == nil {
+			return nil, errors.New("realtime call creation requires a raw request body")
 		}
 		body = info.RawBody
 		contentType = info.RawContentType
-		// model_mapping 生效时定点重写 multipart 的 model 字段（沿用原 boundary，
-		// Content-Type 不变）；未生效时原样直发、零重组。
-		if info.UpstreamModel != "" && info.UpstreamModel != info.RequestModel {
-			body, err = RewriteMultipartModel(info.RawBody, info.RawContentType, info.UpstreamModel)
+		if contentType == "" && bytes.HasPrefix(bytes.TrimSpace(body), []byte("v=0")) {
+			contentType = "application/sdp"
 		}
-		url = ImagesEditsURL(info.ChannelKey.BaseURL)
+		url, err = RealtimeCallsURL(info.ChannelKey.BaseURL, info.ProviderPath, info.ProviderQuery)
 	case adaptor.EndpointChatCompletions:
 		body, err = rewriteChatBody(info, req)
 		url = ChatCompletionsURL(info.ChannelKey.BaseURL)
@@ -86,6 +125,10 @@ func (Adaptor) BuildRequest(ctx context.Context, info *adaptor.RelayInfo, req *d
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
+	}
+	copySafeRequestHeaders(httpReq.Header, info.RequestHeaders)
+	if contentType == "" {
+		contentType = "application/json"
 	}
 	httpReq.Header.Set("Content-Type", contentType)
 	httpReq.Header.Set("Authorization", "Bearer "+info.APIKey)
@@ -224,6 +267,45 @@ func ResponsesURL(baseURL string) string {
 	return normalizeBaseV1(baseURL) + "/responses"
 }
 
+var openAIHopByHopRequestHeaders = map[string]struct{}{
+	"connection": {}, "keep-alive": {}, "proxy-authenticate": {},
+	"proxy-authorization": {}, "te": {}, "trailer": {},
+	"transfer-encoding": {}, "upgrade": {}, "host": {}, "content-length": {},
+}
+
+// copySafeRequestHeaders preserves Codex/OpenAI routing and tracing metadata
+// while preventing a client-supplied credential or connection-scoped header
+// from overriding the selected channel transport.
+func copySafeRequestHeaders(dst, src http.Header) {
+	if dst == nil || src == nil {
+		return
+	}
+	for name, values := range src {
+		lower := strings.ToLower(name)
+		if lower == "authorization" || lower == "proxy-authorization" || lower == "x-api-key" || lower == "x-goog-api-key" {
+			continue
+		}
+		if _, blocked := openAIHopByHopRequestHeaders[lower]; blocked {
+			continue
+		}
+		dst[http.CanonicalHeaderKey(name)] = append([]string(nil), values...)
+	}
+}
+
+func isJSONContentType(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(strings.TrimSpace(contentType))
+	if err != nil {
+		return false
+	}
+	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
+	return mediaType == "application/json" || strings.HasSuffix(mediaType, "+json")
+}
+
+// CompactURL appends the dedicated unary compact endpoint.
+func CompactURL(baseURL string) string {
+	return normalizeBaseV1(baseURL) + "/responses/compact"
+}
+
 // ImagesGenerationsURL 拼接上游生图端点（{base}/v1/images/generations）。
 func ImagesGenerationsURL(baseURL string) string {
 	return normalizeBaseV1(baseURL) + "/images/generations"
@@ -239,10 +321,42 @@ func AlphaSearchURL(baseURL string) string {
 	return normalizeBaseV1(baseURL) + "/alpha/search"
 }
 
+// RealtimeCallsURL builds one of the two public OpenAI call-create contracts.
+// The path is selected by Core from a finite handler table; validate it again
+// here so a direct adaptor caller cannot turn ProviderPath into an open proxy.
+func RealtimeCallsURL(baseURL, providerPath string, query map[string][]string) (string, error) {
+	providerPath = strings.TrimRight(strings.TrimSpace(providerPath), "/")
+	if providerPath == "" {
+		providerPath = "/realtime/calls"
+	}
+	if providerPath != "/realtime/calls" && providerPath != "/live" {
+		return "", fmt.Errorf("unsupported realtime provider path %q", providerPath)
+	}
+	target, err := url.Parse(normalizeBaseV1(baseURL) + providerPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid realtime provider URL: %w", err)
+	}
+	values := target.Query()
+	for key, items := range query {
+		for _, value := range items {
+			values.Add(key, value)
+		}
+	}
+	target.RawQuery = values.Encode()
+	return target.String(), nil
+}
+
 // ParseNonStreamResponse 解析非流式 2xx 响应：提取顶层 usage，
 // 并把响应 model 字段回写为对外模型名（隐藏渠道 model_mapping）。
 // 图像端点另提取 data 数组长度写入 usage.Calls（产出张数，按次×张数计费用）。
 func (Adaptor) ParseNonStreamResponse(info *adaptor.RelayInfo, body []byte) ([]byte, *dto.Usage) {
+	// Realtime call creation is a byte-oriented SDP/JSON/multipart bootstrap
+	// contract. Even when a CPA-backed OpenAI channel handles the request, the
+	// response must remain exactly as received: decoding and re-marshalling
+	// JSON would alter whitespace/order and could corrupt non-JSON SDP payloads.
+	if info != nil && info.Endpoint == adaptor.EndpointRealtimeCalls {
+		return body, nil
+	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(body, &fields); err != nil {
 		return body, nil

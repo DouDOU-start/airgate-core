@@ -229,7 +229,10 @@ func (s *Service) StartOAuth(ctx context.Context, input OAuthStartInput) (OAuthS
 
 // prepareOAuthReauth 重新授权时校验目标账号，并补齐 ProxyURL/Name。
 func (s *Service) prepareOAuthReauth(ctx context.Context, input *OAuthStartInput) error {
-	if input == nil || input.AccountID <= 0 {
+	if input == nil {
+		return nil
+	}
+	if input.AccountID <= 0 {
 		return nil
 	}
 	item, err := s.FindByID(ctx, input.AccountID, LoadOptions{WithProxy: true})
@@ -1326,20 +1329,6 @@ func randomBase64URL(n int) (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
-}
-
-func httpClient(proxyURL string) *http.Client {
-	c := &http.Client{Timeout: 60 * time.Second}
-	proxyURL = strings.TrimSpace(proxyURL)
-	if proxyURL == "" {
-		return c
-	}
-	u, err := url.Parse(proxyURL)
-	if err != nil {
-		return c
-	}
-	c.Transport = &http.Transport{Proxy: http.ProxyURL(u)}
-	return c
 }
 
 func parseJWTPayload(jwt string) map[string]any {

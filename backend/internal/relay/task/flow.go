@@ -434,6 +434,26 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 		attemptLatency := time.Since(attemptStart).Milliseconds()
 		attempts++
 
+		if partialErr := result.unreplayableProviderFailure(); partialErr != nil {
+			// The upstream may already have accepted this asynchronous job. Do
+			// not switch channels and submit it a second time. The task cannot be
+			// tracked without a complete ID response, so release the user's hold
+			// and leave an explicit orphan-risk audit record.
+			refund("上游提交响应中断")
+			reason := outcome.SanitizeKeyLeak(partialErr.Error(), []string{apiKey})
+			writeError(c, http.StatusBadGateway, "upstream_error", "upstream_response_interrupted", "上游任务提交响应中断，已停止重试以避免重复创建任务")
+			hop := attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "responseInterrupted", reason, 0, attemptLatency, false)
+			f.countFailure(ch.ChannelID, "responseInterrupted")
+			f.recordFailure(c, keyInfo, sub.Model, start, errlog.Entry{
+				Phase: errlog.PhaseStreamAborted, StatusCode: http.StatusBadGateway,
+				ErrorType: "upstream_error", ErrorCode: "upstream_response_interrupted",
+				Message:  "上游任务提交已返回部分数据后中断，已阻止渠道 failover",
+				Attempts: attempts, Chain: append(hops, hop),
+				ChannelID: ch.ChannelID, ChannelName: ch.ChannelName,
+			})
+			return
+		}
+
 		// 构建上游请求即失败：客户端/配置问题，一次性 400 终止（不计渠道健康）。
 		if result.buildErr != nil {
 			f.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
@@ -457,11 +477,22 @@ func (f *Flow) submit(c *gin.Context, keyInfo *auth.APIKeyInfo, platform string,
 		if o.Verdict == outcome.Success {
 			taskID, st, perr := ad.ParseSubmitResponse(result.body)
 			if perr != nil || taskID == "" {
-				// 上游 2xx 但提交响应不可解析：按 transient 换渠道。
-				// 注意：上游可能已实际受理任务，此路径存在重复提交风险（与 new-api 同口径），
-				// 由失败留痕携带原始片段供人工对账。
-				o.Verdict = outcome.Transient
-				o.Reason = "提交响应解析失败: " + outcome.BodySnippet(result.body)
+				// 2xx means the provider may already have accepted the asynchronous
+				// job. If the task id cannot be parsed, retrying would risk creating
+				// a duplicate job, even when the body is empty or merely malformed.
+				reason := outcome.SanitizeKeyLeak(taskSubmitResponseParseFailureReason(result.body, perr), []string{apiKey})
+				refund("上游任务提交响应无效")
+				writeError(c, http.StatusBadGateway, "upstream_error", "invalid_upstream_response", "上游任务提交响应无效，已停止重试以避免重复创建任务")
+				hop := attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "responseInvalid", reason, 0, attemptLatency, false)
+				f.countFailure(ch.ChannelID, "responseInvalid")
+				f.recordFailure(c, keyInfo, sub.Model, start, errlog.Entry{
+					Phase: errlog.PhaseUpstreamClientError, StatusCode: http.StatusBadGateway,
+					ErrorType: "upstream_error", ErrorCode: "invalid_upstream_response",
+					Message:  "上游任务提交返回 2xx 但缺少可解析的任务 ID，已阻止渠道 failover",
+					Attempts: attempts, Chain: append(hops, hop),
+					ChannelID: ch.ChannelID, ChannelName: ch.ChannelName,
+				})
+				return
 			} else {
 				f.registry.MarkRecovered(ch.KeyID)
 				t := f.newTask(c, keyInfo, platform, ch, info, sub, taskID, st, hold, estTotal, billingRate)
@@ -593,6 +624,39 @@ type submitResult struct {
 	statusCode int
 	headers    http.Header
 	body       []byte
+	// dataReceived is independent from the HTTP response being committed. A
+	// partial submit body followed by a read error means the provider may have
+	// accepted the task, so retrying on another channel can create duplicates.
+	dataReceived bool
+}
+
+func (r submitResult) unreplayableProviderFailure() error {
+	// Once an asynchronous submit received a 2xx response header, the
+	// provider may already have created the job even when the body fails before
+	// yielding its first byte.  Retrying that indeterminate success on another
+	// channel can create a duplicate task.  A partial body is equally unsafe
+	// regardless of status because the response itself is incomplete.
+	if !r.dataReceived && (r.statusCode < http.StatusOK || r.statusCode >= http.StatusMultipleChoices) {
+		return nil
+	}
+	if r.netErr != nil {
+		return r.netErr
+	}
+	return nil
+}
+
+// taskSubmitResponseParseFailureReason produces a bounded diagnostic for a
+// successful HTTP response that cannot yield a task identifier. Callers still
+// sanitize provider credentials before persisting the returned reason.
+func taskSubmitResponseParseFailureReason(body []byte, parseErr error) string {
+	reason := "提交响应缺少任务 ID"
+	if parseErr != nil {
+		reason = "提交响应解析失败"
+	}
+	if snippet := outcome.BodySnippet(body); snippet != "" {
+		reason += ": " + snippet
+	}
+	return reason
 }
 
 // executeSubmit 单次上游提交：构建请求 → 直发 → 读响应（≤4MB）。
@@ -610,11 +674,17 @@ func (f *Flow) executeSubmit(ctx context.Context, ad Adaptor, info *Info, sub *S
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamRespBytes))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamRespBytes+1))
 	if err != nil {
-		return submitResult{netErr: err}
+		return submitResult{netErr: err, statusCode: resp.StatusCode, headers: resp.Header,
+			body: body, dataReceived: len(body) > 0}
 	}
-	return submitResult{statusCode: resp.StatusCode, headers: resp.Header, body: body}
+	if len(body) > maxUpstreamRespBytes {
+		return submitResult{netErr: fmt.Errorf("upstream task response exceeds %d-byte limit", maxUpstreamRespBytes),
+			statusCode: resp.StatusCode, headers: resp.Header, body: body, dataReceived: true}
+	}
+	return submitResult{statusCode: resp.StatusCode, headers: resp.Header, body: body,
+		dataReceived: len(body) > 0}
 }
 
 // acquireClientSlots user → key 两级并发闸门（口径同 pipeline.acquireClientSlots）。

@@ -40,6 +40,11 @@ type streamResult struct {
 	firstTokenMs int64
 	// written 是否已向客户端写出过字节（含响应头）——写出后不可 failover。
 	written bool
+	// dataReceived records that at least one non-empty upstream SSE line was
+	// observed, even if it is still buffered and no downstream bytes were
+	// committed. A later read failure is then indeterminate and must not be
+	// replayed on another account/key.
+	dataReceived bool
 	// err 中途失败（上游读错误、客户端写错误或流内错误事件）；已写出字节时只能终止。
 	err error
 	// done 是否收到协议级完成信号：OpenAI 路径为 data: [DONE]；
@@ -85,6 +90,11 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 		contentType = "text/event-stream"
 	}
 	header := w.Header()
+	// Preserve Codex/OpenAI end-to-end response metadata (turn state, model,
+	// request ID, models ETag, reasoning flags) while stripping hop-by-hop
+	// framing headers. The body is streamed unchanged, so these headers must be
+	// committed before the first SSE line.
+	copySafeUpstreamResponseHeaders(header, upstream.Header)
 	header.Set("Content-Type", contentType)
 	if header.Get("Cache-Control") == "" {
 		header.Set("Cache-Control", "no-cache")
@@ -148,6 +158,9 @@ func relaySSE(w http.ResponseWriter, upstream *http.Response, start time.Time, e
 	scanner.Buffer(make([]byte, sseInitialBufSize), maxLineBytes)
 	for scanner.Scan() {
 		line := scanner.Text()
+		if line != "" {
+			result.dataReceived = true
+		}
 		data, hasData := extractSSEData(line)
 
 		if observer != nil {

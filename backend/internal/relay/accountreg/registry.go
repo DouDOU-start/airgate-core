@@ -380,6 +380,78 @@ func (r *Registry) ListCandidates(groupID int, model string, exclude []int) []*S
 	return r.listCandidates(groupID, model, exclude, nil, false)
 }
 
+// ListGroupCandidates returns schedulable accounts bound to groupID without
+// requiring a model-index hit. Native Codex endpoints such as a raw Realtime
+// SDP bootstrap and an existing-call sideband do not always carry a model, and
+// accounts with an intentionally empty model catalog must remain selectable for
+// those contracts. Model-specific callers should continue using ListCandidates
+// so per-model availability and cooldowns are enforced.
+func (r *Registry) ListGroupCandidates(groupID int, exclude []int) []*Snapshot {
+	if r == nil {
+		return nil
+	}
+	r.ensureLoaded()
+	now := time.Now()
+
+	r.mu.RLock()
+	ids := make([]int, 0, len(r.accounts))
+	for id, account := range r.accounts {
+		if account == nil || containsInt(exclude, id) {
+			continue
+		}
+		if _, allowed := account.GroupIDs[groupID]; !allowed {
+			continue
+		}
+		if account.State == StateDisabled || account.rateLimitProbeBlocked(now) || !account.IsSchedulable(now) {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	out := make([]*Snapshot, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, r.accounts[id])
+	}
+	r.mu.RUnlock()
+	return out
+}
+
+// ListGroupCandidatesForModel is the model-aware variant of
+// ListGroupCandidates. Accounts with an empty Models map are treated as
+// wildcards, while accounts with an explicit catalog are not. The model-level
+// cooldown is still enforced for both kinds of account.
+func (r *Registry) ListGroupCandidatesForModel(groupID int, model string, exclude []int) []*Snapshot {
+	if r == nil {
+		return nil
+	}
+	model = strings.TrimSpace(model)
+	candidates := r.ListGroupCandidates(groupID, exclude)
+	if model == "" || len(candidates) == 0 {
+		return candidates
+	}
+	now := time.Now()
+	out := make([]*Snapshot, 0, len(candidates))
+	r.mu.RLock()
+	for _, account := range candidates {
+		if account == nil {
+			continue
+		}
+		// An explicit catalog is only eligible when the requested model is
+		// listed. Empty catalogs are native-model wildcards.
+		if len(account.Models) != 0 {
+			if _, ok := account.Models[model]; !ok {
+				continue
+			}
+		}
+		if r.isModelRateLimited(account.ID, model, now) {
+			continue
+		}
+		out = append(out, account)
+	}
+	r.mu.RUnlock()
+	return out
+}
+
 // ListCandidatesAllowRateLimited 返回普通可调度候选，并额外允许调用方显式列出的
 // rate_limited Codex OAuth 账号。该入口仅供已经通过 Relay Hook 决策校验的单次
 // 路由使用；其他平台、API Key、disabled、分组不匹配和模型不匹配仍会被过滤。

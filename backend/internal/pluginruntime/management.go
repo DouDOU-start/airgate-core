@@ -184,7 +184,7 @@ func (m *Manager) InstallBinary(ctx context.Context, requestedID, source string,
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
-	tempBinary := filepath.Join(tempDir, "plugin-candidate")
+	tempBinary := filepath.Join(tempDir, temporaryPluginBinaryName("plugin-candidate"))
 	file, err := os.OpenFile(tempBinary, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o700)
 	if err != nil {
 		return PluginStatus{}, fmt.Errorf("创建插件二进制失败: %w", err)
@@ -303,7 +303,7 @@ func (m *Manager) UpdateBinary(ctx context.Context, id, source string, reader io
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
-	stagedBinary := filepath.Join(tempDir, "plugin-staged")
+	stagedBinary := filepath.Join(tempDir, temporaryPluginBinaryName("plugin-staged"))
 	file, err := os.OpenFile(stagedBinary, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o700)
 	if err != nil {
 		return PluginStatus{}, fmt.Errorf("创建插件二进制失败: %w", err)
@@ -325,7 +325,7 @@ func (m *Manager) UpdateBinary(ctx context.Context, id, source string, reader io
 
 	// 校验进程和最终安装文件必须使用不同副本。在 WSL 挂载盘上运行中的
 	// 可执行文件被重命名后再清理原目录，最终路径可能随之进入删除状态。
-	validationBinary := filepath.Join(tempDir, "plugin-candidate")
+	validationBinary := filepath.Join(tempDir, temporaryPluginBinaryName("plugin-candidate"))
 	if err := copyFile(stagedBinary, validationBinary, 0o700); err != nil {
 		return PluginStatus{}, fmt.Errorf("准备插件校验副本失败: %w", err)
 	}
@@ -989,6 +989,7 @@ func applyPluginInfo(status *PluginStatus, info protocol.PluginInfo) {
 func supportsAnyCapability(capabilities []string) bool {
 	for _, capability := range capabilities {
 		if capability == protocol.CapabilityRelayHookV1 ||
+			capability == protocol.CapabilityProviderAttemptTransformV1 ||
 			capability == protocol.CapabilityAccountTestTransformV1 ||
 			capability == protocol.CapabilityAccountAutofillV1 ||
 			capability == protocol.CapabilityAccountProviderManagementV1 {

@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -17,20 +18,16 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/errlog"
 	"github.com/DouDOU-start/airgate-core/internal/pkg/logx"
 	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
+	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/cursor"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
 	"github.com/DouDOU-start/airgate-core/internal/relay/outcome"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
+	providertransport "github.com/DouDOU-start/airgate-core/internal/relay/transport"
 	"github.com/DouDOU-start/airgate-core/internal/requestaudit"
 )
-
-// AccountForwarder 是 Pipeline 使用的 CPA 转发窄接口。
-// *cpa.Bridge 天然满足；测试可注入确定性替身覆盖账号 failover 状态机。
-type AccountForwarder interface {
-	Forward(ctx context.Context, c *gin.Context, req cpa.ForwardRequest) cpa.ForwardResult
-}
 
 // executeAccountAttempt 执行一次账号路径转发（CPA）。
 // 槽位/RPM 由调用方在抢到后传入；本函数 defer 释放账号并发槽。
@@ -46,6 +43,7 @@ func (p *Pipeline) executeAccountAttempt(
 	rpmMinute int64,
 	auditRequest *requestaudit.Handle,
 	sessionKey string,
+	opts forwardOptions,
 ) attemptResult {
 	defer func() {
 		// 槽位释放异步化：ZREM 幂等，不必阻塞请求收尾/下一次 failover 尝试。
@@ -56,10 +54,30 @@ func (p *Pipeline) executeAccountAttempt(
 		}
 	}()
 
-	if p.cpa == nil {
+	if p.cpa == nil && p.providerTransport == nil {
 		return attemptResult{buildErr: errCPAUnavailable}
 	}
+	// Account-dependent request rewrites run only after routing has selected
+	// this concrete account. Keep the shared failover payload untouched so a
+	// later attempt cannot inherit Codex-only function history.
+	payload = p.transformSelectedCodexAttempt(c.Request.Context(), c, acc, req, endpoint, protocol, payload, opts, requestID)
 
+	providerHeaders := accountProviderHeadersForRequest(c, endpoint, opts.rawBody, opts.rawContentType)
+	for name, values := range opts.providerHeaders {
+		canonical := http.CanonicalHeaderKey(name)
+		if values == nil {
+			providerHeaders.Del(canonical)
+			continue
+		}
+		providerHeaders[canonical] = append([]string(nil), values...)
+	}
+	if strings.EqualFold(strings.TrimSpace(endpoint), adaptor.EndpointCodexTurnCosts) {
+		providerHeaders = codexTurnCostsProviderHeaders(providerHeaders)
+	}
+	method := strings.TrimSpace(opts.method)
+	if method == "" {
+		method = http.MethodPost
+	}
 	fwdReq := cpa.ForwardRequest{
 		Account: cpa.AccountAuthInput{
 			AccountID:   acc.ID,
@@ -69,42 +87,65 @@ func (p *Pipeline) executeAccountAttempt(
 			Credentials: acc.Credentials,
 			ProxyURL:    acc.ProxyURL,
 		},
-		Model:            req.Model,
-		UpstreamModel:    acc.ResolveModel(req.Model),
-		Endpoint:         endpoint,
-		EntryProtocol:    protocol,
-		Stream:           req.Stream,
-		Payload:          payload,
-		Headers:          http.Header{"Content-Type": []string{"application/json"}},
-		RequestStartedAt: start,
-		CursorSessionKey: sessionKey,
+		Model:         req.Model,
+		UpstreamModel: acc.ResolveModel(req.Model),
+		Endpoint:      endpoint,
+		Method:        method,
+		Path: codexProviderPathForAccount(cpa.AccountAuthInput{
+			Platform:    acc.Platform,
+			Type:        acc.Type,
+			Credentials: acc.Credentials,
+		}, endpoint, opts.providerPath),
+		Query:                        cloneForwardQueryValues(opts.providerQueryDefaults),
+		EntryProtocol:                protocol,
+		Stream:                       req.Stream,
+		Payload:                      payload,
+		RawBody:                      opts.rawBody,
+		RawContentType:               opts.rawContentType,
+		Headers:                      providerHeaders,
+		RequestStartedAt:             start,
+		CursorSessionKey:             sessionKey,
+		RemoteControlToken:           opts.remoteControlToken,
+		RemoteControlServerID:        opts.remoteControlServerID,
+		RemoteControlName:            opts.remoteControlName,
+		RemoteControlProtocolVersion: opts.remoteControlProtocolVersion,
+		InstallationID:               opts.installationID,
 	}
 
 	ctx := c.Request.Context()
 	var auditTransport *requestaudit.RoundTripper
 	if auditRequest != nil {
-		var baseTransport http.RoundTripper
-		var errBuild error
-		if acc.Platform == "cursor" {
-			// Cursor Agent 走 Connect-RPC over HTTP/2 双向流，必须强制 h2
-			// ALPN；通用账号传输层会被上游 ALB 以 464 拒绝。
-			baseTransport, errBuild = cursor.SharedH2Transport(acc.ProxyURL)
-		} else {
-			baseTransport, errBuild = p.accountAuditTransport(acc.ProxyURL)
-		}
-		if errBuild != nil {
-			return attemptResult{auditErr: fmt.Errorf("构造账号代理审计传输层失败: %w", errBuild)}
-		}
 		target := requestaudit.Target{
 			RouteKind: "account", AccountID: acc.ID, AccountName: acc.Name,
 			AccountEmail: accountEmail(acc), AccountPlatform: acc.Platform, AccountType: acc.Type,
 		}
-		// CPA 通过固定字符串上下文键接收最终网络层；同时清空 Auth.ProxyURL，
-		// 避免 executor 的代理优先级绕过审计 RoundTripper。
-		auditTransport = requestaudit.NewRoundTripper(baseTransport, auditRequest, target)
-		//nolint:staticcheck
-		ctx = context.WithValue(ctx, "cliproxy.roundtripper", auditTransport)
-		fwdReq.Account.ProxyURL = ""
+		// Native Codex execution happens in a separate plugin process and cannot
+		// inherit the in-process RoundTripper. Pass a controlled sink through the
+		// provider context so the plugin can create/finish the real upstream
+		// attempt without ever receiving credential headers in audit metadata.
+		ctx = withProviderAuditSink(ctx, newNativeAuditSink(auditRequest, target))
+		// Keep the legacy RoundTripper available for a CPA fallback. The account
+		// proxy must remain on the ForwardRequest so native transport can use it;
+		// executeProvider strips it only when entering CPA with this wrapper.
+		if p.cpa != nil || pipelineHasCPATranslation(p.providerTransport) {
+			var baseTransport http.RoundTripper
+			var errBuild error
+			if acc.Platform == "cursor" {
+				// Cursor Agent 走 Connect-RPC over HTTP/2 双向流，必须强制 h2
+				// ALPN；通用账号传输层会被上游 ALB 以 464 拒绝。
+				baseTransport, errBuild = cursor.SharedH2Transport(acc.ProxyURL)
+			} else {
+				baseTransport, errBuild = p.accountAuditTransport(acc.ProxyURL)
+			}
+			if errBuild != nil {
+				return attemptResult{auditErr: fmt.Errorf("构造账号代理审计传输层失败: %w", errBuild)}
+			}
+			// CPA 通过固定字符串上下文键接收最终网络层；同时清空 Auth.ProxyURL，
+			// 避免 executor 的代理优先级绕过审计 RoundTripper。
+			auditTransport = requestaudit.NewRoundTripper(baseTransport, auditRequest, target)
+			//nolint:staticcheck
+			ctx = context.WithValue(ctx, "cliproxy.roundtripper", auditTransport)
+		}
 	}
 	cancel := context.CancelFunc(func() {})
 	if !req.Stream {
@@ -112,7 +153,7 @@ func (p *Pipeline) executeAccountAttempt(
 	}
 	defer cancel()
 
-	result := p.cpa.Forward(ctx, c, fwdReq)
+	result := p.executeProvider(ctx, c, fwdReq)
 	if auditTransport != nil && req.Stream && result.Done && result.StreamErr == nil &&
 		result.NetErr == nil && result.BuildErr == nil && result.StatusCode >= 200 && result.StatusCode < 300 {
 		// CPA 已识别协议终态时覆盖底层“未继续读到 HTTP EOF”的临时观测，
@@ -145,9 +186,149 @@ func (p *Pipeline) executeAccountAttempt(
 		firstTokenMs:        result.FirstTokenMs,
 		requestFirstTokenMs: result.RequestFirstTokenMs,
 		written:             result.Written,
+		responseStarted:     result.ResponseStarted,
+		dataReceived:        result.DataReceived,
 		streamErr:           result.StreamErr,
 		done:                result.Done,
 	}
+}
+
+// pipelineHasCPATranslation reports whether the configured provider transport
+// can execute the legacy CPA translation path. This matters for embedders that
+// inject only a CPAAdapter through ProviderTransport and leave the historical
+// CPA field nil: request-audit must still wrap the real in-process HTTP call.
+func pipelineHasCPATranslation(transport providertransport.ProviderTransport) bool {
+	if transport == nil {
+		return false
+	}
+	capabilities, ok := transport.(providertransport.CapabilityProvider)
+	return ok && capabilities.Capabilities().Translation
+}
+
+func accountProviderHeaders(c *gin.Context) http.Header {
+	return accountProviderHeadersForRequest(c, "", nil, "")
+}
+
+// accountProviderHeadersForRequest copies the safe Codex/OpenAI request
+// headers and supplies a wire-aware Content-Type only when the caller did not
+// provide one. Native Realtime call creation accepts either a raw SDP offer,
+// a JSON backend envelope, or multipart data; the explicit inbound value (and
+// its multipart boundary) always wins. The raw Content-Type is kept separately
+// in forwardOptions because raw endpoints may be assembled by an internal
+// caller rather than directly from c.Request.Header.
+func accountProviderHeadersForRequest(c *gin.Context, endpoint string, rawBody []byte, rawContentType string) http.Header {
+	out := make(http.Header)
+	if c != nil && c.Request != nil {
+		for _, name := range []string{
+			"Accept", "Accept-Encoding", "Accept-Language", "Cache-Control",
+			"Content-Type", "Content-Encoding", "If-Match", "If-None-Match", "User-Agent",
+			"OpenAI-Beta", "OpenAI-Alpha", "OAI-Product-Sku",
+			"OpenAI-Organization", "OpenAI-Project", "OpenAI-Version",
+			"X-OpenAI-Fedramp", "X-OpenAI-Internal-Codex-Residency",
+			"X-OpenAI-Client-User-Agent", "X-OpenAI-Client-Version", "X-Client-Version",
+			"Originator", "X-Oai-Attestation", "X-OpenAI-Memgen-Request",
+			"X-ResponsesAPI-Include-Timing-Metrics", "X-OpenAI-Internal-Codex-Responses-Lite",
+			"Session-Id", "X-Session-Id", "Thread-Id", "X-Client-Request-Id", "X-OpenAI-Subagent",
+			"X-Codex-Installation-Id", "X-Codex-Routing-Hint", "X-Codex-Turn-State",
+			"X-Codex-Turn-Metadata", "X-Codex-Parent-Thread-Id", "X-Codex-Window-Id",
+			"X-Codex-Beta-Features", "Traceparent", "Tracestate",
+		} {
+			if values := c.Request.Header.Values(name); len(values) > 0 {
+				out[http.CanonicalHeaderKey(name)] = append([]string(nil), values...)
+			}
+		}
+		// Codex CLI evolves its telemetry/routing headers independently of
+		// Core releases (for example, new x-codex-turn-metadata fields).  Keep
+		// forwarding all non-sensitive X-Codex/X-OpenAI headers rather than
+		// silently dropping a newly introduced contract.  Credential-shaped and
+		// hop-by-hop names remain blocked below, so this does not weaken the
+		// selected-account boundary.
+		for name, values := range c.Request.Header {
+			if !isForwardableCodexHeaderName(name) || len(values) == 0 {
+				continue
+			}
+			canonical := http.CanonicalHeaderKey(name)
+			if _, exists := out[canonical]; exists {
+				continue
+			}
+			out[canonical] = append([]string(nil), values...)
+		}
+	}
+	// The official turn-cost reconciliation client projects only provider
+	// scope headers (organization/project). Authentication is supplied later by
+	// the selected API-key account, so caller credentials, cookies, routing
+	// hints, and internal metadata must not cross this endpoint boundary.
+	if strings.EqualFold(strings.TrimSpace(endpoint), adaptor.EndpointCodexTurnCosts) {
+		out = codexTurnCostsProviderHeaders(out)
+	}
+	if out.Get("Content-Type") == "" {
+		contentType := ""
+		if strings.TrimSpace(rawContentType) != "" {
+			// Preserve the supplied value byte-for-byte, including multipart
+			// boundary parameters and any media-type parameters.
+			contentType = rawContentType
+		} else if strings.EqualFold(strings.TrimSpace(endpoint), adaptor.EndpointRealtimeCalls) &&
+			bytes.HasPrefix(bytes.TrimSpace(rawBody), []byte("v=0")) {
+			contentType = "application/sdp"
+		}
+		if contentType == "" {
+			contentType = "application/json"
+		}
+		out.Set("Content-Type", contentType)
+	}
+	// readRawBody may have decoded an inbound gzip/zstd body before parsing.
+	// Do not send the decoded payload with the stale encoding marker; the
+	// plugin/CPA transport will frame the normalized body itself.
+	if requestBodyWasDecoded(c) {
+		out.Del("Content-Encoding")
+	}
+	return out
+}
+
+func codexTurnCostsProviderHeaders(in http.Header) http.Header {
+	out := make(http.Header)
+	for name, values := range in {
+		switch strings.ToLower(strings.TrimSpace(name)) {
+		case "openai-organization", "openai-project", "content-type":
+			if len(values) > 0 {
+				out[http.CanonicalHeaderKey(name)] = append([]string(nil), values...)
+			}
+		}
+	}
+	return out
+}
+
+func isForwardableCodexHeaderName(name string) bool {
+	lower := strings.ToLower(strings.TrimSpace(name))
+	if lower == "" || isHopByHopProviderHeader(lower) || isCredentialProviderHeader(lower) {
+		return false
+	}
+	return strings.HasPrefix(lower, "x-codex-") ||
+		strings.HasPrefix(lower, "x-openai-") ||
+		strings.HasPrefix(lower, "x-oai-")
+}
+
+func isHopByHopProviderHeader(lower string) bool {
+	switch lower {
+	case "authorization", "proxy-authorization", "host", "connection", "keep-alive",
+		"proxy-authenticate", "proxy-connection", "te", "trailer", "transfer-encoding",
+		"upgrade", "content-length", "set-cookie":
+		return true
+	default:
+		return false
+	}
+}
+
+func isCredentialProviderHeader(lower string) bool {
+	for _, marker := range []string{
+		"authorization", "api-key", "apikey", "access-token", "refresh-token", "id-token",
+		"session-token", "credential", "secret", "password", "cookie",
+	} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 const largeAccountRequestTimingThreshold = 1 << 20
@@ -363,6 +544,27 @@ func (p *Pipeline) handleAccountOutcome(
 		}
 	}
 
+	if partialErr := result.unreplayableProviderFailure(); partialErr != nil {
+		reason := outcome.SanitizeKeyLeak(partialErr.Error(), []string{apiKeyHint})
+		if rateLimitProbe && p.accounts != nil {
+			p.accounts.MarkRateLimitProbeFailed(acc.ID, probeLease, 0, reason)
+		}
+		billed := result.usage != nil && !opts.zeroBilling
+		if billed {
+			p.recordAccountUsage(c, keyInfo, acc, req, endpoint, result, start, price)
+		}
+		writeError(c, http.StatusBadGateway, "upstream_error", "upstream_response_interrupted", "上游响应中断，已停止重试以避免重复执行请求")
+		hop := accountAttemptHop(len(*hops)+1, acc, result.statusCode, "streamAborted", reason, 0, attemptLatency, false)
+		p.recordFailure(c, keyInfo, req, start, errlog.Entry{
+			Phase: errlog.PhaseStreamAborted, StatusCode: http.StatusBadGateway,
+			ErrorType: "upstream_error", ErrorCode: "upstream_response_interrupted",
+			Message: "上游已返回部分数据后中断，已阻止账号/渠道 failover", Billed: billed,
+			Attempts: attempts, Chain: append(*hops, hop),
+			AccountID: acc.ID, AccountName: acc.Name,
+		})
+		return true
+	}
+
 	// buildErr：一次性 400
 	if result.buildErr != nil {
 		p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
@@ -450,6 +652,22 @@ func (p *Pipeline) handleAccountOutcome(
 
 	switch o.Verdict {
 	case outcome.Success:
+		if opts.responseTransform != nil {
+			if err := opts.responseTransform(acc, &result); err != nil {
+				p.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
+				if rateLimitProbe && p.accounts != nil {
+					p.accounts.MarkRateLimitProbeFailed(acc.ID, probeLease, 0, err.Error())
+				}
+				writeError(c, http.StatusBadGateway, "upstream_error", "invalid_upstream_response", "上游 Codex 文件响应无效")
+				p.recordFailure(c, keyInfo, req, start, errlog.Entry{
+					Phase: errlog.PhaseUpstreamClientError, StatusCode: http.StatusBadGateway,
+					ErrorType: "upstream_error", ErrorCode: "invalid_upstream_response",
+					Message: err.Error(), Attempts: attempts,
+					AccountID: acc.ID, AccountName: acc.Name,
+				})
+				return true
+			}
+		}
 		if p.accounts != nil {
 			p.accounts.ClearModelRateLimited(acc.ID, req.Model)
 			if rateLimitProbe {
@@ -461,7 +679,10 @@ func (p *Pipeline) handleAccountOutcome(
 		if !opts.zeroBilling {
 			p.recordAccountUsage(c, keyInfo, acc, req, endpoint, result, start, price)
 		}
-		writeUpstreamBody(c, result)
+		if endpoint == adaptor.EndpointRealtimeCalls {
+			p.rememberRealtimeCallAccount(keyInfo.UserID, keyInfo.GroupID, result.headers.Get("Location"), acc.ID)
+		}
+		writeUpstreamBodyForMode(c, result, opts.passthroughResponse)
 		return true
 
 	case outcome.RateLimited:
@@ -538,6 +759,16 @@ func (p *Pipeline) handleAccountOutcome(
 		billed := result.usage != nil && !opts.zeroBilling
 		if billed {
 			p.recordAccountUsage(c, keyInfo, acc, req, endpoint, result, start, price)
+		}
+		if opts.passthroughResponse {
+			writePassthroughUpstreamBody(c, result)
+			hop := accountAttemptHop(len(*hops)+1, acc, result.statusCode, "clientError", o.Reason, 0, attemptLatency, false)
+			p.recordFailure(c, keyInfo, req, start, errlog.Entry{
+				Phase: errlog.PhaseUpstreamClientError, StatusCode: result.statusCode,
+				Message: o.Reason, Billed: billed, Attempts: attempts,
+				Chain: append(*hops, hop), AccountID: acc.ID, AccountName: acc.Name,
+			})
+			return true
 		}
 		up := errfmt.ParseUpstream(result.statusCode, result.body)
 		up.Message = outcome.SanitizeUpstreamLeak(up.Message, []string{apiKeyHint}, "")

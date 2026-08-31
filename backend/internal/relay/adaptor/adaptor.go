@@ -24,10 +24,81 @@ const (
 	EndpointChatCompletions = "chat_completions"
 	// EndpointResponses OpenAI Responses API（/v1/responses）。
 	EndpointResponses = "responses"
+	// EndpointCompact Codex/OpenAI Responses compact API (/v1/responses/compact).
+	// Compact is a distinct unary endpoint and must not be translated as a
+	// normal Responses request.
+	EndpointCompact = "compact"
 	// EndpointImagesGenerations OpenAI 生图（/v1/images/generations，JSON 透传）。
 	EndpointImagesGenerations = "images_generations"
-	// EndpointImagesEdits OpenAI 图像编辑（/v1/images/edits，multipart 原样透传）。
+	// EndpointImagesEdits OpenAI 图像编辑（/v1/images/edits，JSON 与 multipart 双形态）。
 	EndpointImagesEdits = "images_edits"
+
+	// Official Codex backend-client management contracts. These are raw native
+	// requests and intentionally do not share the ordinary text translation
+	// endpoint identifiers.
+	EndpointCodexUsage                        = "codex_usage"
+	EndpointCodexThreadUsage                  = "codex_thread_usage"
+	EndpointCodexRateLimitResetCredits        = "codex_rate_limit_reset_credits"
+	EndpointCodexRateLimitResetCreditsConsume = "codex_rate_limit_reset_credits_consume"
+	EndpointCodexAccountsCheck                = "codex_accounts_check"
+	EndpointCodexAccountsNudge                = "codex_accounts_send_add_credits_nudge_email"
+	EndpointCodexProfilesMe                   = "codex_profiles_me"
+	EndpointCodexConfigBundle                 = "codex_config_bundle"
+	EndpointCodexSettingsUser                 = "codex_settings_user"
+	EndpointCodexTasks                        = "codex_tasks"
+	EndpointCodexTasksList                    = "codex_tasks_list"
+	EndpointCodexTaskDetails                  = "codex_task_details"
+	EndpointCodexTaskSiblingTurns             = "codex_task_sibling_turns"
+	EndpointCodexWorkspaceMessages            = "codex_workspace_messages"
+	EndpointCodexPSMCP                        = "codex_ps_mcp"
+	// Official cloud-tasks environment discovery contracts. The global list
+	// and repository-scoped lookup are raw/native GETs; the latter carries
+	// provider/owner/repo and an optional ref as opaque path segments.
+	EndpointCodexEnvironments       = "codex_environments"
+	EndpointCodexEnvironmentsByRepo = "codex_environments_by_repo"
+	// Official ChatGPT remote-plugin catalog and mutation contracts. These
+	// endpoints are OAuth-only control-plane calls; their dynamic path
+	// segments are validated by the pipeline route allowlist before forwarding.
+	EndpointCodexPluginsList             = "codex_plugins_list"
+	EndpointCodexPluginsSearch           = "codex_plugins_search"
+	EndpointCodexPluginsSuggested        = "codex_plugins_suggested"
+	EndpointCodexPluginsInstalled        = "codex_plugins_installed"
+	EndpointCodexPluginsWorkspaceShared  = "codex_plugins_workspace_shared"
+	EndpointCodexPluginsWorkspaceCreated = "codex_plugins_workspace_created"
+	EndpointCodexPluginDetail            = "codex_plugin_detail"
+	EndpointCodexPluginSkillDetail       = "codex_plugin_skill_detail"
+	EndpointCodexPluginInstall           = "codex_plugin_install"
+	EndpointCodexPluginUninstall         = "codex_plugin_uninstall"
+	EndpointCodexPluginShares            = "codex_plugin_shares"
+	// Connector directory and app metadata calls are part of the ChatGPT
+	// backend Apps surface used by current Codex CLI builds. They are raw
+	// control-plane requests, not model-generation traffic.
+	EndpointCodexConnectorsDirectoryList          = "codex_connectors_directory_list"
+	EndpointCodexConnectorsDirectoryListWorkspace = "codex_connectors_directory_list_workspace"
+	EndpointCodexAppsBatch                        = "codex_apps_batch"
+	// Legacy featured-plugin discovery/mutation remains in newer CLI builds
+	// as a compatibility path alongside the /ps/plugins API.
+	EndpointCodexPluginsFeatured       = "codex_plugins_featured"
+	EndpointCodexPluginLegacyEnable    = "codex_plugin_legacy_enable"
+	EndpointCodexPluginLegacyUninstall = "codex_plugin_legacy_uninstall"
+	// Workspace plugin sharing uses the public plugin service path. Upload URL
+	// issuance/finalization/delete are distinct endpoint IDs so method and
+	// account-policy checks remain explicit at the Core boundary.
+	EndpointCodexPluginsWorkspaceUploadURL = "codex_plugins_workspace_upload_url"
+	EndpointCodexPluginsWorkspaceCreate    = "codex_plugins_workspace_create"
+	EndpointCodexPluginsWorkspaceUpdate    = "codex_plugins_workspace_update"
+	EndpointCodexPluginsWorkspaceDetail    = "codex_plugins_workspace_detail"
+	EndpointCodexPluginsWorkspaceDelete    = "codex_plugins_workspace_delete"
+	// Official Codex Remote Control HTTP contracts. These are ChatGPT OAuth
+	// control-plane calls; the websocket server endpoint is intentionally kept
+	// separate because it uses a duplex transport and a dedicated handshake.
+	EndpointCodexRemoteControlEnroll          = "codex_remote_control_enroll"
+	EndpointCodexRemoteControlRefresh         = "codex_remote_control_refresh"
+	EndpointCodexRemoteControlPair            = "codex_remote_control_pair"
+	EndpointCodexRemoteControlPairStatus      = "codex_remote_control_pair_status"
+	EndpointCodexRemoteControlClientsList     = "codex_remote_control_clients_list"
+	EndpointCodexRemoteControlClientRevoke    = "codex_remote_control_client_revoke"
+	EndpointCodexRemoteControlServerWebSocket = "codex_remote_control_server_websocket"
 	// EndpointMessages Anthropic Messages API（/v1/messages）。
 	EndpointMessages = "messages"
 	// EndpointMessagesCountTokens Anthropic token 计数（/v1/messages/count_tokens，零计费）。
@@ -41,6 +112,54 @@ const (
 	EndpointCountTokens = "count_tokens"
 	// EndpointAlphaSearch codex CLI 内置联网搜索（/v1/alpha/search，POST 非流式，按次计费）。
 	EndpointAlphaSearch = "alpha_search"
+	// EndpointRealtimeCalls is the Codex/OpenAI WebRTC call bootstrap endpoint
+	// (/v1/realtime/calls). Its SDP, JSON, or multipart body is a native wire
+	// contract and must never enter CPA translation.
+	EndpointRealtimeCalls = "realtime_calls"
+	// EndpointMemoriesTraceSummarize is the Codex memory-generation unary
+	// endpoint (/v1/memories/trace_summarize). It is native-only and its JSON
+	// body/response are forwarded without Responses translation.
+	EndpointMemoriesTraceSummarize = "memories_trace_summarize"
+	// EndpointRealtimeSideband is the provider WebSocket joined after a
+	// realtime call is created. It is a native duplex contract, never CPA.
+	EndpointRealtimeSideband = "realtime_sideband"
+	// EndpointGuardian is the official Codex Guardian approval-review
+	// Responses-compatible endpoint (/guardian). It is a native control-plane
+	// contract and must not be sent through CPA translation.
+	EndpointGuardian = "guardian"
+	// EndpointGuardianClassifier is the official lightweight Guardian risk
+	// classifier endpoint (/guardian-classifier). It is native-only for the same
+	// reason as EndpointGuardian.
+	EndpointGuardianClassifier = "guardian_classifier"
+	// Codex control-plane endpoints used by the optional official History/Notes
+	// extension. These are raw JSON POST contracts: they must never enter CPA
+	// translation or model-token billing.
+	EndpointHistoryListWindows     = "history_list_windows"
+	EndpointHistoryListItems       = "history_list_items"
+	EndpointHistoryReadItem        = "history_read_item"
+	EndpointHistorySearchContents  = "history_search_contents"
+	EndpointNotesListFilesByPrefix = "notes_list_files_by_prefix"
+	EndpointNotesReadFile          = "notes_read_file"
+	EndpointNotesSearchContents    = "notes_search_contents"
+	EndpointNotesAppendToFile      = "notes_append_to_file"
+	EndpointNotesWriteFile         = "notes_write_file"
+	EndpointNotesThreadHint        = "notes_thread_hint"
+	// EndpointAnalyticsEvents is the asynchronous Codex analytics sink. It is
+	// intentionally zero-billing and native-only; failures are surfaced as the
+	// upstream response but never retried through CPA translation.
+	EndpointAnalyticsEvents = "analytics_events"
+	// EndpointFilesCreate and EndpointFilesFinalize implement the official
+	// Codex file-registration lifecycle. The large blob PUT is handled by
+	// Core's opaque-token upload relay; these two JSON calls still run through
+	// the native Codex executor so OAuth refresh, account proxy, and provider
+	// headers stay identical to the rest of the native surface.
+	EndpointFilesCreate   = "files_create"
+	EndpointFilesFinalize = "files_finalize"
+	// EndpointCodexTurnCosts is the API-key billing reconciliation endpoint
+	// used by the official app-server turn-cost worker. It is a raw native
+	// contract (POST /v1/analytics/codex/turn-costs), not a model-generation
+	// request and therefore must never enter CPA translation or billing.
+	EndpointCodexTurnCosts = "codex_turn_costs"
 	// EndpointXAIVideosGenerations xAI 原生异步视频提交（/v1/videos/generations）。
 	EndpointXAIVideosGenerations = "xai_videos_generations"
 	// EndpointXAIVideosRetrieve xAI 原生异步视频查询（/v1/videos/{request_id}）。
@@ -67,6 +186,14 @@ type RelayInfo struct {
 	RawBody []byte
 	// RawContentType 与 RawBody 配套的原始 Content-Type（含 boundary，原样转发上游）。
 	RawContentType string
+	// ProviderPath and ProviderQuery carry the validated upstream shape for
+	// byte-oriented native channel contracts such as OpenAI Realtime call
+	// creation. Adaptors must continue to enforce their own finite path set.
+	ProviderPath  string
+	ProviderQuery map[string][]string
+	// RequestHeaders carries safe end-to-end protocol metadata. Adaptors must
+	// still replace authentication with the selected upstream credential.
+	RequestHeaders http.Header
 	// Client 出口 HTTP 客户端（管线共享复用）。
 	Client *http.Client
 }

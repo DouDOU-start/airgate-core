@@ -91,6 +91,36 @@ func TestModelsForGroup(t *testing.T) {
 	}
 }
 
+func TestListGroupCandidatesDoesNotRequireModelIndex(t *testing.T) {
+	until := time.Now().Add(time.Hour)
+	registry := New(registryLoaderStub{items: []Snapshot{
+		{ID: 3, State: StateActive, Platform: "codex", Models: nil, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 1, State: StateActive, Platform: "codex", Models: map[string]struct{}{"gpt-test": {}}, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 2, State: StateRateLimited, StateUntil: &until, Platform: "codex", Models: nil, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 4, State: StateDisabled, Platform: "codex", Models: nil, GroupIDs: map[int]struct{}{7: {}}},
+		{ID: 5, State: StateActive, Platform: "codex", Models: nil, GroupIDs: map[int]struct{}{8: {}}},
+	}}, nil)
+	if err := registry.Reload(context.Background()); err != nil {
+		t.Fatalf("load registry: %v", err)
+	}
+
+	if got := snapshotIDs(registry.ListGroupCandidates(7, nil)); !sameIntSet(got, []int{1, 3}) {
+		t.Fatalf("group candidates = %v, want [1 3]", got)
+	}
+	if got := snapshotIDs(registry.ListGroupCandidates(7, []int{1})); !sameIntSet(got, []int{3}) {
+		t.Fatalf("group candidates after exclusion = %v, want [3]", got)
+	}
+	if got := registry.ListCandidates(7, "", nil); len(got) != 0 {
+		t.Fatalf("model-index candidates unexpectedly changed: %v", snapshotIDs(got))
+	}
+	if got := snapshotIDs(registry.ListGroupCandidatesForModel(7, "gpt-test", nil)); !sameIntSet(got, []int{1, 3}) {
+		t.Fatalf("model-aware wildcard candidates = %v, want [1 3]", got)
+	}
+	if got := snapshotIDs(registry.ListGroupCandidatesForModel(7, "other-model", nil)); !sameIntSet(got, []int{3}) {
+		t.Fatalf("non-matching explicit catalog leaked: %v", got)
+	}
+}
+
 func TestCandidateListsOnlyExplicitlyAllowRateLimitedAccounts(t *testing.T) {
 	until := time.Now().Add(time.Hour)
 	registry := New(registryLoaderStub{items: []Snapshot{

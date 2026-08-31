@@ -27,6 +27,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 	"github.com/DouDOU-start/airgate-core/internal/relay/task"
+	providertransport "github.com/DouDOU-start/airgate-core/internal/relay/transport"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/handler"
 
@@ -47,24 +48,29 @@ type Server struct {
 	srv    *http.Server
 
 	// 核心服务组件
-	concurrency       *scheduler.ConcurrencyManager
-	recorder          *billing.Recorder
-	errRecorder       *errlog.Recorder
-	handlers          *bootstrap.HTTPHandlers
-	channelRegistry   *registry.Registry
-	accountRegistry   *accountreg.Registry
-	cpaBridge         *cpa.Bridge
-	pricingCache      *pricing.Cache
-	relay             *pipeline.Pipeline
-	taskFlow          *task.Flow
-	taskPoller        *task.Poller
-	probeEngine       *probe.Engine
-	pluginRuntime     *pluginruntime.Manager
-	pluginHandler     *handler.PluginHandler
-	pluginAccessToken string
+	concurrency         *scheduler.ConcurrencyManager
+	recorder            *billing.Recorder
+	errRecorder         *errlog.Recorder
+	handlers            *bootstrap.HTTPHandlers
+	channelRegistry     *registry.Registry
+	accountRegistry     *accountreg.Registry
+	cpaBridge           *cpa.Bridge
+	pricingCache        *pricing.Cache
+	relay               *pipeline.Pipeline
+	taskFlow            *task.Flow
+	taskPoller          *task.Poller
+	probeEngine         *probe.Engine
+	pluginRuntime       *pluginruntime.Manager
+	pluginHandler       *handler.PluginHandler
+	pluginAccessToken   string
+	remoteControlTokens *middleware.RemoteControlTokenStore
+	curatedPluginsProxy *codexCuratedPluginsExportProxy
+	agentIdentityJWKSProxy *codexAgentIdentityJWKSProxy
 
 	// 中间件组件（需 Shutdown 时释放）
-	ipRateLimiter *middleware.IPRateLimiter
+	ipRateLimiter             *middleware.IPRateLimiter
+	curatedPluginsRateLimiter *middleware.IPRateLimiter
+	agentIdentityJWKSRateLimiter *middleware.IPRateLimiter
 	// oauthRateLimiter /oauth/token 端点的 IP 限流器（防 secret 爆破）。
 	oauthRateLimiter *middleware.IPRateLimiter
 	// ccUsageRateLimiter /v1/usage（cc-switch 兼容端点）的 IP 限流器（防刷）。
@@ -99,6 +105,14 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		recorder:    recorder,
 		errRecorder: errRecorder,
 	}
+	// Remote Control environment/client IDs are URL path *segments* and the
+	// official Codex client escapes separators such as `%2F` inside them. Gin
+	// otherwise routes against URL.Path (where `%2F` is already decoded), which
+	// splits a valid ID into multiple route segments. Keep RawPath available
+	// for all route matching; existing handlers still receive decoded params
+	// because UnescapePathValues remains true.
+	s.engine.UseRawPath = true
+	s.engine.UnescapePathValues = true
 
 	s.handlers = bootstrap.NewHTTPHandlers(bootstrap.HTTPDependencies{
 		Config:      cfg,
@@ -148,6 +162,9 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		Token:   s.pluginAccessToken,
 	})
 	s.pluginHandler = handler.NewPluginHandler(s.pluginRuntime)
+	s.remoteControlTokens = middleware.NewRemoteControlTokenStore()
+	s.curatedPluginsProxy = newCodexCuratedPluginsExportProxy()
+	s.agentIdentityJWKSProxy = newCodexAgentIdentityJWKSProxy()
 	if s.handlers.AccountService != nil {
 		s.handlers.AccountService.SetTestRequestTransformer(s.pluginRuntime)
 	}
@@ -180,6 +197,8 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		AccountFirstTokenSource: accountFirstTokenStore{db: db},
 		ChannelFirstTokenSource: accountFirstTokenStore{db: db},
 		CPA:                     s.cpaBridge,
+		ProviderTransport:       providertransport.NewCodexPluginTransport(s.pluginRuntime),
+		CodexTransportPolicy:    s.pluginRuntime,
 		Pricing:                 s.pricingCache,
 		Concurrency:             concurrency,
 		RPM:                     rpmCounter,
@@ -191,6 +210,7 @@ func NewServer(cfg *config.Config, db *ent.Client, rdb *redis.Client) *Server {
 		HealthTracker:           s.probeEngine,
 		RelayHook:               s.pluginRuntime,
 		RequestAudit:            s.handlers.RequestAuditService,
+		RemoteControlTokens:     s.remoteControlTokens,
 	})
 
 	// 异步任务子系统（视频/音乐）：与同步管线同源组件 + task 持久化 + 余额动账适配器。
@@ -366,6 +386,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 	if s.modelMarketRateLimiter != nil {
 		s.modelMarketRateLimiter.Stop()
+	}
+	if s.curatedPluginsRateLimiter != nil {
+		s.curatedPluginsRateLimiter.Stop()
+	}
+	if s.agentIdentityJWKSRateLimiter != nil {
+		s.agentIdentityJWKSRateLimiter.Stop()
 	}
 
 	// 先排空 HTTP 在途请求，再停两个 recorder：在途请求收尾时仍会调 Record，

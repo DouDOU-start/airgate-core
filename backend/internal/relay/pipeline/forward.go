@@ -27,6 +27,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
 	"github.com/DouDOU-start/airgate-core/internal/relay/streamlife"
+	providertransport "github.com/DouDOU-start/airgate-core/internal/relay/transport"
 	"github.com/DouDOU-start/airgate-core/internal/requestaudit"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 )
@@ -84,6 +85,14 @@ type attemptResult struct {
 	requestFirstTokenMs int64
 	// written 已向客户端写出字节（流式）——写出后不可 failover。
 	written bool
+	// dataReceived 已从 provider 收到数据，但未必已向客户端写出。与
+	// written 分开建模：缓冲中的 partial/error body 也意味着请求可能已
+	// 触达上游，不能再切换账号或渠道重放。
+	dataReceived bool
+	// responseStarted records that the provider response boundary was observed
+	// even when no body bytes/status/header values were available. This is a
+	// stronger replay-safety marker than dataReceived for native transports.
+	responseStarted bool
 	// streamErr 流式中途失败（written 恒为 true，只能终止）。
 	streamErr error
 	// done 流式是否收到 data: [DONE] 完成标志（仅 written=true 时有意义）。
@@ -92,6 +101,30 @@ type attemptResult struct {
 	auditErr error
 	// auditAttempt 是普通渠道路径在发包前创建的上游审计行。
 	auditAttempt *requestaudit.AttemptHandle
+}
+
+// unreplayableProviderFailure reports an indeterminate attempt that crossed
+// the provider response boundary. Nothing may have reached the downstream
+// client yet, but the provider may already have consumed (and billed) the
+// request. Retrying on another account or channel would therefore risk
+// duplicate execution.
+func (r attemptResult) unreplayableProviderFailure() error {
+	if (!r.dataReceived && !r.responseStarted) || r.written {
+		return nil
+	}
+	switch {
+	case r.netErr != nil:
+		return r.netErr
+	case r.streamErr != nil:
+		return r.streamErr
+	case r.buildErr != nil:
+		// BuildErr normally means the request never touched the network. If a
+		// provider also reports DataReceived, the latter is the stronger safety
+		// signal and must suppress failover.
+		return r.buildErr
+	default:
+		return nil
+	}
 }
 
 // failureSummary 记录各类失败，用于全部渠道耗尽后的响应选择。
@@ -126,6 +159,51 @@ func protocolForEndpoint(endpoint string) string {
 // 未纳入翻译白名单的端点仍按入口协议只选择原生渠道。
 func channelRoutingProtocolForEndpoint(endpoint string) string {
 	switch endpoint {
+	case adaptor.EndpointMemoriesTraceSummarize, adaptor.EndpointRealtimeSideband,
+		adaptor.EndpointGuardian, adaptor.EndpointGuardianClassifier,
+		adaptor.EndpointHistoryListWindows, adaptor.EndpointHistoryListItems,
+		adaptor.EndpointHistoryReadItem, adaptor.EndpointHistorySearchContents,
+		adaptor.EndpointNotesListFilesByPrefix, adaptor.EndpointNotesReadFile,
+		adaptor.EndpointNotesSearchContents, adaptor.EndpointNotesAppendToFile,
+		adaptor.EndpointNotesWriteFile, adaptor.EndpointNotesThreadHint,
+		adaptor.EndpointAnalyticsEvents, adaptor.EndpointFilesCreate,
+		adaptor.EndpointFilesFinalize,
+		adaptor.EndpointCodexUsage, adaptor.EndpointCodexThreadUsage,
+		adaptor.EndpointCodexRateLimitResetCredits,
+		adaptor.EndpointCodexRateLimitResetCreditsConsume,
+		adaptor.EndpointCodexAccountsCheck, adaptor.EndpointCodexAccountsNudge,
+		adaptor.EndpointCodexProfilesMe, adaptor.EndpointCodexConfigBundle,
+		adaptor.EndpointCodexSettingsUser, adaptor.EndpointCodexTasks,
+		adaptor.EndpointCodexTasksList, adaptor.EndpointCodexTaskDetails,
+		adaptor.EndpointCodexTaskSiblingTurns,
+		adaptor.EndpointCodexEnvironments, adaptor.EndpointCodexEnvironmentsByRepo,
+		adaptor.EndpointCodexWorkspaceMessages, adaptor.EndpointCodexPSMCP,
+		adaptor.EndpointCodexPluginsList, adaptor.EndpointCodexPluginsSearch,
+		adaptor.EndpointCodexPluginsSuggested, adaptor.EndpointCodexPluginsInstalled,
+		adaptor.EndpointCodexPluginsWorkspaceShared,
+		adaptor.EndpointCodexPluginsWorkspaceCreated, adaptor.EndpointCodexPluginDetail,
+		adaptor.EndpointCodexPluginSkillDetail, adaptor.EndpointCodexPluginInstall,
+		adaptor.EndpointCodexPluginUninstall, adaptor.EndpointCodexPluginShares,
+		adaptor.EndpointCodexConnectorsDirectoryList,
+		adaptor.EndpointCodexConnectorsDirectoryListWorkspace,
+		adaptor.EndpointCodexAppsBatch,
+		adaptor.EndpointCodexPluginsFeatured,
+		adaptor.EndpointCodexPluginLegacyEnable,
+		adaptor.EndpointCodexPluginLegacyUninstall,
+		adaptor.EndpointCodexPluginsWorkspaceUploadURL,
+		adaptor.EndpointCodexPluginsWorkspaceCreate,
+		adaptor.EndpointCodexPluginsWorkspaceUpdate,
+		adaptor.EndpointCodexPluginsWorkspaceDetail,
+		adaptor.EndpointCodexPluginsWorkspaceDelete,
+		adaptor.EndpointCodexRemoteControlEnroll, adaptor.EndpointCodexRemoteControlRefresh,
+		adaptor.EndpointCodexRemoteControlPair, adaptor.EndpointCodexRemoteControlPairStatus,
+		adaptor.EndpointCodexRemoteControlClientsList, adaptor.EndpointCodexRemoteControlClientRevoke,
+		adaptor.EndpointCodexRemoteControlServerWebSocket,
+		adaptor.EndpointCodexTurnCosts:
+		// No registry channel implements these native-only Codex wire
+		// contracts. An internal protocol key keeps ordinary CPA channels out of
+		// the candidate index; forwardOptions adds the account-family guard.
+		return "codex_native"
 	case adaptor.EndpointChatCompletions,
 		adaptor.EndpointResponses,
 		adaptor.EndpointMessages,
@@ -155,14 +233,76 @@ func resolveAlphaSearchPrice(settings GatewaySettings, keyInfo *auth.APIKeyInfo)
 
 // forwardOptions 端点级转发选项（零值即既有默认行为）。
 type forwardOptions struct {
+	// method overrides the upstream HTTP method for native/raw account
+	// contracts. The zero value preserves the historical POST behavior used by
+	// model-generation endpoints.
+	method string
 	// rawBody / rawContentType 非 JSON 端点（multipart 等）的原样体：
 	// rawBody 非 nil 时经 RelayInfo 交 adaptor 原始字节直发上游（不重组），
 	// req 字段表仅承载调度所需 model/stream。
 	rawBody        []byte
 	rawContentType string
+	// providerPath overrides the endpoint-derived native provider path. Codex
+	// realtime call creation uses /live for its Frameless wire shape.
+	providerPath string
+	// nativeCodexAccountsOnly prevents native Codex contracts from ever
+	// entering an ordinary channel or a non-Codex account translation path.
+	nativeCodexAccountsOnly bool
+	// channelRoutingProtocol overrides the endpoint's default channel candidate
+	// protocol for shared aliases. Native Codex requests retain the internal
+	// codex_native pool; ordinary shared Realtime requests use OpenAI channels.
+	channelRoutingProtocol string
+	// nativeCodexAPIKeyOnly restricts a native control-plane call to API-key
+	// Codex accounts. The official turn-cost reconciliation endpoint is
+	// available only on the public API-key contract; selecting a ChatGPT OAuth
+	// account would produce an invalid backend path and needlessly consume a
+	// failover attempt.
+	nativeCodexAPIKeyOnly bool
+	// nativeCodexOAuthOnly restricts a native control-plane call to ChatGPT
+	// OAuth accounts. Remote plugin catalog/mutation APIs reject API-key auth
+	// and must not silently fall through to a CPA channel.
+	nativeCodexOAuthOnly bool
+	// preferNativeCodex makes native Codex accounts win over ordinary CPA
+	// channels for a Codex CLI request while retaining the normal CPA route as
+	// a safe fallback when the plugin/account family is unavailable. The
+	// handler decides this from request signals and the plugin-wide policy.
+	preferNativeCodex bool
+	// allowUnpriced is limited to zero-billing native control-plane calls whose
+	// provider response has no billable usage (realtime bootstrap/memories).
+	allowUnpriced bool
+	// passthroughResponse preserves the native endpoint's response status,
+	// headers, content type, and body even for non-2xx client errors.
+	passthroughResponse bool
+	// providerHeaders overrides the safe inbound header projection for a
+	// request-scoped native control-plane contract. A nil value deletes a
+	// projected header; selected-account credentials are still applied by the
+	// transport layer.
+	providerHeaders http.Header
+	// providerQueryDefaults supplies wire-required query parameters for native
+	// control-plane contracts. Defaults are added only when the caller did not
+	// provide that key, so explicit client values always win.
+	providerQueryDefaults map[string][]string
 	// zeroBilling 零计费端点（countTokens 类）：成功/带 usage 的 4xx 均不写
 	// usage_log、不扣费；余额预检与 failover/outcome 语义照常保留。
 	zeroBilling bool
+	// nativeCodexAccountID pins a native-only control request to the account
+	// selected by an earlier step (for example, Files finalize must stay on
+	// the account that created the file). Zero keeps normal weighted routing.
+	nativeCodexAccountID int
+	// responseTransform runs on a successful native account response before
+	// it is written to the caller. It is used by the Files create contract to
+	// replace the provider upload URL with an AirGate opaque upload token.
+	responseTransform func(*accountreg.Snapshot, *attemptResult) error
+	// Remote Control metadata is kept separate from ordinary provider headers.
+	// The native Codex executor uses the enrolled server token only for pair,
+	// pair/status and websocket contracts; the OAuth lease remains authoritative
+	// for enroll/refresh and client-management calls. These values are populated
+	// by the Remote Control entry handler (or a future token middleware).
+	remoteControlToken           string
+	remoteControlServerID        string
+	remoteControlName            string
+	remoteControlProtocolVersion string
+	installationID               string
 }
 
 // forward 转发主循环（默认选项），语义见 forwardOpt。
@@ -178,6 +318,9 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	ctx := c.Request.Context()
 	protocol := protocolForEndpoint(endpoint)
 	channelRoutingProtocol := channelRoutingProtocolForEndpoint(endpoint)
+	if override := strings.TrimSpace(opts.channelRoutingProtocol); override != "" {
+		channelRoutingProtocol = override
+	}
 
 	// 0. 客户端识别 + 分组客户端限制预检。
 	clientid.Detect(c)
@@ -190,7 +333,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		var err error
 		auditRequest, err = p.requestAudit.StartFast(ctx, requestaudit.RequestInput{
 			RequestID: requestIDOf(c), UserID: keyInfo.UserID, UserEmail: keyInfo.UserEmail,
-			APIKeyID: keyInfo.KeyID, GroupID: keyInfo.GroupID, Client: clientid.Get(c),
+			APIKeyID: keyInfo.KeyID, GroupID: keyInfo.GroupID, Client: relayClientType(c),
 			Protocol: protocol, Endpoint: endpoint, Model: req.Model, Stream: req.Stream,
 			Method: c.Request.Method, Path: c.Request.URL.Path, RawQuery: c.Request.URL.RawQuery,
 			Host: c.Request.Host, RequestProto: c.Request.Proto, RemoteAddr: c.Request.RemoteAddr,
@@ -219,7 +362,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		}()
 	}
 	if len(keyInfo.GroupAllowedClients) > 0 {
-		if !clientid.Matches(clientid.Get(c), keyInfo.GroupAllowedClients) {
+		if !clientid.Matches(relayClientType(c), keyInfo.GroupAllowedClients) {
 			if keyInfo.GroupFallbackID != nil {
 				keyInfo.GroupID = *keyInfo.GroupFallbackID
 			} else {
@@ -264,7 +407,11 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 	// 3. 缺价预检：未配置模型价格一律 400 拒绝（无放行开关，杜绝零成本记账漏洞）。
 	// 解析到的 Price 随请求传递到计费收尾复用（不二次 Get），
 	// 避免请求期间缓存失效/重载失败把已定价模型静默记 0。
-	price, priced := p.pricing.Get(req.Model)
+	price := pricing.Price{}
+	priced := opts.allowUnpriced
+	if !opts.allowUnpriced && p.pricing != nil {
+		price, priced = p.pricing.Get(req.Model)
+	}
 	if endpoint == adaptor.EndpointAlphaSearch {
 		// 联网搜索按次计费：单价取分组覆盖价 ?? 全局 gateway 设置，与模型价目表解耦
 		//（SearchResponse 无 token usage，仅 2xx 成功时按次×1 计价，实际扣费再叠加分组倍率）。
@@ -366,7 +513,42 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 
 		var target routeTarget
 		var ok bool
-		if sessionKey != "" {
+		if opts.nativeCodexAccountsOnly || opts.preferNativeCodex {
+			if opts.nativeCodexAccountID > 0 {
+				target, ok = p.pickBoundNativeCodexAccount(keyInfo.GroupID, req.Model, opts.nativeCodexAccountID)
+				if ok {
+					for _, excluded := range excludeAccounts {
+						if excluded == opts.nativeCodexAccountID {
+							ok = false
+							break
+						}
+					}
+				}
+			} else {
+				target, ok = p.pickNativeCodexRouteWithPlan(
+					keyInfo.GroupID, req.Model, excludeAccounts, routePlan,
+				)
+			}
+		}
+		// A Codex request may have an existing native-account affinity. Reuse it
+		// before weighted native selection, but never let a channel affinity beat
+		// the native plane. Relay Hook plans intentionally disable sessionKey
+		// above, so an explicit account order remains authoritative.
+		if opts.preferNativeCodex && !opts.nativeCodexAccountsOnly && !ok && sessionKey != "" {
+			if kind, id, bound := p.sessionAffinity.lookup(sessionKey); bound && kind == routeAccount {
+				target, ok = p.resolveAffinityTarget(kind, id, keyInfo.GroupID, req.Model, channelRoutingProtocol, excludeKeys, excludeAccounts)
+				if ok && (target.account == nil || !isNativeCodexAccount(target.account)) {
+					ok = false
+				}
+				if !ok {
+					unbindAffinity(kind, id)
+				}
+			}
+		}
+		if ok && opts.preferNativeCodex && !opts.nativeCodexAccountsOnly && sessionKey != "" && target.kind == routeAccount && target.account != nil {
+			p.sessionAffinity.bind(sessionKey, routeAccount, target.account.ID)
+		}
+		if !opts.preferNativeCodex && !opts.nativeCodexAccountsOnly && sessionKey != "" {
 			if kind, id, bound := p.sessionAffinity.lookup(sessionKey); bound {
 				// 绑定优先于优先级：目标仍可调度（且未被本次 failover 排除）就复用。
 				target, ok = p.resolveAffinityTarget(kind, id, keyInfo.GroupID, req.Model, channelRoutingProtocol, excludeKeys, excludeAccounts)
@@ -406,7 +588,44 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 				}
 			}
 		}
-		if !ok {
+		if ok && opts.preferNativeCodex && !opts.nativeCodexAccountsOnly && sessionKey != "" && target.kind == routeAccount && target.account != nil {
+			p.sessionAffinity.bind(sessionKey, routeAccount, target.account.ID)
+		}
+		// Some native control-plane contracts are specific to API-key auth. In
+		// particular, the official turn-cost worker calls the public
+		// `/v1/analytics/codex/turn-costs` endpoint; routing that request through
+		// a ChatGPT OAuth account would select the wrong backend path. Reject the
+		// mismatched native candidate before any account slot/probe is acquired.
+		if ok && opts.nativeCodexAPIKeyOnly {
+			if target.kind != routeAccount || target.account == nil ||
+				!providertransport.IsCodexAPIKeyAuthType(target.account.Type) {
+				if target.kind == routeAccount && target.account != nil {
+					hardExcludeAccounts = append(hardExcludeAccounts, target.account.ID)
+					unbindAffinity(routeAccount, target.account.ID)
+				}
+				target = routeTarget{}
+				ok = false
+				// Re-run the native picker with the mismatched account excluded so
+				// a later API-key account in the same group can still serve the
+				// request. No account slot has been acquired at this point.
+				continue
+			}
+		}
+		if ok && opts.nativeCodexOAuthOnly {
+			if target.kind != routeAccount || target.account == nil ||
+				!providertransport.IsCodexOAuthAuthType(target.account.Type) {
+				if target.kind == routeAccount && target.account != nil {
+					hardExcludeAccounts = append(hardExcludeAccounts, target.account.ID)
+					unbindAffinity(routeAccount, target.account.ID)
+				}
+				target = routeTarget{}
+				ok = false
+				// Continue the native picker with the mismatched account excluded;
+				// no account slot or upstream request has been acquired yet.
+				continue
+			}
+		}
+		if !ok && !opts.nativeCodexAccountsOnly {
 			target, ok = p.pickRouteWithChannelConfig(
 				keyInfo.GroupID,
 				req.Model,
@@ -446,7 +665,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		// ---------- 账号路径（CPA）----------
 		if target.kind == routeAccount {
 			acc := target.account
-			if p.cpa == nil {
+			if p.cpa == nil && p.providerTransport == nil {
 				slog.Warn("relay_account_cpa_unavailable", "account_id", acc.ID)
 				hardExcludeAccounts = append(hardExcludeAccounts, acc.ID)
 				unbindAffinity(routeAccount, acc.ID)
@@ -521,7 +740,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 						}
 					}()
 				}
-				return p.executeAccountAttempt(c, acc, req, endpoint, protocol, payload, start, requestID, rpmMinute, auditRequest, cursorSessionKey)
+				return p.executeAccountAttempt(c, acc, req, endpoint, protocol, payload, start, requestID, rpmMinute, auditRequest, cursorSessionKey, opts)
 			}()
 			attemptLatency := time.Since(attemptStart).Milliseconds()
 			attempts++
@@ -549,7 +768,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		// ---------- 渠道 key 路径（同协议直发，跨协议文本走 CPA）----------
 		ch := target.channel
 		needsCPATranslation := channelNeedsCPATranslation(endpoint, protocol, ch.Type)
-		if needsCPATranslation && p.cpa == nil {
+		if needsCPATranslation && p.cpa == nil && p.providerTransport == nil {
 			slog.Warn("relay_channel_cpa_unavailable", "channel_key_id", ch.KeyID, "type", ch.Type)
 			hardExcludeKeys = append(hardExcludeKeys, ch.KeyID)
 			unbindAffinity(routeChannel, ch.KeyID)
@@ -599,6 +818,9 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			Endpoint:       endpoint,
 			RawBody:        opts.rawBody,
 			RawContentType: opts.rawContentType,
+			ProviderPath:   opts.providerPath,
+			ProviderQuery:  providerQueryWithOverrideForEndpoint(c, endpoint, opts.providerQueryDefaults),
+			RequestHeaders: accountProviderHeaders(c),
 			Client:         p.client,
 		}
 		releaseLocalLoad := p.trackChannelAttempt(ch.KeyID)
@@ -622,6 +844,28 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 		if result.auditErr != nil {
 			p.rpm.DecrementKeyRPM(context.Background(), capacityID, rpmMinute)
 			writeError(c, http.StatusInternalServerError, "server_error", "audit_write_failed", "请求审计写入失败，已阻止转发")
+			return
+		}
+
+		if partialErr := result.unreplayableProviderFailure(); partialErr != nil {
+			reason := outcome.SanitizeKeyLeak(partialErr.Error(), []string{apiKey})
+			billed := result.usage != nil && !opts.zeroBilling
+			if billed {
+				p.recordUsage(c, keyInfo, ch, req, endpoint, result, start, price)
+			}
+			writeError(c, http.StatusBadGateway, "upstream_error", "upstream_response_interrupted", "上游响应中断，已停止重试以避免重复执行请求")
+			hop := attemptHop(len(hops)+1, ch, apiKey, result.statusCode, "streamAborted", reason, 0, attemptLatency, false)
+			if p.errSink != nil {
+				p.errSink.CountFailure(context.Background(), ch.ChannelID, "streamAborted", "")
+			}
+			p.recordFailure(c, keyInfo, req, start, errlog.Entry{
+				Phase: errlog.PhaseStreamAborted, StatusCode: http.StatusBadGateway,
+				ErrorType: "upstream_error", ErrorCode: "upstream_response_interrupted",
+				Message: "上游已返回部分数据后中断，已阻止渠道 failover", Billed: billed,
+				Attempts: attempts, Chain: append(hops, hop),
+				ChannelID: ch.ChannelID, ChannelName: ch.ChannelName,
+			})
+			unbindAffinity(routeChannel, ch.KeyID)
 			return
 		}
 
@@ -732,7 +976,7 @@ func (p *Pipeline) forwardOpt(c *gin.Context, keyInfo *auth.APIKeyInfo, req *dto
 			if !opts.zeroBilling {
 				p.recordUsage(c, keyInfo, ch, req, endpoint, result, start, price)
 			}
-			writeUpstreamBody(c, result)
+			writeUpstreamBodyForMode(c, result, opts.passthroughResponse)
 			return
 
 		case outcome.RateLimited:
@@ -1001,10 +1245,17 @@ func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.Rel
 
 	// 上游非 2xx：读错误体（≤64KB）供判定/透传；错误体带 usage 仍计费。
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
 		result.body = body
+		result.dataReceived = len(body) > 0
 		if u, found := dto.ExtractUsage(body); found {
 			result.usage = &u
+		}
+		if readErr != nil {
+			// Keep the HTTP status/body for outcome classification, but retain
+			// the transport error so an indeterminate partial error response is
+			// never retried on another account.
+			result.netErr = readErr
 		}
 		return result
 	}
@@ -1047,6 +1298,7 @@ func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.Rel
 			}
 			sr := relaySSE(c.Writer, resp, attemptStart, extractUsage, forwardUsageChunk, isFirstContentLine, maxLineBytes, observer)
 			result.usage = sr.usage
+			result.dataReceived = sr.dataReceived
 			result.attemptFirstTokenMs = sr.firstTokenMs
 			if sr.firstTokenMs > 0 {
 				requestBeforeAttemptMs := max(attemptStart.Sub(start).Milliseconds(), 0)
@@ -1084,14 +1336,17 @@ func (p *Pipeline) execute(c *gin.Context, ad adaptor.Adaptor, info *adaptor.Rel
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodyBytes+1))
 	if err != nil {
 		// 非流式读体失败：未向客户端写出，按网络错误处理（可 failover）。
-		return attemptResult{netErr: err, statusCode: resp.StatusCode, headers: resp.Header, auditAttempt: auditAttempt}
+		return attemptResult{netErr: err, statusCode: resp.StatusCode, headers: resp.Header,
+			dataReceived: len(body) > 0, body: body, auditAttempt: auditAttempt}
 	}
 	if len(body) > maxResponseBodyBytes {
-		return attemptResult{netErr: fmt.Errorf("上游响应体超过 %d 字节上限", maxResponseBodyBytes), statusCode: resp.StatusCode, headers: resp.Header, auditAttempt: auditAttempt}
+		return attemptResult{netErr: fmt.Errorf("上游响应体超过 %d 字节上限", maxResponseBodyBytes), statusCode: resp.StatusCode,
+			headers: resp.Header, dataReceived: len(body) > 0, body: body, auditAttempt: auditAttempt}
 	}
 	rewritten, usage := ad.ParseNonStreamResponse(info, body)
 	result.body = rewritten
 	result.usage = usage
+	result.dataReceived = len(body) > 0
 	return result
 }
 
@@ -1239,11 +1494,131 @@ func truncateRunes(s string, limit int) string {
 
 // writeUpstreamBody 非流式成功：透传上游状态码 / Content-Type / 响应体（model 已回写）。
 func writeUpstreamBody(c *gin.Context, result attemptResult) {
+	copySafeUpstreamResponseHeaders(c.Writer.Header(), result.headers)
 	contentType := result.contentType
+	if contentType == "" {
+		contentType = result.headers.Get("Content-Type")
+	}
 	if contentType == "" {
 		contentType = "application/json"
 	}
+	// Preserve the attempt result's normalized content type. The header map is
+	// copied for metadata, but this field is authoritative after adaptor body
+	// rewriting and matches the pre-header-copy behavior.
+	c.Header("Content-Type", contentType)
 	c.Data(result.statusCode, contentType, result.body)
+}
+
+// writePassthroughUpstreamBody preserves a raw upstream response without
+// inventing JSON metadata. In particular, native Realtime may return SDP or a
+// body with no Content-Type at all, and control-plane calls may return 204.
+func writePassthroughUpstreamBody(c *gin.Context, result attemptResult) {
+	copySafeUpstreamResponseHeaders(c.Writer.Header(), result.headers)
+	contentType := result.contentType
+	if contentType == "" && result.headers != nil {
+		contentType = result.headers.Get("Content-Type")
+	}
+	if contentType != "" {
+		c.Writer.Header().Set("Content-Type", contentType)
+	} else {
+		// A present nil value suppresses net/http's response-body sniffing while
+		// emitting no Content-Type field on the wire.
+		c.Writer.Header()["Content-Type"] = nil
+	}
+
+	c.Status(result.statusCode)
+	if !upstreamResponseBodyAllowed(c, result.statusCode) || len(result.body) == 0 {
+		c.Writer.WriteHeaderNow()
+		return
+	}
+	if _, err := c.Writer.Write(result.body); err != nil {
+		_ = c.Error(err)
+		c.Abort()
+	}
+}
+
+func writeUpstreamBodyForMode(c *gin.Context, result attemptResult, passthrough bool) {
+	if passthrough {
+		writePassthroughUpstreamBody(c, result)
+		return
+	}
+	writeUpstreamBody(c, result)
+}
+
+func upstreamResponseBodyAllowed(c *gin.Context, status int) bool {
+	if c != nil && c.Request != nil && c.Request.Method == http.MethodHead {
+		return false
+	}
+	return (status < 100 || status > 199) && status != http.StatusNoContent && status != http.StatusNotModified
+}
+
+// hopByHopResponseHeaders are connection-scoped fields that must never be
+// forwarded by a proxy. Content-Length is deliberately handled separately:
+// adaptors may rewrite the response body (for example, model mappings), so an
+// upstream length could be stale and corrupt the downstream framing.
+var hopByHopResponseHeaders = map[string]struct{}{
+	"connection":          {},
+	"keep-alive":          {},
+	"proxy-authenticate":  {},
+	"proxy-authorization": {},
+	"te":                  {},
+	"trailer":             {},
+	"transfer-encoding":   {},
+	"upgrade":             {},
+	"content-length":      {},
+	"set-cookie":          {},
+}
+
+// copySafeUpstreamResponseHeaders copies end-to-end response metadata while
+// stripping hop-by-hop headers. RFC 9110 also allows Connection to nominate
+// extension fields; those tokens are removed as well.
+func copySafeUpstreamResponseHeaders(dst, src http.Header) {
+	if dst == nil || src == nil {
+		return
+	}
+
+	connectionTokens := make(map[string]struct{})
+	for name, values := range src {
+		if !strings.EqualFold(name, "Connection") {
+			continue
+		}
+		for _, value := range values {
+			for _, token := range strings.Split(value, ",") {
+				token = strings.ToLower(strings.TrimSpace(token))
+				if token != "" {
+					connectionTokens[token] = struct{}{}
+				}
+			}
+		}
+	}
+	// Clear any connection-scoped fields that may have been installed by
+	// middleware before this helper runs, including Connection-nominated
+	// extension fields. This makes the helper safe when called with a reused
+	// response header map.
+	for name := range dst {
+		lowerName := strings.ToLower(name)
+		if _, blocked := hopByHopResponseHeaders[lowerName]; blocked {
+			delete(dst, name)
+			continue
+		}
+		if _, blocked := connectionTokens[lowerName]; blocked {
+			delete(dst, name)
+		}
+	}
+
+	for name, values := range src {
+		canonical := http.CanonicalHeaderKey(name)
+		lowerName := strings.ToLower(name)
+		if _, blocked := hopByHopResponseHeaders[lowerName]; blocked {
+			continue
+		}
+		if _, blocked := connectionTokens[lowerName]; blocked {
+			continue
+		}
+		// Replace, rather than Add, so stale middleware values cannot leak into
+		// an upstream response with the same field name.
+		dst[canonical] = append([]string(nil), values...)
+	}
 }
 
 // writeUpstreamError 不可重试 4xx：语义保留、载体重建——上游错误体解析出的语义字段

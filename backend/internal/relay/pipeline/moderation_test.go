@@ -210,6 +210,7 @@ func TestModerationBlocksAlphaSearch(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/alpha/search",
 		strings.NewReader(`{"model":"gpt-4o","query":"含敏感词的搜索"}`))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Originator", "codex_cli_rs")
 	w := httptest.NewRecorder()
 	env.engine.ServeHTTP(w, req)
 

@@ -34,7 +34,7 @@ func TestNormalizeTestModeUsesNormalByDefault(t *testing.T) {
 
 func TestTransformAccountTestRequestRequiresPlugin(t *testing.T) {
 	service := &Service{}
-	_, err := service.transformAccountTestRequest(context.Background(), TestModeOverage, "gpt-test", json.RawMessage(`{"model":"gpt-test"}`))
+	_, err := service.transformAccountTestRequest(context.Background(), TestModeOverage, "oauth", "gpt-test", json.RawMessage(`{"model":"gpt-test"}`))
 	if !errors.Is(err, accounttesthook.ErrUnavailable) {
 		t.Fatalf("未注入插件时错误 = %v，期望 ErrUnavailable", err)
 	}
@@ -49,13 +49,14 @@ func TestTransformAccountTestRequestPassesOverageContext(t *testing.T) {
 	result, err := service.transformAccountTestRequest(
 		context.Background(),
 		TestModeOverage,
+		"oauth",
 		"gpt-test",
 		json.RawMessage(`{"model":"gpt-test","input":"你好"}`),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if transformer.request.Mode != "overage" || transformer.request.Platform != "codex" || transformer.request.Endpoint != "responses" {
+	if transformer.request.Mode != "overage" || transformer.request.Platform != "codex" || transformer.request.AuthKind != "oauth" || transformer.request.Endpoint != "responses" {
 		t.Fatalf("插件请求上下文异常: %+v", transformer.request)
 	}
 	if len(result) == 0 {

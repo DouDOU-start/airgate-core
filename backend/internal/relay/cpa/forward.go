@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -32,6 +33,10 @@ import (
 var (
 	cpaPreContentFlushDelay        = 60 * time.Second
 	cpaPreContentKeepaliveInterval = 15 * time.Second
+	// ErrCompactUnsupported makes the CPA boundary explicit. Codex compact is
+	// a distinct unary endpoint and translating it as ordinary Responses would
+	// silently corrupt the wire contract.
+	ErrCompactUnsupported = errors.New("codex compact endpoint is unsupported by CPA")
 )
 
 const (
@@ -53,12 +58,17 @@ type ForwardRequest struct {
 	UpstreamModel string
 	// Endpoint 入口端点标识（adaptor.Endpoint*）。
 	Endpoint string
+	Method   string
+	Path     string
+	Query    map[string][]string
 	// EntryProtocol 入口协议（openai / anthropic / gemini）。
 	EntryProtocol string
 	// Stream 是否流式。
 	Stream bool
 	// Payload 原始 JSON 请求体。
-	Payload []byte
+	Payload        []byte
+	RawBody        []byte
+	RawContentType string
 	// Headers 可选转发头。
 	Headers http.Header
 	// RequestStartedAt 是请求进入转发主循环的时间，用于记录包含故障转移的真实首字耗时。
@@ -66,6 +76,15 @@ type ForwardRequest struct {
 	// CursorSessionKey 是下游会话的稳定粘性标识，仅供 Cursor executor
 	// 跨请求复用 conversationId、BlobStore 和 checkpoint。为空时保持无状态。
 	CursorSessionKey string
+	// Remote Control metadata is explicit rather than smuggled through
+	// provider headers. Native Codex transports use the enrolled server token
+	// only for pair/pair-status and websocket contracts; the selected OAuth
+	// lease remains authoritative for enroll/refresh/client management.
+	RemoteControlToken           string
+	RemoteControlServerID        string
+	RemoteControlName            string
+	RemoteControlProtocolVersion string
+	InstallationID               string
 }
 
 // ForwardResult 转发结果，语义对齐 pipeline.attemptResult。
@@ -83,10 +102,22 @@ type ForwardResult struct {
 	// 包含请求转换、请求构造和上游握手，用于定位超大请求首字前的本地开销。
 	ExecutorBootstrapMs int64
 	Written             bool
-	StreamErr           error
-	Done                bool
-	NetErr              error
-	BuildErr            error
+	// ResponseStarted records that the upstream response boundary was
+	// observed, even when no status/header/data bytes were available. Native
+	// transports use this replay-safety marker to prevent account/CPA
+	// failover after a provider request may already have taken effect.
+	ResponseStarted bool
+	// DataReceived records whether the upstream executor emitted any response
+	// data before this attempt ended. It is deliberately distinct from Written:
+	// a provider may buffer data (for example, while deciding whether an error
+	// response is safe to expose) without committing anything downstream. Once
+	// data has been observed, retrying the request on another account/key may
+	// replay a side effect and is therefore not safe.
+	DataReceived bool
+	StreamErr    error
+	Done         bool
+	NetErr       error
+	BuildErr     error
 	// RefreshedCredentials refresh 成功后的新凭证（调用方应落库）。
 	RefreshedCredentials map[string]string
 }
@@ -107,6 +138,9 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 	if b == nil {
 		return ForwardResult{BuildErr: fmt.Errorf("cpa bridge 未初始化")}
 	}
+	if req.Endpoint == adaptor.EndpointCompact {
+		return ForwardResult{BuildErr: ErrCompactUnsupported}
+	}
 	if strings.TrimSpace(req.Model) == "" {
 		return ForwardResult{BuildErr: fmt.Errorf("缺少 model")}
 	}
@@ -119,6 +153,10 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 		return ForwardResult{BuildErr: err}
 	}
 	auth := mappedAuth.auth
+	sourceFmt := sourceFormatFor(req.Endpoint, req.EntryProtocol)
+	if errContract := validateCodexCPAContract(auth.Provider, req.Endpoint, req.EntryProtocol, req.Stream); errContract != nil {
+		return ForwardResult{BuildErr: errContract}
+	}
 	ex, err := b.EnsureExecutor(auth.Provider)
 	if err != nil {
 		return ForwardResult{BuildErr: err}
@@ -137,7 +175,6 @@ func (b *Bridge) Forward(ctx context.Context, c *gin.Context, req ForwardRequest
 	}
 	upstreamModel = resolveProviderUpstreamModel(auth.Provider, req.Model, upstreamModel)
 	modelRewrite := providerResponseModelRewrite(auth.Provider, req.Model, upstreamModel)
-	sourceFmt := sourceFormatFor(req.Endpoint, req.EntryProtocol)
 	execReq := cliproxyexecutor.Request{
 		Model:   upstreamModel,
 		Payload: req.Payload,
@@ -487,6 +524,7 @@ func (b *Bridge) relayStreamSinceWithModelRewrite(
 		firstTokenMs        int64
 		requestFirstTokenMs int64
 		written             bool
+		dataReceived        bool
 		downstreamClosed    bool
 		contentStarted      bool
 		done                bool
@@ -505,6 +543,57 @@ func (b *Bridge) relayStreamSinceWithModelRewrite(
 		isFirstContentPayload = responsesPayloadHasContent
 	case adaptor.EndpointMessages:
 		isFirstContentPayload = anthropicPayloadHasContentDelta
+	case adaptor.EndpointImagesGenerations, adaptor.EndpointImagesEdits:
+		isFirstContentPayload = imagePayloadHasContent
+	}
+
+	// CPA's Codex image executor emits image_generation.completed /
+	// image_edit.completed frames, but the streaming result has no response
+	// Body to inspect after EOF. Keep a line-buffered observer so output image
+	// counts and metadata survive arbitrary executor chunk boundaries.
+	var imageObserver *cpaImageStreamObserver
+	var imageObserverBuffer bytes.Buffer
+	if endpoint == adaptor.EndpointImagesGenerations || endpoint == adaptor.EndpointImagesEdits {
+		imageObserver = &cpaImageStreamObserver{}
+	}
+	observeImagePayload := func(payload []byte, final bool) {
+		if imageObserver == nil || (len(payload) == 0 && !final) {
+			return
+		}
+		if len(payload) > 0 {
+			_, _ = imageObserverBuffer.Write(payload)
+		}
+		for {
+			raw := imageObserverBuffer.Bytes()
+			i := bytes.IndexByte(raw, '\n')
+			if i < 0 {
+				break
+			}
+			line := bytes.TrimSuffix(bytes.Clone(raw[:i]), []byte{'\r'})
+			imageObserverBuffer.Next(i + 1)
+			imageObserver.ObserveLine(line)
+		}
+		if final && imageObserverBuffer.Len() > 0 {
+			imageObserver.ObserveLine(bytes.TrimSuffix(imageObserverBuffer.Bytes(), []byte{'\r'}))
+			imageObserverBuffer.Reset()
+		}
+	}
+	syncImageObserver := func() {
+		if imageObserver == nil {
+			return
+		}
+		if observed, ok := imageObserver.Usage(); ok {
+			if usage == nil {
+				cp := observed
+				usage = &cp
+			} else {
+				merged := mergeStreamUsage(*usage, observed)
+				usage = &merged
+			}
+		}
+		if imageObserver.Done() {
+			done = true
+		}
 	}
 
 	writePayload := func(payload []byte, ensureLineEnding bool) {
@@ -554,6 +643,7 @@ func (b *Bridge) relayStreamSinceWithModelRewrite(
 	}
 	processPayload := func(payload []byte, ensureLineEnding bool) (stop bool) {
 		payload = rewriteResponseModelPayload(payload, modelRewrite)
+		observeImagePayload(payload, false)
 		// 旁路解析 usage / 完成标志。Responses 在分帧后解析，可处理跨 chunk JSON。
 		scanStreamPayload(payload, extractUsage, &usage, &done)
 		if event, ok := streamerr.Detect(payload); ok {
@@ -624,6 +714,7 @@ func (b *Bridge) relayStreamSinceWithModelRewrite(
 			writePayload([]byte(": keepalive\n\n"), false)
 		case chunk, ok := <-stream.Chunks:
 			if !ok {
+				observeImagePayload(nil, true)
 				if responsesFramer != nil {
 					for _, frame := range responsesFramer.Flush() {
 						if processPayload(frame, false) {
@@ -636,11 +727,21 @@ func (b *Bridge) relayStreamSinceWithModelRewrite(
 				}
 				goto finish
 			}
+			// A non-empty provider chunk is an observable upstream side effect,
+			// even when the executor reports an error before Core can write it.
+			// Preserve this bit so the scheduler never replays an indeterminate
+			// request on another account/key.
+			if len(chunk.Payload) > 0 {
+				dataReceived = true
+				result.DataReceived = true
+			}
 			if chunk.Err != nil {
 				streamErr = chunk.Err
 				// 若尚未写出任何字节，按错误结果返回（可 failover）。
 				if !written {
-					return errorToResult(chunk.Err)
+					failed := errorToResult(chunk.Err)
+					failed.DataReceived = dataReceived
+					return failed
 				}
 				goto finish
 			}
@@ -672,6 +773,7 @@ func (b *Bridge) relayStreamSinceWithModelRewrite(
 	}
 
 finish:
+	syncImageObserver()
 	if !written && streamErr == nil {
 		if done {
 			// 合法的无内容完成流仍需把生命周期事件交给客户端。
@@ -683,6 +785,7 @@ finish:
 		}
 	}
 	result.Written = written
+	result.DataReceived = dataReceived
 	result.Usage = usage
 	result.FirstTokenMs = firstTokenMs
 	result.RequestFirstTokenMs = requestFirstTokenMs
@@ -732,14 +835,100 @@ func hasSSEField(payload []byte) bool {
 }
 
 func writeStreamHeaders(w gin.ResponseWriter, headers http.Header) {
-	ct := headerOr(headers, "Content-Type", "text/event-stream")
-	w.Header().Set("Content-Type", ct)
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	if v := headerOr(headers, "X-Request-Id", ""); v != "" {
-		w.Header().Set("X-Request-Id", v)
+	copySafeStreamResponseHeaders(w.Header(), headers)
+	w.Header().Set("Content-Type", headerOr(headers, "Content-Type", "text/event-stream"))
+	if w.Header().Get("Cache-Control") == "" {
+		w.Header().Set("Cache-Control", "no-cache")
 	}
+	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
+}
+
+// Headers emitted by the CPA executor originate at the selected upstream.
+// Preserve end-to-end metadata consumed by Codex (for example turn state,
+// models ETag, server model, reasoning and rate-limit fields), while removing
+// connection-scoped framing and values that no longer describe the translated
+// stream body. Connection can nominate additional hop-by-hop fields, so those
+// tokens must be filtered as well.
+var unsafeStreamResponseHeaders = map[string]struct{}{
+	"connection":          {},
+	"keep-alive":          {},
+	"proxy-authenticate":  {},
+	"proxy-authorization": {},
+	"te":                  {},
+	"trailer":             {},
+	"transfer-encoding":   {},
+	"upgrade":             {},
+	"content-length":      {},
+	"content-encoding":    {},
+	"set-cookie":          {},
+}
+
+// These fields are owned by Airgate's outer middleware/response layer. Ignore
+// upstream values without deleting the value already installed by Airgate.
+var reservedStreamResponseHeaders = map[string]struct{}{
+	"access-control-allow-credentials": {},
+	"access-control-allow-headers":     {},
+	"access-control-allow-methods":     {},
+	"access-control-allow-origin":      {},
+	"access-control-expose-headers":    {},
+	"access-control-max-age":           {},
+	"x-cpa-trace-id":                   {},
+}
+
+func copySafeStreamResponseHeaders(dst, src http.Header) {
+	if dst == nil || src == nil {
+		return
+	}
+
+	connectionScoped := make(map[string]struct{})
+	for name, values := range src {
+		if !strings.EqualFold(name, "Connection") {
+			continue
+		}
+		for _, value := range values {
+			for _, token := range strings.Split(value, ",") {
+				token = strings.ToLower(strings.TrimSpace(token))
+				if token != "" {
+					connectionScoped[token] = struct{}{}
+				}
+			}
+		}
+	}
+	// The caller may have installed headers before the first payload (for
+	// example middleware defaults). Remove stale connection-scoped fields before
+	// applying the upstream set; otherwise a nominated extension could survive
+	// even though it was not present in the current response.
+	for name := range dst {
+		lowerName := strings.ToLower(strings.TrimSpace(name))
+		if _, blocked := unsafeStreamResponseHeaders[lowerName]; blocked {
+			delete(dst, name)
+			continue
+		}
+		if _, blocked := connectionScoped[lowerName]; blocked {
+			delete(dst, name)
+		}
+	}
+
+	for name, values := range src {
+		canonicalName := http.CanonicalHeaderKey(name)
+		lowerName := strings.ToLower(canonicalName)
+		if lowerName == "" {
+			continue
+		}
+		if _, reserved := reservedStreamResponseHeaders[lowerName]; reserved {
+			continue
+		}
+		if _, blocked := unsafeStreamResponseHeaders[lowerName]; blocked {
+			delete(dst, canonicalName)
+			continue
+		}
+		if _, blocked := connectionScoped[lowerName]; blocked {
+			delete(dst, canonicalName)
+			continue
+		}
+		dst[canonicalName] = append([]string(nil), values...)
+	}
 }
 
 func nonStreamOK(resp cliproxyexecutor.Response, extractUsage func([]byte) (dto.Usage, bool)) ForwardResult {
@@ -753,11 +942,12 @@ func nonStreamOK(resp cliproxyexecutor.Response, extractUsage func([]byte) (dto.
 	}
 	ct := nonStreamContentType(resp.Headers)
 	return ForwardResult{
-		StatusCode:  http.StatusOK,
-		Headers:     cloneHeader(resp.Headers),
-		Body:        body,
-		ContentType: ct,
-		Usage:       usage,
+		StatusCode:   http.StatusOK,
+		Headers:      cloneHeader(resp.Headers),
+		Body:         body,
+		ContentType:  ct,
+		Usage:        usage,
+		DataReceived: len(body) > 0,
 	}
 }
 
@@ -840,8 +1030,14 @@ func withRefreshedCredentials(result ForwardResult, credentials map[string]strin
 }
 
 func sourceFormatFor(endpoint, entryProtocol string) sdktranslator.Format {
+	endpoint = strings.ToLower(strings.TrimSpace(endpoint))
 	switch endpoint {
 	case adaptor.EndpointResponses:
+		return sdktranslator.FormatOpenAIResponse
+	case adaptor.EndpointCompact:
+		// Compact is guarded at Forward's public boundary. Keep an explicit
+		// format here for defensive callers, but never translate it as ordinary
+		// Responses; callers should surface ErrCompactUnsupported instead.
 		return sdktranslator.FormatOpenAIResponse
 	case adaptor.EndpointMessages, adaptor.EndpointMessagesCountTokens:
 		return sdktranslator.FormatClaude
@@ -997,6 +1193,92 @@ func looksLikeContent(payload []byte) bool {
 		strings.Contains(s, "delta") ||
 		strings.Contains(s, "text") ||
 		strings.Contains(s, "output")
+}
+
+// imagePayloadHasContent recognizes the terminal/partial event names emitted
+// by OpenAI-compatible image streams. Image frames carry b64_json/url rather
+// than text/content fields, so the generic content heuristic would otherwise
+// keep the whole stream buffered until EOF.
+func imagePayloadHasContent(payload []byte) bool {
+	s := strings.ToLower(string(payload))
+	return strings.Contains(s, ".partial_image") || strings.Contains(s, ".completed")
+}
+
+// cpaImageStreamObserver collects image output counts and optional usage from
+// CPA image SSE frames. It intentionally observes complete SSE lines; the
+// relay supplies those through a chunk-boundary buffer.
+type cpaImageStreamObserver struct {
+	usage   *dto.Usage
+	calls   int
+	done    bool
+	size    string
+	quality string
+}
+
+func (o *cpaImageStreamObserver) ObserveLine(line []byte) {
+	if o == nil {
+		return
+	}
+	line = bytes.TrimSpace(line)
+	if !bytes.HasPrefix(line, []byte("data:")) {
+		return
+	}
+	data := bytes.TrimSpace(line[len("data:"):])
+	if len(data) == 0 || bytes.Equal(data, []byte("[DONE]")) {
+		return
+	}
+	var probe struct {
+		Type    string          `json:"type"`
+		Usage   json.RawMessage `json:"usage"`
+		Size    string          `json:"size"`
+		Quality string          `json:"quality"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return
+	}
+	typ := strings.ToLower(strings.TrimSpace(probe.Type))
+	if strings.HasSuffix(typ, ".completed") {
+		o.calls++
+		o.done = true
+	}
+	if strings.TrimSpace(probe.Size) != "" {
+		o.size = strings.TrimSpace(probe.Size)
+	}
+	if strings.TrimSpace(probe.Quality) != "" {
+		o.quality = strings.TrimSpace(probe.Quality)
+	}
+	if len(probe.Usage) > 0 && !bytes.Equal(bytes.TrimSpace(probe.Usage), []byte("null")) {
+		if parsed, ok := dto.ParseUsage(probe.Usage); ok {
+			if o.usage == nil {
+				o.usage = &parsed
+			} else {
+				merged := mergeStreamUsage(*o.usage, parsed)
+				o.usage = &merged
+			}
+			// Some upstreams expose usage without a dedicated completed event.
+			// Treat it as a terminal observation while retaining the explicit
+			// completed-event count when one is present.
+			o.done = true
+		}
+	}
+}
+
+func (o *cpaImageStreamObserver) Usage() (dto.Usage, bool) {
+	if o == nil || (o.usage == nil && o.calls == 0 && o.size == "" && o.quality == "") {
+		return dto.Usage{}, false
+	}
+	var usage dto.Usage
+	if o.usage != nil {
+		usage = *o.usage
+	}
+	usage.Calls = o.calls
+	usage.ImageSize = o.size
+	usage.ImageQuality = o.quality
+	return usage, true
+}
+
+func (o *cpaImageStreamObserver) Done() bool {
+	return o != nil && o.done
 }
 
 // responsesPayloadHasContent 判断 Responses SSE 帧是否包含真实输出。

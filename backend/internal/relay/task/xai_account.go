@@ -132,6 +132,23 @@ func (f *Flow) submitXAIAccount(c *gin.Context, keyInfo *auth.APIKeyInfo, ad Ada
 			f.accounts.UpdateCredentials(acc.ID, result.RefreshedCredentials)
 		}
 		secret := accountCredentialHint(acc)
+		if partialErr := unreplayableCPAResult(result); partialErr != nil {
+			// A non-empty CPA response followed by a transport error is
+			// indeterminate: xAI may already have accepted the video job. Do not
+			// submit it again through another OAuth account.
+			refund("上游 xAI 任务提交响应中断")
+			reason := outcome.SanitizeKeyLeak(partialErr.Error(), []string{secret})
+			writeError(c, http.StatusBadGateway, "upstream_error", "upstream_response_interrupted", "上游 xAI 任务提交响应中断，已停止重试以避免重复创建任务")
+			hop := accountTaskAttemptHop(len(hops)+1, acc, result.StatusCode, "responseInterrupted", reason, 0, attemptLatency, false)
+			f.recordFailure(c, keyInfo, sub.Model, start, errlog.Entry{
+				Phase: errlog.PhaseStreamAborted, StatusCode: http.StatusBadGateway,
+				ErrorType: "upstream_error", ErrorCode: "upstream_response_interrupted",
+				Message:  "上游 xAI 任务提交已返回部分数据后中断，已阻止账号 failover",
+				Attempts: attempts, Chain: append(hops, hop),
+				AccountID: acc.ID, AccountName: acc.Name,
+			})
+			return
+		}
 		if result.BuildErr != nil {
 			f.rpm.DecrementAccountRPM(context.Background(), acc.ID, rpmMinute)
 			refund("构建 xAI 视频请求失败")
@@ -150,8 +167,21 @@ func (f *Flow) submitXAIAccount(c *gin.Context, keyInfo *auth.APIKeyInfo, ad Ada
 		if o.Verdict == outcome.Success {
 			taskID, st, parseErr := ad.ParseSubmitResponse(result.Body)
 			if parseErr != nil || taskID == "" {
-				o.Verdict = outcome.Transient
-				o.Reason = "提交响应解析失败: " + outcome.BodySnippet(result.Body)
+				// A successful HTTP status does not prove that the response contains
+				// a usable task id. xAI may already have accepted the job, so do not
+				// submit it again through another OAuth account on parse failure.
+				reason := outcome.SanitizeKeyLeak(taskSubmitResponseParseFailureReason(result.Body, parseErr), []string{secret})
+				refund("上游 xAI 任务提交响应无效")
+				writeError(c, http.StatusBadGateway, "upstream_error", "invalid_upstream_response", "上游 xAI 任务提交响应无效，已停止重试以避免重复创建任务")
+				hop := accountTaskAttemptHop(len(hops)+1, acc, result.StatusCode, "responseInvalid", reason, 0, attemptLatency, false)
+				f.recordFailure(c, keyInfo, sub.Model, start, errlog.Entry{
+					Phase: errlog.PhaseUpstreamClientError, StatusCode: http.StatusBadGateway,
+					ErrorType: "upstream_error", ErrorCode: "invalid_upstream_response",
+					Message:  "上游 xAI 任务提交返回 2xx 但缺少可解析的任务 ID，已阻止账号 failover",
+					Attempts: attempts, Chain: append(hops, hop),
+					AccountID: acc.ID, AccountName: acc.Name,
+				})
+				return
 			} else {
 				f.accounts.MarkActive(acc.ID)
 				t := f.newXAIAccountTask(c, keyInfo, acc, sub, taskID, st, hold, estTotal, billingRate)
@@ -220,6 +250,23 @@ func (f *Flow) submitXAIAccount(c *gin.Context, keyInfo *auth.APIKeyInfo, ad Ada
 		ErrorType: errType, ErrorCode: errCode, Message: msg,
 		Attempts: attempts, Chain: hops,
 	})
+}
+
+func unreplayableCPAResult(result cpa.ForwardResult) error {
+	if result.Written || (!result.DataReceived &&
+		(result.StatusCode < http.StatusOK || result.StatusCode >= http.StatusMultipleChoices)) {
+		return nil
+	}
+	switch {
+	case result.NetErr != nil:
+		return result.NetErr
+	case result.StreamErr != nil:
+		return result.StreamErr
+	case result.BuildErr != nil:
+		return result.BuildErr
+	default:
+		return nil
+	}
 }
 
 // hasXAIVideoAccount 判断当前分组和模型是否存在真正可调度的 xAI 账号。

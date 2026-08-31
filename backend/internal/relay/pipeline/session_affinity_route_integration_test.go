@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,27 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 )
+
+func TestAccountFailoverStopsAfterBufferedProviderData(t *testing.T) {
+	env := newTestEnv(t)
+	env.pipe.accounts = newActiveAffinityAccounts(t)
+	forwarder := &scriptedAccountForwarder{forward: func(cpa.ForwardRequest) cpa.ForwardResult {
+		return cpa.ForwardResult{
+			StatusCode:   http.StatusOK,
+			DataReceived: true,
+			NetErr:       errors.New("upstream read failed after data"),
+		}
+	}}
+	env.pipe.cpa = forwarder
+
+	response := doAffinityResponses(t, env, "buffered-data-no-replay")
+	if response.Code != http.StatusBadGateway {
+		t.Fatalf("status=%d body=%s, want terminal 502", response.Code, response.Body.String())
+	}
+	if calls := forwarder.accountCalls(); len(calls) != 1 {
+		t.Fatalf("buffered provider data caused account failover: calls=%v", calls)
+	}
+}
 
 func TestAffinity慢账号迁移会更新主绑定(t *testing.T) {
 	env := newTestEnv(t)

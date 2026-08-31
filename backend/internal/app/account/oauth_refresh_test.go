@@ -2,10 +2,34 @@ package account
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 )
+
+func TestCredentialExpirationSupportsCodexTimestampAndJWTForms(t *testing.T) {
+	want := time.Date(2026, 8, 28, 0, 0, 0, 0, time.UTC)
+	seconds := want.Unix()
+	tests := []struct {
+		name        string
+		credentials map[string]string
+	}{
+		{name: "unix seconds", credentials: map[string]string{"expires_at": strconv.FormatInt(seconds, 10)}},
+		{name: "unix milliseconds", credentials: map[string]string{"expires_at": strconv.FormatInt(seconds*1000, 10)}},
+		{name: "JWT numeric exp", credentials: map[string]string{"access_token": "header." + base64.RawURLEncoding.EncodeToString([]byte(`{"exp":`+strconv.FormatInt(seconds, 10)+`}`)) + ".signature"}},
+		{name: "JWT string exp", credentials: map[string]string{"access_token": "header." + base64.RawURLEncoding.EncodeToString([]byte(`{"exp":"`+strconv.FormatInt(seconds, 10)+`"}`)) + ".signature"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := credentialExpiration(test.credentials)
+			if !ok || !got.Equal(want) {
+				t.Fatalf("credentialExpiration() = %v, %v; want %v, true", got, ok, want)
+			}
+		})
+	}
+}
 
 func TestOAuthCredentialsNeedRefresh覆盖主要授权平台(t *testing.T) {
 	now := time.Date(2026, 8, 7, 8, 0, 0, 0, time.UTC)

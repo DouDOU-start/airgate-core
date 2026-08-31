@@ -24,6 +24,7 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
 	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	openaiadaptor "github.com/DouDOU-start/airgate-core/internal/relay/adaptor/openai"
+	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 	"github.com/DouDOU-start/airgate-core/internal/relay/errfmt"
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
@@ -2519,12 +2520,130 @@ func TestForwardImagesEditsMultipart(t *testing.T) {
 		t.Errorf("record 元数据异常: %+v", rec)
 	}
 
-	t.Run("非 multipart Content-Type 400", func(t *testing.T) {
-		w := env.doImagesEdits(t, []byte(`{"model":"x"}`), "application/json")
-		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "invalid_multipart") {
-			t.Errorf("status = %d, body = %s, want 400 invalid_multipart", w.Code, w.Body.String())
+	t.Run("非法 JSON 400", func(t *testing.T) {
+		w := env.doImagesEdits(t, []byte(`{"model":`), "application/json")
+		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "invalid_json") {
+			t.Errorf("status = %d, body = %s, want 400 invalid_json", w.Code, w.Body.String())
 		}
 	})
+}
+
+// TestForwardImagesEditsJSONCodexShape verifies the official Codex CLI JSON
+// image-edit request (images[].image_url) uses the normal transparent DTO
+// path, applies channel model_mapping, and keeps the image response billing
+// observer unchanged.
+func TestForwardImagesEditsJSONCodexShape(t *testing.T) {
+	var hits atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/images/edits" {
+			t.Errorf("upstream route = %s %s, want POST /v1/images/edits", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("Content-Type"); got != "application/json" {
+			t.Errorf("Content-Type = %q, want application/json", got)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read upstream body: %v", err)
+			return
+		}
+		var payload struct {
+			Model  string `json:"model"`
+			Prompt string `json:"prompt"`
+			Images []struct {
+				ImageURL string `json:"image_url"`
+			} `json:"images"`
+			Unknown map[string]any `json:"unknown"`
+		}
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Errorf("upstream body is not JSON: %v; body=%s", err, body)
+			return
+		}
+		if payload.Model != "gpt-image-upstream" {
+			t.Errorf("upstream model = %q, want mapped model", payload.Model)
+		}
+		if payload.Prompt != "make it blue" || len(payload.Images) != 1 ||
+			payload.Images[0].ImageURL != "data:image/png;base64,QUJD" {
+			t.Errorf("official image edit fields not preserved: %+v", payload)
+		}
+		if payload.Unknown["keep"] != true {
+			t.Errorf("unknown field not preserved: %+v", payload.Unknown)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"created":1,"data":[{"b64_json":"QUJD"}]}`)
+	}))
+	defer upstream.Close()
+
+	env := newTestEnv(t, imgSnap(1, upstream.URL))
+	body := []byte(`{"model":"` + imgPerReqModel + `","prompt":"make it blue",` +
+		`"images":[{"image_url":"data:image/png;base64,QUJD"}],` +
+		`"unknown":{"keep":true}}`)
+	w := env.doImagesEdits(t, body, "application/json")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if hits.Load() != 1 {
+		t.Errorf("upstream hits = %d, want 1", hits.Load())
+	}
+	if !strings.Contains(w.Body.String(), `"b64_json":"QUJD"`) {
+		t.Errorf("image response not passed through: %s", w.Body.String())
+	}
+	rec := env.sink.last(t)
+	if rec.Model != imgPerReqModel || rec.Endpoint != "/v1/images/edits" || rec.Calls != 1 {
+		t.Errorf("billing metadata = %+v", rec)
+	}
+}
+
+// TestForwardImagesEditsJSONCodexAccountCPA confirms that the JSON shape is
+// still handed to the Codex account CPA executor as an openai-image request;
+// it must not be mistaken for multipart or sent through text translation.
+func TestForwardImagesEditsJSONCodexAccountCPA(t *testing.T) {
+	env := newTestEnv(t)
+	accounts := accountreg.New(&fakeAccountLoader{snaps: []accountreg.Snapshot{{
+		ID: 77, Name: "codex-image", Platform: "codex", Type: "oauth",
+		State: accountreg.StateActive, Models: map[string]struct{}{imgPerReqModel: {}},
+		GroupIDs: map[int]struct{}{7: {}}, Credentials: map[string]string{"access_token": "codex-token"},
+	}}}, nil)
+	if err := accounts.Reload(context.Background()); err != nil {
+		t.Fatalf("reload accounts: %v", err)
+	}
+	env.pipe.accounts = accounts
+	forwarder := &scriptedAccountForwarder{forward: func(req cpa.ForwardRequest) cpa.ForwardResult {
+		if req.Endpoint != adaptor.EndpointImagesEdits || req.EntryProtocol != registry.ProtocolOpenAI {
+			t.Errorf("CPA contract = endpoint:%q protocol:%q", req.Endpoint, req.EntryProtocol)
+		}
+		if req.RawBody != nil || req.Headers.Get("Content-Type") != "application/json" {
+			t.Errorf("CPA JSON shape was not preserved: raw=%q content-type=%q", req.RawBody, req.Headers.Get("Content-Type"))
+		}
+		var payload struct {
+			Model  string `json:"model"`
+			Images []struct {
+				ImageURL string `json:"image_url"`
+			} `json:"images"`
+		}
+		if err := json.Unmarshal(req.Payload, &payload); err != nil {
+			t.Errorf("CPA payload is not JSON: %v", err)
+		} else if payload.Model != imgPerReqModel || len(payload.Images) != 1 ||
+			payload.Images[0].ImageURL != "data:image/png;base64,QUJD" {
+			t.Errorf("CPA image JSON payload = %+v", payload)
+		}
+		return cpa.ForwardResult{
+			StatusCode: http.StatusOK, ContentType: "application/json",
+			Body:  []byte(`{"created":1,"data":[{"b64_json":"QUJD"}]}`),
+			Usage: &dto.Usage{Calls: 1},
+		}
+	}}
+	env.pipe.cpa = forwarder
+
+	body := []byte(`{"model":"` + imgPerReqModel + `","prompt":"edit",` +
+		`"images":[{"image_url":"data:image/png;base64,QUJD"}]}`)
+	w := env.doImagesEdits(t, body, "application/json")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if got := len(forwarder.forwardedRequests()); got != 1 {
+		t.Fatalf("CPA calls = %d, want 1", got)
+	}
 }
 
 // TestForwardImagesEditsMultipartNoMappingIdentity 渠道无 model_mapping 时

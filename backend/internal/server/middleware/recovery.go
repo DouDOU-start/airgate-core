@@ -21,7 +21,7 @@ func Recovery() gin.HandlerFunc {
 					"stack", string(debug.Stack()),
 					logx.LogFieldRequestID, rid,
 					logx.LogFieldMethod, c.Request.Method,
-					logx.LogFieldPath, c.Request.URL.Path,
+					logx.LogFieldPath, RedactSensitiveRequestPath(c.Request.URL.Path),
 				)
 				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 					"error":      "internal_server_error",

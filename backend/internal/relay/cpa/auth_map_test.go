@@ -176,6 +176,34 @@ func TestMapAuthCached并发读取(t *testing.T) {
 	}
 }
 
+func TestResolveProviderDoesNotAliasOpenAIToCodex(t *testing.T) {
+	for _, test := range []struct {
+		platform string
+		want     string
+	}{
+		{platform: "openai", want: "openai"},
+		{platform: "OPENAI", want: "openai"},
+		{platform: "openai_codex", want: "openai-codex"},
+		{platform: "openai-codex", want: "openai-codex"},
+	} {
+		if got := ResolveProvider(test.platform); got != test.want {
+			t.Fatalf("ResolveProvider(%q) = %q, want %q", test.platform, got, test.want)
+		}
+	}
+	auth, err := MapAuth(AccountAuthInput{
+		AccountID:   99,
+		Platform:    "openai",
+		Type:        "oauth",
+		Credentials: map[string]string{"access_token": "token"},
+	})
+	if err != nil {
+		t.Fatalf("MapAuth(openai) error: %v", err)
+	}
+	if auth.Provider != "openai" {
+		t.Fatalf("MapAuth(openai) provider = %q, want openai", auth.Provider)
+	}
+}
+
 func BenchmarkMapAuth(b *testing.B) {
 	input := AccountAuthInput{
 		AccountID: 6,

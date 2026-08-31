@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -260,6 +261,16 @@ func (f *fakeErrSink) Record(e errlog.Entry) {
 }
 
 func (f *fakeErrSink) CountFailure(context.Context, int, string, string) {}
+
+func (f *fakeErrSink) last(t *testing.T) errlog.Entry {
+	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.entries) == 0 {
+		t.Fatal("expected an upstream failure entry")
+	}
+	return f.entries[len(f.entries)-1]
+}
 
 // fakeChannelLoader / fakePriceLoader 与 pipeline 测试同构。
 type fakeChannelLoader struct{ snaps []registry.ChannelKeySnapshot }
@@ -570,6 +581,66 @@ func TestXAIVideoSubmitUsesOAuthAccountAndPersistsBinding(t *testing.T) {
 	}
 }
 
+func TestXAIVideoSubmitMalformed2xxStopsAccountFailover(t *testing.T) {
+	const model = "grok-imagine-video-malformed"
+	accounts := accountreg.New(&fakeAccountLoader{snaps: []accountreg.Snapshot{
+		{
+			ID: 333, Name: "First OAuth", Platform: "xai", Type: "oauth",
+			Credentials: map[string]string{"access_token": "oauth-token-1"},
+			Priority:    100, Weight: 10, MaxConcurrency: 2, State: accountreg.StateActive,
+			Models: map[string]struct{}{model: {}}, GroupIDs: map[int]struct{}{7: {}},
+		},
+		{
+			ID: 334, Name: "Second OAuth", Platform: "xai", Type: "oauth",
+			Credentials: map[string]string{"access_token": "oauth-token-2"},
+			Priority:    1, Weight: 10, MaxConcurrency: 2, State: accountreg.StateActive,
+			Models: map[string]struct{}{model: {}}, GroupIDs: map[int]struct{}{7: {}},
+		},
+	}}, nil)
+	if err := accounts.Reload(context.Background()); err != nil {
+		t.Fatalf("账号注册表加载失败: %v", err)
+	}
+	prices := pricing.NewCache(&fakePriceLoader{prices: map[string]pricing.Price{
+		model: {VideoPerSecond: 0.07, VideoResolutionPrices: map[string]float64{"720p": 0.07}},
+	}})
+	if err := prices.Reload(context.Background()); err != nil {
+		t.Fatalf("价目表加载失败: %v", err)
+	}
+	forwarder := &fakeCPAForwarder{results: []cpa.ForwardResult{{
+		StatusCode: http.StatusOK,
+		Headers:    http.Header{"Content-Type": []string{"application/json"}},
+		Body:       []byte(`{"status":"pending"}`),
+	}}}
+	store := newMemStore()
+	balance := newFakeBalance()
+	errSink := &fakeErrSink{}
+	flow := task.NewFlow(task.Options{
+		Accounts: accounts, CPA: forwarder, Pricing: prices,
+		Concurrency: scheduler.NewConcurrencyManager(nil), RPM: scheduler.NewRPMCounter(nil),
+		Calculator: billing.NewCalculator(), Settings: pipeline.NewSettingsReader(nil),
+		Store: store, Balance: balance, ErrLog: errSink,
+	})
+	engine := gin.New()
+	injectKey := func(c *gin.Context) { c.Set(middleware.CtxKeyKeyInfo, testKeyInfo()) }
+	engine.POST("/v1/videos/generations", injectKey, flow.HandleXAIVideoSubmit)
+
+	w := doJSON(t, engine, http.MethodPost, "/v1/videos/generations",
+		`{"model":"grok-imagine-video-malformed","prompt":"海面日落","duration":6,"resolution":"720p"}`)
+	if w.Code != http.StatusBadGateway || !strings.Contains(w.Body.String(), "invalid_upstream_response") {
+		t.Fatalf("malformed xAI 2xx response must fail closed: status=%d body=%s", w.Code, w.Body.String())
+	}
+	if len(forwarder.requests) != 1 || forwarder.requests[0].Account.AccountID != 333 {
+		t.Fatalf("账号 failover must stop after first malformed response: requests=%+v", forwarder.requests)
+	}
+	if store.count() != 0 || len(balance.opsOf("adjust")) != 1 {
+		t.Fatalf("untrackable xAI task must not persist and hold must be refunded: rows=%d adjusts=%+v", store.count(), balance.opsOf("adjust"))
+	}
+	entry := errSink.last(t)
+	if len(entry.Chain) != 1 || strings.Contains(entry.Chain[0].Reason, "oauth-token-1") {
+		t.Fatalf("malformed-response audit reason leaked account credentials: %+v", entry.Chain)
+	}
+}
+
 func TestXAIVideoSubmitWithoutLocalAccountUsesChannelDirectly(t *testing.T) {
 	var gotMethod, gotPath, gotAuth, gotModel string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -695,6 +766,74 @@ func TestVideoSubmitFailoverOn429(t *testing.T) {
 	// 预扣只发生一次，failover 不重复扣。
 	if holds := env.balance.opsOf("hold"); len(holds) != 1 {
 		t.Errorf("holds = %d, want 1", len(holds))
+	}
+}
+
+func TestVideoSubmitPartialResponseStopsFailover(t *testing.T) {
+	var badHits, goodHits atomic.Int32
+	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		badHits.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Length", "128")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"orphan`))
+	}))
+	defer bad.Close()
+	good := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		goodHits.Add(1)
+		_, _ = w.Write([]byte(`{"id":"duplicate","status":"queued"}`))
+	}))
+	defer good.Close()
+
+	env := newTestEnv(t,
+		videoSnap(1, bad.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 100 }),
+		videoSnap(2, good.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 1 }),
+	)
+	w := doJSON(t, env.engine, http.MethodPost, "/v1/videos", `{"model":"sora-2","seconds":4}`)
+
+	if w.Code != http.StatusBadGateway || !strings.Contains(w.Body.String(), "upstream_response_interrupted") {
+		t.Fatalf("partial submit response must fail closed: status=%d body=%s", w.Code, w.Body.String())
+	}
+	if badHits.Load() != 1 || goodHits.Load() != 0 {
+		t.Fatalf("upstream hits bad/good=%d/%d, want 1/0", badHits.Load(), goodHits.Load())
+	}
+	if env.store.count() != 0 || len(env.balance.opsOf("adjust")) != 1 {
+		t.Fatalf("indeterminate task must not persist and its hold must be refunded: rows=%d adjusts=%+v", env.store.count(), env.balance.opsOf("adjust"))
+	}
+}
+
+func TestVideoSubmitMalformed2xxStopsFailover(t *testing.T) {
+	var badHits, goodHits atomic.Int32
+	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		badHits.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"queued","debug":"sk-video-1"}`))
+	}))
+	defer bad.Close()
+	good := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		goodHits.Add(1)
+		_, _ = w.Write([]byte(`{"id":"duplicate","status":"queued"}`))
+	}))
+	defer good.Close()
+
+	env := newTestEnv(t,
+		videoSnap(1, bad.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 100 }),
+		videoSnap(2, good.URL, func(s *registry.ChannelKeySnapshot) { s.Priority = 1 }),
+	)
+	w := doJSON(t, env.engine, http.MethodPost, "/v1/videos", `{"model":"sora-2","seconds":4}`)
+
+	if w.Code != http.StatusBadGateway || !strings.Contains(w.Body.String(), "invalid_upstream_response") {
+		t.Fatalf("malformed 2xx submit response must fail closed: status=%d body=%s", w.Code, w.Body.String())
+	}
+	if badHits.Load() != 1 || goodHits.Load() != 0 {
+		t.Fatalf("upstream hits bad/good=%d/%d, want 1/0", badHits.Load(), goodHits.Load())
+	}
+	if env.store.count() != 0 || len(env.balance.opsOf("adjust")) != 1 {
+		t.Fatalf("untrackable task must not persist and its hold must be refunded: rows=%d adjusts=%+v", env.store.count(), env.balance.opsOf("adjust"))
+	}
+	entry := env.errSink.last(t)
+	if len(entry.Chain) != 1 || strings.Contains(entry.Chain[0].Reason, "sk-video-1") {
+		t.Fatalf("malformed-response audit reason leaked channel credentials: %+v", entry.Chain)
 	}
 }
 

@@ -76,6 +76,31 @@ func TestOAuthSessionConcurrentTerminalTransitionsAreSafe(t *testing.T) {
 	}
 }
 
+func TestFinishCodexOAuthDoesNotPersistTransportMode(t *testing.T) {
+	repo := &importCaptureRepo{}
+	service := NewService(repo, "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
+	entry := &oauthSessionEntry{
+		public: OAuthSession{ID: "codex-mode-session", Platform: "codex", Status: OAuthStatusPending, CreatedAt: time.Now()},
+		input:  OAuthStartInput{Name: "Codex OAuth"},
+		done:   make(chan struct{}),
+	}
+	if err := service.finishOAuthWithCredentials(context.Background(), entry, map[string]string{
+		"access_token": "access-token",
+	}); err != nil {
+		t.Fatalf("完成 Codex OAuth 失败: %v", err)
+	}
+	if repo.created.CredentialsEnc == "" {
+		t.Fatal("OAuth 账号未落库")
+	}
+	item, err := service.FindByID(context.Background(), repo.created.ID, LoadOptions{})
+	if err != nil {
+		t.Fatalf("读取 OAuth 账号失败: %v", err)
+	}
+	if _, exists := item.Credentials["codex_mode"]; exists {
+		t.Fatalf("OAuth codex_mode 未规范化持久化: %#v", item.Credentials)
+	}
+}
+
 func TestPollXAIToken写入OAuth转发元数据(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {

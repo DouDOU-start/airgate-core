@@ -2,11 +2,13 @@ package account
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -77,14 +79,64 @@ func oauthRefreshLead(platform string) time.Duration {
 }
 
 func credentialExpiration(credentials map[string]string) (time.Time, bool) {
+	if credentials == nil {
+		return time.Time{}, false
+	}
 	for _, key := range []string{"expired", "expire", "expires_at", "expiresAt", "expiry", "expires"} {
 		raw := strings.TrimSpace(credentials[key])
 		if raw == "" {
 			continue
 		}
+		// Codex imports and OAuth responses use both Unix seconds and Unix
+		// milliseconds. Accept either representation before trying date
+		// strings so refresh decisions match the native executor.
+		if number, err := strconv.ParseInt(raw, 10, 64); err == nil && number > 0 {
+			if number > 100_000_000_000 {
+				number /= 1000
+			}
+			return time.Unix(number, 0), true
+		}
 		for _, layout := range []string{time.RFC3339Nano, time.RFC3339, "2006-01-02 15:04:05", "2006-01-02 15:04"} {
 			if parsed, err := time.Parse(layout, raw); err == nil {
 				return parsed, true
+			}
+		}
+	}
+	// Access-token-only imports frequently omit an explicit expiry while the
+	// JWT still carries the authoritative exp claim. This is deliberately a
+	// best-effort decode: signature verification belongs to the provider, and
+	// malformed/opaque tokens simply retain the historical no-expiry behavior.
+	if token := strings.TrimSpace(credentials["access_token"]); token != "" {
+		parts := strings.Split(token, ".")
+		if len(parts) >= 2 {
+			payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+			if err != nil {
+				payload, err = base64.URLEncoding.DecodeString(parts[1])
+			}
+			if err == nil {
+				var claims map[string]json.RawMessage
+				if json.Unmarshal(payload, &claims) == nil {
+					if raw := claims["exp"]; len(raw) > 0 {
+						var number json.Number
+						if json.Unmarshal(raw, &number) == nil {
+							if value, err := strconv.ParseInt(string(number), 10, 64); err == nil && value > 0 {
+								if value > 100_000_000_000 {
+									value /= 1000
+								}
+								return time.Unix(value, 0), true
+							}
+						}
+						var textValue string
+						if json.Unmarshal(raw, &textValue) == nil {
+							if value, err := strconv.ParseInt(strings.TrimSpace(textValue), 10, 64); err == nil && value > 0 {
+								if value > 100_000_000_000 {
+									value /= 1000
+								}
+								return time.Unix(value, 0), true
+							}
+						}
+					}
+				}
 			}
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -134,6 +135,32 @@ func TestForwardCrossProtocolChannelUsesCPA(t *testing.T) {
 	if record.InputTokens != 13 || record.CachedInputTokens != 22000 || record.CacheCreationTokens != 40 {
 		t.Fatalf("CPA 翻译后的缓存用量拆分错误: input=%d cached=%d creation=%d",
 			record.InputTokens, record.CachedInputTokens, record.CacheCreationTokens)
+	}
+}
+
+func TestForwardCrossProtocolChannelStopsAfterBufferedData(t *testing.T) {
+	first := testSnap(601, "https://anthropic-first.example/v1", func(s *registry.ChannelKeySnapshot) {
+		s.Type = "anthropic"
+		s.Priority = 100
+	})
+	second := testSnap(602, "https://anthropic-second.example/v1", func(s *registry.ChannelKeySnapshot) {
+		s.Type = "anthropic"
+		s.Priority = 1
+	})
+	env := newTestEnv(t, first, second)
+	forwarder := &captureChannelForwarder{result: cpa.ForwardResult{
+		StatusCode:   http.StatusOK,
+		DataReceived: true,
+		NetErr:       errors.New("upstream read failed after data"),
+	}}
+	env.pipe.cpa = forwarder
+
+	response := env.do(t, `{"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]}`)
+	if response.Code != http.StatusBadGateway {
+		t.Fatalf("status=%d body=%s, want terminal 502", response.Code, response.Body.String())
+	}
+	if calls := forwarder.calls(); len(calls) != 1 {
+		t.Fatalf("buffered provider data caused channel failover: CPA calls=%d", len(calls))
 	}
 }
 

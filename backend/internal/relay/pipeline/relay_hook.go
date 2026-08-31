@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/DouDOU-start/airgate-core/internal/auth"
-	"github.com/DouDOU-start/airgate-core/internal/relay/clientid"
 	"github.com/DouDOU-start/airgate-core/internal/relay/dto"
 	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
 )
@@ -36,7 +35,7 @@ func (p *Pipeline) applyRelayHook(
 		UserID:     keyInfo.UserID,
 		APIKeyID:   keyInfo.KeyID,
 		GroupID:    keyInfo.GroupID,
-		Client:     clientid.Get(c),
+		Client:     relayClientType(c),
 		Endpoint:   endpoint,
 		Protocol:   protocol,
 		Model:      req.Model,

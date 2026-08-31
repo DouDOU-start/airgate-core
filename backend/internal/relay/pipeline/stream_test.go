@@ -489,6 +489,9 @@ func TestRelaySSEObserverInterruptUsesAccumulatedUsage(t *testing.T) {
 	if sr.done {
 		t.Error("中断流不得标记完成")
 	}
+	if !sr.dataReceived {
+		t.Error("读取到上游 SSE 行后必须标记 dataReceived")
+	}
 }
 
 // 首内容前的流内 error 事件不能提交响应头或错误帧，应交给 failover 状态机。

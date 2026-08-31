@@ -405,6 +405,92 @@ func TestRelayStreamDoesNotCommitHeadersBeforeFirstChunk(t *testing.T) {
 	}
 }
 
+func TestRelayStreamPreservesDataReceivedBeforeReadError(t *testing.T) {
+	c, recorder := newStreamTestContext()
+	chunks := make(chan cliproxyexecutor.StreamChunk, 2)
+	chunks <- cliproxyexecutor.StreamChunk{Payload: []byte("event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp-1\"}}\n\n")}
+	chunks <- cliproxyexecutor.StreamChunk{Err: errors.New("upstream connection reset")}
+	close(chunks)
+
+	result := (&Bridge{}).relayStream(context.Background(), c,
+		&cliproxyexecutor.StreamResult{Chunks: chunks}, time.Now(), adaptor.EndpointResponses)
+
+	if !result.DataReceived || result.Written || result.NetErr == nil {
+		t.Fatalf("result=%+v, want buffered provider data plus retry-unsafe read error", result)
+	}
+	if c.Writer.Written() || recorder.Body.Len() != 0 {
+		t.Fatalf("buffered lifecycle frame must not be committed: code=%d body=%q", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestNonStreamOKMarksProviderPayloadReceived(t *testing.T) {
+	result := nonStreamOK(cliproxyexecutor.Response{Payload: []byte(`{"id":"resp-1"}`)}, nil)
+	if !result.DataReceived {
+		t.Fatalf("result=%+v, non-empty provider response must set DataReceived", result)
+	}
+	empty := nonStreamOK(cliproxyexecutor.Response{}, nil)
+	if empty.DataReceived {
+		t.Fatalf("result=%+v, empty provider response must not set DataReceived", empty)
+	}
+}
+
+func TestWriteStreamHeadersPreservesCodexMetadataAndStripsUnsafeHeaders(t *testing.T) {
+	c, recorder := newStreamTestContext()
+	c.Header("Access-Control-Allow-Origin", "https://airgate.example")
+	writeStreamHeaders(c.Writer, http.Header{
+		"Content-Type":                {"text/event-stream; charset=utf-8"},
+		"Cache-Control":               {"no-cache, no-transform"},
+		"X-Codex-Turn-State":          {"turn-state"},
+		"X-Models-Etag":               {"models-v2"},
+		"OpenAI-Model":                {"gpt-test"},
+		"X-Reasoning-Included":        {"true"},
+		"X-Request-Id":                {"req-upstream"},
+		"X-Codex-Primary-Reset":       {"123"},
+		"Connection":                  {"keep-alive, X-Connection-Only"},
+		"X-Connection-Only":           {"must-not-leak"},
+		"Keep-Alive":                  {"timeout=5"},
+		"Proxy-Authenticate":          {"Basic realm=proxy"},
+		"Proxy-Authorization":         {"secret"},
+		"TE":                          {"trailers"},
+		"Trailer":                     {"X-Trailer"},
+		"Transfer-Encoding":           {"chunked"},
+		"Upgrade":                     {"h2c"},
+		"Content-Length":              {"999"},
+		"Content-Encoding":            {"zstd"},
+		"Set-Cookie":                  {"upstream=secret"},
+		"Access-Control-Allow-Origin": {"https://upstream.example"},
+	})
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	for name, want := range map[string]string{
+		"Content-Type":                "text/event-stream; charset=utf-8",
+		"Cache-Control":               "no-cache, no-transform",
+		"X-Codex-Turn-State":          "turn-state",
+		"X-Models-Etag":               "models-v2",
+		"OpenAI-Model":                "gpt-test",
+		"X-Reasoning-Included":        "true",
+		"X-Request-Id":                "req-upstream",
+		"X-Codex-Primary-Reset":       "123",
+		"X-Accel-Buffering":           "no",
+		"Access-Control-Allow-Origin": "https://airgate.example",
+	} {
+		if got := recorder.Header().Get(name); got != want {
+			t.Errorf("header %s = %q, want %q", name, got, want)
+		}
+	}
+	for _, name := range []string{
+		"Connection", "X-Connection-Only", "Keep-Alive", "Proxy-Authenticate",
+		"Proxy-Authorization", "TE", "Trailer", "Transfer-Encoding", "Upgrade",
+		"Content-Length", "Content-Encoding", "Set-Cookie",
+	} {
+		if got := recorder.Header().Get(name); got != "" {
+			t.Errorf("unsafe header %s leaked as %q", name, got)
+		}
+	}
+}
+
 func TestRelayStream内容前超时保活(t *testing.T) {
 	oldDelay, oldInterval := cpaPreContentFlushDelay, cpaPreContentKeepaliveInterval
 	cpaPreContentFlushDelay, cpaPreContentKeepaliveInterval = 30*time.Millisecond, 10*time.Millisecond

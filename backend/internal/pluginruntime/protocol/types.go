@@ -14,6 +14,10 @@ const (
 	PluginKey = "plugin"
 	// CapabilityRelayHookV1 表示插件实现 Relay Hook v1 请求处理能力。
 	CapabilityRelayHookV1 = "relay_hook.v1"
+	// CapabilityProviderAttemptTransformV1 marks a request-body transform that
+	// runs after Core has selected one concrete account. Its output is scoped to
+	// that attempt and cannot influence routing.
+	CapabilityProviderAttemptTransformV1 = "provider_attempt_transform.v1"
 	// CapabilityAccountTestTransformV1 表示插件可按测试模式改写账号连接测试请求。
 	CapabilityAccountTestTransformV1 = "account_test_transform.v1"
 	// CapabilityAccountAutofillV1 表示插件会在独立后台任务中自动补充上游账号。

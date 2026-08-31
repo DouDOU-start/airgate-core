@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/DouDOU-start/airgate-core/ent"
 	entaccount "github.com/DouDOU-start/airgate-core/ent/account"
+	appaccount "github.com/DouDOU-start/airgate-core/internal/app/account"
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/relay/accountreg"
 	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
@@ -158,12 +160,23 @@ func (a *accountRegistryAdapter) mapSnapshot(item *ent.Account) (accountreg.Snap
 		}
 	}
 
+	// The registry bypasses the account service and can therefore observe
+	// historical or manually written aliases. Canonicalize only known values;
+	// preserving an empty/unknown value keeps native Codex eligibility
+	// fail-closed and avoids changing CPA behavior for unrelated platforms.
+	accountType := item.Type
+	if strings.EqualFold(strings.TrimSpace(item.Platform), "codex") {
+		if canonical, recognized := appaccount.CanonicalizeKnownAccountType(item.Type); recognized {
+			accountType = canonical
+		}
+	}
+
 	snap := accountreg.Snapshot{
 		ID:             item.ID,
 		Name:           item.Name,
 		Email:          item.Email,
 		Platform:       item.Platform,
-		Type:           item.Type,
+		Type:           accountType,
 		Credentials:    creds,
 		ProxyURL:       proxyURL,
 		Priority:       item.Priority,
@@ -193,11 +206,7 @@ func buildProxyURL(protocol, address string, port int, username, password string
 	if scheme == "" {
 		scheme = "http"
 	}
-	host := address
-	if port > 0 {
-		host = fmt.Sprintf("%s:%d", address, port)
-	}
-	u := &url.URL{Scheme: scheme, Host: host}
+	u := &url.URL{Scheme: scheme, Host: net.JoinHostPort(strings.Trim(address, "[]"), strconv.Itoa(port))}
 	if username != "" || password != "" {
 		u.User = url.UserPassword(username, password)
 	}

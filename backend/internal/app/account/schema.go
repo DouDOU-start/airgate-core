@@ -58,19 +58,28 @@ func (s *Service) ListPlatforms() []string {
 	return append([]string(nil), SupportedPlatforms...)
 }
 
+// CanonicalizeKnownAccountType canonicalizes only explicitly supported account
+// type aliases. Empty and unknown values are deliberately unrecognized so
+// runtime callers can fail closed instead of silently treating them as OAuth.
+func CanonicalizeKnownAccountType(raw string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case TypeOAuth, "refresh_token", "setup_token", "session", "device":
+		return TypeOAuth, true
+	case TypeAPIKey, "apikey", "api-key", "service_account", "service-account":
+		return TypeAPIKey, true
+	default:
+		return "", false
+	}
+}
+
 // NormalizeAccountType 将历史/别名类型收敛为 oauth | api_key。
 // refresh_token / setup_token / session 等导入方式均视为 OAuth；
-// apikey / service_account 视为 API Key。
+// apikey / service_account 视为 API Key。写入路径保留原有的默认 OAuth 语义。
 func NormalizeAccountType(raw string) string {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "", TypeOAuth, "refresh_token", "setup_token", "session", "device":
-		return TypeOAuth
-	case TypeAPIKey, "apikey", "api-key", "service_account", "service-account":
-		return TypeAPIKey
-	default:
-		// 未知值默认按 OAuth（订阅账号池主路径）。
-		return TypeOAuth
+	if normalized, ok := CanonicalizeKnownAccountType(raw); ok {
+		return normalized
 	}
+	return TypeOAuth
 }
 
 func builtinCredentialSchema(platform string) CredentialSchema {

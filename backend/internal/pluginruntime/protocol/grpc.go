@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"time"
 
 	goplugin "github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
@@ -32,6 +35,27 @@ func (wireCodec) Marshal(value any) ([]byte, error) {
 			return nil, fmt.Errorf("插件协议响应不能为空")
 		}
 		return marshalResponse(*typed)
+	case CodexExecuteRequest:
+		return marshalCodexExecuteRequest(typed)
+	case *CodexExecuteRequest:
+		if typed == nil {
+			return nil, fmt.Errorf("Codex executor request cannot be nil")
+		}
+		return marshalCodexExecuteRequest(*typed)
+	case CodexExecuteEvent:
+		return marshalCodexExecuteEvent(typed)
+	case *CodexExecuteEvent:
+		if typed == nil {
+			return nil, fmt.Errorf("Codex executor event cannot be nil")
+		}
+		return marshalCodexExecuteEvent(*typed)
+	case CodexWebSocketFrame:
+		return marshalCodexWebSocketFrame(typed)
+	case *CodexWebSocketFrame:
+		if typed == nil {
+			return nil, fmt.Errorf("Codex websocket frame cannot be nil")
+		}
+		return marshalCodexWebSocketFrame(*typed)
 	default:
 		return json.Marshal(value)
 	}
@@ -42,9 +66,70 @@ func (wireCodec) Unmarshal(data []byte, value any) error {
 		return unmarshalRequest(data, typed)
 	case *Response:
 		return unmarshalResponse(data, typed)
+	case *CodexExecuteRequest:
+		return unmarshalCodexExecuteRequest(data, typed)
+	case *CodexExecuteEvent:
+		return unmarshalCodexExecuteEvent(data, typed)
+	case *CodexWebSocketFrame:
+		return unmarshalCodexWebSocketFrame(data, typed)
 	default:
 		return json.Unmarshal(data, value)
 	}
+}
+
+type codexExecuteRequestMetadata CodexExecuteRequest
+type codexExecuteEventMetadata CodexExecuteEvent
+type codexWebSocketFrameMetadata CodexWebSocketFrame
+
+func marshalCodexExecuteRequest(request CodexExecuteRequest) ([]byte, error) {
+	metadata := codexExecuteRequestMetadata(request)
+	metadata.Body = nil
+	return marshalEnvelope(metadata, request.Body)
+}
+
+func unmarshalCodexExecuteRequest(data []byte, request *CodexExecuteRequest) error {
+	var metadata codexExecuteRequestMetadata
+	body, err := unmarshalEnvelope(data, &metadata)
+	if err != nil {
+		return err
+	}
+	*request = CodexExecuteRequest(metadata)
+	request.Body = body
+	return nil
+}
+
+func marshalCodexExecuteEvent(event CodexExecuteEvent) ([]byte, error) {
+	metadata := codexExecuteEventMetadata(event)
+	metadata.Data = nil
+	return marshalEnvelope(metadata, event.Data)
+}
+
+func unmarshalCodexExecuteEvent(data []byte, event *CodexExecuteEvent) error {
+	var metadata codexExecuteEventMetadata
+	body, err := unmarshalEnvelope(data, &metadata)
+	if err != nil {
+		return err
+	}
+	*event = CodexExecuteEvent(metadata)
+	event.Data = body
+	return nil
+}
+
+func marshalCodexWebSocketFrame(frame CodexWebSocketFrame) ([]byte, error) {
+	metadata := codexWebSocketFrameMetadata(frame)
+	metadata.Data = nil
+	return marshalEnvelope(metadata, frame.Data)
+}
+
+func unmarshalCodexWebSocketFrame(data []byte, frame *CodexWebSocketFrame) error {
+	var metadata codexWebSocketFrameMetadata
+	body, err := unmarshalEnvelope(data, &metadata)
+	if err != nil {
+		return err
+	}
+	*frame = CodexWebSocketFrame(metadata)
+	frame.Data = body
+	return nil
 }
 
 func init() {
@@ -153,11 +238,27 @@ type Client struct {
 	info PluginInfo
 }
 
+const grpcWebSocketShutdownTimeout = time.Second
+
+// A receive pump may finish on the same scheduler turn in which an executor
+// returns (for example, after the peer sends a malformed frame and the
+// plugin exits because its input channel closes).  Give that pump a short
+// bounded drain window before treating a nil executor result as success; this
+// avoids hiding a real client-stream receive error without adding an
+// unbounded shutdown wait to the RPC.
+const grpcWebSocketRecvDrainTimeout = 25 * time.Millisecond
+
 var _ Plugin = (*Client)(nil)
 
 func (c *Client) invoke(ctx context.Context, method string, input, output any) error {
+	if c == nil || c.conn == nil {
+		return errors.New("plugin client connection is unavailable")
+	}
 	if ctx == nil {
 		ctx = c.ctx
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	return c.conn.Invoke(
 		ctx,
@@ -199,6 +300,245 @@ func (c *Client) Handle(ctx context.Context, request Request) (Response, error) 
 	return response, err
 }
 
+// ExecuteStream opens the server-streaming native Codex executor RPC.
+func (c *Client) ExecuteStream(ctx context.Context, request CodexExecuteRequest, emit func(CodexExecuteEvent) error) error {
+	if c == nil || c.conn == nil {
+		return errors.New("plugin client connection is unavailable")
+	}
+	if ctx == nil {
+		ctx = c.ctx
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// Own a call-scoped cancellation context.  Returning early from the receive
+	// loop (most commonly because Core's downstream writer failed) must cancel
+	// the RPC and therefore the plugin's upstream HTTP request; otherwise a
+	// long-lived SSE response can continue running after the caller has gone
+	// away.  Do not rely on the parent request context being cancelled promptly
+	// in that case.
+	callCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	desc := &grpc.StreamDesc{ServerStreams: true}
+	stream, err := c.conn.NewStream(
+		callCtx,
+		desc,
+		"/"+serviceName+"/ExecuteStream",
+		grpc.ForceCodec(wireCodec{}),
+		grpc.MaxCallRecvMsgSize(MaxMessageBytes),
+		grpc.MaxCallSendMsgSize(MaxMessageBytes),
+	)
+	if err != nil {
+		return err
+	}
+	if err := stream.SendMsg(&request); err != nil {
+		return err
+	}
+	if err := stream.CloseSend(); err != nil {
+		return err
+	}
+	for {
+		var event CodexExecuteEvent
+		if err := stream.RecvMsg(&event); err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+		if emit != nil {
+			if err := emit(event); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// ExecuteWebSocket opens the bidirectional native Codex executor RPC. The
+// first message is the immutable account/request lease; subsequent messages
+// are WebSocket frames supplied by the Core gateway. The receive loop runs in
+// parallel with the send loop so named stream lanes can remain fully duplex.
+func (c *Client) ExecuteWebSocket(ctx context.Context, request CodexExecuteRequest, frames <-chan CodexWebSocketFrame, emit func(CodexWebSocketFrame) error) error {
+	if c == nil || c.conn == nil {
+		return errors.New("plugin client connection is unavailable")
+	}
+	if ctx == nil {
+		ctx = c.ctx
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	callCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	stream, err := c.conn.NewStream(
+		callCtx,
+		&grpc.StreamDesc{ServerStreams: true, ClientStreams: true},
+		"/"+serviceName+"/ExecuteWebSocket",
+		grpc.ForceCodec(wireCodec{}),
+		grpc.MaxCallRecvMsgSize(MaxMessageBytes),
+		grpc.MaxCallSendMsgSize(MaxMessageBytes),
+	)
+	if err != nil {
+		return err
+	}
+	if err := stream.SendMsg(&request); err != nil {
+		return err
+	}
+	// A nil input channel means that the caller has no client frames. Treat it
+	// as an already-closed send side instead of starting a goroutine that can
+	// wait forever on a nil channel while the peer expects a half-close.
+	if frames == nil {
+		closedFrames := make(chan CodexWebSocketFrame)
+		close(closedFrames)
+		frames = closedFrames
+	}
+
+	// Keep half-close failures separate from frame-send failures.  A peer may
+	// send a structured capability/error frame while CloseSend is racing with
+	// the receive pump; treating that transport error as terminal would hide
+	// the useful structured response from the caller.
+	type sendResult struct {
+		err       error
+		halfClose bool
+	}
+	sendErr := make(chan sendResult, 1)
+	recvDone := make(chan struct{})
+	go func() {
+		defer close(sendErr)
+		for {
+			select {
+			case <-callCtx.Done():
+				return
+			case frame, ok := <-frames:
+				if !ok {
+					sendErr <- sendResult{err: stream.CloseSend(), halfClose: true}
+					return
+				}
+				if err := stream.SendMsg(&frame); err != nil {
+					sendErr <- sendResult{err: err}
+					return
+				}
+			}
+		}
+	}()
+
+	type recvResult struct {
+		frame CodexWebSocketFrame
+		err   error
+	}
+	recvCh := make(chan recvResult, 1)
+	go func() {
+		defer close(recvDone)
+		for {
+			var frame CodexWebSocketFrame
+			err := stream.RecvMsg(&frame)
+			// The consumer can return early when the downstream WebSocket closes
+			// or its emit callback fails. Do not leave this receive pump blocked on
+			// a full local channel after the RPC context has been cancelled.
+			select {
+			case recvCh <- recvResult{frame: frame, err: err}:
+			case <-callCtx.Done():
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+	// Cancellation normally unblocks both grpc stream operations. Keep a
+	// bounded join on return as a lifecycle backstop: it prevents a caller that
+	// failed its downstream write from retaining the send/receive pumps forever,
+	// without making the request path hang behind a broken transport forever.
+	defer func() {
+		cancel()
+		timer := time.NewTimer(grpcWebSocketShutdownTimeout)
+		defer timer.Stop()
+		select {
+		case <-sendErr:
+		case <-timer.C:
+			return
+		}
+		select {
+		case <-recvDone:
+		case <-timer.C:
+		}
+	}()
+	var sendDone <-chan sendResult = sendErr
+	var pendingSendErr error
+	// A local SendMsg failure is not guaranteed to terminate the peer's bidi
+	// handler (for example, a message can exceed the client-side send limit
+	// before it ever reaches the wire). Keep a short window for a structured
+	// executor response that is already in flight, then fail closed instead of
+	// waiting on RecvMsg forever.
+	var pendingSendDrain <-chan time.Time
+	consumeRecv := func(result recvResult) (bool, error) {
+		if errors.Is(result.err, io.EOF) {
+			// A CloseSend error is often a consequence of the peer ending the
+			// bidi stream after its final structured frame. Once the receive side
+			// reaches EOF, prefer that protocol result and only surface a real
+			// frame-send failure.
+			if pendingSendErr != nil {
+				return true, pendingSendErr
+			}
+			return true, nil
+		}
+		if result.err != nil {
+			return true, result.err
+		}
+		if emit != nil {
+			if err := emit(result.frame); err != nil {
+				return true, err
+			}
+		}
+		return false, nil
+	}
+	for {
+		select {
+		case result := <-recvCh:
+			if done, err := consumeRecv(result); done {
+				return err
+			}
+		case result, ok := <-sendDone:
+			if !ok {
+				sendDone = nil
+				continue
+			}
+			sendDone = nil
+			if result.err != nil && !result.halfClose {
+				// Do not preempt a structured frame already queued by the peer.
+				// RecvMsg will normally terminate promptly after a SendMsg error;
+				// retaining the error here also lets an already-delivered protocol
+				// error win the race. The bounded drain below covers transports that
+				// leave the peer handler open after a local serialization failure.
+				pendingSendErr = result.err
+				if pendingSendDrain == nil {
+					pendingSendDrain = time.After(grpcWebSocketRecvDrainTimeout)
+				}
+			}
+		case <-pendingSendDrain:
+			// Select is fair when both the timer and recvCh are ready. Drain any
+			// already-buffered receive results once more before returning the local
+			// send error, so a structured executor error that won the race is not
+			// discarded merely because the grace timer fired on the same turn.
+			for {
+				select {
+				case result := <-recvCh:
+					if done, err := consumeRecv(result); done {
+						return err
+					}
+				default:
+					cancel()
+					return pendingSendErr
+				}
+			}
+		case <-callCtx.Done():
+			if pendingSendErr != nil {
+				return pendingSendErr
+			}
+			return callCtx.Err()
+		}
+	}
+}
+
 // GRPCPlugin 把最小 Plugin 接口接入 hashicorp/go-plugin。
 type GRPCPlugin struct {
 	goplugin.NetRPCUnsupportedPlugin
@@ -227,6 +567,8 @@ type pluginServer interface {
 	Start(context.Context, *empty) (*empty, error)
 	Stop(context.Context, *empty) (*empty, error)
 	Handle(context.Context, *Request) (*Response, error)
+	ExecuteStream(*CodexExecuteRequest, grpc.ServerStream) error
+	ExecuteWebSocket(*CodexExecuteRequest, grpc.ServerStream) error
 }
 
 type grpcServer struct {
@@ -264,6 +606,102 @@ func (s *grpcServer) Handle(ctx context.Context, request *Request) (*Response, e
 	return &response, err
 }
 
+func (s *grpcServer) ExecuteStream(request *CodexExecuteRequest, stream grpc.ServerStream) error {
+	executor, ok := s.impl.(CodexExecutor)
+	if !ok {
+		return stream.SendMsg(&CodexExecuteEvent{
+			Version: CodexExecutorVersion,
+			Type:    CodexEventError,
+			Error: &CodexExecutorError{
+				Code:    "unsupported_capability",
+				Message: "plugin does not implement codex_executor.v1",
+				Phase:   "before_headers",
+			},
+		})
+	}
+	return executor.ExecuteStream(stream.Context(), *request, func(event CodexExecuteEvent) error {
+		return stream.SendMsg(&event)
+	})
+}
+
+func (s *grpcServer) ExecuteWebSocket(request *CodexExecuteRequest, stream grpc.ServerStream) error {
+	if request == nil {
+		return errors.New("Codex websocket request cannot be nil")
+	}
+	executor, ok := s.impl.(CodexWebSocketExecutor)
+	if !ok {
+		// Keep capability failures on the structured executor wire. Returning a
+		// raw gRPC error makes Core unable to distinguish an unavailable plugin
+		// from a provider failure and prevents its normal CPA fallback policy.
+		return stream.SendMsg(&CodexWebSocketFrame{
+			Version: CodexExecutorVersion,
+			Type:    CodexWebSocketFrameError,
+			Error: &CodexExecutorError{
+				Code:    "unsupported_capability",
+				Message: "plugin does not implement codex websocket executor",
+				Phase:   "before_headers",
+			},
+		})
+	}
+	// Keep a small bounded burst buffer between the gRPC receive pump and the
+	// plugin. The plugin may emit handshake/control frames before it starts
+	// reading client input; an unbuffered channel would stall the pump and make
+	// cancellation/half-close handling depend on scheduling.
+	frames := make(chan CodexWebSocketFrame, 32)
+	recvErr := make(chan error, 1)
+	pumpStop := make(chan struct{})
+	go func() {
+		defer close(frames)
+		for {
+			var frame CodexWebSocketFrame
+			err := stream.RecvMsg(&frame)
+			if errors.Is(err, io.EOF) {
+				select {
+				case recvErr <- nil:
+				default:
+				}
+				return
+			}
+			if err != nil {
+				select {
+				case recvErr <- err:
+				default:
+				}
+				return
+			}
+			select {
+			case frames <- frame:
+			case <-pumpStop:
+				return
+			case <-stream.Context().Done():
+				select {
+				case recvErr <- stream.Context().Err():
+				default:
+				}
+				return
+			}
+		}
+	}()
+	err := executor.ExecuteWebSocket(stream.Context(), *request, frames, func(frame CodexWebSocketFrame) error {
+		return stream.SendMsg(&frame)
+	})
+	// Stop accepting new input as soon as the plugin has finished. The stream
+	// receive itself is owned by gRPC and is interrupted when this handler
+	// returns. Do not wait for that receive here: the server stream context is
+	// canceled only after the handler returns, so joining it here would add a
+	// shutdown timeout to every server-initiated close.
+	close(pumpStop)
+	if err != nil {
+		return err
+	}
+	select {
+	case recvErr := <-recvErr:
+		return recvErr
+	case <-time.After(grpcWebSocketRecvDrainTimeout):
+		return nil
+	}
+}
+
 func registerPluginServer(server *grpc.Server, impl pluginServer) {
 	server.RegisterService(&grpc.ServiceDesc{
 		ServiceName: serviceName,
@@ -275,6 +713,28 @@ func registerPluginServer(server *grpc.Server, impl pluginServer) {
 			{MethodName: "Stop", Handler: unaryHandler(func(ctx context.Context, request *empty) (any, error) { return impl.Stop(ctx, request) })},
 			{MethodName: "Handle", Handler: unaryHandler(func(ctx context.Context, request *Request) (any, error) { return impl.Handle(ctx, request) })},
 		},
+		Streams: []grpc.StreamDesc{{
+			StreamName:    "ExecuteStream",
+			ServerStreams: true,
+			Handler: func(service any, stream grpc.ServerStream) error {
+				request := new(CodexExecuteRequest)
+				if err := stream.RecvMsg(request); err != nil {
+					return err
+				}
+				return impl.ExecuteStream(request, stream)
+			},
+		}, {
+			StreamName:    "ExecuteWebSocket",
+			ServerStreams: true,
+			ClientStreams: true,
+			Handler: func(service any, stream grpc.ServerStream) error {
+				request := new(CodexExecuteRequest)
+				if err := stream.RecvMsg(request); err != nil {
+					return err
+				}
+				return impl.ExecuteWebSocket(request, stream)
+			},
+		}},
 	}, impl)
 }
 

@@ -26,9 +26,13 @@ type Transformer interface {
 // Request 是发给插件的版本化账号测试请求，只包含待发送的请求体和必要路由元数据。
 // 账号凭证、代理和上游地址不会暴露给插件。
 type Request struct {
-	Version  string          `json:"version"`
-	Mode     string          `json:"mode"`
-	Platform string          `json:"platform"`
+	Version  string `json:"version"`
+	Mode     string `json:"mode"`
+	Platform string `json:"platform"`
+	// AuthKind exposes only the account's declared authentication family (for
+	// example, oauth or api_key). It never contains a token or other credential
+	// material and lets account-scoped transforms enforce their auth boundary.
+	AuthKind string          `json:"auth_kind"`
 	Endpoint string          `json:"endpoint"`
 	Model    string          `json:"model"`
 	Body     json.RawMessage `json:"body"`

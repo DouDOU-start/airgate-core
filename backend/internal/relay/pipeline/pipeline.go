@@ -16,8 +16,10 @@ import (
 	"github.com/DouDOU-start/airgate-core/internal/relay/pricing"
 	"github.com/DouDOU-start/airgate-core/internal/relay/registry"
 	"github.com/DouDOU-start/airgate-core/internal/relay/relayhook"
+	providertransport "github.com/DouDOU-start/airgate-core/internal/relay/transport"
 	"github.com/DouDOU-start/airgate-core/internal/requestaudit"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
+	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
 
 	// 各协议适配器自注册（adaptor.Register）。
 	_ "github.com/DouDOU-start/airgate-core/internal/relay/adaptor/anthropic"
@@ -67,11 +69,27 @@ type Options struct {
 	ChannelFirstTokenSource ChannelFirstTokenSource
 	// CPA 账号路径转发器（生产环境注入 *cpa.Bridge；nil 时账号候选不执行）。
 	CPA AccountForwarder
+	// ProviderTransport executes selected-account requests. When nil, CPA is
+	// wrapped with transport.CPAAdapter, preserving the historical data path.
+	ProviderTransport providertransport.ProviderTransport
+	// CodexTransportPolicy supplies the plugin-wide Codex routing mode. It is
+	// separate from account credentials. The production plugin manager exposes
+	// policy only from a currently running executor, so disabling or failing to
+	// start the plugin returns routing to auto.
+	CodexTransportPolicy providertransport.CodexTransportPolicy
 	// RelayHook 外部请求改写与本次请求路由扩展点（nil 时完全保持原路径）。
 	RelayHook relayhook.Hook
 	// RequestAudit 完整请求审计（nil 时关闭）。
 	RequestAudit *requestaudit.Service
+	// RemoteControlTokens stores upstream Remote Control enrollments. The
+	// store is shared with server authentication middleware.
+	RemoteControlTokens *middleware.RemoteControlTokenStore
 }
+
+// AccountForwarder is retained as a source-compatible alias for callers that
+// inject CPA/test forwarders. New provider implementations should depend on
+// transport.ProviderTransport directly; CPAAdapter bridges this legacy shape.
+type AccountForwarder = providertransport.LegacyForwarder
 
 // Pipeline relay 转发管线。
 type Pipeline struct {
@@ -89,8 +107,13 @@ type Pipeline struct {
 	accountFirstTokenSource AccountFirstTokenSource
 	channelFirstTokenSource ChannelFirstTokenSource
 	cpa                     AccountForwarder
+	providerTransport       providertransport.ProviderTransport
+	codexTransportPolicy    providertransport.CodexTransportPolicy
 	relayHook               relayhook.Hook
 	requestAudit            *requestaudit.Service
+	codexFileUploads        *codexFileUploadStore
+	codexPluginUploads      *codexPluginUploadStore
+	remoteControlTokens     *middleware.RemoteControlTokenStore
 	accountDirectTransport  http.RoundTripper
 	accountTransportMu      sync.Mutex
 	accountTransports       sync.Map
@@ -134,6 +157,18 @@ func New(opts Options) *Pipeline {
 	if calculator == nil {
 		calculator = billing.NewCalculator()
 	}
+	transport := opts.ProviderTransport
+	if transport == nil {
+		transport = providertransport.NewCPAAdapter(opts.CPA)
+	}
+	policy := opts.CodexTransportPolicy
+	if policy == nil {
+		policy, _ = transport.(providertransport.CodexTransportPolicy)
+	}
+	remoteControlTokens := opts.RemoteControlTokens
+	if remoteControlTokens == nil {
+		remoteControlTokens = middleware.NewRemoteControlTokenStore()
+	}
 	return &Pipeline{
 		registry:                opts.Registry,
 		pricing:                 opts.Pricing,
@@ -149,8 +184,13 @@ func New(opts Options) *Pipeline {
 		accountFirstTokenSource: opts.AccountFirstTokenSource,
 		channelFirstTokenSource: opts.ChannelFirstTokenSource,
 		cpa:                     opts.CPA,
+		providerTransport:       transport,
+		codexTransportPolicy:    policy,
 		relayHook:               opts.RelayHook,
 		requestAudit:            opts.RequestAudit,
+		codexFileUploads:        newCodexFileUploadStore(),
+		codexPluginUploads:      newCodexPluginUploadStore(),
+		remoteControlTokens:     remoteControlTokens,
 		accountDirectTransport:  upstreamclient.NewEnvironmentTransport(),
 		client:                  upstreamclient.NewClient(0),
 	}

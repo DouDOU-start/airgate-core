@@ -14,10 +14,22 @@ var cpaModelsJSON []byte
 
 // ModelInfo 静态模型元数据（对齐 CPA registry.ModelInfo 常用字段）。
 type ModelInfo struct {
-	ID          string `json:"id"`
-	DisplayName string `json:"display_name,omitempty"`
-	OwnedBy     string `json:"owned_by,omitempty"`
-	Type        string `json:"type,omitempty"`
+	ID                       string            `json:"id"`
+	DisplayName              string            `json:"display_name,omitempty"`
+	OwnedBy                  string            `json:"owned_by,omitempty"`
+	Type                     string            `json:"type,omitempty"`
+	Description              string            `json:"description,omitempty"`
+	ContextLength            int64             `json:"context_length,omitempty"`
+	MaxCompletionTokens      int64             `json:"max_completion_tokens,omitempty"`
+	Thinking                 ModelThinkingInfo `json:"thinking,omitempty"`
+	SupportedInputModalities []string          `json:"supportedInputModalities,omitempty"`
+}
+
+// ModelThinkingInfo describes reasoning effort levels advertised by the
+// embedded CPA model catalog. It intentionally keeps the source vocabulary so
+// protocol-specific catalog handlers can project it without guessing.
+type ModelThinkingInfo struct {
+	Levels []string `json:"levels,omitempty"`
 }
 
 // cpaCatalog 对应 CLIProxyAPI internal/registry/models/models.json。
@@ -178,6 +190,8 @@ func cloneModelInfos(in []ModelInfo) []ModelInfo {
 		seen[id] = struct{}{}
 		cp := m
 		cp.ID = id
+		cp.Thinking.Levels = append([]string(nil), m.Thinking.Levels...)
+		cp.SupportedInputModalities = append([]string(nil), m.SupportedInputModalities...)
 		if strings.TrimSpace(cp.DisplayName) == "" {
 			cp.DisplayName = id
 		}

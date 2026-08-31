@@ -355,6 +355,9 @@ func (s *Service) TestConnection(ctx context.Context, id int, modelID, prompt st
 	if testMode == TestModeOverage && platform != "codex" {
 		return emitErr(emit, "Codex超额测试仅支持 Codex 账号")
 	}
+	if testMode == TestModeOverage && !strings.EqualFold(strings.TrimSpace(item.Type), "oauth") {
+		return emitErr(emit, "Codex超额测试仅支持 OAuth 账号")
+	}
 	start := time.Now()
 
 	var (
@@ -703,7 +706,7 @@ func (s *Service) testCodex(ctx context.Context, item Account, modelID, prompt s
 	}
 	raw, _ := json.Marshal(payload)
 	if mode == TestModeOverage {
-		transformed, transformErr := s.transformAccountTestRequest(ctx, mode, model, raw)
+		transformed, transformErr := s.transformAccountTestRequest(ctx, mode, item.Type, model, raw)
 		if transformErr != nil {
 			if errors.Is(transformErr, accounttesthook.ErrUnavailable) {
 				return model, testStreamUsage{}, emitErr(emit, "Codex超额测试插件不可用，请先安装并启用支持该模式的插件")
@@ -766,7 +769,7 @@ func (s *Service) testCodex(ctx context.Context, item Account, modelID, prompt s
 	return model, usage, err
 }
 
-func (s *Service) transformAccountTestRequest(ctx context.Context, mode TestMode, model string, body json.RawMessage) (json.RawMessage, error) {
+func (s *Service) transformAccountTestRequest(ctx context.Context, mode TestMode, authKind, model string, body json.RawMessage) (json.RawMessage, error) {
 	if s == nil || s.testTransformer == nil {
 		return nil, accounttesthook.ErrUnavailable
 	}
@@ -774,6 +777,7 @@ func (s *Service) transformAccountTestRequest(ctx context.Context, mode TestMode
 		Version:  accounttesthook.VersionV1,
 		Mode:     string(mode),
 		Platform: "codex",
+		AuthKind: strings.ToLower(strings.TrimSpace(authKind)),
 		Endpoint: "responses",
 		Model:    model,
 		Body:     append(json.RawMessage(nil), body...),

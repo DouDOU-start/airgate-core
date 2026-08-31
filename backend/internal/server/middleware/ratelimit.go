@@ -111,7 +111,7 @@ func NewIPRateLimit(reqPerMin float64) IPRateLimitResult {
 		if !limiter.Allow() {
 			slog.Warn("ip_rate_limited",
 				"ip", ip,
-				"path", c.Request.URL.Path,
+				"path", RedactSensitiveRequestPath(c.Request.URL.Path),
 				logx.LogFieldRequestID, RequestIDFromGinContext(c),
 			)
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
