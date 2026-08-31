@@ -563,7 +563,7 @@ func (m *Manager) UpdateConfigForm(ctx context.Context, id string, values map[st
 			if err := validateConfigFieldValue(field, value); err != nil {
 				return err
 			}
-			normalized[field.Key] = value
+			normalized[field.Key] = persistConfigFieldValue(field, value)
 		}
 	}
 	data, err := yaml.Marshal(normalized)
@@ -588,6 +588,22 @@ func validateConfigFieldValue(field protocol.ConfigField, value any) error {
 		return fmt.Errorf("%s不能大于 %v", field.Label, *field.Max)
 	}
 	return nil
+}
+
+// persistConfigFieldValue 把 JSON 表单里的整型浮点（如 8388608.0）落成 int64，
+// 避免 yaml.Marshal(float64) 写出 8.388608e+06，插件 strconv.Atoi 无法解析。
+func persistConfigFieldValue(field protocol.ConfigField, value any) any {
+	if field.Widget != "number" || emptyConfigValue(value) {
+		return value
+	}
+	number, err := configNumber(value)
+	if err != nil {
+		return value
+	}
+	if n, ok := wholeNumberInt64(number); ok {
+		return n
+	}
+	return number
 }
 
 func configNumber(value any) (float64, error) {

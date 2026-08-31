@@ -3,7 +3,9 @@ package pluginruntime
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 
@@ -46,8 +48,34 @@ func encodeConfigValue(value any) (string, error) {
 		return "", nil
 	case string:
 		return typed, nil
-	case bool, int, int64, uint64, float64:
-		return fmt.Sprint(typed), nil
+	case bool:
+		return strconv.FormatBool(typed), nil
+	case int:
+		return strconv.Itoa(typed), nil
+	case int8:
+		return strconv.FormatInt(int64(typed), 10), nil
+	case int16:
+		return strconv.FormatInt(int64(typed), 10), nil
+	case int32:
+		return strconv.FormatInt(int64(typed), 10), nil
+	case int64:
+		return strconv.FormatInt(typed, 10), nil
+	case uint:
+		return strconv.FormatUint(uint64(typed), 10), nil
+	case uint8:
+		return strconv.FormatUint(uint64(typed), 10), nil
+	case uint16:
+		return strconv.FormatUint(uint64(typed), 10), nil
+	case uint32:
+		return strconv.FormatUint(uint64(typed), 10), nil
+	case uint64:
+		return strconv.FormatUint(typed, 10), nil
+	case float32:
+		return formatConfigFloat(float64(typed)), nil
+	case float64:
+		return formatConfigFloat(typed), nil
+	case json.Number:
+		return encodeConfigJSONNumber(typed)
 	default:
 		encoded, err := json.Marshal(typed)
 		if err != nil {
@@ -55,4 +83,38 @@ func encodeConfigValue(value any) (string, error) {
 		}
 		return string(encoded), nil
 	}
+}
+
+func encodeConfigJSONNumber(value json.Number) (string, error) {
+	if value == "" {
+		return "", nil
+	}
+	if i, err := value.Int64(); err == nil {
+		return strconv.FormatInt(i, 10), nil
+	}
+	f, err := value.Float64()
+	if err != nil {
+		return "", fmt.Errorf("编码数字配置失败: %w", err)
+	}
+	return formatConfigFloat(f), nil
+}
+
+// formatConfigFloat 把浮点标量格式化成插件可解析的十进制字符串。
+// fmt.Sprint(float64) 对 >= 1e6 的整数会输出科学计数法（如 8.388608e+06），
+// 导致插件 strconv.Atoi 失败。
+func formatConfigFloat(value float64) string {
+	if n, ok := wholeNumberInt64(value); ok {
+		return strconv.FormatInt(n, 10)
+	}
+	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
+func wholeNumberInt64(value float64) (int64, bool) {
+	if math.IsNaN(value) || math.IsInf(value, 0) || value != math.Trunc(value) {
+		return 0, false
+	}
+	if value < math.MinInt64 || value > math.MaxInt64 {
+		return 0, false
+	}
+	return int64(value), true
 }
