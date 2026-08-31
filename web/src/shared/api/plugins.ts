@@ -23,6 +23,12 @@ export interface PluginStatus {
   error?: string;
 }
 
+export interface PluginConfigOption {
+  value: string;
+  label: string;
+  description?: string;
+}
+
 export interface PluginConfigField {
   key: string;
   fallback_key?: string;
@@ -37,6 +43,7 @@ export interface PluginConfigField {
   max?: number;
   step?: number;
   filter?: Record<string, string>;
+  options?: PluginConfigOption[];
 }
 
 export interface PluginConfigSchema {

@@ -87,6 +87,22 @@ func TestPersistConfigFieldValueCoercesWholeNumbers(t *testing.T) {
 	}
 }
 
+func TestValidateConfigFieldValueRejectsUnknownOption(t *testing.T) {
+	field := protocol.ConfigField{
+		Key: "codex_mode", Label: "Codex Transport Mode", Widget: "single_select",
+		Options: []protocol.ConfigOption{
+			{Value: "auto", Label: "auto"},
+			{Value: "native", Label: "native"},
+		},
+	}
+	if err := validateConfigFieldValue(field, "native"); err != nil {
+		t.Fatalf("合法选项被拒绝: %v", err)
+	}
+	if err := validateConfigFieldValue(field, "future_mode"); err == nil {
+		t.Fatal("未知选项应被拒绝")
+	}
+}
+
 func TestUpdateConfigFormPersistsJSONWholeNumbersAsIntegers(t *testing.T) {
 	pluginDir := t.TempDir()
 	id := "codex-enhance-fixture"

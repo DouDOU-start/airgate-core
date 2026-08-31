@@ -162,8 +162,8 @@ export default function AccountsPage() {
     queryKey: queryKeys.accounts(listQuery),
     queryFn: () => accountsApi.list(listQuery),
     placeholderData: keepPreviousData,
-    // 与渠道列表一致：30s 刷新运行时并发 / RPM
-    refetchInterval: 30_000,
+    // 运行时并发 / RPM 需要更密的刷新：官方 CLI 走原生插件后单次流可能只有数秒，30s 会整段错过。
+    refetchInterval: 5_000,
   });
 
   const { data: groupsData } = useQuery({

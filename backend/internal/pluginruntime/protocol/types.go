@@ -88,6 +88,15 @@ type ConfigField struct {
 	Max     *float64          `json:"max,omitempty" yaml:"max,omitempty"`
 	Step    *float64          `json:"step,omitempty" yaml:"step,omitempty"`
 	Filter  map[string]string `json:"filter,omitempty" yaml:"filter,omitempty"`
+	// Options 是 single_select 的静态选项；与 DataSource 二选一。
+	Options []ConfigOption `json:"options,omitempty" yaml:"options,omitempty"`
+}
+
+// ConfigOption 是插件配置下拉框的一个可选项。
+type ConfigOption struct {
+	Value       string `json:"value" yaml:"value"`
+	Label       string `json:"label" yaml:"label"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 }
 
 // Request 是能力驱动器发给插件的通用请求。

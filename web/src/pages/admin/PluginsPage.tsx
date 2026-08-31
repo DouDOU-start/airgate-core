@@ -1129,6 +1129,57 @@ function PluginConfigModal({
         </div>
       );
     }
+    if (field.widget === 'single_select' && (field.options?.length ?? 0) > 0) {
+      const options = field.options ?? [];
+      const fallback = typeof field.default === 'string' ? field.default : '';
+      const raw = String(fieldValue ?? fallback);
+      const selectedKey = options.some((option) => option.value === raw)
+        ? raw
+        : (options.some((option) => option.value === fallback) ? fallback : raw);
+      const selected = options.find((option) => option.value === selectedKey);
+      return (
+        <div className="ag-plugin-config-text-field" key={field.key}>
+          <Label className="ag-plugin-config-field-label">
+            {field.label}
+            {field.required ? <span className="text-danger">*</span> : null}
+          </Label>
+          {field.description ? (
+            <p className="ag-plugin-config-field-description">{field.description}</p>
+          ) : null}
+          <Select
+            aria-label={field.label}
+            fullWidth
+            selectedKey={selectedKey || null}
+            onSelectionChange={(key) => setValues((current) => ({
+              ...current,
+              [field.key]: key == null ? '' : String(key),
+            }))}
+          >
+            <Select.Trigger>
+              <Select.Value>{selected?.label ?? field.label}</Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox items={options}>
+                {(option) => (
+                  <ListBox.Item id={option.value} textValue={`${option.label} ${option.description ?? ''}`}>
+                    <span className="flex flex-col gap-0.5 py-0.5">
+                      <span>{option.label}</span>
+                      {option.description ? (
+                        <span className="text-xs font-normal text-text-tertiary">{option.description}</span>
+                      ) : null}
+                    </span>
+                  </ListBox.Item>
+                )}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+          {selected?.description ? (
+            <p className="ag-plugin-config-field-description">{selected.description}</p>
+          ) : null}
+        </div>
+      );
+    }
     if (field.widget === 'text') {
       return (
         <HeroTextField className="ag-plugin-config-text-field" fullWidth isRequired={field.required} key={field.key}>

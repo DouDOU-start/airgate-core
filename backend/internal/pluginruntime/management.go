@@ -574,7 +574,13 @@ func (m *Manager) UpdateConfigForm(ctx context.Context, id string, values map[st
 }
 
 func validateConfigFieldValue(field protocol.ConfigField, value any) error {
-	if field.Widget != "number" || emptyConfigValue(value) {
+	if emptyConfigValue(value) {
+		return nil
+	}
+	if err := validateConfigFieldOptions(field, value); err != nil {
+		return err
+	}
+	if field.Widget != "number" {
 		return nil
 	}
 	number, err := configNumber(value)
@@ -588,6 +594,19 @@ func validateConfigFieldValue(field protocol.ConfigField, value any) error {
 		return fmt.Errorf("%s不能大于 %v", field.Label, *field.Max)
 	}
 	return nil
+}
+
+func validateConfigFieldOptions(field protocol.ConfigField, value any) error {
+	if len(field.Options) == 0 {
+		return nil
+	}
+	raw := strings.TrimSpace(fmt.Sprint(value))
+	for _, option := range field.Options {
+		if option.Value == raw {
+			return nil
+		}
+	}
+	return fmt.Errorf("%s必须是预定义选项", field.Label)
 }
 
 // persistConfigFieldValue 把 JSON 表单里的整型浮点（如 8388608.0）落成 int64，
