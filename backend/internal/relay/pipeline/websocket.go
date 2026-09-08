@@ -802,11 +802,12 @@ func (p *Pipeline) handleCodexWebSocket(c *gin.Context, route codexWebSocketRout
 				return
 			}
 			kind := protocol.CodexWebSocketFrameText
-			if t == websocket.BinaryMessage {
+			switch t {
+			case websocket.BinaryMessage:
 				kind = protocol.CodexWebSocketFrameBinary
-			} else if t == websocket.PingMessage {
+			case websocket.PingMessage:
 				kind = protocol.CodexWebSocketFramePing
-			} else if t == websocket.PongMessage {
+			case websocket.PongMessage:
 				kind = protocol.CodexWebSocketFramePong
 			}
 			if t == websocket.TextMessage && isCodexGuardianWebSocketEndpoint(route.endpoint) {
@@ -1079,10 +1080,6 @@ func codexWebSocketCloseForError(err error) (int, string) {
 		return websocket.CloseTryAgainLater, "native Codex transport unavailable"
 	}
 	return websocket.CloseInternalServerErr, "native Codex transport failed"
-}
-
-func writeResponsesWebSocketUpgradeRequired(c *gin.Context) {
-	writeCodexWebSocketUpgradeRequired(c, "Responses")
 }
 
 func writeCodexWebSocketUpgradeRequired(c *gin.Context, displayName string) {
@@ -1864,17 +1861,6 @@ func normalizeCodexGuardianResponseCreate(data []byte) []byte {
 	return normalized
 }
 
-// realtimeSidebandProviderPath collapses the public compatibility aliases to
-// the two official upstream shapes. Query parameters are carried separately
-// in CodexExecuteRequest.Query and therefore must not be folded into Path.
-func realtimeSidebandProviderPath(c *gin.Context) string {
-	path, _ := realtimeSidebandProviderPathChecked(c)
-	if path == "" {
-		return "/realtime"
-	}
-	return path
-}
-
 func realtimeSidebandProviderPathChecked(c *gin.Context) (string, error) {
 	if c == nil {
 		return "/realtime", nil
@@ -1985,16 +1971,6 @@ func realtimeSidebandPathCallID(c *gin.Context, pathID string) (string, error) {
 		return "", errors.New("invalid realtime call id path encoding")
 	}
 	return decodedSegment, nil
-}
-
-func realtimeSidebandCallID(c *gin.Context) string {
-	if c == nil {
-		return ""
-	}
-	if callID := c.Param("call_id"); callID != "" {
-		return callID
-	}
-	return c.Query("call_id")
 }
 
 func websocketAccountRoutingModel(acc *accountreg.Snapshot, hinted string) string {

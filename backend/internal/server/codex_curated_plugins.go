@@ -198,7 +198,7 @@ func validateCodexCuratedPluginsUpstreamURL(raw string, allowHTTP bool) error {
 	// bind to loopback; accepting arbitrary remote hosts here would turn a
 	// future configuration mistake into an SSRF primitive.
 	host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
-	if host != "chatgpt.com" && !(allowHTTP && isLoopbackHost(host)) {
+	if host != "chatgpt.com" && (!allowHTTP || !isLoopbackHost(host)) {
 		return errors.New("upstream URL host is not the official ChatGPT host")
 	}
 	if !strings.EqualFold(strings.TrimRight(u.EscapedPath(), "/"), "/backend-api/plugins/export/curated") {

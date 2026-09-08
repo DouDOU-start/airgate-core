@@ -173,9 +173,7 @@ func decodeRequestBodyLayer(input []byte, coding string, maxDecodedBytes int64) 
 	default:
 		return nil, fmt.Errorf("%w: %s", errUnsupportedContentEncoding, coding)
 	}
-	if closeReader != nil {
-		defer closeReader()
-	}
+	defer closeReader()
 
 	decoded, err := io.ReadAll(io.LimitReader(reader, limit+1))
 	if err != nil {
@@ -672,10 +670,7 @@ func isCodexClientRequest(c *gin.Context) bool {
 		return false
 	}
 	path := strings.ToLower(strings.TrimSpace(c.Request.URL.Path))
-	if isDedicatedCodexRoutePath(path) {
-		return true
-	}
-	return false
+	return isDedicatedCodexRoutePath(path)
 }
 
 // requireCodexClientBoundary rejects ordinary callers on endpoints whose
@@ -720,16 +715,6 @@ func isDedicatedCodexRoutePath(path string) bool {
 	} {
 		if suffix, ok := codexRouteSuffix(path, prefix); ok {
 			return suffix != "" && isKnownCodexBackendRouteSuffix(suffix)
-		}
-	}
-	return false
-}
-
-func isCodexBackendRoutePath(path string) bool {
-	path = strings.TrimRight(strings.ToLower(strings.TrimSpace(path)), "/")
-	for _, prefix := range []string{"/backend-api/codex", "/backend-api/codex/v1"} {
-		if path == prefix || strings.HasPrefix(path, prefix+"/") {
-			return true
 		}
 	}
 	return false

@@ -57,5 +57,5 @@ func TestProjectCodexWebSocketHandshakeHeadersReturnsNonNilEmptyHeader(t *testin
 	}
 	// Keep the expected concrete type explicit for callers passing the result
 	// directly to websocket.Upgrader.Upgrade.
-	var _ http.Header = got
+	_ = http.Header(got)
 }

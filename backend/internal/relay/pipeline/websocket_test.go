@@ -442,16 +442,6 @@ func (t *responsesWebSocketOutOfOrderTransport) ExecuteWebSocket(
 	return nil, nil
 }
 
-func (t *responsesWebSocketOutOfOrderTransport) turnsSnapshot() [][]byte {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	out := make([][]byte, len(t.turns))
-	for i := range t.turns {
-		out[i] = append([]byte(nil), t.turns[i]...)
-	}
-	return out
-}
-
 type responsesWebSocketTerminalTransport struct {
 	eventType string
 	streamID  string

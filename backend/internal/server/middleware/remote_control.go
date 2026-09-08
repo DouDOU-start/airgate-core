@@ -499,14 +499,6 @@ func remoteControlCredential(c *gin.Context) (token string, presented bool, expl
 	return strings.TrimSpace(parts[1]), true, false
 }
 
-// remoteControlBearer is kept as a small compatibility helper for package
-// tests and embedders that only need the selected bearer.  It intentionally
-// follows the same path-aware rules as remoteControlCredential.
-func remoteControlBearer(c *gin.Context) (string, bool) {
-	token, presented, _ := remoteControlCredential(c)
-	return token, presented
-}
-
 // explicitRemoteControlHeader distinguishes an absent header from an empty
 // one.  Header names are compared case-insensitively because callers that
 // construct http.Request values directly can bypass net/http's canonical key

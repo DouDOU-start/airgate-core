@@ -575,13 +575,6 @@ func cloneForwardQueryValues(in map[string][]string) map[string][]string {
 	return out
 }
 
-// providerQueryWithOverride merges safe inbound query parameters with an
-// endpoint-specific override. Explicit values are appended so repeated query
-// keys (including Codex feature flags) retain their wire semantics.
-func providerQueryWithOverride(c *gin.Context, override map[string][]string) map[string][]string {
-	return providerQueryWithOverrideForEndpoint(c, "", override)
-}
-
 // providerQueryWithOverrideForEndpoint is the endpoint-aware query projector
 // used by native Codex control-plane requests. Most credential-shaped query
 // names are removed, but the Connectors directory API intentionally uses

@@ -101,14 +101,14 @@ func newCodexPluginUploadToken() (string, error) {
 
 func (s *codexPluginUploadStore) issue(lease codexPluginUploadLease) (string, error) {
 	if s == nil {
-		return "", errors.New("Codex plugin upload store is unavailable")
+		return "", errors.New("codex plugin upload store is unavailable")
 	}
 	now := time.Now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sweepLocked(now)
 	if len(s.byToken) >= codexPluginUploadStoreLimit {
-		return "", errors.New("Codex plugin upload store is full")
+		return "", errors.New("codex plugin upload store is full")
 	}
 	for attempt := 0; attempt < 4; attempt++ {
 		token, err := newCodexPluginUploadToken()

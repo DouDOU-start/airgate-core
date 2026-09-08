@@ -120,39 +120,6 @@ func CodexCPATranslationContract(endpoint string) bool {
 	return codexCPAEligibleEndpoint(endpoint)
 }
 
-// codexManagementEndpoint identifies the official backend-client control
-// plane. It is kept separate from the CPA contract list because these calls
-// are raw/native and must never be translated through a text adaptor.
-func codexManagementEndpoint(endpoint string) bool {
-	switch strings.ToLower(strings.TrimSpace(endpoint)) {
-	case "codex_usage", "codex_thread_usage", "codex_rate_limit_reset_credits",
-		"codex_rate_limit_reset_credits_consume", "codex_accounts_check",
-		"codex_accounts_send_add_credits_nudge_email", "codex_profiles_me",
-		"codex_config_bundle", "codex_settings_user", "codex_tasks",
-		"codex_tasks_list", "codex_task_details", "codex_task_sibling_turns",
-		"codex_environments", "codex_environments_by_repo",
-		"codex_workspace_messages", "codex_ps_mcp",
-		"codex_plugins_list", "codex_plugins_search", "codex_plugins_suggested",
-		"codex_plugins_installed", "codex_plugins_workspace_shared",
-		"codex_plugins_workspace_created", "codex_plugin_detail",
-		"codex_plugin_skill_detail", "codex_plugin_install",
-		"codex_plugin_uninstall", "codex_plugin_shares",
-		"codex_connectors_directory_list", "codex_connectors_directory_list_workspace",
-		"codex_apps_batch", "codex_plugins_featured",
-		"codex_plugin_legacy_enable", "codex_plugin_legacy_uninstall",
-		"codex_plugins_workspace_upload_url", "codex_plugins_workspace_create",
-		"codex_plugins_workspace_update", "codex_plugins_workspace_detail",
-		"codex_plugins_workspace_delete",
-		protocol.CodexEndpointRemoteControlEnroll, protocol.CodexEndpointRemoteControlRefresh,
-		protocol.CodexEndpointRemoteControlPair, protocol.CodexEndpointRemoteControlPairStatus,
-		protocol.CodexEndpointRemoteControlClientsList, protocol.CodexEndpointRemoteControlClientRevoke,
-		protocol.CodexEndpointRemoteControl, protocol.CodexEndpointRemoteControlServerWebSocket:
-		return true
-	default:
-		return false
-	}
-}
-
 // CodexOAuthOnlyEndpoint reports native control-plane contracts implemented by
 // ChatGPT's OAuth backend. API-key Codex accounts must never be selected for
 // these paths: the upstream plugin service rejects API-key auth, and sending
@@ -673,7 +640,7 @@ func (t *CodexPluginTransport) ExecuteWebSocket(ctx context.Context, req Request
 			if frame.Error != nil {
 				return &CodexPluginError{Info: *frame.Error}
 			}
-			return errors.New("Codex websocket executor error")
+			return errors.New("codex websocket executor error")
 		default:
 			if emit == nil {
 				return nil
@@ -890,17 +857,6 @@ func codexFedrampCredentialPresent(credentials map[string]string) bool {
 		}
 	}
 	return false
-}
-
-func cloneStringMap(in map[string]string) map[string]string {
-	if in == nil {
-		return nil
-	}
-	out := make(map[string]string, len(in))
-	for key, value := range in {
-		out[key] = value
-	}
-	return out
 }
 
 func nativeEligible(req Request, mode CodexTransportMode) bool {
