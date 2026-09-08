@@ -9,7 +9,9 @@ BACKEND_DIR := backend
 WEB_DIR := web
 BINARY := $(BACKEND_DIR)/server
 WEBDIST := $(BACKEND_DIR)/internal/web/webdist
-GO := GOTOOLCHAIN=auto go
+# 钉死 go.mod 的 1.26：GOTOOLCHAIN=auto 会跟着 golangci-lint 的 go.mod 升到 1.27，
+# 而 v2.12.2 的 staticcheck 在 1.27 上分析 stdlib poll 会 panic（CI 只看到 make exit 2）。
+GO := GOTOOLCHAIN=go1.26.0 go
 GOLANGCI_LINT_VERSION := v2.12.2
 
 # 版本号：默认从 git 派生（dirty 检测），release workflow 通过 -ldflags 注入。
