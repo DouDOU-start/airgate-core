@@ -508,7 +508,7 @@ func (p *Pipeline) HandleCodexPluginUpload(c *gin.Context) {
 		writeError(c, http.StatusBadGateway, "upstream_error", "blob_upload_failed", "workspace plugin upload failed")
 		return
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	copySafeCodexBlobResponseHeaders(c.Writer.Header(), response.Header)
 	c.Status(response.StatusCode)
 	c.Writer.WriteHeaderNow()

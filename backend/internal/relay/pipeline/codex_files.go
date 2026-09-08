@@ -716,7 +716,7 @@ func (p *Pipeline) HandleCodexFileUpload(c *gin.Context) {
 		writeError(c, http.StatusBadGateway, "upstream_error", "blob_upload_failed", "Codex 文件上传到存储服务失败")
 		return
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	copySafeCodexBlobResponseHeaders(c.Writer.Header(), response.Header)
 	c.Status(response.StatusCode)
 	// Azure Blob PUTs normally return an empty body. Commit the upstream status

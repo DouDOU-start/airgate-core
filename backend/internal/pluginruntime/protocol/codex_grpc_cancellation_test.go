@@ -151,7 +151,7 @@ func TestExecuteStreamCancelsRPCWhenEmitFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	client := &Client{ctx: context.Background(), conn: conn}
 
 	emitErr := errors.New("downstream writer failed")
@@ -206,7 +206,7 @@ func TestExecuteWebSocketReportsUnsupportedCapabilityOnStructuredWire(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	client := &Client{ctx: context.Background(), conn: conn}
 	frames := make(chan CodexWebSocketFrame)
 	close(frames)
@@ -244,7 +244,7 @@ func TestExecuteWebSocketNilFramesHalfClosesAndReturns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	client := &Client{conn: conn}
 
 	var got []CodexWebSocketFrame
@@ -296,7 +296,7 @@ func TestExecuteWebSocketReturnsAfterLocalSendFailureWhenPeerStaysOpen(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	client := &Client{ctx: context.Background(), conn: conn}
 	frames := make(chan CodexWebSocketFrame, 1)
 	errCh := make(chan error, 1)

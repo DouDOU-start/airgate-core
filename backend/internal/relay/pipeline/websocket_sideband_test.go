@@ -143,7 +143,7 @@ func TestRealtimeSidebandStartsWithoutResponseCreateAndPreservesWireContract(t *
 		}
 		t.Fatalf("dial sideband: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// The provider request must be dispatched immediately after the downstream
 	// 101; no response.create or any other client data frame has been sent yet.
@@ -241,7 +241,7 @@ func TestRealtimeSidebandUsesCallCreationAccountAffinity(t *testing.T) {
 		}
 		t.Fatalf("dial sideband: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	select {
 	case req := <-transport.requestCh:
@@ -365,7 +365,7 @@ func TestRealtimeSidebandPreservesOfficialEscapedOpaqueCallID(t *testing.T) {
 		}
 		t.Fatalf("dial sideband: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	select {
 	case req := <-transport.requestCh:

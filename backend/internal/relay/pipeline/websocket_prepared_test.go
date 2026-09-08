@@ -113,7 +113,7 @@ func TestPreparedResponsesWebSocketProjects101HeadersAndBuffersProviderFrame(t *
 	if err != nil {
 		t.Fatalf("prepared websocket dial: %v (status=%d)", err, responseStatus(response))
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if response.Header.Get("X-Codex-Turn-State") != "turn-state-1" ||
 		response.Header.Get("X-Reasoning-Included") != "true" ||
 		response.Header.Get("OpenAI-Model") != "gpt-hinted" ||

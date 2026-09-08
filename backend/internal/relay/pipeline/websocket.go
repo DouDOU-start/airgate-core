@@ -491,7 +491,7 @@ func (p *Pipeline) handleCodexWebSocket(c *gin.Context, route codexWebSocketRout
 	if err != nil {
 		return
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 	ws.SetReadLimit(32 << 20)
 	messageType := websocket.TextMessage
 	var first []byte

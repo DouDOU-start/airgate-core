@@ -793,7 +793,7 @@ func TestResponsesWebSocketBillsEachTurnWithItsOwnModelAndRequestFields(t *testi
 		}
 		t.Fatalf("dial Responses websocket: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	requests := []string{
 		`{"type":"response.create","model":"gpt-first","stream":true,"service_tier":"priority","reasoning":{"effort":"high"}}`,
@@ -861,7 +861,7 @@ func TestResponsesWebSocketBillsOutOfOrderLanesByStreamID(t *testing.T) {
 		}
 		t.Fatalf("dial Responses websocket: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	for _, request := range []string{
 		`{"type":"response.create","stream_id":"planner","model":"gpt-planner","stream":true}`,
 		`{"type":"response.create","stream_id":"research","model":"gpt-research","stream":true}`,
@@ -936,7 +936,7 @@ func TestResponsesWebSocketCompletedWithoutUsageRecordsMissingAndReleasesTurnSlo
 	if err != nil {
 		t.Fatalf("dial Responses websocket: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if err := conn.WriteMessage(websocket.TextMessage, []byte(
 		`{"type":"response.create","stream_id":"main","model":"gpt-first","stream":true}`,
 	)); err != nil {
@@ -982,7 +982,7 @@ func TestResponsesWebSocketWarmupHoldsSlotsButSkipsBillingAndRPM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial Responses websocket: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if err := conn.WriteMessage(websocket.TextMessage, []byte(
 		`{"type":"response.create","stream_id":"main","model":"gpt-first","generate":false}`,
 	)); err != nil {
@@ -1026,7 +1026,7 @@ func TestResponsesWebSocketIncompleteWithUsageBillsAndReleasesTurn(t *testing.T)
 	if err != nil {
 		t.Fatalf("dial Responses websocket: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if err := conn.WriteMessage(websocket.TextMessage, []byte(
 		`{"type":"response.create","stream_id":"main","model":"gpt-first","stream":true}`,
 	)); err != nil {
@@ -1069,7 +1069,7 @@ func TestResponsesWebSocketFailedAndScopedErrorReleaseWithoutBilling(t *testing.
 			if err != nil {
 				t.Fatalf("dial Responses websocket: %v", err)
 			}
-			defer conn.Close()
+			defer func() { _ = conn.Close() }()
 			if err := conn.WriteMessage(websocket.TextMessage, []byte(
 				`{"type":"response.create","stream_id":"main","model":"gpt-first","stream":true}`,
 			)); err != nil {
@@ -1112,7 +1112,7 @@ func TestResponsesWebSocketCleanEOFWithoutTerminalIsFailureAndReleasesTurn(t *te
 	if err != nil {
 		t.Fatalf("dial Responses websocket: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if err := conn.WriteMessage(websocket.TextMessage, []byte(
 		`{"type":"response.create","stream_id":"main","model":"gpt-first","stream":true}`,
 	)); err != nil {
@@ -1161,7 +1161,7 @@ func TestResponsesWebSocketDownstreamCloseCancelsStalledExecutor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial Responses websocket: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if err := conn.WriteMessage(websocket.TextMessage, []byte(
 		`{"type":"response.create","model":"gpt-first","stream":true}`,
 	)); err != nil {
@@ -1240,7 +1240,7 @@ func TestResponsesWebSocketUnsupportedLaterModelCloses1013WithoutForwardOrRPMCha
 		}
 		t.Fatalf("dial Responses websocket: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if err := conn.WriteMessage(websocket.TextMessage, []byte(
 		`{"type":"response.create","model":"gpt-first","stream":true,"service_tier":"priority","reasoning":{"effort":"high"}}`,
 	)); err != nil {
@@ -1298,7 +1298,7 @@ func TestResponsesWebSocketAppliesAccountRPMToEveryTurn(t *testing.T) {
 		}
 		t.Fatalf("dial Responses websocket: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	create := []byte(`{"type":"response.create","model":"gpt-first","stream":true}`)
 	if err := conn.WriteMessage(websocket.TextMessage, create); err != nil {
 		t.Fatalf("write first response.create: %v", err)
