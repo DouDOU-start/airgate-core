@@ -138,6 +138,30 @@ func TestComputeCosts(t *testing.T) {
 			want:  Costs{Input: 3, Output: 15},
 		},
 		{
+			name:  "quality 空 / auto 且 size 已知：回退 medium:size",
+			price: Price{Input: 5, Output: 30, ImageSizePrices: map[string]float64{"medium:1024x1024": 0.053, "high:1024x1024": 0.211}},
+			usage: Usage{Calls: 2, ImageSize: "1024x1024", ImageQuality: "auto"},
+			want:  Costs{Input: 0.106},
+		},
+		{
+			name:  "无档位无 token、per_request=0：表内默认档按张兜底",
+			price: Price{Input: 5, Output: 30, ImageSizePrices: map[string]float64{"medium:1024x1024": 0.053, "high:1024x1024": 0.211}},
+			usage: Usage{Calls: 2},
+			want:  Costs{Input: 0.106},
+		},
+		{
+			name:  "质量档已知但 size=auto：按该档 1024x1024 兜底",
+			price: Price{Input: 5, Output: 30, ImageSizePrices: map[string]float64{"medium:1024x1024": 0.053, "high:1024x1024": 0.211}},
+			usage: Usage{Calls: 1, ImageSize: "auto", ImageQuality: "high"},
+			want:  Costs{Input: 0.211},
+		},
+		{
+			name:  "有 token 时不走默认档（非标分辨率）",
+			price: Price{Input: 5, Output: 30, ImageSizePrices: map[string]float64{"medium:1024x1024": 0.053}},
+			usage: Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000, ImageSize: "2048x2048"},
+			want:  Costs{Input: 5, Output: 30},
+		},
+		{
 			name:  "分辨率表命中 Calls=0 钳为 1",
 			price: Price{ImageSizePrices: map[string]float64{"1024x1024": 0.04}},
 			usage: Usage{ImageSize: "1024x1024"},
@@ -265,14 +289,42 @@ func TestImagePriceFor(t *testing.T) {
 		{name: "quality 未配置回退裸 size 键", price: Price{ImageSizePrices: table}, quality: "high", size: "1024x1536", want: 0.06, wantOK: true},
 		{name: "quality 为空只查裸 size 键", price: Price{ImageSizePrices: table}, size: "1024x1536", want: 0.06, wantOK: true},
 		{name: "size 为空不命中（响应未带档位）", price: Price{ImageSizePrices: table}, quality: "high", wantOK: false},
+		{name: "size=auto 视为未解析", price: Price{ImageSizePrices: table}, quality: "high", size: "auto", wantOK: false},
 		{name: "表价 <=0 视为未配置", price: Price{ImageSizePrices: table}, quality: "medium", size: "512x512", wantOK: false},
 		{name: "空表不命中", price: Price{}, quality: "high", size: "1024x1024", wantOK: false},
+		{name: "quality=auto 回退 medium:size", price: Price{ImageSizePrices: map[string]float64{"medium:1024x1024": 0.053, "high:1024x1024": 0.211}}, quality: "auto", size: "1024x1024", want: 0.053, wantOK: true},
+		{name: "quality 空回退 medium:size", price: Price{ImageSizePrices: map[string]float64{"medium:1024x1024": 0.053, "high:1024x1024": 0.211}}, size: "1024x1024", want: 0.053, wantOK: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got, ok := ImagePriceFor(tc.price, tc.quality, tc.size)
 			if ok != tc.wantOK || got != tc.want {
 				t.Errorf("ImagePriceFor(%q, %q) = (%v, %v), want (%v, %v)", tc.quality, tc.size, got, ok, tc.want, tc.wantOK)
+			}
+		})
+	}
+}
+
+func TestImageFallbackPrice(t *testing.T) {
+	table := Price{ImageSizePrices: map[string]float64{"medium:1024x1024": 0.053, "high:1024x1024": 0.211}}
+	cases := []struct {
+		name    string
+		price   Price
+		quality string
+		want    float64
+		wantOK  bool
+	}{
+		{name: "默认 medium:1024x1024", price: table, want: 0.053, wantOK: true},
+		{name: "质量档已知优先该档正方形", price: table, quality: "high", want: 0.211, wantOK: true},
+		{name: "quality=auto 等同未知", price: table, quality: "auto", want: 0.053, wantOK: true},
+		{name: "空表不命中", price: Price{}, wantOK: false},
+		{name: "无标准键时按键名排序取第一个正价", price: Price{ImageSizePrices: map[string]float64{"z:1": 0.02, "a:1": 0.01, "b:1": 0}}, want: 0.01, wantOK: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := ImageFallbackPrice(tc.price, tc.quality)
+			if ok != tc.wantOK || got != tc.want {
+				t.Errorf("ImageFallbackPrice(%q) = (%v, %v), want (%v, %v)", tc.quality, got, ok, tc.want, tc.wantOK)
 			}
 		})
 	}

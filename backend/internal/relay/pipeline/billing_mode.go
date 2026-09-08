@@ -16,7 +16,7 @@ type usageBillingSnapshot struct {
 }
 
 // resolveUsageBilling 按 ComputeCosts 相同的优先级解析计费方式：
-// 图片分辨率表 > 图片按次价（按张）> 通用按次价 > Token。
+// 图片分辨率表 > 图片按次价（按张）> 通用按次价 > 无 token 时表内默认档按张 > Token。
 // endpoint 使用入口语义而非模型名，避免新模型接入后继续增加名称特判。
 func resolveUsageBilling(endpoint string, price pricing.Price, usage dto.Usage) usageBillingSnapshot {
 	snapshot := usageBillingSnapshot{
@@ -27,12 +27,7 @@ func resolveUsageBilling(endpoint string, price pricing.Price, usage dto.Usage) 
 	imageEndpoint := isImageBillingEndpoint(endpoint)
 
 	if perImage, ok := pricing.ImagePriceFor(price, usage.ImageQuality, usage.ImageSize); ok {
-		snapshot.Mode = billing.BillingModePerImage
-		snapshot.InputPrice = perImage
-		if snapshot.Calls < 1 {
-			snapshot.Calls = 1
-		}
-		return snapshot
+		return perImageSnapshot(snapshot, perImage)
 	}
 	if price.PerRequest > 0 {
 		if imageEndpoint {
@@ -44,8 +39,28 @@ func resolveUsageBilling(endpoint string, price pricing.Price, usage dto.Usage) 
 		if snapshot.Calls < 1 {
 			snapshot.Calls = 1
 		}
+		return snapshot
+	}
+	if !imageUsageHasTokens(usage) {
+		if perImage, ok := pricing.ImageFallbackPrice(price, usage.ImageQuality); ok {
+			return perImageSnapshot(snapshot, perImage)
+		}
 	}
 	return snapshot
+}
+
+func perImageSnapshot(snapshot usageBillingSnapshot, unit float64) usageBillingSnapshot {
+	snapshot.Mode = billing.BillingModePerImage
+	snapshot.InputPrice = unit
+	if snapshot.Calls < 1 {
+		snapshot.Calls = 1
+	}
+	return snapshot
+}
+
+func imageUsageHasTokens(u dto.Usage) bool {
+	return u.PromptTokens > 0 || u.CompletionTokens > 0 || u.CachedTokens > 0 ||
+		u.CacheCreationTokens > 0 || u.CacheCreation5mTokens > 0 || u.CacheCreation1hTokens > 0
 }
 
 func isImageBillingEndpoint(endpoint string) bool {

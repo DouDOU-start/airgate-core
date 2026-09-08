@@ -10,6 +10,7 @@ package pricing
 import (
 	"context"
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -193,13 +194,16 @@ func (c *Cache) Invalidate() {
 //  3. PerRequest > 0：整单按次计费，Input = PerRequest × max(Calls, 1)
 //     （图像端点 Calls=响应产出张数；chat 等未设 Calls 恒按 1 次），
 //     其余为 0（忽略全部 token 单价 / 服务档 / 长上下文）。
-//  4. 取 base 单价 inR/outR/cachedR；若 LongContext!=nil 且完整输入超阈值，
+//  4. 分辨率表已配置但未命中、且无 token usage：按表内默认档按张兜底
+//     （gpt-image-2 的 per_request=0 是为了给非标分辨率留 token 计价；
+//     逆向渠道既无档位也无 token 时不能静默 $0）。
+//  5. 取 base 单价 inR/outR/cachedR；若 LongContext!=nil 且完整输入超阈值，
 //     各单价乘对应倍率。完整输入 = PromptTokens（已含缓存读）+ 缓存写；
 //     缓存写优先使用 5m/1h 明细，明细缺失时使用泛化总量。
-//  5. 缓存写入分档：任一双档明细存在时按明细计价；双档都缺失时才把
+//  6. 缓存写入分档：任一双档明细存在时按明细计价；双档都缺失时才把
 //     CacheCreationTokens 作为 5m 写入回退。
-//  6. 分段计价：input 按 (prompt-cached) 扣减避免与 cached 双计。
-//  7. 服务档：serviceTier 非空且非 standard/auto，且 ServiceTiers[serviceTier]>0，
+//  7. 分段计价：input 按 (prompt-cached) 扣减避免与 cached 双计。
+//  8. 服务档：serviceTier 非空且非 standard/auto，且 ServiceTiers[serviceTier]>0，
 //     则整单五项统一乘该倍率（priority/flex 对各维度倍率一致，按整单处理等价）。
 func ComputeCosts(p Price, u Usage, serviceTier string) Costs {
 	u.PromptTokens = clampNonNegative(u.PromptTokens)
@@ -210,19 +214,17 @@ func ComputeCosts(p Price, u Usage, serviceTier string) Costs {
 	u.CacheCreation1hTokens = clampNonNegative(u.CacheCreation1hTokens)
 
 	if perImage, ok := ImagePriceFor(p, u.ImageQuality, u.ImageSize); ok {
-		calls := u.Calls
-		if calls < 1 {
-			calls = 1
-		}
-		return Costs{Input: perImage * float64(calls)}
+		return Costs{Input: perImage * float64(imageCalls(u.Calls))}
 	}
 
 	if p.PerRequest > 0 {
-		calls := u.Calls
-		if calls < 1 {
-			calls = 1
+		return Costs{Input: p.PerRequest * float64(imageCalls(u.Calls))}
+	}
+
+	if !usageHasTokens(u) {
+		if perImage, ok := ImageFallbackPrice(p, u.ImageQuality); ok {
+			return Costs{Input: perImage * float64(imageCalls(u.Calls))}
 		}
-		return Costs{Input: p.PerRequest * float64(calls)}
 	}
 
 	inR, outR, cachedR := p.Input, p.Output, p.CachedInput
@@ -280,15 +282,20 @@ func ComputeCosts(p Price, u Usage, serviceTier string) Costs {
 }
 
 // ImagePriceFor 查图像分辨率价表：先精确匹配 "quality:size"，再回退裸 "size" 键
-// （不分质量档的模型只配 size 键即可）。size 为空（响应未带档位，如逆向渠道）
-// 或未命中返回 false——调用方落回 PerRequest/token 链。
+// （不分质量档的模型只配 size 键即可）。quality/size 为 auto 视为未解析（官方默认值，
+// 与空同义）。quality 空且 size 已知时再按 medium→high→low 回退该尺寸的质量档
+// （客户端常只传 size、或 quality=auto 而逆向渠道不回实际档）。
+// size 为空或未命中返回 false——调用方落回 PerRequest / token / ImageFallbackPrice。
 // 导出供落账侧复用同一查价口径（usage_log「单价 × 张数 = 成本」对账）。
 func ImagePriceFor(p Price, quality, size string) (float64, bool) {
-	if len(p.ImageSizePrices) == 0 || size == "" {
+	if len(p.ImageSizePrices) == 0 {
 		return 0, false
 	}
-	quality = strings.ToLower(strings.TrimSpace(quality))
-	size = strings.ToLower(strings.TrimSpace(size))
+	quality = normalizeImageDim(quality)
+	size = normalizeImageDim(size)
+	if size == "" {
+		return 0, false
+	}
 	if quality != "" {
 		if v, ok := p.ImageSizePrices[quality+":"+size]; ok && v > 0 {
 			return v, true
@@ -297,7 +304,78 @@ func ImagePriceFor(p Price, quality, size string) (float64, bool) {
 	if v, ok := p.ImageSizePrices[size]; ok && v > 0 {
 		return v, true
 	}
+	if quality == "" {
+		for _, q := range imageQualityFallback {
+			if v, ok := p.ImageSizePrices[q+":"+size]; ok && v > 0 {
+				return v, true
+			}
+		}
+	}
 	return 0, false
+}
+
+// imageQualityFallback 质量档未知（空 / auto）时的回退顺序：取中间档，避免把
+// 未声明的 high 按低价放行，也不把草稿 low 默认收成高价。
+var imageQualityFallback = []string{"medium", "high", "low"}
+
+// imageFallbackKeys 档位完全未知时的按张兜底键（gpt-image 默认正方形 + grok 1k）。
+var imageFallbackKeys = []string{
+	"medium:1024x1024",
+	"high:1024x1024",
+	"low:1024x1024",
+	"1024x1024",
+	"1k",
+}
+
+// ImageFallbackPrice 分辨率表已配置但请求/响应都未给出可命中档位、且无 token
+// 计量时的按张兜底单价。优先 quality:1024x1024（若质量档已知），再标准默认档，
+// 最后按键名排序取第一个正价，避免 map 迭代导致金额抖动。
+func ImageFallbackPrice(p Price, quality string) (float64, bool) {
+	if len(p.ImageSizePrices) == 0 {
+		return 0, false
+	}
+	quality = normalizeImageDim(quality)
+	if quality != "" {
+		if v, ok := p.ImageSizePrices[quality+":1024x1024"]; ok && v > 0 {
+			return v, true
+		}
+	}
+	for _, key := range imageFallbackKeys {
+		if v := p.ImageSizePrices[key]; v > 0 {
+			return v, true
+		}
+	}
+	keys := make([]string, 0, len(p.ImageSizePrices))
+	for key, v := range p.ImageSizePrices {
+		if v > 0 {
+			keys = append(keys, key)
+		}
+	}
+	if len(keys) == 0 {
+		return 0, false
+	}
+	sort.Strings(keys)
+	return p.ImageSizePrices[keys[0]], true
+}
+
+func normalizeImageDim(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if s == "auto" {
+		return ""
+	}
+	return s
+}
+
+func usageHasTokens(u Usage) bool {
+	return u.PromptTokens > 0 || u.CompletionTokens > 0 || u.CachedTokens > 0 ||
+		u.CacheCreationTokens > 0 || u.CacheCreation5mTokens > 0 || u.CacheCreation1hTokens > 0
+}
+
+func imageCalls(n int) int {
+	if n < 1 {
+		return 1
+	}
+	return n
 }
 
 // VideoPriceFor 查视频分辨率秒价：先匹配 resolution_prices，再回退 per_second。

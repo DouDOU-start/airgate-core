@@ -71,6 +71,33 @@ func TestResolveUsageBilling(t *testing.T) {
 			wantCalls:      2,
 			wantInputPrice: 5,
 		},
+		{
+			name:           "quality 空且 size 已知：回退 medium:size 按张",
+			endpoint:       adaptor.EndpointImagesGenerations,
+			price:          pricing.Price{Input: 5, Output: 30, ImageSizePrices: map[string]float64{"medium:1024x1024": 0.053, "high:1024x1024": 0.211}},
+			usage:          dto.Usage{Calls: 2, ImageSize: "1024x1024"},
+			wantMode:       billing.BillingModePerImage,
+			wantCalls:      2,
+			wantInputPrice: 0.053,
+		},
+		{
+			name:           "无档位无 token：表内默认档按张兜底",
+			endpoint:       adaptor.EndpointImagesGenerations,
+			price:          pricing.Price{Input: 5, Output: 30, ImageSizePrices: map[string]float64{"medium:1024x1024": 0.053, "high:1024x1024": 0.211}},
+			usage:          dto.Usage{Calls: 1},
+			wantMode:       billing.BillingModePerImage,
+			wantCalls:      1,
+			wantInputPrice: 0.053,
+		},
+		{
+			name:           "非标分辨率有 token：仍走 token 不计默认档",
+			endpoint:       adaptor.EndpointImagesGenerations,
+			price:          pricing.Price{Input: 5, Output: 30, ImageSizePrices: map[string]float64{"medium:1024x1024": 0.053}},
+			usage:          dto.Usage{PromptTokens: 100, CompletionTokens: 4000, Calls: 1, ImageSize: "2048x2048", ImageQuality: "high"},
+			wantMode:       billing.BillingModeToken,
+			wantCalls:      1,
+			wantInputPrice: 5,
+		},
 	}
 
 	for _, tt := range tests {

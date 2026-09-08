@@ -227,8 +227,10 @@ models:
   # ── openai 图像（gpt-image-2 按张计费：分辨率×质量价表，网关以上游响应实际产出
   #    档位计费；官方每张价 2026-07 快照。表命中时互斥短路、忽略 token 价；
   #    token 价为官方值（text in $5 / image out $30），兜底非标准分辨率
-  #    （官方支持数千种尺寸，表未命中时按响应 usage 走 token 计价，防计 0 放行；
-  #    官方 image input $8 无独立列位，edits 图片输入按 input 价计）。──
+  #    （官方支持数千种尺寸，表未命中时按响应 usage 走 token 计价）。
+  #    per_request 保持 0，以免抢走非标尺寸的 token 计价；逆向渠道既无档位也无
+  #    token 时，计费侧按表内默认档 medium:1024x1024 按张兜底，防 $0。
+  #    官方 image input $8 无独立列位，edits 图片输入按 input 价计。──
   - model: gpt-image-2
     tag: openai
     input: 5.0

@@ -182,6 +182,7 @@ const perRequestModel = "flat-model"
 const (
 	imgPerReqModel = "img-flat"
 	imgSizeModel   = "img-size"
+	imgTableModel  = "gpt-image-2"
 	imagenModel    = "imagen-t"
 )
 
@@ -232,6 +233,15 @@ func newTestEnv(t *testing.T, snaps ...registry.ChannelKeySnapshot) *testEnv {
 		imgSizeModel: {
 			PerRequest:      0.05,
 			ImageSizePrices: map[string]float64{"1k": 0.05, "2k": 0.07},
+		},
+		imgTableModel: {
+			Input:  5,
+			Output: 30,
+			ImageSizePrices: map[string]float64{
+				"low:1024x1024": 0.006, "low:1024x1536": 0.005, "low:1536x1024": 0.005,
+				"medium:1024x1024": 0.053, "medium:1024x1536": 0.041, "medium:1536x1024": 0.041,
+				"high:1024x1024": 0.211, "high:1024x1536": 0.165, "high:1536x1024": 0.165,
+			},
 		},
 		imagenModel: {PerRequest: 0.03},
 	}})
@@ -2221,10 +2231,11 @@ func (e *testEnv) doImagesEdits(t *testing.T, body []byte, contentType string) *
 // imgSnap 构造服务图像模型的 openai_compatible 渠道快照。
 func imgSnap(id int, baseURL string, mutate ...func(*registry.ChannelKeySnapshot)) registry.ChannelKeySnapshot {
 	s := testSnap(id, baseURL, func(s *registry.ChannelKeySnapshot) {
-		s.Models = map[string]struct{}{imgPerReqModel: {}, imgSizeModel: {}, testModel: {}}
+		s.Models = map[string]struct{}{imgPerReqModel: {}, imgSizeModel: {}, imgTableModel: {}, testModel: {}}
 		s.ModelMapping = map[string]string{
 			imgPerReqModel: "gpt-image-upstream",
 			imgSizeModel:   "grok-imagine-image-quality",
+			imgTableModel:  "gpt-image-upstream",
 			testModel:      "gpt-4o-upstream",
 		}
 	})
@@ -2343,6 +2354,74 @@ func TestForwardImagesGenerationsTokenBilling(t *testing.T) {
 	}
 	if rec.InputTokens != 1000 || rec.OutputTokens != 500 {
 		t.Errorf("tokens = (%d,%d), want (1000,500)", rec.InputTokens, rec.OutputTokens)
+	}
+}
+
+// TestForwardImagesGenerationsGptImage2ChannelFallback 逆向渠道只回 data、不回 size/quality/usage
+// （gpt-image-2 默认 size/quality=auto、per_request=0）：按表内 medium:1024x1024 按张兜底，禁止 $0。
+func TestForwardImagesGenerationsGptImage2ChannelFallback(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"created":1,"data":[{"b64_json":"QUJD"},{"b64_json":"REVG"}]}`)
+	}))
+	defer upstream.Close()
+
+	env := newTestEnv(t, imgSnap(1, upstream.URL))
+	w := env.doImagesGenerations(t, `{"model":"`+imgTableModel+`","prompt":"a cat"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	rec := env.sink.last(t)
+	if !almostEqual(rec.TotalCost, 0.106) {
+		t.Errorf("TotalCost = %v, want 0.106（medium:1024x1024 $0.053 × 2 张）", rec.TotalCost)
+	}
+	if rec.BillingMode != billing.BillingModePerImage || rec.Calls != 2 || !almostEqual(rec.InputPrice, 0.053) {
+		t.Errorf("媒体计费快照异常: mode=%s calls=%d price=%v", rec.BillingMode, rec.Calls, rec.InputPrice)
+	}
+}
+
+// TestForwardImagesGenerationsGptImage2SizeWithoutQuality 只给 size、quality 缺省/auto：命中 medium:size。
+func TestForwardImagesGenerationsGptImage2SizeWithoutQuality(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"created":1,"data":[{"b64_json":"QUJD"}]}`)
+	}))
+	defer upstream.Close()
+
+	env := newTestEnv(t, imgSnap(1, upstream.URL))
+	w := env.doImagesGenerations(t, `{"model":"`+imgTableModel+`","prompt":"a cat","size":"1024x1536","quality":"auto"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	rec := env.sink.last(t)
+	if !almostEqual(rec.TotalCost, 0.041) {
+		t.Errorf("TotalCost = %v, want 0.041（medium:1024x1536）", rec.TotalCost)
+	}
+	if rec.BillingMode != billing.BillingModePerImage || !almostEqual(rec.InputPrice, 0.041) {
+		t.Errorf("媒体计费快照异常: mode=%s price=%v", rec.BillingMode, rec.InputPrice)
+	}
+}
+
+// TestForwardImagesGenerationsGptImage2NonstandardToken 非标分辨率且上游回了 token：仍走 token，不用默认档。
+func TestForwardImagesGenerationsGptImage2NonstandardToken(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"created":1,"data":[{"b64_json":"QUJD"}],"size":"2048x2048","quality":"high",`+
+			`"usage":{"input_tokens":1000000,"output_tokens":1000000}}`)
+	}))
+	defer upstream.Close()
+
+	env := newTestEnv(t, imgSnap(1, upstream.URL))
+	w := env.doImagesGenerations(t, `{"model":"`+imgTableModel+`","prompt":"a cat","size":"2048x2048","quality":"high"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	rec := env.sink.last(t)
+	if !almostEqual(rec.TotalCost, 35) {
+		t.Errorf("TotalCost = %v, want 35（1M*$5 + 1M*$30）", rec.TotalCost)
+	}
+	if rec.BillingMode != billing.BillingModeToken {
+		t.Errorf("BillingMode = %q, want token", rec.BillingMode)
 	}
 }
 
