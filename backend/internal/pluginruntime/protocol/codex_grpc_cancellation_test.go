@@ -250,7 +250,7 @@ func TestExecuteWebSocketNilFramesHalfClosesAndReturns(t *testing.T) {
 	var got []CodexWebSocketFrame
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- client.ExecuteWebSocket(nil, CodexExecuteRequest{
+		errCh <- client.ExecuteWebSocket(context.TODO(), CodexExecuteRequest{
 			Version: CodexExecutorVersion, Method: "GET", Transport: CodexTransportWebSocket,
 			BaseURL: "https://example.test", Path: "/responses",
 		}, nil, func(frame CodexWebSocketFrame) error {

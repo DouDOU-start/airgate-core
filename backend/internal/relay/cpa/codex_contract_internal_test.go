@@ -4,8 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
+
+	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 )
 
 func TestValidateCodexCPAContractTextProtocols(t *testing.T) {

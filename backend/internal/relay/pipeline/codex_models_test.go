@@ -7,9 +7,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/DouDOU-start/airgate-core/internal/relay/cpa"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
-	"github.com/gin-gonic/gin"
 )
 
 func TestMergeCodexModelMetadataPreservesBundledValuesWhenOverlayIsSparse(t *testing.T) {

@@ -137,7 +137,7 @@ func (p *codexCuratedPluginsExportProxy) Handle(c *gin.Context) {
 		writeCodexCuratedPluginsError(c, http.StatusBadGateway, "upstream_unavailable", "curated plugin export request failed")
 		return
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	maxBody := p.maxBody
 	if maxBody <= 0 {

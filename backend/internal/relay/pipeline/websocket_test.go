@@ -17,6 +17,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/DouDOU-start/airgate-core/internal/auth"
 	"github.com/DouDOU-start/airgate-core/internal/billing"
 	"github.com/DouDOU-start/airgate-core/internal/pluginruntime/protocol"
@@ -25,7 +27,6 @@ import (
 	providertransport "github.com/DouDOU-start/airgate-core/internal/relay/transport"
 	"github.com/DouDOU-start/airgate-core/internal/scheduler"
 	"github.com/DouDOU-start/airgate-core/internal/server/middleware"
-	"github.com/gin-gonic/gin"
 )
 
 func TestCodexWebSocketFrameQueueSerializesSendAndClose(t *testing.T) {

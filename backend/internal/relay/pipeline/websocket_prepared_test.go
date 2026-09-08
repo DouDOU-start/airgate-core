@@ -11,9 +11,10 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/gorilla/websocket"
+
 	"github.com/DouDOU-start/airgate-core/internal/pluginruntime/protocol"
 	providertransport "github.com/DouDOU-start/airgate-core/internal/relay/transport"
-	"github.com/gorilla/websocket"
 )
 
 type preparedWebSocketTestTransport struct {

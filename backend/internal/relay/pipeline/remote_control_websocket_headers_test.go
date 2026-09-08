@@ -80,7 +80,7 @@ func TestCodexWebSocketProviderRequestCarriesOptionalFieldsOutOfBand(t *testing.
 
 func TestCodexRemoteControlWebSocketOptionalHeadersAllowMissingOrBlankHostKind(t *testing.T) {
 	for _, headers := range []http.Header{
-		http.Header{},
+		{},
 		{"X-Codex-Host-Device-Kind": {""}},
 		{"X-Codex-Host-Device-Kind": {"   "}},
 	} {

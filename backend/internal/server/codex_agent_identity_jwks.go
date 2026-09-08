@@ -122,7 +122,7 @@ func (p *codexAgentIdentityJWKSProxy) Handle(c *gin.Context) {
 		writeCodexAgentIdentityJWKSError(c, http.StatusBadGateway, "upstream_unavailable", "agent identity JWKS request failed")
 		return
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	maxBody := p.maxBody
 	if maxBody <= 0 {

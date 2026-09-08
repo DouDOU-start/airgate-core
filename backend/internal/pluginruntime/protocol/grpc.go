@@ -39,21 +39,21 @@ func (wireCodec) Marshal(value any) ([]byte, error) {
 		return marshalCodexExecuteRequest(typed)
 	case *CodexExecuteRequest:
 		if typed == nil {
-			return nil, fmt.Errorf("Codex executor request cannot be nil")
+			return nil, fmt.Errorf("codex executor request cannot be nil")
 		}
 		return marshalCodexExecuteRequest(*typed)
 	case CodexExecuteEvent:
 		return marshalCodexExecuteEvent(typed)
 	case *CodexExecuteEvent:
 		if typed == nil {
-			return nil, fmt.Errorf("Codex executor event cannot be nil")
+			return nil, fmt.Errorf("codex executor event cannot be nil")
 		}
 		return marshalCodexExecuteEvent(*typed)
 	case CodexWebSocketFrame:
 		return marshalCodexWebSocketFrame(typed)
 	case *CodexWebSocketFrame:
 		if typed == nil {
-			return nil, fmt.Errorf("Codex websocket frame cannot be nil")
+			return nil, fmt.Errorf("codex websocket frame cannot be nil")
 		}
 		return marshalCodexWebSocketFrame(*typed)
 	default:
@@ -626,7 +626,7 @@ func (s *grpcServer) ExecuteStream(request *CodexExecuteRequest, stream grpc.Ser
 
 func (s *grpcServer) ExecuteWebSocket(request *CodexExecuteRequest, stream grpc.ServerStream) error {
 	if request == nil {
-		return errors.New("Codex websocket request cannot be nil")
+		return errors.New("codex websocket request cannot be nil")
 	}
 	executor, ok := s.impl.(CodexWebSocketExecutor)
 	if !ok {

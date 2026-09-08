@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
+
+	"github.com/DouDOU-start/airgate-core/internal/relay/adaptor"
 )
 
 // ErrCodexTranslatorUnavailable indicates that a Codex CPA request cannot be

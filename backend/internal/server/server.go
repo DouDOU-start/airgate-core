@@ -48,28 +48,28 @@ type Server struct {
 	srv    *http.Server
 
 	// 核心服务组件
-	concurrency         *scheduler.ConcurrencyManager
-	recorder            *billing.Recorder
-	errRecorder         *errlog.Recorder
-	handlers            *bootstrap.HTTPHandlers
-	channelRegistry     *registry.Registry
-	accountRegistry     *accountreg.Registry
-	cpaBridge           *cpa.Bridge
-	pricingCache        *pricing.Cache
-	relay               *pipeline.Pipeline
-	taskFlow            *task.Flow
-	taskPoller          *task.Poller
-	probeEngine         *probe.Engine
-	pluginRuntime       *pluginruntime.Manager
-	pluginHandler       *handler.PluginHandler
-	pluginAccessToken   string
-	remoteControlTokens *middleware.RemoteControlTokenStore
-	curatedPluginsProxy *codexCuratedPluginsExportProxy
+	concurrency            *scheduler.ConcurrencyManager
+	recorder               *billing.Recorder
+	errRecorder            *errlog.Recorder
+	handlers               *bootstrap.HTTPHandlers
+	channelRegistry        *registry.Registry
+	accountRegistry        *accountreg.Registry
+	cpaBridge              *cpa.Bridge
+	pricingCache           *pricing.Cache
+	relay                  *pipeline.Pipeline
+	taskFlow               *task.Flow
+	taskPoller             *task.Poller
+	probeEngine            *probe.Engine
+	pluginRuntime          *pluginruntime.Manager
+	pluginHandler          *handler.PluginHandler
+	pluginAccessToken      string
+	remoteControlTokens    *middleware.RemoteControlTokenStore
+	curatedPluginsProxy    *codexCuratedPluginsExportProxy
 	agentIdentityJWKSProxy *codexAgentIdentityJWKSProxy
 
 	// 中间件组件（需 Shutdown 时释放）
-	ipRateLimiter             *middleware.IPRateLimiter
-	curatedPluginsRateLimiter *middleware.IPRateLimiter
+	ipRateLimiter                *middleware.IPRateLimiter
+	curatedPluginsRateLimiter    *middleware.IPRateLimiter
 	agentIdentityJWKSRateLimiter *middleware.IPRateLimiter
 	// oauthRateLimiter /oauth/token 端点的 IP 限流器（防 secret 爆破）。
 	oauthRateLimiter *middleware.IPRateLimiter

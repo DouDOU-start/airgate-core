@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	providertransport "github.com/DouDOU-start/airgate-core/internal/relay/transport"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
+
+	providertransport "github.com/DouDOU-start/airgate-core/internal/relay/transport"
 )
 
 // TestCodexCPARequestContracts exercises the actual SDK registry rather than
