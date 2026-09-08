@@ -966,18 +966,29 @@ func (s *Server) registerRoutes() {
 		adminGroup.GET("/invite/logs", handlers.Invite.AdminListRebateLogs)
 	}
 
-	// 加载嵌入的前端 SPA：所有静态资源通过 //go:embed 打进二进制
-	distFS, err := webfs.FS()
-	if err != nil {
+	// 加载嵌入的前端 SPA：所有静态资源通过 //go:embed 打进二进制。
+	// 生产缺资源直接退出；测试模式（空 webdist）只打日志并跳过 SPA 挂载，
+	// 避免 TestNewServer 一类用例 os.Exit 把整个 `go test` 打死。
+	var distFS fs.FS
+	var assetsFS fs.FS
+	var ogIndex *indexHTMLRenderer
+	if loaded, err := webfs.FS(); err != nil {
 		slog.Error("加载嵌入前端失败", "error", err)
-		os.Exit(1)
-	}
-	indexHTML, _ := webfs.IndexHTML()
-	ogIndex := newIndexHTMLRenderer(indexHTML, handlers.SettingsService)
-	assetsFS, err := fs.Sub(distFS, "assets")
-	if err != nil {
-		slog.Error("嵌入前端缺少 assets 子目录", "error", err)
-		os.Exit(1)
+		if gin.Mode() != gin.TestMode {
+			os.Exit(1)
+		}
+	} else {
+		distFS = loaded
+		indexHTML, _ := webfs.IndexHTML()
+		ogIndex = newIndexHTMLRenderer(indexHTML, handlers.SettingsService)
+		assetsFS, err = fs.Sub(distFS, "assets")
+		if err != nil {
+			slog.Error("嵌入前端缺少 assets 子目录", "error", err)
+			if gin.Mode() != gin.TestMode {
+				os.Exit(1)
+			}
+			distFS, assetsFS, ogIndex = nil, nil, nil
+		}
 	}
 
 	// === 对外网关路由（sk- API Key 鉴权，纯透传：入站端点按协议分树） ===
@@ -1291,12 +1302,16 @@ func (s *Server) registerRoutes() {
 	})
 	uploadsGroup.Static("", "data/uploads")
 
-	// 静态文件服务（前端 SPA）
-	r.StaticFS("/assets", http.FS(assetsFS))
+	// 静态文件服务（前端 SPA）；测试模式允许缺嵌入资源，只挂 API 路由。
+	if assetsFS != nil {
+		r.StaticFS("/assets", http.FS(assetsFS))
+	}
 	// og:image 等分享卡片用的根目录静态文件不在 assets/ 下，未显式注册会落进
 	// NoRoute 兜底、被当成 index.html（text/html）吐回去——图片抓取方（微信等）
 	// 拿到的不是真图，卡片配图会失效。这里显式暴露一个 embed.FS 的根文件。
-	r.StaticFileFS("/og-cover.png", "og-cover.png", http.FS(distFS))
+	if distFS != nil {
+		r.StaticFileFS("/og-cover.png", "og-cover.png", http.FS(distFS))
+	}
 
 	// NoRoute: 未匹配路径回退前端 index.html。
 	// P1 起对外网关路由（/v1/chat/completions 等）走显式注册，不再经 NoRoute 分发。
@@ -1337,6 +1352,10 @@ func (s *Server) registerRoutes() {
 					"message": "Codex backend-client endpoint not found",
 				},
 			})
+			return
+		}
+		if ogIndex == nil {
+			c.Status(http.StatusNotFound)
 			return
 		}
 		c.Data(http.StatusOK, "text/html; charset=utf-8", ogIndex.Bytes(c.Request.Context()))

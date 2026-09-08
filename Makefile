@@ -103,7 +103,7 @@ fmt: ## 格式化代码
 	fi
 	@echo "代码格式化完成"
 
-test: ## 运行测试
+test: ensure-webdist ## 运行测试（先同步嵌入前端，避免 internal/server 因空 webdist 直接 os.Exit）
 	@cd $(BACKEND_DIR) && $(GO) test ./...
 	@echo "后端测试完成"
 
