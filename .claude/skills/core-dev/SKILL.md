@@ -72,7 +72,7 @@ description: airgate-core（standalone-gateway 分支）开发指南：架构、
 - `internal/notify` — 管理员外推通知窄抽象（`Message` / `Channel` / `Multi`），供 Bark 等通道复用；后续扩 Telegram/Webhook 时优先挂这里，不必再绑具体业务。
 - `internal/billing` — 三管道计费（actual=total×billing_rate 扣余额；billed=total×sell_rate 累加 key 用量；渠道成本=total×account_rate_multiplier 快照列查询期现算、不落列）与异步记账；billing_rate 优先级链 user.group_rates > tier.rates（用户等级批量分层）> group.rate_multiplier > 1.0（rate.go，鉴权时经 APIKeyInfo 预装载）。**无计量（usage_missing）与中断且无 token（stream_aborted_usage_missing）不落 usage_log**，避免 $0 行污染使用记录；有部分 token 的流中断仍落账。
 - `internal/scheduler` — 仅剩 ConcurrencyManager/RPMCounter（Redis 限流原语，渠道/用户/key 维度）。
-- `internal/pluginruntime` — 独立进程插件（go-plugin gRPC）。能力驱动：`relay_hook.v1` 在选路前整包替换 JSON 请求体（fail-open，不得改 model/stream），`account_test_transform.v1` 仅服务账号连接测试（fail-closed）。配置表单控件：`multi_select` / `single_select`（`data_source=groups` 或静态 `options`）/ `text` / `number` / `textarea` / `switch`。Codex 增强实现在仓外 `airgate-codex-overage`，插件 ID `airgate-codex-enhance`（超额 + instruction 注入）。
+- `internal/pluginruntime` — 独立进程插件（go-plugin gRPC）。能力驱动：`relay_hook.v1` 在选路前整包替换 JSON 请求体（fail-open，不得改 model/stream），`account_test_transform.v1` 仅服务账号连接测试（fail-closed）。配置表单控件：`multi_select` / `single_select`（`data_source=groups` 或静态 `options`）/ `text` / `number` / `textarea` / `switch`。Codex 增强实现在仓外 `airgate-codex-overage`，插件 ID `airgate-codex-enhance`（超额 + instruction 注入；可选账号级原生身份头与 rustls 近似 TLS，能力 `codex_fingerprint.v1`，管理动作 `fingerprints/get|reset`，不声明 `account_provider_management.v1`）。
 
 ## 新增后端领域套路
 

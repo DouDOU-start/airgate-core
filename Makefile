@@ -125,11 +125,7 @@ verify-ent: ## 验证 Ent 生成代码是否最新（与 make ent 使用同一 g
 	@echo "Ent 生成代码一致"
 
 verify-ent-changed: ## pre-commit 专用：本次提交未改动 ent/schema 时跳过重新生成校验
-	@if git diff --cached --quiet -- $(BACKEND_DIR)/ent/schema/; then \
-		echo "ent/schema 无改动，跳过 verify-ent（完整校验见 make verify-ent / make ci）"; \
-	else \
-		$(MAKE) verify-ent; \
-	fi
+	@if git diff --cached --quiet -- $(BACKEND_DIR)/ent/schema/; then echo "ent/schema unchanged, skip verify-ent"; else $(MAKE) verify-ent; fi
 
 setup-hooks: ## 安装 Git hooks（pre-commit + commit-msg）
 	@echo '#!/bin/sh' > .git/hooks/pre-commit

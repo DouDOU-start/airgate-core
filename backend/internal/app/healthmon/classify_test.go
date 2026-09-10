@@ -65,6 +65,7 @@ func TestComputeHealthScoreRates(t *testing.T) {
 	score := ComputeHealthScore(sample, 0.10, 1000, true)
 	if score == nil {
 		t.Fatal("score nil")
+		return
 	}
 	// errorScore=0, ttft=100 → 0.6*0+0.4*100=40
 	if *score != 40 {

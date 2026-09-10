@@ -91,6 +91,7 @@ func TestParseCodexRetryAfterPrefersResetsAt(t *testing.T) {
 	got := parseCodexRetryAfter(body, now)
 	if got == nil {
 		t.Fatal("expected retryAfter")
+		return
 	}
 	if *got != 5*time.Minute {
 		t.Fatalf("retryAfter = %v, want 5m", *got)

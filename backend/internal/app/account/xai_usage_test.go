@@ -70,6 +70,7 @@ func TestParseXAIBillingConfigWeekly(t *testing.T) {
 	})
 	if summary == nil {
 		t.Fatal("summary nil")
+		return
 	}
 	if !summary.HasWeeklyData {
 		t.Fatal("expected weekly data")
@@ -102,6 +103,7 @@ func TestParseXAIBillingConfigMonthlyCentsObject(t *testing.T) {
 	})
 	if summary == nil {
 		t.Fatal("summary nil")
+		return
 	}
 	if summary.MonthlyLimitCents == nil || *summary.MonthlyLimitCents != 15000 {
 		t.Fatalf("limit=%v", summary.MonthlyLimitCents)
@@ -141,6 +143,7 @@ func TestParseXAIBillingConfigOnDemandAfterExhaust(t *testing.T) {
 	})
 	if summary == nil {
 		t.Fatal("summary nil")
+		return
 	}
 	if summary.UsedPercent == nil || *summary.UsedPercent != 100 {
 		t.Fatalf("used%%=%v", summary.UsedPercent)
@@ -168,6 +171,7 @@ func TestMergeXAIBillingSummary(t *testing.T) {
 	merged := mergeXAIBillingSummary(weekly, monthly)
 	if merged == nil {
 		t.Fatal("merged nil")
+		return
 	}
 	if merged.UsagePercent == nil || *merged.UsagePercent != 60 {
 		t.Fatalf("weekly usage=%v", merged.UsagePercent)

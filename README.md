@@ -113,7 +113,7 @@ Gemini Imagen 的 `:predict` 是图像模型专用合同，不是 Codex 文本 R
 - 账号级 `proxy_url` 同时作用于原生插件、CPA 上游请求和凭证刷新；支持 `http://`、`https://`、`socks5://`、`socks5h://`（可带代理认证）。原生 WebSocket 会将 `http/https` 上游转换为 `ws/wss`，并通过 HTTP CONNECT 或 SOCKS5 建立连接。
 - OAuth 账号在凭证临近过期（默认 5 分钟）时主动刷新。优先使用带 `session_token` 的 ChatGPT session（默认 `https://chatgpt.com/api/auth/session`），失败且存在 refresh token 时再使用官方 JSON OAuth token endpoint（默认 `https://auth.openai.com/oauth/token`）；上游 401 只允许再刷新并重试一次。
 - 刷新成功的 access/refresh/session/id token、过期时间、账号 ID、邮箱、套餐与 FedRAMP claim 由 Core 回写账号。刷新失败时仍有效的 access token可进行最后一次上游尝试；凭证缺失或已过期则在发送请求前失败关闭。WebSocket 在握手前刷新，并允许一次 401 握手重试。
-- 客户端传入的 `Authorization`、API key、Cookie、代理认证等不会覆盖所选账号租约；原生插件只注入选中账号的认证头、`ChatGPT-Account-ID`、`Originator`/`User-Agent` 及必要的 FedRAMP 标记。审计事件会去除凭证和 hop-by-hop 头。
+- 客户端传入的 `Authorization`、API key、Cookie、代理认证等不会覆盖所选账号租约；原生插件只注入选中账号的认证头、`ChatGPT-Account-ID`、`Originator`/`User-Agent` 及必要的 FedRAMP 标记。审计事件会去除凭证和 hop-by-hop 头。增强插件可按账号启用独立 CLI 身份头与 rustls 近似 TLS（能力 `codex_fingerprint.v1`，默认关闭；管理动作 `fingerprints/get|reset`），不影响 CPA 翻译出口。
 - 当前原生转发支持 OAuth Bearer、ChatGPT session 与 API-key 租约；不支持官方 Codex 的 Agent Identity（Ed25519/SSH 私钥、runtime/task ID 或动态 `AgentAssertion` 签名）。不会把普通 Bearer 当作 Agent Identity，也不会伪造或降级这类签名请求。
 
 ### Fail-closed 与增强插件的边界

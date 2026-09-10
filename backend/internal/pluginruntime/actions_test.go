@@ -86,6 +86,34 @@ func TestNormalizeManagementActionRejectsTraversal(t *testing.T) {
 	}
 }
 
+func TestInvokeManagementAllowsCodexFingerprintCapability(t *testing.T) {
+	plugin := &fakePlugin{handler: func(_ context.Context, request protocol.Request) (protocol.Response, error) {
+		if request.Method != http.MethodPost || request.Path != "/management/fingerprints/get" {
+			t.Fatalf("指纹管理动作请求异常: %+v", request)
+		}
+		if string(request.Body) != `{"account_id":12}` {
+			t.Fatalf("指纹管理动作请求体异常: %s", request.Body)
+		}
+		return protocol.Response{StatusCode: http.StatusOK, Body: []byte(`{"account_id":12}`)}, nil
+	}}
+	plugin.info = protocol.PluginInfo{
+		ID: "airgate-codex-enhance", Name: "Codex增强", ProtocolVersion: protocol.ProtocolVersion,
+		Capabilities: []string{protocol.CapabilityCodexFingerprintV1},
+	}
+	inst := &instance{id: plugin.info.ID, name: plugin.info.Name, info: plugin.info, plugin: plugin, started: true}
+	manager := &Manager{
+		instances:  map[string]*instance{inst.id: inst},
+		lastErrors: make(map[string]string),
+	}
+	response, err := manager.InvokeManagement(context.Background(), inst.id, "fingerprints/get", []byte(`{"account_id":12}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusOK || string(response.Body) != `{"account_id":12}` {
+		t.Fatalf("指纹管理动作响应异常: %+v", response)
+	}
+}
+
 func testManagementInstance(id string, plugin *fakePlugin) *instance {
 	plugin.info = protocol.PluginInfo{
 		ID: id, Name: id, ProtocolVersion: protocol.ProtocolVersion,

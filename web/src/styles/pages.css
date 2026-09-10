@@ -1013,6 +1013,67 @@
   }
 }
 
+/* 账号管理：Codex 指纹弹窗 */
+
+.ag-elevation-modal.ag-account-fingerprint-modal,
+.ag-elevation-modal.modal__dialog--lg.ag-account-fingerprint-modal {
+  width: min(40rem, calc(100vw - 2rem)) !important;
+  max-width: min(40rem, calc(100vw - 2rem)) !important;
+}
+
+.ag-account-fingerprint-modal__body {
+  display: flex;
+  max-height: min(72dvh, 40rem);
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ag-account-fingerprint-state {
+  display: flex;
+  min-height: 8rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.ag-account-fingerprint-state[data-status="error"] {
+  color: var(--danger);
+}
+
+.ag-account-fingerprint-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin: 0;
+}
+
+.ag-account-fingerprint-field dt {
+  margin-bottom: 0.25rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.ag-account-fingerprint-field dd {
+  margin: 0;
+}
+
+.ag-account-fingerprint-field code {
+  display: block;
+  overflow-x: auto;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: color-mix(in oklab, var(--surface) 88%, var(--border));
+  font-size: 0.75rem;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
 /* 账号管理：使用统计弹窗 */
 
 .ag-elevation-modal.ag-account-stats-modal,

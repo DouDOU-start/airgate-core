@@ -1027,7 +1027,8 @@ func supportsAnyCapability(capabilities []string) bool {
 			capability == protocol.CapabilityProviderAttemptTransformV1 ||
 			capability == protocol.CapabilityAccountTestTransformV1 ||
 			capability == protocol.CapabilityAccountAutofillV1 ||
-			capability == protocol.CapabilityAccountProviderManagementV1 {
+			capability == protocol.CapabilityAccountProviderManagementV1 ||
+			capability == protocol.CapabilityCodexFingerprintV1 {
 			return true
 		}
 	}

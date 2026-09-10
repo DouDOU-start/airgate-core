@@ -26,6 +26,8 @@ const (
 	// CapabilityAccountProviderManagementV1 表示插件提供账号供应商管理动作，
 	// 包括余额、库存报价和手动取货订单。
 	CapabilityAccountProviderManagementV1 = "account_provider_management.v1"
+	// CapabilityCodexFingerprintV1 表示 Codex 增强插件按账号维护原生出站身份头与 TLS 指纹。
+	CapabilityCodexFingerprintV1 = "codex_fingerprint.v1"
 	// ConfigKeyLogLevel 是 Core 传给插件的日志级别配置键。
 	ConfigKeyLogLevel = "log_level"
 	// ConfigKeyCoreBaseURL 是 Core 仅向受支持宿主能力注入的本机访问地址。

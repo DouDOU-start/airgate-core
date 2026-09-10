@@ -11,6 +11,7 @@ func TestParseCodexImageResponseUsage(t *testing.T) {
 	usage := parseCodexImageResponseUsage(body)
 	if usage == nil {
 		t.Fatal("expected image usage")
+		return
 	}
 	if usage.PromptTokens != 12 || usage.CompletionTokens != 34 || usage.CachedTokens != 5 || usage.Calls != 2 || usage.ImageSize != "1024x1536" || usage.ImageQuality != "high" {
 		t.Fatalf("usage = %+v", *usage)
@@ -25,6 +26,7 @@ func TestCodexImageUsageObserverHandlesSplitSSEFrames(t *testing.T) {
 	usage := observer.Usage()
 	if usage == nil {
 		t.Fatal("expected observed usage")
+		return
 	}
 	if usage.PromptTokens != 7 || usage.CompletionTokens != 9 || usage.Calls != 1 || usage.ImageSize != "1024x1024" || usage.ImageQuality != "medium" {
 		t.Fatalf("usage = %+v", *usage)

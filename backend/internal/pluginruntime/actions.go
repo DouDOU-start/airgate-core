@@ -38,7 +38,7 @@ func (m *Manager) InvokeManagement(ctx context.Context, id, action string, body 
 		}
 		return protocol.Response{}, ErrPluginDisabled
 	}
-	if !hasCapability(inst.info, protocol.CapabilityAccountProviderManagementV1) {
+	if !supportsManagementActions(inst.info) {
 		return protocol.Response{}, ErrPluginCapabilityUnsupported
 	}
 	if !inst.acquireCall(time.Now()) {
@@ -80,4 +80,9 @@ func normalizeManagementAction(action string) (string, error) {
 		return "", fmt.Errorf("插件管理动作路径无效")
 	}
 	return "/management" + normalized, nil
+}
+
+func supportsManagementActions(info protocol.PluginInfo) bool {
+	return hasCapability(info, protocol.CapabilityAccountProviderManagementV1) ||
+		hasCapability(info, protocol.CapabilityCodexFingerprintV1)
 }

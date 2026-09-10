@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowUpDown, BarChart3, Boxes, CircleCheck, CircleOff, Download, Pencil, Play, Plus, Power, Trash2, Upload,
+  ArrowUpDown, BarChart3, Boxes, CircleCheck, CircleOff, Download, Fingerprint, Pencil, Play, Plus, Power, Trash2, Upload,
 } from 'lucide-react';
 import {
   Button, Checkbox, Chip, EmptyState, Input, Label, ListBox, Modal, Select, Spinner,
@@ -10,6 +10,7 @@ import {
 } from '@heroui/react';
 import { accountsApi } from '../../shared/api/accounts';
 import { groupsApi } from '../../shared/api/groups';
+import { pluginsApi } from '../../shared/api/plugins';
 import { usePagination } from '../../shared/hooks/usePagination';
 import { useCrudMutation } from '../../shared/hooks/useCrudMutation';
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue';
@@ -31,6 +32,12 @@ import {
 import { AccountTestModal } from './accounts/AccountTestModal';
 import { AccountStatsModal } from './accounts/AccountStatsModal';
 import { AccountModelsModal } from './accounts/AccountModelsModal';
+import {
+  AccountFingerprintModal,
+  accountSupportsFingerprint,
+  fingerprintFeatureEnabled,
+  fingerprintPluginId,
+} from './accounts/AccountFingerprintModal';
 import { useBackgroundAccountUsageRefresh } from './accounts/useBackgroundAccountUsageRefresh';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { MetricChips } from '../../shared/components/MetricChips';
@@ -137,6 +144,7 @@ export default function AccountsPage() {
   const [testingItem, setTestingItem] = useState<AccountResp | null>(null);
   const [statsItem, setStatsItem] = useState<AccountResp | null>(null);
   const [modelsTargets, setModelsTargets] = useState<AccountResp[]>([]);
+  const [fingerprintItem, setFingerprintItem] = useState<AccountResp | null>(null);
   const [exportConfirmOpen, setExportConfirmOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -171,6 +179,19 @@ export default function AccountsPage() {
     queryFn: () => groupsApi.list(FETCH_ALL_PARAMS),
     staleTime: 60_000,
   });
+  const { data: plugins = [] } = useQuery({
+    queryKey: queryKeys.plugins(),
+    queryFn: pluginsApi.list,
+    staleTime: 30_000,
+  });
+  const fingerprintPlugin = fingerprintPluginId(plugins);
+  const { data: fingerprintConfig } = useQuery({
+    queryKey: queryKeys.pluginConfig(fingerprintPlugin),
+    queryFn: () => pluginsApi.getConfig(fingerprintPlugin),
+    enabled: Boolean(fingerprintPlugin),
+    staleTime: 15_000,
+  });
+  const fingerprintReady = Boolean(fingerprintPlugin) && fingerprintFeatureEnabled(fingerprintConfig?.values);
   const groupNameById = useMemo(() => {
     const map = new Map<number, string>();
     for (const g of groupsData?.list ?? []) {
@@ -704,7 +725,7 @@ export default function AccountsPage() {
           </CommonTable.Column>
           <CommonTable.Column id="proxy" style={{ width: 96 }}>{t('accounts.proxy')}</CommonTable.Column>
           <CommonTable.Column id="groups" style={{ width: 134 }}>{t('accounts.groups')}</CommonTable.Column>
-          <CommonTable.Column id="actions" style={{ width: 160 }}>{t('common.actions')}</CommonTable.Column>
+          <CommonTable.Column id="actions" style={{ width: 188 }}>{t('common.actions')}</CommonTable.Column>
         </CommonTable.Header>
         <CommonTable.Body>
           {isLoading ? (
@@ -876,6 +897,17 @@ export default function AccountsPage() {
                     >
                       <BarChart3 className="w-3.5 h-3.5 text-indigo-500" />
                     </Button>
+                    {accountSupportsFingerprint(row.platform) && fingerprintReady ? (
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="secondary"
+                        aria-label={t('accounts.fingerprint')}
+                        onPress={() => setFingerprintItem(row)}
+                      >
+                        <Fingerprint className="w-3.5 h-3.5 text-amber-500" />
+                      </Button>
+                    ) : null}
                     <span title={t('accounts.model_routing')}>
                       <Button
                         isIconOnly
@@ -953,6 +985,11 @@ export default function AccountsPage() {
 
       <AccountTestModal account={testingItem} onClose={() => setTestingItem(null)} />
       <AccountStatsModal account={statsItem} onClose={() => setStatsItem(null)} />
+      <AccountFingerprintModal
+        account={fingerprintItem}
+        pluginId={fingerprintPlugin || undefined}
+        onClose={() => setFingerprintItem(null)}
+      />
       <AccountModelsModal
         accounts={modelsTargets}
         onClose={() => setModelsTargets([])}
